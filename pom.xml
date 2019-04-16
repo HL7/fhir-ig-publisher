@@ -5,10 +5,10 @@
 	<parent>
 		<groupId>ca.uhn.hapi.fhir</groupId>
 		<artifactId>org.hl7.fhir.core</artifactId>
-		<version>3.7.26-SNAPSHOT</version>
+		<version>3.7.27-SNAPSHOT</version>
 	</parent>
 
-	<packaging>jar</packaging>
+	<packaging>pom</packaging>
 	<groupId>org.hl7.fhir</groupId>
 	<artifactId>org.hl7.fhir.igtools</artifactId>
 	<name>HL7 FHIR IG Tools</name>
@@ -37,6 +37,12 @@
 		</dependency>
 
 		<dependency>
+			<groupId>org.fhir</groupId>
+			<artifactId>ucum</artifactId>
+			<version>1.0.2</version>
+		</dependency>
+
+		<dependency>
 			<groupId>ch.qos.logback</groupId>
 			<artifactId>logback-classic</artifactId>
 		</dependency>
@@ -53,6 +59,16 @@
 		<dependency>
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-compress</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.httpcomponents</groupId>
+			<artifactId>httpclient</artifactId>
+			<exclusions>
+				<exclusion>
+					<artifactId>commons-logging</artifactId>
+					<groupId>commons-logging</groupId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 
 	</dependencies>
@@ -77,93 +93,23 @@
 			<plugin>
 				<groupId>org.basepom.maven</groupId>
 				<artifactId>duplicate-finder-maven-plugin</artifactId>
-				<executions>
-					<execution>
-						<id>default</id>
-						<phase>verify</phase>
-						<goals>
-							<goal>check</goal>
-						</goals>
-						<inherited>true</inherited>
-					</execution>
-				</executions>
 				<configuration>
-					<printEqualFiles>false</printEqualFiles>
-					<failBuildInCaseOfDifferentContentConflict>true</failBuildInCaseOfDifferentContentConflict>
-					<failBuildInCaseOfEqualContentConflict>true</failBuildInCaseOfEqualContentConflict>
-					<failBuildInCaseOfConflict>true</failBuildInCaseOfConflict>
-					<checkCompileClasspath>true</checkCompileClasspath>
-					<checkRuntimeClasspath>false</checkRuntimeClasspath>
-					<checkTestClasspath>false</checkTestClasspath>
-					<skip>false</skip>
-					<quiet>false</quiet>
-					<preferLocal>true</preferLocal>
-					<useResultFile>true</useResultFile>
-					<resultFileMinClasspathCount>2</resultFileMinClasspathCount>
-					<resultFile>${project.build.directory}/duplicate-finder-result.xml</resultFile>
-					<ignoredDependencies>
-						<dependency>
-							<groupId>javax.el</groupId>
-							<artifactId>javax.el-api</artifactId>
-						</dependency>
-						<dependency>
-							<groupId>javax.mail</groupId>
-							<artifactId>javax.mail-api</artifactId>
-						</dependency>
-						<dependency>
-							<groupId>javax.activation</groupId>
-							<artifactId>javax.activation-api</artifactId>
-						</dependency>
-						<dependency>
-							<groupId>com.helger</groupId>
-							<artifactId>ph-schematron</artifactId>
-						</dependency>
-						<dependency>
-							<groupId>commons-logging</groupId>
-							<artifactId>commons-logging</artifactId>
-						</dependency>
-						<dependency>
-							<groupId>org.jscience</groupId>
-							<artifactId>jscience</artifactId>
-						</dependency>
-						<dependency>
-							<groupId>org.springframework</groupId>
-							<artifactId>spring-jcl</artifactId>
-						</dependency>
-						<dependency>
-							<groupId>org.springframework</groupId>
-							<artifactId>spring-jcl</artifactId>
-						</dependency>
-						<dependency>
-							<groupId>com.google.code.findbugs</groupId>
-							<artifactId>annotations</artifactId>
-						</dependency>
-						<dependency>
-							<groupId>org.apache.derby</groupId>
-							<artifactId>derbyclient</artifactId>
-						</dependency>
-						<dependency>
-							<groupId>org.apache.derby</groupId>
-							<artifactId>derbynet</artifactId>
-						</dependency>
-						<dependency>
-							<groupId>org.apache.derby</groupId>
-							<artifactId>derbyclient</artifactId>
-						</dependency>
-						<dependency>
-							<groupId>org.apache.poi</groupId>
-							<artifactId>ooxml-schemas</artifactId>
-						</dependency>
-					</ignoredDependencies>
-					<ignoredResourcePatterns>
-						<ignoredResourcePattern>changelog.txt</ignoredResourcePattern>
-						<ignoredResource>javac.bat</ignoredResource>
-						<ignoredResource>about.html</ignoredResource>
-						<ignoredResource>changelog.xml</ignoredResource>
-					</ignoredResourcePatterns>
+					<skip>true</skip>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>animal-sniffer-maven-plugin</artifactId>
+				<configuration>
+					<skip>true</skip>
 				</configuration>
 			</plugin>
 		</plugins>
 	</build>
+
+	<modules>
+		<module>org.hl7.fhir.igtools.core</module>
+		<module>org.hl7.fhir.igtools.cli</module>
+	</modules>
 
 </project>
