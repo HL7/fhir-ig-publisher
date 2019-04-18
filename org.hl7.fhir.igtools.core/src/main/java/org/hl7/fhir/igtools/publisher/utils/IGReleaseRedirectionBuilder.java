@@ -36,6 +36,24 @@ public class IGReleaseRedirectionBuilder {
       "You should not be seeing this page. If you do, ASP has failed badly.\r\n"+
       "</body>\r\n"+
       "</html>\r\n";
+  private static final String PHP_TEMPLATE = "<?php\r\n"+
+      "function Redirect($url)\r\n"+
+      "{\r\n"+
+      "  header('Location: ' . $url, true, 302);\r\n"+
+      "  exit();\r\n"+
+      "}\r\n"+
+      "\r\n"+
+      "$accept = $_SERVER['HTTP_ACCEPT'];\r\n"+
+      "if (strpos($accept, 'json') !== false)\r\n"+
+      "  Redirect('{{literal}}.json');\r\n"+
+      "elseif (strpos($accept, 'html') !== false)\r\n"+
+      "  Redirect('{{html}}');\r\n"+
+      "else \r\n"+
+      "  Redirect('{{literal}}.xml');\r\n"+
+      "?>\r\n"+
+      "    \r\n"+
+      "You should not be seeing this page. If you do, PHP has failed badly.\r\n";
+
   private String folder;
   private String canonical;
   private String vpath;
@@ -51,7 +69,17 @@ public class IGReleaseRedirectionBuilder {
    countUpdated = 0;
   }
 
-  public void buildApacheRedirections() {    
+  public void buildApacheRedirections() throws IOException {    
+    Map<String, String> map = createMap();
+    if (map != null) {
+      for (String s : map.keySet()) {
+        String path = Utilities.path(folder, s, "index.php");
+        String p = s.replace("/", "-");
+        String litPath = Utilities.path(folder, p);
+        if (new File(litPath+".xml").exists() && new File(litPath+".json").exists()) 
+          createPhpRedirect(path, map.get(s), Utilities.pathURL(vpath, p));
+      }
+    }
   }
   
   public void buildAspRedirections() throws IOException {
@@ -79,6 +107,18 @@ public class IGReleaseRedirectionBuilder {
     }
   }
 
+  private void createPhpRedirect(String path, String urlHtml, String urlSrc) throws IOException {
+    String t = PHP_TEMPLATE;
+    t = t.replace("{{html}}", urlHtml);
+    t = t.replace("{{literal}}", urlSrc);
+    Utilities.createDirectory(Utilities.getDirectoryForFile(path));
+    countTotal++;
+    if (!new File(path).exists() || !TextFile.fileToString(path).equals(t)) {
+      TextFile.stringToFile(t, path, false);
+      countUpdated++;
+    }
+  }
+
   private Map<String, String> createMap() throws IOException {
     File f = new File(Utilities.path(folder, "package.tgz"));
     if (!f.exists())
@@ -95,10 +135,10 @@ public class IGReleaseRedirectionBuilder {
       String key = p.getKey();
       if (key.contains("|"))
         key = key.substring(0,  key.indexOf("|"));
-      if (key.length() < canonical.length()+1)
-        throw new Error("canonical too short: "+key);
+      if (key.length() >= canonical.length()+1 && key.startsWith(canonical)) {
       String value = p.getValue().getAsString();
       res.put(key.substring(canonical.length()+1), Utilities.pathURL(vpath, value));
+      }
     }
     return res;
   }

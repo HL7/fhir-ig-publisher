@@ -48,7 +48,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   private boolean autoPath = false;
   private boolean noXhtml;
   
-  public IGKnowledgeProvider(IWorkerContext context, String pathToSpec, JsonObject igs, List<ValidationMessage> errors, boolean noXhtml) throws Exception {
+  public IGKnowledgeProvider(IWorkerContext context, String pathToSpec, String canonical, JsonObject igs, List<ValidationMessage> errors, boolean noXhtml) throws Exception {
     super();
     this.context = context;
     this.pathToSpec = pathToSpec;
@@ -56,15 +56,11 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       this.pathToSpec = this.pathToSpec.substring(0, this.pathToSpec.length()-1);
     this.errors = errors;
     this.noXhtml = noXhtml;
+    this.canonical = canonical;
     loadPaths(igs);
   }
-
   private void loadPaths(JsonObject igs) throws Exception {
-    JsonElement e = igs.get("canonicalBase");
-    if (e == null)
-      throw new Exception("You must define a canonicalBase in the json file");
-    canonical = e.getAsString();
-    e = igs.get("path-pattern");
+    JsonElement e = igs.get("path-pattern");
     if (e != null)
       pathPattern = e.getAsString(); 
     defaultConfig = igs.getAsJsonObject("defaults");

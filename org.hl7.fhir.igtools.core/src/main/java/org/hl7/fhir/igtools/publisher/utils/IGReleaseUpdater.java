@@ -115,7 +115,7 @@ public class IGReleaseUpdater {
     IGPackageChecker pc = new IGPackageChecker(vf, canonical, version.get("path").getAsString(), ig.get("package-id").getAsString());
     pc.check(version.get("version").getAsString(), version.get("fhirversion").getAsString(), ig.get("title").getAsString(), version.get("date").getAsString());
     IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(vf, canonical, version.get("path").getAsString());
-    if (canonical.contains("fhir.org"))
+    if (!canonical.contains("hl7.org/fhir"))
       rb.buildApacheRedirections();
     else
       rb.buildAspRedirections();
@@ -213,6 +213,8 @@ public class IGReleaseUpdater {
       return decorate(sequence);
     else if ("release".equals(status))
       return "Release";
+    else if ("qa-preview".equals(status))
+      return "QA Preview";
     else if ("ballot".equals(status))
       return decorate(sequence)+" Ballot "+ballotCount(ig, sequence, version);
     else if ("draft".equals(status))
