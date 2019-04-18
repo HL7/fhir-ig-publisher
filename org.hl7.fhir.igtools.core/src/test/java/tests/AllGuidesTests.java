@@ -1,4 +1,4 @@
-package org.hl7.fhir.igtools.tests;
+package tests;
 
 import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.publisher.Publisher.CacheOption;
@@ -20,23 +20,33 @@ public class AllGuidesTests {
     System.out.println("");
   }
 
+  private String testingPath() {
+    return System.getProperty("user.dir");
+  }
+
   @Test
-  public void testIg40() throws Exception {
-    test(Utilities.path(TestingUtilities.home(), "tests", "ig", "ig.json"));
+  public void testOldIg() throws Exception {
+    test(Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "old", "ig", "ig.json"));
   } 
 
   @Test
-  public void testIg30() throws Exception {
-    test(Utilities.path(TestingUtilities.home(), "tests", "ig30", "ig.json"));
+  public void testOldIg30() throws Exception {
+    test(Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "old", "ig30", "ig.json"));
   }
   
   @Test
-  public void testIg14() throws Exception {
-    test(Utilities.path(TestingUtilities.home(), "tests", "ig14", "ig.json"));
+  public void testOldIg14() throws Exception {
+    test(Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "old", "ig14", "ig.json"));
   }
   
   @Test
-  public void testIg10() throws Exception {
-    test(Utilities.path(TestingUtilities.home(), "tests", "ig10", "ig.json"));
+  public void testOldIg10() throws Exception {
+    test(Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "old", "ig10", "ig.json"));
   } 
+
+  @Test
+  public void testNewIg() throws Exception {
+    test(Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "new", "ig"));
+  } 
+
 }

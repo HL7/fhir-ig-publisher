@@ -1,0 +1,11 @@
+-------------------------------------------------------------------------------------
+{"code" : {
+  "system" : "http://hl7.org/fhir/spdx-license",
+  "code" : "CC0-1.0"
+}, "valueSet" :null}####
+v: {
+  "display" : "",
+  "severity" : "error",
+  "error" : "The code system \"http://hl7.org/fhir/spdx-license\" is not known; The code provided (http://hl7.org/fhir/spdx-license#CC0-1.0) is not  valid in the value set All codes known to the system"
+}
+-------------------------------------------------------------------------------------
