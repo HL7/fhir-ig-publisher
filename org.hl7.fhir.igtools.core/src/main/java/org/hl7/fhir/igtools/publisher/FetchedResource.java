@@ -103,6 +103,9 @@ public class FetchedResource {
   public void setValidateByUserData(boolean validateByUserData) {
     ValidateByUserData = validateByUserData;
   }
+  public Object fhirType() {
+    return resource != null ? resource.fhirType() : element != null ? element.fhirType() : "??";
+  }
   
   
 }

@@ -8,6 +8,7 @@ import java.util.Set;
 
 import org.hl7.fhir.convertors.VersionConvertorConstants;
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.r5.conformance.ProfileUtilities;
 import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider;
 import org.hl7.fhir.r5.context.IWorkerContext;
@@ -47,8 +48,9 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   private String pathPattern;
   private boolean autoPath = false;
   private boolean noXhtml;
+  private Template template;
   
-  public IGKnowledgeProvider(IWorkerContext context, String pathToSpec, String canonical, JsonObject igs, List<ValidationMessage> errors, boolean noXhtml) throws Exception {
+  public IGKnowledgeProvider(IWorkerContext context, String pathToSpec, String canonical, JsonObject igs, List<ValidationMessage> errors, boolean noXhtml, Template template) throws Exception {
     super();
     this.context = context;
     this.pathToSpec = pathToSpec;
@@ -57,6 +59,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     this.errors = errors;
     this.noXhtml = noXhtml;
     this.canonical = canonical;
+    this.template = template;
     loadPaths(igs);
   }
   private void loadPaths(JsonObject igs) throws Exception {
@@ -65,39 +68,39 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       pathPattern = e.getAsString(); 
     defaultConfig = igs.getAsJsonObject("defaults");
     resourceConfig = igs.getAsJsonObject("resources");
-    if (resourceConfig == null)
-      throw new Exception("No \"resources\" entry found in json file (see http://wiki.hl7.org/index.php?title=IG_Publisher_Documentation#Control_file)");
-    else
+    if (resourceConfig != null) {
       for (Entry<String, JsonElement> pp : resourceConfig.entrySet()) {
-      if (pp.getKey().equals("*")) {
-        autoPath = true;
-      } else if (!pp.getKey().startsWith("_")) {
-        String s = pp.getKey();
-        if (!s.contains("/"))
-          throw new Exception("Bad Resource Identity - should have the format [Type]/[id]:" + s);
-        String type = s.substring(0,  s.indexOf("/"));
-        String id = s.substring(s.indexOf("/")+1); 
-        if (!context.hasResource(StructureDefinition.class, "http://hl7.org/fhir/StructureDefinition/"+type) && !(context.hasResource(StructureDefinition.class , "http://hl7.org/fhir/StructureDefinition/Conformance") && type.equals("CapabilityStatement")))
-          throw new Exception("Bad Resource Identity - should have the format [Type]/[id] where Type is a valid resource type:" + s);
-        if (!id.matches(FormatUtilities.ID_REGEX))
-          throw new Exception("Bad Resource Identity - should have the format [Type]/[id] where id is a valid FHIR id type:" + s);
+        if (pp.getKey().equals("*")) {
+          autoPath = true;
+        } else if (!pp.getKey().startsWith("_")) {
+          String s = pp.getKey();
+          if (!s.contains("/"))
+            throw new Exception("Bad Resource Identity - should have the format [Type]/[id]:" + s);
+          String type = s.substring(0,  s.indexOf("/"));
+          String id = s.substring(s.indexOf("/")+1); 
+          if (!context.hasResource(StructureDefinition.class, "http://hl7.org/fhir/StructureDefinition/"+type) && !(context.hasResource(StructureDefinition.class , "http://hl7.org/fhir/StructureDefinition/Conformance") && type.equals("CapabilityStatement")))
+            throw new Exception("Bad Resource Identity - should have the format [Type]/[id] where Type is a valid resource type:" + s);
+          if (!id.matches(FormatUtilities.ID_REGEX))
+            throw new Exception("Bad Resource Identity - should have the format [Type]/[id] where id is a valid FHIR id type:" + s);
 
-        if (!(pp.getValue() instanceof JsonObject))
-          throw new Exception("Unexpected type in resource list - must be an object");
-        JsonObject o = (JsonObject) pp.getValue();
-        JsonElement p = o.get("base");
-        //        if (p == null)
-        //          throw new Exception("You must provide a base on each path in the json file");
-        if (p != null && !(p instanceof JsonPrimitive) && !((JsonPrimitive) p).isString())
-          throw new Exception("Unexpected type in paths - base must be a string");
-        p = o.get("defns");
-        if (p != null && !(p instanceof JsonPrimitive) && !((JsonPrimitive) p).isString())
-          throw new Exception("Unexpected type in paths - defns must be a string");
-        p = o.get("source");
-        if (p != null && !(p instanceof JsonPrimitive) && !((JsonPrimitive) p).isString())
-          throw new Exception("Unexpected type in paths - source must be a string");
+          if (!(pp.getValue() instanceof JsonObject))
+            throw new Exception("Unexpected type in resource list - must be an object");
+          JsonObject o = (JsonObject) pp.getValue();
+          JsonElement p = o.get("base");
+          //        if (p == null)
+          //          throw new Exception("You must provide a base on each path in the json file");
+          if (p != null && !(p instanceof JsonPrimitive) && !((JsonPrimitive) p).isString())
+            throw new Exception("Unexpected type in paths - base must be a string");
+          p = o.get("defns");
+          if (p != null && !(p instanceof JsonPrimitive) && !((JsonPrimitive) p).isString())
+            throw new Exception("Unexpected type in paths - defns must be a string");
+          p = o.get("source");
+          if (p != null && !(p instanceof JsonPrimitive) && !((JsonPrimitive) p).isString())
+            throw new Exception("Unexpected type in paths - source must be a string");
+        }
       }
-    }
+    } else if (template == null)
+      throw new Exception("No \"resources\" entry found in json file (see http://wiki.hl7.org/index.php?title=IG_Publisher_Documentation#Control_file)");
   }
   
   private boolean hasBoolean(JsonObject obj, String code) {
@@ -223,6 +226,8 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   }
 
   public String getSourceFor(String ref) {
+    if (resourceConfig == null)
+      return null;
     JsonObject o = resourceConfig.getAsJsonObject(ref);
     if (o == null)
       return null;
@@ -233,9 +238,14 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   }
 
   public void findConfiguration(FetchedFile f, FetchedResource r) {
-    JsonObject e = resourceConfig.getAsJsonObject(r.getElement().fhirType()+"/"+r.getId());
-    if (e != null)
-      r.setConfig(e);
+    if (template != null) {
+      r.setConfig(template.getConfig(r.getElement().fhirType(), r.getId()));
+    }
+    if (r.getConfig() == null && resourceConfig != null) {
+      JsonObject e = resourceConfig.getAsJsonObject(r.getElement().fhirType()+"/"+r.getId());
+      if (e != null)
+        r.setConfig(e);
+    }
   }
   
   public void checkForPath(FetchedFile f, FetchedResource r, MetadataResource bc, boolean inner) throws FHIRException {

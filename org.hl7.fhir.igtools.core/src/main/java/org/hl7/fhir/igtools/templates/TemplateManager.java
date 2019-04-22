@@ -30,24 +30,23 @@ public class TemplateManager {
     this.logger = logger;
   }
 
-  public Template makeNullTemplate() throws FHIRException, IOException {
-    logger.logMessage("Default Template (null)");
-    return loadFromTemplate("hl7.fhir.template.default");
-    }
-
-  public Template loadTemplate(String template) throws FHIRException, IOException {
+  public Template loadTemplate(String template, String rootFolder) throws FHIRException, IOException {
     logger.logMessage("Load Template from "+template);
-    return loadFromTemplate(template);
-  }
-
-  private Template loadFromTemplate(String template) throws FHIRException, IOException {
-    NpmPackage npm = loadPackage(template);
+    NpmPackage npm = loadPackage(template, rootFolder);
     if (!npm.isType(PackageType.TEMPLATE))
       throw new FHIRException("The referenced package '"+template+"' does not have the correct type - is "+npm.type()+" but should be a template");
-    return new Template(npm);
+    return new Template(npm, template.equals("#template"), rootFolder);
   }
 
-  private NpmPackage loadPackage(String template) throws FHIRException, IOException {
+  private NpmPackage loadPackage(String template, String rootFolder) throws FHIRException, IOException {
+    if (template.startsWith("#")) {
+      File f = new File(Utilities.path(rootFolder, template.substring(1)));
+      if (f.exists() && f.isDirectory()) {
+        NpmPackage npm = NpmPackage.fromFolder(f.getAbsolutePath(), PackageType.TEMPLATE);
+        return npm;
+      }
+    }
+      
     if (template.matches(PackageCacheManager.PACKAGE_REGEX))
       return pcm.loadPackage(template);
     if (template.matches(PackageCacheManager.PACKAGE_VERSION_REGEX)) {
