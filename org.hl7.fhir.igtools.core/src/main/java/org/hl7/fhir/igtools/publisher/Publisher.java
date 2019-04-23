@@ -537,6 +537,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private Template template;
 
   private boolean igMode;
+
+  private boolean isBuildingTemplate;
+  private JsonObject templateInfo;
   
   private class PreProcessInfo {
     private String xsltName;
@@ -564,38 +567,42 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   public void execute() throws Exception {
     globalStart = System.nanoTime();
     initialize();
-    log("Load Content");
-    try {
-      createIg();
-    } catch (Exception e) {
-      recordOutcome(e, null);
-      throw e;
-    }
-
-    if (watch) {
-      first = false;
-      log("Watching for changes on a 5sec cycle");
-      while (watch) { // terminated externally
-        Thread.sleep(5000);
-        if (load()) {
-          log("Processing changes to "+Integer.toString(changeList.size())+(changeList.size() == 1 ? " file" : " files")+" @ "+genTime());
-          long startTime = System.nanoTime();
-          loadConformance();
-          generateNarratives();
-          checkDependencies();
-          validate();
-          generate();
-          clean();
-          long endTime = System.nanoTime();
-          processTxLog(Utilities.path(destDir != null ? destDir : outputDir, "qa-tx.html"));
-          ValidationPresenter val = new ValidationPresenter(version, businessVersion, igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
-              new BallotChecker(repoRoot).check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version));
-          log("Finished. "+presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
-          recordOutcome(null, val);
-        }
+    if (isBuildingTemplate) {
+      packageTemplate();
+    } else {
+      log("Load Content");
+      try {
+        createIg();
+      } catch (Exception e) {
+        recordOutcome(e, null);
+        throw e;
       }
-    } else
-      log("Done");
+
+      if (watch) {
+        first = false;
+        log("Watching for changes on a 5sec cycle");
+        while (watch) { // terminated externally
+          Thread.sleep(5000);
+          if (load()) {
+            log("Processing changes to "+Integer.toString(changeList.size())+(changeList.size() == 1 ? " file" : " files")+" @ "+genTime());
+            long startTime = System.nanoTime();
+            loadConformance();
+            generateNarratives();
+            checkDependencies();
+            validate();
+            generate();
+            clean();
+            long endTime = System.nanoTime();
+            processTxLog(Utilities.path(destDir != null ? destDir : outputDir, "qa-tx.html"));
+            ValidationPresenter val = new ValidationPresenter(version, businessVersion, igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
+                new BallotChecker(repoRoot).check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version));
+            log("Finished. "+presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
+            recordOutcome(null, val);
+          }
+        }
+      } else
+        log("Done");
+    }
     if (templateLoaded && new File(rootDir).exists())
       Utilities.clearDirectory(Utilities.path(rootDir, "template"));
     if (folderToDelete != null) {
@@ -608,6 +615,54 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
+
+  private void packageTemplate() throws IOException {
+    Utilities.createDirectory(outputDir);
+    long startTime = System.nanoTime();
+    JsonObject j = new JsonObject();
+    j.addProperty("url", templateInfo.get("canonical").getAsString());
+    j.addProperty("package-id", templateInfo.get("name").getAsString());
+    j.addProperty("ig-ver", templateInfo.get("version").getAsString());
+    j.addProperty("date", new SimpleDateFormat("EEE, dd MMM, yyyy HH:mm:ss Z", new Locale("en", "US")).format(execTime.getTime()));
+    j.addProperty("version", Constants.VERSION);
+    j.addProperty("tool", Constants.VERSION+" ("+ToolsVersion.TOOLS_VERSION+")");
+    try {
+      File od = new File(outputDir);
+      FileUtils.cleanDirectory(od);
+      npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), templateInfo);
+      npm.loadFiles(rootDir, new File(rootDir), ".git", "output", "package");
+      npm.finish();
+
+      TextFile.stringToFile(makeTemplateIndexPage(), Utilities.path(outputDir, "index.html"));
+      TextFile.stringToFile(makeTemplateQAPage(), Utilities.path(outputDir, "qa.html"));
+
+      if (mode != IGBuildMode.AUTOBUILD) {
+        pcm.addPackageToCache(templateInfo.get("name").getAsString(), templateInfo.get("version").getAsString(), new FileInputStream(npm.filename()));
+        pcm.addPackageToCache(templateInfo.get("name").getAsString(), "dev", new FileInputStream(npm.filename()));
+      }
+    } catch (Exception e) {
+       e.printStackTrace();
+       j.addProperty("exception", e.getMessage());
+    }
+    long endTime = System.nanoTime();
+    Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    String json = gson.toJson(j);
+    TextFile.stringToFile(json, Utilities.path(outputDir, "qa.json"));
+    
+    // registeringg the package locally
+    log("Finished. "+presentDuration(endTime - startTime)+". Output in "+outputDir);
+  }
+
+
+  private String makeTemplateIndexPage() {
+    String page = "<!DOCTYPE HTML><html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\"><head><title>Template Page</title></head><body><p><b>Template {{npm}}</b></p><p>You  can <a href=\"package.tgz\">download the template</a>, though you should not need to; just refer to the template as {{npm}} in your IG configuration.</p></body></html>";
+    return page.replace("{{npm}}", templateInfo.get("name").getAsString());
+  }
+
+  private String makeTemplateQAPage() {
+    String page = "<!DOCTYPE HTML><html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\"><head><title>Template QA Page</title></head><body><p><b>Template {{npm}}</b></p><p>You  can <a href=\"package.tgz\">download the template</a>, though you should not need to; just refer to the template as {{npm}} in your IG configuration.</p></body></html>";
+    return page.replace("{{npm}}", templateInfo.get("name").getAsString());
+  }
 
   private void processTxLog(String path) throws FileNotFoundException, IOException {
     if (txLog != null) {
@@ -995,10 +1050,31 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     IniFile ini = checkNewIg();
     if (ini != null)
       initializeFromIg(ini);   
+    else if (isTemplate())
+      initializeTemplate();
     else
       initializeFromJson();   
   }
 
+  private void initializeTemplate() throws IOException {
+    rootDir = configFile;
+    outputDir = Utilities.path(rootDir, "output");
+  }
+
+
+  private boolean isTemplate() throws IOException {
+    File pack = new File(Utilities.path(configFile, "package", "package.json"));
+    if (pack.exists()) {
+      JsonObject json = JsonTrackingParser.parseJson(pack);
+      if (json.has("type") && "fhir.template".equals(json.get("type").getAsString())) {
+        isBuildingTemplate = true;
+        templateInfo = json;
+        return true;
+      }
+    }
+    return false;
+  }
+  
   private IniFile checkNewIg() throws IOException {
     if (configFile == null)
       return null;

@@ -170,3 +170,8 @@ local.properties
 /org.hl7.fhir.igtools.core/src/test/resources/test-igs/old/ig30/qa
 /org.hl7.fhir.igtools.core/src/test/resources/test-igs/old/ig30/temp
 /org.hl7.fhir.igtools.core/src/test/resources/test-igs/old/ig30/template
+/org.hl7.fhir.igtools.core/src/test/resources/test-igs/new/ig/ig.ini
+/org.hl7.fhir.igtools.core/src/test/resources/test-igs/new/ig/output
+/org.hl7.fhir.igtools.core/src/test/resources/test-igs/new/ig2/output
+/org.hl7.fhir.igtools.core/src/test/resources/test-igs/new/ig2/temp
+/org.hl7.fhir.igtools.core/src/test/resources/test-igs/new/ig2/template

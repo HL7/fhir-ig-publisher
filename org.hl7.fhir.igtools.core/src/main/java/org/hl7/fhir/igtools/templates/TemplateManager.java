@@ -48,7 +48,7 @@ public class TemplateManager {
     }
       
     if (template.matches(PackageCacheManager.PACKAGE_REGEX))
-      return pcm.loadPackage(template);
+      return pcm.loadPackage(template, "current");
     if (template.matches(PackageCacheManager.PACKAGE_VERSION_REGEX)) {
       String[] p = template.split("\\#");
       return pcm.loadPackage(p[0], p[1]);
