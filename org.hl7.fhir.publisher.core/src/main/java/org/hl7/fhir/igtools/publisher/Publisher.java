@@ -1423,7 +1423,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
 
     if (configuration.has("template"))
-      template = templateManager.loadTemplate(str(configuration, "template"), rootDir, configuration.get("npm=name").getAsString(), mode == IGBuildMode.AUTOBUILD);
+      template = templateManager.loadTemplate(str(configuration, "template"), rootDir, configuration.has("npm-name") ? configuration.get("npm-name").getAsString() : null, mode == IGBuildMode.AUTOBUILD);
     
     if (Utilities.existsInList(version.substring(0,  3), "1.0", "1.4", "1.6", "3.0"))
       markdownEngine = new MarkDownProcessor(Dialect.DARING_FIREBALL);

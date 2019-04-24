@@ -2,8 +2,10 @@
   "url": "http://hl7.org/fhir/test-ig-14/ImplementationGuide/ig",
   "name": "Implementation Guide Template",
   "package-id": "hl7.fhir.test.ig14",
-  "date": "Wed, 24 Apr, 2019 16:24:05 -0400",
-  "exception": "Error processing string: Implementation Guide Template",
+  "date": "Thu, 25 Apr, 2019 07:29:45 +1000",
+  "errs": 16,
+  "warnings": 0,
+  "hints": 0,
   "version": "1.4.0",
   "tool": "4.1.0 (3)"
 }
