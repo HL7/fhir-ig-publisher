@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<ImplementationGuide xmlns="http://hl7.org/fhir">
+  <id value="ig"/>
+  <extension url="http://hl7.org/fhir/StructureDefinition/igpublisher-folder-resource">
+    <valueString value="/Users/jamesagnew/git/fhir-ig-publisher/org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/ig10/resources"/>
+  </extension>
+  <extension url="http://hl7.org/fhir/StructureDefinition/igpublisher-folder-pages">
+    <valueString value="/Users/jamesagnew/git/fhir-ig-publisher/org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/ig10/pages"/>
+  </extension>
+  <url value="http://hl7.org/fhir/test-ig-10/ImplementationGuide/ig"/>
+  <name value="Implementation Guide Template"/>
+  <status value="draft"/>
+  <experimental value="true"/>
+  <publisher value="FHIR Project"/>
+  <packageId value="hl7.fhir.test.ig10"/>
+  <license value="CC0-1.0"/>
+  <fhirVersion value="1.0.2"/>
+  <definition>
+    <grouping>
+      <name value="base"/>
+    </grouping>
+    <resource>
+      <reference>
+        <reference value="StructureDefinition/daf-core-allergyintolerance"/>
+      </reference>
+    </resource>
+    <resource>
+      <reference>
+        <reference value="ValueSet/test-ig-vs"/>
+      </reference>
+    </resource>
+    <resource>
+      <reference>
+        <reference value="AllergyIntolerance/62d29612-802f-4233-8df2-fa85d021937b"/>
+      </reference>
+    </resource>
+    <page>
+      <nameUrl value="index.html"/>
+      <title value="Home Page"/>
+      <generation value="html"/>
+    </page>
+    <parameter>
+      <code value="generate"/>
+      <value value="xml"/>
+    </parameter>
+    <parameter>
+      <code value="generate"/>
+      <value value="JSON"/>
+    </parameter>
+  </definition>
+</ImplementationGuide>

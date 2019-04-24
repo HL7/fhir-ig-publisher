@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<ImplementationGuide xmlns="http://hl7.org/fhir">
+  <id value="hl7.fhir.test.ig14-null"/>
+  <text>
+    <status value="generated"/><div xmlns="http://www.w3.org/1999/xhtml"><h2>Implementation Guide Template</h2><p>The official URL for this implementation guide is: </p><pre>http://hl7.org/fhir/test-ig-14/ImplementationGuide/ig</pre></div>
+  </text>
+  <url value="http://hl7.org/fhir/test-ig-14/ImplementationGuide/ig"/>
+  <name value="Implementation Guide Template"/>
+  <status value="draft"/>
+  <experimental value="true"/>
+  <publisher value="FHIR Project"/>
+  <fhirVersion value="1.4.0"/>
+  <package id="p1">
+    <name value="base"/>
+  </package>
+  <package id="diagnosticorder-daf-profile-spreadsheet.xml">
+    <name value="U.S. Data Access Framework (DAF) DiagnosticOrder Profile"/>
+    <resource>
+      <extension url="http://hl7.org/fhir/StructureDefinition/implementationguide-page">
+        <valueUri value="StructureDefinition-daf-diagnosticorder.html"/>
+      </extension>
+      <example value="false"/>
+      <name value="U.S. Data Access Framework (DAF) DiagnosticOrder Profile"/>
+      <sourceReference>
+        <reference value="StructureDefinition/daf-diagnosticorder"/>
+      </sourceReference>
+    </resource>
+  </package>
+  <page>
+    <source value="index.html"/>
+    <name value="Home Page"/>
+    <kind value="page"/>
+  </page>
+</ImplementationGuide>

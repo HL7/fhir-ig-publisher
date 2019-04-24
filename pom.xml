@@ -2,16 +2,44 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
+	<!--
+		 A note on versions! This project depends on the org.hl7.fhir.core project
+		 and uses its POM file as a base. We do this in order to get consistent import
+		 versions of the various things that are pulled in from that project.
+
+		 To bump the version of this project (which is versioned imndependently from
+		 org.hl7.fhir.core) just update the <version> tag below.
+
+		 If you want to bump the version of the org.hl7.fhir.core project that
+		 this project depends on, make sure to do it in both the <parent>
+		 tag and the <core_version> tags below.
+	-->
+
 	<parent>
 		<groupId>ca.uhn.hapi.fhir</groupId>
 		<artifactId>org.hl7.fhir.core</artifactId>
-		<version>3.7.27-SNAPSHOT</version>
+		<version>3.7.28-SNAPSHOT</version>
 	</parent>
+	<properties>
+		<core_version>3.7.28-SNAPSHOT</core_version>
+	</properties>
+	<version>0.9.0</version> <!-- See the note above -->
 
 	<packaging>pom</packaging>
 	<groupId>org.hl7.fhir</groupId>
-	<artifactId>org.hl7.fhir.igtools</artifactId>
+	<artifactId>org.hl7.fhir.publisher</artifactId>
 	<name>HL7 FHIR IG Tools</name>
+
+	<repositories>
+		<repository>
+			<id>oss-snapshot</id>
+			<url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+			<snapshots>
+				<enabled>true</enabled>
+			</snapshots>
+		</repository>
+	</repositories>
+
 
 	<organization>
 		<name>Health Level 7</name>
@@ -23,17 +51,22 @@
 		<dependency>
 			<groupId>ca.uhn.hapi.fhir</groupId>
 			<artifactId>org.hl7.fhir.r5</artifactId>
-			<version>${project.version}</version>
+			<version>${core_version}</version>
 		</dependency>
 		<dependency>
 			<groupId>ca.uhn.hapi.fhir</groupId>
 			<artifactId>org.hl7.fhir.convertors</artifactId>
-			<version>${project.version}</version>
+			<version>${core_version}</version>
 		</dependency>
 		<dependency>
 			<groupId>ca.uhn.hapi.fhir</groupId>
 			<artifactId>org.hl7.fhir.validation</artifactId>
-			<version>${project.version}</version>
+			<version>${core_version}</version>
+		</dependency>
+		<dependency>
+			<groupId>ca.uhn.hapi.fhir</groupId>
+			<artifactId>org.hl7.fhir.utilities</artifactId>
+			<version>${core_version}</version>
 		</dependency>
 
 		<dependency>
@@ -108,8 +141,8 @@
 	</build>
 
 	<modules>
-		<module>org.hl7.fhir.igtools.core</module>
-		<module>org.hl7.fhir.igtools.cli</module>
+		<module>org.hl7.fhir.publisher.core</module>
+		<module>org.hl7.fhir.publisher.cli</module>
 	</modules>
 
 </project>

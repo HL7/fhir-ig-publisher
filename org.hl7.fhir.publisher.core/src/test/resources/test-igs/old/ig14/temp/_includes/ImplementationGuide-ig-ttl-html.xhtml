@@ -1,0 +1,53 @@
+<pre class="rdf">
+@prefix fhir: &lt;http://hl7.org/fhir/&gt; .
+@prefix owl: &lt;http://www.w3.org/2002/07/owl#&gt; .
+@prefix rdfs: &lt;http://www.w3.org/2000/01/rdf-schema#&gt; .
+@prefix xsd: &lt;http://www.w3.org/2001/XMLSchema#&gt; .
+
+# - resource -------------------------------------------------------------------
+
+ a fhir:ImplementationGuide;
+  <a href="http://hl7.org/fhir/2016May/rdf.html#tree-root">fhir:nodeRole</a> fhir:treeRoot;
+  <a href="http://hl7.org/fhir/2016May/implementationguide.html#ImplementationGuide.id">fhir:Resource.id</a> [ <a href="http://hl7.org/fhir/2016May/datatypes.html#id">fhir:value</a> &quot;hl7.fhir.test.ig14-null&quot;];
+  <a href="http://hl7.org/fhir/2016May/implementationguide.html#ImplementationGuide.text">fhir:DomainResource.text</a> [
+     <a href="http://hl7.org/fhir/2016May/narrative.html#Narrative.status">fhir:Narrative.status</a> [ <a href="http://hl7.org/fhir/2016May/datatypes.html#code">fhir:value</a> &quot;generated&quot; ];
+     fhir:Narrative.div &quot;&lt;div xmlns=\&quot;http://www.w3.org/1999/xhtml\&quot;&gt;&lt;h2&gt;Implementation Guide Template&lt;/h2&gt;&lt;p&gt;The official URL for this implementation guide is: &lt;/p&gt;&lt;pre&gt;http://hl7.org/fhir/test-ig-14/ImplementationGuide/ig&lt;/pre&gt;&lt;/div&gt;&quot;
+  ];
+  <a href="http://hl7.org/fhir/2016May/implementationguide.html#ImplementationGuide.url">fhir:ImplementationGuide.url</a> [ <a href="http://hl7.org/fhir/2016May/datatypes.html#uri">fhir:value</a> &quot;http://hl7.org/fhir/test-ig-14/ImplementationGuide/ig&quot;];
+  <a href="http://hl7.org/fhir/2016May/implementationguide.html#ImplementationGuide.name">fhir:ImplementationGuide.name</a> [ <a href="http://hl7.org/fhir/2016May/datatypes.html#string">fhir:value</a> &quot;Implementation Guide Template&quot;];
+  <a href="http://hl7.org/fhir/2016May/implementationguide.html#ImplementationGuide.status">fhir:ImplementationGuide.status</a> [ <a href="http://hl7.org/fhir/2016May/datatypes.html#code">fhir:value</a> &quot;draft&quot;];
+  <a href="http://hl7.org/fhir/2016May/implementationguide.html#ImplementationGuide.experimental">fhir:ImplementationGuide.experimental</a> [ <a href="http://hl7.org/fhir/2016May/datatypes.html#boolean">fhir:value</a> &quot;true&quot;^^xsd:boolean];
+  <a href="http://hl7.org/fhir/2016May/implementationguide.html#ImplementationGuide.publisher">fhir:ImplementationGuide.publisher</a> [ <a href="http://hl7.org/fhir/2016May/datatypes.html#string">fhir:value</a> &quot;FHIR Project&quot;];
+  <a href="http://hl7.org/fhir/2016May/implementationguide.html#ImplementationGuide.fhirVersion">fhir:ImplementationGuide.fhirVersion</a> [ <a href="http://hl7.org/fhir/2016May/datatypes.html#id">fhir:value</a> &quot;1.4.0&quot;];
+  <a href="http://hl7.org/fhir/2016May/implementationguide.html#ImplementationGuide.package">fhir:ImplementationGuide.package</a> [
+     <a href="http://hl7.org/fhir/2016May/rdf.html#index">fhir:index</a> 0;
+     <a href="http://hl7.org/fhir/2016May/implementationguide.html#ImplementationGuide.package.id">fhir:Element.id</a> [ <a href="http://hl7.org/fhir/2016May/datatypes.html#id">fhir:value</a> &quot;p1&quot; ];
+     <a href="http://hl7.org/fhir/2016May/implementationguide.html#ImplementationGuide.package.name">fhir:ImplementationGuide.package.name</a> [ <a href="http://hl7.org/fhir/2016May/datatypes.html#string">fhir:value</a> &quot;base&quot; ]
+  ], [
+     <a href="http://hl7.org/fhir/2016May/rdf.html#index">fhir:index</a> 1;
+     <a href="http://hl7.org/fhir/2016May/implementationguide.html#ImplementationGuide.package.id">fhir:Element.id</a> [ <a href="http://hl7.org/fhir/2016May/datatypes.html#id">fhir:value</a> &quot;diagnosticorder-daf-profile-spreadsheet.xml&quot; ];
+     <a href="http://hl7.org/fhir/2016May/implementationguide.html#ImplementationGuide.package.name">fhir:ImplementationGuide.package.name</a> [ <a href="http://hl7.org/fhir/2016May/datatypes.html#string">fhir:value</a> &quot;U.S. Data Access Framework (DAF) DiagnosticOrder Profile&quot; ];
+     <a href="http://hl7.org/fhir/2016May/implementationguide.html#ImplementationGuide.package.resource">fhir:ImplementationGuide.package.resource</a> [
+       <a href="http://hl7.org/fhir/2016May/rdf.html#index">fhir:index</a> 0;
+       <a href="http://hl7.org/fhir/2016May/implementationguide.html#ImplementationGuide.package.resource.extension">fhir:Element.extension</a> [
+         <a href="http://hl7.org/fhir/2016May/rdf.html#index">fhir:index</a> 0;
+         <a href="http://hl7.org/fhir/2016May/extensibility.html#Extension.url">fhir:Extension.url</a> [ <a href="http://hl7.org/fhir/2016May/datatypes.html#uri">fhir:value</a> &quot;http://hl7.org/fhir/StructureDefinition/implementationguide-page&quot; ];
+         <a href="http://hl7.org/fhir/2016May/extensibility.html#Extension.value[x]">fhir:Extension.valueUri</a> [ <a href="http://hl7.org/fhir/2016May/datatypes.html#uri">fhir:value</a> &quot;StructureDefinition-daf-diagnosticorder.html&quot; ]       ];
+       <a href="http://hl7.org/fhir/2016May/implementationguide.html#ImplementationGuide.package.resource.example">fhir:ImplementationGuide.package.resource.example</a> [ <a href="http://hl7.org/fhir/2016May/datatypes.html#boolean">fhir:value</a> &quot;false&quot;^^xsd:boolean ];
+       <a href="http://hl7.org/fhir/2016May/implementationguide.html#ImplementationGuide.package.resource.name">fhir:ImplementationGuide.package.resource.name</a> [ <a href="http://hl7.org/fhir/2016May/datatypes.html#string">fhir:value</a> &quot;U.S. Data Access Framework (DAF) DiagnosticOrder Profile&quot; ];
+       <a href="http://hl7.org/fhir/2016May/implementationguide.html#ImplementationGuide.package.resource.source[x]">fhir:ImplementationGuide.package.resource.sourceReference</a> [
+         <a href="http://hl7.org/fhir/2016May/references.html#Reference#Reference.reference">fhir:Reference.reference</a> [ <a href="http://hl7.org/fhir/2016May/datatypes.html#string">fhir:value</a> &quot;StructureDefinition/daf-diagnosticorder&quot; ]       ]     ]
+  ];
+  <a href="http://hl7.org/fhir/2016May/implementationguide.html#ImplementationGuide.page">fhir:ImplementationGuide.page</a> [
+     <a href="http://hl7.org/fhir/2016May/implementationguide.html#ImplementationGuide.page.source">fhir:ImplementationGuide.page.source</a> [ <a href="http://hl7.org/fhir/2016May/datatypes.html#uri">fhir:value</a> &quot;index.html&quot; ];
+     <a href="http://hl7.org/fhir/2016May/implementationguide.html#ImplementationGuide.page.name">fhir:ImplementationGuide.page.name</a> [ <a href="http://hl7.org/fhir/2016May/datatypes.html#string">fhir:value</a> &quot;Home Page&quot; ];
+     <a href="http://hl7.org/fhir/2016May/implementationguide.html#ImplementationGuide.page.kind">fhir:ImplementationGuide.page.kind</a> [ <a href="http://hl7.org/fhir/2016May/datatypes.html#code">fhir:value</a> &quot;page&quot; ]
+  ].
+
+# - ontology header ------------------------------------------------------------
+
+ a owl:Ontology;
+  owl:imports fhir:fhir.ttl.
+
+</pre>
+
