@@ -1,0 +1,9 @@
+﻿{
+  "url": "http://hl7.org/fhir/test/ImplementationGuide/test-ig",
+  "name": "Test Implementation Guide",
+  "package-id": "hl7.fhir.test.ig40",
+  "date": "Thu, 25 Apr, 2019 07:52:32 +1000",
+  "exception": "Process exited with an error: 1 (Exit value: 1)",
+  "version": "4.0.0",
+  "tool": "4.1.0 (3)"
+}
