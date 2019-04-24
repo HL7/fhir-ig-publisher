@@ -68,7 +68,7 @@ public class TemplateManager {
     if (template.startsWith("#")) {
       File f = new File(Utilities.path(rootFolder, template.substring(1)));
       if (f.exists() && f.isDirectory()) {
-        NpmPackage npm = NpmPackage.fromFolder(f.getAbsolutePath(), PackageType.TEMPLATE);
+        NpmPackage npm = NpmPackage.fromFolder(f.getAbsolutePath(), PackageType.TEMPLATE, "output", ".git");
         return npm;
       }
     }

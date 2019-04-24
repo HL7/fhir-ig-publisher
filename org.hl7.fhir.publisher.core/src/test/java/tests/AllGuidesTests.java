@@ -49,44 +49,28 @@ public class AllGuidesTests {
 
   @Test
   public void testNewIgInlineTemplate1() throws Exception {
-    String path = Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "new", "ig");
-    setup(path, "#template");
-    test(Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "new", "ig"));
+    test(Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "new", "ig-inline"));
   } 
 
   @Test
   public void testNewIgInlineTemplate2() throws Exception {
-    String path = Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "new", "ig2");
-    setup(path, "#template-local");
-    test(Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "new", "ig2"));
+    test(Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "new", "ig-inline-rename"));
   } 
 
   @Test
   public void testNewIgExternalTemplateLocal() throws Exception {
-    String path = Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "new", "ig");
-    setup(path, "C:\\work\\org.hl7.fhir\\org.hl7.fhir.template.test"); // not sure what to do about the path here...
-    test(path);
+    test(Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "new", "ig-dir"));
   }
 
   @Test
   public void testNewIgExternalTemplateGitHub() throws Exception {
-    String path = Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "new", "ig");
-    setup(path, "http://github.com/FHIR/test-template");
-    test(path);
+    test(Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "new", "ig-github"));
   }
 
   @Test
   public void testNewIgExternalTemplatePckage() throws Exception {
-    String path = Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "new", "ig");
-    setup(path, "fhir.test.template");
-    test(path);
+    test(Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "new", "ig-package"));
   }
 
-  private void setup(String path, String template) throws IOException {
-    IniFile ini = new IniFile(Utilities.path(path, "ig.ini"));
-    ini.setStringProperty("IG", "ig", "resources/ig-new.json", null);
-    ini.setStringProperty("IG", "template", template, null); 
-    ini.save();
-  } 
 
 }
