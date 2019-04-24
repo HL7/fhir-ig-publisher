@@ -78,7 +78,7 @@ public class AllGuidesTests {
   @Test
   public void testNewIgExternalTemplatePckage() throws Exception {
     String path = Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "new", "ig");
-    setup(path, "hl7.fhir.template.test");
+    setup(path, "fhir.test.template");
     test(path);
   }
 

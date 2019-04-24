@@ -1,12 +1,21 @@
 package org.hl7.fhir.igtools.templates;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.tools.ant.DefaultLogger;
+import org.apache.tools.ant.Project;
+import org.apache.tools.ant.ProjectHelper;
+import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.exceptions.FHIRFormatError;
+import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.utilities.JsonMerger;
 import org.hl7.fhir.utilities.Utilities;
@@ -18,27 +27,34 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 
+
 public class Template {
 
   private NpmPackage pack;
   private JsonObject configuration;
   
-  private boolean noInit;
   private String templateDir;
   private String root;
+  private boolean canExecute;
+  private String scriptOnLoad;
+  private String scriptOnGenerate;
+  private String scriptOnJekyll;
+  private String scriptOnCheck;
   
   /** unpack the template into /template 
    * 
    * @param npm - the package containing the template
    * @param noInit - a flag to prevent the template being copied into {rootDir}/template (only when it's already there as an inline template)
    * @param rootDir  the root directory for the IG
+   * @param canExecute 
    * 
    * @throws IOException - only if the path is incorrect or the disk runs out of space
    */
-  public Template(NpmPackage npm, boolean noInit, String rootDir) throws IOException {
+  public Template(NpmPackage npm, boolean noInit, String rootDir, boolean canExecute) throws IOException {
     pack = npm;
     root = rootDir;
-    this.noInit = noInit;
+    this.canExecute = canExecute;
+    
     templateDir = Utilities.path(rootDir, "template");
     if (!noInit) {  // special case  - no init when template is already in the right place
       Utilities.createDirectory(templateDir);
@@ -47,9 +63,20 @@ public class Template {
     }
     // ok, now templateDir has the content of the template
     configuration = JsonTrackingParser.parseJsonFile(Utilities.path(templateDir, "config.json"));
+    
+    if (configuration.has("scripts")) {
+      JsonObject scripts = configuration.getAsJsonObject("scripts");
+      if (scripts.has("onLoad"))
+        scriptOnLoad = scripts.get("onload").getAsString();
+      if (scripts.has("onGenerate"))
+        scriptOnGenerate = scripts.get("onGenerate").getAsString();
+      if (scripts.has("onJekyll"))
+        scriptOnJekyll = scripts.get("onJekyll").getAsString();
+      if (scripts.has("onCheck"))
+        scriptOnCheck = scripts.get("onCheck").getAsString();
+    }
   }
   
-
   /**
    * this is the first event of the template life cycle. At this point, the template can modify the IG as it sees fit. 
    * This typically includes scanning the content in the IG and filling out resource/page entries and details
@@ -58,9 +85,32 @@ public class Template {
    * 
    * @param ig
    * @return
+   * @throws IOException 
+   * @throws FileNotFoundException 
+   * @throws FHIRException 
    */
-  public ImplementationGuide modifyIG(ImplementationGuide ig) {
-    return ig;
+  public ImplementationGuide modifyIGEvent(ImplementationGuide ig) throws FileNotFoundException, IOException, FHIRException {
+    if (!canExecute || scriptOnLoad == null)
+      return ig;
+    new XmlParser().compose(new FileOutputStream(Utilities.path(templateDir, "ig-working.xml")), ig);
+    runScript(scriptOnLoad);
+    String fn = Utilities.path(templateDir, "ig-updated.xml");
+    if (new File(fn).exists())
+      throw new FHIRException("onLoad script "+scriptOnLoad+" failed - no output file produced");
+    return (ImplementationGuide) new XmlParser().parse(new FileInputStream(fn));  
+  }
+  
+  private void runScript(String script) throws IOException {
+    File buildFile = new File(Utilities.path(templateDir, script));
+    Project project = new Project();
+    ProjectHelper.configureProject(project, buildFile);
+    DefaultLogger consoleLogger = new DefaultLogger();
+    consoleLogger.setErrorPrintStream(System.err);
+    consoleLogger.setOutputPrintStream(System.out);
+    consoleLogger.setMessageOutputLevel(Project.MSG_INFO);
+    project.addBuildListener(consoleLogger);
+    project.init();
+    project.executeTarget(project.getDefaultTarget());
   }
 
   private String ostr(JsonObject obj, String name) throws Exception {
@@ -113,7 +163,7 @@ public class Template {
   }
 
   public void beforeGenerate(String tempDir) throws IOException {
-    File src = new File(Utilities.path(templateDir, "jekyll"));
+    File src = new File(Utilities.path(templateDir, "content"));
     if (src.exists()) {
       FileUtils.copyDirectory(src, new File(tempDir));
     }

@@ -30,12 +30,38 @@ public class TemplateManager {
     this.logger = logger;
   }
 
-  public Template loadTemplate(String template, String rootFolder) throws FHIRException, IOException {
+  public Template loadTemplate(String template, String rootFolder, String packageId, boolean autoMode) throws FHIRException, IOException {
     logger.logMessage("Load Template from "+template);
+    boolean canExecute = !autoMode || checkTemplateId(template, packageId);
     NpmPackage npm = loadPackage(template, rootFolder);
     if (!npm.isType(PackageType.TEMPLATE))
       throw new FHIRException("The referenced package '"+template+"' does not have the correct type - is "+npm.type()+" but should be a template");
-    return new Template(npm, template.equals("#template"), rootFolder);
+    return new Template(npm, template.equals("#template"), rootFolder, canExecute);
+  }
+
+  private boolean checkTemplateId(String template, String packageId) {
+    // template control on the autobuilder 
+    // - templates are only allowed if approved by the FHIR product director
+    // - templates can run code, so only trusted templates are allowed
+    
+    // first, the following templates authored by HL7 are allowed 
+    if (isTemplate("http://github.com/FHIR/test-template", "fhir.test.template", template))
+      return true;
+    if (isTemplate("http://github.com/HL7/fhir-template", "hl7.fhir.template", template))
+      return true;
+    
+    // we might choose to allow some IGs here...
+    return false;
+  }
+
+  private boolean isTemplate(String url, String id, String template) {
+    if (url.equals(template))
+      return true;
+    if (template.equals(id))
+      return true;
+    if (template.matches(PackageCacheManager.PACKAGE_VERSION_REGEX) && template.startsWith(id+"#"))
+      return true;
+    return false;
   }
 
   private NpmPackage loadPackage(String template, String rootFolder) throws FHIRException, IOException {

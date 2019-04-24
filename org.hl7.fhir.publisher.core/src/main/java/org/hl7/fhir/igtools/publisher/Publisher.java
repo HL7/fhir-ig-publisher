@@ -1102,10 +1102,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     String templateName = ini.getStringProperty("IG", "template");
     if (templateName == null)
       throw new Exception("You must nominate a template - consult the IG Publisher documentation");
-    template = templateManager.loadTemplate(templateName, rootDir);
     igName = Utilities.path(repoRoot, ini.getStringProperty("IG", "ig"));
     sourceIg = (ImplementationGuide) VersionConvertor_40_50.convertResource(FormatUtilities.loadFile(igName));
-    sourceIg = template.modifyIG(sourceIg);
+    template = templateManager.loadTemplate(templateName, rootDir, sourceIg.getPackageId(), mode == IGBuildMode.AUTOBUILD);
+    sourceIg = template.modifyIGEvent(sourceIg);
     // ok, loaded. Now we start loading settings out of the IG
     tool = GenerationTool.Jekyll;
     version = processVersion(sourceIg.getFhirVersion().get(0).asStringValue()); // todo: support multiple versions
@@ -1423,7 +1423,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
 
     if (configuration.has("template"))
-      template = templateManager.loadTemplate(str(configuration, "template"), rootDir);
+      template = templateManager.loadTemplate(str(configuration, "template"), rootDir, configuration.get("npm=name").getAsString(), mode == IGBuildMode.AUTOBUILD);
     
     if (Utilities.existsInList(version.substring(0,  3), "1.0", "1.4", "1.6", "3.0"))
       markdownEngine = new MarkDownProcessor(Dialect.DARING_FIREBALL);
