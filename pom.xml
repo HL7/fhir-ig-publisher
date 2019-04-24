@@ -28,7 +28,7 @@
 	<packaging>pom</packaging>
 	<groupId>org.hl7.fhir</groupId>
 	<artifactId>org.hl7.fhir.publisher</artifactId>
-	<name>HL7 FHIR IG Tools</name>
+	<name>HL7 FHIR IG Publisher</name>
 
 	<repositories>
 		<repository>

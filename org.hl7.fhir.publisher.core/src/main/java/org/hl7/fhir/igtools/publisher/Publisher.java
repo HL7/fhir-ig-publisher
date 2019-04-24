@@ -1105,7 +1105,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     template = templateManager.loadTemplate(templateName, rootDir);
     igName = Utilities.path(repoRoot, ini.getStringProperty("IG", "ig"));
     sourceIg = (ImplementationGuide) VersionConvertor_40_50.convertResource(FormatUtilities.loadFile(igName));
-    sourceIg = template.modifyIG(sourceIg, repoRoot);
+    sourceIg = template.modifyIG(sourceIg);
     // ok, loaded. Now we start loading settings out of the IG
     tool = GenerationTool.Jekyll;
     version = processVersion(sourceIg.getFhirVersion().get(0).asStringValue()); // todo: support multiple versions
@@ -1335,7 +1335,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (Extension e : sourceIg.getExtensionsByUrl(IGHelper.EXT_BUNDLE)) {
       bundles.add(e.getValue().primitiveValue());
     }
-    template.prepare(sourceIg);
     log("Initialization complete");
   }
 

@@ -25,12 +25,22 @@ public class Template {
   
   private boolean noInit;
   private String templateDir;
+  private String root;
   
+  /** unpack the template into /template 
+   * 
+   * @param npm - the package containing the template
+   * @param noInit - a flag to prevent the template being copied into {rootDir}/template (only when it's already there as an inline template)
+   * @param rootDir  the root directory for the IG
+   * 
+   * @throws IOException - only if the path is incorrect or the disk runs out of space
+   */
   public Template(NpmPackage npm, boolean noInit, String rootDir) throws IOException {
     pack = npm;
+    root = rootDir;
     this.noInit = noInit;
     templateDir = Utilities.path(rootDir, "template");
-    if (!noInit) {  // special case  - no init when template is already there
+    if (!noInit) {  // special case  - no init when template is already in the right place
       Utilities.createDirectory(templateDir);
       Utilities.clearDirectory(templateDir);
       pack.unPack(templateDir);
@@ -39,46 +49,17 @@ public class Template {
     configuration = JsonTrackingParser.parseJsonFile(Utilities.path(templateDir, "config.json"));
   }
   
-//template.copyTo("template", templateDir);
-//List<String> files = new ArrayList<String>();
-//copyFiles(Utilities.path(templateDir, "jekyll"), Utilities.path(templateDir, "jekyll"), tempDir, files); 
-//for (String s : files)
-//  otherFilesStartup.add(Utilities.path(tempDir, s)); 
-//JsonObject tc = JsonTrackingParser.parseJson(template.load("template", "config.json"));
-//new JsonMerger().merge(configuration, tc);
-//templateLoaded = true;
-//templatePck = template.name();
-//  public NpmPackage fetch(String src) throws IOException {
-//    if (src.startsWith("https://github.com")) {
-//      URL url = new URL(Utilities.pathURL(src, "archive", "master.zip"));
-//      HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-//      connection.setRequestMethod("GET");
-//      InputStream zip = connection.getInputStream();
-//      return NpmPackage.fromZip(zip, true); 
-//    } else {
-//      File f = new File(src);
-//      if (f.exists() && f.isDirectory())    
-//        return loadLiteralPath(src);
-//      else
-//        throw new IOException("Unable ti interpret template source '"+src+"'");
-//    }
-//  }
-//
-//  private InputStream fetchUrl(String pathURL) {
-//    // TODO Auto-generated method stub
-//    return null;
-//  }
-//
-//  private NpmPackage loadLiteralPath(String path) throws IOException {
-//    NpmPackage pi = new NpmPackage(path);
-//    return pi;
-//  }
 
-  public void prepare(ImplementationGuide ig) {
-    
-  }
-  
-  public ImplementationGuide modifyIG(ImplementationGuide ig, String repoRoot) {
+  /**
+   * this is the first event of the template life cycle. At this point, the template can modify the IG as it sees fit. 
+   * This typically includes scanning the content in the IG and filling out resource/page entries and details
+   * 
+   * Note that the param
+   * 
+   * @param ig
+   * @return
+   */
+  public ImplementationGuide modifyIG(ImplementationGuide ig) {
     return ig;
   }
 
