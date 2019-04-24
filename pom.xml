@@ -26,7 +26,7 @@
 	<version>0.9.0</version> <!-- See the note above -->
 
 	<packaging>pom</packaging>
-	<groupId>org.hl7.fhir</groupId>
+	<groupId>org.hl7.fhir.publisher</groupId>
 	<artifactId>org.hl7.fhir.publisher</artifactId>
 	<name>HL7 FHIR IG Publisher</name>
 
