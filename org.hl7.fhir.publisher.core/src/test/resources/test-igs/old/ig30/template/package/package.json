@@ -1,9 +1,0 @@
-{
-  "name": "fhir.test.template",
-  "version": "0.0.2",
-  "type": "fhir.template",
-  "license": "CC0-1.0",
-  "description": "FHIR Test Template",
-  "author": "http://hl7.org/fhir",
-  "canonical" : "http://github.com/FHIR/test-template"
-}
