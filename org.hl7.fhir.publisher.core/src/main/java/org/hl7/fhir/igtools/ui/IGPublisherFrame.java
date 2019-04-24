@@ -36,7 +36,7 @@ public class IGPublisherFrame extends javax.swing.JFrame {
   private javax.swing.JButton btnIG;
   private javax.swing.JPanel jPanel1;
   private javax.swing.JTextArea txtLog;
-  private javafx.embed.swing.JFXPanel txtValidation;
+  private javax.swing.JTextArea txtValidation;
   private javax.swing.JComboBox<String> cbxIGName;
   private javax.swing.JToolBar jToolBar1;
   private IniFile ini;
@@ -76,7 +76,7 @@ public class IGPublisherFrame extends javax.swing.JFrame {
     btnQA = new javax.swing.JButton();
     btnIG = new javax.swing.JButton();
     txtLog = new javax.swing.JTextArea();
-    txtValidation = new javafx.embed.swing.JFXPanel();
+    txtValidation = new javax.swing.JTextArea();
 
     setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 

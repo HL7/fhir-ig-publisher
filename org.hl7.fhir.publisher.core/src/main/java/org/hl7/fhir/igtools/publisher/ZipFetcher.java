@@ -26,14 +26,13 @@ import org.hl7.fhir.utilities.Utilities;
 
 public class ZipFetcher implements IFetchFile {
 
-  private static final org.slf4j.Logger ourLog = org.slf4j.LoggerFactory.getLogger(ZipFetcher.class);
   private Map<String, FetchedFile> myFiles = new HashMap<>();
   private ILoggingService myLogger;
   private IGKnowledgeProvider myPkp;
   private List<String> myResourceDirs;
 
   public ZipFetcher(byte[] theZipFile) {
-    ourLog.info("Beginning parsing ZIP file ({} bytes)", theZipFile.length);
+    myLogger.logMessage(String.format("Beginning parsing ZIP file ({} bytes)", theZipFile.length));
 
     try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(theZipFile))) {
 
@@ -41,12 +40,12 @@ public class ZipFetcher implements IFetchFile {
       while (true) {
         ZipEntry entry = zis.getNextEntry();
         if (entry == null) {
-          ourLog.info("No more entries");
+          myLogger.logMessage("No more entries");
           break;
         }
 
         String entryName = entry.getName();
-		  ourLog.info("Found entry: {}", entryName);
+		  myLogger.logMessage(String.format("Found entry: {}", entryName));
 
         FetchedFile ff = new FetchedFile();
         ff.setPath(entryName);
@@ -239,7 +238,7 @@ public class ZipFetcher implements IFetchFile {
     if (ff == null)
       return FetchState.NOT_FOUND;
 	 else if (ff.getContentType() == null) {
-		ourLog.warn("No content type on path {}", path);
+	   String.format(String.format("No content type on path {}", path));
       return FetchState.FILE;
 	 } else if (ff.getContentType().equals("application/directory"))
       return FetchState.DIR;
