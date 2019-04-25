@@ -1116,6 +1116,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
   private void initializeFromIg(IniFile ini) throws Exception {
+    loadFromBuildServer();
     configFile = ini.getFileName();
     igMode = true;
     repoRoot = Utilities.getDirectoryForFile(ini.getFileName());
@@ -1248,7 +1249,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     
     // loading the specifications
     SpecificationPackage spec = null; 
-    loadFromBuildServer();
     if (specifications != null) { 
       // web server mode: use one of the preloaded versions...
       String sver = version;
@@ -1444,6 +1444,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       rootDir = new File(rootDir).getCanonicalPath();
     }
 
+    loadFromBuildServer();
     if (configuration.has("template"))
       template = templateManager.loadTemplate(str(configuration, "template"), rootDir, configuration.has("npm-name") ? configuration.get("npm-name").getAsString() : null, mode == IGBuildMode.AUTOBUILD);
     
@@ -1532,7 +1533,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     SpecificationPackage spec = null; 
 
-    loadFromBuildServer();
     if (specifications != null) { 
       // web server mode: use one of the preloaded versions...
       String sver = version;
