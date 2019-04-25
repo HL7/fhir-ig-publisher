@@ -2435,21 +2435,23 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void templateBeforeJekyll() throws IOException {
-    if (debug)
+    if (template != null) {
       if (debug)
         waitForInput("before OnJekyll");
       template.beforeJekyllEvent(tempDir, publishedIg);
       if (debug)
         waitForInput("after OnJekyll");
+    }
   }
   
   private void templateOnCheck() throws IOException {
-    if (debug)
+    if (template != null) {
       if (debug)
         waitForInput("before OnJekyll");
       template.onCheckEvent(tempDir, publishedIg);
       if (debug)
         waitForInput("after OnJekyll");
+    }
   }
   
   private void waitForInput(String string) throws IOException {
