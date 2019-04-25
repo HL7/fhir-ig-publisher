@@ -5477,7 +5477,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     if (ig != null) {
       b.append("= IG =\r\n");
-      b.append(TextFile.fileToString(determineActualIG(ig)));
+      b.append(TextFile.fileToString(determineActualIG(ig, null)));
     }
 
     b.append("\r\n");
@@ -5546,7 +5546,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           System.out.println("=======================================================================================");
           System.out.println("Publish IG "+ig);
           Publisher self = new Publisher();
-          self.setConfigFile(determineActualIG(ig));
+          self.setConfigFile(determineActualIG(ig, null));
           self.setTxServer(getNamedParam(args, "-tx"));
           if (hasParam(args, "-resetTx"))
             self.setCacheOption(CacheOption.CLEAR_ALL);
@@ -5580,6 +5580,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           System.out.print(" "+args[i]);
       }      
       System.out.println();
+      if (hasNamedParam(args, "-auto-ig-build")) {
+        self.setMode(IGBuildMode.AUTOBUILD);
+        self.targetOutput = getNamedParam(args, "-target");
+      }
       if (hasParam(args, "-source")) {
         // run with standard template. this is publishing lite
         self.setSourceDir(getNamedParam(args, "-source"));
@@ -5639,7 +5643,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         self.setConfigFile(generateIGFromSimplifier(getNamedParam(args, "-simplifier"), getNamedParam(args, "-destination"), getNamedParam(args, "-canonical"), getNamedParam(args, "-npm-name"), getNamedParam(args, "-license"), packages));
         self.folderToDelete = Utilities.getDirectoryForFile(self.getConfigFile());
       } else {
-        self.setConfigFile(determineActualIG(getNamedParam(args, "-ig")));
+        self.setConfigFile(determineActualIG(getNamedParam(args, "-ig"), self.mode));
         if (Utilities.noString(self.getConfigFile()))
           throw new Exception("No Implementation Guide Specified (-ig parameter)");
         if (!(new File(self.getConfigFile()).isAbsolute()))
@@ -5655,10 +5659,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       self.setTxServer(getNamedParam(args, "-tx"));
       self.setPackagesFolder(getNamedParam(args, "-packages"));
-      if (hasNamedParam(args, "-auto-ig-build")) {
-        self.setMode(IGBuildMode.AUTOBUILD);
-        self.targetOutput = getNamedParam(args, "-target");
-      }
       self.watch = hasParam(args, "-watch");
       self.debug = hasParam(args, "-debug");
       self.cacheVersion = hasParam(args, "-cacheVersion");
@@ -5782,14 +5782,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
 
-  private static String determineActualIG(String ig) throws Exception {
+  private static String determineActualIG(String ig, IGBuildMode mode) throws Exception {
     File f = new File(ig);
+    if (!f.exists() && mode == IGBuildMode.AUTOBUILD) {
+      String s = Utilities.getDirectoryForFile(ig);
+      f = new File(s == null ? System.getProperty("user.dir") : s);
+    }
     if (!f.exists())
       throw new Exception("Unable to find the nominated IG at "+f.getAbsolutePath());
     if (f.isDirectory() && new File(Utilities.path(ig, "ig.json")).exists())
       return Utilities.path(ig, "ig.json");
     else
-      return ig;
+      return f.getAbsolutePath();
   }
 
 

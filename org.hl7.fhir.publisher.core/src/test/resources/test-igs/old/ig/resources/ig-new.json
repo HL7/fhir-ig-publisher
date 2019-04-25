@@ -3,11 +3,11 @@
   "id" : "test-ig",
   "extension" : [{
     "url" : "http://hl7.org/fhir/StructureDefinition/igpublisher-folder-resource",
-    "valueString" : "/Users/jamesagnew/git/fhir-ig-publisher/org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/ig/resources"
+    "valueString" : "C:\\work\\org.hl7.fhir\\fhir-ig-publisher\\org.hl7.fhir.publisher.core\\src\\test\\resources\\test-igs\\old\\ig\\resources"
   },
   {
     "url" : "http://hl7.org/fhir/StructureDefinition/igpublisher-folder-pages",
-    "valueString" : "/Users/jamesagnew/git/fhir-ig-publisher/org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/ig/pages"
+    "valueString" : "C:\\work\\org.hl7.fhir\\fhir-ig-publisher\\org.hl7.fhir.publisher.core\\src\\test\\resources\\test-igs\\old\\ig\\pages"
   }],
   "url" : "http://hl7.org/fhir/test/ImplementationGuide/test-ig",
   "name" : "Test Implementation Guide",

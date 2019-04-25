@@ -2,15 +2,8 @@
   "url": "http://hl7.org/fhir/test-ig-14/ImplementationGuide/ig",
   "name": "Implementation Guide Template",
   "package-id": "hl7.fhir.test.ig14",
-<<<<<<< Updated upstream
-  "date": "Wed, 24 Apr, 2019 20:37:53 -0400",
+  "date": "Thu, 25 Apr, 2019 17:25:34 +1000",
   "exception": "Error processing string: Implementation Guide Template",
-=======
-  "date": "Thu, 25 Apr, 2019 08:27:40 +1000",
-  "errs": 16,
-  "warnings": 0,
-  "hints": 0,
->>>>>>> Stashed changes
   "version": "1.4.0",
   "tool": "4.1.0 (3)"
 }

@@ -104,6 +104,24 @@
             </exclusions>
         </dependency>
 
+        <!-- Markdown Utilities -->
+        <dependency>
+            <groupId>com.atlassian.commonmark</groupId>
+            <artifactId>commonmark</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>com.atlassian.commonmark</groupId>
+            <artifactId>commonmark-ext-gfm-tables</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>com.github.rjeschke</groupId>
+            <artifactId>txtmark</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+
     </dependencies>
 
     <dependencyManagement>
