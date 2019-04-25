@@ -27,6 +27,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -36,6 +37,7 @@ import org.apache.tools.ant.Project;
 import org.apache.tools.ant.ProjectHelper;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
+import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.utilities.JsonMerger;
@@ -85,10 +87,10 @@ public class Template {
     // ok, now templateDir has the content of the template
     configuration = JsonTrackingParser.parseJsonFile(Utilities.path(templateDir, "config.json"));
     
-    if (configuration.has("scripts")) {
+    if (configuration.has("scripts") && canExecute) {
       JsonObject scripts = configuration.getAsJsonObject("scripts");
       if (scripts.has("onLoad"))
-        scriptOnLoad = scripts.get("onload").getAsString();
+        scriptOnLoad = scripts.get("onLoad").getAsString();
       if (scripts.has("onGenerate"))
         scriptOnGenerate = scripts.get("onGenerate").getAsString();
       if (scripts.has("onJekyll"))
@@ -113,15 +115,26 @@ public class Template {
   public ImplementationGuide modifyIGEvent(ImplementationGuide ig) throws FileNotFoundException, IOException, FHIRException {
     if (!canExecute || scriptOnLoad == null)
       return ig;
-    new XmlParser().compose(new FileOutputStream(Utilities.path(templateDir, "ig-working.xml")), ig);
-    runScript(scriptOnLoad);
-    String fn = Utilities.path(templateDir, "ig-updated.xml");
-    if (new File(fn).exists())
+    String sfn = Utilities.path(templateDir, "ig-working.");
+    String fn = Utilities.path(templateDir, "ig-updated.");
+    Map<String, String> props = new HashMap<>(); 
+    props.put("ig.source", sfn); 
+    props.put("ig.dest", fn); 
+    
+    new XmlParser().compose(new FileOutputStream(sfn+"xml"), ig);
+    new JsonParser().compose(new FileOutputStream(sfn+"json"), ig);
+    runScript(scriptOnLoad, Utilities.path(root, "temp"), props);
+    if (new File(fn+"xml").exists())
+      return (ImplementationGuide) new XmlParser().parse(new FileInputStream(fn+"xml"));
+    else if (new File(fn+"json").exists())
+      return (ImplementationGuide) new JsonParser().parse(new FileInputStream(fn+"json"));
+    else
       throw new FHIRException("onLoad script "+scriptOnLoad+" failed - no output file produced");
-    return (ImplementationGuide) new XmlParser().parse(new FileInputStream(fn));  
+    
+    
   }
   
-  private void runScript(String script) throws IOException {
+  private void runScript(String script, String tempDir, Map<String, String> props) throws IOException {
     File buildFile = new File(Utilities.path(templateDir, script));
     Project project = new Project();
     ProjectHelper.configureProject(project, buildFile);
@@ -130,6 +143,16 @@ public class Template {
     consoleLogger.setOutputPrintStream(System.out);
     consoleLogger.setMessageOutputLevel(Project.MSG_INFO);
     project.addBuildListener(consoleLogger);
+    project.setBasedir(root);
+    project.setProperty("ig.root", root);
+    project.setProperty("ig.temp", tempDir);
+    project.setProperty("ig.template", templateDir);
+    project.setProperty("ig.scripts", Utilities.path(templateDir, "scripts"));
+    if (props != null) {
+      for (String s : props.keySet()) {
+        project.setProperty(s, props.get(s));
+      }
+    }
     project.init();
     project.executeTarget(project.getDefaultTarget());
   }
@@ -183,16 +206,42 @@ public class Template {
     return null;
   }
 
-  public void beforeGenerate(String tempDir) throws IOException {
+  public void beforeGenerateEvent(String tempDir, ImplementationGuide ig) throws IOException {
     File src = new File(Utilities.path(templateDir, "content"));
     if (src.exists()) {
       FileUtils.copyDirectory(src, new File(tempDir));
     }
-    // load it into temp
-    // if it as an initial any file, let it run 
-    // load template configuration for templates / defaults    
+    if (canExecute && scriptOnGenerate != null) {
+      String sfn = Utilities.path(templateDir, "ig-working.");
+      Map<String, String> props = new HashMap<>(); 
+      props.put("ig.source", sfn);       
+      new XmlParser().compose(new FileOutputStream(sfn+"xml"), ig);
+      new JsonParser().compose(new FileOutputStream(sfn+"json"), ig);
+      runScript(scriptOnGenerate, Utilities.path(root, "temp"), props);      
+    }
   }
 
+  public void beforeJekyllEvent(String tempDir, ImplementationGuide ig) throws IOException {
+    if (canExecute && scriptOnJekyll != null) {
+      String sfn = Utilities.path(templateDir, "ig-working.");
+      Map<String, String> props = new HashMap<>(); 
+      props.put("ig.source", sfn);       
+      new XmlParser().compose(new FileOutputStream(sfn+"xml"), ig);
+      new JsonParser().compose(new FileOutputStream(sfn+"json"), ig);
+      runScript(scriptOnJekyll, Utilities.path(root, "temp"), props);      
+    }
+  }
+
+  public void onCheckEvent(String tempDir, ImplementationGuide ig) throws IOException {
+    if (canExecute && scriptOnCheck != null) {
+      String sfn = Utilities.path(templateDir, "ig-working.");
+      Map<String, String> props = new HashMap<>(); 
+      props.put("ig.source", sfn);       
+      new XmlParser().compose(new FileOutputStream(sfn+"xml"), ig);
+      new JsonParser().compose(new FileOutputStream(sfn+"json"), ig);
+      runScript(scriptOnCheck, Utilities.path(root, "temp"), props);      
+    }
+  }
 
   
 }

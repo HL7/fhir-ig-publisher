@@ -7,7 +7,12 @@ import org.hl7.fhir.igtools.publisher.Publisher.CacheOption;
 import org.hl7.fhir.r5.test.utils.TestingUtilities;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.junit.Test;
+
+import com.google.gson.JsonObject;
+
+import junit.framework.Assert;
 
 public class AllGuidesTests {
 
@@ -59,7 +64,14 @@ public class AllGuidesTests {
 
   @Test
   public void testNewIgExternalTemplateLocal() throws Exception {
-    test(Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "new", "ig-dir"));
+    String path = Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "new", "ig-dir");
+    test(path);
+    checkIGMods(Utilities.path(path, "output", "ImplementationGuide-test-ig.json"));// check that the onload() event fired as expected
+  }
+
+  private void checkIGMods(String path) throws IOException {
+    JsonObject json = JsonTrackingParser.parseJsonFile(path);
+    Assert.assertEquals("xxxxx", json.get("publisher").getAsString());  // jjjjj is set in the javascript load script
   }
 
   @Test

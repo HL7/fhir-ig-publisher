@@ -210,6 +210,7 @@ import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.VersionUtil;
 import org.hl7.fhir.utilities.ZipGenerator;
 import org.hl7.fhir.utilities.cache.NpmPackage;
 import org.hl7.fhir.utilities.cache.PackageCacheManager;
@@ -2425,15 +2426,30 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private void templateBeforeGenerate() throws IOException {
     if (template != null) {
-      template.beforeGenerate(tempDir);
       if (debug)
-        waitForInput("before-generate");
+        waitForInput("before OnGenerate");
+      template.beforeGenerateEvent(tempDir, publishedIg);
+      if (debug)
+        waitForInput("after OnGenerate");
     }
   }
 
-  private void templateAfterGenerate() throws IOException {
+  private void templateBeforeJekyll() throws IOException {
     if (debug)
-      waitForInput("before-generate");
+      if (debug)
+        waitForInput("before OnJekyll");
+      template.beforeJekyllEvent(tempDir, publishedIg);
+      if (debug)
+        waitForInput("after OnJekyll");
+  }
+  
+  private void templateOnCheck() throws IOException {
+    if (debug)
+      if (debug)
+        waitForInput("before OnJekyll");
+      template.onCheckEvent(tempDir, publishedIg);
+      if (debug)
+        waitForInput("after OnJekyll");
   }
   
   private void waitForInput(String string) throws IOException {
@@ -3466,9 +3482,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       generateSummaryOutputs();
     
     cleanOutput(tempDir);
-    
-    templateAfterGenerate();
-    
+        
     if (nestedIgConfig != null) {
       if (watch) {
         throw new Exception("Cannot run in watch mode when IG has a nested IG.");
@@ -3501,8 +3515,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       createToc(childPublisher.getPublishedIg().getDefinition().getPage(), igArtifactsPage, nestedIgOutput);
     }
-    
+    templateBeforeJekyll();
+
     if (runTool()) {
+      templateOnCheck();
 
       if (!changeList.isEmpty()) {
         File df = makeSpecFile();
@@ -5557,8 +5573,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     } else {
       Publisher self = new Publisher();
-      System.out.println("FHIR Implementation Guide Publisher (v"+self.getToolingVersion()+", gen-code v"+Constants.VERSION+" / "+ToolsVersion.TOOLS_VERSION_STR+") @ "+nowAsString());
-      System.out.println("Detected Java version: " + System.getProperty("java.version")+" from "+System.getProperty("java.home")+" on "+System.getProperty("os.arch")+" ("+System.getProperty("sun.arch.data.model")+"bit). "+toMB(Runtime.getRuntime().maxMemory())+"MB available");
+      System.out.println("FHIR Implementation Guide Publisher "+VersionUtil.getVersionString());
+      System.out.println("Detected Java version: " + System.getProperty("java.version")+" from "+System.getProperty("java.home")+" on "+System.getProperty("os.arch")+" ("+System.getProperty("sun.arch.data.model")+"bit). "+toMB(Runtime.getRuntime().maxMemory())+"MB available. Run time = "+nowAsString());
       System.out.print("["+System.getProperty("user.dir")+"]");
       for (int i = 0; i < args.length; i++) {
           System.out.print(" "+args[i]);
