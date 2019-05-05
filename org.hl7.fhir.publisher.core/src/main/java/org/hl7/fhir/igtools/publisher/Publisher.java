@@ -3089,11 +3089,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
         
   private void load(String type) throws Exception {
-    log(LogCategory.PROGRESS, "process type: "+type);
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getElement().fhirType().equals(type)) {
-          log(LogCategory.PROGRESS, "process res: "+r.getId());
+          log(LogCategory.PROGRESS, "process res: "+r.fhirType()+"/"+r.getId());
           if (r.getResource() == null)
             try {
               if (f.getBundleType() == FetchedBundleType.NATIVE)

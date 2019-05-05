@@ -206,3 +206,5 @@ local.properties
 /org.hl7.fhir.publisher.core/src/test/resources/test-igs/new/ig-inline-rename/template
 /org.hl7.fhir.publisher.core/src/test/resources/test-igs/new/ig-package/template
 /org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/ig30/template
+/org.hl7.fhir.publisher.core/src/test/resources/test-igs/new/ig-package/output
+/zuliprc

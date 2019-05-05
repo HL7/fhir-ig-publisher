@@ -61,14 +61,14 @@ public class IGPackageChecker {
     this.packageId = packageId;
    }
 
-  public void check(String ver, String fhirversion, String name, String date) throws IOException, FHIRException {
+  public void check(String ver, String pckId, String fhirversion, String name, String date, String url, String canonical) throws IOException, FHIRException {
     String pf = Utilities.path(folder, "package.tgz");
     File f = new File(pf);
     if (!f.exists()) {
       makePackage(pf, name, ver, fhirversion, date);
     } else {
       NpmPackage pck = NpmPackage.fromPackage(new FileInputStream(f));
-      if (!pck.version().equals(ver)) {
+      if (!pck.version().equals(ver) || !pck.name().equals(pckId) || !pck.getWebLocation().equals(url) || !pck.canonical().equals(canonical)) {
         f.renameTo(new File(Utilities.changeFileExt(pf, ".tgz-old")));
         TarArchiveOutputStream tar;
         ByteArrayOutputStream OutputStream;
@@ -86,6 +86,12 @@ public class IGPackageChecker {
             JsonObject json = JsonTrackingParser.parseJson(b);
             json.remove("version");
             json.addProperty("version", ver);
+            json.remove("name");
+            json.addProperty("name", pckId);
+            json.remove("url");
+            json.addProperty("url", url);
+            json.remove("canonical");
+            json.addProperty("canonical", canonical);
             b = TextFile.stringToBytes(new GsonBuilder().setPrettyPrinting().create().toJson(json), false);
           }
           TarArchiveEntry entry = new TarArchiveEntry(s);
