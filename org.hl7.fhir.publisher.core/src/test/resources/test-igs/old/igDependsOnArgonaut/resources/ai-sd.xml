@@ -1,0 +1,63 @@
+<StructureDefinition xmlns="http://hl7.org/fhir">
+	<id value="argo-based-allergyintolerance"/>
+	<meta>
+		<versionId value="3"/>
+		<lastUpdated value="2016-09-29T00:11:47.157+00:00"/>
+	</meta>
+	<url value="http://hl7.org/fhir/test-ig-depends-on-argonaut/StructureDefinition/argo-based-allergyintolerance"/>
+	<version value="1.0.2"/>
+	<name value="Profile argo-based-allergyintolerance"/>
+	<status value="draft"/>
+	<publisher value="Health Level Seven International (FHIR - Infrastructure)"/>
+	<contact>
+		<telecom>
+			<system value="other"/>
+			<value value="http://www.healthit.gov"/>
+		</telecom>
+	</contact>
+	<date value="2016-08-01"/>
+	<mapping>
+		<identity value="rim"/>
+		<uri value="http://hl7.org/v3"/>
+		<name value="RIM Mapping"/>
+	</mapping>
+	<mapping>
+		<identity value="w5"/>
+		<uri value="http://hl7.org/fhir/w5"/>
+		<name value="W5 Mapping"/>
+	</mapping>
+	<mapping>
+		<identity value="v2"/>
+		<uri value="http://hl7.org/v2"/>
+		<name value="HL7 v2 Mapping"/>
+	</mapping>
+	<kind value="resource"/>
+	<constrainedType value="AllergyIntolerance"/>
+	<abstract value="false"/>
+	<base value="http://fhir.org/guides/argonaut/StructureDefinition/argo-allergyintolerance"/>
+	<differential>
+		<element id="AllergyIntolerance-argobasedallergyintolerance">
+			<path value="AllergyIntolerance"/>
+			<name value="ArgoBasedAllergyIntolerance"/>
+			<mustSupport value="false"/>
+			<isModifier value="false"/>
+		</element>
+		<element id="AllergyIntolerance-argobasedallergyintolerance.substance">
+			<path value="AllergyIntolerance.substance"/>
+			<min value="1"/>
+			<max value="1"/>
+			<type>
+				<code value="CodeableConcept"/>
+			</type>
+			<mustSupport value="true"/>
+			<isModifier value="false"/>
+			<binding>
+			  <!-- changed binding strength to required -->
+				<strength value="required"/>
+				<valueSetReference>
+					<reference value="http://fhir.org/guides/argonaut/ValueSet/substance"/>
+				</valueSetReference>
+			</binding>
+		</element>
+	</differential>
+</StructureDefinition>

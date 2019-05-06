@@ -35,32 +35,37 @@ public class AllGuidesTests {
   @Test
   public void testOldIg() throws Exception {
     test(Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "old", "ig", "ig.json"));
-  } 
+  }
 
   @Test
   public void testOldIg30() throws Exception {
     test(Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "old", "ig30", "ig.json"));
   }
-  
+
   @Test
   public void testOldIg14() throws Exception {
     test(Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "old", "ig14", "ig.json"));
   }
-  
+
   @Test
   public void testOldIg10() throws Exception {
     test(Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "old", "ig10", "ig.json"));
-  } 
+  }
+
+  @Test
+  public void testOldIgDependsOnArgonaut() throws Exception {
+    test(Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "old", "igDependsOnArgonaut", "ig.json"));
+  }
 
   @Test
   public void testNewIgInlineTemplate1() throws Exception {
     test(Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "new", "ig-inline"));
-  } 
+  }
 
   @Test
   public void testNewIgInlineTemplate2() throws Exception {
     test(Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "new", "ig-inline-rename"));
-  } 
+  }
 
   @Test
   public void testNewIgExternalTemplateLocal() throws Exception {

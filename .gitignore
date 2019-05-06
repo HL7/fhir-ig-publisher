@@ -170,6 +170,9 @@ local.properties
 /org.hl7.fhir.igtools.core/src/test/resources/test-igs/old/ig30/qa
 /org.hl7.fhir.igtools.core/src/test/resources/test-igs/old/ig30/temp
 /org.hl7.fhir.igtools.core/src/test/resources/test-igs/old/ig30/template
+/org.hl7.fhir.igtools.core/src/test/resources/test-igs/old/igDependsOnArgonaut/output
+/org.hl7.fhir.igtools.core/src/test/resources/test-igs/old/igDependsOnArgonaut/qa
+/org.hl7.fhir.igtools.core/src/test/resources/test-igs/old/igDependsOnArgonaut/temp
 /org.hl7.fhir.igtools.core/src/test/resources/test-igs/new/ig/ig.ini
 /org.hl7.fhir.igtools.core/src/test/resources/test-igs/new/ig/output
 /org.hl7.fhir.igtools.core/src/test/resources/test-igs/new/ig2/output
@@ -192,6 +195,9 @@ local.properties
 /org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/ig30/qa
 /org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/ig30/output
 /org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/ig30/temp
+/org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/igDependsOnArgonaut/output
+/org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/igDependsOnArgonaut/qa
+/org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/igDependsOnArgonaut/temp
 /org.hl7.fhir.publisher.core/src/test/resources/test-igs/new/ig-dir/output
 /org.hl7.fhir.publisher.core/src/test/resources/test-igs/new/ig-dir/temp
 /org.hl7.fhir.publisher.core/src/test/resources/test-igs/new/ig-github/output

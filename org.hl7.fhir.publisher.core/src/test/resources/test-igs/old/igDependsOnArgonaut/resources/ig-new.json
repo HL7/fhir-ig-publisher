@@ -1,0 +1,59 @@
+{
+  "resourceType" : "ImplementationGuide",
+  "id" : "ig",
+  "extension" : [{
+    "url" : "http://hl7.org/fhir/StructureDefinition/igpublisher-folder-resource",
+    "valueString" : "/Users/cmoesel/dev/HL7/fhir-ig-publisher/org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/igDependsOnArgonaut/resources"
+  },
+  {
+    "url" : "http://hl7.org/fhir/StructureDefinition/igpublisher-folder-pages",
+    "valueString" : "/Users/cmoesel/dev/HL7/fhir-ig-publisher/org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/igDependsOnArgonaut/pages"
+  }],
+  "url" : "http://hl7.org/fhir/test-ig-depends-on-argonaut/ImplementationGuide/ig",
+  "name" : "Implementation Guide Template",
+  "status" : "draft",
+  "experimental" : true,
+  "publisher" : "FHIR Project",
+  "packageId" : "hl7.fhir.test.igDependsOnArgonaut",
+  "license" : "CC0-1.0",
+  "fhirVersion" : [null,
+  "1.0.2"],
+  "dependsOn" : [{
+    "id" : "argonaut",
+    "uri" : "http://fhir.org/guides/argonaut/r2",
+    "version" : "1.0.0"
+  }],
+  "definition" : {
+    "grouping" : [{
+      "name" : "base"
+    }],
+    "resource" : [{
+      "reference" : {
+        "reference" : "StructureDefinition/argo-based-allergyintolerance"
+      }
+    },
+    {
+      "reference" : {
+        "reference" : "ValueSet/test-ig-vs"
+      }
+    },
+    {
+      "reference" : {
+        "reference" : "AllergyIntolerance/62d29612-802f-4233-8df2-fa85d021937b"
+      }
+    }],
+    "page" : {
+      "nameUrl" : "index.html",
+      "title" : "Home Page",
+      "generation" : "html"
+    },
+    "parameter" : [{
+      "code" : "generate",
+      "value" : "xml"
+    },
+    {
+      "code" : "generate",
+      "value" : "JSON"
+    }]
+  }
+}
