@@ -1052,6 +1052,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     templateManager = new TemplateManager(pcm, logger);
     templateProvider = new IGPublisherLiquidTemplateServices();
     log("Package Cache: "+pcm.getFolder());
+
+    String v = (version==null) ? Constants.VERSION : version;
+    if (!pcm.hasPackage("hl7.fhir.core", (version==null) ? Constants.VERSION : version)) {
+      String url = getMasterSource();
+      InputStream src = fetchFromSource("hl7.fhir.core-" + v, url);
+      pcm.addPackageToCache("hl7.fhir.core",v, src);
+    }
+    
     if (packagesFolder != null) {
       log("Loading Packages from "+packagesFolder);
       pcm.loadFromFolder(packagesFolder);
@@ -1822,7 +1830,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     PackageCacheManager pcm = new PackageCacheManager(true, ToolsVersion.TOOLS_VERSION);
     
     NpmPackage npm = null; 
-    npm = pcm.loadPackage("hl7.fhir.core", Constants.VERSION);
+    if (version == null) {
+      version = Constants.VERSION;
+	}
+    if (!pcm.hasPackage("hl7.fhir.core", version)) {
+      String url = getMasterSource();
+      InputStream src = fetchFromSource("hl7.fhir.core-" + version, url);
+      pcm.addPackageToCache("hl7.fhir.core", version, src);
+    }
+    npm = pcm.loadPackage("hl7.fhir.core", version);
     
     ZipInputStream zip = new ZipInputStream(npm.load("other", "ig-template.zip"));
     byte[] buffer = new byte[2048];
