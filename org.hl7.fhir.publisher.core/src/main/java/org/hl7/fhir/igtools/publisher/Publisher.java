@@ -74,23 +74,15 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.SystemUtils;
-import org.hl7.fhir.convertors.IGR2ConvertorAdvisor;
-import org.hl7.fhir.convertors.R2016MayToR4Loader;
 import org.hl7.fhir.convertors.R2016MayToR5Loader;
-import org.hl7.fhir.convertors.R2ToR4Loader;
 import org.hl7.fhir.convertors.R2ToR5Loader;
-import org.hl7.fhir.convertors.R3ToR4Loader;
 import org.hl7.fhir.convertors.R3ToR5Loader;
 import org.hl7.fhir.convertors.R4ToR5Loader;
 import org.hl7.fhir.convertors.TerminologyClientFactory;
-import org.hl7.fhir.convertors.VersionConvertorAdvisor40;
 import org.hl7.fhir.convertors.VersionConvertorAdvisor50;
-import org.hl7.fhir.convertors.VersionConvertor_10_40;
 import org.hl7.fhir.convertors.VersionConvertor_10_50;
 import org.hl7.fhir.convertors.VersionConvertor_14_30;
-import org.hl7.fhir.convertors.VersionConvertor_14_40;
 import org.hl7.fhir.convertors.VersionConvertor_14_50;
-import org.hl7.fhir.convertors.VersionConvertor_30_40;
 import org.hl7.fhir.convertors.VersionConvertor_30_50;
 import org.hl7.fhir.convertors.VersionConvertor_40_50;
 import org.hl7.fhir.exceptions.DefinitionException;
@@ -151,7 +143,6 @@ import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.FhirPublication;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.ImplementationGuide.GuidePageGeneration;
-import org.hl7.fhir.r5.model.ImplementationGuide.GuideParameterCode;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionGroupingComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionPageComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionParameterComponent;
@@ -180,7 +171,6 @@ import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.openapi.OpenApiGenerator;
 import org.hl7.fhir.r5.openapi.Writer;
 import org.hl7.fhir.r5.terminologies.ValueSetExpander.ValueSetExpansionOutcome;
-import org.hl7.fhir.r5.test.utils.ToolsHelper;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.r5.utils.FHIRPathEngine;
 import org.hl7.fhir.r5.utils.FHIRPathEngine.IEvaluationContext;
@@ -189,7 +179,6 @@ import org.hl7.fhir.r5.utils.IResourceValidator;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator.Category;
 import org.hl7.fhir.r5.utils.NarrativeGenerator;
-import org.hl7.fhir.r5.utils.NarrativeGenerator.ILiquidTemplateProvider;
 import org.hl7.fhir.r5.utils.NarrativeGenerator.IReferenceResolver;
 import org.hl7.fhir.r5.utils.NarrativeGenerator.ITypeParser;
 import org.hl7.fhir.r5.utils.NarrativeGenerator.ResourceWithReference;
@@ -203,8 +192,8 @@ import org.hl7.fhir.r5.validation.InstanceValidator;
 import org.hl7.fhir.r5.validation.ProfileValidator;
 import org.hl7.fhir.utilities.CSFile;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
+import org.hl7.fhir.utilities.FileNotifier;
 import org.hl7.fhir.utilities.IniFile;
-import org.hl7.fhir.utilities.JsonMerger;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.StandardsStatus;
@@ -5495,6 +5484,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return; 
     } else if (hasParam(args, "-help") || hasParam(args, "-?") || hasParam(args, "/?") || hasParam(args, "?")) {
       System.out.println("");
+      System.out.println("To use this publisher to create an new FHIR Implementation Guide, run ");
+      System.out.println("with the command");
+      System.out.println("");
+      System.out.println("-init [path] [-version [version]]");
+      System.out.println("");
+      System.out.println(" -init: a path where the implementation guide should be initialized (new ig)");
+      System.out.println(" -version: the version for the new ig (3.0.1=STU3, 4.0.0=R4), if not set, current will be used)");
+      System.out.println("");
+      System.out.println("");
       System.out.println("To use this publisher to publish a FHIR Implementation Guide, run ");
       System.out.println("with the commands");
       System.out.println("");
@@ -5516,6 +5514,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       System.out.println("           this parameter can be present multiple times");
       System.out.println("");
       System.out.println("The most important output from the publisher is qa.html");
+      System.out.println("");
       System.out.println("");
       System.out.println("Alternatively, you can run the Publisher directly against a folder containing");
       System.out.println("a set of resources, to validate and represent them");
@@ -5643,6 +5642,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         // create an appropriate ig.json in the specified folder
         self.setConfigFile(generateIGFromSimplifier(getNamedParam(args, "-simplifier"), getNamedParam(args, "-destination"), getNamedParam(args, "-canonical"), getNamedParam(args, "-npm-name"), getNamedParam(args, "-license"), packages));
         self.folderToDelete = Utilities.getDirectoryForFile(self.getConfigFile());
+      } else if (hasParam(args, "-init")) {
+        // nothing to do in the moment, but has to be checked, otherwise the else part would fail
       } else {
         self.setConfigFile(determineActualIG(getNamedParam(args, "-ig"), self.mode));
         if (Utilities.noString(self.getConfigFile()))
@@ -5675,7 +5676,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       else
         self.setCacheOption(CacheOption.LEAVE);
       try {
-        self.execute();
+    	// for initializing new ig do an other handling
+        if (hasParam(args, "-init")) {
+          self.createNew(args);
+        }else {
+          self.execute();
+        }
       } catch (Exception e) {
         exitCode = 1;
         self.log("Publishing Content Failed: "+e.getMessage());
@@ -5939,4 +5945,47 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     parentInspector.getSpecMaps().addAll(specMaps);
   }
   
+  // new stuff for building a new ig project
+  private void createNew(String[] args) throws Exception {
+    log("Creating a new FHIR Implementation Guide");
+    File initDir = new File(getNamedParam(args, "-init"));
+    if (!initDir.exists()) {
+      initDir.mkdirs();
+    }
+    setConfigFile(null);
+
+    String useVersion = Constants.VERSION;
+    if (hasParam(args, "-version")) {
+      useVersion = getNamedParam(args, "-version");
+	}
+    version = useVersion;
+    specifiedVersion = version;
+    log("The version to use "+version);
+    
+    initialize();
+    log("");
+    copyScratchToNew(initDir);
+    log("");
+    log("Initialization completed. Start working on your IG in the directory "+initDir.getAbsolutePath());
+  }
+  
+  public void copyScratchToNew(File initDir) throws Exception {
+    log("Copy from "+adHocTmpDir +" to "+initDir.getAbsolutePath());
+    if (adHocTmpDir != null && new File(adHocTmpDir).exists()) {
+      Utilities.copyDirectory(adHocTmpDir, initDir.getAbsolutePath(), new FileNotifier() {
+        @Override
+        public void copyFile(String arg0, String arg1) {
+          log("copy file " + arg0 + " to "+ arg1);
+          try {
+            IOUtils.copy(new FileInputStream(arg0), new FileOutputStream(arg1));
+          } catch (IOException e) {
+            log("Error copiing file " + arg0 + " to "+ arg1+"\n"+e.getMessage());
+          }
+        }
+	  });
+      new File(adHocTmpDir).deleteOnExit();
+    }
+    configFile = new File(initDir, "ig.json").getAbsolutePath();
+    
+  }
 }
