@@ -3,10 +3,10 @@
 <ImplementationGuide xmlns="http://hl7.org/fhir">
   <id value="ig"/>
   <extension url="http://hl7.org/fhir/StructureDefinition/igpublisher-folder-resource">
-    <valueString value="/Users/cmoesel/dev/HL7/fhir-ig-publisher/org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/igDependsOnArgonaut/resources"/>
+    <valueString value="C:\work\org.hl7.fhir\fhir-ig-publisher\org.hl7.fhir.publisher.core\src\test\resources\test-igs\old\igDependsOnArgonaut\resources"/>
   </extension>
   <extension url="http://hl7.org/fhir/StructureDefinition/igpublisher-folder-pages">
-    <valueString value="/Users/cmoesel/dev/HL7/fhir-ig-publisher/org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/igDependsOnArgonaut/pages"/>
+    <valueString value="C:\work\org.hl7.fhir\fhir-ig-publisher\org.hl7.fhir.publisher.core\src\test\resources\test-igs\old\igDependsOnArgonaut\pages"/>
   </extension>
   <url value="http://hl7.org/fhir/test-ig-depends-on-argonaut/ImplementationGuide/ig"/>
   <name value="Implementation Guide Template"/>

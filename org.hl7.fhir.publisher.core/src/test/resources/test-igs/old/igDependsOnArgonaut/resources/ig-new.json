@@ -3,11 +3,11 @@
   "id" : "ig",
   "extension" : [{
     "url" : "http://hl7.org/fhir/StructureDefinition/igpublisher-folder-resource",
-    "valueString" : "/Users/cmoesel/dev/HL7/fhir-ig-publisher/org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/igDependsOnArgonaut/resources"
+    "valueString" : "C:\\work\\org.hl7.fhir\\fhir-ig-publisher\\org.hl7.fhir.publisher.core\\src\\test\\resources\\test-igs\\old\\igDependsOnArgonaut\\resources"
   },
   {
     "url" : "http://hl7.org/fhir/StructureDefinition/igpublisher-folder-pages",
-    "valueString" : "/Users/cmoesel/dev/HL7/fhir-ig-publisher/org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/igDependsOnArgonaut/pages"
+    "valueString" : "C:\\work\\org.hl7.fhir\\fhir-ig-publisher\\org.hl7.fhir.publisher.core\\src\\test\\resources\\test-igs\\old\\igDependsOnArgonaut\\pages"
   }],
   "url" : "http://hl7.org/fhir/test-ig-depends-on-argonaut/ImplementationGuide/ig",
   "name" : "Implementation Guide Template",
