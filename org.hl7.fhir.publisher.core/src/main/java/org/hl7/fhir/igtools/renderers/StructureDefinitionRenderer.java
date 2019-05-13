@@ -1081,6 +1081,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     if ("http://hl7.org/fhir/provenance".equals(uri)) return "http://hl7.org/fhir/provenance.html";
     if ("http://hl7.org/fhir/w5".equals(uri)) return "http://hl7.org/fhir/w5.html";
     if ("http://hl7.org/fhir/workflow".equals(uri)) return "http://hl7.org/fhir/workflow.html";
+    if ("http://hl7.org/fhir/interface".equals(uri)) return "http://hl7.org/fhir/patterns.html";
     if ("http://hl7.org/v2".equals(uri)) return "http://hl7.org/comparison-v2.html";
     if ("http://hl7.org/v3".equals(uri)) return "http://hl7.org/comparison-v3.html";
     if ("http://hl7.org/v3/cda".equals(uri)) return "http://hl7.org/comparison-cda.html";
