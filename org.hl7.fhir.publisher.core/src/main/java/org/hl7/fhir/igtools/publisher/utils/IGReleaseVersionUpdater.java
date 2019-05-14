@@ -39,7 +39,7 @@ public class IGReleaseVersionUpdater {
   private static final String END_HTML_MARKER = "</p><!--EndReleaseHeader-->";
   private static final String START_PUB_BOX = "<p id=\"publish-box\">";
   private static final String PUB_STYLE = "#publish-box";
-  private static final String CSS = "#publish-box {  list-style: none;  padding: 0; }\np#publish-box { background-color: yellow; border:1px solid maroon; padding: 5px;}\nimg#publish-box { text-align: baseline; }\n#markdown-toc li{font-size: 1em;}\n";
+  private static final String CSS = "#publish-box {  list-style: none;  padding: 0; }\np#publish-box { background-color: yellow; border:1px solid maroon; padding: 5px;}\nimg#publish-box { vertical-align: baseline; }\n#markdown-toc li{font-size: 1em;}\n";
   
   private String folder;
   private List<String> ignoreList;
