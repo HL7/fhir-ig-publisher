@@ -2946,7 +2946,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         igpkp.findConfiguration(file, r);
         if (srcForLoad == null)
           srcForLoad = findIGReference(r.fhirType(), r.getId());
-        if (srcForLoad == null) {
+        if (srcForLoad == null && !"ImplementationGuide".equals(r.fhirType())) {
           srcForLoad = publishedIg.getDefinition().addResource();
           srcForLoad.getReference().setReference(r.fhirType()+"/"+r.getId());
         }
@@ -2971,7 +2971,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             throw new Exception("Unable to determine file type for "+file.getName());
           r.setElement(e);
         }
-        srcForLoad.setUserData("loaded.resource", r);
+        if (srcForLoad != null)
+          srcForLoad.setUserData("loaded.resource", r);
         
         r.setTitle(e.getChildValue("name"));
         Element m = e.getNamedChild("meta");

@@ -242,7 +242,13 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       }
       if (s != null)
         bc.setUserData("path", specPath(s));
-      
+      // special cases
+      else if (bc.getUrl().equals("http://hl7.org/fhir/ValueSet/security-role-type"))
+        bc.setUserData("path", specPath("valueset-security-role-type.html"));
+      else if (bc.getUrl().equals("http://hl7.org/fhir/ValueSet/object-lifecycle-events"))
+        bc.setUserData("path", specPath("valueset-object-lifecycle-events.html"));
+//      else
+//        System.out.println("No path for "+bc.getUrl());
     }    
   }
 
