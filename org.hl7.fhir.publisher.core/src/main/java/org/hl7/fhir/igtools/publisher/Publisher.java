@@ -2099,7 +2099,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       dep.addProperty("package", packageId);
 
     String webref = pi.getWebLocation();
-    String location = dep.has("location") ? "" : dep.get("location").getAsString(); 
+    String location = dep.has("location") ? dep.get("location").getAsString() : ""; 
     if (location.startsWith(".."))
       webref = location;
     
@@ -4471,6 +4471,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     data.add("ig", ig);
     ig.addProperty("id", publishedIg.getId());
     ig.addProperty("name", publishedIg.getName());
+    ig.addProperty("title", publishedIg.getTitle());
     ig.addProperty("url", publishedIg.getUrl());
     if (businessVersion!=null)
       ig.addProperty("version", businessVersion);
