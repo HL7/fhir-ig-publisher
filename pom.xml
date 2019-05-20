@@ -23,7 +23,7 @@
     <properties>
         <core_version>3.7.34-SNAPSHOT</core_version>
     </properties>
-    <version>0.9.8-SNAPSHOT</version> <!-- See the note above -->
+    <version>0.9.9-SNAPSHOT</version> <!-- See the note above -->
 
     <packaging>pom</packaging>
     <groupId>org.hl7.fhir.publisher</groupId>
