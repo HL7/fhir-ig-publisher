@@ -219,25 +219,27 @@ public class ConfigFileConverter {
       for (Entry<String, JsonElement> pp : configuration.getAsJsonObject("resources").entrySet()) {
         if (!pp.getKey().startsWith("_")) {
           String s = pp.getKey();
-          JsonObject o = (JsonObject) pp.getValue();
-          JsonElement vb = o.get("base");
-          JsonElement vd = o.get("defns");
-          JsonElement vf = o.get("format");
-          JsonElement vs = o.get("source");
-          if (vb != null && vd != null && vf != null && vs != null) {
-            ImplementationGuideDefinitionResourceComponent res = getResource(ig.getDefinition(), s);
-            if (res == null) {
-              res = ig.getDefinition().addResource();
-              res.setReference(new Reference(s));
+          if (pp.getValue().isJsonObject()) {
+            JsonObject o = (JsonObject) pp.getValue();
+            JsonElement vb = o.get("base");
+            JsonElement vd = o.get("defns");
+            JsonElement vf = o.get("format");
+            JsonElement vs = o.get("source");
+            if (vb != null && vd != null && vf != null && vs != null) {
+              ImplementationGuideDefinitionResourceComponent res = getResource(ig.getDefinition(), s);
+              if (res == null) {
+                res = ig.getDefinition().addResource();
+                res.setReference(new Reference(s));
+              }
+              if (vb != null)
+                res.addExtension(ToolingExtensions.EXT_IGP_BASE, new StringType(((JsonPrimitive) vb).getAsString()));
+              if (vd != null)
+                res.addExtension(ToolingExtensions.EXT_IGP_DEFNS, new StringType(((JsonPrimitive) vd).getAsString()));
+              if (vf != null)
+                res.addExtension(ToolingExtensions.EXT_IGP_FORMAT, new StringType(((JsonPrimitive) vf).getAsString()));
+              if (vs != null)
+                res.addExtension(ToolingExtensions.EXT_IGP_SOURCE, new StringType(((JsonPrimitive) vs).getAsString()));
             }
-            if (vb != null)
-              res.addExtension(ToolingExtensions.EXT_IGP_BASE, new StringType(((JsonPrimitive) vb).getAsString()));
-            if (vd != null)
-              res.addExtension(ToolingExtensions.EXT_IGP_DEFNS, new StringType(((JsonPrimitive) vd).getAsString()));
-            if (vf != null)
-              res.addExtension(ToolingExtensions.EXT_IGP_FORMAT, new StringType(((JsonPrimitive) vf).getAsString()));
-            if (vs != null)
-              res.addExtension(ToolingExtensions.EXT_IGP_SOURCE, new StringType(((JsonPrimitive) vs).getAsString()));
           }
         }
       }

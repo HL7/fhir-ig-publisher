@@ -76,6 +76,7 @@ public class TypeRef {
 	private List<String> params = new ArrayList<String>();
 	private List<String> aggregations = new ArrayList<String>();
 	private ReferenceVersionRules versioning;
+  private List<String> patterns;
 
 	public TypeRef()
 	{
@@ -248,6 +249,14 @@ public class TypeRef {
   @Override
   public String toString() {
     return summary();
+  }
+  
+  public List<String> getPatterns() {
+    return patterns;
+  }
+
+  public void setPatterns(List<String> patterns) {
+    this.patterns = patterns;
   }
   
   

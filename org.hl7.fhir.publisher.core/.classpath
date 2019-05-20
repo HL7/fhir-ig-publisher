@@ -24,6 +24,19 @@
 			<attribute name="maven.pomderived" value="true"/>
 		</attributes>
 	</classpathentry>
+	<classpathentry combineaccessrules="false" kind="src" path="/org.hl7.fhir.convertors"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/org.hl7.fhir.dstu2"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/org.hl7.fhir.dstu2016may"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/org.hl7.fhir.dstu3"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/org.hl7.fhir.r4"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/org.hl7.fhir.r5"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/org.hl7.fhir.utilities"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/org.hl7.fhir.validation"/>
+	<classpathentry kind="con" path="org.eclipse.m2e.MAVEN2_CLASSPATH_CONTAINER">
+		<attributes>
+			<attribute name="maven.pomderived" value="true"/>
+		</attributes>
+	</classpathentry>
 	<classpathentry kind="var" path="M2_REPO/org/apache/ant/ant/1.10.5/ant-1.10.5.jar" sourcepath="M2_REPO/org/apache/ant/ant/1.10.5/ant-1.10.5-sources.jar"/>
 	<classpathentry kind="var" path="M2_REPO/org/apache/ant/ant-launcher/1.10.5/ant-launcher-1.10.5.jar" sourcepath="M2_REPO/org/apache/ant/ant-launcher/1.10.5/ant-launcher-1.10.5-sources.jar"/>
 	<classpathentry kind="var" path="M2_REPO/ca/uhn/hapi/fhir/hapi-fhir-base/3.7.0-SNAPSHOT/hapi-fhir-base-3.7.0-SNAPSHOT.jar" sourcepath="M2_REPO/ca/uhn/hapi/fhir/hapi-fhir-base/3.7.0-SNAPSHOT/hapi-fhir-base-3.7.0-SNAPSHOT-sources.jar"/>
@@ -70,18 +83,5 @@
 	<classpathentry kind="var" path="M2_REPO/net/bytebuddy/byte-buddy/1.9.3/byte-buddy-1.9.3.jar" sourcepath="M2_REPO/net/bytebuddy/byte-buddy/1.9.3/byte-buddy-1.9.3-sources.jar"/>
 	<classpathentry kind="var" path="M2_REPO/net/bytebuddy/byte-buddy-agent/1.9.3/byte-buddy-agent-1.9.3.jar" sourcepath="M2_REPO/net/bytebuddy/byte-buddy-agent/1.9.3/byte-buddy-agent-1.9.3-sources.jar"/>
 	<classpathentry kind="var" path="M2_REPO/org/objenesis/objenesis/2.6/objenesis-2.6.jar" sourcepath="M2_REPO/org/objenesis/objenesis/2.6/objenesis-2.6-sources.jar"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/org.hl7.fhir.convertors"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/org.hl7.fhir.dstu2"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/org.hl7.fhir.dstu2016may"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/org.hl7.fhir.dstu3"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/org.hl7.fhir.r4"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/org.hl7.fhir.r5"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/org.hl7.fhir.utilities"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/org.hl7.fhir.validation"/>
-	<classpathentry kind="con" path="org.eclipse.m2e.MAVEN2_CLASSPATH_CONTAINER">
-		<attributes>
-			<attribute name="maven.pomderived" value="true"/>
-		</attributes>
-	</classpathentry>
 	<classpathentry kind="output" path="target/classes"/>
 </classpath>
