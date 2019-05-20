@@ -1445,8 +1445,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
 
     loadFromBuildServer();
-    if (configuration.has("template"))
+    if (configuration.has("template")) {
       template = templateManager.loadTemplate(str(configuration, "template"), rootDir, configuration.has("npm-name") ? configuration.get("npm-name").getAsString() : null, mode == IGBuildMode.AUTOBUILD);
+      configuration.add("defaults", template.config().get("defaults"));
+    }
     
     if (Utilities.existsInList(version.substring(0,  3), "1.0", "1.4", "1.6", "3.0"))
       markdownEngine = new MarkDownProcessor(Dialect.DARING_FIREBALL);
@@ -2428,7 +2430,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (template != null) {
       if (debug)
         waitForInput("before OnGenerate");
-      template.beforeGenerateEvent(tempDir, publishedIg);
+      template.beforeGenerateEvent(tempDir, publishedIg, otherFilesRun);
       if (debug)
         waitForInput("after OnGenerate");
     }

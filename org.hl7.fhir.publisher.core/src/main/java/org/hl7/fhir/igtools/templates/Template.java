@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.tools.ant.DefaultLogger;
@@ -206,10 +207,18 @@ public class Template {
     return null;
   }
 
-  public void beforeGenerateEvent(String tempDir, ImplementationGuide ig) throws IOException {
+  public void beforeGenerateEvent(String tempDir, ImplementationGuide ig, Set<String> fileList) throws IOException {
     File src = new File(Utilities.path(templateDir, "content"));
     if (src.exists()) {
-      FileUtils.copyDirectory(src, new File(tempDir));
+      for (File f : src.listFiles()) {
+        if (f.isDirectory())
+          FileUtils.copyDirectory(f, new File(Utilities.path(tempDir, f.getName())));
+        else {
+          File nf = new File(Utilities.path(tempDir, f.getName()));
+          fileList.add(nf.getAbsolutePath());
+          FileUtils.copyFile(f, nf);
+        }
+      }
     }
     if (canExecute && scriptOnGenerate != null) {
       String sfn = Utilities.path(templateDir, "ig-working.");
