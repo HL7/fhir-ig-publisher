@@ -215,6 +215,7 @@ import org.hl7.fhir.utilities.ZipGenerator;
 import org.hl7.fhir.utilities.cache.NpmPackage;
 import org.hl7.fhir.utilities.cache.PackageCacheManager;
 import org.hl7.fhir.utilities.cache.PackageGenerator.PackageType;
+import org.hl7.fhir.utilities.json.JSONUtil;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.hl7.fhir.utilities.cache.ToolsVersion;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
@@ -1447,7 +1448,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     loadFromBuildServer();
     if (configuration.has("template")) {
       template = templateManager.loadTemplate(str(configuration, "template"), rootDir, configuration.has("npm-name") ? configuration.get("npm-name").getAsString() : null, mode == IGBuildMode.AUTOBUILD);
-      configuration.add("defaults", template.config().get("defaults"));
+      if (!configuration.has("defaults"))
+        configuration.add("defaults", template.config().get("defaults"));
+      else
+        JSONUtil.merge(template.config().getAsJsonObject("defaults"), configuration.getAsJsonObject("defaults"));
     }
     
     if (Utilities.existsInList(version.substring(0,  3), "1.0", "1.4", "1.6", "3.0"))
