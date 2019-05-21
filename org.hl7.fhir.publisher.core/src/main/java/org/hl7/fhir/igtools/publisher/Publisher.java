@@ -5251,7 +5251,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "xlsx")) {
       String path = Utilities.path(tempDir, r.getId()+".xlsx");
       f.getOutputNames().add(path);
-      new ProfileUtilities(context, errors, igpkp).generateXlsx(new FileOutputStream(path), sd, true);
+      new ProfileUtilities(context, errors, igpkp).generateXlsx(new FileOutputStream(path), sd, true, true);
     }
 
     if (!regen && sd.getKind() != StructureDefinitionKind.LOGICAL &&  igpkp.wantGen(r, "sch")) {
