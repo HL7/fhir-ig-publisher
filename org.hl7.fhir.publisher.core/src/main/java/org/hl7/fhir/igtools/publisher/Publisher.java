@@ -99,6 +99,8 @@ import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.exceptions.PathEngineException;
 import org.hl7.fhir.igtools.publisher.FetchedFile.FetchedBundleType;
 import org.hl7.fhir.igtools.publisher.IFetchFile.FetchState;
+import org.hl7.fhir.igtools.publisher.Publisher.ListItemEntry;
+import org.hl7.fhir.igtools.publisher.Publisher.ListViewSorterById;
 import org.hl7.fhir.igtools.renderers.BaseRenderer;
 import org.hl7.fhir.igtools.renderers.CodeSystemRenderer;
 import org.hl7.fhir.igtools.renderers.JsonXhtmlRenderer;
@@ -158,6 +160,8 @@ import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionPa
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.SPDXLicense;
+import org.hl7.fhir.r5.model.ListResource;
+import org.hl7.fhir.r5.model.ListResource.ListEntryComponent;
 import org.hl7.fhir.r5.model.MetadataResource;
 import org.hl7.fhir.r5.model.Parameters;
 import org.hl7.fhir.r5.model.PrimitiveType;
@@ -186,6 +190,7 @@ import org.hl7.fhir.r5.utils.FHIRPathEngine;
 import org.hl7.fhir.r5.utils.FHIRPathEngine.IEvaluationContext;
 import org.hl7.fhir.r5.utils.IGHelper;
 import org.hl7.fhir.r5.utils.IResourceValidator;
+import org.hl7.fhir.r5.utils.LiquidEngine;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator.Category;
 import org.hl7.fhir.r5.utils.NarrativeGenerator;
@@ -962,15 +967,30 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private FetchedResource getResourceForUri(FetchedFile f, String uri) {
-      for (FetchedResource r : f.getResources()) {
-        if (r.getResource() != null && r.getResource() instanceof MetadataResource) {
-          MetadataResource bc = (MetadataResource) r.getResource();
-          if (bc.getUrl() != null && bc.getUrl().equals(uri))
+    for (FetchedResource r : f.getResources()) {
+      if (r.getResource() != null && r.getResource() instanceof MetadataResource) {
+        MetadataResource bc = (MetadataResource) r.getResource();
+        if (bc.getUrl() != null && bc.getUrl().equals(uri))
           return r;
-        }
       }
-    return null;
     }
+    return null;
+  }
+
+  private FetchedResource getResourceForRef(FetchedFile f, String ref) {
+    for (FetchedResource r : f.getResources()) {
+      if ((r.fhirType()+"/"+r.getId()).equals(ref))
+        return r;
+    }
+    for (FetchedFile f1 : fileList) {
+      for (FetchedResource r : f1.getResources()) {
+        if ((r.fhirType()+"/"+r.getId()).equals(ref))
+          return r;
+      }
+    }
+    
+    return null;
+  }
 
   private FetchedResource getResourceForUri(String uri) {
     for (FetchedFile f : fileList) {
@@ -2390,7 +2410,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (FetchedFile f : fileList) {
         for (FetchedResource r : f.getResources()) {
           ImplementationGuideDefinitionResourceComponent rg = findIGReference(r.fhirType(), r.getId());
-          if (rg == null) {
+          if (!"ImplementationGuide".equals(r.fhirType()) && rg == null) {
             System.out.println("resource "+r.fhirType()+"/"+r.getId()+" not defined");
             failed = true;
           }
@@ -2767,6 +2787,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     load("CapabilityStatement");
     load("Questionnaire");
     load("PlanDefinition");
+    loadLists();
     generateSnapshots();
     checkConformanceResources();
     generateLogicalMaps();
@@ -3095,6 +3116,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
         
+  private void loadLists() throws Exception {
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getElement().fhirType().equals("List")) {
+          ListResource l = (ListResource) convertFromElement(r.getElement());
+          r.setResource(l);          
+        }
+      }
+    }
+  }
+  
   private void load(String type) throws Exception {
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
@@ -4827,6 +4859,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               generateOutputsConceptMap(f, r, (ConceptMap) r.getResource(), vars);
               break;
 
+            case List:
+              generateOutputsList(f, r, (ListResource) r.getResource(), vars);              
             case CapabilityStatement:
               generateOutputsCapabilityStatement(f, r, (CapabilityStatement) r.getResource(), vars);
               break;
@@ -4851,6 +4885,180 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
+
+  public class ListItemEntry {
+
+    private String id;
+    private String link;
+    private String name;
+    private String desc;
+
+    public ListItemEntry(String id, String link, String name, String desc) {
+      super();
+      this.id = id;
+      this.link = link;
+      this.name = name;
+      this.desc = desc;
+    }
+
+    public String getId() {
+      return id;
+    }
+
+    public String getLink() {
+      return link;
+    }
+
+    public String getName() {
+      return name;
+    }
+
+    public String getDesc() {
+      return desc;
+    }
+  }
+
+  public class ListViewSorterById implements Comparator<ListItemEntry> {
+    @Override
+    public int compare(ListItemEntry arg0, ListItemEntry arg1) {
+      return arg0.getId().compareTo(arg1.getId());
+    }
+  }
+
+  public class ListViewSorterByName implements Comparator<ListItemEntry> {
+    @Override
+    public int compare(ListItemEntry arg0, ListItemEntry arg1) {
+      return arg0.getName().compareTo(arg1.getName());
+    }
+  }
+
+
+  private void generateOutputsList(FetchedFile f, FetchedResource r, ListResource resource, Map<String, String> vars) throws IOException, FHIRException {
+    // we have 4 kinds of outputs:
+    //  * list: a series of <li><a href="{{link}}">{{name}}</a> {{desc}}</li>
+    //  * list-simple: a series of <li><a href="{{link}}">{{name}}]</a></li>
+    //  * table: a series of <tr><td><a href="{{link}}">{{name}}]</a></td><td>{{desc}}</td></tr>
+    //  * scripted: in format as provided by config, using liquid variables {{link}}, {{name}}, {{desc}} as desired
+    // not all resources have a description. Name might be generated
+    //
+    // each list is produced 3 times: 
+    //  * in order provided by the list
+    //  * in alphabetical order by link
+    //  * in allhpbetical order by name
+    
+    List<ListItemEntry> list = new ArrayList<>();
+    
+    for (ListEntryComponent li : resource.getEntry()) {
+      if (!li.getDeleted() && li.hasItem() && li.getItem().hasReference()) {
+        String ref = li.getItem().getReference();
+        FetchedResource lr = getResourceForUri(f, ref);
+        if (lr == null)
+          lr = getResourceForRef(f, ref);
+        if (lr != null) {
+          list.add(new ListItemEntry(getListId(lr), getListLink(lr), getListName(lr), getListDesc(lr)));          
+        } else {
+          // ok, we'll see if we can resolve it from another spec 
+          Resource l = context.fetchResource(null, ref);
+          if (l== null && ref.matches(Constants.LOCAL_REF_REGEX)) {
+            String[] p = ref.split("\\/");
+            l = context.fetchResourceById(p[0], p[1]);
+          }
+          if (l != null)
+            list.add(new ListItemEntry(getListId(l), getListLink(l), getListName(l), getListDesc(l)));          
+        }
+      }
+    }
+    if (igpkp.wantGen(r, "list-list"))
+      fragment("List-"+resource.getId()+"-list-no", genListView(list, "<li><a href=\"{{link}}\">{{name}}</a> {{desc}}</li>\r\n"), f.getOutputNames());
+    if (igpkp.wantGen(r, "list-list-simple"))
+      fragment("List-"+resource.getId()+"-list-no-simple", genListView(list, "<li><a href=\"{{link}}\"></a> {{desc}}</li>\r\n"), f.getOutputNames());
+    if (igpkp.wantGen(r, "list-list-table"))
+      fragment("List-"+resource.getId()+"-list-no-table", genListView(list, "<tr><td><a href=\"{{link}}\">{{name}}]</a></td><td>{{desc}}</td></tr>\r\n"), f.getOutputNames());
+
+    Collections.sort(list, new ListViewSorterById());
+    if (igpkp.wantGen(r, "list-list"))
+      fragment("List-"+resource.getId()+"-list-id", genListView(list, "<li><a href=\"{{link}}\">{{name}}</a> {{desc}}</li>\r\n"), f.getOutputNames());
+    if (igpkp.wantGen(r, "list-list-simple"))
+      fragment("List-"+resource.getId()+"-list-id-simple", genListView(list, "<li><a href=\"{{link}}\"></a> {{desc}}</li>\r\n"), f.getOutputNames());
+    if (igpkp.wantGen(r, "list-list-table"))
+      fragment("List-"+resource.getId()+"-list-id-table", genListView(list, "<tr><td><a href=\"{{link}}\">{{name}}]</a></td><td>{{desc}}</td></tr>\r\n"), f.getOutputNames());
+
+    Collections.sort(list, new ListViewSorterByName());
+    if (igpkp.wantGen(r, "list-list"))
+      fragment("List-"+resource.getId()+"-list-name", genListView(list, "<li><a href=\"{{link}}\">{{name}}</a> {{desc}}</li>\r\n"), f.getOutputNames());
+    if (igpkp.wantGen(r, "list-list-simple"))
+      fragment("List-"+resource.getId()+"-list-name-simple", genListView(list, "<li><a href=\"{{link}}\"></a> {{desc}}</li>\r\n"), f.getOutputNames());
+    if (igpkp.wantGen(r, "list-list-table"))
+      fragment("List-"+resource.getId()+"-list-name-table", genListView(list, "<tr><td><a href=\"{{link}}\">{{name}}]</a></td><td>{{desc}}</td></tr>\r\n"), f.getOutputNames());
+  }
+
+  private String genListView(List<ListItemEntry> list, String template) {
+    StringBuilder b = new StringBuilder();
+    for (ListItemEntry i : list) {
+      String s = template;
+      if (s.contains("{{link}}"))
+        s = s.replace("{{link}}", i.getLink());
+      if (s.contains("{{name}}"))
+        s = s.replace("{{name}}", i.getName());
+      if (s.contains("{{desc}}"))
+        s = s.replace("{{desc}}", i.getDesc() == null ? "" : markdownEngine.process(i.getDesc(), "List reference description"));
+      b.append(s);
+    }
+    return b.toString();
+  }
+
+  private String getListId(FetchedResource lr) {
+    return lr.fhirType()+"/"+lr.getId();
+  }
+
+  private String getListLink(FetchedResource lr) {
+    if (lr.getResource() != null)
+      return lr.getResource().getUserString("path");
+    else
+      return igpkp.getLinkFor(lr);
+  }
+
+  private String getListName(FetchedResource lr) {
+    if (lr.getResource() != null) {
+      if (lr.getResource() instanceof MetadataResource)
+        return ((MetadataResource)lr.getResource()).getName();
+      return lr.getResource().fhirType()+"/"+lr.getResource().getId();
+    }
+    else {
+      // well, as a non-metadata resource, we don't really have a name. We'll use the link
+      return getListLink(lr);
+    }
+  }
+
+  private String getListDesc(FetchedResource lr) {
+    if (lr.getResource() != null) {
+      if (lr.getResource() instanceof MetadataResource)
+        return ((MetadataResource)lr.getResource()).getName();
+      return lr.getResource().fhirType()+"/"+lr.getResource().getId();
+    }
+    else
+      return null;
+  }
+
+  private String getListId(Resource r) {
+    return r.fhirType()+"/"+r.getId();
+  }
+
+  private String getListLink(Resource r) {
+    return r.getUserString("path");
+  }
+
+  private String getListName(Resource r) {
+    if (r instanceof MetadataResource)
+      return ((MetadataResource) r).getName();
+    return r.fhirType()+"/"+r.getId();
+  }
+
+  private String getListDesc(Resource r) {
+    if (r instanceof MetadataResource)
+      return ((MetadataResource) r).getName();
+    return r.fhirType()+"/"+r.getId();
+  }
 
   private byte[] transform(byte[] source, byte[] xslt) throws TransformerException {
     TransformerFactory f = TransformerFactory.newInstance();

@@ -46,6 +46,18 @@
     },
     {
       "reference" : {
+        "reference" : "Patient/test-ig-pat"
+      },
+      "exampleBoolean" : true
+    },
+    {
+      "reference" : {
+        "reference" : "List/test-ig-list"
+      },
+      "exampleBoolean" : false
+    },
+    {
+      "reference" : {
         "reference" : "ValueSet/test-ig-vsint"
       },
       "exampleBoolean" : false

@@ -46,6 +46,12 @@
         <reference value="ValueSet/test-ig-bnd2"/>
       </reference>
     </resource>
+    <resource>
+      <exampleBoolean value="true"/>
+      <reference>
+        <reference value="Patient/test-ig-pat"/>
+      </reference>
+    </resource>
 
     
     <!-- Profiles --> 

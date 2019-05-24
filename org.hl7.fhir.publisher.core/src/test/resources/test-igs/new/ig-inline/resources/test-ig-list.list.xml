@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<List xmlns="http://hl7.org/fhir">
+  <id value="test-ig-list"/>
+  
+ <status value="current"/>
+ <mode value="working"/>
+
+ <!-- a profile in this IG -->
+ <entry><item><reference value="StructureDefinition/order-template"/></item></entry>
+
+ <!-- a valueset in this IG -->
+ <entry><item><reference value="ValueSet/test-ig-bnd1"/></item></entry>
+
+ <!-- a non-metadata resource in this IG -->
+ <entry><item><reference value="Patient/test-ig-pat"/></item></entry>
+
+ <!-- a metadata resource in the base spec -->
+ <entry><item><reference value="http://hl7.org/fhir/StructureDefinition/shareableactivitydefinition"/></item></entry>
+
+ <!-- a non-metadata resource in the base spec -->
+ <entry><item><reference value="Patient/example"/></item></entry>
+
+ <!-- a non-existent resource  -->
+ <entry><item><reference value="Patient/f1c557a8-7d64-45d1-bd3b-a1db568258b7"/></item></entry>
+ 
+</List>
