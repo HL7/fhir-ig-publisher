@@ -5003,7 +5003,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "list-list"))
       fragmentIfNN("List-"+resource.getId()+"-list-"+id+(type == null ? "" : "-"+type), genListView(list, "<li><a href=\"{{link}}\">{{name}}</a> {{desc}}</li>\r\n", type), f.getOutputNames());
     if (igpkp.wantGen(r, "list-list-simple"))
-      fragmentIfNN("List-"+resource.getId()+"-list-"+id+"-simple"+(type == null ? "" : "-"+type), genListView(list, "<li><a href=\"{{link}}\"></a> {{desc}}</li>\r\n", type), f.getOutputNames());
+      fragmentIfNN("List-"+resource.getId()+"-list-"+id+"-simple"+(type == null ? "" : "-"+type), genListView(list, "<li><a href=\"{{link}}\">{{name}}</a></li>\r\n", type), f.getOutputNames());
     if (igpkp.wantGen(r, "list-list-table"))
       fragmentIfNN("List-"+resource.getId()+"-list-"+id+"-table"+(type == null ? "" : "-"+type), genListView(list, "<tr><td><a href=\"{{link}}\">{{name}}</a></td><td>{{desc}}</td></tr>\r\n", type), f.getOutputNames());
     if (script != null)
@@ -5020,12 +5020,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (s.contains("{{name}}"))
           s = s.replace("{{name}}", i.getName());
         if (s.contains("{{desc}}"))
-          s = s.replace("{{desc}}", i.getDesc() == null ? "" : markdownEngine.process(i.getDesc(), "List reference description"));
+          s = s.replace("{{desc}}", i.getDesc() == null ? "" : trimPara(markdownEngine.process(i.getDesc(), "List reference description")));
         b.append(s);
       }
     }
     return b.toString();
   }
+
+  private String trimPara(String output) {
+    if (output.startsWith("<p>") && output.endsWith("</p>\n") && !output.substring(3).contains("<p>"))
+      return output.substring(0, output.length()-5).substring(3);
+    else
+      return output;
+  }
+
 
   private String getListId(FetchedResource lr) {
     return lr.fhirType()+"/"+lr.getId();
