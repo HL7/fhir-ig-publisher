@@ -1038,6 +1038,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (!(obj.get(name) instanceof JsonPrimitive))
       return null;
     JsonPrimitive p = (JsonPrimitive) obj.get(name);
+    if (p.isBoolean())
+      return p.getAsString();
     if (!p.isString())
       return null;
     return p.getAsString();
@@ -4860,7 +4862,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               break;
 
             case List:
-              generateOutputsList(f, r, (ListResource) r.getResource(), vars);              
+              generateOutputsList(f, r, (ListResource) r.getResource(), vars);      
+              break;
+              
             case CapabilityStatement:
               generateOutputsCapabilityStatement(f, r, (CapabilityStatement) r.getResource(), vars);
               break;
@@ -4892,9 +4896,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     private String link;
     private String name;
     private String desc;
+    private String type;
 
-    public ListItemEntry(String id, String link, String name, String desc) {
+    public ListItemEntry(String type, String id, String link, String name, String desc) {
       super();
+      this.type = type;
       this.id = id;
       this.link = link;
       this.name = name;
@@ -4916,6 +4922,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     public String getDesc() {
       return desc;
     }
+
+    public String getType() {
+      return type;
+    }
+    
   }
 
   public class ListViewSorterById implements Comparator<ListItemEntry> {
@@ -4945,6 +4956,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     //  * in order provided by the list
     //  * in alphabetical order by link
     //  * in allhpbetical order by name
+    // and if there is more than one resource type in the list, 
     
     List<ListItemEntry> list = new ArrayList<>();
     
@@ -4955,7 +4967,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (lr == null)
           lr = getResourceForRef(f, ref);
         if (lr != null) {
-          list.add(new ListItemEntry(getListId(lr), getListLink(lr), getListName(lr), getListDesc(lr)));          
+          list.add(new ListItemEntry(lr.fhirType(), getListId(lr), getListLink(lr), getListName(lr), getListDesc(lr)));          
         } else {
           // ok, we'll see if we can resolve it from another spec 
           Resource l = context.fetchResource(null, ref);
@@ -4964,45 +4976,53 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             l = context.fetchResourceById(p[0], p[1]);
           }
           if (l != null)
-            list.add(new ListItemEntry(getListId(l), getListLink(l), getListName(l), getListDesc(l)));          
+            list.add(new ListItemEntry(l.fhirType(), getListId(l), getListLink(l), getListName(l), getListDesc(l)));          
         }
       }
     }
-    if (igpkp.wantGen(r, "list-list"))
-      fragment("List-"+resource.getId()+"-list-no", genListView(list, "<li><a href=\"{{link}}\">{{name}}</a> {{desc}}</li>\r\n"), f.getOutputNames());
-    if (igpkp.wantGen(r, "list-list-simple"))
-      fragment("List-"+resource.getId()+"-list-no-simple", genListView(list, "<li><a href=\"{{link}}\"></a> {{desc}}</li>\r\n"), f.getOutputNames());
-    if (igpkp.wantGen(r, "list-list-table"))
-      fragment("List-"+resource.getId()+"-list-no-table", genListView(list, "<tr><td><a href=\"{{link}}\">{{name}}]</a></td><td>{{desc}}</td></tr>\r\n"), f.getOutputNames());
-
+    String script = igpkp.getProperty(r, "list-script");
+    String types = igpkp.getProperty(r, "list-types"); 
+    genListViews(f, r, resource, list, script, "no", null);
+    if (types != null)
+      for (String t : types.split("\\|"))
+        genListViews(f, r, resource, list, script, "no", t.trim());
     Collections.sort(list, new ListViewSorterById());
-    if (igpkp.wantGen(r, "list-list"))
-      fragment("List-"+resource.getId()+"-list-id", genListView(list, "<li><a href=\"{{link}}\">{{name}}</a> {{desc}}</li>\r\n"), f.getOutputNames());
-    if (igpkp.wantGen(r, "list-list-simple"))
-      fragment("List-"+resource.getId()+"-list-id-simple", genListView(list, "<li><a href=\"{{link}}\"></a> {{desc}}</li>\r\n"), f.getOutputNames());
-    if (igpkp.wantGen(r, "list-list-table"))
-      fragment("List-"+resource.getId()+"-list-id-table", genListView(list, "<tr><td><a href=\"{{link}}\">{{name}}]</a></td><td>{{desc}}</td></tr>\r\n"), f.getOutputNames());
-
+    genListViews(f, r, resource, list, script, "id", null);
+    if (types != null)
+      for (String t : types.split("\\|"))
+        genListViews(f, r, resource, list, script, "id", t.trim());
     Collections.sort(list, new ListViewSorterByName());
-    if (igpkp.wantGen(r, "list-list"))
-      fragment("List-"+resource.getId()+"-list-name", genListView(list, "<li><a href=\"{{link}}\">{{name}}</a> {{desc}}</li>\r\n"), f.getOutputNames());
-    if (igpkp.wantGen(r, "list-list-simple"))
-      fragment("List-"+resource.getId()+"-list-name-simple", genListView(list, "<li><a href=\"{{link}}\"></a> {{desc}}</li>\r\n"), f.getOutputNames());
-    if (igpkp.wantGen(r, "list-list-table"))
-      fragment("List-"+resource.getId()+"-list-name-table", genListView(list, "<tr><td><a href=\"{{link}}\">{{name}}]</a></td><td>{{desc}}</td></tr>\r\n"), f.getOutputNames());
+    genListViews(f, r, resource, list, script, "name", null);
+    if (types != null)
+      for (String t : types.split("\\|"))
+        genListViews(f, r, resource, list, script, "name", t.trim());
   }
 
-  private String genListView(List<ListItemEntry> list, String template) {
+
+  public void genListViews(FetchedFile f, FetchedResource r, ListResource resource, List<ListItemEntry> list, String script, String id, String type) throws IOException, FHIRException {
+    if (igpkp.wantGen(r, "list-list"))
+      fragmentIfNN("List-"+resource.getId()+"-list-"+id+(type == null ? "" : "-"+type), genListView(list, "<li><a href=\"{{link}}\">{{name}}</a> {{desc}}</li>\r\n", type), f.getOutputNames());
+    if (igpkp.wantGen(r, "list-list-simple"))
+      fragmentIfNN("List-"+resource.getId()+"-list-"+id+"-simple"+(type == null ? "" : "-"+type), genListView(list, "<li><a href=\"{{link}}\"></a> {{desc}}</li>\r\n", type), f.getOutputNames());
+    if (igpkp.wantGen(r, "list-list-table"))
+      fragmentIfNN("List-"+resource.getId()+"-list-"+id+"-table"+(type == null ? "" : "-"+type), genListView(list, "<tr><td><a href=\"{{link}}\">{{name}}</a></td><td>{{desc}}</td></tr>\r\n", type), f.getOutputNames());
+    if (script != null)
+      fragmentIfNN("List-"+resource.getId()+"-list-"+id+"-script"+(type == null ? "" : "-"+type), genListView(list, script, type), f.getOutputNames());
+  }
+
+  private String genListView(List<ListItemEntry> list, String template, String type) {
     StringBuilder b = new StringBuilder();
     for (ListItemEntry i : list) {
-      String s = template;
-      if (s.contains("{{link}}"))
-        s = s.replace("{{link}}", i.getLink());
-      if (s.contains("{{name}}"))
-        s = s.replace("{{name}}", i.getName());
-      if (s.contains("{{desc}}"))
-        s = s.replace("{{desc}}", i.getDesc() == null ? "" : markdownEngine.process(i.getDesc(), "List reference description"));
-      b.append(s);
+      if (type == null || type.equals(i.getType())) {
+        String s = template;
+        if (s.contains("{{link}}"))
+          s = s.replace("{{link}}", i.getLink());
+        if (s.contains("{{name}}"))
+          s = s.replace("{{name}}", i.getName());
+        if (s.contains("{{desc}}"))
+          s = s.replace("{{desc}}", i.getDesc() == null ? "" : markdownEngine.process(i.getDesc(), "List reference description"));
+        b.append(s);
+      }
     }
     return b.toString();
   }
@@ -5523,9 +5543,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return div.getXhtml();
   }
 
+  private void fragmentIfNN(String name, String content, Set<String> outputTracker) throws IOException, FHIRException {
+    if (!Utilities.noString(content))
+      fragment(name, content, outputTracker, null, null, null);
+  }
+  
   private void fragment(String name, String content, Set<String> outputTracker) throws IOException, FHIRException {
     fragment(name, content, outputTracker, null, null, null);
   }
+  
   private void fragment(String name, String content, Set<String> outputTracker, FetchedResource r, Map<String, String> vars, String format) throws IOException, FHIRException {
     String fixedContent = (r==null? content : igpkp.doReplacements(content, r, vars, format));
     if (checkMakeFile(fixedContent.getBytes(Charsets.UTF_8), Utilities.path(tempDir, "_includes", name+".xhtml"), outputTracker)) {
