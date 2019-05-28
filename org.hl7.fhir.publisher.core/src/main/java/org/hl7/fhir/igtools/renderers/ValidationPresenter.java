@@ -59,8 +59,9 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private String altPackageId;
   private String igVersion;
   private String ballotCheck;
+  private String toolsVersion;
 
-  public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, String ballotCheck) {
+  public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, String ballotCheck, String toolsVersion) {
     super();
     this.statedVersion = statedVersion;
     this.igVersion = igVersion;
@@ -70,6 +71,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     this.packageId = packageId;
     this.altPackageId = altPackageId;
     this.ballotCheck = ballotCheck;
+    this.toolsVersion = toolsVersion;
   }
 
   private List<FetchedFile> sorted(List<FetchedFile> files) {
@@ -213,7 +215,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       "</head>\r\n"+
       "<body style=\"margin: 20px; background-color: #ffffff\">\r\n"+
       " <h1>Validation Results for $title$</h1>\r\n"+
-      " <p>Generated $time$. FHIR version $version$ for $packageId$#$igversion$ (canonical = <a href=\"$canonical$\">$canonical$</a> (<a href=\"$canonical$/history.html\">history</a>))</p>\r\n"+
+      " <p>Generated $time$, IG-Publisher $toolsVersion$. FHIR version $version$ for $packageId$#$igversion$ (canonical = <a href=\"$canonical$\">$canonical$</a> (<a href=\"$canonical$/history.html\">history</a>))</p>\r\n"+
       "$suppressedmsgssummary$"+
       " <p>HL7 Publication check:</p> $ballotCheck$\r\n"+
       " <table class=\"grid\">\r\n"+
@@ -294,6 +296,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     ST t = template(headerTemplate);
     t.add("version", statedVersion);
     t.add("igversion", igVersion);
+    t.add("toolsVersion", toolsVersion);
     t.add("title", title);
     t.add("time", new Date().toString());
     t.add("err", Integer.toString(err));
@@ -313,6 +316,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private String genHeaderTxt(String title, int err, int warn, int info) {
     ST t = template(headerTemplateText);
     t.add("version", statedVersion);
+    t.add("toolsVersion", toolsVersion);
     t.add("igversion", igVersion);
     t.add("title", title);
     t.add("time", new Date().toString());
