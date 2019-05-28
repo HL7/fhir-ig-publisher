@@ -2775,6 +2775,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     scan("DataElement");
     scan("StructureDefinition");
     scan("OperationDefinition");
+    scan("SearchParameter");
     scan("CapabilityStatement");
     scan("Questionnaire");
     scan("PlanDefinition");
@@ -2786,6 +2787,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     load("DataElement");
     load("StructureDefinition");
     load("OperationDefinition");
+    load("SearchParameter");
     load("CapabilityStatement");
     load("Questionnaire");
     load("PlanDefinition");

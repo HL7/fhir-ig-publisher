@@ -2,7 +2,7 @@
   "url": "http://hl7.org/fhir/test/ImplementationGuide/test-ig",
   "name": "Test Implementation Guide",
   "package-id": "hl7.fhir.test.ig40",
-  "date": "Fri, 24 May, 2019 23:08:25 +1000",
+  "date": "Sun, 26 May, 2019 09:10:40 +1000",
   "errs": 78,
   "warnings": 36,
   "hints": 0,

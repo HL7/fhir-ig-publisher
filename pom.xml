@@ -18,10 +18,10 @@
     <parent>
         <groupId>ca.uhn.hapi.fhir</groupId>
         <artifactId>org.hl7.fhir.core</artifactId>
-        <version>3.7.38-SNAPSHOT</version>
+        <version>3.7.39-SNAPSHOT</version>
     </parent>
     <properties>
-        <core_version>3.7.38-SNAPSHOT</core_version>
+        <core_version>3.7.39-SNAPSHOT</core_version>
     </properties>
     <version>0.9.14-SNAPSHOT</version> <!-- See the note above -->
 

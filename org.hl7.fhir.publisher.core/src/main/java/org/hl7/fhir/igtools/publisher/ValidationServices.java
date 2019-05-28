@@ -185,6 +185,8 @@ public class ValidationServices implements IValidatorResourceFetcher {
   public void initOtherUrls() {
     otherUrls.clear();
     otherUrls.add("http://hl7.org/fhir/sid/us-ssn");
+    otherUrls.add("http://hl7.org/fhir/sid/cvx");
+    otherUrls.add("http://hl7.org/fhir/sid/ndc");
     otherUrls.add("http://hl7.org/fhir/sid/us-npi");
     otherUrls.add("http://hl7.org/fhir/sid/icd-10-vn");
     otherUrls.add("http://hl7.org/fhir/w5");
