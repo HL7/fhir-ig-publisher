@@ -568,6 +568,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private boolean isBuildingTemplate;
   private JsonObject templateInfo;
+  private ExtensionTracker extensionTracker;
   
   private class PreProcessInfo {
     private String xsltName;
@@ -1085,6 +1086,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     
     templateManager = new TemplateManager(pcm, logger);
     templateProvider = new IGPublisherLiquidTemplateServices();
+    extensionTracker = new ExtensionTracker();
     log("Package Cache: "+pcm.getFolder());
     if (packagesFolder != null) {
       log("Loading Packages from "+packagesFolder);
@@ -1380,6 +1382,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (Extension e : sourceIg.getExtensionsByUrl(IGHelper.EXT_BUNDLE)) {
       bundles.add(e.getValue().primitiveValue());
     }
+    if (mode == IGBuildMode.AUTOBUILD)
+      extensionTracker.setoptIn(true);
+    else if (npmName.contains("hl7") || npmName.contains("argonaut") || npmName.contains("ihe"))
+      extensionTracker.setoptIn(true);
+    else 
+      extensionTracker.setoptIn(!ini.getBooleanProperty("IG", "usage-stats-opt-out"));
     log("Initialization complete");
   }
 
@@ -1737,6 +1745,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
     }
+    if (mode == IGBuildMode.AUTOBUILD)
+      extensionTracker.setoptIn(true);
+    else if (npmName.contains("hl7") || npmName.contains("argonaut") || npmName.contains("ihe"))
+      extensionTracker.setoptIn(true);
+    else 
+      extensionTracker.setoptIn(!configuration.has("usage-stats-opt-out"));
+
     log("Initialization complete");
     // now, do regeneration
     JsonArray regenlist = configuration.getAsJsonArray("regenerate");
@@ -2423,6 +2438,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         throw new Exception("Invalid - see reasons"); // if this ever happens, it's a programming issue....
       }
     }
+    extensionTracker.scan(publishedIg);
     return needToBuild;
   }
 
@@ -2799,7 +2815,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     generateAdditionalExamples();
     executeTransforms();
     validateExpressions();
+    scanForUsageStats();
   }
+
+  private void scanForUsageStats() {
+    log(LogCategory.PROGRESS, "scanForUsageStats");
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.fhirType().equals("StructureDefinition")) 
+          extensionTracker.scan((StructureDefinition) r.getResource());
+        extensionTracker.scan(r.getElement());
+      }
+    }
+  }
+
 
   private void checkConformanceResources() {
     log(LogCategory.PROGRESS, "check profiles");
@@ -3522,8 +3551,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       generateHtmlOutputs(f, false);
 
     ValidationPresenter.filterMessages(errors, suppressedMessages, false);
-    if (!changeList.isEmpty())
+    if (!changeList.isEmpty()) {
       generateSummaryOutputs();
+    }
+    TextFile.bytesToFile(extensionTracker.generate(), Utilities.path(tempDir, "usage-stats.json"));
+    try {
+      log("Sending Usage Stats to Server");
+      extensionTracker.sendToServer("http://test.fhir.org/usage-stats");
+    } catch (Exception e) {
+      System.out.println("Submitting Usage Stats failed: "+e.getMessage());
+    }
+    
+    otherFilesRun.add(Utilities.path(tempDir, "usage-stats.json"));
     
     cleanOutput(tempDir);
         
