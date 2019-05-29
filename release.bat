@@ -14,7 +14,6 @@ call mvn versions:set -DnewVersion=0.9.18-SNAPSHOT
 call git commit -a -m "Release new version 0.9.18-SNAPSHOT"
 call git push origin master
 call "C:\tools\fnr.exe" --cl --dir "C:\work\org.hl7.fhir\build" --fileMask "*.xml" --find "0.9.17-SNAPSHOT" --replace "0.9.18-SNAPSHOT"
-call "C:\tools\fnr.exe" --cl --dir "C:\work\org.hl7.fhir\build" --fileMask "*.xml" --find "0.9,17-SNAPSHOT" --replace "0.9.18-SNAPSHOT"
 call mvn deploy
 copy org.hl7.fhir.publisher.cli\target\org.hl7.fhir.publisher.cli-0.9.18-SNAPSHOT.jar ..\latest-ig-publisher\org.hl7.fhir.publisher.jar
 cd ..\latest-ig-publisher
