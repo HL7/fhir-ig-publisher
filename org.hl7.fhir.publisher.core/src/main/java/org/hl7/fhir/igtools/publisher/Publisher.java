@@ -1293,9 +1293,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     // initializing the tx sub-system
     Utilities.createDirectory(vsCache);
-    if (cacheOption == CacheOption.CLEAR_ALL || (mode == IGBuildMode.AUTOBUILD)) {
+    if (cacheOption == CacheOption.CLEAR_ALL) {
       log("Terminology Cache is at "+vsCache+". Clearing now");
       Utilities.clearDirectory(vsCache);
+    } else if (mode == IGBuildMode.AUTOBUILD) {
+      log("Terminology Cache is at "+vsCache+". Trimming now");
+      Utilities.clearDirectory(vsCache, "snomed.cache", "loinc.cache", "ucum.cache");
     } else if (cacheOption == CacheOption.CLEAR_ERRORS) {
       log("Terminology Cache is at "+vsCache+". Clearing Errors now");
       log("Deleted "+Integer.toString(clearErrors(vsCache))+" files");
@@ -1556,9 +1559,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     forceDir(qaDir);
 
     Utilities.createDirectory(vsCache);
-    if (cacheOption == CacheOption.CLEAR_ALL || (mode == IGBuildMode.AUTOBUILD)) {
+    if (cacheOption == CacheOption.CLEAR_ALL) {
       log("Terminology Cache is at "+vsCache+". Clearing now");
       Utilities.clearDirectory(vsCache);
+    } else if (mode == IGBuildMode.AUTOBUILD) {
+      log("Terminology Cache is at "+vsCache+". Trimming now");
+      Utilities.clearDirectory(vsCache, "snomed.cache", "loinc.cache", "ucum.cache");
     } else if (cacheOption == CacheOption.CLEAR_ERRORS) {
         log("Terminology Cache is at "+vsCache+". Clearing Errors now");
         log("Deleted "+Integer.toString(clearErrors(vsCache))+" files");
@@ -4850,7 +4856,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         saveNativeResourceOutputs(f, r);
     }    
   }
-  private void generateHtmlOutputs(FetchedFile f, boolean regen) throws TransformerException, IOException {
+  private void generateHtmlOutputs(FetchedFile f, boolean regen) throws TransformerException, IOException, FHIRException {
     if (f.getProcessMode() == FetchedFile.PROCESS_NONE) {
       String dst = tempDir;
       if (f.getRelativePath().startsWith(File.separator))
@@ -4883,6 +4889,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         log("Exception generating page "+dst+": "+e.getMessage());
       }
     } else {
+      saveFileOutputs(f);
       for (FetchedResource r : f.getResources()) {
         try {
           dlog(LogCategory.PROGRESS, "Produce outputs for "+r.getElement().fhirType()+"/"+r.getId());
@@ -5210,6 +5217,39 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
 
+  private void saveFileOutputs(FetchedFile f) throws IOException, FHIRException {
+    if (f.getResources().size() == 1) {
+      Map<String, String> vars = new HashMap<>();
+      FetchedResource r = f.getResources().get(0);
+      StringBuilder b = new StringBuilder();
+      b.append("<table class=\"grid\">\r\n");
+      b.append("<tr><td><b>Level</b></td><td><b>Type</b></td><td><b>Location</b></td><td><b>Message</b></td></tr>\r\n");
+      genVMessage(b, f.getErrors(), IssueSeverity.FATAL);
+      genVMessage(b, f.getErrors(), IssueSeverity.ERROR);
+      genVMessage(b, f.getErrors(), IssueSeverity.WARNING);
+      genVMessage(b, f.getErrors(), IssueSeverity.INFORMATION);
+      b.append("</table>\r\n");
+      fragment(r.fhirType()+"-"+r.getId()+"-valdiation", b.toString(), f.getOutputNames(), r, vars, null);
+    }
+  }
+
+  public void genVMessage(StringBuilder b, List<ValidationMessage> vms, IssueSeverity lvl) {
+    for (ValidationMessage vm : vms) {
+      if (vm.getLevel() == lvl) {
+        b.append("<tr><td>");
+        b.append(vm.getLevel().toCode());
+        b.append("</td><td>");
+        b.append(vm.getType().toCode());
+        b.append("</td><td>");
+        b.append(vm.getLocation());
+        b.append("</td><td>");
+        b.append(vm.getHtml());
+        b.append("</td><td>");
+        b.append("</td></tr>\r\n");
+      }
+    }
+  }
+
   private void saveDirectResourceOutputs(FetchedFile f, FetchedResource r, Map<String, String> vars) throws FileNotFoundException, Exception {
     String baseName = igpkp.getProperty(r, "base");
     if (r.getResource() != null && r.getResource() instanceof StructureDefinition) {
@@ -5273,6 +5313,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       String html = xhtml == null ? "" : new XhtmlComposer(XhtmlComposer.XML).compose(xhtml);
       fragment(r.getElement().fhirType()+"-"+r.getId()+"-html", html, f.getOutputNames(), r, vars, null);
     }
+   
     //  NarrativeGenerator gen = new NarrativeGenerator(null, null, context);
     //  gen.generate(f.getElement(), false);
     //  xhtml = getXhtml(f);

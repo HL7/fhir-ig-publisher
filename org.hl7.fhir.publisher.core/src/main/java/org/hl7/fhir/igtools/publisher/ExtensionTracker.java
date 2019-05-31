@@ -24,6 +24,7 @@ import org.hl7.fhir.igtools.publisher.ExtensionTracker.SDSorter;
 import org.hl7.fhir.igtools.publisher.ExtensionTracker.UsageSorter;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.model.ElementDefinition;
+import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
@@ -167,6 +168,14 @@ public class ExtensionTracker {
       exts.add(ext);
       ext.addProperty("url", sd.getUrl());
       ext.addProperty("title", sd.present());
+      JsonArray types = new JsonArray();
+      for (ElementDefinition e : sd.getSnapshot().getElement()) {
+        if (e.getPath().contains(".value"))
+          for (TypeRefComponent t : e.getType())
+            types.add(t.getCode());
+      }
+      if (types.size() > 0)
+        ext.add("types", types);
     }
 
 
