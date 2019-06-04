@@ -229,7 +229,7 @@ public class HTLMLInspector {
             break;
           }
         }
-        if (check) {
+        if (check && !findExemptionComment(lf.getXhtml())) {
           messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, s, "The html source does not contain the header marker" 
             + (first ? " "+RELEASE_HTML_MARKER+" (see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations)" : ""), IssueSeverity.ERROR));
         }
@@ -374,11 +374,19 @@ public class HTLMLInspector {
   private void checkTemplatePoints(XhtmlNode x, List<ValidationMessage> messages, String s) {
     // look for a footer: a div tag with igtool=footer on it 
     XhtmlNode footer = findFooterDiv(x);
-    if (footer == null) 
+    if (footer == null && !findExemptionComment(x)) 
       messages.add(new ValidationMessage(Source.Publisher, IssueType.STRUCTURE, s, "The html must include a div with an attribute igtool=\"footer\" that marks the footer in the template", IssueSeverity.ERROR));
     else {
       // look in the footer for: .. nothing yet... 
     }
+  }
+
+  private boolean findExemptionComment(XhtmlNode x) {
+    for (XhtmlNode c : x.getChildNodes()) {
+      if (c.getNodeType() == NodeType.Comment && x.getContent().trim().equals("frameset content"))
+        return true;
+    }
+    return false;
   }
 
   private XhtmlNode findFooterDiv(XhtmlNode x) {
