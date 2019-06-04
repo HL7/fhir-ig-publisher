@@ -5109,7 +5109,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private String getListDesc(FetchedResource lr) {
     if (lr.getResource() != null) {
       if (lr.getResource() instanceof MetadataResource)
-        return ((MetadataResource)lr.getResource()).getName();
+        return ((MetadataResource)lr.getResource()).getDescription();
       return lr.getResource().fhirType()+"/"+lr.getResource().getId();
     }
     else
