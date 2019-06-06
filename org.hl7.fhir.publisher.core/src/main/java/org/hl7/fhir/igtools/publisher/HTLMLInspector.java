@@ -383,7 +383,7 @@ public class HTLMLInspector {
 
   private boolean findExemptionComment(XhtmlNode x) {
     for (XhtmlNode c : x.getChildNodes()) {
-      if (c.getNodeType() == NodeType.Comment && x.getContent().trim().equals("frameset content"))
+      if (c.getNodeType() == NodeType.Comment && x.getContent() != null && x.getContent().trim().equals("frameset content"))
         return true;
     }
     return false;
