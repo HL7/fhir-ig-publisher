@@ -987,6 +987,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (FetchedResource r : f1.getResources()) {
         if ((r.fhirType()+"/"+r.getId()).equals(ref))
           return r;
+        if (r.getResource() != null && r.getResource() instanceof MetadataResource && ((MetadataResource) r.getResource()).getUrl().equals(ref))
+          return r;
       }
     }
     
@@ -2072,7 +2074,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (fn.endsWith(".json") && fn.contains("-")) {
         Resource r = null;
         String t = fn.substring(0, fn.indexOf("-"));
-        if (Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "SearchParameter", "OperationDefinition", "Questionnaire","ConceptMap","StructureMap", "NamingSystem")) {
+        if (Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "SearchParameter", "OperationDefinition", "Questionnaire","ConceptMap","StructureMap", "NamingSystem", "ImplementationGuide")) {
           if (igm.getVersion().equals("3.0.1") || igm.getVersion().equals("3.0.0")) {
             org.hl7.fhir.dstu3.model.Resource res = new org.hl7.fhir.dstu3.formats.JsonParser().parse(pi.load("package", fn));
             r = VersionConvertor_30_50.convertResource(res, true);
@@ -2368,7 +2370,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     needToBuild = loadBundles(needToBuild, igf);
     for (ImplementationGuideDefinitionResourceComponent res : publishedIg.getDefinition().getResource()) {
       if (!res.hasReference())
-        throw new Exception("Missing source reference on "+res.getName());
+        throw new Exception("Missing source reference on a reesource in the IG with the name "+res.getName());
       if (!bndIds.contains(res.getReference().getReference()) && !res.hasUserData("loaded.resource")) { // todo: this doesn't work for differential builds
         FetchedFile f = fetcher.fetch(res.getReference(), igf);
         boolean rchanged = noteFile(res, f);        
@@ -4945,14 +4947,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     private String name;
     private String desc;
     private String type;
+    private Element element;
 
-    public ListItemEntry(String type, String id, String link, String name, String desc) {
+    public ListItemEntry(String type, String id, String link, String name, String desc, Element element) {
       super();
       this.type = type;
       this.id = id;
       this.link = link;
       this.name = name;
       this.desc = desc;
+      this.element = element;
     }
 
     public String getId() {
@@ -5015,7 +5019,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (lr == null)
           lr = getResourceForRef(f, ref);
         if (lr != null) {
-          list.add(new ListItemEntry(lr.fhirType(), getListId(lr), getListLink(lr), getListName(lr), getListDesc(lr)));          
+          list.add(new ListItemEntry(lr.fhirType(), getListId(lr), getListLink(lr), getListName(lr), getListDesc(lr), lr.getElement()));          
         } else {
           // ok, we'll see if we can resolve it from another spec 
           Resource l = context.fetchResource(null, ref);
@@ -5024,7 +5028,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             l = context.fetchResourceById(p[0], p[1]);
           }
           if (l != null)
-            list.add(new ListItemEntry(l.fhirType(), getListId(l), getListLink(l), getListName(l), getListDesc(l)));          
+            list.add(new ListItemEntry(l.fhirType(), getListId(l), getListLink(l), getListName(l), getListDesc(l), null));          
         }
       }
     }
@@ -5044,6 +5048,25 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (types != null)
       for (String t : types.split("\\|"))
         genListViews(f, r, resource, list, script, "name", t.trim());
+    
+    // now, if the list has a package-id extension, generate the package for the list
+    if (resource.hasExtension(ToolingExtensions.EXT_LIST_PACKAGE)) {
+      Extension ext = resource.getExtensionByUrl(ToolingExtensions.EXT_LIST_PACKAGE);
+      String id = ToolingExtensions.readStringExtension(ext, "id");
+      String name = ToolingExtensions.readStringExtension(ext, "name");
+      String dfn = Utilities.path(tempDir, id+".tgz");
+      NPMPackageGenerator gen = NPMPackageGenerator.subset(npm, dfn, id, name);
+      for (ListItemEntry i : list) {
+        if (i.element != null) {
+          ByteArrayOutputStream bs = new ByteArrayOutputStream();
+          new org.hl7.fhir.r5.elementmodel.JsonParser(context).compose(i.element, bs, OutputStyle.NORMAL, igpkp.getCanonical());
+          gen.addFile(Category.RESOURCE, i.element.fhirType()+"-"+i.element.getIdBase()+".json", bs.toByteArray());
+        }
+      }
+      gen.finish();
+      otherFilesRun.add(Utilities.path(tempDir, id+".tgz"));
+    }
+    
   }
 
 
