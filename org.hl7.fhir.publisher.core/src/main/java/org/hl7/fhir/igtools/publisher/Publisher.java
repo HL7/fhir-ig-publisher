@@ -4766,6 +4766,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (r.getResource() != null && r.getResource() instanceof MetadataResource) {
       name = ((MetadataResource) r.getResource()).present();
       desc = getDesc((MetadataResource) r.getResource(), desc);
+    } else if (r.getElement() != null && r.getElement().hasChild("description")) {
+      desc = new StringType(r.getElement().getChildValue("description"));
     }
     list.append(" <li><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a> "+Utilities.escapeXml(desc.asStringValue())+"</li>\r\n");
     lists.append(" <li><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a></li>\r\n");
@@ -5570,13 +5572,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "uml"))
       fragmentError("StructureDefinition-"+sd.getId()+"-uml", "yet to be done: UML as SVG", null, f.getOutputNames());
     if (igpkp.wantGen(r, "tx"))
-      fragment("StructureDefinition-"+sd.getId()+"-tx", sdr.tx(includeHeadings, true), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+sd.getId()+"-tx", sdr.tx(includeHeadings, false), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "tx-must-support"))
-      fragment("StructureDefinition-"+sd.getId()+"-tx-must-support", sdr.tx(includeHeadings, false), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+sd.getId()+"-tx-must-support", sdr.tx(includeHeadings, true), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "tx-diff"))
-      fragment("StructureDefinition-"+sd.getId()+"-tx-diff", sdr.txDiff(includeHeadings, true), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+sd.getId()+"-tx-diff", sdr.txDiff(includeHeadings, false), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "tx-diff-must-support"))
-      fragment("StructureDefinition-"+sd.getId()+"-tx-diff-must-support", sdr.txDiff(includeHeadings, false), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+sd.getId()+"-tx-diff-must-support", sdr.txDiff(includeHeadings, true), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "inv"))
       fragment("StructureDefinition-"+sd.getId()+"-inv", sdr.inv(includeHeadings), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "dict"))
