@@ -41,10 +41,16 @@ import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.model.ImplementationGuide;
+import org.hl7.fhir.r5.model.OperationOutcome;
+import org.hl7.fhir.r5.model.OperationOutcome.OperationOutcomeIssueComponent;
+import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.JsonMerger;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.validation.ValidationMessage;
+import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
+import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -135,8 +141,22 @@ public class Template {
     
   }
   
-  private void runScript(String script, String tempDir, Map<String, String> props) throws IOException {
-    File buildFile = new File(Utilities.path(templateDir, script));
+  private Map<String, List<ValidationMessage>> runScript(String script, String tempDir, Map<String, String> props) throws IOException, FHIRException {
+    String filename = script;
+    String target = null;
+    if (filename.contains("#")) {
+      target = filename.substring(filename.indexOf("#")+1);
+      filename = filename.substring(0, filename.indexOf("#"));
+    }
+    
+    File jsonOutcomes = new File(Utilities.path(templateDir, "validation.json"));
+    if (jsonOutcomes.exists())
+      jsonOutcomes.delete();
+    File xmlOutcomes = new File(Utilities.path(templateDir, "validation.xml"));
+    if (xmlOutcomes.exists())
+      xmlOutcomes.delete();
+    
+    File buildFile = new File(Utilities.path(templateDir, filename));
     Project project = new Project();
     ProjectHelper.configureProject(project, buildFile);
     DefaultLogger consoleLogger = new DefaultLogger();
@@ -155,7 +175,32 @@ public class Template {
       }
     }
     project.init();
-    project.executeTarget(project.getDefaultTarget());
+    project.executeTarget(target == null ?  project.getDefaultTarget() : target);
+    Map<String, List<ValidationMessage>> res = new HashMap<>();
+    if (jsonOutcomes.exists()) {
+      loadValidationMessages((OperationOutcome) new JsonParser().parse(new FileInputStream(jsonOutcomes)), res);
+    } else if (xmlOutcomes.exists()) {
+      loadValidationMessages((OperationOutcome) new JsonParser().parse(new FileInputStream(xmlOutcomes)), res);
+    }
+    if (jsonOutcomes.exists())
+      jsonOutcomes.delete();
+    if (xmlOutcomes.exists())
+      xmlOutcomes.delete();     
+    return res;
+  }
+
+  private void loadValidationMessages(OperationOutcome op, Map<String, List<ValidationMessage>> res) throws FHIRException {
+    for (OperationOutcomeIssueComponent issue : op.getIssue()) {
+      String source = ToolingExtensions.readStringExtension(issue, ToolingExtensions.EXT_ISSUE_SOURCE);
+      if (source == null)
+        source = "";
+      if (res.containsKey(source))
+        res.put(source, new ArrayList<>());
+      ValidationMessage vm = ToolingExtensions.readValidationMessage(issue, Source.Template);
+      if (vm.getLevel() == IssueSeverity.FATAL)
+        throw new FHIRException("Fatal Error from Template: "+vm.getMessage());
+      res.get(source).add(vm);
+    }    
   }
 
   private String ostr(JsonObject obj, String name) throws Exception {
@@ -207,7 +252,7 @@ public class Template {
     return null;
   }
 
-  public void beforeGenerateEvent(String tempDir, ImplementationGuide ig, Set<String> fileList) throws IOException {
+  public Map<String, List<ValidationMessage>> beforeGenerateEvent(String tempDir, ImplementationGuide ig, Set<String> fileList) throws IOException, FHIRException {
     File src = new File(Utilities.path(templateDir, "content"));
     if (src.exists()) {
       for (File f : src.listFiles()) {
@@ -226,30 +271,33 @@ public class Template {
       props.put("ig.source", sfn);       
       new XmlParser().compose(new FileOutputStream(sfn+"xml"), ig);
       new JsonParser().compose(new FileOutputStream(sfn+"json"), ig);
-      runScript(scriptOnGenerate, Utilities.path(root, "temp"), props);      
-    }
+      return runScript(scriptOnGenerate, Utilities.path(root, "temp"), props);      
+    } else
+      return null;
   }
 
-  public void beforeJekyllEvent(String tempDir, ImplementationGuide ig) throws IOException {
+  public Map<String, List<ValidationMessage>> beforeJekyllEvent(String tempDir, ImplementationGuide ig) throws IOException, FHIRException {
     if (canExecute && scriptOnJekyll != null) {
       String sfn = Utilities.path(templateDir, "ig-working.");
       Map<String, String> props = new HashMap<>(); 
       props.put("ig.source", sfn);       
       new XmlParser().compose(new FileOutputStream(sfn+"xml"), ig);
       new JsonParser().compose(new FileOutputStream(sfn+"json"), ig);
-      runScript(scriptOnJekyll, Utilities.path(root, "temp"), props);      
-    }
+      return runScript(scriptOnJekyll, Utilities.path(root, "temp"), props);      
+    } else
+      return null;
   }
 
-  public void onCheckEvent(String tempDir, ImplementationGuide ig) throws IOException {
+  public Map<String, List<ValidationMessage>> onCheckEvent(String tempDir, ImplementationGuide ig) throws IOException, FHIRException {
     if (canExecute && scriptOnCheck != null) {
       String sfn = Utilities.path(templateDir, "ig-working.");
       Map<String, String> props = new HashMap<>(); 
       props.put("ig.source", sfn);       
       new XmlParser().compose(new FileOutputStream(sfn+"xml"), ig);
       new JsonParser().compose(new FileOutputStream(sfn+"json"), ig);
-      runScript(scriptOnCheck, Utilities.path(root, "temp"), props);      
-    }
+      return runScript(scriptOnCheck, Utilities.path(root, "temp"), props);      
+    } else
+      return null;
   }
 
   

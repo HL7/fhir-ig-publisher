@@ -101,6 +101,9 @@ import org.hl7.fhir.igtools.publisher.FetchedFile.FetchedBundleType;
 import org.hl7.fhir.igtools.publisher.IFetchFile.FetchState;
 import org.hl7.fhir.igtools.publisher.Publisher.ListItemEntry;
 import org.hl7.fhir.igtools.publisher.Publisher.ListViewSorterById;
+import org.hl7.fhir.igtools.publisher.utils.IGRegistryMaintainer;
+import org.hl7.fhir.igtools.publisher.utils.IGReleaseUpdater;
+import org.hl7.fhir.igtools.publisher.utils.IGReleaseVersionDeleter;
 import org.hl7.fhir.igtools.renderers.BaseRenderer;
 import org.hl7.fhir.igtools.renderers.CodeSystemRenderer;
 import org.hl7.fhir.igtools.renderers.JsonXhtmlRenderer;
@@ -959,6 +962,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
+  private FetchedFile getFileForFile(String path) {
+    for (FetchedFile f : fileList) {
+      if (f.getPath().equals(path))
+        return f;
+    }
+    return null;
+  }
+
+  
   private FetchedFile getFileForUri(String uri) {
     for (FetchedFile f : fileList) {
       if (getResourceForUri(f, uri) != null)
@@ -2476,31 +2488,42 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
 
-  private void templateBeforeGenerate() throws IOException {
+  private void templateBeforeGenerate() throws IOException, FHIRException {
     if (template != null) {
       if (debug)
         waitForInput("before OnGenerate");
-      template.beforeGenerateEvent(tempDir, publishedIg, otherFilesRun);
+      checkOutcomes(template.beforeGenerateEvent(tempDir, publishedIg, otherFilesRun));
       if (debug)
         waitForInput("after OnGenerate");
     }
   }
 
-  private void templateBeforeJekyll() throws IOException {
+  private void checkOutcomes(Map<String, List<ValidationMessage>> outcomes) {
+    for (String s : outcomes.keySet()) {
+      FetchedFile f = getFileForFile(s);
+      if (f == null)
+        errors.addAll(outcomes.get(s));
+      else
+        f.getErrors().addAll(outcomes.get(s));        
+    }    
+  }
+
+
+  private void templateBeforeJekyll() throws IOException, FHIRException {
     if (template != null) {
       if (debug)
         waitForInput("before OnJekyll");
-      template.beforeJekyllEvent(tempDir, publishedIg);
+      checkOutcomes(template.beforeJekyllEvent(tempDir, publishedIg));
       if (debug)
         waitForInput("after OnJekyll");
     }
   }
   
-  private void templateOnCheck() throws IOException {
+  private void templateOnCheck() throws IOException, FHIRException {
     if (template != null) {
       if (debug)
         waitForInput("before OnJekyll");
-      template.onCheckEvent(tempDir, publishedIg);
+      checkOutcomes(template.onCheckEvent(tempDir, publishedIg));
       if (debug)
         waitForInput("after OnJekyll");
     }
@@ -5841,7 +5864,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return b.toString();
   }
 
-
+  
   public static void main(String[] args) throws Exception {
     int exitCode = 0;
     if (hasParam(args, "-gui") || args.length == 0) {
@@ -5893,8 +5916,50 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       conv.setLicense(getNamedParam(args, "-license"));
       conv.setWebsite(getNamedParam(args, "-website"));
       conv.execute();
+    } else if (hasParam(args, "delete-current")) {
+      if (!args[0].equals("-delete-current"))
+        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history}");
+      if (args.length < 4)
+        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history}");
+      File f = new File(args[1]);
+      if (!f.exists() || !f.isDirectory())
+        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history}");
+      String history = getNamedParam(args, "-history");
+      if (Utilities.noString(history))
+        throw new Error("-delete-current requires a -history parameter");
+      File fh = new File(history);
+      if (!fh.exists() || fh.isDirectory())
+        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history}");
+      IGReleaseVersionDeleter deleter = new IGReleaseVersionDeleter();
+      deleter.clear(f.getAbsolutePath(), fh.getAbsolutePath());
     } else if (hasParam(args, "publish-update")) {
-      throw new Error("not done yet");      
+      if (!args[0].equals("-publish-update"))
+        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root}");
+      if (args.length < 4)
+        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root}");
+      File f = new File(args[1]);
+      if (!f.exists() || !f.isDirectory())
+        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root}");
+      String url = getNamedParam(args, "-url");      
+      if (Utilities.noString(url))
+        throw new Error("-publish-update requires a -url parameter");
+      String root = getNamedParam(args, "-root");      
+      if (Utilities.noString(root))
+        throw new Error("-publish-update requires a -root parameter");
+      File fr = new File(root);
+      if (!fr.exists() || fr.isDirectory())
+        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root}");
+      
+      String registry = getNamedParam(args, "-registry");
+      if (Utilities.noString(registry))
+        throw new Error("-publish-update requires a -registry parameter");
+      fr = new File(registry);
+      if (!fr.exists() || fr.isDirectory())
+        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root}");
+      IGRegistryMaintainer reg = new IGRegistryMaintainer(registry);
+      IGReleaseUpdater updater = new IGReleaseUpdater(args[1], url, root, reg);
+      updater.check();
+      reg.finish();      
     } else if (hasParam(args, "-multi")) {
       int i = 1;
       for (String ig : TextFile.fileToString(getNamedParam(args, "-multi")).split("\\r?\\n")) {
