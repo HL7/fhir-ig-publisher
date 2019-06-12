@@ -5918,7 +5918,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       conv.setLicense(getNamedParam(args, "-license"));
       conv.setWebsite(getNamedParam(args, "-website"));
       conv.execute();
-    } else if (hasParam(args, "delete-current")) {
+    } else if (hasParam(args, "-delete-current")) {
       if (!args[0].equals("-delete-current"))
         throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history}");
       if (args.length < 4)
@@ -5934,7 +5934,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history}");
       IGReleaseVersionDeleter deleter = new IGReleaseVersionDeleter();
       deleter.clear(f.getAbsolutePath(), fh.getAbsolutePath());
-    } else if (hasParam(args, "publish-update")) {
+    } else if (hasParam(args, "-publish-update")) {
       if (!args[0].equals("-publish-update"))
         throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root}");
       if (args.length < 4)
