@@ -5920,44 +5920,44 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       conv.execute();
     } else if (hasParam(args, "-delete-current")) {
       if (!args[0].equals("-delete-current"))
-        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history}");
+        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history} (first argument is not -delete-current)");
       if (args.length < 4)
-        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history}");
+        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history} (not enough arguements)");
       File f = new File(args[1]);
       if (!f.exists() || !f.isDirectory())
-        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history}");
+        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history} ({root}/{realm}/{code} not found)");
       String history = getNamedParam(args, "-history");
       if (Utilities.noString(history))
-        throw new Error("-delete-current requires a -history parameter");
+        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history} (no history found)");
       File fh = new File(history);
       if (!fh.exists() || fh.isDirectory())
-        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history}");
+        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history} ({history} not found)");
       IGReleaseVersionDeleter deleter = new IGReleaseVersionDeleter();
       deleter.clear(f.getAbsolutePath(), fh.getAbsolutePath());
     } else if (hasParam(args, "-publish-update")) {
       if (!args[0].equals("-publish-update"))
-        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root}");
+        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} (first argument is not -publish-update)");
       if (args.length < 4)
-        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root}");
+        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} (not enough args)");
       File f = new File(args[1]);
       if (!f.exists() || !f.isDirectory())
-        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root}");
+        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} ({root}/{realm}/{code} not found)");
       String url = getNamedParam(args, "-url");      
       if (Utilities.noString(url))
-        throw new Error("-publish-update requires a -url parameter");
+        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} (-url parameter not found)");
       String root = getNamedParam(args, "-root");      
       if (Utilities.noString(root))
-        throw new Error("-publish-update requires a -root parameter");
+        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} (-root parameter not found)");
       File fr = new File(root);
       if (!fr.exists() || fr.isDirectory())
-        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root}");
+        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} ({root} not found)");
       
       String registry = getNamedParam(args, "-registry");
       if (Utilities.noString(registry))
-        throw new Error("-publish-update requires a -registry parameter");
+        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} (-registry parameter not found)");
       fr = new File(registry);
       if (!fr.exists() || fr.isDirectory())
-        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root}");
+        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} ({registry} not found)");
       IGRegistryMaintainer reg = new IGRegistryMaintainer(registry);
       IGReleaseUpdater updater = new IGReleaseUpdater(args[1], url, root, reg);
       updater.check();
