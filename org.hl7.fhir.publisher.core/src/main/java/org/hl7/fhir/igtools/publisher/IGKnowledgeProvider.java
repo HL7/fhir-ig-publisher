@@ -434,9 +434,21 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
         }
       } else {
         ValueSet vs = context.fetchResource(ValueSet.class, ref);
-        if (vs != null && vs.hasUserData("path")) {
-          br.url = vs.getUserString("path");  
-          br.display = vs.present();
+        if (vs != null) {
+          if (ref.contains("|")) {
+            br.url = vs.getUserString("versionpath");
+            if (br.url==null) {
+              System.out.println("Unable to find version-specific path for reference - defaulting to version-independent reference: " + ref);
+              br.url = vs.getUserString("path");
+            }
+            br.display = vs.getName() + " (" + vs.getVersion() + ")"; 
+          } else if (vs != null && vs.hasUserData("path")) {
+            br.url = vs.getUserString("path");  
+            br.display = vs.present();
+          } else {
+            br.url = vs.getUserString("path");
+            br.display = vs.getName(); 
+          }
         } else if (Utilities.isAbsoluteUrl(ref) && (!ref.startsWith("http://hl7.org") || !ref.startsWith("http://terminology.hl7.org"))) {
           br.url = ref;  
           br.display = ref;
@@ -444,16 +456,6 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
           br.url = ref+".html"; // broken link, 
           br.display = ref;
           brokenLinkWarning(path, ref);
-        } else if (ref.contains("|")) {
-          br.url = vs.getUserString("versionpath");
-          if (br.url==null) {
-            System.out.println("Unable to find version-specific path for reference - defaulting to version-independent reference: " + ref);
-            br.url = vs.getUserString("path");
-          }
-          br.display = vs.getName(); 
-        } else {
-          br.url = vs.getUserString("path");
-          br.display = vs.getName(); 
         }
       }
     }
