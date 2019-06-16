@@ -53,6 +53,7 @@ import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionCo
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.SPDXLicense;
+import org.hl7.fhir.r5.terminologies.TerminologyServiceOptions;
 import org.hl7.fhir.r5.model.Parameters;
 import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.model.Resource;
@@ -140,7 +141,7 @@ public class ConfigFileConverter {
           c.setSystem("http://unstats.un.org/unsd/methods/m49/m49.htm").setCode(sc);
         else
           c.setSystem("urn:iso:std:iso:3166").setCode(sc);
-        ValidationResult vr = context.validateCode(c, null);
+        ValidationResult vr = context.validateCode(new TerminologyServiceOptions(), c, null);
         if (vr.getDisplay() != null)
           c.setDisplay(vr.getDisplay());
       }
