@@ -36,7 +36,7 @@ public class IgExistenceScanner {
     System.out.println("found: ");
     for (String s : igs) {
       System.out.println(s);
-      new IGReleaseUpdater(s, args[1], args[0], reg).check();
+      new IGReleaseUpdater(s, args[1], args[0], reg, null).check();
     }
     System.out.println("==================== ");
     reg.finish();

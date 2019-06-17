@@ -103,6 +103,7 @@ import org.hl7.fhir.igtools.publisher.Publisher.ListItemEntry;
 import org.hl7.fhir.igtools.publisher.Publisher.ListViewSorterById;
 import org.hl7.fhir.igtools.publisher.utils.IGRegistryMaintainer;
 import org.hl7.fhir.igtools.publisher.utils.IGReleaseUpdater;
+import org.hl7.fhir.igtools.publisher.utils.IGReleaseUpdater.ServerType;
 import org.hl7.fhir.igtools.publisher.utils.IGReleaseVersionDeleter;
 import org.hl7.fhir.igtools.renderers.BaseRenderer;
 import org.hl7.fhir.igtools.renderers.CodeSystemRenderer;
@@ -5959,8 +5960,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       fr = new File(registry);
       if (!fr.exists() || fr.isDirectory())
         throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} ({registry} not found)");
+      ServerType serverType = null;
+      if (hasParam(args, "-server-type")) {
+        String st = getNamedParam(args, "-server-type").toLowerCase();
+        if (st.equals("asp"))
+          serverType = ServerType.ASP;
+        else if (st.equals("apache"))
+          serverType = ServerType.APACHE;
+        else 
+          throw new Error("-server-type "+st+" not known - use ASP or Apache");
+      }
       IGRegistryMaintainer reg = new IGRegistryMaintainer(registry);
-      IGReleaseUpdater updater = new IGReleaseUpdater(args[1], url, root, reg);
+      IGReleaseUpdater updater = new IGReleaseUpdater(args[1], url, root, reg, serverType);
       updater.check();
       reg.finish();      
     } else if (hasParam(args, "-multi")) {
