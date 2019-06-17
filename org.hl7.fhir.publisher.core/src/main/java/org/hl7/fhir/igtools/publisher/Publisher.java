@@ -103,6 +103,7 @@ import org.hl7.fhir.igtools.publisher.Publisher.ListItemEntry;
 import org.hl7.fhir.igtools.publisher.Publisher.ListViewSorterById;
 import org.hl7.fhir.igtools.publisher.utils.IGRegistryMaintainer;
 import org.hl7.fhir.igtools.publisher.utils.IGReleaseUpdater;
+import org.hl7.fhir.igtools.publisher.utils.IGReleaseUpdater.ServerType;
 import org.hl7.fhir.igtools.publisher.utils.IGReleaseVersionDeleter;
 import org.hl7.fhir.igtools.renderers.BaseRenderer;
 import org.hl7.fhir.igtools.renderers.CodeSystemRenderer;
@@ -186,6 +187,7 @@ import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.openapi.OpenApiGenerator;
 import org.hl7.fhir.r5.openapi.Writer;
+import org.hl7.fhir.r5.terminologies.TerminologyServiceOptions;
 import org.hl7.fhir.r5.terminologies.ValueSetExpander.ValueSetExpansionOutcome;
 import org.hl7.fhir.r5.test.utils.ToolsHelper;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
@@ -1699,7 +1701,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           c.setSystem("http://unstats.un.org/unsd/methods/m49/m49.htm").setCode(sc);
         else
           c.setSystem("urn:iso:std:iso:3166").setCode(sc);
-        ValidationResult vr = context.validateCode(c, null);
+        ValidationResult vr = context.validateCode(new TerminologyServiceOptions("en-US"), c, null);
         if (vr.getDisplay() != null)
           c.setDisplay(vr.getDisplay());
       }
@@ -4766,6 +4768,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (r.getResource() != null && r.getResource() instanceof MetadataResource) {
       name = ((MetadataResource) r.getResource()).present();
       desc = getDesc((MetadataResource) r.getResource(), desc);
+    } else if (r.getElement() != null && r.getElement().hasChild("description")) {
+      desc = new StringType(r.getElement().getChildValue("description"));
     }
     list.append(" <li><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a> "+Utilities.escapeXml(desc.asStringValue())+"</li>\r\n");
     lists.append(" <li><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a></li>\r\n");
@@ -5528,7 +5532,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       else
         oa = new Writer(new FileOutputStream(Utilities.path(tempDir, cpbs.getId()+ ".openapi.json")));
       String lic = license();
-      String displ = context.doValidateCode(new Coding("http://hl7.org/fhir/spdx-license",  lic, null), null, false).getDisplay();
+      String displ = context.doValidateCode(new TerminologyServiceOptions("en-US"), new Coding("http://hl7.org/fhir/spdx-license",  lic, null), null, false).getDisplay();
       new OpenApiGenerator(context, cpbs, oa).generate(displ, "http://spdx.org/licenses/"+lic+".html");
       oa.commit();
       otherFilesRun.add(Utilities.path(tempDir, cpbs.getId()+ ".openapi.json"));
@@ -5570,13 +5574,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "uml"))
       fragmentError("StructureDefinition-"+sd.getId()+"-uml", "yet to be done: UML as SVG", null, f.getOutputNames());
     if (igpkp.wantGen(r, "tx"))
-      fragment("StructureDefinition-"+sd.getId()+"-tx", sdr.tx(includeHeadings, true), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+sd.getId()+"-tx", sdr.tx(includeHeadings, false), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "tx-must-support"))
-      fragment("StructureDefinition-"+sd.getId()+"-tx-must-support", sdr.tx(includeHeadings, false), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+sd.getId()+"-tx-must-support", sdr.tx(includeHeadings, true), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "tx-diff"))
-      fragment("StructureDefinition-"+sd.getId()+"-tx-diff", sdr.txDiff(includeHeadings, true), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+sd.getId()+"-tx-diff", sdr.txDiff(includeHeadings, false), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "tx-diff-must-support"))
-      fragment("StructureDefinition-"+sd.getId()+"-tx-diff-must-support", sdr.txDiff(includeHeadings, false), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+sd.getId()+"-tx-diff-must-support", sdr.txDiff(includeHeadings, true), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "inv"))
       fragment("StructureDefinition-"+sd.getId()+"-inv", sdr.inv(includeHeadings), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "dict"))
@@ -5916,48 +5920,58 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       conv.setLicense(getNamedParam(args, "-license"));
       conv.setWebsite(getNamedParam(args, "-website"));
       conv.execute();
-    } else if (hasParam(args, "delete-current")) {
+    } else if (hasParam(args, "-delete-current")) {
       if (!args[0].equals("-delete-current"))
-        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history}");
+        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history} (first argument is not -delete-current)");
       if (args.length < 4)
-        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history}");
+        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history} (not enough arguements)");
       File f = new File(args[1]);
       if (!f.exists() || !f.isDirectory())
-        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history}");
+        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history} ({root}/{realm}/{code} not found)");
       String history = getNamedParam(args, "-history");
       if (Utilities.noString(history))
-        throw new Error("-delete-current requires a -history parameter");
+        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history} (no history found)");
       File fh = new File(history);
       if (!fh.exists() || fh.isDirectory())
-        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history}");
+        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history} ({history} not found)");
       IGReleaseVersionDeleter deleter = new IGReleaseVersionDeleter();
       deleter.clear(f.getAbsolutePath(), fh.getAbsolutePath());
-    } else if (hasParam(args, "publish-update")) {
+    } else if (hasParam(args, "-publish-update")) {
       if (!args[0].equals("-publish-update"))
-        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root}");
+        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} (first argument is not -publish-update)");
       if (args.length < 4)
-        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root}");
+        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} (not enough args)");
       File f = new File(args[1]);
       if (!f.exists() || !f.isDirectory())
-        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root}");
+        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} ({root}/{realm}/{code} not found)");
       String url = getNamedParam(args, "-url");      
       if (Utilities.noString(url))
-        throw new Error("-publish-update requires a -url parameter");
+        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} (-url parameter not found)");
       String root = getNamedParam(args, "-root");      
       if (Utilities.noString(root))
-        throw new Error("-publish-update requires a -root parameter");
+        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} (-root parameter not found)");
       File fr = new File(root);
       if (!fr.exists() || fr.isDirectory())
-        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root}");
+        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} ({root} not found)");
       
       String registry = getNamedParam(args, "-registry");
       if (Utilities.noString(registry))
-        throw new Error("-publish-update requires a -registry parameter");
+        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} (-registry parameter not found)");
       fr = new File(registry);
       if (!fr.exists() || fr.isDirectory())
-        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root}");
+        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} ({registry} not found)");
+      ServerType serverType = null;
+      if (hasParam(args, "-server-type")) {
+        String st = getNamedParam(args, "-server-type").toLowerCase();
+        if (st.equals("asp"))
+          serverType = ServerType.ASP;
+        else if (st.equals("apache"))
+          serverType = ServerType.APACHE;
+        else 
+          throw new Error("-server-type "+st+" not known - use ASP or Apache");
+      }
       IGRegistryMaintainer reg = new IGRegistryMaintainer(registry);
-      IGReleaseUpdater updater = new IGReleaseUpdater(args[1], url, root, reg);
+      IGReleaseUpdater updater = new IGReleaseUpdater(args[1], url, root, reg, serverType);
       updater.check();
       reg.finish();      
     } else if (hasParam(args, "-multi")) {

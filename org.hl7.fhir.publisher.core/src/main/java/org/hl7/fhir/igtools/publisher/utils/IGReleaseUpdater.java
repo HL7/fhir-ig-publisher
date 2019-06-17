@@ -29,6 +29,7 @@ import java.util.List;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.utils.IGRegistryMaintainer.ImplementationGuideEntry;
+import org.hl7.fhir.igtools.publisher.utils.IGReleaseUpdater.ServerType;
 import org.hl7.fhir.r5.model.Enumerations.FHIRVersion;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
@@ -42,16 +43,22 @@ import com.google.gson.JsonObject;
 
 public class IGReleaseUpdater {
 
+  public enum ServerType {
+    APACHE, ASP
+  }
+
   private String folder;
   private String url;
   private String rootFolder;
   private IGRegistryMaintainer reg;
+  private ServerType serverType;
 
-  public IGReleaseUpdater(String folder, String url, String rootFolder, IGRegistryMaintainer reg) {
+  public IGReleaseUpdater(String folder, String url, String rootFolder, IGRegistryMaintainer reg, ServerType serverType) {
     this.folder = folder;
     this.url = url;
     this.rootFolder = rootFolder;
     this.reg = reg;
+    this.serverType = serverType;
   }
 
   public void check()  {
@@ -137,7 +144,11 @@ public class IGReleaseUpdater {
     pc.check(version.get("version").getAsString(), ig.get("package-id").getAsString(), version.get("fhirversion").getAsString(), 
         ig.get("title").getAsString(), version.get("date").getAsString(), version.get("path").getAsString(), canonical);
     IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(vf, canonical, version.get("path").getAsString());
-    if (!canonical.contains("hl7.org/fhir"))
+    if (serverType == ServerType.APACHE)
+      rb.buildApacheRedirections();
+    else if (serverType == ServerType.ASP)
+      rb.buildAspRedirections();
+    else if (!canonical.contains("hl7.org/fhir"))
       rb.buildApacheRedirections();
     else
       rb.buildAspRedirections();

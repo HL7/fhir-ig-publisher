@@ -1,26 +1,28 @@
-REM replace versions before running
-REM make sure you are committed
-
 @echo off
+
+set oldver=0.9.30
+set newver=0.9.31
+
+
 echo ..
 echo =============================================================================
-echo upgrade and release fhir IG Publisher from 0.9.26-SNAPSHOT to 0.9.27-SNAPSHOT
+echo upgrade and release fhir IG Publisher from %oldver%-SNAPSHOT to %newver%-SNAPSHOT
 echo =============================================================================
 echo ..
 echo Make sure code is commmitted and check the versions...
 pause
 
-call mvn versions:set -DnewVersion=0.9.27-SNAPSHOT
-call git commit -a -m "Release new version 0.9.27-SNAPSHOT"
+call mvn versions:set -DnewVersion=%newver%-SNAPSHOT
+call git commit -a -m "Release new version %newver%-SNAPSHOT"
 call git push origin master
-call "C:\tools\fnr.exe" --cl --dir "C:\work\org.hl7.fhir\build" --fileMask "*.xml" --find "0.9.26-SNAPSHOT" --replace "0.9.27-SNAPSHOT"
+call "C:\tools\fnr.exe" --cl --dir "C:\work\org.hl7.fhir\build" --fileMask "*.xml" --find "%oldver%-SNAPSHOT" --replace "%newver%-SNAPSHOT"
 call mvn deploy
-copy org.hl7.fhir.publisher.cli\target\org.hl7.fhir.publisher.cli-0.9.27-SNAPSHOT.jar ..\latest-ig-publisher\org.hl7.fhir.publisher.jar
+copy org.hl7.fhir.publisher.cli\target\org.hl7.fhir.publisher.cli-%newver%-SNAPSHOT.jar ..\latest-ig-publisher\org.hl7.fhir.publisher.jar
 cd ..\latest-ig-publisher
-call git commit -a -m "Release new version 0.9.27-SNAPSHOT"
+call git commit -a -m "Release new version %newver%-SNAPSHOT"
 call git push origin master
 cd ..\fhir-ig-publisher
-call python c:\tools\zulip-api\zulip\zulip\send.py --stream committers/notification --subject "java IGPublisher" -m "New Java IGPublisher v0.9.27-SNAPSHOT released at https://oss.sonatype.org/service/local/artifact/maven/redirect?r=snapshots&g=org.hl7.fhir.publisher&a=org.hl7.fhir.publisher.cli&v=0.9.27-SNAPSHOT&e=jar, and also deployed at https://fhir.github.io/latest-ig-publisher/org.hl7.fhir.publisher.jar" --config-file zuliprc
+call python c:\tools\zulip-api\zulip\zulip\send.py --stream committers/notification --subject "java IGPublisher" -m "New Java IGPublisher v%newver%-SNAPSHOT released at https://oss.sonatype.org/service/local/artifact/maven/redirect?r=snapshots&g=org.hl7.fhir.publisher&a=org.hl7.fhir.publisher.cli&v=%newver%-SNAPSHOT&e=jar, and also deployed at https://fhir.github.io/latest-ig-publisher/org.hl7.fhir.publisher.jar" --config-file zuliprc
 
 echo ========
 echo all done
