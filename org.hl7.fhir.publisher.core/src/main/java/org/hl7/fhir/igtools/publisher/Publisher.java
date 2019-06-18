@@ -1415,7 +1415,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (url == null)
       return url;
     if (url.contains("/ImplementationGuide/"))
-      return url.substring(0,  url.indexOf("/ImplementationGuide/"));
+      return url.substring(0, url.indexOf("/ImplementationGuide/"));
     throw new FHIRException("Unable to understand IG url: "+url);
   }
 
