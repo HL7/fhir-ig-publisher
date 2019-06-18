@@ -5932,8 +5932,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (Utilities.noString(history))
         throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history} (no history found)");
       File fh = new File(history);
-      if (!fh.exists() || !fh.isDirectory())
-        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history} ({history} not found)");
+      if (!fh.exists())
+        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history} ({history} not found ("+history+"))");
+      if (!fh.isDirectory())
+        throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history} ({history} not a directory ("+history+"))");
       IGReleaseVersionDeleter deleter = new IGReleaseVersionDeleter();
       deleter.clear(f.getAbsolutePath(), fh.getAbsolutePath());
     } else if (hasParam(args, "-publish-update")) {
