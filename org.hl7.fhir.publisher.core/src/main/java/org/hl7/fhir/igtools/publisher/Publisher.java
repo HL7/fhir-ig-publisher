@@ -5953,7 +5953,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (Utilities.noString(root))
         throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} (-root parameter not found)");
       File fr = new File(root);
-      if (!fr.exists() || fr.isDirectory())
+      if (!fr.exists() || !fr.isDirectory())
         throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} ({root} not found)");
       
       String registry = getNamedParam(args, "-registry");

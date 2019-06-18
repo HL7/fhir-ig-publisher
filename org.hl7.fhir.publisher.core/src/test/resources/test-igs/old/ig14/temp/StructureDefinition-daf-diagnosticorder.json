@@ -21,7 +21,7 @@
       ]
     }
   ],
-  "date": "2014-08-21T00:00:00Z",
+  "date": "2014-08-21T00:00:00+10:00",
   "description": "Defines constraints and extensions on the DiagnosticOrder resource for use in querying and retrieving DiagnosticOrder information.",
   "fhirVersion": "1.4.0",
   "mapping": [
