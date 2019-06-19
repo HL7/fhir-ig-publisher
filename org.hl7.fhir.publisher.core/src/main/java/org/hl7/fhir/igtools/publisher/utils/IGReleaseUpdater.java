@@ -33,6 +33,7 @@ import org.hl7.fhir.igtools.publisher.utils.IGReleaseUpdater.ServerType;
 import org.hl7.fhir.r5.model.Enumerations.FHIRVersion;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.json.JSONUtil;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 
 import com.google.gson.Gson;
@@ -69,32 +70,32 @@ public class IGReleaseUpdater {
         errs.add("unable to find package-list.json");
       else {
         JsonObject json = JsonTrackingParser.parseJsonFile(f);
-        String canonical = json.get("canonical").getAsString();
+        String canonical = JSONUtil.str(json, "canonical");
         JsonArray list = json.getAsJsonArray("list");
         JsonObject root = null;
         for (JsonElement n : list) {
           JsonObject o = (JsonObject) n;
           if (!o.has("version"))
            throw new Error(folder+" has Version without version");
-          if (!o.get("version").getAsString().equals("current")) {
+          if (!JSONUtil.str(o, "version").equals("current")) {
             if (o.has("current"))
               root = o;
           }
         }
         boolean save = false;
-        ImplementationGuideEntry rc = reg.seeIg(json.get("package-id").getAsString(), canonical, json.get("title").getAsString());
+        ImplementationGuideEntry rc = reg.seeIg(JSONUtil.str(json, "package-id"), canonical, JSONUtil.str(json, "title"));
         boolean hasRelease = false;
         List<String> folders = new ArrayList<>();
         for (JsonElement n : list) {
           JsonObject o = (JsonObject) n;
-          if (o.get("version").getAsString().equals("current")) {
-            reg.seeCiBuild(rc, o.get("path").getAsString());
+          if (JSONUtil.str(o, "version").equals("current")) {
+            reg.seeCiBuild(rc, JSONUtil.str(o, "path"));
           } else {
-            String v = o.get("version").getAsString();
+            String v = JSONUtil.str(o, "version");
             if (!o.has("path"))
               errs.add("version "+v+" has no path'"); 
             else {
-              String path = o.get("path").getAsString();;
+              String path = JSONUtil.str(o, "path");
               String vf = Utilities.path(path.replace(url, rootFolder));
               if (!path.endsWith(".html")) {
                 if (!(new File(vf).exists()))
@@ -106,11 +107,11 @@ public class IGReleaseUpdater {
               }
               if (o.has("current"))
                 root = o;
-              if (o.get("status").getAsString().equals("release") || o.get("status").getAsString().equals("trial-use") ) {
-                reg.seeRelease(rc, o.get("sequence").getAsString(), o.get("version").getAsString(), o.get("fhirversion").getAsString(), o.get("path").getAsString());
+              if (JSONUtil.str(o, "status").equals("release") || JSONUtil.str(o, "status").equals("trial-use")) {
+                reg.seeRelease(rc, JSONUtil.str(o, "sequence"), JSONUtil.str(o, "version"), JSONUtil.str(o, "fhirversion", "fhir-version"), JSONUtil.str(o, "path"));
                 hasRelease = true;
-              } else if (!hasRelease && FHIRVersion.isValidCode(o.get("fhirversion").getAsString()))
-                reg.seeCandidate(rc, o.get("sequence").getAsString()+" "+Utilities.titleize(o.get("status").getAsString()), o.get("version").getAsString(), o.get("fhirversion").getAsString(), o.get("path").getAsString());
+              } else if (!hasRelease && FHIRVersion.isValidCode(JSONUtil.str(o, "fhirversion", "fhir-version")))
+                reg.seeCandidate(rc, JSONUtil.str(o, "sequence")+" "+Utilities.titleize(JSONUtil.str(o, "status")), JSONUtil.str(o, "version"), JSONUtil.str(o, "fhirversion", "fhir-version"), JSONUtil.str(o, "path"));
             }
           }
         }
@@ -140,10 +141,10 @@ public class IGReleaseUpdater {
     IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(vf, ignoreList, version);
     igvu.updateStatement(fragment);
     System.out.println("    .. "+igvu.getCountTotal()+" files checked, "+igvu.getCountUpdated()+" updated");
-    IGPackageChecker pc = new IGPackageChecker(vf, canonical, version.get("path").getAsString(), ig.get("package-id").getAsString());
-    pc.check(version.get("version").getAsString(), ig.get("package-id").getAsString(), version.get("fhirversion").getAsString(), 
-        ig.get("title").getAsString(), version.get("date").getAsString(), version.get("path").getAsString(), canonical);
-    IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(vf, canonical, version.get("path").getAsString());
+    IGPackageChecker pc = new IGPackageChecker(vf, canonical, JSONUtil.str(version, "path"), JSONUtil.str(ig, "package-id"));
+    pc.check(JSONUtil.str(version, "version"), JSONUtil.str(ig, "package-id"), JSONUtil.str(version, "fhirversion", "fhir-version"), 
+        JSONUtil.str(ig, "title"), JSONUtil.str(version, "date"), JSONUtil.str(version, "path"), canonical);
+    IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(vf, canonical, JSONUtil.str(version, "path"));
     if (serverType == ServerType.APACHE)
       rb.buildApacheRedirections();
     else if (serverType == ServerType.ASP)
@@ -153,7 +154,7 @@ public class IGReleaseUpdater {
     else
       rb.buildAspRedirections();
     System.out.println("    .. "+rb.getCountTotal()+" redirections ("+rb.getCountUpdated()+" created/updated)");
-    if (!version.has("fhirversion")) {
+    if (!JSONUtil.has(version, "fhirversion", "fhir-version")) {
       if (rb.getFhirVersion() == null)
         System.out.println("Unable to determine FHIR version for "+vf);
       else {
@@ -177,9 +178,9 @@ public class IGReleaseUpdater {
    * @return
    */
   private String genFragment(JsonObject ig, JsonObject version, JsonObject root, String canonical) {
-    String p1 = ig.get("title").getAsString()+" (v"+version.get("version").getAsString()+": "+state(ig, version)+")";
-    String p2 = root == null ? "" : version == root ? ". This is the current published version" : ". The current version is <a href=\""+(root.get("path").getAsString().startsWith(canonical) ? canonical : root.get("path").getAsString())+"\">"+root.get("version").getAsString()+"</a>";
-    p2 = p2 + (version.has("fhirversion") ? " based on <a href=\"http://hl7.org/fhir/"+getPath(version.get("fhirversion").getAsString())+"\">FHIR "+fhirRef(version.get("fhirversion").getAsString())+"</a>" : "")+". ";
+    String p1 = JSONUtil.str(ig, "title")+" (v"+JSONUtil.str(version, "version")+": "+state(ig, version)+")";
+    String p2 = root == null ? "" : version == root ? ". This is the current published version" : ". The current version is <a href=\""+(JSONUtil.str(root, "path").startsWith(canonical) ? canonical : JSONUtil.str(root, "path"))+"\">"+JSONUtil.str(root, "version")+"</a>";
+    p2 = p2 + (JSONUtil.has(version, "fhirversion", "fhir-version") ? " based on <a href=\"http://hl7.org/fhir/"+getPath(JSONUtil.str(version, "fhirversion", "fhir-version"))+"\">FHIR "+fhirRef(JSONUtil.str(version, "fhirversion", "fhir-version"))+"</a>" : "")+". ";
     String p3 = " See the <a href=\""+Utilities.pathURL(canonical, canonical.contains("fhir.org") ? "history.shtml" : "history.cfml")+"\">Directory of published versions</a>";
     return p1+p2+p3;
   }
@@ -239,9 +240,9 @@ public class IGReleaseUpdater {
   }
 
   private String state(JsonObject ig, JsonObject version) {
-    String status = version.get("status").getAsString();
-    String sequence = version.get("sequence").getAsString();
-    String desc = version.get("sequence").getAsString();
+    String status = JSONUtil.str(version, "status");
+    String sequence = JSONUtil.str(version, "sequence");
+    String desc = JSONUtil.str(version,"sequence");
     if ("trial-use".equals(status))
       return decorate(sequence);
     else if ("release".equals(status))
@@ -267,7 +268,7 @@ public class IGReleaseUpdater {
       JsonObject o = (JsonObject) list.get(i);
       if (o == version)
         return Integer.toString(c);
-      if (sequence.equals(o.get("sequence").getAsString()) && "ballot".equals(version.get("status").getAsString()))
+      if (sequence.equals(JSONUtil.str(o, "sequence")) && "ballot".equals(JSONUtil.str(version, "status")))
         c++;
     }
     return "1";
