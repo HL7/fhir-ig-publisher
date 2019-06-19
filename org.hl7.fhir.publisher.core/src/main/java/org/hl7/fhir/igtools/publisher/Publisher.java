@@ -6012,7 +6012,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       Publisher self = new Publisher();
       System.out.println("FHIR Implementation Guide Publisher "+IGVersionUtil.getVersionString());
       System.out.println("Detected Java version: " + System.getProperty("java.version")+" from "+System.getProperty("java.home")+" on "+System.getProperty("os.arch")+" ("+System.getProperty("sun.arch.data.model")+"bit). "+toMB(Runtime.getRuntime().maxMemory())+"MB available");
-      System.out.println("Run time = "+nowAsString(self.execTime)+" ( @ "+nowAsDate(self.execTime)+")");
+      System.out.println("Run time = "+nowAsString(self.execTime)+" ( @ "+nowAsDate(self.execTime)+" )");
       System.out.print("["+System.getProperty("user.dir")+"]");
       for (int i = 0; i < args.length; i++) {
           System.out.print(" "+args[i]);
