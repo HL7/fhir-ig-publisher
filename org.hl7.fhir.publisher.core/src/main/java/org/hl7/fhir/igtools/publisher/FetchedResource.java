@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 
 import org.hl7.fhir.r5.elementmodel.Element;
+import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
 import org.hl7.fhir.r5.model.Resource;
 
 import com.google.gson.JsonObject;
@@ -42,6 +43,7 @@ public class FetchedResource {
   private String exampleUri;
   private boolean ValidateByUserData;
   private HashSet<FetchedResource> examples = new HashSet<FetchedResource>();
+  private ImplementationGuideDefinitionResourceComponent resEntry;
 
   public Resource getResource() {
     return resource;
@@ -126,6 +128,13 @@ public class FetchedResource {
   }
   public String fhirType() {
     return resource != null ? resource.fhirType() : element != null ? element.fhirType() : "??";
+  }
+  public void setResEntry(ImplementationGuideDefinitionResourceComponent value) {
+    this.resEntry = value;
+    
+  }
+  public ImplementationGuideDefinitionResourceComponent getResEntry() {
+    return resEntry;
   }
   
   

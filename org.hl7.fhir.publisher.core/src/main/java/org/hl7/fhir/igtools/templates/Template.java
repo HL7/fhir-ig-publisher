@@ -41,8 +41,10 @@ import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.model.ImplementationGuide;
+import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
 import org.hl7.fhir.r5.model.OperationOutcome;
 import org.hl7.fhir.r5.model.OperationOutcome.OperationOutcomeIssueComponent;
+import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.JsonMerger;
 import org.hl7.fhir.utilities.Utilities;
@@ -130,7 +132,7 @@ public class Template {
     
     new XmlParser().compose(new FileOutputStream(sfn+"xml"), ig);
     new JsonParser().compose(new FileOutputStream(sfn+"json"), ig);
-    runScript(scriptOnLoad, Utilities.path(root, "temp"), props);
+    runScript(scriptOnLoad, Utilities.path(root, "temp"), props, null);
     if (new File(fn+"xml").exists())
       return (ImplementationGuide) new XmlParser().parse(new FileInputStream(fn+"xml"));
     else if (new File(fn+"json").exists())
@@ -141,7 +143,7 @@ public class Template {
     
   }
   
-  private Map<String, List<ValidationMessage>> runScript(String script, String tempDir, Map<String, String> props) throws IOException, FHIRException {
+  private Map<String, List<ValidationMessage>> runScript(String script, String tempDir, Map<String, String> props, ImplementationGuide ig) throws IOException, FHIRException {
     String filename = script;
     String target = null;
     if (filename.contains("#")) {
@@ -150,11 +152,13 @@ public class Template {
     }
     
     File jsonOutcomes = new File(Utilities.path(templateDir, "validation.json"));
-    if (jsonOutcomes.exists())
-      jsonOutcomes.delete();
     File xmlOutcomes = new File(Utilities.path(templateDir, "validation.xml"));
-    if (xmlOutcomes.exists())
-      xmlOutcomes.delete();
+    File jsonIg = new File(Utilities.path(templateDir, "ig-updated.json"));
+    File xmlIg = new File(Utilities.path(templateDir, "ig-updated.xml"));
+    if (jsonOutcomes.exists()) jsonOutcomes.delete();
+    if (xmlOutcomes.exists())  xmlOutcomes.delete();
+    if (jsonIg.exists())  jsonIg.delete();
+    if (xmlIg.exists())  xmlIg.delete();
     
     File buildFile = new File(Utilities.path(templateDir, filename));
     Project project = new Project();
@@ -180,13 +184,45 @@ public class Template {
     if (jsonOutcomes.exists()) {
       loadValidationMessages((OperationOutcome) new JsonParser().parse(new FileInputStream(jsonOutcomes)), res);
     } else if (xmlOutcomes.exists()) {
-      loadValidationMessages((OperationOutcome) new JsonParser().parse(new FileInputStream(xmlOutcomes)), res);
+      loadValidationMessages((OperationOutcome) new XmlParser().parse(new FileInputStream(xmlOutcomes)), res);
     }
-    if (jsonOutcomes.exists())
-      jsonOutcomes.delete();
-    if (xmlOutcomes.exists())
-      xmlOutcomes.delete();     
+    if (ig != null) {
+      if (jsonIg.exists())
+        loadModifiedIg((ImplementationGuide) new JsonParser().parse(new FileInputStream(jsonIg)), ig);
+      else if (xmlIg.exists())
+        loadModifiedIg((ImplementationGuide) new XmlParser().parse(new FileInputStream(jsonIg)), ig);
+    }
+    
+    if (jsonOutcomes.exists()) jsonOutcomes.delete();
+    if (xmlOutcomes.exists())  xmlOutcomes.delete();
+    if (jsonIg.exists())  jsonIg.delete();
+    if (xmlIg.exists())  xmlIg.delete();
+    
     return res;
+  }
+
+  private void loadModifiedIg(ImplementationGuide modIg, ImplementationGuide ig) throws FHIRException {
+    int oc = ig.getDefinition().getResource().size();
+    int nc = modIg.getDefinition().getResource().size();
+    if (oc != nc)
+      throw new FHIRException("Ths template is not allowed to modify the resources ("+oc+"/"+nc+")");
+    for (ImplementationGuideDefinitionResourceComponent or : ig.getDefinition().getResource()) {
+      ImplementationGuideDefinitionResourceComponent nr = getMatchingResource(modIg, or.getReference()); 
+      if (nr == null)
+        throw new FHIRException("Ths template is not allowed to modify the resources - didn't find '"+or.getReference()+"'");
+    }
+    ig.setDefinition(modIg.getDefinition());
+    ig.getManifest().setPage(modIg.getManifest().getPage());
+    ig.getManifest().setImage(modIg.getManifest().getImage());
+    ig.getManifest().setOther(modIg.getManifest().getOther());
+  }
+
+  private ImplementationGuideDefinitionResourceComponent getMatchingResource(ImplementationGuide modIg, Reference reference) {
+    for (ImplementationGuideDefinitionResourceComponent nr : modIg.getDefinition().getResource()) {
+      if (nr.getReference().getReference().equals(reference.getReference()))
+        return nr;
+    }
+    return null;
   }
 
   private void loadValidationMessages(OperationOutcome op, Map<String, List<ValidationMessage>> res) throws FHIRException {
@@ -271,7 +307,7 @@ public class Template {
       props.put("ig.source", sfn);       
       new XmlParser().compose(new FileOutputStream(sfn+"xml"), ig);
       new JsonParser().compose(new FileOutputStream(sfn+"json"), ig);
-      return runScript(scriptOnGenerate, Utilities.path(root, "temp"), props);      
+      return runScript(scriptOnGenerate, Utilities.path(root, "temp"), props, ig);      
     } else
       return null;
   }
@@ -283,7 +319,7 @@ public class Template {
       props.put("ig.source", sfn);       
       new XmlParser().compose(new FileOutputStream(sfn+"xml"), ig);
       new JsonParser().compose(new FileOutputStream(sfn+"json"), ig);
-      return runScript(scriptOnJekyll, Utilities.path(root, "temp"), props);      
+      return runScript(scriptOnJekyll, Utilities.path(root, "temp"), props, null);      
     } else
       return null;
   }
@@ -295,7 +331,7 @@ public class Template {
       props.put("ig.source", sfn);       
       new XmlParser().compose(new FileOutputStream(sfn+"xml"), ig);
       new JsonParser().compose(new FileOutputStream(sfn+"json"), ig);
-      return runScript(scriptOnCheck, Utilities.path(root, "temp"), props);      
+      return runScript(scriptOnCheck, Utilities.path(root, "temp"), props, null);      
     } else
       return null;
   }
