@@ -174,6 +174,8 @@ import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.ResourceFactory;
 import org.hl7.fhir.r5.model.ResourceType;
 import org.hl7.fhir.r5.model.StringType;
+import org.hl7.fhir.r5.model.OperationDefinition;
+import org.hl7.fhir.r5.model.SearchParameter;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
@@ -4849,6 +4851,21 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     if (r instanceof StructureDefinition) {
       StructureDefinition v = (StructureDefinition) r;
+      if (v.hasDescription())
+        return v.getDescriptionElement();
+    }
+    if (r instanceof OperationDefinition) {
+      OperationDefinition v = (OperationDefinition) r;
+      if (v.hasDescription())
+        return v.getDescriptionElement();
+    }
+    if (r instanceof SearchParameter) {
+      SearchParameter v = (SearchParameter) r;
+      if (v.hasDescription())
+        return v.getDescriptionElement();
+    }
+    if (r instanceof CapabilityStatement) {
+      CapabilityStatement v = (CapabilityStatement) r;
       if (v.hasDescription())
         return v.getDescriptionElement();
     }
