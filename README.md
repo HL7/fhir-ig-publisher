@@ -19,4 +19,4 @@ mvn -Dmaven.test.skip install
 
 == Maintenance
 
-This project is maintained by Grahame Grieve and Lord Mckenzie on behalf of the FHIR community.
+This project is maintained by Grahame Grieve and Lloyd Mckenzie on behalf of the FHIR community.
