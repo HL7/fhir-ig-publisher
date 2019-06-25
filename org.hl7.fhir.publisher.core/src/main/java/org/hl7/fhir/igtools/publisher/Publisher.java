@@ -5636,6 +5636,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     if (igpkp.wantGen(r, "example-list"))
       fragment("StructureDefinition-example-list-"+sd.getId(), sdr.exampleList(fileList), f.getOutputNames(), r, vars, null);
+      if (igpkp.wantGen(r, "example-table"))
+      fragment("StructureDefinition-example-table-"+sd.getId(), sdr.exampleTable(fileList), f.getOutputNames(), r, vars, null);
+
 
     if (igpkp.wantGen(r, "csv")) {
       String path = Utilities.path(tempDir, r.getId()+".csv");
