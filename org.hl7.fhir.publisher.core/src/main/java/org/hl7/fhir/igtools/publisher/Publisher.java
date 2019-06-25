@@ -706,6 +706,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       f.println("<html><head><title>"+title+"</title></head><body><h2>"+title+"</h2>");
       f.print(tx);
       f.println("</head></html>");
+      f.close();
     }
     
   }
