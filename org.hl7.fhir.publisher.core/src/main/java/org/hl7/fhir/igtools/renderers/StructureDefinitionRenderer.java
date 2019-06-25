@@ -1184,6 +1184,30 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     return b.toString();
   }
 
+  public String exampleTable(List<FetchedFile> fileList) {
+    StringBuilder b = new StringBuilder();
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        for (String p : r.getProfiles()) {
+          if (sd.getUrl().equals(p)) {
+            String name = r.fhirType() + "/" + r.getId();
+            String title = r.getTitle();
+            if (Utilities.noString(title))
+              name = "example";
+            if (f.getTitle() != null && f.getTitle() != f.getName())
+              title = f.getTitle();
+            String ref = igp.getLinkFor(r);
+            b.append(" <tr>\r\n");
+            b.append("   <td><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a></td>\r\n");
+            b.append("   <td>"+Utilities.escapeXml(title)+"</td>\r\n");
+            b.append(" </tr>\r\n");
+          }
+        }
+      }
+    }
+    return b.toString();
+  }
+
   public String span(boolean onlyConstraints, String canonical, Set<String> outputTracker) throws IOException, FHIRException {
     return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateSpanningTable(sd, destDir, onlyConstraints, canonical, outputTracker));
   }
