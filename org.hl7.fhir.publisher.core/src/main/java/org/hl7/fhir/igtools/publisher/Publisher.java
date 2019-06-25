@@ -4881,21 +4881,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   @SuppressWarnings("rawtypes")
   private PrimitiveType getDesc(MetadataResource r, PrimitiveType desc) {
-    if (r instanceof CodeSystem) {
-      CodeSystem v = (CodeSystem) r;
-      if (v.hasDescription())
-        return v.getDescriptionElement();
-    }
-    if (r instanceof ValueSet) {
-      ValueSet v = (ValueSet) r;
-      if (v.hasDescription())
-        return v.getDescriptionElement();
-    }
-    if (r instanceof StructureDefinition) {
-      StructureDefinition v = (StructureDefinition) r;
-      if (v.hasDescription())
-        return v.getDescriptionElement();
-    }
+    if (r.hasDescription())
+      return r.getDescriptionElement();
     return desc;
   }
 
@@ -6054,7 +6041,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     } else {
       Publisher self = new Publisher();
-      System.out.println("FHIR Implementation Guide Publisher "+IGVersionUtil.getVersionString());
+      System.out.println("FHIR IG Publisher "+IGVersionUtil.getVersionString());
       System.out.println("Detected Java version: " + System.getProperty("java.version")+" from "+System.getProperty("java.home")+" on "+System.getProperty("os.arch")+" ("+System.getProperty("sun.arch.data.model")+"bit). "+toMB(Runtime.getRuntime().maxMemory())+"MB available");
       System.out.println("Run time = "+nowAsString(self.execTime)+" ( @ "+nowAsDate(self.execTime)+" )");
       System.out.print("["+System.getProperty("user.dir")+"]");
