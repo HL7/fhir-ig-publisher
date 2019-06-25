@@ -706,6 +706,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       f.println("<html><head><title>"+title+"</title></head><body><h2>"+title+"</h2>");
       f.print(tx);
       f.println("</head></html>");
+      f.close();
     }
     
   }
@@ -2389,6 +2390,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       i++;
       if (!bndIds.contains(res.getReference().getReference()) && !res.hasUserData("loaded.resource")) { // todo: this doesn't work for differential builds
         FetchedFile f = fetcher.fetch(res.getReference(), igf);
+        if (!f.hasTitle() && res.getName() != null)
+          f.setTitle(res.getName());
         boolean rchanged = noteFile(res, f);        
         needToBuild = rchanged || needToBuild;
         if (rchanged) 
@@ -4809,6 +4812,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       else
         ref = ref+"."+prefixType;
     PrimitiveType desc = new StringType(r.getTitle());
+    if (!r.hasTitle())
+      desc = new StringType(f.getTitle());
     if (r.getResource() != null && r.getResource() instanceof MetadataResource) {
       name = ((MetadataResource) r.getResource()).present();
       desc = getDesc((MetadataResource) r.getResource(), desc);
@@ -5631,6 +5636,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     if (igpkp.wantGen(r, "example-list"))
       fragment("StructureDefinition-example-list-"+sd.getId(), sdr.exampleList(fileList), f.getOutputNames(), r, vars, null);
+      if (igpkp.wantGen(r, "example-table"))
+      fragment("StructureDefinition-example-table-"+sd.getId(), sdr.exampleTable(fileList), f.getOutputNames(), r, vars, null);
+
 
     if (igpkp.wantGen(r, "csv")) {
       String path = Utilities.path(tempDir, r.getId()+".csv");

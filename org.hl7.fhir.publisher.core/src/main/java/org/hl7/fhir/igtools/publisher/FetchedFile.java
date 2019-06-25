@@ -128,6 +128,7 @@ public class FetchedFile {
   }
   public FetchedResource addResource() {
     FetchedResource r = new FetchedResource();
+    r.setTitle(getTitle());
     resources.add(r);
     return r;
   }
@@ -163,6 +164,9 @@ public class FetchedFile {
   }
   public void setProcessMode(int processMode) {
     this.processMode = processMode;
+  }
+  public Boolean hasTitle() {
+    return title != null;
   }
   public String getTitle() {
     return title == null ? name : title;
