@@ -133,6 +133,11 @@ public class FetchedResource {
     this.resEntry = value;
     
   }
+
+  /**
+   * Note: this may be broken after the Template.beforeGenerate event, so do not use after that 
+   * @return
+   */
   public ImplementationGuideDefinitionResourceComponent getResEntry() {
     return resEntry;
   }

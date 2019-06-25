@@ -2512,6 +2512,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
   private void checkOutcomes(Map<String, List<ValidationMessage>> outcomes) {
+    if (outcomes == null)
+      return;
+    
     for (String s : outcomes.keySet()) {
       FetchedFile f = getFileForFile(s);
       if (f == null)
