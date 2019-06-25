@@ -26,7 +26,7 @@
        fhir:ContactPoint.value [ fhir:value "http://www.healthit.gov" ]
      ]
   ];
-  fhir:StructureDefinition.date [ fhir:value "2014-08-21T00:00:00Z"^^xsd:dateTime];
+  fhir:StructureDefinition.date [ fhir:value "2014-08-21T00:00:00+10:00"^^xsd:dateTime];
   fhir:StructureDefinition.description [ fhir:value "Defines constraints and extensions on the DiagnosticOrder resource for use in querying and retrieving DiagnosticOrder information."];
   fhir:StructureDefinition.fhirVersion [ fhir:value "1.4.0"];
   fhir:StructureDefinition.mapping [

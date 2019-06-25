@@ -1415,7 +1415,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (url == null)
       return url;
     if (url.contains("/ImplementationGuide/"))
-      return url.substring(0,  url.indexOf("/ImplementationGuide/"));
+      return url.substring(0, url.indexOf("/ImplementationGuide/"));
     throw new FHIRException("Unable to understand IG url: "+url);
   }
 
@@ -2382,9 +2382,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       needToBuild = loadResources(needToBuild, igf);
     needToBuild = loadSpreadsheets(needToBuild, igf);
     needToBuild = loadBundles(needToBuild, igf);
+    int i = 0;
     for (ImplementationGuideDefinitionResourceComponent res : publishedIg.getDefinition().getResource()) {
       if (!res.hasReference())
-        throw new Exception("Missing source reference on a reesource in the IG with the name "+res.getName());
+        throw new Exception("Missing source reference on a reesource in the IG with the name '"+res.getName()+"' (index = "+i+")");
+      i++;
       if (!bndIds.contains(res.getReference().getReference()) && !res.hasUserData("loaded.resource")) { // todo: this doesn't work for differential builds
         FetchedFile f = fetcher.fetch(res.getReference(), igf);
         boolean rchanged = noteFile(res, f);        
@@ -2498,9 +2500,21 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (debug)
         waitForInput("after OnGenerate");
     }
+    cleanUpExtensions(publishedIg);
   }
 
+  private void cleanUpExtensions(ImplementationGuide ig) {
+   ToolingExtensions.removeExtension(ig, IGHelper.EXT_SPREADSHEET);
+   ToolingExtensions.removeExtension(ig, IGHelper.EXT_BUNDLE);
+   for (ImplementationGuideDefinitionResourceComponent r : ig.getDefinition().getResource())
+     ToolingExtensions.removeExtension(r, IGHelper.EXT_RESOURCE_INFO);
+  }
+
+
   private void checkOutcomes(Map<String, List<ValidationMessage>> outcomes) {
+    if (outcomes == null)
+      return;
+    
     for (String s : outcomes.keySet()) {
       FetchedFile f = getFileForFile(s);
       if (f == null)
@@ -2691,6 +2705,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         res.setName(r.getId()).setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
       }
       res.setUserData("loaded.resource", r);
+      r.setResEntry(res);
     }
     return changed || needToBuild;
   }
@@ -2717,6 +2732,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         res.setName(r.getTitle()).setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
       }
       res.setUserData("loaded.resource", f);
+      r.setResEntry(res);
     }
     return changed || needToBuild;
   }
@@ -2792,6 +2808,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         res.setName(r.getTitle()).setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
       }
       res.setUserData("loaded.resource", r);
+      r.setResEntry(res);
     }
     return changed || needToBuild;
   }
@@ -2829,6 +2846,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     scan("Questionnaire");
     scan("PlanDefinition");
     
+    loadInfo();
     load("NamingSystem");
     load("CodeSystem");
     load("ValueSet");
@@ -2850,6 +2868,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validateExpressions();
     scanForUsageStats();
   }
+
+  private void loadInfo() {
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getResEntry() != null) {
+          ToolingExtensions.setStringExtension(r.getResEntry(), IGHelper.EXT_RESOURCE_INFO, r.fhirType());
+        }
+      }
+    }
+  }
+
 
   private void scanForUsageStats() {
     log(LogCategory.PROGRESS, "scanForUsageStats");
@@ -3064,8 +3093,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             throw new Exception("Unable to determine file type for "+file.getName());
           r.setElement(e);
         }
-        if (srcForLoad != null)
+        if (srcForLoad != null) {
           srcForLoad.setUserData("loaded.resource", r);
+          r.setResEntry(srcForLoad);
+        }
         
         r.setTitle(e.getChildValue("name"));
         Element m = e.getNamedChild("meta");
@@ -3323,9 +3354,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     dlog(LogCategory.PROGRESS, "Generate Snapshots");
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
-        if (r.getResource() instanceof StructureDefinition && !r.isSnapshotted()) {
-          StructureDefinition sd = (StructureDefinition) r.getResource();
-          generateSnapshot(f, r, sd, false);
+        if (r.getResource() instanceof StructureDefinition) {
+          if (r.getResEntry() != null)
+            ToolingExtensions.setStringExtension(r.getResEntry(), IGHelper.EXT_RESOURCE_INFO, r.fhirType()+":"+getSDType((StructureDefinition) r.getResource()));
+
+          if (!r.isSnapshotted()) {
+            StructureDefinition sd = (StructureDefinition) r.getResource();
+            generateSnapshot(f, r, sd, false);
+          }
         }
       }
     }
@@ -3336,6 +3372,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
   }
+
+  private String getSDType(StructureDefinition sd) {
+    if ("Extension".equals(sd.getType()))
+      return "extension";
+//    if (sd.getKind() == StructureDefinitionKind.LOGICAL)
+    return sd.getKind().toCode();
+  }
+
 
   private void generateSnapshot(FetchedFile f, FetchedResource r, StructureDefinition sd, boolean close) throws Exception {
     boolean changed = false;
@@ -5953,7 +5997,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (Utilities.noString(root))
         throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} (-root parameter not found)");
       File fr = new File(root);
-      if (!fr.exists() || fr.isDirectory())
+      if (!fr.exists() || !fr.isDirectory())
         throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} ({root} not found)");
       
       String registry = getNamedParam(args, "-registry");
@@ -6012,7 +6056,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       Publisher self = new Publisher();
       System.out.println("FHIR Implementation Guide Publisher "+IGVersionUtil.getVersionString());
       System.out.println("Detected Java version: " + System.getProperty("java.version")+" from "+System.getProperty("java.home")+" on "+System.getProperty("os.arch")+" ("+System.getProperty("sun.arch.data.model")+"bit). "+toMB(Runtime.getRuntime().maxMemory())+"MB available");
-      System.out.println("Run time = "+nowAsString());
+      System.out.println("Run time = "+nowAsString(self.execTime)+" ( @ "+nowAsDate(self.execTime)+" )");
       System.out.print("["+System.getProperty("user.dir")+"]");
       for (int i = 0; i < args.length; i++) {
           System.out.print(" "+args[i]);
@@ -6263,12 +6307,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
 
-  private static String nowAsString() {
-    Calendar cal = Calendar.getInstance();
+  private static String nowAsString(Calendar cal) {
     DateFormat df = DateFormat.getDateTimeInstance(DateFormat.FULL, DateFormat.FULL);
     return df.format(cal.getTime());
   }
 
+  private static String nowAsDate(Calendar cal) {
+    DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX");
+    return df.format(cal.getTime());
+  }
 
   public Map<String, SpecificationPackage> getSpecifications() {
     return specifications;
