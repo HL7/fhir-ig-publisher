@@ -346,6 +346,60 @@ public class StructureDefinitionRenderer extends BaseRenderer {
       return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateTable(defnFile, sd, false, destDir, false, sd.getId(), true, prefix, "", false, false, outputTracker));
   }
 
+  public String mustsupport(String defnFile, Set<String> outputTracker) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
+    if (sd.getSnapshot().getElement().isEmpty())
+      return "";
+    else
+    {
+      XhtmlComposer composer = new XhtmlComposer(XhtmlComposer.HTML);
+      List<ElementDefinition> realElements = sd.getSnapshot().getElement();
+      List<ElementDefinition> mustSupportElements = new ArrayList<ElementDefinition>();
+      
+      for (ElementDefinition ed : realElements) {
+        if (ed.hasMustSupport() && ed.getMustSupport() || !ed.getPath().contains(".")) {
+          ElementDefinition edCopy = ed.copy();
+          if (edCopy.hasExample())
+            edCopy.getExample().clear();
+          if (edCopy.hasBinding())
+            edCopy.setBinding(null);
+          edCopy.setMustSupport(false);
+          mustSupportElements.add(edCopy);
+        }
+      }
+
+      sd.getSnapshot().setElement(mustSupportElements);
+      org.hl7.fhir.utilities.xhtml.XhtmlNode table = utils.generateTable(defnFile, sd, false, destDir, false, sd.getId(), true, prefix, "", false, false, outputTracker);
+      sd.getSnapshot().setElement(realElements);
+
+      // List<org.hl7.fhir.utilities.xhtml.XhtmlNode> removeNodes = new ArrayList<org.hl7.fhir.utilities.xhtml.XhtmlNode>();
+      // int index = 0;
+      // for (org.hl7.fhir.utilities.xhtml.XhtmlNode tableRow : table.getChildNodes()) {
+      //   index++;
+      //   if (index > 2) { // skip the header and resource rows
+      //     String rowText = composer.compose(tableRow);
+      //     if (!rowText.contains("This element must be supported")) {
+      //       removeNodes.add(tableRow);
+      //     }
+      //     else {
+      //       // and remove the must support tag (as they are all must support)
+      //       for (org.hl7.fhir.utilities.xhtml.XhtmlNode columnNode : tableRow.getChildNodes()) {
+      //         for (org.hl7.fhir.utilities.xhtml.XhtmlNode spanNode : columnNode.getChildNodes()) {
+      //           if (spanNode.getAttribute("title") == "This element must be supported") {
+      //             columnNode.getChildNodes().remove(spanNode);
+      //               break;
+      //           }
+      //         }
+      //       }
+      //     }
+      //   }
+      // }
+      // for (org.hl7.fhir.utilities.xhtml.XhtmlNode tableRow : removeNodes) {
+      //   table.getChildNodes().remove(tableRow);
+      // }
+      return composer.compose(table);
+    }
+  }
+
   public String grid(String defnFile, Set<String> outputTracker) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
     if (sd.getSnapshot().getElement().isEmpty())
       return "";
