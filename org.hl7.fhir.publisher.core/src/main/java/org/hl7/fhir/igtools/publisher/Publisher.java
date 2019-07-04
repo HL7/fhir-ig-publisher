@@ -196,6 +196,7 @@ import org.hl7.fhir.r5.utils.FHIRPathEngine.IEvaluationContext;
 import org.hl7.fhir.r5.utils.IGHelper;
 import org.hl7.fhir.r5.utils.IResourceValidator;
 import org.hl7.fhir.r5.utils.LiquidEngine;
+import org.hl7.fhir.r5.utils.MappingSheetParser;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator.Category;
 import org.hl7.fhir.r5.utils.NarrativeGenerator;
@@ -558,6 +559,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private boolean doTransforms;
   private List<String> spreadsheets = new ArrayList<>();
   private List<String> bundles = new ArrayList<>();
+  private List<String> mappings = new ArrayList<>();
 
   private IGPublisherLiquidTemplateServices templateProvider;
 
@@ -1373,6 +1375,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     pvalidator.setCheckAggregation(checkAggregation);
     pvalidator.setCheckMustSupport(hintAboutNonMustSupport);
     validator.getExtensionDomains().addAll(extensionDomains);
+    validator.getExtensionDomains().add(IGHelper.EXT_PRIVATE_BASE);
     validationFetcher = new ValidationServices(context, igpkp, fileList, npmList );
     validator.setFetcher(validationFetcher);
     for (String s : context.getBinaries().keySet()) {
@@ -1398,6 +1401,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     
     for (Extension e : sourceIg.getExtensionsByUrl(IGHelper.EXT_SPREADSHEET)) {
       spreadsheets.add(e.getValue().primitiveValue());
+    }
+    for (Extension e : sourceIg.getExtensionsByUrl(IGHelper.EXT_MAPPING_CSV)) {
+      mappings.add(e.getValue().primitiveValue());
     }
     for (Extension e : sourceIg.getExtensionsByUrl(IGHelper.EXT_BUNDLE)) {
       bundles.add(e.getValue().primitiveValue());
@@ -1628,10 +1634,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         txLog = null;
       } else {
         log("Connect to Terminology Server at "+txServer);
-        checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient(txServer, FhirPublication.fromCode(version)), txLog));
+        try {
+          checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient(txServer, FhirPublication.fromCode(version)), txLog));
+        } catch (Exception e) {
+          log("WARNING: Could not connect to terminology server - terminology content will likely not publish correctly ("+e.getMessage()+")");          
+        }
       }
     } else 
-      checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient(webTxServer.getAddress(), FhirPublication.fromCode(version)), txLog));
+      try {
+        checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient(webTxServer.getAddress(), FhirPublication.fromCode(version)), txLog));
+      } catch (Exception e) {
+        log("WARNING: Could not connect to terminology server - terminology content will likely not publish correctly ("+e.getMessage()+")");          
+      }
     
     
     loadSpecDetails(context.getBinaries().get("spec.internals"));
@@ -1691,6 +1705,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (JsonElement e : (JsonArray) paths.get("extension-domains"))
         validator.getExtensionDomains().add(((JsonPrimitive) e).getAsString());
     }
+    validator.getExtensionDomains().add(IGHelper.EXT_PRIVATE_BASE);
     if (configuration.has("jurisdiction")) {
       jurisdictions = new ArrayList<CodeableConcept>();
       for (String s : configuration.getAsJsonPrimitive("jurisdiction").getAsString().trim().split("\\,")) {
@@ -1750,6 +1765,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (array != null) {
       for (JsonElement be : array) 
         spreadsheets.add(be.getAsString());
+    }
+    array = configuration.getAsJsonArray("mappings");
+    if (array != null) {
+      for (JsonElement be : array) 
+        mappings.add(be.getAsString());
     }
     array = configuration.getAsJsonArray("bundles");
     if (array != null) {
@@ -2382,6 +2402,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (sourceDir != null || igpkp.isAutoPath())
       needToBuild = loadResources(needToBuild, igf);
     needToBuild = loadSpreadsheets(needToBuild, igf);
+    needToBuild = loadMappings(needToBuild, igf);
     needToBuild = loadBundles(needToBuild, igf);
     int i = 0;
     for (ImplementationGuideDefinitionResourceComponent res : publishedIg.getDefinition().getResource()) {
@@ -2740,6 +2761,35 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return changed || needToBuild;
   }
 
+
+  private boolean loadMappings(boolean needToBuild, FetchedFile igf) throws Exception {
+    for (String s : mappings) {
+      needToBuild = loadMapping(s, needToBuild, igf);
+    }
+    return needToBuild;
+  }
+
+  private boolean loadMapping(String name, boolean needToBuild, FetchedFile igf) throws Exception {
+    if (name.startsWith("!"))
+      return false;
+    FetchedFile f = fetcher.fetchResourceFile(name);
+    boolean changed = noteFile("Mapping/"+name, f);
+    if (changed) {
+      dlog(LogCategory.PROGRESS, "load "+f.getPath());
+      MappingSheetParser p = new MappingSheetParser();
+      p.parse(new ByteArrayInputStream(f.getSource()), f.getRelativePath());
+      ConceptMap cm = p.getConceptMap();
+      FetchedResource r = f.addResource();
+      r.setResource(cm);
+      r.setId(cm.getId());
+      r.setElement(convertToElement(cm));
+      r.setTitle(r.getElement().getChildValue("name"));
+      igpkp.findConfiguration(f, r);
+    } else {
+      f = altMap.get("Mapping/"+name);
+    }
+    return changed || needToBuild;
+  }
 
   private boolean loadSpreadsheets(boolean needToBuild, FetchedFile igf) throws Exception {
     Set<String> knownValueSetIds = new HashSet<>();
@@ -5558,6 +5608,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       fragmentError("ConceptMap-"+cm.getId()+"-content", "yet to be done: table presentation of the concept map", null, f.getOutputNames());
     if (igpkp.wantGen(r, "xref"))
       fragmentError("ConceptMap-"+cm.getId()+"-xref", "yet to be done: list of all places where concept map is used", null, f.getOutputNames());
+    MappingSheetParser p = new MappingSheetParser();
+    if (igpkp.wantGen(r, "sheet") && p.isSheet(cm))
+      fragment("ConceptMap-"+cm.getId()+"-sheet", p.genSheet(cm), f.getOutputNames(), r, vars, null);
   }
 
   private void generateOutputsCapabilityStatement(FetchedFile f, FetchedResource r, CapabilityStatement cpbs, Map<String, String> vars) throws Exception {
