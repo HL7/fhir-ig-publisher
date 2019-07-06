@@ -30,7 +30,7 @@
        fhir:index 0;
        fhir:Element.extension [
          fhir:index 0;
-         fhir:Extension.url [ fhir:value "http://tools.fhir.org/StructureDefinition/resource-information" ];
+         fhir:Extension.url [ fhir:value "http://hl7.org/fhir/tools/StructureDefinition/resource-information" ];
          fhir:Extension.valueString [ fhir:value "StructureDefinition:resource" ]
        ], [
          fhir:index 1;

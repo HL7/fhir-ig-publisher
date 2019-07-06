@@ -17,7 +17,7 @@
   <package id="diagnosticorder-daf-profile-spreadsheet.xml">
     <name value="U.S. Data Access Framework (DAF) DiagnosticOrder Profile"/>
     <resource>
-      <extension url="http://tools.fhir.org/StructureDefinition/resource-information">
+      <extension url="http://hl7.org/fhir/tools/StructureDefinition/resource-information">
         <valueString value="StructureDefinition:resource"/>
       </extension>
       <extension url="http://hl7.org/fhir/StructureDefinition/implementationguide-page">

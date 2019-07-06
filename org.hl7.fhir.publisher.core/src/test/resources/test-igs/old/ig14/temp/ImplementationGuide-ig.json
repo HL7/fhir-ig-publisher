@@ -23,7 +23,7 @@
         {
           "extension": [
             {
-              "url": "http://tools.fhir.org/StructureDefinition/resource-information",
+              "url": "http://hl7.org/fhir/tools/StructureDefinition/resource-information",
               "valueString": "StructureDefinition:resource"
             },
             {
