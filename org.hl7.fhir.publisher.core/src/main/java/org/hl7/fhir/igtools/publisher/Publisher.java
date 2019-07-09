@@ -167,6 +167,8 @@ import org.hl7.fhir.r5.model.ImplementationGuide.SPDXLicense;
 import org.hl7.fhir.r5.model.ListResource;
 import org.hl7.fhir.r5.model.ListResource.ListEntryComponent;
 import org.hl7.fhir.r5.model.MetadataResource;
+import org.hl7.fhir.r5.model.Narrative;
+import org.hl7.fhir.r5.model.Narrative.NarrativeStatus;
 import org.hl7.fhir.r5.model.Parameters;
 import org.hl7.fhir.r5.model.PrimitiveType;
 import org.hl7.fhir.r5.model.Reference;
@@ -3441,7 +3443,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     ProfileUtilities utils = new ProfileUtilities(context, f.getErrors(), igpkp);
     StructureDefinition base = sd.hasBaseDefinition() ? fetchSnapshotted(sd.getBaseDefinition()) : null;
     utils.setIds(sd, true);
-    if (sd.getKind() != StructureDefinitionKind.LOGICAL) {
+    if (sd.getKind() != StructureDefinitionKind.LOGICAL || sd.getDerivation()==TypeDerivationRule.CONSTRAINT) {
       if (!sd.hasSnapshot()) {
         dlog(LogCategory.PROGRESS, "Generate Snapshot for "+sd.getUrl());
         if (base == null)

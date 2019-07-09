@@ -1214,7 +1214,9 @@ public class StructureDefinitionRenderer extends BaseRenderer {
 
   public String pseudoJson() throws Exception {
     StringBuilder b = new StringBuilder();
-    ElementDefinition root = sd.getSnapshot().getElement().get(0);
+    if (sd.getSnapshot() == null || sd.getSnapshot().getElement() == null || sd.getSnapshot().getElement().size()==0) {
+      return "";
+    }
     String rn = sd.getSnapshot().getElement().get(0).getPath();
     b.append(" // <span style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(sd.getTitle()) + "</span>\r\n {\r\n");
     if (sd.getKind() == StructureDefinitionKind.RESOURCE)
