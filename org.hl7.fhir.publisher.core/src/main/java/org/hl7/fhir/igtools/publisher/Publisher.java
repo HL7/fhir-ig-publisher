@@ -203,6 +203,7 @@ import org.hl7.fhir.r5.utils.NarrativeGenerator;
 import org.hl7.fhir.r5.utils.NarrativeGenerator.ILiquidTemplateProvider;
 import org.hl7.fhir.r5.utils.NarrativeGenerator.IReferenceResolver;
 import org.hl7.fhir.r5.utils.NarrativeGenerator.ITypeParser;
+import org.hl7.fhir.r5.utils.NarrativeGenerator.ResourceContext;
 import org.hl7.fhir.r5.utils.NarrativeGenerator.ResourceWithReference;
 import org.hl7.fhir.r5.utils.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.StructureMapUtilities.StructureMapAnalysis;
@@ -836,7 +837,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               for (Element e : r.getElement().getChildrenByName("entry")) {
                 Element res = e.getNamedChild("resource");
                 if (res!=null && "http://hl7.org/fhir/StructureDefinition/DomainResource".equals(res.getProperty().getStructure().getBaseDefinition()) && !hasNarrative(res)) {
-                  gen.generate(gen.new ResourceContext(r.getElement(), res), res, true, getTypeLoader(f,r));
+                  gen.generate(new ResourceContext(r.getElement(), res), res, true, getTypeLoader(f,r));
                 }
               }
             }
