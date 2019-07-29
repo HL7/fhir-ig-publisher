@@ -213,13 +213,15 @@ public class SpecMapManager {
       tgt = tgt.substring(base.length());
     else
       return false;
+    if (tgt.contains("#"))
+      tgt = tgt.substring(0, tgt.indexOf("#"));
     if (targetSet.contains(tgt))
       return true;
     if (Utilities.existsInList(tgt, "qa.html", "toc.html"))
       return true;
-    if (tgt.contains("#"))
-      tgt = tgt.substring(0, tgt.indexOf("#"));
     if (targetSet.contains(tgt))
+      return true;
+    if (paths.has(base+"/"+tgt))
       return true;
     return false;  
   }
