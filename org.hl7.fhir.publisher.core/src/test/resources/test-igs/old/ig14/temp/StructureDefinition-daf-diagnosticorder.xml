@@ -44,7 +44,7 @@
       <value value="http://www.healthit.gov"/>
     </telecom>
   </contact>
-  <date value="2014-08-21T00:00:00Z"/>
+  <date value="2014-08-21T00:00:00+00:00"/>
   <description value="Defines constraints and extensions on the DiagnosticOrder resource for use in querying and retrieving DiagnosticOrder information."/>
   <fhirVersion value="1.4.0"/>
   <mapping>
