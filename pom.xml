@@ -18,12 +18,12 @@
     <parent>
         <groupId>ca.uhn.hapi.fhir</groupId>
         <artifactId>org.hl7.fhir.core</artifactId>
-        <version>3.8.13-SNAPSHOT</version>
+        <version>3.8.14-SNAPSHOT</version>
     </parent>
     <properties>
-        <core_version>3.8.13-SNAPSHOT</core_version>
+        <core_version>3.8.14-SNAPSHOT</core_version>
     </properties>
-    <version>0.9.44-SNAPSHOT</version> <!-- See the note above -->
+    <version>0.9.45-SNAPSHOT</version> <!-- See the note above -->
 
     <packaging>pom</packaging>
     <groupId>org.hl7.fhir.publisher</groupId>

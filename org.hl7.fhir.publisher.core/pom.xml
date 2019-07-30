@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.hl7.fhir.publisher</groupId>
         <artifactId>org.hl7.fhir.publisher</artifactId>
-        <version>0.9.44-SNAPSHOT</version>
+        <version>0.9.45-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
