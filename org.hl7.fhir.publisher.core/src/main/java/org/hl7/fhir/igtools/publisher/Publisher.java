@@ -1767,10 +1767,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (JsonElement be : array) 
         spreadsheets.add(be.getAsString());
     }
-    array = configuration.getAsJsonArray("mappings");
-    if (array != null) {
-      for (JsonElement be : array) 
-        mappings.add(be.getAsString());
+    if (configuration.has("mappings") && configuration.get("mappings").isJsonArray()) {
+      array = configuration.getAsJsonArray("mappings");
+      if (array != null) {
+        for (JsonElement be : array) 
+          mappings.add(be.getAsString());
+      }
     }
     array = configuration.getAsJsonArray("bundles");
     if (array != null) {
@@ -3307,7 +3309,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               throw new Exception("Error: conformance resource "+f.getPath()+" could not be loaded");
             boolean altered = false;
             if (bc.hasUrl()) {
-              if (adHocTmpDir == null && !listedURLExemptions.contains(bc.getUrl()) && !bc.getUrl().equals(Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())))
+              if (adHocTmpDir == null && !listedURLExemptions.contains(bc.getUrl()) && !isExampleResource(bc) && !bc.getUrl().equals(Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())))
                 f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, bc.getUrl(), "conformance resource "+f.getPath()+" canonical URL ("+Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())+") does not match the URL ("+bc.getUrl()+")", IssueSeverity.ERROR));
                 // throw new Exception("Error: conformance resource "+f.getPath()+" canonical URL ("+Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())+") does not match the URL ("+bc.getUrl()+")");            
             } else if (bc.hasId())
@@ -3375,6 +3377,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
   
+  private boolean isExampleResource(MetadataResource mr) {
+    for (ImplementationGuideDefinitionResourceComponent ir : publishedIg.getDefinition().getResource()) {
+      if (isSameResource(ir, mr))
+        return ir.hasExample();
+    }
+    return false;
+  }
+
+
+  private boolean isSameResource(ImplementationGuideDefinitionResourceComponent ir, MetadataResource mr) {
+    return ir.getReference().getReference().equals(mr.fhirType()+"/"+mr.getId());
+  }
+
+
   private void dlog(LogCategory category, String s) {
     logger.logDebugMessage(category, Utilities.padRight(s, ' ', 80)+" ("+presentDuration(System.nanoTime()-globalStart)+"sec)");
   }
@@ -3934,7 +3950,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         String u = igpkp.getCanonical()+r.getUrlTail();
         if (r.getResource() != null && r.getResource() instanceof MetadataResource) {
           String uc = ((MetadataResource) r.getResource()).getUrl();
-          if (uc != null && !u.equals(uc) && !isListedURLExemption(uc) && adHocTmpDir == null)
+          if (uc != null && !u.equals(uc) && !isListedURLExemption(uc) && !isExampleResource((MetadataResource) r.getResource()) && adHocTmpDir == null)
             f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, f.getName(), "URL Mismatch "+u+" vs "+uc, IssueSeverity.ERROR));
           if (uc != null && !u.equals(uc))
             map.path(uc, igpkp.getLinkFor(r));

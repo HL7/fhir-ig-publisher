@@ -316,7 +316,7 @@ public class HTLMLInspector {
           src = src.replace(RELEASE_HTML_MARKER, START_HTML_MARKER + statusText+END_HTML_MARKER);
           TextFile.stringToFile(src, f, false);
         }
-          
+        x = new XhtmlParser().setMustBeWellFormed(strict).parse(new FileInputStream(f), null);
       } catch (Exception e1) {
         hl7State = false;
       }
