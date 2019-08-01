@@ -317,10 +317,14 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     String s = "The reference "+ref+" could not be resolved";
     if (!msgs.contains(s)) {
       msgs.add(s);
-      errors.add(new ValidationMessage(Source.Publisher, IssueType.INVARIANT, location, s, IssueSeverity.ERROR));
+      errors.add(new ValidationMessage(Source.Publisher, IssueType.INVARIANT, pathToFhirPath(location), s, IssueSeverity.ERROR));
     }
   }
 
+  private String pathToFhirPath(String path) {
+    return path.replace("[x]", "");
+  }
+  
   private String specPath(String path) {
     return Utilities.pathURL(pathToSpec, path);
   }

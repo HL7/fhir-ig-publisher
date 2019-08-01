@@ -569,7 +569,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     StringBuilder b = new StringBuilder();
     b.append("<table class=\"dict\">\r\n");
 
-    List<StringPair> replacements = new ArrayList<StringPair>();
+    Map<String, String> replacements = new HashMap<>();
     for (ElementDefinition ec : sd.getSnapshot().getElement()) {
       if (incProfiledOut || !"0".equals(ec.getMax())) {
         if (isProfiledExtension(ec)) {
@@ -589,7 +589,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
                   tl.add(tc);
                   String s = ec.getId().replace("[x]", Utilities.capitalize(tc));
                   b.append("<a name=\""+s+"\"> </a>");
-                  replacements.add(new StringPair(ec.getId(), s));
+                  replacements.put(ec.getId(), s);
                 }
               }
             }
@@ -601,31 +601,31 @@ public class StructureDefinitionRenderer extends BaseRenderer {
         } else {
           String title = ec.getId();
           b.append("  <tr><td colspan=\"2\" class=\"structure\"><span class=\"self-link-parent\"><a name=\""+ec.getId()+"\"> </a>");
-          if (ec.getId().endsWith("[x]")) {
+          if (ec.getPath().endsWith("[x]") && ec.hasSliceName()) {
             Set<String> tl = new HashSet<String>();
             for (TypeRefComponent tr : ec.getType()) {
               String tc = tr.getCode();
               if (!tl.contains(tc)) {
                 tl.add(tc);
-                String s = ec.getId().replace("[x]", Utilities.capitalize(tc));
-                b.append("<a name=\""+s+"\"> </a>");
-                replacements.add(new StringPair(ec.getId(), s));
+                String s = ec.getPath().replace("[x]", Utilities.capitalize(tc));
+                replacements.put(ec.getId(), s);
               }
             }
-          } else if (ec.hasBase() && ec.getBase().getPath().endsWith("[x]")) {
-            String s = nottail(ec.getId())+"."+tail(ec.getBase().getPath());
-            replacements.add(new StringPair(ec.getId(), s));
-            b.append("<a name=\""+s+"\"> </a>");
-          } else if (!ec.getId().equals(ec.getPath())) {
-            b.append("<a name=\""+ec.getPath()+"\"> </a>");
-          }
-          for (StringPair s : replacements)
-            if (ec.getId().startsWith(s.match))
-              b.append("<a name=\""+s.replace+ec.getId().substring(s.match.length())+"\"> </a>");
+//          } else if (ec.hasBase() && ec.getBase().getPath().endsWith("[x]")) {
+//            String s = nottail(ec.getId())+"."+tail(ec.getBase().getPath());
+//            replacements.add(new StringPair(ec.getId(), s));
+//            b.append("<a name=\""+s+"\"> </a>");
+          } 
+//          else if (ec.hasSliceName()) {
+//            b.append("<a name=\""+ec.getPath()+"\"> </a>");
+//          } 
+          for (String sp : replacements.keySet())
+            if (ec.getId().startsWith(sp))
+              b.append("<a name=\""+replacements.get(sp)+ec.getId().substring(sp.length())+"\"> </a>");
           b.append("<span style=\"color: grey\">"+Integer.toString(i++)+".</span> <b>"+title+"</b>"+link(ec.getId())+"</span></td></tr>\r\n");
           generateElementInner(b, sd, ec, 1, null);
           if (ec.hasSlicing())
-            generateSlicing(sd, ec.getSlicing());
+            generateSlicing(b, sd, ec, ec.getSlicing());
         }
       }
     }
@@ -656,6 +656,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
   }
 
   private void generateElementInner(StringBuilder b, StructureDefinition profile, ElementDefinition d, int mode, ElementDefinition value) throws Exception {
+    tableRow(b, translate("sd.dict", "SliceName"), "profiling.html#slicing", d.getSliceName());
     tableRowNE(b, translate("sd.dict", "Definition"), null, processMarkdown(profile.getName(), d.getDefinitionElement()));
     tableRowNE(b, translate("sd.dict", "Note"), null, businessIdWarning(profile.getName(), tail(d.getPath())));
     tableRow(b, translate("sd.dict", "Control"), "conformance-rules.html#conformance", describeCardinality(d) + summariseConditions(d.getCondition()));
@@ -682,27 +683,30 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     tableRow(b, translate("sd.dict", "SNOMED-CT Code"), null, getMapping(profile, d, SNOMED_MAPPING));
   }
 
-  private void generateSlicing(StructureDefinition profile, ElementDefinitionSlicingComponent slicing) throws IOException {
-    StringBuilder b = new StringBuilder();
+  private void generateSlicing(StringBuilder b, StructureDefinition profile, ElementDefinition ed, ElementDefinitionSlicingComponent slicing) throws IOException {
+    String rs = null;
     if (slicing.getOrdered())
-      b.append("<li>"+translate("sd.dict", "ordered")+"</li>");
+      rs = translate("sd.dict", "ordered");
     else
-      b.append("<li>"+translate("sd.dict", "unordered")+"</li>");
+      rs = translate("sd.dict", "unordered");
     if (slicing.hasRules())
-      b.append("<li>"+slicing.getRules().getDisplay()+"</li>");
+      rs = rs+" and "+slicing.getRules().getDisplay();
+    
+    StringBuilder bl = new StringBuilder();
     if (!slicing.getDiscriminator().isEmpty()) {
-      b.append("<li>"+translate("sd.dict", "discriminators")+": ");
       boolean first = true;
       for (ElementDefinitionSlicingDiscriminatorComponent s : slicing.getDiscriminator()) {
         if (first)
           first = false;
         else
-          b.append(", ");
-        b.append(s.getType().toCode()+":"+s.getPath());
+          bl.append(", ");
+        bl.append("<li>"+s.getType().toCode()+" @ "+s.getPath()+"</li>");
       }
-      b.append("</li>");
     }
-    tableRowNE(b, ""+translate("sd.dict", "Slicing"), "profiling.html#slicing", translate("sd.dict", "This element introduces a set of slices. The slicing rules are")+": <ul> "+b.toString()+"</ul>");
+    if (slicing.hasDiscriminator())
+      tableRowNE(b, ""+translate("sd.dict", "Slicing"), "profiling.html#slicing", "This element introduces a set of slices on "+ed.getPath()+". The slices are "+rs+", and can be differentiated using the following discriminators: <ul> "+bl.toString()+"</ul>");
+    else
+      tableRowNE(b, ""+translate("sd.dict", "Slicing"), "profiling.html#slicing", "This element introduces a set of slices on "+ed.getPath()+". The slices are "+rs+", and defines no discriminators to differentiate the slices");
   }
 
   private void tableRow(StringBuilder b, String name, String defRef, String value) throws IOException {

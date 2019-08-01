@@ -1767,10 +1767,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (JsonElement be : array) 
         spreadsheets.add(be.getAsString());
     }
-    array = configuration.getAsJsonArray("mappings");
-    if (array != null) {
-      for (JsonElement be : array) 
-        mappings.add(be.getAsString());
+    if (configuration.has("mappings") && configuration.get("mappings").isJsonArray()) {
+      array = configuration.getAsJsonArray("mappings");
+      if (array != null) {
+        for (JsonElement be : array) 
+          mappings.add(be.getAsString());
+      }
     }
     array = configuration.getAsJsonArray("bundles");
     if (array != null) {
@@ -2210,7 +2212,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     System.out.println("Fetch Package history from "+Utilities.pathURL(canonical, "package-list.json"));
     pl = fetchJson(Utilities.pathURL(canonical, "package-list.json"));
     if (!canonical.equals(pl.get("canonical").getAsString()))
-      throw new Exception("Canonical mismatch fetching package list for "+igver);
+      throw new Exception("Canonical mismatch fetching package list for "+canonical+"#"+igver+", package-list.json says "+pl.get("canonical"));
     for (JsonElement e : pl.getAsJsonArray("list")) {
       JsonObject o = (JsonObject) e;
       if (igver.equals(o.get("version").getAsString())) {
@@ -2914,6 +2916,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     load("PlanDefinition");
     loadLists();
     generateSnapshots();
+    generateNarratives();
     checkConformanceResources();
     generateLogicalMaps();
     load("StructureMap");
@@ -3294,11 +3297,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               throw new Exception("Error parsing "+f.getName()+": "+e.getMessage(), e);
             }
           if (!r.isValidated()) {
-            if (r.getResource() instanceof DomainResource && !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv())) {
-              gen.setDefinitionsTarget(igpkp.getDefinitionsName(r));
-              gen.generate((DomainResource) r.getResource(), otherFilesStartup);
-              r.setElement(convertToElement(r.getResource()));
-            }
+            // we;re going to do this later....
+//            if (r.getResource() instanceof DomainResource && !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv())) {
+//              gen.setDefinitionsTarget(igpkp.getDefinitionsName(r));
+//              gen.generate((DomainResource) r.getResource(), otherFilesStartup);
+//              r.setElement(convertToElement(r.getResource()));
+//            }
             validate(f, r);
           }
           if (r.getResource() instanceof MetadataResource) {
@@ -3307,7 +3311,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               throw new Exception("Error: conformance resource "+f.getPath()+" could not be loaded");
             boolean altered = false;
             if (bc.hasUrl()) {
-              if (adHocTmpDir == null && !listedURLExemptions.contains(bc.getUrl()) && !bc.getUrl().equals(Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())))
+              if (adHocTmpDir == null && !listedURLExemptions.contains(bc.getUrl()) && !isExampleResource(bc) && !bc.getUrl().equals(Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())))
                 f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, bc.getUrl(), "conformance resource "+f.getPath()+" canonical URL ("+Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())+") does not match the URL ("+bc.getUrl()+")", IssueSeverity.ERROR));
                 // throw new Exception("Error: conformance resource "+f.getPath()+" canonical URL ("+Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())+") does not match the URL ("+bc.getUrl()+")");            
             } else if (bc.hasId())
@@ -3375,6 +3379,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
   
+  private boolean isExampleResource(MetadataResource mr) {
+    for (ImplementationGuideDefinitionResourceComponent ir : publishedIg.getDefinition().getResource()) {
+      if (isSameResource(ir, mr))
+        return ir.hasExample();
+    }
+    return false;
+  }
+
+
+  private boolean isSameResource(ImplementationGuideDefinitionResourceComponent ir, MetadataResource mr) {
+    return ir.getReference().getReference().equals(mr.fhirType()+"/"+mr.getId());
+  }
+
+
   private void dlog(LogCategory category, String s) {
     logger.logDebugMessage(category, Utilities.padRight(s, ' ', 80)+" ("+presentDuration(System.nanoTime()-globalStart)+"sec)");
   }
@@ -3934,7 +3952,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         String u = igpkp.getCanonical()+r.getUrlTail();
         if (r.getResource() != null && r.getResource() instanceof MetadataResource) {
           String uc = ((MetadataResource) r.getResource()).getUrl();
-          if (uc != null && !u.equals(uc) && !isListedURLExemption(uc) && adHocTmpDir == null)
+          if (uc != null && !u.equals(uc) && !isListedURLExemption(uc) && !isExampleResource((MetadataResource) r.getResource()) && adHocTmpDir == null)
             f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, f.getName(), "URL Mismatch "+u+" vs "+uc, IssueSeverity.ERROR));
           if (uc != null && !u.equals(uc))
             map.path(uc, igpkp.getLinkFor(r));

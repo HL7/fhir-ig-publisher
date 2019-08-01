@@ -36,6 +36,7 @@ import org.hl7.fhir.r5.model.Bundle;
 import org.hl7.fhir.r5.model.Bundle.BundleEntryComponent;
 import org.hl7.fhir.r5.model.Constants;
 import org.hl7.fhir.r5.model.OperationOutcome;
+import org.hl7.fhir.r5.utils.FHIRPathEngine;
 import org.hl7.fhir.r5.utils.OperationOutcomeUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.TranslatingUtilities;
@@ -131,6 +132,12 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     OperationOutcome oo = new OperationOutcome();
     validationBundle.addEntry(new BundleEntryComponent().setResource(oo));
     for (ValidationMessage vm : linkErrors) {
+      FHIRPathEngine fpe = new FHIRPathEngine(provider.getContext());
+      try {
+        fpe.parse(vm.getLocation());
+      } catch (Exception e) {
+        System.out.println("Internal error in location for message: '"+e.getMessage()+"', loc = '"+subst100(vm.getLocation())+"', err = '"+subst100(vm.getMessage())+"'");
+      }
       oo.getIssue().add(OperationOutcomeUtilities.convertToIssue(vm, oo));
     }
     for (FetchedFile f : files) {
@@ -169,6 +176,12 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     
     String summary = "Errors: " + err + "  Warnings: " + warn + "  Info: " + info;
     return path + "\r\n" + summary;
+  }
+
+  private String subst100(String msg) {
+    if (msg == null)
+      return "";
+    return msg.length() > 100 ? msg.substring(0, 100) : msg;
   }
 
   private String genSuppressedMessages(List<String> filteredMessages) {

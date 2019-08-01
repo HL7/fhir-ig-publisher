@@ -729,7 +729,8 @@ public class IgSpreadsheetParser {
     }
     doAliases(sheet, row, e);
 
-    e.setIsModifier(parseBoolean(sheet.getColumn(row, "Is Modifier"), row, false));
+    if (sheet.hasColumn(row, "Is Modifier"))
+      e.setIsModifier(parseBoolean(sheet.getColumn(row, "Is Modifier"), row, false));
     if (e.getIsModifier()) {
       String reason = sheet.getColumn(row, "Modifier Reason");
       if (Utilities.noString(reason)) {
@@ -1272,7 +1273,8 @@ public class IgSpreadsheetParser {
     }
     exe.setShort(sheet.getColumn(row, "Short Name"));
 
-    exe.setIsModifier(parseBoolean(sheet.getColumn(row, "Is Modifier"), row, false));
+    if (sheet.hasColumn(row, "Is Modifier"))
+      exe.setIsModifier(parseBoolean(sheet.getColumn(row, "Is Modifier"), row, false));
     if (exe.getIsModifier()) {
       String reason = sheet.getColumn(row, "Modifier Reason");
       if (Utilities.noString(reason)) {
