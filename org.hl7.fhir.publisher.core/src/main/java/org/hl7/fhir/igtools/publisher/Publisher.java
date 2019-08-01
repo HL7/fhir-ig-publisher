@@ -2212,7 +2212,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     System.out.println("Fetch Package history from "+Utilities.pathURL(canonical, "package-list.json"));
     pl = fetchJson(Utilities.pathURL(canonical, "package-list.json"));
     if (!canonical.equals(pl.get("canonical").getAsString()))
-      throw new Exception("Canonical mismatch fetching package list for "+igver);
+      throw new Exception("Canonical mismatch fetching package list for "+canonical+"#"+igver+", package-list.json says "+pl.get("canonical"));
     for (JsonElement e : pl.getAsJsonArray("list")) {
       JsonObject o = (JsonObject) e;
       if (igver.equals(o.get("version").getAsString())) {
@@ -2916,6 +2916,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     load("PlanDefinition");
     loadLists();
     generateSnapshots();
+    generateNarratives();
     checkConformanceResources();
     generateLogicalMaps();
     load("StructureMap");
@@ -3296,11 +3297,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               throw new Exception("Error parsing "+f.getName()+": "+e.getMessage(), e);
             }
           if (!r.isValidated()) {
-            if (r.getResource() instanceof DomainResource && !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv())) {
-              gen.setDefinitionsTarget(igpkp.getDefinitionsName(r));
-              gen.generate((DomainResource) r.getResource(), otherFilesStartup);
-              r.setElement(convertToElement(r.getResource()));
-            }
+            // we;re going to do this later....
+//            if (r.getResource() instanceof DomainResource && !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv())) {
+//              gen.setDefinitionsTarget(igpkp.getDefinitionsName(r));
+//              gen.generate((DomainResource) r.getResource(), otherFilesStartup);
+//              r.setElement(convertToElement(r.getResource()));
+//            }
             validate(f, r);
           }
           if (r.getResource() instanceof MetadataResource) {
