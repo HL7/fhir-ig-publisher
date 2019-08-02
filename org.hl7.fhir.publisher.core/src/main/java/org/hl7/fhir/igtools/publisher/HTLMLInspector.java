@@ -499,7 +499,8 @@ public class HTLMLInspector {
       resolved = manual.contains(rref);
     if (!resolved && specs != null){
       for (SpecMapManager spec : specs) {
-        resolved = resolved || spec.getBase().equals(rref) || (spec.getBase()).equals(rref+"/") || spec.hasTarget(rref); 
+        resolved = resolved || spec.getBase().equals(rref) || (spec.getBase()).equals(rref+"/") || spec.hasTarget(rref) || 
+            Utilities.existsInList(rref, Utilities.pathURL(spec.getBase(), "definitions.json.zip"), Utilities.pathURL(spec.getBase(), "definitions.xml.zip"), Utilities.pathURL(spec.getBase(), "package.tgz")); 
       }
     }
     
