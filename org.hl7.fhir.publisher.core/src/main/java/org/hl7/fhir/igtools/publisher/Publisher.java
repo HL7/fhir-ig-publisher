@@ -2095,7 +2095,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (fn.endsWith(".json") && fn.contains("-")) {
         Resource r = null;
         String t = fn.substring(0, fn.indexOf("-"));
-        if (Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "SearchParameter", "OperationDefinition", "Questionnaire","ConceptMap","StructureMap", "NamingSystem", "ImplementationGuide", "CapabilityStatement")) {
+        if (Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "SearchParameter", "OperationDefinition", "Questionnaire", "ConceptMap", "StructureMap", "NamingSystem", "ImplementationGuide", "CapabilityStatement")) {
           if (igm.getVersion().equals("3.0.1") || igm.getVersion().equals("3.0.0")) {
             org.hl7.fhir.dstu3.model.Resource res = new org.hl7.fhir.dstu3.formats.JsonParser().parse(pi.load("package", fn));
             r = VersionConvertor_30_50.convertResource(res, true);
@@ -2872,42 +2872,81 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return url.substring(url.lastIndexOf("/")+1);
   }
 
+  private List<String> metadataResourceNames() {
+    List<String> res = new ArrayList<>();
+    // order matters here
+    res.add("NamingSystem");
+    res.add("CodeSystem");
+    res.add("ValueSet");
+    res.add("ConceptMap");
+    res.add("DataElement");
+    res.add("StructureDefinition");
+    res.add("OperationDefinition");
+    res.add("SearchParameter");
+    res.add("CapabilityStatement");
+    res.add("StructureMap");
+    res.add("CapabilityStatement2");
+    res.add("ActivityDefinition");
+    res.add("ChargeItemDefinition");
+    res.add("CompartmentDefinition");
+    res.add("ConceptMap");
+    res.add("ConditionDefinition");
+    res.add("EffectEvidenceSynthesis");
+    res.add("EventDefinition");
+    res.add("Evidence");
+    res.add("EvidenceVariable");
+    res.add("ExampleScenario");
+    res.add("GraphDefinition");
+    res.add("ImplementationGuide");
+    res.add("Library");
+    res.add("Measure");
+    res.add("MessageDefinition");
+    res.add("PlanDefinition");
+    res.add("Questionnaire");
+    res.add("ResearchDefinition");
+    res.add("ResearchElementDefinition");
+    res.add("RiskEvidenceSynthesis");
+    res.add("SearchParameter");
+    res.add("Statistic");
+    res.add("TerminologyCapabilities");
+    res.add("TestScript");
+    return res;
+  }
+  
   private void loadConformance() throws Exception {
-    scan("NamingSystem");
-    scan("CodeSystem");
-    scan("ValueSet");
-    scan("ConceptMap");
-    scan("DataElement");
-    scan("StructureDefinition");
-    scan("OperationDefinition");
-    scan("SearchParameter");
-    scan("CapabilityStatement");
-    scan("Questionnaire");
-    scan("PlanDefinition");
-    
+    for (String s : metadataResourceNames()) 
+      scan(s);
     loadInfo();
-    load("NamingSystem");
-    load("CodeSystem");
-    load("ValueSet");
-    load("ConceptMap");
-    load("DataElement");
-    load("StructureDefinition");
-    load("OperationDefinition");
-    load("SearchParameter");
-    load("CapabilityStatement");
-    load("Questionnaire");
-    load("PlanDefinition");
+    for (String s : metadataResourceNames()) 
+      load(s);
+    for (String s : metadataResourceNames()) 
+      validate(s);
+    
     loadLists();
     generateSnapshots();
     generateNarratives();
     checkConformanceResources();
     generateLogicalMaps();
-    load("StructureMap");
+//    load("StructureMap"); // todo: this is a problem...
     generateAdditionalExamples();
     executeTransforms();
     validateExpressions();
     scanForUsageStats();
   }
+
+  private void validate(String type) throws Exception {
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getElement().fhirType().equals(type)) {
+          log(LogCategory.PROGRESS, "validate res: "+r.fhirType()+"/"+r.getId());
+          if (!r.isValidated()) {
+            validate(f, r);
+          }
+        }
+      }
+    }
+  }
+
 
   private void loadInfo() {
     for (FetchedFile f : fileList) {
@@ -3279,15 +3318,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             } catch (Exception e) {
               throw new Exception("Error parsing "+f.getName()+": "+e.getMessage(), e);
             }
-          if (!r.isValidated()) {
-            // we;re going to do this later....
-//            if (r.getResource() instanceof DomainResource && !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv())) {
-//              gen.setDefinitionsTarget(igpkp.getDefinitionsName(r));
-//              gen.generate((DomainResource) r.getResource(), otherFilesStartup);
-//              r.setElement(convertToElement(r.getResource()));
-//            }
-            validate(f, r);
-          }
           if (r.getResource() instanceof MetadataResource) {
             MetadataResource bc = (MetadataResource) r.getResource();
             if (bc == null)
@@ -3295,13 +3325,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             boolean altered = false;
             if (bc.hasUrl()) {
               if (adHocTmpDir == null && !listedURLExemptions.contains(bc.getUrl()) && !isExampleResource(bc) && !bc.getUrl().equals(Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())))
-                f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, bc.getUrl(), "conformance resource "+f.getPath()+" canonical URL ("+Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())+") does not match the URL ("+bc.getUrl()+")", IssueSeverity.ERROR));
+                f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, bc.getUrl(), "Conformance resource "+f.getPath()+" - the canonical URL ("+Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())+") does not match the URL ("+bc.getUrl()+")", IssueSeverity.ERROR));
                 // throw new Exception("Error: conformance resource "+f.getPath()+" canonical URL ("+Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())+") does not match the URL ("+bc.getUrl()+")");            
             } else if (bc.hasId())
               bc.setUrl(Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId()));
             else
               throw new Exception("Error: conformance resource "+f.getPath()+" has neither id nor url");
-
 
             if (businessVersion != null) {
               if (!bc.hasVersion()) {
