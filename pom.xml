@@ -18,10 +18,10 @@
     <parent>
         <groupId>ca.uhn.hapi.fhir</groupId>
         <artifactId>org.hl7.fhir.core</artifactId>
-        <version>3.8.17-SNAPSHOT</version>
+        <version>3.8.19-SNAPSHOT</version>
     </parent>
     <properties>
-        <core_version>3.8.17-SNAPSHOT</core_version>
+        <core_version>3.8.19-SNAPSHOT</core_version>
         <maven.test.skip>true</maven.test.skip>
     </properties>
     <version>0.9.48-SNAPSHOT</version> <!-- See the note above -->
