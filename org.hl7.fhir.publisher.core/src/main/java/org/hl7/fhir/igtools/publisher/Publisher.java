@@ -317,23 +317,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     @Override
     public Base resolveReference(Object appContext, String url) {
-      if (appContext instanceof Element)  {
-        Element bnd = (Element) appContext;
-        if (bnd.fhirType().equals("Bundle")) {
-          for (Element be : bnd.getChildrenByName("entry")) {
-            Element res = be.getNamedChild("resource");
-            if (res != null) { 
-              String fullUrl = be.getChildValue("fullUrl");
-              String rt = res.fhirType();
-              String id = res.getChildValue("id");
-              if (url.equals(fullUrl))
-                return res;
-              if (url.equals(rt+"/"+id))
-                return res;
-            }
-          }
-        }
-      }
       if (Utilities.isAbsoluteUrl(url)) {
         if (url.startsWith(igpkp.getCanonical())) {
           url = url.substring(igpkp.getCanonical().length());

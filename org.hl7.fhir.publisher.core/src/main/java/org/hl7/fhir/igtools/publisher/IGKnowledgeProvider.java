@@ -227,15 +227,17 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     return false;
   }
 
-  public String getDefinitionsName(FetchedResource r) {
-	return getProperty(r, "defns");
+  public String getDefinitionsName(FetchedResource r) {	
+    return getProperty(r, "defns");
   }
 
   // base specification only
   public void loadSpecPaths(SpecMapManager paths) throws Exception {
     this.specPaths = paths;
     for (MetadataResource bc : context.allConformanceResources()) {
-      String s = paths.getPath(bc.getUrl());
+      String s = getOverride(bc.getUrl());
+      if (s == null)
+        s = paths.getPath(bc.getUrl());
       if (s == null && bc instanceof CodeSystem) { // work around for an R2 issue) 
         CodeSystem cs = (CodeSystem) bc;
         s = paths.getPath(cs.getValueSet());
@@ -252,6 +254,26 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     }    
   }
 
+  private String getOverride(String url) {
+    if ("http://hl7.org/fhir/StructureDefinition/DataRequirement".equals(url))
+     return "metadatatypes.html#DataRequirement";
+    if ("http://hl7.org/fhir/StructureDefinition/ContactDetail".equals(url))
+      return "metadatatypes.html#ContactDetail";
+    if ("http://hl7.org/fhir/StructureDefinition/Contributor".equals(url))
+      return "metadatatypes.html#Contributor";
+    if ("http://hl7.org/fhir/StructureDefinition/ParameterDefinition".equals(url))
+      return "metadatatypes.html#ParameterDefinition";
+    if ("http://hl7.org/fhir/StructureDefinition/RelatedArtifact".equals(url))
+      return "metadatatypes.html#RelatedArtifact";
+    if ("http://hl7.org/fhir/StructureDefinition/TriggerDefinition".equals(url))
+      return "metadatatypes.html#TriggerDefinition";
+    if ("http://hl7.org/fhir/StructureDefinition/UsageContext".equals(url))
+      return "metadatatypes.html#UsageContext";
+    if ("http://hl7.org/fhir/StructureDefinition/Extension".equals(url))
+      return "extensibility.html#Extension";
+    return null;
+  }
+  
   public String getSourceFor(String ref) {
     if (resourceConfig == null)
       return null;
