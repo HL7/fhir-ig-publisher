@@ -2376,11 +2376,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (publishedIg.hasPackageId())
       pcm.recordMap(igpkp.getCanonical(), publishedIg.getPackageId());
     
-    String id = npmName+"-"+businessVersion;
+    String id = npmName;
     if (npmName.startsWith("hl7.")) {
       if (!id.matches("[A-Za-z0-9\\-\\.]{1,64}"))
         throw new FHIRException("The generated ID is '"+id+"' which is not valid");
+      FetchedResource r = fetchByResource("ImplementationGuide", publishedIg.getId());
       publishedIg.setId(id);
+      publishedIg.setUrl(igpkp.getCanonical()+"/ImplementationGuide/"+id);
+      if (r != null) { // it better be....
+        r.setId(id);
+        r.getElement().getNamedChild("id").setValue(id);
+        r.getElement().getNamedChild("url").setValue(publishedIg.getUrl());
+      }        
     } else if (!id.equals(publishedIg.getId()))
       errors.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "ImplementationGuide.id", "The Implementation Guide Resource id should be "+id, IssueSeverity.WARNING));
       
@@ -2475,6 +2482,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     extensionTracker.scan(publishedIg);
     return needToBuild;
   }
+
+  private FetchedResource fetchByResource(String type, String id) {
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.fhirType().equals(type) && r.getId().equals(id))
+          return r;
+      }
+    }
+    return null;
+  }
+
 
   private String targetUrl() {
     if (mode == null)
@@ -3726,6 +3744,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     otherFilesRun.add(Utilities.path(tempDir, "usage-stats.json"));
     
     cleanOutput(tempDir);
+    try {
+      download("http://www.fhir.org/archive/icon_fixed.gif", Utilities.path(tempDir, "icon_fixed.gif"));
+    } catch (Exception e) {
+      // nothing
+    }
+    
         
     if (nestedIgConfig != null) {
       if (watch) {
@@ -3821,9 +3845,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
-
-
-
+  private void download(String address, String filename) throws IOException {
+    URL url = new URL(address);
+    URLConnection c = url.openConnection();
+    InputStream s = c.getInputStream();
+    FileOutputStream f = new FileOutputStream(filename);
+    transfer(s, f, 1024);
+    f.close();   
+  }
+  
+  public static void transfer(InputStream in, OutputStream out, int buffer) throws IOException {
+    byte[] read = new byte[buffer]; // Your buffer size.
+    while (0 < (buffer = in.read(read)))
+        out.write(read, 0, buffer);
+}
 
   private void updateImplementationGuide() throws Exception {
     for (ImplementationGuideDefinitionResourceComponent res : publishedIg.getDefinition().getResource()) {

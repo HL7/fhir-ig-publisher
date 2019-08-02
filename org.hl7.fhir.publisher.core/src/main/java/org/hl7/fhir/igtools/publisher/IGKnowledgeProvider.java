@@ -303,7 +303,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     else if (bc.getUrl().startsWith(canonical) && !bc.getUrl().endsWith("/"+bc.getId()))
       error(f, bc.fhirType()+".url","Resource id/url mismatch: "+bc.getId()+"/"+bc.getUrl());
     if (!inner && !r.getId().equals(bc.getId()))
-      error(f, bc.fhirType()+".id", "Resource id/id mismatch: "+r.getId()+"/"+bc.getUrl());
+      error(f, bc.fhirType()+".id", "Resource id/loaded id mismatch: "+r.getId()+"/"+bc.getUrl());
     if (r.getConfig() == null)
       findConfiguration(f, r);
     JsonObject e = r.getConfig();
