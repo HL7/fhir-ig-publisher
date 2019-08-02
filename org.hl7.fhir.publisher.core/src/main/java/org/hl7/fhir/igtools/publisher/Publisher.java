@@ -3209,7 +3209,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
-  private ImplementationGuideDefinitionResourceComponent findIGReference(Object type, String id) {
+  private ImplementationGuideDefinitionResourceComponent findIGReference(String type, String id) {
     for (ImplementationGuideDefinitionResourceComponent r : publishedIg.getDefinition().getResource()) {
       if (r.hasReference() && r.getReference().getReference().equals(type+"/"+id))
         return r;
@@ -5355,7 +5355,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void saveNativeResourceOutputs(FetchedFile f, FetchedResource r) throws FHIRException, IOException {
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
     new org.hl7.fhir.r5.elementmodel.JsonParser(context).compose(r.getElement(), bs, OutputStyle.NORMAL, igpkp.getCanonical());
-    npm.addFile(Category.RESOURCE, r.getElement().fhirType()+"-"+r.getId()+".json", bs.toByteArray());
+    npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, r.getElement().fhirType()+"-"+r.getId()+".json", bs.toByteArray());
     if (igpkp.wantGen(r, "xml") || forHL7orFHIR()) {
       String path = Utilities.path(tempDir, r.getElement().fhirType()+"-"+r.getId()+".xml");
       f.getOutputNames().add(path);
@@ -5378,6 +5378,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       stream.close();
     }    
   }
+
+  private boolean isExample(FetchedFile f, FetchedResource r) {
+    ImplementationGuideDefinitionResourceComponent igr = findIGReference(r.fhirType(), r.getId());
+    if (igr == null)
+      return false;
+    else
+      return igr.hasExample();
+  }
+
 
   private boolean forHL7orFHIR() {
     return igpkp.getCanonical().contains("hl7.org") || igpkp.getCanonical().contains("fhir.org") ;
