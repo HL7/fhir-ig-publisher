@@ -93,10 +93,10 @@ public class BallotChecker {
             errors.add("package-list.json entry: must have a 'status' that describes the ballot status");
           if (!o.has("sequence"))
             errors.add("package-list.json entry: must have a 'sequence' that describes the ballot goal");
-          if (!o.has("fhir-version"))
-            errors.add("package-list.json entry: must have a 'fhir-version' that specifies the FHIR version ("+fhirVersion+")");
-          else if (!o.get("fhir-version").getAsString().equals(fhirVersion))
-            errors.add("package-list.json entry: must have a 'fhir-version' that entry with the right value - is '"+o.get("fhir-version").getAsString()+"', should start with '"+fhirVersion+"'");
+          if (!o.has("fhirversion"))
+            errors.add("package-list.json entry: must have a 'fhirversion' that specifies the FHIR version ("+fhirVersion+")");
+          else if (!o.get("fhirversion").getAsString().equals(fhirVersion))
+            errors.add("package-list.json entry: must have a 'fhirversion' that entry with the right value - is '"+o.get("fhirversion").getAsString()+"', should start with '"+fhirVersion+"'");
           if (!o.has("path"))
             errors.add("package-list.json entry: must have a 'path' where it will be published");
           else if (!o.get("path").getAsString().startsWith(canonical))
