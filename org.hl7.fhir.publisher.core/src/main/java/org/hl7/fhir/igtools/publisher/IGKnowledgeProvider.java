@@ -299,11 +299,11 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   
   public void checkForPath(FetchedFile f, FetchedResource r, MetadataResource bc, boolean inner) throws FHIRException {
     if (!bc.hasUrl())
-      error(f.getPath(), "Resource has no url: "+bc.getId());
+      error(f, bc.fhirType()+".url", "Resource has no url: "+bc.getId());
     else if (bc.getUrl().startsWith(canonical) && !bc.getUrl().endsWith("/"+bc.getId()))
-      error(f.getPath(), "Resource id/url mismatch: "+bc.getId()+"/"+bc.getUrl());
+      error(f, bc.fhirType()+".url","Resource id/url mismatch: "+bc.getId()+"/"+bc.getUrl());
     if (!inner && !r.getId().equals(bc.getId()))
-      error(f.getPath(), "Resource id/id mismatch: "+r.getId()+"/"+bc.getUrl());
+      error(f, bc.fhirType()+".id", "Resource id/loaded id mismatch: "+r.getId()+"/"+bc.getUrl());
     if (r.getConfig() == null)
       findConfiguration(f, r);
     JsonObject e = r.getConfig();
@@ -317,10 +317,10 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       bc.setUserData("path", r.getElement().fhirType()+"/"+r.getId()+".html");
   }
 
-  private void error(String location, String msg) {
+  private void error(FetchedFile f, String path, String msg) {
     if (!msgs.contains(msg)) {
       msgs.add(msg);
-      errors.add(new ValidationMessage(Source.Publisher, IssueType.INVARIANT, location, msg, IssueSeverity.ERROR));
+      f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.INVARIANT, path, msg, IssueSeverity.ERROR));
     }
   }
 
