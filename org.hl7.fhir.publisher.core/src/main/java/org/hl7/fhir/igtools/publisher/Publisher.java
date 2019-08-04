@@ -5423,8 +5423,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     else if (igr.hasExampleCanonicalType())
       return true;
     else
+    try {
       return igr.getExampleBooleanType().booleanValue();
-  }
+    }
+    catch (NullPointerException ex) {
+      System.out.println("Error: For resource " + igr.getName() + " isExample() throws " + ex);
+      return false;
+    }
+}
 
 
   private boolean forHL7orFHIR() {
