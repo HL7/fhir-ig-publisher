@@ -62,16 +62,23 @@ import com.google.gson.JsonPrimitive;
 
 public class Template {
 
+  public static final int IG_NONE = 0;
+  public static final int IG_ANY = 1;
+  public static final int IG_NO_RESOURCE = 2;
+  
   private NpmPackage pack;
   private JsonObject configuration;
   
   private String templateDir;
   private String root;
   private boolean canExecute;
-  private String scriptOnLoad;
-  private String scriptOnGenerate;
-  private String scriptOnJekyll;
-  private String scriptOnCheck;
+  private String script;
+  private String targetOnLoad;
+  private String targetOnGenerate;
+  private String targetOnJekyll;
+  private String targetOnCheck;
+  private Project antProject;
+  private JsonObject defaults;
   
   /** unpack the template into /template 
    * 
@@ -96,109 +103,85 @@ public class Template {
     // ok, now templateDir has the content of the template
     configuration = JsonTrackingParser.parseJsonFile(Utilities.path(templateDir, "config.json"));
     
-    if (configuration.has("scripts") && canExecute) {
-      JsonObject scripts = configuration.getAsJsonObject("scripts");
-      if (scripts.has("onLoad"))
-        scriptOnLoad = scripts.get("onLoad").getAsString();
-      if (scripts.has("onGenerate"))
-        scriptOnGenerate = scripts.get("onGenerate").getAsString();
-      if (scripts.has("onJekyll"))
-        scriptOnJekyll = scripts.get("onJekyll").getAsString();
-      if (scripts.has("onCheck"))
-        scriptOnCheck = scripts.get("onCheck").getAsString();
+    if (configuration.has("script") && canExecute) {
+      script = configuration.get("script").getAsString();
+      if (!configuration.has("targets"))
+        throw new FHIRException("If a script is provided, then targets must be defined");
+      JsonObject targets = configuration.getAsJsonObject("targets");
+      if (targets.has("onLoad"))
+        targetOnLoad = targets.get("onLoad").getAsString();
+      if (targets.has("onGenerate"))
+        targetOnGenerate = targets.get("onGenerate").getAsString();
+      if (targets.has("onJekyll"))
+        targetOnJekyll = targets.get("onJekyll").getAsString();
+      if (targets.has("onCheck"))
+        targetOnCheck = targets.get("onCheck").getAsString();
+      File buildFile = new File(Utilities.path(templateDir, script));
+      antProject = new Project();
+      
+      ProjectHelper.configureProject(antProject, buildFile);
+      DefaultLogger consoleLogger = new DefaultLogger();
+      consoleLogger.setErrorPrintStream(System.err);
+      consoleLogger.setOutputPrintStream(System.out);
+      consoleLogger.setMessageOutputLevel(Project.MSG_INFO);
+      antProject.addBuildListener(consoleLogger);
+      antProject.setBasedir(root);
+      antProject.setProperty("ig.root", root);
+      antProject.setProperty("ig.temp", Utilities.path(root, "temp"));
+      antProject.setProperty("ig.template", templateDir);
+      antProject.setProperty("ig.scripts", Utilities.path(templateDir, "scripts"));
+      antProject.init();
+    }
+    
+    if (configuration.has("defaults")) {
+      defaults = (JsonObject)configuration.get("defaults");
     }
   }
-  
-  /**
-   * this is the first event of the template life cycle. At this point, the template can modify the IG as it sees fit. 
-   * This typically includes scanning the content in the IG and filling out resource/page entries and details
-   * 
-   * Note that the param
-   * 
-   * @param ig
-   * @return
-   * @throws IOException 
-   * @throws FileNotFoundException 
-   * @throws FHIRException 
-   */
-  public ImplementationGuide modifyIGEvent(ImplementationGuide ig) throws FileNotFoundException, IOException, FHIRException {
-    if (!canExecute || scriptOnLoad == null)
-      return ig;
-    String sfn = Utilities.path(templateDir, "ig-working.");
-    String fn = Utilities.path(templateDir, "ig-updated.");
-    Map<String, String> props = new HashMap<>(); 
-    props.put("ig.source", sfn); 
-    props.put("ig.dest", fn); 
     
+  private ImplementationGuide runScriptTarget(String target, Map<String, List<ValidationMessage>> messages, ImplementationGuide ig, int modifyIg) throws IOException, FHIRException {
+    File jsonOutcomes = new File(Utilities.path(templateDir, target + "-validation.json"));
+    File xmlOutcomes = new File(Utilities.path(templateDir, target + "-validation.xml"));
+    if (jsonOutcomes.exists())
+      jsonOutcomes.delete();
+    if (xmlOutcomes.exists())
+      xmlOutcomes.delete();
+    String sfn = Utilities.path(templateDir, target + "-ig-working.");
+    String fn = Utilities.path(templateDir, target + "-ig-updated.");
+    antProject.setProperty(target + ".ig.source", sfn);
+    antProject.setProperty(target + ".ig.dest", fn);
+    File jsonIg = new File(Utilities.path(templateDir, sfn +"json"));
+    File xmlIg = new File(Utilities.path(templateDir, sfn + "xml"));
+    if (jsonIg.exists())
+      jsonIg.delete();
+    if (xmlIg.exists())
+      xmlIg.delete();
     new XmlParser().compose(new FileOutputStream(sfn+"xml"), ig);
-    new JsonParser().compose(new FileOutputStream(sfn+"json"), ig);
-    runScript(scriptOnLoad, Utilities.path(root, "temp"), props, null);
-    if (new File(fn+"xml").exists())
-      return (ImplementationGuide) new XmlParser().parse(new FileInputStream(fn+"xml"));
-    else if (new File(fn+"json").exists())
-      return (ImplementationGuide) new JsonParser().parse(new FileInputStream(fn+"json"));
-    else
-      throw new FHIRException("onLoad script "+scriptOnLoad+" failed - no output file produced");
-    
-    
-  }
-  
-  private Map<String, List<ValidationMessage>> runScript(String script, String tempDir, Map<String, String> props, ImplementationGuide ig) throws IOException, FHIRException {
-    String filename = script;
-    String target = null;
-    if (filename.contains("#")) {
-      target = filename.substring(filename.indexOf("#")+1);
-      filename = filename.substring(0, filename.indexOf("#"));
-    }
-    
-    File jsonOutcomes = new File(Utilities.path(templateDir, "validation.json"));
-    File xmlOutcomes = new File(Utilities.path(templateDir, "validation.xml"));
-    File jsonIg = new File(Utilities.path(templateDir, "ig-updated.json"));
-    File xmlIg = new File(Utilities.path(templateDir, "ig-updated.xml"));
-    if (jsonOutcomes.exists()) jsonOutcomes.delete();
-    if (xmlOutcomes.exists())  xmlOutcomes.delete();
-    if (jsonIg.exists())  jsonIg.delete();
-    if (xmlIg.exists())  xmlIg.delete();
-    
-    File buildFile = new File(Utilities.path(templateDir, filename));
-    Project project = new Project();
-    ProjectHelper.configureProject(project, buildFile);
-    DefaultLogger consoleLogger = new DefaultLogger();
-    consoleLogger.setErrorPrintStream(System.err);
-    consoleLogger.setOutputPrintStream(System.out);
-    consoleLogger.setMessageOutputLevel(Project.MSG_INFO);
-    project.addBuildListener(consoleLogger);
-    project.setBasedir(root);
-    project.setProperty("ig.root", root);
-    project.setProperty("ig.temp", tempDir);
-    project.setProperty("ig.template", templateDir);
-    project.setProperty("ig.scripts", Utilities.path(templateDir, "scripts"));
-    if (props != null) {
-      for (String s : props.keySet()) {
-        project.setProperty(s, props.get(s));
-      }
-    }
-    project.init();
-    project.executeTarget(target == null ?  project.getDefaultTarget() : target);
-    Map<String, List<ValidationMessage>> res = new HashMap<>();
+    new JsonParser().compose(new FileOutputStream(sfn+"json"), ig);    
+    antProject.executeTarget(target);
     if (jsonOutcomes.exists()) {
-      loadValidationMessages((OperationOutcome) new JsonParser().parse(new FileInputStream(jsonOutcomes)), res);
+      loadValidationMessages((OperationOutcome) new JsonParser().parse(new FileInputStream(jsonOutcomes)), messages);
     } else if (xmlOutcomes.exists()) {
-      loadValidationMessages((OperationOutcome) new XmlParser().parse(new FileInputStream(xmlOutcomes)), res);
+      loadValidationMessages((OperationOutcome) new XmlParser().parse(new FileInputStream(xmlOutcomes)), messages);
     }
-    if (ig != null) {
-      if (jsonIg.exists())
-        loadModifiedIg((ImplementationGuide) new JsonParser().parse(new FileInputStream(jsonIg)), ig);
-      else if (xmlIg.exists())
-        loadModifiedIg((ImplementationGuide) new XmlParser().parse(new FileInputStream(jsonIg)), ig);
+    switch (modifyIg) {
+      case IG_ANY:
+        if (new File(fn+"xml").exists())
+          return (ImplementationGuide) new XmlParser().parse(new FileInputStream(fn+"xml"));
+        else if (new File(fn+"json").exists())
+          return (ImplementationGuide) new JsonParser().parse(new FileInputStream(fn+"json"));
+        else
+          throw new FHIRException("onLoad script "+targetOnLoad+" failed - no output file produced");        
+      case IG_NO_RESOURCE:
+        if (jsonIg.exists())
+          loadModifiedIg((ImplementationGuide) new JsonParser().parse(new FileInputStream(jsonIg)), ig);
+        else if (xmlIg.exists())
+          loadModifiedIg((ImplementationGuide) new XmlParser().parse(new FileInputStream(jsonIg)), ig);
+        return null;
+      case IG_NONE:
+        return null;
+      default:
+        throw new FHIRException("Unexpected modifyIg value: " + modifyIg);
     }
-    
-    if (jsonOutcomes.exists()) jsonOutcomes.delete();
-    if (xmlOutcomes.exists())  xmlOutcomes.delete();
-    if (jsonIg.exists())  jsonIg.delete();
-    if (xmlIg.exists())  xmlIg.delete();
-    
-    return res;
   }
 
   private void loadModifiedIg(ImplementationGuide modIg, ImplementationGuide ig) throws FHIRException {
@@ -285,10 +268,19 @@ public class Template {
   }
 
   public JsonObject getConfig(String type, String id) {
+    if (defaults!=null) {
+      if (defaults.has(type))
+        return (JsonObject)defaults.get(type);
+      else if (defaults.has("Any"))
+        return (JsonObject)defaults.get("Any");
+    }
     return null;
   }
 
-  public Map<String, List<ValidationMessage>> beforeGenerateEvent(String tempDir, ImplementationGuide ig, Set<String> fileList) throws IOException, FHIRException {
+  public ImplementationGuide onLoadEvent(ImplementationGuide ig, Map<String, List<ValidationMessage>> messages) throws IOException, FHIRException {
+    return runScriptTarget(targetOnLoad, messages, ig, IG_ANY);
+  }
+  public Map<String, List<ValidationMessage>> beforeGenerateEvent(ImplementationGuide ig, String tempDir, Set<String> fileList) throws IOException, FHIRException {
     File src = new File(Utilities.path(templateDir, "content"));
     if (src.exists()) {
       for (File f : src.listFiles()) {
@@ -301,37 +293,28 @@ public class Template {
         }
       }
     }
-    if (canExecute && scriptOnGenerate != null) {
-      String sfn = Utilities.path(templateDir, "ig-working.");
-      Map<String, String> props = new HashMap<>(); 
-      props.put("ig.source", sfn);       
-      new XmlParser().compose(new FileOutputStream(sfn+"xml"), ig);
-      new JsonParser().compose(new FileOutputStream(sfn+"json"), ig);
-      return runScript(scriptOnGenerate, Utilities.path(root, "temp"), props, ig);      
+    if (canExecute && targetOnGenerate != null) {
+      Map<String, List<ValidationMessage>> messages = new HashMap<String, List<ValidationMessage>>();
+      runScriptTarget(targetOnGenerate, messages, ig, IG_NO_RESOURCE);
+      return messages;
     } else
       return null;
   }
 
-  public Map<String, List<ValidationMessage>> beforeJekyllEvent(String tempDir, ImplementationGuide ig) throws IOException, FHIRException {
-    if (canExecute && scriptOnJekyll != null) {
-      String sfn = Utilities.path(templateDir, "ig-working.");
-      Map<String, String> props = new HashMap<>(); 
-      props.put("ig.source", sfn);       
-      new XmlParser().compose(new FileOutputStream(sfn+"xml"), ig);
-      new JsonParser().compose(new FileOutputStream(sfn+"json"), ig);
-      return runScript(scriptOnJekyll, Utilities.path(root, "temp"), props, null);      
+  public Map<String, List<ValidationMessage>> beforeJekyllEvent(ImplementationGuide ig) throws IOException, FHIRException {
+    if (canExecute && targetOnJekyll != null) {
+      Map<String, List<ValidationMessage>> messages = new HashMap<String, List<ValidationMessage>>();
+      runScriptTarget(targetOnJekyll, messages, null, IG_NONE);
+      return messages;
     } else
       return null;
   }
 
-  public Map<String, List<ValidationMessage>> onCheckEvent(String tempDir, ImplementationGuide ig) throws IOException, FHIRException {
-    if (canExecute && scriptOnCheck != null) {
-      String sfn = Utilities.path(templateDir, "ig-working.");
-      Map<String, String> props = new HashMap<>(); 
-      props.put("ig.source", sfn);       
-      new XmlParser().compose(new FileOutputStream(sfn+"xml"), ig);
-      new JsonParser().compose(new FileOutputStream(sfn+"json"), ig);
-      return runScript(scriptOnCheck, Utilities.path(root, "temp"), props, null);      
+  public Map<String, List<ValidationMessage>> onCheckEvent(ImplementationGuide ig) throws IOException, FHIRException {
+    if (canExecute && targetOnCheck != null) {
+      Map<String, List<ValidationMessage>> messages = new HashMap<String, List<ValidationMessage>>();
+      runScriptTarget(targetOnCheck, messages, null, IG_NONE);
+      return messages;
     } else
       return null;
   }
