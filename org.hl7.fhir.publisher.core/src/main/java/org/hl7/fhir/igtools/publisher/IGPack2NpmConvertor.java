@@ -189,7 +189,7 @@ public class IGPack2NpmConvertor {
         checkVersions(ig, version, f.getAbsolutePath());
         checkLicense(ig);
 
-        System.out.println("  url = "+canonical+", version = "+ig.getVersion()+", fhir-version = "+ig.getFhirVersion()+", id = "+ig.getPackageId()+", license = "+ig.getLicense());
+        System.out.println("  url = "+canonical+", version = "+ig.getVersion()+", fhirversion = "+ig.getFhirVersion()+", id = "+ig.getPackageId()+", license = "+ig.getLicense());
 
         for (String k : files.keySet()) {
           if (k.endsWith(".json"))

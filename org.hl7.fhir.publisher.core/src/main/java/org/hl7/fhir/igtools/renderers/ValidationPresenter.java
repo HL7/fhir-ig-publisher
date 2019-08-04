@@ -44,6 +44,7 @@ import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
+import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
 import org.stringtemplate.v4.ST;
 
 public class ValidationPresenter extends TranslatingUtilities implements Comparator<FetchedFile> {
@@ -132,13 +133,15 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     OperationOutcome oo = new OperationOutcome();
     validationBundle.addEntry(new BundleEntryComponent().setResource(oo));
     for (ValidationMessage vm : linkErrors) {
-      FHIRPathEngine fpe = new FHIRPathEngine(provider.getContext());
-      try {
-        fpe.parse(vm.getLocation());
-      } catch (Exception e) {
-        System.out.println("Internal error in location for message: '"+e.getMessage()+"', loc = '"+subst100(vm.getLocation())+"', err = '"+subst100(vm.getMessage())+"'");
+      if (vm.getSource() != Source.LinkChecker) {
+        FHIRPathEngine fpe = new FHIRPathEngine(provider.getContext());
+        try {
+          fpe.parse(vm.getLocation());
+        } catch (Exception e) {
+          System.out.println("Internal error in location for message: '"+e.getMessage()+"', loc = '"+subst100(vm.getLocation())+"', err = '"+subst100(vm.getMessage())+"'");
+        }
+        oo.getIssue().add(OperationOutcomeUtilities.convertToIssue(vm, oo));
       }
-      oo.getIssue().add(OperationOutcomeUtilities.convertToIssue(vm, oo));
     }
     for (FetchedFile f : files) {
       if (!f.getErrors().isEmpty()) {

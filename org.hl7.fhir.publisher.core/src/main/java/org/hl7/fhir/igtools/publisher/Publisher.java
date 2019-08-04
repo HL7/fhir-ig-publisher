@@ -2125,7 +2125,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (fn.endsWith(".json") && fn.contains("-")) {
         Resource r = null;
         String t = fn.substring(0, fn.indexOf("-"));
-        if (Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "SearchParameter", "OperationDefinition", "Questionnaire","ConceptMap","StructureMap", "NamingSystem", "ImplementationGuide", "CapabilityStatement")) {
+        if (Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "SearchParameter", "OperationDefinition", "Questionnaire", "ConceptMap", "StructureMap", "NamingSystem", "ImplementationGuide", "CapabilityStatement")) {
           if (igm.getVersion().equals("3.0.1") || igm.getVersion().equals("3.0.0")) {
             org.hl7.fhir.dstu3.model.Resource res = new org.hl7.fhir.dstu3.formats.JsonParser().parse(pi.load("package", fn));
             r = VersionConvertor_30_50.convertResource(res, true);
@@ -2413,11 +2413,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (publishedIg.hasPackageId())
       pcm.recordMap(igpkp.getCanonical(), publishedIg.getPackageId());
     
-    String id = npmName+"-"+businessVersion;
+    String id = npmName;
     if (npmName.startsWith("hl7.")) {
       if (!id.matches("[A-Za-z0-9\\-\\.]{1,64}"))
         throw new FHIRException("The generated ID is '"+id+"' which is not valid");
+      FetchedResource r = fetchByResource("ImplementationGuide", publishedIg.getId());
       publishedIg.setId(id);
+      publishedIg.setUrl(igpkp.getCanonical()+"/ImplementationGuide/"+id);
+      if (r != null) { // it better be....
+        r.setId(id);
+        r.getElement().getNamedChild("id").setValue(id);
+        r.getElement().getNamedChild("url").setValue(publishedIg.getUrl());
+      }        
     } else if (!id.equals(publishedIg.getId()))
       errors.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "ImplementationGuide.id", "The Implementation Guide Resource id should be "+id, IssueSeverity.WARNING));
       
@@ -2512,6 +2519,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     extensionTracker.scan(publishedIg);
     return needToBuild;
   }
+
+  private FetchedResource fetchByResource(String type, String id) {
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.fhirType().equals(type) && r.getId().equals(id))
+          return r;
+      }
+    }
+    return null;
+  }
+
 
   private String targetUrl() {
     if (mode == null)
@@ -2909,42 +2927,81 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return url.substring(url.lastIndexOf("/")+1);
   }
 
+  private List<String> metadataResourceNames() {
+    List<String> res = new ArrayList<>();
+    // order matters here
+    res.add("NamingSystem");
+    res.add("CodeSystem");
+    res.add("ValueSet");
+    res.add("ConceptMap");
+    res.add("DataElement");
+    res.add("StructureDefinition");
+    res.add("OperationDefinition");
+    res.add("SearchParameter");
+    res.add("CapabilityStatement");
+    res.add("StructureMap");
+    res.add("CapabilityStatement2");
+    res.add("ActivityDefinition");
+    res.add("ChargeItemDefinition");
+    res.add("CompartmentDefinition");
+    res.add("ConceptMap");
+    res.add("ConditionDefinition");
+    res.add("EffectEvidenceSynthesis");
+    res.add("EventDefinition");
+    res.add("Evidence");
+    res.add("EvidenceVariable");
+    res.add("ExampleScenario");
+    res.add("GraphDefinition");
+    res.add("ImplementationGuide");
+    res.add("Library");
+    res.add("Measure");
+    res.add("MessageDefinition");
+    res.add("PlanDefinition");
+    res.add("Questionnaire");
+    res.add("ResearchDefinition");
+    res.add("ResearchElementDefinition");
+    res.add("RiskEvidenceSynthesis");
+    res.add("SearchParameter");
+    res.add("Statistic");
+    res.add("TerminologyCapabilities");
+    res.add("TestScript");
+    return res;
+  }
+  
   private void loadConformance() throws Exception {
-    scan("NamingSystem");
-    scan("CodeSystem");
-    scan("ValueSet");
-    scan("ConceptMap");
-    scan("DataElement");
-    scan("StructureDefinition");
-    scan("OperationDefinition");
-    scan("SearchParameter");
-    scan("CapabilityStatement");
-    scan("Questionnaire");
-    scan("PlanDefinition");
-    
+    for (String s : metadataResourceNames()) 
+      scan(s);
     loadInfo();
-    load("NamingSystem");
-    load("CodeSystem");
-    load("ValueSet");
-    load("ConceptMap");
-    load("DataElement");
-    load("StructureDefinition");
-    load("OperationDefinition");
-    load("SearchParameter");
-    load("CapabilityStatement");
-    load("Questionnaire");
-    load("PlanDefinition");
+    for (String s : metadataResourceNames()) 
+      load(s);
+    for (String s : metadataResourceNames()) 
+      validate(s);
+    
     loadLists();
     generateSnapshots();
     generateNarratives();
     checkConformanceResources();
     generateLogicalMaps();
-    load("StructureMap");
+//    load("StructureMap"); // todo: this is a problem...
     generateAdditionalExamples();
     executeTransforms();
     validateExpressions();
     scanForUsageStats();
   }
+
+  private void validate(String type) throws Exception {
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getElement().fhirType().equals(type)) {
+          log(LogCategory.PROGRESS, "validate res: "+r.fhirType()+"/"+r.getId());
+          if (!r.isValidated()) {
+            validate(f, r);
+          }
+        }
+      }
+    }
+  }
+
 
   private void loadInfo() {
     for (FetchedFile f : fileList) {
@@ -3207,7 +3264,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
-  private ImplementationGuideDefinitionResourceComponent findIGReference(Object type, String id) {
+  private ImplementationGuideDefinitionResourceComponent findIGReference(String type, String id) {
     for (ImplementationGuideDefinitionResourceComponent r : publishedIg.getDefinition().getResource()) {
       if (r.hasReference() && r.getReference().getReference().equals(type+"/"+id))
         return r;
@@ -3316,15 +3373,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             } catch (Exception e) {
               throw new Exception("Error parsing "+f.getName()+": "+e.getMessage(), e);
             }
-          if (!r.isValidated()) {
-            // we;re going to do this later....
-//            if (r.getResource() instanceof DomainResource && !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv())) {
-//              gen.setDefinitionsTarget(igpkp.getDefinitionsName(r));
-//              gen.generate((DomainResource) r.getResource(), otherFilesStartup);
-//              r.setElement(convertToElement(r.getResource()));
-//            }
-            validate(f, r);
-          }
           if (r.getResource() instanceof MetadataResource) {
             MetadataResource bc = (MetadataResource) r.getResource();
             if (bc == null)
@@ -3332,13 +3380,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             boolean altered = false;
             if (bc.hasUrl()) {
               if (adHocTmpDir == null && !listedURLExemptions.contains(bc.getUrl()) && !isExampleResource(bc) && !bc.getUrl().equals(Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())))
-                f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, bc.getUrl(), "conformance resource "+f.getPath()+" canonical URL ("+Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())+") does not match the URL ("+bc.getUrl()+")", IssueSeverity.ERROR));
+                f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, bc.getUrl(), "Conformance resource "+f.getPath()+" - the canonical URL ("+Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())+") does not match the URL ("+bc.getUrl()+")", IssueSeverity.ERROR));
                 // throw new Exception("Error: conformance resource "+f.getPath()+" canonical URL ("+Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())+") does not match the URL ("+bc.getUrl()+")");            
             } else if (bc.hasId())
               bc.setUrl(Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId()));
             else
               throw new Exception("Error: conformance resource "+f.getPath()+" has neither id nor url");
-
 
             if (businessVersion != null) {
               if (!bc.hasVersion()) {
@@ -3759,6 +3806,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     otherFilesRun.add(Utilities.path(tempDir, "usage-stats.json"));
     
     cleanOutput(tempDir);
+    try {
+      download("http://www.fhir.org/archive/icon_fixed.gif", Utilities.path(tempDir, "icon_fixed.gif"));
+    } catch (Exception e) {
+      // nothing
+    }
+    
         
     if (nestedIgConfig != null) {
       if (watch) {
@@ -3854,9 +3907,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
-
-
-
+  private void download(String address, String filename) throws IOException {
+    URL url = new URL(address);
+    URLConnection c = url.openConnection();
+    InputStream s = c.getInputStream();
+    FileOutputStream f = new FileOutputStream(filename);
+    transfer(s, f, 1024);
+    f.close();   
+  }
+  
+  public static void transfer(InputStream in, OutputStream out, int buffer) throws IOException {
+    byte[] read = new byte[buffer]; // Your buffer size.
+    while (0 < (buffer = in.read(read)))
+        out.write(read, 0, buffer);
+}
 
   private void updateImplementationGuide() throws Exception {
     for (ImplementationGuideDefinitionResourceComponent res : publishedIg.getDefinition().getResource()) {
@@ -5388,7 +5452,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void saveNativeResourceOutputs(FetchedFile f, FetchedResource r) throws FHIRException, IOException {
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
     new org.hl7.fhir.r5.elementmodel.JsonParser(context).compose(r.getElement(), bs, OutputStyle.NORMAL, igpkp.getCanonical());
-    npm.addFile(Category.RESOURCE, r.getElement().fhirType()+"-"+r.getId()+".json", bs.toByteArray());
+    npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, r.getElement().fhirType()+"-"+r.getId()+".json", bs.toByteArray());
     if (igpkp.wantGen(r, "xml") || forHL7orFHIR()) {
       String path = Utilities.path(tempDir, r.getElement().fhirType()+"-"+r.getId()+".xml");
       f.getOutputNames().add(path);
@@ -5411,6 +5475,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       stream.close();
     }    
   }
+
+  private boolean isExample(FetchedFile f, FetchedResource r) {
+    ImplementationGuideDefinitionResourceComponent igr = findIGReference(r.fhirType(), r.getId());
+    if (igr == null)
+      return false;
+    else if (igr.hasExample())
+      return false;
+    else if (igr.hasExampleCanonicalType())
+      return true;
+    else
+      return igr.getExampleBooleanType().booleanValue();
+  }
+
 
   private boolean forHL7orFHIR() {
     return igpkp.getCanonical().contains("hl7.org") || igpkp.getCanonical().contains("fhir.org") ;
