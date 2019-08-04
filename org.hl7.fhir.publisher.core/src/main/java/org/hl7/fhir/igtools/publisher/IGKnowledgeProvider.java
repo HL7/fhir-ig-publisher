@@ -568,8 +568,4 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     return br;
   }
 
-  public boolean isHL7Checks() {
-    return canonical.contains("hl7.org") || canonical.contains("fhir.org") ;
-  }
-
 }
