@@ -5418,7 +5418,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     ImplementationGuideDefinitionResourceComponent igr = findIGReference(r.fhirType(), r.getId());
     if (igr == null)
       return false;
-    else if (igr.hasExample())
+    else if (!igr.hasExample())
       return false;
     else if (igr.hasExampleCanonicalType())
       return true;
