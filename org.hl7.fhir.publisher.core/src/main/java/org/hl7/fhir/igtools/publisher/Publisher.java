@@ -5732,7 +5732,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "json-schema"))
       fragmentError("StructureDefinition-"+sd.getId()+"-json-schema", "yet to be done: json schema as html", null, f.getOutputNames());
 
-    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge);
+    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, fileList);
     if (igpkp.wantGen(r, "summary"))
       fragment("StructureDefinition-"+sd.getId()+"-summary", sdr.summary(), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "header"))
@@ -5770,7 +5770,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "maps"))
       fragment("StructureDefinition-"+sd.getId()+"-maps-all", sdr.mappings(true), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "xref"))
-      fragmentError("StructureDefinition-"+sd.getId()+"-sd-xref", "Yet to be done: xref", null, f.getOutputNames());
+      fragment("StructureDefinition-"+sd.getId()+"-sd-xref", sdr.references(), f.getOutputNames(), r, vars, null);
     if (sd.getDerivation() == TypeDerivationRule.CONSTRAINT && igpkp.wantGen(r, "span"))
       fragment("StructureDefinition-"+sd.getId()+"-span", sdr.span(true, igpkp.getCanonical(), otherFilesRun), f.getOutputNames(), r, vars, null);
     if (sd.getDerivation() == TypeDerivationRule.CONSTRAINT && igpkp.wantGen(r, "spanall"))
