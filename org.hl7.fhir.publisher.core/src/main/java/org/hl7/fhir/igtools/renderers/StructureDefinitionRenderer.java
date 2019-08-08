@@ -37,9 +37,11 @@ import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
+import org.hl7.fhir.r4.model.UrlType;
 import org.hl7.fhir.r5.conformance.ProfileUtilities;
 import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider.BindingResolution;
 import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.model.CanonicalType;
@@ -85,13 +87,15 @@ public class StructureDefinitionRenderer extends BaseRenderer {
   ProfileUtilities utils;
   private StructureDefinition sd;
   private String destDir;
+  private List<FetchedFile> files;
 
-  public StructureDefinitionRenderer(IWorkerContext context, String prefix, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge) {
+  public StructureDefinitionRenderer(IWorkerContext context, String prefix, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files) {
     super(context, prefix, igp, maps, markdownEngine, packge);
     this.sd = sd;
     this.destDir = destDir;
     utils = new ProfileUtilities(context, null, igp);
     utils.setIgmode(true);
+    this.files = files;
   }
 
   @Override
@@ -1714,6 +1718,91 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     }
     String s = slicing.getOrdered() ? " in any order" : " in the specified order " + (slicing.hasRules() ? slicing.getRules().getDisplay() : "");
     return "// sliced by "+csv.toString()+" "+s;
+  }
+
+  public String references() {
+    Map<String, String> base = new HashMap<>();
+    Map<String, String> refs = new HashMap<>();
+    Map<String, String> trefs = new HashMap<>();
+    Map<String, String> examples = new HashMap<>();
+    for (StructureDefinition sd : context.allStructures()) {
+      if (this.sd.getUrl().equals(sd.getBaseDefinition())) {
+        base.put(sd.getUserString("path"), sd.present());
+      }
+      for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+        for (TypeRefComponent tr : ed.getType()) {
+          for (CanonicalType u : tr.getProfile()) {
+            if (this.sd.getUrl().equals(u.getValue())) {
+              refs.put(sd.getUserString("path"), sd.present());
+            }
+          }
+          for (CanonicalType u : tr.getTargetProfile()) {
+            if (this.sd.getUrl().equals(u.getValue())) {
+              trefs.put(sd.getUserString("path"), sd.present());
+            }
+          }
+        }
+      }
+    }
+    for (FetchedFile f : files) {
+      for (FetchedResource r : f.getResources()) {
+        if (usesSD(r.getElement())) {
+          String p = igp.getLinkFor(r);
+          examples.put(p, r.getTitle());          
+        }
+      }
+    }
+
+    StringBuilder b= new StringBuilder();
+    b.append("<p><b>Usage:</b></p>\r\n<ul>\r\n");
+    if (!base.isEmpty())
+      b.append(" <li>Derived from this "+sd.describeType()+": "+refList(base)+"</li>\r\n");
+    if (!refs.isEmpty())
+      b.append(" <li>Use this "+sd.describeType()+": "+refList(refs)+"</li>\r\n");
+    if (!trefs.isEmpty())
+      b.append(" <li>Refer to this "+sd.describeType()+": "+refList(refs)+"</li>\r\n");
+    if (!examples.isEmpty())
+      b.append(" <li>Examples for this "+sd.describeType()+": "+refList(examples)+"</li>\r\n");
+    if (base.isEmpty() && refs.isEmpty() && trefs.isEmpty() && examples.isEmpty())
+      b.append(" <li>This "+sd.describeType()+" is not used in this Implementation Guide</li>\r\n");
+    b.append("</ul>\r\n");
+    return b.toString();
+  }
+
+  private boolean usesSD(Element resource) {
+    if (resource.hasChild("meta")) {
+      Element meta = resource.getNamedChild("meta");
+      for (Element p : meta.getChildrenByName("profile")) {
+        if (sd.getUrl().equals(p.getValue()))
+          return true;
+      }
+    }
+    return usesExtension(resource);
+  }
+
+  private boolean usesExtension(Element focus) {
+    for (Element child : focus.getChildren()) {
+      if (child.getName().equals("Extension") && sd.getUrl().equals(child.getChildValue("url")))
+        return true;
+      if (usesExtension(child))
+        return true;
+    }   
+    return false;
+  }
+
+  private String refList(Map<String, String> base) {
+    CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
+    for (String s : sorted(base.keySet())) {
+      b.append("<a href=\""+s+"\">"+base.get(s)+"</a>");
+    }
+    return b.toString();
+  }
+
+  private List<String> sorted(Set<String> keys) {
+    List<String> res = new ArrayList<>();
+    res.addAll(keys);
+    Collections.sort(res);
+    return res;
   }
 
 }
