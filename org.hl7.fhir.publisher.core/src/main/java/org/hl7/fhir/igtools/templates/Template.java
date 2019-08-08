@@ -79,6 +79,8 @@ public class Template {
   private String targetOnCheck;
   private Project antProject;
   private JsonObject defaults;
+  private JsonArray extraTemplates;
+  private JsonArray preProcess;
   
   /** unpack the template into /template 
    * 
@@ -136,9 +138,33 @@ public class Template {
     if (configuration.has("defaults")) {
       defaults = (JsonObject)configuration.get("defaults");
     }
+
+    if (configuration.has("extraTemplates")) {
+      extraTemplates = (JsonArray)configuration.get("extraTemplates");
+    }
+
+    if (configuration.has("pre-process")) {
+      preProcess = (JsonArray)configuration.get("pre-process");
+    }
+}
+  
+  public boolean hasPreProcess() {
+    return preProcess != null;
   }
     
-  private ImplementationGuide runScriptTarget(String target, Map<String, List<ValidationMessage>> messages, ImplementationGuide ig, int modifyIg) throws IOException, FHIRException {
+  public JsonArray getPreProcess() {
+    return preProcess;
+  }
+    
+  public boolean hasExtraTemplates() {
+    return extraTemplates != null;
+  }
+    
+  public JsonArray getExtraTemplates() {
+    return extraTemplates;
+  }
+    
+  private ImplementationGuide runScriptTarget(String target, Map<String, List<ValidationMessage>> messages, ImplementationGuide ig, List<String> fileNames, int modifyIg) throws IOException, FHIRException {
     File jsonOutcomes = new File(Utilities.path(templateDir, target + "-validation.json"));
     File xmlOutcomes = new File(Utilities.path(templateDir, target + "-validation.xml"));
     if (jsonOutcomes.exists())
@@ -147,41 +173,55 @@ public class Template {
       xmlOutcomes.delete();
     String sfn = Utilities.path(templateDir, target + "-ig-working.");
     String fn = Utilities.path(templateDir, target + "-ig-updated.");
-    antProject.setProperty(target + ".ig.source", sfn);
-    antProject.setProperty(target + ".ig.dest", fn);
     File jsonIg = new File(Utilities.path(templateDir, sfn +"json"));
     File xmlIg = new File(Utilities.path(templateDir, sfn + "xml"));
-    if (jsonIg.exists())
-      jsonIg.delete();
-    if (xmlIg.exists())
-      xmlIg.delete();
-    new XmlParser().compose(new FileOutputStream(sfn+"xml"), ig);
-    new JsonParser().compose(new FileOutputStream(sfn+"json"), ig);    
+    if (ig != null) {
+      antProject.setProperty(target + ".ig.source", sfn);
+      antProject.setProperty(target + ".ig.dest", fn);
+      if (jsonIg.exists())
+        jsonIg.delete();
+      if (xmlIg.exists())
+        xmlIg.delete();
+      new XmlParser().compose(new FileOutputStream(sfn+"xml"), ig);
+      new JsonParser().compose(new FileOutputStream(sfn+"json"), ig);    
+    }
     antProject.executeTarget(target);
+    if (fileNames!=null) {
+      String files = antProject.getProperty(target + ".files");
+      if (files!=null) {
+        String [] fileArray = files.split(";");
+        for (int i=0;i<fileArray.length;i++) {
+          fileNames.add(fileArray[i]);
+        }
+      }
+    }
     if (jsonOutcomes.exists()) {
       loadValidationMessages((OperationOutcome) new JsonParser().parse(new FileInputStream(jsonOutcomes)), messages);
     } else if (xmlOutcomes.exists()) {
       loadValidationMessages((OperationOutcome) new XmlParser().parse(new FileInputStream(xmlOutcomes)), messages);
     }
-    switch (modifyIg) {
-      case IG_ANY:
-        if (new File(fn+"xml").exists())
-          return (ImplementationGuide) new XmlParser().parse(new FileInputStream(fn+"xml"));
-        else if (new File(fn+"json").exists())
-          return (ImplementationGuide) new JsonParser().parse(new FileInputStream(fn+"json"));
-        else
-          throw new FHIRException("onLoad script "+targetOnLoad+" failed - no output file produced");        
-      case IG_NO_RESOURCE:
-        if (jsonIg.exists())
-          loadModifiedIg((ImplementationGuide) new JsonParser().parse(new FileInputStream(jsonIg)), ig);
-        else if (xmlIg.exists())
-          loadModifiedIg((ImplementationGuide) new XmlParser().parse(new FileInputStream(jsonIg)), ig);
-        return null;
-      case IG_NONE:
-        return null;
-      default:
-        throw new FHIRException("Unexpected modifyIg value: " + modifyIg);
+    if (ig != null) {
+      switch (modifyIg) {
+        case IG_ANY:
+          if (new File(fn+"xml").exists())
+            return (ImplementationGuide) new XmlParser().parse(new FileInputStream(fn+"xml"));
+          else if (new File(fn+"json").exists())
+            return (ImplementationGuide) new JsonParser().parse(new FileInputStream(fn+"json"));
+          else
+            throw new FHIRException("onLoad script "+targetOnLoad+" failed - no output file produced");        
+        case IG_NO_RESOURCE:
+          if (jsonIg.exists())
+            loadModifiedIg((ImplementationGuide) new JsonParser().parse(new FileInputStream(jsonIg)), ig);
+          else if (xmlIg.exists())
+            loadModifiedIg((ImplementationGuide) new XmlParser().parse(new FileInputStream(jsonIg)), ig);
+          return null;
+        case IG_NONE:
+          return null;
+        default:
+          throw new FHIRException("Unexpected modifyIg value: " + modifyIg);
+      }
     }
+    return null;
   }
 
   private void loadModifiedIg(ImplementationGuide modIg, ImplementationGuide ig) throws FHIRException {
@@ -278,9 +318,9 @@ public class Template {
   }
 
   public ImplementationGuide onLoadEvent(ImplementationGuide ig, Map<String, List<ValidationMessage>> messages) throws IOException, FHIRException {
-    return runScriptTarget(targetOnLoad, messages, ig, IG_ANY);
+    return runScriptTarget(targetOnLoad, messages, ig, null, IG_ANY);
   }
-  public Map<String, List<ValidationMessage>> beforeGenerateEvent(ImplementationGuide ig, String tempDir, Set<String> fileList) throws IOException, FHIRException {
+  public Map<String, List<ValidationMessage>> beforeGenerateEvent(ImplementationGuide ig, String tempDir, Set<String> fileList, List<String> newFileList) throws IOException, FHIRException {
     File src = new File(Utilities.path(templateDir, "content"));
     if (src.exists()) {
       for (File f : src.listFiles()) {
@@ -295,16 +335,16 @@ public class Template {
     }
     if (canExecute && targetOnGenerate != null) {
       Map<String, List<ValidationMessage>> messages = new HashMap<String, List<ValidationMessage>>();
-      runScriptTarget(targetOnGenerate, messages, ig, IG_NO_RESOURCE);
+      runScriptTarget(targetOnGenerate, messages, ig, newFileList, IG_NO_RESOURCE);
       return messages;
     } else
       return null;
   }
 
-  public Map<String, List<ValidationMessage>> beforeJekyllEvent(ImplementationGuide ig) throws IOException, FHIRException {
+  public Map<String, List<ValidationMessage>> beforeJekyllEvent(ImplementationGuide ig, List<String> newFileList) throws IOException, FHIRException {
     if (canExecute && targetOnJekyll != null) {
       Map<String, List<ValidationMessage>> messages = new HashMap<String, List<ValidationMessage>>();
-      runScriptTarget(targetOnJekyll, messages, null, IG_NONE);
+      runScriptTarget(targetOnJekyll, messages, null, newFileList, IG_NONE);
       return messages;
     } else
       return null;
@@ -313,7 +353,7 @@ public class Template {
   public Map<String, List<ValidationMessage>> onCheckEvent(ImplementationGuide ig) throws IOException, FHIRException {
     if (canExecute && targetOnCheck != null) {
       Map<String, List<ValidationMessage>> messages = new HashMap<String, List<ValidationMessage>>();
-      runScriptTarget(targetOnCheck, messages, null, IG_NONE);
+      runScriptTarget(targetOnCheck, messages, null, null, IG_NONE);
       return messages;
     } else
       return null;
