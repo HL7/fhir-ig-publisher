@@ -205,7 +205,9 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     if (defaultConfig != null) {
       
       JsonObject cfg = null;
-      if (r.getElement().fhirType().equals("StructureDefinition")) {
+      if (r.isExample())
+        cfg = defaultConfig.getAsJsonObject("example");
+      if (cfg==null && r.getElement().fhirType().equals("StructureDefinition")) {
         cfg = defaultConfig.getAsJsonObject(r.fhirType()+":"+getSDType(r));
         if (cfg != null && hasString(cfg, propertyName))
           return getString(cfg, propertyName);        
@@ -303,7 +305,10 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   public void findConfiguration(FetchedFile f, FetchedResource r) {
     if (template != null) {
       JsonObject cfg = null;
-      if (r.getElement().fhirType().equals("StructureDefinition")) {
+      if (r.isExample()) {
+        cfg = defaultConfig.getAsJsonObject("example");
+      }        
+      if (cfg == null && r.getElement().fhirType().equals("StructureDefinition")) {
         cfg = defaultConfig.getAsJsonObject(r.fhirType()+":"+getSDType(r));
       }
       if (cfg == null)

@@ -2482,6 +2482,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             r.setExampleUri(sourceIg.getUrl().substring(0, publishedIg.getUrl().indexOf("ImplementationGuide/")) + ref);
           else
             r.setExampleUri(Utilities.pathURL(publishedIg.getUrl(), ref));
+          // Redo this because we now have example information
+          igpkp.findConfiguration(f, r);
         }
       }
     }
