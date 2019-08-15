@@ -658,8 +658,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       npm.loadFiles(rootDir, new File(rootDir), ".git", "output", "package");
       npm.finish();
 
-      TextFile.stringToFile(makeTemplateIndexPage(), Utilities.path(outputDir, "index.html"));
-      TextFile.stringToFile(makeTemplateQAPage(), Utilities.path(outputDir, "qa.html"));
+      TextFile.stringToFile(makeTemplateIndexPage(), Utilities.path(outputDir, "index.html"), false);
+      TextFile.stringToFile(makeTemplateQAPage(), Utilities.path(outputDir, "qa.html"), false);
 
       if (mode != IGBuildMode.AUTOBUILD) {
         pcm.addPackageToCache(templateInfo.get("name").getAsString(), templateInfo.get("version").getAsString(), new FileInputStream(npm.filename()));
@@ -672,7 +672,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     long endTime = System.nanoTime();
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
     String json = gson.toJson(j);
-    TextFile.stringToFile(json, Utilities.path(outputDir, "qa.json"));
+    TextFile.stringToFile(json, Utilities.path(outputDir, "qa.json"), false);
     
     // registeringg the package locally
     log("Finished. "+presentDuration(endTime - startTime)+". Output in "+outputDir);
@@ -758,7 +758,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       j.addProperty("tool", Constants.VERSION+" ("+ToolsVersion.TOOLS_VERSION+")");
       Gson gson = new GsonBuilder().setPrettyPrinting().create();
       String json = gson.toJson(j);
-      TextFile.stringToFile(json, Utilities.path(destDir != null ? destDir : outputDir, "qa.json"));
+      TextFile.stringToFile(json, Utilities.path(destDir != null ? destDir : outputDir, "qa.json"), false);
     } catch (Exception e) {
       // nothing at all
     }
@@ -1855,7 +1855,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         Utilities.clearDirectory(dir);
       }
     }
-    TextFile.stringToFile(version, verFile);
+    TextFile.stringToFile(version, verFile, false);
   }
 
 
@@ -4439,7 +4439,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
     String json = gson.toJson(data);
-    TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "structuredefinitions.json"));
+    TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "structuredefinitions.json"), false);
 
     if (publishedIg.getDefinition().hasPage()) {
       JsonObject pages = new JsonObject();
@@ -4447,7 +4447,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       //   gson = new GsonBuilder().setPrettyPrinting().create();
       //   json = gson.toJson(pages);
       json = pages.toString();
-      TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "pages.json"));
+      TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "pages.json"), false);
 
       createToc();
       if (htmlTemplate != null || mdTemplate != null) {
@@ -4504,7 +4504,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       FetchedFile f = relativeNames.get(sourcePath);
       String s = "---\r\n---\r\n{% include " + template + "%}";
       String targetPath = Utilities.path(tempDir, p);
-      TextFile.stringToFile(s, targetPath);
+      TextFile.stringToFile(s, targetPath, false);
       if (f==null) // toc.xml
         checkMakeFile(s.getBytes(), targetPath, otherFilesRun);
       else
@@ -4681,7 +4681,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     String s = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><div style=\"col-12\"><table style=\"border:0px;font-size:11px;font-family:verdana;vertical-align:top;\" cellpadding=\"0\" border=\"0\" cellspacing=\"0\"><tbody>";
     s = s + createTocPage(publishedIg.getDefinition().getPage(), insertPage, insertAfterName, insertOffset, null, "", "0", false);
     s = s + "</tbody></table></div>";
-    TextFile.stringToFile(s, Utilities.path(tempDir, "_includes", "toc.xml"));
+    TextFile.stringToFile(s, Utilities.path(tempDir, "_includes", "toc.xml"), false);
   }
 
   private String createTocPage(ImplementationGuideDefinitionPageComponent page, ImplementationGuideDefinitionPageComponent insertPage, String insertAfterName, String insertOffset, String currentOffset, String indents, String label, boolean last) throws FHIRException {
@@ -4802,7 +4802,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
     String json = gson.toJson(data);
-    TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "fhir.json"));
+    TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "fhir.json"), false);
   }
 
   private void generateResourceReferences() throws Exception {
@@ -5998,7 +5998,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           System.out.println("File log: " + logPath);
         }
         filelog.append(msg+"\r\n");
-        TextFile.stringToFile(filelog.toString(), logPath);
+        TextFile.stringToFile(filelog.toString(), logPath, false);
       } catch (IOException e) {
         e.printStackTrace();
       }
@@ -6187,7 +6187,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             e.printStackTrace();
             break;
           }
-          TextFile.stringToFile(buildReport(ig, null, self.filelog.toString(), Utilities.path(self.qaDir, "validation.txt")), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher-"+Integer.toString(i)+".log"));
+          TextFile.stringToFile(buildReport(ig, null, self.filelog.toString(), Utilities.path(self.qaDir, "validation.txt")), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher-"+Integer.toString(i)+".log"), false);
           System.out.println("=======================================================================================");
           System.out.println("");
           System.out.println("");
@@ -6313,7 +6313,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         exitCode = 1;
       } finally {
         if (self.mode == IGBuildMode.MANUAL) {
-          TextFile.stringToFile(buildReport(getNamedParam(args, "-ig"), getNamedParam(args, "-source"), self.filelog.toString(), Utilities.path(self.qaDir, "validation.txt")), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher.log"));
+          TextFile.stringToFile(buildReport(getNamedParam(args, "-ig"), getNamedParam(args, "-source"), self.filelog.toString(), Utilities.path(self.qaDir, "validation.txt")), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher.log"), false);
         }
       }
     }
