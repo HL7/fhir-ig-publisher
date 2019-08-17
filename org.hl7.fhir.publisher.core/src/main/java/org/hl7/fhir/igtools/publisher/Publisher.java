@@ -1175,6 +1175,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     boolean hintAboutNonMustSupport = false;
     boolean anyExtensionsAllowed = false;
     boolean checkAggregation = false;
+    boolean autoLoad = false;
     List<String> extensionDomains = new ArrayList<>();
     
     for (ImplementationGuideDefinitionParameterComponent p : sourceIg.getDefinition().getParameter()) {
@@ -1188,6 +1189,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           genExamples = true;
       } else if (p.getCode().equals("path-resource")) {     
         resourceDirs.add(Utilities.path(rootDir, p.getValue()));
+      } else if (p.getCode().equals("autoload-resources")) {     
+        autoLoad = "true".equals(p.getValue());
       } else if (p.getCode().equals("path-pages")) {     
         pagesDirs.add(Utilities.path(rootDir, p.getValue()));
       } else if (p.getCode().equals("path-qa")) {     
@@ -1333,6 +1336,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     
     loadSpecDetails(context.getBinaries().get("spec.internals"));
     igpkp = new IGKnowledgeProvider(context, checkAppendSlash(specPath), determineCanonical(sourceIg.getUrl()), template.config(), errors, version.equals("1.0.2"), template);
+    if (autoLoad)
+      igpkp.setAutoPath(true);
     igpkp.loadSpecPaths(specMaps.get(0));
     fetcher.setPkp(igpkp);
     
@@ -3162,7 +3167,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               altered = true;
             } 
             if (Utilities.noString(id)) {
-              throw new Exception("Resource has no id in "+file.getPath());
+              throw new Exception("Resource has no id in "+file.getPath()+" and canonical URL ("+url+") does not start with the IG canonical URL ("+prefix+")");
             }
           }
         }
@@ -3610,36 +3615,36 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (parseVersion.equals("3.0.1") || parseVersion.equals("3.0.0")) {
       org.hl7.fhir.dstu3.model.Resource res;
       if (contentType.contains("json"))
-        res = new org.hl7.fhir.dstu3.formats.JsonParser().parse(source);
+        res = new org.hl7.fhir.dstu3.formats.JsonParser(true).parse(source);
       else if (contentType.contains("xml"))
-        res = new org.hl7.fhir.dstu3.formats.XmlParser().parse(source);
+        res = new org.hl7.fhir.dstu3.formats.XmlParser(true).parse(source);
       else
         throw new Exception("Unable to determine file type for "+name);
       return VersionConvertor_30_50.convertResource(res, false);
     } else if (parseVersion.equals("4.0.0")) {
       org.hl7.fhir.r4.model.Resource res;
       if (contentType.contains("json"))
-        res = new org.hl7.fhir.r4.formats.JsonParser().parse(source);
+        res = new org.hl7.fhir.r4.formats.JsonParser(true).parse(source);
       else if (contentType.contains("xml"))
-        res = new org.hl7.fhir.r4.formats.XmlParser().parse(source);
+        res = new org.hl7.fhir.r4.formats.XmlParser(true).parse(source);
       else
         throw new Exception("Unable to determine file type for "+name);
       return VersionConvertor_40_50.convertResource(res);
     } else if (parseVersion.equals("1.4.0")) {
       org.hl7.fhir.dstu2016may.model.Resource res;
       if (contentType.contains("json"))
-        res = new org.hl7.fhir.dstu2016may.formats.JsonParser().parse(source);
+        res = new org.hl7.fhir.dstu2016may.formats.JsonParser(true).parse(source);
       else if (contentType.contains("xml"))
-        res = new org.hl7.fhir.dstu2016may.formats.XmlParser().parse(source);
+        res = new org.hl7.fhir.dstu2016may.formats.XmlParser(true).parse(source);
       else
         throw new Exception("Unable to determine file type for "+name);
       return VersionConvertor_14_50.convertResource(res);
     } else if (parseVersion.equals("1.0.2")) {
       org.hl7.fhir.dstu2.model.Resource res;
       if (contentType.contains("json"))
-        res = new org.hl7.fhir.dstu2.formats.JsonParser().parse(source);
+        res = new org.hl7.fhir.dstu2.formats.JsonParser(true).parse(source);
       else if (contentType.contains("xml"))
-        res = new org.hl7.fhir.dstu2.formats.XmlParser().parse(source);
+        res = new org.hl7.fhir.dstu2.formats.XmlParser(true).parse(source);
       else
         throw new Exception("Unable to determine file type for "+name);
 
@@ -3647,9 +3652,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return new VersionConvertor_10_50(advisor ).convertResource(res);
     } else if (parseVersion.equals(Constants.VERSION)) {
       if (contentType.contains("json"))
-        return new JsonParser().parse(source);
+        return new JsonParser(true).parse(source);
       else if (contentType.contains("xml"))
-        return new XmlParser().parse(source);
+        return new XmlParser(true).parse(source);
       else
         throw new Exception("Unable to determine file type for "+name);
     } else

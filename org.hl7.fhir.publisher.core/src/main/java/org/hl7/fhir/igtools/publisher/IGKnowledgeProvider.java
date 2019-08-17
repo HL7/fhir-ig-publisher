@@ -567,5 +567,9 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     }
     return br;
   }
+  public void setAutoPath(boolean autoPath) {
+    this.autoPath = autoPath;
+  }
 
+  
 }
