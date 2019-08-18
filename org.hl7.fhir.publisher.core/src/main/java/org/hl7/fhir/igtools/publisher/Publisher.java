@@ -5464,7 +5464,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       genVMessage(b, f.getErrors(), IssueSeverity.WARNING);
       genVMessage(b, f.getErrors(), IssueSeverity.INFORMATION);
       b.append("</table>\r\n");
-      fragment(r.fhirType()+"-"+r.getId()+"-valdiation", b.toString(), f.getOutputNames(), r, vars, null);
+      fragment(r.fhirType()+"-"+r.getId()+"-validation", b.toString(), f.getOutputNames(), r, vars, null);
     }
   }
 
