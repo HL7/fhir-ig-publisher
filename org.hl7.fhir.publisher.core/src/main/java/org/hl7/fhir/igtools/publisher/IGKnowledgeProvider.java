@@ -203,7 +203,16 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     if (r.getConfig() != null && hasString(r.getConfig(), propertyName))
       return getString(r.getConfig(), propertyName);
     if (defaultConfig != null) {
-      JsonObject cfg = defaultConfig.getAsJsonObject(r.getElement().fhirType());
+      
+      JsonObject cfg = null;
+      if (r.isExample())
+        cfg = defaultConfig.getAsJsonObject("example");
+      if (cfg==null && r.getElement().fhirType().equals("StructureDefinition")) {
+        cfg = defaultConfig.getAsJsonObject(r.fhirType()+":"+getSDType(r));
+        if (cfg != null && hasString(cfg, propertyName))
+          return getString(cfg, propertyName);        
+      }
+      cfg = defaultConfig.getAsJsonObject(r.getElement().fhirType());
   	  if (cfg != null && hasString(cfg, propertyName))
   	    return getString(cfg, propertyName);
       cfg = defaultConfig.getAsJsonObject("Any");
@@ -211,6 +220,13 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
         return getString(cfg, propertyName);
     }
     return null;
+  }
+
+  public static String getSDType(FetchedResource r) {
+    if ("Extension".equals(r.getElement().getChildValue("type")))
+      return "extension";
+//    if (sd.getKind() == StructureDefinitionKind.LOGICAL)
+    return r.getElement().getChildValue("kind");
   }
 
   public boolean hasProperty(FetchedResource r, String propertyName) {
@@ -288,7 +304,16 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
 
   public void findConfiguration(FetchedFile f, FetchedResource r) {
     if (template != null) {
-      r.setConfig(template.getConfig(r.getElement().fhirType(), r.getId()));
+      JsonObject cfg = null;
+      if (r.isExample()) {
+        cfg = defaultConfig.getAsJsonObject("example");
+      }        
+      if (cfg == null && r.getElement().fhirType().equals("StructureDefinition")) {
+        cfg = defaultConfig.getAsJsonObject(r.fhirType()+":"+getSDType(r));
+      }
+      if (cfg == null)
+        cfg = template.getConfig(r.getElement().fhirType(), r.getId());        
+      r.setConfig(cfg);
     }
     if (r.getConfig() == null && resourceConfig != null) {
       JsonObject e = resourceConfig.getAsJsonObject(r.getElement().fhirType()+"/"+r.getId());
@@ -567,9 +592,9 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     }
     return br;
   }
-
-  public boolean isHL7Checks() {
-    return canonical.contains("hl7.org") || canonical.contains("fhir.org") ;
+  public void setAutoPath(boolean autoPath) {
+    this.autoPath = autoPath;
   }
 
+  
 }

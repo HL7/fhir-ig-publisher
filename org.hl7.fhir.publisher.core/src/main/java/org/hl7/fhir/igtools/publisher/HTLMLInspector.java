@@ -39,6 +39,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import org.apache.commons.math3.random.ISAACRandom;
+import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService.LogCategory;
@@ -181,14 +183,15 @@ public class HTLMLInspector {
 
   private String statusText;
   private List<String> exemptHtmlPatterns = new ArrayList<>();
+  private boolean isAutoBuild;
 
-  public HTLMLInspector(String rootFolder, List<SpecMapManager> specs, ILoggingService log, String canonical, boolean hl7Checks) {
+  public HTLMLInspector(String rootFolder, List<SpecMapManager> specs, ILoggingService log, String canonical, boolean isAutoBuild) {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
     this.log = log;
     this.canonical = canonical;
     this.forHL7 = canonical.contains("hl7.org/fhir");
-    this.hl7Checks = hl7Checks;
+    this.isAutoBuild = isAutoBuild;
   }
 
   public void setAltRootFolder(String altRootFolder) throws IOException {
@@ -211,8 +214,9 @@ public class HTLMLInspector {
 
     log.logDebugMessage(LogCategory.HTML, "Loading Files");
     // load files
-    for (String s : loadList)
+    for (String s : loadList) {
       loadFile(s, rootFolder, messages);
+    }
 
 
     log.logDebugMessage(LogCategory.HTML, "Checking Files");
@@ -230,14 +234,18 @@ public class HTLMLInspector {
           }
         }
         if (check && !findExemptionComment(lf.getXhtml())) {
-          messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, s, "The html source does not contain the header marker" 
+          messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, s, "The html source does not contain the publish box" 
             + (first ? " "+RELEASE_HTML_MARKER+" (see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations)" : ""), IssueSeverity.ERROR));
+          if (isAutoBuild) {
+            throw new FHIRException("The auto-build infrastructure does not publish IGs that contain HTML pages without the publish-box present. For further information, see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations");
+          }
         }
         first = false;
       }
       if (lf.getXhtml() != null)
-        if (checkLinks(s, "", lf.getXhtml(), null, messages, false) != NodeChangeType.NONE) // returns true if changed
+        if (checkLinks(s, "", lf.getXhtml(), null, messages, false) != NodeChangeType.NONE) { // returns true if changed
           saveFile(lf);
+        }
     }
  
     log.logDebugMessage(LogCategory.HTML, "Checking Other Links");
@@ -307,7 +315,7 @@ public class HTLMLInspector {
       if (htmlName || !(e.getMessage().startsWith("Unable to Parse HTML - does not start with tag.") || e.getMessage().startsWith("Malformed XHTML")))
     	messages.add(new ValidationMessage(Source.Publisher, IssueType.STRUCTURE, s, e.getMessage(), IssueSeverity.ERROR));    	
     }
-    if (hl7Checks && x != null) {
+    if (x != null) {
       String src;
       try {
         src = TextFile.fileToString(f);
@@ -511,7 +519,8 @@ public class HTLMLInspector {
     }
     // special case end-points that are always valid:
      if (!resolved)
-      resolved = Utilities.existsInList(ref, "http://hl7.org/fhir/fhir-spec-r4.zip", "http://hl7.org/fhir/R4/fhir-spec-r4.zip", "http://hl7.org/fhir/STU3/fhir-spec.zip", "http://hl7.org/fhir/DSTU2/fhir-spec.zip") || 
+      resolved = Utilities.existsInList(ref, "http://hl7.org/fhir/fhir-spec-r4.zip", "http://hl7.org/fhir/R4/fhir-spec-r4.zip", "http://hl7.org/fhir/STU3/fhir-spec.zip", "http://hl7.org/fhir/DSTU2/fhir-spec.zip", 
+          "http://hl7.org/fhir-issues", "http://hl7.org/registry") || 
           matchesTarget(ref, "http://hl7.org", "http://hl7.org/fhir/DSTU2", "http://hl7.org/fhir/STU3", "http://hl7.org/fhir/R4", "http://hl7.org/fhir/smart-app-launch", "http://hl7.org/fhir/validator");
     
     if (!resolved) {
@@ -684,7 +693,7 @@ public class HTLMLInspector {
   }
 
   public static void main(String[] args) throws Exception {
-    HTLMLInspector inspector = new HTLMLInspector(args[0], null, null, "http://hl7.org/fhir/us/core", true);
+    HTLMLInspector inspector = new HTLMLInspector(args[0], null, null, "http://hl7.org/fhir/us/core", false);
     inspector.setStrict(false);
     List<ValidationMessage> linkmsgs = inspector.check("test text");
     int bl = 0;

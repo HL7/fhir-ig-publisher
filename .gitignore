@@ -214,3 +214,4 @@ local.properties
 /org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/ig30/template
 /org.hl7.fhir.publisher.core/src/test/resources/test-igs/new/ig-package/output
 /zuliprc
+/org.hl7.fhir.publisher.core/var/lib

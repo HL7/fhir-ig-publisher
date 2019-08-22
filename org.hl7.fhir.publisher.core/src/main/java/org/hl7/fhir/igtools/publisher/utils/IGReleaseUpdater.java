@@ -26,6 +26,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map.Entry;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.utils.IGRegistryMaintainer.ImplementationGuideEntry;
@@ -70,6 +71,8 @@ public class IGReleaseUpdater {
         errs.add("unable to find package-list.json");
       else {
         JsonObject json = JsonTrackingParser.parseJsonFile(f);
+        if (url.contains("hl7.org"))
+          checkJsonNoApostrophes("", json);
         String canonical = JSONUtil.str(json, "canonical");
         JsonArray list = json.getAsJsonArray("list");
         JsonObject root = null;
@@ -132,6 +135,32 @@ public class IGReleaseUpdater {
         System.out.println("    "+s);
       }      
     }
+  }
+
+  private void checkJsonNoApostrophes(String path, JsonObject json) {
+    for (Entry<String, JsonElement> p : json.entrySet()) {
+      if (p.getValue().isJsonPrimitive()) {
+        checkJsonNoApostrophesInProperty(path+"."+p.getKey(), p.getValue());
+      } else if (p.getValue().isJsonObject()) {
+        checkJsonNoApostrophes(path+"."+p.getKey(), (JsonObject) p.getValue());
+      } else if (p.getValue().isJsonArray()) {
+        int i = 0;
+        for (JsonElement ai : ((JsonArray) p.getValue())) {
+          if (ai.isJsonPrimitive()) {
+            checkJsonNoApostrophesInProperty(path+"."+p.getKey()+"["+Integer.toString(i)+"]", ai);
+          } else if (ai.isJsonObject()) {
+            checkJsonNoApostrophes(path+"."+p.getKey()+"["+Integer.toString(i)+"]", (JsonObject) ai);
+          } // no arrays containing arrays in package-list.json
+          i++;
+        }
+      }
+    }
+  }
+
+  private void checkJsonNoApostrophesInProperty(String path, JsonElement json) {
+    String s = json.getAsString();
+    if (s.contains("'"))
+      System.out.println("There is a problem in the package-list.json file: "+path+" contains an apostrophe (\"'\")");
   }
 
   private boolean updateStatement(String vf, List<String> ignoreList, JsonObject ig, JsonObject version, List<String> errs, JsonObject root, String canonical) throws FileNotFoundException, IOException, FHIRException {

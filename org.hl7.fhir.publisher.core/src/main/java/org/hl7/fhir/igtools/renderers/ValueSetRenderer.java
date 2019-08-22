@@ -159,15 +159,17 @@ public class ValueSetRenderer extends BaseRenderer {
     }
     for (String url : sorted(sdurls)) {
       StructureDefinition sd = context.fetchResource(StructureDefinition.class, url);
-      for (ElementDefinition ed : sd.getSnapshot().getElement()) {
-        if (ed.hasBinding() && ed.getBinding().hasValueSet()) {
-          if ((ed.getBinding().hasValueSet() && ed.getBinding().getValueSet().equals(vs.getUrl()))) {
-            if (first) {
-              first = false;
-              b.append("<ul>\r\n");
+      if (sd != null) {
+        for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+          if (ed.hasBinding() && ed.getBinding().hasValueSet()) {
+            if ((ed.getBinding().hasValueSet() && ed.getBinding().getValueSet().equals(vs.getUrl()))) {
+              if (first) {
+                first = false;
+                b.append("<ul>\r\n");
+              }
+              b.append(" <li><a href=\""+sd.getUserString("path")+"\">"+Utilities.escapeXml(sd.present())+"</a></li>\r\n");
+              break;
             }
-            b.append(" <li><a href=\""+sd.getUserString("path")+"\">"+Utilities.escapeXml(sd.present())+"</a></li>\r\n");
-            break;
           }
         }
       }
