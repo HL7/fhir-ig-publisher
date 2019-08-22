@@ -1177,6 +1177,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     boolean checkAggregation = false;
     boolean autoLoad = false;
     List<String> extensionDomains = new ArrayList<>();
+    Map<String, String> expParamMap = new HashMap<>();
     
     for (ImplementationGuideDefinitionParameterComponent p : sourceIg.getDefinition().getParameter()) {
       if (p.getCode().equals("logging")) { // added
@@ -1210,7 +1211,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       } else if (p.getCode().equals("extension-domain")) {
         extensionDomains.add(p.getValue());
       } else if (p.getCode().equals("ig-expansion-parameters")) {     
-        exemptHtmlPatterns.add(p.getValue());
+        expParamMap.put(p.getCode(), p.getValue());
       } else if (p.getCode().equals("special-url")) {     
         listedURLExemptions.add(p.getValue());
       } else if (p.getCode().equals("template-openapi")) {     
@@ -1319,8 +1320,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       throw new Exception("Unable to access or create the cache directory at "+vsCache);
     log("Load Terminology Cache from "+vsCache);
     context.initTS(vsCache);
-    if (expParams != null)
+    if (expParams != null) {
       context.setExpansionProfile((Parameters) VersionConvertor_40_50.convertResource(FormatUtilities.loadFile(expParams)));
+    } else if (!expParamMap.isEmpty()) {
+      context.setExpansionProfile(new Parameters());      
+    }
+    for (String n : expParamMap.values())
+      context.getExpansionParameters().addParameter(n, expParamMap.get(n));
+    
     txLog = Utilities.createTempFile("fhir-ig-", ".log").getAbsolutePath();
     if (mode != IGBuildMode.WEBSERVER) {
       if (txServer == null || !txServer.contains(":")) {
@@ -3500,7 +3507,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     ProfileUtilities utils = new ProfileUtilities(context, f.getErrors(), igpkp);
     StructureDefinition base = sd.hasBaseDefinition() ? fetchSnapshotted(sd.getBaseDefinition()) : null;
     utils.setIds(sd, true);
-    if (sd.getKind() != StructureDefinitionKind.LOGICAL) {
+    if (sd.getKind() != StructureDefinitionKind.LOGICAL || sd.getDerivation()==TypeDerivationRule.CONSTRAINT) {
       if (!sd.hasSnapshot()) {
         dlog(LogCategory.PROGRESS, "Generate Snapshot for "+sd.getUrl());
         if (base == null)
@@ -3823,7 +3830,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Checking Output HTML");
       String statusMessage;
       if (mode == IGBuildMode.AUTOBUILD) 
-        statusMessage = Utilities.escapeXml(sourceIg.present())+", "+sourceIg.getPublisher()+" - CI build for vesion "+businessVersion+"). This version is based on the current content of <a href=\""+gh()+"\">"+gh()+"</a> and changes regularly. See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>"; 
+        statusMessage = Utilities.escapeXml(sourceIg.present())+", "+sourceIg.getPublisher()+" - CI build for version "+businessVersion+"). This version is based on the current content of <a href=\""+gh()+"\">"+gh()+"</a> and changes regularly. See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>"; 
       else if (mode == IGBuildMode.PUBLICATION) 
         statusMessage = "Publication Build: This will be filled in by the publication tooling"; 
       else 
