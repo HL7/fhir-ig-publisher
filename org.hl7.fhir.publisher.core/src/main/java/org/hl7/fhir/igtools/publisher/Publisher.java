@@ -3823,7 +3823,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Checking Output HTML");
       String statusMessage;
       if (mode == IGBuildMode.AUTOBUILD) 
-        statusMessage = Utilities.escapeXml(sourceIg.present())+", "+sourceIg.getPublisher()+" - CI build for vesion "+businessVersion+"). This version is based on the current content of <a href=\""+gh()+"\">"+gh()+"</a> and changes regularly. See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>"; 
+        statusMessage = Utilities.escapeXml(sourceIg.present())+", "+sourceIg.getPublisher()+" - CI build for version "+businessVersion+"). This version is based on the current content of <a href=\""+gh()+"\">"+gh()+"</a> and changes regularly. See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>"; 
       else if (mode == IGBuildMode.PUBLICATION) 
         statusMessage = "Publication Build: This will be filled in by the publication tooling"; 
       else 
