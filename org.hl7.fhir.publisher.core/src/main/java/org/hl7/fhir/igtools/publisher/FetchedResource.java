@@ -115,6 +115,10 @@ public class FetchedResource {
     this.exampleUri = exampleUri;
   }  
 
+  public boolean isExample() {
+    return (this.exampleUri != null);
+  }  
+
   public HashSet<FetchedResource> getExamples() {
     return examples;
   }  

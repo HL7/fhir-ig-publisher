@@ -1294,7 +1294,8 @@ public class IgSpreadsheetParser {
       List<TypeRef> types = tp.parse(sheet.getColumn(row, "Type"), true, metadata("extension.uri"), context, false);
       exv.getType().addAll(tp.convert(context, exv.getPath(), types, false, exv));
       if (exv.getType().size()>1) {
-        exv.setPath(exe.getPath()+".valueReference");
+//        exv.setPath(exe.getPath()+".valueReference");
+        exv.setPath(exe.getPath()+".value[x]");
         for (TypeRefComponent t : exv.getType()) {
           if (!t.getCode().equals("Reference")) {
             exv.setPath(exe.getPath()+".value[x]");
@@ -1307,7 +1308,8 @@ public class IgSpreadsheetParser {
           exv.setName("value[x]");
         else {*/
           String name = type.getCode();
-          exv.setPath(exe.getPath()+".value" + name.substring(0,1).toUpperCase() + name.substring(1));
+          exv.setPath(exe.getPath()+".value[x]");
+//          exv.setPath(exe.getPath()+".value" + name.substring(0,1).toUpperCase() + name.substring(1));
 //        }
       }
 
