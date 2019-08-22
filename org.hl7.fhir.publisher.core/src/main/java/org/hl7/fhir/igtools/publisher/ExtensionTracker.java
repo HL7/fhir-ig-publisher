@@ -121,7 +121,7 @@ public class ExtensionTracker {
 
     //now, scan the definitions looking for references to extensions, and noting their context
     for (ElementDefinition ed : sd.getSnapshot().getElement()) {
-      if (ed.getType().size() == 1 && "Extension".equals(ed.getTypeFirstRep().getCode()) && ed.getTypeFirstRep().hasProfile()) {
+      if (ed.getType().size() == 1 && "Extension".equals(ed.getTypeFirstRep().getWorkingCode()) && ed.getTypeFirstRep().hasProfile()) {
         usages.add(new ExtensionUsage(true, ed.getTypeFirstRep().getProfile().get(0).asStringValue(), tail(ed.getPath())));
       }
     }
@@ -172,7 +172,7 @@ public class ExtensionTracker {
       for (ElementDefinition e : sd.getSnapshot().getElement()) {
         if (e.getPath().contains(".value"))
           for (TypeRefComponent t : e.getType())
-            types.add(t.getCode());
+            types.add(t.getWorkingCode());
       }
       if (types.size() > 0)
         ext.add("types", types);
