@@ -3851,6 +3851,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     cleanOutput(tempDir);
     try {
       download("http://www.fhir.org/archive/icon_fixed.gif", Utilities.path(tempDir, "icon_fixed.gif"));
+      download("http://www.fhir.org/archive/icon_slice_item.png", Utilities.path(tempDir, "icon_slice_item.png"));
     } catch (Exception e) {
       // nothing
     }
