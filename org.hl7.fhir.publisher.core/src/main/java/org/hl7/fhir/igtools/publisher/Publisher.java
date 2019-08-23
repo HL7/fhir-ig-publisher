@@ -844,7 +844,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private boolean isConvertableResource(String t) {
-    return Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "Conformance", "CapabilityStatement", 
+    return Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "Conformance", "CapabilityStatement", "Questionnaire", 
         "ConceptMap", "OperationOutcome", "CompartmentDefinition", "OperationDefinition", "ImplementationGuide");
   }
 
@@ -1199,6 +1199,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     List<String> extensionDomains = new ArrayList<>();
     tempDir = Utilities.path(rootDir, "temp");
     outputDir = Utilities.path(rootDir, "output");
+    Map<String, String> expParamMap = new HashMap<>();
     
     for (ImplementationGuideDefinitionParameterComponent p : sourceIg.getDefinition().getParameter()) {
       if (p.getCode().equals("logging")) { // added
@@ -1235,8 +1236,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         exemptHtmlPatterns.add(p.getValue());
       } else if (p.getCode().equals("extension-domain")) {
         extensionDomains.add(p.getValue());
-//      } else if (p.getCode().equals("ig-expansion-parameters")) {
-//        exemptHtmlPatterns.add(p.getValue());
+      } else if (p.getCode().equals("ig-expansion-parameters")) {     
+        expParamMap.put(p.getCode(), p.getValue());
       } else if (p.getCode().equals("special-url")) {     
         listedURLExemptions.add(p.getValue());
       } else if (p.getCode().equals("template-openapi")) {     
@@ -1280,9 +1281,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (pagesDirs.isEmpty())
       pagesDirs.add(Utilities.path(rootDir, "pages"));
     if (mode != IGBuildMode.WEBSERVER){
-//      tempDir = Utilities.path(rootDir, "temp");
-//      String p = "output";
-//      outputDir = Paths.get(p).isAbsolute() ? p : Utilities.path(rootDir, p);
+      tempDir = Utilities.path(rootDir, "temp");
+      String p = "output";
+      outputDir = Paths.get(p).isAbsolute() ? p : Utilities.path(rootDir, p);
     }
     if (mode == IGBuildMode.WEBSERVER) 
       vsCache = Utilities.path(System.getProperty("java.io.tmpdir"), "fhircache");
@@ -1365,8 +1366,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       throw new Exception("Unable to access or create the cache directory at "+vsCache);
     log("Load Terminology Cache from "+vsCache);
     context.initTS(vsCache);
-    if (expParams != null)
+    if (expParams != null) {
       context.setExpansionProfile((Parameters) VersionConvertor_40_50.convertResource(FormatUtilities.loadFile(expParams)));
+    } else if (!expParamMap.isEmpty()) {
+      context.setExpansionProfile(new Parameters());      
+    }
+    for (String n : expParamMap.values())
+      context.getExpansionParameters().addParameter(n, expParamMap.get(n));
+    
     txLog = Utilities.createTempFile("fhir-ig-", ".log").getAbsolutePath();
     if (mode != IGBuildMode.WEBSERVER) {
       if (txServer == null || !txServer.contains(":")) {
@@ -2153,7 +2160,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (fn.endsWith(".json") && fn.contains("-")) {
         Resource r = null;
         String t = fn.substring(0, fn.indexOf("-"));
-        if (Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "SearchParameter", "OperationDefinition", "Questionnaire", "ConceptMap", "StructureMap", "NamingSystem", "ImplementationGuide", "CapabilityStatement")) {
+        if (Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "SearchParameter", "OperationDefinition", "Questionnaire", "ConceptMap", "StructureMap", "NamingSystem", "ImplementationGuide", "CapabilityStatement", "Questionnaire")) {
           if (igm.getVersion().equals("3.0.1") || igm.getVersion().equals("3.0.0")) {
             org.hl7.fhir.dstu3.model.Resource res = new org.hl7.fhir.dstu3.formats.JsonParser().parse(pi.load("package", fn));
             r = VersionConvertor_30_50.convertResource(res, true);
@@ -3588,7 +3595,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     ProfileUtilities utils = new ProfileUtilities(context, f.getErrors(), igpkp);
     StructureDefinition base = sd.hasBaseDefinition() ? fetchSnapshotted(sd.getBaseDefinition()) : null;
     utils.setIds(sd, true);
-    if (sd.getKind() != StructureDefinitionKind.LOGICAL) {
+    if (sd.getKind() != StructureDefinitionKind.LOGICAL || sd.getDerivation()==TypeDerivationRule.CONSTRAINT) {
       if (!sd.hasSnapshot()) {
         dlog(LogCategory.PROGRESS, "Generate Snapshot for "+sd.getUrl());
         if (base == null)
@@ -3844,6 +3851,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     cleanOutput(tempDir);
     try {
       download("http://www.fhir.org/archive/icon_fixed.gif", Utilities.path(tempDir, "icon_fixed.gif"));
+      download("http://www.fhir.org/archive/icon_slice_item.png", Utilities.path(tempDir, "icon_slice_item.png"));
     } catch (Exception e) {
       // nothing
     }

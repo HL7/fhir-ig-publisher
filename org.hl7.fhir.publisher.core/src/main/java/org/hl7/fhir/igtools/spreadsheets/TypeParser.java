@@ -232,8 +232,8 @@ public class TypeParser {
     for (TypeRefComponent tr1 : list) {
       for (TypeRefComponent tr2 : list) {
         if (tr1 != tr2) {
-          if (tr1.getCode().equals(tr2.getCode()))
-            throw new Exception("duplicate code "+tr1.getCode());
+          if (tr1.getWorkingCode().equals(tr2.getWorkingCode()))
+            throw new Exception("duplicate code "+tr1.getWorkingCode());
         }
       }
     }
@@ -242,7 +242,7 @@ public class TypeParser {
 
   private TypeRefComponent getTypeComponent(List<TypeRefComponent> list, String name) {
     for (TypeRefComponent tr : list) 
-      if (tr.getCode().equals(name))
+      if (tr.getWorkingCode().equals(name))
         return tr;
     TypeRefComponent tr = new TypeRefComponent();
     tr.setCode(name);

@@ -251,7 +251,7 @@ public class IgSpreadsheetParser {
       ElementDefinition e = processLine(sd, sheet, row, invariants, true, row == 0);
       if (e != null)
         for (TypeRefComponent t : e.getType()) {
-          if (t.hasProfile() && !"Extension".equals(t.getCode()) && t.getProfile().get(0).getValue().startsWith("#")) {
+          if (t.hasProfile() && !"Extension".equals(t.getWorkingCode()) && t.getProfile().get(0).getValue().startsWith("#")) {
             if (!namedSheets.contains(t.getProfile().get(0).getValue().substring(1)))
               namedSheets.add(t.getProfile().get(0).getValue().substring(1));
           }
@@ -845,7 +845,7 @@ public class IgSpreadsheetParser {
       if (s.contains("//"))
         s = s.substring(0,  s.indexOf("//")).trim();
       if (!Utilities.noString(s)) {
-        Type v = processStringToType(e.getTypeFirstRep().getCode(), s, e.getPath());
+        Type v = processStringToType(e.getTypeFirstRep().getWorkingCode(), s, e.getPath());
         if (v != null) {
           Extension ex = e.addExtension();
           ex.setUrl("http://hl7.org/fhir/StructureDefinition/structuredefinition-example");
@@ -923,7 +923,7 @@ public class IgSpreadsheetParser {
       return null;
     if (e.getType().size() != 1)
       throw new Exception("Unable to process "+column+" unless a single type is specified @ "+getLocation(row)+", type = \""+e.typeSummary()+"\", column = "+column);
-    String type = e.getType().get(0).getCode();
+    String type = e.getType().get(0).getWorkingCode();
     StructureDefinition sd = context.fetchTypeDefinition(type);
     if (sd != null && sd.hasBaseDefinition() && sd.getDerivation() == TypeDerivationRule.CONSTRAINT)
       type = sd.getType();
@@ -1297,7 +1297,7 @@ public class IgSpreadsheetParser {
 //        exv.setPath(exe.getPath()+".valueReference");
         exv.setPath(exe.getPath()+".value[x]");
         for (TypeRefComponent t : exv.getType()) {
-          if (!t.getCode().equals("Reference")) {
+          if (!t.getWorkingCode().equals("Reference")) {
             exv.setPath(exe.getPath()+".value[x]");
             break;
           }
@@ -1307,7 +1307,7 @@ public class IgSpreadsheetParser {
 /*        if (type.getCode().equals("*") || type.get.getParams().size()>1)
           exv.setName("value[x]");
         else {*/
-          String name = type.getCode();
+          String name = type.getWorkingCode();
           exv.setPath(exe.getPath()+".value[x]");
 //          exv.setPath(exe.getPath()+".value" + name.substring(0,1).toUpperCase() + name.substring(1));
 //        }

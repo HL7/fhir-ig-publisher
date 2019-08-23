@@ -376,7 +376,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
           if (t != null)
             ed.getBinding().setUserData("tx.value", t);
         }
-        if (ed.getType().size() == 1 && ed.getType().get(0).getCode().equals("Extension"))
+        if (ed.getType().size() == 1 && ed.getType().get(0).getWorkingCode().equals("Extension"))
           id = id + "<br/>"+ed.getType().get(0).getProfile();
         txlist.add(id);
         txmap.put(id, ed.getBinding());
@@ -417,7 +417,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
           if (t != null)
             ed.getBinding().setUserData("tx.value", t);
         }
-        if (ed.getType().size() == 1 && ed.getType().get(0).getCode().equals("Extension"))
+        if (ed.getType().size() == 1 && ed.getType().get(0).getWorkingCode().equals("Extension"))
           id = id + "<br/>"+ed.getType().get(0).getProfile();
         txlist.add(id);
         txmap.put(id, ed.getBinding());
@@ -588,7 +588,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
             if (ec.getId().endsWith("[x]")) {
               Set<String> tl = new HashSet<String>();
               for (TypeRefComponent tr : ec.getType()) {
-                String tc = tr.getCode();
+                String tc = tr.getWorkingCode();
                 if (!tl.contains(tc)) {
                   tl.add(tc);
                   String s = ec.getId().replace("[x]", Utilities.capitalize(tc));
@@ -608,7 +608,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
           if (ec.getPath().endsWith("[x]") && ec.hasSliceName()) {
             Set<String> tl = new HashSet<String>();
             for (TypeRefComponent tr : ec.getType()) {
-              String tc = tr.getCode();
+              String tc = tr.getWorkingCode();
               if (!tl.contains(tc)) {
                 tl.add(tc);
                 String s = ec.getPath().replace("[x]", Utilities.capitalize(tc));
@@ -643,7 +643,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
   }
 
   private boolean isProfiledExtension(ElementDefinition ec) {
-    return ec.getType().size() == 1 && "Extension".equals(ec.getType().get(0).getCode()) && ec.getType().get(0).hasProfile();
+    return ec.getType().size() == 1 && "Extension".equals(ec.getType().get(0).getWorkingCode()) && ec.getType().get(0).hasProfile();
   }
 
 
@@ -812,15 +812,15 @@ public class StructureDefinitionRenderer extends BaseRenderer {
   }
 
   private void describeType(StringBuilder b, TypeRefComponent t) throws Exception {
-    if (t.getCode() == null)
+    if (t.getWorkingCode() == null)
       return;
-    if (t.getCode().startsWith("="))
+    if (t.getWorkingCode().startsWith("="))
       return;
 
-    if (t.getCode().startsWith("xs:")) {
-      b.append(t.getCode());
+    if (t.getWorkingCode().startsWith("xs:")) {
+      b.append(t.getWorkingCode());
     } else {
-      String s = igp.getLinkFor(sd.getUserString("path"), t.getCode());
+      String s = igp.getLinkFor(sd.getUserString("path"), t.getWorkingCode());
       if (s != null) {
         b.append("<a href=\"");
         //    GG 13/12/2016 - I think that this is always wrong now. 
@@ -836,10 +836,10 @@ public class StructureDefinitionRenderer extends BaseRenderer {
           //       b.append(t.getCode());
         }
         b.append("\">");
-        b.append(t.getCode());
+        b.append(t.getWorkingCode());
         b.append("</a>");
       } else 
-        b.append(t.getCode());
+        b.append(t.getWorkingCode());
     }
     if (t.hasProfile()) {
       b.append("(");
@@ -1221,8 +1221,10 @@ public class StructureDefinitionRenderer extends BaseRenderer {
   }
 
   public String pseudoJson() throws Exception {
+    if (sd.getSnapshot() == null || sd.getSnapshot().getElement() == null || sd.getSnapshot().getElement().size()==0) {
+      return "";
+    }
     StringBuilder b = new StringBuilder();
-    ElementDefinition root = sd.getSnapshot().getElement().get(0);
     String rn = sd.getSnapshot().getElement().get(0).getPath();
     b.append(" // <span style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(sd.getTitle()) + "</span>\r\n {\r\n");
     if (sd.getKind() == StructureDefinitionKind.RESOURCE)
@@ -1260,7 +1262,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
 
   private boolean allTypesAreReference(ElementDefinition child) {
     for (TypeRefComponent tr : child.getType()) {
-      if (!"Reference".equals(tr.getCode()))
+      if (!"Reference".equals(tr.getWorkingCode()))
           return false;
     }
     return !child.getType().isEmpty();
@@ -1333,7 +1335,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     String name =  tail(elem.getPath());
     String en = asValue ? "value[x]" : name;
     if (en.contains("[x]"))
-      en = en.replace("[x]", upFirst(type.getCode()));
+      en = en.replace("[x]", upFirst(type.getWorkingCode()));
     boolean unbounded = elem.hasBase() && elem.getBase().hasMax() ? elem.getBase().getMax().equals("*") : "*".equals(elem.getMax());
     String defPage = igp.getLinkForProfile(sd, sd.getUrl());
     // 1. name
@@ -1352,26 +1354,26 @@ public class StructureDefinitionRenderer extends BaseRenderer {
       assert(children.size() > 0);
       b.append("{");
       delayedClose = true;
-    } else if (type.getCode() == null) {
+    } else if (type.getWorkingCode() == null) {
       // For the 'value' element of simple types
       b.append("&lt;<span style=\"color: darkgreen\">n/a</span>&gt;");
-    } else if (isPrimitive(type.getCode())) {
-      if (!(type.getCode().equals("integer") || type.getCode().equals("boolean") || type.getCode().equals("decimal")))
+    } else if (isPrimitive(type.getWorkingCode())) {
+      if (!(type.getWorkingCode().equals("integer") || type.getWorkingCode().equals("boolean") || type.getWorkingCode().equals("decimal")))
         b.append("\"");
       if (elem.hasFixed()) 
         b.append(Utilities.escapeJson(((PrimitiveType) elem.getFixed()).asStringValue()));
       else {
-        String l = getSrcFile(type.getCode());
+        String l = getSrcFile(type.getWorkingCode());
         if (l == null)
-            b.append("&lt;<span style=\"color: darkgreen\">" + type.getCode()+ "</span>&gt;");
+            b.append("&lt;<span style=\"color: darkgreen\">" + type.getWorkingCode()+ "</span>&gt;");
         else
-          b.append("&lt;<span style=\"color: darkgreen\"><a href=\"" +suffix(l, type.getCode()) + "\">" + type.getCode()+ "</a></span>&gt;");
+          b.append("&lt;<span style=\"color: darkgreen\"><a href=\"" +suffix(l, type.getWorkingCode()) + "\">" + type.getWorkingCode()+ "</a></span>&gt;");
       }
-      if (!(type.getCode().equals("integer") || type.getCode().equals("boolean") || type.getCode().equals("decimal")))
+      if (!(type.getWorkingCode().equals("integer") || type.getWorkingCode().equals("boolean") || type.getWorkingCode().equals("decimal")))
         b.append("\"");
     } else {
       b.append("{");
-      b.append("<span style=\"color: darkgreen\"><a href=\"" +suffix(getSrcFile(type.getCode()), type.getCode()) + "\">" + type.getCode()+ "</a></span>");
+      b.append("<span style=\"color: darkgreen\"><a href=\"" +suffix(getSrcFile(type.getWorkingCode()), type.getWorkingCode()) + "\">" + type.getWorkingCode()+ "</a></span>");
       if (type.hasProfile()) {
         StructureDefinition tsd = context.fetchResource(StructureDefinition.class, type.getProfile().get(0).getValue());
         if (tsd != null)
@@ -1470,7 +1472,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     String name =  tail(elem.getPath());
     String en = asValue ? "value[x]" : name;
     if (en.contains("[x]"))
-      en = en.replace("[x]", upFirst(type.getCode()));
+      en = en.replace("[x]", upFirst(type.getWorkingCode()));
     boolean unbounded = elem.hasMax() && elem.getMax().equals("*");
 
     String indentS = "";
@@ -1539,7 +1541,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     String name =  tail(elem.getPath());
     String en = asValue ? "value[x]" : name;
     if (en.contains("[x]"))
-      en = en.replace("[x]", upFirst(type.getCode()));
+      en = en.replace("[x]", upFirst(type.getWorkingCode()));
     boolean unbounded = elem.hasMax() && elem.getMax().equals("*");
 
     String indentS = "";
