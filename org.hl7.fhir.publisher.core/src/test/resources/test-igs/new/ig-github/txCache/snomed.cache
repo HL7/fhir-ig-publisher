@@ -2,7 +2,7 @@
 {"code" : {
   "system" : "http://snomed.info/sct",
   "code" : "404684003"
-}, "valueSet" :null}####
+}, "valueSet" :null, "lang":"null"}####
 v: {
   "display" : "Clinical finding (finding)",
   "severity" : null,
@@ -34,15 +34,15 @@ e: {
       "url" : "http://hl7.org/fhir/StructureDefinition/valueset-unclosed",
       "valueBoolean" : true
     }],
-    "identifier" : "urn:uuid:e2d73bd7-5f3e-4a09-b35a-155ffc1fc8dd",
-    "timestamp" : "2019-04-18T06:10:42.221Z",
+    "identifier" : "urn:uuid:9ea1dcc0-95d3-40e4-a4ae-be765b25a01c",
+    "timestamp" : "2019-08-23T13:53:35.406Z",
     "parameter" : [{
       "name" : "limitedExpansion",
       "valueString" : "-1"
     },
     {
       "name" : "version",
-      "valueString" : "http://snomed.info/sct?version=http://snomed.info/sct/20611000087101/version/20161031"
+      "valueString" : "http://snomed.info/sct?version=http://snomed.info/sct/20611000087101/version/20190430"
     }],
     "contains" : [{
       "system" : "http://snomed.info/sct",
@@ -228,11 +228,6 @@ e: {
       "system" : "http://snomed.info/sct",
       "code" : "257006",
       "display" : "Acne rosacea, erythematous telangiectatic type"
-    },
-    {
-      "system" : "http://snomed.info/sct",
-      "code" : "258001",
-      "display" : "Pseudoknuckle pad"
     },
     {
       "system" : "http://snomed.info/sct",
@@ -641,11 +636,6 @@ e: {
     },
     {
       "system" : "http://snomed.info/sct",
-      "code" : "634005",
-      "display" : "Saddle boil"
-    },
-    {
-      "system" : "http://snomed.info/sct",
       "code" : "640003",
       "display" : "Injury of pneumogastric nerve"
     },
@@ -657,7 +647,7 @@ e: {
     {
       "system" : "http://snomed.info/sct",
       "code" : "646009",
-      "display" : "Idiopathic cyst of anterior chamber"
+      "display" : "Idiopathic cyst of anterior chamber of eye"
     },
     {
       "system" : "http://snomed.info/sct",
@@ -991,11 +981,6 @@ e: {
     },
     {
       "system" : "http://snomed.info/sct",
-      "code" : "954008",
-      "display" : "Renon-Delille syndrome"
-    },
-    {
-      "system" : "http://snomed.info/sct",
       "code" : "961007",
       "display" : "Erythema nodosum, acute form"
     },
@@ -1251,11 +1236,6 @@ e: {
     },
     {
       "system" : "http://snomed.info/sct",
-      "code" : "1156003",
-      "display" : "Cavitary prostatitis"
-    },
-    {
-      "system" : "http://snomed.info/sct",
       "code" : "1168007",
       "display" : "Allotype"
     },
@@ -1288,11 +1268,6 @@ e: {
       "system" : "http://snomed.info/sct",
       "code" : "1201005",
       "display" : "Benign essential hypertension"
-    },
-    {
-      "system" : "http://snomed.info/sct",
-      "code" : "1203008",
-      "display" : "Deep third degree burn of forehead AND/OR cheek with loss of body part"
     },
     {
       "system" : "http://snomed.info/sct",
@@ -1363,11 +1338,6 @@ e: {
       "system" : "http://snomed.info/sct",
       "code" : "1282001",
       "display" : "Laryngeal perichondritis"
-    },
-    {
-      "system" : "http://snomed.info/sct",
-      "code" : "1283006",
-      "display" : "Visual acuity less than .02 (1/60, count fingers 1 meter) or visual field less than 5 degrees, but better than 5."
     },
     {
       "system" : "http://snomed.info/sct",
@@ -2031,11 +2001,6 @@ e: {
     },
     {
       "system" : "http://snomed.info/sct",
-      "code" : "1858000",
-      "display" : "Infection caused by Stilesia globipunctata"
-    },
-    {
-      "system" : "http://snomed.info/sct",
       "code" : "1860003",
       "display" : "Fluid volume disorder"
     },
@@ -2098,11 +2063,6 @@ e: {
       "system" : "http://snomed.info/sct",
       "code" : "1926006",
       "display" : "Osteopetrosis"
-    },
-    {
-      "system" : "http://snomed.info/sct",
-      "code" : "1938002",
-      "display" : "Emotional AND/OR mental disease in mother complicating pregnancy, childbirth AND/OR puerperium"
     },
     {
       "system" : "http://snomed.info/sct",
@@ -2298,11 +2258,6 @@ e: {
       "system" : "http://snomed.info/sct",
       "code" : "2102007",
       "display" : "Deep corneal vascularization"
-    },
-    {
-      "system" : "http://snomed.info/sct",
-      "code" : "2103002",
-      "display" : "Reflex sympathetic dystrophy of upper extremity"
     },
     {
       "system" : "http://snomed.info/sct",
@@ -2527,7 +2482,7 @@ e: {
     {
       "system" : "http://snomed.info/sct",
       "code" : "2298005",
-      "display" : "Focal facial dermal dysplasia"
+      "display" : "Goltz-Gorlin (dermal hypoplasia) syndrome"
     },
     {
       "system" : "http://snomed.info/sct",
@@ -2667,7 +2622,7 @@ e: {
     {
       "system" : "http://snomed.info/sct",
       "code" : "2420007",
-      "display" : "Third degree burn of multiple sites of upper limb"
+      "display" : "Full thickness burn of multiple sites of upper limb"
     },
     {
       "system" : "http://snomed.info/sct",
@@ -2713,11 +2668,6 @@ e: {
       "system" : "http://snomed.info/sct",
       "code" : "2469009",
       "display" : "Onychomalacia"
-    },
-    {
-      "system" : "http://snomed.info/sct",
-      "code" : "2470005",
-      "display" : "Brain damage"
     },
     {
       "system" : "http://snomed.info/sct",
@@ -3152,7 +3102,7 @@ e: {
     {
       "system" : "http://snomed.info/sct",
       "code" : "2840008",
-      "display" : "Open fracture of vault of skull with cerebral laceration AND/OR contusion"
+      "display" : "Cerebral laceration AND/OR contusion co-occurrent and due to open fracture of vault of skull"
     },
     {
       "system" : "http://snomed.info/sct",
@@ -3278,11 +3228,6 @@ e: {
       "system" : "http://snomed.info/sct",
       "code" : "2967003",
       "display" : "Non-comitant strabismus"
-    },
-    {
-      "system" : "http://snomed.info/sct",
-      "code" : "2972007",
-      "display" : "Occlusion of anterior spinal artery"
     },
     {
       "system" : "http://snomed.info/sct",
@@ -3761,11 +3706,6 @@ e: {
     },
     {
       "system" : "http://snomed.info/sct",
-      "code" : "3401001",
-      "display" : "Cercopithecus herpesvirus 1 disease"
-    },
-    {
-      "system" : "http://snomed.info/sct",
       "code" : "3415004",
       "display" : "Cyanosis"
     },
@@ -3857,7 +3797,7 @@ e: {
     {
       "system" : "http://snomed.info/sct",
       "code" : "3474005",
-      "display" : "Glycine max poisoning"
+      "display" : "Soybean poisoning"
     },
     {
       "system" : "http://snomed.info/sct",
@@ -3893,11 +3833,6 @@ e: {
       "system" : "http://snomed.info/sct",
       "code" : "3503000",
       "display" : "Gender identity disorder of adolescence, previously asexual"
-    },
-    {
-      "system" : "http://snomed.info/sct",
-      "code" : "3505007",
-      "display" : "Nonallopathic lesion of the arm"
     },
     {
       "system" : "http://snomed.info/sct",
@@ -4096,11 +4031,6 @@ e: {
     },
     {
       "system" : "http://snomed.info/sct",
-      "code" : "3660008",
-      "display" : "Lethal glossopharyngeal defect"
-    },
-    {
-      "system" : "http://snomed.info/sct",
       "code" : "3662000",
       "display" : "Rolling hiatus hernia"
     },
@@ -4186,11 +4116,6 @@ e: {
     },
     {
       "system" : "http://snomed.info/sct",
-      "code" : "3745000",
-      "display" : "Sleep rhythm problem"
-    },
-    {
-      "system" : "http://snomed.info/sct",
       "code" : "3747008",
       "display" : "EC - Ejection click"
     },
@@ -4237,7 +4162,7 @@ e: {
     {
       "system" : "http://snomed.info/sct",
       "code" : "3762005",
-      "display" : "Bilateral recurrent femoral hernia with gangrene"
+      "display" : "Gangrene co-occurrent and due to bilateral recurrent femoral hernia"
     },
     {
       "system" : "http://snomed.info/sct",
@@ -4252,7 +4177,7 @@ e: {
     {
       "system" : "http://snomed.info/sct",
       "code" : "3797007",
-      "display" : "Periodontal cyst"
+      "display" : "Cyst of periodontal tissue"
     },
     {
       "system" : "http://snomed.info/sct",
@@ -4421,11 +4346,6 @@ e: {
     },
     {
       "system" : "http://snomed.info/sct",
-      "code" : "4004009",
-      "display" : "Monster with cranial anomalies"
-    },
-    {
-      "system" : "http://snomed.info/sct",
       "code" : "4006006",
       "display" : "Foetal tachycardia affecting management of mother"
     },
@@ -4526,11 +4446,6 @@ e: {
     },
     {
       "system" : "http://snomed.info/sct",
-      "code" : "4092002",
-      "display" : "Nonallopathic lesion of costovertebral region"
-    },
-    {
-      "system" : "http://snomed.info/sct",
       "code" : "4103001",
       "display" : "Complex partial seizure"
     },
@@ -4577,17 +4492,12 @@ e: {
     {
       "system" : "http://snomed.info/sct",
       "code" : "4136000",
-      "display" : "Macrodactylia of toes"
+      "display" : "Macrodactyly of toe"
     },
     {
       "system" : "http://snomed.info/sct",
       "code" : "4142001",
       "display" : "Muscular asthenopia"
-    },
-    {
-      "system" : "http://snomed.info/sct",
-      "code" : "4152002",
-      "display" : "Acquired hypoprothrombinemia"
     },
     {
       "system" : "http://snomed.info/sct",
@@ -4633,11 +4543,6 @@ e: {
       "system" : "http://snomed.info/sct",
       "code" : "4184009",
       "display" : "Congenital malformation of the endocrine glands"
-    },
-    {
-      "system" : "http://snomed.info/sct",
-      "code" : "4191007",
-      "display" : "Scaphoid head"
     },
     {
       "system" : "http://snomed.info/sct",
@@ -4803,11 +4708,6 @@ e: {
       "system" : "http://snomed.info/sct",
       "code" : "4308002",
       "display" : "RSIS - Repetitive strain injury syndrome"
-    },
-    {
-      "system" : "http://snomed.info/sct",
-      "code" : "4310000",
-      "display" : "Third degree burn of wrist AND/OR hand"
     },
     {
       "system" : "http://snomed.info/sct",
@@ -5043,19 +4943,109 @@ e: {
       "system" : "http://snomed.info/sct",
       "code" : "4483005",
       "display" : "Syphilitic punched out ulcer"
+    },
+    {
+      "system" : "http://snomed.info/sct",
+      "code" : "4490000",
+      "display" : "Impairment level: better eye: moderate impairment: lesser eye: near-total impairment"
+    },
+    {
+      "system" : "http://snomed.info/sct",
+      "code" : "4494009",
+      "display" : "Diverticulitis of large intestine"
+    },
+    {
+      "system" : "http://snomed.info/sct",
+      "code" : "4495005",
+      "display" : "Congenital hypertrophy of ureteric valve"
+    },
+    {
+      "system" : "http://snomed.info/sct",
+      "code" : "4499004",
+      "display" : "Disseminated anergic leishmaniasis"
+    },
+    {
+      "system" : "http://snomed.info/sct",
+      "code" : "4501007",
+      "display" : "Tuberculous ascites"
+    },
+    {
+      "system" : "http://snomed.info/sct",
+      "code" : "4506002",
+      "display" : "Educational problem"
+    },
+    {
+      "system" : "http://snomed.info/sct",
+      "code" : "4510004",
+      "display" : "Streptococcal meningitis"
+    },
+    {
+      "system" : "http://snomed.info/sct",
+      "code" : "4512007",
+      "display" : "Group sex play"
+    },
+    {
+      "system" : "http://snomed.info/sct",
+      "code" : "4519003",
+      "display" : "Hypouricemia"
+    },
+    {
+      "system" : "http://snomed.info/sct",
+      "code" : "4522001",
+      "display" : "Dental plaque"
+    },
+    {
+      "system" : "http://snomed.info/sct",
+      "code" : "4523006",
+      "display" : "Babinski-Nageotte syndrome"
+    },
+    {
+      "system" : "http://snomed.info/sct",
+      "code" : "4526003",
+      "display" : "Probenecid poisoning"
+    },
+    {
+      "system" : "http://snomed.info/sct",
+      "code" : "4528002",
+      "display" : "Senecio jacobea poisoning"
+    },
+    {
+      "system" : "http://snomed.info/sct",
+      "code" : "4529005",
+      "display" : "Abnormal spermatogenesis"
+    },
+    {
+      "system" : "http://snomed.info/sct",
+      "code" : "4530000",
+      "display" : "Madelung deformity"
+    },
+    {
+      "system" : "http://snomed.info/sct",
+      "code" : "4547004",
+      "display" : "Determination of outcome, satisfactory to physician"
+    },
+    {
+      "system" : "http://snomed.info/sct",
+      "code" : "4550001",
+      "display" : "Special infant formula"
+    },
+    {
+      "system" : "http://snomed.info/sct",
+      "code" : "4554005",
+      "display" : "Intraventricular conduction defect"
+    },
+    {
+      "system" : "http://snomed.info/sct",
+      "code" : "4556007",
+      "display" : "Gastritis"
+    },
+    {
+      "system" : "http://snomed.info/sct",
+      "code" : "4557003",
+      "display" : "Preinfarction angina"
     }]
   }
 },
-  "error" : ""
-}
--------------------------------------------------------------------------------------
-{"code" : {
-  "system" : "http://snomed.info/sct",
-  "code" : "404684003"
-}, "valueSet" :null, "lang":"null"}####
-v: {
-  "display" : "Clinical finding (finding)",
-  "severity" : null,
   "error" : ""
 }
 -------------------------------------------------------------------------------------
