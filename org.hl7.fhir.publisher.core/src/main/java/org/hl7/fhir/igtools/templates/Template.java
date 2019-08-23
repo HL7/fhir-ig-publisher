@@ -318,7 +318,10 @@ public class Template {
   }
 
   public ImplementationGuide onLoadEvent(ImplementationGuide ig, Map<String, List<ValidationMessage>> messages) throws IOException, FHIRException {
-    return runScriptTarget(targetOnLoad, messages, ig, null, IG_ANY);
+    if (targetOnLoad!=null)
+      return runScriptTarget(targetOnLoad, messages, ig, null, IG_ANY);
+    else
+      return ig;
   }
   public Map<String, List<ValidationMessage>> beforeGenerateEvent(ImplementationGuide ig, String tempDir, Set<String> fileList, List<String> newFileList) throws IOException, FHIRException {
     File src = new File(Utilities.path(templateDir, "content"));

@@ -1,0 +1,41 @@
+-------------------------------------------------------------------------------------
+{"code" : {
+  "coding" : [{
+    "system" : "urn:iso:std:iso:3166",
+    "code" : "US"
+  }]
+}, "valueSet" :{
+  "resourceType" : "ValueSet",
+  "compose" : {
+    "include" : [{
+      "system" : "urn:iso:std:iso:3166"
+    },
+    {
+      "system" : "urn:iso:std:iso:3166:-2"
+    },
+    {
+      "system" : "http://unstats.un.org/unsd/methods/m49/m49.htm",
+      "filter" : [{
+        "property" : "class",
+        "op" : "=",
+        "value" : "region"
+      }]
+    }]
+  }
+}, "lang":"null"}####
+v: {
+  "display" : "United States of America",
+  "severity" : null,
+  "error" : ""
+}
+-------------------------------------------------------------------------------------
+{"code" : {
+  "system" : "urn:iso:std:iso:3166",
+  "code" : "US"
+}, "valueSet" :null, "lang":"null"}####
+v: {
+  "display" : "United States of America",
+  "severity" : null,
+  "error" : ""
+}
+-------------------------------------------------------------------------------------
