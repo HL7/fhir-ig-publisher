@@ -129,7 +129,6 @@ public class Template {
       antProject.addBuildListener(consoleLogger);
       antProject.setBasedir(root);
       antProject.setProperty("ig.root", root);
-      antProject.setProperty("ig.temp", Utilities.path(root, "temp"));
       antProject.setProperty("ig.template", templateDir);
       antProject.setProperty("ig.scripts", Utilities.path(templateDir, "scripts"));
       antProject.init();
@@ -188,7 +187,7 @@ public class Template {
     antProject.executeTarget(target);
     if (fileNames!=null) {
       String files = antProject.getProperty(target + ".files");
-      if (files!=null) {
+      if (!files.isEmpty()) {
         String [] fileArray = files.split(";");
         for (int i=0;i<fileArray.length;i++) {
           fileNames.add(fileArray[i]);
@@ -339,6 +338,7 @@ public class Template {
     }
     if (canExecute && targetOnGenerate != null) {
       Map<String, List<ValidationMessage>> messages = new HashMap<String, List<ValidationMessage>>();
+      antProject.setProperty("ig.temp", tempDir);
       runScriptTarget(targetOnGenerate, messages, ig, newFileList, IG_NO_RESOURCE);
       return messages;
     } else

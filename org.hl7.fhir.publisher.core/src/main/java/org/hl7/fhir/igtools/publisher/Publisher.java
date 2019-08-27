@@ -1223,12 +1223,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       } else if (p.getCode().equals("path-liquid")) {
         templateProvider.load(Utilities.path(rootDir, p.getValue()));
       } else if (p.getCode().equals("path-temp")) {
-//      } else if (p.getCode().equals("path-temp") && mode != IGBuildMode.WEBSERVER) {
-//      Don't think there's a reason why the temp directory couldn't be overridden when building the web server?  (Grahame, you can strip the comment if you concur, otherwise keep the commented line)
         tempDir = Utilities.path(rootDir, p.getValue());
+        if (!tempDir.startsWith(rootDir))
+          throw new Exception("Temp directory must be a sub-folder of the base directory");
       } else if (p.getCode().equals("path-output") && mode != IGBuildMode.WEBSERVER) {
         // Can't override outputDir if building using webserver
         outputDir = Utilities.path(rootDir, p.getValue());
+        if (!outputDir.startsWith(rootDir))
+          throw new Exception("Output directory must be a sub-folder of the base directory");
       } else if (p.getCode().equals("path-history")) {     
         historyPage = p.getValue();
       } else if (p.getCode().equals("path-expansion-params")) {     
@@ -1573,11 +1575,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else
       pagesDirs.add(Utilities.path(rootDir, str(paths, "pages", "pages")));
     
-    if (mode != IGBuildMode.WEBSERVER){
-      tempDir = Utilities.path(rootDir, str(paths, "temp", "temp"));
-      String p = str(paths, "output", "output");
-      outputDir = Paths.get(p).isAbsolute() ? p : Utilities.path(rootDir, p);
-    }
     
    qaDir = Utilities.path(rootDir, str(paths, "qa"));
    vsCache = ostr(paths, "txCache");
@@ -1868,19 +1865,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   void handlePreProcess(JsonObject pp, String root) throws Exception {
     String path = Utilities.path(root, str(pp, "folder"));
-    checkDir(path);
-    prePagesDirs.add(path);
-    String prePagesXslt = null;
-    if (pp.has("transform")) {
-      prePagesXslt = Utilities.path(root, str(pp, "transform"));
-      checkFile(prePagesXslt);
+    if (checkDir(path, true)) {
+      prePagesDirs.add(path);
+      String prePagesXslt = null;
+      if (pp.has("transform")) {
+        prePagesXslt = Utilities.path(root, str(pp, "transform"));
+        checkFile(prePagesXslt);
+      }
+      String relativePath = null;
+      if (pp.has("relativePath")) {
+        relativePath = str(pp, "relativePath");
+      }
+      PreProcessInfo ppinfo = new PreProcessInfo(prePagesXslt, relativePath);
+      preProcessInfo.put(path, ppinfo);
     }
-    String relativePath = null;
-    if (pp.has("relativePath")) {
-      relativePath = str(pp, "relativePath");
-    }
-    PreProcessInfo ppinfo = new PreProcessInfo(prePagesXslt, relativePath);
-    preProcessInfo.put(path, ppinfo);
   }
 
   private void loadSuppressedMessages(String messageFile) throws Exception {
