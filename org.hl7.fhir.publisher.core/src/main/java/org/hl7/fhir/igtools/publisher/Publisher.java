@@ -1223,8 +1223,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       } else if (p.getCode().equals("path-liquid")) {
         templateProvider.load(Utilities.path(rootDir, p.getValue()));
       } else if (p.getCode().equals("path-temp")) {
+//      } else if (p.getCode().equals("path-temp") && mode != IGBuildMode.WEBSERVER) {
+//      Don't think there's a reason why the temp directory couldn't be overridden when building the web server?  (Grahame, you can strip the comment if you concur, otherwise keep the commented line)
         tempDir = Utilities.path(rootDir, p.getValue());
-      } else if (p.getCode().equals("path-output")) {     
+      } else if (p.getCode().equals("path-output") && mode != IGBuildMode.WEBSERVER) {
+        // Can't override outputDir if building using webserver
         outputDir = Utilities.path(rootDir, p.getValue());
       } else if (p.getCode().equals("path-history")) {     
         historyPage = p.getValue();
@@ -1280,11 +1283,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       resourceDirs.add(Utilities.path(rootDir, "resources"));
     if (pagesDirs.isEmpty())
       pagesDirs.add(Utilities.path(rootDir, "pages"));
-    if (mode != IGBuildMode.WEBSERVER){
-      tempDir = Utilities.path(rootDir, "temp");
-      String p = "output";
-      outputDir = Paths.get(p).isAbsolute() ? p : Utilities.path(rootDir, p);
-    }
     if (mode == IGBuildMode.WEBSERVER) 
       vsCache = Utilities.path(System.getProperty("java.io.tmpdir"), "fhircache");
     else if (vsCache == null) {
