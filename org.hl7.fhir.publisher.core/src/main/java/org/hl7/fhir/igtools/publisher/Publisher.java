@@ -1178,7 +1178,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
     
-    
     Map<String, List<ValidationMessage>> messages = new HashMap<String, List<ValidationMessage>>();
     sourceIg = template.onLoadEvent(sourceIg, messages);
     checkOutcomes(messages);
@@ -3230,6 +3229,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } catch (Exception ex) {
       throw new Exception("Unable to parse "+file.getName()+": " +ex.getMessage(), ex);
     }
+    if (e == null)
+      throw new Exception("Unable to parse "+file.getName()+": " +file.getErrors().get(0).summary());
+    
     if (e != null) {
       try {
         boolean altered = false;
