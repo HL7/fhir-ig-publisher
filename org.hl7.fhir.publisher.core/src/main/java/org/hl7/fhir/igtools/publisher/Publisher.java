@@ -1574,7 +1574,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else
       pagesDirs.add(Utilities.path(rootDir, str(paths, "pages", "pages")));
     
-    
+    if (mode != IGBuildMode.WEBSERVER){
+      tempDir = Utilities.path(rootDir, str(paths, "temp", "temp"));
+      String p = str(paths, "output", "output");
+      outputDir = Paths.get(p).isAbsolute() ? p : Utilities.path(rootDir, p);
+    }
    qaDir = Utilities.path(rootDir, str(paths, "qa"));
    vsCache = ostr(paths, "txCache");
    templateProvider.clear();
@@ -3853,7 +3857,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } catch (Exception e) {
       // nothing
     }
-    
+
         
     if (nestedIgConfig != null) {
       if (watch) {
@@ -5943,8 +5947,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       DomainResource dr = (DomainResource) r.getResource();
       if (dr.getText().hasDiv())
         return dr.getText().getDiv();
-      else
-        return null;
     }
     if (r.getResource() != null && r.getResource() instanceof Bundle) {
       Bundle b = (Bundle) r.getResource();
