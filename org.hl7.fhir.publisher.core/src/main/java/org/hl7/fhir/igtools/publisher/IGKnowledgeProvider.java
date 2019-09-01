@@ -207,7 +207,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       JsonObject cfg = null;
       if (r.isExample())
         cfg = defaultConfig.getAsJsonObject("example");
-      if (cfg==null && r.getElement().fhirType().equals("StructureDefinition")) {
+      if (cfg==null && "StructureDefinition".equals(r.getElement().fhirType())) {
         cfg = defaultConfig.getAsJsonObject(r.fhirType()+":"+getSDType(r));
         if (cfg != null && hasString(cfg, propertyName))
           return getString(cfg, propertyName);        
