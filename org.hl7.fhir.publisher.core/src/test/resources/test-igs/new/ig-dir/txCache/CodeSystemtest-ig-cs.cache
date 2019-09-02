@@ -50,7 +50,7 @@ e: {
   }
 }}####
 e: {
-  "error" : "Error from server: Unable to provide support for code system http://hl7.org/fhir/CodeSystem/test-ig-cs"
+  "error" : "Error sending HTTP Post/Put Payload"
 }
 -------------------------------------------------------------------------------------
 {"hierarchical" : true, "valueSet" :{
@@ -68,7 +68,7 @@ e: {
   }
 }}####
 e: {
-  "error" : "Error from server: Unable to provide support for code system http://hl7.org/fhir/CodeSystem/test-ig-cs"
+  "error" : "Error sending HTTP Post/Put Payload"
 }
 -------------------------------------------------------------------------------------
 {"hierarchical" : true, "valueSet" :{
@@ -80,6 +80,6 @@ e: {
   }
 }}####
 e: {
-  "error" : "Error from server: Unable to provide support for code system http://hl7.org/fhir/CodeSystem/test-ig-cs"
+  "error" : "Error sending HTTP Post/Put Payload"
 }
 -------------------------------------------------------------------------------------
