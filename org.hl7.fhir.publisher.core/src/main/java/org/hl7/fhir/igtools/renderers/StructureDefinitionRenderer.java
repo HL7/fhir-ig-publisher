@@ -566,6 +566,11 @@ public class StructureDefinitionRenderer extends BaseRenderer {
       this.replace = replace;
     }
 
+    @Override
+    public String toString() {
+      return match+" -> "+replace;
+    }
+
   }
 
   public String dict(boolean incProfiledOut) throws Exception {
@@ -573,8 +578,9 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     StringBuilder b = new StringBuilder();
     b.append("<table class=\"dict\">\r\n");
 
-    Map<String, String> replacements = new HashMap<>();
+    List<StringPair> replacements = new ArrayList<>();
     for (ElementDefinition ec : sd.getSnapshot().getElement()) {
+      trimReplacements(replacements, ec.getId());
       if (incProfiledOut || !"0".equals(ec.getMax())) {
         if (isProfiledExtension(ec)) {
           StructureDefinition extDefn = context.fetchResource(StructureDefinition.class, ec.getType().get(0).getProfile().get(0).getValue());
@@ -593,7 +599,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
                   tl.add(tc);
                   String s = ec.getId().replace("[x]", Utilities.capitalize(tc));
                   b.append("<a name=\""+s+"\"> </a>");
-                  replacements.put(ec.getId(), s);
+                  replacements.add(new StringPair(ec.getId(), s));
                 }
               }
             }
@@ -605,14 +611,16 @@ public class StructureDefinitionRenderer extends BaseRenderer {
         } else {
           String title = ec.getId();
           b.append("  <tr><td colspan=\"2\" class=\"structure\"><span class=\"self-link-parent\"><a name=\""+ec.getId()+"\"> </a>");
-          if (ec.getPath().endsWith("[x]") && ec.hasSliceName()) {
+          if (ec.getPath().endsWith("[x]")) {
             Set<String> tl = new HashSet<String>();
             for (TypeRefComponent tr : ec.getType()) {
               String tc = tr.getWorkingCode();
               if (!tl.contains(tc)) {
                 tl.add(tc);
-                String s = ec.getPath().replace("[x]", Utilities.capitalize(tc));
-                replacements.put(ec.getId(), s);
+                String s = ec.getId().replace("[x]", Utilities.capitalize(tc));
+                replacements.add(new StringPair(ec.getId(), s));
+                s = ec.getPath().replace("[x]", Utilities.capitalize(tc));
+                replacements.add(new StringPair(ec.getId(), s));
               }
             }
 //          } else if (ec.hasBase() && ec.getBase().getPath().endsWith("[x]")) {
@@ -623,9 +631,9 @@ public class StructureDefinitionRenderer extends BaseRenderer {
 //          else if (ec.hasSliceName()) {
 //            b.append("<a name=\""+ec.getPath()+"\"> </a>");
 //          } 
-          for (String sp : replacements.keySet())
-            if (ec.getId().startsWith(sp))
-              b.append("<a name=\""+replacements.get(sp)+ec.getId().substring(sp.length())+"\"> </a>");
+          Set<String> anchors = generateReplacements(ec.getId(), replacements);
+          for (String s : anchors)
+              b.append("<a name=\""+s+"\"> </a>");
           b.append("<span style=\"color: grey\">"+Integer.toString(i++)+".</span> <b>"+title+"</b>"+link(ec.getId())+"</span></td></tr>\r\n");
           generateElementInner(b, sd, ec, 1, null);
           if (ec.hasSlicing())
@@ -636,6 +644,40 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     b.append("</table>\r\n");
     i++;
     return b.toString();
+  }
+
+  private void trimReplacements(List<StringPair> replacements, String id) {
+    List<StringPair> toRemove = new ArrayList<>();
+    for (StringPair p : replacements) {
+      if (!id.startsWith(p.match))
+        toRemove.add(p);
+    }
+    replacements.removeAll(toRemove);
+    
+  }
+
+  private Set<String> generateReplacements(String id, List<StringPair> replacements) {
+    Set<String> res = new HashSet<>();
+    if (replacements.isEmpty())
+      return res;
+    
+    Set<String> add = new HashSet<>();
+    res.add(id);
+    do {
+      add.clear();
+      for (String s : res) {
+        for (StringPair p : replacements) {
+          if (s.startsWith(p.match)) {
+            String r = p.replace+s.substring(p.match.length());
+            if (!res.contains(r))
+              add.add(r);
+          }
+        }
+      }
+      res.addAll(add);
+    } while (!add.isEmpty());
+    res.remove(id);
+    return res;
   }
 
   private String link(String id) {
