@@ -271,6 +271,8 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   }
 
   private String getOverride(String url) {
+    if ("http://hl7.org/fhir/StructureDefinition/Reference".equals(url))
+      return "references.html#Reference";
     if ("http://hl7.org/fhir/StructureDefinition/DataRequirement".equals(url))
      return "metadatatypes.html#DataRequirement";
     if ("http://hl7.org/fhir/StructureDefinition/ContactDetail".equals(url))
