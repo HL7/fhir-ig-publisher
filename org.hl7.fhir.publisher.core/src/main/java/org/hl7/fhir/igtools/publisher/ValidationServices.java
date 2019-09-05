@@ -170,7 +170,10 @@ public class ValidationServices implements IValidatorResourceFetcher {
     
     if (url.startsWith("http://hl7.org/fhir"))
       try {
-        return context.fetchResourceWithException(Resource.class, url) != null;
+        if (context.fetchResourceWithException(Resource.class, url) != null)
+          return true;
+        else
+          return url.substring(19).matches("\\/\\d.\\d\\/[A-Z][a-zA-Z]+\\/extension-[A-Z][a-zA-Z]+(\\.[a-z][a-zA-z]+)+(\\[x\\])?");
       } catch (FHIRException e) {
         return false;
       }
