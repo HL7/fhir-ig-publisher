@@ -4402,7 +4402,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (s.contains("Source:"))
         return true;
       if (s.contains("Liquid Exception:"))
-    	  return true;
+    	  throw new RuntimeException(s);
       if (s.contains("Destination:"))
         return false;
       if (s.contains("Configuration"))
