@@ -69,6 +69,7 @@ import javax.xml.transform.stream.StreamSource;
 
 import org.apache.commons.codec.Charsets;
 import org.apache.commons.exec.DefaultExecutor;
+import org.apache.commons.exec.ExecuteWatchdog;
 import org.apache.commons.exec.PumpStreamHandler;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -415,6 +416,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private static final String REDIRECT_SOURCE = "<html>\r\n<head>\r\n<meta http-equiv=\"Refresh\" content=\"0; url=site/index.html\"/>\r\n</head>\r\n"+
        "<body>\r\n<p>See here: <a href=\"site/index.html\">this link</a>.</p>\r\n</body>\r\n</html>\r\n";
+
+  private static final long JEKYLL_TIMEOUT = 60000 * 5; // 5 minutes.... 
 
   private String configFile;
   private String sourceDir;
@@ -4450,7 +4453,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     PumpStreamHandler pump = new PumpStreamHandler(pumpHandler);
     exec.setStreamHandler(pump);
     exec.setWorkingDirectory(new File(tempDir));
-
+    ExecuteWatchdog watchdog = new ExecuteWatchdog(JEKYLL_TIMEOUT);
+    exec.setWatchdog(watchdog);
+    
 //    dumpVars();
 
     try {
@@ -4459,7 +4464,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 	    else
 	      exec.execute(org.apache.commons.exec.CommandLine.parse(jekyllCommand+" build --destination \""+outputDir+"\""));
     } catch (IOException ioex) {
-    	log("Jekyll has failed - not installed (correcty?). Complete output from running Jekyll: " + pumpHandler.getBufferString());
+      log("Jekyll has failed - not installed (correctly?). Complete output from running Jekyll: " + pumpHandler.getBufferString());
+      log("Check that Jekyll is installed correctly");
     	throw ioex;
     }
     return true;
