@@ -3836,7 +3836,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Sending Usage Stats to Server");
       extensionTracker.sendToServer("http://test.fhir.org/usage-stats");
     } catch (Exception e) {
-      System.out.println("Submitting Usage Stats failed: "+e.getMessage());
+      log("Submitting Usage Stats failed: "+e.getMessage());
     }
     
     otherFilesRun.add(Utilities.path(tempDir, "usage-stats.json"));
