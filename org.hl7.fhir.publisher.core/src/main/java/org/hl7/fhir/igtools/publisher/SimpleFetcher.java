@@ -32,6 +32,7 @@ import java.util.List;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
+import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService.LogCategory;
 import org.hl7.fhir.r5.formats.FormatUtilities;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.Reference;
@@ -285,7 +286,7 @@ public class SimpleFetcher implements IFetchFile {
           }
         }
       }
-      log.logMessage("Loaded "+Integer.toString(count)+" files from "+s);
+      log.logDebugMessage(LogCategory.PROGRESS, "Loaded "+Integer.toString(count)+" files from "+s);
     }
     return res;
   }

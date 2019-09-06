@@ -224,6 +224,7 @@ public class HTLMLInspector {
     // check links
     boolean first = true;
     for (String s : sorted(cache.keySet())) {
+      log.logDebugMessage(LogCategory.HTML, "Check "+s);
       LoadedFile lf = cache.get(s);
       if (lf.getHl7State() != null && !lf.getHl7State()) {
         boolean check = true;
@@ -300,6 +301,8 @@ public class HTLMLInspector {
   }
 
   private void loadFile(String s, String base, List<ValidationMessage> messages) {
+    log.logDebugMessage(LogCategory.HTML, "Load "+s);
+
     File f = new File(s);
     Boolean hl7State = null;
     XhtmlNode x = null;

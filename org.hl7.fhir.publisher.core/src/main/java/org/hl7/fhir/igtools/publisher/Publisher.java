@@ -724,7 +724,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     try {
       validate();
     } catch (Exception ex){
-      log(ex.toString());
+      log("Unhandled Exception: " +ex.toString());
       throw(ex);
     }
     log("Generating Outputs in "+outputDir);
@@ -812,12 +812,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void generateNarratives() throws Exception {
-    dlog(LogCategory.PROGRESS, "gen narratives");
+    logDebugMessage(LogCategory.PROGRESS, "gen narratives");
     for (FetchedFile f : fileList) {
-      System.out.println(f.getName());
       for (FetchedResource r : f.getResources()) {
         if (r.getExampleUri()==null || genExampleNarratives) {
-          dlog(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId());
+          logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId());
           if (r.getResource() != null && isConvertableResource(r.getResource().fhirType())) {
             boolean regen = false;
             gen.setDefinitionsTarget(igpkp.getDefinitionsName(r));
@@ -840,7 +839,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             }
           }
         } else {
-          dlog(LogCategory.PROGRESS, "skipped narrative for "+f.getName()+" : "+r.getId());
+          logDebugMessage(LogCategory.PROGRESS, "skipped narrative for "+f.getName()+" : "+r.getId());
         }
       }
     }
@@ -869,12 +868,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else
       throw new FHIRException("Unsupported version "+ver);
   }
-
-
-  private void log(LogCategory progress, String message) {
-    log(message);
-  }
-
 
   private boolean hasNarrative(Element element) {
     return element.hasChild("text") && element.getNamedChild("text").hasChild("div");
@@ -1089,14 +1082,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     if (days > 0)
       res = String.format("%dd %02d:%02d:%02d.%04d", days, hours, minutes, seconds, millis);
-    else if (hours > 0 || minutes > 0)
+    else if (hours > 0)
       res = String.format("%02d:%02d:%02d.%04d", hours, minutes, seconds, millis);
-    else
-      res = String.format("%02d.%04d", seconds, millis);
+    else //
+      res = String.format("%02d:%02d.%04d", minutes, seconds, millis);
+//    else
+//      res = String.format("%02d.%04d", seconds, millis);
     return res;
   }
 
   public void initialize() throws Exception {
+    first = true;
     pcm = new PackageCacheManager(mode == null || mode == IGBuildMode.MANUAL || mode == IGBuildMode.PUBLICATION, ToolsVersion.TOOLS_VERSION);
     if (mode == IGBuildMode.PUBLICATION)
       log("Build Formal Publication package, intended for "+getTargetOutput());
@@ -1106,11 +1102,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     extensionTracker = new ExtensionTracker();
     log("Package Cache: "+pcm.getFolder());
     if (packagesFolder != null) {
-      log("Loading Packages from "+packagesFolder);
+      log("Also loading Packages from "+packagesFolder);
       pcm.loadFromFolder(packagesFolder);
     }
     fetcher.setResourceDirs(resourceDirs);
-    first = true;
     IniFile ini = checkNewIg();
     if (ini != null)
       initializeFromIg(ini);   
@@ -1205,7 +1200,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     
     for (ImplementationGuideDefinitionParameterComponent p : sourceIg.getDefinition().getParameter()) {
       if (p.getCode().equals("logging")) { // added
-        System.out.println("Logging " + p.getValue());
         logOptions.add(p.getValue());        
       } else if (p.getCode().equals("generate")) { // added
         if ("example-narratives".equals(p.getValue()))
@@ -1296,10 +1290,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
        vsCache = Utilities.path(System.getProperty("user.home"), "fhircache");
     }
     
-    dlog(LogCategory.INIT, "Check folders");
+    logDebugMessage(LogCategory.INIT, "Check folders");
     List<String> missingDirs = new ArrayList<String>();
     for (String s : resourceDirs) {
-      dlog(LogCategory.INIT, "Source: "+s);
+      logDebugMessage(LogCategory.INIT, "Source: "+s);
       if (!checkDir(s, true))
         missingDirs.add(s);
     }
@@ -1307,22 +1301,22 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     
     missingDirs.clear();
     for (String s : pagesDirs) {
-      dlog(LogCategory.INIT, "Pages: "+s);
+      logDebugMessage(LogCategory.INIT, "Pages: "+s);
       if (!checkDir(s, true))
         missingDirs.add(s);
     }
     pagesDirs.removeAll(missingDirs);
 
-    dlog(LogCategory.INIT, "Temp: "+tempDir);
+    logDebugMessage(LogCategory.INIT, "Temp: "+tempDir);
     Utilities.clearDirectory(tempDir);
     forceDir(tempDir);
     forceDir(Utilities.path(tempDir, "_includes"));
     forceDir(Utilities.path(tempDir, "_data"));
-    dlog(LogCategory.INIT, "Output: "+outputDir);
+    logDebugMessage(LogCategory.INIT, "Output: "+outputDir);
     forceDir(outputDir);
     Utilities.clearDirectory(outputDir);
     if (qaDir != null) {
-      dlog(LogCategory.INIT, "QA Dir: "+qaDir);
+      logDebugMessage(LogCategory.INIT, "QA Dir: "+qaDir);
       forceDir(qaDir);
     }
     makeQA = mode == IGBuildMode.WEBSERVER ? false : qaDir != null;
@@ -1361,12 +1355,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       Utilities.clearDirectory(vsCache, "snomed.cache", "loinc.cache", "ucum.cache");
     } else if (cacheOption == CacheOption.CLEAR_ERRORS) {
       log("Terminology Cache is at "+vsCache+". Clearing Errors now");
-      log("Deleted "+Integer.toString(clearErrors(vsCache))+" files");
+      logDebugMessage(LogCategory.INIT, "Deleted "+Integer.toString(clearErrors(vsCache))+" files");
     } else
       log("Terminology Cache is at "+vsCache+". "+Integer.toString(Utilities.countFilesInDirectory(vsCache))+" files in cache");
     if (!new File(vsCache).exists())
       throw new Exception("Unable to access or create the cache directory at "+vsCache);
-    log("Load Terminology Cache from "+vsCache);
+    logDebugMessage(LogCategory.INIT, "Load Terminology Cache from "+vsCache);
     context.initTS(vsCache);
     if (expParams != null) {
       context.setExpansionProfile((Parameters) VersionConvertor_40_50.convertResource(FormatUtilities.loadFile(expParams)));
@@ -1523,7 +1517,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (configuration.has("logging")) {
       for (JsonElement n : configuration.getAsJsonArray("logging")) {
         String level = ((JsonPrimitive) n).getAsString();
-        System.out.println("Logging " + level);
         logOptions.add(level);
       }
     }
@@ -1610,24 +1603,24 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     igName = Utilities.path(resourceDirs.get(0), str(configuration, "source", "ig.xml"));
 
-    dlog(LogCategory.INIT, "Check folders");
+    logDebugMessage(LogCategory.INIT, "Check folders");
     for (String s : resourceDirs) {
-      dlog(LogCategory.INIT, "Source: "+s);
+      logDebugMessage(LogCategory.INIT, "Source: "+s);
       checkDir(s);
     }
     for (String s : pagesDirs) {
-      dlog(LogCategory.INIT, "Pages: "+s);
+      logDebugMessage(LogCategory.INIT, "Pages: "+s);
       checkDir(s);
     }
-    dlog(LogCategory.INIT, "Temp: "+tempDir);
+    logDebugMessage(LogCategory.INIT, "Temp: "+tempDir);
     Utilities.clearDirectory(tempDir);
     forceDir(tempDir);
     forceDir(Utilities.path(tempDir, "_includes"));
     forceDir(Utilities.path(tempDir, "_data"));
-    dlog(LogCategory.INIT, "Output: "+outputDir);
+    logDebugMessage(LogCategory.INIT, "Output: "+outputDir);
     forceDir(outputDir);
     Utilities.clearDirectory(outputDir);
-    dlog(LogCategory.INIT, "Temp: "+qaDir);
+    logDebugMessage(LogCategory.INIT, "Temp: "+qaDir);
     forceDir(qaDir);
 
     Utilities.createDirectory(vsCache);
@@ -1639,7 +1632,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       Utilities.clearDirectory(vsCache, "snomed.cache", "loinc.cache", "ucum.cache");
     } else if (cacheOption == CacheOption.CLEAR_ERRORS) {
         log("Terminology Cache is at "+vsCache+". Clearing Errors now");
-        log("Deleted "+Integer.toString(clearErrors(vsCache))+" files");
+        logDebugMessage(LogCategory.INIT, "Deleted "+Integer.toString(clearErrors(vsCache))+" files");
     } else
       log("Terminology Cache is at "+vsCache+". "+Integer.toString(Utilities.countFilesInDirectory(vsCache))+" files in cache");
     if (!new File(vsCache).exists())
@@ -1835,7 +1828,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     else 
       extensionTracker.setoptIn(!configuration.has("usage-stats-opt-out"));
 
-    log("Initialization complete");
+    logDebugMessage(LogCategory.INIT, "Initialization complete");
     // now, do regeneration
     JsonArray regenlist = configuration.getAsJsonArray("regenerate");
     if (regenlist != null)
@@ -1913,7 +1906,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (verFile.exists()) {
       String ver = TextFile.fileToString(verFile);
       if (!ver.equals(version)) {
-        log("Terminology Server Version has changed from "+ver+" to "+version+", so clearing txCache");
+        logDebugMessage(LogCategory.INIT, "Terminology Server Version has changed from "+ver+" to "+version+", so clearing txCache");
         Utilities.clearDirectory(dir);
       }
     }
@@ -2035,17 +2028,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (v.equals("current")) {
       // currency of the current core package is a problem, since its not really version controlled.
       // we'll check for a specified version...
-      log("Checking hl7.fhir.core-"+v+" currency");
+      logDebugMessage(LogCategory.INIT, "Checking hl7.fhir.core-"+v+" currency");
       int cacheVersion = getBuildVersionForCorePackage(pi);
       int lastAcceptableVersion = ToolsVersion.TOOLS_VERSION;
       if (cacheVersion < lastAcceptableVersion) {
-        log("Updating hl7.fhir.core-"+version+" package from source (too old - is "+cacheVersion+", must be "+lastAcceptableVersion);
+        logDebugMessage(LogCategory.INIT, "Updating hl7.fhir.core-"+version+" package from source (too old - is "+cacheVersion+", must be "+lastAcceptableVersion);
         pi = pcm.addPackageToCache("hl7.fhir.core", "current", fetchFromSource("hl7.fhir.core-"+v, getMasterSource()));
       } else {
-        log("   ...  ok: is "+cacheVersion+", must be "+lastAcceptableVersion);
+        logDebugMessage(LogCategory.INIT, "   ...  ok: is "+cacheVersion+", must be "+lastAcceptableVersion);
       }
     }
-    log("Load hl7.fhir.core-"+v+" package from "+pi.description());
+    logDebugMessage(LogCategory.INIT, "Load hl7.fhir.core-"+v+" package from "+pi.description());
     if (pi != null)
       npmList.add(pi);
     return loadPack(pi);
@@ -2068,7 +2061,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private InputStream fetchFromSource(String id, String source) throws IOException {
-    log("Fetch "+id+" package from "+source);
+    logDebugMessage(LogCategory.INIT, "Fetch "+id+" package from "+source);
     URL url = new URL(source+"?nocache=" + System.currentTimeMillis());
     URLConnection c = url.openConnection();
     return c.getInputStream();
@@ -2139,7 +2132,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           throw new Exception("Unknown Package "+packageId+"#"+igver);
       }
     }
-    log("Load "+name+" ("+canonical+") from "+packageId+"#"+igver);
+    logDebugMessage(LogCategory.INIT, "Load "+name+" ("+canonical+") from "+packageId+"#"+igver);
 
     String webref = pi.getWebLocation();
     
@@ -2233,7 +2226,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           throw new Exception("Unknown Package "+packageId+"#"+igver);
       }
     }
-    log("Load "+name+" ("+canonical+") from "+packageId+"#"+igver);
+    logDebugMessage(LogCategory.INIT, "Load "+name+" ("+canonical+") from "+packageId+"#"+igver);
     if (ostr(dep, "package") == null && packageId != null)
       dep.addProperty("package", packageId);
 
@@ -2371,7 +2364,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private boolean checkMakeFile(byte[] bs, String path, Set<String> outputTracker) throws IOException {
-    dlog(LogCategory.PROGRESS, "Check Generate "+path);
+    logDebugMessage(LogCategory.PROGRESS, "Check Generate "+path);
     if (first) {
       String s = path.toLowerCase();
       if (allOutputs.contains(s))
@@ -2838,7 +2831,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private boolean loadResource(boolean needToBuild, FetchedFile f) throws Exception {
-    dlog(LogCategory.PROGRESS, "load "+f.getPath());
+    logDebugMessage(LogCategory.PROGRESS, "load "+f.getPath());
     boolean changed = noteFile(f.getPath(), f);
     if (changed) {
       loadAsElementModel(f, f.addResource(), null);
@@ -2869,7 +2862,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     FetchedFile f = fetcher.fetchResourceFile(name);
     boolean changed = noteFile("Mapping/"+name, f);
     if (changed) {
-      dlog(LogCategory.PROGRESS, "load "+f.getPath());
+      logDebugMessage(LogCategory.PROGRESS, "load "+f.getPath());
       MappingSheetParser p = new MappingSheetParser();
       p.parse(new ByteArrayInputStream(f.getSource()), f.getRelativePath());
       ConceptMap cm = p.getConceptMap();
@@ -2901,7 +2894,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     boolean changed = noteFile("Spreadsheet/"+name, f);
     if (changed) {
       f.getValuesetsToLoad().clear();
-      dlog(LogCategory.PROGRESS, "load "+f.getPath());
+      logDebugMessage(LogCategory.PROGRESS, "load "+f.getPath());
       Bundle bnd = new IgSpreadsheetParser(context, execTime, igpkp.getCanonical(), f.getValuesetsToLoad(), first, context.getBinaries().get("mappingSpaces.details"), knownValueSetIds).parse(f);
       f.setBundle(new FetchedResource());
       f.setBundleType(FetchedBundleType.SPREADSHEET);
@@ -3046,7 +3039,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getElement().fhirType().equals(type)) {
-          log(LogCategory.PROGRESS, "validate res: "+r.fhirType()+"/"+r.getId());
+          logDebugMessage(LogCategory.PROGRESS, "validate res: "+r.fhirType()+"/"+r.getId());
           if (!r.isValidated()) {
             validate(f, r);
           }
@@ -3068,7 +3061,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
   private void scanForUsageStats() {
-    log(LogCategory.PROGRESS, "scanForUsageStats");
+    logDebugMessage(LogCategory.PROGRESS, "scanForUsageStats");
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.fhirType().equals("StructureDefinition")) 
@@ -3080,16 +3073,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
   private void checkConformanceResources() {
-    log(LogCategory.PROGRESS, "check profiles");
+    logDebugMessage(LogCategory.PROGRESS, "check profiles");
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getElement().fhirType().equals("StructureDefinition")) {
-          log(LogCategory.PROGRESS, "process profile: "+r.getId());
+          logDebugMessage(LogCategory.PROGRESS, "process profile: "+r.getId());
           StructureDefinition sd = (StructureDefinition) r.getResource();
           f.getErrors().addAll(pvalidator.validate(sd, false));
         }
         if (r.getElement().fhirType().equals("CodeSystem")) {
-          log(LogCategory.PROGRESS, "process CodeSystem: "+r.getId());
+          logDebugMessage(LogCategory.PROGRESS, "process CodeSystem: "+r.getId());
           CodeSystem cs = (CodeSystem) r.getResource();
           f.getErrors().addAll(csvalidator.validate(cs, false));
         }
@@ -3391,7 +3384,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void scan(String type) throws Exception {
-    log(LogCategory.PROGRESS, "process type: "+type);
+    logDebugMessage(LogCategory.PROGRESS, "process type: "+type);
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getElement().fhirType().equals(type)) {
@@ -3418,7 +3411,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getElement().fhirType().equals(type)) {
-          log(LogCategory.PROGRESS, "process res: "+r.fhirType()+"/"+r.getId());
+          logDebugMessage(LogCategory.PROGRESS, "process res: "+r.fhirType()+"/"+r.getId());
           if (r.getResource() == null)
             try {
               if (f.getBundleType() == FetchedBundleType.NATIVE)
@@ -3447,8 +3440,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               if (!bc.hasVersion()) {
                 altered = true;
               } else if (!bc.getVersion().equals(businessVersion))
-                System.out.println("Business version mismatch in "+f.getName()+" - overriding from "+bc.getVersion()+" to "+businessVersion);
-              bc.setVersion(businessVersion);
+                bc.setVersion(businessVersion);
             }
             if (contacts != null) {
               altered = true;
@@ -3492,7 +3484,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               r.setElement(convertToElement(bc));
             igpkp.checkForPath(f, r, bc, false);
             try {
-              //            if (!(bc instanceof StructureDefinition))
               context.cacheResource(bc);
             } catch (Exception e) {
               throw new Exception("Exception loading "+bc.getUrl()+": "+e.getMessage(), e);
@@ -3505,7 +3496,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               b = (Bundle) convertFromElement(r.getElement());
               r.setResource(b);
             } catch (Exception e) { 
-              log(LogCategory.PROGRESS, "Ignoring conformance resources in Bundle "+f.getName()+" because :"+e.getMessage());
+              logDebugMessage(LogCategory.PROGRESS, "Ignoring conformance resources in Bundle "+f.getName()+" because :"+e.getMessage());
             }
           }
           if (b != null) {
@@ -3517,7 +3508,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                     igpkp.checkForPath(f,  r,  mr, true);
                   context.cacheResource(mr);
                 } else
-                  log(LogCategory.PROGRESS, "Ignoring resource "+type+"/"+mr.getId()+" in Bundle "+f.getName()+" because it has no canonical URL");
+                  logDebugMessage(LogCategory.PROGRESS, "Ignoring resource "+type+"/"+mr.getId()+" in Bundle "+f.getName()+" because it has no canonical URL");
                  
               }
             }
@@ -3540,10 +3531,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return ir.getReference().getReference().equals(mr.fhirType()+"/"+mr.getId());
   }
 
-
-  private void dlog(LogCategory category, String s) {
-    logger.logDebugMessage(category, Utilities.padRight(s, ' ', 80)+" ("+presentDuration(System.nanoTime()-globalStart)+"sec)");
-  }
 
   private void generateAdditionalExamples() throws Exception {
     if (genExamples) {
@@ -3571,7 +3558,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void generateSnapshots() throws Exception {
-    dlog(LogCategory.PROGRESS, "Generate Snapshots");
+    logDebugMessage(LogCategory.PROGRESS, "Generate Snapshots");
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() instanceof StructureDefinition) {
@@ -3595,14 +3582,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private void generateSnapshot(FetchedFile f, FetchedResource r, StructureDefinition sd, boolean close) throws Exception {
     boolean changed = false;
-    dlog(LogCategory.PROGRESS, "Check Snapshot for "+sd.getUrl());
+    logDebugMessage(LogCategory.PROGRESS, "Check Snapshot for "+sd.getUrl());
     sd.setFhirVersion(FHIRVersion.fromCode(version));
     ProfileUtilities utils = new ProfileUtilities(context, f.getErrors(), igpkp);
     StructureDefinition base = sd.hasBaseDefinition() ? fetchSnapshotted(sd.getBaseDefinition()) : null;
     utils.setIds(sd, true);
     if (sd.getKind() != StructureDefinitionKind.LOGICAL || sd.getDerivation()==TypeDerivationRule.CONSTRAINT) {
       if (!sd.hasSnapshot()) {
-        dlog(LogCategory.PROGRESS, "Generate Snapshot for "+sd.getUrl());
+        logDebugMessage(LogCategory.PROGRESS, "Generate Snapshot for "+sd.getUrl());
         if (base == null)
           throw new Exception("base is null ("+sd.getBaseDefinition()+" from "+sd.getUrl()+")");
         List<String> errors = new ArrayList<String>();
@@ -3623,7 +3610,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         changed = true;
       }
     } else { //sd.getKind() == StructureDefinitionKind.LOGICAL
-      dlog(LogCategory.PROGRESS, "Generate Snapshot for Logical Model "+sd.getUrl());
+      logDebugMessage(LogCategory.PROGRESS, "Generate Snapshot for Logical Model "+sd.getUrl());
       if (!sd.hasSnapshot()) {
         utils.populateLogicalSnapshot(sd);
         changed = true;
@@ -3632,12 +3619,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (changed || (!r.getElement().hasChild("snapshot") && sd.hasSnapshot()))
       r.setElement(convertToElement(sd));
     r.setSnapshotted(true);
-    dlog(LogCategory.CONTEXT, "Context.See "+sd.getUrl());
+    logDebugMessage(LogCategory.CONTEXT, "Context.See "+sd.getUrl());
     context.cacheResource(sd);
   }
 
   private void validateExpressions() {
-    dlog(LogCategory.PROGRESS, "validate Expressions");
+    logDebugMessage(LogCategory.PROGRESS, "validate Expressions");
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() instanceof StructureDefinition && !r.isSnapshotted()) {
@@ -3780,12 +3767,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private void validate() throws Exception {
     for (FetchedFile f : fileList) {
-      dlog(LogCategory.PROGRESS, " .. validate "+f.getName());
+      logDebugMessage(LogCategory.PROGRESS, " .. validate "+f.getName());
       if (first)
-        dlog(LogCategory.PROGRESS, " .. "+f.getName());
+        logDebugMessage(LogCategory.PROGRESS, " .. "+f.getName());
       for (FetchedResource r : f.getResources()) {
         if (!r.isValidated()) {
-          dlog(LogCategory.PROGRESS, "     validating "+r.getTitle());
+          logDebugMessage(LogCategory.PROGRESS, "     validating "+r.getTitle());
           validate(f, r);
         }
       }
@@ -4466,8 +4453,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 	    else
 	      exec.execute(org.apache.commons.exec.CommandLine.parse(jekyllCommand+" build --destination \""+outputDir+"\""));
     } catch (IOException ioex) {
-      log("Jekyll has failed - not installed (correctly?). Complete output from running Jekyll: " + pumpHandler.getBufferString());
-      log("Check that Jekyll is installed correctly");
+      log("Jekyll has failed. Complete output from running Jekyll: " + pumpHandler.getBufferString());
+      log("Note: Check that Jekyll is installed correctly");
     	throw ioex;
     }
     return true;
@@ -5152,14 +5139,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private void log(String s) {
     if (first)
-      logger.logMessage(Utilities.padRight(s, ' ', 80)+" ("+presentDuration(System.nanoTime()-globalStart)+"sec)");
+      logger.logMessage(Utilities.padRight(s, ' ', 80)+" ("+presentDuration(System.nanoTime()-globalStart)+")");
     else
       logger.logMessage(s);
   }
 
   private void generateNativeOutputs(FetchedFile f, boolean regen) throws IOException, FHIRException {
     for (FetchedResource r : f.getResources()) {
-        dlog(LogCategory.PROGRESS, "Produce resources for "+r.getElement().fhirType()+"/"+r.getId());
+        logDebugMessage(LogCategory.PROGRESS, "Produce resources for "+r.getElement().fhirType()+"/"+r.getId());
         saveNativeResourceOutputs(f, r);
     }    
   }
@@ -5199,7 +5186,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       saveFileOutputs(f);
       for (FetchedResource r : f.getResources()) {
         try {
-          dlog(LogCategory.PROGRESS, "Produce outputs for "+r.getElement().fhirType()+"/"+r.getId());
+          logDebugMessage(LogCategory.PROGRESS, "Produce outputs for "+r.getElement().fhirType()+"/"+r.getId());
           Map<String, String> vars = makeVars(r);
           saveDirectResourceOutputs(f, r, vars);
 
@@ -6307,12 +6294,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       Publisher self = new Publisher();
       System.out.println("FHIR IG Publisher "+IGVersionUtil.getVersionString());
       System.out.println("Detected Java version: " + System.getProperty("java.version")+" from "+System.getProperty("java.home")+" on "+System.getProperty("os.arch")+" ("+System.getProperty("sun.arch.data.model")+"bit). "+toMB(Runtime.getRuntime().maxMemory())+"MB available");
-      System.out.println("Run time = "+nowAsString(self.execTime)+" ( @ "+nowAsDate(self.execTime)+" )");
-      System.out.print("["+System.getProperty("user.dir")+"]");
+      System.out.print("Parameters:");
       for (int i = 0; i < args.length; i++) {
           System.out.print(" "+args[i]);
       }      
+      System.out.print(" [dir = "+System.getProperty("user.dir")+"]");
       System.out.println();
+      System.out.println("Run time = "+nowAsString(self.execTime)+" ("+nowAsDate(self.execTime)+")");
       if (hasNamedParam(args, "-auto-ig-build")) {
         self.setMode(IGBuildMode.AUTOBUILD);
         self.targetOutput = getNamedParam(args, "-target");
