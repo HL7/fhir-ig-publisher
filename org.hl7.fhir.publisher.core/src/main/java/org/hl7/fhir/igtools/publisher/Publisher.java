@@ -1660,7 +1660,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     try {
       new ConfigFileConverter().convert(configFile, context, pcm);
     } catch (Exception e) {
-      System.out.println("exception generating new IG");
+      log("exception generating new IG");
       e.printStackTrace();
     }
     log("Load Terminology Cache from "+vsCache);
@@ -2187,7 +2187,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                 u = u + "|" + v;
                 p = igm.getPath(u);
                 if (p == null)
-                  System.out.println("In IG "+name+" map: No identity found for "+u);
+                  log("In IG "+name+" map: No identity found for "+u);
                 r.setUserData("versionpath", canonical+"/"+ igpkp.doReplacements(p, r, null, null));
               }
             }
@@ -2252,7 +2252,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return pcm.loadPackage(packageId, igver);
     
     JsonObject pl;
-    System.out.println("Fetch Package history from "+Utilities.pathURL(canonical, "package-list.json"));
+    logDebugMessage(LogCategory.INIT, "Fetch Package history from "+Utilities.pathURL(canonical, "package-list.json"));
     pl = fetchJson(Utilities.pathURL(canonical, "package-list.json"));
     if (!canonical.equals(pl.get("canonical").getAsString()))
       throw new Exception("Canonical mismatch fetching package list for "+canonical+"#"+igver+", package-list.json says "+pl.get("canonical"));
@@ -2530,7 +2530,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (ImplementationGuideDefinitionResourceComponent r : publishedIg.getDefinition().getResource()) {
         b.append(r.getReference().getReference());
         if (!r.hasUserData("loaded.resource")) {
-          System.out.println("resource "+r.getReference().getReference()+" not loaded");
+          log("Resource "+r.getReference().getReference()+" not loaded");
           failed = true;
         }
       }  
@@ -2538,13 +2538,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         for (FetchedResource r : f.getResources()) {
           ImplementationGuideDefinitionResourceComponent rg = findIGReference(r.fhirType(), r.getId());
           if (!"ImplementationGuide".equals(r.fhirType()) && rg == null) {
-            System.out.println("resource "+r.fhirType()+"/"+r.getId()+" not defined");
+            Log("Resource "+r.fhirType()+"/"+r.getId()+" not defined");
             failed = true;
           }
         }
       }
       if (failed) {
-        System.out.println("resources: "+b.toString());
+        Log("Resources: "+b.toString());
         throw new Exception("Invalid - see reasons"); // if this ever happens, it's a programming issue....
       }
     }
@@ -3267,7 +3267,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         // convert to the current version. Here, we need to convert to the stated version. Note that we need to do this after
         // the first load above because above, we didn't have enough data to get the configuration, but we do now. 
         if (!ver.equals(version)) {
-          //          System.out.println("Need to do version conversion on "+r.getElement().fhirType()+" from "+ver+" to "+version);
           if (file.getContentType().contains("json"))
             e = loadFromJsonWithVersionChange(file, ver, version);
           else if (file.getContentType().contains("xml"))
@@ -5138,10 +5137,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void log(String s) {
-    if (first)
-      logger.logMessage(Utilities.padRight(s, ' ', 80)+" ("+presentDuration(System.nanoTime()-globalStart)+")");
-    else
-      logger.logMessage(s);
+    logger.logMessage(s);
   }
 
   private void generateNativeOutputs(FetchedFile f, boolean regen) throws IOException, FHIRException {
@@ -6085,7 +6081,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   @Override
   public void logMessage(String msg) {
-    System.out.println(msg);
+    if (first)
+      System.out.println(Utilities.padRight(msg, ' ', 80)+" ("+presentDuration(System.nanoTime()-globalStart)+")");
+    else
+      System.out.println(msg);
+    
     if (mode == IGBuildMode.MANUAL) {
       try {
         String logPath = Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher-tmp.log");
