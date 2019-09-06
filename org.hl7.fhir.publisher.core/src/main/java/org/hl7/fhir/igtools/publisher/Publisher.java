@@ -663,7 +663,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     try {
       File od = new File(outputDir);
       FileUtils.cleanDirectory(od);
-      npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), templateInfo);
+      npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), templateInfo, execTime.getTime());
       npm.loadFiles(rootDir, new File(rootDir), ".git", "output", "package");
       npm.finish();
 
@@ -5360,7 +5360,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       String id = ToolingExtensions.readStringExtension(ext, "id");
       String name = ToolingExtensions.readStringExtension(ext, "name");
       String dfn = Utilities.path(tempDir, id+".tgz");
-      NPMPackageGenerator gen = NPMPackageGenerator.subset(npm, dfn, id, name);
+      NPMPackageGenerator gen = NPMPackageGenerator.subset(npm, dfn, id, name, execTime.getTime());
       for (ListItemEntry i : list) {
         if (i.element != null) {
           ByteArrayOutputStream bs = new ByteArrayOutputStream();
