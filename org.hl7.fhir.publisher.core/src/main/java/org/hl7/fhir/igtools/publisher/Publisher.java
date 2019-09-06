@@ -2522,7 +2522,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (!dep.hasPackageId()) 
         throw new FHIRException("Unknown package id for "+dep.getUri());
     }
-    npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, genTime());
+    npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, execTime.getTime());
     execTime = Calendar.getInstance();
 
     gen = new NarrativeGenerator("", "", context, this).setLiquidServices(templateProvider, validator.getExternalHostServices());
@@ -3826,6 +3826,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     otherFilesRun.clear();
     otherFilesRun.add(Utilities.path(outputDir, "package.tgz"));
+    otherFilesRun.add(Utilities.path(outputDir, "package.manifest.json"));
     for (String rg : regenList)
       regenerate(rg);
 
@@ -3903,6 +3904,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         File df = makeSpecFile();
         npm.addFile(Category.OTHER, "spec.internals", TextFile.fileToBytes(df.getAbsolutePath()));
         npm.finish();
+        
 
         if (mode == null || mode == IGBuildMode.MANUAL) {
           if (cacheVersion)

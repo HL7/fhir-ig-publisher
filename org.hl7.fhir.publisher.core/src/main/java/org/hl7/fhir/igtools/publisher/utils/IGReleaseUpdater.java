@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Map.Entry;
 
@@ -164,34 +165,35 @@ public class IGReleaseUpdater {
   }
 
   private boolean updateStatement(String vf, List<String> ignoreList, JsonObject ig, JsonObject version, List<String> errs, JsonObject root, String canonical) throws FileNotFoundException, IOException, FHIRException {
-    boolean vc = false;
-    String fragment = genFragment(ig, version, root, canonical);
-    System.out.println("  "+vf+": "+fragment);
-    IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(vf, ignoreList, version);
-    igvu.updateStatement(fragment);
-    System.out.println("    .. "+igvu.getCountTotal()+" files checked, "+igvu.getCountUpdated()+" updated");
-    IGPackageChecker pc = new IGPackageChecker(vf, canonical, JSONUtil.str(version, "path"), JSONUtil.str(ig, "package-id"));
-    pc.check(JSONUtil.str(version, "version"), JSONUtil.str(ig, "package-id"), JSONUtil.str(version, "fhirversion", "fhir-version"), 
-        JSONUtil.str(ig, "title"), JSONUtil.str(version, "date"), JSONUtil.str(version, "path"), canonical);
-    IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(vf, canonical, JSONUtil.str(version, "path"));
-    if (serverType == ServerType.APACHE)
-      rb.buildApacheRedirections();
-    else if (serverType == ServerType.ASP)
-      rb.buildAspRedirections();
-    else if (!canonical.contains("hl7.org/fhir"))
-      rb.buildApacheRedirections();
-    else
-      rb.buildAspRedirections();
-    System.out.println("    .. "+rb.getCountTotal()+" redirections ("+rb.getCountUpdated()+" created/updated)");
-    if (!JSONUtil.has(version, "fhirversion", "fhir-version")) {
-      if (rb.getFhirVersion() == null)
-        System.out.println("Unable to determine FHIR version for "+vf);
-      else {
-        version.addProperty("fhir-version", rb.getFhirVersion());
-        vc = true;
-      }
-    }
-    return vc;
+    throw new Error("this needs checking by Grahame");
+//    boolean vc = false;
+//    String fragment = genFragment(ig, version, root, canonical);
+//    System.out.println("  "+vf+": "+fragment);
+//    IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(vf, ignoreList, version);
+//    igvu.updateStatement(fragment);
+//    System.out.println("    .. "+igvu.getCountTotal()+" files checked, "+igvu.getCountUpdated()+" updated");
+//    IGPackageChecker pc = new IGPackageChecker(vf, canonical, JSONUtil.str(version, "path"), JSONUtil.str(ig, "package-id"));
+//    pc.check(JSONUtil.str(version, "version"), JSONUtil.str(ig, "package-id"), JSONUtil.str(version, "fhirversion", "fhir-version"), 
+//        JSONUtil.str(ig, "title"), new Date(JSONUtil.str(version, "date")), JSONUtil.str(version, "path"), canonical);
+//    IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(vf, canonical, JSONUtil.str(version, "path"));
+//    if (serverType == ServerType.APACHE)
+//      rb.buildApacheRedirections();
+//    else if (serverType == ServerType.ASP)
+//      rb.buildAspRedirections();
+//    else if (!canonical.contains("hl7.org/fhir"))
+//      rb.buildApacheRedirections();
+//    else
+//      rb.buildAspRedirections();
+//    System.out.println("    .. "+rb.getCountTotal()+" redirections ("+rb.getCountUpdated()+" created/updated)");
+//    if (!JSONUtil.has(version, "fhirversion", "fhir-version")) {
+//      if (rb.getFhirVersion() == null)
+//        System.out.println("Unable to determine FHIR version for "+vf);
+//      else {
+//        version.addProperty("fhir-version", rb.getFhirVersion());
+//        vc = true;
+//      }
+//    }
+//    return vc;
   }
 
   /**

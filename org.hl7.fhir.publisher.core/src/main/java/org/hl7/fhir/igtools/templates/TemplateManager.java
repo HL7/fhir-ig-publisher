@@ -70,6 +70,10 @@ public class TemplateManager {
       return true;
     if (isTemplate("http://github.com/HL7/fhir-template", "hl7.fhir.template", template))
       return true;
+    if (isTemplate("http://github.com/HL7/fhir-template", "fhir.base.template", template))
+      return true;
+    if (isTemplate("http://github.com/HL7/fhir-template", "fhir.divinci.template", template))
+      return true;    
     
     // we might choose to allow some IGs here...
     return false;
