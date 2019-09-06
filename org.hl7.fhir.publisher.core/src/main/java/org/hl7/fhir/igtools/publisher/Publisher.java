@@ -2601,7 +2601,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       checkOutcomes(template.beforeGenerateEvent(publishedIg, tempDir, otherFilesRun, newFileList));
       for (String newFile: newFileList) {
         try {
-          FetchedFile f = fetcher.fetch(newFile);
+          FetchedFile f = fetcher.fetch(Utilities.path(repoRoot, newFile));
           String dir = Utilities.getDirectoryForFile(f.getPath());
           String relative = dir.substring(tempDir.length()+1);
           f.setRelativePath(f.getPath().substring(dir.length()+1));
