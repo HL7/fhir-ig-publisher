@@ -2538,13 +2538,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         for (FetchedResource r : f.getResources()) {
           ImplementationGuideDefinitionResourceComponent rg = findIGReference(r.fhirType(), r.getId());
           if (!"ImplementationGuide".equals(r.fhirType()) && rg == null) {
-            Log("Resource "+r.fhirType()+"/"+r.getId()+" not defined");
+            log("Resource "+r.fhirType()+"/"+r.getId()+" not defined");
             failed = true;
           }
         }
       }
       if (failed) {
-        Log("Resources: "+b.toString());
+        log("Resources: "+b.toString());
         throw new Exception("Invalid - see reasons"); // if this ever happens, it's a programming issue....
       }
     }
