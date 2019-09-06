@@ -69,6 +69,7 @@ import javax.xml.transform.stream.StreamSource;
 
 import org.apache.commons.codec.Charsets;
 import org.apache.commons.exec.DefaultExecutor;
+import org.apache.commons.exec.ExecuteWatchdog;
 import org.apache.commons.exec.PumpStreamHandler;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -416,6 +417,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private static final String REDIRECT_SOURCE = "<html>\r\n<head>\r\n<meta http-equiv=\"Refresh\" content=\"0; url=site/index.html\"/>\r\n</head>\r\n"+
        "<body>\r\n<p>See here: <a href=\"site/index.html\">this link</a>.</p>\r\n</body>\r\n</html>\r\n";
 
+  private static final long JEKYLL_TIMEOUT = 60000 * 5; // 5 minutes.... 
+
   private String configFile;
   private String sourceDir;
   private String destDir;
@@ -660,7 +663,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     try {
       File od = new File(outputDir);
       FileUtils.cleanDirectory(od);
-      npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), templateInfo);
+      npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), templateInfo, execTime.getTime());
       npm.loadFiles(rootDir, new File(rootDir), ".git", "output", "package");
       npm.finish();
 
@@ -2519,7 +2522,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (!dep.hasPackageId()) 
         throw new FHIRException("Unknown package id for "+dep.getUri());
     }
-    npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, genTime());
+    npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, execTime.getTime());
     execTime = Calendar.getInstance();
 
     gen = new NarrativeGenerator("", "", context, this).setLiquidServices(templateProvider, validator.getExternalHostServices());
@@ -3823,6 +3826,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     otherFilesRun.clear();
     otherFilesRun.add(Utilities.path(outputDir, "package.tgz"));
+    otherFilesRun.add(Utilities.path(outputDir, "package.manifest.json"));
     for (String rg : regenList)
       regenerate(rg);
 
@@ -3900,6 +3904,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         File df = makeSpecFile();
         npm.addFile(Category.OTHER, "spec.internals", TextFile.fileToBytes(df.getAbsolutePath()));
         npm.finish();
+        
 
         if (mode == null || mode == IGBuildMode.MANUAL) {
           if (cacheVersion)
@@ -4450,7 +4455,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     PumpStreamHandler pump = new PumpStreamHandler(pumpHandler);
     exec.setStreamHandler(pump);
     exec.setWorkingDirectory(new File(tempDir));
-
+    ExecuteWatchdog watchdog = new ExecuteWatchdog(JEKYLL_TIMEOUT);
+    exec.setWatchdog(watchdog);
+    
 //    dumpVars();
 
     try {
@@ -4459,7 +4466,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 	    else
 	      exec.execute(org.apache.commons.exec.CommandLine.parse(jekyllCommand+" build --destination \""+outputDir+"\""));
     } catch (IOException ioex) {
-    	log("Jekyll has failed - not installed (correcty?). Complete output from running Jekyll: " + pumpHandler.getBufferString());
+      log("Jekyll has failed - not installed (correctly?). Complete output from running Jekyll: " + pumpHandler.getBufferString());
+      log("Check that Jekyll is installed correctly");
     	throw ioex;
     }
     return true;
@@ -5352,7 +5360,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       String id = ToolingExtensions.readStringExtension(ext, "id");
       String name = ToolingExtensions.readStringExtension(ext, "name");
       String dfn = Utilities.path(tempDir, id+".tgz");
-      NPMPackageGenerator gen = NPMPackageGenerator.subset(npm, dfn, id, name);
+      NPMPackageGenerator gen = NPMPackageGenerator.subset(npm, dfn, id, name, execTime.getTime());
       for (ListItemEntry i : list) {
         if (i.element != null) {
           ByteArrayOutputStream bs = new ByteArrayOutputStream();
