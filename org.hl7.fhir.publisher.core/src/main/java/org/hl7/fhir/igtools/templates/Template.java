@@ -201,7 +201,7 @@ public class Template {
     }
     if (ig != null) {
       String newXml = fn+"xml";
-      String newJson = fn+"xml";
+      String newJson = fn+"json";
       switch (modifyIg) {
         case IG_ANY:
           if (new File(newXml).exists())
