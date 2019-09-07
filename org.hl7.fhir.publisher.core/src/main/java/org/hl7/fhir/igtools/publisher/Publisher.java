@@ -2102,7 +2102,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private void loadIg(ImplementationGuideDependsOnComponent dep) throws Exception {
     String name = dep.getId();
-    if (dep.hasId()) {
+    if (!dep.hasId()) {
       logMessage("Dependency has no id, so can't be referred to in markdown in the IG");
       name = "u"+Utilities.makeUuidLC().replace("-", "");
     }

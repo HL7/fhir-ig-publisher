@@ -200,19 +200,21 @@ public class Template {
       loadValidationMessages((OperationOutcome) new XmlParser().parse(new FileInputStream(xmlOutcomes)), messages);
     }
     if (ig != null) {
+      String newXml = fn+"xml";
+      String newJson = fn+"xml";
       switch (modifyIg) {
         case IG_ANY:
-          if (new File(fn+"xml").exists())
-            return (ImplementationGuide) new XmlParser().parse(new FileInputStream(fn+"xml"));
-          else if (new File(fn+"json").exists())
-            return (ImplementationGuide) new JsonParser().parse(new FileInputStream(fn+"json"));
+          if (new File(newXml).exists())
+            return (ImplementationGuide) new XmlParser().parse(new FileInputStream(newXml));
+          else if (new File(newJson).exists())
+            return (ImplementationGuide) new JsonParser().parse(new FileInputStream(newJson));
           else
             throw new FHIRException("onLoad script "+targetOnLoad+" failed - no output file produced");        
         case IG_NO_RESOURCE:
-          if (jsonIg.exists())
-            loadModifiedIg((ImplementationGuide) new JsonParser().parse(new FileInputStream(jsonIg)), ig);
-          else if (xmlIg.exists())
-            loadModifiedIg((ImplementationGuide) new XmlParser().parse(new FileInputStream(jsonIg)), ig);
+          if (new File(newXml).exists())
+            loadModifiedIg((ImplementationGuide) new XmlParser().parse(new FileInputStream(newXml)), ig);
+          else if (new File(newJson).exists())
+            loadModifiedIg((ImplementationGuide) new JsonParser().parse(new FileInputStream(newJson)), ig);
           return null;
         case IG_NONE:
           return null;
