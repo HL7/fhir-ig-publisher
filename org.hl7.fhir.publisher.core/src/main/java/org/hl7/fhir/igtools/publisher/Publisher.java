@@ -137,6 +137,7 @@ import org.hl7.fhir.r5.model.Base;
 import org.hl7.fhir.r5.model.Bundle;
 import org.hl7.fhir.r5.model.Bundle.BundleEntryComponent;
 import org.hl7.fhir.r5.model.Bundle.BundleType;
+import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.CapabilityStatement;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeableConcept;
@@ -2540,6 +2541,44 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           if (!"ImplementationGuide".equals(r.fhirType()) && rg == null) {
             log("Resource "+r.fhirType()+"/"+r.getId()+" not defined");
             failed = true;
+          }
+          if (rg != null) {
+            if (!rg.hasName()) {
+              if (r.getElement().hasChild("title"))
+                rg.setName(r.getElement().getChildValue("title"));
+            }
+            if (!rg.hasDescription()) {
+              if (r.getElement().hasChild("description"))
+                rg.setDescription(r.getElement().getChildValue("description"));
+            }
+            if (!rg.hasExample()) {
+              // If the instance declares a profile that's got the same canonical base as this IG, then the resource is an example of that profile
+              Map<String, String> profiles = new HashMap<String, String>();
+              if (r.getElement().hasChild("meta")) {
+                for (Element p : r.getElement().getChildren("meta").get(0).getChildren("profile")) {
+                  if (!profiles.containsKey(p.getValue()))
+                    profiles.put(p.getValue(), p.getValue());
+                }
+              }
+              if (r.getElement().getName().equals("Bundle")) {
+                for (Element entry : r.getElement().getChildren("entry")) {
+                  for (Element entres : entry.getChildren("resource")) {
+                    if (entres.hasChild("meta")) {
+                      for (Element p : entres.getChildren("meta").get(0).getChildren("profile")) {
+                        if (!profiles.containsKey(p.getValue()))
+                          profiles.put(p.getValue(), p.getValue());
+                      }
+                    }              
+                  }
+                }
+              }
+              for (String p : profiles.keySet()) {
+                // Ideally we'd want to have *all* of the profiles listed as examples, but right now we can only have one, so we just overwrite and take the last.
+                if (p.startsWith(igpkp.getCanonical()+"/StructureDefinition")) {
+                  rg.setExample(new CanonicalType(p));
+                }
+              }
+            }            
           }
         }
       }

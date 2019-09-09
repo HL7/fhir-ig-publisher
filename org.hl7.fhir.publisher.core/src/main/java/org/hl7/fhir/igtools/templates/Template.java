@@ -254,7 +254,7 @@ public class Template {
       String source = ToolingExtensions.readStringExtension(issue, ToolingExtensions.EXT_ISSUE_SOURCE);
       if (source == null)
         source = "";
-      if (res.containsKey(source))
+      if (!res.containsKey(source))
         res.put(source, new ArrayList<>());
       ValidationMessage vm = ToolingExtensions.readValidationMessage(issue, Source.Template);
       if (vm.getLevel() == IssueSeverity.FATAL)

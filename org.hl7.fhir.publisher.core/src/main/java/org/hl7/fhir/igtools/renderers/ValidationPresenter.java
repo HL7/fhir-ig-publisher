@@ -133,7 +133,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     OperationOutcome oo = new OperationOutcome();
     validationBundle.addEntry(new BundleEntryComponent().setResource(oo));
     for (ValidationMessage vm : linkErrors) {
-      if (vm.getSource() != Source.LinkChecker) {
+      if (vm.getSource() != Source.LinkChecker && vm.getLocation()!=null) {
         FHIRPathEngine fpe = new FHIRPathEngine(provider.getContext());
         try {
           fpe.parse(vm.getLocation());
@@ -508,8 +508,10 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   }
   private String genDetails(ValidationMessage vm) {
     ST t = template(vm.getLocationLink() != null ? detailsTemplateWithLink : vm.getTxLink() != null ? detailsTemplateTx : detailsTemplate);
-    t.add("path", makeLocal(vm.getLocation()));
-    t.add("pathlink", vm.getLocationLink());
+    if (vm.getLocation()!=null) {
+      t.add("path", makeLocal(vm.getLocation()));
+      t.add("pathlink", vm.getLocationLink());
+    }
     t.add("level", vm.getLevel().toCode());
     t.add("color", colorForLevel(vm.getLevel()));
     t.add("msg", vm.getHtml());
