@@ -226,7 +226,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     if ("Extension".equals(r.getElement().getChildValue("type")))
       return "extension";
 //    if (sd.getKind() == StructureDefinitionKind.LOGICAL)
-    return r.getElement().getChildValue("kind");
+    return r.getElement().getChildValue("kind") + ("true".equals(r.getElement().getChildValue("abstract")) ? ":abstract" : "");
   }
 
   public boolean hasProperty(FetchedResource r, String propertyName) {

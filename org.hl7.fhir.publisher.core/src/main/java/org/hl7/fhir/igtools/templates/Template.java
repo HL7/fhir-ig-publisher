@@ -200,19 +200,21 @@ public class Template {
       loadValidationMessages((OperationOutcome) new XmlParser().parse(new FileInputStream(xmlOutcomes)), messages);
     }
     if (ig != null) {
+      String newXml = fn+"xml";
+      String newJson = fn+"json";
       switch (modifyIg) {
         case IG_ANY:
-          if (new File(fn+"xml").exists())
-            return (ImplementationGuide) new XmlParser().parse(new FileInputStream(fn+"xml"));
-          else if (new File(fn+"json").exists())
-            return (ImplementationGuide) new JsonParser().parse(new FileInputStream(fn+"json"));
+          if (new File(newXml).exists())
+            return (ImplementationGuide) new XmlParser().parse(new FileInputStream(newXml));
+          else if (new File(newJson).exists())
+            return (ImplementationGuide) new JsonParser().parse(new FileInputStream(newJson));
           else
             throw new FHIRException("onLoad script "+targetOnLoad+" failed - no output file produced");        
         case IG_NO_RESOURCE:
-          if (jsonIg.exists())
-            loadModifiedIg((ImplementationGuide) new JsonParser().parse(new FileInputStream(jsonIg)), ig);
-          else if (xmlIg.exists())
-            loadModifiedIg((ImplementationGuide) new XmlParser().parse(new FileInputStream(jsonIg)), ig);
+          if (new File(newXml).exists())
+            loadModifiedIg((ImplementationGuide) new XmlParser().parse(new FileInputStream(newXml)), ig);
+          else if (new File(newJson).exists())
+            loadModifiedIg((ImplementationGuide) new JsonParser().parse(new FileInputStream(newJson)), ig);
           return null;
         case IG_NONE:
           return null;
@@ -252,7 +254,7 @@ public class Template {
       String source = ToolingExtensions.readStringExtension(issue, ToolingExtensions.EXT_ISSUE_SOURCE);
       if (source == null)
         source = "";
-      if (res.containsKey(source))
+      if (!res.containsKey(source))
         res.put(source, new ArrayList<>());
       ValidationMessage vm = ToolingExtensions.readValidationMessage(issue, Source.Template);
       if (vm.getLevel() == IssueSeverity.FATAL)
