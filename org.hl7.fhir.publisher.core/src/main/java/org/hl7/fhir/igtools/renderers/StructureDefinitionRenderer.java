@@ -318,10 +318,10 @@ public class StructureDefinitionRenderer extends BaseRenderer {
   private String summarise(CodeableConcept cc) throws FHIRException {
     if (cc.getCoding().size() == 1 && cc.getText() == null) {
       return summarise(cc.getCoding().get(0));
-    } else if (cc.getCoding().size() == 0 && cc.hasText()) {
+    } else if (cc.hasText()) {
       return "\"" + cc.getText()+"\"";
     } else 
-      throw new FHIRException("too complex to describe");
+      throw new FHIRException("Error describing concept - not done yet (multiple codings, no text)");
   }
 
   private String summarise(Coding coding) throws FHIRException {
