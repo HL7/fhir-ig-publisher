@@ -1391,7 +1391,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     igpkp.loadSpecPaths(specMaps.get(0));
     fetcher.setPkp(igpkp);
     
-    inspector = new HTLMLInspector(outputDir, specMaps, this, igpkp.getCanonical(), mode == IGBuildMode.AUTOBUILD);
+    inspector = new HTLMLInspector(outputDir, specMaps, this, igpkp.getCanonical());
     inspector.getManual().add("full-ig.zip");
     if (historyPage != null) {
       inspector.getManual().add(historyPage);
@@ -1704,7 +1704,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       businessVersion = configuration.getAsJsonPrimitive("fixed-business-version").getAsString();
     }
     
-    inspector = new HTLMLInspector(outputDir, specMaps, this, igpkp.getCanonical(), mode == IGBuildMode.AUTOBUILD);
+    inspector = new HTLMLInspector(outputDir, specMaps, this, igpkp.getCanonical());
     inspector.getManual().add("full-ig.zip");
     historyPage = ostr(paths, "history");
     if (historyPage != null) {
@@ -3881,8 +3881,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     
     cleanOutput(tempDir);
     try {
-      download("http://www.fhir.org/archive/icon_fixed.gif", Utilities.path(tempDir, "icon_fixed.gif"));
-      download("http://www.fhir.org/archive/icon_slice_item.png", Utilities.path(tempDir, "icon_slice_item.png"));
+      download("https://www.fhir.org/archive/icon_fixed.gif", Utilities.path(tempDir, "icon_fixed.gif"));
+      download("https://www.fhir.org/archive/icon_slice_item.png", Utilities.path(tempDir, "icon_slice_item.png"));
     } catch (Exception e) {
       // nothing
     }
@@ -3976,9 +3976,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       errors.addAll(linkmsgs);    
       for (FetchedFile f : fileList)
         ValidationPresenter.filterMessages(f.getErrors(), suppressedMessages, false);
-      log("Build final .zip");
       if (brokenLinksError && linkmsgs.size() > 0)
         throw new Error("Halting build because broken links have been found, and these are disallowed in the IG control file");
+      if (mode == IGBuildMode.AUTOBUILD && inspector.isMissingPublishBox()) {
+        throw new FHIRException("The auto-build infrastructure does not publish IGs that contain HTML pages without the publish-box present. For further information, see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations");
+      }
+
+      log("Build final .zip");
       ZipGenerator zip = new ZipGenerator(Utilities.path(tempDir, "full-ig.zip"));
       zip.addFolder(outputDir, "site/", false);
       zip.addFileSource("index.html", REDIRECT_SOURCE, false);

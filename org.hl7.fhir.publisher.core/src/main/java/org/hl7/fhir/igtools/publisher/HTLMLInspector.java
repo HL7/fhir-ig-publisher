@@ -183,15 +183,14 @@ public class HTLMLInspector {
 
   private String statusText;
   private List<String> exemptHtmlPatterns = new ArrayList<>();
-  private boolean isAutoBuild;
+  private boolean missingPublishBox;
 
-  public HTLMLInspector(String rootFolder, List<SpecMapManager> specs, ILoggingService log, String canonical, boolean isAutoBuild) {
+  public HTLMLInspector(String rootFolder, List<SpecMapManager> specs, ILoggingService log, String canonical) {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
     this.log = log;
     this.canonical = canonical;
     this.forHL7 = canonical.contains("hl7.org/fhir");
-    this.isAutoBuild = isAutoBuild;
   }
 
   public void setAltRootFolder(String altRootFolder) throws IOException {
@@ -237,9 +236,7 @@ public class HTLMLInspector {
         if (check && !findExemptionComment(lf.getXhtml())) {
           messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, s, "The html source does not contain the publish box" 
             + (first ? " "+RELEASE_HTML_MARKER+" (see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations)" : ""), IssueSeverity.ERROR));
-          if (isAutoBuild) {
-            throw new FHIRException("The auto-build infrastructure does not publish IGs that contain HTML pages without the publish-box present. For further information, see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations");
-          }
+          missingPublishBox = true;
         }
         first = false;
       }
@@ -696,7 +693,7 @@ public class HTLMLInspector {
   }
 
   public static void main(String[] args) throws Exception {
-    HTLMLInspector inspector = new HTLMLInspector(args[0], null, null, "http://hl7.org/fhir/us/core", false);
+    HTLMLInspector inspector = new HTLMLInspector(args[0], null, null, "http://hl7.org/fhir/us/core");
     inspector.setStrict(false);
     List<ValidationMessage> linkmsgs = inspector.check("test text");
     int bl = 0;
@@ -753,6 +750,10 @@ public class HTLMLInspector {
 
   public List<String> getExemptHtmlPatterns() {
     return exemptHtmlPatterns;
+  }
+
+  public boolean isMissingPublishBox() {
+    return missingPublishBox;
   }
 
   
