@@ -1,7 +1,7 @@
 @echo off
 
-set oldver=0.9.68
-set newver=0.9.69
+set oldver=0.9.69
+set newver=0.9.70
 
 
 echo ..
