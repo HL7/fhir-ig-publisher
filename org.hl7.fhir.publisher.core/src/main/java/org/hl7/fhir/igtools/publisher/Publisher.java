@@ -2588,6 +2588,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         throw new Exception("Invalid - see reasons"); // if this ever happens, it's a programming issue....
       }
     }
+    logDebugMessage(LogCategory.INIT, "Loaded Files: "+fileList.size());
+    for (FetchedFile f : fileList) {
+      logDebugMessage(LogCategory.INIT, "  "+f.getTitle()+" - "+f.getResources().size()+" Resources");
+      for (FetchedResource r : f.getResources())
+        logDebugMessage(LogCategory.INIT, "    "+r.fhirType()+"/"+r.getId());      
+    }
     extensionTracker.scan(publishedIg);
     return needToBuild;
   }
@@ -3025,8 +3031,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     res.add("OperationDefinition");
     res.add("SearchParameter");
     res.add("CapabilityStatement");
-    res.add("StructureMap");
     res.add("CapabilityStatement2");
+    res.add("StructureMap");
     res.add("ActivityDefinition");
     res.add("ChargeItemDefinition");
     res.add("CompartmentDefinition");
