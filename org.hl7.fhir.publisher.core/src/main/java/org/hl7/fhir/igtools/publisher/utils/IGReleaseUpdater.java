@@ -24,6 +24,8 @@ package org.hl7.fhir.igtools.publisher.utils;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -164,7 +166,7 @@ public class IGReleaseUpdater {
       System.out.println("There is a problem in the package-list.json file: "+path+" contains an apostrophe (\"'\")");
   }
 
-  private boolean updateStatement(String vf, List<String> ignoreList, JsonObject ig, JsonObject version, List<String> errs, JsonObject root, String canonical) throws FileNotFoundException, IOException, FHIRException {
+  private boolean updateStatement(String vf, List<String> ignoreList, JsonObject ig, JsonObject version, List<String> errs, JsonObject root, String canonical) throws FileNotFoundException, IOException, FHIRException, ParseException {
     boolean vc = false;
     String fragment = genFragment(ig, version, root, canonical);
     System.out.println("  "+vf+": "+fragment);
@@ -173,7 +175,7 @@ public class IGReleaseUpdater {
     System.out.println("    .. "+igvu.getCountTotal()+" files checked, "+igvu.getCountUpdated()+" updated");
     IGPackageChecker pc = new IGPackageChecker(vf, canonical, JSONUtil.str(version, "path"), JSONUtil.str(ig, "package-id"));
     pc.check(JSONUtil.str(version, "version"), JSONUtil.str(ig, "package-id"), JSONUtil.str(version, "fhirversion", "fhirversion"), 
-        JSONUtil.str(ig, "title"), new Date(JSONUtil.str(version, "date")), JSONUtil.str(version, "path"), canonical);
+        JSONUtil.str(ig, "title"), new SimpleDateFormat("yyyy-MM-dd").parse(JSONUtil.str(version, "date")), JSONUtil.str(version, "path"), canonical);
     IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(vf, canonical, JSONUtil.str(version, "path"));
     if (serverType == ServerType.APACHE)
       rb.buildApacheRedirections();
