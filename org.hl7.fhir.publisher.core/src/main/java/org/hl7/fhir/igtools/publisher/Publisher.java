@@ -575,6 +575,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private boolean isBuildingTemplate;
   private JsonObject templateInfo;
   private ExtensionTracker extensionTracker;
+
+  private String currVer;
   
   private class PreProcessInfo {
     private String xsltName;
@@ -630,7 +632,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             long endTime = System.nanoTime();
             processTxLog(Utilities.path(destDir != null ? destDir : outputDir, "qa-tx.html"));
             ValidationPresenter val = new ValidationPresenter(version, businessVersion, igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
-                new BallotChecker(repoRoot).check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), VersionUtil.getVersionString());
+                new BallotChecker(repoRoot).check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), "v"+IGVersionUtil.getVersion(), fetchCurrentIGPubVersion());
             log("Finished. "+presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
             recordOutcome(null, val);
           }
@@ -649,6 +651,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
   }
+
 
 
   private void packageTemplate() throws IOException {
@@ -733,7 +736,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     long endTime = System.nanoTime();
     clean();
     ValidationPresenter val = new ValidationPresenter(version, businessVersion, igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
-        new BallotChecker(repoRoot).check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), VersionUtil.getVersionString());
+        new BallotChecker(repoRoot).check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), "v"+IGVersionUtil.getVersion(), fetchCurrentIGPubVersion());
     if (isChild()) {
       log("Finished. "+presentDuration(endTime - startTime));      
     } else {
@@ -6712,4 +6715,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     parentInspector.getSpecMaps().addAll(specMaps);
   }
   
+  private String fetchCurrentIGPubVersion() {
+    if (currVer == null) {
+      
+      try {
+        JsonObject json = fetchJson("https://fhir.github.io/latest-ig-publisher/tools.json");
+        currVer = json.getAsJsonObject("publisher").get("version").getAsString();
+      } catch (IOException e) {
+        currVer = "??";
+      }
+    }
+    return currVer;
+  }
+
 }

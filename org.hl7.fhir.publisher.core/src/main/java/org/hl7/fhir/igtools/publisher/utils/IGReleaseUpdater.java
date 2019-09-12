@@ -165,35 +165,34 @@ public class IGReleaseUpdater {
   }
 
   private boolean updateStatement(String vf, List<String> ignoreList, JsonObject ig, JsonObject version, List<String> errs, JsonObject root, String canonical) throws FileNotFoundException, IOException, FHIRException {
-    throw new Error("this needs checking by Grahame");
-//    boolean vc = false;
-//    String fragment = genFragment(ig, version, root, canonical);
-//    System.out.println("  "+vf+": "+fragment);
-//    IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(vf, ignoreList, version);
-//    igvu.updateStatement(fragment);
-//    System.out.println("    .. "+igvu.getCountTotal()+" files checked, "+igvu.getCountUpdated()+" updated");
-//    IGPackageChecker pc = new IGPackageChecker(vf, canonical, JSONUtil.str(version, "path"), JSONUtil.str(ig, "package-id"));
-//    pc.check(JSONUtil.str(version, "version"), JSONUtil.str(ig, "package-id"), JSONUtil.str(version, "fhirversion", "fhir-version"), 
-//        JSONUtil.str(ig, "title"), new Date(JSONUtil.str(version, "date")), JSONUtil.str(version, "path"), canonical);
-//    IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(vf, canonical, JSONUtil.str(version, "path"));
-//    if (serverType == ServerType.APACHE)
-//      rb.buildApacheRedirections();
-//    else if (serverType == ServerType.ASP)
-//      rb.buildAspRedirections();
-//    else if (!canonical.contains("hl7.org/fhir"))
-//      rb.buildApacheRedirections();
-//    else
-//      rb.buildAspRedirections();
-//    System.out.println("    .. "+rb.getCountTotal()+" redirections ("+rb.getCountUpdated()+" created/updated)");
-//    if (!JSONUtil.has(version, "fhirversion", "fhir-version")) {
-//      if (rb.getFhirVersion() == null)
-//        System.out.println("Unable to determine FHIR version for "+vf);
-//      else {
-//        version.addProperty("fhir-version", rb.getFhirVersion());
-//        vc = true;
-//      }
-//    }
-//    return vc;
+    boolean vc = false;
+    String fragment = genFragment(ig, version, root, canonical);
+    System.out.println("  "+vf+": "+fragment);
+    IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(vf, ignoreList, version);
+    igvu.updateStatement(fragment);
+    System.out.println("    .. "+igvu.getCountTotal()+" files checked, "+igvu.getCountUpdated()+" updated");
+    IGPackageChecker pc = new IGPackageChecker(vf, canonical, JSONUtil.str(version, "path"), JSONUtil.str(ig, "package-id"));
+    pc.check(JSONUtil.str(version, "version"), JSONUtil.str(ig, "package-id"), JSONUtil.str(version, "fhirversion", "fhirversion"), 
+        JSONUtil.str(ig, "title"), new Date(JSONUtil.str(version, "date")), JSONUtil.str(version, "path"), canonical);
+    IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(vf, canonical, JSONUtil.str(version, "path"));
+    if (serverType == ServerType.APACHE)
+      rb.buildApacheRedirections();
+    else if (serverType == ServerType.ASP)
+      rb.buildAspRedirections();
+    else if (!canonical.contains("hl7.org/fhir"))
+      rb.buildApacheRedirections();
+    else
+      rb.buildAspRedirections();
+    System.out.println("    .. "+rb.getCountTotal()+" redirections ("+rb.getCountUpdated()+" created/updated)");
+    if (!JSONUtil.has(version, "fhirversion", "fhirversion")) {
+      if (rb.getFhirVersion() == null)
+        System.out.println("Unable to determine FHIR version for "+vf);
+      else {
+        version.addProperty("fhirversion", rb.getFhirVersion());
+        vc = true;
+      }
+    }
+    return vc;
   }
 
   /**
@@ -211,7 +210,7 @@ public class IGReleaseUpdater {
   private String genFragment(JsonObject ig, JsonObject version, JsonObject root, String canonical) {
     String p1 = JSONUtil.str(ig, "title")+" (v"+JSONUtil.str(version, "version")+": "+state(ig, version)+")";
     String p2 = root == null ? "" : version == root ? ". This is the current published version" : ". The current version is <a href=\""+(JSONUtil.str(root, "path").startsWith(canonical) ? canonical : JSONUtil.str(root, "path"))+"\">"+JSONUtil.str(root, "version")+"</a>";
-    p2 = p2 + (JSONUtil.has(version, "fhirversion", "fhir-version") ? " based on <a href=\"http://hl7.org/fhir/"+getPath(JSONUtil.str(version, "fhirversion", "fhir-version"))+"\">FHIR "+fhirRef(JSONUtil.str(version, "fhirversion", "fhir-version"))+"</a>" : "")+". ";
+    p2 = p2 + (version.has("fhirversion") ? " based on <a href=\"http://hl7.org/fhir/"+getPath(JSONUtil.str(version, "fhirversion", "fhir-version"))+"\">FHIR "+fhirRef(JSONUtil.str(version, "fhirversion"))+"</a>" : "")+". ";
     String p3 = " See the <a href=\""+Utilities.pathURL(canonical, canonical.contains("fhir.org") ? "history.shtml" : "history.cfml")+"\">Directory of published versions</a>";
     return p1+p2+p3;
   }

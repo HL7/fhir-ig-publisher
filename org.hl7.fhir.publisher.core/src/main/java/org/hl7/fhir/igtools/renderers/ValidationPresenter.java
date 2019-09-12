@@ -62,8 +62,10 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private String igVersion;
   private String ballotCheck;
   private String toolsVersion;
+  private String currentToolsVersion;
 
-  public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, String ballotCheck, String toolsVersion) {
+  public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, String ballotCheck, 
+      String toolsVersion, String currentToolsVersion) {
     super();
     this.statedVersion = statedVersion;
     this.igVersion = igVersion;
@@ -74,6 +76,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     this.altPackageId = altPackageId;
     this.ballotCheck = ballotCheck;
     this.toolsVersion = toolsVersion;
+    this.currentToolsVersion = currentToolsVersion;
   }
 
   private List<FetchedFile> sorted(List<FetchedFile> files) {
@@ -231,7 +234,8 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       "</head>\r\n"+
       "<body style=\"margin: 20px; background-color: #ffffff\">\r\n"+
       " <h1>Validation Results for $title$</h1>\r\n"+
-      " <p>Generated $time$, IG-Publisher $toolsVersion$. FHIR version $version$ for $packageId$#$igversion$ (canonical = <a href=\"$canonical$\">$canonical$</a> (<a href=\"$canonical$/history.html\">history</a>))</p>\r\n"+
+      " <p>Generated $time$, FHIR version $version$ for $packageId$#$igversion$ (canonical = <a href=\"$canonical$\">$canonical$</a> (<a href=\"$canonical$/history.html\">history</a>))</p>\r\n"+
+      "$versionCheck$\r\n"+
       "$suppressedmsgssummary$"+
       " <p>HL7 Publication check:</p> $ballotCheck$\r\n"+
       " <table class=\"grid\">\r\n"+
@@ -287,6 +291,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       "$title$ : Validation Results\r\n"+
       "=========================================\r\n\r\n"+
       "err = $err$, warn = $warn$, info = $info$\r\n"+
+      "$versionCheck$\r\n"+
       "Generated $time$. FHIR version $version$ for $packageId$#$igversion$ (canonical = $canonical$)\r\n\r\n";
   
   private final String summaryTemplateText = 
@@ -313,6 +318,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("version", statedVersion);
     t.add("igversion", igVersion);
     t.add("toolsVersion", toolsVersion);
+    t.add("versionCheck", versionCheckHtml());
     t.add("title", title);
     t.add("time", new Date().toString());
     t.add("err", Integer.toString(err));
@@ -333,6 +339,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     ST t = template(headerTemplateText);
     t.add("version", statedVersion);
     t.add("toolsVersion", toolsVersion);
+    t.add("versionCheck", versionCheckText());
     t.add("igversion", igVersion);
     t.add("title", title);
     t.add("time", new Date().toString());
@@ -558,5 +565,32 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     return info;
   }  
   
+  private String versionCheckText() {
+    StringBuilder b = new StringBuilder();
+    b.append("IG Publisher Version: ");
+    b.append(toolsVersion);
+    if (!toolsVersion.equals(currentToolsVersion)) {
+      b.append(" Out of date - current version is ");
+      b.append(currentToolsVersion);      
+    }
+    return b.toString();
+  }
+
+  private String versionCheckHtml() {
+    StringBuilder b = new StringBuilder();
+    if (!toolsVersion.equals(currentToolsVersion)) {
+      b.append("<p style=\"background-color: #ffcccc\">IG Publisher Version: ");
+    } else {
+      b.append("<p>IG Publisher Version: ");
+    }
+    b.append(toolsVersion);
+    if (!toolsVersion.equals(currentToolsVersion)) {
+      b.append(", which is out of date. The current version is ");
+      b.append(currentToolsVersion);      
+      b.append(" <a hhef=\"https://fhir.github.io/latest-ig-publisher/org.hl7.fhir.publisher.jar\">Download Latest</a>");
+    }
+    b.append("</p>");
+    return b.toString();
+  }
   
 }
