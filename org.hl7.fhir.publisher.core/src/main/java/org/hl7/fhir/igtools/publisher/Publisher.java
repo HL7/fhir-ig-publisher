@@ -2365,7 +2365,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private boolean checkMakeFile(byte[] bs, String path, Set<String> outputTracker) throws IOException {
-    logDebugMessage(LogCategory.PROGRESS, "Check Generate "+path);
+    logDebugMessage(LogCategory.GENERATE, "Check Generate "+path);
     if (first) {
       String s = path.toLowerCase();
       if (allOutputs.contains(s))
@@ -2471,6 +2471,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         throw new Exception("Missing source reference on a reesource in the IG with the name '"+res.getName()+"' (index = "+i+")");
       i++;
       if (!bndIds.contains(res.getReference().getReference()) && !res.hasUserData("loaded.resource")) { // todo: this doesn't work for differential builds
+        logDebugMessage(LogCategory.INIT, "Load "+res.getReference());
         FetchedFile f = fetcher.fetch(res.getReference(), igf);
         if (!f.hasTitle() && res.getName() != null)
           f.setTitle(res.getName());
@@ -2870,7 +2871,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private boolean loadResource(boolean needToBuild, FetchedFile f) throws Exception {
-    logDebugMessage(LogCategory.PROGRESS, "load "+f.getPath());
+    logDebugMessage(LogCategory.INIT, "load "+f.getPath());
     boolean changed = noteFile(f.getPath(), f);
     if (changed) {
       loadAsElementModel(f, f.addResource(), null);
@@ -2901,7 +2902,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     FetchedFile f = fetcher.fetchResourceFile(name);
     boolean changed = noteFile("Mapping/"+name, f);
     if (changed) {
-      logDebugMessage(LogCategory.PROGRESS, "load "+f.getPath());
+      logDebugMessage(LogCategory.INIT, "load "+f.getPath());
       MappingSheetParser p = new MappingSheetParser();
       p.parse(new ByteArrayInputStream(f.getSource()), f.getRelativePath());
       ConceptMap cm = p.getConceptMap();
@@ -2933,7 +2934,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     boolean changed = noteFile("Spreadsheet/"+name, f);
     if (changed) {
       f.getValuesetsToLoad().clear();
-      logDebugMessage(LogCategory.PROGRESS, "load "+f.getPath());
+      logDebugMessage(LogCategory.INIT, "load "+f.getPath());
       Bundle bnd = new IgSpreadsheetParser(context, execTime, igpkp.getCanonical(), f.getValuesetsToLoad(), first, context.getBinaries().get("mappingSpaces.details"), knownValueSetIds).parse(f);
       f.setBundle(new FetchedResource());
       f.setBundleType(FetchedBundleType.SPREADSHEET);
