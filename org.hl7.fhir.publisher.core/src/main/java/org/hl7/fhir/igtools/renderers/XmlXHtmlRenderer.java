@@ -86,6 +86,11 @@ public class XmlXHtmlRenderer implements IXMLWriter {
     this.href = href;
   }
 
+  @Override
+  public void anchor(String name) {
+    b.append("<a name=\""+name+"\"></a>");
+  }
+
   public String useHref() {
     String result = this.href;
     this.href = null;

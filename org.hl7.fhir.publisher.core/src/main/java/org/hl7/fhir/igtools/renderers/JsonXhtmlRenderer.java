@@ -181,5 +181,11 @@ public class JsonXhtmlRenderer extends TranslatingUtilities implements JsonCreat
   public void link(String href) {
     this.href = href;
   }
+
+  @Override
+  public void anchor(String name) {
+    b.append("<a name=\""+name+"\"></a>");
+  }
+
   
 }
