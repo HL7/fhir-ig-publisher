@@ -126,6 +126,10 @@ tmp/
 local.properties
 .loadpath
 *.hprof
+.project
+.classpath
+**/.settings
+.settings
 
 # External tool builders
 .externalToolBuilders/
