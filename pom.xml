@@ -152,11 +152,13 @@
 			<optional>true</optional>
 		</dependency>
 
+		<!--
         <dependency>
             <groupId>plantuml</groupId>
             <artifactId>plantuml-jar-asl</artifactId>
             <version>1.2019.10</version>
-        </dependency>
+		  </dependency>
+		  -->
 
     </dependencies>
 
