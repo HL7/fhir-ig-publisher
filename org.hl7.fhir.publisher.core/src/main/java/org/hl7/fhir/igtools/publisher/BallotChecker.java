@@ -86,21 +86,21 @@ public class BallotChecker {
         if (o.has("version") && o.get("version").getAsString().equals(version)) {
           found = true;
           if (!o.has("desc") && !o.has("descmd") && !o.has("changes"))
-            errors.add("package-list.json entry: must have a 'desc' / 'descmd' or 'changes' (or both)");
+            errors.add("package-list.json entry for v"+version+": must have a 'desc' / 'descmd' or 'changes' (or both)");
           if (!o.has("date"))
-            errors.add("package-list.json entry: must have a 'date' (though the value doesn't matter)");
+            errors.add("package-list.json entry for v"+version+": must have a 'date' (though the value doesn't matter)");
           if (!o.has("status"))
-            errors.add("package-list.json entry: must have a 'status' that describes the ballot status");
+            errors.add("package-list.json entry for v"+version+": must have a 'status' that describes the ballot status");
           if (!o.has("sequence"))
-            errors.add("package-list.json entry: must have a 'sequence' that describes the ballot goal");
-          if (!o.has("fhir-version"))
-            errors.add("package-list.json entry: must have a 'fhir-version' that specifies the FHIR version ("+fhirVersion+")");
-          else if (!o.get("fhir-version").getAsString().equals(fhirVersion))
-            errors.add("package-list.json entry: must have a 'fhir-version' that entry with the right value - is '"+o.get("fhir-version").getAsString()+"', should start with '"+fhirVersion+"'");
+            errors.add("package-list.json entry for v"+version+": must have a 'sequence' that describes the ballot goal");
+          if (!o.has("fhirversion"))
+            errors.add("package-list.json entry for v"+version+": must have a 'fhirversion' that specifies the FHIR version ("+fhirVersion+")");
+          else if (!o.get("fhirversion").getAsString().equals(fhirVersion))
+            errors.add("package-list.json entry for v"+version+": must have a 'fhirversion' with the right value - is '"+o.get("fhirversion").getAsString()+"', should be or start with '"+fhirVersion+"'");
           if (!o.has("path"))
-            errors.add("package-list.json entry: must have a 'path' where it will be published");
+            errors.add("package-list.json entry for v"+version+": must have a 'path' where it will be published");
           else if (!o.get("path").getAsString().startsWith(canonical))
-            errors.add("package-list.json entry: must have a 'path' that starts with the canonical (is '"+o.get("path").getAsString()+"', should start with '"+canonical+"'");
+            errors.add("package-list.json entry for v"+version+": must have a 'path' that starts with the canonical (is '"+o.get("path").getAsString()+"', should start with '"+canonical+"'");
           if (errors.size() == 0)
             errors.add("All ok (path - "+o.get("path").getAsString()+")");              
             

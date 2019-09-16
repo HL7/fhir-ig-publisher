@@ -36,6 +36,7 @@ import org.hl7.fhir.r5.model.Bundle;
 import org.hl7.fhir.r5.model.Bundle.BundleEntryComponent;
 import org.hl7.fhir.r5.model.Constants;
 import org.hl7.fhir.r5.model.OperationOutcome;
+import org.hl7.fhir.r5.utils.FHIRPathEngine;
 import org.hl7.fhir.r5.utils.OperationOutcomeUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.TranslatingUtilities;
@@ -43,6 +44,7 @@ import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
+import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
 import org.stringtemplate.v4.ST;
 
 public class ValidationPresenter extends TranslatingUtilities implements Comparator<FetchedFile> {
@@ -60,8 +62,10 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private String igVersion;
   private String ballotCheck;
   private String toolsVersion;
+  private String currentToolsVersion;
 
-  public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, String ballotCheck, String toolsVersion) {
+  public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, String ballotCheck, 
+      String toolsVersion, String currentToolsVersion) {
     super();
     this.statedVersion = statedVersion;
     this.igVersion = igVersion;
@@ -72,6 +76,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     this.altPackageId = altPackageId;
     this.ballotCheck = ballotCheck;
     this.toolsVersion = toolsVersion;
+    this.currentToolsVersion = currentToolsVersion;
   }
 
   private List<FetchedFile> sorted(List<FetchedFile> files) {
@@ -131,7 +136,15 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     OperationOutcome oo = new OperationOutcome();
     validationBundle.addEntry(new BundleEntryComponent().setResource(oo));
     for (ValidationMessage vm : linkErrors) {
-      oo.getIssue().add(OperationOutcomeUtilities.convertToIssue(vm, oo));
+      if (vm.getSource() != Source.LinkChecker && vm.getLocation()!=null) {
+        FHIRPathEngine fpe = new FHIRPathEngine(provider.getContext());
+        try {
+          fpe.parse(vm.getLocation());
+        } catch (Exception e) {
+          System.out.println("Internal error in location for message: '"+e.getMessage()+"', loc = '"+subst100(vm.getLocation())+"', err = '"+subst100(vm.getMessage())+"'");
+        }
+        oo.getIssue().add(OperationOutcomeUtilities.convertToIssue(vm, oo));
+      }
     }
     for (FetchedFile f : files) {
       if (!f.getErrors().isEmpty()) {
@@ -169,6 +182,12 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     
     String summary = "Errors: " + err + "  Warnings: " + warn + "  Info: " + info;
     return path + "\r\n" + summary;
+  }
+
+  private String subst100(String msg) {
+    if (msg == null)
+      return "";
+    return msg.length() > 100 ? msg.substring(0, 100) : msg;
   }
 
   private String genSuppressedMessages(List<String> filteredMessages) {
@@ -215,7 +234,8 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       "</head>\r\n"+
       "<body style=\"margin: 20px; background-color: #ffffff\">\r\n"+
       " <h1>Validation Results for $title$</h1>\r\n"+
-      " <p>Generated $time$, IG-Publisher $toolsVersion$. FHIR version $version$ for $packageId$#$igversion$ (canonical = <a href=\"$canonical$\">$canonical$</a> (<a href=\"$canonical$/history.html\">history</a>))</p>\r\n"+
+      " <p>Generated $time$, FHIR version $version$ for $packageId$#$igversion$ (canonical = <a href=\"$canonical$\">$canonical$</a> (<a href=\"$canonical$/history.html\">history</a>))</p>\r\n"+
+      "$versionCheck$\r\n"+
       "$suppressedmsgssummary$"+
       " <p>HL7 Publication check:</p> $ballotCheck$\r\n"+
       " <table class=\"grid\">\r\n"+
@@ -271,6 +291,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       "$title$ : Validation Results\r\n"+
       "=========================================\r\n\r\n"+
       "err = $err$, warn = $warn$, info = $info$\r\n"+
+      "$versionCheck$\r\n"+
       "Generated $time$. FHIR version $version$ for $packageId$#$igversion$ (canonical = $canonical$)\r\n\r\n";
   
   private final String summaryTemplateText = 
@@ -297,6 +318,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("version", statedVersion);
     t.add("igversion", igVersion);
     t.add("toolsVersion", toolsVersion);
+    t.add("versionCheck", versionCheckHtml());
     t.add("title", title);
     t.add("time", new Date().toString());
     t.add("err", Integer.toString(err));
@@ -317,6 +339,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     ST t = template(headerTemplateText);
     t.add("version", statedVersion);
     t.add("toolsVersion", toolsVersion);
+    t.add("versionCheck", versionCheckText());
     t.add("igversion", igVersion);
     t.add("title", title);
     t.add("time", new Date().toString());
@@ -492,8 +515,10 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   }
   private String genDetails(ValidationMessage vm) {
     ST t = template(vm.getLocationLink() != null ? detailsTemplateWithLink : vm.getTxLink() != null ? detailsTemplateTx : detailsTemplate);
-    t.add("path", makeLocal(vm.getLocation()));
-    t.add("pathlink", vm.getLocationLink());
+    if (vm.getLocation()!=null) {
+      t.add("path", makeLocal(vm.getLocation()));
+      t.add("pathlink", vm.getLocationLink());
+    }
     t.add("level", vm.getLevel().toCode());
     t.add("color", colorForLevel(vm.getLevel()));
     t.add("msg", vm.getHtml());
@@ -540,5 +565,32 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     return info;
   }  
   
+  private String versionCheckText() {
+    StringBuilder b = new StringBuilder();
+    b.append("IG Publisher Version: ");
+    b.append(toolsVersion);
+    if (!toolsVersion.equals(currentToolsVersion)) {
+      b.append(" Out of date - current version is ");
+      b.append(currentToolsVersion);      
+    }
+    return b.toString();
+  }
+
+  private String versionCheckHtml() {
+    StringBuilder b = new StringBuilder();
+    if (!toolsVersion.equals(currentToolsVersion)) {
+      b.append("<p style=\"background-color: #ffcccc\">IG Publisher Version: ");
+    } else {
+      b.append("<p>IG Publisher Version: ");
+    }
+    b.append(toolsVersion);
+    if (!toolsVersion.equals(currentToolsVersion)) {
+      b.append(", which is out of date. The current version is ");
+      b.append(currentToolsVersion);      
+      b.append(" <a hhef=\"https://fhir.github.io/latest-ig-publisher/org.hl7.fhir.publisher.jar\">Download Latest</a>");
+    }
+    b.append("</p>");
+    return b.toString();
+  }
   
 }

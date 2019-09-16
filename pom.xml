@@ -18,12 +18,13 @@
     <parent>
         <groupId>ca.uhn.hapi.fhir</groupId>
         <artifactId>org.hl7.fhir.core</artifactId>
-        <version>3.8.9-SNAPSHOT</version>
+        <version>4.0.17-SNAPSHOT</version>
     </parent>
     <properties>
-        <core_version>3.8.9-SNAPSHOT</core_version>
+        <core_version>4.0.17-SNAPSHOT</core_version>
+        <maven.test.skip>true</maven.test.skip>
     </properties>
-    <version>0.9.41-SNAPSHOT</version> <!-- See the note above -->
+    <version>0.9.77-SNAPSHOT</version> <!-- See the note above -->
 
     <packaging>pom</packaging>
     <groupId>org.hl7.fhir.publisher</groupId>
@@ -37,6 +38,10 @@
             <snapshots>
                 <enabled>true</enabled>
             </snapshots>
+        </repository>
+        <repository>
+            <id>local</id>
+            <url>file://${basedir}/lib</url>
         </repository>
     </repositories>
 
@@ -146,6 +151,20 @@
 			<version>1.4</version>
 			<optional>true</optional>
 		</dependency>
+
+        <dependency>
+            <groupId>org.apache.xmlbeans</groupId>
+            <artifactId>xmlbeans</artifactId>
+            <version>3.0.2</version>
+        </dependency>
+
+		<!--
+        <dependency>
+            <groupId>plantuml</groupId>
+            <artifactId>plantuml-jar-asl</artifactId>
+            <version>1.2019.10</version>
+		  </dependency>
+		  -->
 
     </dependencies>
 

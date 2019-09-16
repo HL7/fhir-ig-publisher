@@ -27,6 +27,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
@@ -61,7 +62,7 @@ public class IGPackageChecker {
     this.packageId = packageId;
    }
 
-  public void check(String ver, String pckId, String fhirversion, String name, String date, String url, String canonical) throws IOException, FHIRException {
+  public void check(String ver, String pckId, String fhirversion, String name, Date date, String url, String canonical) throws IOException, FHIRException {
     String pf = Utilities.path(folder, "package.tgz");
     File f = new File(pf);
     if (!f.exists()) {
@@ -111,13 +112,13 @@ public class IGPackageChecker {
     
   }
 
-  private void makePackage(String file, String name, String ver, String fhirversion, String date) throws FHIRException, IOException {
+  private void makePackage(String file, String name, String ver, String fhirversion, Date date) throws FHIRException, IOException {
     ImplementationGuide ig = new ImplementationGuide();
     ig.setUrl(Utilities.pathURL(canonical, "ImplementationGuide", "ig"));
     ig.setName(name);
     ig.setTitle(Utilities.titleize(name));
     ig.setVersion(ver);
-    ig.getDateElement().setValueAsString(date);
+    ig.getDateElement().setValue(date);
     ig.setPackageId(packageId);
     ig.setLicense(SPDXLicense.CC01_0);
     ig.getManifest().setRendering(vpath);

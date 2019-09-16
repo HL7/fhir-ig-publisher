@@ -54,6 +54,8 @@ public class TemplateManager {
   public Template loadTemplate(String template, String rootFolder, String packageId, boolean autoMode) throws FHIRException, IOException {
     logger.logMessage("Load Template from "+template);
     boolean canExecute = !autoMode || checkTemplateId(template, packageId);
+    if (!canExecute)
+      logger.logMessage("IG template is not trusted.  No scripts will be executed");
     NpmPackage npm = loadPackage(template, rootFolder);
     if (!npm.isType(PackageType.TEMPLATE))
       throw new FHIRException("The referenced package '"+template+"' does not have the correct type - is "+npm.type()+" but should be a template");
@@ -66,13 +68,11 @@ public class TemplateManager {
     // - templates can run code, so only trusted templates are allowed
     
     // first, the following templates authored by HL7 are allowed 
-    if (isTemplate("http://github.com/FHIR/test-template", "fhir.test.template", template))
-      return true;
-    if (isTemplate("http://github.com/HL7/fhir-template", "hl7.fhir.template", template))
-      return true;
-    
+    return isTemplate("http://github.com/FHIR/test-template", "fhir.test.template", template)
+        || isTemplate("http://github.com/HL7/fhir-template", "hl7.fhir.template", template)
+        || isTemplate("http://github.com/HL7/fhir-template", "fhir.base.template", template)
+        || isTemplate("http://github.com/HL7/fhir-template", "fhir.davinci.template", template);
     // we might choose to allow some IGs here...
-    return false;
   }
 
   private boolean isTemplate(String url, String id, String template) {

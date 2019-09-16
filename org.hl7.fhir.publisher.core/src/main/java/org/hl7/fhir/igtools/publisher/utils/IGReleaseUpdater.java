@@ -24,8 +24,12 @@ package org.hl7.fhir.igtools.publisher.utils;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Map.Entry;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.utils.IGRegistryMaintainer.ImplementationGuideEntry;
@@ -70,6 +74,8 @@ public class IGReleaseUpdater {
         errs.add("unable to find package-list.json");
       else {
         JsonObject json = JsonTrackingParser.parseJsonFile(f);
+        if (url.contains("hl7.org"))
+          checkJsonNoApostrophes("", json);
         String canonical = JSONUtil.str(json, "canonical");
         JsonArray list = json.getAsJsonArray("list");
         JsonObject root = null;
@@ -134,7 +140,33 @@ public class IGReleaseUpdater {
     }
   }
 
-  private boolean updateStatement(String vf, List<String> ignoreList, JsonObject ig, JsonObject version, List<String> errs, JsonObject root, String canonical) throws FileNotFoundException, IOException, FHIRException {
+  private void checkJsonNoApostrophes(String path, JsonObject json) {
+    for (Entry<String, JsonElement> p : json.entrySet()) {
+      if (p.getValue().isJsonPrimitive()) {
+        checkJsonNoApostrophesInProperty(path+"."+p.getKey(), p.getValue());
+      } else if (p.getValue().isJsonObject()) {
+        checkJsonNoApostrophes(path+"."+p.getKey(), (JsonObject) p.getValue());
+      } else if (p.getValue().isJsonArray()) {
+        int i = 0;
+        for (JsonElement ai : ((JsonArray) p.getValue())) {
+          if (ai.isJsonPrimitive()) {
+            checkJsonNoApostrophesInProperty(path+"."+p.getKey()+"["+Integer.toString(i)+"]", ai);
+          } else if (ai.isJsonObject()) {
+            checkJsonNoApostrophes(path+"."+p.getKey()+"["+Integer.toString(i)+"]", (JsonObject) ai);
+          } // no arrays containing arrays in package-list.json
+          i++;
+        }
+      }
+    }
+  }
+
+  private void checkJsonNoApostrophesInProperty(String path, JsonElement json) {
+    String s = json.getAsString();
+    if (s.contains("'"))
+      System.out.println("There is a problem in the package-list.json file: "+path+" contains an apostrophe (\"'\")");
+  }
+
+  private boolean updateStatement(String vf, List<String> ignoreList, JsonObject ig, JsonObject version, List<String> errs, JsonObject root, String canonical) throws FileNotFoundException, IOException, FHIRException, ParseException {
     boolean vc = false;
     String fragment = genFragment(ig, version, root, canonical);
     System.out.println("  "+vf+": "+fragment);
@@ -142,8 +174,8 @@ public class IGReleaseUpdater {
     igvu.updateStatement(fragment);
     System.out.println("    .. "+igvu.getCountTotal()+" files checked, "+igvu.getCountUpdated()+" updated");
     IGPackageChecker pc = new IGPackageChecker(vf, canonical, JSONUtil.str(version, "path"), JSONUtil.str(ig, "package-id"));
-    pc.check(JSONUtil.str(version, "version"), JSONUtil.str(ig, "package-id"), JSONUtil.str(version, "fhirversion", "fhir-version"), 
-        JSONUtil.str(ig, "title"), JSONUtil.str(version, "date"), JSONUtil.str(version, "path"), canonical);
+    pc.check(JSONUtil.str(version, "version"), JSONUtil.str(ig, "package-id"), JSONUtil.str(version, "fhirversion", "fhirversion"), 
+        JSONUtil.str(ig, "title"), new SimpleDateFormat("yyyy-MM-dd").parse(JSONUtil.str(version, "date")), JSONUtil.str(version, "path"), canonical);
     IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(vf, canonical, JSONUtil.str(version, "path"));
     if (serverType == ServerType.APACHE)
       rb.buildApacheRedirections();
@@ -154,11 +186,11 @@ public class IGReleaseUpdater {
     else
       rb.buildAspRedirections();
     System.out.println("    .. "+rb.getCountTotal()+" redirections ("+rb.getCountUpdated()+" created/updated)");
-    if (!JSONUtil.has(version, "fhirversion", "fhir-version")) {
+    if (!JSONUtil.has(version, "fhirversion", "fhirversion")) {
       if (rb.getFhirVersion() == null)
         System.out.println("Unable to determine FHIR version for "+vf);
       else {
-        version.addProperty("fhir-version", rb.getFhirVersion());
+        version.addProperty("fhirversion", rb.getFhirVersion());
         vc = true;
       }
     }
@@ -180,7 +212,7 @@ public class IGReleaseUpdater {
   private String genFragment(JsonObject ig, JsonObject version, JsonObject root, String canonical) {
     String p1 = JSONUtil.str(ig, "title")+" (v"+JSONUtil.str(version, "version")+": "+state(ig, version)+")";
     String p2 = root == null ? "" : version == root ? ". This is the current published version" : ". The current version is <a href=\""+(JSONUtil.str(root, "path").startsWith(canonical) ? canonical : JSONUtil.str(root, "path"))+"\">"+JSONUtil.str(root, "version")+"</a>";
-    p2 = p2 + (JSONUtil.has(version, "fhirversion", "fhir-version") ? " based on <a href=\"http://hl7.org/fhir/"+getPath(JSONUtil.str(version, "fhirversion", "fhir-version"))+"\">FHIR "+fhirRef(JSONUtil.str(version, "fhirversion", "fhir-version"))+"</a>" : "")+". ";
+    p2 = p2 + (version.has("fhirversion") ? " based on <a href=\"http://hl7.org/fhir/"+getPath(JSONUtil.str(version, "fhirversion", "fhir-version"))+"\">FHIR "+fhirRef(JSONUtil.str(version, "fhirversion"))+"</a>" : "")+". ";
     String p3 = " See the <a href=\""+Utilities.pathURL(canonical, canonical.contains("fhir.org") ? "history.shtml" : "history.cfml")+"\">Directory of published versions</a>";
     return p1+p2+p3;
   }

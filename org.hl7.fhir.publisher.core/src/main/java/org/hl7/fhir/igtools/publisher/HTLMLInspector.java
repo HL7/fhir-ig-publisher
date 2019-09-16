@@ -39,6 +39,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import org.apache.commons.math3.random.ISAACRandom;
+import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService.LogCategory;
@@ -181,14 +183,14 @@ public class HTLMLInspector {
 
   private String statusText;
   private List<String> exemptHtmlPatterns = new ArrayList<>();
+  private boolean missingPublishBox;
 
-  public HTLMLInspector(String rootFolder, List<SpecMapManager> specs, ILoggingService log, String canonical, boolean hl7Checks) {
+  public HTLMLInspector(String rootFolder, List<SpecMapManager> specs, ILoggingService log, String canonical) {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
     this.log = log;
     this.canonical = canonical;
     this.forHL7 = canonical.contains("hl7.org/fhir");
-    this.hl7Checks = hl7Checks;
   }
 
   public void setAltRootFolder(String altRootFolder) throws IOException {
@@ -211,8 +213,9 @@ public class HTLMLInspector {
 
     log.logDebugMessage(LogCategory.HTML, "Loading Files");
     // load files
-    for (String s : loadList)
+    for (String s : loadList) {
       loadFile(s, rootFolder, messages);
+    }
 
 
     log.logDebugMessage(LogCategory.HTML, "Checking Files");
@@ -220,6 +223,7 @@ public class HTLMLInspector {
     // check links
     boolean first = true;
     for (String s : sorted(cache.keySet())) {
+      log.logDebugMessage(LogCategory.HTML, "Check "+s);
       LoadedFile lf = cache.get(s);
       if (lf.getHl7State() != null && !lf.getHl7State()) {
         boolean check = true;
@@ -230,14 +234,16 @@ public class HTLMLInspector {
           }
         }
         if (check && !findExemptionComment(lf.getXhtml())) {
-          messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, s, "The html source does not contain the header marker" 
+          messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, s, "The html source does not contain the publish box" 
             + (first ? " "+RELEASE_HTML_MARKER+" (see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations)" : ""), IssueSeverity.ERROR));
+          missingPublishBox = true;
         }
         first = false;
       }
       if (lf.getXhtml() != null)
-        if (checkLinks(s, "", lf.getXhtml(), null, messages, false) != NodeChangeType.NONE) // returns true if changed
+        if (checkLinks(s, "", lf.getXhtml(), null, messages, false) != NodeChangeType.NONE) { // returns true if changed
           saveFile(lf);
+        }
     }
  
     log.logDebugMessage(LogCategory.HTML, "Checking Other Links");
@@ -292,6 +298,8 @@ public class HTLMLInspector {
   }
 
   private void loadFile(String s, String base, List<ValidationMessage> messages) {
+    log.logDebugMessage(LogCategory.HTML, "Load "+s);
+
     File f = new File(s);
     Boolean hl7State = null;
     XhtmlNode x = null;
@@ -307,7 +315,7 @@ public class HTLMLInspector {
       if (htmlName || !(e.getMessage().startsWith("Unable to Parse HTML - does not start with tag.") || e.getMessage().startsWith("Malformed XHTML")))
     	messages.add(new ValidationMessage(Source.Publisher, IssueType.STRUCTURE, s, e.getMessage(), IssueSeverity.ERROR));    	
     }
-    if (hl7Checks && x != null) {
+    if (x != null) {
       String src;
       try {
         src = TextFile.fileToString(f);
@@ -316,7 +324,7 @@ public class HTLMLInspector {
           src = src.replace(RELEASE_HTML_MARKER, START_HTML_MARKER + statusText+END_HTML_MARKER);
           TextFile.stringToFile(src, f, false);
         }
-          
+        x = new XhtmlParser().setMustBeWellFormed(strict).parse(new FileInputStream(f), null);
       } catch (Exception e1) {
         hl7State = false;
       }
@@ -499,7 +507,8 @@ public class HTLMLInspector {
       resolved = manual.contains(rref);
     if (!resolved && specs != null){
       for (SpecMapManager spec : specs) {
-        resolved = resolved || spec.getBase().equals(rref) || (spec.getBase()).equals(rref+"/") || spec.hasTarget(rref); 
+        resolved = resolved || spec.getBase().equals(rref) || (spec.getBase()).equals(rref+"/") || spec.hasTarget(rref) || 
+            Utilities.existsInList(rref, Utilities.pathURL(spec.getBase(), "definitions.json.zip"), Utilities.pathURL(spec.getBase(), "definitions.xml.zip"), Utilities.pathURL(spec.getBase(), "package.tgz")); 
       }
     }
     
@@ -510,7 +519,8 @@ public class HTLMLInspector {
     }
     // special case end-points that are always valid:
      if (!resolved)
-      resolved = Utilities.existsInList(ref, "http://hl7.org/fhir/fhir-spec-r4.zip", "http://hl7.org/fhir/R4/fhir-spec-r4.zip", "http://hl7.org/fhir/STU3/fhir-spec.zip", "http://hl7.org/fhir/DSTU2/fhir-spec.zip") || 
+      resolved = Utilities.existsInList(ref, "http://hl7.org/fhir/fhir-spec-r4.zip", "http://hl7.org/fhir/R4/fhir-spec-r4.zip", "http://hl7.org/fhir/STU3/fhir-spec.zip", "http://hl7.org/fhir/DSTU2/fhir-spec.zip", 
+          "http://hl7.org/fhir-issues", "http://hl7.org/registry") || 
           matchesTarget(ref, "http://hl7.org", "http://hl7.org/fhir/DSTU2", "http://hl7.org/fhir/STU3", "http://hl7.org/fhir/R4", "http://hl7.org/fhir/smart-app-launch", "http://hl7.org/fhir/validator");
     
     if (!resolved) {
@@ -595,7 +605,7 @@ public class HTLMLInspector {
     } else {
       if (text == null)
         text = "";
-      messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The link '"+ref+"' for \""+text.replaceAll("[\\s\\n]+", " ").trim()+"\" cannot be resolved"+tgtList, IssueSeverity.ERROR).setLocationLink(uuid == null ? null : makeLocal(filename)+"#"+uuid));
+      messages.add(new ValidationMessage(Source.LinkChecker, IssueType.NOTFOUND, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The link '"+ref+"' for \""+text.replaceAll("[\\s\\n]+", " ").trim()+"\" cannot be resolved"+tgtList, IssueSeverity.ERROR).setLocationLink(uuid == null ? null : makeLocal(filename)+"#"+uuid));
       return true;
     } 
   }
@@ -683,7 +693,7 @@ public class HTLMLInspector {
   }
 
   public static void main(String[] args) throws Exception {
-    HTLMLInspector inspector = new HTLMLInspector(args[0], null, null, "http://hl7.org/fhir/us/core", true);
+    HTLMLInspector inspector = new HTLMLInspector(args[0], null, null, "http://hl7.org/fhir/us/core");
     inspector.setStrict(false);
     List<ValidationMessage> linkmsgs = inspector.check("test text");
     int bl = 0;
@@ -740,6 +750,10 @@ public class HTLMLInspector {
 
   public List<String> getExemptHtmlPatterns() {
     return exemptHtmlPatterns;
+  }
+
+  public boolean isMissingPublishBox() {
+    return missingPublishBox;
   }
 
   

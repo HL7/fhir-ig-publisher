@@ -32,6 +32,7 @@ import java.util.List;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
+import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService.LogCategory;
 import org.hl7.fhir.r5.formats.FormatUtilities;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.Reference;
@@ -191,8 +192,18 @@ public class SimpleFetcher implements IFetchFile {
           fn = findFile(dirs, id+".xml");
         if (fn == null)
           fn = findFile(dirs, id+".json");
+        if (fn == null) 
+          fn = findFile(dirs, type+"-"+id+".xml");
+        if (fn == null) 
+          fn = findFile(dirs, id+"."+type+".xml");
         if (fn == null)
-          throw new Exception("Unable to find the source file for "+type+"/"+id+": not specified, so tried "+type.toLowerCase()+"-"+id+".xml, "+id+"."+type.toLowerCase()+".xml, "+type.toLowerCase()+"-"+id+".json, "+type.toLowerCase()+"/"+id+".xml, "+type.toLowerCase()+"/"+id+".json, "+id+".xml, and "+id+".json in dirs "+dirs.toString());
+          fn = findFile(dirs, type+"-"+id+".json");
+        if (fn == null)
+          fn = findFile(dirs, type+"/"+id+".xml");
+        if (fn == null)
+          fn = findFile(dirs, type+"/"+id+".json");
+        if (fn == null)
+          throw new Exception("Unable to find the source file for "+type+"/"+id+": not specified, so tried "+type+"-"+id+".xml, "+id+"."+type+".xml, "+type+"-"+id+".json, "+type+"/"+id+".xml, "+type+"/"+id+".json, "+id+".xml, and "+id+".json (and lowercase resource name variants) in dirs "+dirs.toString());
       } else {
         fn = findFile(dirs, fn);
         if (fn == null || !exists(fn))
@@ -275,7 +286,7 @@ public class SimpleFetcher implements IFetchFile {
           }
         }
       }
-      log.logMessage("Loaded "+Integer.toString(count)+" files from "+s);
+      log.logDebugMessage(LogCategory.PROGRESS, "Loaded "+Integer.toString(count)+" files from "+s);
     }
     return res;
   }

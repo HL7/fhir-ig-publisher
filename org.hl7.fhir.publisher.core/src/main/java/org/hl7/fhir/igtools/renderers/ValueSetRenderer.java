@@ -40,6 +40,8 @@ import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.MetadataResource;
 import org.hl7.fhir.r5.model.PlanDefinition;
 import org.hl7.fhir.r5.model.PlanDefinition.PlanDefinitionActionComponent;
+import org.hl7.fhir.r5.model.Questionnaire;
+import org.hl7.fhir.r5.model.Questionnaire.QuestionnaireItemComponent;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.TriggerDefinition;
 import org.hl7.fhir.r5.model.UriType;
@@ -121,6 +123,7 @@ public class ValueSetRenderer extends BaseRenderer {
     Set<String> sdurls = new HashSet<String>();
     Set<String> vsurls = new HashSet<String>();
     Set<String> pdurls = new HashSet<String>();
+    Set<String> qurls = new HashSet<String>();
     for (MetadataResource sd : context.allConformanceResources()) {
       if (sd instanceof StructureDefinition)
         sdurls.add(sd.getUrl());
@@ -128,6 +131,8 @@ public class ValueSetRenderer extends BaseRenderer {
         vsurls.add(sd.getUrl());
       if (sd instanceof PlanDefinition)
         pdurls.add(sd.getUrl());
+      if (sd instanceof Questionnaire && sd.hasUrl())
+        qurls.add(sd.getUrl());
     }
     
     for (String url : sorted(vsurls)) {
@@ -159,16 +164,32 @@ public class ValueSetRenderer extends BaseRenderer {
     }
     for (String url : sorted(sdurls)) {
       StructureDefinition sd = context.fetchResource(StructureDefinition.class, url);
-      for (ElementDefinition ed : sd.getSnapshot().getElement()) {
-        if (ed.hasBinding() && ed.getBinding().hasValueSet()) {
-          if ((ed.getBinding().hasValueSet() && ed.getBinding().getValueSet().equals(vs.getUrl()))) {
-            if (first) {
-              first = false;
-              b.append("<ul>\r\n");
+      if (sd != null) {
+        for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+          if (ed.hasBinding() && ed.getBinding().hasValueSet()) {
+            if ((ed.getBinding().hasValueSet() && ed.getBinding().getValueSet().equals(vs.getUrl()))) {
+              if (first) {
+                first = false;
+                b.append("<ul>\r\n");
+              }
+              b.append(" <li><a href=\""+sd.getUserString("path")+"\">"+Utilities.escapeXml(sd.present())+"</a></li>\r\n");
+              break;
             }
-            b.append(" <li><a href=\""+sd.getUserString("path")+"\">"+Utilities.escapeXml(sd.present())+"</a></li>\r\n");
-            break;
           }
+        }
+      }
+    }
+    
+    for (String url : sorted(qurls)) {
+      Questionnaire q = context.fetchResource(Questionnaire.class, url);
+      if (q != null) {
+        if (questionnaireUsesValueSet(q.getItem(), vs.getUrl())) {
+          if (first) {
+            first = false;
+            b.append("<ul>\r\n");
+          }
+          b.append(" <li><a href=\""+q.getUserString("path")+"\">"+Utilities.escapeXml(q.present())+"</a></li>\r\n");
+          break;
         }
       }
     }
@@ -189,6 +210,16 @@ public class ValueSetRenderer extends BaseRenderer {
     else
       b.append("</ul>\r\n");
     return b.toString();
+  }
+
+  private boolean questionnaireUsesValueSet(List<QuestionnaireItemComponent> items, String url) {
+    for (QuestionnaireItemComponent i : items) {
+      if (i.hasAnswerValueSet() && url.equals(i.getAnswerValueSet()))
+        return true;
+      if (questionnaireUsesValueSet(i.getItem(), url))
+        return true;
+    }
+    return false;
   }
 
   private List<String> sorted(Collection<String> collection) {

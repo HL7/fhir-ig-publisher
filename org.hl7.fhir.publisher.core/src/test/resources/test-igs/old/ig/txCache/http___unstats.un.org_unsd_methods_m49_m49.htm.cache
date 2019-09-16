@@ -2,7 +2,7 @@
 {"code" : {
   "system" : "http://unstats.un.org/unsd/methods/m49/m49.htm",
   "code" : "013"
-}, "valueSet" :null}####
+}, "valueSet" :null, "lang":"en-US"}####
 v: {
   "display" : "Central America",
   "severity" : null,
@@ -10,9 +10,40 @@ v: {
 }
 -------------------------------------------------------------------------------------
 {"code" : {
+  "coding" : [{
+    "system" : "http://unstats.un.org/unsd/methods/m49/m49.htm",
+    "code" : "013",
+    "display" : "Central America"
+  }]
+}, "valueSet" :{
+  "resourceType" : "ValueSet",
+  "compose" : {
+    "include" : [{
+      "system" : "urn:iso:std:iso:3166"
+    },
+    {
+      "system" : "urn:iso:std:iso:3166:-2"
+    },
+    {
+      "system" : "http://unstats.un.org/unsd/methods/m49/m49.htm",
+      "filter" : [{
+        "property" : "class",
+        "op" : "=",
+        "value" : "region"
+      }]
+    }]
+  }
+}, "lang":"null"}####
+v: {
+  "display" : "",
+  "severity" : "error",
+  "error" : "Not done yet @ TAreaCodeServices.Close"
+}
+-------------------------------------------------------------------------------------
+{"code" : {
   "system" : "http://unstats.un.org/unsd/methods/m49/m49.htm",
   "code" : "013"
-}, "valueSet" :null, "lang":"en-US"}####
+}, "valueSet" :null, "lang":"null"}####
 v: {
   "display" : "Central America",
   "severity" : null,

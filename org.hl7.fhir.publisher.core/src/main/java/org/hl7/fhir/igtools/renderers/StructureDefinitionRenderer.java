@@ -37,9 +37,11 @@ import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
+import org.hl7.fhir.r4.model.UrlType;
 import org.hl7.fhir.r5.conformance.ProfileUtilities;
 import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider.BindingResolution;
 import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.model.CanonicalType;
@@ -85,13 +87,15 @@ public class StructureDefinitionRenderer extends BaseRenderer {
   ProfileUtilities utils;
   private StructureDefinition sd;
   private String destDir;
+  private List<FetchedFile> files;
 
-  public StructureDefinitionRenderer(IWorkerContext context, String prefix, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge) {
+  public StructureDefinitionRenderer(IWorkerContext context, String prefix, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files) {
     super(context, prefix, igp, maps, markdownEngine, packge);
     this.sd = sd;
     this.destDir = destDir;
     utils = new ProfileUtilities(context, null, igp);
     utils.setIgmode(true);
+    this.files = files;
   }
 
   @Override
@@ -314,10 +318,10 @@ public class StructureDefinitionRenderer extends BaseRenderer {
   private String summarise(CodeableConcept cc) throws FHIRException {
     if (cc.getCoding().size() == 1 && cc.getText() == null) {
       return summarise(cc.getCoding().get(0));
-    } else if (cc.getCoding().size() == 0 && cc.hasText()) {
+    } else if (cc.hasText()) {
       return "\"" + cc.getText()+"\"";
     } else 
-      throw new FHIRException("too complex to describe");
+      throw new FHIRException("Error describing concept - not done yet (multiple codings, no text)");
   }
 
   private String summarise(Coding coding) throws FHIRException {
@@ -426,7 +430,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
           if (t != null)
             ed.getBinding().setUserData("tx.value", t);
         }
-        if (ed.getType().size() == 1 && ed.getType().get(0).getCode().equals("Extension"))
+        if (ed.getType().size() == 1 && ed.getType().get(0).getWorkingCode().equals("Extension"))
           id = id + "<br/>"+ed.getType().get(0).getProfile();
         txlist.add(id);
         txmap.put(id, ed.getBinding());
@@ -467,7 +471,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
           if (t != null)
             ed.getBinding().setUserData("tx.value", t);
         }
-        if (ed.getType().size() == 1 && ed.getType().get(0).getCode().equals("Extension"))
+        if (ed.getType().size() == 1 && ed.getType().get(0).getWorkingCode().equals("Extension"))
           id = id + "<br/>"+ed.getType().get(0).getProfile();
         txlist.add(id);
         txmap.put(id, ed.getBinding());
@@ -616,6 +620,11 @@ public class StructureDefinitionRenderer extends BaseRenderer {
       this.replace = replace;
     }
 
+    @Override
+    public String toString() {
+      return match+" -> "+replace;
+    }
+
   }
 
   public String dict(boolean incProfiledOut) throws Exception {
@@ -623,8 +632,9 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     StringBuilder b = new StringBuilder();
     b.append("<table class=\"dict\">\r\n");
 
-    List<StringPair> replacements = new ArrayList<StringPair>();
+    List<StringPair> replacements = new ArrayList<>();
     for (ElementDefinition ec : sd.getSnapshot().getElement()) {
+      trimReplacements(replacements, ec.getId());
       if (incProfiledOut || !"0".equals(ec.getMax())) {
         if (isProfiledExtension(ec)) {
           StructureDefinition extDefn = context.fetchResource(StructureDefinition.class, ec.getType().get(0).getProfile().get(0).getValue());
@@ -638,7 +648,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
             if (ec.getId().endsWith("[x]")) {
               Set<String> tl = new HashSet<String>();
               for (TypeRefComponent tr : ec.getType()) {
-                String tc = tr.getCode();
+                String tc = tr.getWorkingCode();
                 if (!tl.contains(tc)) {
                   tl.add(tc);
                   String s = ec.getId().replace("[x]", Utilities.capitalize(tc));
@@ -655,31 +665,33 @@ public class StructureDefinitionRenderer extends BaseRenderer {
         } else {
           String title = ec.getId();
           b.append("  <tr><td colspan=\"2\" class=\"structure\"><span class=\"self-link-parent\"><a name=\""+ec.getId()+"\"> </a>");
-          if (ec.getId().endsWith("[x]")) {
+          if (ec.getPath().endsWith("[x]")) {
             Set<String> tl = new HashSet<String>();
             for (TypeRefComponent tr : ec.getType()) {
-              String tc = tr.getCode();
+              String tc = tr.getWorkingCode();
               if (!tl.contains(tc)) {
                 tl.add(tc);
                 String s = ec.getId().replace("[x]", Utilities.capitalize(tc));
-                b.append("<a name=\""+s+"\"> </a>");
+                replacements.add(new StringPair(ec.getId(), s));
+                s = ec.getPath().replace("[x]", Utilities.capitalize(tc));
                 replacements.add(new StringPair(ec.getId(), s));
               }
             }
-          } else if (ec.hasBase() && ec.getBase().getPath().endsWith("[x]")) {
-            String s = nottail(ec.getId())+"."+tail(ec.getBase().getPath());
-            replacements.add(new StringPair(ec.getId(), s));
-            b.append("<a name=\""+s+"\"> </a>");
-          } else if (!ec.getId().equals(ec.getPath())) {
-            b.append("<a name=\""+ec.getPath()+"\"> </a>");
-          }
-          for (StringPair s : replacements)
-            if (ec.getId().startsWith(s.match))
-              b.append("<a name=\""+s.replace+ec.getId().substring(s.match.length())+"\"> </a>");
+//          } else if (ec.hasBase() && ec.getBase().getPath().endsWith("[x]")) {
+//            String s = nottail(ec.getId())+"."+tail(ec.getBase().getPath());
+//            replacements.add(new StringPair(ec.getId(), s));
+//            b.append("<a name=\""+s+"\"> </a>");
+          } 
+//          else if (ec.hasSliceName()) {
+//            b.append("<a name=\""+ec.getPath()+"\"> </a>");
+//          } 
+          Set<String> anchors = generateReplacements(ec.getId(), replacements);
+          for (String s : anchors)
+              b.append("<a name=\""+s+"\"> </a>");
           b.append("<span style=\"color: grey\">"+Integer.toString(i++)+".</span> <b>"+title+"</b>"+link(ec.getId())+"</span></td></tr>\r\n");
           generateElementInner(b, sd, ec, 1, null);
           if (ec.hasSlicing())
-            generateSlicing(sd, ec.getSlicing());
+            generateSlicing(b, sd, ec, ec.getSlicing());
         }
       }
     }
@@ -688,12 +700,46 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     return b.toString();
   }
 
+  private void trimReplacements(List<StringPair> replacements, String id) {
+    List<StringPair> toRemove = new ArrayList<>();
+    for (StringPair p : replacements) {
+      if (!id.startsWith(p.match))
+        toRemove.add(p);
+    }
+    replacements.removeAll(toRemove);
+    
+  }
+
+  private Set<String> generateReplacements(String id, List<StringPair> replacements) {
+    Set<String> res = new HashSet<>();
+    if (replacements.isEmpty())
+      return res;
+    
+    Set<String> add = new HashSet<>();
+    res.add(id);
+    do {
+      add.clear();
+      for (String s : res) {
+        for (StringPair p : replacements) {
+          if (s.startsWith(p.match)) {
+            String r = p.replace+s.substring(p.match.length());
+            if (!res.contains(r))
+              add.add(r);
+          }
+        }
+      }
+      res.addAll(add);
+    } while (!add.isEmpty());
+    res.remove(id);
+    return res;
+  }
+
   private String link(String id) {
     return "<a href=\"#"+id+"\" title=\"link to here\" class=\"self-link\"><svg viewBox=\"0 0 1792 1792\" width=\"16\" class=\"self-link\" height=\"16\"><path d=\"M1520 1216q0-40-28-68l-208-208q-28-28-68-28-42 0-72 32 3 3 19 18.5t21.5 21.5 15 19 13 25.5 3.5 27.5q0 40-28 68t-68 28q-15 0-27.5-3.5t-25.5-13-19-15-21.5-21.5-18.5-19q-33 31-33 73 0 40 28 68l206 207q27 27 68 27 40 0 68-26l147-146q28-28 28-67zm-703-705q0-40-28-68l-206-207q-28-28-68-28-39 0-68 27l-147 146q-28 28-28 67 0 40 28 68l208 208q27 27 68 27 42 0 72-31-3-3-19-18.5t-21.5-21.5-15-19-13-25.5-3.5-27.5q0-40 28-68t68-28q15 0 27.5 3.5t25.5 13 19 15 21.5 21.5 18.5 19q33-31 33-73zm895 705q0 120-85 203l-147 146q-83 83-203 83-121 0-204-85l-206-207q-83-83-83-203 0-123 88-209l-88-88q-86 88-208 88-120 0-204-84l-208-208q-84-84-84-204t85-203l147-146q83-83 203-83 121 0 204 85l206 207q83 83 83 203 0 123-88 209l88 88q86-88 208-88 120 0 204 84l208 208q84 84 84 204z\" fill=\"navy\"></path></svg></a>";
   }
 
   private boolean isProfiledExtension(ElementDefinition ec) {
-    return ec.getType().size() == 1 && "Extension".equals(ec.getType().get(0).getCode()) && ec.getType().get(0).hasProfile();
+    return ec.getType().size() == 1 && "Extension".equals(ec.getType().get(0).getWorkingCode()) && ec.getType().get(0).hasProfile();
   }
 
 
@@ -710,6 +756,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
   }
 
   private void generateElementInner(StringBuilder b, StructureDefinition profile, ElementDefinition d, int mode, ElementDefinition value) throws Exception {
+    tableRow(b, translate("sd.dict", "SliceName"), "profiling.html#slicing", d.getSliceName());
     tableRowNE(b, translate("sd.dict", "Definition"), null, processMarkdown(profile.getName(), d.getDefinitionElement()));
     tableRowNE(b, translate("sd.dict", "Note"), null, businessIdWarning(profile.getName(), tail(d.getPath())));
     tableRow(b, translate("sd.dict", "Control"), "conformance-rules.html#conformance", describeCardinality(d) + summariseConditions(d.getCondition()));
@@ -736,27 +783,30 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     tableRow(b, translate("sd.dict", "SNOMED-CT Code"), null, getMapping(profile, d, SNOMED_MAPPING));
   }
 
-  private void generateSlicing(StructureDefinition profile, ElementDefinitionSlicingComponent slicing) throws IOException {
-    StringBuilder b = new StringBuilder();
+  private void generateSlicing(StringBuilder b, StructureDefinition profile, ElementDefinition ed, ElementDefinitionSlicingComponent slicing) throws IOException {
+    String rs = null;
     if (slicing.getOrdered())
-      b.append("<li>"+translate("sd.dict", "ordered")+"</li>");
+      rs = translate("sd.dict", "ordered");
     else
-      b.append("<li>"+translate("sd.dict", "unordered")+"</li>");
+      rs = translate("sd.dict", "unordered");
     if (slicing.hasRules())
-      b.append("<li>"+slicing.getRules().getDisplay()+"</li>");
+      rs = rs+" and "+slicing.getRules().getDisplay();
+    
+    StringBuilder bl = new StringBuilder();
     if (!slicing.getDiscriminator().isEmpty()) {
-      b.append("<li>"+translate("sd.dict", "discriminators")+": ");
       boolean first = true;
       for (ElementDefinitionSlicingDiscriminatorComponent s : slicing.getDiscriminator()) {
         if (first)
           first = false;
         else
-          b.append(", ");
-        b.append(s.getType().toCode()+":"+s.getPath());
+          bl.append(", ");
+        bl.append("<li>"+s.getType().toCode()+" @ "+s.getPath()+"</li>");
       }
-      b.append("</li>");
     }
-    tableRowNE(b, ""+translate("sd.dict", "Slicing"), "profiling.html#slicing", translate("sd.dict", "This element introduces a set of slices. The slicing rules are")+": <ul> "+b.toString()+"</ul>");
+    if (slicing.hasDiscriminator())
+      tableRowNE(b, ""+translate("sd.dict", "Slicing"), "profiling.html#slicing", "This element introduces a set of slices on "+ed.getPath()+". The slices are "+rs+", and can be differentiated using the following discriminators: <ul> "+bl.toString()+"</ul>");
+    else
+      tableRowNE(b, ""+translate("sd.dict", "Slicing"), "profiling.html#slicing", "This element introduces a set of slices on "+ed.getPath()+". The slices are "+rs+", and defines no discriminators to differentiate the slices");
   }
 
   private void tableRow(StringBuilder b, String name, String defRef, String value) throws IOException {
@@ -858,15 +908,15 @@ public class StructureDefinitionRenderer extends BaseRenderer {
   }
 
   private void describeType(StringBuilder b, TypeRefComponent t) throws Exception {
-    if (t.getCode() == null)
+    if (t.getWorkingCode() == null)
       return;
-    if (t.getCode().startsWith("="))
+    if (t.getWorkingCode().startsWith("="))
       return;
 
-    if (t.getCode().startsWith("xs:")) {
-      b.append(t.getCode());
+    if (t.getWorkingCode().startsWith("xs:")) {
+      b.append(t.getWorkingCode());
     } else {
-      String s = igp.getLinkFor(sd.getUserString("path"), t.getCode());
+      String s = igp.getLinkFor(sd.getUserString("path"), t.getWorkingCode());
       if (s != null) {
         b.append("<a href=\"");
         //    GG 13/12/2016 - I think that this is always wrong now. 
@@ -882,10 +932,10 @@ public class StructureDefinitionRenderer extends BaseRenderer {
           //       b.append(t.getCode());
         }
         b.append("\">");
-        b.append(t.getCode());
+        b.append(t.getWorkingCode());
         b.append("</a>");
       } else 
-        b.append(t.getCode());
+        b.append(t.getWorkingCode());
     }
     if (t.hasProfile()) {
       b.append("(");
@@ -1267,8 +1317,10 @@ public class StructureDefinitionRenderer extends BaseRenderer {
   }
 
   public String pseudoJson() throws Exception {
+    if (sd.getSnapshot() == null || sd.getSnapshot().getElement() == null || sd.getSnapshot().getElement().size()==0) {
+      return "";
+    }
     StringBuilder b = new StringBuilder();
-    ElementDefinition root = sd.getSnapshot().getElement().get(0);
     String rn = sd.getSnapshot().getElement().get(0).getPath();
     b.append(" // <span style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(sd.getTitle()) + "</span>\r\n {\r\n");
     if (sd.getKind() == StructureDefinitionKind.RESOURCE)
@@ -1306,7 +1358,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
 
   private boolean allTypesAreReference(ElementDefinition child) {
     for (TypeRefComponent tr : child.getType()) {
-      if (!"Reference".equals(tr.getCode()))
+      if (!"Reference".equals(tr.getWorkingCode()))
           return false;
     }
     return !child.getType().isEmpty();
@@ -1379,7 +1431,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     String name =  tail(elem.getPath());
     String en = asValue ? "value[x]" : name;
     if (en.contains("[x]"))
-      en = en.replace("[x]", upFirst(type.getCode()));
+      en = en.replace("[x]", upFirst(type.getWorkingCode()));
     boolean unbounded = elem.hasBase() && elem.getBase().hasMax() ? elem.getBase().getMax().equals("*") : "*".equals(elem.getMax());
     String defPage = igp.getLinkForProfile(sd, sd.getUrl());
     // 1. name
@@ -1398,26 +1450,26 @@ public class StructureDefinitionRenderer extends BaseRenderer {
       assert(children.size() > 0);
       b.append("{");
       delayedClose = true;
-    } else if (type.getCode() == null) {
+    } else if (type.getWorkingCode() == null) {
       // For the 'value' element of simple types
       b.append("&lt;<span style=\"color: darkgreen\">n/a</span>&gt;");
-    } else if (isPrimitive(type.getCode())) {
-      if (!(type.getCode().equals("integer") || type.getCode().equals("boolean") || type.getCode().equals("decimal")))
+    } else if (isPrimitive(type.getWorkingCode())) {
+      if (!(type.getWorkingCode().equals("integer") || type.getWorkingCode().equals("boolean") || type.getWorkingCode().equals("decimal")))
         b.append("\"");
       if (elem.hasFixed()) 
         b.append(Utilities.escapeJson(((PrimitiveType) elem.getFixed()).asStringValue()));
       else {
-        String l = getSrcFile(type.getCode());
+        String l = getSrcFile(type.getWorkingCode());
         if (l == null)
-            b.append("&lt;<span style=\"color: darkgreen\">" + type.getCode()+ "</span>&gt;");
+            b.append("&lt;<span style=\"color: darkgreen\">" + type.getWorkingCode()+ "</span>&gt;");
         else
-          b.append("&lt;<span style=\"color: darkgreen\"><a href=\"" +suffix(l, type.getCode()) + "\">" + type.getCode()+ "</a></span>&gt;");
+          b.append("&lt;<span style=\"color: darkgreen\"><a href=\"" +suffix(l, type.getWorkingCode()) + "\">" + type.getWorkingCode()+ "</a></span>&gt;");
       }
-      if (!(type.getCode().equals("integer") || type.getCode().equals("boolean") || type.getCode().equals("decimal")))
+      if (!(type.getWorkingCode().equals("integer") || type.getWorkingCode().equals("boolean") || type.getWorkingCode().equals("decimal")))
         b.append("\"");
     } else {
       b.append("{");
-      b.append("<span style=\"color: darkgreen\"><a href=\"" +suffix(getSrcFile(type.getCode()), type.getCode()) + "\">" + type.getCode()+ "</a></span>");
+      b.append("<span style=\"color: darkgreen\"><a href=\"" +suffix(getSrcFile(type.getWorkingCode()), type.getWorkingCode()) + "\">" + type.getWorkingCode()+ "</a></span>");
       if (type.hasProfile()) {
         StructureDefinition tsd = context.fetchResource(StructureDefinition.class, type.getProfile().get(0).getValue());
         if (tsd != null)
@@ -1516,7 +1568,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     String name =  tail(elem.getPath());
     String en = asValue ? "value[x]" : name;
     if (en.contains("[x]"))
-      en = en.replace("[x]", upFirst(type.getCode()));
+      en = en.replace("[x]", upFirst(type.getWorkingCode()));
     boolean unbounded = elem.hasMax() && elem.getMax().equals("*");
 
     String indentS = "";
@@ -1585,7 +1637,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     String name =  tail(elem.getPath());
     String en = asValue ? "value[x]" : name;
     if (en.contains("[x]"))
-      en = en.replace("[x]", upFirst(type.getCode()));
+      en = en.replace("[x]", upFirst(type.getWorkingCode()));
     boolean unbounded = elem.hasMax() && elem.getMax().equals("*");
 
     String indentS = "";
@@ -1764,6 +1816,91 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     }
     String s = slicing.getOrdered() ? " in any order" : " in the specified order " + (slicing.hasRules() ? slicing.getRules().getDisplay() : "");
     return "// sliced by "+csv.toString()+" "+s;
+  }
+
+  public String references() {
+    Map<String, String> base = new HashMap<>();
+    Map<String, String> refs = new HashMap<>();
+    Map<String, String> trefs = new HashMap<>();
+    Map<String, String> examples = new HashMap<>();
+    for (StructureDefinition sd : context.allStructures()) {
+      if (this.sd.getUrl().equals(sd.getBaseDefinition())) {
+        base.put(sd.getUserString("path"), sd.present());
+      }
+      for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+        for (TypeRefComponent tr : ed.getType()) {
+          for (CanonicalType u : tr.getProfile()) {
+            if (this.sd.getUrl().equals(u.getValue())) {
+              refs.put(sd.getUserString("path"), sd.present());
+            }
+          }
+          for (CanonicalType u : tr.getTargetProfile()) {
+            if (this.sd.getUrl().equals(u.getValue())) {
+              trefs.put(sd.getUserString("path"), sd.present());
+            }
+          }
+        }
+      }
+    }
+    for (FetchedFile f : files) {
+      for (FetchedResource r : f.getResources()) {
+        if (usesSD(r.getElement())) {
+          String p = igp.getLinkFor(r);
+          examples.put(p, r.getTitle());          
+        }
+      }
+    }
+
+    StringBuilder b= new StringBuilder();
+    b.append("<p><b>Usage:</b></p>\r\n<ul>\r\n");
+    if (!base.isEmpty())
+      b.append(" <li>Derived from this "+sd.describeType()+": "+refList(base)+"</li>\r\n");
+    if (!refs.isEmpty())
+      b.append(" <li>Use this "+sd.describeType()+": "+refList(refs)+"</li>\r\n");
+    if (!trefs.isEmpty())
+      b.append(" <li>Refer to this "+sd.describeType()+": "+refList(refs)+"</li>\r\n");
+    if (!examples.isEmpty())
+      b.append(" <li>Examples for this "+sd.describeType()+": "+refList(examples)+"</li>\r\n");
+    if (base.isEmpty() && refs.isEmpty() && trefs.isEmpty() && examples.isEmpty())
+      b.append(" <li>This "+sd.describeType()+" is not used in this Implementation Guide</li>\r\n");
+    b.append("</ul>\r\n");
+    return b.toString();
+  }
+
+  private boolean usesSD(Element resource) {
+    if (resource.hasChild("meta")) {
+      Element meta = resource.getNamedChild("meta");
+      for (Element p : meta.getChildrenByName("profile")) {
+        if (sd.getUrl().equals(p.getValue()))
+          return true;
+      }
+    }
+    return usesExtension(resource);
+  }
+
+  private boolean usesExtension(Element focus) {
+    for (Element child : focus.getChildren()) {
+      if (child.getName().equals("Extension") && sd.getUrl().equals(child.getChildValue("url")))
+        return true;
+      if (usesExtension(child))
+        return true;
+    }   
+    return false;
+  }
+
+  private String refList(Map<String, String> base) {
+    CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
+    for (String s : sorted(base.keySet())) {
+      b.append("<a href=\""+s+"\">"+base.get(s)+"</a>");
+    }
+    return b.toString();
+  }
+
+  private List<String> sorted(Set<String> keys) {
+    List<String> res = new ArrayList<>();
+    res.addAll(keys);
+    Collections.sort(res);
+    return res;
   }
 
 }
