@@ -356,10 +356,13 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     else
     {
       XhtmlComposer composer = new XhtmlComposer(XhtmlComposer.HTML);
-      List<ElementDefinition> realElements = sd.getSnapshot().getElement();
+      StructureDefinition sdCopy = sd.copy();
       List<ElementDefinition> mustSupportElements = new ArrayList<ElementDefinition>();
-      
-      for (ElementDefinition ed : realElements) {
+
+      // Scan through all the properties checking for must support elements
+      // and clear properties in the cloned StructureDefinition that we don't want to
+      // show in the custom view
+      for (ElementDefinition ed : sdCopy.getSnapshot().getElement()) {
         if (ed.hasMustSupport() && ed.getMustSupport() || !ed.getPath().contains(".")) {
           ElementDefinition edCopy = ed.copy();
           if (edCopy.hasExample())
@@ -371,35 +374,9 @@ public class StructureDefinitionRenderer extends BaseRenderer {
         }
       }
 
-      sd.getSnapshot().setElement(mustSupportElements);
-      org.hl7.fhir.utilities.xhtml.XhtmlNode table = utils.generateTable(defnFile, sd, false, destDir, false, sd.getId(), true, prefix, "", false, false, outputTracker);
-      sd.getSnapshot().setElement(realElements);
+      sdCopy.getSnapshot().setElement(mustSupportElements);
+      org.hl7.fhir.utilities.xhtml.XhtmlNode table = utils.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, prefix, "", false, false, outputTracker);
 
-      // List<org.hl7.fhir.utilities.xhtml.XhtmlNode> removeNodes = new ArrayList<org.hl7.fhir.utilities.xhtml.XhtmlNode>();
-      // int index = 0;
-      // for (org.hl7.fhir.utilities.xhtml.XhtmlNode tableRow : table.getChildNodes()) {
-      //   index++;
-      //   if (index > 2) { // skip the header and resource rows
-      //     String rowText = composer.compose(tableRow);
-      //     if (!rowText.contains("This element must be supported")) {
-      //       removeNodes.add(tableRow);
-      //     }
-      //     else {
-      //       // and remove the must support tag (as they are all must support)
-      //       for (org.hl7.fhir.utilities.xhtml.XhtmlNode columnNode : tableRow.getChildNodes()) {
-      //         for (org.hl7.fhir.utilities.xhtml.XhtmlNode spanNode : columnNode.getChildNodes()) {
-      //           if (spanNode.getAttribute("title") == "This element must be supported") {
-      //             columnNode.getChildNodes().remove(spanNode);
-      //               break;
-      //           }
-      //         }
-      //       }
-      //     }
-      //   }
-      // }
-      // for (org.hl7.fhir.utilities.xhtml.XhtmlNode tableRow : removeNodes) {
-      //   table.getChildNodes().remove(tableRow);
-      // }
       return composer.compose(table);
     }
   }
