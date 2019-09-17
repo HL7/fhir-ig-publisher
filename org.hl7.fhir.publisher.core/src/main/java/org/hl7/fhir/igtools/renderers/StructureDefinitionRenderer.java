@@ -350,6 +350,37 @@ public class StructureDefinitionRenderer extends BaseRenderer {
       return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateTable(defnFile, sd, false, destDir, false, sd.getId(), true, prefix, "", false, false, outputTracker));
   }
 
+  public String mustsupport(String defnFile, Set<String> outputTracker) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
+    if (sd.getSnapshot().getElement().isEmpty())
+      return "";
+    else
+    {
+      XhtmlComposer composer = new XhtmlComposer(XhtmlComposer.HTML);
+      StructureDefinition sdCopy = sd.copy();
+      List<ElementDefinition> mustSupportElements = new ArrayList<ElementDefinition>();
+
+      // Scan through all the properties checking for must support elements
+      // and clear properties in the cloned StructureDefinition that we don't want to
+      // show in the custom view
+      for (ElementDefinition ed : sdCopy.getSnapshot().getElement()) {
+        if (ed.hasMustSupport() && ed.getMustSupport() || !ed.getPath().contains(".")) {
+          ElementDefinition edCopy = ed.copy();
+          if (edCopy.hasExample())
+            edCopy.getExample().clear();
+          if (edCopy.hasBinding())
+            edCopy.setBinding(null);
+          edCopy.setMustSupport(false);
+          mustSupportElements.add(edCopy);
+        }
+      }
+
+      sdCopy.getSnapshot().setElement(mustSupportElements);
+      org.hl7.fhir.utilities.xhtml.XhtmlNode table = utils.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, prefix, "", false, false, outputTracker);
+
+      return composer.compose(table);
+    }
+  }
+
   public String grid(String defnFile, Set<String> outputTracker) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
     if (sd.getSnapshot().getElement().isEmpty())
       return "";
