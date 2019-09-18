@@ -524,9 +524,9 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     }
     if (vsn.equals("?ext"))
       if (tx.getValueSet() != null)
-        System.out.println("No value set at "+path+" (url = '"+tx.getValueSet()+"')");
+        System.out.println("No value set found at "+path+" (url = '"+tx.getValueSet()+"')");
       else
-        System.out.println("No value set at "+path+" (no url)");
+        System.out.println("No value set specified at "+path+" (no url)");
     if (tx.hasUserData("tx.value"))
       vss = "Fixed Value: "+summariseValue((Type) tx.getUserData("tx.value"));
     else if (tx.hasUserData("tx.pattern"))
