@@ -109,7 +109,6 @@ public class ExtensionTracker {
     fhirVersion = publishedIg.getFhirVersion().get(0).asStringValue();
     jurisdiction = publishedIg.getJurisdictionFirstRep().getCodingFirstRep().getCode();
     packageId = publishedIg.getPackageId();
-
   }
 
   public void scan(StructureDefinition sd) {

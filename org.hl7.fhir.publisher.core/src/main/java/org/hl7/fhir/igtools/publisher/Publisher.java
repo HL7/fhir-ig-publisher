@@ -108,6 +108,7 @@ import org.hl7.fhir.igtools.publisher.utils.IGReleaseUpdater.ServerType;
 import org.hl7.fhir.igtools.publisher.utils.IGReleaseVersionDeleter;
 import org.hl7.fhir.igtools.renderers.BaseRenderer;
 import org.hl7.fhir.igtools.renderers.CodeSystemRenderer;
+import org.hl7.fhir.igtools.renderers.CrossViewRenderer;
 import org.hl7.fhir.igtools.renderers.JsonXhtmlRenderer;
 import org.hl7.fhir.igtools.renderers.StructureDefinitionRenderer;
 import org.hl7.fhir.igtools.renderers.StructureMapRenderer;
@@ -3961,7 +3962,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Checking Output HTML");
       String statusMessage;
       if (mode == IGBuildMode.AUTOBUILD) 
-        statusMessage = Utilities.escapeXml(sourceIg.present())+", "+sourceIg.getPublisher()+" - CI build for version "+businessVersion+"). This version is based on the current content of <a href=\""+gh()+"\">"+gh()+"</a> and changes regularly. See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>"; 
+        statusMessage = Utilities.escapeXml(sourceIg.present())+", published by "+sourceIg.getPublisher()+". This is not an authorized publication; it is the continuous build for version "+businessVersion+"). This version is based on the current content of <a href=\""+gh()+"\">"+gh()+"</a> and changes regularly. See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>"; 
       else if (mode == IGBuildMode.PUBLICATION) 
         statusMessage = "Publication Build: This will be filled in by the publication tooling"; 
       else 
@@ -4529,6 +4530,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     generateResourceReferences();
 
     generateDataFile();
+    
+    CrossViewRenderer cvr = new CrossViewRenderer(igpkp.getCanonical(), context);
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getResource() != null && r.getResource() instanceof MetadataResource) {
+          cvr.seeResource((MetadataResource) r.getResource());
+        }
+      }
+    }
+    fragment("summary-observations", cvr.getObservationSummary(), otherFilesRun);
+    fragment("summary-extensions", cvr.getExtensionSummary(), otherFilesRun);
     
     // now, list the profiles - all the profiles
     JsonObject data = new JsonObject();
@@ -5132,6 +5144,33 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
 
+    genResourceReferencesList(rt, items, "");
+    Collections.sort(items, new ItemSorterById());
+    genResourceReferencesList(rt, items, "byid-");
+    Collections.sort(items, new ItemSorterByName());
+    genResourceReferencesList(rt, items, "name-");
+  }
+
+
+  public class ItemSorterById implements Comparator<Item> {
+    @Override
+    public int compare(Item arg0, Item arg1) {
+      String l = arg0.r == null ? null : arg0.r.getId();
+      String r = arg1.r == null ? null : arg1.r.getId();
+      return l == null ? 0 : l.compareTo(r);
+    }
+  }
+
+  public class ItemSorterByName implements Comparator<Item> {
+    @Override
+    public int compare(Item arg0, Item arg1) {
+      String l = arg0.r == null ? null : arg0.r.getTitle();
+      String r = arg1.r == null ? null : arg1.r.getTitle();
+      return l == null ? 0 : l.compareTo(r);
+    }
+  }
+
+  public void genResourceReferencesList(ResourceType rt, List<Item> items, String ext) throws Exception, IOException {
     StringBuilder list = new StringBuilder();
     StringBuilder lists = new StringBuilder();
     StringBuilder table = new StringBuilder();
@@ -5154,15 +5193,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         genEntryItem(listX, listsX, tableX, null, null, null, i.f, i.r, i.sort, "xml");
       }
     }
-    fragment("list-"+Utilities.pluralizeMe(rt.toString().toLowerCase()), list.toString(), otherFilesRun);
-    fragment("list-simple-"+Utilities.pluralizeMe(rt.toString().toLowerCase()), lists.toString(), otherFilesRun);
-    fragment("table-"+Utilities.pluralizeMe(rt.toString().toLowerCase()), table.toString(), otherFilesRun);
-    fragment("list-"+Utilities.pluralizeMe(rt.toString().toLowerCase())+"-json", listJ.toString(), otherFilesRun);
-    fragment("list-simple-"+Utilities.pluralizeMe(rt.toString().toLowerCase())+"-json", listsJ.toString(), otherFilesRun);
-    fragment("table-"+Utilities.pluralizeMe(rt.toString().toLowerCase())+"-json", tableJ.toString(), otherFilesRun);
-    fragment("list-"+Utilities.pluralizeMe(rt.toString().toLowerCase())+"-xml", listX.toString(), otherFilesRun);
-    fragment("list-simple-"+Utilities.pluralizeMe(rt.toString().toLowerCase())+"-xml", listsX.toString(), otherFilesRun);
-    fragment("table-"+Utilities.pluralizeMe(rt.toString().toLowerCase())+"-xml", tableX.toString(), otherFilesRun);
+    String pm = Utilities.pluralizeMe(rt.toString().toLowerCase());
+    fragment("list-"+ext+pm, list.toString(), otherFilesRun);
+    fragment("list-simple-"+ext+pm, lists.toString(), otherFilesRun);
+    fragment("table-"+ext+pm, table.toString(), otherFilesRun);
+    fragment("list-"+ext+pm+"-json", listJ.toString(), otherFilesRun);
+    fragment("list-simple-"+ext+pm+"-json", listsJ.toString(), otherFilesRun);
+    fragment("table-"+ext+pm+"-json", tableJ.toString(), otherFilesRun);
+    fragment("list-"+ext+pm+"-xml", listX.toString(), otherFilesRun);
+    fragment("list-simple-"+ext+pm+"-xml", listsX.toString(), otherFilesRun);
+    fragment("table-"+ext+pm+"-xml", tableX.toString(), otherFilesRun);
   }
 
   @SuppressWarnings("rawtypes")

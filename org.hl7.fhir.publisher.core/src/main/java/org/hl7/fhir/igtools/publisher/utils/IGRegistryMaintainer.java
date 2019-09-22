@@ -38,6 +38,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSyntaxException;
 
 public class IGRegistryMaintainer {
@@ -155,6 +156,9 @@ public class IGRegistryMaintainer {
           e.addProperty("history", getHistoryPage(ig.canonical));
           e.addProperty("canonical", ig.canonical);
           e.addProperty("ci-build", ig.cibuild);
+          JsonArray a = new JsonArray();
+          e.add("language", a);
+          a.add(new JsonPrimitive("en"));
         } else {
           if (!e.has("ci-build") || e.get("ci-build").equals(ig.cibuild)) {
             e.remove("ci-build");
@@ -171,10 +175,10 @@ public class IGRegistryMaintainer {
         e.add("editions", a);
         if (!ig.getCandidates().isEmpty()) {
           PublicationEntry p = ig.getCandidates().get(0);
-          a.add(makeEdition(p));
+          a.add(makeEdition(p, ig.packageId));
         }
         for (PublicationEntry p : ig.getReleases()) {
-          a.add(makeEdition(p));
+          a.add(makeEdition(p, ig.packageId));
         }
       }
       TextFile.stringToFile(new GsonBuilder().setPrettyPrinting().create().toJson(json), path, false);
@@ -191,11 +195,14 @@ public class IGRegistryMaintainer {
     }    
   }
   
-  private JsonObject makeEdition(PublicationEntry p) {
+  private JsonObject makeEdition(PublicationEntry p, String packageId) {
     JsonObject e = new JsonObject();
     e.addProperty("name", p.getName());
     e.addProperty("ig-version", p.getVersion());
-    e.addProperty("fhir-version", p.getFhirVersion());
+    JsonArray a = new JsonArray();
+    e.add("fhir-version", a);
+    a.add(new JsonPrimitive(p.getFhirVersion()));
+    e.addProperty("package", packageId+"#"+p.getFhirVersion());
     e.addProperty("url", p.getPath());
     return e;
   }
