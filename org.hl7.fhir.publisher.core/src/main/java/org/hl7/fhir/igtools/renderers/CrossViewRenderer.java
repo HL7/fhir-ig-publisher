@@ -28,14 +28,14 @@ public class CrossViewRenderer {
   public class ObsListSorter implements Comparator<ObservationProfile> {
     @Override
     public int compare(ObservationProfile l, ObservationProfile r) {
-      return l.source.getUrl().compareTo(r.source.getUrl());
+      return l.source.getUrl().toLowerCase().compareTo(r.source.getUrl().toLowerCase());
     }
   }
 
   public class ExtListSorter implements Comparator<ExtensionDefinition> {
     @Override
     public int compare(ExtensionDefinition l, ExtensionDefinition r) {
-      return l.source.getUrl().compareTo(r.source.getUrl());
+      return l.source.getUrl().toLowerCase().compareTo(r.source.getUrl().toLowerCase());
     }
   }
 
