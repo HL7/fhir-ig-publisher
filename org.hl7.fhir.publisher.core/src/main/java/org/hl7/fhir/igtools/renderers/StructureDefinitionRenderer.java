@@ -646,12 +646,21 @@ public class StructureDefinitionRenderer extends BaseRenderer {
             Set<String> tl = new HashSet<String>();
             for (TypeRefComponent tr : ec.getType()) {
               String tc = tr.getWorkingCode();
+              if (Utilities.isAbsoluteUrl(tc)) {
+                StructureDefinition sd = context.fetchResource(StructureDefinition.class, tc);
+                if (sd != null)
+                  tc = sd.getType();
+              }
               if (!tl.contains(tc)) {
                 tl.add(tc);
                 String s = ec.getId().replace("[x]", Utilities.capitalize(tc));
-                replacements.add(new StringPair(ec.getId(), s));
+                StringPair sp = new StringPair(ec.getId(), s);
+                if (!hasReplacement(replacements, sp) && !ec.getId().equals(s))
+                  replacements.add(sp);
                 s = ec.getPath().replace("[x]", Utilities.capitalize(tc));
-                replacements.add(new StringPair(ec.getId(), s));
+                sp = new StringPair(ec.getId(), s);
+                if (!hasReplacement(replacements, sp))
+                  replacements.add(sp);
               }
             }
 //          } else if (ec.hasBase() && ec.getBase().getPath().endsWith("[x]")) {
@@ -675,6 +684,15 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     b.append("</table>\r\n");
     i++;
     return b.toString();
+  }
+
+  private boolean hasReplacement(List<StringPair> replacements, StringPair sp) {
+    for (StringPair t : replacements) {
+      if (t.match.equals(sp.match) && t.replace.equals(sp.replace)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private void trimReplacements(List<StringPair> replacements, String id) {

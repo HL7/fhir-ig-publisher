@@ -110,6 +110,7 @@ import org.hl7.fhir.igtools.renderers.BaseRenderer;
 import org.hl7.fhir.igtools.renderers.CodeSystemRenderer;
 import org.hl7.fhir.igtools.renderers.CrossViewRenderer;
 import org.hl7.fhir.igtools.renderers.JsonXhtmlRenderer;
+import org.hl7.fhir.igtools.renderers.OperationDefinitionRenderer;
 import org.hl7.fhir.igtools.renderers.StructureDefinitionRenderer;
 import org.hl7.fhir.igtools.renderers.StructureMapRenderer;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter;
@@ -170,6 +171,7 @@ import org.hl7.fhir.r5.model.ImplementationGuide.SPDXLicense;
 import org.hl7.fhir.r5.model.ListResource;
 import org.hl7.fhir.r5.model.ListResource.ListEntryComponent;
 import org.hl7.fhir.r5.model.MetadataResource;
+import org.hl7.fhir.r5.model.OperationDefinition;
 import org.hl7.fhir.r5.model.Parameters;
 import org.hl7.fhir.r5.model.PrimitiveType;
 import org.hl7.fhir.r5.model.Reference;
@@ -5302,6 +5304,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             case StructureDefinition:
               generateOutputsStructureDefinition(f, r, (StructureDefinition) r.getResource(), vars, regen);
               break;
+            case OperationDefinition:
+              generateOutputsOperationDefinition(f, r, (OperationDefinition) r.getResource(), vars, regen);
+              break;
             case StructureMap:
               generateOutputsStructureMap(f, r, (StructureMap) r.getResource(), vars);
               break;
@@ -5320,6 +5325,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
+
+  private void generateOutputsOperationDefinition(FetchedFile f, FetchedResource r, OperationDefinition od, Map<String, String> vars, boolean regen) throws FHIRException, IOException {
+    OperationDefinitionRenderer odr = new OperationDefinitionRenderer(context, checkAppendSlash(specPath), od, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, fileList);
+    if (igpkp.wantGen(r, "summary"))
+      fragment("OperationDefinition-"+od.getId()+"-summary", odr.summary(), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "idempotence"))
+      fragment("OperationDefinition-"+od.getId()+"-summary", odr.idempotence(), f.getOutputNames(), r, vars, null);
+  }
 
   public class ListItemEntry {
 
