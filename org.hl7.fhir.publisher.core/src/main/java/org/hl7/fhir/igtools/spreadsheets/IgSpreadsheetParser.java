@@ -771,7 +771,7 @@ public class IgSpreadsheetParser {
         ElementDefinitionConstraintComponent inv = invariants.get(sn);
         if (inv == null)
           throw new Exception("unable to find Invariant '" + sn + "' "   + getLocation(row));
-        e.addCondition(inv.getId());
+        e.addCondition(inv.getKey());
       }
     }
 
