@@ -380,7 +380,7 @@ public class CrossViewRenderer {
       for (String t : types) {
         if (first) first = false; else b.append(" | ");
         StructureDefinition sd = context.fetchTypeDefinition(t);
-        if (t != null) {
+        if (sd != null) {
           b.append("<a href=\""+sd.getUserString("path")+"\">"+t+"</a>");
         } else {
           b.append(t);
