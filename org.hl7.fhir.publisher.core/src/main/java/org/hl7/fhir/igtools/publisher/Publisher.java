@@ -2156,52 +2156,63 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
 
-  public void loadFromPackage(String name, String canonical, NpmPackage pi, String webref, SpecMapManager igm)
-      throws IOException, FHIRException, FHIRFormatError, Exception {
+  public void loadFromPackage(String name, String canonical, NpmPackage pi, String webref, SpecMapManager igm) throws IOException {
     for (String fn : pi.list("package")) {
-      if (fn.endsWith(".json") && fn.contains("-")) {
-        Resource r = null;
-        String t = fn.substring(0, fn.indexOf("-"));
-        if (Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "SearchParameter", "OperationDefinition", "Questionnaire", "ConceptMap", "StructureMap", "NamingSystem", "ImplementationGuide", "CapabilityStatement", "Questionnaire")) {
-          if (igm.getVersion().equals("3.0.1") || igm.getVersion().equals("3.0.0")) {
-            org.hl7.fhir.dstu3.model.Resource res = new org.hl7.fhir.dstu3.formats.JsonParser().parse(pi.load("package", fn));
-            r = VersionConvertor_30_50.convertResource(res, true);
-          } else if (igm.getVersion().equals("4.0.0")) {
-            org.hl7.fhir.r4.model.Resource res = new org.hl7.fhir.r4.formats.JsonParser().parse(pi.load("package", fn));
-            r = VersionConvertor_40_50.convertResource(res);
-          } else if (igm.getVersion().equals("1.4.0")) {
-            org.hl7.fhir.dstu2016may.model.Resource res = new org.hl7.fhir.dstu2016may.formats.JsonParser().parse(pi.load("package", fn));
-            r = VersionConvertor_14_50.convertResource(res);
-          } else if (igm.getVersion().equals("1.0.2")) {
-            org.hl7.fhir.dstu2.model.Resource res = new org.hl7.fhir.dstu2.formats.JsonParser().parse(pi.load("package", fn));
-            VersionConvertorAdvisor50 advisor = new IGR2ConvertorAdvisor5();
-            r = new VersionConvertor_10_50(advisor ).convertResource(res);
-          } else if (igm.getVersion().equals(Constants.VERSION)) {
-            r = new JsonParser().parse(pi.load("package", fn));
-          } else
-            throw new Exception("Unsupported version "+igm.getVersion());
-        }
-        if (r != null) {
-          if (r instanceof MetadataResource) {
-            String u = ((MetadataResource) r).getUrl();
-            if (u != null) {
-              String p = igm.getPath(u);
-              if (p == null)
-                throw new Exception("Internal error in IG "+name+" map: No identity found for "+u);
-              r.setUserData("path", webref+"/"+ igpkp.doReplacements(p, r, null, null));
-              String v = ((MetadataResource) r).getVersion();
-              if (v!=null) {
-                u = u + "|" + v;
-                p = igm.getPath(u);
-                if (p == null)
-                  log("In IG "+name+" map: No identity found for "+u);
-                r.setUserData("versionpath", canonical+"/"+ igpkp.doReplacements(p, r, null, null));
-              }
-            }
-            context.cacheResource(r);
-          }
-        }
+      try {
+        loadResourceFromPackage(name, canonical, pi, webref, igm, fn);
+      } catch (Exception e) {
+        log("Error loading "+fn+": "+e.getMessage());
+        throw new FHIRException("Error loading "+fn+": "+e.getMessage(), e);
       } 
+    }
+  }
+
+
+
+  public void loadResourceFromPackage(String name, String canonical, NpmPackage pi, String webref, SpecMapManager igm, String fn)
+      throws IOException, Exception {
+    if (fn.endsWith(".json") && fn.contains("-")) {
+      Resource r = null;
+      String t = fn.substring(0, fn.indexOf("-"));
+      if (Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "SearchParameter", "OperationDefinition", "Questionnaire", "ConceptMap", "StructureMap", "NamingSystem", "ImplementationGuide", "CapabilityStatement", "Questionnaire")) {
+        if (igm.getVersion().equals("3.0.1") || igm.getVersion().equals("3.0.0")) {
+          org.hl7.fhir.dstu3.model.Resource res = new org.hl7.fhir.dstu3.formats.JsonParser().parse(pi.load("package", fn));
+          r = VersionConvertor_30_50.convertResource(res, true);
+        } else if (igm.getVersion().equals("4.0.0")) {
+          org.hl7.fhir.r4.model.Resource res = new org.hl7.fhir.r4.formats.JsonParser().parse(pi.load("package", fn));
+          r = VersionConvertor_40_50.convertResource(res);
+        } else if (igm.getVersion().equals("1.4.0")) {
+          org.hl7.fhir.dstu2016may.model.Resource res = new org.hl7.fhir.dstu2016may.formats.JsonParser().parse(pi.load("package", fn));
+          r = VersionConvertor_14_50.convertResource(res);
+        } else if (igm.getVersion().equals("1.0.2")) {
+          org.hl7.fhir.dstu2.model.Resource res = new org.hl7.fhir.dstu2.formats.JsonParser().parse(pi.load("package", fn));
+          VersionConvertorAdvisor50 advisor = new IGR2ConvertorAdvisor5();
+          r = new VersionConvertor_10_50(advisor ).convertResource(res);
+        } else if (igm.getVersion().equals(Constants.VERSION)) {
+          r = new JsonParser().parse(pi.load("package", fn));
+        } else
+          throw new Exception("Unsupported version "+igm.getVersion());
+      }
+      if (r != null) {
+        if (r instanceof MetadataResource) {
+          String u = ((MetadataResource) r).getUrl();
+          if (u != null) {
+            String p = igm.getPath(u);
+            if (p == null)
+              throw new Exception("Internal error in IG "+name+" map: No identity found for "+u);
+            r.setUserData("path", webref+"/"+ igpkp.doReplacements(p, r, null, null));
+            String v = ((MetadataResource) r).getVersion();
+            if (v!=null) {
+              u = u + "|" + v;
+              p = igm.getPath(u);
+              if (p == null)
+                log("In IG "+name+" map: No identity found for "+u);
+              r.setUserData("versionpath", canonical+"/"+ igpkp.doReplacements(p, r, null, null));
+            }
+          }
+          context.cacheResource(r);
+        }
+      }
     }
   }
   
@@ -2233,7 +2244,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           throw new Exception("Unknown Package "+packageId+"#"+igver);
       }
     }
-    logDebugMessage(LogCategory.INIT, "Load "+name+" ("+canonical+") from "+packageId+"#"+igver);
+    log("Load "+name+" ("+canonical+") from "+packageId+"#"+igver);
     if (ostr(dep, "package") == null && packageId != null)
       dep.addProperty("package", packageId);
 
@@ -2247,7 +2258,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     igm.setBase(canonical);
     specMaps.add(igm);
     if (!version.equals(igm.getVersion())) {
-      log("Version mismatch. This IG is version "+version+", while the IG '"+name+"' is from version "+igm.getVersion()+" (will try to run anyway)");
+      log("Version mismatch. This IG is for FHIR version "+version+", while the IG '"+name+"' is for FHIR version "+igm.getVersion()+" (will try to run anyway)");
     }
     
     loadFromPackage(name, canonical, pi, webref, igm);
@@ -3657,6 +3668,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           changed = true;
           sd.getDifferential().getElement().add(0, new ElementDefinition().setPath(p.substring(0, p.indexOf("."))));
         }
+        utils.setDefWebRoot(igpkp.getCanonical());
         utils.generateSnapshot(base, sd, sd.getUrl(), Utilities.extractBaseUrl(base.getUserString("path")), sd.getName());
         changed = true;
       }
@@ -5331,7 +5343,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "summary"))
       fragment("OperationDefinition-"+od.getId()+"-summary", odr.summary(), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "idempotence"))
-      fragment("OperationDefinition-"+od.getId()+"-summary", odr.idempotence(), f.getOutputNames(), r, vars, null);
+      fragment("OperationDefinition-"+od.getId()+"-idempotence", odr.idempotence(), f.getOutputNames(), r, vars, null);
   }
 
   public class ListItemEntry {
