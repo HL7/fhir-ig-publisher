@@ -49,7 +49,17 @@ import com.google.gson.JsonObject;
 public class IGReleaseUpdater {
 
   public enum ServerType {
-    APACHE, ASP
+    APACHE, ASP;
+
+    public static ServerType fromCode(String st) {
+      st = st.toLowerCase();
+      if (st.equals("asp"))
+        return ServerType.ASP;
+      else if (st.equals("apache"))
+        return ServerType.APACHE;
+      else 
+        throw new Error("-server-type "+st+" not known - use ASP or Apache");
+    }
   }
 
   private String folder;

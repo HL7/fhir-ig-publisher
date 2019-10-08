@@ -24,20 +24,69 @@ package org.hl7.fhir.igtools.publisher.utils;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.hl7.fhir.igtools.publisher.utils.IGReleaseUpdater.ServerType;
+import org.hl7.fhir.utilities.IniFile;
+import org.hl7.fhir.utilities.Utilities;
+
+import com.google.gson.JsonSyntaxException;
+
 public class IgExistenceScanner {
 
-  public static void main(String[] args) throws FileNotFoundException, IOException {
-    System.out.println("looking for IGs in "+args[0]);
-    List<String> igs = scanForIgs(args[0]);
-    IGRegistryMaintainer reg = new IGRegistryMaintainer(args.length > 2 ? args[2] : null);
+  public static void main(String[] args) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
+    execute(args[0], args.length > 2 ? new IGRegistryMaintainer(args[2]) : null);
+  }
+  
+  public static void execute(String folder, IGRegistryMaintainer reg) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
+    File f = new File(folder);
+    if (!f.exists())
+      throw new IOException("Folder "+folder+" not found");
+    if (!f.isDirectory())
+      throw new IOException("The path "+folder+" is not a folder");
+    if (!f.exists())
+      throw new IOException("publish.ini not found in "+folder);
+    
+    f = new File(Utilities.path(folder, "publish.ini"));
+    IniFile ini = new IniFile(f.getAbsolutePath());
+    if ("fhir.layout".equals(ini.getStringProperty("website", "style")))
+      throw new IOException("publish.ini in "+folder+" not in the correct format (missing style=fhir.layout in [website])");
+      
+    String url = ini.getStringProperty("website",  "url");
+    if (reg == null && !ini.getBooleanProperty("website", "no-registry"))
+      throw new Error("This web site contains IGs that are registered in the implementation guide registry, and you must pass in a reference to the registry");
+    ServerType serverType = ServerType.fromCode(ini.getStringProperty("website", "server"));
+    
+    System.out.println("Update the website at "+folder);
+    System.out.println("The public URL is at "+folder);
+    if (reg == null)
+      System.out.println("The public registry will not be updated");
+    else
+      System.out.println("Update the public registry at "+reg.getPath());
+    System.out.println("The server type is "+serverType);
+    System.out.print("Enter y to continue");    
+    int r = System.in.read();
+    if (r != 'y')
+      return;
+    
+    System.out.println("looking for IGs in "+folder);
+    List<String> igs = scanForIgs(folder);
     System.out.println("found: ");
     for (String s : igs) {
-      System.out.println(s);
-      new IGReleaseUpdater(s, args[1], args[0], reg, null).check();
+      System.out.println("  "+s);
+      new IGReleaseUpdater(s, url, folder, reg, serverType).check();
     }
+    System.out.println("==================== ");
+    System.out.println("Processing Feeds for "+folder);
+    if (!Utilities.noString(ini.getStringProperty("feeds",  "package"))) {
+      new FeedBuilder().execute(folder, ini.getStringProperty("feeds", "package"), ini.getStringProperty("website", "org"), url, true);
+    }
+    if (!Utilities.noString(ini.getStringProperty("feeds",  "publication"))) {
+      new FeedBuilder().execute(folder, ini.getStringProperty("feeds", "publication"), ini.getStringProperty("website", "org"), url, false);
+    }
+    System.out.println("Finished Processing Feeds");
     System.out.println("==================== ");
     reg.finish();
   }
@@ -63,4 +112,6 @@ public class IgExistenceScanner {
     }
     return igs;
   }
+  
+  
 }

@@ -106,6 +106,7 @@ import org.hl7.fhir.igtools.publisher.utils.IGRegistryMaintainer;
 import org.hl7.fhir.igtools.publisher.utils.IGReleaseUpdater;
 import org.hl7.fhir.igtools.publisher.utils.IGReleaseUpdater.ServerType;
 import org.hl7.fhir.igtools.publisher.utils.IGReleaseVersionDeleter;
+import org.hl7.fhir.igtools.publisher.utils.IgExistenceScanner;
 import org.hl7.fhir.igtools.renderers.BaseRenderer;
 import org.hl7.fhir.igtools.renderers.CodeSystemRenderer;
 import org.hl7.fhir.igtools.renderers.CrossViewRenderer;
@@ -6342,41 +6343,24 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       deleter.clear(f.getAbsolutePath(), fh.getAbsolutePath());
     } else if (hasParam(args, "-publish-update")) {
       if (!args[0].equals("-publish-update"))
-        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} (first argument is not -publish-update)");
-      if (args.length < 4)
-        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} (not enough args)");
-      File f = new File(args[1]);
+        throw new Error("-publish-update must have the format -publish-update -folder {folder} -registry {registry}/fhir-ig-list.json (first argument is not -publish-update)");
+      if (args.length < 3)
+        throw new Error("-publish-update must have the format -publish-update -folder {folder} -registry {registry}/fhir-ig-list.json (not enough args)");
+      File f = new File(getNamedParam(args, "-folder"));
       if (!f.exists() || !f.isDirectory())
-        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} ({root}/{realm}/{code} not found)");
-      String url = getNamedParam(args, "-url");      
-      if (Utilities.noString(url))
-        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} (-url parameter not found)");
-      String root = getNamedParam(args, "-root");      
-      if (Utilities.noString(root))
-        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} (-root parameter not found)");
-      File fr = new File(root);
-      if (!fr.exists() || !fr.isDirectory())
-        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} ({root} not found)");
+        throw new Error("-publish-update must have the format -publish-update -folder {folder} -registry {registry}/fhir-ig-list.json ({folder} not found)");
       
       String registry = getNamedParam(args, "-registry");
       if (Utilities.noString(registry))
-        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} (-registry parameter not found)");
-      fr = new File(registry);
-      if (!fr.exists() || fr.isDirectory())
-        throw new Error("-publish-update must have the format -publish-update {root}/{realm}/{code} -registry {registry}/fhir-ig-list.json -url {url} -root {root} ({registry} not found)");
-      ServerType serverType = null;
-      if (hasParam(args, "-server-type")) {
-        String st = getNamedParam(args, "-server-type").toLowerCase();
-        if (st.equals("asp"))
-          serverType = ServerType.ASP;
-        else if (st.equals("apache"))
-          serverType = ServerType.APACHE;
-        else 
-          throw new Error("-server-type "+st+" not known - use ASP or Apache");
+        throw new Error("-publish-update must have the format -publish-update -url {url} -root {root} -registry {registry}/fhir-ig-list.json (-registry parameter not found)");
+      if (!"n/a".equals(registry)) {
+        File fr = new File(registry);
+        if (!fr.exists() || fr.isDirectory())
+          throw new Error("-publish-update must have the format -publish-update -url {url} -root {root} -registry {registry}/fhir-ig-list.json ({registry} not found)");
       }
-      IGRegistryMaintainer reg = new IGRegistryMaintainer(registry);
-      IGReleaseUpdater updater = new IGReleaseUpdater(args[1], url, root, reg, serverType);
-      updater.check();
+     
+      IGRegistryMaintainer reg = "n/a".equals(registry) ? null : new IGRegistryMaintainer(registry);
+      IgExistenceScanner.execute(f.getAbsolutePath(), reg);
       reg.finish();      
     } else if (hasParam(args, "-multi")) {
       int i = 1;
@@ -6418,7 +6402,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (int i = 0; i < args.length; i++) {
           System.out.print(" "+args[i]);
       }      
-      System.out.print(" [dir = "+System.getProperty("user.dir")+"]");
+      System.out.println();
+      System.out.print("dir = "+System.getProperty("user.dir")+", path = "+System.getenv("PATH"));
       System.out.println();
       System.out.println("Run time = "+nowAsString(self.execTime)+" ("+nowAsDate(self.execTime)+")");
       if (hasNamedParam(args, "-auto-ig-build")) {
@@ -6525,7 +6510,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         self.log("Stack Dump (for debugging):");
         e.printStackTrace();
         for (StackTraceElement st : e.getStackTrace()) {
-          self.filelog.append(st.toString());
+          if (st != null && self.filelog != null)
+            self.filelog.append(st.toString());
         }
         exitCode = 1;
       } finally {

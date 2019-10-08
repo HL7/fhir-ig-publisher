@@ -231,4 +231,8 @@ public class IGRegistryMaintainer {
     return "??";
   }
 
+  public String getPath() {
+    return path;
+  }
+
 }
