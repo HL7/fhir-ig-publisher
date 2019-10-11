@@ -26,7 +26,7 @@
        fhir:ContactPoint.value [ fhir:value "http://www.healthit.gov" ]
      ]
   ];
-  fhir:StructureDefinition.date [ fhir:value "2014-08-21T00:00:00+10:00"^^xsd:dateTime];
+  fhir:StructureDefinition.date [ fhir:value "2014-08-21T00:00:00+04:00"^^xsd:dateTime];
   fhir:StructureDefinition.description [ fhir:value "Defines constraints and extensions on the DiagnosticOrder resource for use in querying and retrieving DiagnosticOrder information."];
   fhir:StructureDefinition.fhirVersion [ fhir:value "1.4.0"];
   fhir:StructureDefinition.mapping [
@@ -951,9 +951,13 @@
          fhir:ElementDefinition.type.profile [
            fhir:value "http://hl7.org/fhir/StructureDefinition/daf-resultobs";
            fhir:index 0
-         ], [
+         ]
+       ], [
+         fhir:index 1;
+         fhir:ElementDefinition.type.code [ fhir:value "Reference" ];
+         fhir:ElementDefinition.type.profile [
            fhir:value "http://hl7.org/fhir/StructureDefinition/daf-condition";
-           fhir:index 1
+           fhir:index 0
          ]
        ];
        fhir:ElementDefinition.maxLength [ fhir:value "0"^^xsd:integer ];
@@ -1631,9 +1635,13 @@
          fhir:ElementDefinition.type.profile [
            fhir:value "http://hl7.org/fhir/StructureDefinition/Practitioner";
            fhir:index 0
-         ], [
+         ]
+       ], [
+         fhir:index 1;
+         fhir:ElementDefinition.type.code [ fhir:value "Reference" ];
+         fhir:ElementDefinition.type.profile [
            fhir:value "http://hl7.org/fhir/StructureDefinition/Device";
-           fhir:index 1
+           fhir:index 0
          ]
        ];
        fhir:ElementDefinition.maxLength [ fhir:value "0"^^xsd:integer ];
@@ -2559,9 +2567,13 @@
          fhir:ElementDefinition.type.profile [
            fhir:value "http://hl7.org/fhir/StructureDefinition/daf-resultobs";
            fhir:index 0
-         ], [
+         ]
+       ], [
+         fhir:index 1;
+         fhir:ElementDefinition.type.code [ fhir:value "Reference" ];
+         fhir:ElementDefinition.type.profile [
            fhir:value "http://hl7.org/fhir/StructureDefinition/daf-condition";
-           fhir:index 1
+           fhir:index 0
          ]
        ];
        fhir:ElementDefinition.mustSupport [ fhir:value "true"^^xsd:boolean ];

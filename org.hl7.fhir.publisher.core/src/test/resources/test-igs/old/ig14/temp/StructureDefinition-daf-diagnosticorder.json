@@ -21,7 +21,7 @@
       ]
     }
   ],
-  "date": "2014-08-21T00:00:00+10:00",
+  "date": "2014-08-21T00:00:00+04:00",
   "description": "Defines constraints and extensions on the DiagnosticOrder resource for use in querying and retrieving DiagnosticOrder information.",
   "fhirVersion": "1.4.0",
   "mapping": [
@@ -937,7 +937,12 @@
           {
             "code": "Reference",
             "profile": [
-              "http://hl7.org/fhir/StructureDefinition/daf-resultobs",
+              "http://hl7.org/fhir/StructureDefinition/daf-resultobs"
+            ]
+          },
+          {
+            "code": "Reference",
+            "profile": [
               "http://hl7.org/fhir/StructureDefinition/daf-condition"
             ]
           }
@@ -1634,7 +1639,12 @@
           {
             "code": "Reference",
             "profile": [
-              "http://hl7.org/fhir/StructureDefinition/Practitioner",
+              "http://hl7.org/fhir/StructureDefinition/Practitioner"
+            ]
+          },
+          {
+            "code": "Reference",
+            "profile": [
               "http://hl7.org/fhir/StructureDefinition/Device"
             ]
           }
@@ -2577,7 +2587,12 @@
           {
             "code": "Reference",
             "profile": [
-              "http://hl7.org/fhir/StructureDefinition/daf-resultobs",
+              "http://hl7.org/fhir/StructureDefinition/daf-resultobs"
+            ]
+          },
+          {
+            "code": "Reference",
+            "profile": [
               "http://hl7.org/fhir/StructureDefinition/daf-condition"
             ]
           }

@@ -3,10 +3,10 @@
 <ImplementationGuide xmlns="http://hl7.org/fhir">
   <id value="test-ig"/>
   <extension url="http://hl7.org/fhir/StructureDefinition/igpublisher-folder-resource">
-    <valueString value="C:\work\org.hl7.fhir\fhir-ig-publisher\org.hl7.fhir.publisher.core\src\test\resources\test-igs\old\ig\resources"/>
+    <valueString value="/Users/grahame/Documents/work/fhir-ig-publisher/org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/ig/resources"/>
   </extension>
   <extension url="http://hl7.org/fhir/StructureDefinition/igpublisher-folder-pages">
-    <valueString value="C:\work\org.hl7.fhir\fhir-ig-publisher\org.hl7.fhir.publisher.core\src\test\resources\test-igs\old\ig\pages"/>
+    <valueString value="/Users/grahame/Documents/work/fhir-ig-publisher/org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/ig/pages"/>
   </extension>
   <url value="http://hl7.org/fhir/test/ImplementationGuide/test-ig"/>
   <name value="Test Implementation Guide"/>
@@ -32,6 +32,12 @@
     <resource>
       <reference>
         <reference value="CodeSystem/test-ig-cs"/>
+      </reference>
+      <exampleBoolean value="false"/>
+    </resource>
+    <resource>
+      <reference>
+        <reference value="CodeSystem/cs-prop"/>
       </reference>
       <exampleBoolean value="false"/>
     </resource>

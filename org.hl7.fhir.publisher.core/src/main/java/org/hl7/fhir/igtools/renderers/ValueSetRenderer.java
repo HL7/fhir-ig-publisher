@@ -60,8 +60,8 @@ public class ValueSetRenderer extends BaseRenderer {
 
   private ValueSet vs;
 
-  public ValueSetRenderer(IWorkerContext context, String prefix, ValueSet vs, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge) {
-    super(context, prefix, igp, maps, markdownEngine, packge);
+  public ValueSetRenderer(IWorkerContext context, String prefix, ValueSet vs, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, NarrativeGenerator gen) {
+    super(context, prefix, igp, maps, markdownEngine, packge, gen);
     this.vs = vs; 
   }
 
@@ -111,7 +111,7 @@ public class ValueSetRenderer extends BaseRenderer {
       return new XhtmlComposer(XhtmlComposer.HTML).compose(vs.getText().getDiv());
     ValueSet vsc = vs.copy();
     vsc.setText(null);
-    new NarrativeGenerator("", "", context).generate(vsc, outputTracker);
+    gen.generate(vsc, outputTracker);
 
     return new XhtmlComposer(XhtmlComposer.HTML).compose(vsc.getText().getDiv());
   }

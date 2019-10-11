@@ -67,6 +67,7 @@
     "test-ig-spreadsheet.xml",
     "test-ig-lee.xml"
   ],
+  "code.system.property.list" : ["http://hl7.org/fhir/test/properties-cs-prop"],
   "bundles" : [
     "test-bundle"
   ],  
@@ -77,6 +78,9 @@
 		},
 		"CodeSystem/test-ig-cs": {
 			"base": "codesystems.html#test-ig-cs"
+		},
+		"CodeSystem/cs-prop": {
+			"base": "codesystems.html#cs-prop"
 		},
 		"ValueSet/test-ig-vs": {
 			"base": "valuesets.html#test-ig-vs"

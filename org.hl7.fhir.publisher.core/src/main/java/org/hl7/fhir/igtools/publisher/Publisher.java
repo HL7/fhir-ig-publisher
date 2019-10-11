@@ -44,6 +44,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -581,6 +582,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private ExtensionTracker extensionTracker;
 
   private String currVer;
+
+  private List<String> codeSystemProps = new ArrayList<>();
   
   private class PreProcessInfo {
     private String xsltName;
@@ -1218,6 +1221,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         resourceDirs.add(Utilities.path(rootDir, p.getValue()));
       } else if (p.getCode().equals("autoload-resources")) {     
         autoLoad = "true".equals(p.getValue());
+      } else if (p.getCode().equals("codesystem-property")) {     
+        codeSystemProps.add(p.getValue());
       } else if (p.getCode().equals("path-pages")) {     
         pagesDirs.add(Utilities.path(rootDir, p.getValue()));
       } else if (p.getCode().equals("path-qa")) {     
@@ -1735,6 +1740,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
 
+    JsonArray cspl = configuration.getAsJsonArray("code.system.property.list");
+    if (cspl != null) {
+      for (JsonElement csp : cspl) {
+        codeSystemProps.add(((JsonPrimitive) csp).getAsString());
+      }
+    }
+
+    
     // ;
     validator = new InstanceValidator(context, new IGPublisherHostServices()); // todo: host services for reference resolution....
     validator.setAllowXsiLocation(true);
@@ -2542,6 +2555,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     gen.setCorePath(checkAppendSlash(specPath));
     gen.setDestDir(Utilities.path(tempDir));
     gen.setPkp(igpkp);
+    gen.getCodeSystemPropList().addAll(codeSystemProps );
 
     if (igMode) {
       boolean failed = false;
@@ -5130,7 +5144,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     list.append(" <li><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a> "+Utilities.escapeXml(desc.asStringValue())+"</li>\r\n");
     lists.append(" <li><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a></li>\r\n");
-    table.append(" <tr><td><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a> </td><td>"+new BaseRenderer(context, null, igpkp, specMaps, markdownEngine, packge).processMarkdown("description", desc )+"</td></tr>\r\n");
+    table.append(" <tr><td><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a> </td><td>"+new BaseRenderer(context, null, igpkp, specMaps, markdownEngine, packge, gen).processMarkdown("description", desc )+"</td></tr>\r\n");
     
     if (listMM != null) {
       String mm = "";
@@ -5141,7 +5155,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       listMM.append(" <li><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a>"+mm+" "+Utilities.escapeXml(desc.asStringValue())+"</li>\r\n");
       listsMM.append(" <li><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a>"+mm+"</li>\r\n");
-      tableMM.append(" <tr><td><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a> </td><td>"+new BaseRenderer(context, null, igpkp, specMaps, markdownEngine, packge).processMarkdown("description", desc )+"</td><td>"+mm+"</td></tr>\r\n");
+      tableMM.append(" <tr><td><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a> </td><td>"+new BaseRenderer(context, null, igpkp, specMaps, markdownEngine, packge, gen).processMarkdown("description", desc )+"</td><td>"+mm+"</td></tr>\r\n");
     }
   }
 
@@ -5340,7 +5354,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
   private void generateOutputsOperationDefinition(FetchedFile f, FetchedResource r, OperationDefinition od, Map<String, String> vars, boolean regen) throws FHIRException, IOException {
-    OperationDefinitionRenderer odr = new OperationDefinitionRenderer(context, checkAppendSlash(specPath), od, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, fileList);
+    OperationDefinitionRenderer odr = new OperationDefinitionRenderer(context, checkAppendSlash(specPath), od, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, fileList, gen);
     if (igpkp.wantGen(r, "summary"))
       fragment("OperationDefinition-"+od.getId()+"-summary", odr.summary(), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "idempotence"))
@@ -5834,7 +5848,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
    * @throws Exception
    */
   private void generateOutputsCodeSystem(FetchedFile f, FetchedResource fr, CodeSystem cs, Map<String, String> vars) throws Exception {
-    CodeSystemRenderer csr = new CodeSystemRenderer(context, specPath, cs, igpkp, specMaps, markdownEngine, packge);
+    CodeSystemRenderer csr = new CodeSystemRenderer(context, specPath, cs, igpkp, specMaps, markdownEngine, packge, gen);
     if (igpkp.wantGen(fr, "summary"))
       fragment("CodeSystem-"+cs.getId()+"-summary", csr.summary(igpkp.wantGen(fr, "xml"), igpkp.wantGen(fr, "json"), igpkp.wantGen(fr, "ttl")), f.getOutputNames(), fr, vars, null);
     if (igpkp.wantGen(fr, "content"))
@@ -5855,7 +5869,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
    * @throws Exception
    */
   private void generateOutputsValueSet(FetchedFile f, FetchedResource r, ValueSet vs, Map<String, String> vars) throws Exception {
-    ValueSetRenderer vsr = new ValueSetRenderer(context, specPath, vs, igpkp, specMaps, markdownEngine, packge);
+    ValueSetRenderer vsr = new ValueSetRenderer(context, specPath, vs, igpkp, specMaps, markdownEngine, packge, gen);
     if (igpkp.wantGen(r, "summary"))
       fragment("ValueSet-"+vs.getId()+"-summary", vsr.summary(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl")), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "cld"))
@@ -5950,7 +5964,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "json-schema"))
       fragmentError("StructureDefinition-"+sd.getId()+"-json-schema", "yet to be done: json schema as html", null, f.getOutputNames());
 
-    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, fileList);
+    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, fileList, gen);
     if (igpkp.wantGen(r, "summary"))
       fragment("StructureDefinition-"+sd.getId()+"-summary", sdr.summary(), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "header"))
@@ -6038,7 +6052,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void generateOutputsStructureMap(FetchedFile f, FetchedResource r, StructureMap map, Map<String,String> vars) throws Exception {
-    StructureMapRenderer smr = new StructureMapRenderer(context, checkAppendSlash(specPath), map, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge);
+    StructureMapRenderer smr = new StructureMapRenderer(context, checkAppendSlash(specPath), map, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, gen);
     if (igpkp.wantGen(r, "summary"))
       fragment("StructureMap-"+map.getId()+"-summary", smr.summary(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl")), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "content"))

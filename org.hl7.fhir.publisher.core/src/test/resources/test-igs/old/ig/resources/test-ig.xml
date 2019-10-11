@@ -19,6 +19,13 @@
     <resource>
       <exampleBoolean value="false"/>
       <reference>
+        <reference value="CodeSystem/cs-prop"/>
+      </reference>
+    </resource>
+
+    <resource>
+      <exampleBoolean value="false"/>
+      <reference>
         <reference value="ValueSet/test-ig-vs"/>
       </reference>
     </resource>

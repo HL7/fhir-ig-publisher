@@ -29,6 +29,7 @@ import org.hl7.fhir.r5.conformance.ProfileUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.PrimitiveType;
 import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.r5.utils.NarrativeGenerator;
 import org.hl7.fhir.r5.utils.TranslatingUtilities;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
@@ -41,9 +42,10 @@ public class BaseRenderer extends TranslatingUtilities {
   protected List<SpecMapManager> specmaps;
   protected NpmPackage packge;
   private MarkDownProcessor markdownEngine;
+  protected NarrativeGenerator gen;
 
 
-  public BaseRenderer(IWorkerContext context, String prefix, IGKnowledgeProvider igp, List<SpecMapManager> specmaps, MarkDownProcessor markdownEngine, NpmPackage packge) {
+  public BaseRenderer(IWorkerContext context, String prefix, IGKnowledgeProvider igp, List<SpecMapManager> specmaps, MarkDownProcessor markdownEngine, NpmPackage packge, NarrativeGenerator gen) {
     super();
     this.context = context;
     this.prefix = prefix;
@@ -51,6 +53,7 @@ public class BaseRenderer extends TranslatingUtilities {
     this.specmaps = specmaps;
     this.markdownEngine = markdownEngine;
     this.packge = packge; 
+    this.gen = gen;
   }
 
   @SuppressWarnings("rawtypes")

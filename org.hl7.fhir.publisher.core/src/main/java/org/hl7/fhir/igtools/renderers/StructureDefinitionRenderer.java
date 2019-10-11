@@ -70,6 +70,7 @@ import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.Type;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.utils.ElementDefinitionUtilities;
+import org.hl7.fhir.r5.utils.NarrativeGenerator;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
@@ -89,8 +90,8 @@ public class StructureDefinitionRenderer extends BaseRenderer {
   private String destDir;
   private List<FetchedFile> files;
 
-  public StructureDefinitionRenderer(IWorkerContext context, String prefix, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files) {
-    super(context, prefix, igp, maps, markdownEngine, packge);
+  public StructureDefinitionRenderer(IWorkerContext context, String prefix, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, NarrativeGenerator gen) {
+    super(context, prefix, igp, maps, markdownEngine, packge, gen);
     this.sd = sd;
     this.destDir = destDir;
     utils = new ProfileUtilities(context, null, igp);

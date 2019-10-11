@@ -50,8 +50,8 @@ public class CodeSystemRenderer extends BaseRenderer {
 
   private CodeSystem cs;
 
-  public CodeSystemRenderer(IWorkerContext context, String prefix, CodeSystem cs, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge) {
-    super(context, prefix, igp, maps, markdownEngine, packge);
+  public CodeSystemRenderer(IWorkerContext context, String prefix, CodeSystem cs, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, NarrativeGenerator gen) {
+    super(context, prefix, igp, maps, markdownEngine, packge, gen);
     this.cs = cs;
   }
 
@@ -112,7 +112,7 @@ public class CodeSystemRenderer extends BaseRenderer {
       CodeSystem csc = cs.copy();
       csc.setId(cs.getId()); // because that's not copied
       csc.setText(null);
-      new NarrativeGenerator(prefix, prefix, context).generate(csc, outputTracker);
+      gen.generate(csc, outputTracker);
       return new XhtmlComposer(XhtmlComposer.HTML).compose(csc.getText().getDiv());
 //    }
   }
