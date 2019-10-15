@@ -48,8 +48,9 @@ public class FeedBuilder {
     private String status;
     private String sequence;
     private String fhirversion;
+    private String kind;
     
-    public Publication(String packageId, String title, String canonical, String version, String desc, String date, String path, String status, String sequence, String fhirversion) {
+    public Publication(String packageId, String title, String canonical, String version, String desc, String date, String path, String status, String sequence, String fhirversion, String kind) {
       super();
       this.packageId = packageId;
       this.title = title;
@@ -68,6 +69,7 @@ public class FeedBuilder {
       this.status = status;
       this.sequence = sequence;
       this.fhirversion = fhirversion;
+      this.kind = kind;
     }
     public String getPackageId() {
       return packageId;
@@ -104,8 +106,11 @@ public class FeedBuilder {
       // Wed, 04 Sep 2019 08:58:14 GMT      
       return sdf.format(date);
     }
-    public String title() {
-      return title;
+    public String title(boolean forPackage) {
+      if (forPackage)
+        return packageId+"#"+version;
+      else
+        return title;
     }
     public String desc() {
       return desc;
@@ -115,6 +120,12 @@ public class FeedBuilder {
         return Utilities.pathURL(path, "package.tgz");
       else
         return Utilities.pathURL(path, "index.html");
+    }
+    public String fhirVersion() {
+      return fhirversion;
+    }
+    public String kind() {
+      return kind;
     }    
   }
 
@@ -130,7 +141,8 @@ public class FeedBuilder {
   private String buildFeed(List<Publication> pubs, String orgName, String thisUrl, boolean forPackage) {
     StringBuilder b = new StringBuilder();
     b.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n");
-    b.append("<rss xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:content=\"http://purl.org/rss/1.0/modules/content/\" xmlns:atom=\"http://www.w3.org/2005/Atom\" version=\"2.0\">\r\n");
+    b.append("<rss xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:content=\"http://purl.org/rss/1.0/modules/content/\" "+
+          "xmlns:fhir=\"http://hl7.org/fhir/feed\" xmlns:atom=\"http://www.w3.org/2005/Atom\" version=\"2.0\">\r\n");
     b.append("  <channel>\r\n");
     b.append("    <title>"+orgName+" FHIR Publications</title>\r\n");
     b.append("    <description>New publications by "+orgName+"></description>\r\n");
@@ -145,14 +157,16 @@ public class FeedBuilder {
     b.append("    <ttl>600</ttl>\r\n");
     
     for (Publication pub : pubs) {
-      b.append("      <item>\r\n");
-      b.append("        <title>"+Utilities.escapeXml(pub.title())+"</title>\r\n");
-      b.append("        <description>"+Utilities.escapeXml(pub.desc())+"</description>\r\n");
-      b.append("        <link>"+Utilities.escapeXml(pub.link(forPackage))+"</link>\r\n");
-      b.append("        <guid isPermaLink=\"true\">"+Utilities.escapeXml(pub.link(forPackage))+"</guid>\r\n");
-      b.append("        <dc:creator>"+orgName+"</dc:creator>\r\n");
-      b.append("        <pubDate>"+pub.presentDate()+"</pubDate>\r\n");
-      b.append("      </item>\r\n");
+      b.append("    <item>\r\n");
+      b.append("      <title>"+Utilities.escapeXml(pub.title(forPackage))+"</title>\r\n");
+      b.append("      <description>"+Utilities.escapeXml(pub.desc())+"</description>\r\n");
+      b.append("      <link>"+Utilities.escapeXml(pub.link(forPackage))+"</link>\r\n");
+      b.append("      <guid isPermaLink=\"true\">"+Utilities.escapeXml(pub.link(forPackage))+"</guid>\r\n");
+      b.append("      <dc:creator>"+orgName+"</dc:creator>\r\n");
+      b.append("      <fhir:version>"+pub.fhirVersion()+"</fhir:version>\r\n");
+      b.append("      <fhir:kind>"+pub.kind()+"</fhir:kind>\r\n");
+      b.append("      <pubDate>"+pub.presentDate()+"</pubDate>\r\n");
+      b.append("    </item>\r\n");
     }
     b.append("  </channel>\r\n");
     b.append("</rss>\r\n");
@@ -175,6 +189,9 @@ public class FeedBuilder {
     String packageId = JSONUtil.str(json, "package-id");
     String title = JSONUtil.str(json, "title");
     String canonical = JSONUtil.str(json, "canonical");
+    String kind = JSONUtil.str(json, "kind");
+    if (Utilities.noString(kind))
+      kind = "fhir.ig";
     for (JsonElement e : JSONUtil.forceArray(json, "list")) {
       JsonObject v = (JsonObject) e;
       String version = JSONUtil.str(v, "version");
@@ -187,7 +204,13 @@ public class FeedBuilder {
         String status = JSONUtil.str(v, "status");
         String sequence = JSONUtil.str(v, "sequence");
         String fhirversion = JSONUtil.str(v, "fhirversion");
-        pubs.add(new Publication(packageId, title, canonical, version, desc, date, path, status, sequence, fhirversion));
+        if (Utilities.noString(fhirversion)) {
+          if ("fhir.core".equals(kind))
+            fhirversion = version;
+          else
+            System.out.println("No fhirVersion for "+version+" in "+f.getAbsolutePath());
+        }
+        pubs.add(new Publication(packageId, title, canonical, version, desc, date, path, status, sequence, fhirversion, kind));
       }
     }
 
