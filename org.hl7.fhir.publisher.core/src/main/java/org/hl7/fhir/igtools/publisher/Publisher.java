@@ -20,7 +20,6 @@ package org.hl7.fhir.igtools.publisher;
  * #L%
  */
 
-
 import java.awt.EventQueue;
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
@@ -275,7 +274,7 @@ import com.google.gson.JsonPrimitive;
  *     structure map
  *
  *   validate all source files (including the IG itself)
- *
+ *   
  *   for each source file:
  *     generate all outputs
  *
@@ -284,7 +283,6 @@ import com.google.gson.JsonPrimitive;
  * Documentation: see http://wiki.hl7.org/index.php?title=IG_Publisher_Documentation
  * 
  * @author Grahame Grieve
- *
  */
 
 public class Publisher implements IWorkerContext.ILoggingService, IReferenceResolver {
@@ -2883,12 +2881,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     } else
       f = altMap.get("Bundle/"+name);
-    ImplementationGuideDefinitionGroupingComponent pck = publishedIg.getDefinition().addGrouping().setName(f.getTitle());
-    pck.setId(name);
+    ImplementationGuideDefinitionGroupingComponent pck = null;
     for (FetchedResource r : f.getResources()) {
       bndIds.add(r.getElement().fhirType()+"/"+r.getId());
       ImplementationGuideDefinitionResourceComponent res = findIGReference(r.fhirType(), r.getId());
       if (res == null) {
+        if (pck == null) {
+          publishedIg.getDefinition().addGrouping().setName(f.getTitle());
+          pck.setId(name);
+        }
         res = publishedIg.getDefinition().addResource();
         res.setGroupingId(pck.getId());
         res.setName(r.getId()).setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
@@ -3015,12 +3016,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         changed = changed || vrchanged || crchanged;
       }
     }
-    ImplementationGuideDefinitionGroupingComponent pck = publishedIg.getDefinition().addGrouping().setName(f.getTitle());
-    pck.setId(name);
+    ImplementationGuideDefinitionGroupingComponent pck = null;
     for (FetchedResource r : f.getResources()) {
       bndIds.add(r.getElement().fhirType()+"/"+r.getId());
       ImplementationGuideDefinitionResourceComponent res = findIGReference(r.fhirType(), r.getId()); 
       if (res == null) {
+        if (pck == null) {
+          publishedIg.getDefinition().addGrouping().setName(f.getTitle());
+          pck.setId(name);
+        }
         res = publishedIg.getDefinition().addResource();
         res.setGroupingId(pck.getId());
         res.setName(r.getTitle()).setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
