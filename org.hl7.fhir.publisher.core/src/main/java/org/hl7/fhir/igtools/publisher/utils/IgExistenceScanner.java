@@ -81,10 +81,10 @@ public class IgExistenceScanner {
     System.out.println("==================== ");
     System.out.println("Processing Feeds for "+folder);
     if (!Utilities.noString(ini.getStringProperty("feeds",  "package"))) {
-      new FeedBuilder().execute(folder, ini.getStringProperty("feeds", "package"), ini.getStringProperty("website", "org"), url, true);
+      new FeedBuilder().execute(folder, Utilities.path(folder, ini.getStringProperty("feeds", "package")), ini.getStringProperty("website", "org"), url, true);
     }
     if (!Utilities.noString(ini.getStringProperty("feeds",  "publication"))) {
-      new FeedBuilder().execute(folder, ini.getStringProperty("feeds", "publication"), ini.getStringProperty("website", "org"), url, false);
+      new FeedBuilder().execute(folder, Utilities.path(folder, ini.getStringProperty("feeds", "publication")), ini.getStringProperty("website", "org"), url, false);
     }
     System.out.println("Finished Processing Feeds");
     System.out.println("==================== ");

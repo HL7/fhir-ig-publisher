@@ -2887,7 +2887,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       ImplementationGuideDefinitionResourceComponent res = findIGReference(r.fhirType(), r.getId());
       if (res == null) {
         if (pck == null) {
-          publishedIg.getDefinition().addGrouping().setName(f.getTitle());
+          pck = publishedIg.getDefinition().addGrouping().setName(f.getTitle());
           pck.setId(name);
         }
         res = publishedIg.getDefinition().addResource();
@@ -3022,7 +3022,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       ImplementationGuideDefinitionResourceComponent res = findIGReference(r.fhirType(), r.getId()); 
       if (res == null) {
         if (pck == null) {
-          publishedIg.getDefinition().addGrouping().setName(f.getTitle());
+          pck = publishedIg.getDefinition().addGrouping().setName(f.getTitle());
           pck.setId(name);
         }
         res = publishedIg.getDefinition().addResource();
