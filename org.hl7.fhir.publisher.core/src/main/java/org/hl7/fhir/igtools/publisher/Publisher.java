@@ -162,7 +162,7 @@ import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.FhirPublication;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.ImplementationGuide.GuidePageGeneration;
-import org.hl7.fhir.r5.model.ImplementationGuide.GuideParameterCode;
+import org.hl7.fhir.r5.utils.GuideParameterCode;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionGroupingComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionPageComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionParameterComponent;

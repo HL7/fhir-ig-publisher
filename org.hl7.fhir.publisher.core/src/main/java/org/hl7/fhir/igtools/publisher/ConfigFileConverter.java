@@ -48,7 +48,7 @@ import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.Constants;
 import org.hl7.fhir.r5.model.Enumerations.FHIRVersion;
 import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.model.ImplementationGuide.GuideParameterCode;
+import org.hl7.fhir.r5.utils.GuideParameterCode;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
