@@ -3755,9 +3755,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         changed = true;
       }
     } else { //sd.getKind() == StructureDefinitionKind.LOGICAL
-      logDebugMessage(LogCategory.PROGRESS, "Generate Snapshot for Logical Model "+sd.getUrl());
+      logDebugMessage(LogCategory.PROGRESS, "Generate Snapshot for Logical Model or specialization"+sd.getUrl());
       if (!sd.hasSnapshot()) {
-        utils.populateLogicalSnapshot(sd);
+        utils.setDefWebRoot(igpkp.getCanonical());
+        utils.generateSnapshot(base, sd, sd.getUrl(), Utilities.extractBaseUrl(base.getUserString("path")), sd.getName());
         changed = true;
       }
     }
