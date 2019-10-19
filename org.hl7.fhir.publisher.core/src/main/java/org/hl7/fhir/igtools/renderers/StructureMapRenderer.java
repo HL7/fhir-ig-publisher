@@ -69,7 +69,7 @@ public class StructureMapRenderer extends BaseRenderer {
     if (map.hasPublisher())
       b.append(" <tr><td>"+translate("sm.summary", "Publisher")+":</td><td>"+Utilities.escapeXml(gt(map.getPublisherElement()))+"</td></tr>\r\n");
     if (map.hasCopyright())
-      b.append(" <tr><td>"+translate("sm.summary", "Copyright")+":</td><td>"+Utilities.escapeXml(gt(map.getCopyrightElement()))+"</td></tr>\r\n");
+      b.append(" <tr><td>"+translate("sm.summary", "Copyright")+":</td><td>"+processMarkdown("copyright", map.getCopyrightElement())+"</td></tr>\r\n");
     if (ToolingExtensions.hasExtension(map, ToolingExtensions.EXT_FMM_LEVEL))
       b.append(" <tr><td><a class=\"fmm\" href=\"versions.html#maturity\" title=\"Maturity Level\">"+translate("cs.summary", "Maturity")+"</a>:</td><td>"+ToolingExtensions.readStringExtension(map, ToolingExtensions.EXT_FMM_LEVEL)+"</td></tr>\r\n");
     if (xml || json || ttl) {
