@@ -179,7 +179,6 @@ public class HTLMLInspector {
   private Map<String, SpecMapManager> otherSpecs = new HashMap<String, SpecMapManager>();
   private List<String> errorPackages = new ArrayList<>();
   private String canonical;
-  private boolean hl7Checks;
 
   private String statusText;
   private List<String> exemptHtmlPatterns = new ArrayList<>();

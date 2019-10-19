@@ -6332,6 +6332,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       System.out.println("-destination: where to put the output (including qa.html)");
       System.out.println("");
       System.out.println("the publisher also supports the param -proxy=[address]:[port] for if you use a proxy (stupid java won't pick up the system settings)");
+      System.out.println("or you can configure the proxy using -Dhttp.proxyHost=<ip> -Dhttp.proxyPort=<port> -Dhttps.proxyHost=<ip> -Dhttps.proxyPort=<port>");
       System.out.println("");
       System.out.println("For additional information, see http://wiki.hl7.org/index.php?title=Proposed_new_FHIR_IG_build_Process");
     } else if (hasParam(args, "-convert")) {
@@ -6503,6 +6504,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         String[] p = proxy.split("\\:");
         System.setProperty("http.proxyHost", p[0]);
         System.setProperty("http.proxyPort", p[1]);
+        System.setProperty("https.proxyHost", p[0]);
+        System.setProperty("https.proxyPort", p[1]);
       }
       self.setTxServer(getNamedParam(args, "-tx"));
       self.setPackagesFolder(getNamedParam(args, "-packages"));
