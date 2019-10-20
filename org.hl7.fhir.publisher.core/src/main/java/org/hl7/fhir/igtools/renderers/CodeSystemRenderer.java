@@ -69,7 +69,7 @@ public class CodeSystemRenderer extends BaseRenderer {
     if (CodeSystemUtilities.hasOID(cs))
       b.append(" <tr><td>"+translate("cs.summary", "OID")+":</td><td>"+CodeSystemUtilities.getOID(cs)+"("+translate("cs.summary", "for OID based terminology systems")+")</td></tr>\r\n");
     if (cs.hasCopyright())
-      b.append(" <tr><td>"+translate("cs.summary", "Copyright")+":</td><td>"+Utilities.escapeXml(gt(cs.getCopyrightElement()))+"</td></tr>\r\n");
+      b.append(" <tr><td>"+translate("cs.summary", "Copyright")+":</td><td>"+processMarkdown("copyright", cs.getCopyrightElement())+"</td></tr>\r\n");
     if (ToolingExtensions.hasExtension(cs, ToolingExtensions.EXT_FMM_LEVEL))
       b.append(" <tr><td><a class=\"fmm\" href=\"versions.html#maturity\" title=\"Maturity Level\">"+translate("cs.summary", "Maturity")+"</a>:</td><td>"+ToolingExtensions.readStringExtension(cs, ToolingExtensions.EXT_FMM_LEVEL)+"</td></tr>\r\n");
     if (xml || json || ttl) {
