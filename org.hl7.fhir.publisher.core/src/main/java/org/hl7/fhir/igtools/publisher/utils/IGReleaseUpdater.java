@@ -45,6 +45,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
 
 public class IGReleaseUpdater {
 
@@ -99,13 +100,15 @@ public class IGReleaseUpdater {
           }
         }
         boolean save = false;
-        ImplementationGuideEntry rc = reg.seeIg(JSONUtil.str(json, "package-id"), canonical, JSONUtil.str(json, "title"));
+        ImplementationGuideEntry rc = reg == null ? null : reg.seeIg(JSONUtil.str(json, "package-id"), canonical, JSONUtil.str(json, "title"));
         boolean hasRelease = false;
         List<String> folders = new ArrayList<>();
         for (JsonElement n : list) {
           JsonObject o = (JsonObject) n;
           if (JSONUtil.str(o, "version").equals("current")) {
-            reg.seeCiBuild(rc, JSONUtil.str(o, "path"));
+            if (reg != null) {
+              reg.seeCiBuild(rc, JSONUtil.str(o, "path"));
+            }
           } else {
             String v = JSONUtil.str(o, "version");
             if (!o.has("path"))
@@ -123,11 +126,13 @@ public class IGReleaseUpdater {
               }
               if (o.has("current"))
                 root = o;
-              if (JSONUtil.str(o, "status").equals("release") || JSONUtil.str(o, "status").equals("trial-use")) {
-                reg.seeRelease(rc, JSONUtil.str(o, "sequence"), JSONUtil.str(o, "version"), JSONUtil.str(o, "fhirversion", "fhir-version"), JSONUtil.str(o, "path"));
-                hasRelease = true;
-              } else if (!hasRelease && FHIRVersion.isValidCode(JSONUtil.str(o, "fhirversion", "fhir-version")))
-                reg.seeCandidate(rc, JSONUtil.str(o, "sequence")+" "+Utilities.titleize(JSONUtil.str(o, "status")), JSONUtil.str(o, "version"), JSONUtil.str(o, "fhirversion", "fhir-version"), JSONUtil.str(o, "path"));
+              if (reg != null) {
+                if (JSONUtil.str(o, "status").equals("release") || JSONUtil.str(o, "status").equals("trial-use")) {
+                  reg.seeRelease(rc, JSONUtil.str(o, "sequence"), JSONUtil.str(o, "version"), JSONUtil.str(o, "fhirversion", "fhir-version"), JSONUtil.str(o, "path"));
+                  hasRelease = true;
+                } else if (!hasRelease && FHIRVersion.isValidCode(JSONUtil.str(o, "fhirversion", "fhir-version")))
+                  reg.seeCandidate(rc, JSONUtil.str(o, "sequence")+" "+Utilities.titleize(JSONUtil.str(o, "status")), JSONUtil.str(o, "version"), JSONUtil.str(o, "fhirversion", "fhir-version"), JSONUtil.str(o, "path"));
+              }
             }
           }
         }
@@ -135,6 +140,28 @@ public class IGReleaseUpdater {
           updateStatement(folder, folders, json, root, errs, root, canonical);
         if (save)
           TextFile.stringToFile(new GsonBuilder().setPrettyPrinting().create().toJson(json), f, false);
+        File ht = new File(Utilities.path(folder, "history.template"));
+        if (ht.exists()) {
+          scrubApostrophes(json);
+          String jsonv = new GsonBuilder().create().toJson(json);
+          String html = TextFile.fileToString(ht);
+          while (html.contains("[%title%]"))
+            html = html.replace("[%title%]", json.get("title").getAsString());
+          while (html.contains("[%json%]"))
+            html = html.replace("[%json%]", jsonv);
+          TextFile.stringToFile(html, Utilities.path(folder, "history.html"), false);
+        }
+        ht = new File(Utilities.path(folder, "directory.template"));
+        if (ht.exists()) {
+          scrubApostrophes(json);
+          String jsonv = new GsonBuilder().create().toJson(json);
+          String html = TextFile.fileToString(ht);
+          while (html.contains("[%title%]"))
+            html = html.replace("[%title%]", json.get("title").getAsString());
+          while (html.contains("[%json%]"))
+            html = html.replace("[%json%]", jsonv);
+          TextFile.stringToFile(html, Utilities.path(folder, "directory.html"), false);
+        }
       }
         
     } catch (Exception e) {e.printStackTrace();
@@ -147,6 +174,27 @@ public class IGReleaseUpdater {
       for (String s : errs) {
         System.out.println("    "+s);
       }      
+    }
+  }
+
+  private void scrubApostrophes(JsonObject json) {
+    for (Entry<String, JsonElement> p : json.entrySet()) {
+      if (p.getValue().isJsonPrimitive()) {
+        scrubApostrophesInProperty(p);
+      } else if (p.getValue().isJsonObject()) {
+        scrubApostrophes((JsonObject) p.getValue());
+      } else if (p.getValue().isJsonArray()) {
+        int i = 0;
+        for (JsonElement ai : ((JsonArray) p.getValue())) {
+          if (ai.isJsonPrimitive()) {
+            if (ai.getAsString().contains("'"))
+              throw new Error("Don't know how to handle apostrophes in arrays");
+          } else if (ai.isJsonObject()) {
+            scrubApostrophes((JsonObject) ai);
+          } // no arrays containing arrays in package-list.json
+          i++;
+        }
+      }
     }
   }
 
@@ -167,6 +215,14 @@ public class IGReleaseUpdater {
           i++;
         }
       }
+    }
+  }
+
+  private void scrubApostrophesInProperty(Entry<String, JsonElement> p) {
+    String s = p.getValue().getAsString();
+    if (s.contains("'")) {
+      s = s.replace("'", "`");
+      p.setValue(new JsonPrimitive(s));
     }
   }
 
@@ -316,4 +372,8 @@ public class IGReleaseUpdater {
     return "1";
   }
 
+  public static void main(String[] args) throws Exception {
+    new IGReleaseUpdater(args[0], args[1], args[2], null, ServerType.ASP).check();
+  }
+  
 }

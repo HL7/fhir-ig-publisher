@@ -26,9 +26,12 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
@@ -42,10 +45,12 @@ import org.hl7.fhir.r5.utils.NPMPackageGenerator.Category;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
+import org.hl7.fhir.utilities.cache.NpmPackageIndexBuilder;
 import org.hl7.fhir.utilities.cache.PackageGenerator.PackageType;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
 public class IGPackageChecker {
@@ -60,7 +65,7 @@ public class IGPackageChecker {
     this.canonical = canonical;
     this.vpath = vpath;
     this.packageId = packageId;
-   }
+  }
 
   public void check(String ver, String pckId, String fhirversion, String name, Date date, String url, String canonical) throws IOException, FHIRException {
     String pf = Utilities.path(folder, "package.tgz");
@@ -69,7 +74,7 @@ public class IGPackageChecker {
       makePackage(pf, name, ver, fhirversion, date);
     } else {
       NpmPackage pck = NpmPackage.fromPackage(new FileInputStream(f));
-      if (!pck.version().equals(ver) || !pck.name().equals(pckId) || !pck.getWebLocation().equals(url) || !pck.canonical().equals(canonical)) {
+      if (!pck.version().equals(ver) || !pck.name().equals(pckId) || !pck.getWebLocation().equals(url) || !pck.canonical().equals(canonical) || !pck.hasFile("package", ".index.json")) {
         f.renameTo(new File(Utilities.changeFileExt(pf, ".tgz-old")));
         TarArchiveOutputStream tar;
         ByteArrayOutputStream OutputStream;
@@ -80,6 +85,9 @@ public class IGPackageChecker {
         bufferedOutputStream = new BufferedOutputStream(OutputStream);
         gzipOutputStream = new GzipCompressorOutputStream(bufferedOutputStream);
         tar = new TarArchiveOutputStream(gzipOutputStream);
+
+        NpmPackageIndexBuilder indexer = new NpmPackageIndexBuilder();
+        indexer.start();
 
         for (String s : pck.getContent().keySet()) {
           byte[] b = pck.getContent().get(s);
@@ -94,6 +102,8 @@ public class IGPackageChecker {
             json.remove("canonical");
             json.addProperty("canonical", canonical);
             b = TextFile.stringToBytes(new GsonBuilder().setPrettyPrinting().create().toJson(json), false);
+          } else {
+            indexer.seeFile(tail(s), b);
           }
           TarArchiveEntry entry = new TarArchiveEntry(s);
           entry.setSize(b.length);
@@ -101,6 +111,13 @@ public class IGPackageChecker {
           tar.write(b);
           tar.closeArchiveEntry();
         }
+        byte[] cnt = indexer.build().getBytes(Charset.forName("UTF-8"));
+        TarArchiveEntry entry = new TarArchiveEntry("package/.index.json");
+        entry.setSize(cnt.length);
+        tar.putArchiveEntry(entry);
+        tar.write(cnt);
+        tar.closeArchiveEntry();
+
         tar.finish();
         tar.close();
         gzipOutputStream.close();
@@ -109,7 +126,10 @@ public class IGPackageChecker {
         TextFile.bytesToFile(OutputStream.toByteArray(), pf);
       }
     }
-    
+  }
+
+  private String tail(String s) {
+    return s.substring(s.lastIndexOf("/")+1);
   }
 
   private void makePackage(String file, String name, String ver, String fhirversion, Date date) throws FHIRException, IOException {
@@ -143,6 +163,5 @@ public class IGPackageChecker {
     }
     npm.finish();    
   }
-
 
 }

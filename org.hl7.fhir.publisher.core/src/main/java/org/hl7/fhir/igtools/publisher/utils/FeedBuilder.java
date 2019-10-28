@@ -24,6 +24,8 @@ import com.google.gson.JsonSyntaxException;
 
 public class FeedBuilder {
 
+  private static final String RSS_DATE = "EEE, dd MMM yyyy hh:mm:ss";
+
   public class PublicationSorter implements Comparator<Publication> {
 
     @Override
@@ -49,14 +51,16 @@ public class FeedBuilder {
     private String sequence;
     private String fhirversion;
     private String kind;
+    private String folder;
     
-    public Publication(String packageId, String title, String canonical, String version, String desc, String date, String path, String status, String sequence, String fhirversion, String kind) {
+    public Publication(String packageId, String title, String canonical, String version, String desc, String date, String path, String status, String sequence, String fhirversion, String kind, String folder) {
       super();
       this.packageId = packageId;
       this.title = title;
       this.canonical = canonical;
       this.version = version;
       this.desc = desc;
+      this.folder = folder;
       SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
       if (date.length() == 7)
         date = date + "-01";
@@ -102,9 +106,9 @@ public class FeedBuilder {
       return fhirversion;
     }
     public String presentDate() {
-      SimpleDateFormat sdf = new SimpleDateFormat("ddd, dd, MMMM yyyy hh:mm:ss z");
+      SimpleDateFormat sdf = new SimpleDateFormat(RSS_DATE);
       // Wed, 04 Sep 2019 08:58:14 GMT      
-      return sdf.format(date);
+      return sdf.format(date)+" GMT";
     }
     public String title(boolean forPackage) {
       if (forPackage)
@@ -127,18 +131,21 @@ public class FeedBuilder {
     public String kind() {
       return kind;
     }    
+    public boolean isSemVer() {
+      return version.matches("[0-9]+[.][0-9]+[a-z]?[.][0-9]+[a-z]?");
+    }
   }
 
-  public void execute(String rootFolder, String feedFile, String orgName, String thisUrl, boolean forPackage) throws JsonSyntaxException, FileNotFoundException, IOException, ParseException {
+  public void execute(String rootFolder, String feedFile, String orgName, String thisUrl, boolean forPackage, String rootUrl) throws JsonSyntaxException, FileNotFoundException, IOException, ParseException {
     List<Publication> pubs = new ArrayList<>();
     
-    scanFolder(new File(rootFolder), pubs);
+    scanFolder(new File(rootFolder), pubs, rootUrl, rootFolder);
     Collections.sort(pubs, new PublicationSorter());
     String s = buildFeed(pubs, orgName, thisUrl, forPackage);
     TextFile.stringToFile(s, feedFile);
   }
 
-  private String buildFeed(List<Publication> pubs, String orgName, String thisUrl, boolean forPackage) {
+  private String buildFeed(List<Publication> pubs, String orgName, String thisUrl, boolean forPackage) throws IOException {
     StringBuilder b = new StringBuilder();
     b.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n");
     b.append("<rss xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:content=\"http://purl.org/rss/1.0/modules/content/\" "+
@@ -149,42 +156,54 @@ public class FeedBuilder {
     b.append("    <link>"+thisUrl+"</link>\r\n");
     b.append("    <generator>HL7 FHIR Publication tooling</generator>\r\n");
     // "Fri, 20 Sep 2019 12:44:30 GMT"
-    SimpleDateFormat df = new SimpleDateFormat("ddd, dd MMM YYYY hh:mm:ss z");
-    b.append("    <lastBuildDate>"+df.format(new Date())+"</lastBuildDate>\r\n");
+    SimpleDateFormat df = new SimpleDateFormat(RSS_DATE);
+    b.append("    <lastBuildDate>"+df.format(new Date())+" GMT"+"</lastBuildDate>\r\n");
     b.append("    <atom:link href=\""+thisUrl+"\" rel=\"self\" type=\"application/rss+xml\"/>\r\n");
     b.append("    <pubDate>"+df.format(new Date())+"</pubDate>\r\n");
     b.append("    <language>en></language>\r\n");
     b.append("    <ttl>600</ttl>\r\n");
     
     for (Publication pub : pubs) {
-      b.append("    <item>\r\n");
-      b.append("      <title>"+Utilities.escapeXml(pub.title(forPackage))+"</title>\r\n");
-      b.append("      <description>"+Utilities.escapeXml(pub.desc())+"</description>\r\n");
-      b.append("      <link>"+Utilities.escapeXml(pub.link(forPackage))+"</link>\r\n");
-      b.append("      <guid isPermaLink=\"true\">"+Utilities.escapeXml(pub.link(forPackage))+"</guid>\r\n");
-      b.append("      <dc:creator>"+orgName+"</dc:creator>\r\n");
-      b.append("      <fhir:version>"+pub.fhirVersion()+"</fhir:version>\r\n");
-      b.append("      <fhir:kind>"+pub.kind()+"</fhir:kind>\r\n");
-      b.append("      <pubDate>"+pub.presentDate()+"</pubDate>\r\n");
-      b.append("    </item>\r\n");
+      if (forPackage && !pub.isSemVer()) {
+        System.out.println("Ignoring package "+pub.title(forPackage)+" as the version ("+pub.getVersion()+") does not conform to semver");
+      } else if (forPackage && !packageExists(pub.folder)) {
+        System.out.println("Ignoring package "+pub.title(forPackage)+" as the actual package coud not be found at "+pub.folder);
+      } else {
+        b.append("    <item>\r\n");
+        b.append("      <title>"+Utilities.escapeXml(pub.title(forPackage))+"</title>\r\n");
+        b.append("      <description>"+Utilities.escapeXml(pub.desc())+"</description>\r\n");
+        b.append("      <link>"+Utilities.escapeXml(pub.link(forPackage))+"</link>\r\n");
+        b.append("      <guid isPermaLink=\"true\">"+Utilities.escapeXml(pub.link(forPackage))+"</guid>\r\n");
+        b.append("      <dc:creator>"+orgName+"</dc:creator>\r\n");
+        b.append("      <fhir:version>"+pub.fhirVersion()+"</fhir:version>\r\n");
+        b.append("      <fhir:kind>"+pub.kind()+"</fhir:kind>\r\n");
+        b.append("      <pubDate>"+pub.presentDate()+"</pubDate>\r\n");
+        b.append("    </item>\r\n");
+      }
     }
     b.append("  </channel>\r\n");
     b.append("</rss>\r\n");
     return b.toString();
   }
 
-  private void scanFolder(File folder, List<Publication> pubs) throws JsonSyntaxException, FileNotFoundException, IOException, ParseException {
+  private boolean packageExists(String folder) throws IOException {
+    return new File(Utilities.path(folder, "package.tgz")).exists();
+    
+  }
+
+  private void scanFolder(File folder, List<Publication> pubs, String rootUrl, String rootFolder) throws JsonSyntaxException, FileNotFoundException, IOException, ParseException {
     for (File f : folder.listFiles()) {
       if (f.isDirectory()) {
-        scanFolder(f, pubs);
+        scanFolder(f, pubs, rootUrl, rootFolder);
       } else if (f.getName().equals("package-list.json")) {
-        loadPackageList(f, pubs);
+        loadPackageList(f, pubs, rootUrl, rootFolder);
       }
     }    
   }
 
-  private void loadPackageList(File f, List<Publication> pubs) throws JsonSyntaxException, FileNotFoundException, IOException, ParseException {
+  private void loadPackageList(File f, List<Publication> pubs, String rootUrl, String rootFolder) throws JsonSyntaxException, FileNotFoundException, IOException, ParseException {
     System.out.println("Load from "+f.getAbsolutePath());
+    String folder = Utilities.getDirectoryForFile(f.getAbsolutePath());    
     JsonObject json = (JsonObject) new JsonParser().parse(TextFile.fileToString(f)); // use gson parser to preseve property order
     String packageId = JSONUtil.str(json, "package-id");
     String title = JSONUtil.str(json, "title");
@@ -210,15 +229,19 @@ public class FeedBuilder {
           else
             System.out.println("No fhirVersion for "+version+" in "+f.getAbsolutePath());
         }
-        pubs.add(new Publication(packageId, title, canonical, version, desc, date, path, status, sequence, fhirversion, kind));
+        pubs.add(new Publication(packageId, title, canonical, version, desc, date, path, status, sequence, fhirversion, kind, getCorrectPath(path, rootUrl, rootFolder)));
       }
     }
-
-
   }
   
+
+  private String getCorrectPath(String path, String rootUrl, String rootFolder) throws IOException {
+    path = path.substring(rootUrl.length());
+    return Utilities.path(rootFolder, path);
+  }
+
   public static void main(String[] args) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
-    new FeedBuilder().execute("C:\\web\\hl7.org\\fhir", "C:\\web\\hl7.org\\fhir\\package-feed.xml", "HL7", "http://hl7.org/fhir/package-feed.xml", true);
-    new FeedBuilder().execute("C:\\web\\hl7.org\\fhir", "C:\\web\\hl7.org\\fhir\\publication-feed.xml", "HL7", "http://hl7.org/fhir/publication-feed.xml", false);
+    new FeedBuilder().execute("C:\\web\\hl7.org\\fhir", "C:\\web\\hl7.org\\fhir\\package-feed.xml", "HL7", "http://hl7.org/fhir/package-feed.xml", true, "http://hl7.org/fhir");
+    new FeedBuilder().execute("C:\\web\\hl7.org\\fhir", "C:\\web\\hl7.org\\fhir\\publication-feed.xml", "HL7", "http://hl7.org/fhir/publication-feed.xml", false, "http://hl7.org/fhir");
   }
 }
