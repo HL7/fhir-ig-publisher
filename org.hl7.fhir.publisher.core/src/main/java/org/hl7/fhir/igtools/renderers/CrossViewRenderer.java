@@ -362,7 +362,7 @@ public class CrossViewRenderer {
           if (cat.isEmpty()) {
             b.append("<p>All the observations have the no assigned category</p>\r\n");            
           } else {
-            b.append("<p>All the observations have the category "+NarrativeGenerator.describeCoding(cat, false)+"</p>\r\n");
+            b.append("<p>All the observations have the category "+new NarrativeGenerator("", "", context).describeCoding(cat, false)+"</p>\r\n");
           }
           hasCat = false;
         }
