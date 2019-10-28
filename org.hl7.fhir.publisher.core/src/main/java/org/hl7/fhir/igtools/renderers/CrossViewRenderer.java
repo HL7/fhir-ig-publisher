@@ -334,22 +334,45 @@ public class CrossViewRenderer {
       b.append("<table class=\"grid\">\r\n");
       boolean hasCat = false;
       boolean hasCode = false;
+      boolean hasLoinc = false;
+      boolean hasSnomed = false;
       boolean hasEffective = false;
       boolean hasTypes = false;
       boolean hasBodySite = false;
       boolean hasMethod = false;
       for (ObservationProfile op : obsList) {
         hasCat = hasCat || !op.category.isEmpty();
-        hasCode = hasCode || !op.code.isEmpty();
+        hasLoinc = hasLoinc || hasCode(op.code, "http://loinc.org");
+        hasSnomed = hasSnomed || hasCode(op.code, "http://snomed.info/sct");
+        hasCode = hasCode || hasOtherCode(op.code, "http://loinc.org", "http://snomed.info/sct");
         hasEffective = hasEffective || !op.effectiveTypes.isEmpty();
         hasTypes = hasTypes || !op.types.isEmpty();
         hasBodySite = hasBodySite || !op.bodySite.isEmpty();
         hasMethod = hasMethod || !op.method.isEmpty();
       }
+      if (hasCat) {
+        List<Coding> cat = obsList.get(0).category;
+        boolean diff = false;
+        for (ObservationProfile op : obsList) {
+          if (!isSameCodes(cat, op.category)) {
+            diff = true;
+          }
+        }
+        if (!diff) {
+          if (cat.isEmpty()) {
+            b.append("<p>All the observations have the no assigned category</p>\r\n");            
+          } else {
+            b.append("<p>All the observations have the category "+NarrativeGenerator.describeCoding(cat, false)+"</p>\r\n");
+          }
+          hasCat = false;
+        }
+      }
       b.append(" <tr>");
-      b.append("<td><b>Profile</b></td>");
       if (hasCat) b.append("<td><b>Category</b></td>");
+      if (hasLoinc) b.append("<td><b>Loinc</b></td>");
+      if (hasSnomed) b.append("<td><b>Snomed</b></td>");
       if (hasCode) b.append("<td><b>Code</b></td>");
+      b.append("<td><b>Profile Name</b></td>");
       if (hasEffective) b.append("<td><b>Time Types</b></td>");
       if (hasTypes) b.append("<td><b>Value Types</b></td>");
       if (hasBodySite) b.append("<td><b>Body Site</b></td>");
@@ -358,13 +381,16 @@ public class CrossViewRenderer {
       
       for (ObservationProfile op : obsList) {
         b.append(" <tr>");
+
+        renderCodingCell(b, hasCat, op.category, null, null);
+        renderCodingCell(b, hasLoinc, op.code, "http://loinc.org", "https://loinc.org/");
+        renderCodingCell(b, hasSnomed, op.code, "http://snomed.info/sct", null);
+        renderCodingCell(b, hasCode, op.code, null, null);
         b.append("<td><a href=\""+op.source.getUserString("path")+"\">"+op.source.present()+"</a></td>");
-        renderCodingCell(b, hasCat, op.category);
-        renderCodingCell(b, hasCode, op.code);
         renderTypeCell(b, hasEffective, op.effectiveTypes);
         renderTypeCell(b, hasTypes, op.types);
-        renderCodingCell(b, hasBodySite, op.bodySite);
-        renderCodingCell(b, hasMethod, op.method);
+        renderCodingCell(b, hasBodySite, op.bodySite, null, null);
+        renderCodingCell(b, hasMethod, op.method, null, null);
         
         b.append("</tr>\r\n");
       }
@@ -373,6 +399,39 @@ public class CrossViewRenderer {
     return b.toString();
   }
   
+  private boolean isSameCodes(List<Coding> l1, List<Coding> l2) {
+    if (l1.size() != l2.size())
+      return false;
+    for (Coding c1 : l1) {
+      boolean found = false;
+      for (Coding c2 : l2) {
+        found = found || (c2.hasSystem() && c2.getSystem().equals(c1.getSystem()) && c2.hasCode() && c2.getCode().equals(c1.getCode()));
+      }
+      if (!found)
+        return false;
+    }
+    return true;
+  }
+
+  private boolean hasOtherCode(List<Coding> codes, String... exclusions) {
+    boolean found = false;
+    for (Coding c : codes) {
+      if (!Utilities.existsInList(c.getSystem(), exclusions)) {
+        found = true;
+      }
+    }
+    return found;  
+  }
+
+  private boolean hasCode(List<Coding> codes, String system) {
+    for (Coding c : codes) {
+      if (system.equals(c.getSystem())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private void renderTypeCell(StringBuilder b, boolean render, List<String> types) {
     if (render) {
       b.append("<td>");
@@ -390,28 +449,38 @@ public class CrossViewRenderer {
     }
     
   }
-  private void renderCodingCell(StringBuilder b, boolean render, List<Coding> list) {
+  private void renderCodingCell(StringBuilder b, boolean render, List<Coding> list, String system, String link) {
     if (render) {
       b.append("<td>");
       boolean first = true;
       for (Coding t : list) {
-        if (first) first = false; else b.append(", ");
-        String sys = NarrativeGenerator.describeSystem(t.getSystem());
-        if (sys.equals(t.getSystem()))
-          sys = null;
-        if (sys == null) {
-          CodeSystem cs = context.fetchCodeSystem(t.getSystem());
-          if (cs != null)
-            sys = cs.getTitle();
-        }
-        ValidationResult vr = context.validateCode(null, t.getSystem(), t.getCode(), null);
-        if (vr != null & vr.getDisplay() != null) {
-          if (Utilities.existsInList(t.getSystem(), "http://loinc.org"))
-            b.append("<span title=\""+t.getSystem()+(sys == null ? "" : " ("+sys+")")+": "+ vr.getDisplay()+"\">"+t.getCode()+" "+vr.getDisplay()+"</span>");           
-          else
-            b.append("<span title=\""+t.getSystem()+(sys == null ? "" : " ("+sys+")")+": "+ vr.getDisplay()+"\">"+t.getCode()+"</span>");           
-        } else {
-          b.append("<span title=\""+t.getSystem()+(sys == null ? "" : " ("+sys+"): ")+"\">"+t.getCode()+"</span>");           
+        if (system == null || system.equals(t.getSystem())) {
+          if (first) first = false; else b.append(", ");
+          String sys = NarrativeGenerator.describeSystem(t.getSystem());
+          if (sys.equals(t.getSystem()))
+            sys = null;
+          if (sys == null) {
+            CodeSystem cs = context.fetchCodeSystem(t.getSystem());
+            if (cs != null)
+              sys = cs.getTitle();
+          }
+          ValidationResult vr = context.validateCode(null, t.getSystem(), t.getCode(), null);
+          if (system != null) {
+            if (vr != null & vr.getDisplay() != null) {
+              b.append("<a href=\""+link+t.getCode()+"\" title=\""+vr.getDisplay()+"\">"+t.getCode()+"</a>");
+            } else {
+              b.append("<a href=\""+link+t.getCode()+"\">"+t.getCode()+"</a>");
+            }
+          } else {
+            if (vr != null & vr.getDisplay() != null) {
+              if (Utilities.existsInList(t.getSystem(), "http://loinc.org"))
+                b.append("<span title=\""+t.getSystem()+(sys == null ? "" : " ("+sys+")")+": "+ vr.getDisplay()+"\">"+t.getCode()+" "+vr.getDisplay()+"</span>");           
+              else
+                b.append("<span title=\""+t.getSystem()+(sys == null ? "" : " ("+sys+")")+": "+ vr.getDisplay()+"\">"+t.getCode()+"</span>");           
+            } else {
+              b.append("<span title=\""+t.getSystem()+(sys == null ? "" : " ("+sys+"): ")+"\">"+t.getCode()+"</span>");           
+            }
+          }
         }
       }
       b.append("</td>");
