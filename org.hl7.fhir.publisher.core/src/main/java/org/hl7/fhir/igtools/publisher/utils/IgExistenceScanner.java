@@ -37,7 +37,7 @@ import com.google.gson.JsonSyntaxException;
 public class IgExistenceScanner {
 
   public static void main(String[] args) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
-    execute(args[0], args.length > 2 ? new IGRegistryMaintainer(args[2]) : null);
+    execute(args[0], args.length > 1 ? new IGRegistryMaintainer(args[1]) : null);
   }
   
   public static void execute(String folder, IGRegistryMaintainer reg) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
@@ -46,13 +46,14 @@ public class IgExistenceScanner {
       throw new IOException("Folder "+folder+" not found");
     if (!f.isDirectory())
       throw new IOException("The path "+folder+" is not a folder");
+    
+    f = new File(Utilities.path(folder, "publish.ini"));
     if (!f.exists())
       throw new IOException("publish.ini not found in "+folder);
     
-    f = new File(Utilities.path(folder, "publish.ini"));
     IniFile ini = new IniFile(f.getAbsolutePath());
-    if ("fhir.layout".equals(ini.getStringProperty("website", "style")))
-      throw new IOException("publish.ini in "+folder+" not in the correct format (missing style=fhir.layout in [website])");
+    if (!"fhir.layout".equals(ini.getStringProperty("website", "style")))
+      throw new IOException("publish.ini in "+f.getAbsolutePath()+" not in the correct format (missing style=fhir.layout in [website])");
       
     String url = ini.getStringProperty("website",  "url");
     if (reg == null && !ini.getBooleanProperty("website", "no-registry"))
@@ -60,13 +61,13 @@ public class IgExistenceScanner {
     ServerType serverType = ServerType.fromCode(ini.getStringProperty("website", "server"));
     
     System.out.println("Update the website at "+folder);
-    System.out.println("The public URL is at "+folder);
+    System.out.println("The public URL is at "+url);
     if (reg == null)
       System.out.println("The public registry will not be updated");
     else
       System.out.println("Update the public registry at "+reg.getPath());
     System.out.println("The server type is "+serverType);
-    System.out.print("Enter y to continue");    
+    System.out.print("Enter y to continue: ");    
     int r = System.in.read();
     if (r != 'y')
       return;
