@@ -2273,7 +2273,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (location.startsWith(".."))
       webref = location;
     
-    SpecMapManager igm = new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.getNpm().getAsJsonObject("dependencies").get("hl7.fhir.core").getAsString());
+    String ver = pi.fhirVersion();
+    SpecMapManager igm = new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), ver);
     igm.setName(name);
     igm.setBase(canonical);
     specMaps.add(igm);
