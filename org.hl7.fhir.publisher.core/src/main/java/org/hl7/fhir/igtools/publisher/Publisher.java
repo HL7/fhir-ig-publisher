@@ -2276,9 +2276,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     String ver = pi.fhirVersion();
     SpecMapManager igm = new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), ver);
     igm.setName(name);
-    igm.setBase(canonical);
+    igm.setBase(webref);
+    igm.setBase2(canonical);
     specMaps.add(igm);
-    if (!version.equals(igm.getVersion())) {
+    if (!VersionUtilities.versionsCompatible(version, igm.getVersion())) {
       log("Version mismatch. This IG is for FHIR version "+version+", while the IG '"+name+"' is for FHIR version "+igm.getVersion()+" (will try to run anyway)");
     }
     

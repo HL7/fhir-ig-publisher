@@ -43,6 +43,13 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSyntaxException;
 
+/**
+ * TODO: should we call versionless references ok? not sure....
+ * (Grahame, 31-Oct 2019)
+ * 
+ * @author graha
+ *
+ */
 public class SpecMapManager {
 
   private JsonObject spec;
@@ -50,7 +57,8 @@ public class SpecMapManager {
   private JsonObject pages;
   private JsonArray targets;
   private JsonArray images;
-  private String base;
+  private String base; // canonical, versionless
+  private String base2; // versioned  
   private String name;
   private Set<String> targetSet = new HashSet<String>();
   private Set<String> imageSet = new HashSet<String>();
@@ -192,6 +200,14 @@ public class SpecMapManager {
     this.base = base;
   }
 
+  public String getBase2() {
+    return base2;
+  }
+
+  public void setBase2(String base2) {
+    this.base2 = base2;
+  }
+
   public void target(String tgt) {
     if (!targetSet.contains(tgt)) {
       targetSet.add(tgt);
@@ -207,6 +223,13 @@ public class SpecMapManager {
   }
   
   public boolean hasTarget(String tgt) {
+    if (hasTarget1(tgt))
+      return true;
+    else 
+      return hasTarget2(tgt);
+  }
+  
+  public boolean hasTarget1(String tgt) {
     if (tgt.startsWith(base+"/"))
       tgt = tgt.substring(base.length()+1);
     else if (tgt.startsWith(base))
@@ -222,6 +245,29 @@ public class SpecMapManager {
     if (targetSet.contains(tgt))
       return true;
     if (paths.has(base+"/"+tgt))
+      return true;
+    return false;  
+  }
+
+  public boolean hasTarget2(String tgt) {
+    if (base2 == null)
+      return false;
+    
+    if (tgt.startsWith(base2+"/"))
+      tgt = tgt.substring(base2.length()+1);
+    else if (tgt.startsWith(base2))
+      tgt = tgt.substring(base2.length());
+    else
+      return false;
+    if (tgt.contains("#"))
+      tgt = tgt.substring(0, tgt.indexOf("#"));
+    if (targetSet.contains(tgt))
+      return true;
+    if (Utilities.existsInList(tgt, "qa.html", "toc.html"))
+      return true;
+    if (targetSet.contains(tgt))
+      return true;
+    if (paths.has(base2+"/"+tgt))
       return true;
     return false;  
   }
