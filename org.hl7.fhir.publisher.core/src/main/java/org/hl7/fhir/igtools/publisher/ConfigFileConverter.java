@@ -265,7 +265,7 @@ public class ConfigFileConverter {
   }
 
   private Resource parse(String filename, String version) throws Exception {
-    if (version.equals("3.0.1") || version.equals("3.0.0")) {
+    if (version.startsWith("3.0")) {
       org.hl7.fhir.dstu3.model.Resource res;
       if (filename.contains("json"))
         res = new org.hl7.fhir.dstu3.formats.JsonParser().parse(new FileInputStream(filename));
@@ -274,7 +274,7 @@ public class ConfigFileConverter {
       else
         throw new Exception("Unable to determine file type for "+filename);
       return VersionConvertor_30_50.convertResource(res, false);
-    } else if (version.equals("1.4.0")) {
+    } else if (version.startsWith("1.4")) {
       org.hl7.fhir.dstu2016may.model.Resource res;
       if (filename.contains("json"))
         res = new org.hl7.fhir.dstu2016may.formats.JsonParser().parse(new FileInputStream(filename));
@@ -283,7 +283,7 @@ public class ConfigFileConverter {
       else
         throw new Exception("Unable to determine file type for "+filename);
       return VersionConvertor_14_50.convertResource(res);
-    } else if (version.equals("1.0.2")) {
+    } else if (version.startsWith("1.0")) {
       org.hl7.fhir.dstu2.model.Resource res;
       if (filename.contains("json"))
         res = new org.hl7.fhir.dstu2.formats.JsonParser().parse(new FileInputStream(filename));
@@ -294,7 +294,7 @@ public class ConfigFileConverter {
 
       VersionConvertorAdvisor50 advisor = new IGR2ConvertorAdvisor5();
       return new VersionConvertor_10_50(advisor).convertResource(res);
-    } else if (version.equals("4.0.0")) {
+    } else if (version.startsWith("4.0")) {
       org.hl7.fhir.r4.model.Resource res;
       if (filename.contains("json"))
         res = new org.hl7.fhir.r4.formats.JsonParser().parse(new FileInputStream(filename));

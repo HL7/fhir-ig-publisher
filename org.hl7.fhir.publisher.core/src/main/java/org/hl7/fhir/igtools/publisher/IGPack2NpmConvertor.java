@@ -244,13 +244,13 @@ public class IGPack2NpmConvertor {
   }
 
   private byte[] compose(ImplementationGuide ig, String version) throws IOException, FHIRException {
-    if (version.equals("1.0.2")) {
+    if (version.startsWith("1.0")) {
       return new org.hl7.fhir.dstu2.formats.JsonParser().composeBytes(new org.hl7.fhir.convertors.VersionConvertor_10_50(null).convertResource(ig));
-    } else if (version.equals("1.4.0")) {
+    } else if (version.startsWith("1.4")) {
       return new org.hl7.fhir.dstu2016may.formats.JsonParser().composeBytes(org.hl7.fhir.convertors.VersionConvertor_14_50.convertResource(ig));
-    } else if (version.equals("3.0.1") || version.equals("3.0.0") ) {
+    } else if (version.startsWith("3.0") ) {
       return new org.hl7.fhir.dstu3.formats.JsonParser().composeBytes(org.hl7.fhir.convertors.VersionConvertor_30_50.convertResource(ig, false));
-    } else if (version.equals("4.0.0") || version.equals("4.0.1") ) {
+    } else if (version.startsWith("4.0") ) {
       return new org.hl7.fhir.r4.formats.JsonParser().composeBytes(org.hl7.fhir.convertors.VersionConvertor_40_50.convertResource(ig));
     } else if (version.equals(Constants.VERSION)) {
       return new org.hl7.fhir.r5.formats.JsonParser().composeBytes(ig);
@@ -392,16 +392,16 @@ public class IGPack2NpmConvertor {
     if (n == null)
       throw new FHIRException("Multiple Implementation Guides found");
     byte[] b = files.get(n);
-    if (version.equals("1.0.2")) {
+    if (version.startsWith("1.0")) {
       org.hl7.fhir.dstu2.model.Resource r = new org.hl7.fhir.dstu2.formats.JsonParser().parse(b);
       return (ImplementationGuide) new org.hl7.fhir.convertors.VersionConvertor_10_50(null).convertResource(r);
-    } else if (version.equals("1.4.0")) {
+    } else if (version.startsWith("1.4")) {
       org.hl7.fhir.dstu2016may.model.Resource r = new org.hl7.fhir.dstu2016may.formats.JsonParser().parse(b);
       return (ImplementationGuide) org.hl7.fhir.convertors.VersionConvertor_14_50.convertResource(r);
-    } else if (version.equals("3.0.1") || version.equals("3.0.0") ) {
+    } else if (version.startsWith("3.0") ) {
       org.hl7.fhir.dstu3.model.Resource r = new org.hl7.fhir.dstu3.formats.JsonParser().parse(b);
       return (ImplementationGuide) org.hl7.fhir.convertors.VersionConvertor_30_50.convertResource(r, false);
-    } else if (version.equals("4.0.1") || version.equals("4.0.0") ) {
+    } else if (version.startsWith("4.0") ) {
       org.hl7.fhir.r4.model.Resource r = new org.hl7.fhir.r4.formats.JsonParser().parse(b);
       return (ImplementationGuide) org.hl7.fhir.convertors.VersionConvertor_40_50.convertResource(r);
     } else if (version.equals(Constants.VERSION)) {
@@ -430,8 +430,10 @@ public class IGPack2NpmConvertor {
     String v = ini.getStringProperty("FHIR", "version");
     if (v == null)
       throw new Error("unable to determine version from "+new String(bytes));
-    if ("3.0.0".equals(v))
-      v = "3.0.1";
+    if (v.startsWith("3.0"))
+      v = "3.0.2";
+    if (v.startsWith("4.0"))
+      v = "4.0.1";
     return v;
   }
 

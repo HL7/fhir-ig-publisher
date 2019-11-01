@@ -3,11 +3,11 @@
   "id" : "test-ig",
   "extension" : [{
     "url" : "http://hl7.org/fhir/StructureDefinition/igpublisher-folder-resource",
-    "valueString" : "/Users/grahame/Documents/work/fhir-ig-publisher/org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/ig30/resources"
+    "valueString" : "C:\\work\\org.hl7.fhir\\fhir-ig-publisher\\org.hl7.fhir.publisher.core\\src\\test\\resources\\test-igs\\old\\ig30\\resources"
   },
   {
     "url" : "http://hl7.org/fhir/StructureDefinition/igpublisher-folder-pages",
-    "valueString" : "/Users/grahame/Documents/work/fhir-ig-publisher/org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/ig30/pages"
+    "valueString" : "C:\\work\\org.hl7.fhir\\fhir-ig-publisher\\org.hl7.fhir.publisher.core\\src\\test\\resources\\test-igs\\old\\ig30\\pages"
   }],
   "url" : "http://hl7.org/fhir/test/ImplementationGuide/test-ig",
   "name" : "Test Implementation Guide",
@@ -16,7 +16,7 @@
   "publisher" : "FHIR Project",
   "packageId" : "hl7.fhir.test.ig30",
   "license" : "CC0-1.0",
-  "fhirVersion" : ["3.0.1"],
+  "fhirVersion" : ["3.0.2"],
   "definition" : {
     "grouping" : [{
       "id" : "p1",

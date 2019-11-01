@@ -71,7 +71,7 @@ public class AllGuidesTests {
   public void testNewIgExternalTemplateLocal() throws Exception {
     String path = Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "new", "ig-dir");
     test(path);
-    checkIGMods(Utilities.path(path, "output", "ImplementationGuide-test-ig.json"));// check that the onload() event fired as expected
+    checkIGMods(Utilities.path(path, "output", "ImplementationGuide-hl7.fhir.test.ig40.json"));// check that the onload() event fired as expected
   }
 
   private void checkIGMods(String path) throws IOException {

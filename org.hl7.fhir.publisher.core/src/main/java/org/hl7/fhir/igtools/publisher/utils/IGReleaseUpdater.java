@@ -35,8 +35,10 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.utils.IGRegistryMaintainer.ImplementationGuideEntry;
 import org.hl7.fhir.igtools.publisher.utils.IGReleaseUpdater.ServerType;
 import org.hl7.fhir.r5.model.Enumerations.FHIRVersion;
+import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.JSONUtil;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 
@@ -68,13 +70,25 @@ public class IGReleaseUpdater {
   private String rootFolder;
   private IGRegistryMaintainer reg;
   private ServerType serverType;
+  private List<String> ignoreList = new ArrayList<>();
 
-  public IGReleaseUpdater(String folder, String url, String rootFolder, IGRegistryMaintainer reg, ServerType serverType) {
+  public IGReleaseUpdater(String folder, String url, String rootFolder, IGRegistryMaintainer reg, ServerType serverType, List<String> otherSpecs) throws IOException {
     this.folder = folder;
     this.url = url;
     this.rootFolder = rootFolder;
-    this.reg = reg;
+    if (!"".equals("http://hl7.org/fhir")) { // keep the main spec out of the registry
+      this.reg = reg;
+    }
     this.serverType = serverType;
+    if (new File(Utilities.path(folder, "publish.ini")).exists()) {
+      IniFile ini = new IniFile(Utilities.path(folder, "publish.ini"));
+      if (ini.getPropertyNames("no-process") != null) {
+        for (String s : ini.getPropertyNames("no-process")) {
+          this.ignoreList.add(Utilities.path(folder, s));
+        }
+      }
+    }
+    this.ignoreList.addAll(otherSpecs);
   }
 
   public void check()  {
@@ -85,11 +99,10 @@ public class IGReleaseUpdater {
         errs.add("unable to find package-list.json");
       else {
         JsonObject json = JsonTrackingParser.parseJsonFile(f);
-        if (url.contains("hl7.org"))
-          checkJsonNoApostrophes("", json);
         String canonical = JSONUtil.str(json, "canonical");
         JsonArray list = json.getAsJsonArray("list");
         JsonObject root = null;
+        System.out.println("Update "+folder+" for "+canonical);
         for (JsonElement n : list) {
           JsonObject o = (JsonObject) n;
           if (!o.has("version"))
@@ -121,7 +134,7 @@ public class IGReleaseUpdater {
                   errs.add("version "+v+" path "+vf+" not found (canonical = "+canonical+", path = "+path+")");
                 else {
                   folders.add(vf);
-                  save = updateStatement(vf, null, json, o, errs, root, canonical) | save;
+                  save = updateStatement(vf, null, ignoreList, json, o, errs, root, canonical, canonical.equals("http://hl7.org/fhir")) | save;
                 }
               }
               if (o.has("current"))
@@ -137,7 +150,7 @@ public class IGReleaseUpdater {
           }
         }
         if (root != null)
-          updateStatement(folder, folders, json, root, errs, root, canonical);
+          updateStatement(folder, folders, ignoreList, json, root, errs, root, canonical, canonical.equals("http://hl7.org/fhir"));
         if (save)
           TextFile.stringToFile(new GsonBuilder().setPrettyPrinting().create().toJson(json), f, false);
         File ht = new File(Utilities.path(folder, "history.template"));
@@ -198,26 +211,26 @@ public class IGReleaseUpdater {
     }
   }
 
-  private void checkJsonNoApostrophes(String path, JsonObject json) {
-    for (Entry<String, JsonElement> p : json.entrySet()) {
-      if (p.getValue().isJsonPrimitive()) {
-        checkJsonNoApostrophesInProperty(path+"."+p.getKey(), p.getValue());
-      } else if (p.getValue().isJsonObject()) {
-        checkJsonNoApostrophes(path+"."+p.getKey(), (JsonObject) p.getValue());
-      } else if (p.getValue().isJsonArray()) {
-        int i = 0;
-        for (JsonElement ai : ((JsonArray) p.getValue())) {
-          if (ai.isJsonPrimitive()) {
-            checkJsonNoApostrophesInProperty(path+"."+p.getKey()+"["+Integer.toString(i)+"]", ai);
-          } else if (ai.isJsonObject()) {
-            checkJsonNoApostrophes(path+"."+p.getKey()+"["+Integer.toString(i)+"]", (JsonObject) ai);
-          } // no arrays containing arrays in package-list.json
-          i++;
-        }
-      }
-    }
-  }
-
+//  private void checkJsonNoApostrophes(String path, JsonObject json) {
+//    for (Entry<String, JsonElement> p : json.entrySet()) {
+//      if (p.getValue().isJsonPrimitive()) {
+//        checkJsonNoApostrophesInProperty(path+"."+p.getKey(), p.getValue());
+//      } else if (p.getValue().isJsonObject()) {
+//        checkJsonNoApostrophes(path+"."+p.getKey(), (JsonObject) p.getValue());
+//      } else if (p.getValue().isJsonArray()) {
+//        int i = 0;
+//        for (JsonElement ai : ((JsonArray) p.getValue())) {
+//          if (ai.isJsonPrimitive()) {
+//            checkJsonNoApostrophesInProperty(path+"."+p.getKey()+"["+Integer.toString(i)+"]", ai);
+//          } else if (ai.isJsonObject()) {
+//            checkJsonNoApostrophes(path+"."+p.getKey()+"["+Integer.toString(i)+"]", (JsonObject) ai);
+//          } // no arrays containing arrays in package-list.json
+//          i++;
+//        }
+//      }
+//    }
+//  }
+//
   private void scrubApostrophesInProperty(Entry<String, JsonElement> p) {
     String s = p.getValue().getAsString();
     if (s.contains("'")) {
@@ -226,22 +239,29 @@ public class IGReleaseUpdater {
     }
   }
 
-  private void checkJsonNoApostrophesInProperty(String path, JsonElement json) {
-    String s = json.getAsString();
-    if (s.contains("'"))
-      System.out.println("There is a problem in the package-list.json file: "+path+" contains an apostrophe (\"'\")");
-  }
-
-  private boolean updateStatement(String vf, List<String> ignoreList, JsonObject ig, JsonObject version, List<String> errs, JsonObject root, String canonical) throws FileNotFoundException, IOException, FHIRException, ParseException {
+//  private void checkJsonNoApostrophesInProperty(String path, JsonElement json) {
+//    String s = json.getAsString();
+//    if (s.contains("'"))
+//      System.out.println("There is a problem in the package-list.json file: "+path+" contains an apostrophe (\"'\")");
+//  }
+//
+  private boolean updateStatement(String vf, List<String> ignoreList, List<String> ignoreListOuter, JsonObject ig, JsonObject version, List<String> errs, JsonObject root, String canonical, boolean isCore) throws FileNotFoundException, IOException, FHIRException, ParseException {
+    if (ignoreList == null) {
+      return false;
+    }
     boolean vc = false;
-    String fragment = genFragment(ig, version, root, canonical);
+    String fragment = genFragment(ig, version, root, canonical, ignoreList != null, isCore);
     System.out.println("  "+vf+": "+fragment);
-    IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(vf, ignoreList, version);
-    igvu.updateStatement(fragment);
-    System.out.println("    .. "+igvu.getCountTotal()+" files checked, "+igvu.getCountUpdated()+" updated");
-    IGPackageChecker pc = new IGPackageChecker(vf, canonical, JSONUtil.str(version, "path"), JSONUtil.str(ig, "package-id"));
-    pc.check(JSONUtil.str(version, "version"), JSONUtil.str(ig, "package-id"), JSONUtil.str(version, "fhirversion", "fhirversion"), 
-        JSONUtil.str(ig, "title"), new SimpleDateFormat("yyyy-MM-dd").parse(JSONUtil.str(version, "date")), JSONUtil.str(version, "path"), canonical);
+    IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(vf, ignoreList, ignoreListOuter, version, folder);
+    igvu.updateStatement(fragment, ignoreList != null ? 0 : 1);
+    System.out.println("  .. "+igvu.getCountTotal()+" files checked, "+igvu.getCountUpdated()+" updated");
+    igvu.checkXmlJsonClones(vf);
+    System.out.println("  .. "+igvu.getClonedTotal()+" clones checked, "+igvu.getClonedCount()+" updated");
+//    if (!isCore) {
+//      IGPackageChecker pc = new IGPackageChecker(vf, canonical, JSONUtil.str(version, "path"), JSONUtil.str(ig, "package-id"));
+//      pc.check(JSONUtil.str(version, "version"), JSONUtil.str(ig, "package-id"), JSONUtil.str(version, "fhirversion", "fhirversion"), 
+//          JSONUtil.str(ig, "title"), new SimpleDateFormat("yyyy-MM-dd").parse(JSONUtil.str(version, "date")), JSONUtil.str(version, "path"), canonical);
+//    }
     IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(vf, canonical, JSONUtil.str(version, "path"));
     if (serverType == ServerType.APACHE)
       rb.buildApacheRedirections();
@@ -251,11 +271,11 @@ public class IGReleaseUpdater {
       rb.buildApacheRedirections();
     else
       rb.buildAspRedirections();
-    System.out.println("    .. "+rb.getCountTotal()+" redirections ("+rb.getCountUpdated()+" created/updated)");
+    System.out.println("  .. "+rb.getCountTotal()+" redirections ("+rb.getCountUpdated()+" created/updated)");
     if (!JSONUtil.has(version, "fhirversion", "fhirversion")) {
-      if (rb.getFhirVersion() == null)
+      if (rb.getFhirVersion() == null) {
         System.out.println("Unable to determine FHIR version for "+vf);
-      else {
+      } else {
         version.addProperty("fhirversion", rb.getFhirVersion());
         vc = true;
       }
@@ -275,15 +295,25 @@ public class IGReleaseUpdater {
    * @param canonical
    * @return
    */
-  private String genFragment(JsonObject ig, JsonObject version, JsonObject root, String canonical) {
+  private String genFragment(JsonObject ig, JsonObject version, JsonObject root, String canonical, boolean currentPublication, boolean isCore) {
     String p1 = JSONUtil.str(ig, "title")+" (v"+JSONUtil.str(version, "version")+": "+state(ig, version)+")";
-    String p2 = root == null ? "" : version == root ? ". This is the current published version" : ". The current version is <a href=\""+(JSONUtil.str(root, "path").startsWith(canonical) ? canonical : JSONUtil.str(root, "path"))+"\">"+JSONUtil.str(root, "version")+"</a>";
-    p2 = p2 + (version.has("fhirversion") ? " based on <a href=\"http://hl7.org/fhir/"+getPath(JSONUtil.str(version, "fhirversion", "fhir-version"))+"\">FHIR "+fhirRef(JSONUtil.str(version, "fhirversion"))+"</a>" : "")+". ";
-    String p3 = " See the <a href=\""+Utilities.pathURL(canonical, canonical.contains("fhir.org") ? "history.shtml" : "history.cfml")+"\">Directory of published versions</a>";
-    return p1+p2+p3;
+    if (!isCore) {
+      p1 = p1 + (version.has("fhirversion") ? " based on <a href=\"http://hl7.org/fhir/"+getPath(JSONUtil.str(version, "fhirversion", "fhir-version"))+"\">FHIR "+fhirRef(JSONUtil.str(version, "fhirversion"))+"</a>" : "")+". ";
+    } else {
+      p1 = p1 + ". ";      
+    }
+    String p2 = root == null ? "" : version == root ? "This is the current published version"+(currentPublication ? "" : " in it's permanent home (it will always be available at this URL)") : "The current version which supercedes this version is <a href=\""+(JSONUtil.str(root, "path").startsWith(canonical) ? canonical : JSONUtil.str(root, "path"))+"{{fn}}\">"+JSONUtil.str(root, "version")+"</a>";
+    String p3;
+    if (canonical.equals("http://hl7.org/fhir"))
+      p3 = " For a full list of available versions, see the <a href=\"{{path}}directory.html\">Directory of published versions <img src=\"external.png\" style=\"text-align: baseline\"></a>";
+    else
+      p3 = " For a full list of available versions, see the <a href=\""+Utilities.pathURL(canonical, canonical.contains("fhir.org") ? "history.shtml" : "history.html")+"\">Directory of published versions <img src=\"external.png\" style=\"text-align: baseline\"></a>";
+    return "This page is part of the "+p1+p2+". "+p3;
   }
 
   private String getPath(String v) {
+    if ("4.0.1".equals(v))
+      return "R4";
     if ("4.0.0".equals(v))
       return "R4";
     if ("3.5a.0".equals(v))
@@ -294,7 +324,11 @@ public class IGReleaseUpdater {
       return "2018May";
     if ("3.2.0".equals(v))
       return "2018Jan";
+    if ("3.0.0".equals(v))
+      return "STU3";
     if ("3.0.1".equals(v))
+      return "STU3";
+    if ("3.0.2".equals(v))
       return "STU3";
     if ("1.8.0".equals(v))
       return "2017Jan";
@@ -328,11 +362,11 @@ public class IGReleaseUpdater {
   }
 
   private String fhirRef(String v) {
-    if ("1.0.2".equals(v))
+    if (VersionUtilities.isR2Ver(v))
       return "R2";
-    if ("3.0.1".equals(v))
+    if (VersionUtilities.isR3Ver(v))
       return "R3";
-    if ("4.0.0".equals(v))
+    if (VersionUtilities.isR4Ver(v))
       return "R4";    
     return "v"+v;
   }
@@ -351,11 +385,14 @@ public class IGReleaseUpdater {
       return decorate(sequence)+" Ballot "+ballotCount(ig, sequence, version);
     else if ("draft".equals(status))
       return decorate(sequence)+" Draft";
+    else if ("normative+trial-use".equals(status))
+      return decorate(sequence+" - Mixed Normative and STU");
     else 
       throw new Error("unknown status "+status);
   }
 
   private String decorate(String sequence) {
+    sequence = sequence.replace("Normative", "<a href=\"https://confluence.hl7.org/display/HL7/HL7+Balloting\" title=\"Normative Standard\">Normative</a>");
     return sequence.replace("STU", "<a href=\"https://confluence.hl7.org/display/HL7/HL7+Balloting\" title=\"Standard for Trial-Use\">STU</a>");
   }
 
@@ -373,7 +410,7 @@ public class IGReleaseUpdater {
   }
 
   public static void main(String[] args) throws Exception {
-    new IGReleaseUpdater(args[0], args[1], args[2], null, ServerType.ASP).check();
+    new IGReleaseUpdater(args[0], args[1], args[2], null, ServerType.ASP, null).check();
   }
   
 }

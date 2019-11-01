@@ -42,7 +42,15 @@ public class IGReleaseRedirectionBuilder {
       "\r\n"+
       "<%\r\n"+
       "  var s = String(Request.ServerVariables(\"HTTP_ACCEPT\"));\r\n"+
-      "  if (s.indexOf(\"json\") > -1) \r\n"+
+      "  if (s.indexOf(\"application/json+fhir\") > -1) \r\n"+
+      "    Response.Redirect(\"{{literal}}.json2\");\r\n"+
+      "  else if (s.indexOf(\"application/fhir+json\") > -1) \r\n"+
+      "    Response.Redirect(\"{{literal}}.json1\");\r\n"+
+      "  else if (s.indexOf(\"application/xml+fhir\") > -1) \r\n"+
+      "    Response.Redirect(\"{{literal}}.xml2\");\r\n"+
+      "  else if (s.indexOf(\"application/fhir+xml\") > -1) \r\n"+
+      "    Response.Redirect(\"{{literal}}.xml1\");\r\n"+
+      "  else if (s.indexOf(\"json\") > -1) \r\n"+
       "    Response.Redirect(\"{{literal}}.json\");\r\n"+
       "  else if (s.indexOf(\"html\") > -1) \r\n"+
       "    Response.Redirect(\"{{html}}\");\r\n"+
@@ -109,11 +117,23 @@ public class IGReleaseRedirectionBuilder {
       for (String s : map.keySet()) {
         String path = Utilities.path(folder, s, "index.asp");
         String p = s.replace("/", "-");
-        String litPath = Utilities.path(folder, p);
-        if (new File(litPath+".xml").exists() && new File(litPath+".json").exists()) 
-          createAspRedirect(path, map.get(s), Utilities.pathURL(vpath, p));
+        String litPath = Utilities.path(folder, p)+".html";
+        if (!new File(litPath+".xml").exists() && !new File(litPath+".json").exists()) 
+          litPath = Utilities.path(folder, tail(map.get(s)));
+        File file = new File(Utilities.changeFileExt(litPath, ".xml"));
+        if (file.exists() && new File(Utilities.changeFileExt(litPath, ".json")).exists()) {
+          createAspRedirect(path, map.get(s), Utilities.pathURL(vpath, head(file.getName())));
+        }
       }
     }
+  }
+
+  private String head(String name) {
+    return name.substring(0, name.indexOf("."));
+  }
+
+  private String tail(String name) {
+    return name.substring(name.lastIndexOf("/")+1);
   }
 
   private void createAspRedirect(String path, String urlHtml, String urlSrc) throws IOException {

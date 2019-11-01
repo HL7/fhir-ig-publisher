@@ -200,8 +200,10 @@ public class IGRegistryMaintainer {
     e.addProperty("name", p.getName());
     e.addProperty("ig-version", p.getVersion());
     JsonArray a = new JsonArray();
-    e.add("fhir-version", a);
-    a.add(new JsonPrimitive(p.getFhirVersion()));
+    if (p.getFhirVersion() != null) {
+      e.add("fhir-version", a);
+      a.add(new JsonPrimitive(p.getFhirVersion()));
+    }
     e.addProperty("package", packageId+"#"+p.getFhirVersion());
     e.addProperty("url", p.getPath());
     return e;

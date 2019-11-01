@@ -3,10 +3,10 @@
 <ImplementationGuide xmlns="http://hl7.org/fhir">
   <id value="test-ig"/>
   <extension url="http://hl7.org/fhir/StructureDefinition/igpublisher-folder-resource">
-    <valueString value="/Users/grahame/Documents/work/fhir-ig-publisher/org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/ig30/resources"/>
+    <valueString value="C:\work\org.hl7.fhir\fhir-ig-publisher\org.hl7.fhir.publisher.core\src\test\resources\test-igs\old\ig30\resources"/>
   </extension>
   <extension url="http://hl7.org/fhir/StructureDefinition/igpublisher-folder-pages">
-    <valueString value="/Users/grahame/Documents/work/fhir-ig-publisher/org.hl7.fhir.publisher.core/src/test/resources/test-igs/old/ig30/pages"/>
+    <valueString value="C:\work\org.hl7.fhir\fhir-ig-publisher\org.hl7.fhir.publisher.core\src\test\resources\test-igs\old\ig30\pages"/>
   </extension>
   <url value="http://hl7.org/fhir/test/ImplementationGuide/test-ig"/>
   <name value="Test Implementation Guide"/>
@@ -15,7 +15,7 @@
   <publisher value="FHIR Project"/>
   <packageId value="hl7.fhir.test.ig30"/>
   <license value="CC0-1.0"/>
-  <fhirVersion value="3.0.1"/>
+  <fhirVersion value="3.0.2"/>
   <definition>
     <grouping id="p1">
       <name value="base"/>

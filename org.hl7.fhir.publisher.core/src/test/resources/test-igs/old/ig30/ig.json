@@ -13,7 +13,7 @@
   "license" : "CC0-1.0",
   "template" : "https://github.com/FHIR/test-template",
 	"canonicalBase": "http://hl7.org/fhir/test",
-  "version" : "3.0.1",
+  "version" : "3.0.2",
   "sct-edition" :  "http://snomed.info/sct/900000000000207008",
 	"defaults": {
 		"_documentation": "this object contains the default publishing policy for different types. Anything not mentioned defaults to true",

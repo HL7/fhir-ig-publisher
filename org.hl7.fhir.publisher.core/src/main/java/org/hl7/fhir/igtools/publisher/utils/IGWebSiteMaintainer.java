@@ -34,13 +34,13 @@ import org.hl7.fhir.utilities.Utilities;
 
 import com.google.gson.JsonSyntaxException;
 
-public class IgExistenceScanner {
+public class IGWebSiteMaintainer {
 
   public static void main(String[] args) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
-    execute(args[0], args.length > 1 ? new IGRegistryMaintainer(args[1]) : null);
+    execute(args[0], args.length > 1 ? new IGRegistryMaintainer(args[1]) : null, args.length >= 3 && "true".equals(args[2]));
   }
   
-  public static void execute(String folder, IGRegistryMaintainer reg) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
+  public static void execute(String folder, IGRegistryMaintainer reg, boolean doCore) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
     File f = new File(folder);
     if (!f.exists())
       throw new IOException("Folder "+folder+" not found");
@@ -71,44 +71,47 @@ public class IgExistenceScanner {
     int r = System.in.read();
     if (r != 'y')
       return;
-    
     System.out.println("looking for IGs in "+folder);
-    List<String> igs = scanForIgs(folder);
-    System.out.println("found: ");
+    List<String> igs = scanForIgs(folder, doCore);
+    System.out.println("found "+igs.size()+" IGs to update:");
     for (String s : igs) {
-      System.out.println("  "+s);
-      new IGReleaseUpdater(s, url, folder, reg, serverType).check();
+      System.out.println(" - "+s);
     }
-    System.out.println("==================== ");
-    System.out.println("Processing Feeds for "+folder);
-    if (!Utilities.noString(ini.getStringProperty("feeds",  "package"))) {
-      new FeedBuilder().execute(folder, Utilities.path(folder, ini.getStringProperty("feeds", "package")), ini.getStringProperty("website", "org"), Utilities.pathURL(url, ini.getStringProperty("feeds", "package")), true, url);
+
+    for (String s : igs) {
+      new IGReleaseUpdater(s, url, folder, reg, serverType, igs).check();
     }
-    if (!Utilities.noString(ini.getStringProperty("feeds",  "publication"))) {
-      new FeedBuilder().execute(folder, Utilities.path(folder, ini.getStringProperty("feeds", "publication")), ini.getStringProperty("website", "org"), Utilities.pathURL(url, ini.getStringProperty("feeds", "publication")), false, url);
-    }
-    System.out.println("Finished Processing Feeds");
-    System.out.println("==================== ");
-    reg.finish();
+//    System.out.println("==================== ");
+//    System.out.println("Processing Feeds for "+folder);
+//    if (!Utilities.noString(ini.getStringProperty("feeds",  "package"))) {
+//      new FeedBuilder().execute(folder, Utilities.path(folder, ini.getStringProperty("feeds", "package")), ini.getStringProperty("website", "org"), Utilities.pathURL(url, ini.getStringProperty("feeds", "package")), true, url);
+//    }
+//    if (!Utilities.noString(ini.getStringProperty("feeds",  "publication"))) {
+//      new FeedBuilder().execute(folder, Utilities.path(folder, ini.getStringProperty("feeds", "publication")), ini.getStringProperty("website", "org"), Utilities.pathURL(url, ini.getStringProperty("feeds", "publication")), false, url);
+//    }
+//    System.out.println("Finished Processing Feeds");
+//    System.out.println("==================== ");
+//    reg.finish();
   }
   
-  public static List<String> scanForIgs(String folder) {
-    return scanForIgs(new File(folder), true);
+  public static List<String> scanForIgs(String folder, boolean doCore) throws IOException {
+    return scanForIgs(new File(folder), true, doCore);
   }
   
-  public static List<String> scanForIgs(File folder, boolean isRoot) {
+  public static List<String> scanForIgs(File folder, boolean root, boolean doCore) throws IOException {
     List<String> igs = new ArrayList<>();
     boolean isIg = false;
     for (File f : folder.listFiles()) {
-      if (f.getName().equals("package-list.json") && !isRoot)
+      if (f.getName().equals("package-list.json"))
         isIg = true;
     }
-    if (isIg)
+    if (isIg && (doCore || !new File(Utilities.path(folder.getAbsolutePath(), "directory.template")).exists())) {
         igs.add(folder.getAbsolutePath());
-    else { 
+    }
+    if (!isIg || root) {
       for (File f : folder.listFiles()) {
         if (f.isDirectory())
-          igs.addAll(scanForIgs(f, false));
+          igs.addAll(scanForIgs(f, false, false));
       }
     }
     return igs;
