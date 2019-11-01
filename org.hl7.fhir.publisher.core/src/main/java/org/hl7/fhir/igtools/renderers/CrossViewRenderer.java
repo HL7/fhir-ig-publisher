@@ -247,8 +247,10 @@ public class CrossViewRenderer {
   }
 
   private void seeExtensionDefinition(StructureDefinition sd) {
-    if (sd.getUrl().length() < canonical.length()+21)
+    if (sd.getUrl().length() < canonical.length()+21) {
+      System.out.println("extension url doesn't follow canonical pattern: "+sd.getUrl()+", so omitted from extension summary");
       return;
+    }
     ExtensionDefinition exd = new ExtensionDefinition();
     extList.add(exd);
     exd.source = sd;
@@ -277,8 +279,13 @@ public class CrossViewRenderer {
       ElementDefinition ed = list.get(i);
       if (ed.getPath().equals("Extension.extension.url") && ed.hasFixed()) {
         exd.code = ed.getFixed().primitiveValue();
-        if (exd.code.startsWith(canonical) && exd.code.length() > canonical.length() + 21)
-          exd.code = exd.code.substring(canonical.length() + 21);
+        if (exd.code.startsWith(canonical)) {
+          if (exd.code.length() > canonical.length() + 21) {
+            System.out.println("extension code doesn't follow canonical pattern: "+exd.code);
+          } else { 
+            exd.code = exd.code.substring(canonical.length() + 21);
+          }
+        }
       }
       
       if (ed.getPath().startsWith("Extension.extension.value")) {
