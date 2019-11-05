@@ -25,6 +25,7 @@ import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
@@ -76,66 +77,41 @@ public class IGPackageChecker {
       makePackage(pf, name, ver, fhirversion, date);
     } else {
       NpmPackage pck = NpmPackage.fromPackage(new FileInputStream(f));
-      if (!pck.version().equals(ver) || !pck.name().equals(pckId) || !pck.getWebLocation().equals(url) || !pck.canonical().equals(canonical) || !pck.hasFile("package", ".index.json")) {
-        f.renameTo(new File(Utilities.changeFileExt(pf, ".tgz-old")));
-        TarArchiveOutputStream tar;
-        ByteArrayOutputStream OutputStream;
-        BufferedOutputStream bufferedOutputStream;
-        GzipCompressorOutputStream gzipOutputStream;
-
-        OutputStream = new ByteArrayOutputStream();
-        bufferedOutputStream = new BufferedOutputStream(OutputStream);
-        gzipOutputStream = new GzipCompressorOutputStream(bufferedOutputStream);
-        tar = new TarArchiveOutputStream(gzipOutputStream);
-
-        NpmPackageIndexBuilder indexer = new NpmPackageIndexBuilder();
-        indexer.start();
-
-        for (String s : pck.getContent().keySet()) {
-          byte[] b = pck.getContent().get(s);
-          if (s.equals("package/package.json")) {
-            JsonObject json = JsonTrackingParser.parseJson(b);
-            json.remove("version");
-            json.addProperty("version", ver);
-            json.remove("name");
-            json.addProperty("name", pckId);
-            json.remove("url");
-            json.addProperty("url", url);
-            json.remove("canonical");
-            json.addProperty("canonical", canonical);
-            if (json.has("dependencies")) {
-              JsonObject dep = json.getAsJsonObject("dependencies");
-              if (dep.has("hl7.fhir.core")) {
-                String v = dep.get("hl7.fhir.core").getAsString();
-                dep.remove("hl7.fhir.core");
-                v = VersionUtilities.getCurrentVersion(v);
-                dep.addProperty(VersionUtilities.packageForVersion(v), v);;
-              }
-            }
-            b = TextFile.stringToBytes(new GsonBuilder().setPrettyPrinting().create().toJson(json), false);
-          } else {
-            indexer.seeFile(tail(s), b);
-          }
-          TarArchiveEntry entry = new TarArchiveEntry(s);
-          entry.setSize(b.length);
-          tar.putArchiveEntry(entry);
-          tar.write(b);
-          tar.closeArchiveEntry();
-        }
-        byte[] cnt = indexer.build().getBytes(Charset.forName("UTF-8"));
-        TarArchiveEntry entry = new TarArchiveEntry("package/.index.json");
-        entry.setSize(cnt.length);
-        tar.putArchiveEntry(entry);
-        tar.write(cnt);
-        tar.closeArchiveEntry();
-
-        tar.finish();
-        tar.close();
-        gzipOutputStream.close();
-        bufferedOutputStream.close();
-        OutputStream.close();
-        TextFile.bytesToFile(OutputStream.toByteArray(), pf);
+      File af = new File(Utilities.changeFileExt(f.getAbsolutePath(), ".tgz.bak"));
+      if (!af.exists()) // if it already exists, assume that's our backup, don't overrwrite it
+        f.renameTo(af);
+      JsonObject json = pck.getNpm();
+      if (!json.has("version") || !json.get("version").getAsString().equals(ver)) {
+        json.remove("version");
+        json.addProperty("version", ver);
       }
+      if (!json.has("name") || !json.get("name").getAsString().equals(pckId)) {
+        json.remove("name");
+        json.addProperty("name", pckId);
+      }
+      if (!json.has("url") || !json.get("url").getAsString().equals(url)) {
+        json.remove("url");
+        json.addProperty("url", url);
+      }
+      if (!json.has("canonical") || !json.get("canonical").getAsString().equals(canonical)) {
+        json.remove("canonical");
+        json.addProperty("canonical", canonical);
+      }
+      JsonArray vl = new JsonArray();
+      json.add("fhirVersions", vl);
+      vl.add(fhirversion);
+      
+      if (json.has("dependencies")) {
+        JsonObject dep = json.getAsJsonObject("dependencies");
+        if (dep.has("hl7.fhir.core")) {
+          String v = VersionUtilities.getCurrentVersion(fhirversion);
+          if (VersionUtilities.packageForVersion(v) != null) {
+            dep.addProperty(VersionUtilities.packageForVersion(v), v);
+          }
+          dep.remove("hl7.fhir.core");
+        }
+      }
+      pck.save(new FileOutputStream(f));
     }
   }
 

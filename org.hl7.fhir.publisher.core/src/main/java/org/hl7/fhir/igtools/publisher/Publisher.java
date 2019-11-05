@@ -4957,9 +4957,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     data.addProperty("packageId", npmName);
     data.addProperty("igVer", businessVersion);
     data.addProperty("errorCount", getErrorCount());
-    data.addProperty("version", specMaps.get(0).getVersion());
+    data.addProperty("version", version);
     data.addProperty("revision", specMaps.get(0).getBuild());
-    data.addProperty("versionFull", specMaps.get(0).getVersion()+"-"+specMaps.get(0).getBuild());
+    data.addProperty("versionFull", version+"-"+specMaps.get(0).getBuild());
     data.addProperty("toolingVersion", Constants.VERSION);
     data.addProperty("toolingRevision", ToolsVersion.TOOLS_VERSION_STR);
     data.addProperty("toolingVersionFull", Constants.VERSION+" ("+ToolsVersion.TOOLS_VERSION_STR+")");

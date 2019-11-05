@@ -234,7 +234,7 @@ public class IGReleaseUpdater {
   private void scrubApostrophesInProperty(Entry<String, JsonElement> p) {
     String s = p.getValue().getAsString();
     if (s.contains("'")) {
-      s = s.replace("'", "`");
+      s = s.replace("'", "\\'");
       p.setValue(new JsonPrimitive(s));
     }
   }
@@ -246,9 +246,7 @@ public class IGReleaseUpdater {
 //  }
 //
   private boolean updateStatement(String vf, List<String> ignoreList, List<String> ignoreListOuter, JsonObject ig, JsonObject version, List<String> errs, JsonObject root, String canonical, boolean isCore) throws FileNotFoundException, IOException, FHIRException, ParseException {
-    if (ignoreList == null) {
-      return false;
-    }
+
     boolean vc = false;
     String fragment = genFragment(ig, version, root, canonical, ignoreList != null, isCore);
     System.out.println("  "+vf+": "+fragment);
@@ -257,11 +255,11 @@ public class IGReleaseUpdater {
     System.out.println("  .. "+igvu.getCountTotal()+" files checked, "+igvu.getCountUpdated()+" updated");
     igvu.checkXmlJsonClones(vf);
     System.out.println("  .. "+igvu.getClonedTotal()+" clones checked, "+igvu.getClonedCount()+" updated");
-//    if (!isCore) {
-//      IGPackageChecker pc = new IGPackageChecker(vf, canonical, JSONUtil.str(version, "path"), JSONUtil.str(ig, "package-id"));
-//      pc.check(JSONUtil.str(version, "version"), JSONUtil.str(ig, "package-id"), JSONUtil.str(version, "fhirversion", "fhirversion"), 
-//          JSONUtil.str(ig, "title"), new SimpleDateFormat("yyyy-MM-dd").parse(JSONUtil.str(version, "date")), JSONUtil.str(version, "path"), canonical);
-//    }
+    if (!isCore) {
+      IGPackageChecker pc = new IGPackageChecker(vf, canonical, JSONUtil.str(version, "path"), JSONUtil.str(ig, "package-id"));
+      pc.check(JSONUtil.str(version, "version"), JSONUtil.str(ig, "package-id"), JSONUtil.str(version, "fhirversion", "fhirversion"), 
+          JSONUtil.str(ig, "title"), new SimpleDateFormat("yyyy-MM-dd").parse(JSONUtil.str(version, "date")), JSONUtil.str(version, "path"), canonical);
+    }
     IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(vf, canonical, JSONUtil.str(version, "path"));
     if (serverType == ServerType.APACHE)
       rb.buildApacheRedirections();
@@ -307,7 +305,7 @@ public class IGReleaseUpdater {
     if (canonical.equals("http://hl7.org/fhir"))
       p3 = " For a full list of available versions, see the <a href=\"{{path}}directory.html\">Directory of published versions <img src=\"external.png\" style=\"text-align: baseline\"></a>";
     else
-      p3 = " For a full list of available versions, see the <a href=\""+Utilities.pathURL(canonical, canonical.contains("fhir.org") ? "history.shtml" : "history.html")+"\">Directory of published versions <img src=\"external.png\" style=\"text-align: baseline\"></a>";
+      p3 = " For a full list of available versions, see the <a href=\"history.html\">Directory of published versions <img src=\"external.png\" style=\"text-align: baseline\"></a>";
     return "This page is part of the "+p1+p2+". "+p3;
   }
 

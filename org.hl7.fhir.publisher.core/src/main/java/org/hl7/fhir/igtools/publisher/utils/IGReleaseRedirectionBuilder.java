@@ -73,8 +73,16 @@ public class IGReleaseRedirectionBuilder {
       "}\r\n"+
       "\r\n"+
       "$accept = $_SERVER['HTTP_ACCEPT'];\r\n"+
-      "if (strpos($accept, 'json') !== false)\r\n"+
+      "if (strpos($accept, 'application/json+fhir') !== false)\r\n"+
+      "  Redirect('{{literal}}.json2');\r\n"+
+      "elseif (strpos($accept, 'application/fhir+json') !== false)\r\n"+
+      "  Redirect('{{literal}}.json1');\r\n"+
+      "elseif (strpos($accept, 'json') !== false)\r\n"+
       "  Redirect('{{literal}}.json');\r\n"+
+      "elseif (strpos($accept, 'application/xml+fhir') !== false)\r\n"+
+      "  Redirect('{{literal}}.xml2');\r\n"+
+      "elseif (strpos($accept, 'application/fhir+xml') !== false)\r\n"+
+      "  Redirect('{{literal}}.xml1');\r\n"+
       "elseif (strpos($accept, 'html') !== false)\r\n"+
       "  Redirect('{{html}}');\r\n"+
       "else \r\n"+

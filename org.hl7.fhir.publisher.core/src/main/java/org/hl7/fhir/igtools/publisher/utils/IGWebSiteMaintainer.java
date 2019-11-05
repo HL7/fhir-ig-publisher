@@ -67,31 +67,31 @@ public class IGWebSiteMaintainer {
     else
       System.out.println("Update the public registry at "+reg.getPath());
     System.out.println("The server type is "+serverType);
-    System.out.print("Enter y to continue: ");    
-    int r = System.in.read();
-    if (r != 'y')
-      return;
     System.out.println("looking for IGs in "+folder);
     List<String> igs = scanForIgs(folder, doCore);
     System.out.println("found "+igs.size()+" IGs to update:");
     for (String s : igs) {
       System.out.println(" - "+s);
     }
+    System.out.print("Enter y to continue: ");    
+    int r = System.in.read();
+    if (r != 'y')
+      return;
 
     for (String s : igs) {
       new IGReleaseUpdater(s, url, folder, reg, serverType, igs).check();
     }
-//    System.out.println("==================== ");
-//    System.out.println("Processing Feeds for "+folder);
-//    if (!Utilities.noString(ini.getStringProperty("feeds",  "package"))) {
-//      new FeedBuilder().execute(folder, Utilities.path(folder, ini.getStringProperty("feeds", "package")), ini.getStringProperty("website", "org"), Utilities.pathURL(url, ini.getStringProperty("feeds", "package")), true, url);
-//    }
-//    if (!Utilities.noString(ini.getStringProperty("feeds",  "publication"))) {
-//      new FeedBuilder().execute(folder, Utilities.path(folder, ini.getStringProperty("feeds", "publication")), ini.getStringProperty("website", "org"), Utilities.pathURL(url, ini.getStringProperty("feeds", "publication")), false, url);
-//    }
-//    System.out.println("Finished Processing Feeds");
-//    System.out.println("==================== ");
-//    reg.finish();
+    System.out.println("==================== ");
+    System.out.println("Processing Feeds for "+folder);
+    if (!Utilities.noString(ini.getStringProperty("feeds",  "package"))) {
+      new FeedBuilder().execute(folder, Utilities.path(folder, ini.getStringProperty("feeds", "package")), ini.getStringProperty("website", "org"), Utilities.pathURL(url, ini.getStringProperty("feeds", "package")), true, url);
+    }
+    if (!Utilities.noString(ini.getStringProperty("feeds",  "publication"))) {
+      new FeedBuilder().execute(folder, Utilities.path(folder, ini.getStringProperty("feeds", "publication")), ini.getStringProperty("website", "org"), Utilities.pathURL(url, ini.getStringProperty("feeds", "publication")), false, url);
+    }
+    System.out.println("Finished Processing Feeds");
+    System.out.println("==================== ");
+    reg.finish();
   }
   
   public static List<String> scanForIgs(String folder, boolean doCore) throws IOException {
