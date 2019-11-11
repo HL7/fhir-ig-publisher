@@ -77,41 +77,28 @@ public class IGPackageChecker {
       makePackage(pf, name, ver, fhirversion, date);
     } else {
       NpmPackage pck = NpmPackage.fromPackage(new FileInputStream(f));
-      File af = new File(Utilities.changeFileExt(f.getAbsolutePath(), ".tgz.bak"));
-      if (!af.exists()) // if it already exists, assume that's our backup, don't overrwrite it
-        f.renameTo(af);
       JsonObject json = pck.getNpm();
-      if (!json.has("version") || !json.get("version").getAsString().equals(ver)) {
-        json.remove("version");
-        json.addProperty("version", ver);
+      checkJsonProp(pf, json, "version", ver);
+      checkJsonProp(pf, json, "name", pckId);
+      checkJsonProp(pf, json, "url", url);
+      checkJsonProp(pf, json, "canonical", canonical);
+      if (!json.has("fhirVersions")) {
+        System.out.println("Problem with "+pf+": missing fhirVersions");
       }
-      if (!json.has("name") || !json.get("name").getAsString().equals(pckId)) {
-        json.remove("name");
-        json.addProperty("name", pckId);
-      }
-      if (!json.has("url") || !json.get("url").getAsString().equals(url)) {
-        json.remove("url");
-        json.addProperty("url", url);
-      }
-      if (!json.has("canonical") || !json.get("canonical").getAsString().equals(canonical)) {
-        json.remove("canonical");
-        json.addProperty("canonical", canonical);
-      }
-      JsonArray vl = new JsonArray();
-      json.add("fhirVersions", vl);
-      vl.add(fhirversion);
-      
       if (json.has("dependencies")) {
         JsonObject dep = json.getAsJsonObject("dependencies");
         if (dep.has("hl7.fhir.core")) {
-          String v = VersionUtilities.getCurrentVersion(fhirversion);
-          if (VersionUtilities.packageForVersion(v) != null) {
-            dep.addProperty(VersionUtilities.packageForVersion(v), v);
-          }
-          dep.remove("hl7.fhir.core");
+          System.out.println("Problem with "+pf+": found hl7.fhir.core in dependencies");
         }
       }
-      pck.save(new FileOutputStream(f));
+    }
+  }
+
+  public void checkJsonProp(String pf, JsonObject json, String propName, String value) {
+    if (!json.has(propName)) {
+      System.out.println("Problem with "+pf+": missing "+propName);
+    } else if (!json.get(propName).getAsString().equals(value)) {
+      System.out.println("Problem with "+pf+": expected "+propName+" "+value+" but found "+json.get(propName).getAsString());
     }
   }
 

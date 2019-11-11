@@ -146,6 +146,7 @@ public class FeedBuilder {
     scanFolder(new File(rootFolder), pubs, rootUrl, rootFolder);
     Collections.sort(pubs, new PublicationSorter());
     String s = buildFeed(pubs, orgName, thisUrl, forPackage);
+    System.out.println("Save feed to "+feedFile);
     TextFile.stringToFile(s, feedFile);
   }
 
@@ -176,14 +177,14 @@ public class FeedBuilder {
       if (forPackage && !pub.isSemVer()) {
         System.out.println("Ignoring package "+pub.title(forPackage)+" as the version ("+pub.getVersion()+") does not conform to semver");
       } else if (forPackage && !packageExists(pub.folder)) {
-        System.out.println("Ignoring package "+pub.title(forPackage)+" as the actual package coud not be found at "+pub.folder);
+        System.out.println("Ignoring package "+pub.title(forPackage)+" as the actual package could not be found at "+pub.folder);
       } else {
         String desc = pub.desc();
         if (forPackage) {
           // open the package, check the details and get the description
           NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(pub.folder, "package.tgz")));
           if (!(npm.name()+"#"+npm.version()).equals(pub.title(forPackage)))
-            System.out.println("id mismatch in "+Utilities.path(pub.folder, "package.tgz")+" - expected "+pub.title(forPackage)+" but found "+npm.name());
+            System.out.println("id mismatch in "+Utilities.path(pub.folder, "package.tgz")+" - expected "+pub.title(forPackage)+" but found "+npm.name()+"#"+npm.version());
           desc = npm.description();
         }
         if (forPackage) {

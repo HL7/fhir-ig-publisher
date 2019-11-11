@@ -95,6 +95,17 @@ public class IGWebSiteMaintainer {
   }
   
   public static List<String> scanForIgs(String folder, boolean doCore) throws IOException {
+    File f = new File(Utilities.path(folder, "publish.ini"));
+    if (f.exists() && !doCore) {
+      IniFile ini = new IniFile(f.getAbsolutePath());
+      if (ini.hasSection("ig-dirs")) {
+        List<String> igs = new ArrayList<>();
+        for (String s: ini.getPropertyNames("ig-dirs")) {
+          igs.addAll(scanForIgs(new File(Utilities.path(folder, s)), false, false));
+        }
+        return igs;
+      }
+    }
     return scanForIgs(new File(folder), true, doCore);
   }
   

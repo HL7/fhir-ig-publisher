@@ -82,8 +82,8 @@ public class IGReleaseUpdater {
     this.serverType = serverType;
     if (new File(Utilities.path(folder, "publish.ini")).exists()) {
       IniFile ini = new IniFile(Utilities.path(folder, "publish.ini"));
-      if (ini.getPropertyNames("no-process") != null) {
-        for (String s : ini.getPropertyNames("no-process")) {
+      if (ini.getPropertyNames("ig-dirs") != null) {
+        for (String s : ini.getPropertyNames("ig-dirs")) {
           this.ignoreList.add(Utilities.path(folder, s));
         }
       }
@@ -140,8 +140,8 @@ public class IGReleaseUpdater {
               if (o.has("current"))
                 root = o;
               if (reg != null) {
-                if (JSONUtil.str(o, "status").equals("release") || JSONUtil.str(o, "status").equals("trial-use")) {
-                  reg.seeRelease(rc, JSONUtil.str(o, "sequence"), JSONUtil.str(o, "version"), JSONUtil.str(o, "fhirversion", "fhir-version"), JSONUtil.str(o, "path"));
+                if (JSONUtil.str(o, "status").equals("release") || JSONUtil.str(o, "status").equals("trial-use") || JSONUtil.str(o, "status").equals("update")) {
+                  reg.seeRelease(rc, JSONUtil.str(o, "status").equals("update") ? "STU Update" : JSONUtil.str(o, "sequence"), JSONUtil.str(o, "version"), JSONUtil.str(o, "fhirversion", "fhir-version"), JSONUtil.str(o, "path"));
                   hasRelease = true;
                 } else if (!hasRelease && FHIRVersion.isValidCode(JSONUtil.str(o, "fhirversion", "fhir-version")))
                   reg.seeCandidate(rc, JSONUtil.str(o, "sequence")+" "+Utilities.titleize(JSONUtil.str(o, "status")), JSONUtil.str(o, "version"), JSONUtil.str(o, "fhirversion", "fhir-version"), JSONUtil.str(o, "path"));
@@ -234,7 +234,7 @@ public class IGReleaseUpdater {
   private void scrubApostrophesInProperty(Entry<String, JsonElement> p) {
     String s = p.getValue().getAsString();
     if (s.contains("'")) {
-      s = s.replace("'", "\\'");
+      s = s.replace("'", "`");
       p.setValue(new JsonPrimitive(s));
     }
   }
@@ -305,7 +305,7 @@ public class IGReleaseUpdater {
     if (canonical.equals("http://hl7.org/fhir"))
       p3 = " For a full list of available versions, see the <a href=\"{{path}}directory.html\">Directory of published versions <img src=\"external.png\" style=\"text-align: baseline\"></a>";
     else
-      p3 = " For a full list of available versions, see the <a href=\"history.html\">Directory of published versions <img src=\"external.png\" style=\"text-align: baseline\"></a>";
+      p3 = " For a full list of available versions, see the <a href=\"{{path}}history.html\">Directory of published versions <img src=\"external.png\" style=\"text-align: baseline\"></a>";
     return "This page is part of the "+p1+p2+". "+p3;
   }
 
@@ -372,7 +372,6 @@ public class IGReleaseUpdater {
   private String state(JsonObject ig, JsonObject version) {
     String status = JSONUtil.str(version, "status");
     String sequence = JSONUtil.str(version, "sequence");
-    String desc = JSONUtil.str(version,"sequence");
     if ("trial-use".equals(status))
       return decorate(sequence);
     else if ("release".equals(status))
@@ -383,6 +382,8 @@ public class IGReleaseUpdater {
       return decorate(sequence)+" Ballot "+ballotCount(ig, sequence, version);
     else if ("draft".equals(status))
       return decorate(sequence)+" Draft";
+    else if ("update".equals(status))
+      return decorate(sequence)+" Update";
     else if ("normative+trial-use".equals(status))
       return decorate(sequence+" - Mixed Normative and STU");
     else 

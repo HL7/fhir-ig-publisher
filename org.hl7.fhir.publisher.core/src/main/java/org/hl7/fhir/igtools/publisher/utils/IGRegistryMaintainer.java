@@ -160,17 +160,18 @@ public class IGRegistryMaintainer {
           e.add("language", a);
           a.add(new JsonPrimitive("en"));
         } else {
-          if (!e.has("ci-build") || e.get("ci-build").equals(ig.cibuild)) {
-            e.remove("ci-build");
-            e.addProperty("ci-build", ig.cibuild);
-          }
-          if (!e.has("canonical") || e.get("canonical").equals(ig.canonical)) {
+          if (!e.has("canonical") || !e.get("canonical").getAsString().equals(ig.canonical)) {
             e.remove("canonical");
             e.addProperty("canonical", ig.canonical);
           }
+          if (!e.has("ci-build") || !e.get("ci-build").getAsString().equals(ig.cibuild)) {
+            e.remove("ci-build");
+            e.addProperty("ci-build", ig.cibuild);
+          }
         }
-        if (e.has("editions"))
+        if (e.has("editions")) {
           e.remove("editions");
+        }
         JsonArray a = new JsonArray();
         e.add("editions", a);
         if (!ig.getCandidates().isEmpty()) {
@@ -197,23 +198,36 @@ public class IGRegistryMaintainer {
   
   private JsonObject makeEdition(PublicationEntry p, String packageId) {
     JsonObject e = new JsonObject();
-    e.addProperty("name", p.getName());
-    e.addProperty("ig-version", p.getVersion());
-    JsonArray a = new JsonArray();
-    if (p.getFhirVersion() != null) {
-      e.add("fhir-version", a);
-      a.add(new JsonPrimitive(p.getFhirVersion()));
+    if (!e.has("name") || !e.get("name").getAsString().equals(p.getName())) {
+      e.remove("name");
+      e.addProperty("name", p.getName());
     }
-    e.addProperty("package", packageId+"#"+p.getFhirVersion());
-    e.addProperty("url", p.getPath());
+    if (!e.has("ig-version") || !e.get("ig-version").getAsString().equals(p.getName())) {
+      e.remove("ig-version");
+      e.addProperty("ig-version", p.getVersion());
+    }
+    if (!e.has("package") || !e.get("package").getAsString().equals(packageId+"#"+p.getVersion())) {
+      e.remove("package");
+      e.addProperty("package", packageId+"#"+p.getVersion());
+    }
+    if (p.getFhirVersion() != null) {
+      if (!e.has("fhir-version") || e.getAsJsonArray("fhir-version").size() != 1 || !e.getAsJsonArray("fhir-version").get(0).getAsString().equals(p.getName())) {
+        e.remove("fhir-version");
+        JsonArray a = new JsonArray();
+        e.add("fhir-version", a);
+        a.add(new JsonPrimitive(p.getFhirVersion()));
+      } 
+    } else if(e.has("fhir-version")) {
+      e.remove("fhir-version");
+    }
+    if (!e.has("url") || !e.get("url").getAsString().equals(p.getPath())) {
+      e.remove("url");
+      e.addProperty("url", p.getPath());
+    }
     return e;
   }
 
   private String getHistoryPage(String canonical) {
-    if (canonical.contains("hl7.org"))
-      return Utilities.pathURL(canonical, "history.cfml");
-    if (canonical.contains("fhir.org"))
-      return Utilities.pathURL(canonical, "history.shtml");
     return Utilities.pathURL(canonical, "history.html");
   }
 
