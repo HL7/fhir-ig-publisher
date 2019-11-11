@@ -100,6 +100,7 @@ import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.exceptions.PathEngineException;
 import org.hl7.fhir.igtools.publisher.FetchedFile.FetchedBundleType;
 import org.hl7.fhir.igtools.publisher.IFetchFile.FetchState;
+import org.hl7.fhir.igtools.publisher.Publisher.JsonDependency;
 import org.hl7.fhir.igtools.publisher.Publisher.ListItemEntry;
 import org.hl7.fhir.igtools.publisher.Publisher.ListViewSorterById;
 import org.hl7.fhir.igtools.publisher.utils.IGRegistryMaintainer;
@@ -287,6 +288,34 @@ import com.google.gson.JsonPrimitive;
  */
 
 public class Publisher implements IWorkerContext.ILoggingService, IReferenceResolver {
+
+  public class JsonDependency {
+    private String name;
+    private String canonical;
+    private String npmId;
+    private String version;
+    public JsonDependency(String name, String canonical, String npmId, String version) {
+      super();
+      this.name = name;
+      this.canonical = canonical;
+      this.npmId = npmId;
+      this.version = version;
+    }
+    public String getName() {
+      return name;
+    }
+    public String getCanonical() {
+      return canonical;
+    }
+    public String getNpmId() {
+      return npmId;
+    }
+    public String getVersion() {
+      return version;
+    }
+    
+
+  }
 
   public class IGPublisherHostServices implements IEvaluationContext {
 
@@ -583,6 +612,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private String currVer;
 
   private List<String> codeSystemProps = new ArrayList<>();
+
+  private List<JsonDependency> jsonDependencies = new ArrayList<>();
   
   private class PreProcessInfo {
     private String xsltName;
@@ -2165,7 +2196,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     String webref = pi.getWebLocation();
     
-    SpecMapManager igm = new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.getNpm().getAsJsonObject("dependencies").get("hl7.fhir.core").getAsString());
+    SpecMapManager igm = new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion());
     igm.setName(name);
     igm.setBase(canonical);
     specMaps.add(igm);
@@ -2284,6 +2315,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     
     loadFromPackage(name, canonical, pi, webref, igm);
+    jsonDependencies .add(new JsonDependency(name, canonical, pi.name(), pi.version()));
   }
 
 
@@ -2549,6 +2581,24 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
     
+    for (JsonDependency dep : jsonDependencies) {
+      ImplementationGuideDependsOnComponent d = null;
+      for (ImplementationGuideDependsOnComponent t : publishedIg.getDependsOn()) {
+        if (dep.getCanonical().equals(t.getUri()) || dep.getNpmId().equals(t.getPackageId())) {
+          d = t;
+          break;
+        }
+      }
+      if (d == null) {
+        d = publishedIg.addDependsOn();
+        d.setUri(dep.getCanonical());
+        d.setVersion(dep.getVersion());
+        d.setPackageId(dep.getNpmId());
+      } else {
+        d.setVersion(dep.getVersion());
+      }
+    }
+
     for (ImplementationGuideDependsOnComponent dep : publishedIg.getDependsOn()) {
       if (!dep.hasPackageId()) {
         dep.setPackageId(pcm.getPackageId(dep.getUri()));
@@ -5014,7 +5064,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void generateResourceReferences() throws Exception {
-    for (ResourceType rt : ResourceType.values()) {
+    Set<String> resourceTypes = new HashSet<>();
+    for (StructureDefinition sd : context.allStructures()) {
+      if (sd.getDerivation() == TypeDerivationRule.SPECIALIZATION && sd.getKind() == StructureDefinitionKind.RESOURCE) {
+        resourceTypes.add(sd.getType());
+      }
+    }
+    for (String rt : resourceTypes) {
       generateResourceReferences(rt);
     }
     generateProfiles();
@@ -5176,11 +5232,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
-  private void generateResourceReferences(ResourceType rt) throws Exception {
+  private void generateResourceReferences(String rt) throws Exception {
     List<Item> items = new ArrayList<Item>();
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
-        if (r.getElement().fhirType().equals(rt.toString())) {
+        if (r.getElement().fhirType().equals(rt)) {
             if (r.getResource() instanceof MetadataResource) {
               MetadataResource md = (MetadataResource) r.getResource();
               items.add(new Item(f, r, md.hasTitle() ? md.getTitle() : md.hasName() ? md.getName() : r.getTitle()));
@@ -5216,7 +5272,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
-  public void genResourceReferencesList(ResourceType rt, List<Item> items, String ext) throws Exception, IOException {
+  public void genResourceReferencesList(String rt, List<Item> items, String ext) throws Exception, IOException {
     StringBuilder list = new StringBuilder();
     StringBuilder lists = new StringBuilder();
     StringBuilder table = new StringBuilder();
@@ -5233,13 +5289,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (Item i : items) {
         String name = i.r.getTitle();
         if (Utilities.noString(name))
-          name = rt.toString();
+          name = rt;
         genEntryItem(list, lists, table, listMM, listsMM, tableMM, i.f, i.r, i.sort, null);
         genEntryItem(listJ, listsJ, tableJ, null, null, null, i.f, i.r, i.sort, "json");
         genEntryItem(listX, listsX, tableX, null, null, null, i.f, i.r, i.sort, "xml");
       }
     }
-    String pm = Utilities.pluralizeMe(rt.toString().toLowerCase());
+    String pm = Utilities.pluralizeMe(rt.toLowerCase());
     fragment("list-"+ext+pm, list.toString(), otherFilesRun);
     fragment("list-simple-"+ext+pm, lists.toString(), otherFilesRun);
     fragment("table-"+ext+pm, table.toString(), otherFilesRun);
