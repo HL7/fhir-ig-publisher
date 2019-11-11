@@ -71,7 +71,8 @@ public class TemplateManager {
     return isTemplate("http://github.com/FHIR/test-template", "fhir.test.template", template)
         || isTemplate("http://github.com/HL7/fhir-template", "hl7.fhir.template", template)
         || isTemplate("http://github.com/HL7/fhir-template", "fhir.base.template", template)
-        || isTemplate("http://github.com/HL7/fhir-template", "fhir.davinci.template", template);
+        || isTemplate("http://github.com/HL7/fhir-template", "fhir.davinci.template", template)
+        || isTemplate("https://github.com/IHE/ihe-ig-template", "ihe.fhir.template", template);
     // we might choose to allow some IGs here...
   }
 
