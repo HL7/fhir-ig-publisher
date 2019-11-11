@@ -167,6 +167,9 @@ public class ValidationServices implements IValidatorResourceFetcher {
   public boolean resolveURL(Object appContext, String path, String url) throws IOException {
     if (otherUrls.contains(url))
       return true;
+
+    if (url.startsWith("http://hl7.org/fhirpath/System."))
+      return true;
     
     if (url.startsWith("http://hl7.org/fhir"))
       try {
