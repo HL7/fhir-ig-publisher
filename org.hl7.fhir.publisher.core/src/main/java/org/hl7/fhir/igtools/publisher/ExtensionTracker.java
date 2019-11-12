@@ -213,7 +213,7 @@ public class ExtensionTracker {
     }
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
     String json = gson.toJson(data);
-    return json.getBytes(Charsets.UTF_8);
+    return TextFile.stringToBytes(json, false);
   }
 
   public boolean isoptIn() {

@@ -4420,7 +4420,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
     ri.append("resourcecount="+Integer.toString(i)+"\r\n");
-    zip.addBytes("registry.info", ri.toString().getBytes(Charsets.UTF_8), false);
+    zip.addBytes("registry.info",TextFile.stringToBytes(ri.toString(), false), false);
     zip.close();
   }
 
@@ -5897,7 +5897,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         outputName = determineOutputName(outputName, r, vars, format, extension);
         if (!outputName.contains("#")) {
           String path = Utilities.path(tempDir, outputName);
-          checkMakeFile(template.getBytes(Charsets.UTF_8), path, outputTracker);
+          checkMakeFile(TextFile.stringToBytes(template, false), path, outputTracker);
         }
       }
     }
@@ -6180,7 +6180,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   
   private void fragment(String name, String content, Set<String> outputTracker, FetchedResource r, Map<String, String> vars, String format) throws IOException, FHIRException {
     String fixedContent = (r==null? content : igpkp.doReplacements(content, r, vars, format));
-    if (checkMakeFile(wrapLiquid(fixedContent).getBytes(Charsets.UTF_8), Utilities.path(tempDir, "_includes", name+".xhtml"), outputTracker)) {
+    if (checkMakeFile(TextFile.stringToBytes(wrapLiquid(fixedContent), false), Utilities.path(tempDir, "_includes", name+".xhtml"), outputTracker)) {
       if (mode != IGBuildMode.AUTOBUILD && makeQA)
         TextFile.stringToFile(pageWrap(fixedContent, name), Utilities.path(qaDir, name+".html"), true);
     }

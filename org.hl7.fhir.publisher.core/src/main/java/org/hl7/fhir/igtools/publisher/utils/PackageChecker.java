@@ -83,7 +83,7 @@ public class PackageChecker {
             tar.closeArchiveEntry();
           }
           if (!hasIndex) {
-            byte[] cnt = indexer.build().getBytes(Charset.forName("UTF-8"));
+            byte[] cnt = TextFile.stringToBytes(indexer.build(), false);
             TarArchiveEntry entry = new TarArchiveEntry("package/.index.json");
             entry.setSize(cnt.length);
             tar.putArchiveEntry(entry);
