@@ -1073,12 +1073,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   
   private String str(JsonObject obj, String name) throws Exception {
     if (!obj.has(name))
-      throw new Exception("Property "+name+" not found");
+      throw new Exception("Property '"+name+"' not found");
     if (!(obj.get(name) instanceof JsonPrimitive))
-      throw new Exception("Property "+name+" not a primitive");
+      throw new Exception("Property '"+name+"' not a primitive");
     JsonPrimitive p = (JsonPrimitive) obj.get(name);
     if (!p.isString())
-      throw new Exception("Property "+name+" not a string");
+      throw new Exception("Property '"+name+"' not a string");
     return p.getAsString();
   }
 
@@ -6180,11 +6180,28 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   
   private void fragment(String name, String content, Set<String> outputTracker, FetchedResource r, Map<String, String> vars, String format) throws IOException, FHIRException {
     String fixedContent = (r==null? content : igpkp.doReplacements(content, r, vars, format));
-    if (checkMakeFile(fixedContent.getBytes(Charsets.UTF_8), Utilities.path(tempDir, "_includes", name+".xhtml"), outputTracker)) {
+    if (checkMakeFile(wrapLiquid(fixedContent).getBytes(Charsets.UTF_8), Utilities.path(tempDir, "_includes", name+".xhtml"), outputTracker)) {
       if (mode != IGBuildMode.AUTOBUILD && makeQA)
         TextFile.stringToFile(pageWrap(fixedContent, name), Utilities.path(qaDir, name+".html"), true);
     }
   }
+
+  /**
+   * None of the fragments presently generated inculde {{ }} liquid tags. So any 
+   * liquid tags found in the fragments are actually what should be displayed post-jekyll.
+   * So we're going to globally escape them here. If any fragments want to include actual
+   * Jekyll tags, we'll hav to do something much harder.
+   * 
+   * see https://stackoverflow.com/questions/24102498/escaping-double-curly-braces-inside-a-markdown-code-block-in-jekyll
+   * 
+   * @param fixedContent
+   * @return
+   */
+  private String wrapLiquid(String content) {
+    return "{% raw %}"+content+"{% endraw %}";
+  }
+
+
 
   private String pageWrap(String content, String title) {
     return "<html>\r\n"+
