@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.util.Map;
 
+import org.hl7.fhir.r5.context.MetadataResourceManager;
 import org.hl7.fhir.r5.formats.IParser;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.ContactDetail;
@@ -36,9 +37,9 @@ import org.hl7.fhir.utilities.Utilities;
 
 public class CodeSystemConvertor {
 
-  private Map<String, CodeSystem> codeSystems;
+  private MetadataResourceManager<CodeSystem> codeSystems;
 
-  public CodeSystemConvertor(Map<String, CodeSystem> codeSystems) {
+  public CodeSystemConvertor(MetadataResourceManager<CodeSystem> codeSystems) {
     super();
     this.codeSystems = codeSystems;
   }
@@ -56,7 +57,7 @@ public class CodeSystemConvertor {
       populate(cs, vs);
 //      if (codeSystems.containsKey(cs.getUrl())) 
 //        throw new Exception("Duplicate Code System: "+cs.getUrl());
-      codeSystems.put(cs.getUrl(), cs);
+      codeSystems.see(cs);
     }    
   }
 
