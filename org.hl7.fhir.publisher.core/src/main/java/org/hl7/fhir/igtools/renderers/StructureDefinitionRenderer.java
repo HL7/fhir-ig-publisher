@@ -334,7 +334,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     if (cs == null) 
       return "<span title=\""+coding.getSystem()+"\">"+coding.getCode()+"</a>"+(!coding.hasDisplay() ? "" : "(\""+gt(coding.getDisplayElement())+"\")");
     else
-      return "<a title=\""+cs.present()+"\" href=\""+cs.getUserData("path")+"#"+coding.getCode()+"\">"+coding.getCode()+"</a>"+(!coding.hasDisplay() ? "" : "(\""+gt(coding.getDisplayElement())+"\")");
+      return "<a title=\""+cs.present()+"\" href=\""+cs.getUserData("path")+"#"+cs.getId()+"-"+coding.getCode()+"\">"+coding.getCode()+"</a>"+(!coding.hasDisplay() ? "" : "(\""+gt(coding.getDisplayElement())+"\")");
   }
 
   public String diff(String defnFile, Set<String> outputTracker) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
