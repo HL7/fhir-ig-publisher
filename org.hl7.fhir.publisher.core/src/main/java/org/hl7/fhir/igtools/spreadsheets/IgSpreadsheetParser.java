@@ -72,7 +72,7 @@ public class IgSpreadsheetParser {
   private Calendar genDate;
   private String base;
   private XLSXmlParser xls;
-  private Map<String, MappingSpace> mappings = new HashMap<String, MappingSpace>();
+  private Map<String, MappingSpace> mappings;
   private Map<String, List<String>> metadata = new HashMap<String, List<String>>();
   private String sheetname;
   private String name;
@@ -83,7 +83,7 @@ public class IgSpreadsheetParser {
   private Set<String> knownValueSetIds;
   private boolean first;
 
-  public IgSpreadsheetParser(SimpleWorkerContext context, Calendar genDate, String base, Map<String, String> valuesetsToLoad, boolean first, byte[] msSource, Set<String> knownValueSetIds) throws Exception {
+  public IgSpreadsheetParser(SimpleWorkerContext context, Calendar genDate, String base, Map<String, String> valuesetsToLoad, boolean first, Map<String, MappingSpace> mappings, Set<String> knownValueSetIds) throws Exception {
     this.context = context;
     this.genDate = genDate;
     this.base = base;
@@ -91,30 +91,7 @@ public class IgSpreadsheetParser {
     this.valuesetsToLoad = valuesetsToLoad;
     this.knownValueSetIds = knownValueSetIds;
     valuesetsToLoad.clear();
-    loadMappingSpaces(msSource);
-  }
-
-  private void loadMappingSpaces(byte[] source) throws Exception {
-    ByteArrayInputStream is = null;
-    try {
-      DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-      factory.setNamespaceAware(true);
-      DocumentBuilder builder = factory.newDocumentBuilder();
-      is = new ByteArrayInputStream(source);
-      Document doc = builder.parse(is);
-      Element e = XMLUtil.getFirstChild(doc.getDocumentElement());
-      while (e != null) {
-        MappingSpace m = new MappingSpace(XMLUtil.getNamedChild(e, "columnName").getTextContent(), XMLUtil.getNamedChild(e, "title").getTextContent(),
-            XMLUtil.getNamedChild(e, "id").getTextContent(), Integer.parseInt(XMLUtil.getNamedChild(e, "sort").getTextContent()), true, false, false, XMLUtil.getNamedChild(e, "link") != null ? XMLUtil.getNamedChild(e, "link").getTextContent(): XMLUtil.getNamedChild(e, "url").getTextContent());
-        mappings.put(XMLUtil.getNamedChild(e, "url").getTextContent(), m);
-        Element p = XMLUtil.getNamedChild(e, "preamble");
-        if (p != null)
-          m.setPreamble(new XhtmlParser().parseHtmlNode(p).setName("div"));
-        e = XMLUtil.getNextSibling(e);
-      }
-    } catch (Exception e) {
-      throw new Exception("Error processing mappingSpaces.details: "+e.getMessage(), e);
-    }
+    this.mappings = mappings;
   }
 
   private void message(FetchedFile f, String msg, String html, IssueType type, IssueSeverity level) {

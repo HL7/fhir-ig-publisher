@@ -61,6 +61,8 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import javax.swing.UIManager;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
@@ -119,6 +121,7 @@ import org.hl7.fhir.igtools.renderers.ValidationPresenter;
 import org.hl7.fhir.igtools.renderers.ValueSetRenderer;
 import org.hl7.fhir.igtools.renderers.XmlXHtmlRenderer;
 import org.hl7.fhir.igtools.spreadsheets.IgSpreadsheetParser;
+import org.hl7.fhir.igtools.spreadsheets.MappingSpace;
 import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.igtools.templates.TemplateManager;
 import org.hl7.fhir.igtools.ui.GraphicalPublisher;
@@ -245,6 +248,9 @@ import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
+import org.hl7.fhir.utilities.xhtml.XhtmlParser;
+import org.hl7.fhir.utilities.xml.XMLUtil;
+import org.w3c.dom.Document;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -493,6 +499,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private boolean first;
 
   private Map<String, SpecificationPackage> specifications;
+  private Map<String, MappingSpace> mappingSpaces = new HashMap<String, MappingSpace>();
   private Map<ImplementationGuideDefinitionResourceComponent, FetchedFile> fileMap = new HashMap<ImplementationGuideDefinitionResourceComponent, FetchedFile>();
   private Map<String, FetchedFile> altMap = new HashMap<String, FetchedFile>();
   private List<FetchedFile> fileList = new ArrayList<FetchedFile>();
@@ -2497,9 +2504,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       altMap.get(IG_NAME).getResources().get(0).setResource(publishedIg);
     }
     
+    loadMappingSpaces(context.getBinaries().get("mappingSpaces.details"));
+    validationFetcher.getMappingUrls().addAll(mappingSpaces.keySet());
     validationFetcher.getOtherUrls().add(publishedIg.getUrl());
     for (SpecMapManager s :  specMaps) {
       validationFetcher.getOtherUrls().add(s.getBase());
+      if (s.getBase2() != null) {
+        validationFetcher.getOtherUrls().add(s.getBase2());
+      }
     }
 
     if (npmName == null)
@@ -3034,7 +3046,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (changed) {
       f.getValuesetsToLoad().clear();
       logDebugMessage(LogCategory.INIT, "load "+f.getPath());
-      Bundle bnd = new IgSpreadsheetParser(context, execTime, igpkp.getCanonical(), f.getValuesetsToLoad(), first, context.getBinaries().get("mappingSpaces.details"), knownValueSetIds).parse(f);
+      Bundle bnd = new IgSpreadsheetParser(context, execTime, igpkp.getCanonical(), f.getValuesetsToLoad(), first, mappingSpaces, knownValueSetIds).parse(f);
       f.setBundle(new FetchedResource());
       f.setBundleType(FetchedBundleType.SPREADSHEET);
       f.getBundle().setResource(bnd);
@@ -6887,5 +6899,29 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     return currVer;
   }
+
+  private void loadMappingSpaces(byte[] source) throws Exception {
+    ByteArrayInputStream is = null;
+    try {
+      DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+      factory.setNamespaceAware(true);
+      DocumentBuilder builder = factory.newDocumentBuilder();
+      is = new ByteArrayInputStream(source);
+      Document doc = builder.parse(is);
+      org.w3c.dom.Element e = XMLUtil.getFirstChild(doc.getDocumentElement());
+      while (e != null) {
+        MappingSpace m = new MappingSpace(XMLUtil.getNamedChild(e, "columnName").getTextContent(), XMLUtil.getNamedChild(e, "title").getTextContent(),
+            XMLUtil.getNamedChild(e, "id").getTextContent(), Integer.parseInt(XMLUtil.getNamedChild(e, "sort").getTextContent()), true, false, false, XMLUtil.getNamedChild(e, "link") != null ? XMLUtil.getNamedChild(e, "link").getTextContent(): XMLUtil.getNamedChild(e, "url").getTextContent());
+        mappingSpaces.put(XMLUtil.getNamedChild(e, "url").getTextContent(), m);
+        org.w3c.dom.Element p = XMLUtil.getNamedChild(e, "preamble");
+        if (p != null)
+          m.setPreamble(new XhtmlParser().parseHtmlNode(p).setName("div"));
+        e = XMLUtil.getNextSibling(e);
+      }
+    } catch (Exception e) {
+      throw new Exception("Error processing mappingSpaces.details: "+e.getMessage(), e);
+    }
+  }
+
 
 }
