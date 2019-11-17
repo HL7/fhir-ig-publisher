@@ -52,6 +52,7 @@ public class ValidationServices implements IValidatorResourceFetcher {
   private List<FetchedFile> files;
   private List<NpmPackage> packages;
   private List<String> otherUrls = new ArrayList<>();
+  private List<String> mappingUrls = new ArrayList<>();
   
   
   public ValidationServices(IWorkerContext context, IGKnowledgeProvider ipg, List<FetchedFile> files, List<NpmPackage> packages) {
@@ -171,6 +172,10 @@ public class ValidationServices implements IValidatorResourceFetcher {
     if (url.startsWith("http://hl7.org/fhirpath/System."))
       return true;
     
+    if (path.contains("StructureDefinition.mapping") && mappingUrls.contains(url)) {
+      return true;
+    }
+    
     if (url.startsWith("http://hl7.org/fhir"))
       try {
         return context.fetchResourceWithException(Resource.class, url) != null;
@@ -183,6 +188,10 @@ public class ValidationServices implements IValidatorResourceFetcher {
 
   public List<String> getOtherUrls() {
     return otherUrls;
+  }
+
+  public List<String> getMappingUrls() {
+    return mappingUrls;
   }
 
   public void initOtherUrls() {
