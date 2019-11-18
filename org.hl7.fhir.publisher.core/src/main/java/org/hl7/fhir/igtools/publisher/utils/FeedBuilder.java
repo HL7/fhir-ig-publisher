@@ -140,14 +140,26 @@ public class FeedBuilder {
     }
   }
 
-  public void execute(String rootFolder, String feedFile, String orgName, String thisUrl, boolean forPackage, String rootUrl) throws JsonSyntaxException, FileNotFoundException, IOException, ParseException {
+  public void execute(String rootFolder, String packageFile, String publicationFile, String orgName, String thisUrl, String rootUrl) throws JsonSyntaxException, FileNotFoundException, IOException, ParseException {
+    System.out.println("Build Feed. ");
+    System.out.println("  rootFolder="+rootFolder);
+    System.out.println("  packageFile="+packageFile);
+    System.out.println("  publicationFile="+publicationFile);
+    System.out.println("  orgName="+orgName);
+    System.out.println("  thisUrl="+thisUrl);
+    System.out.println("  rootUrl="+rootUrl);
     List<Publication> pubs = new ArrayList<>();
     
     scanFolder(new File(rootFolder), pubs, rootUrl, rootFolder);
     Collections.sort(pubs, new PublicationSorter());
-    String s = buildFeed(pubs, orgName, thisUrl, forPackage);
-    System.out.println("Save feed to "+feedFile);
-    TextFile.stringToFile(s, feedFile);
+    if (packageFile != null) {
+      System.out.println("Save Package feed to "+packageFile);
+      TextFile.stringToFile(buildFeed(pubs, orgName, thisUrl, true), packageFile);
+    }
+    if (publicationFile != null) {
+      System.out.println("Save publication feed to "+publicationFile);
+      TextFile.stringToFile(buildFeed(pubs, orgName, thisUrl, false), publicationFile);
+    }
   }
 
   private String buildFeed(List<Publication> pubs, String orgName, String thisUrl, boolean forPackage) throws IOException {
@@ -291,7 +303,6 @@ public class FeedBuilder {
   }
 
   public static void main(String[] args) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
-    new FeedBuilder().execute("C:\\web\\hl7.org\\fhir", "C:\\web\\hl7.org\\fhir\\package-feed.xml", "HL7", "http://hl7.org/fhir/package-feed.xml", true, "http://hl7.org/fhir");
-    new FeedBuilder().execute("C:\\web\\hl7.org\\fhir", "C:\\web\\hl7.org\\fhir\\publication-feed.xml", "HL7", "http://hl7.org/fhir/publication-feed.xml", false, "http://hl7.org/fhir");
+    new FeedBuilder().execute("C:\\web\\hl7.org\\fhir", "C:\\web\\hl7.org\\fhir\\package-feed.xml", "C:\\web\\hl7.org\\fhir\\publication-feed.xml", "HL7", "http://hl7.org/fhir/package-feed.xml", "http://hl7.org/fhir");
   }
 }

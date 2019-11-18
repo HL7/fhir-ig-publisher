@@ -83,11 +83,8 @@ public class IGWebSiteMaintainer {
     }
     System.out.println("==================== ");
     System.out.println("Processing Feeds for "+folder);
-    if (!Utilities.noString(ini.getStringProperty("feeds",  "package"))) {
-      new FeedBuilder().execute(folder, Utilities.path(folder, ini.getStringProperty("feeds", "package")), ini.getStringProperty("website", "org"), Utilities.pathURL(url, ini.getStringProperty("feeds", "package")), true, url);
-    }
-    if (!Utilities.noString(ini.getStringProperty("feeds",  "publication"))) {
-      new FeedBuilder().execute(folder, Utilities.path(folder, ini.getStringProperty("feeds", "publication")), ini.getStringProperty("website", "org"), Utilities.pathURL(url, ini.getStringProperty("feeds", "publication")), false, url);
+    if (!Utilities.noString(ini.getStringProperty("feeds",  "package")) || !Utilities.noString(ini.getStringProperty("feeds",  "publication"))) {
+      new FeedBuilder().execute(folder, Utilities.path(folder, ini.getStringProperty("feeds", "package")), ini.getStringProperty("feeds", "publication"), ini.getStringProperty("website", "org"), Utilities.pathURL(url, ini.getStringProperty("feeds", "package")), url);
     }
     System.out.println("Finished Processing Feeds");
     System.out.println("==================== ");
