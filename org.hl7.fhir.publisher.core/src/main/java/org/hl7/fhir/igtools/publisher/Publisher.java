@@ -719,8 +719,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       TextFile.stringToFile(makeTemplateQAPage(), Utilities.path(outputDir, "qa.html"), false);
 
       if (mode != IGBuildMode.AUTOBUILD) {
-        pcm.addPackageToCache(templateInfo.get("name").getAsString(), templateInfo.get("version").getAsString(), new FileInputStream(npm.filename()));
-        pcm.addPackageToCache(templateInfo.get("name").getAsString(), "dev", new FileInputStream(npm.filename()));
+        pcm.addPackageToCache(templateInfo.get("name").getAsString(), templateInfo.get("version").getAsString(), new FileInputStream(npm.filename()), Utilities.path(outputDir, "package.tgz"));
+        pcm.addPackageToCache(templateInfo.get("name").getAsString(), "dev", new FileInputStream(npm.filename()), Utilities.path(outputDir, "package.tgz"));
       }
     } catch (Exception e) {
        e.printStackTrace();
@@ -2089,7 +2089,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (pi == null) {
       String url = getMasterSource();
       InputStream src = fetchFromSource("hl7.fhir.core-"+v, url);
-      pi = pcm.addPackageToCache("hl7.fhir.core", v, src);
+      pi = pcm.addPackageToCache("hl7.fhir.core", v, src, url);
     }
     if (v.equals("current")) {
       // currency of the current core package is a problem, since its not really version controlled.
@@ -2099,7 +2099,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       int lastAcceptableVersion = ToolsVersion.TOOLS_VERSION;
       if (cacheVersion < lastAcceptableVersion) {
         logDebugMessage(LogCategory.INIT, "Updating hl7.fhir.core-"+version+" package from source (too old - is "+cacheVersion+", must be "+lastAcceptableVersion);
-        pi = pcm.addPackageToCache("hl7.fhir.core", "current", fetchFromSource("hl7.fhir.core-"+v, getMasterSource()));
+        pi = pcm.addPackageToCache("hl7.fhir.core", "current", fetchFromSource("hl7.fhir.core-"+v, getMasterSource()), getMasterSource());
       } else {
         logDebugMessage(LogCategory.INIT, "   ...  ok: is "+cacheVersion+", must be "+lastAcceptableVersion);
       }
@@ -2339,7 +2339,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       JsonObject o = (JsonObject) e;
       if (igver.equals(o.get("version").getAsString())) {
         InputStream src = fetchFromSource(pl.get("package-id").getAsString()+"-"+igver, Utilities.pathURL(o.get("path").getAsString(), "package.tgz"));
-        return pcm.addPackageToCache(pl.get("package-id").getAsString(), igver, src);
+        return pcm.addPackageToCache(pl.get("package-id").getAsString(), igver, src, Utilities.pathURL(o.get("path").getAsString(), "package.tgz"));
       }
     }
     return null;
@@ -4049,14 +4049,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         npm.addFile(Category.OTHER, "spec.internals", TextFile.fileToBytes(df.getAbsolutePath()));
         npm.finish();
         
-
         if (mode == null || mode == IGBuildMode.MANUAL) {
           if (cacheVersion)
-            pcm.addPackageToCache(publishedIg.getPackageId(), publishedIg.getVersion(), new FileInputStream(npm.filename()));
+            pcm.addPackageToCache(publishedIg.getPackageId(), publishedIg.getVersion(), new FileInputStream(npm.filename()), "[output]");
           else
-            pcm.addPackageToCache(publishedIg.getPackageId(), "dev", new FileInputStream(npm.filename()));        
+            pcm.addPackageToCache(publishedIg.getPackageId(), "dev", new FileInputStream(npm.filename()), "[output]");        
         } else if (mode == IGBuildMode.PUBLICATION)
-          pcm.addPackageToCache(publishedIg.getPackageId(), publishedIg.getVersion(), new FileInputStream(npm.filename()));
+          pcm.addPackageToCache(publishedIg.getPackageId(), publishedIg.getVersion(), new FileInputStream(npm.filename()), "[output]");
         generateZips(df);
       }
     }

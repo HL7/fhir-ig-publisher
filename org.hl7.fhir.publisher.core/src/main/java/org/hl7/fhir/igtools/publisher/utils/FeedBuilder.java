@@ -202,7 +202,7 @@ public class FeedBuilder {
         if (forPackage) {
           for (String s : pub.subPackages) {
             // open the package, check the details and get the description
-            NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(pub.folder, s+".tgz")));
+            NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(pub.folder, s+".tgz")), Utilities.path(pub.folder, s+".tgz"));
             if (!npm.name().equals(s))
               System.out.println("id mismatch in "+Utilities.path(pub.folder, s+".tgz")+" - expected "+s+" but found "+npm.name());
             if (!npm.version().equals(pub.version))

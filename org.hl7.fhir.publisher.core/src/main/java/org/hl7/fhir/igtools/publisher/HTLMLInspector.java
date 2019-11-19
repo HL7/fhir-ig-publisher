@@ -628,7 +628,7 @@ public class HTLMLInspector {
       URL url1 = new URL(Utilities.pathURL(url, "package.tgz")+"?nocache=" + System.currentTimeMillis());
       URLConnection c = url1.openConnection();
       InputStream src = c.getInputStream();
-      pi = pcm.addPackageToCache(id, ver, src);
+      pi = pcm.addPackageToCache(id, ver, src, url);
     }    
     SpecMapManager sm = new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.getNpm().getAsJsonObject("dependencies").get("hl7.fhir.core").getAsString());
     sm.setBase(url);
