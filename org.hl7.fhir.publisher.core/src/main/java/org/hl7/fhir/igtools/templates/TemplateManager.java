@@ -52,6 +52,12 @@ public class TemplateManager {
   }
 
   public Template loadTemplate(String template, String rootFolder, String packageId, boolean autoMode) throws FHIRException, IOException {
+    return loadTemplate(template, rootFolder, packageId, autoMode, new ArrayList<String>());
+  }
+
+  public Template loadTemplate(String template, String rootFolder, String packageId, boolean autoMode, List<String> parentTemplateIds) throws FHIRException, IOException {
+    boolean noClear = false;
+    boolean leafTemplate = parentTemplateIds.isEmpty();
     logger.logMessage("Load Template from "+template);
     boolean canExecute = !autoMode || checkTemplateId(template, packageId);
     if (!canExecute)
@@ -59,7 +65,20 @@ public class TemplateManager {
     NpmPackage npm = loadPackage(template, rootFolder);
     if (!npm.isType(PackageType.TEMPLATE))
       throw new FHIRException("The referenced package '"+template+"' does not have the correct type - is "+npm.type()+" but should be a template");
-    return new Template(npm, template.equals("#template"), rootFolder, canExecute);
+    if (npm.getNpm().has("base")) {
+      noClear = true;
+      parentTemplateIds.add(template);
+      String baseTemplate = npm.getNpm().get("base").getAsString();
+      if (parentTemplateIds.contains(baseTemplate)) {
+        parentTemplateIds.add(baseTemplate);
+        throw new FHIRException("Template parents recurse: " + String.join("->", parentTemplateIds));
+      }
+      loadTemplate(baseTemplate, rootFolder, packageId, false, parentTemplateIds);
+    }
+    if (leafTemplate)
+      return new Template(npm, template.equals("#template"), rootFolder, canExecute, noClear);
+    else
+      return null;
   }
 
   private boolean checkTemplateId(String template, String packageId) {

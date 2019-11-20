@@ -91,7 +91,7 @@ public class Template {
    * 
    * @throws IOException - only if the path is incorrect or the disk runs out of space
    */
-  public Template(NpmPackage npm, boolean noInit, String rootDir, boolean canExecute) throws IOException {
+  public Template(NpmPackage npm, boolean noInit, String rootDir, boolean canExecute, boolean noClear) throws IOException {
     pack = npm;
     root = rootDir;
     this.canExecute = canExecute;
@@ -99,7 +99,8 @@ public class Template {
     templateDir = Utilities.path(rootDir, "template");
     if (!noInit) {  // special case  - no init when template is already in the right place
       Utilities.createDirectory(templateDir);
-      Utilities.clearDirectory(templateDir);
+      if (!noClear)
+        Utilities.clearDirectory(templateDir);
       pack.unPack(templateDir);
     }
     // ok, now templateDir has the content of the template
