@@ -57,7 +57,6 @@ public class TemplateManager {
 
   public Template loadTemplate(String template, String rootFolder, String packageId, boolean autoMode, List<String> parentTemplateIds) throws FHIRException, IOException {
     boolean noClear = false;
-    boolean leafTemplate = parentTemplateIds.isEmpty();
     logger.logMessage("Load Template from "+template);
     boolean canExecute = !autoMode || checkTemplateId(template, packageId);
     if (!canExecute)
@@ -75,10 +74,7 @@ public class TemplateManager {
       }
       loadTemplate(baseTemplate, rootFolder, packageId, false, parentTemplateIds);
     }
-    if (leafTemplate)
-      return new Template(npm, template.equals("#template"), rootFolder, canExecute, noClear);
-    else
-      return null;
+    return new Template(npm, template.equals("#template"), rootFolder, canExecute, noClear, false);
   }
 
   private boolean checkTemplateId(String template, String packageId) {
@@ -88,9 +84,9 @@ public class TemplateManager {
     
     // first, the following templates authored by HL7 are allowed 
     return isTemplate("http://github.com/FHIR/test-template", "fhir.test.template", template)
-        || isTemplate("http://github.com/HL7/base-template", "fhir.base.template", template)
-        || isTemplate("http://github.com/HL7/fhir-template", "hl7.fhir.template", template)
-        || isTemplate("http://github.com/HL7/davinci-template", "fhir.davinci.template", template)
+        || isTemplate("http://github.com/HL7/ig-template-base", "fhir.base.template", template)
+        || isTemplate("http://github.com/HL7/ig-template-fhir", "hl7.fhir.template", template)
+        || isTemplate("http://github.com/HL7/ig-template-davinci", "fhir.davinci.template", template)
         || isTemplate("https://github.com/IHE/ihe-ig-template", "ihe.fhir.template", template);
     // we might choose to allow some IGs here...
   }
