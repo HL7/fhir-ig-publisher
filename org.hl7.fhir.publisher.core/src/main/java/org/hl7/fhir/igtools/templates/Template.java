@@ -91,7 +91,7 @@ public class Template {
    * 
    * @throws IOException - only if the path is incorrect or the disk runs out of space
    */
-  public Template(NpmPackage npm, boolean noInit, String rootDir, boolean canExecute, boolean noClear) throws IOException {
+  public Template(NpmPackage npm, boolean noInit, String rootDir, boolean canExecute, boolean noClear, boolean noLoad) throws IOException {
     pack = npm;
     root = rootDir;
     this.canExecute = canExecute;
@@ -101,50 +101,51 @@ public class Template {
       Utilities.createDirectory(templateDir);
       if (!noClear)
         Utilities.clearDirectory(templateDir);
-      pack.unPack(templateDir);
+      pack.unPackWithAppend(templateDir);
     }
     // ok, now templateDir has the content of the template
     configuration = JsonTrackingParser.parseJsonFile(Utilities.path(templateDir, "config.json"));
-    
-    if (configuration.has("script") && canExecute) {
-      script = configuration.get("script").getAsString();
-      if (!configuration.has("targets"))
-        throw new FHIRException("If a script is provided, then targets must be defined");
-      JsonObject targets = configuration.getAsJsonObject("targets");
-      if (targets.has("onLoad"))
-        targetOnLoad = targets.get("onLoad").getAsString();
-      if (targets.has("onGenerate"))
-        targetOnGenerate = targets.get("onGenerate").getAsString();
-      if (targets.has("onJekyll"))
-        targetOnJekyll = targets.get("onJekyll").getAsString();
-      if (targets.has("onCheck"))
-        targetOnCheck = targets.get("onCheck").getAsString();
-      File buildFile = new File(Utilities.path(templateDir, script));
-      antProject = new Project();
+    if (!noLoad) {
+      if (configuration.has("script") && canExecute) {
+        script = configuration.get("script").getAsString();
+        if (!configuration.has("targets"))
+          throw new FHIRException("If a script is provided, then targets must be defined");
+        JsonObject targets = configuration.getAsJsonObject("targets");
+        if (targets.has("onLoad"))
+          targetOnLoad = targets.get("onLoad").getAsString();
+        if (targets.has("onGenerate"))
+          targetOnGenerate = targets.get("onGenerate").getAsString();
+        if (targets.has("onJekyll"))
+          targetOnJekyll = targets.get("onJekyll").getAsString();
+        if (targets.has("onCheck"))
+          targetOnCheck = targets.get("onCheck").getAsString();
+        File buildFile = new File(Utilities.path(templateDir, script));
+        antProject = new Project();
+        
+        ProjectHelper.configureProject(antProject, buildFile);
+        DefaultLogger consoleLogger = new DefaultLogger();
+        consoleLogger.setErrorPrintStream(System.err);
+        consoleLogger.setOutputPrintStream(System.out);
+        consoleLogger.setMessageOutputLevel(Project.MSG_INFO);
+        antProject.addBuildListener(consoleLogger);
+        antProject.setBasedir(root);
+        antProject.setProperty("ig.root", root);
+        antProject.setProperty("ig.template", templateDir);
+        antProject.setProperty("ig.scripts", Utilities.path(templateDir, "scripts"));
+        antProject.init();
+      }
       
-      ProjectHelper.configureProject(antProject, buildFile);
-      DefaultLogger consoleLogger = new DefaultLogger();
-      consoleLogger.setErrorPrintStream(System.err);
-      consoleLogger.setOutputPrintStream(System.out);
-      consoleLogger.setMessageOutputLevel(Project.MSG_INFO);
-      antProject.addBuildListener(consoleLogger);
-      antProject.setBasedir(root);
-      antProject.setProperty("ig.root", root);
-      antProject.setProperty("ig.template", templateDir);
-      antProject.setProperty("ig.scripts", Utilities.path(templateDir, "scripts"));
-      antProject.init();
-    }
-    
-    if (configuration.has("defaults")) {
-      defaults = (JsonObject)configuration.get("defaults");
-    }
-
-    if (configuration.has("extraTemplates")) {
-      extraTemplates = (JsonArray)configuration.get("extraTemplates");
-    }
-
-    if (configuration.has("pre-process")) {
-      preProcess = (JsonArray)configuration.get("pre-process");
+      if (configuration.has("defaults")) {
+        defaults = (JsonObject)configuration.get("defaults");
+      }
+  
+      if (configuration.has("extraTemplates")) {
+        extraTemplates = (JsonArray)configuration.get("extraTemplates");
+      }
+  
+      if (configuration.has("pre-process")) {
+        preProcess = (JsonArray)configuration.get("pre-process");
+      }
     }
 }
   
