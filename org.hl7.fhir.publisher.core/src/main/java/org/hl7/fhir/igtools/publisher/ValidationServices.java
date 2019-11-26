@@ -88,9 +88,11 @@ public class ValidationServices implements IValidatorResourceFetcher {
         if (u.startsWith("/"))
           u = u.substring(1);
         String[] ul = u.split("\\/");
-        InputStream s = npm.loadResource(ul[0], ul[1]);
-        if (s != null)
-          return Manager.makeParser(context, FhirFormat.JSON).parse(s);
+        if (ul.length >= 2) {
+          InputStream s = npm.loadResource(ul[0], ul[1]);
+          if (s != null)
+            return Manager.makeParser(context, FhirFormat.JSON).parse(s);
+        }
       }
     }
     String[] parts = url.split("\\/");
