@@ -303,9 +303,9 @@ public class IGReleaseUpdater {
     String p2 = root == null ? "" : version == root ? "This is the current published version"+(currentPublication ? "" : " in it's permanent home (it will always be available at this URL)") : "The current version which supercedes this version is <a href=\""+(JSONUtil.str(root, "path").startsWith(canonical) ? canonical : JSONUtil.str(root, "path"))+"{{fn}}\">"+JSONUtil.str(root, "version")+"</a>";
     String p3;
     if (canonical.equals("http://hl7.org/fhir"))
-      p3 = " For a full list of available versions, see the <a href=\"{{path}}directory.html\">Directory of published versions <img src=\"external.png\" style=\"text-align: baseline\"></a>";
+      p3 = " For a full list of available versions, see the <a href=\""+canonical+"/directory.html\">Directory of published versions <img src=\"external.png\" style=\"text-align: baseline\"></a>";
     else
-      p3 = " For a full list of available versions, see the <a href=\"{{path}}history.html\">Directory of published versions <img src=\"external.png\" style=\"text-align: baseline\"></a>";
+      p3 = " For a full list of available versions, see the <a href=\""+canonical+"/history.html\">Directory of published versions <img src=\"external.png\" style=\"text-align: baseline\"></a>";
     return "This page is part of the "+p1+p2+". "+p3;
   }
 
@@ -392,7 +392,10 @@ public class IGReleaseUpdater {
 
   private String decorate(String sequence) {
     sequence = sequence.replace("Normative", "<a href=\"https://confluence.hl7.org/display/HL7/HL7+Balloting\" title=\"Normative Standard\">Normative</a>");
-    return sequence.replace("STU", "<a href=\"https://confluence.hl7.org/display/HL7/HL7+Balloting\" title=\"Standard for Trial-Use\">STU</a>");
+    if (sequence.contains("DSTU"))
+      return sequence.replace("DSTU", "<a href=\"https://confluence.hl7.org/display/HL7/HL7+Balloting\" title=\"Draft Standard for Trial-Use\">DSTU</a>");
+    else
+      return sequence.replace("STU", "<a href=\"https://confluence.hl7.org/display/HL7/HL7+Balloting\" title=\"Standard for Trial-Use\">STU</a>");
   }
 
   private String ballotCount(JsonObject ig, String sequence, JsonObject version) {

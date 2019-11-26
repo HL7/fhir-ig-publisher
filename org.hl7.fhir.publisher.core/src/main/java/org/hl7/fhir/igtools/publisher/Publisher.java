@@ -1439,6 +1439,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient(webTxServer.getAddress(), FhirPublication.fromCode(version)), txLog));
     
     loadSpecDetails(context.getBinaries().get("spec.internals"));
+    loadPubPack();
     igpkp = new IGKnowledgeProvider(context, checkAppendSlash(specPath), determineCanonical(sourceIg.getUrl()), template.config(), errors, VersionUtilities.isR2Ver(version), template);
     if (autoLoad)
       igpkp.setAutoPath(true);
@@ -1753,6 +1754,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (cb == null)
       throw new Exception("You must define a canonicalBase in the json file");
 
+    loadPubPack();
+
     igpkp = new IGKnowledgeProvider(context, checkAppendSlash(specPath), cb.getAsString(), configuration, errors, VersionUtilities.isR2Ver(version), null);
     igpkp.loadSpecPaths(specMaps.get(0));
     fetcher.setPkp(igpkp);
@@ -1902,6 +1905,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         regenList.add(((JsonPrimitive) regen).getAsString());
 
   }
+
+  private void loadPubPack() throws FHIRException, IOException {
+    NpmPackage npm = pcm.loadPackage("hl7.fhir.pubpack", "0.0.2");
+    context.loadFromPackage(npm, null);
+  }
+
+
 
   private void processExtraTemplates(JsonArray templates) throws Exception {
     if (templates!=null) {
@@ -2083,9 +2093,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     String v = version.equals(Constants.VERSION) ? "current" : version;
 
     if (Utilities.noString(igPack)) {
+      System.out.println("Load from Package "+VersionUtilities.packageForVersion(v)+"#"+v);
       pi = pcm.loadPackage(VersionUtilities.packageForVersion(v), v);
-    } else
+    } else {
+      System.out.println("Load from provided file "+igPack);
       pi = NpmPackage.fromPackage(new FileInputStream(igPack));
+    }
     if (pi == null) {
       String url = getMasterSource();
       InputStream src = fetchFromSource("hl7.fhir.core-"+v, url);
