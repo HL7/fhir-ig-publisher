@@ -25,12 +25,15 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
+import org.hl7.fhir.utilities.json.JSONUtil;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 
 import com.google.gson.JsonElement;
@@ -90,24 +93,37 @@ public class IGReleaseRedirectionBuilder {
       "?>\r\n"+
       "    \r\n"+
       "You should not be seeing this page. If you do, PHP has failed badly.\r\n";
-
+  
+  private static final String WC_START = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + 
+      "<configuration>\n" + 
+      "  <system.webServer>\n" + 
+      "    <rewrite>\n" + 
+      "      <rules>\n";
+  
+  private static final String WC_END = "      </rules>\n" + 
+      "    </rewrite>\n" + 
+      "  </system.webServer>\n" + 
+      "</configuration>";
+  
   private String folder;
   private String canonical;
   private String vpath;
+  private String websiteRootFolder;
   private int countTotal;
   private int countUpdated;
   private NpmPackage pkg;
 
-  public IGReleaseRedirectionBuilder(String folder, String canonical, String vpath) {
+  public IGReleaseRedirectionBuilder(String folder, String canonical, String vpath, String websiteRootFolder) {
    this.folder = folder; 
    this.canonical = canonical;
    this.vpath = vpath;
+   this.websiteRootFolder = websiteRootFolder;
    countTotal = 0;
    countUpdated = 0;
   }
 
   public void buildApacheRedirections() throws IOException {    
-    Map<String, String> map = createMap();
+    Map<String, String> map = createMap(false);
     if (map != null) {
       for (String s : map.keySet()) {
         String path = Utilities.path(folder, s, "index.php");
@@ -119,8 +135,133 @@ public class IGReleaseRedirectionBuilder {
     }
   }
   
-  public void buildAspRedirections() throws IOException {
-    Map<String, String> map = createMap();
+  public void buildNewAspRedirections(boolean isCore, boolean isCoreRoot) throws IOException {
+    Map<String, String> map = createMap(isCore);
+    if (map == null) {
+      System.out.println("!!! no map, "+folder);
+    } else {
+      // we need to generate a web config, and the redirectors
+      Set<String> rtl = listResourceTypes(map);
+      if (rtl.isEmpty()) {
+        System.out.println("!!! empty map, "+folder);
+      } else {
+        generateWebConfig(rtl);
+        for (String rt : rtl) {
+          generateRedirect(rt, map);
+        }
+        if (isCoreRoot) {
+          for (String s : map.keySet()) {
+            if (!s.contains("/")) {
+              String path = Utilities.path(folder, s, "index.asp");
+              String p = s.replace("/", "-");
+              String litPath = Utilities.path(folder, p)+".html";
+              if (!new File(litPath+".xml").exists() && !new File(litPath+".json").exists()) 
+                litPath = Utilities.path(folder, tail(map.get(s)));
+              File file = new File(Utilities.changeFileExt(litPath, ".xml"));
+              if (file.exists() && new File(Utilities.changeFileExt(litPath, ".json")).exists()) {
+                createAspRedirect(path, map.get(s), Utilities.pathURL(vpath, head(file.getName())));
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private void generateRedirect(String rt, Map<String, String> map) throws IOException {
+    StringBuilder b = new StringBuilder();
+    countTotal++;
+
+    String root = Utilities.pathURL(canonical, rt);
+    b.append("<%@ language=\"javascript\"%>\r\n" + 
+        "\r\n" + 
+        "<%\r\n" + 
+        "  var s = String(Request.ServerVariables(\"HTTP_ACCEPT\"));\r\n" +
+        "  var id = Request.QueryString(\"id\");\r\n"+
+        "  if (s.indexOf(\"application/json+fhir\") > -1) \r\n" + 
+        "    Response.Redirect(\""+root+"-\"+id+\".json2\");\r\n" + 
+        "  else if (s.indexOf(\"application/fhir+json\") > -1) \r\n" + 
+        "    Response.Redirect(\""+root+"-\"+id+\".json1\");\r\n" + 
+        "  else if (s.indexOf(\"application/xml+fhir\") > -1) \r\n" + 
+        "    Response.Redirect(\""+root+"-\"+id+\".xml2\");\r\n" + 
+        "  else if (s.indexOf(\"application/fhir+xml\") > -1) \r\n" + 
+        "    Response.Redirect(\""+root+"-\"+id+\".xml1\");\r\n" + 
+        "  else if (s.indexOf(\"json\") > -1) \r\n" + 
+        "    Response.Redirect(\""+root+"-\"+id+\".json\");\r\n" + 
+        "  else if (s.indexOf(\"html\") == -1) \r\n" + 
+        "    Response.Redirect(\""+root+"-\"+id+\".xml\");\r\n" );
+    for (String s : map.keySet()) {
+      if (s.startsWith(rt+"/")) {
+        String id = s.substring(rt.length()+1);
+        String link = map.get(s);
+        b.append("  else if (id == \""+id+"\")\r\n" + 
+            "    Response.Redirect(\""+link+"\");\r\n");
+      }
+    }
+    b.append(     
+        "\r\n" + 
+        "%>\r\n" + 
+        "\r\n" + 
+        "<!DOCTYPE html>\r\n" + 
+        "<html>\r\n" + 
+        "<body>\r\n" + 
+        "Internal Error - unknown id <%= Request.QueryString(\"id\") %> .\r\n" + 
+        "</body>\r\n" + 
+        "</html>\r\n");
+
+    String asp = b.toString();
+    File f = new File(Utilities.path(folder, "cr"+rt.toLowerCase()+".asp"));
+    if (f.exists()) {
+      String aspc = TextFile.fileToString(f);
+      if (aspc.equals(asp))
+        return;
+    }
+    countUpdated++;
+    TextFile.stringToFile(b.toString(), f);    
+    
+  }
+
+  private void generateWebConfig(Set<String> rtl) throws IOException {
+    StringBuilder b = new StringBuilder();
+    b.append(WC_START);
+    countTotal++;
+    for (String rt : rtl) {
+      b.append("        <rule name=\""+rulePrefix()+rt+"\">\n" + 
+        "          <match url=\"^("+rt+")/([A-Za-z0-9\\-\\.]{1,64})\" />\n" + 
+        "          <action type=\"Rewrite\" url=\"cr"+rt.toLowerCase()+".asp?type={R:1}&amp;id={R:2}\" />\n" + 
+        "        </rule>\n" + 
+        "");
+    }
+    b.append(WC_END);
+    String wc = b.toString();
+    File f = new File(Utilities.path(folder, "web.config"));
+    if (f.exists()) {
+      String wcc = TextFile.fileToString(f);
+      if (wcc.equals(wc))
+        return;
+    }
+    countUpdated++;
+    TextFile.stringToFile(b.toString(),f);    
+  }
+
+  private String rulePrefix() {
+    String t = folder.substring(websiteRootFolder.length()+1);
+    t = t.replace("/", ".").replace("\\", ".");
+    return t+".";
+  }
+
+  private Set<String> listResourceTypes(Map<String, String> map) {
+    Set<String> res = new HashSet<>();
+    for (String s : map.keySet()) {
+      if (s.contains("/")) {
+        res.add(s.substring(0, s.indexOf("/")));
+      }
+    }
+    return res;
+  }
+
+  public void buildOldAspRedirections() throws IOException {
+    Map<String, String> map = createMap(false);
     if (map != null) {
       for (String s : map.keySet()) {
         String path = Utilities.path(folder, s, "index.asp");
@@ -168,7 +309,20 @@ public class IGReleaseRedirectionBuilder {
     }
   }
 
-  private Map<String, String> createMap() throws IOException {
+  private Map<String, String> createMap(boolean isCore) throws IOException {
+    if (new File(Utilities.path(folder, "spec.internals")).exists()) {
+      JsonObject json = null;
+      try {
+        json = JsonTrackingParser.parseJsonFile(Utilities.path(folder, "spec.internals"));
+      } catch (Exception e) {
+        return null;
+      }
+      Map<String, String> res = parseSpecDetails(json);
+      if (isCore) {
+        scanAdditionalFiles(res);      
+      }
+      return res;
+    }
     File f = new File(Utilities.path(folder, "package.tgz"));
     if (!f.exists())
       return null;
@@ -179,6 +333,26 @@ public class IGReleaseRedirectionBuilder {
     } catch (Exception e) {
       return null;
     }
+    Map<String, String> res = parseSpecDetails(json);
+    if (isCore) {
+      scanAdditionalFiles(res);      
+    }
+    return res;
+  }
+
+  private void scanAdditionalFiles(Map<String, String> res) throws IOException {
+    for (File f : new File(folder).listFiles()) {
+      if (f.getName().endsWith(".json") && !f.getName().endsWith(".canonical.json") && new File(Utilities.changeFileExt(f.getAbsolutePath(), ".xml")).exists() && new File(Utilities.changeFileExt(f.getAbsolutePath(), ".html")).exists()) {
+        JsonObject obj = JsonTrackingParser.parseJson(f);
+        if (obj.has("resourceType") && obj.has("id")) {
+          res.put(JSONUtil.str(obj, "resourceType")+"/"+JSONUtil.str(obj, "id"), Utilities.pathURL(vpath, Utilities.changeFileExt(f.getName(), ".html")));
+        }
+      }
+    }
+    
+  }
+
+  public Map<String, String> parseSpecDetails(JsonObject json) {
     Map<String, String> res = new HashMap<>();
     for (Entry<String, JsonElement> p : json.getAsJsonObject("paths").entrySet()) {
       String key = p.getKey();

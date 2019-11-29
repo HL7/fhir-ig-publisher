@@ -1189,15 +1189,15 @@ public class StructureDefinitionRenderer extends BaseRenderer {
   }
 
   private boolean hasMappings(ElementDefinition e, StructureDefinitionMappingComponent map) {
-    ElementDefinitionMappingComponent m = getMap(e, map.getIdentity());
-    if (m != null)
+    List<ElementDefinitionMappingComponent> ml = getMap(e, map.getIdentity());
+    if (!ml.isEmpty())
       return true;
     int i = sd.getSnapshot().getElement().indexOf(e)+1;
     while (i < sd.getSnapshot().getElement().size()) {
       ElementDefinition t =  sd.getSnapshot().getElement().get(i);
       if (t.getPath().startsWith(e.getPath()+".")) {
-        m = getMap(t, map.getIdentity());
-        if (m != null)
+        ml = getMap(t, map.getIdentity());
+        if (!ml.isEmpty())
           return true;
       }
       i++;
@@ -1225,21 +1225,29 @@ public class StructureDefinitionRenderer extends BaseRenderer {
       s.append(")");
     }
     s.append("</td>");
-    ElementDefinitionMappingComponent m = getMap(e, id);
-    if (m == null)
+    List<ElementDefinitionMappingComponent> ml = getMap(e, id);
+    if (ml.isEmpty())
       s.append("<td></td>");
-    else
-      s.append("<td>"+Utilities.escapeXml(m.getMap())+"</td>");
+    else {
+      s.append("<td>");
+      boolean first = true;
+      for (ElementDefinitionMappingComponent m : ml) {
+        if (first) first = false; else s.append(", ");
+        s.append(Utilities.escapeXml(m.getMap()));
+      }
+      s.append("</td>");
+    }
     s.append(" </tr>\r\n");
   }
 
 
-  private ElementDefinitionMappingComponent getMap(ElementDefinition e, String id) {
+  private List<ElementDefinitionMappingComponent> getMap(ElementDefinition e, String id) {
+    List<ElementDefinitionMappingComponent> res = new ArrayList<>();  
     for (ElementDefinitionMappingComponent m : e.getMapping()) {
       if (m.getIdentity().equals(id))
-        return m;
+        res.add(m);
     }
-    return null;
+    return res;
   }
 
   public String header() throws Exception {

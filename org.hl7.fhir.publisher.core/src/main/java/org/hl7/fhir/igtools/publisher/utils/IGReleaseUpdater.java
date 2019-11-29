@@ -52,12 +52,14 @@ import com.google.gson.JsonPrimitive;
 public class IGReleaseUpdater {
 
   public enum ServerType {
-    APACHE, ASP;
+    APACHE, ASP1, ASP2;
 
     public static ServerType fromCode(String st) {
       st = st.toLowerCase();
-      if (st.equals("asp"))
-        return ServerType.ASP;
+      if (st.equals("asp-old"))
+        return ServerType.ASP1;
+      else if (st.equals("asp-new"))
+        return ServerType.ASP2;
       else if (st.equals("apache"))
         return ServerType.APACHE;
       else 
@@ -260,15 +262,17 @@ public class IGReleaseUpdater {
       pc.check(JSONUtil.str(version, "version"), JSONUtil.str(ig, "package-id"), JSONUtil.str(version, "fhirversion", "fhirversion"), 
           JSONUtil.str(ig, "title"), new SimpleDateFormat("yyyy-MM-dd").parse(JSONUtil.str(version, "date")), JSONUtil.str(version, "path"), canonical);
     }
-    IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(vf, canonical, JSONUtil.str(version, "path"));
+    IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(vf, canonical, JSONUtil.str(version, "path"), rootFolder);
     if (serverType == ServerType.APACHE)
       rb.buildApacheRedirections();
-    else if (serverType == ServerType.ASP)
-      rb.buildAspRedirections();
+    else if (serverType == ServerType.ASP2)
+      rb.buildNewAspRedirections(isCore, isCore && vf.equals(rootFolder));
+    else if (serverType == ServerType.ASP1)
+      rb.buildOldAspRedirections();
     else if (!canonical.contains("hl7.org/fhir"))
       rb.buildApacheRedirections();
     else
-      rb.buildAspRedirections();
+      rb.buildOldAspRedirections();
     System.out.println("  .. "+rb.getCountTotal()+" redirections ("+rb.getCountUpdated()+" created/updated)");
     if (!JSONUtil.has(version, "fhirversion", "fhirversion")) {
       if (rb.getFhirVersion() == null) {
@@ -412,7 +416,7 @@ public class IGReleaseUpdater {
   }
 
   public static void main(String[] args) throws Exception {
-    new IGReleaseUpdater(args[0], args[1], args[2], null, ServerType.ASP, null).check();
+    new IGReleaseUpdater(args[0], args[1], args[2], null, ServerType.ASP2, null).check();
   }
   
 }

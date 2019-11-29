@@ -2838,11 +2838,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     for (String prePagesDir : prePagesDirs) {
       FetchedFile dir = fetcher.fetch(prePagesDir);
-      dir.setRelativePath("");
-      if (!dir.isFolder())
-        throw new Exception("pre-processed page reference is not a folder");
-      if (loadPrePages(dir, dir.getPath()))
-        changed = true;
+      if (dir != null) {
+        dir.setRelativePath("");
+        if (!dir.isFolder())
+          throw new Exception("pre-processed page reference is not a folder");
+        if (loadPrePages(dir, dir.getPath()))
+          changed = true;
+      }
     }
     return changed;
   }
