@@ -151,12 +151,18 @@ public class TypeRef {
 		return name.equals("*");
 	}
 	
-	public boolean isResourceReference()
-	{
-		// When the type is Reference(X), this is a resource reference
-		return name.equals("Reference") && !params.isEmpty();
-	}
-	
+  public boolean isResourceReference()
+  {
+    // When the type is Reference(X), this is a resource reference
+    return name.equals("Reference") && !params.isEmpty();
+  }
+  
+  public boolean isCodeableReference()
+  {
+    // When the type is Reference(X), this is a resource reference
+    return name.equals("CodeableReference") && !params.isEmpty();
+  }
+  
   public boolean isCanonical()
   {
     // When the type is Reference(X), this is a resource reference
