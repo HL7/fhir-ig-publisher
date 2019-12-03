@@ -108,6 +108,7 @@ public class IGReleaseRedirectionBuilder {
   private String folder;
   private String canonical;
   private String vpath;
+  private String localFolder;
   private String websiteRootFolder;
   private int countTotal;
   private int countUpdated;
@@ -118,6 +119,7 @@ public class IGReleaseRedirectionBuilder {
    this.canonical = canonical;
    this.vpath = vpath;
    this.websiteRootFolder = websiteRootFolder;
+   localFolder = folder.substring(websiteRootFolder.length());
    countTotal = 0;
    countUpdated = 0;
   }
@@ -205,7 +207,7 @@ public class IGReleaseRedirectionBuilder {
         "<!DOCTYPE html>\r\n" + 
         "<html>\r\n" + 
         "<body>\r\n" + 
-        "Internal Error - unknown id <%= Request.QueryString(\"id\") %> .\r\n" + 
+        "Internal Error - unknown id <%= Request.QueryString(\"id\") %> (from "+Utilities.path(localFolder, "cr"+rt.toLowerCase()+".asp")+") .\r\n" + 
         "</body>\r\n" + 
         "</html>\r\n");
 
@@ -225,12 +227,14 @@ public class IGReleaseRedirectionBuilder {
     StringBuilder b = new StringBuilder();
     b.append(WC_START);
     countTotal++;
-    for (String rt : rtl) {
-      b.append("        <rule name=\""+rulePrefix()+rt+"\">\n" + 
-        "          <match url=\"^("+rt+")/([A-Za-z0-9\\-\\.]{1,64})\" />\n" + 
-        "          <action type=\"Rewrite\" url=\"cr"+rt.toLowerCase()+".asp?type={R:1}&amp;id={R:2}\" />\n" + 
-        "        </rule>\n" + 
-        "");
+    for (String rt : rtl) { 
+      if (!Utilities.existsInList(rt, "v2", "v3")) {
+        b.append("        <rule name=\""+rulePrefix()+rt+"\">\n" + 
+            "          <match url=\"^("+rt+")/([A-Za-z0-9\\-\\.]{1,64})\" />\n" + 
+            "          <action type=\"Rewrite\" url=\"cr"+rt.toLowerCase()+".asp?type={R:1}&amp;id={R:2}\" />\n" + 
+            "        </rule>\n" + 
+            "");
+      }
     }
     b.append(WC_END);
     String wc = b.toString();

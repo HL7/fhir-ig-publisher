@@ -7,7 +7,7 @@
          and uses its POM file as a base. We do this in order to get consistent import
          versions of the various things that are pulled in from that project.
 
-         To bump the version of this project (which is versioned imndependently from
+         To bump the version of this project (which is versioned independently from
          org.hl7.fhir.core) just update the <version> tag below.
 
          If you want to bump the version of the org.hl7.fhir.core project that
@@ -18,10 +18,10 @@
     <parent>
         <groupId>ca.uhn.hapi.fhir</groupId>
         <artifactId>org.hl7.fhir.core</artifactId>
-        <version>4.1.9-SNAPSHOT</version>
+        <version>4.1.10-SNAPSHOT.1.9-SNAPSHOT</version>
     </parent>
     <properties>
-        <core_version>4.1.9-SNAPSHOT</core_version>
+        <core_version>4.1.10-SNAPSHOT.1.9-SNAPSHOT</core_version>
         <maven.test.skip>true</maven.test.skip>
     </properties>
     <version>1.0.5-SNAPSHOT</version> <!-- See the note above -->

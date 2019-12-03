@@ -136,7 +136,7 @@ public class IGReleaseUpdater {
                   errs.add("version "+v+" path "+vf+" not found (canonical = "+canonical+", path = "+path+")");
                 else {
                   folders.add(vf);
-                  save = updateStatement(vf, null, ignoreList, json, o, errs, root, canonical, canonical.equals("http://hl7.org/fhir")) | save;
+                  save = updateStatement(vf, null, ignoreList, json, o, errs, root, canonical, folder, canonical.equals("http://hl7.org/fhir"), false) | save;
                 }
               }
               if (o.has("current"))
@@ -152,7 +152,7 @@ public class IGReleaseUpdater {
           }
         }
         if (root != null)
-          updateStatement(folder, folders, ignoreList, json, root, errs, root, canonical, canonical.equals("http://hl7.org/fhir"));
+          updateStatement(folder, folders, ignoreList, json, root, errs, root, canonical, folder, canonical.equals("http://hl7.org/fhir"), true);
         if (save)
           TextFile.stringToFile(new GsonBuilder().setPrettyPrinting().create().toJson(json), f, false);
         File ht = new File(Utilities.path(folder, "history.template"));
@@ -247,7 +247,7 @@ public class IGReleaseUpdater {
 //      System.out.println("There is a problem in the package-list.json file: "+path+" contains an apostrophe (\"'\")");
 //  }
 //
-  private boolean updateStatement(String vf, List<String> ignoreList, List<String> ignoreListOuter, JsonObject ig, JsonObject version, List<String> errs, JsonObject root, String canonical, boolean isCore) throws FileNotFoundException, IOException, FHIRException, ParseException {
+  private boolean updateStatement(String vf, List<String> ignoreList, List<String> ignoreListOuter, JsonObject ig, JsonObject version, List<String> errs, JsonObject root, String canonical, String canonicalPath, boolean isCore, boolean isCurrent) throws FileNotFoundException, IOException, FHIRException, ParseException {
 
     boolean vc = false;
     String fragment = genFragment(ig, version, root, canonical, ignoreList != null, isCore);
@@ -274,6 +274,10 @@ public class IGReleaseUpdater {
     else
       rb.buildOldAspRedirections();
     System.out.println("  .. "+rb.getCountTotal()+" redirections ("+rb.getCountUpdated()+" created/updated)");
+    new DownloadBuilder(vf, canonical, isCurrent ?  canonical: JSONUtil.str(version, "path")).execute();
+    if (!isCurrent && serverType == ServerType.ASP2) {
+      new VersionRedirectorGenerator(canonicalPath).execute(JSONUtil.str(version, "version"), JSONUtil.str(version, "path"));
+    }
     if (!JSONUtil.has(version, "fhirversion", "fhirversion")) {
       if (rb.getFhirVersion() == null) {
         System.out.println("Unable to determine FHIR version for "+vf);
@@ -282,7 +286,18 @@ public class IGReleaseUpdater {
         vc = true;
       }
     }
+    // check links:
+    checkFileExists(vf, "package.tgz");
+    checkFileExists(vf, "qa.html");
+    checkFileExists(vf, isCore ? "fhir-spec.zip" : "full-ig.zip");
     return vc;
+  }
+
+  private void checkFileExists(String vf, String name) throws IOException {
+    if (!new File(Utilities.path(vf, name)).exists()) {
+      System.out.println("File "+name+" does not exist in "+vf);
+    }
+
   }
 
   /**
