@@ -2093,7 +2093,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     String v = version.equals(Constants.VERSION) ? "current" : version;
 
     if (Utilities.noString(igPack)) {
-      System.out.println("Load from Package "+VersionUtilities.packageForVersion(v)+"#"+v);
+      System.out.println("Core Package "+VersionUtilities.packageForVersion(v)+"#"+v);
       pi = pcm.loadPackage(VersionUtilities.packageForVersion(v), v);
     } else {
       System.out.println("Load from provided file "+igPack);
