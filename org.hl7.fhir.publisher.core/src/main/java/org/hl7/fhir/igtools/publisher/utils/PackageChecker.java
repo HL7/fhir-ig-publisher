@@ -5,6 +5,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
@@ -45,59 +46,18 @@ public class PackageChecker {
         if (f.getName().endsWith(".tgz")) {
           System.out.println("Package "+f.getAbsolutePath());
           NpmPackage pck = NpmPackage.fromPackage(new FileInputStream(f));
-        
-          
-          TarArchiveOutputStream tar;
-          ByteArrayOutputStream OutputStream;
-          BufferedOutputStream bufferedOutputStream;
-          GzipCompressorOutputStream gzipOutputStream;
-
-          OutputStream = new ByteArrayOutputStream();
-          bufferedOutputStream = new BufferedOutputStream(OutputStream);
-          gzipOutputStream = new GzipCompressorOutputStream(bufferedOutputStream);
-          tar = new TarArchiveOutputStream(gzipOutputStream);
-
-          NpmPackageIndexBuilder indexer = new NpmPackageIndexBuilder();
-          indexer.start();
-
-          boolean hasIndex = false;
-          for (String s : pck.getContent().keySet()) {
-            byte[] b = pck.getContent().get(s);
-            if (s.equals("package/package.json")) {
-              JsonObject json = JsonTrackingParser.parseJson(b);
-              JsonArray vl = json.getAsJsonArray("fhir-version-list");
-              if (vl != null) {
-                json.add("fhirVersions", vl);
-                json.remove("fhir-version-list");
-              }
-              b = TextFile.stringToBytes(new GsonBuilder().setPrettyPrinting().create().toJson(json), false);
-            } else if (s.startsWith("package/")) {
-              indexer.seeFile(tail(s), b);
-              if (s.endsWith(".index.json"))
-                hasIndex = true;
-            }
-            TarArchiveEntry entry = new TarArchiveEntry(s);
-            entry.setSize(b.length);
-            tar.putArchiveEntry(entry);
-            tar.write(b);
-            tar.closeArchiveEntry();
+          boolean save = false;
+          JsonObject json = JsonTrackingParser.parseJson(pck.load("package", "package.json"));
+          JsonArray vl = json.getAsJsonArray("fhir-version-list");
+          if (vl != null) {
+            json.add("fhirVersions", vl);
+            json.remove("fhir-version-list");
+            save = true;
           }
-          if (!hasIndex) {
-            byte[] cnt = TextFile.stringToBytes(indexer.build(), false);
-            TarArchiveEntry entry = new TarArchiveEntry("package/.index.json");
-            entry.setSize(cnt.length);
-            tar.putArchiveEntry(entry);
-            tar.write(cnt);
-            tar.closeArchiveEntry();
+          if (save) {
+            f.renameTo(new File(Utilities.changeFileExt(f.getAbsolutePath(), ".tgz-old")));
+            pck.save(new FileOutputStream(f));
           }
-
-          tar.finish();
-          tar.close();
-          gzipOutputStream.close();
-          bufferedOutputStream.close();
-          OutputStream.close();
-          f.renameTo(new File(Utilities.changeFileExt(f.getAbsolutePath(), ".tgz-old")));
-          TextFile.bytesToFile(OutputStream.toByteArray(), f.getAbsolutePath());          
         }
       }
     }    

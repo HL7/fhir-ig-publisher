@@ -131,7 +131,7 @@ public class TemplateManager {
       HttpURLConnection connection = (HttpURLConnection) url.openConnection();
       connection.setRequestMethod("GET");
       InputStream zip = connection.getInputStream();
-      return NpmPackage.fromZip(zip, true); 
+      return NpmPackage.fromZip(zip, true, url.toString()); 
     }
     throw new FHIRException("Unable to load template from "+template);
   }
