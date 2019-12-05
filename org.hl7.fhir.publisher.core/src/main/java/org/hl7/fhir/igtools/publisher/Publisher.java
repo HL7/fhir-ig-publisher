@@ -1176,9 +1176,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (json.has("type") && "fhir.template".equals(json.get("type").getAsString())) {
         isBuildingTemplate = true;
         templateInfo = json;
+        System.out.println("targetOutput: "+targetOutput);
         return true;
       }
     }
+    
     return false;
   }
   
