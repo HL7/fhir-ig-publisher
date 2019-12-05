@@ -761,33 +761,42 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
   public void createIg() throws Exception, IOException, EOperationOutcome, FHIRException {
-    load();
-
-    long startTime = System.nanoTime();
-    log("Processing Conformance Resources");
-    loadConformance();
-    log("Generating Narratives");
-    generateNarratives();
-    log("Validating Resources");
     try {
-      validate();
-    } catch (Exception ex){
-      log("Unhandled Exception: " +ex.toString());
-      throw(ex);
+      load();
+
+      long startTime = System.nanoTime();
+      log("Processing Conformance Resources");
+      loadConformance();
+      log("Generating Narratives");
+      generateNarratives();
+      log("Validating Resources");
+      try {
+        validate();
+      } catch (Exception ex){
+        log("Unhandled Exception: " +ex.toString());
+        throw(ex);
+      }
+      log("Generating Outputs in "+outputDir);
+      generate();
+      long endTime = System.nanoTime();
+      clean();
+      ValidationPresenter val = new ValidationPresenter(version, businessVersion, igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
+          new BallotChecker(repoRoot).check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), "v"+IGVersionUtil.getVersion(), fetchCurrentIGPubVersion());
+      if (isChild()) {
+        log("Finished. "+presentDuration(endTime - startTime));      
+      } else {
+        processTxLog(Utilities.path(destDir != null ? destDir : outputDir, "qa-tx.html"));
+        log("Finished. "+presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
+      }
+      recordOutcome(null, val);
+    } catch (Exception e) {
+      try {
+        recordOutcome(e, null);        
+      } catch (Exception ex) {
+        ex.printStackTrace();
+      }
+      throw e;
     }
-    log("Generating Outputs in "+outputDir);
-    generate();
-    long endTime = System.nanoTime();
-    clean();
-    ValidationPresenter val = new ValidationPresenter(version, businessVersion, igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
-        new BallotChecker(repoRoot).check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), "v"+IGVersionUtil.getVersion(), fetchCurrentIGPubVersion());
-    if (isChild()) {
-      log("Finished. "+presentDuration(endTime - startTime));      
-    } else {
-      processTxLog(Utilities.path(destDir != null ? destDir : outputDir, "qa-tx.html"));
-      log("Finished. "+presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
-    }
-    recordOutcome(null, val);
   }
 
   private void recordOutcome(Exception ex, ValidationPresenter val) {
