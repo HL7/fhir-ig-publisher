@@ -1396,6 +1396,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else
       spec = loadCorePackage();
     context = spec.makeContext();
+    context.setProgress(true);
     context.setIgnoreProfileErrors(true);
     context.setLogger(logger);
     context.setAllowLoadingDuplicates(true);
@@ -1714,6 +1715,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     
     context = spec.makeContext();
     context.setIgnoreProfileErrors(true);
+    context.setProgress(true);
     context.setLogger(logger);
     context.setAllowLoadingDuplicates(true);
     context.setExpandCodesLimit(1000);
