@@ -2153,6 +2153,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
   private SpecificationPackage loadPack(NpmPackage pi) throws Exception {  
+    pi.debugDump("core");
     packge = pi;
     SpecificationPackage sp = null;
     if (VersionUtilities.isR2Ver(version)) {

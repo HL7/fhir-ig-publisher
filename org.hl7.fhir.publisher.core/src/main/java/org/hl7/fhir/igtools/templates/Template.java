@@ -96,7 +96,8 @@ public class Template {
     pack = npm;
     root = rootDir;
     this.canExecute = canExecute;
-    
+    npm.debugDump("template");
+
     templateDir = Utilities.path(rootDir, "template");
     if (!noInit) {  // special case  - no init when template is already in the right place
       Utilities.createDirectory(templateDir);
