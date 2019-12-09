@@ -21,7 +21,16 @@ package org.hl7.fhir.igtools.publisher;
  */
 
 import java.io.InputStream;
+import java.text.SimpleDateFormat;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Date;
 import java.util.Properties;
+
+import org.hl7.fhir.r5.model.InstantType;
+import org.hl7.fhir.utilities.Utilities;
 
 import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import static org.apache.commons.lang3.StringUtils.left;
@@ -73,7 +82,17 @@ public class IGVersionUtil {
   }
 
   public static String getVersionString() {
-    return "Version " + getVersion() + " - Built " + getBuildTime() + " - Git " + left(getBuildNumber(), 12);
+    return "Version " + getVersion() + " (Git# " + left(getBuildNumber(), 12)+"). Built " + getBuildTime() + " ("+getDurationSinceBuild()+")";
   }
+
+  private static String getDurationSinceBuild() {
+    try {
+      InstantType dt = new InstantType(ourBuildTime);
+      return Utilities.describeDuration(Duration.ofMillis(new Date().getTime() - dt.getValue().getTime()))+" old";
+    } catch (Exception e) {
+      return "??";
+    }
+  }
+
 
 }

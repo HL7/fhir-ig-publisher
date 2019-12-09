@@ -223,6 +223,7 @@ import org.hl7.fhir.r5.utils.formats.Turtle;
 import org.hl7.fhir.r5.validation.CodeSystemValidator;
 import org.hl7.fhir.r5.validation.InstanceValidator;
 import org.hl7.fhir.r5.validation.ProfileValidator;
+import org.hl7.fhir.r5.validation.VersionUtil;
 import org.hl7.fhir.utilities.CSFile;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.IniFile;
@@ -233,7 +234,6 @@ import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.TerminologyServiceOptions;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.VersionUtil;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.ZipGenerator;
 import org.hl7.fhir.utilities.cache.NpmPackage;
@@ -2054,7 +2054,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     PackageCacheManager pcm = new PackageCacheManager(true, ToolsVersion.TOOLS_VERSION);
     
     NpmPackage npm = null; 
-    npm = pcm.loadPackage("hl7.fhir.core", Constants.VERSION);
+    if (specifiedVersion == null) {
+      npm = pcm.loadPackage("hl7.fhir.r5.core", Constants.VERSION);
+    } else {
+      String vid = VersionUtilities.getCurrentVersion(specifiedVersion);
+      String pid = VersionUtilities.packageForVersion(vid);
+      npm = pcm.loadPackage(pid, vid);
+    }
     
     ZipInputStream zip = new ZipInputStream(npm.load("other", "ig-template.zip"));
     byte[] buffer = new byte[2048];
@@ -2075,7 +2081,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void buildConfigFile() throws IOException, org.hl7.fhir.exceptions.FHIRException, FHIRFormatError {
     configFile = Utilities.path(adHocTmpDir, "ig.json");
     // temporary config, until full ig template is in place
-    String v = specifiedVersion != null ? specifiedVersion : Constants.VERSION; 
+    String v = specifiedVersion != null ? VersionUtilities.getCurrentVersion(specifiedVersion) : Constants.VERSION; 
     String igs = VersionUtilities.isR3Ver(v) ? "ig3.xml" : "ig4.xml";
     TextFile.stringToFile(
             "{\r\n"+
