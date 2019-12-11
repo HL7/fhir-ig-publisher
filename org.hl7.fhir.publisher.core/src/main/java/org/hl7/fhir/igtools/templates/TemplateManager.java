@@ -35,6 +35,7 @@ import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.utilities.JsonMerger;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
+import org.hl7.fhir.utilities.cache.NpmPackage.NpmPackageFolder;
 import org.hl7.fhir.utilities.cache.PackageCacheManager;
 import org.hl7.fhir.utilities.cache.PackageGenerator.PackageType;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
@@ -45,6 +46,7 @@ public class TemplateManager {
 
   private PackageCacheManager pcm;
   private ILoggingService logger;
+  boolean canExecute;
 
   public TemplateManager(PackageCacheManager pcm, ILoggingService logger) {
     this.pcm = pcm;
@@ -52,43 +54,93 @@ public class TemplateManager {
   }
 
   public Template loadTemplate(String template, String rootFolder, String packageId, boolean autoMode) throws FHIRException, IOException {
-    return loadTemplate(template, rootFolder, packageId, autoMode, new ArrayList<String>());
+    String templateDir = Utilities.path(rootFolder, "template");
+    boolean inPlace = template.equals("#template");
+    if (!inPlace) {
+      Utilities.createDirectory(templateDir);
+      Utilities.clearDirectory(templateDir);
+    };
+    List<String> scriptTemplates = new ArrayList<String>();
+    
+    canExecute = true;
+    NpmPackage npm;
+    if (!inPlace) {
+      installTemplate(template, rootFolder, templateDir, scriptTemplates, new ArrayList<String>(), 0);
+    }
+    
+    if (!autoMode) {
+      canExecute = true; // nah, we don't care. locally, we'll build whatever people give us
+    }
+    if (!canExecute) {
+      logger.logMessage("IG template is not trusted.  No scripts will be executed");
+    }
+    return new Template(rootFolder, canExecute);
   }
 
-  public Template loadTemplate(String template, String rootFolder, String packageId, boolean autoMode, List<String> parentTemplateIds) throws FHIRException, IOException {
-    boolean noClear = false;
-    logger.logMessage("Load Template from "+template);
-    boolean canExecute = !autoMode || checkTemplateId(template, packageId);
-    if (!canExecute)
-      logger.logMessage("IG template is not trusted.  No scripts will be executed");
+  private void installTemplate(String template, String rootFolder, String templateDir, List<String> scriptIds, ArrayList<String> loadedIds, int level) throws FHIRException, IOException {
+    logger.logMessage(Utilities.padLeft("", ' ', level) + "Load Template from "+template);
     NpmPackage npm = loadPackage(template, rootFolder);
     if (!npm.isType(PackageType.TEMPLATE))
       throw new FHIRException("The referenced package '"+template+"' does not have the correct type - is "+npm.type()+" but should be a template");
+    loadedIds.add(npm.name());
     if (npm.getNpm().has("base")) {
-      noClear = true;
-      parentTemplateIds.add(template);
       String baseTemplate = npm.getNpm().get("base").getAsString();
-      if (parentTemplateIds.contains(baseTemplate)) {
-        parentTemplateIds.add(baseTemplate);
-        throw new FHIRException("Template parents recurse: " + String.join("->", parentTemplateIds));
+      if (loadedIds.contains(baseTemplate)) {
+        loadedIds.add(baseTemplate);
+        throw new FHIRException("Template parents recurse: " + String.join("->", loadedIds));
       }
-      loadTemplate(baseTemplate, rootFolder, packageId, false, parentTemplateIds);
+      installTemplate(baseTemplate, rootFolder, templateDir, scriptIds, loadedIds, level + 1);
     }
-    return new Template(npm, template.equals("#template"), rootFolder, canExecute, noClear, false);
+    npm.debugDump("template");
+    npm.unPackWithAppend(templateDir);
+    boolean noScripts = true;
+    for (NpmPackageFolder f : npm.getFolders().values()) {
+      for (String n : f.listFiles()) {
+        noScripts = noScripts && Utilities.existsInList(extension(n), ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico");
+      }
+    }
+    if (!noScripts) {
+      checkTemplateId(template, npm.name());
+    }
   }
 
-  private boolean checkTemplateId(String template, String packageId) {
-    // template control on the autobuilder 
-    // - templates are only allowed if approved by the FHIR product director
-    // - templates can run code, so only trusted templates are allowed
-    
-    // first, the following templates authored by HL7 are allowed 
-    return isTemplate("http://github.com/FHIR/test-template", "fhir.test.template", template)
-        || isTemplate("http://github.com/HL7/ig-template-base", "fhir.base.template", template)
-        || isTemplate("http://github.com/HL7/ig-template-fhir", "hl7.fhir.template", template)
-        || isTemplate("http://github.com/HL7/ig-template-davinci", "fhir.davinci.template", template)
-        || isTemplate("https://github.com/IHE/ihe-ig-template", "ihe.fhir.template", template);
-    // we might choose to allow some IGs here...
+  private String extension(String n) {
+    if (!n.contains(".")) {
+      return "";
+    }
+    return n.substring(n.lastIndexOf("."));
+  }
+
+  /**
+   * If we get to here, we've found a template with active content. This code checks that it's authorised.
+   * 
+   * If the IG is being run locally, we don't care - we'll always run it (see code in loadTemplate)
+   * But on the ci-build, we only allow scripts that are approved by the FHIR product director
+   * (as enforced by this code here).
+   * 
+   * We only allow scripts from packages loaded by package id, for known packages 
+   * (the only way to fiddle with packages loaded by id is through the code)
+   * 
+   * todo:
+   * - cross-check that the package id matches the github id (needs change on the ci-build infrastructure)
+   *   this change would check that someone hasn't run a different template through the ci-build with the same id
+   *   
+   * @param template
+   * @param packageId
+   * @return
+   */
+  private void checkTemplateId(String template, String packageId) {
+    if (!template.equals(packageId)) {
+      canExecute = false;
+    } else if (!Utilities.existsInList(packageId, 
+        // if you are proposing to change this list, discuss with FHIR Product Director first
+        "fhir.test.template", 
+        "fhir.base.template",
+        "hl7.fhir.template",
+        "fhir.davinci.template",
+        "ihe.fhir.template")) {
+      canExecute = false;
+    }
   }
 
   private boolean isTemplate(String url, String id, String template) {

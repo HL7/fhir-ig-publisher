@@ -85,71 +85,61 @@ public class Template {
   
   /** unpack the template into /template 
    * 
-   * @param npm - the package containing the template
-   * @param noInit - a flag to prevent the template being copied into {rootDir}/template (only when it's already there as an inline template)
    * @param rootDir  the root directory for the IG
    * @param canExecute 
    * 
    * @throws IOException - only if the path is incorrect or the disk runs out of space
    */
-  public Template(NpmPackage npm, boolean noInit, String rootDir, boolean canExecute, boolean noClear, boolean noLoad) throws IOException {
-    pack = npm;
+  public Template(String rootDir, boolean canExecute) throws IOException {
     root = rootDir;
     this.canExecute = canExecute;
-    npm.debugDump("template");
 
     templateDir = Utilities.path(rootDir, "template");
-    if (!noInit) {  // special case  - no init when template is already in the right place
-      Utilities.createDirectory(templateDir);
-      if (!noClear)
-        Utilities.clearDirectory(templateDir);
-      pack.unPackWithAppend(templateDir);
-    }
+
     // ok, now templateDir has the content of the template
     configuration = JsonTrackingParser.parseJsonFile(Utilities.path(templateDir, "config.json"));
-    if (!noLoad) {
-      if (configuration.has("script") && canExecute) {
-        script = configuration.get("script").getAsString();
-        if (!configuration.has("targets"))
-          throw new FHIRException("If a script is provided, then targets must be defined");
-        JsonObject targets = configuration.getAsJsonObject("targets");
-        if (targets.has("onLoad"))
-          targetOnLoad = targets.get("onLoad").getAsString();
-        if (targets.has("onGenerate"))
-          targetOnGenerate = targets.get("onGenerate").getAsString();
-        if (targets.has("onJekyll"))
-          targetOnJekyll = targets.get("onJekyll").getAsString();
-        if (targets.has("onCheck"))
-          targetOnCheck = targets.get("onCheck").getAsString();
-        File buildFile = new File(Utilities.path(templateDir, script));
-        antProject = new Project();
-        
-        ProjectHelper.configureProject(antProject, buildFile);
-        DefaultLogger consoleLogger = new DefaultLogger();
-        consoleLogger.setErrorPrintStream(System.err);
-        consoleLogger.setOutputPrintStream(System.out);
-        consoleLogger.setMessageOutputLevel(Project.MSG_INFO);
-        antProject.addBuildListener(consoleLogger);
-        antProject.setBasedir(root);
-        antProject.setProperty("ig.root", root);
-        antProject.setProperty("ig.template", templateDir);
-        antProject.setProperty("ig.scripts", Utilities.path(templateDir, "scripts"));
-        antProject.init();
-      }
-      
-      if (configuration.has("defaults")) {
-        defaults = (JsonObject)configuration.get("defaults");
-      }
-  
-      if (configuration.has("extraTemplates")) {
-        extraTemplates = (JsonArray)configuration.get("extraTemplates");
-      }
-  
-      if (configuration.has("pre-process")) {
-        preProcess = (JsonArray)configuration.get("pre-process");
-      }
+    if (configuration.has("script")) {
+      script = configuration.get("script").getAsString();
+      if (!configuration.has("targets"))
+        throw new FHIRException("If a script is provided, then targets must be defined");
+      JsonObject targets = configuration.getAsJsonObject("targets");
+      if (targets.has("onLoad"))
+        targetOnLoad = targets.get("onLoad").getAsString();
+      if (targets.has("onGenerate"))
+        targetOnGenerate = targets.get("onGenerate").getAsString();
+      if (targets.has("onJekyll"))
+        targetOnJekyll = targets.get("onJekyll").getAsString();
+      if (targets.has("onCheck"))
+        targetOnCheck = targets.get("onCheck").getAsString();
+      File buildFile = new File(Utilities.path(templateDir, script));
+      antProject = new Project();
+
+      ProjectHelper.configureProject(antProject, buildFile);
+      DefaultLogger consoleLogger = new DefaultLogger();
+      consoleLogger.setErrorPrintStream(System.err);
+      consoleLogger.setOutputPrintStream(System.out);
+      consoleLogger.setMessageOutputLevel(Project.MSG_INFO);
+      antProject.addBuildListener(consoleLogger);
+      antProject.setBasedir(root);
+      antProject.setProperty("ig.root", root);
+      antProject.setProperty("ig.template", templateDir);
+      antProject.setProperty("ig.scripts", Utilities.path(templateDir, "scripts"));
+      antProject.init();
     }
-}
+
+    if (configuration.has("defaults")) {
+      defaults = (JsonObject)configuration.get("defaults");
+    }
+
+    if (configuration.has("extraTemplates")) {
+      extraTemplates = (JsonArray)configuration.get("extraTemplates");
+    }
+
+    if (configuration.has("pre-process")) {
+      preProcess = (JsonArray)configuration.get("pre-process");
+    }
+  }
+
   
   public boolean hasPreProcess() {
     return preProcess != null;
@@ -168,6 +158,9 @@ public class Template {
   }
     
   private ImplementationGuide runScriptTarget(String target, Map<String, List<ValidationMessage>> messages, ImplementationGuide ig, List<String> fileNames, int modifyIg) throws IOException, FHIRException {
+    if (!canExecute) {
+      throw new FHIRException("Unable to execute '"+target+"' in script '"+script+"' as the script is not trusted");
+    }
     File jsonOutcomes = new File(Utilities.path(templateDir, target + "-validation.json"));
     File xmlOutcomes = new File(Utilities.path(templateDir, target + "-validation.xml"));
     if (jsonOutcomes.exists())
@@ -342,7 +335,7 @@ public class Template {
         }
       }
     }
-    if (canExecute && targetOnGenerate != null) {
+    if (targetOnGenerate != null) {
       Map<String, List<ValidationMessage>> messages = new HashMap<String, List<ValidationMessage>>();
       antProject.setProperty("ig.temp", tempDir);
       runScriptTarget(targetOnGenerate, messages, ig, newFileList, IG_NO_RESOURCE);
@@ -352,7 +345,7 @@ public class Template {
   }
 
   public Map<String, List<ValidationMessage>> beforeJekyllEvent(ImplementationGuide ig, List<String> newFileList) throws IOException, FHIRException {
-    if (canExecute && targetOnJekyll != null) {
+    if (targetOnJekyll != null) {
       Map<String, List<ValidationMessage>> messages = new HashMap<String, List<ValidationMessage>>();
       runScriptTarget(targetOnJekyll, messages, null, newFileList, IG_NONE);
       return messages;
@@ -361,7 +354,7 @@ public class Template {
   }
 
   public Map<String, List<ValidationMessage>> onCheckEvent(ImplementationGuide ig) throws IOException, FHIRException {
-    if (canExecute && targetOnCheck != null) {
+    if (targetOnCheck != null) {
       Map<String, List<ValidationMessage>> messages = new HashMap<String, List<ValidationMessage>>();
       runScriptTarget(targetOnCheck, messages, null, null, IG_NONE);
       return messages;
