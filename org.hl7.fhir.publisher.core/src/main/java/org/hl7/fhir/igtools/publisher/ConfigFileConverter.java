@@ -66,6 +66,7 @@ import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.cache.PackageCacheManager;
 import org.hl7.fhir.utilities.cache.ToolsVersion;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.validation.ValidationOptions;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -141,7 +142,7 @@ public class ConfigFileConverter {
           c.setSystem("http://unstats.un.org/unsd/methods/m49/m49.htm").setCode(sc);
         else
           c.setSystem("urn:iso:std:iso:3166").setCode(sc);
-        ValidationResult vr = context.validateCode(new TerminologyServiceOptions(), c, null);
+        ValidationResult vr = context.validateCode(new ValidationOptions(), c, null);
         if (vr.getDisplay() != null)
           c.setDisplay(vr.getDisplay());
       }

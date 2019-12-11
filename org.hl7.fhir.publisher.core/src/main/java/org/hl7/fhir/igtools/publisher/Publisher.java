@@ -242,6 +242,7 @@ import org.hl7.fhir.utilities.cache.PackageGenerator.PackageType;
 import org.hl7.fhir.utilities.json.JSONUtil;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.hl7.fhir.utilities.cache.ToolsVersion;
+import org.hl7.fhir.utilities.validation.ValidationOptions;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
@@ -1841,7 +1842,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           c.setSystem("http://unstats.un.org/unsd/methods/m49/m49.htm").setCode(sc);
         else
           c.setSystem("urn:iso:std:iso:3166").setCode(sc);
-        ValidationResult vr = context.validateCode(new TerminologyServiceOptions("en-US"), c, null);
+        ValidationResult vr = context.validateCode(new ValidationOptions("en-US"), c, null);
         if (vr.getDisplay() != null)
           c.setDisplay(vr.getDisplay());
       }
@@ -6069,7 +6070,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       else
         oa = new Writer(new FileOutputStream(Utilities.path(tempDir, cpbs.getId()+ ".openapi.json")));
       String lic = license();
-      String displ = context.doValidateCode(new TerminologyServiceOptions("en-US"), new Coding("http://hl7.org/fhir/spdx-license",  lic, null), null, false).getDisplay();
+      String displ = context.validateCode(new ValidationOptions("en-US"), new Coding("http://hl7.org/fhir/spdx-license",  lic, null), null).getDisplay();
       new OpenApiGenerator(context, cpbs, oa).generate(displ, "http://spdx.org/licenses/"+lic+".html");
       oa.commit();
       otherFilesRun.add(Utilities.path(tempDir, cpbs.getId()+ ".openapi.json"));
