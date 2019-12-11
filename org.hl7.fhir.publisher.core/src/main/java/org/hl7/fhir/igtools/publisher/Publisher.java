@@ -2316,13 +2316,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       packageId = pcm.getPackageId(canonical);
     if (Utilities.noString(canonical) && !Utilities.noString(packageId))
       canonical = pcm.getPackageUrl(packageId);
-    if (Utilities.noString(canonical))
-      throw new Exception("You must specify a canonical URL for the IG "+name);
     
     NpmPackage pi = packageId == null ? null : pcm.loadPackageFromCacheOnly(packageId, igver);
     if (pi != null)
       npmList.add(pi);
     if (pi == null) {
+      if (Utilities.noString(canonical))
+        throw new Exception("You must specify a canonical URL for the IG "+name);
       pi = resolveDependency(canonical, packageId, igver);
       if (pi == null) {
         if (Utilities.noString(packageId))
@@ -2334,7 +2334,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (packageId == null) {
       packageId = pi.name();
     }
-      
+    if (Utilities.noString(canonical)) {
+      canonical = pi.canonical();
+    }
+  
     log("Load "+name+" ("+canonical+") from "+packageId+"#"+igver);
     if (ostr(dep, "package") == null && packageId != null)
       dep.addProperty("package", packageId);
@@ -3798,7 +3801,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           sd.getDifferential().getElement().add(0, new ElementDefinition().setPath(p.substring(0, p.indexOf("."))));
         }
         utils.setDefWebRoot(igpkp.getCanonical());
-        utils.generateSnapshot(base, sd, sd.getUrl(), Utilities.extractBaseUrl(base.getUserString("path")), sd.getName());
+        try {
+          utils.generateSnapshot(base, sd, sd.getUrl(), Utilities.extractBaseUrl(base.getUserString("path")), sd.getName());
+        } catch (Exception e) { 
+          throw new FHIRException("Unable to generate snapshot for "+sd.getUrl()+" in "+f.getName(), e);
+        }
         changed = true;
       }
     } else { //sd.getKind() == StructureDefinitionKind.LOGICAL
