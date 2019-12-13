@@ -13,6 +13,7 @@ import java.util.Set;
 import org.apache.http.Header;
 import org.apache.http.HttpEntityEnclosingRequest;
 import org.apache.http.HttpResponse;
+import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
 import org.apache.http.client.methods.HttpPost;
@@ -92,6 +93,8 @@ public class ExtensionTracker {
     }
 
   }
+
+  private static final boolean THREADED = true;
 
   private boolean optIn = true;
   private List<StructureDefinition> exts = new ArrayList<>();
@@ -225,21 +228,43 @@ public class ExtensionTracker {
   }
 
 
+  public void runAsThead(String address, byte[] ba) throws IOException {
+    new Thread(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          send(address, ba);
+        } catch (IOException e) {
+          System.out.println("Sending usage stats failed: "+e.getMessage());
+        }
+      }
+    }).start();
+  }
+
+  private void send(String address, byte[] ba) throws ClientProtocolException, IOException {
+    HttpPost req = new HttpPost(address);
+    req.addHeader("User-Agent", "IGPublisher");
+    req.addHeader("Accept", "application/json");
+    req.addHeader("Content-Type", "application/json");
+    req.setHeader("Authorization", "Bearer 9D1C23C0-3915-4542-882E-2BCC55645DF8");
+    @SuppressWarnings("deprecation")
+    HttpClient httpclient = new DefaultHttpClient();
+    //  if(proxy != null) {
+    //  httpclient.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, proxy);
+    //}
+//    HttpResponse response = null;
+    req.setEntity(new ByteArrayEntity(ba));
+    httpclient.execute(req);
+    httpclient.getConnectionManager().shutdown();
+  }
+
   public void sendToServer(String address) throws IOException {
     if (optIn) {
-      HttpPost req = new HttpPost(address);
-      req.addHeader("User-Agent", "IGPublisher");
-      req.addHeader("Accept", "application/json");
-      req.addHeader("Content-Type", "application/json");
-      req.setHeader("Authorization", "Bearer 9D1C23C0-3915-4542-882E-2BCC55645DF8");
-      HttpClient httpclient = new DefaultHttpClient();
-      //  if(proxy != null) {
-      //  httpclient.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, proxy);
-      //}
-      HttpResponse response = null;
-      req.setEntity(new ByteArrayEntity(generate()));
-      response = httpclient.execute(req);
-      httpclient.getConnectionManager().shutdown();
+      if (THREADED) {
+        runAsThead(address, generate());
+      } else {
+        send(address, generate());        
+      }
     }
   }
 

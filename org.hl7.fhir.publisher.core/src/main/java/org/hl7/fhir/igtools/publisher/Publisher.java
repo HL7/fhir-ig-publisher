@@ -564,8 +564,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private PackageCacheManager pcm;
 
-  private JsonArray buildInfo;
-
   private TemplateManager templateManager;
 
   private String rootDir;
@@ -1943,10 +1941,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void loadFromBuildServer() {
     log("Contacting Build Server...");
     try {
-      buildInfo = pcm.loadFromBuildServer();
+      pcm.loadFromBuildServer();
       log(" ... done");
     } catch (Throwable e) {
-      buildInfo = null;
       log(" ... Running without information from build ("+e.getMessage()+")");
     }
   }
@@ -6242,10 +6239,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   /**
-   * None of the fragments presently generated inculde {{ }} liquid tags. So any 
+   * None of the fragments presently generated inclde {{ }} liquid tags. So any 
    * liquid tags found in the fragments are actually what should be displayed post-jekyll.
    * So we're going to globally escape them here. If any fragments want to include actual
-   * Jekyll tags, we'll hav to do something much harder.
+   * Jekyll tags, we'll have to do something much harder.
    * 
    * see https://stackoverflow.com/questions/24102498/escaping-double-curly-braces-inside-a-markdown-code-block-in-jekyll
    * 

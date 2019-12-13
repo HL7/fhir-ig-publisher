@@ -29,6 +29,7 @@ import org.hl7.fhir.r5.conformance.ProfileUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.PrimitiveType;
 import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
 import org.hl7.fhir.r5.utils.NarrativeGenerator;
 import org.hl7.fhir.r5.utils.TranslatingUtilities;
 import org.hl7.fhir.utilities.MarkDownProcessor;
@@ -136,5 +137,14 @@ public class BaseRenderer extends TranslatingUtilities {
     else
       return uri;
   }
-  
+
+  protected String describeStatus(PublicationStatus status, boolean experimental) {
+    switch (status) {
+    case ACTIVE: return experimental ? "Experimental" : "Active"; 
+    case DRAFT: return "draft";
+    case RETIRED: return "retired";
+    default: return "Unknown";
+    }
+  }
+
 }

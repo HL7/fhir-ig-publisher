@@ -34,6 +34,7 @@ import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeSystem.CodeSystemContentMode;
+import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
 import org.hl7.fhir.r5.model.MetadataResource;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
@@ -61,13 +62,21 @@ public class CodeSystemRenderer extends BaseRenderer {
     b.append(" <tbody><tr><td>"+translate("cs.summary", "Defining URL")+":</td><td>"+Utilities.escapeXml(cs.getUrl())+"</td></tr>\r\n");
     if (cs.hasVersion())
       b.append(" <tr><td>"+translate("cs.summary", "Version")+":</td><td>"+Utilities.escapeXml(cs.getVersion())+"</td></tr>\r\n");
-    b.append(" <tr><td>"+translate("cs.summary", "Name")+":</td><td>"+Utilities.escapeXml(gt(cs.getNameElement()))+"</td></tr>\r\n");
-    b.append(" <tr><td>"+translate("cs.summary", "Status")+":</td><td>"+describeContent(cs.getContent())+"</td></tr>\r\n");
-    b.append(" <tr><td>"+translate("cs.summary", "Definition")+":</td><td>"+processMarkdown("description", cs.getDescriptionElement())+"</td></tr>\r\n");
+    if (cs.hasName()) {
+      b.append(" <tr><td>"+translate("vs.summary", "Name")+":</td><td>"+Utilities.escapeXml(gt(cs.getNameElement()))+"</td></tr>\r\n");
+    }
+    if (cs.hasTitle()) {
+      b.append(" <tr><td>"+translate("vs.summary", "Title")+":</td><td>"+Utilities.escapeXml(gt(cs.getTitleElement()))+"</td></tr>\r\n");
+    }
+    b.append(" <tr><td>"+translate("cs.summary", "Status")+":</td><td>"+describeStatus(cs.getStatus(), cs.getExperimental())+"</td></tr>\r\n");
+    b.append(" <tr><td>"+translate("cs.summary", "Content")+":</td><td>"+describeContent(cs.getContent())+"</td></tr>\r\n");
+    if (cs.hasDescription()) {
+      b.append(" <tr><td>"+translate("vs.summary", "Definition")+":</td><td>"+processMarkdown("description", cs.getDescriptionElement())+"</td></tr>\r\n");
+    }
     if (cs.hasPublisher())
       b.append(" <tr><td>"+translate("cs.summary", "Publisher")+":</td><td>"+Utilities.escapeXml(gt(cs.getPublisherElement()))+"</td></tr>\r\n");
     if (CodeSystemUtilities.hasOID(cs))
-      b.append(" <tr><td>"+translate("cs.summary", "OID")+":</td><td>"+CodeSystemUtilities.getOID(cs)+"("+translate("cs.summary", "for OID based terminology systems")+")</td></tr>\r\n");
+      b.append(" <tr><td>"+translate("cs.summary", "OID")+":</td><td>"+CodeSystemUtilities.getOID(cs)+" ("+translate("cs.summary", "for OID based terminology systems")+")</td></tr>\r\n");
     if (cs.hasCopyright())
       b.append(" <tr><td>"+translate("cs.summary", "Copyright")+":</td><td>"+processMarkdown("copyright", cs.getCopyrightElement())+"</td></tr>\r\n");
     if (ToolingExtensions.hasExtension(cs, ToolingExtensions.EXT_FMM_LEVEL))
@@ -93,7 +102,6 @@ public class CodeSystemRenderer extends BaseRenderer {
 
     return b.toString();
   }
-
 
   private String describeContent(CodeSystemContentMode content) {
     switch (content) {

@@ -69,14 +69,23 @@ public class ValueSetRenderer extends BaseRenderer {
     StringBuilder b = new StringBuilder();
     b.append("<table class=\"grid\">\r\n");
     b.append(" <tbody><tr><td>"+translate("vs.summary", "Defining URL")+":</td><td>"+Utilities.escapeXml(vs.getUrl())+"</td></tr>\r\n");
-    if (vs.hasVersion())
+    if (vs.hasVersion()) {
       b.append(" <tr><td>"+translate("cs.summary", "Version")+":</td><td>"+Utilities.escapeXml(vs.getVersion())+"</td></tr>\r\n");
-    b.append(" <tr><td>"+translate("vs.summary", "Name")+":</td><td>"+Utilities.escapeXml(gt(vs.getNameElement()))+"</td></tr>\r\n");
-    b.append(" <tr><td>"+translate("vs.summary", "Definition")+":</td><td>"+processMarkdown("description", vs.getDescriptionElement())+"</td></tr>\r\n");
+    }
+    if (vs.hasName()) {
+      b.append(" <tr><td>"+translate("vs.summary", "Name")+":</td><td>"+Utilities.escapeXml(gt(vs.getNameElement()))+"</td></tr>\r\n");
+    }
+    b.append(" <tr><td>"+translate("cs.summary", "Status")+":</td><td>"+describeStatus(vs.getStatus(), vs.getExperimental())+"</td></tr>\r\n");
+    if (vs.hasTitle()) {
+      b.append(" <tr><td>"+translate("vs.summary", "Title")+":</td><td>"+Utilities.escapeXml(gt(vs.getTitleElement()))+"</td></tr>\r\n");
+    }
+    if (vs.hasDescription()) {
+      b.append(" <tr><td>"+translate("vs.summary", "Definition")+":</td><td>"+processMarkdown("description", vs.getDescriptionElement())+"</td></tr>\r\n");
+    }
     if (vs.hasPublisher())
       b.append(" <tr><td>"+translate("vs.summary", "Publisher")+":</td><td>"+Utilities.escapeXml(gt(vs.getPublisherElement()))+"</td></tr>\r\n");
     if (ValueSetUtilities.hasOID(vs))
-      b.append(" <tr><td>"+translate("vs.summary", "OID")+":</td><td>"+ValueSetUtilities.getOID(vs)+"("+translate("vs.summary", "for OID based terminology systems")+")</td></tr>\r\n");
+      b.append(" <tr><td>"+translate("vs.summary", "OID")+":</td><td>"+ValueSetUtilities.getOID(vs)+" ("+translate("vs.summary", "for OID based terminology systems")+")</td></tr>\r\n");
     if (vs.hasCopyright())
       b.append(" <tr><td>"+translate("vs.summary", "Copyright")+":</td><td>"+processMarkdown("copyright", vs.getCopyrightElement())+"</td></tr>\r\n");
     if (ToolingExtensions.hasExtension(vs, ToolingExtensions.EXT_FMM_LEVEL))

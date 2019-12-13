@@ -22,6 +22,7 @@ import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionSnapshotComponent;
 import org.hl7.fhir.r5.utils.NarrativeGenerator;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.validation.ValidationOptions;
 
 public class CrossViewRenderer {
 
@@ -473,7 +474,7 @@ public class CrossViewRenderer {
             if (cs != null)
               sys = cs.getTitle();
           }
-          ValidationResult vr = context.validateCode(null, t.getSystem(), t.getCode(), null);
+          ValidationResult vr = context.validateCode(ValidationOptions.defaults(), t.getSystem(), t.getCode(), null);
           if (system != null) {
             if (vr != null & vr.getDisplay() != null) {
               b.append("<a href=\""+link+t.getCode()+"\" title=\""+vr.getDisplay()+"\">"+t.getCode()+"</a>");
