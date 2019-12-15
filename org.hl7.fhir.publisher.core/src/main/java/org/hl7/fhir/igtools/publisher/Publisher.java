@@ -247,6 +247,7 @@ import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
+import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.utilities.xhtml.XhtmlParser;
@@ -1302,6 +1303,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         exemptHtmlPatterns.add(p.getValue());
       } else if (p.getCode().equals("extension-domain")) {
         extensionDomains.add(p.getValue());
+      } else if (p.getCode().equals("active-tables")) {
+        HierarchicalTableGenerator.ACTIVE_TABLES = "true".equals(p.getValue());
       } else if (p.getCode().equals("ig-expansion-parameters")) {     
         expParamMap.put(p.getCode(), p.getValue());
       } else if (p.getCode().equals("special-url")) {     
@@ -1883,6 +1886,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     genExamples = "true".equals(ostr(configuration, "gen-examples"));
     doTransforms = "true".equals(ostr(configuration, "do-transforms"));
     appendTrailingSlashInDataFile = "true".equals(ostr(configuration, "append-slash-to-dependency-urls"));
+    HierarchicalTableGenerator.ACTIVE_TABLES = configuration.has("activeTables") && configuration.get("activeTables").getAsBoolean();
     
     JsonArray array = configuration.getAsJsonArray("spreadsheets");
     if (array != null) {
@@ -1919,7 +1923,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void loadPubPack() throws FHIRException, IOException {
-    NpmPackage npm = pcm.loadPackage("hl7.fhir.pubpack", "0.0.2");
+    NpmPackage npm = pcm.loadPackage("hl7.fhir.pubpack", "0.0.3");
     context.loadFromPackage(npm, null);
   }
 
@@ -2500,6 +2504,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (s.endsWith(".css") && !isChild())
       return true;
     if (s.startsWith("tbl"))
+      return true;
+    if (s.endsWith(".js"))
       return true;
     if (s.startsWith("icon"))
       return true;
@@ -3210,11 +3216,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     loadInfo();
     for (String s : metadataResourceNames()) 
       load(s);
+    generateSnapshots();
     for (String s : metadataResourceNames()) 
       validate(s);
     
     loadLists();
-    generateSnapshots();
     generateNarratives();
     checkConformanceResources();
     generateLogicalMaps();
@@ -4040,13 +4046,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     otherFilesRun.add(Utilities.path(tempDir, "usage-stats.json"));
     
     cleanOutput(tempDir);
-    try {
-      download("http://www.fhir.org/archive/icon_fixed.gif", Utilities.path(tempDir, "icon_fixed.gif"));
-      download("http://www.fhir.org/archive/icon_slice_item.png", Utilities.path(tempDir, "icon_slice_item.png"));
-    } catch (Exception e) {
-      // nothing
-    }
-
         
     if (nestedIgConfig != null) {
       if (watch) {

@@ -341,14 +341,14 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     if (sd.getDifferential().getElement().isEmpty())
       return "";
     else
-      return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateTable(defnFile, sd, true, destDir, false, sd.getId(), false, prefix, "", false, false, outputTracker));
+      return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateTable(defnFile, sd, true, destDir, false, sd.getId(), false, prefix, "", false, false, outputTracker, true));
   }
 
   public String snapshot(String defnFile, Set<String> outputTracker) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
     if (sd.getSnapshot().getElement().isEmpty())
       return "";
     else
-      return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateTable(defnFile, sd, false, destDir, false, sd.getId(), true, prefix, "", false, false, outputTracker));
+      return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateTable(defnFile, sd, false, destDir, false, sd.getId(), true, prefix, "", false, false, outputTracker, true));
   }
 
   public String byMustSupport(String defnFile, Set<String> outputTracker) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
@@ -376,7 +376,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
       }
 
       sdCopy.getSnapshot().setElement(mustSupportElements);
-      org.hl7.fhir.utilities.xhtml.XhtmlNode table = utils.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, prefix, "", false, false, outputTracker);
+      org.hl7.fhir.utilities.xhtml.XhtmlNode table = utils.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, prefix, "", false, false, outputTracker, true);
 
       return composer.compose(table);
     }
