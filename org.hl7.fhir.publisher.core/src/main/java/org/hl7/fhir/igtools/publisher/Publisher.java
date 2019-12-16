@@ -3876,6 +3876,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
     }
+    // Special case for logical models:
+    if ("http://hl7.org/fhir/StructureDefinition/Base".equals(url)) {
+      return ProfileUtilities.makeBaseDefinition(FHIRVersion.fromCode(version));
+    }
     return context.fetchResource(StructureDefinition.class, url);
   }
 
