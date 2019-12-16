@@ -3786,19 +3786,22 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     StructureDefinition base = sd.hasBaseDefinition() ? fetchSnapshotted(sd.getBaseDefinition()) : null;
     utils.setIds(sd, true);
 
-    if (base == null)
+    if (base == null) {
       throw new Exception("Cannot find or generate snapshot for base definition ("+sd.getBaseDefinition()+" from "+sd.getUrl()+")");
+    }
 
     if (sd.getKind() != StructureDefinitionKind.LOGICAL || sd.getDerivation()==TypeDerivationRule.CONSTRAINT) {
       if (!sd.hasSnapshot()) {
         logDebugMessage(LogCategory.PROGRESS, "Generate Snapshot for "+sd.getUrl());
         List<String> errors = new ArrayList<String>();
-        if (close)
+        if (close) {
           utils.closeDifferential(base, sd);
-        else
+        } else {
           utils.sortDifferential(base, sd, "profile "+sd.getUrl(), errors);
-        for (String s : errors)
+        }
+        for (String s : errors) {
           f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, sd.getUrl(), s, IssueSeverity.ERROR));
+        }
         utils.setIds(sd, true);
 
         String p = sd.getDifferential().getElement().get(0).getPath();
@@ -3822,8 +3825,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         changed = true;
       }
     }
-    if (changed || (!r.getElement().hasChild("snapshot") && sd.hasSnapshot()))
+    if (changed || (!r.getElement().hasChild("snapshot") && sd.hasSnapshot())) {
       r.setElement(convertToElement(sd));
+    }
     r.setSnapshotted(true);
     logDebugMessage(LogCategory.CONTEXT, "Context.See "+sd.getUrl());
     context.cacheResource(sd);
