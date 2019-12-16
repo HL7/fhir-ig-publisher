@@ -3785,11 +3785,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     ProfileUtilities utils = new ProfileUtilities(context, f.getErrors(), igpkp);
     StructureDefinition base = sd.hasBaseDefinition() ? fetchSnapshotted(sd.getBaseDefinition()) : null;
     utils.setIds(sd, true);
+
+    if (base == null)
+      throw new Exception("Cannot find or generate snapshot for base definition ("+sd.getBaseDefinition()+" from "+sd.getUrl()+")");
+
     if (sd.getKind() != StructureDefinitionKind.LOGICAL || sd.getDerivation()==TypeDerivationRule.CONSTRAINT) {
       if (!sd.hasSnapshot()) {
         logDebugMessage(LogCategory.PROGRESS, "Generate Snapshot for "+sd.getUrl());
-        if (base == null)
-          throw new Exception("base is null ("+sd.getBaseDefinition()+" from "+sd.getUrl()+")");
         List<String> errors = new ArrayList<String>();
         if (close)
           utils.closeDifferential(base, sd);
