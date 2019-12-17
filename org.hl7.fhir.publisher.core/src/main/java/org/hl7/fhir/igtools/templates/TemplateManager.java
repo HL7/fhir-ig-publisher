@@ -137,6 +137,7 @@ public class TemplateManager {
         "fhir.test.template", 
         "fhir.base.template",
         "hl7.fhir.template",
+        "hl7.cda.template",
         "fhir.davinci.template",
         "ihe.fhir.template")) {
       canExecute = false;
