@@ -230,6 +230,7 @@ import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.JsonMerger;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
+import org.hl7.fhir.utilities.NDJsonWriter;
 import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.TerminologyServiceOptions;
 import org.hl7.fhir.utilities.TextFile;
@@ -1454,7 +1455,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     
     loadSpecDetails(context.getBinaries().get("spec.internals"));
     loadPubPack();
-    igpkp = new IGKnowledgeProvider(context, checkAppendSlash(specPath), determineCanonical(sourceIg.getUrl()), template.config(), errors, VersionUtilities.isR2Ver(version), template);
+    igpkp = new IGKnowledgeProvider(context, checkAppendSlash(specPath), determineCanonical(sourceIg.getUrl(), "ImplementationGuide.url"), template.config(), errors, VersionUtilities.isR2Ver(version), template);
     if (autoLoad)
       igpkp.setAutoPath(true);
     igpkp.loadSpecPaths(specMaps.get(0));
@@ -1471,8 +1472,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     inspector.getExemptHtmlPatterns().addAll(exemptHtmlPatterns);
     inspector.setPcm(pcm);
     
+    int i = 0;
     for (ImplementationGuideDependsOnComponent dep : sourceIg.getDependsOn()) {
-      loadIg(dep);
+      loadIg(dep, i);
+      i++;
     }
 
     // set up validator;
@@ -1532,12 +1535,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
 
-  private String determineCanonical(String url) throws FHIRException {
+  private String determineCanonical(String url, String path) throws FHIRException {
     if (url == null)
       return url;
     if (url.contains("/ImplementationGuide/"))
       return url.substring(0, url.indexOf("/ImplementationGuide/"));
-    throw new FHIRException("Unable to understand IG url: "+url);
+    errors.add(new ValidationMessage(Source.Publisher, IssueType.INVALID, path, "The canonical URL for an Implementation Guide must point directly to the implementation guide reosurce, not to the Implementation Guide as a whole", IssueSeverity.WARNING));
+    return url;
   }
 
 
@@ -1925,6 +1929,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void loadPubPack() throws FHIRException, IOException {
     NpmPackage npm = pcm.loadPackage("hl7.fhir.pubpack", "0.0.3");
     context.loadFromPackage(npm, null);
+    npm = pcm.loadPackage("hl7.fhir.xver-extensions", "0.0.1");
+    context.loadFromPackage(npm, null);
   }
 
 
@@ -2202,7 +2208,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return ep;
   }
 
-  private void loadIg(ImplementationGuideDependsOnComponent dep) throws Exception {
+  private void loadIg(ImplementationGuideDependsOnComponent dep, int index) throws Exception {
     String name = dep.getId();
     if (!dep.hasId()) {
       logMessage("Dependency has no id, so can't be referred to in markdown in the IG");
@@ -2210,7 +2216,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     if (!Utilities.isToken(name))
       throw new Exception("IG Name must be a valid token ("+name+")");
-    String canonical = determineCanonical(dep.getUri());
+    String canonical = determineCanonical(dep.getUri(), "ImplementationGuide.dependency["+index+".url");
     String packageId = dep.getPackageId();
     if (Utilities.noString(packageId))
       packageId = pcm.getPackageId(canonical);
@@ -2241,8 +2247,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     SpecMapManager igm = new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion());
     igm.setName(name);
     igm.setBase(canonical);
+    igm.setBase2(pi.url());
     specMaps.add(igm);
-    if (!version.equals(igm.getVersion())) {
+    if (!VersionUtilities.versionsCompatible(version, igm.getVersion())) {
       log("Version mismatch. This IG is version "+version+", while the IG '"+name+"' is from version "+igm.getVersion()+" (will try to run anyway)");
     }
     
@@ -3633,6 +3640,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             else
               throw new Exception("Error: conformance resource "+f.getPath()+" has neither id nor url");
 
+            if (replaceLiquidTags(bc)) {
+              altered = true;
+            }
             if (businessVersion != null) {
               if (!bc.hasVersion()) {
                 altered = true;
@@ -3718,6 +3728,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
   
+  private boolean replaceLiquidTags(DomainResource resource) {
+    if (!resource.hasText() || !resource.getText().hasDiv())
+      return false;
+    Map<String, String> vars = new HashMap<>();
+    vars.put("{{site.data.fhir.path}}", igpkp.getCanonical()+"/");
+    return new LiquidEngine(context, validator.getExternalHostServices()).replaceInHtml(resource.getText().getDiv(), vars);
+  }
+
+
+
   private boolean isExampleResource(MetadataResource mr) {
     for (ImplementationGuideDefinitionResourceComponent ir : publishedIg.getDefinition().getResource()) {
       if (isSameResource(ir, mr))

@@ -212,6 +212,8 @@ public class ValidationServices implements IValidatorResourceFetcher {
     otherUrls.add("http://hl7.org/fhir/fivews");
     otherUrls.add("http://hl7.org/fhir/workflow");
     otherUrls.add("http://hl7.org/fhir/tools/StructureDefinition/resource-information");
+    otherUrls.add("http://hl7.org/fhir/ConsentPolicy/opt-out"); 
+    otherUrls.add("http://hl7.org/fhir/ConsentPolicy/opt-in");
   }
 
 }
