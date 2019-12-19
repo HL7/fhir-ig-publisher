@@ -1929,6 +1929,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void loadPubPack() throws FHIRException, IOException {
     NpmPackage npm = pcm.loadPackage("hl7.fhir.pubpack", "0.0.3");
     context.loadFromPackage(npm, null);
+    npm = pcm.loadPackage("hl7.fhir.xver-extensions", "0.0.1");
+    context.loadFromPackage(npm, null);
   }
 
 
