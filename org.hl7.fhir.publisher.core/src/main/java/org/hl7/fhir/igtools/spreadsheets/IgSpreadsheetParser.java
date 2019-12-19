@@ -782,6 +782,10 @@ public class IgSpreadsheetParser {
     if (!Utilities.noString(sheet.getColumn(row, "Max Length")))
       e.setMaxLength(Integer.parseInt(sheet.getColumn(row, "Max Length")));
     e.setRequirements(Utilities.appendPeriod(sheet.getColumn(row, "Requirements")));
+    if (e.hasRequirements() && !e.getPath().contains(".")) {
+      sd.setPurpose(e.getRequirements());
+      e.setRequirements(null);
+    }
     e.setComment(Utilities.appendPeriod(sheet.getColumn(row, "Comments")));
     for (String n : mappings.keySet()) {
       MappingSpace m = mappings.get(n);
