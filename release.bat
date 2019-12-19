@@ -30,6 +30,8 @@ cd ..\fhir-ig-publisher
 call python c:\tools\zulip-api\zulip\zulip\send.py --stream committers/notification --subject "java IGPublisher" -m "New Java IGPublisher v%newver%-SNAPSHOT released at https://oss.sonatype.org/service/local/artifact/maven/redirect?r=snapshots&g=org.hl7.fhir.publisher&a=org.hl7.fhir.publisher.cli&v=%newver%-SNAPSHOT&e=jar, and also deployed at https://fhir.github.io/latest-ig-publisher/org.hl7.fhir.publisher.jar" --config-file zuliprc
 call python c:\tools\zulip-api\zulip\zulip\send.py --stream tooling/releases --subject "IGPublisher" -m "New IGPublisher @ https://fhir.github.io/latest-ig-publisher/org.hl7.fhir.publisher.jar (v%newver%)" --config-file zuliprc
 
+call mvn eclipse:eclipse
+
 :DONE
 echo ========
 echo all done
