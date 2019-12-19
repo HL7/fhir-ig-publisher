@@ -11,6 +11,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 import org.hl7.fhir.igtools.publisher.utils.FeedBuilder.Publication;
 import org.hl7.fhir.igtools.publisher.utils.FeedBuilder.PublicationSorter;
@@ -64,7 +65,7 @@ public class FeedBuilder {
       this.version = version;
       this.desc = desc;
       this.folder = folder;
-      SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+      SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", new Locale("en", "US"));
       if (date.length() == 7)
         date = date + "-01";
       try {
@@ -110,7 +111,7 @@ public class FeedBuilder {
       return fhirversion;
     }
     public String presentDate() {
-      SimpleDateFormat sdf = new SimpleDateFormat(RSS_DATE);
+      SimpleDateFormat sdf = new SimpleDateFormat(RSS_DATE, new Locale("en", "US"));
       // Wed, 04 Sep 2019 08:58:14 GMT      
       return sdf.format(date)+" GMT";
     }
@@ -178,7 +179,7 @@ public class FeedBuilder {
     b.append("    <link>"+thisUrl+"</link>\r\n");
     b.append("    <generator>HL7 FHIR Publication tooling</generator>\r\n");
     // "Fri, 20 Sep 2019 12:44:30 GMT"
-    SimpleDateFormat df = new SimpleDateFormat(RSS_DATE);
+    SimpleDateFormat df = new SimpleDateFormat(RSS_DATE, new Locale("en", "US"));
     b.append("    <lastBuildDate>"+df.format(new Date())+" GMT"+"</lastBuildDate>\r\n");
     b.append("    <atom:link href=\""+thisUrl+"\" rel=\"self\" type=\"application/rss+xml\"/>\r\n");
     b.append("    <pubDate>"+df.format(new Date())+"</pubDate>\r\n");

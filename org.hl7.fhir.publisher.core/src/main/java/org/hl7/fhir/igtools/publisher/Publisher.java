@@ -4547,7 +4547,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     String is = "[FHIR]\r\nversion="+version+"\r\n";
     IniFile ini = new IniFile(new ByteArrayInputStream(TextFile.stringToBytes(is, false)));
     ini.setStringProperty("IG", "version", version, null);
-    ini.setStringProperty("IG", "date",  new SimpleDateFormat("yyyyMMddhhmmssZ").format(execTime.getTime()), null);
+    ini.setStringProperty("IG", "date",  new SimpleDateFormat("yyyyMMddhhmmssZ", new Locale("en", "US")).format(execTime.getTime()), null);
     ByteArrayOutputStream b = new ByteArrayOutputStream();
     ini.save(b);
     return b.toByteArray();
@@ -6846,7 +6846,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private static String nowAsDate(Calendar cal) {
-    DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX");
+    DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", new Locale("en", "US"));
     return df.format(cal.getTime());
   }
 

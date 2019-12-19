@@ -47,12 +47,8 @@ public class BallotChecker {
       return "<ul><li>n/a - not an HL7.org or FHIR.org implementation guide</li></ul>\r\n";
     
     List<String> errors = new ArrayList<String>();
-    if (canonical.contains("fhir.org")) {
-      if (!Utilities.existsInList(historyPage, Utilities.pathURL(canonical, "history.html"), Utilities.pathURL(canonical, "history.shtml")))
-        errors.add("History Page '"+historyPage+"' is wrong (ig.json#paths/history) - must be '"+Utilities.pathURL(canonical, "history.html")+"' or '"+Utilities.pathURL(canonical, "history.shtml")+"'");
-    } else {
-      if (!Utilities.existsInList(historyPage, Utilities.pathURL(canonical, "history.html"), Utilities.pathURL(canonical, "history.cfml")))
-      errors.add("History Page '"+historyPage+"' is wrong (ig.json#paths/history) - must be '"+Utilities.pathURL(canonical, "history.html")+"' or '"+Utilities.pathURL(canonical, "history.cfml")+"'");
+    if (!Utilities.existsInList(historyPage, Utilities.pathURL(canonical, "history.html"))) {
+      errors.add("History Page '"+historyPage+"' is wrong (ig.json#paths/history) - must be '"+Utilities.pathURL(canonical, "history.html")+"'");
     }
     
     JsonObject json = null;

@@ -29,6 +29,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map.Entry;
 
 import org.hl7.fhir.exceptions.FHIRException;
@@ -260,7 +261,7 @@ public class IGReleaseUpdater {
     if (!isCore) {
       IGPackageChecker pc = new IGPackageChecker(vf, canonical, JSONUtil.str(version, "path"), JSONUtil.str(ig, "package-id"));
       pc.check(JSONUtil.str(version, "version"), JSONUtil.str(ig, "package-id"), JSONUtil.str(version, "fhirversion", "fhirversion"), 
-          JSONUtil.str(ig, "title"), new SimpleDateFormat("yyyy-MM-dd").parse(JSONUtil.str(version, "date")), JSONUtil.str(version, "path"), canonical);
+          JSONUtil.str(ig, "title"), new SimpleDateFormat("yyyy-MM-dd", new Locale("en", "US")).parse(JSONUtil.str(version, "date")), JSONUtil.str(version, "path"), canonical);
     }
     IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(vf, canonical, JSONUtil.str(version, "path"), rootFolder);
     if (serverType == ServerType.APACHE)

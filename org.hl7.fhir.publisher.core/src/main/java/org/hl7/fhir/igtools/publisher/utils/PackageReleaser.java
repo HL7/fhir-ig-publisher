@@ -10,6 +10,7 @@ import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -79,7 +80,7 @@ public class PackageReleaser {
     addTextChild(item, "dc:creator", "FHIR Project");
     addTextChild(item, "fhir:version", fhirVersion);
     addTextChild(item, "fhir:kind", fhirKind);
-    SimpleDateFormat df = new SimpleDateFormat(RSS_DATE);
+    SimpleDateFormat df = new SimpleDateFormat(RSS_DATE, new Locale("en", "US"));
     addTextChild(item, "pubDate", df.format(new Date()));
     txt = rss.createTextNode("\n    ");
     item.appendChild(txt);

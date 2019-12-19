@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map.Entry;
 import java.util.Set;
 
@@ -72,8 +73,8 @@ public class SpecMapManager {
     spec.addProperty("tool-version", toolVersion);
     spec.addProperty("tool-build", buildId);
     spec.addProperty("webUrl", webUrl);
-    spec.addProperty("date", new SimpleDateFormat("yyyy-MM-dd").format(genDate.getTime()));
-    spec.addProperty("date-time", new SimpleDateFormat("yyyyMMddhhmmssZ").format(genDate.getTime()));
+    spec.addProperty("date", new SimpleDateFormat("yyyy-MM-dd", new Locale("en", "US")).format(genDate.getTime()));
+    spec.addProperty("date-time", new SimpleDateFormat("yyyyMMddhhmmssZ", new Locale("en", "US")).format(genDate.getTime()));
     paths = new JsonObject();
     spec.add("paths", paths);
     pages = new JsonObject();

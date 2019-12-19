@@ -501,7 +501,7 @@ public class HTLMLInspector {
     String tgtList = "";
     boolean resolved = Utilities.existsInList(ref, "qa.html", "http://hl7.org/fhir", "http://hl7.org", "http://www.hl7.org", "http://hl7.org/fhir/search.cfm") || ref.startsWith("http://gforge.hl7.org/gf/project/fhir/tracker/") || ref.startsWith("mailto:") || ref.startsWith("javascript:");
     if (!resolved && forHL7)
-      resolved = Utilities.pathURL(canonical, "history.html").equals(ref) || Utilities.pathURL(canonical, "history.cfml").equals(ref); 
+      resolved = Utilities.pathURL(canonical, "history.html").equals(ref); 
     if (!resolved)
       resolved = manual.contains(rref);
     if (!resolved && specs != null){
