@@ -1,7 +1,7 @@
 @echo off
 
-set oldver=1.0.26
-set newver=1.0.27
+set oldver=1.0.27
+set newver=1.0.28
 
 
 echo ..
@@ -9,12 +9,8 @@ echo ===========================================================================
 echo upgrade and release fhir IG Publisher from %oldver%-SNAPSHOT to %newver%-SNAPSHOT
 echo =============================================================================
 echo ..
-echo Make sure code is commmitted and check the versions...
-pause
 
 call mvn versions:set -DnewVersion=%newver%-SNAPSHOT
-
-pause
 
 call git commit -a -m "Release new version %newver%-SNAPSHOT"
 call git push origin master
