@@ -374,8 +374,12 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     return path.replace("[x]", "");
   }
   
-  private String specPath(String path) {
+  public String specPath(String path) {
     return Utilities.pathURL(pathToSpec, path);
+  }
+
+  public String specPath() {
+    return pathToSpec;
   }
 
   // ---- overrides ---------------------------------------------------------------------------
