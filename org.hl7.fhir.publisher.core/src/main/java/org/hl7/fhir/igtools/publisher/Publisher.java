@@ -2890,6 +2890,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private boolean loadPrePages(FetchedFile dir, String basePath) throws Exception {
     boolean changed = false;
     PreProcessInfo ppinfo = preProcessInfo.get(basePath);
+    if (ppinfo==null)
+      throw new Exception("Unable to find preProcessInfo for basePath: " + basePath);
     if (!altMap.containsKey("pre-page/"+dir.getPath())) {
       changed = true;
       altMap.put("pre-page/"+dir.getPath(), dir);
