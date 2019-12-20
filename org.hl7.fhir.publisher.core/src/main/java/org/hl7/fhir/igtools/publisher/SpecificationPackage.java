@@ -27,6 +27,7 @@ import java.io.IOException;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.context.SimpleWorkerContext.IContextResourceLoader;
+import org.hl7.fhir.r5.context.SimpleWorkerContext.ILoadFilter;
 import org.hl7.fhir.utilities.cache.NpmPackage;
 
 public class SpecificationPackage {
@@ -61,12 +62,19 @@ public class SpecificationPackage {
   }
 
   public static SpecificationPackage fromPackage(NpmPackage pi, IContextResourceLoader loader) throws FileNotFoundException, IOException, FHIRException {
+    return fromPackage(pi, loader, null);
+  }
+  
+  public static SpecificationPackage fromPackage(NpmPackage pi, IContextResourceLoader loader, ILoadFilter filter) throws FileNotFoundException, IOException, FHIRException {
     SpecificationPackage self = new SpecificationPackage();
-    self.context = SimpleWorkerContext.fromPackage(pi, loader);
+    self.context = SimpleWorkerContext.fromPackage(pi, loader, filter);
     return self;
   }
 
   public static SpecificationPackage fromPackage(NpmPackage pi) throws FileNotFoundException, IOException, FHIRException {
+    return fromPackage(pi, null);
+  }
+  public static SpecificationPackage fromPackage(NpmPackage pi, ILoadFilter filter) throws FileNotFoundException, IOException, FHIRException {
     SpecificationPackage self = new SpecificationPackage();
     self.context = SimpleWorkerContext.fromPackage(pi, null);
     return self;

@@ -132,6 +132,7 @@ import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.r5.context.IWorkerContext.ValidationResult;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
+import org.hl7.fhir.r5.context.SimpleWorkerContext.ILoadFilter;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.Manager.FhirFormat;
 import org.hl7.fhir.r5.elementmodel.ObjectConverter;
@@ -296,7 +297,7 @@ import com.google.gson.JsonPrimitive;
  * @author Grahame Grieve
  */
 
-public class Publisher implements IWorkerContext.ILoggingService, IReferenceResolver {
+public class Publisher implements IWorkerContext.ILoggingService, IReferenceResolver, ILoadFilter {
 
   public class JsonDependency {
     private String name;
@@ -622,6 +623,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private List<String> codeSystemProps = new ArrayList<>();
 
   private List<JsonDependency> jsonDependencies = new ArrayList<>();
+
+  private Boolean noTerminologyHL7Org;
   
   private class PreProcessInfo {
     private String xsltName;
@@ -1218,6 +1221,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     igMode = true;
     repoRoot = Utilities.getDirectoryForFile(ini.getFileName());
     rootDir = repoRoot;
+    noTerminologyHL7Org = ini.getBooleanProperty("IG", "no-tx.hl7.org");
     // ok, first we load the template
     String templateName = ini.getStringProperty("IG", "template");
     if (templateName == null)
@@ -2180,15 +2184,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     packge = pi;
     SpecificationPackage sp = null;
     if (VersionUtilities.isR2Ver(version)) {
-      sp = SpecificationPackage.fromPackage(pi, new R2ToR5Loader());
+      sp = SpecificationPackage.fromPackage(pi, new R2ToR5Loader(), this);
     } else if (VersionUtilities.isR2BVer(version)) {
-      sp = SpecificationPackage.fromPackage(pi, new R2016MayToR5Loader());
+      sp = SpecificationPackage.fromPackage(pi, new R2016MayToR5Loader(), this);
     } else if (VersionUtilities.isR3Ver(version)) {
-      sp = SpecificationPackage.fromPackage(pi, new R3ToR5Loader());
+      sp = SpecificationPackage.fromPackage(pi, new R3ToR5Loader(), this);
     } else if (VersionUtilities.isR4Ver(version)) {
-      sp = SpecificationPackage.fromPackage(pi, new R4ToR5Loader());
+      sp = SpecificationPackage.fromPackage(pi, new R4ToR5Loader(), this);
     } else 
-      sp = SpecificationPackage.fromPackage(pi);
+      sp = SpecificationPackage.fromPackage(pi, this);
     sp.loadOtherContent(pi);
     
     if (!version.equals(Constants.VERSION)) {
