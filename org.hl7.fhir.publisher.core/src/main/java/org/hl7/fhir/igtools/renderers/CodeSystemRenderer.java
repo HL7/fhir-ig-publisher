@@ -153,10 +153,11 @@ public class CodeSystemRenderer extends BaseRenderer {
 
   private boolean addLink(StringBuilder b, boolean first, ValueSet vc, ConceptSetComponent ed, Set<String> processed) {
     if (ed.hasSystem() && ed.getSystem().equals(cs.getUrl())) {
-      if (first) {
-        first = false;
-        b.append("<ul>\r\n");
-      } else if (!processed.contains(vc.getUserString("path"))) {
+      if (!processed.contains(vc.getUserString("path"))) {
+        if (first) {
+          first = false;
+          b.append("<ul>\r\n");
+        } 
         b.append(" <li><a href=\""+vc.getUserString("path")+"\">"+Utilities.escapeXml(gt(vc.getNameElement()))+"</a></li>\r\n");
         processed.add(vc.getUserString("path"));
       }
