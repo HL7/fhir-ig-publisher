@@ -72,7 +72,7 @@ public class SpecificationPackage {
   }
 
   public static SpecificationPackage fromPackage(NpmPackage pi) throws FileNotFoundException, IOException, FHIRException {
-    return fromPackage(pi, null);
+    return fromPackage(pi, null, null);
   }
   public static SpecificationPackage fromPackage(NpmPackage pi, ILoadFilter filter) throws FileNotFoundException, IOException, FHIRException {
     SpecificationPackage self = new SpecificationPackage();

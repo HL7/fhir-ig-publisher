@@ -6997,4 +6997,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
 
+
+  @Override
+  public boolean isOkToLoad(Resource resource) {
+    if (!noTerminologyHL7Org) {
+      return true;
+    }
+    if (!(resource instanceof MetadataResource))
+      return true;
+    MetadataResource m = (MetadataResource) resource;
+    return !m.getUrl().startsWith("http://terminology.hl7.org");
+  }
+
+
 }
