@@ -624,7 +624,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private List<JsonDependency> jsonDependencies = new ArrayList<>();
 
-  private Boolean noTerminologyHL7Org;
+  private boolean noTerminologyHL7Org;
   
   private class PreProcessInfo {
     private String xsltName;
@@ -2184,13 +2184,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     packge = pi;
     SpecificationPackage sp = null;
     if (VersionUtilities.isR2Ver(version)) {
-      sp = SpecificationPackage.fromPackage(pi, new R2ToR5Loader(), this);
+      sp = SpecificationPackage.fromPackage(pi, new R2ToR5Loader(new String[] { "StructureDefinition", "ValueSet", "SearchParameter", "OperationDefinition", "Questionnaire","ConceptMap","StructureMap", "NamingSystem"}), this);
     } else if (VersionUtilities.isR2BVer(version)) {
-      sp = SpecificationPackage.fromPackage(pi, new R2016MayToR5Loader(), this);
+      sp = SpecificationPackage.fromPackage(pi, new R2016MayToR5Loader(new String[] { "StructureDefinition", "ValueSet", "CodeSystem", "SearchParameter", "OperationDefinition", "Questionnaire","ConceptMap","StructureMap", "NamingSystem"}), this);
     } else if (VersionUtilities.isR3Ver(version)) {
-      sp = SpecificationPackage.fromPackage(pi, new R3ToR5Loader(), this);
+      sp = SpecificationPackage.fromPackage(pi, new R3ToR5Loader(new String[] { "StructureDefinition", "ValueSet", "CodeSystem", "SearchParameter", "OperationDefinition", "Questionnaire","ConceptMap","StructureMap", "NamingSystem"}), this);
     } else if (VersionUtilities.isR4Ver(version)) {
-      sp = SpecificationPackage.fromPackage(pi, new R4ToR5Loader(), this);
+      sp = SpecificationPackage.fromPackage(pi, new R4ToR5Loader(new String[] { "StructureDefinition", "ValueSet", "CodeSystem", "SearchParameter", "OperationDefinition", "Questionnaire","ConceptMap","StructureMap", "NamingSystem"}), this);
     } else 
       sp = SpecificationPackage.fromPackage(pi, this);
     sp.loadOtherContent(pi);
@@ -3192,6 +3192,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     res.add("OperationDefinition");
     res.add("SearchParameter");
     res.add("CapabilityStatement");
+    res.add("Conformance");
     res.add("CapabilityStatement2");
     res.add("StructureMap");
     res.add("ActivityDefinition");
@@ -3734,7 +3735,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (!resource.hasText() || !resource.getText().hasDiv())
       return false;
     Map<String, String> vars = new HashMap<>();
-    vars.put("{{site.data.fhir.path}}", igpkp.getCanonical()+"/");
+    vars.put("{{site.data.fhir.path}}", igpkp.specPath()+"/");
     return new LiquidEngine(context, validator.getExternalHostServices()).replaceInHtml(resource.getText().getDiv(), vars);
   }
 
@@ -7006,7 +7007,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (!(resource instanceof MetadataResource))
       return true;
     MetadataResource m = (MetadataResource) resource;
-    return !m.getUrl().startsWith("http://terminology.hl7.org");
+    return m.hasUrl() && !m.getUrl().startsWith("http://terminology.hl7.org");
   }
 
 
