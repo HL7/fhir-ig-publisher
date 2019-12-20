@@ -475,6 +475,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private boolean isChild;
   private boolean cacheVersion;
   private boolean appendTrailingSlashInDataFile;
+  private boolean newIg = false;
 
   private Publisher childPublisher = null;
   private String childOutput = "";
@@ -1168,9 +1169,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     fetcher.setResourceDirs(resourceDirs);
     IniFile ini = checkNewIg();
-    if (ini != null)
+    if (ini != null) {
+      newIg = true;
       initializeFromIg(ini);   
-    else if (isTemplate())
+    } else if (isTemplate())
       initializeTemplate();
     else
       initializeFromJson();   
@@ -2890,6 +2892,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private boolean loadPrePages(FetchedFile dir, String basePath) throws Exception {
     boolean changed = false;
     PreProcessInfo ppinfo = preProcessInfo.get(basePath);
+    if (ppinfo==null)
+      throw new Exception("Unable to find preProcessInfo for basePath: " + basePath);
     if (!altMap.containsKey("pre-page/"+dir.getPath())) {
       changed = true;
       altMap.put("pre-page/"+dir.getPath(), dir);
@@ -6174,9 +6178,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (igpkp.wantGen(r, "example-table"))
       fragment("StructureDefinition-example-table-"+sd.getId(), sdr.exampleTable(fileList), f.getOutputNames(), r, vars, null);
 
-
+    String sdPrefix = newIg ? "StructureDefinition-" : "";
     if (igpkp.wantGen(r, "csv")) {
-      String path = Utilities.path(tempDir, r.getId()+".csv");
+      String path = Utilities.path(tempDir, sdPrefix + r.getId()+".csv");
       f.getOutputNames().add(path);
       new ProfileUtilities(context, errors, igpkp).generateCsvs(new FileOutputStream(path), sd, true);
     }
@@ -6191,16 +6195,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
 
     if (igpkp.wantGen(r, "xlsx")) {
-      String path = Utilities.path(tempDir, r.getId()+".xlsx");
+      String path = Utilities.path(tempDir, sdPrefix + r.getId()+".xlsx");
       f.getOutputNames().add(path);
       new ProfileUtilities(context, errors, igpkp).generateXlsx(new FileOutputStream(path), sd, true, true);
     }
 
     if (!regen && sd.getKind() != StructureDefinitionKind.LOGICAL &&  igpkp.wantGen(r, "sch")) {
-      String path = Utilities.path(tempDir, r.getId()+".sch");
+      String path = Utilities.path(tempDir, sdPrefix + r.getId()+".sch");
       f.getOutputNames().add(path);
       new ProfileUtilities(context, errors, igpkp).generateSchematrons(new FileOutputStream(path), sd);
-      npm.addFile(Category.SCHEMATRON, r.getId()+".sch", IOUtils.toByteArray(Utilities.path(tempDir, r.getId()+".sch")));
+      npm.addFile(Category.SCHEMATRON, sdPrefix + r.getId()+".sch", IOUtils.toByteArray(Utilities.path(tempDir, sdPrefix + r.getId()+".sch")));
     }
     if (igpkp.wantGen(r, "sch"))
       fragmentError("StructureDefinition-"+sd.getId()+"-sch", "yet to be done: schematron as html", null, f.getOutputNames());
