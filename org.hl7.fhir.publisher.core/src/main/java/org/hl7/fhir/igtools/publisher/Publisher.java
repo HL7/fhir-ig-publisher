@@ -1202,11 +1202,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private IniFile checkNewIg() throws IOException {
     if (configFile == null)
       return null;
-    File cf = new CSFile(configFile);
+    File cf = mode == IGBuildMode.AUTOBUILD ? new File(configFile) : new CSFile(configFile);
     if (!cf.exists())
       return null;
     if (cf.isDirectory())
-      cf = new CSFile(Utilities.path(configFile, "ig.ini"));
+      cf = mode == IGBuildMode.AUTOBUILD ? new File(Utilities.path(configFile, "ig.ini")) : new CSFile(Utilities.path(configFile, "ig.ini"));
     if (!cf.exists())
       return null;
     String s = TextFile.fileToString(cf);
