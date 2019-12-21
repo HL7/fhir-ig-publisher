@@ -1979,7 +1979,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         relativePath = str(pp, "relativePath");
       }
       PreProcessInfo ppinfo = new PreProcessInfo(prePagesXslt, relativePath);
-      preProcessInfo.put(path, ppinfo);
+      preProcessInfo.put(path.toLowerCase(), ppinfo);
     }
   }
 
@@ -2891,7 +2891,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private boolean loadPrePages(FetchedFile dir, String basePath) throws Exception {
     boolean changed = false;
-    PreProcessInfo ppinfo = preProcessInfo.get(basePath);
+    PreProcessInfo ppinfo = preProcessInfo.get(basePath.toLowerCase());
     if (ppinfo==null) {
       System.out.println("PreProcessInfo hash:" + preProcessInfo.toString());
       throw new Exception("Unable to find preProcessInfo for basePath: " + basePath);
@@ -4969,7 +4969,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
 
     for (String prePagesDir: prePagesDirs) {
-      PreProcessInfo ppinfo = preProcessInfo.get(prePagesDir);
+      PreProcessInfo ppinfo = preProcessInfo.get(prePagesDir.toLowerCase());
       String baseFile = prePagesDir + File.separator;
       if (ppinfo.relativePath.equals(""))
         baseFile = baseFile + "_includes" + File.separator;
