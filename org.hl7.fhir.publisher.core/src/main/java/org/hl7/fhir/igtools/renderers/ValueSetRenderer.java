@@ -37,7 +37,7 @@ import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.DataRequirement;
 import org.hl7.fhir.r5.model.DataRequirement.DataRequirementCodeFilterComponent;
 import org.hl7.fhir.r5.model.ElementDefinition;
-import org.hl7.fhir.r5.model.MetadataResource;
+import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.PlanDefinition;
 import org.hl7.fhir.r5.model.PlanDefinition.PlanDefinitionActionComponent;
 import org.hl7.fhir.r5.model.Questionnaire;
@@ -133,7 +133,7 @@ public class ValueSetRenderer extends BaseRenderer {
     Set<String> vsurls = new HashSet<String>();
     Set<String> pdurls = new HashSet<String>();
     Set<String> qurls = new HashSet<String>();
-    for (MetadataResource sd : context.allConformanceResources()) {
+    for (CanonicalResource sd : context.allConformanceResources()) {
       if (sd instanceof StructureDefinition)
         sdurls.add(sd.getUrl());
       if (sd instanceof ValueSet)

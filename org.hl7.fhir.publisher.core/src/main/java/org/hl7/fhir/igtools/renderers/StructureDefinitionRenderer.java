@@ -67,7 +67,7 @@ import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionMappingComponent;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
-import org.hl7.fhir.r5.model.Type;
+import org.hl7.fhir.r5.model.DataType;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.utils.ElementDefinitionUtilities;
 import org.hl7.fhir.r5.utils.NarrativeGenerator;
@@ -294,7 +294,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
   }
 
 
-  private String summariseValue(Type fixed) throws FHIRException {
+  private String summariseValue(DataType fixed) throws FHIRException {
     if (fixed instanceof org.hl7.fhir.r5.model.PrimitiveType)
       return ((org.hl7.fhir.r5.model.PrimitiveType) fixed).asStringValue();
     if (fixed instanceof CodeableConcept) 
@@ -404,7 +404,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
           ed.getBinding().setUserData("tx.pattern", ed.getPattern());
         } else {
           // tricky : scan the children for a fixed coding value
-          Type t = findFixedValue(ed, true);
+          DataType t = findFixedValue(ed, true);
           if (t != null)
             ed.getBinding().setUserData("tx.value", t);
         }
@@ -445,7 +445,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
           ed.getBinding().setUserData("tx.pattern", ed.getPattern());
         } else {
           // tricky : scan the children for a fixed coding value
-          Type t = findFixedValue(ed, false);
+          DataType t = findFixedValue(ed, false);
           if (t != null)
             ed.getBinding().setUserData("tx.value", t);
         }
@@ -472,7 +472,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     }
   }
 
-  private Type findFixedValue(ElementDefinition ed, boolean diff) {
+  private DataType findFixedValue(ElementDefinition ed, boolean diff) {
     if (ElementDefinitionUtilities.hasType(ed, "Coding")) {
       List<ElementDefinition> children = ProfileUtilities.getChildList(sd, ed, diff);
       String sys = null;
@@ -529,9 +529,9 @@ public class StructureDefinitionRenderer extends BaseRenderer {
       else
         System.out.println("No value set specified at "+path+" (no url)");
     if (tx.hasUserData("tx.value"))
-      vss = "Fixed Value: "+summariseValue((Type) tx.getUserData("tx.value"));
+      vss = "Fixed Value: "+summariseValue((DataType) tx.getUserData("tx.value"));
     else if (tx.hasUserData("tx.pattern"))
-      vss = "Pattern: "+summariseValue((Type) tx.getUserData("tx.pattern"));
+      vss = "Pattern: "+summariseValue((DataType) tx.getUserData("tx.pattern"));
     
     b.append("<tr><td>").append(path).append("</td><td><a href=\"").append(prefix).append("terminologies.html#").append(tx.getStrength() == null ? "" : egt(tx.getStrengthElement()));
     if (tx.hasDescription())
@@ -1080,7 +1080,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     return b.toString();
     
   }
-  private String encodeValue(Type value) throws Exception {
+  private String encodeValue(DataType value) throws Exception {
     if (value == null || value.isEmpty())
       return null;
     if (value instanceof PrimitiveType)

@@ -39,7 +39,7 @@ import org.hl7.fhir.r5.elementmodel.Property;
 import org.hl7.fhir.r5.formats.FormatUtilities;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
-import org.hl7.fhir.r5.model.MetadataResource;
+import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
@@ -250,7 +250,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   // base specification only
   public void loadSpecPaths(SpecMapManager paths) throws Exception {
     this.specPaths = paths;
-    for (MetadataResource bc : context.allConformanceResources()) {
+    for (CanonicalResource bc : context.allConformanceResources()) {
       String s = getOverride(bc.getUrl());
       if (s == null)
         s = paths.getPath(bc.getUrl());
@@ -324,7 +324,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     }
   }
   
-  public void checkForPath(FetchedFile f, FetchedResource r, MetadataResource bc, boolean inner) throws FHIRException {
+  public void checkForPath(FetchedFile f, FetchedResource r, CanonicalResource bc, boolean inner) throws FHIRException {
     if (!bc.hasUrl())
       error(f, bc.fhirType()+".url", "Resource has no url: "+bc.getId());
     else if (bc.getUrl().startsWith(canonical) && !bc.getUrl().endsWith("/"+bc.getId()))

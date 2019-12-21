@@ -16,7 +16,7 @@ import org.hl7.fhir.r5.model.CodeableConcept;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
-import org.hl7.fhir.r5.model.MetadataResource;
+import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.Narrative;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionSnapshotComponent;
@@ -79,7 +79,7 @@ public class CrossViewRenderer {
     this.context = context;
   }
   
-  public void seeResource(MetadataResource res) {
+  public void seeResource(CanonicalResource res) {
     if (res instanceof StructureDefinition) {
       seeStructureDefinition((StructureDefinition) res);
     }

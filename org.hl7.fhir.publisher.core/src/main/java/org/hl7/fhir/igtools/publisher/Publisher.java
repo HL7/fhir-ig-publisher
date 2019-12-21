@@ -176,7 +176,7 @@ import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnCom
 import org.hl7.fhir.r5.model.ImplementationGuide.SPDXLicense;
 import org.hl7.fhir.r5.model.ListResource;
 import org.hl7.fhir.r5.model.ListResource.ListEntryComponent;
-import org.hl7.fhir.r5.model.MetadataResource;
+import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.OperationDefinition;
 import org.hl7.fhir.r5.model.Parameters;
 import org.hl7.fhir.r5.model.PrimitiveType;
@@ -1039,8 +1039,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private FetchedResource getResourceForUri(FetchedFile f, String uri) {
     for (FetchedResource r : f.getResources()) {
-      if (r.getResource() != null && r.getResource() instanceof MetadataResource) {
-        MetadataResource bc = (MetadataResource) r.getResource();
+      if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
+        CanonicalResource bc = (CanonicalResource) r.getResource();
         if (bc.getUrl() != null && bc.getUrl().equals(uri))
           return r;
       }
@@ -1057,7 +1057,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (FetchedResource r : f1.getResources()) {
         if ((r.fhirType()+"/"+r.getId()).equals(ref))
           return r;
-        if (r.getResource() != null && r.getResource() instanceof MetadataResource && ((MetadataResource) r.getResource()).getUrl().equals(ref))
+        if (r.getResource() != null && r.getResource() instanceof CanonicalResource && ((CanonicalResource) r.getResource()).getUrl().equals(ref))
           return r;
       }
     }
@@ -1202,11 +1202,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private IniFile checkNewIg() throws IOException {
     if (configFile == null)
       return null;
-    File cf = new File(configFile);
+    File cf = new CSFile(configFile);
     if (!cf.exists())
       return null;
     if (cf.isDirectory())
-      cf = new File(Utilities.path(configFile, "ig.ini"));
+      cf = new CSFile(Utilities.path(configFile, "ig.ini"));
     if (!cf.exists())
       return null;
     String s = TextFile.fileToString(cf);
@@ -2297,14 +2297,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else
       throw new Exception("Unsupported version "+igm.getVersion());
     if (r != null) {
-      if (r instanceof MetadataResource) {
-        String u = ((MetadataResource) r).getUrl();
+      if (r instanceof CanonicalResource) {
+        String u = ((CanonicalResource) r).getUrl();
         if (u != null) {
           String p = igm.getPath(u);
           if (p == null)
             throw new Exception("Internal error in IG "+name+" map: No identity found for "+u);
           r.setUserData("path", webref+"/"+ igpkp.doReplacements(p, r, null, null));
-          String v = ((MetadataResource) r).getVersion();
+          String v = ((CanonicalResource) r).getVersion();
           if (v!=null) {
             u = u + "|" + v;
             p = igm.getPath(u);
@@ -3635,8 +3635,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             } catch (Exception e) {
               throw new Exception("Error parsing "+f.getName()+": "+e.getMessage(), e);
             }
-          if (r.getResource() instanceof MetadataResource) {
-            MetadataResource bc = (MetadataResource) r.getResource();
+          if (r.getResource() instanceof CanonicalResource) {
+            CanonicalResource bc = (CanonicalResource) r.getResource();
             if (bc == null)
               throw new Exception("Error: conformance resource "+f.getPath()+" could not be loaded");
             boolean altered = false;
@@ -3721,7 +3721,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           if (b != null) {
             for (BundleEntryComponent be : b.getEntry()) {
               if (be.hasResource() && be.getResource().fhirType().equals(type)) {
-                MetadataResource mr = (MetadataResource) be.getResource();
+                CanonicalResource mr = (CanonicalResource) be.getResource();
                 if (mr.hasUrl()) {
                   if (!mr.hasUserData("path"))
                     igpkp.checkForPath(f,  r,  mr, true);
@@ -3747,7 +3747,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
 
-  private boolean isExampleResource(MetadataResource mr) {
+  private boolean isExampleResource(CanonicalResource mr) {
     for (ImplementationGuideDefinitionResourceComponent ir : publishedIg.getDefinition().getResource()) {
       if (isSameResource(ir, mr))
         return ir.hasExample();
@@ -3756,7 +3756,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
 
-  private boolean isSameResource(ImplementationGuideDefinitionResourceComponent ir, MetadataResource mr) {
+  private boolean isSameResource(ImplementationGuideDefinitionResourceComponent ir, CanonicalResource mr) {
     return ir.getReference().getReference().equals(mr.fhirType()+"/"+mr.getId());
   }
 
@@ -4253,7 +4253,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (res == null)
       throw new Exception("Unable to find regeneration source for "+uri);
 
-    MetadataResource bc = (MetadataResource) res;
+    CanonicalResource bc = (CanonicalResource) res;
 
     FetchedFile f = new FetchedFile();
     FetchedResource r = f.addResource();
@@ -4348,13 +4348,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         String u = igpkp.getCanonical()+r.getUrlTail();
-        if (r.getResource() != null && r.getResource() instanceof MetadataResource) {
-          String uc = ((MetadataResource) r.getResource()).getUrl();
-          if (uc != null && !u.equals(uc) && !isListedURLExemption(uc) && !isExampleResource((MetadataResource) r.getResource()) && adHocTmpDir == null)
+        if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
+          String uc = ((CanonicalResource) r.getResource()).getUrl();
+          if (uc != null && !u.equals(uc) && !isListedURLExemption(uc) && !isExampleResource((CanonicalResource) r.getResource()) && adHocTmpDir == null)
             f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, f.getName(), "URL Mismatch "+u+" vs "+uc, IssueSeverity.ERROR));
           if (uc != null && !u.equals(uc))
             map.path(uc, igpkp.getLinkFor(r));
-          String v = ((MetadataResource) r.getResource()).getVersion();
+          String v = ((CanonicalResource) r.getResource()).getVersion();
           if (v != null) {
             map.path(uc + "|" + v, v + "/" + igpkp.getLinkFor(r));
           }
@@ -4423,7 +4423,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     Set<FetchedResource> files = new HashSet<FetchedResource>();
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
-        if (r.getResource() != null && r.getResource() instanceof MetadataResource) {
+        if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
           files.add(r);
         }
       }
@@ -4498,7 +4498,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     int i = 0;
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
-        if (r.getResource() != null && r.getResource() instanceof MetadataResource) {
+        if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
           try {
             ByteArrayOutputStream bs = new ByteArrayOutputStream();
             org.hl7.fhir.dstu3.model.Resource r3 = VersionConvertor_30_50.convertResource(r.getResource(), false);
@@ -4526,7 +4526,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     zip.addFileName("spec.internals", specFile, false);
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
-        if (r.getResource() != null && r.getResource() instanceof MetadataResource) {
+        if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
           ByteArrayOutputStream bs = new ByteArrayOutputStream();
           if (VersionUtilities.isR3Ver(version)) {
             new org.hl7.fhir.dstu3.formats.JsonParser().compose(bs, VersionConvertor_30_50.convertResource(r.getResource(), false));
@@ -4722,8 +4722,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     CrossViewRenderer cvr = new CrossViewRenderer(igpkp.getCanonical(), context);
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
-        if (r.getResource() != null && r.getResource() instanceof MetadataResource) {
-          cvr.seeResource((MetadataResource) r.getResource());
+        if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
+          cvr.seeResource((CanonicalResource) r.getResource());
         }
       }
     }
@@ -5301,9 +5301,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     PrimitiveType desc = new StringType(r.getTitle());
     if (!r.hasTitle())
       desc = new StringType(f.getTitle());
-    if (r.getResource() != null && r.getResource() instanceof MetadataResource) {
-      name = ((MetadataResource) r.getResource()).present();
-      desc = getDesc((MetadataResource) r.getResource(), desc);
+    if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
+      name = ((CanonicalResource) r.getResource()).present();
+      desc = getDesc((CanonicalResource) r.getResource(), desc);
     } else if (r.getElement() != null && r.getElement().hasChild("description")) {
       desc = new StringType(r.getElement().getChildValue("description"));
     }
@@ -5329,8 +5329,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getElement().fhirType().equals(rt)) {
-            if (r.getResource() instanceof MetadataResource) {
-              MetadataResource md = (MetadataResource) r.getResource();
+            if (r.getResource() instanceof CanonicalResource) {
+              CanonicalResource md = (CanonicalResource) r.getResource();
               items.add(new Item(f, r, md.hasTitle() ? md.getTitle() : md.hasName() ? md.getName() : r.getTitle()));
             } else
               items.add(new Item(f, r, Utilities.noString(r.getTitle()) ? r.getId() : r.getTitle()));
@@ -5400,7 +5400,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   @SuppressWarnings("rawtypes")
-  private PrimitiveType getDesc(MetadataResource r, PrimitiveType desc) {
+  private PrimitiveType getDesc(CanonicalResource r, PrimitiveType desc) {
     if (r.hasDescription())
       return r.getDescriptionElement();
     return desc;
@@ -5705,8 +5705,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private String getListName(FetchedResource lr) {
     if (lr.getResource() != null) {
-      if (lr.getResource() instanceof MetadataResource)
-        return ((MetadataResource)lr.getResource()).getName();
+      if (lr.getResource() instanceof CanonicalResource)
+        return ((CanonicalResource)lr.getResource()).getName();
       return lr.getResource().fhirType()+"/"+lr.getResource().getId();
     }
     else {
@@ -5717,8 +5717,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private String getListDesc(FetchedResource lr) {
     if (lr.getResource() != null) {
-      if (lr.getResource() instanceof MetadataResource)
-        return ((MetadataResource)lr.getResource()).getDescription();
+      if (lr.getResource() instanceof CanonicalResource)
+        return ((CanonicalResource)lr.getResource()).getDescription();
       return lr.getResource().fhirType()+"/"+lr.getResource().getId();
     }
     else
@@ -5734,14 +5734,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private String getListName(Resource r) {
-    if (r instanceof MetadataResource)
-      return ((MetadataResource) r).getName();
+    if (r instanceof CanonicalResource)
+      return ((CanonicalResource) r).getName();
     return r.fhirType()+"/"+r.getId();
   }
 
   private String getListDesc(Resource r) {
-    if (r instanceof MetadataResource)
-      return ((MetadataResource) r).getName();
+    if (r instanceof CanonicalResource)
+      return ((CanonicalResource) r).getName();
     return r.fhirType()+"/"+r.getId();
   }
 
@@ -7010,9 +7010,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (!noTerminologyHL7Org) {
       return true;
     }
-    if (!(resource instanceof MetadataResource))
+    if (!(resource instanceof CanonicalResource))
       return true;
-    MetadataResource m = (MetadataResource) resource;
+    CanonicalResource m = (CanonicalResource) resource;
     return m.hasUrl() && !m.getUrl().startsWith("http://terminology.hl7.org");
   }
 

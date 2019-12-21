@@ -37,7 +37,7 @@ import org.hl7.fhir.r5.formats.FormatUtilities;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.Type;
+import org.hl7.fhir.r5.model.DataType;
 import org.hl7.fhir.r5.model.UriType;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
@@ -161,7 +161,7 @@ public class SimpleFetcher implements IFetchFile {
   }
 
   @Override
-  public FetchedFile fetch(Type source, FetchedFile src) throws Exception {
+  public FetchedFile fetch(DataType source, FetchedFile src) throws Exception {
     if (source instanceof Reference || source instanceof CanonicalType) {
       String s = source instanceof CanonicalType ? source.primitiveValue() : ((Reference)source).getReference();
       if (!s.contains("/"))

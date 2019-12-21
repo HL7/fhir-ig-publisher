@@ -35,7 +35,7 @@ import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeSystem.CodeSystemContentMode;
 import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
-import org.hl7.fhir.r5.model.MetadataResource;
+import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
@@ -130,7 +130,7 @@ public class CodeSystemRenderer extends BaseRenderer {
     boolean first = true;
     b.append("\r\n");
     List<String> vsurls = new ArrayList<String>();
-    for (MetadataResource sd : context.allConformanceResources()) {
+    for (CanonicalResource sd : context.allConformanceResources()) {
       if (sd instanceof ValueSet)
         vsurls.add(sd.getUrl());
     }

@@ -25,7 +25,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.util.Map;
 
-import org.hl7.fhir.r5.context.MetadataResourceManager;
+import org.hl7.fhir.r5.context.CanonicalResourceManager;
 import org.hl7.fhir.r5.formats.IParser;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.ContactDetail;
@@ -37,9 +37,9 @@ import org.hl7.fhir.utilities.Utilities;
 
 public class CodeSystemConvertor {
 
-  private MetadataResourceManager<CodeSystem> codeSystems;
+  private CanonicalResourceManager<CodeSystem> codeSystems;
 
-  public CodeSystemConvertor(MetadataResourceManager<CodeSystem> codeSystems) {
+  public CodeSystemConvertor(CanonicalResourceManager<CodeSystem> codeSystems) {
     super();
     this.codeSystems = codeSystems;
   }
