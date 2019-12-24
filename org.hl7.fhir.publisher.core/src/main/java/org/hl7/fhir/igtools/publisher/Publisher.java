@@ -3642,7 +3642,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             boolean altered = false;
             if (bc.hasUrl()) {
               if (adHocTmpDir == null && !listedURLExemptions.contains(bc.getUrl()) && !isExampleResource(bc) && !bc.getUrl().equals(Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())))
-                f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, bc.getUrl(), "Conformance resource "+f.getPath()+" - the canonical URL ("+Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())+") does not match the URL ("+bc.getUrl()+")", IssueSeverity.ERROR));
+                if (!bc.fhirType().equals("CapabilityStatement") || !bc.getUrl().contains("/Conformance/"))
+                  f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, bc.getUrl(), "Conformance resource "+f.getPath()+" - the canonical URL ("+Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())+") does not match the URL ("+bc.getUrl()+")", IssueSeverity.ERROR));
                 // throw new Exception("Error: conformance resource "+f.getPath()+" canonical URL ("+Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())+") does not match the URL ("+bc.getUrl()+")");            
             } else if (bc.hasId())
               bc.setUrl(Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId()));
