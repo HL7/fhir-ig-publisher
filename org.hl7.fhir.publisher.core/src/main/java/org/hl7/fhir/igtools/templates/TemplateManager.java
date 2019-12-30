@@ -96,7 +96,7 @@ public class TemplateManager {
     boolean noScripts = true;
     for (NpmPackageFolder f : npm.getFolders().values()) {
       for (String n : f.listFiles()) {
-        noScripts = noScripts && Utilities.existsInList(extension(n), ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico");
+        noScripts = noScripts && Utilities.existsInList(extension(n), ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg");
       }
     }
     if (!noScripts) {

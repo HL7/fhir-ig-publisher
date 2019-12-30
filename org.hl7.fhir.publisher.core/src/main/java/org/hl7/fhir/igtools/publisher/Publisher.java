@@ -175,7 +175,7 @@ import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionRe
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.SPDXLicense;
 import org.hl7.fhir.r5.model.ListResource;
-import org.hl7.fhir.r5.model.ListResource.ListEntryComponent;
+import org.hl7.fhir.r5.model.ListResource.ListResourceEntryComponent;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.OperationDefinition;
 import org.hl7.fhir.r5.model.Parameters;
@@ -5599,7 +5599,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     
     List<ListItemEntry> list = new ArrayList<>();
     
-    for (ListEntryComponent li : resource.getEntry()) {
+    for (ListResourceEntryComponent li : resource.getEntry()) {
       if (!li.getDeleted() && li.hasItem() && li.getItem().hasReference()) {
         String ref = li.getItem().getReference();
         FetchedResource lr = getResourceForUri(f, ref);

@@ -558,7 +558,7 @@ public class HTLMLInspector {
             resolved = true;
           else { 
             resolved = f.targets.contains(name);
-            tgtList = " (valid targets: "+f.targets.toString()+")";
+            tgtList = " (valid targets: "+(f.targets.size() > 20 ? Integer.toString(f.targets.size())+" targets"  :  f.targets.toString())+")";
           }
         }
       }

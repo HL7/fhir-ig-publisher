@@ -38,7 +38,7 @@ import org.hl7.fhir.r5.model.Enumerations.BindingStrength;
 import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
 import org.hl7.fhir.r5.model.Enumerations.SearchParamType;
 import org.hl7.fhir.r5.model.OperationDefinition.OperationDefinitionParameterComponent;
-import org.hl7.fhir.r5.model.Quantity.QuantityComparator;
+import org.hl7.fhir.r5.model.Enumerations.QuantityComparator;
 import org.hl7.fhir.r5.model.StructureDefinition.*;
 import org.hl7.fhir.r5.model.ValueSet.ConceptReferenceComponent;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
@@ -1080,7 +1080,7 @@ public class IgSpreadsheetParser {
     ElementDefinition exu = ex.getDifferential().addElement();
     exu.setPath("Extension.url");
     exu.setFixed(new UriType(ex.getUrl()));
-    TypeRefComponent tc = new TypeRefComponent(new UriType("uri"));
+    TypeRefComponent tc = new TypeRefComponent("uri");
     List<TypeRefComponent> tcList = new ArrayList<TypeRefComponent>();
     tcList.add(tc);
     exu.setType(tcList);
@@ -1469,7 +1469,7 @@ public class IgSpreadsheetParser {
             p.setDocumentation(doco);
             p.setMin(Integer.parseInt(min));
             p.setMax(max);
-            p.setType(type);
+            p.setType(Enumerations.FHIRAllTypes.fromCode(type));
             p.getSearchTypeElement().setValueAsString(sheet.getColumn(row, "Search Type"));
             p.addTargetProfile(profile);
             String bs = sheet.getColumn(row, "Binding");
