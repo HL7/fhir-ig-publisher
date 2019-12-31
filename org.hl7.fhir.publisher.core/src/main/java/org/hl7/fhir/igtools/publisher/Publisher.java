@@ -6557,9 +6557,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (!fr.exists() || fr.isDirectory())
           throw new Error("-publish-update must have the format -publish-update -url {url} -root {root} -registry {registry}/fhir-ig-list.json ({registry} not found)");
       }
-     
+      boolean doCore = "true".equals(getNamedParam(args, "-core"));
+      
       IGRegistryMaintainer reg = "n/a".equals(registry) ? null : new IGRegistryMaintainer(registry);
-      IGWebSiteMaintainer.execute(f.getAbsolutePath(), reg, false);
+      IGWebSiteMaintainer.execute(f.getAbsolutePath(), reg, doCore);
       reg.finish();      
     } else if (hasParam(args, "-multi")) {
       int i = 1;
