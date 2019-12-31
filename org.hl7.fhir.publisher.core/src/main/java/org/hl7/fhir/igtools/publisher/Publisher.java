@@ -1270,6 +1270,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     Map<String, String> expParamMap = new HashMap<>();
     
     for (ImplementationGuideDefinitionParameterComponent p : sourceIg.getDefinition().getParameter()) {
+      // documentation for this list: https://confluence.hl7.org/display/FHIR/Implementation+Guide+Parameters
       if (p.getCode().equals("logging")) { // added
         logOptions.add(p.getValue());        
       } else if (p.getCode().equals("generate")) { // added
