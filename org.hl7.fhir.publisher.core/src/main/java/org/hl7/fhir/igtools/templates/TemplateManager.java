@@ -136,9 +136,10 @@ public class TemplateManager {
         // if you are proposing to change this list, discuss with FHIR Product Director first
         "fhir.test.template", 
         "fhir.base.template",
+        "hl7.base.template",
         "hl7.fhir.template",
         "hl7.cda.template",
-        "fhir.davinci.template",
+        "hl7.davinci.template",
         "ihe.fhir.template")) {
       canExecute = false;
     }
