@@ -96,7 +96,7 @@ public class TemplateManager {
     boolean noScripts = true;
     for (NpmPackageFolder f : npm.getFolders().values()) {
       for (String n : f.listFiles()) {
-        noScripts = noScripts && Utilities.existsInList(extension(n), ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg");
+        noScripts = noScripts && Utilities.existsInList(extension(n), ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini", ".eot", ".otf", ".svg", ".ttf", ".woff", ".txt", ".yml");
       }
     }
     if (!noScripts) {
@@ -136,9 +136,10 @@ public class TemplateManager {
         // if you are proposing to change this list, discuss with FHIR Product Director first
         "fhir.test.template", 
         "fhir.base.template",
+        "hl7.base.template",
         "hl7.fhir.template",
         "hl7.cda.template",
-        "fhir.davinci.template",
+        "hl7.davinci.template",
         "ihe.fhir.template")) {
       canExecute = false;
     }
