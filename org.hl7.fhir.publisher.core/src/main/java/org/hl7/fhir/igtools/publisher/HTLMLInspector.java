@@ -499,7 +499,8 @@ public class HTLMLInspector {
       rref = rref.substring(2);
     
     String tgtList = "";
-    boolean resolved = Utilities.existsInList(ref, "qa.html", "http://hl7.org/fhir", "http://hl7.org", "http://www.hl7.org", "http://hl7.org/fhir/search.cfm") || ref.startsWith("http://gforge.hl7.org/gf/project/fhir/tracker/") || ref.startsWith("mailto:") || ref.startsWith("javascript:");
+    boolean resolved = Utilities.existsInList(ref, "qa.html", "http://hl7.org/fhir", "http://hl7.org", "http://www.hl7.org", "http://hl7.org/fhir/search.cfm") || 
+        ref.startsWith("http://gforge.hl7.org/gf/project/fhir/tracker/") || ref.startsWith("mailto:") || ref.startsWith("javascript:");
     if (!resolved && forHL7)
       resolved = Utilities.pathURL(canonical, "history.html").equals(ref); 
     if (!resolved)
@@ -528,7 +529,7 @@ public class HTLMLInspector {
           matchesTarget(ref, "http://hl7.org", "http://hl7.org/fhir/DSTU2", "http://hl7.org/fhir/STU3", "http://hl7.org/fhir/R4", "http://hl7.org/fhir/smart-app-launch", "http://hl7.org/fhir/validator");
     
     if (!resolved) {
-      if (rref.startsWith("http://") || rref.startsWith("https://")) {
+      if (rref.startsWith("http://") || rref.startsWith("https://") || rref.startsWith("ftp://")) {
         resolved = true;
         if (specs != null) {
           for (SpecMapManager spec : specs) {
