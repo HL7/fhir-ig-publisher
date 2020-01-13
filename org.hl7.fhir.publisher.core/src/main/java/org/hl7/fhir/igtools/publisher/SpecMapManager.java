@@ -32,6 +32,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.r5.model.Constants;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
@@ -142,7 +143,24 @@ public class SpecMapManager {
   }
 
   public String getPath(String url) throws Exception {
-    return strOpt(paths, url);
+    if (paths.has(url)) {
+      return strOpt(paths, url);
+      
+    }
+    if (url.matches(Constants.URI_REGEX)) {
+      int cc = 0;
+      int cursor = url.length()-1;
+      while (cursor > 0 && cc < 2) {
+        if (url.charAt(cursor) == '/') {
+          cc++;
+        }
+        cursor--;
+      }
+      String u = url.substring(cursor+2);
+      return strOpt(paths, u);
+      
+    }
+    return null;
   }
 
   public List<String> getPathUrls() {
