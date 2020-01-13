@@ -84,7 +84,7 @@ public class IGPackageChecker {
       checkJsonProp(pf, json, "canonical", canonical);
       if (!json.has("fhirVersions")) {
         System.out.println("Problem with "+pf+": missing fhirVersions");
-      }
+      } 
       if (json.has("dependencies")) {
         JsonObject dep = json.getAsJsonObject("dependencies");
         if (dep.has("hl7.fhir.core")) {
@@ -119,7 +119,13 @@ public class IGPackageChecker {
     if (FHIRVersion.isValidCode(fhirversion))
       ig.addFhirVersion(FHIRVersion.fromCode(fhirversion));
     List<String> fhirversions = new ArrayList<>();
-    fhirversions.add(fhirversion);
+    if (fhirversion.contains("|")) {
+      for (String v : fhirversion.split("\\|")) {
+        fhirversions.add(v);
+      }
+    } else {
+      fhirversions.add(fhirversion);
+    }
     NPMPackageGenerator npm = new NPMPackageGenerator(file, canonical, vpath, PackageType.IG, ig, date, fhirversions);
     for (File f : new File(folder).listFiles()) {
       if (f.getName().endsWith(".openapi.json")) {
