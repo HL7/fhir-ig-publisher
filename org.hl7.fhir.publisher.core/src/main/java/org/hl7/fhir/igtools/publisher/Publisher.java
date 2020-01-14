@@ -1547,7 +1547,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return url;
     if (url.contains("/ImplementationGuide/"))
       return url.substring(0, url.indexOf("/ImplementationGuide/"));
-    errors.add(new ValidationMessage(Source.Publisher, IssueType.INVALID, path, "The canonical URL for an Implementation Guide must point directly to the implementation guide reosurce, not to the Implementation Guide as a whole", IssueSeverity.WARNING));
+    if (path != null) {
+      errors.add(new ValidationMessage(Source.Publisher, IssueType.INVALID, path, "The canonical URL for an Implementation Guide must point directly to the implementation guide resource, not to the Implementation Guide as a whole", IssueSeverity.WARNING));
+    }
     return url;
   }
 
@@ -2218,12 +2220,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void loadIg(ImplementationGuideDependsOnComponent dep, int index) throws Exception {
     String name = dep.getId();
     if (!dep.hasId()) {
-      logMessage("Dependency has no id, so can't be referred to in markdown in the IG");
+      logMessage("Dependency '"+idForDep(dep)+"' has no id, so can't be referred to in markdown in the IG");
       name = "u"+Utilities.makeUuidLC().replace("-", "");
     }
     if (!Utilities.isToken(name))
       throw new Exception("IG Name must be a valid token ("+name+")");
-    String canonical = determineCanonical(dep.getUri(), "ImplementationGuide.dependency["+index+".url");
+    String canonical = determineCanonical(dep.getUri(), "ImplementationGuide.dependency["+index+"].url");
     String packageId = dep.getPackageId();
     if (Utilities.noString(packageId))
       packageId = pcm.getPackageId(canonical);
@@ -2249,6 +2251,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     logDebugMessage(LogCategory.INIT, "Load "+name+" ("+canonical+") from "+packageId+"#"+igver);
 
+    if (dep.hasUri() && !dep.getUri().contains("/ImplementationGuide/")) {
+      String cu = getIgUri(pi);
+      if (cu != null) {
+        errors.add(new ValidationMessage(Source.Publisher, IssueType.INFORMATIONAL, "ImplementationGuide.dependency["+index+"].url", 
+            "The correct canonical URL for this dependency is "+cu, IssueSeverity.INFORMATION));
+      }
+    }
     String webref = pi.getWebLocation();
     
     SpecMapManager igm = new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion());
@@ -2263,6 +2272,30 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     loadFromPackage(name, canonical, pi, webref, igm);
     
   }
+
+
+  private String idForDep(ImplementationGuideDependsOnComponent dep) {
+    if (dep.hasPackageId()) {
+      return dep.getPackageId();
+    }
+    if (dep.hasUri()) {
+      return dep.getUri();
+    }
+    return "{no id}";
+  }
+
+
+
+  private String getIgUri(NpmPackage pi) throws IOException {
+    for (String rs : pi.listResources("ImplementationGuide")) {
+      JsonObject json = JsonTrackingParser.parseJson(pi.loadResource(rs));
+      if (json.has("packageId") && json.get("packageId").getAsString().equals(pi.name()) && json.has("url")) {
+        return json.get("url").getAsString();
+      }
+    }
+    return null;
+  }
+
 
 
   public void loadFromPackage(String name, String canonical, NpmPackage pi, String webref, SpecMapManager igm) throws IOException {
@@ -2667,7 +2700,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     for (ImplementationGuideDependsOnComponent dep : publishedIg.getDependsOn()) {
       if (!dep.hasPackageId()) {
-        dep.setPackageId(pcm.getPackageId(dep.getUri()));
+        dep.setPackageId(pcm.getPackageId(determineCanonical(dep.getUri(), null)));
       }
       if (!dep.hasPackageId()) 
         throw new FHIRException("Unknown package id for "+dep.getUri());
