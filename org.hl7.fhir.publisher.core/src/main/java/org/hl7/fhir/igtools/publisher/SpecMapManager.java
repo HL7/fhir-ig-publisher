@@ -143,6 +143,9 @@ public class SpecMapManager {
   }
 
   public String getPath(String url) throws Exception {
+    if (url == null) {
+      return null;
+    }
     if (paths.has(url)) {
       return strOpt(paths, url);
       
