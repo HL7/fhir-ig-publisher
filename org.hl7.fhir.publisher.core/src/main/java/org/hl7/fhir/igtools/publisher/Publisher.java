@@ -4063,16 +4063,59 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (FetchedResource r : f.getResources()) {
         if (r.fhirType().equals("StructureDefinition")) {
           StructureDefinition sd = (StructureDefinition) r.getResource();
-          if (sd.getKind() == StructureDefinitionKind.RESOURCE || sd.getKind() == StructureDefinitionKind.COMPLEXTYPE) {
-            int c = countExamples(sd.getUrl());
-            if (c == 0) {
-              f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, sd.getUrl(), "The Implementation Guide contains no examples for this profile", IssueSeverity.WARNING));
+          if ((sd.getKind() == StructureDefinitionKind.RESOURCE || sd.getKind() == StructureDefinitionKind.COMPLEXTYPE)) {
+            if (!sd.getType().equals("Extension")) {
+              int c = countExamples(sd.getUrl());
+              if (c == 0) {
+                f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, sd.getUrl(), "The Implementation Guide contains no examples for this profile", IssueSeverity.WARNING));
+              }
+            } else if (sd.getType().equals("Extension")) {
+              int c = countUsages(getFixedUrl(sd));
+              if (c == 0) {
+                f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, sd.getUrl(), "The Implementation Guide contains no examples for this extension", IssueSeverity.WARNING));
+              }              
             }
           }
-        }
+        }        
       }
     }
   }
+
+  private int countUsages(String fixedUrl) {
+    int res = 0;
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        res = res + countExtensionUsage(r.getElement(), fixedUrl);
+      }
+    }
+    return res;
+  }
+
+
+
+  private int countExtensionUsage(Element element, String url) {
+    int res = 0;
+    if (element.fhirType().equals("Extension") && url.equals(element.getChildValue("url"))) {
+      res = res + 1;
+    }
+    for (Element child : element.getChildren()) {
+      res = res + countExtensionUsage(child, url);
+    }
+    return res;
+  }
+
+
+
+  private String getFixedUrl(StructureDefinition sd) {
+    for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+      if (ed.getPath().equals("Extension.url") && ed.hasFixed()) {
+        return ed.getFixed().primitiveValue();
+      }
+    }
+    return sd.getUrl();
+  }
+
+
 
   private int countExamples(String url) {
     int res = 0;
