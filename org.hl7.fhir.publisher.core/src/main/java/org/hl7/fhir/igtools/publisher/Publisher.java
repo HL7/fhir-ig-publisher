@@ -4057,7 +4057,38 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
     }
+    logDebugMessage(LogCategory.PROGRESS, " .. check Profile Examples");
+    logDebugMessage(LogCategory.PROGRESS, "gen narratives");
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.fhirType().equals("StructureDefinition")) {
+          StructureDefinition sd = (StructureDefinition) r.getResource();
+          if (sd.getKind() == StructureDefinitionKind.RESOURCE || sd.getKind() == StructureDefinitionKind.COMPLEXTYPE) {
+            int c = countExamples(sd.getUrl());
+            if (c == 0) {
+              f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, sd.getUrl(), "The Implementation Guide contains no examples for this profile", IssueSeverity.WARNING));
+            }
+          }
+        }
+      }
+    }
   }
+
+  private int countExamples(String url) {
+    int res = 0;
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        for (String p : r.getProfiles()) {
+          if (url.equals(p)) {
+            res++;
+          }
+        }
+      }
+    }
+    return res;
+  }
+
+
 
   private void validate(FetchedFile file, FetchedResource r) throws Exception {
     List<ValidationMessage> errs = new ArrayList<ValidationMessage>();
@@ -6212,7 +6243,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     if (igpkp.wantGen(r, "example-list"))
       fragment("StructureDefinition-example-list-"+sd.getId(), sdr.exampleList(fileList), f.getOutputNames(), r, vars, null);
-      if (igpkp.wantGen(r, "example-table"))
+    if (igpkp.wantGen(r, "example-table"))
       fragment("StructureDefinition-example-table-"+sd.getId(), sdr.exampleTable(fileList), f.getOutputNames(), r, vars, null);
 
     String sdPrefix = newIg ? "StructureDefinition-" : "";
