@@ -1275,11 +1275,11 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     return b.toString();
   }
 
-  public String exampleList(List<FetchedFile> fileList) {
+  public String exampleList(List<FetchedFile> fileList, boolean statedOnly) {
     StringBuilder b = new StringBuilder();
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
-        for (String p : r.getProfiles()) {
+        for (String p : r.getProfiles(statedOnly)) {
           if (sd.getUrl().equals(p)) {
             String name = r.getTitle();
             if (Utilities.noString(name))
@@ -1293,11 +1293,11 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     return b.toString();
   }
 
-  public String exampleTable(List<FetchedFile> fileList) {
+  public String exampleTable(List<FetchedFile> fileList, boolean statedOnly) {
     StringBuilder b = new StringBuilder();
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
-        for (String p : r.getProfiles()) {
+        for (String p : r.getProfiles(statedOnly)) {
           if (sd.getUrl().equals(p)) {
             String name = r.fhirType() + "/" + r.getId();
             String title = r.getTitle();
