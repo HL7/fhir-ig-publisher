@@ -2733,6 +2733,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                 // Ideally we'd want to have *all* of the profiles listed as examples, but right now we can only have one, so we just overwrite and take the last.
                 if (p.startsWith(igpkp.getCanonical()+"/StructureDefinition")) {
                   rg.setExample(new CanonicalType(p));
+                  if (rg.getName()==null) {
+                    String name = String.join(" - ", rg.getReference().getReference().split("/"));
+                    rg.setName("Example " + name);
+                  }
+                  examples.add(r);
+                  r.setExampleUri(p);
+                  igpkp.findConfiguration(f, r);
                 }
               }
             }            
@@ -2809,6 +2816,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           throw new FHIRException(e.getMessage());
         }
       }
+      igPages.clear();
+      if (publishedIg.getDefinition().hasPage())
+        loadIgPages(publishedIg.getDefinition().getPage(), igPages);
       if (debug)
         waitForInput("after OnGenerate");
     }
