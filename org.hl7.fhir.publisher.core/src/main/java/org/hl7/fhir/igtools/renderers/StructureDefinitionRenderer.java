@@ -564,10 +564,11 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     Map<String, List<ElementDefinitionConstraintComponent>> txmap = new HashMap<String, List<ElementDefinitionConstraintComponent>>();
     for (ElementDefinition ed : sd.getSnapshot().getElement()) {
       if (!"0".equals(ed.getMax())) {
-        txlist.add(ed.getPath());
-        txmap.put(ed.getPath(), ed.getConstraint());
+        txlist.add(ed.getId());
+        txmap.put(ed.getId(), ed.getConstraint());
       }
     }
+    
     if (txlist.isEmpty())
       return "";
     else {
@@ -576,10 +577,10 @@ public class StructureDefinitionRenderer extends BaseRenderer {
         b.append("<h4>"+translate("sd.inv", "Constraints")+"</h4>\r\n");       
       b.append("<table class=\"list\">\r\n");
       b.append("<tr><td width=\"60\"><b>"+translate("sd.inv", "Id")+"</b></td><td><b>"+translate("sd.inv", "Path")+"</b></td><td><b>"+translate("sd.inv", "Details")+"</b></td><td><b>"+translate("sd.inv", "Requirements")+"</b></td></tr>\r\n");
-      for (String path : txlist)  {
-        List<ElementDefinitionConstraintComponent> invs = txmap.get(path);
+      for (String id : txlist)  {
+        List<ElementDefinitionConstraintComponent> invs = txmap.get(id);
         for (ElementDefinitionConstraintComponent inv : invs) {
-          b.append("<tr><td>").append(inv.getKey()).append("</td><td>").append(path).append("</td><td>").append(Utilities.escapeXml(gt(inv.getHumanElement())))
+          b.append("<tr><td>").append(inv.getKey()).append("</td><td>").append(id).append("</td><td>").append(Utilities.escapeXml(gt(inv.getHumanElement())))
           .append("<br/>: ").append(Utilities.escapeXml(inv.getExpression())).append("</td><td>").append(Utilities.escapeXml(gt(inv.getRequirementsElement()))).append("</td></tr>\r\n");
         }
       }
@@ -1274,11 +1275,11 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     return b.toString();
   }
 
-  public String exampleList(List<FetchedFile> fileList) {
+  public String exampleList(List<FetchedFile> fileList, boolean statedOnly) {
     StringBuilder b = new StringBuilder();
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
-        for (String p : r.getProfiles()) {
+        for (String p : r.getProfiles(statedOnly)) {
           if (sd.getUrl().equals(p)) {
             String name = r.getTitle();
             if (Utilities.noString(name))
@@ -1292,11 +1293,11 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     return b.toString();
   }
 
-  public String exampleTable(List<FetchedFile> fileList) {
+  public String exampleTable(List<FetchedFile> fileList, boolean statedOnly) {
     StringBuilder b = new StringBuilder();
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
-        for (String p : r.getProfiles()) {
+        for (String p : r.getProfiles(statedOnly)) {
           if (sd.getUrl().equals(p)) {
             String name = r.fhirType() + "/" + r.getId();
             String title = r.getTitle();

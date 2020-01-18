@@ -38,11 +38,13 @@ public class FetchedResource {
   private Element element;
   private JsonObject config;
   private boolean validated;
-  private List<String> profiles = new ArrayList<String>();
+  private boolean validateAsResource;
+  private List<String> statedProfiles = new ArrayList<String>();
+  private List<String> foundProfiles = new ArrayList<String>();
   private boolean snapshotted;
   private String exampleUri;
-  private boolean ValidateByUserData;
-  private HashSet<FetchedResource> examples = new HashSet<FetchedResource>();
+  private HashSet<FetchedResource> statedExamples = new HashSet<FetchedResource>();
+  private HashSet<FetchedResource> foundExamples = new HashSet<FetchedResource>();
   private ImplementationGuideDefinitionResourceComponent resEntry;
 
   public Resource getResource() {
@@ -90,8 +92,19 @@ public class FetchedResource {
   public void setValidated(boolean validated) {
     this.validated = validated;
   }
-  public List<String> getProfiles() {
-    return profiles;
+  public List<String> getProfiles(boolean statedOnly) {
+    List<String> res = new ArrayList<>();
+    res.addAll(statedProfiles);
+    if (!statedOnly) {
+      res.addAll(foundProfiles);
+    }
+    return res;
+  }
+  public List<String> getStatedProfiles() {
+    return statedProfiles;
+  }
+  public List<String> getFoundProfiles() {
+    return foundProfiles;
   }
   public String getUrlTail() {
     return "/"+element.fhirType()+"/"+id;
@@ -119,20 +132,22 @@ public class FetchedResource {
     return (this.exampleUri != null);
   }  
 
-  public HashSet<FetchedResource> getExamples() {
-    return examples;
+  public HashSet<FetchedResource> getFoundExamples() {
+    return foundExamples;
   }  
 
-  public void addExample(FetchedResource r) {
-    this.examples.add(r);
+  public void addFoundExample(FetchedResource r) {
+    this.foundExamples.add(r);
   }
   
-  public boolean isValidateByUserData() {
-    return ValidateByUserData;
+  public HashSet<FetchedResource> getStatedExamples() {
+    return statedExamples;
+  }  
+
+  public void addStatedExample(FetchedResource r) {
+    this.statedExamples.add(r);
   }
-  public void setValidateByUserData(boolean validateByUserData) {
-    ValidateByUserData = validateByUserData;
-  }
+  
   public String fhirType() {
     return resource != null ? resource.fhirType() : element != null ? element.fhirType() : "??";
   }
@@ -147,6 +162,12 @@ public class FetchedResource {
    */
   public ImplementationGuideDefinitionResourceComponent getResEntry() {
     return resEntry;
+  }
+  public boolean isValidateAsResource() {
+    return validateAsResource;
+  }
+  public void setValidateAsResource(boolean validateAsResource) {
+    this.validateAsResource = validateAsResource;
   }
   
   
