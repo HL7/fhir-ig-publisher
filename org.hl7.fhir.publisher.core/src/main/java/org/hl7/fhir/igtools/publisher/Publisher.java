@@ -4187,7 +4187,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     } else {
       if (r.getElement().hasUserData("profile")) {
-        validator.validate(r.getElement(), errs, r.getElement(), r.getElement().getUserString("profile"));
+        String ref = r.getElement().getUserString("profile");
+        if (!Utilities.isAbsoluteFileName(ref)) {
+          ref = Utilities.pathURL(igpkp.getCanonical(), ref);
+        }
+        validator.validate(r.getElement(), errs, r.getElement(), ref);
       } else {
         validator.validate(r.getElement(), errs, r.getElement());
       }
