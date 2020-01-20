@@ -2664,6 +2664,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (f != null && f.getResources().size()!=1)
           throw new Exception("Can't have an exampleFor unless the file has exactly one resource");
         FetchedResource r = getResourceForUri(res.getExampleCanonicalType().asStringValue());
+        if (r == null)
+            throw new Exception("Unable to resolve example canonical " + res.getExampleCanonicalType().asStringValue());
         examples.add(r);
         String ref = res.getExampleCanonicalType().getValueAsString();
         if (ref.contains(":")) {
@@ -3078,7 +3080,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
         res = publishedIg.getDefinition().addResource();
         res.setGroupingId(pck.getId());
-        res.setName(r.getId()).setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
+        if (!res.hasName())
+          if (r.hasTitle())
+            res.setName(r.getTitle());
+          else
+            res.setName(r.getId());
+        if (!res.hasDescription())
+          res.setDescription(((CanonicalResource)r.getResource()).getDescription());
+        res.setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
       }
       res.setUserData("loaded.resource", r);
       r.setResEntry(res);
@@ -3105,7 +3114,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       ImplementationGuideDefinitionResourceComponent res = findIGReference(r.fhirType(), r.getId());
       if (res == null) {
         res = publishedIg.getDefinition().addResource();
-        res.setName(r.getTitle()).setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
+        if (!res.hasName())
+          res.setName(r.getTitle());
+        if (!res.hasDescription())
+          res.setDescription(((CanonicalResource)r.getResource()).getDescription());
+        res.setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
       }
       res.setUserData("loaded.resource", f);
       r.setResEntry(res);
@@ -3213,7 +3226,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
         res = publishedIg.getDefinition().addResource();
         res.setGroupingId(pck.getId());
-        res.setName(r.getTitle()).setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
+        if (!res.hasName())
+          res.setName(r.getTitle());
+        if (!res.hasDescription())
+          res.setDescription(((CanonicalResource)r.getResource()).getDescription());
+        res.setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
       }
       res.setUserData("loaded.resource", r);
       r.setResEntry(res);
