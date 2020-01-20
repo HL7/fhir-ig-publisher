@@ -267,6 +267,8 @@ public class IgSpreadsheetParser {
     bundle.addEntry().setResource(sd).setFullUrl(sd.getUrl());
 
     // Changed the default from metadata to Short because the former caused problems when there are multiple sheets in a workbook
+    if (sheet.hasColumn(0, "Definition"))
+      sd.setDescription(sheet.getColumn(0, "Definition"));
     if (sheet.hasColumn(0, "Profile.title"))
       sd.setTitle(sheet.getColumn(0, "Profile.title"));
     else if (sd.getDifferential().getElementFirstRep().hasShort())
