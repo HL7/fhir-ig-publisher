@@ -2649,30 +2649,34 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (!res.hasReference())
         throw new Exception("Missing source reference on a reesource in the IG with the name '"+res.getName()+"' (index = "+i+")");
       i++;
+      FetchedFile f = null;
       if (!bndIds.contains(res.getReference().getReference()) && !res.hasUserData("loaded.resource")) { // todo: this doesn't work for differential builds
         logDebugMessage(LogCategory.INIT, "Load "+res.getReference());
-        FetchedFile f = fetcher.fetch(res.getReference(), igf);
+        f = fetcher.fetch(res.getReference(), igf);
         if (!f.hasTitle() && res.getName() != null)
           f.setTitle(res.getName());
         boolean rchanged = noteFile(res, f);        
         needToBuild = rchanged || needToBuild;
         if (rchanged) 
           loadAsElementModel(f, f.addResource(), res);
-        if (res.hasExampleCanonicalType()) {
-          if (f.getResources().size()!=1)
-            throw new Exception("Can't have an exampleFor unless the file has exactly one resource");
-          FetchedResource r = f.getResources().get(0);
-          examples.add(r);
-          String ref = res.getExampleCanonicalType().getValueAsString();
-          if (ref.contains(":")) {
-            r.setExampleUri(ref);
-          } else if (publishedIg.getUrl().contains("ImplementationGuide/"))
-            r.setExampleUri(sourceIg.getUrl().substring(0, publishedIg.getUrl().indexOf("ImplementationGuide/")) + ref);
-          else
-            r.setExampleUri(Utilities.pathURL(publishedIg.getUrl(), ref));
-          // Redo this because we now have example information
+      }
+      if (res.hasExampleCanonicalType()) {
+        if (f != null && f.getResources().size()!=1)
+          throw new Exception("Can't have an exampleFor unless the file has exactly one resource");
+        FetchedResource r = getResourceForUri(res.getExampleCanonicalType().asStringValue());
+        if (r == null)
+            throw new Exception("Unable to resolve example canonical " + res.getExampleCanonicalType().asStringValue());
+        examples.add(r);
+        String ref = res.getExampleCanonicalType().getValueAsString();
+        if (ref.contains(":")) {
+          r.setExampleUri(ref);
+        } else if (publishedIg.getUrl().contains("ImplementationGuide/"))
+          r.setExampleUri(publishedIg.getUrl().substring(0, publishedIg.getUrl().indexOf("ImplementationGuide/")) + ref);
+        else
+          r.setExampleUri(Utilities.pathURL(publishedIg.getUrl(), ref));
+        // Redo this because we now have example information
+        if (f!=null)
           igpkp.findConfiguration(f, r);
-        }
       }
     }
 
@@ -2775,6 +2779,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                 // Ideally we'd want to have *all* of the profiles listed as examples, but right now we can only have one, so we just overwrite and take the last.
                 if (p.startsWith(igpkp.getCanonical()+"/StructureDefinition")) {
                   rg.setExample(new CanonicalType(p));
+                  if (rg.getName()==null) {
+                    String name = String.join(" - ", rg.getReference().getReference().split("/"));
+                    rg.setName("Example " + name);
+                  }
+                  examples.add(r);
+                  r.setExampleUri(p);
+                  igpkp.findConfiguration(f, r);
                 }
               }
             }            
@@ -2851,6 +2862,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           throw new FHIRException(e.getMessage());
         }
       }
+      igPages.clear();
+      if (publishedIg.getDefinition().hasPage())
+        loadIgPages(publishedIg.getDefinition().getPage(), igPages);
       if (debug)
         waitForInput("after OnGenerate");
     }
@@ -3066,7 +3080,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
         res = publishedIg.getDefinition().addResource();
         res.setGroupingId(pck.getId());
-        res.setName(r.getId()).setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
+        if (!res.hasName())
+          if (r.hasTitle())
+            res.setName(r.getTitle());
+          else
+            res.setName(r.getId());
+        if (!res.hasDescription())
+          res.setDescription(((CanonicalResource)r.getResource()).getDescription());
+        res.setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
       }
       res.setUserData("loaded.resource", r);
       r.setResEntry(res);
@@ -3093,7 +3114,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       ImplementationGuideDefinitionResourceComponent res = findIGReference(r.fhirType(), r.getId());
       if (res == null) {
         res = publishedIg.getDefinition().addResource();
-        res.setName(r.getTitle()).setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
+        if (!res.hasName())
+          res.setName(r.getTitle());
+        if (!res.hasDescription())
+          res.setDescription(((CanonicalResource)r.getResource()).getDescription());
+        res.setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
       }
       res.setUserData("loaded.resource", f);
       r.setResEntry(res);
@@ -3201,7 +3226,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
         res = publishedIg.getDefinition().addResource();
         res.setGroupingId(pck.getId());
-        res.setName(r.getTitle()).setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
+        if (!res.hasName())
+          res.setName(r.getTitle());
+        if (!res.hasDescription())
+          res.setDescription(((CanonicalResource)r.getResource()).getDescription());
+        res.setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
       }
       res.setUserData("loaded.resource", r);
       r.setResEntry(res);
