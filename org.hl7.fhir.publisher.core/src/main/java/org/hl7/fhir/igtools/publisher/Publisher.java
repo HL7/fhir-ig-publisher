@@ -4217,7 +4217,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else {
       if (r.getElement().hasUserData("profile")) {
         String ref = r.getElement().getUserString("profile");
-        if (!Utilities.isAbsoluteFileName(ref)) {
+        if (!Utilities.isAbsoluteUrl(ref)) {
           ref = Utilities.pathURL(igpkp.getCanonical(), ref);
         }
         validator.validate(r.getElement(), errs, r.getElement(), ref);
