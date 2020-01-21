@@ -1498,6 +1498,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.setNoExtensibleWarnings(true);
     validator.setHintAboutNonMustSupport(hintAboutNonMustSupport);
     validator.setAnyExtensionsAllowed(anyExtensionsAllowed);
+    validator.setAllowExamples(true);
+    
     pvalidator = new ProfileValidator();
     pvalidator.setContext(context);
     csvalidator = new CodeSystemValidator();
@@ -1839,6 +1841,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.setNoExtensibleWarnings(true);
     validator.setHintAboutNonMustSupport(bool(configuration, "hintAboutNonMustSupport"));
     validator.setAnyExtensionsAllowed(bool(configuration, "anyExtensionsAllowed"));
+    validator.setAllowExamples(true);
     
     pvalidator = new ProfileValidator();
     pvalidator.setContext(context);
@@ -2663,17 +2666,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (res.hasExampleCanonicalType()) {
         if (f != null && f.getResources().size()!=1)
           throw new Exception("Can't have an exampleFor unless the file has exactly one resource");
-        FetchedResource r = getResourceForUri(res.getExampleCanonicalType().asStringValue());
+        FetchedResource r = f.getResources().get(0);
         if (r == null)
             throw new Exception("Unable to resolve example canonical " + res.getExampleCanonicalType().asStringValue());
         examples.add(r);
         String ref = res.getExampleCanonicalType().getValueAsString();
-        if (ref.contains(":")) {
+        if (Utilities.isAbsoluteUrl(ref)) {
           r.setExampleUri(ref);
-        } else if (publishedIg.getUrl().contains("ImplementationGuide/"))
-          r.setExampleUri(publishedIg.getUrl().substring(0, publishedIg.getUrl().indexOf("ImplementationGuide/")) + ref);
-        else
-          r.setExampleUri(Utilities.pathURL(publishedIg.getUrl(), ref));
+        } else {
+          r.setExampleUri(Utilities.pathURL(igpkp.getCanonical(), ref));
+        }
         // Redo this because we now have example information
         if (f!=null)
           igpkp.findConfiguration(f, r);
@@ -3872,6 +3874,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
           if (!r.isSnapshotted()) {
             StructureDefinition sd = (StructureDefinition) r.getResource();
+            sd.setSnapshot(null); // make sure its clrared out so we do actually regenerate it at this point
             generateSnapshot(f, r, sd, false);
           }
         }
@@ -3904,7 +3907,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (close) {
           utils.closeDifferential(base, sd);
         } else {
-          utils.sortDifferential(base, sd, "profile "+sd.getUrl(), errors);
+          utils.sortDifferential(base, sd, "profile "+sd.getUrl(), errors, true);
         }
         for (String s : errors) {
           f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, sd.getUrl(), s, IssueSeverity.ERROR));

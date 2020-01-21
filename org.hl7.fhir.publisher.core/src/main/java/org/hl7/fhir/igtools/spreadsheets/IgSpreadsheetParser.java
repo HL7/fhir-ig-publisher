@@ -1173,7 +1173,7 @@ public class IgSpreadsheetParser {
     StructureDefinition base = this.context.fetchResource(StructureDefinition.class, "http://hl7.org/fhir/StructureDefinition/Extension");
     List<String> errors = new ArrayList<String>();
     ProfileUtilities utils = new ProfileUtilities(this.context, issues, null);
-    utils.sortDifferential(base, ex, "extension "+ex.getUrl(), errors);
+    utils.sortDifferential(base, ex, "extension "+ex.getUrl(), errors, false);
     assert(errors.size() == 0);
     utils.setIds(ex, false);
     return row;
