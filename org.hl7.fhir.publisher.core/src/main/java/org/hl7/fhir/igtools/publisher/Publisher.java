@@ -1045,6 +1045,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         CanonicalResource bc = (CanonicalResource) r.getResource();
         if (bc.getUrl() != null && bc.getUrl().equals(uri))
           return r;
+      } else if (r.getResEntry()!=null) {
+        String rUrl = Utilities.pathURL(igpkp.getCanonical(), r.getResEntry().getReference().getReference());
+        if (rUrl.equals(uri))
+          return r;
       }
     }
     return null;
@@ -2652,10 +2656,36 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (!res.hasReference())
         throw new Exception("Missing source reference on a reesource in the IG with the name '"+res.getName()+"' (index = "+i+")");
       i++;
+/*      if (!bndIds.contains(res.getReference().getReference()) && !res.hasUserData("loaded.resource")) { // todo: this doesn't work for differential builds
+        logDebugMessage(LogCategory.INIT, "Load "+res.getReference());
+        FetchedFile f = fetcher.fetch(res.getReference(), igf);
+        if (!f.hasTitle() && res.getName() != null)
+          f.setTitle(res.getName());
+        boolean rchanged = noteFile(res, f);        
+        needToBuild = rchanged || needToBuild;
+        if (rchanged) 
+          loadAsElementModel(f, f.addResource(), res);
+        if (res.hasExampleCanonicalType()) {
+          if (f.getResources().size()!=1)
+            throw new Exception("Can't have an exampleFor unless the file has exactly one resource");
+          FetchedResource r = f.getResources().get(0);
+          examples.add(r);
+          String ref = res.getExampleCanonicalType().getValueAsString();
+          if (ref.contains(":")) {
+            r.setExampleUri(ref);
+          } else if (publishedIg.getUrl().contains("ImplementationGuide/"))
+            r.setExampleUri(sourceIg.getUrl().substring(0, publishedIg.getUrl().indexOf("ImplementationGuide/")) + ref);
+          else
+            r.setExampleUri(Utilities.pathURL(publishedIg.getUrl(), ref));
+          // Redo this because we now have example information
+          igpkp.findConfiguration(f, r);
+        }
+      }*/
+
       FetchedFile f = null;
       if (!bndIds.contains(res.getReference().getReference()) && !res.hasUserData("loaded.resource")) { // todo: this doesn't work for differential builds
         logDebugMessage(LogCategory.INIT, "Load "+res.getReference());
-        f = fetcher.fetch(res.getReference(), igf);
+        f = fetcher.fetch(res.getReference(), igf);        
         if (!f.hasTitle() && res.getName() != null)
           f.setTitle(res.getName());
         boolean rchanged = noteFile(res, f);        
@@ -2666,7 +2696,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (res.hasExampleCanonicalType()) {
         if (f != null && f.getResources().size()!=1)
           throw new Exception("Can't have an exampleFor unless the file has exactly one resource");
-        FetchedResource r = f.getResources().get(0);
+        FetchedResource r = null;
+        if (f!=null)
+          r = f.getResources().get(0);
+        else
+          r = getResourceForUri(Utilities.pathURL(igpkp.getCanonical(), res.getReference().getReference()));
         if (r == null)
             throw new Exception("Unable to resolve example canonical " + res.getExampleCanonicalType().asStringValue());
         examples.add(r);
