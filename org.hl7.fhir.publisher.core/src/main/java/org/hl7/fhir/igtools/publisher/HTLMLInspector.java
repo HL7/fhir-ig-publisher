@@ -576,7 +576,7 @@ public class HTLMLInspector {
               vers = pcm.listVersions(url);
             } catch (Exception e) {
               errorPackages.add(url);
-              System.out.println("Error checking links for "+url+": "+e.getMessage());
+              System.out.println("Error #1 checking links for "+url+": "+e.getMessage()+" (resolving "+ref+")");
             }
             if (vers != null) {
               for (String ver : vers.getVersions().keySet()) {
@@ -596,7 +596,7 @@ public class HTLMLInspector {
                     }
                   } catch (Exception e) {
                     errorPackages.add(v);
-                    System.out.println("Error checking links for "+v+": "+e.getMessage());
+                    System.out.println("Error #2 checking links for "+v+": "+e.getMessage()+" (resolving "+ref+")");
                   }
                 }
               }

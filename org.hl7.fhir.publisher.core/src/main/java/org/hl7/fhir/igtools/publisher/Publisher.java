@@ -2666,7 +2666,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (res.hasExampleCanonicalType()) {
         if (f != null && f.getResources().size()!=1)
           throw new Exception("Can't have an exampleFor unless the file has exactly one resource");
-        FetchedResource r = f.getResources().get(0);
+        FetchedResource r = res.hasUserData("loaded.resource") ? (FetchedResource) res.getUserData("loaded.resource") : f.getResources().get(0);
         if (r == null)
             throw new Exception("Unable to resolve example canonical " + res.getExampleCanonicalType().asStringValue());
         examples.add(r);
@@ -3122,7 +3122,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           res.setDescription(((CanonicalResource)r.getResource()).getDescription());
         res.setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
       }
-      res.setUserData("loaded.resource", f);
+      res.setUserData("loaded.resource", r);
       r.setResEntry(res);
     }
     return changed || needToBuild;
