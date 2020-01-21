@@ -1045,10 +1045,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         CanonicalResource bc = (CanonicalResource) r.getResource();
         if (bc.getUrl() != null && bc.getUrl().equals(uri))
           return r;
-      } else if (r.getResEntry()!=null) {
-        String rUrl = Utilities.pathURL(igpkp.getCanonical(), r.getResEntry().getReference().getReference());
-        if (rUrl.equals(uri))
-          return r;
       }
     }
     return null;
@@ -2668,16 +2664,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (rchanged) 
           loadAsElementModel(f, f.addResource(), res);
       }
+      if (f==null && res.hasUserData("loaded.resource") && res.getUserData("loaded.resource") instanceof FetchedFile )
+        f = (FetchedFile) res.getUserData("loaded.resource");
       if (res.hasExampleCanonicalType()) {
         if (f != null && f.getResources().size()!=1)
           throw new Exception("Can't have an exampleFor unless the file has exactly one resource");
-        FetchedResource r = null;
-        if (f!=null)
+        FetchedResource r = f!=null ? f.getResources().get(0) : (FetchedResource) res.getUserData("loaded.resource");
+/*        if (f!=null)
           r = f.getResources().get(0);
         else
           r = getResourceForUri(Utilities.pathURL(igpkp.getCanonical(), res.getReference().getReference()));
         if (r == null)
-            throw new Exception("Unable to resolve example canonical " + res.getExampleCanonicalType().asStringValue());
+            throw new Exception("Unable to resolve example canonical " + res.getExampleCanonicalType().asStringValue());*/
         examples.add(r);
         String ref = res.getExampleCanonicalType().getValueAsString();
         if (Utilities.isAbsoluteUrl(ref)) {
