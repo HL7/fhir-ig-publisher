@@ -4107,24 +4107,26 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (FetchedResource r : f.getResources()) {
         if (r.fhirType().equals("StructureDefinition")) {
           StructureDefinition sd = (StructureDefinition) r.getResource();
-          if (sd.getKind() == StructureDefinitionKind.RESOURCE) {
-            int cE = countStatedExamples(sd.getUrl());
-            int cI = countFoundExamples(sd.getUrl());
-            if (cE + cI == 0) {
-              f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, sd.getUrl(), "The Implementation Guide contains no examples for this profile", IssueSeverity.WARNING));
-            } else if (cE == 0) {
-              f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, sd.getUrl(), "The Implementation Guide contains no explicitly linked examples for this profile", IssueSeverity.INFORMATION));
-            }
-          } else if (sd.getKind() == StructureDefinitionKind.COMPLEXTYPE) {
-            if (sd.getType().equals("Extension")) {
-              int c = countUsages(getFixedUrl(sd));
-              if (c == 0) {
-                f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, sd.getUrl(), "The Implementation Guide contains no examples for this extension", IssueSeverity.WARNING));
-              }
-            } else {
+          if (!sd.getAbstract()) {
+            if (sd.getKind() == StructureDefinitionKind.RESOURCE) {
+              int cE = countStatedExamples(sd.getUrl());
               int cI = countFoundExamples(sd.getUrl());
-              if (cI == 0) {
-                f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, sd.getUrl(), "The Implementation Guide contains no examples for this data type profile", IssueSeverity.WARNING));
+              if (cE + cI == 0) {
+                f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, sd.getUrl(), "The Implementation Guide contains no examples for this profile", IssueSeverity.WARNING));
+              } else if (cE == 0) {
+                f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, sd.getUrl(), "The Implementation Guide contains no explicitly linked examples for this profile", IssueSeverity.INFORMATION));
+              }
+            } else if (sd.getKind() == StructureDefinitionKind.COMPLEXTYPE) {
+              if (sd.getType().equals("Extension")) {
+                int c = countUsages(getFixedUrl(sd));
+                if (c == 0) {
+                  f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, sd.getUrl(), "The Implementation Guide contains no examples for this extension", IssueSeverity.WARNING));
+                }
+              } else {
+                int cI = countFoundExamples(sd.getUrl());
+                if (cI == 0) {
+                  f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, sd.getUrl(), "The Implementation Guide contains no examples for this data type profile", IssueSeverity.WARNING));
+                }
               }
             }
           }
