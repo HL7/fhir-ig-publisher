@@ -10,8 +10,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.utils.FeedBuilder.Publication;
 import org.hl7.fhir.igtools.publisher.utils.FeedBuilder.PublicationSorter;
@@ -161,6 +163,11 @@ public class FeedBuilder {
       System.out.println("Save publication feed to "+publicationFile);
       TextFile.stringToFile(buildFeed(pubs, orgName, thisUrl, false), publicationFile);
     }
+    Set<String> statusCodes = new HashSet<>();
+    for (Publication pub : pubs) {
+      statusCodes.add(pub.status);
+    }
+    System.out.println("Known status codes: "+statusCodes);
   }
 
   private String buildFeed(List<Publication> pubs, String orgName, String thisUrl, boolean forPackage) throws IOException {
