@@ -3902,37 +3902,45 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     if (sd.getKind() != StructureDefinitionKind.LOGICAL || sd.getDerivation()==TypeDerivationRule.CONSTRAINT) {
       if (!sd.hasSnapshot()) {
-        logDebugMessage(LogCategory.PROGRESS, "Generate Snapshot for "+sd.getUrl());
-        List<String> errors = new ArrayList<String>();
-        if (close) {
-          utils.closeDifferential(base, sd);
-        } else {
-          utils.sortDifferential(base, sd, "profile "+sd.getUrl(), errors, true);
-        }
-        for (String s : errors) {
-          f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, sd.getUrl(), s, IssueSeverity.ERROR));
-        }
-        utils.setIds(sd, true);
+        if (sd.getDifferential().getElement().size() > 0) {
+          logDebugMessage(LogCategory.PROGRESS, "Generate Snapshot for " + sd.getUrl());
+          List<String> errors = new ArrayList<String>();
+          if (close) {
+            utils.closeDifferential(base, sd);
+          } else {
+            utils.sortDifferential(base, sd, "profile " + sd.getUrl(), errors, true);
+          }
+          for (String s : errors) {
+            f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, sd.getUrl(), s, IssueSeverity.ERROR));
+          }
+          utils.setIds(sd, true);
 
-        String p = sd.getDifferential().getElement().get(0).getPath();
-        if (p.contains(".")) {
+          String p = sd.getDifferential().getElement().get(0).getPath();
+          if (p.contains(".")) {
+            changed = true;
+            sd.getDifferential().getElement().add(0, new ElementDefinition().setPath(p.substring(0, p.indexOf("."))));
+          }
+          utils.setDefWebRoot(igpkp.getCanonical());
+          try {
+            utils.generateSnapshot(base, sd, sd.getUrl(), Utilities.extractBaseUrl(base.getUserString("path")), sd.getName());
+          } catch (Exception e) {
+            throw new FHIRException("Unable to generate snapshot for " + sd.getUrl() + " in " + f.getName(), e);
+          }
           changed = true;
-          sd.getDifferential().getElement().add(0, new ElementDefinition().setPath(p.substring(0, p.indexOf("."))));
+        } else {
+          f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, sd.getUrl(), "Cannot generate a snapshot when no differential elements are present on the structure definition", IssueSeverity.ERROR));
         }
-        utils.setDefWebRoot(igpkp.getCanonical());
-        try {
-          utils.generateSnapshot(base, sd, sd.getUrl(), Utilities.extractBaseUrl(base.getUserString("path")), sd.getName());
-        } catch (Exception e) { 
-          throw new FHIRException("Unable to generate snapshot for "+sd.getUrl()+" in "+f.getName(), e);
-        }
-        changed = true;
       }
     } else { //sd.getKind() == StructureDefinitionKind.LOGICAL
       logDebugMessage(LogCategory.PROGRESS, "Generate Snapshot for Logical Model or specialization"+sd.getUrl());
       if (!sd.hasSnapshot()) {
-        utils.setDefWebRoot(igpkp.getCanonical());
-        utils.generateSnapshot(base, sd, sd.getUrl(), Utilities.extractBaseUrl(base.getUserString("path")), sd.getName());
-        changed = true;
+        if (sd.getDifferential().getElement().size() > 0) {
+          utils.setDefWebRoot(igpkp.getCanonical());
+          utils.generateSnapshot(base, sd, sd.getUrl(), Utilities.extractBaseUrl(base.getUserString("path")), sd.getName());
+          changed = true;
+        } else {
+          f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, sd.getUrl(), "Cannot generate a snapshot when no differential elements are present on the structure definition", IssueSeverity.ERROR));
+        }
       }
     }
     if (changed || (!r.getElement().hasChild("snapshot") && sd.hasSnapshot())) {
