@@ -245,7 +245,7 @@ public class IGPack2NpmConvertor {
 
   private byte[] compose(ImplementationGuide ig, String version) throws IOException, FHIRException {
     if (version.startsWith("1.0")) {
-      return new org.hl7.fhir.dstu2.formats.JsonParser().composeBytes(new org.hl7.fhir.convertors.VersionConvertor_10_50(null).convertResource(ig));
+      return new org.hl7.fhir.dstu2.formats.JsonParser().composeBytes(org.hl7.fhir.convertors.VersionConvertor_10_50.convertResource(ig));
     } else if (version.startsWith("1.4")) {
       return new org.hl7.fhir.dstu2016may.formats.JsonParser().composeBytes(org.hl7.fhir.convertors.VersionConvertor_14_50.convertResource(ig));
     } else if (version.startsWith("3.0") ) {
@@ -394,7 +394,7 @@ public class IGPack2NpmConvertor {
     byte[] b = files.get(n);
     if (version.startsWith("1.0")) {
       org.hl7.fhir.dstu2.model.Resource r = new org.hl7.fhir.dstu2.formats.JsonParser().parse(b);
-      return (ImplementationGuide) new org.hl7.fhir.convertors.VersionConvertor_10_50(null).convertResource(r);
+      return (ImplementationGuide) org.hl7.fhir.convertors.VersionConvertor_10_50.convertResource(r);
     } else if (version.startsWith("1.4")) {
       org.hl7.fhir.dstu2016may.model.Resource r = new org.hl7.fhir.dstu2016may.formats.JsonParser().parse(b);
       return (ImplementationGuide) org.hl7.fhir.convertors.VersionConvertor_14_50.convertResource(r);

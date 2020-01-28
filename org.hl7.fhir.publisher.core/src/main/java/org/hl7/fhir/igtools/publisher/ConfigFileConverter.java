@@ -294,7 +294,7 @@ public class ConfigFileConverter {
         throw new Exception("Unable to determine file type for "+filename);
 
       VersionConvertorAdvisor50 advisor = new IGR2ConvertorAdvisor5();
-      return new VersionConvertor_10_50(advisor).convertResource(res);
+      return VersionConvertor_10_50.convertResource(res, advisor);
     } else if (version.startsWith("4.0")) {
       org.hl7.fhir.r4.model.Resource res;
       if (filename.contains("json"))
