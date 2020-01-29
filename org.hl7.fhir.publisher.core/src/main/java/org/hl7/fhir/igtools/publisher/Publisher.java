@@ -703,8 +703,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
-
-
   private void packageTemplate() throws IOException {
     Utilities.createDirectory(outputDir);
     long startTime = System.nanoTime();
@@ -3354,7 +3352,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (FetchedResource r : f.getResources()) {
         if (r.fhirType().equals("StructureDefinition")) 
           extensionTracker.scan((StructureDefinition) r.getResource());
-        extensionTracker.scan(r.getElement());
+        extensionTracker.scan(r.getElement(), f.getName());
       }
     }
   }
@@ -3914,8 +3912,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
         utils.setIds(sd, true);
 
-        String p = sd.getDifferential().getElement().get(0).getPath();
-        if (p.contains(".")) {
+        String p = sd.getDifferential().hasElement() ? sd.getDifferential().getElement().get(0).getPath() : null;
+        if (p == null || p.contains(".")) {
           changed = true;
           sd.getDifferential().getElement().add(0, new ElementDefinition().setPath(p.substring(0, p.indexOf("."))));
         }
