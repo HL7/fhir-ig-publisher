@@ -20,6 +20,7 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.conn.params.ConnRoutePNames;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.ExtensionTracker.ExtensionUsage;
 import org.hl7.fhir.igtools.publisher.ExtensionTracker.SDSorter;
 import org.hl7.fhir.igtools.publisher.ExtensionTracker.UsageSorter;
@@ -134,20 +135,23 @@ public class ExtensionTracker {
     return path.substring(0,  path.lastIndexOf("."));
   }
 
-  public void scan(Element element) {
+  public void scan(Element element, String origin) {
     String t = element.fhirType();
     if (!useCount.containsKey(t))
       useCount.put(t, 0);
     useCount.put(t, useCount.get(t)+1);
-    scan(t, element);
+    scan(t, element, origin);
   }
 
-  private void scan(String path, Element element) {
+  private void scan(String path, Element element, String origin) {
     for (Element e : element.getChildren()) {
       if (Utilities.existsInList(e.getName(), "extension", "modifierExtension")) {
-        usages.add(new ExtensionUsage(false, e.getChildValue("url"), path));
+        String url = e.getChildValue("url");
+        if (url != null) {
+          usages.add(new ExtensionUsage(false, url, path));
+        }
       } else {
-        scan(path+"."+e.getName(), e);
+        scan(path+"."+e.getName(), e, origin);
       }
     }    
   }
