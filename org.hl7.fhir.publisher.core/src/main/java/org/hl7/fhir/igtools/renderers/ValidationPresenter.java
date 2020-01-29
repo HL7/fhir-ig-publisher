@@ -519,7 +519,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       t.add("path", makeLocal(vm.getLocation()));
       t.add("pathlink", vm.getLocationLink());
     }
-    t.add("level", vm.getLevel().toCode());
+    t.add("level", vm.isSlicingHint() ? "Slicing Information" : vm.getLevel().toCode());
     t.add("color", colorForLevel(vm.getLevel()));
     t.add("msg", vm.getHtml());
     t.add("tx", "qa-tx.html#l"+vm.getTxLink());
