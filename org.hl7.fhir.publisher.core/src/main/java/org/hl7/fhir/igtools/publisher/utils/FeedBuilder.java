@@ -206,6 +206,11 @@ public class FeedBuilder {
           if (!(npm.name()+"#"+npm.version()).equals(pub.title(forPackage)))
             System.out.println("id mismatch in "+Utilities.path(pub.folder, "package.tgz")+" - expected "+pub.title(forPackage)+" but found "+npm.name()+"#"+npm.version());
           desc = npm.description();
+          String pver = npm.version();
+          if (!pver.equals(pub.version)) {
+            System.out.println("Version mismatch - package-list.json says "+pub.version+", actual package says "+pver);
+          }
+          
         }
         if (forPackage) {
           for (String s : pub.subPackages) {
