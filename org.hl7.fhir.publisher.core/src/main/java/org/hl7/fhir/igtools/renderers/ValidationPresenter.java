@@ -108,8 +108,11 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       b.append(genSummaryRow(f));
     b.append(genEnd());
     b.append(genStartInternal());
-    for (ValidationMessage vm : linkErrors)
-      b.append(genDetails(vm));
+    int id = 0;
+    for (ValidationMessage vm : linkErrors) {
+      b.append(genDetails(vm, id));
+      id++;
+    }
     b.append(genEnd());
     for (FetchedFile f : files) {
       b.append(genStart(f));
@@ -118,7 +121,8 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       else
         b.append(startTemplateNoErrors);
       for (ValidationMessage vm : removeDupMessages(f.getErrors())) {
-        b.append(genDetails(vm));
+        b.append(genDetails(vm, id));
+        id++;
         if (vm.getLevel().equals(ValidationMessage.IssueSeverity.FATAL)||vm.getLevel().equals(ValidationMessage.IssueSeverity.ERROR))
           err++;
         else if (vm.getLevel().equals(ValidationMessage.IssueSeverity.WARNING))
@@ -231,6 +235,22 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       "<head>\r\n"+
       "  <title>$title$ : Validation Results</title>\r\n"+
       "  <link href=\"fhir.css\" rel=\"stylesheet\"/>\r\n"+
+      "  <style>\r\n"+
+      "    span.flip  { background-color: #4CAF50; color: white; border: solid 1px #a6d8a8; padding: 2px }\r\n"+
+      "  </style>\r\n"+
+      "  <script>\r\n"+
+      "    function flip(id) {\r\n"+
+      "      var span = document.getElementById('s'+id);\r\n"+
+      "      var div = document.getElementById(id);\r\n"+
+      "      if (document.getElementById('s'+id).innerHTML == 'Show Reasoning') {\r\n"+
+      "        div.style.display = 'block';\r\n"+
+      "        span.innerHTML = 'Hide Reasoning';\r\n"+
+      "      } else {\r\n"+
+      "        div.style.display = 'none';\r\n"+
+      "        span.innerHTML = 'Show Reasoning';\r\n"+
+      "      }\r\n"+
+      "    }\r\n"+
+      "  </script>\r\n"+
       "</head>\r\n"+
       "<body style=\"margin: 20px; background-color: #ffffff\">\r\n"+
       " <h1>Validation Results for $title$</h1>\r\n"+
@@ -277,6 +297,11 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b> (<a href=\"$tx$\">see Tx log</a>)</td>\r\n"+
       "   </tr>\r\n";
   
+  private final String detailsTemplateWithExtraDetails = 
+      "   <tr style=\"background-color: $color$\">\r\n"+
+      "     <td><b><a href=\"$pathlink$\">$path$</a></b></td><td><b>$level$</b></td><td><b>$msg$</b> <span id=\"s$id$\" class=\"flip\" onclick=\"flip('$id$')\">Show Reasoning</span><div id=\"$id$\" style=\"display: none\"><p>&nbsp;</p>$msgdetails$</div></td>\r\n"+
+      "   </tr>\r\n";
+      
   private final String detailsTemplateWithLink = 
       "   <tr style=\"background-color: $color$\">\r\n"+
       "     <td><b><a href=\"$pathlink$\">$path$</a></b></td><td><b>$level$</b></td><td><b>$msg$</b></td>\r\n"+
@@ -513,15 +538,17 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("path", makeLocal(f.getPath()));
     return t.render();
   }
-  private String genDetails(ValidationMessage vm) {
-    ST t = template(vm.getLocationLink() != null ? detailsTemplateWithLink : vm.getTxLink() != null ? detailsTemplateTx : detailsTemplate);
+  private String genDetails(ValidationMessage vm, int id) {
+    ST t = template(vm.isSlicingHint() ? detailsTemplateWithExtraDetails : vm.getLocationLink() != null ? detailsTemplateWithLink : vm.getTxLink() != null ? detailsTemplateTx : detailsTemplate);
     if (vm.getLocation()!=null) {
       t.add("path", makeLocal(vm.getLocation()));
       t.add("pathlink", vm.getLocationLink());
     }
     t.add("level", vm.isSlicingHint() ? "Slicing Information" : vm.getLevel().toCode());
     t.add("color", colorForLevel(vm.getLevel()));
+    t.add("id", "l"+id);
     t.add("msg", vm.getHtml());
+    t.add("msgdetails", vm.isSlicingHint() ? vm.getSliceHtml() : vm.getHtml());
     t.add("tx", "qa-tx.html#l"+vm.getTxLink());
     return t.render();
   }

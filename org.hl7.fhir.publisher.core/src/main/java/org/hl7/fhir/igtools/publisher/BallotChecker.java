@@ -92,7 +92,7 @@ public class BallotChecker {
           if (!o.has("fhirversion"))
             errors.add("package-list.json entry for v"+version+": must have a 'fhirversion' that specifies the FHIR version ("+fhirVersion+")");
           else if (!o.get("fhirversion").getAsString().equals(fhirVersion))
-            errors.add("package-list.json entry for v"+version+": must have a 'fhirversion' with the right value - is '"+o.get("fhirversion").getAsString()+"', should be or start with '"+fhirVersion+"'");
+            errors.add("package-list.json entry for v"+version+": must have a 'fhirversion' with the right value - is '"+o.get("fhirversion").getAsString()+"', should be '"+fhirVersion+"'");
           if (!o.has("path"))
             errors.add("package-list.json entry for v"+version+": must have a 'path' where it will be published");
           else if (!o.get("path").getAsString().startsWith(canonical))
