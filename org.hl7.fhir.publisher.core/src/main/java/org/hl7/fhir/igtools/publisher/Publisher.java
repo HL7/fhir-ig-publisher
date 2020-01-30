@@ -601,6 +601,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private String nestedIgOutput;
   private boolean genExamples;
   private boolean doTransforms;
+  private boolean allInvariants = true;
   private List<String> spreadsheets = new ArrayList<>();
   private List<String> bundles = new ArrayList<>();
   private List<String> mappings = new ArrayList<>();
@@ -628,6 +629,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private List<JsonDependency> jsonDependencies = new ArrayList<>();
 
   private boolean noTerminologyHL7Org;
+
   
   private class PreProcessInfo {
     private String xsltName;
@@ -1324,7 +1326,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         htmlTemplate = p.getValue();
       } else if (p.getCode().equals("template-md")) {     
         mdTemplate = p.getValue();
-
+      } else if (p.getCode().equals("show-inherited-invariants")) {     
+        allInvariants = "true".equals(p.getValue());
       } else if (p.getCode().equals("apply-contact") && p.getValue().equals("true")) {
         contacts = sourceIg.getContact();
       } else if (p.getCode().equals("apply-context") && p.getValue().equals("true")) {
@@ -1909,6 +1912,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     genExamples = "true".equals(ostr(configuration, "gen-examples"));
     doTransforms = "true".equals(ostr(configuration, "do-transforms"));
     appendTrailingSlashInDataFile = "true".equals(ostr(configuration, "append-slash-to-dependency-urls"));
+    allInvariants = configuration.has("show-inherited-invariants") ? "true".equals(ostr(configuration, "show-inherited-invariants")) : true;
     HierarchicalTableGenerator.ACTIVE_TABLES = configuration.has("activeTables") && configuration.get("activeTables").getAsBoolean();
     
     JsonArray array = configuration.getAsJsonArray("spreadsheets");
@@ -3915,7 +3919,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         String p = sd.getDifferential().hasElement() ? sd.getDifferential().getElement().get(0).getPath() : null;
         if (p == null || p.contains(".")) {
           changed = true;
-          sd.getDifferential().getElement().add(0, new ElementDefinition().setPath(p.substring(0, p.indexOf("."))));
+          sd.getDifferential().getElement().add(0, new ElementDefinition().setPath(p == null ? sd.getType() : p.substring(0, p.indexOf("."))));
         }
         utils.setDefWebRoot(igpkp.getCanonical());
         try {
@@ -6314,7 +6318,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "json-schema"))
       fragmentError("StructureDefinition-"+sd.getId()+"-json-schema", "yet to be done: json schema as html", null, f.getOutputNames());
 
-    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, fileList, gen);
+    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, fileList, gen, allInvariants);
     if (igpkp.wantGen(r, "summary"))
       fragment("StructureDefinition-"+sd.getId()+"-summary", sdr.summary(), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "header"))

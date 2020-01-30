@@ -89,14 +89,16 @@ public class StructureDefinitionRenderer extends BaseRenderer {
   private StructureDefinition sd;
   private String destDir;
   private List<FetchedFile> files;
+  private boolean allInvariants;
 
-  public StructureDefinitionRenderer(IWorkerContext context, String prefix, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, NarrativeGenerator gen) {
+  public StructureDefinitionRenderer(IWorkerContext context, String prefix, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, NarrativeGenerator gen, boolean allInvariants) {
     super(context, prefix, igp, maps, markdownEngine, packge, gen);
     this.sd = sd;
     this.destDir = destDir;
     utils = new ProfileUtilities(context, null, igp);
     utils.setIgmode(true);
     this.files = files;
+    this.allInvariants = allInvariants;
   }
 
   @Override
@@ -580,8 +582,10 @@ public class StructureDefinitionRenderer extends BaseRenderer {
       for (String id : txlist)  {
         List<ElementDefinitionConstraintComponent> invs = txmap.get(id);
         for (ElementDefinitionConstraintComponent inv : invs) {
-          b.append("<tr><td>").append(inv.getKey()).append("</td><td>").append(id).append("</td><td>").append(Utilities.escapeXml(gt(inv.getHumanElement())))
-          .append("<br/>: ").append(Utilities.escapeXml(inv.getExpression())).append("</td><td>").append(Utilities.escapeXml(gt(inv.getRequirementsElement()))).append("</td></tr>\r\n");
+          if (!inv.hasSource() || inv.getSource().equals(sd.getUrl()) || allInvariants) {
+            b.append("<tr><td>").append(inv.getKey()).append("</td><td>").append(id).append("</td><td>").append(Utilities.escapeXml(gt(inv.getHumanElement())))
+            .append("<br/>: ").append(Utilities.escapeXml(inv.getExpression())).append("</td><td>").append(Utilities.escapeXml(gt(inv.getRequirementsElement()))).append("</td></tr>\r\n");
+          }
         }
       }
       b.append("</table>\r\n");
@@ -1770,10 +1774,12 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     StringBuilder b = new StringBuilder();
     boolean first = true;
     for (ElementDefinitionConstraintComponent i : elem.getConstraint()) {
-      if (!first)
-        b.append("; ");
-      first = false;
-      b.append(i.getKey()+": "+i.getHuman());
+      if (!i.hasSource() || i.getSource().equals(sd.getUrl()) || allInvariants) {
+        if (!first)
+          b.append("; ");
+        first = false;
+        b.append(i.getKey()+": "+i.getHuman());
+      }
     }
 
     return b.toString();
@@ -1908,4 +1914,5 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     return res;
   }
 
+  
 }
