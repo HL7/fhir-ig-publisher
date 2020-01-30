@@ -1596,6 +1596,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       buildConfigFile();
     } else
       log("Load Configuration from "+configFile);
+    if (!new File(configFile).exists())
+      throw new Exception("Unable to find file " + configFile + " and no ig.ini file specified - nothing to build.");
     try {
       configuration = JsonTrackingParser.parseJsonFile(configFile);
     } catch (Exception e) {
