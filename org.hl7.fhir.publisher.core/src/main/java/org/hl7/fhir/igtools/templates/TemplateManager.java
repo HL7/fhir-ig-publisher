@@ -126,11 +126,13 @@ public class TemplateManager {
     }
   }
   
-  private void applyConfigChanges(JsonObject baseConfig, JsonObject deltaConfig) {
+  private void applyConfigChanges(JsonObject baseConfig, JsonObject deltaConfig) throws FHIRException {
     for (String key : deltaConfig.keySet()) {
       if (baseConfig.has(key)) {
         JsonElement baseElement = baseConfig.get(key);
         JsonElement newElement = deltaConfig.get(key);
+        if (baseElement.isJsonArray()!=newElement.isJsonArray() || baseElement.isJsonObject()!=newElement.isJsonObject() || baseElement.isJsonPrimitive()!=newElement.isJsonPrimitive())
+          throw new FHIRException("When overriding template config file, element " + key + " has a different JSON type in the base config file (" + baseElement + ") than it does in the overriding config file (" + newElement + ").");
         if (newElement.isJsonObject()) {
           applyConfigChanges(baseElement.getAsJsonObject(), deltaConfig.get(key).getAsJsonObject());
         } else if (newElement.isJsonArray()) {
