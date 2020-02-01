@@ -5313,6 +5313,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     ig.addProperty("status", publishedIg.getStatusElement().asStringValue());
     ig.addProperty("experimental", publishedIg.getExperimental());
     ig.addProperty("publisher", publishedIg.getPublisher());
+    ig.addProperty("gitstatus", getGitStatus());
     if (publishedIg.hasContact()) {
       JsonArray jc = new JsonArray();
       ig.add("contact", jc);
@@ -5344,6 +5345,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
     String json = gson.toJson(data);
     TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "fhir.json"), false);
+  }
+
+  private String getGitStatus() throws IOException {
+    File gitDir = new File(Utilities.path(Utilities.getDirectoryForFile(configFile), ".git"));
+    if (!gitDir.exists()) {
+      return "";      
+    }
+    String head = TextFile.fileToString(Utilities.path(gitDir.getAbsolutePath(), "HEAD")).trim();
+    return head.substring(head.lastIndexOf("/")+1);
   }
 
   private void generateResourceReferences() throws Exception {
@@ -6901,13 +6911,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         exitCode = 1;
         self.log("Publishing Content Failed: "+e.getMessage());
         self.log("");
-        self.log("Use -? to get command line help");
-        self.log("");
-        self.log("Stack Dump (for debugging):");
-        e.printStackTrace();
-        for (StackTraceElement st : e.getStackTrace()) {
-          if (st != null && self.filelog != null)
-            self.filelog.append(st.toString());
+        if (e.getMessage().contains("xsl:message")) {
+          self.log("This error was created by the template");
+          
+        } else {
+          self.log("Use -? to get command line help");
+          self.log("");
+          self.log("Stack Dump (for debugging):");
+          e.printStackTrace();
+          for (StackTraceElement st : e.getStackTrace()) {
+            if (st != null && self.filelog != null)
+              self.filelog.append(st.toString());
+          }
         }
         exitCode = 1;
       } finally {
