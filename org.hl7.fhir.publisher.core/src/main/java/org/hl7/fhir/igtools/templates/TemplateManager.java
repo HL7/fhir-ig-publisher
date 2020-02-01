@@ -33,6 +33,7 @@ import java.util.List;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.utilities.JsonMerger;
+import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
 import org.hl7.fhir.utilities.cache.NpmPackage.NpmPackageFolder;
@@ -40,12 +41,16 @@ import org.hl7.fhir.utilities.cache.PackageCacheManager;
 import org.hl7.fhir.utilities.cache.PackageGenerator.PackageType;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 public class TemplateManager {
 
   private PackageCacheManager pcm;
   private ILoggingService logger;
+  private List<JsonObject> configs = new ArrayList<JsonObject>();
   boolean canExecute;
 
   public TemplateManager(PackageCacheManager pcm, ILoggingService logger) {
@@ -93,14 +98,50 @@ public class TemplateManager {
     }
     npm.debugDump("template");
     npm.unPackWithAppend(templateDir);
-    boolean noScripts = true;
-    for (NpmPackageFolder f : npm.getFolders().values()) {
-      for (String n : f.listFiles()) {
-        noScripts = noScripts && Utilities.existsInList(extension(n), ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini", ".eot", ".otf", ".svg", ".ttf", ".woff", ".txt", ".yml");
+    String configPath = Utilities.path(templateDir, "config.json");
+    JsonObject config = JsonTrackingParser.parseJsonFile(configPath);
+    configs.add(config);
+    boolean noScripts = !config.has("script") && !config.has("targets");
+    if (noScripts) {
+      for (NpmPackageFolder f : npm.getFolders().values()) {
+        for (String n : f.listFiles()) {
+          if (!Utilities.existsInList(extension(n), ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini", ".eot", ".otf", ".svg", ".ttf", ".woff", ".txt", ".yml")) {
+            noScripts = false;
+            break;
+          }
+        }
       }
     }
     if (!noScripts) {
       checkTemplateId(template, npm.name());
+    }
+    if (level==0 && configs.size()!=1) {
+      config = configs.get(0);
+      for (int i=1;i<configs.size(); i++) {
+        applyConfigChanges(config, configs.get(i));
+      }
+      Gson gson = new GsonBuilder().setPrettyPrinting().create();
+      String configString = gson.toJson(config);
+      TextFile.stringToFile(configString, configPath, false);
+    }
+  }
+  
+  private void applyConfigChanges(JsonObject baseConfig, JsonObject deltaConfig) {
+    for (String key : deltaConfig.keySet()) {
+      if (baseConfig.has(key)) {
+        JsonElement baseElement = baseConfig.get(key);
+        JsonElement newElement = deltaConfig.get(key);
+        if (newElement.isJsonObject()) {
+          applyConfigChanges(baseElement.getAsJsonObject(), deltaConfig.get(key).getAsJsonObject());
+        } else if (newElement.isJsonArray()) {
+          baseElement.getAsJsonArray().addAll(newElement.getAsJsonArray());
+        } else {
+          baseConfig.remove(key);
+          baseConfig.add(key, deltaConfig.get(key));
+        }
+      } else {
+        baseConfig.add(key, deltaConfig.get(key));
+      }
     }
   }
 
