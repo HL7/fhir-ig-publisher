@@ -723,8 +723,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       npm.finish();
 
       TextFile.stringToFile(makeTemplateIndexPage(), Utilities.path(outputDir, "index.html"), false);
+      TextFile.stringToFile(makeTemplateJekyllIndexPage(), Utilities.path(outputDir, "jekyll.html"), false);
       TextFile.stringToFile(makeTemplateQAPage(), Utilities.path(outputDir, "qa.html"), false);
-
+      
       if (mode != IGBuildMode.AUTOBUILD) {
         pcm.addPackageToCache(templateInfo.get("name").getAsString(), templateInfo.get("version").getAsString(), new FileInputStream(npm.filename()), Utilities.path(outputDir, "package.tgz"));
         pcm.addPackageToCache(templateInfo.get("name").getAsString(), "dev", new FileInputStream(npm.filename()), Utilities.path(outputDir, "package.tgz"));
@@ -737,15 +738,42 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
     String json = gson.toJson(j);
     TextFile.stringToFile(json, Utilities.path(outputDir, "qa.json"), false);
-    
+
+    ZipGenerator zip = new ZipGenerator(Utilities.path(tempDir, "full-ig.zip"));
+    zip.addFolder(outputDir, "site/", false);
+    zip.addFileSource("index.html", REDIRECT_SOURCE, false);
+    zip.close();
+    Utilities.copyFile(Utilities.path(tempDir, "full-ig.zip"), Utilities.path(outputDir, "full-ig.zip"));
+
     // registeringg the package locally
     log("Finished. "+presentDuration(endTime - startTime)+". Output in "+outputDir);
   }
 
 
   private String makeTemplateIndexPage() {
-    String page = "<!DOCTYPE HTML><html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\"><head><title>Template Page</title></head><body><p><b>Template {{npm}}</b></p><p>You  can <a href=\"package.tgz\">download the template</a>, though you should not need to; just refer to the template as {{npm}} in your IG configuration.</p></body></html>";
-    return page.replace("{{npm}}", templateInfo.get("name").getAsString());
+    String page = "<!DOCTYPE HTML>\r\n"+
+       "<html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\">\r\n"+
+       "<head>\r\n"+
+       "  <title>Template Page</title>\r\n"+
+       "</head>\r\n"+
+       "<body>\r\n"+
+       "  <p><b>Template {{npm}}</b></p>\r\n"+
+       "  <p>You can <a href=\"package.tgz\">download the template</a>, though you should not need to; just refer to the template as {{npm}} in your IG configuration.</p>\r\n"+
+       "  <p>A <a href=\"{{canonical}}/history.html\">full version history is published</a></p>\r\n"+
+       "</body>\r\n"+
+       "</html>\r\n";
+    return page.replace("{{npm}}", templateInfo.get("name").getAsString()).replace("{{canonical}}", templateInfo.get("canonical").getAsString());
+  }
+
+  private String makeTemplateJekyllIndexPage() {
+    String page = "---"+
+       "layout: page"+
+       "title: {{npm}}"+
+       "---"+
+       "  <p><b>Template {{npm}}</b></p>\r\n"+
+       "  <p>You can <a href=\"package.tgz\">download the template</a>, though you should not need to; just refer to the template as {{npm}} in your IG configuration.</p>\r\n"+
+       "  <p>A <a href=\"{{canonical}}/history.html\">full version history is published</a></p>\r\n";
+    return page.replace("{{npm}}", templateInfo.get("name").getAsString()).replace("{{canonical}}", templateInfo.get("canonical").getAsString());
   }
 
   private String makeTemplateQAPage() {
