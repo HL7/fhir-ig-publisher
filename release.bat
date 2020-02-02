@@ -1,7 +1,7 @@
 @echo off
 
-set oldver=1.0.53
-set newver=1.0.54
+set oldver=1.0.54
+set newver=1.0.55
 
 
 echo ..
@@ -11,6 +11,9 @@ echo ===========================================================================
 echo ..
 
 call mvn versions:set -DnewVersion=%newver%-SNAPSHOT
+
+call C:\work\org.hl7.fhir\test-igs\update.bat
+cd C:\work\org.hl7.fhir\fhir-ig-publisher
 
 call git commit -a -m "Release new version %newver%-SNAPSHOT"
 call git push origin master

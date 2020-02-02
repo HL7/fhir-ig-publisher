@@ -6911,7 +6911,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         exitCode = 1;
         self.log("Publishing Content Failed: "+e.getMessage());
         self.log("");
-        if (e.getMessage().contains("xsl:message")) {
+        if (e.getMessage() != null &&  e.getMessage().contains("xsl:message")) {
           self.log("This error was created by the template");
           
         } else {
