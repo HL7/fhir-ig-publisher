@@ -94,7 +94,11 @@ public class TemplateManager {
         loadedIds.add(baseTemplate);
         throw new FHIRException("Template parents recurse: " + String.join("->", loadedIds));
       }
-      installTemplate(baseTemplate, rootFolder, templateDir, scriptIds, loadedIds, level + 1);
+      if (!npm.getNpm().has("dependencies") || !npm.getNpm().getAsJsonObject("dependencies").has(baseTemplate)) {
+        throw new FHIRException("Unable to resolve "+baseTemplate+" because it is not listed in the dependencies");
+      }
+      String ver = npm.getNpm().getAsJsonObject("dependencies").get(baseTemplate).getAsString();
+      installTemplate(baseTemplate+"#"+ver, rootFolder, templateDir, scriptIds, loadedIds, level + 1);
     }
     npm.debugDump("template");
     npm.unPackWithAppend(templateDir);

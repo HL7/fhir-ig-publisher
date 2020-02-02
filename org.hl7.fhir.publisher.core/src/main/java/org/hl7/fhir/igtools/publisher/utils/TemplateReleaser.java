@@ -33,7 +33,8 @@ import org.w3c.dom.Node;
 
 import com.google.gson.JsonObject;
 
-public class PackageReleaser {
+public class TemplateReleaser {
+  
   private static final String RSS_DATE = "EEE, dd MMM yyyy hh:mm:ss";
 
   private Document rss;
@@ -45,14 +46,16 @@ public class PackageReleaser {
 
   // 3 parameters: source of package, package dest folder, and release note
   public static void main(String[] args) throws Exception {
-    new PackageReleaser().release(args[0], args[1], args[1]);
+    new TemplateReleaser().release(args[0], args[1], args[2]);
   }
 
   private void release(String source, String dest, String note) throws Exception {
     SimpleDateFormat df = new SimpleDateFormat(RSS_DATE, new Locale("en", "US"));
     checkDest(dest);
     for (File f : new File(source).listFiles()) {
-      release(source, dest, f.getName(), note, df);
+      if (f.isDirectory()) {
+        release(source, dest, f.getName(), note, df);
+      }
     }
     Element lbd = XMLUtil.getNamedChild(channel, "lastBuildDate");
     lbd.setTextContent(df.format(new Date()));
@@ -82,15 +85,13 @@ public class PackageReleaser {
   private NpmPackage checkPackage(String source, String folder) throws IOException {
     File f = new File(Utilities.path(source, folder));
     check(f.exists(), "Source "+source+" not found");
-    check(f.isDirectory(), "Source "+source+" is not a directory");
+    check(f.isDirectory(), "Source "+source+"\\"+folder+" is not a directory");
     File p = new File(Utilities.path(source, folder, "output", "package.tgz"));
     check(p.exists(), "Source Package "+p.getAbsolutePath()+" not found");
     check(!p.isDirectory(), "Source Package "+p.getAbsolutePath()+" is a directory");
     NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(p));
     String pid = npm.name();
     String version = npm.version();
-    String tv = npm.toolsVersion();
-    check("3".equals(tv), "Source Package "+p.getAbsolutePath()+" Package tools-version is not 3");
     check(pid != null, "Source Package "+p.getAbsolutePath()+" Package id not found");
     check(NpmPackage.isValidName(pid), "Source Package "+p.getAbsolutePath()+" Package id "+pid+" is not valid");
     check(pid.equals(folder), "Name mismatch between folder and package");
@@ -98,8 +99,6 @@ public class PackageReleaser {
     check(NpmPackage.isValidVersion(version), "Source Package "+p.getAbsolutePath()+" Package version "+version+" is not valid");
     String fhirKind = npm.type(); 
     check(fhirKind != null, "Source Package "+p.getAbsolutePath()+" Package type not found");
-    String fhirVersion = npm.fhirVersion();
-    check(fhirVersion != null, "Could not determine FHIR version");
     return npm;
   }
     
@@ -135,7 +134,6 @@ public class PackageReleaser {
       addTextChild(item, "link", Utilities.pathURL(linkRoot, npm.name(), npm.version(), "package.tgz"));
       addTextChild(item, "guid", Utilities.pathURL(linkRoot, npm.name(), npm.version(), "package.tgz")).setAttribute("isPermaLink", "true");
       addTextChild(item, "dc:creator", "FHIR Project");
-      addTextChild(item, "fhir:version", npm.fhirVersion());
       addTextChild(item, "fhir:kind", npm.type());
       addTextChild(item, "pubDate", df.format(new Date()));
       txt = rss.createTextNode("\n    ");

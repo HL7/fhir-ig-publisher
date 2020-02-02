@@ -6907,6 +6907,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         self.setCacheOption(CacheOption.LEAVE);
       try {
         self.execute();
+        if (hasParam(args, "-no-errors")) {
+          exitCode = self.countErrs(self.errors) > 0 ? 1 : 0;
+        }
       } catch (Exception e) {
         exitCode = 1;
         self.log("Publishing Content Failed: "+e.getMessage());
