@@ -78,6 +78,7 @@ public class Template {
   private String targetOnGenerate;
   private String targetOnJekyll;
   private String targetOnCheck;
+  private String templateThatCantExecute;
   private Project antProject;
   private JsonObject defaults;
   private JsonArray extraTemplates;
@@ -90,9 +91,10 @@ public class Template {
    * 
    * @throws IOException - only if the path is incorrect or the disk runs out of space
    */
-  public Template(String rootDir, boolean canExecute) throws IOException {
+  public Template(String rootDir, boolean canExecute, String templateThatCantExecute) throws IOException {
     root = rootDir;
     this.canExecute = canExecute;
+    this.templateThatCantExecute = templateThatCantExecute;
 
     templateDir = Utilities.path(rootDir, "template");
 
@@ -159,7 +161,7 @@ public class Template {
     
   private ImplementationGuide runScriptTarget(String target, Map<String, List<ValidationMessage>> messages, ImplementationGuide ig, List<String> fileNames, int modifyIg) throws IOException, FHIRException {
     if (!canExecute) {
-      throw new FHIRException("Unable to execute '"+target+"' in script '"+script+"' as the script is not trusted");
+      throw new FHIRException("Unable to execute '"+target+"' in script '"+script+"' as the template '"+templateThatCantExecute+"' is not trusted");
     }
     File jsonOutcomes = new File(Utilities.path(templateDir, target + "-validation.json"));
     File xmlOutcomes = new File(Utilities.path(templateDir, target + "-validation.xml"));

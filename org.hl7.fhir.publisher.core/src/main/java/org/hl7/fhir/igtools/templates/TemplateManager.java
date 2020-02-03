@@ -52,6 +52,7 @@ public class TemplateManager {
   private ILoggingService logger;
   private List<JsonObject> configs = new ArrayList<JsonObject>();
   boolean canExecute;
+  String templateThatCantExecute;
 
   public TemplateManager(PackageCacheManager pcm, ILoggingService logger) {
     this.pcm = pcm;
@@ -77,9 +78,9 @@ public class TemplateManager {
       canExecute = true; // nah, we don't care. locally, we'll build whatever people give us
     }
     if (!canExecute) {
-      logger.logMessage("IG template is not trusted.  No scripts will be executed");
+      logger.logMessage("IG template '"+templateThatCantExecute+"' is not trusted.  No scripts will be executed");
     }
-    return new Template(rootFolder, canExecute);
+    return new Template(rootFolder, canExecute, templateThatCantExecute);
   }
 
   private void installTemplate(String template, String rootFolder, String templateDir, List<String> scriptIds, ArrayList<String> loadedIds, int level) throws FHIRException, IOException {
@@ -177,8 +178,12 @@ public class TemplateManager {
    * @return
    */
   private void checkTemplateId(String template, String packageId) {
+    if (template.contains("#")) {
+      template = template.substring(0, template.indexOf("#"));
+    }
     if (!template.equals(packageId)) {
       canExecute = false;
+      templateThatCantExecute = packageId;
     } else if (!Utilities.existsInList(packageId, 
         // if you are proposing to change this list, discuss with FHIR Product Director first
         "fhir.test.template", 
@@ -189,6 +194,7 @@ public class TemplateManager {
         "hl7.davinci.template",
         "ihe.fhir.template")) {
       canExecute = false;
+      templateThatCantExecute = packageId;
     }
   }
 
