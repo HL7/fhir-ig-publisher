@@ -74,9 +74,9 @@ public class TemplateManager {
       installTemplate(template, rootFolder, templateDir, scriptTemplates, new ArrayList<String>(), 0);
     }
     
-    if (!autoMode) {
-      canExecute = true; // nah, we don't care. locally, we'll build whatever people give us
-    }
+//    if (!autoMode) {
+//      canExecute = true; // nah, we don't care. locally, we'll build whatever people give us
+//    }
     if (!canExecute) {
       logger.logMessage("IG template '"+templateThatCantExecute+"' is not trusted.  No scripts will be executed");
     }
@@ -178,12 +178,10 @@ public class TemplateManager {
    * @return
    */
   private void checkTemplateId(String template, String packageId) {
-    if (template.contains("#")) {
-      template = template.substring(0, template.indexOf("#"));
-    }
-    if (!template.equals(packageId)) {
+    String t = template.contains("#") ? template.substring(0, template.indexOf("#")) : template;
+    if (!t.equals(packageId)) {
       canExecute = false;
-      templateThatCantExecute = packageId;
+      templateThatCantExecute = template;
     } else if (!Utilities.existsInList(packageId, 
         // if you are proposing to change this list, discuss with FHIR Product Director first
         "fhir.test.template", 
@@ -194,7 +192,7 @@ public class TemplateManager {
         "hl7.davinci.template",
         "ihe.fhir.template")) {
       canExecute = false;
-      templateThatCantExecute = packageId;
+      templateThatCantExecute = template;
     }
   }
 
