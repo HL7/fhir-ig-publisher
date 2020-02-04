@@ -77,7 +77,7 @@ public class TemplateManager {
       installTemplate(template, rootFolder, templateDir, scriptTemplates, new ArrayList<String>(), 0);
     }
     
-    if (!autoMode) {z
+    if (!autoMode) {
       canExecute = true; // nah, we don't care. locally, we'll build whatever people give us
     }
     if (!canExecute) {
