@@ -112,6 +112,9 @@ public class TemplateManager {
     JsonObject config = null;
     if (npm.hasFile("package\\$root", "config.json")) {
       config = JsonTrackingParser.parseJson(npm.load("package\\$root", "config.json"));
+      if (config == null) {
+        config = JsonTrackingParser.parseJson(npm.load("package/$root", "config.json"));
+      }
       configs.add(config);
       noScripts = !config.has("script") && !config.has("targets");
     }  
@@ -131,7 +134,7 @@ public class TemplateManager {
       checkTemplateId(template, npm.name(), config == null ? "has file extensions: "+ ext : config.has("script") ? "template nominates a script" : 
         config.has("targets") ? "template nominates ant targets" : "has file extensions: "+ ext);
     }
-    if (level==0 && configs.size()!=1) {
+    if (level==0 && configs.size() > 1) {
       config = configs.get(0);
       for (int i=1;i<configs.size(); i++) {
         applyConfigChanges(config, configs.get(i));
