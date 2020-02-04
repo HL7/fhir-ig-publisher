@@ -28,7 +28,9 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
@@ -53,6 +55,7 @@ public class TemplateManager {
   private List<JsonObject> configs = new ArrayList<JsonObject>();
   boolean canExecute;
   String templateThatCantExecute;
+  String templateReason;
 
   public TemplateManager(PackageCacheManager pcm, ILoggingService logger) {
     this.pcm = pcm;
@@ -74,13 +77,13 @@ public class TemplateManager {
       installTemplate(template, rootFolder, templateDir, scriptTemplates, new ArrayList<String>(), 0);
     }
     
-//    if (!autoMode) {
-//      canExecute = true; // nah, we don't care. locally, we'll build whatever people give us
-//    }
+    if (!autoMode) {z
+      canExecute = true; // nah, we don't care. locally, we'll build whatever people give us
+    }
     if (!canExecute) {
       logger.logMessage("IG template '"+templateThatCantExecute+"' is not trusted.  No scripts will be executed");
     }
-    return new Template(rootFolder, canExecute, templateThatCantExecute);
+    return new Template(rootFolder, canExecute, templateThatCantExecute, templateReason);
   }
 
   private void installTemplate(String template, String rootFolder, String templateDir, List<String> scriptIds, ArrayList<String> loadedIds, int level) throws FHIRException, IOException {
@@ -101,24 +104,32 @@ public class TemplateManager {
       String ver = npm.getNpm().getAsJsonObject("dependencies").get(baseTemplate).getAsString();
       installTemplate(baseTemplate+"#"+ver, rootFolder, templateDir, scriptIds, loadedIds, level + 1);
     }
-    npm.debugDump("template");
+    // npm.debugDump("template");
+    
     npm.unPackWithAppend(templateDir);
-    String configPath = Utilities.path(templateDir, "config.json");
-    JsonObject config = JsonTrackingParser.parseJsonFile(configPath);
-    configs.add(config);
-    boolean noScripts = !config.has("script") && !config.has("targets");
+    Set<String> ext = new HashSet<>();
+    boolean noScripts = true;
+    JsonObject config = null;
+    if (npm.hasFile("package\\$root", "config.json")) {
+      config = JsonTrackingParser.parseJson(npm.load("package\\$root", "config.json"));
+      configs.add(config);
+      noScripts = !config.has("script") && !config.has("targets");
+    }  
     if (noScripts) {
       for (NpmPackageFolder f : npm.getFolders().values()) {
         for (String n : f.listFiles()) {
-          if (!Utilities.existsInList(extension(n), ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini", ".eot", ".otf", ".svg", ".ttf", ".woff", ".txt", ".yml")) {
+          String s = extension(n);
+          if (!Utilities.existsInList(s, ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini", ".eot", ".otf", ".svg", ".ttf", ".woff", ".txt", ".yml")) {
             noScripts = false;
+            ext.add(s);
             break;
           }
         }
       }
     }
     if (!noScripts) {
-      checkTemplateId(template, npm.name());
+      checkTemplateId(template, npm.name(), config == null ? "has file extensions: "+ ext : config.has("script") ? "template nominates a script" : 
+        config.has("targets") ? "template nominates ant targets" : "has file extensions: "+ ext);
     }
     if (level==0 && configs.size()!=1) {
       config = configs.get(0);
@@ -127,6 +138,7 @@ public class TemplateManager {
       }
       Gson gson = new GsonBuilder().setPrettyPrinting().create();
       String configString = gson.toJson(config);
+      String configPath = Utilities.path(templateDir, "config.json");
       TextFile.stringToFile(configString, configPath, false);
     }
   }
@@ -177,11 +189,12 @@ public class TemplateManager {
    * @param packageId
    * @return
    */
-  private void checkTemplateId(String template, String packageId) {
+  private void checkTemplateId(String template, String packageId, String reason) {
     String t = template.contains("#") ? template.substring(0, template.indexOf("#")) : template;
     if (!t.equals(packageId)) {
       canExecute = false;
       templateThatCantExecute = template;
+      templateReason = reason;
     } else if (!Utilities.existsInList(packageId, 
         // if you are proposing to change this list, discuss with FHIR Product Director first
         "fhir.test.template", 
@@ -193,6 +206,7 @@ public class TemplateManager {
         "ihe.fhir.template")) {
       canExecute = false;
       templateThatCantExecute = template;
+      templateReason = reason;
     }
   }
 

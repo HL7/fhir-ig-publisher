@@ -83,18 +83,21 @@ public class Template {
   private JsonObject defaults;
   private JsonArray extraTemplates;
   private JsonArray preProcess;
+  private String templateReason;
   
   /** unpack the template into /template 
    * 
    * @param rootDir  the root directory for the IG
    * @param canExecute 
+   * @param templateExtensions 
    * 
    * @throws IOException - only if the path is incorrect or the disk runs out of space
    */
-  public Template(String rootDir, boolean canExecute, String templateThatCantExecute) throws IOException {
+  public Template(String rootDir, boolean canExecute, String templateThatCantExecute, String templateReason) throws IOException {
     root = rootDir;
     this.canExecute = canExecute;
     this.templateThatCantExecute = templateThatCantExecute;
+    this.templateReason = templateReason;
 
     templateDir = Utilities.path(rootDir, "template");
 
@@ -161,7 +164,7 @@ public class Template {
     
   private ImplementationGuide runScriptTarget(String target, Map<String, List<ValidationMessage>> messages, ImplementationGuide ig, List<String> fileNames, int modifyIg) throws IOException, FHIRException {
     if (!canExecute) {
-      throw new FHIRException("Unable to execute '"+target+"' in script '"+script+"' as the template '"+templateThatCantExecute+"' is not trusted");
+      throw new FHIRException("Unable to execute '"+target+"' in script '"+script+"' as the template '"+templateThatCantExecute+"' is not trusted (reason: "+templateReason+")");
     }
     File jsonOutcomes = new File(Utilities.path(templateDir, target + "-validation.json"));
     File xmlOutcomes = new File(Utilities.path(templateDir, target + "-validation.xml"));
