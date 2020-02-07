@@ -111,10 +111,7 @@ public class TemplateManager {
     boolean noScripts = true;
     JsonObject config = null;
     if (npm.hasFile("package\\$root", "config.json")) {
-      config = JsonTrackingParser.parseJson(npm.load("package\\$root", "config.json"));
-      if (config == null) {
-        config = JsonTrackingParser.parseJson(npm.load("package/$root", "config.json"));
-      }
+      config = JsonTrackingParser.parseJson(npm.load(Utilities.path("package", "$root"), "config.json"));
       configs.add(config);
       noScripts = !config.has("script") && !config.has("targets");
     }  
@@ -224,38 +221,42 @@ public class TemplateManager {
   }
 
   private NpmPackage loadPackage(String template, String rootFolder) throws FHIRException, IOException {
-    if (template.startsWith("#")) {
-      File f = new File(Utilities.path(rootFolder, template.substring(1)));
-      if (f.exists() && f.isDirectory()) {
-        NpmPackage npm = NpmPackage.fromFolder(f.getAbsolutePath(), PackageType.TEMPLATE, "output", ".git");
-        return npm;
+    try {
+      if (template.startsWith("#")) {
+        File f = new File(Utilities.path(rootFolder, template.substring(1)));
+        if (f.exists() && f.isDirectory()) {
+          NpmPackage npm = NpmPackage.fromFolder(f.getAbsolutePath(), PackageType.TEMPLATE, "output", ".git");
+          return npm;
+        }
       }
+
+      if (template.matches(PackageCacheManager.PACKAGE_REGEX)) {
+        return pcm.loadPackage(template, "current");
+      }
+      if (template.matches(PackageCacheManager.PACKAGE_VERSION_REGEX)) {
+        String[] p = template.split("\\#");
+        return pcm.loadPackage(p[0], p[1]);
+      }
+      File f = new File(template);
+      if (f.exists())
+        if (f.isDirectory())
+          return NpmPackage.fromFolder(template);
+        else
+          return NpmPackage.fromPackage(new FileInputStream(template));
+      if (template.startsWith("https://github.com") || template.startsWith("http://github.com")) {
+        if (template.startsWith("http://github.com"))
+          template = template.replace("http://github.com", "https://github.com");
+
+        URL url = new URL(Utilities.pathURL(template, "archive", "master.zip"));
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("GET");
+        InputStream zip = connection.getInputStream();
+        return NpmPackage.fromZip(zip, true, url.toString()); 
+      }
+      throw new FHIRException("Unable to load template from "+template);
+    } catch (Exception e) {
+      throw new FHIRException("Error loading template "+template+": "+e.getMessage(), e);
     }
-      
-    if (template.matches(PackageCacheManager.PACKAGE_REGEX)) {
-      return pcm.loadPackage(template, "current");
-    }
-    if (template.matches(PackageCacheManager.PACKAGE_VERSION_REGEX)) {
-      String[] p = template.split("\\#");
-      return pcm.loadPackage(p[0], p[1]);
-    }
-    File f = new File(template);
-    if (f.exists())
-      if (f.isDirectory())
-        return NpmPackage.fromFolder(template);
-      else
-        return NpmPackage.fromPackage(new FileInputStream(template));
-    if (template.startsWith("https://github.com") || template.startsWith("http://github.com")) {
-      if (template.startsWith("http://github.com"))
-        template = template.replace("http://github.com", "https://github.com");
-      
-      URL url = new URL(Utilities.pathURL(template, "archive", "master.zip"));
-      HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-      connection.setRequestMethod("GET");
-      InputStream zip = connection.getInputStream();
-      return NpmPackage.fromZip(zip, true, url.toString()); 
-    }
-    throw new FHIRException("Unable to load template from "+template);
   }
   
 }
