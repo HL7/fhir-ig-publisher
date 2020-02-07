@@ -242,6 +242,22 @@
                     </execution>
                 </executions>
             </plugin>
+           <plugin>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <trimStackTrace>false</trimStackTrace>
+                    <testFailureIgnore>false</testFailureIgnore>
+                    <argLine>-Xmx4096m</argLine>
+                    <redirectTestOutputToFile>false</redirectTestOutputToFile>
+                    <includes>
+                        <include>**/All*</include>
+                    </includes>
+                    <excludes>
+                        <exclude>**/*dstu*/**</exclude>
+                        <exclude>**/*r4*/**</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>        
         </plugins>
     </build>
 

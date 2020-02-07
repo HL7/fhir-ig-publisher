@@ -74,9 +74,12 @@ public class SimpleFetcher implements IFetchFile {
     if (f.isDirectory()) {
       ff.setContentType("application/directory");
       ff.setFolder(true);   
-      for (File fl : f.listFiles())
-        ff.getFiles().add(fl.getCanonicalPath());
-    } else {
+      for (File fl : f.listFiles()) {
+        if (!isIgnoredFile(fl.getName())) {
+          ff.getFiles().add(fl.getCanonicalPath());
+        }
+      }
+    } else if (!isIgnoredFile(f.getName())) {
       ff.setFolder(false);   
       if (path.endsWith("json"))
         ff.setContentType("application/fhir+json");
@@ -90,6 +93,11 @@ public class SimpleFetcher implements IFetchFile {
       ss.close();
     }
     return ff;
+  }
+
+  private boolean isIgnoredFile(String name) {
+    // TODO Auto-generated method stub
+    return false;
   }
 
   @Override
