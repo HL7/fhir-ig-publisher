@@ -1295,6 +1295,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     boolean checkAggregation = false;
     boolean autoLoad = false;
     boolean showReferenceMessages = false;
+    Boolean useStatsOptOut = null;
     List<String> extensionDomains = new ArrayList<>();
     tempDir = Utilities.path(rootDir, "temp");
     outputDir = Utilities.path(rootDir, "output");
@@ -1340,6 +1341,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         loadSuppressedMessages(Utilities.path(rootDir, p.getValue()));
       } else if (p.getCode().equals("html-exempt")) {     
         exemptHtmlPatterns.add(p.getValue());
+      } else if (p.getCode().equals("usage-stats-opt-out")) {     
+        useStatsOptOut = "true".equals(p.getValue());
       } else if (p.getCode().equals("extension-domain")) {
         extensionDomains.add(p.getValue());
       } else if (p.getCode().equals("active-tables")) {
@@ -1575,7 +1578,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       extensionTracker.setoptIn(true);
     else if (npmName.contains("hl7") || npmName.contains("argonaut") || npmName.contains("ihe"))
       extensionTracker.setoptIn(true);
-    else 
+    else if (useStatsOptOut != null) 
+      extensionTracker.setoptIn(useStatsOptOut);
+    else
       extensionTracker.setoptIn(!ini.getBooleanProperty("IG", "usage-stats-opt-out"));
     log("Initialization complete");
   }
@@ -4725,6 +4730,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             zip.addBytes(r.getElement().fhirType()+"-"+r.getId()+".json", bs.toByteArray(), false);
           } catch (Exception e) {
             log("Can't store "+r.getElement().fhirType()+"-"+r.getId()+" in R3 format for registry.fhir.org");
+            e.printStackTrace();
           }
           i++;
         }
