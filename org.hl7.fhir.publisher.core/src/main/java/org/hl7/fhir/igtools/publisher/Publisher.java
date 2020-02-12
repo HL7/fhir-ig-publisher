@@ -3776,12 +3776,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                 bc.setVersion(businessVersion);
               }
             }
-            if (contacts != null) {
+            if (contacts != null && !contacts.isEmpty()) {
               altered = true;
               bc.getContact().clear();
               bc.getContact().addAll(contacts);
             }
-            if (contexts != null) {
+            if (contexts != null && !contexts.isEmpty()) {
               altered = true;
               bc.getUseContext().clear();
               bc.getUseContext().addAll(contexts);
@@ -3795,7 +3795,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 //              altered = true;
 //              bc.setLicense(license);
             }
-            if (jurisdictions != null) {
+            if (jurisdictions != null && !jurisdictions.isEmpty()) {
               altered = true;
               bc.getJurisdiction().clear();
               bc.getJurisdiction().addAll(jurisdictions);
