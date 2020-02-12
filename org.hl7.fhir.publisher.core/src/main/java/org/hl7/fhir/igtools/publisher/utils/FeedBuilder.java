@@ -44,7 +44,6 @@ public class FeedBuilder {
   }
 
   public class Publication {
-
     private String packageId;
     private String title;
     private String canonical;
@@ -141,6 +140,11 @@ public class FeedBuilder {
     public boolean isSemVer() {
       return version.matches("[0-9]+[.][0-9]+[a-z]?[.][0-9]+[a-z]?");
     }
+    
+    @Override
+    public String toString() {
+      return packageId+"#"+version + (!subPackages.isEmpty() ? subPackages.toString() : "");
+    }
   }
 
   public void execute(String rootFolder, String packageFile, String publicationFile, String orgName, String thisUrl, String rootUrl) throws JsonSyntaxException, FileNotFoundException, IOException, ParseException {
@@ -184,7 +188,7 @@ public class FeedBuilder {
       b.append("    <description>New publications by "+orgName+"></description>\r\n");      
     }
     b.append("    <link>"+thisUrl+"</link>\r\n");
-    b.append("    <generator>HL7 FHIR Publication tooling</generator>\r\n");
+    b.append("    <generator>HL7, Inc FHIR Publication tooling</generator>\r\n");
     // "Fri, 20 Sep 2019 12:44:30 GMT"
     SimpleDateFormat df = new SimpleDateFormat(RSS_DATE, new Locale("en", "US"));
     b.append("    <lastBuildDate>"+df.format(new Date())+" GMT"+"</lastBuildDate>\r\n");
@@ -196,11 +200,11 @@ public class FeedBuilder {
     for (Publication pub : pubs) {
       if (forPackage && !pub.isSemVer()) {
         System.out.println("Ignoring package "+pub.title(forPackage)+" as the version ("+pub.getVersion()+") does not conform to semver");
-      } else if (forPackage && !packageExists(pub.folder)) {
+      } else if (forPackage && !packageExists(pub.folder, pub.subPackages)) {
         System.out.println("Ignoring package "+pub.title(forPackage)+" as the actual package could not be found at "+pub.folder);
       } else {
         String desc = pub.desc();
-        if (forPackage) {
+        if (forPackage && new File(Utilities.path(pub.folder, "package.tgz")).exists()) {
           // open the package, check the details and get the description
           NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(pub.folder, "package.tgz")));
           if (!(npm.name()+"#"+npm.version()).equals(pub.title(forPackage)))
@@ -255,8 +259,16 @@ public class FeedBuilder {
     return link.substring(0, link.lastIndexOf("/"));
   }
 
-  private boolean packageExists(String folder) throws IOException {
-    return new File(Utilities.path(folder, "package.tgz")).exists();
+  private boolean packageExists(String folder, List<String> subPackages) throws IOException {
+    if (subPackages.isEmpty()) {
+      return new File(Utilities.path(folder, "package.tgz")).exists();
+    } else {
+      boolean ok = true;
+      for (String s : subPackages) {
+        ok = ok && new File(Utilities.path(folder, s+".tgz")).exists();
+      }
+      return ok;
+    }
     
   }
 
@@ -316,6 +328,6 @@ public class FeedBuilder {
   }
 
   public static void main(String[] args) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
-    new FeedBuilder().execute("C:\\web\\hl7.org\\fhir", "C:\\web\\hl7.org\\fhir\\package-feed.xml", "C:\\web\\hl7.org\\fhir\\publication-feed.xml", "HL7", "http://hl7.org/fhir/package-feed.xml", "http://hl7.org/fhir");
+    new FeedBuilder().execute("C:\\web\\hl7.org\\fhir", "C:\\web\\hl7.org\\fhir\\package-feed.xml", "C:\\web\\hl7.org\\fhir\\publication-feed.xml", "HL7, Inc", "http://hl7.org/fhir/package-feed.xml", "http://hl7.org/fhir");
   }
 }
