@@ -96,8 +96,7 @@ public class SimpleFetcher implements IFetchFile {
   }
 
   private boolean isIgnoredFile(String name) {
-    // TODO Auto-generated method stub
-    return false;
+    return name.startsWith(".");
   }
 
   @Override
@@ -259,7 +258,7 @@ public class SimpleFetcher implements IFetchFile {
           if (!f.isDirectory()) {
             String fn = f.getCanonicalPath();
             String ext = Utilities.getFileExtension(fn);
-            if (!Utilities.existsInList(ext, "md", "txt") && !fn.endsWith(".gitignore") && !fn.contains("-spreadsheet")) {
+            if (!Utilities.existsInList(ext, "md", "txt") && !fn.endsWith(".gitignore") && !fn.contains("-spreadsheet") && !isIgnoredFile(f.getName())) {
               boolean ok = false;
               if (!Utilities.existsInList(ext, "json", "ttl", "html", "txt"))
                 try {
