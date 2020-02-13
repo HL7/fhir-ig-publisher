@@ -3,7 +3,6 @@
 set oldver=1.0.62
 set newver=1.0.63
 
-
 echo ..
 echo =============================================================================
 echo upgrade and release fhir IG Publisher from %oldver%-SNAPSHOT to %newver%-SNAPSHOT
@@ -29,8 +28,8 @@ IF %ERRORLEVEL% NEQ 0 (
   GOTO DONE
 )
 
-pause
-call C:\work\org.hl7.fhir\test-igs\upgrade.bat
+rem call C:\work\org.hl7.fhir\test-igs\upgrade.bat
+cd C:\work\org.hl7.fhir\fhir-ig-publisher
 
 call "C:\tools\versionNotes.exe" -fileName C:\work\org.hl7.fhir\latest-ig-publisher\release-notes-publisher.md -version %newver% -fileDest C:\temp\current-release-notes-publisher.md -url https://fhir.github.io/latest-ig-publisher/org.hl7.fhir.publisher.jar -maven https://oss.sonatype.org/service/local/artifact/maven/redirect?r=snapshots&g=org.hl7.fhir.publisher&a=org.hl7.fhir.publisher.cli&v=%newver%-SNAPSHOT&e=jar
 
@@ -44,8 +43,6 @@ call python c:\tools\zulip-api\zulip\zulip\send.py --stream committers/notificat
 call python c:\tools\zulip-api\zulip\zulip\send.py --stream tooling/releases --subject "IGPublisher" --config-file zuliprc < C:\temp\current-release-notes-publisher.md
 
 del C:\temp\current-release-notes-publisher.md 
-
-pause
 
 :DONE
 echo ========

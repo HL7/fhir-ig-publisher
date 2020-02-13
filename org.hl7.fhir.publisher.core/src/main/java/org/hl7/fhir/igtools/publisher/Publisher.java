@@ -5007,9 +5007,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     for (FetchedResource r: examples) {
       FetchedResource baseRes = getResourceForUri(r.getExampleUri());
-      if (baseRes == null)
-        throw new Exception ("Unable to find exampleFor resource " + r.getExampleUri() + " for resource " + r.getUrlTail());
-      baseRes.addStatedExample(r);
+      if (baseRes == null) {
+        errors.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, r.fhirType()+"/"+r.getId(), "Unable to find profile " + r.getExampleUri() + " nominated as the profile for which resource " + r.getUrlTail()+" is an example", IssueSeverity.ERROR));
+      } else {
+        baseRes.addStatedExample(r);
+      }
     }
 
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
