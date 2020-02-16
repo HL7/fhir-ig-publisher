@@ -111,10 +111,15 @@ public class TemplateManager {
     boolean noScripts = true;
     JsonObject config = null;
     if (npm.hasFile("package\\$root", "config.json")) {
-      config = JsonTrackingParser.parseJson(npm.load(Utilities.path("package", "$root"), "config.json"));
+      config = JsonTrackingParser.parseJson(npm.load("package\\$root", "config.json"));
+      configs.add(config);
+      noScripts = !config.has("script") && !config.has("targets");
+    } else if (npm.hasFile("package/$root", "config.json")) {
+      config = JsonTrackingParser.parseJson(npm.load("package/$root", "config.json"));
       configs.add(config);
       noScripts = !config.has("script") && !config.has("targets");
     }  
+
     if (noScripts) {
       for (NpmPackageFolder f : npm.getFolders().values()) {
         for (String n : f.listFiles()) {
