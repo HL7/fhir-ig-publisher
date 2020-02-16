@@ -37,6 +37,7 @@ import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
+import org.hl7.fhir.igtools.renderers.StructureDefinitionRenderer.BindingResolutionDetails;
 import org.hl7.fhir.r4.model.UrlType;
 import org.hl7.fhir.r5.conformance.ProfileUtilities;
 import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider.BindingResolution;
@@ -80,6 +81,17 @@ import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Piece;
 
 public class StructureDefinitionRenderer extends BaseRenderer {
+  public class BindingResolutionDetails {
+    private String vss;
+    private String vsn;
+    public BindingResolutionDetails(String vss, String vsn) {
+      super();
+      this.vss = vss;
+      this.vsn = vsn;
+    }
+
+  }
+
   public static final String RIM_MAPPING = "http://hl7.org/v3";
   public static final String v2_MAPPING = "http://hl7.org/v2";
   public static final String LOINC_MAPPING = "http://loinc.org";
@@ -394,7 +406,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
   public String txDiff(boolean withHeadings, boolean mustSupportOnly) throws FHIRException {
     List<String> txlist = new ArrayList<String>();
     boolean hasFixed  = false;
-    Map<String, ElementDefinitionBindingComponent> txmap = new HashMap<String, ElementDefinitionBindingComponent>();
+    Map<String, ElementDefinition> txmap = new HashMap<String, ElementDefinition>();
     for (ElementDefinition ed : sd.getDifferential().getElement()) {
       if (ed.hasBinding() && !"0".equals(ed.getMax()) && (!mustSupportOnly || ed.getMustSupport())) {
         String id = ed.getId();
@@ -413,7 +425,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
         if (ed.getType().size() == 1 && ed.getType().get(0).getWorkingCode().equals("Extension"))
           id = id + "<br/>"+ed.getType().get(0).getProfile();
         txlist.add(id);
-        txmap.put(id, ed.getBinding());
+        txmap.put(id, ed);
       }
     }
     if (txlist.isEmpty())
@@ -425,7 +437,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
       b.append("<table class=\"list\">\r\n");
       b.append("<tr><td><b>"+translate("sd.tx", "Path")+"</b></td><td><b>"+translate("sd.tx", "Conformance")+"</b></td><td><b>"+translate("sd.tx", hasFixed ? "ValueSet / Code" : "ValueSet")+"</b></td></tr>\r\n");
       for (String path : txlist)  {
-        txItem(txmap, b, path);
+        txItem(txmap, b, path, sd.getUrl());
       }
       b.append("</table>\r\n");
       return b.toString();
@@ -435,7 +447,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
   public String tx(boolean withHeadings, boolean mustSupportOnly) throws FHIRException {
     List<String> txlist = new ArrayList<String>();
     boolean hasFixed  = false;
-    Map<String, ElementDefinitionBindingComponent> txmap = new HashMap<String, ElementDefinitionBindingComponent>();
+    Map<String, ElementDefinition> txmap = new HashMap<String, ElementDefinition>();
     for (ElementDefinition ed : sd.getSnapshot().getElement()) {
       if (ed.hasBinding() && !"0".equals(ed.getMax()) && (!mustSupportOnly || ed.getMustSupport())) {
         String id = ed.getId();
@@ -454,7 +466,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
         if (ed.getType().size() == 1 && ed.getType().get(0).getWorkingCode().equals("Extension"))
           id = id + "<br/>"+ed.getType().get(0).getProfile();
         txlist.add(id);
-        txmap.put(id, ed.getBinding());
+        txmap.put(id, ed);
       }
     }
     if (txlist.isEmpty())
@@ -466,7 +478,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
       b.append("<table class=\"list\">\r\n");
       b.append("<tr><td><b>"+translate("sd.tx", "Path")+"</b></td><td><b>"+translate("sd.tx", "Conformance")+"</b></td><td><b>"+translate("sd.tx", hasFixed ? "ValueSet / Code" : "ValueSet")+"</b></td></tr>\r\n");
       for (String path : txlist)  {
-        txItem(txmap, b, path);
+        txItem(txmap, b, path, sd.getUrl());
       }
       b.append("</table>\r\n");
       return b.toString();
@@ -491,55 +503,41 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     return null;
   }
 
-  public void txItem(Map<String, ElementDefinitionBindingComponent> txmap, StringBuilder b, String path) throws FHIRException {
-    ElementDefinitionBindingComponent tx = txmap.get(path);
-    String vss = "";
-    String vsn = "?ext";
+  public void txItem(Map<String, ElementDefinition> txmap, StringBuilder b, String path, String url) throws FHIRException {
+    ElementDefinition ed = txmap.get(path);
+    ElementDefinitionBindingComponent tx = ed.getBinding();
+    BindingResolutionDetails brd = new BindingResolutionDetails("", "?ext");
     if (tx.hasValueSet()) {
-      String uri = tx.getValueSet();
-      String name = getSpecialValueSetName(uri);
-      if (name != null) {
-        vss = "<a href=\""+uri+"\">"+Utilities.escapeXml(name)+"</a>";
-        vsn = name;
-      } else {
-      ValueSet vs = context.fetchResource(ValueSet.class, canonicalise(uri));
-      if (vs == null) {
-        BindingResolution br = igp.resolveActualUrl(uri);
-        if (br.url == null)
-          vss = "<code>"+Utilities.escapeXml(br.display)+"</code>";
-        else if (Utilities.isAbsoluteUrl(br.url))
-          vss = "<a href=\""+br.url+"\">"+Utilities.escapeXml(br.display)+"</a>";
-        else
-          vss = "<a href=\""+prefix+br.url+"\">"+Utilities.escapeXml(br.display)+"</a>";
-      } else { 
-        String p = vs.getUserString("path");
-        if (p == null)
-          vss = "<a href=\"??\">"+Utilities.escapeXml(gt(vs.getNameElement()))+" ("+translate("sd.tx", "missing link")+")</a>";
-        else if (p.startsWith("http:"))
-          vss = "<a href=\""+p+"\">"+Utilities.escapeXml(gt(vs.getNameElement()))+"</a>";
-        else
-          vss = "<a href=\""+p+"\">"+Utilities.escapeXml(gt(vs.getNameElement()))+"</a>";
-        StringType title = vs.hasTitleElement() ? vs.getTitleElement() : vs.getNameElement();
-        if (title != null)
-          vsn = gt(title);
-      }
-      }
+      txDetails(tx, brd, false);
+    } else if (ed.hasUserData(ProfileUtilities.DERIVATION_POINTER)) {
+      ElementDefinitionBindingComponent txi = ((ElementDefinition) ed.getUserData(ProfileUtilities.DERIVATION_POINTER)).getBinding();
+      txDetails(txi, brd, true);
     }
-    if (vsn.equals("?ext"))
+    boolean strengthInh = false;
+    BindingStrength strength = null;
+    if (tx.hasStrength()) {
+      strength = tx.getStrength();
+    } else if (ed.hasUserData(ProfileUtilities.DERIVATION_POINTER)) {
+      ElementDefinitionBindingComponent txi = ((ElementDefinition) ed.getUserData(ProfileUtilities.DERIVATION_POINTER)).getBinding();
+      strength = txi.getStrength();
+      strengthInh = true;
+    }
+          
+    if (brd.vsn.equals("?ext"))
       if (tx.getValueSet() != null)
-        System.out.println("No value set found at "+path+" (url = '"+tx.getValueSet()+"')");
-      else
-        System.out.println("No value set specified at "+path+" (no url)");
+        System.out.println("No value set found at "+url+"#"+path+" (url = '"+tx.getValueSet()+"')");
+      else if (!tx.hasDescription())
+        System.out.println("No value set specified at "+url+"#"+path+" (no url)");
     if (tx.hasUserData("tx.value"))
-      vss = "Fixed Value: "+summariseValue((DataType) tx.getUserData("tx.value"));
+      brd.vss = "Fixed Value: "+summariseValue((DataType) tx.getUserData("tx.value"));
     else if (tx.hasUserData("tx.pattern"))
-      vss = "Pattern: "+summariseValue((DataType) tx.getUserData("tx.pattern"));
+      brd.vss = "Pattern: "+summariseValue((DataType) tx.getUserData("tx.pattern"));
     
-    b.append("<tr><td>").append(path).append("</td><td><a href=\"").append(prefix).append("terminologies.html#").append(tx.getStrength() == null ? "" : egt(tx.getStrengthElement()));
+    b.append("<tr><td>").append(path).append("</td><td><a style=\"opacity: "+opacityStr(strengthInh)+"\" href=\"").append(prefix).append("terminologies.html#").append(strength == null ? "" : egt(tx.getStrengthElement()));
     if (tx.hasDescription())
-      b.append("\">").append(tx.getStrength() == null ? "" : egt(tx.getStrengthElement())).append("</a></td><td title=\"").append(Utilities.escapeXml(tx.getDescription())).append("\">").append(vss);
+      b.append("\">").append(strength == null ? "" : egt(tx.getStrengthElement())).append("</a></td><td title=\"").append(Utilities.escapeXml(tx.getDescription())).append("\">").append(brd.vss);
     else
-      b.append("\">").append(tx.getStrength() == null ? "" : egt(tx.getStrengthElement())).append("</a></td><td>").append(vss);
+      b.append("\">").append(strength == null ? "" : egt(tx.getStrengthElement())).append("</a></td><td>").append(brd.vss);
     if (tx.hasExtension(ToolingExtensions.EXT_MAX_VALUESET)) {
       BindingResolution br = igp.resolveBinding(sd, ToolingExtensions.readStringExtension(tx, ToolingExtensions.EXT_MAX_VALUESET), path);
       b.append("<br/>");
@@ -553,6 +551,41 @@ public class StructureDefinitionRenderer extends BaseRenderer {
       b.append((br.url == null ? Utilities.escapeXml(br.display) : "<a href=\""+ (Utilities.isAbsoluteUrl(br.url) || !igp.prependLinks() ? br.url : prefix+br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>"));
     }      
     b.append("</td></tr>\r\n");
+  }
+
+  public void txDetails(ElementDefinitionBindingComponent tx, BindingResolutionDetails brd, boolean inherited) {
+    String uri = tx.getValueSet();
+    String name = getSpecialValueSetName(uri);
+    if (name != null) {
+      brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\""+uri+"\">"+Utilities.escapeXml(name)+"</a>";
+      brd.vsn = name;
+    } else {
+      ValueSet vs = context.fetchResource(ValueSet.class, canonicalise(uri));
+      if (vs == null) {
+        BindingResolution br = igp.resolveActualUrl(uri);
+        if (br.url == null)
+          brd.vss = "<code>"+Utilities.escapeXml(br.display)+"</code>";
+        else if (Utilities.isAbsoluteUrl(br.url))
+          brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\""+br.url+"\">"+Utilities.escapeXml(br.display)+"</a>";
+        else
+          brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\""+prefix+br.url+"\">"+Utilities.escapeXml(br.display)+"</a>";
+      } else { 
+        String p = vs.getUserString("path");
+        if (p == null)
+          brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\"??\">"+Utilities.escapeXml(gt(vs.getNameElement()))+" ("+translate("sd.tx", "missing link")+")</a>";
+        else if (p.startsWith("http:"))
+          brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\""+p+"\">"+Utilities.escapeXml(gt(vs.getNameElement()))+"</a>";
+        else
+          brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\""+p+"\">"+Utilities.escapeXml(gt(vs.getNameElement()))+"</a>";
+        StringType title = vs.hasTitleElement() ? vs.getTitleElement() : vs.getNameElement();
+        if (title != null)
+          brd.vsn = gt(title);
+      }
+    }
+  }
+
+  private String opacityStr(boolean inherited) {
+    return inherited ? "0.5" : "1.0";
   }
 
   private String getSpecialValueSetName(String uri) {
@@ -1138,9 +1171,9 @@ public class StructureDefinitionRenderer extends BaseRenderer {
 
         String url = getUrlForUri(map.getUri());
         if (url == null)
-          s.append("<a name=\""+map.getIdentity() +"\"> </a><h3>"+translate("sd.maps", "Mappings for %s (%s)", Utilities.escapeXml(gt(map.getNameElement())), map.getUri())+"</h3>");
+          s.append("<a name=\""+map.getIdentity() +"\"> </a><h3>"+translate("sd.maps", "Mappings for %s (%s)", Utilities.escapeXml(gt(map.getNameElement())), Utilities.escapeXml(map.getUri()))+"</h3>");
         else
-          s.append("<a name=\""+map.getIdentity() +"\"> </a><h3>"+translate("sd.maps", "Mappings for %s (<a href=\""+url+"\">%s</a>)", Utilities.escapeXml(gt(map.getNameElement())), map.getUri())+"</h3>");
+          s.append("<a name=\""+map.getIdentity() +"\"> </a><h3>"+translate("sd.maps", "Mappings for %s (<a href=\""+url+"\">%s</a>)", Utilities.escapeXml(gt(map.getNameElement())), Utilities.escapeXml(map.getUri()))+"</h3>");
         if (map.hasComment())
           s.append("<p>"+Utilities.escapeXml(gt(map.getCommentElement()))+"</p>");
 //        else if (specmaps != null && preambles.has(map.getUri()))   
