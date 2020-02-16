@@ -1248,7 +1248,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
   private void initializeFromIg(IniFile ini) throws Exception {
-    loadFromBuildServer();
     configFile = ini.getFileName();
     igMode = true;
     repoRoot = Utilities.getDirectoryForFile(ini.getFileName());
@@ -1676,7 +1675,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       rootDir = new File(rootDir).getCanonicalPath();
     }
 
-    loadFromBuildServer();
     if (configuration.has("template")) {
       template = templateManager.loadTemplate(str(configuration, "template"), rootDir, configuration.has("npm-name") ? configuration.get("npm-name").getAsString() : null, mode == IGBuildMode.AUTOBUILD);
       if (!configuration.has("defaults"))
@@ -2006,16 +2004,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
   }
-  private void loadFromBuildServer() {
-    log("Contacting Build Server...");
-    try {
-      pcm.loadFromBuildServer();
-      log(" ... done");
-    } catch (Throwable e) {
-      log(" ... Running without information from build ("+e.getMessage()+")");
-    }
-  }
-
 
   void handlePreProcess(JsonObject pp, String root) throws Exception {
     String path = Utilities.path(root, str(pp, "folder"));
@@ -2660,8 +2648,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       publishedIg.addFhirVersion(FHIRVersion.fromCode(version));
     if (!publishedIg.hasVersion() && businessVersion != null)
       publishedIg.setVersion(businessVersion);
-    if (publishedIg.hasPackageId())
-      pcm.recordMap(igpkp.getCanonical(), publishedIg.getPackageId());
     
     String id = npmName;
     if (npmName.startsWith("hl7.")) {
