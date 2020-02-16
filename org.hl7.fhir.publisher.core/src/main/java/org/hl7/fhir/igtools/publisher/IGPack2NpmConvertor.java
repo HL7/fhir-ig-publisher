@@ -352,8 +352,6 @@ public class IGPack2NpmConvertor {
           pid = scanner.nextLine().trim();
         }
         d.setPackageId(pid);
-        if (post)
-          pcm.recordMap(d.getUri(), d.getPackageId());
       }
     }
   }
@@ -366,9 +364,7 @@ public class IGPack2NpmConvertor {
     
     String pid = pcm.getPackageId(canonical);
     if (ig.hasPackageId()) {
-      if (Utilities.noString(pid))
-        pcm.recordMap(canonical, ig.getPackageId());
-      else if (!ig.getPackageId().equals(pid))
+      if (!ig.getPackageId().equals(pid))
         throw new FHIRException("package mismatch "+canonical+"="+ig.getPackageId()+" but cache has "+pid);
     } else {
       while (Utilities.noString(pid)) {
@@ -376,7 +372,6 @@ public class IGPack2NpmConvertor {
         pid = scanner.nextLine().trim();
       }
       ig.setPackageId(pid);      
-      pcm.recordMap(canonical, ig.getPackageId());
     }
   }
 
