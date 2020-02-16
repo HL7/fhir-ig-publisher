@@ -49,6 +49,7 @@ import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
 import org.hl7.fhir.utilities.cache.PackageCacheManager;
 import org.hl7.fhir.utilities.cache.PackageCacheManager.VersionHistory;
+import org.hl7.fhir.utilities.json.JSONUtil;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
@@ -57,6 +58,10 @@ import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode.Location;
+
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+
 import org.hl7.fhir.utilities.xhtml.XhtmlParser;
 
 //import org.owasp.html.Handler;
@@ -177,6 +182,7 @@ public class HTLMLInspector {
   private List<String> igs;
   private PackageCacheManager pcm;
   private Map<String, SpecMapManager> otherSpecs = new HashMap<String, SpecMapManager>();
+  private Map<String, String> specList = new HashMap<>();
   private List<String> errorPackages = new ArrayList<>();
   private String canonical;
 
@@ -564,47 +570,53 @@ public class HTLMLInspector {
         }
       }
     }
-    if (!resolved)
-      for (String url : pcm.getUrls()) {
-        if (!"http://hl7.org/fhir".equals(url)) {
-          if (matchesTarget(ref, url))
-            resolved = true;
-          if (ref.startsWith(url) && !errorPackages.contains(url)) {
-            // now, iterate the package list to see if we have a version match
-            VersionHistory vers = null; 
-            try {
-              vers = pcm.listVersions(url);
-            } catch (Exception e) {
-              errorPackages.add(url);
-              System.out.println("Error #1 checking links for "+url+": "+e.getMessage()+" (resolving "+ref+")");
-            }
-            if (vers != null) {
-              for (String ver : vers.getVersions().keySet()) {
-                String v = vers.getId()+"#"+ver;
-                if (!errorPackages.contains(v)) {
-                  try {
-                    if (ref.startsWith(vers.getVersions().get(ver))) {
-                      SpecMapManager sm = otherSpecs.get(v);
-                      if (sm == null) {
-                        sm = loadSpecMap(vers.getId(), ver, vers.getVersions().get(ver));
-                        otherSpecs.put(v, sm);
-                      }
-                      if (sm.getBase().equals(rref) || (sm.getBase()).equals(rref+"/") || sm.hasTarget(rref)) {
-                        resolved = true;
-                        break;
-                      }
-                    }
-                  } catch (Exception e) {
-                    errorPackages.add(v);
-                    System.out.println("Error #2 checking links for "+v+": "+e.getMessage()+" (resolving "+ref+")");
-                  }
-                }
-              }
-            }
-          }
-        }
+    if (!resolved) {
+      if (specList.isEmpty()) {
+        pcm.listAllIds(specList);
       }
-
+//      for (String id : specList.keySet()) {
+//        String url = specList.get(id);
+//        if (!"http://hl7.org/fhir".equals(url)) {
+//          if (matchesTarget(ref, url))
+//            resolved = true;
+//          if (ref.startsWith(url) && !errorPackages.contains(url)) {
+//            // now, iterate the package list to see if we have a version match
+//            JsonObject plist = null; 
+//            try {
+//              plist = fetchJson(Utilities.pathURL(url, "package-list.json"));
+//            } catch (Exception e) {
+//              errorPackages.add(url);
+//              System.out.println("Error #1 checking links for "+url+": "+e.getMessage()+" (resolving "+ref+")");
+//            }
+//            if (plist != null) {
+//              for (JsonElement vere : plist.getAsJsonArray("list")) {
+//                JsonObject ver = (JsonObject) vere;
+//                String sver = JSONUtil.str(ver, "version");
+//                String v = JSONUtil.str(plist, "package-id")+"#"+sver;
+//                if (!errorPackages.contains(v)) {
+//                  try {
+//                    if (ref.startsWith(JSONUtil.str(ver, "url"))) {
+//                      SpecMapManager sm = otherSpecs.get(v);
+//                      if (sm == null) {
+//                        sm = loadSpecMap(JSONUtil.str(plist, "package-id"), sver, JSONUtil.str(ver, "url"));
+//                        otherSpecs.put(v, sm);
+//                      }
+//                      if (sm.getBase().equals(rref) || (sm.getBase()).equals(rref+"/") || sm.hasTarget(rref)) {
+//                        resolved = true;
+//                        break;
+//                      }
+//                    }
+//                  } catch (Exception e) {
+//                    errorPackages.add(v);
+//                    System.out.println("Error #2 checking links for "+v+": "+e.getMessage()+" (resolving "+ref+")");
+//                  }
+//                }
+//              }
+//            }
+//          }
+//        }
+//      }
+    }
     if (resolved) {
       return false;
     } else {
@@ -613,6 +625,13 @@ public class HTLMLInspector {
       messages.add(new ValidationMessage(Source.LinkChecker, IssueType.NOTFOUND, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The link '"+ref+"' for \""+text.replaceAll("[\\s\\n]+", " ").trim()+"\" cannot be resolved"+tgtList, IssueSeverity.ERROR).setLocationLink(uuid == null ? null : makeLocal(filename)+"#"+uuid));
       return true;
     } 
+  }
+
+
+  private JsonObject fetchJson(String source) throws IOException {
+    URL url = new URL(source);
+    URLConnection c = url.openConnection();
+    return (JsonObject) new com.google.gson.JsonParser().parse(TextFile.streamToString(c.getInputStream()));
   }
 
   private boolean matchesTarget(String ref, String... url) {
