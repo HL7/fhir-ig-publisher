@@ -535,7 +535,7 @@ public class HTLMLInspector {
           matchesTarget(ref, "http://hl7.org", "http://hl7.org/fhir/DSTU2", "http://hl7.org/fhir/STU3", "http://hl7.org/fhir/R4", "http://hl7.org/fhir/smart-app-launch", "http://hl7.org/fhir/validator");
     
     if (!resolved) {
-      if (rref.startsWith("http://") || rref.startsWith("https://") || rref.startsWith("ftp://")) {
+      if (rref.startsWith("http://") || rref.startsWith("https://") || rref.startsWith("ftp://") || rref.startsWith("tel:")) {
         resolved = true;
         if (specs != null) {
           for (SpecMapManager spec : specs) {
@@ -571,9 +571,9 @@ public class HTLMLInspector {
       }
     }
     if (!resolved) {
-      if (specList.isEmpty()) {
-        pcm.listAllIds(specList);
-      }
+//      if (specList.isEmpty()) {
+//        pcm.listAllIds(specList);
+//      }
 //      for (String id : specList.keySet()) {
 //        String url = specList.get(id);
 //        if (!"http://hl7.org/fhir".equals(url)) {
