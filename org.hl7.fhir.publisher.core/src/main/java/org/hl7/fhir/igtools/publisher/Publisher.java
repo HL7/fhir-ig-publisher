@@ -102,6 +102,7 @@ import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.exceptions.PathEngineException;
 import org.hl7.fhir.igtools.publisher.FetchedFile.FetchedBundleType;
 import org.hl7.fhir.igtools.publisher.IFetchFile.FetchState;
+import org.hl7.fhir.igtools.publisher.Publisher.IGBuildMode;
 import org.hl7.fhir.igtools.publisher.Publisher.JsonDependency;
 import org.hl7.fhir.igtools.publisher.Publisher.ListItemEntry;
 import org.hl7.fhir.igtools.publisher.Publisher.ListViewSorterById;
@@ -4596,7 +4597,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     FileUtils.copyFile(new File(Utilities.path(outputDir, "validator.pack")),new File(Utilities.path(outputDir, "validator-" + sourceIg.getId() + ".pack")));
     generateCsvZip();
     generateExcelZip();
-    generateRegistryUploadZip(df.getCanonicalPath());
+//    generateRegistryUploadZip(df.getCanonicalPath());
   }
 
   private boolean supportsTurtle() {
@@ -7045,7 +7046,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
 
-  private static String determineActualIG(String ig, IGBuildMode mode) throws Exception {
+  public static String determineActualIG(String ig, IGBuildMode mode) throws Exception {
     File f = new File(ig);
     if (!f.exists() && mode == IGBuildMode.AUTOBUILD) {
       String s = Utilities.getDirectoryForFile(ig);
@@ -7278,6 +7279,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           example.getFoundProfiles().add(profile.getUrl());
         }
       }
+    }
+    
+  }
+
+  public static void publishDirect(String path) throws Exception {
+    Publisher self = new Publisher();
+    self.setConfigFile(Publisher.determineActualIG(path, IGBuildMode.PUBLICATION));
+    self.execute();
+    if (self.countErrs(self.errors) > 0) {
+      throw new Exception("Building IG '"+path+"' caused an error");
     }
     
   }
