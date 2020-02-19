@@ -299,6 +299,9 @@ public class FeedBuilder {
         String desc = JSONUtil.str(v, "desc");
         if (Utilities.noString(desc))
           desc = JSONUtil.str(v, "descmd");
+        if (!v.has("date")) {
+          System.out.println("no date - "+version+" in "+f.getAbsolutePath());
+        }
         String date = JSONUtil.str(v, "date");
         String path = JSONUtil.str(v, "path");
         String status = JSONUtil.str(v, "status");

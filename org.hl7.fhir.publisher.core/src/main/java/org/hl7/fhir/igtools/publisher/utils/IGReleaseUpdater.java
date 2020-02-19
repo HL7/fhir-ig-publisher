@@ -53,7 +53,7 @@ import com.google.gson.JsonPrimitive;
 public class IGReleaseUpdater {
 
   public enum ServerType {
-    APACHE, ASP1, ASP2;
+    APACHE, ASP1, ASP2, LITESPEED;
 
     public static ServerType fromCode(String st) {
       st = st.toLowerCase();
@@ -63,6 +63,8 @@ public class IGReleaseUpdater {
         return ServerType.ASP2;
       else if (st.equals("apache"))
         return ServerType.APACHE;
+      else if (st.equals("litespeed"))
+        return ServerType.LITESPEED;
       else 
         throw new Error("-server-type "+st+" not known - use ASP or Apache");
     }
@@ -270,6 +272,8 @@ public class IGReleaseUpdater {
       rb.buildNewAspRedirections(isCore, isCore && vf.equals(rootFolder));
     else if (serverType == ServerType.ASP1)
       rb.buildOldAspRedirections();
+    else if (serverType == ServerType.LITESPEED)
+      rb.buildLitespeedRedirections();
     else if (!canonical.contains("hl7.org/fhir"))
       rb.buildApacheRedirections();
     else

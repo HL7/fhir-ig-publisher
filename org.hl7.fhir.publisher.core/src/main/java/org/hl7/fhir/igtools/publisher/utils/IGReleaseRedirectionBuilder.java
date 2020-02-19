@@ -281,12 +281,45 @@ public class IGReleaseRedirectionBuilder {
     }
   }
 
+  public void buildLitespeedRedirections() throws IOException {
+    Map<String, String> map = createMap(false);
+    if (map != null) {
+      for (String s : map.keySet()) {
+        File of = new File(Utilities.path(folder, s, "index.asp"));
+        if (of.exists()) {
+          of.delete();
+        }
+        String path = Utilities.path(folder, s, "index.php");
+        String p = s.replace("/", "-");
+        String litPath = Utilities.path(folder, p)+".html";
+        if (!new File(litPath+".xml").exists() && !new File(litPath+".json").exists()) 
+          litPath = Utilities.path(folder, tail(map.get(s)));
+        File file = new File(Utilities.changeFileExt(litPath, ".xml"));
+        if (file.exists() && new File(Utilities.changeFileExt(litPath, ".json")).exists()) {
+          createLitespeedRedirect(path, map.get(s), Utilities.pathURL(vpath, head(file.getName())));
+        }
+      }
+    }
+  }
+
   private String head(String name) {
     return name.substring(0, name.indexOf("."));
   }
 
   private String tail(String name) {
     return name.substring(name.lastIndexOf("/")+1);
+  }
+
+  private void createLitespeedRedirect(String path, String urlHtml, String urlSrc) throws IOException {
+    String t = PHP_TEMPLATE;
+    t = t.replace("{{html}}", urlHtml);
+    t = t.replace("{{literal}}", urlSrc);
+    Utilities.createDirectory(Utilities.getDirectoryForFile(path));
+    countTotal++;
+    if (!new File(path).exists() || !TextFile.fileToString(path).equals(t)) {
+      TextFile.stringToFile(t, path, false);
+      countUpdated++;
+    }
   }
 
   private void createAspRedirect(String path, String urlHtml, String urlSrc) throws IOException {
