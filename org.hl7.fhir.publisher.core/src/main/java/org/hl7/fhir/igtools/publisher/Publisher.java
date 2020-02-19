@@ -35,6 +35,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.lang.reflect.InvocationTargetException;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Paths;
@@ -2470,7 +2471,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private JsonObject fetchJson(String source) throws IOException {
     URL url = new URL(source+"?nocache=" + System.currentTimeMillis());
-    URLConnection c = url.openConnection();
+    HttpURLConnection c = (HttpURLConnection) url.openConnection();
+    c.setInstanceFollowRedirects(true);
     return JsonTrackingParser.parseJson(c.getInputStream());
   }
 
