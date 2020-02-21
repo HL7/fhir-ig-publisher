@@ -203,12 +203,15 @@ public class ConfigFileConverter {
         String igver = ostr(dep, "version");
         String packageId = ostr(dep, "package");
 
-        if (Utilities.noString(packageId))
+        if (Utilities.noString(packageId)) {
           packageId = pcm.getPackageId(canonical);
-        if (Utilities.noString(canonical) && !Utilities.noString(packageId))
+        }
+        if (Utilities.noString(canonical) && !Utilities.noString(packageId)) {
           canonical = pcm.getPackageUrl(packageId);
-        if (Utilities.noString(canonical))
+        }
+        if (Utilities.noString(canonical)) {
           throw new Exception("You must specify a canonical URL for the IG "+name);
+        }
 
         ImplementationGuideDependsOnComponent igd = ig.addDependsOn();
         igd.setId(name);
