@@ -306,7 +306,7 @@ public class TemplateReleaser {
     List<VersionDecision> res = new ArrayList<TemplateReleaser.VersionDecision>();
     for (String s : oldList.keySet()) {
       if (!newList.containsKey(s)) {
-        throw new Exception("Existing template "+s+" not found in release set");
+        throw new Exception("Existing template "+s+" not found in release set ("+newList.keySet()+")");
       }
       VersionDecision vd = new VersionDecision();
       res.add(vd);
