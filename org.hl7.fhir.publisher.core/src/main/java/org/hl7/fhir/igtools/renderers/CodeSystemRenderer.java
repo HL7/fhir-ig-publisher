@@ -110,7 +110,7 @@ public class CodeSystemRenderer extends BaseRenderer {
     case EXAMPLE: return translate("cs.summary", "A few representative concepts are included in the code system resource");
     case FRAGMENT: return translate("cs.summary", "A subset of the code system concepts are included in the code system resource");
     }
-    return "?? illegal status";
+    return "?? illegal content status value "+(content == null ? "(null)" : content.toCode());
   }
 
   public String content(Set<String> outputTracker) throws EOperationOutcome, FHIRException, IOException, org.hl7.fhir.exceptions.FHIRException  {

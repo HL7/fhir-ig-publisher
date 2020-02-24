@@ -589,7 +589,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
   }
 
   private String getSpecialValueSetName(String uri) {
-    if (uri.startsWith("http://loinc.org/vs/"))
+    if (uri != null && uri.startsWith("http://loinc.org/vs/"))
       return "LOINC "+uri.substring(20);
     return null;
   }

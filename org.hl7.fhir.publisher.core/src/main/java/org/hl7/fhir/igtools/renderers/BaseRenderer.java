@@ -132,6 +132,9 @@ public class BaseRenderer extends TranslatingUtilities {
   }
 
   protected String canonicalise(String uri) {
+    if (uri == null) {
+      return null;
+    }
     if (!uri.startsWith("http:") && !uri.startsWith("https:"))
       return igp.getCanonical()+"/"+uri;
     else

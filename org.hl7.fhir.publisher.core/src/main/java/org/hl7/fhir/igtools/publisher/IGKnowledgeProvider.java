@@ -580,21 +580,23 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
 
   public BindingResolution resolveActualUrl(String uri) {
     BindingResolution br = new BindingResolution();
-    if (uri.startsWith("http://loinc.org/vs/")) {
-      String code = tail(uri);
-      if (code.startsWith("LL")) {
-        br.url = "https://r.details.loinc.org/AnswerList/"+code+".html";
-        br.display = "LOINC Answer List "+code;
+    if (uri != null) {
+      if (uri.startsWith("http://loinc.org/vs/")) {
+        String code = tail(uri);
+        if (code.startsWith("LL")) {
+          br.url = "https://r.details.loinc.org/AnswerList/"+code+".html";
+          br.display = "LOINC Answer List "+code;
+        } else {
+          br.url = "https://r.details.loinc.org/LOINC/"+code+".html";
+          br.display = "LOINC "+code;
+        }
+      } else if (uri.startsWith("urn:")) {
+        br.url = null;
+        br.display = uri;
       } else {
-        br.url = "https://r.details.loinc.org/LOINC/"+code+".html";
-        br.display = "LOINC "+code;
+        br.url = uri;
+        br.display = uri;
       }
-    } else if (uri.startsWith("urn:")) {
-      br.url = null;
-      br.display = uri;
-    } else {
-      br.url = uri;
-      br.display = uri;
     }
     return br;
   }
