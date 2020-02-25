@@ -239,16 +239,19 @@ public class TemplateManager {
         return pcm.loadPackage(p[0], p[1]);
       }
       File f = new File(template);
-      if (f.exists())
-        if (f.isDirectory())
+      if (f.exists()) {
+        if (f.isDirectory()) {
           return NpmPackage.fromFolder(template);
-        else
+        } else {
           return NpmPackage.fromPackage(new FileInputStream(template));
+        }
+      }
       if (template.startsWith("https://github.com") || template.startsWith("http://github.com")) {
-        if (template.startsWith("http://github.com"))
+        if (template.startsWith("http://github.com")) {
           template = template.replace("http://github.com", "https://github.com");
+        }
 
-        URL url = new URL(Utilities.pathURL(template, "archive", "master.zip"));
+        URL url = new URL(zipUrl(template));
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setRequestMethod("GET");
         InputStream zip = connection.getInputStream();
@@ -257,6 +260,19 @@ public class TemplateManager {
       throw new FHIRException("Unable to load template from "+template);
     } catch (Exception e) {
       throw new FHIRException("Error loading template "+template+": "+e.getMessage(), e);
+    }
+  }
+
+  private String zipUrl(String template) {
+    if (!template.startsWith("https://github.com")) {
+      throw new FHIRException("Cannot refer to a template by URL unless referring to a github repository: "+template);
+    } else if (Utilities.charCount(template, '/') == 4) {
+      return Utilities.pathURL(template, "archive", "master.zip");      
+    } else if (Utilities.charCount(template, '/') == 6) {
+      String[] p = template.split("\\/");
+      return Utilities.pathURL("https://github.com", p[3], p[4], "archive", p[6]+".zip");      
+    } else {
+      throw new FHIRException("Template syntax in URL referring to a github repository was not understood: "+template);
     }
   }
   
