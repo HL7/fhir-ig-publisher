@@ -110,7 +110,7 @@ public class TemplateManager {
     Set<String> ext = new HashSet<>();
     boolean noScripts = true;
     JsonObject config = null;
-    if (npm.hasFile("package\\$root", "config.json")) {
+    if (npm.hasFile(Utilities.path("package", "$root"), "config.json")) {
       config = JsonTrackingParser.parseJson(npm.load(Utilities.path("package", "$root"), "config.json"));
       configs.add(config);
       noScripts = !config.has("script") && !config.has("targets");
