@@ -1532,9 +1532,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.setAnyExtensionsAllowed(anyExtensionsAllowed);
     validator.setAllowExamples(true);
     
-    pvalidator = new ProfileValidator();
+    pvalidator = new ProfileValidator(context);
     pvalidator.setContext(context);
-    csvalidator = new CodeSystemValidator();
+    csvalidator = new CodeSystemValidator(context);
     pvalidator.setCheckAggregation(checkAggregation);
     pvalidator.setCheckMustSupport(hintAboutNonMustSupport);
     validator.setShowMessagesFromReferences(showReferenceMessages);
@@ -1878,9 +1878,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.setAnyExtensionsAllowed(bool(configuration, "anyExtensionsAllowed"));
     validator.setAllowExamples(true);
     
-    pvalidator = new ProfileValidator();
+    pvalidator = new ProfileValidator(context);
     pvalidator.setContext(context);
-    csvalidator = new CodeSystemValidator();
+    csvalidator = new CodeSystemValidator(context);
     if (configuration.has("check-aggregation") && configuration.get("check-aggregation").getAsBoolean())
       pvalidator.setCheckAggregation(true);
     if (configuration.has("check-mustSupport") && configuration.get("check-mustSupport").getAsBoolean())

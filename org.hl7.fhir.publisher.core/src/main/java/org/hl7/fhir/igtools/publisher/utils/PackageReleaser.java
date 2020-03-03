@@ -31,16 +31,33 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
+import org.hl7.fhir.convertors.R3ToR5Loader;
+import org.hl7.fhir.convertors.R4ToR5Loader;
+import org.hl7.fhir.convertors.VersionConvertor_10_30;
+import org.hl7.fhir.convertors.VersionConvertor_10_40;
+import org.hl7.fhir.convertors.VersionConvertor_14_50;
+import org.hl7.fhir.convertors.VersionConvertor_30_40;
+import org.hl7.fhir.convertors.VersionConvertor_30_50;
+import org.hl7.fhir.convertors.VersionConvertor_40_50;
+import org.hl7.fhir.dstu2.formats.JsonParser;
+import org.hl7.fhir.dstu2.model.StructureDefinition;
+import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.IGVersionUtil;
 import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.publisher.Publisher.CacheOption;
 import org.hl7.fhir.igtools.publisher.Publisher.IGBuildMode;
 import org.hl7.fhir.igtools.publisher.utils.PackageReleaser.VersionDecision;
+import org.hl7.fhir.r5.context.SimpleWorkerContext;
+import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.r5.utils.StructureMapUtilities;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
+import org.hl7.fhir.utilities.cache.PackageCacheManager;
+import org.hl7.fhir.utilities.cache.ToolsVersion;
 import org.hl7.fhir.utilities.json.JSONUtil;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.hl7.fhir.utilities.xml.XMLUtil;
@@ -126,8 +143,13 @@ public class PackageReleaser {
   private Document rss;
   private Element channel;
   private String linkRoot;
+  private org.hl7.fhir.r4.context.SimpleWorkerContext r4;
+  private org.hl7.fhir.dstu3.context.SimpleWorkerContext r3;
 
   private File xml;
+  private IniFile config;
+
+  private PackageCacheManager pcm;
 
 
   // 2 parameters: source of package, package dest folder
@@ -135,7 +157,7 @@ public class PackageReleaser {
     try {
       new PackageReleaser().release(args[0], args[1]);
     } catch (Throwable e) {
-      System.out.println("Error releasing templates from "+args[0]+" to "+args[1]+":");
+      System.out.println("Error releasing packages from "+args[0]+" to "+args[1]+":");
       System.out.println(e.getMessage());
       System.out.println("");
       e.printStackTrace();
@@ -143,6 +165,13 @@ public class PackageReleaser {
   }
 
   private void release(String source, String dest) throws Exception {
+    pcm = new PackageCacheManager(true, ToolsVersion.TOOLS_VERSION);
+    System.out.println("Load hl7.fhir.r4.core");
+    r4 = org.hl7.fhir.r4.context.SimpleWorkerContext.fromPackage(pcm.loadPackage("hl7.fhir.r4.core", "4.0.1"));
+    System.out.println("Load hl7.fhir.r3.core");
+    r3 = org.hl7.fhir.dstu3.context.SimpleWorkerContext.fromPackage(pcm.loadPackage("hl7.fhir.r3.core", "3.0.2"));
+    System.out.println("Scanning...");
+
     SimpleDateFormat df = new SimpleDateFormat(RSS_DATE, new Locale("en", "US"));
     checkDest(dest);
     Map<String, String> currentPublishedVersions = scanForCurrentVersions(dest);
@@ -158,6 +187,8 @@ public class PackageReleaser {
     System.out.println("Do you want to continue [y/n]");
     int r = System.in.read();
     if (r == 'y') {
+      config = new IniFile(Utilities.path(source, "config.ini"));
+      
       // now: for any implicit upgrades, set up the package-list.json
       System.out.println("Updating Package Lists");
       for (VersionDecision vd : versionsList) {
@@ -178,31 +209,47 @@ public class PackageReleaser {
       }
       System.out.println("Building Packages");
       for (VersionDecision vd : versionsList) {
-        if (!vd.built) {
+        if (!vd.built && vd.type != VersionChangeType.NONE) {
           build(source, vd, versionsList);
         }
       }
       System.out.println("Finished Building IGs");
-    
-      System.out.println("Releasing Packages");
-      for (VersionDecision vd : versionsList) {
-        if (vd.type != VersionChangeType.NONE) {
-          release(dest, source, vd, df);
+//       if (true) { throw new Error("bang!"); }
+      
+        System.out.println("Releasing Packages");
+        for (VersionDecision vd : versionsList) {
+          if (vd.type != VersionChangeType.NONE) {
+            release(dest, source, vd, df);
+          }
         }
-      }
+        updatePackagesList(dest, versionsList);
 
-      System.out.println("Reset Packages");
-      for (VersionDecision vd : versionsList) {
-        resetVersions(source, vd, versionsList);
+        System.out.println("Reset Packages");
+        for (VersionDecision vd : versionsList) {
+          resetVersions(source, vd, versionsList);
+        }
+        Element lbd = XMLUtil.getNamedChild(channel, "lastBuildDate");
+        lbd.setTextContent(df.format(new Date()));
+        File bak = new File(Utilities.changeFileExt(xml.getAbsolutePath(),  ".bak"));
+        if (bak.exists())
+          bak.delete();
+        xml.renameTo(bak);
+        saveXml(new FileOutputStream(xml));  
+        System.out.println("Published");
+    }
+  }
+
+  private void updatePackagesList(String dest, List<VersionDecision> versionsList) throws IOException {
+    boolean save = false;
+    JsonObject pl = JsonTrackingParser.parseJson(new File(Utilities.path(dest, "package-list.json")));
+    for (VersionDecision vd : versionsList) {
+      if (!pl.getAsJsonObject("packages").has(vd.getId())) {
+        pl.getAsJsonObject("packages").addProperty(vd.getId(), Utilities.pathURL("http://fhir.org/packages/", vd.getId()));
+        save = true;
       }
-      Element lbd = XMLUtil.getNamedChild(channel, "lastBuildDate");
-      lbd.setTextContent(df.format(new Date()));
-      File bak = new File(Utilities.changeFileExt(xml.getAbsolutePath(),  ".bak"));
-      if (bak.exists())
-        bak.delete();
-      xml.renameTo(bak);
-      saveXml(new FileOutputStream(xml));  
-      System.out.println("Published");
+    }    
+    if (save) {
+      JsonTrackingParser.write(pl, new File(Utilities.path(dest, "package-list.json")));
     }
   }
 
@@ -210,19 +257,170 @@ public class PackageReleaser {
     List<String> dependendencies = listDependencies(source, vd.getId());
     for (String s : dependendencies) {
       VersionDecision v = findVersion(versions, s);
-      if (!v.built) {
+      if (v != null && !v.built) {
         build(source, v, versions);
       }
     }
-    makePackage(Utilities.path(source, vd.getId()));
+    makePackage(Utilities.path(source, vd.getId()), vd.getId());
   }
 
-  private void makePackage(String path) throws IOException {
-    // first, do we need to do any prep?
-    
-    // now, actully make the tgz file
-    NpmPackage npm = NpmPackage.fromFolder(path);
-    npm.save(new FileOutputStream(Utilities.path(path, "output", "package.tgz")));
+  private void makePackage(String path, String id) throws IOException {
+    try {
+      if (config.hasSection(id)) {
+        String v = config.getStringProperty(id, "version");
+        makeResources(config.getStringProperty(id, "r2-source"), "1.0", v, path);
+        makeResources(config.getStringProperty(id, "r2b-source"), "1.4", v, path);
+        makeResources(config.getStringProperty(id, "r3-source"), "3.0", v, path);
+        makeResources(config.getStringProperty(id, "r4-source"), "4.0", v, path);
+        makeR2Structures(path, v);
+        makeR3Structures(path, v);
+        makeR4Structures(path, v);
+      }
+      // now, actully make the tgz file
+      Utilities.clearDirectory(Utilities.path(path, "output"));
+      new File(Utilities.path(path, "output")).delete();
+
+      NpmPackage npm = NpmPackage.fromFolder(path);
+      npm.loadAllFiles();
+      Utilities.createDirectory(Utilities.path(path, "output"));
+      npm.save(new FileOutputStream(Utilities.path(path, "output", "package.tgz")));
+    } catch (Throwable e) {
+      throw new IOException("Error processing "+path+": "+e.getMessage(), e);
+    }
+  }
+
+  private void makeR2Structures(String path, String outVer) throws FHIRException, IOException {
+    NpmPackage npm = pcm.loadPackage("hl7.fhir.r2.core", null);
+    for (String id : npm.listResources("StructureDefinition")) {
+      StructureDefinition sd = (StructureDefinition) new JsonParser().parse(npm.loadResource(id));
+      sd.setId("r2-"+sd.getId());
+      sd.setUrl(sd.getUrl().substring(0, 20)+"2.0/"+sd.getUrl().substring(20));
+      String filename = Utilities.path(path, "package", sd.fhirType()+"-"+sd.getId()+".json");
+      if ("1.0".equals(outVer)) {
+        new org.hl7.fhir.dstu2.formats.JsonParser().compose(new FileOutputStream(filename), sd);
+      } else if ("3.0".equals(outVer)) {
+        org.hl7.fhir.dstu3.model.Resource r3 = VersionConvertor_10_30.convertResource(sd);
+        new org.hl7.fhir.dstu3.formats.JsonParser().compose(new FileOutputStream(filename), r3);
+      } else if ("4.0".equals(outVer)) {
+        org.hl7.fhir.r4.model.Resource r4 = VersionConvertor_10_40.convertResource(sd);
+        new org.hl7.fhir.r4.formats.JsonParser().compose(new FileOutputStream(filename), r4);
+      } else {
+        throw new Error("Unknown version "+outVer);
+      }      
+    }
+  }
+
+  private void makeR3Structures(String path, String outVer) throws FHIRException, IOException {
+    NpmPackage npm = pcm.loadPackage("hl7.fhir.r3.core", null);
+    for (String id : npm.listResources("StructureDefinition")) {
+      org.hl7.fhir.dstu3.model.StructureDefinition sd = (org.hl7.fhir.dstu3.model.StructureDefinition) new org.hl7.fhir.dstu3.formats.JsonParser().parse(npm.loadResource(id));
+      sd.setId("r3-"+sd.getId());
+      sd.setUrl(sd.getUrl().substring(0, 20)+"3.0/"+sd.getUrl().substring(20));
+      String filename = Utilities.path(path, "package", sd.fhirType()+"-"+sd.getId()+".json");
+      if ("1.0".equals(outVer)) {
+        org.hl7.fhir.dstu2.model.Resource r2 = VersionConvertor_10_30.convertResource(sd);
+        new org.hl7.fhir.dstu2.formats.JsonParser().compose(new FileOutputStream(filename), r2);
+      } else if ("3.0".equals(outVer)) {
+        new org.hl7.fhir.dstu3.formats.JsonParser().compose(new FileOutputStream(filename), sd);
+      } else if ("4.0".equals(outVer)) {
+        org.hl7.fhir.r4.model.Resource r4 = VersionConvertor_30_40.convertResource(sd, false);
+        new org.hl7.fhir.r4.formats.JsonParser().compose(new FileOutputStream(filename), r4);
+      } else {
+        throw new Error("Unknown version "+outVer);
+      }      
+    }
+  }
+
+  private void makeR4Structures(String path, String outVer) throws FHIRException, IOException {
+    NpmPackage npm = pcm.loadPackage("hl7.fhir.r4.core", null);
+    for (String id : npm.listResources("StructureDefinition")) {
+      org.hl7.fhir.r4.model.StructureDefinition sd = (org.hl7.fhir.r4.model.StructureDefinition) new org.hl7.fhir.r4.formats.JsonParser().parse(npm.loadResource(id));
+      sd.setId("r4-"+sd.getId());
+      sd.setUrl(sd.getUrl().substring(0, 20)+"4.0/"+sd.getUrl().substring(20));
+      String filename = Utilities.path(path, "package", sd.fhirType()+"-"+sd.getId()+".json");
+      if ("1.0".equals(outVer)) {
+        org.hl7.fhir.dstu2.model.Resource r2 = VersionConvertor_10_40.convertResource(sd);
+        new org.hl7.fhir.dstu2.formats.JsonParser().compose(new FileOutputStream(filename), r2);
+      } else if ("3.0".equals(outVer)) {
+        org.hl7.fhir.dstu3.model.Resource r3 = VersionConvertor_30_40.convertResource(sd, false);
+        new org.hl7.fhir.dstu3.formats.JsonParser().compose(new FileOutputStream(filename), r3);
+      } else if ("4.0".equals(outVer)) {
+        new org.hl7.fhir.r4.formats.JsonParser().compose(new FileOutputStream(filename), sd);
+      } else {
+        throw new Error("Unknown version "+outVer);
+      }      
+    }
+  }
+
+  private void makeResources(String src, String inVer, String outVer, String dest) throws IOException, Error {
+    if (src != null) {
+      String[] srcs = src.split("\\,");
+      for (String s : srcs) {
+        File srcF = new File(Utilities.path(dest, s));
+        makeResources(srcF, inVer, outVer, dest);
+      }
+    }
+  }
+
+  private void makeResources(File srcF, String inVer, String outVer, String dest) throws FHIRFormatError, FileNotFoundException, IOException {
+    for (File f : srcF.listFiles()) {
+      if (f.isDirectory()) {
+        makeResources(f,  inVer, outVer, dest);
+      } else if (Utilities.existsInList(Utilities.getFileExtension(f.getName()), "map", "xml", "json")) {
+        try {
+          Resource r = parseResource(f, inVer);
+          String filename = Utilities.path(dest, "package", r.fhirType()+"-"+r.getId()+".json");
+          if ("1.4".equals(outVer)) {
+            org.hl7.fhir.dstu2016may.model.Resource r2b = VersionConvertor_14_50.convertResource(r);
+            new org.hl7.fhir.dstu2016may.formats.JsonParser().compose(new FileOutputStream(filename), r2b);
+          } else if ("3.0".equals(outVer)) {
+            org.hl7.fhir.dstu3.model.Resource r3 = VersionConvertor_30_50.convertResource(r, false);
+            new org.hl7.fhir.dstu3.formats.JsonParser().compose(new FileOutputStream(filename), r3);
+          } else if ("4.0".equals(outVer)) {
+            org.hl7.fhir.r4.model.Resource r4 = VersionConvertor_40_50.convertResource(r);
+            new org.hl7.fhir.r4.formats.JsonParser().compose(new FileOutputStream(filename), r4);
+          } else {
+            throw new Error("Unknown version "+outVer);
+          }
+        } catch (Exception e) {
+          throw new FHIRException("Exception processing "+f.getName()+": "+e.getMessage(), e);
+        }
+      }
+    }
+  }
+
+  private Resource parseResource(File f, String ver) throws FHIRFormatError, FileNotFoundException, IOException {
+    if ("1.4".equals(ver)) {
+      org.hl7.fhir.dstu2016may.model.Resource r;
+      if (f.getName().endsWith(".xml")) {
+        r = new org.hl7.fhir.dstu2016may.formats.XmlParser().parse(new FileInputStream(f));
+      } else { // if (f.getName().endsWith(".json")) {
+        r = new org.hl7.fhir.dstu2016may.formats.JsonParser().parse(new FileInputStream(f));
+      }
+      return VersionConvertor_14_50.convertResource(r);
+    } else if ("3.0".equals(ver)) {
+      org.hl7.fhir.dstu3.model.Resource r;
+      if (f.getName().endsWith(".map")) {
+        r = new org.hl7.fhir.dstu3.utils.StructureMapUtilities(r3).parse(TextFile.fileToString(f));
+      } else if (f.getName().endsWith(".xml")) {
+        r = new org.hl7.fhir.dstu3.formats.XmlParser().parse(new FileInputStream(f));
+      } else { // if (f.getName().endsWith(".json")) {
+        r = new org.hl7.fhir.dstu3.formats.JsonParser().parse(new FileInputStream(f));
+      }
+      return VersionConvertor_30_50.convertResource(r, false);
+    } else if ("4.0".equals(ver)) {
+      org.hl7.fhir.r4.model.Resource r;
+      if (f.getName().endsWith(".map")) {
+        r = new org.hl7.fhir.r4.utils.StructureMapUtilities(r4).parse(TextFile.fileToString(f), f.getName());
+      } else if (f.getName().endsWith(".xml")) {
+        r = new org.hl7.fhir.r4.formats.XmlParser().parse(new FileInputStream(f));
+      } else { // if (f.getName().endsWith(".json")) {
+        r = new org.hl7.fhir.r4.formats.JsonParser().parse(new FileInputStream(f));
+      }
+      return VersionConvertor_40_50.convertResource(r);
+    } else {
+      throw new Error("Unknown version "+ver);
+    }
   }
 
   private void updateVersions(String source, VersionDecision vd, List<VersionDecision> versionsList) throws FileNotFoundException, IOException {
@@ -491,7 +689,7 @@ public class PackageReleaser {
     String version = npm.version();
     check(pid != null, "Source Package "+p.getAbsolutePath()+" Package id not found");
     check(NpmPackage.isValidName(pid), "Source Package "+p.getAbsolutePath()+" Package id "+pid+" is not valid");
-    check(pid.equals(folder), "Name mismatch between folder and package");
+    check(pid.equals(folder), "Name mismatch between folder and package ("+pid+"/"+folder+")");
     check(version != null, "Source Package "+p.getAbsolutePath()+" Package version not found");
     check(NpmPackage.isValidVersion(version), "Source Package "+p.getAbsolutePath()+" Package version "+version+" is not valid");
     String fhirKind = npm.type(); 

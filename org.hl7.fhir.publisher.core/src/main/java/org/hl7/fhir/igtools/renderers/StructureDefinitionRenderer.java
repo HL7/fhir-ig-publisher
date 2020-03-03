@@ -488,7 +488,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
 
   private DataType findFixedValue(ElementDefinition ed, boolean diff) {
     if (ElementDefinitionUtilities.hasType(ed, "Coding")) {
-      List<ElementDefinition> children = ProfileUtilities.getChildList(sd, ed, diff);
+      List<ElementDefinition> children = utils.getChildList(sd, ed, diff);
       String sys = null;
       String code = null;
       for (ElementDefinition cd : children) {
