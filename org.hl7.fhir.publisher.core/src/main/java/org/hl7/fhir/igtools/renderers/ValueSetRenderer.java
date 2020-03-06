@@ -116,13 +116,12 @@ public class ValueSetRenderer extends BaseRenderer {
   }
 
   public String cld(Set<String> outputTracker) throws EOperationOutcome, FHIRException, IOException, org.hl7.fhir.exceptions.FHIRException  {
-    if (vs.hasText() && vs.getText().hasDiv())
-      return new XhtmlComposer(XhtmlComposer.HTML).compose(vs.getText().getDiv());
+//    if (vs.hasText() && vs.getText().hasDiv())
+//      return new XhtmlComposer(XhtmlComposer.HTML).compose(vs.getText().getDiv());
     ValueSet vsc = vs.copy();
     vsc.setText(null);
-    gen.generate(vsc, outputTracker);
-
-    return new XhtmlComposer(XhtmlComposer.HTML).compose(vsc.getText().getDiv());
+    gen.generate(null, vsc, vsc, false);
+    return "<h3>Definition</h3>\r\n" + new XhtmlComposer(XhtmlComposer.HTML).compose(vsc.getText().getDiv());
   }
 
   public String xref() throws FHIRException {
