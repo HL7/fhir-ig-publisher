@@ -202,7 +202,6 @@ import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.openapi.OpenApiGenerator;
 import org.hl7.fhir.r5.openapi.Writer;
 import org.hl7.fhir.r5.terminologies.ValueSetExpander.ValueSetExpansionOutcome;
-import org.hl7.fhir.r5.test.utils.ToolsHelper;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.r5.utils.FHIRPathEngine;
 import org.hl7.fhir.r5.utils.FHIRPathEngine.IEvaluationContext;
@@ -214,7 +213,6 @@ import org.hl7.fhir.r5.utils.MappingSheetParser;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator.Category;
 import org.hl7.fhir.r5.utils.NarrativeGenerator;
-import org.hl7.fhir.r5.utils.NarrativeGenerator.ILiquidTemplateProvider;
 import org.hl7.fhir.r5.utils.NarrativeGenerator.IReferenceResolver;
 import org.hl7.fhir.r5.utils.NarrativeGenerator.ITypeParser;
 import org.hl7.fhir.r5.utils.NarrativeGenerator.ResourceContext;
@@ -224,19 +222,8 @@ import org.hl7.fhir.r5.utils.StructureMapUtilities.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
 import org.hl7.fhir.r5.utils.formats.Turtle;
-import org.hl7.fhir.utilities.CSFile;
-import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
-import org.hl7.fhir.utilities.IniFile;
-import org.hl7.fhir.utilities.JsonMerger;
-import org.hl7.fhir.utilities.MarkDownProcessor;
+import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
-import org.hl7.fhir.utilities.NDJsonWriter;
-import org.hl7.fhir.utilities.StandardsStatus;
-import org.hl7.fhir.utilities.TerminologyServiceOptions;
-import org.hl7.fhir.utilities.TextFile;
-import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.ZipGenerator;
 import org.hl7.fhir.utilities.cache.NpmPackage;
 import org.hl7.fhir.utilities.cache.PackageCacheManager;
 import org.hl7.fhir.utilities.cache.PackageGenerator.PackageType;
@@ -301,6 +288,8 @@ import com.google.gson.JsonPrimitive;
  */
 
 public class Publisher implements IWorkerContext.ILoggingService, IReferenceResolver, ILoadFilter, IValidationProfileUsageTracker {
+
+  private TranslationImplementation translator = null;
 
   public class JsonDependency {
     private String name;
@@ -1386,6 +1375,33 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         else if (p.getValue().equals("show-reference-messages"))
           showReferenceMessages = true;
         
+      } else if (p.getCode().equals("language") && p.hasValue()) {
+        final String language = p.getValue();
+        if(language != null && language.length() > 0) {
+          if(this.translator == null) {
+            this.translator = new TranslationImplementation();
+          }
+          this.translator.setLang(language);
+        }
+      } else if (p.getCode().equals("languages") && p.hasValue()) {
+        System.out.println("Languages parameter found. No support yet.");
+        /*
+        if(this.translator == null) {
+            this.translator = new TranslationImplementation();
+          }
+        final String languages = p.getValue();
+        if(languages != null && languages.length() > 0) {
+          final String firstLanguage = Arrays.stream(languages.split(","))
+                  .map(String::trim)
+                  .filter(s -> s.length() > 0)
+                  .findFirst()
+                  .orElseGet(() -> {
+                    System.out.println("Language parameter defined, but no valid languages found");
+                    return null;
+                  });
+          ((TranslationImplementation)this.translator).setLang(firstLanguage);
+        }
+        */
       }
     }
     
@@ -5745,6 +5761,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private void generateOutputsOperationDefinition(FetchedFile f, FetchedResource r, OperationDefinition od, Map<String, String> vars, boolean regen) throws FHIRException, IOException {
     OperationDefinitionRenderer odr = new OperationDefinitionRenderer(context, checkAppendSlash(specPath), od, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, fileList, gen);
+    odr.setTranslator(this.translator);
     if (igpkp.wantGen(r, "summary"))
       fragment("OperationDefinition-"+od.getId()+"-summary", odr.summary(), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "idempotence"))
@@ -6141,6 +6158,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     if (igpkp.wantGen(r, "json-html")) {
       JsonXhtmlRenderer j = new JsonXhtmlRenderer();
+      j.setTranslator(this.translator);
       org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(context);
       jp.setLinkResolver(igpkp);
       jp.compose(r.getElement(), j);
@@ -6233,12 +6251,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
    *   summary
    *   content as html
    *   xref
-   * @param resource
    * @throws org.hl7.fhir.exceptions.FHIRException
    * @throws Exception
    */
   private void generateOutputsCodeSystem(FetchedFile f, FetchedResource fr, CodeSystem cs, Map<String, String> vars) throws Exception {
     CodeSystemRenderer csr = new CodeSystemRenderer(context, specPath, cs, igpkp, specMaps, markdownEngine, packge, gen);
+    csr.setTranslator(this.translator);
     if (igpkp.wantGen(fr, "summary"))
       fragment("CodeSystem-"+cs.getId()+"-summary", csr.summary(igpkp.wantGen(fr, "xml"), igpkp.wantGen(fr, "json"), igpkp.wantGen(fr, "ttl")), f.getOutputNames(), fr, vars, null);
     if (igpkp.wantGen(fr, "content"))
@@ -6260,6 +6278,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
    */
   private void generateOutputsValueSet(FetchedFile f, FetchedResource r, ValueSet vs, Map<String, String> vars) throws Exception {
     ValueSetRenderer vsr = new ValueSetRenderer(context, specPath, vs, igpkp, specMaps, markdownEngine, packge, gen);
+    vsr.setTranslator(this.translator);
     if (igpkp.wantGen(r, "summary"))
       fragment("ValueSet-"+vs.getId()+"-summary", vsr.summary(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl")), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "cld"))
@@ -6309,7 +6328,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
    *   summary
    *   content as html
    *   xref
-   * @param resource
    * @throws IOException
    */
   private void generateOutputsConceptMap(FetchedFile f, FetchedResource r, ConceptMap cm, Map<String, String> vars) throws IOException, FHIRException {
@@ -6355,6 +6373,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       fragmentError("StructureDefinition-"+sd.getId()+"-json-schema", "yet to be done: json schema as html", null, f.getOutputNames());
 
     StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, fileList, gen, allInvariants);
+    sdr.setTranslator(this.translator);
     if (igpkp.wantGen(r, "summary"))
       fragment("StructureDefinition-"+sd.getId()+"-summary", sdr.summary(), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "header"))
@@ -6448,6 +6467,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private void generateOutputsStructureMap(FetchedFile f, FetchedResource r, StructureMap map, Map<String,String> vars) throws Exception {
     StructureMapRenderer smr = new StructureMapRenderer(context, checkAppendSlash(specPath), map, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, gen);
+    smr.setTranslator(this.translator);
     if (igpkp.wantGen(r, "summary"))
       fragment("StructureMap-"+map.getId()+"-summary", smr.summary(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl")), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "content"))
@@ -6516,7 +6536,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
    * 
    * see https://stackoverflow.com/questions/24102498/escaping-double-curly-braces-inside-a-markdown-code-block-in-jekyll
    * 
-   * @param fixedContent
+   * @param content
    * @return
    */
   private String wrapLiquid(String content) {
@@ -6953,6 +6973,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
         exitCode = 1;
       } finally {
+        self.translator.printKeys();
         if (self.mode == IGBuildMode.MANUAL) {
           TextFile.stringToFile(buildReport(getNamedParam(args, "-ig"), getNamedParam(args, "-source"), self.filelog.toString(), Utilities.path(self.qaDir, "validation.txt")), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher.log"), false);
         }
