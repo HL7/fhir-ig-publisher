@@ -38,7 +38,7 @@ public class TranslationImplementation implements TranslationServices {
   // -- configuration -------------------------------------------------------
   
   private String lang; 
-  private String nonAlpha = "[^a-zA-Z0-9_.]+";
+  private String nonAlpha = "[^a-zA-Z0-9_]+";
   private String noEndDash = "_$";
   private Locale locale = Locale.getDefault();
 
