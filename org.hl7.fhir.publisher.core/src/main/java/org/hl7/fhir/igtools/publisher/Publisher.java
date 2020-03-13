@@ -86,6 +86,7 @@ import org.hl7.fhir.convertors.R2ToR5Loader;
 import org.hl7.fhir.convertors.R3ToR4Loader;
 import org.hl7.fhir.convertors.R3ToR5Loader;
 import org.hl7.fhir.convertors.R4ToR5Loader;
+import org.hl7.fhir.convertors.R5ToR5Loader;
 import org.hl7.fhir.convertors.TerminologyClientFactory;
 import org.hl7.fhir.convertors.VersionConvertorAdvisor40;
 import org.hl7.fhir.convertors.VersionConvertorAdvisor50;
@@ -1533,7 +1534,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.setAllowExamples(true);
     
     pvalidator = new ProfileValidator(context);
-    pvalidator.setContext(context);
     csvalidator = new CodeSystemValidator(context);
     pvalidator.setCheckAggregation(checkAggregation);
     pvalidator.setCheckMustSupport(hintAboutNonMustSupport);
@@ -1706,7 +1706,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       String p = str(paths, "output", "output");
       outputDir = Paths.get(p).isAbsolute() ? p : Utilities.path(rootDir, p);
     }
-   qaDir = Utilities.path(rootDir, str(paths, "qa"));
+   qaDir = Utilities.path(rootDir, str(paths, "qa", "qa"));
    vsCache = ostr(paths, "txCache");
    templateProvider.clear();
    if (paths.has("liquid")) {
@@ -1879,7 +1879,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.setAllowExamples(true);
     
     pvalidator = new ProfileValidator(context);
-    pvalidator.setContext(context);
     csvalidator = new CodeSystemValidator(context);
     if (configuration.has("check-aggregation") && configuration.get("check-aggregation").getAsBoolean())
       pvalidator.setCheckAggregation(true);
@@ -2235,7 +2234,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else if (VersionUtilities.isR4Ver(version)) {
       sp = SpecificationPackage.fromPackage(pi, new R4ToR5Loader(new String[] { "StructureDefinition", "ValueSet", "CodeSystem", "SearchParameter", "OperationDefinition", "Questionnaire","ConceptMap","StructureMap", "NamingSystem"}), this);
     } else 
-      sp = SpecificationPackage.fromPackage(pi, this);
+      sp = SpecificationPackage.fromPackage(pi, new R5ToR5Loader(new String[] { "StructureDefinition", "ValueSet", "CodeSystem", "SearchParameter", "OperationDefinition", "Questionnaire","ConceptMap","StructureMap", "NamingSystem"}), this);
     sp.loadOtherContent(pi);
     
     if (!version.equals(Constants.VERSION)) {
