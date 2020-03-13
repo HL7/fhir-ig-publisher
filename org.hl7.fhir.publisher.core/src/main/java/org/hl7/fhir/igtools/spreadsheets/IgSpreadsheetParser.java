@@ -713,10 +713,17 @@ public class IgSpreadsheetParser {
     if (e.getIsModifier()) {
       String reason = sheet.getColumn(row, "Modifier Reason");
       if (Utilities.noString(reason)) {
-        System.out.println("Missing IsModifierReason on "+path);
-        reason = "Not known why this is labelled a modifier";
+        if (path.endsWith(".modifierExtension")) {
+          reason = "Modifier extensions are expected to modify the meaning or interpretation of the element that contains them";
+        } else {
+          System.out.println("Missing IsModifierReason on "+path);
+          reason = "Not known why this is labelled a modifier";
+        }
       }
       e.setIsModifierReason(reason);
+    } else if (path.endsWith(".modifierExtension")) {
+      e.setIsModifier(true);
+      e.setIsModifierReason("Modifier extensions are expected to modify the meaning or interpretation of the element that contains them");
     }
     // later, this will get hooked in from the underlying definitions, but we need to know this now to validate the extension modifier matching
     if (e.getPath().endsWith(".modifierExtension"))
