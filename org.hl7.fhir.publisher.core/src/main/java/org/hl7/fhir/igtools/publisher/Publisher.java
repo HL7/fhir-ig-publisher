@@ -1191,7 +1191,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (mode == IGBuildMode.PUBLICATION)
       log("Build Formal Publication package, intended for "+getTargetOutput());
     
-    templateManager = new TemplateManager(pcm, logger);
+    templateManager = new TemplateManager(pcm, logger, gh());
     templateProvider = new IGPublisherLiquidTemplateServices();
     extensionTracker = new ExtensionTracker();
     log("Package Cache: "+pcm.getFolder());
