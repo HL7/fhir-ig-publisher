@@ -466,6 +466,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
        "<body>\r\n<p>See here: <a href=\"site/index.html\">this link</a>.</p>\r\n</body>\r\n</html>\r\n";
 
   private static final long JEKYLL_TIMEOUT = 60000 * 5; // 5 minutes.... 
+  private static final long FSH_TIMEOUT = 60000 * 1; // 1 minutes.... 
 
   private String configFile;
   private String sourceDir;
@@ -1200,6 +1201,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       pcm.loadFromFolder(packagesFolder);
     }
     fetcher.setResourceDirs(resourceDirs);
+    File fsh = new File(Utilities.path(configFile, "fsh"));
+    if (fsh.exists() && fsh.isDirectory()) {
+      runFsh(fsh);
+    }
     IniFile ini = checkNewIg();
     if (ini != null) {
       newIg = true;
@@ -1209,6 +1214,62 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     else
       initializeFromJson();   
   }
+  
+  public class MySushiHandler extends OutputStream {
+
+    private byte[] buffer;
+    private int length;
+
+    public MySushiHandler() {
+      buffer = new byte[256];
+    }
+
+    public String getBufferString() {
+      return new String(this.buffer, 0, length);
+    }
+
+    private boolean passSushiFilter(String s) {
+      if (Utilities.noString(s))
+        return false;
+      return true;
+    }
+
+    @Override
+    public void write(int b) throws IOException {
+      buffer[length] = (byte) b;
+      length++;
+      if (b == 10) { // eoln
+        String s = new String(buffer, 0, length);
+        if (passSushiFilter(s))
+          log("Sushi: "+s.trim());
+        length = 0;
+      }
+    }
+  }
+
+  private void runFsh(File file) throws IOException {
+    
+    DefaultExecutor exec = new DefaultExecutor();
+    exec.setExitValue(0);
+    MySushiHandler pumpHandler = new MySushiHandler();
+    PumpStreamHandler pump = new PumpStreamHandler(pumpHandler);
+    exec.setStreamHandler(pump);
+    exec.setWorkingDirectory(new File(configFile));
+    ExecuteWatchdog watchdog = new ExecuteWatchdog(FSH_TIMEOUT);
+    exec.setWatchdog(watchdog);
+    
+    try {
+      if (SystemUtils.IS_OS_WINDOWS)
+        exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C sushi ./fsh -o ."));
+      else
+        exec.execute(org.apache.commons.exec.CommandLine.parse("sushi ./fsh -o ."));
+    } catch (IOException ioex) {
+      log("Sushi has failed. Complete output from running Sushi : " + pumpHandler.getBufferString());
+      log("Note: Check that Sushi is installed correctly (\"npm install -g fsh-sushi\". On windows, get npm from https://www.npmjs.com/get-npm)");
+      throw ioex;
+    }    
+  }
+
 
   private void initializeTemplate() throws IOException {
     rootDir = configFile;
@@ -4403,7 +4464,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private String gh() {
-    return targetOutput.replace("https://build.fhir.org/ig", "https://github.com");
+    return targetOutput == null ? null : targetOutput.replace("https://build.fhir.org/ig", "https://github.com");
   }
 
 
@@ -4838,7 +4899,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
 
     public String getBufferString() {
-    	return new String(this.buffer);
+    	return new String(this.buffer, 0, length);
     }
 
     private boolean passJekyllFilter(String s) {
