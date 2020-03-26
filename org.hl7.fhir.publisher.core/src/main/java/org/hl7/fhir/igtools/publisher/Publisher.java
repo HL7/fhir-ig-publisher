@@ -4003,7 +4003,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (close) {
           utils.closeDifferential(base, sd);
         } else {
-          utils.sortDifferential(base, sd, "profile "+sd.getUrl(), errors, true);
+	try {
+            utils.sortDifferential(base, sd, "profile " + sd.getUrl(), errors, true);
+          } catch (Exception e)
+          {
+            logDebugMessage(LogCategory.PROGRESS, "could not generate Snapshot for "+sd.getUrl());
+          }
         }
         for (String s : errors) {
           f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, sd.getUrl(), s, IssueSeverity.ERROR));
