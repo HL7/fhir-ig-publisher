@@ -1201,7 +1201,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       pcm.loadFromFolder(packagesFolder);
     }
     fetcher.setResourceDirs(resourceDirs);
-    File fsh = new File(Utilities.path(configFile, "fsh"));
+    File fsh = new File(Utilities.path(focusDir(), "fsh"));
     if (fsh.exists() && fsh.isDirectory()) {
       runFsh(fsh);
     }
@@ -1215,6 +1215,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       initializeFromJson();   
   }
   
+  private String focusDir() {
+    String dir = configFile.endsWith("ig.ini") ? configFile.substring(0, configFile.length()-6) : configFile;
+    if (dir.endsWith(File.separatorChar+".")) {
+      dir = dir.substring(0, dir.length()-2);
+    }
+    return Utilities.noString(dir) ? getCurentDirectory() : dir;
+  }
+
   public class MySushiHandler extends OutputStream {
 
     private byte[] buffer;
@@ -1254,7 +1262,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     MySushiHandler pumpHandler = new MySushiHandler();
     PumpStreamHandler pump = new PumpStreamHandler(pumpHandler);
     exec.setStreamHandler(pump);
-    exec.setWorkingDirectory(new File(configFile));
+    exec.setWorkingDirectory(file);
     ExecuteWatchdog watchdog = new ExecuteWatchdog(FSH_TIMEOUT);
     exec.setWatchdog(watchdog);
     
@@ -1295,6 +1303,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private IniFile checkNewIg() throws IOException {
     if (configFile == null)
       return null;
+    if (configFile.endsWith(File.separatorChar+".")) {
+      configFile = configFile.substring(0, configFile.length()-2);
+    }
     File cf = mode == IGBuildMode.AUTOBUILD ? new File(configFile) : new CSFile(configFile);
     if (!cf.exists())
       return null;
