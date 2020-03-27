@@ -24,7 +24,7 @@
         <core_version>4.2.11-SNAPSHOT</core_version>
         <maven.test.skip>true</maven.test.skip>
     </properties>
-    <version>1.0.74-SNAPSHOT</version> <!-- See the note above -->
+    <version>1.0.75-SNAPSHOT</version> <!-- See the note above -->
 
     <packaging>pom</packaging>
     <groupId>org.hl7.fhir.publisher</groupId>
