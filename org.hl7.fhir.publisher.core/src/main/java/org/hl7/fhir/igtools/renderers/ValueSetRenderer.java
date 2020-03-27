@@ -55,6 +55,7 @@ import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
+import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
 public class ValueSetRenderer extends BaseRenderer {
 
@@ -116,8 +117,13 @@ public class ValueSetRenderer extends BaseRenderer {
   }
 
   public String cld(Set<String> outputTracker) throws EOperationOutcome, FHIRException, IOException, org.hl7.fhir.exceptions.FHIRException  {
-//    if (vs.hasText() && vs.getText().hasDiv())
-//      return new XhtmlComposer(XhtmlComposer.HTML).compose(vs.getText().getDiv());
+    if (vs.hasText() && vs.getText().hasDiv()) {
+      for (XhtmlNode n : vs.getText().getDiv().getChildNodes()) {
+        if ("div".equals(n.getName()) && "cld".equals(n.getAttribute("id"))) {
+          return "<h3>Definition</h3>\r\n" + new XhtmlComposer(XhtmlComposer.HTML).compose(n);
+        }
+      }
+    }
     ValueSet vsc = vs.copy();
     vsc.setText(null);
     gen.generate(null, vsc, vsc, false);
