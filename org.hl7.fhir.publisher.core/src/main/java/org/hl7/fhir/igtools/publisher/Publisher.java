@@ -4007,7 +4007,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             utils.sortDifferential(base, sd, "profile " + sd.getUrl(), errors, true);
           } catch (Exception e)
           {
-            logDebugMessage(LogCategory.PROGRESS, "could not generate Snapshot for "+sd.getUrl());
+            logDebugMessage(LogCategory.PROGRESS, "could not sort differentials for "+sd.getUrl());
           }
         }
         for (String s : errors) {
