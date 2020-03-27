@@ -886,7 +886,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getElement() != null && r.getElement().fhirType().equals(parts[0]) && r.getId().equals(parts[1])) {
-          String path = igpkp.getLinkFor(r);
+          String path = igpkp.getLinkFor(r, true);
           return new ResourceWithReference(path, gen.new ResourceWrapperMetaElement(r.getElement()));
         }
       }
@@ -1203,7 +1203,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     fetcher.setResourceDirs(resourceDirs);
     File fsh = new File(Utilities.path(focusDir(), "fsh"));
     if (fsh.exists() && fsh.isDirectory()) {
-      runFsh(fsh);
+      runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())));
     }
     IniFile ini = checkNewIg();
     if (ini != null) {
@@ -1227,6 +1227,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     private byte[] buffer;
     private int length;
+    private int errorCount = -1;
 
     public MySushiHandler() {
       buffer = new byte[256];
@@ -1248,15 +1249,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       length++;
       if (b == 10) { // eoln
         String s = new String(buffer, 0, length);
-        if (passSushiFilter(s))
+        if (passSushiFilter(s)) {
           log("Sushi: "+s.trim());
+          if (s.startsWith("Errors:")) {
+            errorCount = Integer.parseInt(s.substring(7).trim());
+          }
+        }
         length = 0;
       }
     }
   }
 
   private void runFsh(File file) throws IOException {
-    
+    log("Run Sushi on "+file.getAbsolutePath());
     DefaultExecutor exec = new DefaultExecutor();
     exec.setExitValue(0);
     MySushiHandler pumpHandler = new MySushiHandler();
@@ -1272,10 +1277,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       else
         exec.execute(org.apache.commons.exec.CommandLine.parse("sushi ./fsh -o ."));
     } catch (IOException ioex) {
-      log("Sushi has failed. Complete output from running Sushi : " + pumpHandler.getBufferString());
+      log("Sushi couldn't be run. Complete output from running Sushi : " + pumpHandler.getBufferString());
       log("Note: Check that Sushi is installed correctly (\"npm install -g fsh-sushi\". On windows, get npm from https://www.npmjs.com/get-npm)");
       throw ioex;
     }    
+    if (pumpHandler.errorCount == -1) {
+      log("Sushi has failed - no errors count in the output. Complete output from running Sushi : " + pumpHandler.getBufferString());      
+    } else if (pumpHandler.errorCount > 0) {
+      throw new IOException("Sushi failed with errors. Complete output from running Sushi : " + pumpHandler.getBufferString());
+    }
   }
 
 
@@ -2787,7 +2797,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     for (FetchedFile f: fileList) {
       for (FetchedResource r: f.getResources()) {
-        resources.put(igpkp.doReplacements(igpkp.getLinkFor(r), r, null, null), r);
+        resources.put(igpkp.doReplacements(igpkp.getLinkFor(r, false), r, null, null), r);
       }
     }
     
@@ -3501,7 +3511,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             nr.setTitle("Generated Profile (by Transform)");
             f.getResources().add(nr);
             igpkp.findConfiguration(f, nr);
-            sd.setUserData("path", igpkp.getLinkFor(nr));
+            sd.setUserData("path", igpkp.getLinkFor(nr, true));
             generateSnapshot(f, nr, sd, true);
           }
         }
@@ -3971,7 +3981,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           if (!r.isSnapshotted()) {
             StructureDefinition sd = (StructureDefinition) r.getResource();
             sd.setSnapshot(null); // make sure its clrared out so we do actually regenerate it at this point
-            generateSnapshot(f, r, sd, false);
+            try {
+              generateSnapshot(f, r, sd, false);
+            } catch (Exception e) {
+              throw new Exception("Error generating snapshot for "+f.getTitle()+(f.getResources().size() > 0 ? "("+r.getId()+")" : "")+": "+e.getMessage(), e);
+            }
           }
         }
       }
@@ -4505,7 +4519,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
       if (r != null) {
-        String path = igpkp.doReplacements(igpkp.getLinkFor(r), r, null, null);
+        String path = igpkp.doReplacements(igpkp.getLinkFor(r, false), r, null, null);
         res.addExtension().setUrl("http://hl7.org/fhir/StructureDefinition/implementationguide-page").setValue(new UriType(path));
         inspector.addLinkToCheck("Implementation Guide", path, "??");
       }
@@ -4636,13 +4650,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           if (uc != null && !u.equals(uc) && !isListedURLExemption(uc) && !isExampleResource((CanonicalResource) r.getResource()) && adHocTmpDir == null)
             f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, f.getName(), "URL Mismatch "+u+" vs "+uc, IssueSeverity.ERROR));
           if (uc != null && !u.equals(uc))
-            map.path(uc, igpkp.getLinkFor(r));
+            map.path(uc, igpkp.getLinkFor(r, true));
           String v = ((CanonicalResource) r.getResource()).getVersion();
           if (v != null) {
-            map.path(uc + "|" + v, v + "/" + igpkp.getLinkFor(r));
+            map.path(uc + "|" + v, v + "/" + igpkp.getLinkFor(r, true));
           }
         }
-        map.path(u, igpkp.getLinkFor(r));
+        map.path(u, igpkp.getLinkFor(r, true));
       }
     }
     for (String s : new File(outputDir).list()) {
@@ -5359,7 +5373,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private ImplementationGuideDefinitionPageComponent pageForFetchedResource(FetchedResource r) throws FHIRException {
-    String key = igpkp.doReplacements(igpkp.getLinkFor(r), r, null, null);
+    String key = igpkp.doReplacements(igpkp.getLinkFor(r, false), r, null, null);
     return igPages.get(key);
   }
 
@@ -5586,7 +5600,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         StringBuilder list, StringBuilder lists, StringBuilder table, 
         StringBuilder listMM, StringBuilder listsMM, StringBuilder tableMM, 
         FetchedFile f, FetchedResource r, String name, String prefixType) throws Exception {
-    String ref = igpkp.doReplacements(igpkp.getLinkFor(r), r, null, null);
+    String ref = igpkp.doReplacements(igpkp.getLinkFor(r, false), r, null, null);
     if (Utilities.noString(ref))
       throw new Exception("No reference found for "+r.getId());
     if (prefixType != null)
@@ -5996,7 +6010,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (lr.getResource() != null)
       return lr.getResource().getUserString("path");
     else
-      return igpkp.getLinkFor(lr);
+      return igpkp.getLinkFor(lr, true);
   }
 
   private String getListName(FetchedResource lr) {
@@ -6262,7 +6276,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (template != null && !template.isEmpty()) {
       boolean existsAsPage = false;
       if (ff != null) {
-        String fn = igpkp.getLinkFor(r);
+        String fn = igpkp.getLinkFor(r, true);
         for (String pagesDir: pagesDirs) {
           if (altMap.containsKey("page/"+Utilities.path(pagesDir, fn))) {
             existsAsPage = true;

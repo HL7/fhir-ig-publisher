@@ -563,10 +563,15 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     return canonical;
   }
 
-  public String getLinkFor(FetchedResource r) {
+  public String getLinkFor(FetchedResource r, boolean replace) {
 	String base = getProperty(r, "base");
-	if (base!=null)
+	if (base!=null) {
+	  if (replace) {
+	    base = base.replace("{{[id]}}", r.getId());
+	    base = base.replace("{{[type]}}", r.getElement().fhirType());
+	  }
 	  return base;
+	}
   return r.getElement().fhirType()+"-"+r.getId()+".html";
   }
 

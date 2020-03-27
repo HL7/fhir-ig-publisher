@@ -493,9 +493,9 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("link", makelink(f));
     t.add("filename", f.getName());
     t.add("path", makeLocal(f.getPath()));
-    String link = provider.getLinkFor(f.getResources().get(0));
+    String link = provider.getLinkFor(f.getResources().get(0), true);
     if (link==null) {
-      link = altProvider.getLinkFor(f.getResources().get(0));
+      link = altProvider.getLinkFor(f.getResources().get(0), true);
     }
     if (link != null) { 
       link = link.replace("{{[id]}}", f.getResources().get(0).getId());

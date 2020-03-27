@@ -1321,7 +1321,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
             String name = r.getTitle();
             if (Utilities.noString(name))
               name = "example";
-            String ref = igp.getLinkFor(r);
+            String ref = igp.getLinkFor(r, true);
             b.append(" <li><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a></li>\r\n");
           }
         }
@@ -1342,7 +1342,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
               name = "example";
             if (f.getTitle() != null && f.getTitle() != f.getName())
               title = f.getTitle();
-            String ref = igp.getLinkFor(r);
+            String ref = igp.getLinkFor(r, true);
             b.append(" <tr>\r\n");
             b.append("   <td><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a></td>\r\n");
             b.append("   <td>"+Utilities.escapeXml(title)+"</td>\r\n");
@@ -1889,7 +1889,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     for (FetchedFile f : files) {
       for (FetchedResource r : f.getResources()) {
         if (usesSD(r.getElement())) {
-          String p = igp.getLinkFor(r);
+          String p = igp.getLinkFor(r, true);
           examples.put(p, r.getTitle());          
         }
       }
