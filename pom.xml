@@ -220,6 +220,7 @@
                     <verbose>false</verbose>
                     <debug>false</debug>
                     <additionalJOption>-Xdoclint:none</additionalJOption>
+		            <source>8</source>
                 </configuration>
                 <executions>
                     <execution>
