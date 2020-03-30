@@ -2962,7 +2962,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         try {
           FetchedFile f = fetcher.fetch(Utilities.path(repoRoot, newFile));
           String dir = Utilities.getDirectoryForFile(f.getPath());
-          String relative = dir.substring(tempDir.length()+1);
+          String relative = dir.substring(tempDir.length());
+          if (relative.length() > 0)
+            relative = relative.substring(1);
           f.setRelativePath(f.getPath().substring(dir.length()+1));
           PreProcessInfo ppinfo = new PreProcessInfo(null, relative);
           loadPrePage(f, ppinfo);
