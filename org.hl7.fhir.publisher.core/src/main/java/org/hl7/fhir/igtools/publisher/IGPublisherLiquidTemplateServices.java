@@ -44,7 +44,10 @@ public class IGPublisherLiquidTemplateServices implements ILiquidTemplateProvide
   }
   
   public void load(String path) throws FileNotFoundException, IOException {
-    for (File f : new File(path).listFiles()) {
+    File p = new File(path);
+    if (!p.exists())
+      return;
+    for (File f : p.listFiles()) {
       if (f.getName().endsWith(".liquid")) {
         String fn = f.getName();
         fn = fn.substring(0, fn.indexOf("."));
