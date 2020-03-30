@@ -4003,11 +4003,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (close) {
           utils.closeDifferential(base, sd);
         } else {
-	try {
+	    try {
             utils.sortDifferential(base, sd, "profile " + sd.getUrl(), errors, true);
           } catch (Exception e)
           {
-            logDebugMessage(LogCategory.PROGRESS, "could not sort differentials for "+sd.getUrl());
+            errors.stream().forEach(error -> logDebugMessage(LogCategory.PROGRESS, error));
+            throw new Exception("could not sort differentials for StructureDefinition with url: "+sd.getUrl(), e);
           }
         }
         for (String s : errors) {
