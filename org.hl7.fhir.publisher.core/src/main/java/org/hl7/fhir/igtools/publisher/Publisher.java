@@ -4020,12 +4020,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (close) {
           utils.closeDifferential(base, sd);
         } else {
-	    try {
+    	    try {
             utils.sortDifferential(base, sd, "profile " + sd.getUrl(), errors, true);
-          } catch (Exception e)
-          {
-            errors.stream().forEach(error -> logDebugMessage(LogCategory.PROGRESS, error));
-            throw new Exception("could not sort differentials for StructureDefinition with url: "+sd.getUrl(), e);
+          } catch (Exception e) {
+            f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.EXCEPTION, sd.getUrl(), "Exception generating snapshot: "+e.getMessage(), IssueSeverity.ERROR));
           }
         }
         for (String s : errors) {
