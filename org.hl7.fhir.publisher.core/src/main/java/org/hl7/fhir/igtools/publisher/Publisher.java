@@ -1251,8 +1251,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         String s = new String(buffer, 0, length);
         if (passSushiFilter(s)) {
           log("Sushi: "+s.trim());
-          if (s.startsWith("Errors:")) {
-            errorCount = Integer.parseInt(s.substring(7).trim());
+          if (s.trim().startsWith("Errors:")) {
+            errorCount = Integer.parseInt(s.substring(10).trim());
           }
         }
         length = 0;
@@ -1279,6 +1279,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } catch (IOException ioex) {
       log("Sushi couldn't be run. Complete output from running Sushi : " + pumpHandler.getBufferString());
       log("Note: Check that Sushi is installed correctly (\"npm install -g fsh-sushi\". On windows, get npm from https://www.npmjs.com/get-npm)");
+      log("Exception: "+ioex.getMessage());
       throw ioex;
     }    
     if (pumpHandler.errorCount == -1) {
