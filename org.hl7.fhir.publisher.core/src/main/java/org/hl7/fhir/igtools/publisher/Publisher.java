@@ -2963,7 +2963,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         try {
           FetchedFile f = fetcher.fetch(Utilities.path(repoRoot, newFile));
           String dir = Utilities.getDirectoryForFile(f.getPath());
-          String relative = dir.substring(tempDir.length()+1);
+          String relative = dir.substring(tempDir.length());
+          if (relative.length() > 0)
+            relative = relative.substring(1);
           f.setRelativePath(f.getPath().substring(dir.length()+1));
           PreProcessInfo ppinfo = new PreProcessInfo(null, relative);
           loadPrePage(f, ppinfo);
@@ -4018,7 +4020,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (close) {
           utils.closeDifferential(base, sd);
         } else {
-          utils.sortDifferential(base, sd, "profile "+sd.getUrl(), errors, true);
+	    try {
+            utils.sortDifferential(base, sd, "profile " + sd.getUrl(), errors, true);
+          } catch (Exception e)
+          {
+            errors.stream().forEach(error -> logDebugMessage(LogCategory.PROGRESS, error));
+            throw new Exception("could not sort differentials for StructureDefinition with url: "+sd.getUrl(), e);
+          }
         }
         for (String s : errors) {
           f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, sd.getUrl(), s, IssueSeverity.ERROR));
