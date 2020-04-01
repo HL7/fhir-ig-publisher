@@ -203,6 +203,7 @@ public class TemplateManager {
         "fhir.base.template",
         "hl7.base.template",
         "hl7.fhir.template",
+        "hl7.utg.template",
         "hl7.be.fhir.template",
         "hl7.cda.template",
         "hl7.davinci.template",
