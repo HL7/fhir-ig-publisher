@@ -101,10 +101,6 @@ private static final String VER = "1.0.53";
     testIg("hl7.fhir.uv.sdc", null);
   }
 
-  @Test
-  public void testIPS() throws Exception {
-    testIg("hl7.fhir.uv.ips", "ig.json");
-  }
 
   @Test
   public void testECR() throws Exception {
@@ -180,5 +176,9 @@ private static final String VER = "1.0.53";
 //    test(Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "new", "ig-package"));
 //  }
 
+  //@Test
+  public void testIPS() throws Exception {
+    testIg("hl7.fhir.uv.ips", "ig.json");
+  }
 
 }

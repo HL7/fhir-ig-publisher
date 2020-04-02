@@ -18,13 +18,13 @@
     <parent>
         <groupId>ca.uhn.hapi.fhir</groupId>
         <artifactId>org.hl7.fhir.core</artifactId>
-        <version>4.2.6-SNAPSHOT</version>
+        <version>4.2.13-SNAPSHOT</version>
     </parent>
     <properties>
-        <core_version>4.2.6-SNAPSHOT</core_version>
+        <core_version>4.2.13-SNAPSHOT</core_version>
         <maven.test.skip>true</maven.test.skip>
     </properties>
-    <version>1.0.70-SNAPSHOT</version> <!-- See the note above -->
+    <version>1.0.77-SNAPSHOT</version> <!-- See the note above -->
 
     <packaging>pom</packaging>
     <groupId>org.hl7.fhir.publisher</groupId>
@@ -220,6 +220,7 @@
                     <verbose>false</verbose>
                     <debug>false</debug>
                     <additionalJOption>-Xdoclint:none</additionalJOption>
+		            <source>8</source>
                 </configuration>
                 <executions>
                     <execution>

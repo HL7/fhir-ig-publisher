@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.context.IWorkerContext;
@@ -215,6 +216,11 @@ public class ValidationServices implements IValidatorResourceFetcher {
     otherUrls.add("http://hl7.org/fhir/tools/StructureDefinition/resource-information");
     otherUrls.add("http://hl7.org/fhir/ConsentPolicy/opt-out"); 
     otherUrls.add("http://hl7.org/fhir/ConsentPolicy/opt-in");
+  }
+
+  @Override
+  public void setLocale(Locale locale) {
+    
   }
 
 }
