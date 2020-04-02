@@ -494,7 +494,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private String specPath;
   private String qaDir;
   private String version;
-  private List<String> suppressedMessages = new ArrayList<String>();
+  private Map<String, String> suppressedMessages = new HashMap<>();
 
   private String igName;
   private IGBuildMode mode; // for the IG publication infrastructure
@@ -1385,6 +1385,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     outputDir = Utilities.path(rootDir, "output");
     Map<String, String> expParamMap = new HashMap<>();
     
+    int count = 0;
     for (ImplementationGuideDefinitionParameterComponent p : sourceIg.getDefinition().getParameter()) {
       // documentation for this list: https://confluence.hl7.org/display/FHIR/Implementation+Guide+Parameters
       if (p.getCode().equals("logging")) { // added
@@ -1422,7 +1423,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       } else if (p.getCode().equals("path-expansion-params")) {     
         expParams = p.getValue();
       } else if (p.getCode().equals("path-suppressed-warnings")) {     
-        loadSuppressedMessages(Utilities.path(rootDir, p.getValue()));
+        loadSuppressedMessages(Utilities.path(rootDir, p.getValue()), "ImplementationGuide.definition.parameter["+count+"].value");
       } else if (p.getCode().equals("html-exempt")) {     
         exemptHtmlPatterns.add(p.getValue());
       } else if (p.getCode().equals("usage-stats-opt-out")) {     
@@ -1471,6 +1472,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           showReferenceMessages = true;
         
       }
+      count++;
     }
     
     // ok process the paths
@@ -1992,7 +1994,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (configuration.has("suppressedWarningFile")) {
       String suppressPath = configuration.getAsJsonPrimitive("suppressedWarningFile").getAsString();
       if (!suppressPath.isEmpty())
-        loadSuppressedMessages(Utilities.path(rootDir, suppressPath));
+        loadSuppressedMessages(Utilities.path(rootDir, suppressPath), "ConfigFile.suppressedWarningFile");
     }
     validationFetcher = new ValidationServices(context, igpkp, fileList, npmList );
     validator.setFetcher(validationFetcher);
@@ -2106,21 +2108,48 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
-  private void loadSuppressedMessages(String messageFile) throws Exception {
-    InputStreamReader r = new InputStreamReader(new FileInputStream(messageFile));
-    StringBuilder b = new StringBuilder();
-    while (r.ready()) {
-      char c = (char) r.read();
-      if (c == '\r' || c == '\n') {
+  private void loadSuppressedMessages(String messageFile, String path) throws Exception {
+    File f = new File(messageFile);
+    if (!f.exists()) {
+      errors.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, path, "Supressed messages file not found", IssueSeverity.ERROR));
+    } else {
+      String s = TextFile.fileToString(messageFile);
+      if (s.toLowerCase().startsWith("== suppressed messages ==")) {
+        String[] lines = s.split("\\r?\\n");
+        String reason = null;
+        for (int i = 1; i < lines.length; i++) {
+          String l = lines[i].trim();
+          if (!Utilities.noString(l)) {
+            if (l.startsWith("# ")) {
+              reason = l.substring(2);
+            } else {
+              if (reason == null) { 
+                errors.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, path, "Supressed messages file has errors with no reason", IssueSeverity.ERROR));
+                suppressedMessages.put(l, "??");
+              } else {
+                suppressedMessages.put(l, reason);
+              }
+            }
+          }
+        }
+      } else {
+        errors.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, path, "Supressed messages file is not using the new format (see https://confluence.hl7.org/display/FHIR/Implementation+Guide+Parameters)", IssueSeverity.ERROR));
+        InputStreamReader r = new InputStreamReader(new FileInputStream(messageFile));
+        StringBuilder b = new StringBuilder();
+        while (r.ready()) {
+          char c = (char) r.read();
+          if (c == '\r' || c == '\n') {
+            if (b.length() > 0)
+              suppressedMessages.put(b.toString(), "??");
+            b = new StringBuilder();
+          } else
+            b.append(c);
+        }
         if (b.length() > 0)
-          suppressedMessages.add(b.toString());
-        b = new StringBuilder();
-      } else
-        b.append(c);
+          suppressedMessages.put(b.toString(), "??");
+        r.close();
+      }
     }
-    if (b.length() > 0)
-      suppressedMessages.add(b.toString());
-    r.close();
   }
   
   private void checkTSVersion(String dir, String version) throws FileNotFoundException, IOException {
@@ -3734,6 +3763,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private Element loadFromJson(FetchedFile file) throws Exception {
     org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(context);
     jp.setupValidation(ValidationPolicy.EVERYTHING, file.getErrors());
+    jp.setAllowComments(true);
     return jp.parse(new ByteArrayInputStream(file.getSource()));
   }
 
@@ -4152,7 +4182,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else if (VersionUtilities.isR4Ver(parseVersion)) {
       org.hl7.fhir.r4.model.Resource res;
       if (contentType.contains("json"))
-        res = new org.hl7.fhir.r4.formats.JsonParser(true).parse(source);
+        res = new org.hl7.fhir.r4.formats.JsonParser(true, true).parse(source);
       else if (contentType.contains("xml"))
         res = new org.hl7.fhir.r4.formats.XmlParser(true).parse(source);
       else
@@ -4180,7 +4210,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return VersionConvertor_10_50.convertResource(res, advisor);
     } else if (parseVersion.equals(Constants.VERSION)) {
       if (contentType.contains("json"))
-        return new JsonParser(true).parse(source);
+        return new JsonParser(true, true).parse(source);
       else if (contentType.contains("xml"))
         return new XmlParser(true).parse(source);
       else
@@ -4376,7 +4406,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (FetchedFile f : changeList)
       generateHtmlOutputs(f, false);
 
-    ValidationPresenter.filterMessages(errors, suppressedMessages, false);
+    ValidationPresenter.filterMessages(errors, suppressedMessages.keySet(), false);
     if (!changeList.isEmpty()) {
       generateSummaryOutputs();
     }
@@ -4461,7 +4491,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         statusMessage = Utilities.escapeXml(sourceIg.present())+" - Local Development build (v"+businessVersion+"). See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>";
               
       List<ValidationMessage> linkmsgs = inspector.check(statusMessage);
-      ValidationPresenter.filterMessages(linkmsgs, suppressedMessages, true);
+      ValidationPresenter.filterMessages(linkmsgs, suppressedMessages.keySet(), true);
       int bl = 0;
       int lf = 0;
       for (ValidationMessage m : linkmsgs) {
@@ -4478,7 +4508,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("  ... "+Integer.toString(inspector.links())+" "+checkPlural("link", inspector.links())+", "+Integer.toString(bl)+" broken "+checkPlural("link", lf)+" ("+Integer.toString((bl*100)/(inspector.links() == 0 ? 1 : inspector.links()))+"%)");
       errors.addAll(linkmsgs);    
       for (FetchedFile f : fileList)
-        ValidationPresenter.filterMessages(f.getErrors(), suppressedMessages, false);
+        ValidationPresenter.filterMessages(f.getErrors(), suppressedMessages.keySet(), false);
       if (brokenLinksError && linkmsgs.size() > 0)
         throw new Error("Halting build because broken links have been found, and these are disallowed in the IG control file");
       if (mode == IGBuildMode.AUTOBUILD && inspector.isMissingPublishBox()) {
@@ -6380,7 +6410,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       } else {
         if (exp.getError() != null) { 
           fragmentError("ValueSet-"+vs.getId()+"-expansion", "No Expansion for this valueset (not supported by Publication Tooling)", "Publication Tooling Error: "+exp.getError(), f.getOutputNames());
-          f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, vs.getId(), exp.getError(), IssueSeverity.ERROR).setTxLink(exp.getTxLink()));
+          if (exp.getError().contains("Unable to provide support")) {
+            f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, vs.getId(), exp.getError(), IssueSeverity.WARNING).setTxLink(exp.getTxLink()));
+          } else {
+            f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, vs.getId(), exp.getError(), IssueSeverity.ERROR).setTxLink(exp.getTxLink()));
+          }
         } else {
           fragmentError("ValueSet-"+vs.getId()+"-expansion", "No Expansion for this valueset (not supported by Publication Tooling)", "Unknown Error", f.getOutputNames());
           f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, vs.getId(), "Unknown Error expanding ValueSet", IssueSeverity.ERROR).setTxLink(exp.getTxLink()));

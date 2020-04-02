@@ -24,10 +24,15 @@ package org.hl7.fhir.igtools.renderers;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
@@ -86,7 +91,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     return list;
   }
   
-  public String generate(String title, List<ValidationMessage> allErrors, List<FetchedFile> files, String path, List<String> filteredMessages) throws IOException {
+  public String generate(String title, List<ValidationMessage> allErrors, List<FetchedFile> files, String path, Map<String, String> filteredMessages) throws IOException {
     
     for (FetchedFile f : files) {
       for (ValidationMessage vm : removeDupMessages(f.getErrors())) {
@@ -194,19 +199,34 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     return msg.length() > 100 ? msg.substring(0, 100) : msg;
   }
 
-  private String genSuppressedMessages(List<String> filteredMessages) {
-    if (filteredMessages.size() == 0)
-      return "";
+  private String genSuppressedMessages(Map<String, String> msgs) {
     StringBuilder b = new StringBuilder();
-    b.append("<a name=\"suppressed\"> </a>\r\n<p><b>Suppressed Error Messages</b></p><ul>\r\n");
-    for (String s : filteredMessages) {
-      b.append(" <li>"+Utilities.escapeXml(s)+"</li>\r\n");
+    b.append("<a name=\"suppressed\"> </a>\r\n<p><b>Suppressed Error Messages</b></p>\r\n");
+    Map<String, List<String>> inverted = new HashMap<>();
+    for (Entry<String, String> e : msgs.entrySet()) {
+      if (!inverted.containsKey(e.getValue())) {
+        inverted.put(e.getValue(), new ArrayList<>());
+      }
+      inverted.get(e.getValue()).add(e.getKey());
     }
-    b.append("</ul>\r\n");
+    for (String s : sorted(inverted.keySet())) {
+      b.append("<p><b>"+Utilities.escapeXml(s)+"</b></p><ul>\r\n");
+      for (String m : inverted.get(s)) {
+        b.append(" <li>"+Utilities.escapeXml(m)+"</li>\r\n");
+      }
+      b.append("</ul>\r\n");
+    }
     return b.toString();
   }
 
-  public static void filterMessages(List<ValidationMessage> messages, List<String> suppressedMessages, boolean suppressErrors) {
+  private List<String> sorted(Set<String> keys) {
+    List<String> list = new ArrayList<>();
+    list.addAll(keys);
+    Collections.sort(list);
+    return list;
+  }
+
+  public static void filterMessages(List<ValidationMessage> messages, Collection<String> suppressedMessages, boolean suppressErrors) {
     List<ValidationMessage> filteredMessages = new ArrayList<ValidationMessage>();
     for (ValidationMessage message : removeDupMessages(messages)) {
       if ((!suppressedMessages.contains(message.getDisplay()) && !suppressedMessages.contains(message.getMessage()))
