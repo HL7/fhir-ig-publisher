@@ -2989,17 +2989,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       List<String> newFileList = new ArrayList<String>();
       checkOutcomes(template.beforeGenerateEvent(publishedIg, tempDir, otherFilesRun, newFileList));
       for (String newFile: newFileList) {
-        try {
-          FetchedFile f = fetcher.fetch(Utilities.path(repoRoot, newFile));
-          String dir = Utilities.getDirectoryForFile(f.getPath());
-          String relative = dir.substring(tempDir.length());
-          if (relative.length() > 0)
-            relative = relative.substring(1);
-          f.setRelativePath(f.getPath().substring(dir.length()+1));
-          PreProcessInfo ppinfo = new PreProcessInfo(null, relative);
-          loadPrePage(f, ppinfo);
-        } catch (Exception e) {
-          throw new FHIRException(e.getMessage());
+        if (!newFile.isEmpty()) {
+          try {
+            FetchedFile f = fetcher.fetch(Utilities.path(repoRoot, newFile));
+            String dir = Utilities.getDirectoryForFile(f.getPath());
+            String relative = dir.substring(tempDir.length());
+            if (relative.length() > 0)
+              relative = relative.substring(1);
+            f.setRelativePath(f.getPath().substring(dir.length()+1));
+            PreProcessInfo ppinfo = new PreProcessInfo(null, relative);
+            loadPrePage(f, ppinfo);
+          } catch (Exception e) {
+            throw new FHIRException(e.getMessage());
+          }
         }
       }
       igPages.clear();
