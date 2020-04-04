@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -16,9 +15,7 @@ import org.cqframework.cql.elm.tracking.TrackBack;
 import org.fhir.ucum.UcumEssenceService;
 import org.fhir.ucum.UcumException;
 import org.fhir.ucum.UcumService;
-import org.hl7.fhir.IssueType;
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.igtools.publisher.CqlSubSystem.CqlSourceFileInformation;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.r5.model.Library;
 import org.hl7.fhir.utilities.cache.NpmPackage;
@@ -114,7 +111,7 @@ public class CqlSubSystem {
    */
   public void execute() throws FHIRException {
     try {
-      fileMap = new HashMap<String, CqlSourceFileInformation>();
+      fileMap = new HashMap<>();
 
       // TODO: Construct NPMLibrarySourceProvider
 
@@ -137,20 +134,38 @@ public class CqlSubSystem {
    * @return
    */
   public CqlSourceFileInformation getFileInformation(String filename) {
-    return null;
+    if (fileMap == null) {
+      throw new IllegalStateException("File map is not available, execute has not been called");
+    }
+
+    if (!fileMap.containsKey(filename)) {
+      throw new IllegalArgumentException(String.format("File %s not found in file map", filename));
+    }
+
+    return this.fileMap.remove(filename);
   }
 
   /**
    * Called at the end after all getFileInformation have been called
-   * return any errors that didn't have any particular home, and also 
+   * return any errors that didn't have any particular home, and also
    * errors for any files that were linked but haven't been accessed using
-   * getFileInformation - these have been omitted from the IG, and that's 
+   * getFileInformation - these have been omitted from the IG, and that's
    * an error
-   * 
+   *
    * @return
    */
   public List<ValidationMessage> getGeneralErrors() {
-    return null;
+    List<ValidationMessage> result = new ArrayList<>();
+
+    if (fileMap != null) {
+      for (Map.Entry<String, CqlSourceFileInformation> entry : fileMap.entrySet()) {
+        result.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.PROCESSING, entry.getKey(), "CQL source was not associated with a library resource in the IG.", ValidationMessage.IssueSeverity.ERROR));
+      }
+    }
+
+    return result;
+  }
+
   private void translateFolder(String folder) {
     // TODO: Readconfig - CqlTranslator.Options, outputFormat: { XML, JSON, BOTH }, validateUnits, errorLevel, signatureLevel
     CqlTranslator.Options[] options = getDefaultOptions();
@@ -166,14 +181,12 @@ public class CqlSubSystem {
     LibraryManager libraryManager = new LibraryManager(modelManager);
     libraryManager.getLibrarySourceLoader().registerProvider(new DefaultLibrarySourceProvider(Paths.get(folder)));
     libraryManager.getLibrarySourceLoader().registerProvider(new FhirLibrarySourceProvider());
-    // TODO: register NPMLibrarySourceProvider
+    // TODO: register NpmLibrarySourceProvider
 
     // foreach *.cql file
     for (File file : new File(folder).listFiles(getCqlFilenameFilter())) {
       translateFile(modelManager, libraryManager, file, format, validateUnits, errorLevel, signatureLevel, options);
-  }
     }
-}
   }
 
   private ValidationMessage.IssueType severityToIssueType(CqlTranslatorException.ErrorSeverity severity) {
