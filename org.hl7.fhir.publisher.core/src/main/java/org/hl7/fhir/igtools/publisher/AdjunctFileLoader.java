@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.hl7.fhir.igtools.publisher.CqlSubSystem.CqlSourceFileInformation;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.ObjectConverter;
 import org.hl7.fhir.r5.model.Attachment;
@@ -47,57 +48,65 @@ public class AdjunctFileLoader {
   public boolean replaceAttachments(FetchedFile f, Element e) {
     List<ElementWithPath> attachments = makeListOfAttachments(e);
     for (ElementWithPath att : attachments) {
-      String fn = checkReplaceable(att.element);
+      String fn = checkReplaceable(att.getElement());
       if (fn != null) {
         Attachment a;
         try {
           a = loadFile(fn);
-          if (a == null) {
-            f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.element.line(), att.element.col(), att.getPath(), "Unable to find Adjunct Binary "+fn, IssueSeverity.ERROR));
-          } else {
-            att.element.getChildren().clear();
-            if (a.hasContentType()) {
-              att.element.setChildValue("contentType", a.getContentType());
-            } else {
-              f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.element.line(), att.element.col(), att.getPath(), "Unknown file type "+fn, IssueSeverity.ERROR));
-            }
-            att.element.setProperty("data".hashCode(), "data", new Base64BinaryType(a.getData()));
-          }
+          addAttachment(f, att, fn, a);
+          // Library - post processing needed
           if (e.fhirType().equals("Library") && "text/cql".equals(a.getContentType())) {
             // we just injected CQL into a library 
             performLibraryCQLProcessing(e, a.getUrl());
           }
         } catch (Exception ex) {
-          f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.element.line(), att.element.col(), att.getPath(), "Error Loading "+fn+": " +ex.getMessage(), IssueSeverity.ERROR));
+          f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.getElement().line(), att.getElement().col(), att.getPath(), "Error Loading "+fn+": " +ex.getMessage(), IssueSeverity.ERROR));
         }
       }
     }
     // special cases:
     // binary - not an attachment 
     if (e.fhirType().equals("Binary")) {
-      String n = e.getChildValue("data");
-      if (n != null && n.startsWith("ig-loader-")) {
-        String fn = n.substring(10);
-        try {
-          Attachment a = loadFile(fn);
-          if (a == null) {
-            f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, e.line(), e.col(), "Binary", "Unable to find Adjunct Binary "+fn, IssueSeverity.ERROR));
-          } else {
-            if (a.hasContentType()) {
-              e.setChildValue("contentType", a.getContentType());
-            } else {
-              f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, e.line(), e.col(), "Binary", "Unknown file type "+fn, IssueSeverity.ERROR));
-            }
-            e.setProperty("data".hashCode(), "data", new Base64BinaryType(a.getData()));
-          }
-        } catch (Exception ex) {
-          f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, e.line(), e.col(), "Binary", "Error Loading "+fn+": " +ex.getMessage(), IssueSeverity.ERROR));
-        }
-        
-      }
+      processBinary(f, e);
     }
-    // Library - post processing needed
     return false;
+  }
+
+  public void processBinary(FetchedFile f, Element e) {
+    String n = e.getChildValue("data");
+    if (n != null && n.startsWith("ig-loader-")) {
+      String fn = n.substring(10);
+      try {
+        Attachment a = loadFile(fn);
+        if (a == null) {
+          f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, e.line(), e.col(), "Binary", "Unable to find Adjunct Binary "+fn, IssueSeverity.ERROR));
+        } else {
+          if (a.hasContentType()) {
+            e.setChildValue("contentType", a.getContentType());
+          } else {
+            f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, e.line(), e.col(), "Binary", "Unknown file type "+fn, IssueSeverity.ERROR));
+          }
+          e.setProperty("data".hashCode(), "data", new Base64BinaryType(a.getData()));
+        }
+      } catch (Exception ex) {
+        f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, e.line(), e.col(), "Binary", "Error Loading "+fn+": " +ex.getMessage(), IssueSeverity.ERROR));
+      }
+      
+    }
+  }
+
+  public void addAttachment(FetchedFile f, ElementWithPath att, String fn, Attachment a) {
+    if (a == null) {
+      f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.getElement().line(), att.getElement().col(), att.getPath(), "Unable to find Adjunct Binary "+fn, IssueSeverity.ERROR));
+    } else {
+      att.getElement().getChildren().clear();
+      if (a.hasContentType()) {
+        att.getElement().setChildValue("contentType", a.getContentType());
+      } else {
+        f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.getElement().line(), att.getElement().col(), att.getPath(), "Unknown file type "+fn, IssueSeverity.ERROR));
+      }
+      att.getElement().setProperty("data".hashCode(), "data", new Base64BinaryType(a.getData()));
+    }
   }
 
   private Attachment loadFile(String fn) throws FileNotFoundException, IOException {
@@ -177,7 +186,10 @@ public class AdjunctFileLoader {
   }
   
   private void performLibraryCQLProcessing(Element e, String name) {
-    
+    CqlSourceFileInformation info = cql.getFileInformation(name);
+    Element att = (Element) e.makeProperty("content".hashCode(), "content");
+    att.setChildValue("contentType", "application/elm+xml");
+    att.setProperty("data".hashCode(), "data", new Base64BinaryType(info.getElm()));    
   }
 
 }

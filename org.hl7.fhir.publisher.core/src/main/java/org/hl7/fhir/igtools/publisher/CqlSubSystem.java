@@ -16,6 +16,8 @@ import org.fhir.ucum.UcumEssenceService;
 import org.fhir.ucum.UcumException;
 import org.fhir.ucum.UcumService;
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.exceptions.FHIRFormatError;
+import org.hl7.fhir.igtools.publisher.CqlSubSystem.CqlSourceFileInformation;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.r5.model.Library;
 import org.hl7.fhir.utilities.cache.NpmPackage;
@@ -54,7 +56,7 @@ public class CqlSubSystem {
    * irrespective of waht version the IG is 
    */
   public interface ILibraryReader {
-    public Library readLibrary(InputStream stream); 
+    public Library readLibrary(InputStream stream) throws FHIRFormatError, IOException; 
   }
   
   /**
