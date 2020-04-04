@@ -20,10 +20,12 @@ import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
 
 public class AdjunctFileLoader {
 
+  private CqlSubSystem cql;
   private List<String> binaryPaths;
 
-  public AdjunctFileLoader(List<String> binaryPaths) {
+  public AdjunctFileLoader(List<String> binaryPaths, CqlSubSystem cql) {
     this.binaryPaths = binaryPaths;
+    this.cql = cql;
   }
 
   private class ElementWithPath {
@@ -63,7 +65,7 @@ public class AdjunctFileLoader {
           }
           if (e.fhirType().equals("Library") && "text/cql".equals(a.getContentType())) {
             // we just injected CQL into a library 
-            performLibraryCQLProcessing(e, a.getData());
+            performLibraryCQLProcessing(e, a.getUrl());
           }
         } catch (Exception ex) {
           f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.element.line(), att.element.col(), att.getPath(), "Error Loading "+fn+": " +ex.getMessage(), IssueSeverity.ERROR));
@@ -105,6 +107,7 @@ public class AdjunctFileLoader {
         Attachment att = new Attachment();
         att.setContentType(determineContentType(Utilities.getFileExtension(fn)));
         att.setData(TextFile.fileToBytes(f));
+        att.setUrl(f.getAbsolutePath());
         return att;
       }
     }
@@ -173,7 +176,7 @@ public class AdjunctFileLoader {
     }    
   }
   
-  private void performLibraryCQLProcessing(Element e, byte[] data) {
+  private void performLibraryCQLProcessing(Element e, String name) {
     
   }
 

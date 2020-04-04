@@ -535,6 +535,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private List<String> listedURLExemptions = new ArrayList<String>();
   private String jekyllCommand = "jekyll";
   private boolean makeQA = true;
+  private CqlSubSystem cql;
 
   private long globalStart;
 
@@ -2792,6 +2793,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else if (!id.equals(publishedIg.getId()))
       errors.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "ImplementationGuide.id", "The Implementation Guide Resource id should be "+id, IssueSeverity.WARNING));
       
+    // Cql Compile
+    cql = new CqlSubSystem(npmList, binaryPaths, new LibraryLoader(version), this);
+    if (binaryPaths.size() > 0) {
+      cql.execute();
+    }
     // load any bundles
     if (sourceDir != null || igpkp.isAutoPath())
       needToBuild = loadResources(needToBuild, igf);
@@ -3760,8 +3766,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private boolean loadAdjunctBinaries(FetchedFile f, FetchedResource r) {
-    return new AdjunctFileLoader(binaryPaths).replaceAttachments(f, r.getElement());
-//    return false;
+    return new AdjunctFileLoader(binaryPaths, cql).replaceAttachments(f, r.getElement());
   }
 
   private ImplementationGuideDefinitionResourceComponent findIGReference(String type, String id) {

@@ -36,7 +36,6 @@ public class CqlSubSystem {
     public List<String> getRelatedArtifacts() {
       return relatedArtifacts;
     }
-    
   }
 
   /**
@@ -49,12 +48,18 @@ public class CqlSubSystem {
   }
   
   /**
-   * all the NPM packages this IG depends on (including base)
+   * all the NPM packages this IG depends on (including base). 
+   * This list is in a maintained order such that you can just 
+   * do for (NpmPackage p : packages) and that will resolve the 
+   * library in the right order
+   *   
    */
   private List<NpmPackage> packages;
   
   /**
    * All the file paths cql files might be found in (absolute local file paths)
+   * 
+   * will be at least one error
    */
   private List<String> folders; 
   
@@ -79,6 +84,8 @@ public class CqlSubSystem {
   /**
    * Do the compile. Do not return any exceptions related to content; only thros exceptions for infrastructural issues 
    * 
+   * note that it's not an error if there's no .cql files - this is called without checking for their existence
+   *  
    * Any exception will stop the build cold.
    */
   public void execute() throws FHIRException {
@@ -88,5 +95,17 @@ public class CqlSubSystem {
   public CqlSourceFileInformation getFileInformation(String filename) {
     return null;
   }
-  
+ 
+  /**
+   * Called at the end after all getFileInformation have been called
+   * return any errors that didn't have any particular home, and also 
+   * errors for any files that were linked but haven't been accessed using
+   * getFileInformation - these have been omitted from the IG, and that's 
+   * an error
+   * 
+   * @return
+   */
+  public List<ValidationMessage> getGeneralErrors() {
+    return null;
+  }
 }
