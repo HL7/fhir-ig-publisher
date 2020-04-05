@@ -380,8 +380,11 @@ public class CqlSubSystem {
   }
 
   private String getReferenceUrl(String path, String version) {
-    if (!Paths.get(path).isAbsolute()) {
-      // TODO: How do I get to the canonical base for the IG?
+    String uri = NamespaceManager.getUriPart(path);
+    String name = NamespaceManager.getNamePart(path);
+
+    if (uri != null) {
+      return String.format("%s/Library/%s%s", uri, name, version != null ? ("|" + version) : "");
     }
 
     return String.format("Library/%s%s", path, version != null ? ("|" + version) : "");
