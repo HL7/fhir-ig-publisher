@@ -16,9 +16,13 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.CqlSubSystem.CqlSourceFileInformation;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
+import org.hl7.fhir.r5.model.DataRequirement;
 import org.hl7.fhir.r5.model.Library;
+import org.hl7.fhir.r5.model.RelatedArtifact;
 import org.hl7.fhir.utilities.cache.NpmPackage;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
+import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
+import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.w3._1999.xhtml.P;
 
 public class CqlSubSystem {
@@ -29,8 +33,8 @@ public class CqlSubSystem {
   public class CqlSourceFileInformation {
     private byte[] elm;
     private List<ValidationMessage> errors = new ArrayList<>();
-    private List<String> dataRequirements = new ArrayList<>();
-    private List<String> relatedArtifacts = new ArrayList<>();
+    private List<DataRequirement> dataRequirements = new ArrayList<>();
+    private List<RelatedArtifact> relatedArtifacts = new ArrayList<>();
     public byte[] getElm() {
       return elm;
     }
@@ -40,10 +44,10 @@ public class CqlSubSystem {
     public List<ValidationMessage> getErrors() {
       return errors;
     }
-    public List<String> getDataRequirements() {
+    public List<DataRequirement> getDataRequirements() {
       return dataRequirements;
     }
-    public List<String> getRelatedArtifacts() {
+    public List<RelatedArtifact> getRelatedArtifacts() {
       return relatedArtifacts;
     }
   }
@@ -60,24 +64,18 @@ public class CqlSubSystem {
       // VersionedIdentifier.version: Version of the library
       // TODO: Optimize to use the index to resolve by URL
       for (NpmPackage p : packages) {
-        if (p.canonical().equals(identifier.getSystem())) {
-          // Assume "package" folder organization
-          try {
-            for (String s : p.listResources("Library")) {
-              Library l = reader.readLibrary(p.load("package", s));
-              if (l.getName().equals(identifier.getId())) {
-                if ((identifier.getVersion() == null) || identifier.getVersion().equals(l.getVersion())) {
-                  for (org.hl7.fhir.r5.model.Attachment a : l.getContent()) {
-                    if (a.getContentType() != null && a.getContentType().equals("text/cql")) {
-                      return new ByteArrayInputStream(a.getData());
-                    }
-                  }
-                }
+        try {
+          InputStream s = p.loadByCanonicalVersion(identifier.getSystem()+"/Library/"+identifier.getId(), identifier.getVersion());
+          if (s != null) {
+            Library l = reader.readLibrary(s);
+            for (org.hl7.fhir.r5.model.Attachment a : l.getContent()) {
+              if (a.getContentType() != null && a.getContentType().equals("text/cql")) {
+                return new ByteArrayInputStream(a.getData());
               }
             }
-          } catch (IOException e) {
-            logger.logDebugMessage(ILoggingService.LogCategory.PROGRESS, String.format("Exceptions occurred attempting to load npm library source for %s", identifier.toString()));
           }
+        } catch (IOException e) {
+          logger.logDebugMessage(ILoggingService.LogCategory.PROGRESS, String.format("Exceptions occurred attempting to load npm library source for %s", identifier.toString()));
         }
       }
 
@@ -131,12 +129,13 @@ public class CqlSubSystem {
    */
   private Map<String, CqlSourceFileInformation> fileMap;
 
-  public CqlSubSystem(List<NpmPackage> packages, List<String> folders, ILibraryReader reader, ILoggingService logger) {
+  public CqlSubSystem(List<NpmPackage> packages, List<String> folders, ILibraryReader reader, ILoggingService logger, UcumService ucumService) {
     super();
     this.packages = packages;
     this.folders = folders;
     this.reader = reader;
     this.logger = logger;
+    this.ucumService = ucumService;
   }
   
   /**
@@ -151,10 +150,7 @@ public class CqlSubSystem {
       logger.logMessage("Translating CQL source");
       fileMap = new HashMap<>();
 
-      // Set up UcumService
-      initializeUcumService();
-
-      // foreach folder
+       // foreach folder
       for (String folder : folders) {
         translateFolder(folder);
       }
@@ -171,11 +167,11 @@ public class CqlSubSystem {
    */
   public CqlSourceFileInformation getFileInformation(String filename) {
     if (fileMap == null) {
-      throw new IllegalStateException("File map is not available, execute has not been called");
+      throw new IllegalStateException("CQL File map is not available, execute has not been called");
     }
 
     if (!fileMap.containsKey(filename)) {
-      throw new IllegalArgumentException(String.format("File %s not found in file map", filename));
+      return null;
     }
 
     return this.fileMap.remove(filename);
@@ -261,14 +257,16 @@ public class CqlSubSystem {
   private void translateFile(ModelManager modelManager, LibraryManager libraryManager, File file, String format,
                              boolean validateUnits, CqlTranslatorException.ErrorSeverity errorLevel,
                              LibraryBuilder.SignatureLevel signatureLevel, CqlTranslator.Options[] options) {
+    logger.logMessage(String.format("Translating CQL source in file %s", file.toString()));
+    CqlSourceFileInformation result = new CqlSourceFileInformation();
+    fileMap.put(file.getAbsoluteFile().toString(), result);
+
     try {
-      logger.logMessage(String.format("Translating CQL source in file %s", file.toString()));
 
       // translate toXML
       CqlTranslator translator = CqlTranslator.fromFile(file, modelManager, libraryManager,
               validateUnits ? ucumService : null, errorLevel, signatureLevel, options);
 
-      CqlSourceFileInformation result = new CqlSourceFileInformation();
       // record errors and warnings
       for (CqlTranslatorException exception : translator.getExceptions()) {
         result.getErrors().add(exceptionToValidationMessage(file, exception));
@@ -276,10 +274,9 @@ public class CqlSubSystem {
 
       // TODO: If the translation fails, output all the validation messages to the log?
       if (translator.getErrors().size() > 0) {
-        logger.logMessage(String.format("Translation failed due with (%d) errors.", translator.getErrors().size()));
+        result.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.EXCEPTION, file.getName(), String.format("CQL Processing failed due with (%d) errors.", translator.getErrors().size()), IssueSeverity.ERROR));
       }
       else {
-
         // convert to base64 bytes
         result.setElm(translator.toXml().getBytes());
 
@@ -291,13 +288,10 @@ public class CqlSubSystem {
 
         // TODO: Extract terminology data? (include code system and value set references as relatedArtifacts?
 
-        // put to map
-        fileMap.put(file.getAbsoluteFile().toString(), result);
       }
     }
-    catch (IOException e) {
-      logger.logDebugMessage(ILoggingService.LogCategory.PROGRESS,
-              String.format("Errors occurred attempting to translate file %s: %s", file.toString(), e.getMessage()));
+    catch (Exception e) {
+      result.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.EXCEPTION, file.getName(), "CQL Processing failed with exception: "+e.getMessage(), IssueSeverity.ERROR));
     }
   }
 
@@ -320,34 +314,23 @@ public class CqlSubSystem {
     };
   }
 
-  private void initializeUcumService() {
-    try {
-      ucumService = new UcumEssenceService(UcumEssenceService.class.getResourceAsStream("/ucum-essence.xml"));
-    }
-    catch (UcumException e) {
-      logger.logDebugMessage(ILoggingService.LogCategory.PROGRESS, String.format("Could not create UCUM validation service: %s", e.getMessage()));
-    }
-  }
-
-  private List<String> extractRelatedArtifacts(org.hl7.elm.r1.Library library) {
-    List<String> result = new ArrayList();
+  private List<RelatedArtifact> extractRelatedArtifacts(org.hl7.elm.r1.Library library) {
+    List<RelatedArtifact> result = new ArrayList<>();
 
     if (library.getIncludes() != null && !library.getIncludes().getDef().isEmpty()) {
       for (IncludeDef def : library.getIncludes().getDef()) {
-        org.hl7.fhir.r5.model.RelatedArtifact ra = toRelatedArtifact(def);
-        // TODO: Serialize to the result list
+        result.add(toRelatedArtifact(def));
       }
     }
 
     return result;
   }
 
-  private List<String> extractDataRequirements(List<org.hl7.elm.r1.Retrieve> retrieves, TranslatedLibrary library, LibraryManager libraryManager) {
-    List<String> result = new ArrayList();
+  private List<DataRequirement> extractDataRequirements(List<org.hl7.elm.r1.Retrieve> retrieves, TranslatedLibrary library, LibraryManager libraryManager) {
+    List<DataRequirement> result = new ArrayList<>();
 
     for (Retrieve retrieve : retrieves) {
-      org.hl7.fhir.r5.model.DataRequirement dr = toDataRequirement(retrieve, library, libraryManager);
-      // TODO: Serialize to the result list
+      result.add(toDataRequirement(retrieve, library, libraryManager));
     }
 
     return result;
@@ -371,7 +354,7 @@ public class CqlSubSystem {
   private org.hl7.fhir.r5.model.DataRequirement toDataRequirement(Retrieve retrieve, TranslatedLibrary library, LibraryManager libraryManager) {
     org.hl7.fhir.r5.model.DataRequirement dr = new org.hl7.fhir.r5.model.DataRequirement();
 
-    dr.setType(org.hl7.fhir.r5.model.Enumerations.FHIRAllTypes.valueOf(retrieve.getDataType().getLocalPart()));
+    dr.setType(org.hl7.fhir.r5.model.Enumerations.FHIRAllTypes.fromCode(retrieve.getDataType().getLocalPart()));
 
     // Set profile if specified
     if (retrieve.getTemplateId() != null) {

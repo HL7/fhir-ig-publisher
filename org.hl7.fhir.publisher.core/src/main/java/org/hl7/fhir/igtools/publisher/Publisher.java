@@ -2794,7 +2794,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       errors.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "ImplementationGuide.id", "The Implementation Guide Resource id should be "+id, IssueSeverity.WARNING));
       
     // Cql Compile
-    cql = new CqlSubSystem(npmList, binaryPaths, new LibraryLoader(version), this);
+    cql = new CqlSubSystem(npmList, binaryPaths, new LibraryLoader(version), this, context.getUcumService());
     if (binaryPaths.size() > 0) {
       cql.execute();
     }
@@ -2839,7 +2839,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
 
-    errors.addAll(cql.getGeneralErrors());
     // load static pages
     needToBuild = loadPrePages() || needToBuild;
     needToBuild = loadPages() || needToBuild;
@@ -3480,6 +3479,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     generateAdditionalExamples();
     executeTransforms();
     validateExpressions();
+    errors.addAll(cql.getGeneralErrors());
     scanForUsageStats();
   }
 
@@ -3750,7 +3750,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           r.setElement(e).setId(id).setTitle(e.getChildValue("name"));
           r.setResource(res);
         }
-        if (loadAdjunctBinaries(file, r)) {
+        if (new AdjunctFileLoader(binaryPaths, cql).replaceAttachments1(file, r, metadataResourceNames())) {
           altered = true;
         }
         if ((altered && r.getResource() != null) || (ver.equals(Constants.VERSION) && r.getResource() == null))
@@ -3764,10 +3764,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         throw new Exception("Unable to determine type for  "+file.getName()+": " +ex.getMessage(), ex);
       }
     }
-  }
-
-  private boolean loadAdjunctBinaries(FetchedFile f, FetchedResource r) {
-    return new AdjunctFileLoader(binaryPaths, cql).replaceAttachments(f, r.getElement());
   }
 
   private ImplementationGuideDefinitionResourceComponent findIGReference(String type, String id) {
@@ -3944,6 +3940,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             if (!bc.hasStatus()) {
               altered = true;
               bc.setStatus(PublicationStatus.DRAFT);
+            }
+            if (new AdjunctFileLoader(binaryPaths, cql).replaceAttachments2(f, r)) {
+              altered = true;
             }
             if (altered)
               r.setElement(convertToElement(bc));
