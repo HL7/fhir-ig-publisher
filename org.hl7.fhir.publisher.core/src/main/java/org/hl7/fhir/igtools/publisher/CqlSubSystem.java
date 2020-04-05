@@ -129,13 +129,16 @@ public class CqlSubSystem {
    */
   private Map<String, CqlSourceFileInformation> fileMap;
 
-  public CqlSubSystem(List<NpmPackage> packages, List<String> folders, ILibraryReader reader, ILoggingService logger, UcumService ucumService) {
+  private String canonicalBase;
+  
+  public CqlSubSystem(List<NpmPackage> packages, List<String> folders, ILibraryReader reader, ILoggingService logger, UcumService ucumService, String canonicalBase) {
     super();
     this.packages = packages;
     this.folders = folders;
     this.reader = reader;
     this.logger = logger;
     this.ucumService = ucumService;
+    this.canonicalBase = canonicalBase;
   }
   
   /**
