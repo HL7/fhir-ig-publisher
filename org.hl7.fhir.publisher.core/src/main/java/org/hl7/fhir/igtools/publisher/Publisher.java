@@ -2794,7 +2794,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       errors.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "ImplementationGuide.id", "The Implementation Guide Resource id should be "+id, IssueSeverity.WARNING));
       
     // Cql Compile
-    cql = new CqlSubSystem(npmList, binaryPaths, new LibraryLoader(version), this, context.getUcumService(), igpkp.getCanonical());
+    cql = new CqlSubSystem(npmList, binaryPaths, new LibraryLoader(version), this, context.getUcumService(), sourceIg.getName(), igpkp.getCanonical());
     if (binaryPaths.size() > 0) {
       cql.execute();
     }
