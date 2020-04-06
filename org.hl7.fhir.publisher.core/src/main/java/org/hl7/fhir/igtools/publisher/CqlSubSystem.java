@@ -129,16 +129,34 @@ public class CqlSubSystem {
    */
   private Map<String, CqlSourceFileInformation> fileMap;
 
+  /**
+   * The name of the IG, used to construct a NamespaceInfo for the CQL translator
+   * Libraries that don't specify a namespace will be built in this namespace
+   * Libraries can specify a namespace, but must use this name to do it
+   */
+  private String igName;
+
+  /**
+   * The canonical base of the IG, will to construct a NamespaceInfo for the CQL translator
+   * Libraries translated in this IG will have this namespaceUri as their system
+   * Library resources published in this IG will then have URLs of [canonicalBase]/Library/[libraryName]
+   */
   private String canonicalBase;
-  
-  public CqlSubSystem(List<NpmPackage> packages, List<String> folders, ILibraryReader reader, ILoggingService logger, UcumService ucumService, String canonicalBase) {
+
+  private NamespaceInfo namespaceInfo;
+
+  public CqlSubSystem(List<NpmPackage> packages, List<String> folders, ILibraryReader reader, ILoggingService logger, UcumService ucumService, String igName, String canonicalBase) {
     super();
     this.packages = packages;
     this.folders = folders;
     this.reader = reader;
     this.logger = logger;
     this.ucumService = ucumService;
+    this.igName = igName;
     this.canonicalBase = canonicalBase;
+    if (igName != null && !igName.isEmpty() && canonicalBase != null && !canonicalBase.isEmpty()) {
+      this.namespaceInfo = new NamespaceInfo(igName, canonicalBase);
+    }
   }
   
   /**
@@ -220,9 +238,24 @@ public class CqlSubSystem {
     libraryManager.getLibrarySourceLoader().registerProvider(new FhirLibrarySourceProvider());
     libraryManager.getLibrarySourceLoader().registerProvider(new NpmLibrarySourceProvider());
 
+    loadNamespaces(libraryManager);
+
     // foreach *.cql file
     for (File file : new File(folder).listFiles(getCqlFilenameFilter())) {
       translateFile(modelManager, libraryManager, file, format, validateUnits, errorLevel, signatureLevel, options);
+    }
+  }
+
+  private void loadNamespaces(LibraryManager libraryManager) {
+    if (namespaceInfo != null) {
+      libraryManager.getNamespaceManager().addNamespace(namespaceInfo);
+    }
+
+    for (NpmPackage p : packages) {
+      if (p.name() != null && !p.name().isEmpty() && p.canonical() != null && !p.canonical().isEmpty()) {
+        NamespaceInfo ni = new NamespaceInfo(p.name(), p.canonical());
+        libraryManager.getNamespaceManager().addNamespace(ni);
+      }
     }
   }
 
@@ -267,7 +300,7 @@ public class CqlSubSystem {
     try {
 
       // translate toXML
-      CqlTranslator translator = CqlTranslator.fromFile(file, modelManager, libraryManager,
+      CqlTranslator translator = CqlTranslator.fromFile(namespaceInfo, file, modelManager, libraryManager,
               validateUnits ? ucumService : null, errorLevel, signatureLevel, options);
 
       // record errors and warnings
@@ -347,8 +380,11 @@ public class CqlSubSystem {
   }
 
   private String getReferenceUrl(String path, String version) {
-    if (!Paths.get(path).isAbsolute()) {
-      // TODO: How do I get to the canonical base for the IG?
+    String uri = NamespaceManager.getUriPart(path);
+    String name = NamespaceManager.getNamePart(path);
+
+    if (uri != null) {
+      return String.format("%s/Library/%s%s", uri, name, version != null ? ("|" + version) : "");
     }
 
     return String.format("Library/%s%s", path, version != null ? ("|" + version) : "");
