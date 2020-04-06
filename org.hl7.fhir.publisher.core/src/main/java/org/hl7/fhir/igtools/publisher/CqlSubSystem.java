@@ -62,7 +62,6 @@ public class CqlSubSystem {
       // VersionedIdentifier.id: Name of the library
       // VersionedIdentifier.system: Namespace for the library, as a URL
       // VersionedIdentifier.version: Version of the library
-      // TODO: Optimize to use the index to resolve by URL
       for (NpmPackage p : packages) {
         try {
           InputStream s = p.loadByCanonicalVersion(identifier.getSystem()+"/Library/"+identifier.getId(), identifier.getVersion());
@@ -130,14 +129,14 @@ public class CqlSubSystem {
   private Map<String, CqlSourceFileInformation> fileMap;
 
   /**
-   * The name of the IG, used to construct a NamespaceInfo for the CQL translator
+   * The packageId for the implementation guide, used to construct a NamespaceInfo for the CQL translator
    * Libraries that don't specify a namespace will be built in this namespace
    * Libraries can specify a namespace, but must use this name to do it
    */
-  private String igName;
+  private String packageId;
 
   /**
-   * The canonical base of the IG, will to construct a NamespaceInfo for the CQL translator
+   * The canonical base of the IG, used to construct a NamespaceInfo for the CQL translator
    * Libraries translated in this IG will have this namespaceUri as their system
    * Library resources published in this IG will then have URLs of [canonicalBase]/Library/[libraryName]
    */
@@ -145,17 +144,17 @@ public class CqlSubSystem {
 
   private NamespaceInfo namespaceInfo;
 
-  public CqlSubSystem(List<NpmPackage> packages, List<String> folders, ILibraryReader reader, ILoggingService logger, UcumService ucumService, String igName, String canonicalBase) {
+  public CqlSubSystem(List<NpmPackage> packages, List<String> folders, ILibraryReader reader, ILoggingService logger, UcumService ucumService, String packageId, String canonicalBase) {
     super();
     this.packages = packages;
     this.folders = folders;
     this.reader = reader;
     this.logger = logger;
     this.ucumService = ucumService;
-    this.igName = igName;
+    this.packageId = packageId;
     this.canonicalBase = canonicalBase;
-    if (igName != null && !igName.isEmpty() && canonicalBase != null && !canonicalBase.isEmpty()) {
-      this.namespaceInfo = new NamespaceInfo(igName, canonicalBase);
+    if (packageId != null && !packageId.isEmpty() && canonicalBase != null && !canonicalBase.isEmpty()) {
+      this.namespaceInfo = new NamespaceInfo(packageId, canonicalBase);
     }
   }
   
@@ -234,9 +233,9 @@ public class CqlSubSystem {
     // Construct FhirLibrarySourceProvider
     ModelManager modelManager = new ModelManager();
     LibraryManager libraryManager = new LibraryManager(modelManager);
-    libraryManager.getLibrarySourceLoader().registerProvider(new DefaultLibrarySourceProvider(Paths.get(folder)));
-    libraryManager.getLibrarySourceLoader().registerProvider(new FhirLibrarySourceProvider());
     libraryManager.getLibrarySourceLoader().registerProvider(new NpmLibrarySourceProvider());
+    libraryManager.getLibrarySourceLoader().registerProvider(new FhirLibrarySourceProvider());
+    libraryManager.getLibrarySourceLoader().registerProvider(new DefaultLibrarySourceProvider(Paths.get(folder)));
 
     loadNamespaces(libraryManager);
 
@@ -310,7 +309,8 @@ public class CqlSubSystem {
 
       // TODO: If the translation fails, output all the validation messages to the log?
       if (translator.getErrors().size() > 0) {
-        result.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.EXCEPTION, file.getName(), String.format("CQL Processing failed due with (%d) errors.", translator.getErrors().size()), IssueSeverity.ERROR));
+        result.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.EXCEPTION, file.getName(), String.format("CQL Processing failed with (%d) errors.", translator.getErrors().size()), IssueSeverity.ERROR));
+        logger.logMessage(String.format("Translation failed with (%d) errors; see the error log for more information.", translator.getErrors().size()));
       }
       else {
         // convert to base64 bytes
@@ -324,6 +324,7 @@ public class CqlSubSystem {
 
         // TODO: Extract terminology data? (include code system and value set references as relatedArtifacts?
 
+        logger.logMessage("CQL translation completed successfully.");
       }
     }
     catch (Exception e) {
