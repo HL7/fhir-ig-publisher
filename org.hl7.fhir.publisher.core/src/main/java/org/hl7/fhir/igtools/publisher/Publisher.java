@@ -179,6 +179,7 @@ import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnCom
 import org.hl7.fhir.r5.model.ImplementationGuide.SPDXLicense;
 import org.hl7.fhir.r5.model.ListResource;
 import org.hl7.fhir.r5.model.ListResource.ListResourceEntryComponent;
+import org.hl7.fhir.r5.model.MetadataResource;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.OperationDefinition;
 import org.hl7.fhir.r5.model.Parameters;
@@ -534,6 +535,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private List<String> listedURLExemptions = new ArrayList<String>();
   private String jekyllCommand = "jekyll";
   private boolean makeQA = true;
+  private CqlSubSystem cql;
 
   private long globalStart;
 
@@ -554,6 +556,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private List<ContactDetail> contacts;
   private List<UsageContext> contexts;
+  private List<String> binaryPaths = new ArrayList<>();
   private String copyright;
   private List<CodeableConcept> jurisdictions;
   private SPDXLicense licenseInfo;
@@ -881,13 +884,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   @Override
   public ResourceWithReference resolve(String url) {
     String[] parts = url.split("\\/");
-    if (parts.length != 2)
+    if (parts.length < 2)
       return null;
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getElement() != null && r.getElement().fhirType().equals(parts[0]) && r.getId().equals(parts[1])) {
           String path = igpkp.getLinkFor(r, true);
           return new ResourceWithReference(path, gen.new ResourceWrapperMetaElement(r.getElement()));
+        }
+        if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
+          if (url.equals(((CanonicalResource) r.getResource()).getUrl())) {
+            String path = igpkp.getLinkFor(r, true);
+            return new ResourceWithReference(path, gen.new ResourceWrapperDirect(r.getResource()));            
+          }
         }
       }
     }
@@ -1442,6 +1451,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         htmlTemplate = p.getValue();
       } else if (p.getCode().equals("template-md")) {     
         mdTemplate = p.getValue();
+      } else if (p.getCode().equals("path-binary")) {     
+        binaryPaths.add(Utilities.path(rootDir, p.getValue()));
       } else if (p.getCode().equals("show-inherited-invariants")) {     
         allInvariants = "true".equals(p.getValue());
       } else if (p.getCode().equals("apply-contact") && p.getValue().equals("true")) {
@@ -1780,6 +1791,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         resourceDirs.add(Utilities.path(rootDir, ((JsonPrimitive) e).getAsString()));
     } else
       resourceDirs.add(Utilities.path(rootDir, str(paths, "resources", "resources")));
+    if (paths != null && paths.get("binaries") instanceof JsonArray) {
+      for (JsonElement e : (JsonArray) paths.get("binaries")) {
+        binaryPaths.add(Utilities.path(rootDir, ((JsonPrimitive) e).getAsString()));
+      }
+    } 
     if (paths != null && paths.get("pages") instanceof JsonArray) {
       for (JsonElement e : (JsonArray) paths.get("pages"))
         pagesDirs.add(Utilities.path(rootDir, ((JsonPrimitive) e).getAsString()));
@@ -2777,6 +2793,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else if (!id.equals(publishedIg.getId()))
       errors.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "ImplementationGuide.id", "The Implementation Guide Resource id should be "+id, IssueSeverity.WARNING));
       
+    // Cql Compile
+    cql = new CqlSubSystem(npmList, binaryPaths, new LibraryLoader(version), this, context.getUcumService(), igpkp.getCanonical());
+    if (binaryPaths.size() > 0) {
+      cql.execute();
+    }
     // load any bundles
     if (sourceDir != null || igpkp.isAutoPath())
       needToBuild = loadResources(needToBuild, igf);
@@ -2993,7 +3014,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           try {
             FetchedFile f = fetcher.fetch(Utilities.path(repoRoot, newFile));
             String dir = Utilities.getDirectoryForFile(f.getPath());
-            String relative = dir.substring(tempDir.length());
+            String relative = tempDir.length() > dir.length() ? "" : dir.substring(tempDir.length());
             if (relative.length() > 0)
               relative = relative.substring(1);
             f.setRelativePath(f.getPath().substring(dir.length()+1));
@@ -3460,6 +3481,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     generateAdditionalExamples();
     executeTransforms();
     validateExpressions();
+    errors.addAll(cql.getGeneralErrors());
     scanForUsageStats();
   }
 
@@ -3730,6 +3752,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           r.setElement(e).setId(id).setTitle(e.getChildValue("name"));
           r.setResource(res);
         }
+        if (new AdjunctFileLoader(binaryPaths, cql).replaceAttachments1(file, r, metadataResourceNames())) {
+          altered = true;
+        }
         if ((altered && r.getResource() != null) || (ver.equals(Constants.VERSION) && r.getResource() == null))
           r.setResource(new ObjectConverter(context).convert(r.getElement()));
         if ((altered && r.getResource() == null))
@@ -3917,6 +3942,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             if (!bc.hasStatus()) {
               altered = true;
               bc.setStatus(PublicationStatus.DRAFT);
+            }
+            if (new AdjunctFileLoader(binaryPaths, cql).replaceAttachments2(f, r)) {
+              altered = true;
             }
             if (altered)
               r.setElement(convertToElement(bc));
