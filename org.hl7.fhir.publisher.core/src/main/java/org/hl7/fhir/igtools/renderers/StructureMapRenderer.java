@@ -70,8 +70,10 @@ public class StructureMapRenderer extends BaseRenderer {
       b.append(" <tr><td>"+translate("sm.summary", "Publisher")+":</td><td>"+Utilities.escapeXml(gt(map.getPublisherElement()))+"</td></tr>\r\n");
     if (map.hasCopyright())
       b.append(" <tr><td>"+translate("sm.summary", "Copyright")+":</td><td>"+processMarkdown("copyright", map.getCopyrightElement())+"</td></tr>\r\n");
-    if (ToolingExtensions.hasExtension(map, ToolingExtensions.EXT_FMM_LEVEL))
-      b.append(" <tr><td><a class=\"fmm\" href=\"versions.html#maturity\" title=\"Maturity Level\">"+translate("cs.summary", "Maturity")+"</a>:</td><td>"+ToolingExtensions.readStringExtension(map, ToolingExtensions.EXT_FMM_LEVEL)+"</td></tr>\r\n");
+    if (ToolingExtensions.hasExtension(map, ToolingExtensions.EXT_FMM_LEVEL)) {
+      // Use hard-coded spec link to point to current spec because DSTU2 had maturity listed on a different page
+      b.append(" <tr><td><a class=\"fmm\" href=\"http://hl7.org/fhir/versions.html#maturity\" title=\"Maturity Level\">"+translate("cs.summary", "Maturity")+"</a>:</td><td>"+ToolingExtensions.readStringExtension(map, ToolingExtensions.EXT_FMM_LEVEL)+"</td></tr>\r\n");
+    }
     if (xml || json || ttl) {
       b.append(" <tr><td>"+translate("sm.summary", "Source Resource")+":</td><td>");
       boolean first = true;

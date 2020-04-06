@@ -5692,8 +5692,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       String mm = "";
       if (r.getResource() != null && r.getResource() instanceof DomainResource) {
         String fmm = ToolingExtensions.readStringExtension((DomainResource) r.getResource(), ToolingExtensions.EXT_FMM_LEVEL);
-        if (fmm != null)
-          mm = " <a class=\"fmm\" href=\"versions.html#maturity\" title=\"Maturity Level\">"+fmm+"</a>";
+        if (fmm != null) {
+          // Use hard-coded spec link to point to current spec because DSTU2 had maturity listed on a different page
+          mm = " <a class=\"fmm\" href=\"http://hl7.org/fhir/versions.html#maturity\" title=\"Maturity Level\">"+fmm+"</a>";
+        }
       }
       listMM.append(" <li><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a>"+mm+" "+Utilities.escapeXml(desc.asStringValue())+"</li>\r\n");
       listsMM.append(" <li><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a>"+mm+"</li>\r\n");
@@ -6331,7 +6333,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       ss = StandardsStatus.TRIAL_USE;
     if (fmm != null)
       return "<table class=\"cols\"><tbody><tr>"+
-        "<td><a href=\""+checkAppendSlash(specPath)+"versions.html#maturity\">Maturity Level</a>: "+fmm+"</td>"+
+        "<td><a href=\"http://hl7.org/fhir/versions.html#maturity\">Maturity Level</a>: "+fmm+"</td>"+
         "<td>&nbsp;<a href=\""+checkAppendSlash(specPath)+"versions.html#std-process\" title=\"Standard Status\">"+ss.toDisplay()+"</a></td>"+
         "</tr></tbody></table>";
     else
