@@ -694,7 +694,11 @@ public class StructureDefinitionRenderer extends BaseRenderer {
               }
               if (!tl.contains(tc)) {
                 tl.add(tc);
-                String s = ec.getId().replace("[x]", Utilities.capitalize(tc));
+                String s = ec.getId();
+                if (s.contains(":") && s.lastIndexOf(":") > s.lastIndexOf("[x]")) {
+                  s = s.substring(0, s.lastIndexOf(":"));
+                }
+                s = s.replace("[x]", Utilities.capitalize(tc));
                 StringPair sp = new StringPair(ec.getId(), s);
                 if (!hasReplacement(replacements, sp) && !ec.getId().equals(s))
                   replacements.add(sp);
