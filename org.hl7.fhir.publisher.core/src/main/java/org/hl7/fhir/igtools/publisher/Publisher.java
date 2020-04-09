@@ -79,6 +79,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.SystemUtils;
 import org.hl7.fhir.convertors.IGR2ConvertorAdvisor;
+import org.hl7.fhir.convertors.NpmPackageVersionConverter;
 import org.hl7.fhir.convertors.R2016MayToR4Loader;
 import org.hl7.fhir.convertors.R2016MayToR5Loader;
 import org.hl7.fhir.convertors.R2ToR4Loader;
@@ -133,6 +134,7 @@ import org.hl7.fhir.r5.conformance.ConstraintJavaGenerator;
 import org.hl7.fhir.r5.conformance.ProfileUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
+import org.hl7.fhir.r5.context.IWorkerContext.PackageVersion;
 import org.hl7.fhir.r5.context.IWorkerContext.ValidationResult;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.context.SimpleWorkerContext.ILoadFilter;
@@ -611,6 +613,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private List<String> spreadsheets = new ArrayList<>();
   private List<String> bundles = new ArrayList<>();
   private List<String> mappings = new ArrayList<>();
+  private List<String> generateVersions = new ArrayList<>();
 
   private IGPublisherLiquidTemplateServices templateProvider;
 
@@ -1469,7 +1472,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         publisher = sourceIg.getPublisher();
       } else if (p.getCode().equals("apply-version") && p.getValue().equals("true")) {
         businessVersion = sourceIg.getVersion();
-
+      } else if (p.getCode().equals("generate-version")) {     
+        generateVersions.add(p.getValue());
       } else if (p.getCode().equals("validation")) {
         if (p.getValue().equals("check-must-support"))
           hintAboutNonMustSupport = true;
@@ -1481,7 +1485,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           brokenLinksError = true;
         else if (p.getValue().equals("show-reference-messages"))
           showReferenceMessages = true;
-        
       }
       count++;
     }
@@ -2512,7 +2515,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             r.setUserData("versionpath", canonical+"/"+ igpkp.doReplacements(p, r, null, null));
           }
         }
-        context.cacheResource(r);
+        context.cacheResourceFromPackage(r, new PackageVersion(pi.id(), pi.version()));
       }
     }
   }
@@ -3950,7 +3953,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               r.setElement(convertToElement(bc));
             igpkp.checkForPath(f, r, bc, false);
             try {
-              context.cacheResource(bc);
+              context.cacheResourceFromPackage(bc, new PackageVersion(publishedIg.getPackageId(), publishedIg.getVersion()));
             } catch (Exception e) {
               throw new Exception("Exception loading "+bc.getUrl()+": "+e.getMessage(), e);
             }
@@ -3972,7 +3975,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                 if (mr.hasUrl()) {
                   if (!mr.hasUserData("path"))
                     igpkp.checkForPath(f,  r,  mr, true);
-                  context.cacheResource(mr);
+                  context.cacheResourceFromPackage(mr, new PackageVersion(publishedIg.getPackageId(), publishedIg.getVersion()));
                 } else
                   logDebugMessage(LogCategory.PROGRESS, "Ignoring resource "+type+"/"+mr.getId()+" in Bundle "+f.getName()+" because it has no canonical URL");
                  
@@ -4117,7 +4120,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     r.setSnapshotted(true);
     logDebugMessage(LogCategory.CONTEXT, "Context.See "+sd.getUrl());
-    context.cacheResource(sd);
+    context.cacheResourceFromPackage(sd, new PackageVersion(publishedIg.getPackageId(), publishedIg.getVersion()));
   }
 
   private void validateExpressions() {
@@ -4501,6 +4504,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             pcm.addPackageToCache(publishedIg.getPackageId(), "dev", new FileInputStream(npm.filename()), "[output]");        
         } else if (mode == IGBuildMode.PUBLICATION)
           pcm.addPackageToCache(publishedIg.getPackageId(), publishedIg.getVersion(), new FileInputStream(npm.filename()), "[output]");
+        for (String s : generateVersions) {
+          generatePackageVersion(npm.filename(), s);
+        }
         generateZips(df);
       }
     }
@@ -4552,6 +4558,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       zip.close();
       Utilities.copyFile(Utilities.path(tempDir, "full-ig.zip"), Utilities.path(outputDir, "full-ig.zip"));
       log("Final .zip built");
+    }
+  }
+
+  private void generatePackageVersion(String filename, String ver) throws IOException {
+    NpmPackageVersionConverter self = new NpmPackageVersionConverter(filename, Utilities.path(Utilities.getDirectoryForFile(filename), publishedIg.getPackageId()+"."+ver+".tgz"), ver);
+    self.execute();
+    for (String s : self.getErrors()) {
+      errors.add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, "ImplementationGuide", "Error creating "+ver+" package: "+s, IssueSeverity.ERROR));
     }
   }
 

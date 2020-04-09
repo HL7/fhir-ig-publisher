@@ -18,7 +18,9 @@ call C:\work\org.hl7.fhir\test-igs\update.bat
 cd C:\work\org.hl7.fhir\fhir-ig-publisher
 
 call git commit -t v%newver% -a -m "Release new version %newver%"
+call git tag v%newver%
 call git push origin master
+
 call "C:\tools\fnr.exe" -dir "C:\work\org.hl7.fhir\build" -fileMask "*.xml" -find "%oldver%-SNAPSHOT" -replace "%newver%-SNAPSHOT" -count 1
 call "C:\tools\fnr.exe" -dir "C:\work\org.hl7.fhir\latest-ig-publisher" -fileMask "*.html" -find "%oldver%" -replace "%newver%" -count 1
 call "C:\tools\fnr.exe" -dir "C:\work\org.hl7.fhir\latest-ig-publisher" -fileMask "*.json" -find "%oldver%" -replace "%newver%" -count 1

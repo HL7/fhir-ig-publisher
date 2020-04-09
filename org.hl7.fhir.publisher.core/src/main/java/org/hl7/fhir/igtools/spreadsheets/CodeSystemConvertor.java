@@ -26,6 +26,7 @@ import java.io.FileInputStream;
 import java.util.Map;
 
 import org.hl7.fhir.r5.context.CanonicalResourceManager;
+import org.hl7.fhir.r5.context.IWorkerContext.PackageVersion;
 import org.hl7.fhir.r5.formats.IParser;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.ContactDetail;
@@ -44,7 +45,7 @@ public class CodeSystemConvertor {
     this.codeSystems = codeSystems;
   }
 
-  public void convert(IParser p, ValueSet vs, String name) throws Exception {
+  public void convert(IParser p, ValueSet vs, String name, PackageVersion packageInfo) throws Exception {
     String nname = name.replace("valueset-", "codesystem-");
     if (nname.equals(name))
       nname = Utilities.changeFileExt(name, "-cs.xml");
@@ -57,7 +58,7 @@ public class CodeSystemConvertor {
       populate(cs, vs);
 //      if (codeSystems.containsKey(cs.getUrl())) 
 //        throw new Exception("Duplicate Code System: "+cs.getUrl());
-      codeSystems.see(cs);
+      codeSystems.see(cs, packageInfo);
     }    
   }
 

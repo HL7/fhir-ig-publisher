@@ -268,6 +268,7 @@ public class SimpleFetcher implements IFetchFile {
                   ok = true;
                 } catch (Exception e) {
                   log.logMessage(e.getMessage() +" loading "+f);
+                  e.printStackTrace();
                 }
               if (!ok && !Utilities.existsInList(ext, "xml", "ttl", "html", "txt")) {
                 try {
@@ -277,6 +278,7 @@ public class SimpleFetcher implements IFetchFile {
                   ok = true;
                 } catch (Exception e) {
                   log.logMessage(e.getMessage() +" loading "+f);
+                  e.printStackTrace();
                 }
               }
               if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt")) {
@@ -287,6 +289,7 @@ public class SimpleFetcher implements IFetchFile {
                   ok = true;
                 } catch (Exception e) {
                   log.logMessage(e.getMessage() +" loading "+f);
+                  e.printStackTrace();
                 }
               }
             }
