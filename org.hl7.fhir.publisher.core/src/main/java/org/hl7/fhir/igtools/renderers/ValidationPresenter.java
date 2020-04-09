@@ -561,7 +561,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private String genDetails(ValidationMessage vm, int id) {
     ST t = template(vm.isSlicingHint() ? detailsTemplateWithExtraDetails : vm.getLocationLink() != null ? detailsTemplateWithLink : vm.getTxLink() != null ? detailsTemplateTx : detailsTemplate);
     if (vm.getLocation()!=null) {
-      t.add("path", makeLocal(vm.getLocation()));
+      t.add("path", makeLocal(vm.getLocation())+lineCol(vm));
       t.add("pathlink", vm.getLocationLink());
     }
     t.add("level", vm.isSlicingHint() ? "Slicing Information" : vm.getLevel().toCode());
@@ -571,6 +571,10 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("msgdetails", vm.isSlicingHint() ? vm.getSliceHtml() : vm.getHtml());
     t.add("tx", "qa-tx.html#l"+vm.getTxLink());
     return t.render();
+  }
+
+  private String lineCol(ValidationMessage vm) {
+    return vm.getLine() > 0 ? " (l"+vm.getLine()+"/c"+vm.getCol()+")" : "";
   }
 
   private String genDetailsTxt(ValidationMessage vm) {
