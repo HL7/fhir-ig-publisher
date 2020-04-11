@@ -2914,7 +2914,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             }
             if (!rg.hasDescription()) {
               if (r.getElement().hasChild("description"))
-                rg.setDescription(r.getElement().getChildValue("description"));
+                rg.setDescription(r.getElement().getChildValue("description").trim());
             }
             if (!rg.hasExample()) {
               // If the instance declares a profile that's got the same canonical base as this IG, then the resource is an example of that profile
@@ -3252,7 +3252,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           else
             res.setName(r.getId());
         if (!res.hasDescription())
-          res.setDescription(((CanonicalResource)r.getResource()).getDescription());
+          res.setDescription(((CanonicalResource)r.getResource()).getDescription().trim());
         res.setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
       }
       res.setUserData("loaded.resource", r);
@@ -3283,7 +3283,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (!res.hasName())
           res.setName(r.getTitle());
         if (!res.hasDescription())
-          res.setDescription(((CanonicalResource)r.getResource()).getDescription());
+          res.setDescription(((CanonicalResource)r.getResource()).getDescription().trim());
         res.setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
       }
       res.setUserData("loaded.resource", r);
@@ -3395,7 +3395,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (!res.hasName())
           res.setName(r.getTitle());
         if (!res.hasDescription())
-          res.setDescription(((CanonicalResource)r.getResource()).getDescription());
+          res.setDescription(((CanonicalResource)r.getResource()).getDescription().trim());
         res.setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
       }
       res.setUserData("loaded.resource", r);
@@ -4439,7 +4439,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (FetchedFile f : changeList)
       generateHtmlOutputs(f, false);
 
-    ValidationPresenter.filterMessages(errors, suppressedMessages.keySet(), false);
     if (!changeList.isEmpty()) {
       generateSummaryOutputs();
     }
@@ -4527,10 +4526,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         statusMessage = Utilities.escapeXml(sourceIg.present())+" - Local Development build (v"+businessVersion+"). See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>";
               
       List<ValidationMessage> linkmsgs = inspector.check(statusMessage);
-      ValidationPresenter.filterMessages(linkmsgs, suppressedMessages.keySet(), true);
       int bl = 0;
       int lf = 0;
-      for (ValidationMessage m : linkmsgs) {
+      for (ValidationMessage m : ValidationPresenter.filterMessages(linkmsgs, suppressedMessages.keySet())) {
         if (m.getLevel() == IssueSeverity.ERROR) {
           if (m.getType() == IssueType.NOTFOUND)
             bl++;
@@ -4543,8 +4541,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("  ... "+Integer.toString(inspector.total())+" html "+checkPlural("file", inspector.total())+", "+Integer.toString(lf)+" "+checkPlural("page", lf)+" invalid xhtml ("+Integer.toString((lf*100)/(inspector.total() == 0 ? 1 : inspector.total()))+"%)");
       log("  ... "+Integer.toString(inspector.links())+" "+checkPlural("link", inspector.links())+", "+Integer.toString(bl)+" broken "+checkPlural("link", lf)+" ("+Integer.toString((bl*100)/(inspector.links() == 0 ? 1 : inspector.links()))+"%)");
       errors.addAll(linkmsgs);    
-      for (FetchedFile f : fileList)
-        ValidationPresenter.filterMessages(f.getErrors(), suppressedMessages.keySet(), false);
       if (brokenLinksError && linkmsgs.size() > 0)
         throw new Error("Halting build because broken links have been found, and these are disallowed in the IG control file");
       if (mode == IGBuildMode.AUTOBUILD && inspector.isMissingPublishBox()) {
@@ -6447,6 +6443,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         NarrativeGenerator gen = new NarrativeGenerator("", null, context).setLiquidServices(templateProvider, validator.getExternalHostServices());
         gen.setTooCostlyNoteNotEmpty("This value set has >1000 codes in it. In order to keep the publication size manageable, only a selection (1000 codes) of the whole set of codes is shown");
         gen.setTooCostlyNoteEmpty("This value set cannot be expanded because of the way it is defined - it has an infinite number of members");
+        gen.setTooCostlyNoteNotEmptyDependent("One of this value set's dependencies has >1000 codes in it. In order to keep the publication size manageable, only a selection of the whole set of codes is shown");
+        gen.setTooCostlyNoteEmptyDependent("This value set cannot be expanded because of the way it is defined - one of it's dependents has an infinite number of members");
         exp.getValueset().setCompose(null);
         exp.getValueset().setText(null);
         gen.generate(null, exp.getValueset(), false);
