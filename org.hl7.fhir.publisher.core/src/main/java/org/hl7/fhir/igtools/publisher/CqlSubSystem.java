@@ -11,14 +11,15 @@ import org.cqframework.cql.elm.tracking.TrackBack;
 import org.fhir.ucum.UcumEssenceService;
 import org.fhir.ucum.UcumException;
 import org.fhir.ucum.UcumService;
+import org.hl7.cql.model.*;
 import org.hl7.elm.r1.*;
+import org.hl7.elm.r1.Expression;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.CqlSubSystem.CqlSourceFileInformation;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
-import org.hl7.fhir.r5.model.DataRequirement;
+import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.model.Library;
-import org.hl7.fhir.r5.model.RelatedArtifact;
 import org.hl7.fhir.utilities.cache.NpmPackage;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
@@ -35,6 +36,7 @@ public class CqlSubSystem {
     private List<ValidationMessage> errors = new ArrayList<>();
     private List<DataRequirement> dataRequirements = new ArrayList<>();
     private List<RelatedArtifact> relatedArtifacts = new ArrayList<>();
+    private List<ParameterDefinition> parameters = new ArrayList<>();
     public byte[] getElm() {
       return elm;
     }
@@ -49,6 +51,9 @@ public class CqlSubSystem {
     }
     public List<RelatedArtifact> getRelatedArtifacts() {
       return relatedArtifacts;
+    }
+    public List<ParameterDefinition> getParameters() {
+      return parameters;
     }
   }
 
@@ -307,22 +312,31 @@ public class CqlSubSystem {
         result.getErrors().add(exceptionToValidationMessage(file, exception));
       }
 
-      // TODO: If the translation fails, output all the validation messages to the log?
       if (translator.getErrors().size() > 0) {
-        result.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.EXCEPTION, file.getName(), String.format("CQL Processing failed with (%d) errors.", translator.getErrors().size()), IssueSeverity.ERROR));
+        result.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.EXCEPTION, file.getName(),
+                String.format("CQL Processing failed with (%d) errors.", translator.getErrors().size()), IssueSeverity.ERROR));
         logger.logMessage(String.format("Translation failed with (%d) errors; see the error log for more information.", translator.getErrors().size()));
       }
       else {
         // convert to base64 bytes
         result.setElm(translator.toXml().getBytes());
 
-        // Extract relatedArtifact data
+        // TODO: Report context, requires 1.5 translator (ContextDef)
+        // NOTE: In STU3, only Patient context is supported
+
+        // Extract relatedArtifact data (models, libraries, code systems, and value sets)
         result.relatedArtifacts.addAll(extractRelatedArtifacts(translator.toELM()));
+
+        // Extract parameter data
+        List<ValidationMessage> paramMessages = new ArrayList<>();
+        result.parameters.addAll(extractParameters(translator.toELM(), paramMessages));
+        for (ValidationMessage paramMessage : paramMessages) {
+          result.getErrors().add(new ValidationMessage(paramMessage.getSource(), paramMessage.getType(), file.getName(),
+                  paramMessage.getMessage(), paramMessage.getLevel()));
+        }
 
         // Extract dataRequirement data
         result.dataRequirements.addAll(extractDataRequirements(translator.toRetrieves(), translator.getTranslatedLibrary(), libraryManager));
-
-        // TODO: Extract terminology data? (include code system and value set references as relatedArtifacts?
 
         logger.logMessage("CQL translation completed successfully.");
       }
@@ -354,9 +368,47 @@ public class CqlSubSystem {
   private List<RelatedArtifact> extractRelatedArtifacts(org.hl7.elm.r1.Library library) {
     List<RelatedArtifact> result = new ArrayList<>();
 
+    // Report model dependencies
+    // URL for a model info is: [baseCanonical]/Library/[model-name]-ModelInfo
+    if (library.getUsings() != null && !library.getUsings().getDef().isEmpty()) {
+      for (UsingDef def : library.getUsings().getDef()) {
+        // System model info is an implicit dependency, do not report
+        if (!def.getLocalIdentifier().equals("System")) {
+          result.add(toRelatedArtifact(def));
+        }
+      }
+    }
+
+    // Report library dependencies
     if (library.getIncludes() != null && !library.getIncludes().getDef().isEmpty()) {
       for (IncludeDef def : library.getIncludes().getDef()) {
         result.add(toRelatedArtifact(def));
+      }
+    }
+
+    // Report CodeSystem dependencies
+    if (library.getCodeSystems() != null && !library.getCodeSystems().getDef().isEmpty()) {
+      for (CodeSystemDef def : library.getCodeSystems().getDef()) {
+        result.add(toRelatedArtifact(def));
+      }
+    }
+
+    // Report ValueSet dependencies
+    if (library.getValueSets() != null && !library.getValueSets().getDef().isEmpty()) {
+      for (ValueSetDef def : library.getValueSets().getDef()) {
+        result.add(toRelatedArtifact(def));
+      }
+    }
+
+    return result;
+  }
+
+  private List<ParameterDefinition> extractParameters(org.hl7.elm.r1.Library library, List<ValidationMessage> messages) {
+    List<ParameterDefinition> result = new ArrayList<>();
+
+    if (library.getParameters() != null && !library.getParameters().getDef().isEmpty()) {
+      for (ParameterDef def : library.getParameters().getDef()) {
+        result.add(toParameterDefinition(def, messages));
       }
     }
 
@@ -373,7 +425,20 @@ public class CqlSubSystem {
     return result;
   }
 
-  // TODO: Express in version independent Element Model?
+  private org.hl7.fhir.r5.model.RelatedArtifact toRelatedArtifact(UsingDef usingDef) {
+    return new org.hl7.fhir.r5.model.RelatedArtifact()
+            .setType(RelatedArtifact.RelatedArtifactType.DEPENDSON)
+            .setResource(getModelInfoReferenceUrl(usingDef.getUri(), usingDef.getLocalIdentifier(), usingDef.getVersion()));
+  }
+
+  private String getModelInfoReferenceUrl(String uri, String name, String version) {
+    if (uri != null) {
+      return String.format("%s/Library/%s-ModelInfo%s", uri, name, version != null ? ("|" + version) : "");
+    }
+
+    return String.format("Library/%-ModelInfo%s", name, version != null ? ("|" + version) : "");
+  }
+
   private org.hl7.fhir.r5.model.RelatedArtifact toRelatedArtifact(IncludeDef includeDef) {
     return new org.hl7.fhir.r5.model.RelatedArtifact()
             .setType(org.hl7.fhir.r5.model.RelatedArtifact.RelatedArtifactType.DEPENDSON)
@@ -389,6 +454,64 @@ public class CqlSubSystem {
     }
 
     return String.format("Library/%s%s", path, version != null ? ("|" + version) : "");
+  }
+
+  private org.hl7.fhir.r5.model.RelatedArtifact toRelatedArtifact(CodeSystemDef codeSystemDef) {
+    return new org.hl7.fhir.r5.model.RelatedArtifact()
+            .setType(org.hl7.fhir.r5.model.RelatedArtifact.RelatedArtifactType.DEPENDSON)
+            .setResource(toReference(codeSystemDef));
+  }
+
+  private org.hl7.fhir.r5.model.RelatedArtifact toRelatedArtifact(ValueSetDef valueSetDef) {
+    return new org.hl7.fhir.r5.model.RelatedArtifact()
+            .setType(org.hl7.fhir.r5.model.RelatedArtifact.RelatedArtifactType.DEPENDSON)
+            .setResource(toReference(valueSetDef));
+  }
+
+  private ParameterDefinition toParameterDefinition(ParameterDef def, List<ValidationMessage> messages) {
+    org.hl7.cql.model.DataType parameterType = def.getResultType() instanceof ListType ? ((ListType)def.getResultType()).getElementType() : def.getResultType();
+
+    return new ParameterDefinition()
+            .setName(def.getName())
+            .setUse(Enumerations.OperationParameterUse.IN)
+            .setMin(0)
+            .setMax(def.getResultType() instanceof ListType ? "*" : "1")
+            .setType(Enumerations.FHIRAllTypes.fromCode(toFHIRTypeCode(parameterType, def.getName(), messages)));
+  }
+
+  private String toFHIRTypeCode(org.hl7.cql.model.DataType dataType, String parameterName, List<ValidationMessage> messages) {
+    if (dataType instanceof NamedType) {
+      switch (((NamedType)dataType).getName()) {
+        case "System.Boolean": return "boolean";
+        case "System.Integer": return "integer";
+        case "System.Decimal": return "decimal";
+        case "System.Date": return "date";
+        case "System.DateTime": return "dateTime";
+        case "System.Time": return "time";
+        case "System.String": return "string";
+        case "System.Quantity": return "Quantity";
+        case "System.Ratio": return "Ratio";
+        case "System.Any": return "Any";
+        case "System.Code": return "Coding";
+        case "System.Concept": return "CodeableConcept";
+      }
+    }
+
+    if (dataType instanceof IntervalType) {
+      if (((IntervalType)dataType).getPointType() instanceof NamedType) {
+        switch (((NamedType)((IntervalType)dataType).getPointType()).getName()) {
+          case "System.Date":
+          case "System.DateTime":
+          case "System.Time": return "Period";
+          case "System.Quantity": return "Range";
+        }
+      }
+    }
+
+    // Issue a warning that the parameter type is not supported
+    messages.add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.NOTSUPPORTED, "CQL Library Packaging",
+            String.format("Parameter type %s of parameter %s is not supported; reported as FHIR.Any", dataType.toLabel(), parameterName), IssueSeverity.WARNING));
+    return "Any";
   }
 
   private org.hl7.fhir.r5.model.DataRequirement toDataRequirement(Retrieve retrieve, TranslatedLibrary library, LibraryManager libraryManager) {
@@ -407,6 +530,8 @@ public class CqlSubSystem {
               new org.hl7.fhir.r5.model.DataRequirement.DataRequirementCodeFilterComponent();
 
       cfc.setPath(retrieve.getCodeProperty());
+
+      // TODO: Support retrieval when the target is a CodeSystemRef
 
       if (retrieve.getCodes() instanceof ValueSetRef) {
         ValueSetRef vsr = (ValueSetRef)retrieve.getCodes();
@@ -470,11 +595,11 @@ public class CqlSubSystem {
   }
 
   private String toReference(CodeSystemDef codeSystemDef) {
-    return codeSystemDef.getId() + codeSystemDef.getVersion() != null ? ("|" + codeSystemDef.getVersion()) : "";
+    return codeSystemDef.getId() + (codeSystemDef.getVersion() != null ? ("|" + codeSystemDef.getVersion()) : "");
   }
 
   private String toReference(ValueSetDef valueSetDef) {
-    return valueSetDef.getId() + valueSetDef.getVersion() != null ? ("|" + valueSetDef.getVersion()) : "";
+    return valueSetDef.getId() + (valueSetDef.getVersion() != null ? ("|" + valueSetDef.getVersion()) : "");
   }
 
   // TODO: Move to the CQL-to-ELM translator
