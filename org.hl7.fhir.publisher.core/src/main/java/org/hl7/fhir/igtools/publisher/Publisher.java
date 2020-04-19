@@ -2913,8 +2913,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                 rg.setName(r.getElement().getChildValue("title"));
             }
             if (!rg.hasDescription()) {
-              if (r.getElement().hasChild("description"))
-                rg.setDescription(r.getElement().getChildValue("description").trim());
+              if (r.getElement().hasChild("description")) {
+                Element descriptionElement = r.getElement().getNamedChild("description");
+                if (descriptionElement.hasValue()) {
+                  rg.setDescription(r.getElement().getChildValue("description").trim());
+                }
+                else {
+                  if (descriptionElement.hasChild("text")) {
+                    Element textElement = descriptionElement.getNamedChild("text");
+                    if (textElement.hasValue()) {
+                      rg.setDescription(textElement.getValue().trim());
+                    }
+                  }
+                }
+              }
             }
             if (!rg.hasExample()) {
               // If the instance declares a profile that's got the same canonical base as this IG, then the resource is an example of that profile
