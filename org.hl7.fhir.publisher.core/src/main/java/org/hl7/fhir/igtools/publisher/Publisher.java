@@ -109,6 +109,9 @@ import org.hl7.fhir.igtools.publisher.Publisher.IGBuildMode;
 import org.hl7.fhir.igtools.publisher.Publisher.JsonDependency;
 import org.hl7.fhir.igtools.publisher.Publisher.ListItemEntry;
 import org.hl7.fhir.igtools.publisher.Publisher.ListViewSorterById;
+import org.hl7.fhir.igtools.publisher.realm.NullRealmBusinessRules;
+import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
+import org.hl7.fhir.igtools.publisher.realm.USRealmBusinessRules;
 import org.hl7.fhir.igtools.publisher.utils.IGRegistryMaintainer;
 import org.hl7.fhir.igtools.publisher.utils.IGReleaseUpdater;
 import org.hl7.fhir.igtools.publisher.utils.IGReleaseUpdater.ServerType;
@@ -614,6 +617,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private List<String> bundles = new ArrayList<>();
   private List<String> mappings = new ArrayList<>();
   private List<String> generateVersions = new ArrayList<>();
+  RealmBusinessRules realmRules;
 
   private IGPublisherLiquidTemplateServices templateProvider;
 
@@ -638,6 +642,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private List<JsonDependency> jsonDependencies = new ArrayList<>();
 
   private boolean noTerminologyHL7Org;
+
+  private Coding expectedJurisdiction;
 
   
   private class PreProcessInfo {
@@ -1224,9 +1230,31 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else if (isTemplate())
       initializeTemplate();
     else
-      initializeFromJson();   
+      initializeFromJson();
+    expectedJurisdiction = checkForJurisdiction();
+    realmRules = makeRealmBusinessRules();
   }
   
+  private Coding checkForJurisdiction() {
+    String id = npmName;
+    if (!id.startsWith("hl7.") || !id.contains(".")) {
+      return null;
+    }
+    String[] parts = id.split("\\.");
+    if (Utilities.existsInList(parts[1], "terminology")) {
+      return null;
+    }
+    if (Utilities.existsInList(parts[1], "fhir") && !Utilities.existsInList(parts[1], "nothing-yet")) {
+      if (parts[2].equals("uv")) {
+        return new Coding("http://unstats.un.org/unsd/methods/m49/m49.htm", "001", "World");
+      } else {
+        return new Coding("urn:iso:std:iso:3166:-2", parts[2].toUpperCase(), null);
+      }
+    } else {
+      return null;
+    }
+  }
+
   private String focusDir() {
     String dir = configFile.endsWith("ig.ini") ? configFile.substring(0, configFile.length()-6) : configFile;
     if (dir.endsWith(File.separatorChar+".")) {
@@ -1315,6 +1343,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (json.has("type") && "fhir.template".equals(json.get("type").getAsString())) {
         isBuildingTemplate = true;
         templateInfo = json;
+        npmName = json.get("name").getAsString();
         System.out.println("targetOutput: "+targetOutput);
         return true;
       }
@@ -2087,7 +2116,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void loadPubPack() throws FHIRException, IOException {
-    NpmPackage npm = pcm.loadPackage("hl7.fhir.pubpack", "0.0.3");
+    NpmPackage npm = pcm.loadPackage("hl7.fhir.pubpack", "0.0.4");
     context.loadFromPackage(npm, null);
     npm = pcm.loadPackage("hl7.fhir.xver-extensions", "0.0.3");
     context.loadFromPackage(npm, null);
@@ -2144,7 +2173,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             } else {
               if (reason == null) { 
                 errors.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, path, "Supressed messages file has errors with no reason", IssueSeverity.ERROR));
-                suppressedMessages.put(l, "??");
+                suppressedMessages.put(l, "?pub-msg-1?");
               } else {
                 suppressedMessages.put(l, reason);
               }
@@ -2159,13 +2188,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           char c = (char) r.read();
           if (c == '\r' || c == '\n') {
             if (b.length() > 0)
-              suppressedMessages.put(b.toString(), "??");
+              suppressedMessages.put(b.toString(), "?pub-msg-2?");
             b = new StringBuilder();
           } else
             b.append(c);
         }
         if (b.length() > 0)
-          suppressedMessages.put(b.toString(), "??");
+          suppressedMessages.put(b.toString(), "?pub-msg-3?");
         r.close();
       }
     }
@@ -2603,41 +2632,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     HttpURLConnection c = (HttpURLConnection) url.openConnection();
     c.setInstanceFollowRedirects(true);
     return JsonTrackingParser.parseJson(c.getInputStream());
-  }
-
-
-  private Map<String, byte[]> fetchDefinitions(String source, String name) throws Exception {
-    // todo: if filename is a URL
-    Map<String, byte[]> res = new HashMap<String, byte[]>();
-    String filename;
-    if (source.startsWith("http:") || source.startsWith("https:"))
-      filename = fetchFromURL(source, name);
-    else if (Utilities.isAbsoluteFileName(source))
-      filename = Utilities.path(source, "validator.pack");
-    else 
-      filename = Utilities.path(fetcher.pathForFile(configFile), source, "validator.pack");
-    ZipInputStream zip = null;
-    InputStream stream = fetcher.openAsStream(filename);
-    zip = new ZipInputStream(stream);
-    ZipEntry ze;
-    while ((ze = zip.getNextEntry()) != null) {
-      int size;
-      byte[] buffer = new byte[2048];
-
-      ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-      BufferedOutputStream bos = new BufferedOutputStream(bytes, buffer.length);
-
-      while ((size = zip.read(buffer, 0, buffer.length)) != -1) {
-        bos.write(buffer, 0, size);
-      }
-      bos.flush();
-      bos.close();
-      res.put(ze.getName(), bytes.toByteArray());
-
-      zip.closeEntry();
-    }
-    zip.close();
-    return res;
   }
 
   private String fetchFromURL(String source, String name) throws Exception {
@@ -3525,7 +3519,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
 
-  private void checkConformanceResources() {
+  private void checkConformanceResources() throws IOException {
     logDebugMessage(LogCategory.PROGRESS, "check profiles");
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
@@ -3533,6 +3527,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           logDebugMessage(LogCategory.PROGRESS, "process profile: "+r.getId());
           StructureDefinition sd = (StructureDefinition) r.getResource();
           f.getErrors().addAll(pvalidator.validate(sd, false));
+          checkJurisdiction(f, (CanonicalResource) r.getResource(), IssueSeverity.ERROR, "must");
+          realmRules.checkSD(f, sd);
+        } else if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
+          checkJurisdiction(f, (CanonicalResource) r.getResource(), IssueSeverity.WARNING, "should");
+          realmRules.checkCR(f, (CanonicalResource) r.getResource());
         }
         if (r.getElement().fhirType().equals("CodeSystem")) {
           logDebugMessage(LogCategory.PROGRESS, "process CodeSystem: "+r.getId());
@@ -3542,7 +3541,28 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
   }
+  
+  private RealmBusinessRules makeRealmBusinessRules() {
+    if (expectedJurisdiction != null && expectedJurisdiction.getCode().equals("US")) {
+      return new USRealmBusinessRules(context, version, tempDir, igpkp.getCanonical());
+    } else {
+      return new NullRealmBusinessRules();
+    }
+  }
 
+
+  private void checkJurisdiction(FetchedFile f, CanonicalResource resource, IssueSeverity error, String verb) {
+    if (expectedJurisdiction != null) {
+      boolean ok = false;
+      for (CodeableConcept cc : resource.getJurisdiction()) {
+        ok = ok || cc.hasCoding(expectedJurisdiction);
+      }
+      if (!ok) {
+        f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, resource.fhirType()+".jurisdiction", "The resource "+verb+" declare it's jurisdiction to match the package id ("+npmName+", jurisdiction = "+expectedJurisdiction.toString()+")",
+            error).setMessageId(I18nConstants.RESOURCE_JURISDICTION_MISMATCH));
+      }
+    }
+  }
 
   private void executeTransforms() throws FHIRException, Exception {
     if (doTransforms) {
@@ -3889,7 +3909,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             if (bc.hasUrl()) {
               if (adHocTmpDir == null && !listedURLExemptions.contains(bc.getUrl()) && !isExampleResource(bc) && !bc.getUrl().equals(Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())))
                 if (!bc.fhirType().equals("CapabilityStatement") || !bc.getUrl().contains("/Conformance/"))
-                  f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, bc.getUrl(), "Conformance resource "+f.getPath()+" - the canonical URL ("+Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())+") does not match the URL ("+bc.getUrl()+")", IssueSeverity.ERROR));
+                  f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, bc.getUrl(), "Conformance resource "+f.getPath()+" - the canonical URL ("+Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), 
+                      bc.getId())+") does not match the URL ("+bc.getUrl()+")", IssueSeverity.ERROR).setMessageId(I18nConstants.RESOURCE_CANONICAL_MISMATCH));
                 // throw new Exception("Error: conformance resource "+f.getPath()+" canonical URL ("+Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())+") does not match the URL ("+bc.getUrl()+")");            
             } else if (bc.hasId())
               bc.setUrl(Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId()));
@@ -4450,6 +4471,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Submitting Usage Stats failed: "+e.getMessage());
     }
     
+    realmRules.addOtherFiles(otherFilesRun);
     otherFilesRun.add(Utilities.path(tempDir, "usage-stats.json"));
     
     cleanOutput(tempDir);
@@ -4525,10 +4547,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       else 
         statusMessage = Utilities.escapeXml(sourceIg.present())+" - Local Development build (v"+businessVersion+"). See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>";
               
+      realmRules.addOtherFiles(inspector.getExceptions());
       List<ValidationMessage> linkmsgs = inspector.check(statusMessage);
       int bl = 0;
       int lf = 0;
-      for (ValidationMessage m : ValidationPresenter.filterMessages(linkmsgs, suppressedMessages.keySet())) {
+      for (ValidationMessage m : ValidationPresenter.filterMessages(linkmsgs, true, suppressedMessages.keySet())) {
         if (m.getLevel() == IssueSeverity.ERROR) {
           if (m.getType() == IssueType.NOTFOUND)
             bl++;
@@ -4598,7 +4621,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (r != null) {
         String path = igpkp.doReplacements(igpkp.getLinkFor(r, false), r, null, null);
         res.addExtension().setUrl("http://hl7.org/fhir/StructureDefinition/implementationguide-page").setValue(new UriType(path));
-        inspector.addLinkToCheck("Implementation Guide", path, "??");
+        inspector.addLinkToCheck("Implementation Guide", path, "fake generated link");
       }
     }
 
@@ -7383,7 +7406,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         JsonObject json = fetchJson("https://fhir.github.io/latest-ig-publisher/tools.json");
         currVer = json.getAsJsonObject("publisher").get("version").getAsString();
       } catch (IOException e) {
-        currVer = "??";
+        currVer = "?pub-ver-1?";
       }
     }
     return currVer;

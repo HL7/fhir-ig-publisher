@@ -1107,7 +1107,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     case REQUIRED:
       return ""+translate("sd.dict", "The codes SHALL be taken from ");
     default:
-      return ""+"??";
+      return ""+"?sd-conf?";
     }
   }
 
@@ -1778,7 +1778,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
   private String getSrcFile(String code) {
     StructureDefinition sd = context.fetchResource(StructureDefinition.class, ProfileUtilities.sdNs(code, null));
     if (sd == null)
-      return "??";
+      return "?sd-src?";
     else {
       String l = igp.getLinkForProfile(this.sd, sd.getUrl());
       if (l == null)
