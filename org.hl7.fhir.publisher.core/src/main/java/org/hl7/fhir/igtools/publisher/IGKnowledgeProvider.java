@@ -326,11 +326,11 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   
   public void checkForPath(FetchedFile f, FetchedResource r, CanonicalResource bc, boolean inner) throws FHIRException {
     if (!bc.hasUrl())
-      error(f, bc.fhirType()+".url", "Resource has no url: "+bc.getId());
+      error(f, bc.fhirType()+".url", "Resource has no url: "+bc.getId(), I18nConstants.RESOURCE_ID_NO_URL);
     else if (bc.getUrl().startsWith(canonical) && !bc.getUrl().endsWith("/"+bc.getId()))
-      error(f, bc.fhirType()+".url","Resource id/url mismatch: "+bc.getId()+"/"+bc.getUrl());
+      error(f, bc.fhirType()+".url","Resource id/url mismatch: "+bc.getId()+"/"+bc.getUrl(), I18nConstants.RESOURCE_ID_MISMATCH);
     if (!inner && !r.getId().equals(bc.getId()))
-      error(f, bc.fhirType()+".id", "Resource id/loaded id mismatch: "+r.getId()+"/"+bc.getUrl());
+      error(f, bc.fhirType()+".id", "Resource id/loaded id mismatch: "+r.getId()+"/"+bc.getUrl(), I18nConstants.RESOURCE_ID_LOADED_MISMATCH);
     if (r.getConfig() == null)
       findConfiguration(f, r);
     JsonObject e = r.getConfig();
@@ -344,10 +344,10 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       bc.setUserData("path", r.getElement().fhirType()+"/"+r.getId()+".html");
   }
 
-  private void error(FetchedFile f, String path, String msg) {
+  private void error(FetchedFile f, String path, String msg, String msgId) {
     if (!msgs.contains(msg)) {
       msgs.add(msg);
-      f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.INVARIANT, path, msg, IssueSeverity.ERROR));
+      f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.INVARIANT, path, msg, IssueSeverity.ERROR).setMessageId(msgId));
     }
   }
 
@@ -533,8 +533,8 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       return null;
     if (sd != null && sd.hasUserData("path"))
       return sd.getUserString("path")+"|"+sd.getName();
-    brokenLinkWarning("??", url);
-    return "unknown.html|??";
+    brokenLinkWarning("?pkp-1?", url);
+    return "unknown.html|?pkp-2?";
   }
 
 
