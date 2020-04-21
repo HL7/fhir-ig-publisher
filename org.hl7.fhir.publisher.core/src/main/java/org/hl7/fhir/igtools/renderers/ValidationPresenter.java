@@ -118,7 +118,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   public String generate(String title, List<ValidationMessage> allErrors, List<FetchedFile> files, String path, Map<String, String> filteredMessages) throws IOException {
     
     for (FetchedFile f : files) {
-      for (ValidationMessage vm : filterMessages(f.getErrors(), filteredMessages.keySet())) {
+      for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages.keySet())) {
         if (vm.getLevel().equals(ValidationMessage.IssueSeverity.FATAL)||vm.getLevel().equals(ValidationMessage.IssueSeverity.ERROR))
           err++;
         else if (vm.getLevel().equals(ValidationMessage.IssueSeverity.WARNING))
@@ -128,7 +128,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       }
     }
     
-    List<ValidationMessage> linkErrors = filterMessages(allErrors, filteredMessages.keySet()); 
+    List<ValidationMessage> linkErrors = filterMessages(allErrors, true, filteredMessages.keySet()); 
     StringBuilder b = new StringBuilder();
     b.append(genHeader(title, err, warn, info, linkErrors.size(), filteredMessages.size()));
     b.append(genSummaryRowInteral(linkErrors));
@@ -149,15 +149,9 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
         b.append(startTemplateErrors);
       else
         b.append(startTemplateNoErrors);
-      for (ValidationMessage vm : filterMessages(f.getErrors(), filteredMessages.keySet())) {
+      for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages.keySet())) {
         b.append(genDetails(vm, id));
         id++;
-        if (vm.getLevel().equals(ValidationMessage.IssueSeverity.FATAL)||vm.getLevel().equals(ValidationMessage.IssueSeverity.ERROR))
-          err++;
-        else if (vm.getLevel().equals(ValidationMessage.IssueSeverity.WARNING))
-          warn++;
-        else
-          info++;
       }
       b.append(genEnd());
     }    
@@ -197,7 +191,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
         oo = new OperationOutcome();
         validationBundle.addEntry(new BundleEntryComponent().setResource(oo));
         ToolingExtensions.addStringExtension(oo, ToolingExtensions.EXT_OO_FILE, f.getName());
-        for (ValidationMessage vm : filterMessages(f.getErrors(), filteredMessages.keySet())) {
+        for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages.keySet())) {
           oo.getIssue().add(OperationOutcomeUtilities.convertToIssue(vm, oo));
         }
       }
@@ -219,7 +213,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     b.append(genEndTxt());
     for (FetchedFile f : files) {
       b.append(genStartTxt(f));
-      for (ValidationMessage vm : filterMessages(f.getErrors(), filteredMessages.keySet()))
+      for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages.keySet()))
         b.append(vm.getDisplay() + "\r\n");
       b.append(genEndTxt());
     }    
@@ -233,7 +227,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
 
 
   private void getMatchingMessages(FetchedFile f, String n, List<FiledValidationMessage> fvml, Map<String, String> filteredMessages) {
-    for (ValidationMessage vm : filterMessages(f.getErrors(), filteredMessages.keySet())) {
+    for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages.keySet())) {
       if (n.equals(vm.getMessageId())) {
         fvml.add(new FiledValidationMessage(f, vm));
       }
@@ -242,12 +236,23 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
 
   private List<String> messageIdNames() {
     I18nConstants obj = new I18nConstants();
+    org.hl7.fhir.igtools.publisher.I18nConstants obj2 = new org.hl7.fhir.igtools.publisher.I18nConstants(); // not that it really matters?
     List<String> names = new ArrayList<>();
     Field[] interfaceFields=I18nConstants.class.getFields();
     for(Field f : interfaceFields) {
       try {
         if (Modifier.isStatic(f.getModifiers())) {
           String n = (String) f.get(obj);
+          names.add(n);
+        }
+      } catch (Exception e) {
+      }
+    }
+    interfaceFields=org.hl7.fhir.igtools.publisher.I18nConstants.class.getFields();
+    for(Field f : interfaceFields) {
+      try {
+        if (Modifier.isStatic(f.getModifiers())) {
+          String n = (String) f.get(obj2);
           names.add(n);
         }
       } catch (Exception e) {
@@ -290,11 +295,11 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     return list;
   }
 
-  public static List<ValidationMessage> filterMessages(List<ValidationMessage> messages, Collection<String> suppressedMessages) {
+  public static List<ValidationMessage> filterMessages(List<ValidationMessage> messages, boolean canSuppressErrors, Collection<String> suppressedMessages) {
     List<ValidationMessage> passList = new ArrayList<ValidationMessage>();
     Set<String> msgs = new HashSet<>();
     for (ValidationMessage message : messages) {
-      if (!(suppressedMessages.contains(message.getDisplay()) || suppressedMessages.contains(message.getMessage())) || message.getLevel().isError()) {
+      if (!(suppressedMessages.contains(message.getDisplay()) || suppressedMessages.contains(message.getMessage())) || canSuppressErrors || message.getLevel().isError()) {
         if (!msgs.contains(message.getLocation()+"|"+message.getMessage())) {
           passList.add(message);
           msgs.add(message.getLocation()+"|"+message.getMessage());
@@ -529,7 +534,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private String genSummaryRow(FetchedFile f, Map<String, String> filteredMessages) {
     ST t = template(summaryTemplate);
     t.add("link", makelink(f));
-    List<ValidationMessage> uniqueErrors = filterMessages(f.getErrors(), filteredMessages.keySet());
+    List<ValidationMessage> uniqueErrors = filterMessages(f.getErrors(), false, filteredMessages.keySet());
     
     t.add("filename", f.getName());
     String ec = errCount(uniqueErrors);
