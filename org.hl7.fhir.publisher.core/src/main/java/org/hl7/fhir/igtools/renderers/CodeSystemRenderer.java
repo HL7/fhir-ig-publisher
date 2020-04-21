@@ -80,6 +80,9 @@ public class CodeSystemRenderer extends BaseRenderer {
     if (CodeSystemUtilities.hasOID(cs)) {
       b.append(" <tr><td>"+translate("cs.summary", "OID")+":</td><td>"+CodeSystemUtilities.getOID(cs)+" ("+translate("cs.summary", "for OID based terminology systems")+")</td></tr>\r\n");
     }
+    if (cs.hasContent()) {
+      b.append(" <tr><td>"+translate("cs.summary", "Content Mode")+":</td><td>"+translate("cs.summary", cs.getContent().getDisplay())+"</td></tr>\r\n");      
+    }
     if (cs.hasValueSet()) {
       ValueSet vs = context.fetchResource(ValueSet.class, cs.getValueSet());
       if (vs == null) {
