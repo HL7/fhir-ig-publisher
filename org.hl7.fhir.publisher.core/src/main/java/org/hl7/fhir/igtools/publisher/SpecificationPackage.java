@@ -26,7 +26,7 @@ import java.io.IOException;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
-import org.hl7.fhir.r5.context.SimpleWorkerContext.IContextResourceLoader;
+import org.hl7.fhir.r5.context.IWorkerContext.IContextResourceLoader;
 import org.hl7.fhir.r5.context.SimpleWorkerContext.ILoadFilter;
 import org.hl7.fhir.utilities.cache.NpmPackage;
 

@@ -90,7 +90,7 @@ public class IGVersionUtil {
       InstantType dt = new InstantType(ourBuildTime);
       return Utilities.describeDuration(Duration.ofMillis(new Date().getTime() - dt.getValue().getTime()))+" old";
     } catch (Exception e) {
-      return "??";
+      return "?vu-duration?";
     }
   }
 

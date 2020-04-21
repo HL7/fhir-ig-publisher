@@ -189,6 +189,7 @@ public class HTLMLInspector {
   private String statusText;
   private List<String> exemptHtmlPatterns = new ArrayList<>();
   private boolean missingPublishBox;
+  private Set<String> exceptions = new HashSet<>();
 
   public HTLMLInspector(String rootFolder, List<SpecMapManager> specs, ILoggingService log, String canonical) {
     this.rootFolder = rootFolder.replace("/", File.separator);
@@ -290,14 +291,16 @@ public class HTLMLInspector {
 
   private void listFiles(String folder, List<String> loadList) {
     for (File f : new File(folder).listFiles()) {
-      if (f.isDirectory()) {
-        listFiles(f.getAbsolutePath() ,loadList);
-      } else {
-        LoadedFile lf = cache.get(f.getAbsolutePath());
-        if (lf == null || lf.getLastModified() != f.lastModified())
-          loadList.add(f.getAbsolutePath());
-        else
-          lf.setIteration(iteration);
+      if (!exceptions.contains(f.getAbsolutePath())) {
+        if (f.isDirectory()) {
+          listFiles(f.getAbsolutePath(), loadList);
+        } else {
+          LoadedFile lf = cache.get(f.getAbsolutePath());
+          if (lf == null || lf.getLastModified() != f.lastModified())
+            loadList.add(f.getAbsolutePath());
+          else
+            lf.setIteration(iteration);
+        }
       }
     }
   }
@@ -447,7 +450,7 @@ public class HTLMLInspector {
     if (x.getName() != null)
       path = path + "/"+ x.getName();
     if ("title".equals(x.getName()) && Utilities.noString(x.allText()))
-      x.addText("??");
+      x.addText("?html-link?");
     if ("a".equals(x.getName()) && x.hasAttribute("href"))
       changed = checkResolveLink(s, x.getLocation(), path, x.getAttribute("href"), x.allText(), messages, uuid);
     if ("img".equals(x.getName()) && x.hasAttribute("src"))
@@ -778,6 +781,10 @@ public class HTLMLInspector {
 
   public boolean isMissingPublishBox() {
     return missingPublishBox;
+  }
+
+  public Set<String> getExceptions() {
+    return exceptions;
   }
 
   
