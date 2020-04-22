@@ -3765,6 +3765,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           r.setResEntry(srcForLoad);
           if (srcForLoad.hasExampleCanonicalType()) {
             r.getElement().setUserData("profile", srcForLoad.getExampleCanonicalType().getValue());
+            r.getStatedProfiles().add(srcForLoad.getExampleCanonicalType().getValue());
           }
         }
         
