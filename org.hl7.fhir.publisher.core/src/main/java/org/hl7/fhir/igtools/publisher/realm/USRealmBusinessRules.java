@@ -43,7 +43,7 @@ import com.google.gson.JsonObject;
 
 public class USRealmBusinessRules extends RealmBusinessRules {
 
-  private static final boolean DO_PROFILE_COMPARISON = false;
+  private static final boolean DO_PROFILE_COMPARISON = true;
  
   List<StructureDefinition> usCoreProfiles;
   private IWorkerContext context;
@@ -79,7 +79,9 @@ public class USRealmBusinessRules extends RealmBusinessRules {
         if (usd instanceof StructureDefinition) {
           usCoreProfiles.add((StructureDefinition) usd);
         }
-        context.cacheResourceFromPackage(usd, new PackageVersion(uscore.id(), uscore.version()));
+        if (!context.hasResource(Resource.class, usd.getUrl())) {
+          context.cacheResourceFromPackage(usd, new PackageVersion(uscore.id(), uscore.version()));
+        }
       }
     }
     List<String> types = new ArrayList<>();
