@@ -18,6 +18,7 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.I18nConstants;
+import org.hl7.fhir.igtools.publisher.realm.USRealmBusinessRules.ProfilePair;
 import org.hl7.fhir.r5.conformance.ProfileComparer;
 import org.hl7.fhir.r5.conformance.ProfileUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
@@ -43,6 +44,28 @@ import com.google.gson.JsonObject;
 
 public class USRealmBusinessRules extends RealmBusinessRules {
 
+  public class ProfilePair {
+    List<ValidationMessage> errors;
+    StructureDefinition local;
+    StructureDefinition uscore;
+    public ProfilePair(List<ValidationMessage> errors, StructureDefinition local, StructureDefinition uscore) {
+      super();
+      this.errors = errors;
+      this.local = local;
+      this.uscore = uscore;
+    }
+    public List<ValidationMessage> getErrors() {
+      return errors;
+    }
+    public StructureDefinition getLocal() {
+      return local;
+    }
+    public StructureDefinition getUscore() {
+      return uscore;
+    }
+    
+  }
+
   private static final boolean DO_PROFILE_COMPARISON = true;
  
   List<StructureDefinition> usCoreProfiles;
@@ -50,8 +73,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
   private String version;
   private String dstDir;
   private KeyGenerator keygen;
-  private boolean compDir = false;
-  private ProfileComparer comp; 
+  private List<ProfilePair> comparisons = new ArrayList<>();
 
   public USRealmBusinessRules(IWorkerContext context, String version, String dstDir, String canonical) {
     super();
@@ -64,9 +86,6 @@ public class USRealmBusinessRules extends RealmBusinessRules {
 
   @Override
   public void startChecks() throws IOException {
-    if (DO_PROFILE_COMPARISON) {
-     comp = new ProfileComparer(context, keygen, Utilities.path(dstDir, "us-core-comparisons"));
-    }
   }
 
   @Override
@@ -103,27 +122,9 @@ public class USRealmBusinessRules extends RealmBusinessRules {
         b.append(vm.getMessage());
         f.getErrors().add(vm);
         if (DO_PROFILE_COMPARISON) {
-          compDir = true;
           // actually, that should be an error, but US realm doesn't have a proper base, so we're going to report the differences against the base
-          Utilities.createDirectory(Utilities.path(dstDir, "us-core-comparisons"));
           for (StructureDefinition candidate : candidateProfiles(sd.getType())) {
-            try {
-              comp.setLeftLink("../"+sd.getUserString("path"));
-              comp.setLeftName("This IG: "+sd.present());          
-              comp.setLeftPrefix("..");
-              comp.setRightLink("http://hl7.org/fhir/us/core/StructureDefinition-"+candidate.getId()+".html");
-              comp.setRightName("US-Core: "+candidate.present());
-              comp.setId(sd.getId()+"-"+candidate.getId());
-              comp.setTitle(": "+sd.present()+" and US-Core "+candidate.present());
-              comp.compareProfiles(sd, candidate);
-              File htmlFile = new File(comp.generate());
-              b.append(". <a href=\"us-core-comparisons/"+htmlFile.getName()+"\">Comparison with "+candidate.present()+"</a>");
-            } catch (Exception e) {
-              ValidationMessage vm1 = new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, "StructureDefinition", "Internal exception comparing to US Core "+ sd.present()+": "+e.getMessage(),
-                  IssueSeverity.ERROR).setMessageId("US_CORE_COMPARISON_EXCEPTION"); 
-              f.getErrors().add(vm1);
-              e.printStackTrace();
-            }
+            comparisons.add(new ProfilePair(f.getErrors(), sd, candidate));
           }
         }
         vm.setHtml(b.toString());
@@ -197,13 +198,39 @@ public class USRealmBusinessRules extends RealmBusinessRules {
 
 
   public void addOtherFiles(Set<String> otherFilesRun) throws IOException {
-    if (compDir) {
+    if (comparisons.size() > 0) {
       otherFilesRun.add(Utilities.path(dstDir, "us-core-comparisons"));
     }
   }
 
   @Override
   public void finishChecks() {
+    ProfileComparer comp;
+    if (DO_PROFILE_COMPARISON) {
+//      Utilities.createDirectory(Utilities.path(dstDir, "us-core-comparisons"));
+//      comp = new ProfileComparer(context, keygen, Utilities.path(dstDir, "us-core-comparisons"));
+      
+    }
 
+    /**
+     *             try {
+              comp.setLeftLink("../"+sd.getUserString("path"));
+              comp.setLeftName("This IG: "+sd.present());          
+              comp.setLeftPrefix("..");
+              comp.setRightLink("http://hl7.org/fhir/us/core/StructureDefinition-"+candidate.getId()+".html");
+              comp.setRightName("US-Core: "+candidate.present());
+              comp.setId(sd.getId()+"-"+candidate.getId());
+              comp.setTitle(": "+sd.present()+" and US-Core "+candidate.present());
+              comp.compareProfiles(sd, candidate);
+              File htmlFile = new File(comp.generate());
+              b.append(". <a href=\"us-core-comparisons/"+htmlFile.getName()+"\">Comparison with "+candidate.present()+"</a>");
+            } catch (Exception e) {
+              ValidationMessage vm1 = new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, "StructureDefinition", "Internal exception comparing to US Core "+ sd.present()+": "+e.getMessage(),
+                  IssueSeverity.ERROR).setMessageId("US_CORE_COMPARISON_EXCEPTION"); 
+              f.getErrors().add(vm1);
+              e.printStackTrace();
+            }
+
+     */
   }
 }

@@ -3532,6 +3532,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
   private void checkConformanceResources() throws IOException {
+    realmRules.startChecks();
     logDebugMessage(LogCategory.PROGRESS, "check profiles");
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
@@ -3552,6 +3553,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
     }
+    realmRules.finishChecks();
   }
   
   private RealmBusinessRules makeRealmBusinessRules() {
