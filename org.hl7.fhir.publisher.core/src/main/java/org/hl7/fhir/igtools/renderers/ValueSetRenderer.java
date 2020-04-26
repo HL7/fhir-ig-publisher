@@ -129,7 +129,7 @@ public class ValueSetRenderer extends BaseRenderer {
     ValueSet vsc = vs.copy();
     vsc.setText(null);
     gen.generate(null, vsc, vsc, false);
-    return "<h3>Definition</h3>\r\n" + new XhtmlComposer(XhtmlComposer.HTML).compose(vsc.getText().getDiv());
+    return "<h3>Logical Definition (CLD)</h3>\r\n" + new XhtmlComposer(XhtmlComposer.HTML).compose(vsc.getText().getDiv());
   }
 
   public String xref() throws FHIRException {
