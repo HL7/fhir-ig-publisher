@@ -1248,7 +1248,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (parts[2].equals("uv")) {
         return new Coding("http://unstats.un.org/unsd/methods/m49/m49.htm", "001", "World");
       } else {
-        return new Coding("urn:iso:std:iso:3166:-2", parts[2].toUpperCase(), null);
+        return new Coding("urn:iso:std:iso:3166", parts[2].toUpperCase(), null);
       }
     } else {
       return null;
