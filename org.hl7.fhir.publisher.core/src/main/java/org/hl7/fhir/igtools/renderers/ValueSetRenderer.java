@@ -188,7 +188,12 @@ public class ValueSetRenderer extends BaseRenderer {
                 first = false;
                 b.append("<ul>\r\n");
               }
-              b.append(" <li><a href=\""+sd.getUserString("path")+"\">"+Utilities.escapeXml(sd.present())+"</a></li>\r\n");
+              String path = sd.getUserString("path");
+              if (path == null) {
+                System.out.println("No path for "+sd.getUrl());
+              } else {
+                b.append(" <li><a href=\""+path+"\">"+Utilities.escapeXml(sd.present())+"</a></li>\r\n");
+              }
               break;
             }
           }
@@ -204,7 +209,12 @@ public class ValueSetRenderer extends BaseRenderer {
             first = false;
             b.append("<ul>\r\n");
           }
-          b.append(" <li><a href=\""+q.getUserString("path")+"\">"+Utilities.escapeXml(q.present())+"</a></li>\r\n");
+          String path = q.getUserString("path");
+          if (path == null) {
+            System.out.println("No path for "+q.getUrl());
+          } else {
+            b.append(" <li><a href=\""+path+"\">"+Utilities.escapeXml(q.present())+"</a></li>\r\n");
+          }
           break;
         }
       }
