@@ -5033,6 +5033,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     private byte[] buffer;
     private int length;
+    private boolean observedToSucceed = false;
 
     public MyFilterHandler() {
       buffer = new byte[256];
@@ -5057,6 +5058,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         return false;
       if (s.contains("Auto-regeneration:"))
         return false;
+      if (s.contains("done in"))
+        observedToSucceed = true;
       return true;
     }
 
@@ -5107,9 +5110,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 	    else
 	      exec.execute(org.apache.commons.exec.CommandLine.parse(jekyllCommand+" build --destination \""+outputDir+"\""));
     } catch (IOException ioex) {
-      log("Jekyll has failed. Complete output from running Jekyll: " + pumpHandler.getBufferString());
-      log("Note: Check that Jekyll is installed correctly");
-    	throw ioex;
+      if (pumpHandler.observedToSucceed) {
+        log("Jekyll claimed to succeed, but returned an error. Proceeding anyway");
+      } else {
+        log("Jekyll has failed. Complete output from running Jekyll: " + pumpHandler.getBufferString());
+        log("Note: Check that Jekyll is installed correctly");
+      	throw ioex;
+      }
     }
     return true;
   }
