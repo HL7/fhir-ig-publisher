@@ -161,8 +161,13 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     s = s.replace("{{[type]}}", r.getElement().fhirType());
     s = s.replace("{{[uid]}}", r.getElement().fhirType()+"="+r.getId());
     if (vars != null) {
-      for (String n : vars.keySet())
-        s = s == null ? "" : s.replace("{{["+n+"]}}", vars.get(n));
+      for (String n : vars.keySet()) {
+        String v = vars.get(n);
+        if (v == null) {
+          v = "";
+        }
+        s = s == null ? "" : s.replace("{{["+n+"]}}", v);
+      }
     }
     return s;
   }
@@ -263,7 +268,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       if (s == null) {
         s = paths.getPath(bc.getUrl());
       }
-      if (s == null && bc instanceof CodeSystem) { // work around for an R2 issue) 
+      if (s == null && bc instanceof CodeSystem) { // work around f                                                                                                                  or an R2 issue) 
         CodeSystem cs = (CodeSystem) bc;
         s = paths.getPath(cs.getValueSet());
       }
@@ -274,6 +279,8 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
         bc.setUserData("path", specPath("valueset-security-role-type.html"));
       } else if (bc.hasUrl() && bc.getUrl().equals("http://hl7.org/fhir/ValueSet/object-lifecycle-events")) {
         bc.setUserData("path", specPath("valueset-object-lifecycle-events.html"));
+      } else if (bc.hasUrl() && bc.getUrl().equals("http://hl7.org/fhir/ValueSet/performer-function")) {
+        bc.setUserData("path", specPath("valueset-performer-function.html"));
 //      else
 //        System.out.println("No path for "+bc.getUrl());
       }
