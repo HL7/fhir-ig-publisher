@@ -221,8 +221,10 @@ public class StructureDefinitionRenderer extends BaseRenderer {
           res.append(s);
         res.append("\r\n</ul>\r\n\r\n");
       }
-      if (ToolingExtensions.hasExtension(sd, ToolingExtensions.EXT_FMM_LEVEL))
-        res.append("<p><b><a class=\"fmm\" href=\"versions.html#maturity\" title=\"Maturity Level\">"+translate("cs.summary", "Maturity")+"</a></b>: "+ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_FMM_LEVEL)+"</p>\r\n");
+      if (ToolingExtensions.hasExtension(sd, ToolingExtensions.EXT_FMM_LEVEL)) {
+        // Use hard-coded spec link to point to current spec because DSTU2 had maturity listed on a different page
+        res.append("<p><b><a class=\"fmm\" href=\"http://hl7.org/fhir/versions.html#maturity\" title=\"Maturity Level\">"+translate("cs.summary", "Maturity")+"</a></b>: "+ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_FMM_LEVEL)+"</p>\r\n");
+      }
       
       return res.toString();
     } catch (Exception e) {
@@ -692,7 +694,11 @@ public class StructureDefinitionRenderer extends BaseRenderer {
               }
               if (!tl.contains(tc)) {
                 tl.add(tc);
-                String s = ec.getId().replace("[x]", Utilities.capitalize(tc));
+                String s = ec.getId();
+                if (s.contains(":") && s.lastIndexOf(":") > s.lastIndexOf("[x]")) {
+                  s = s.substring(0, s.lastIndexOf(":"));
+                }
+                s = s.replace("[x]", Utilities.capitalize(tc));
                 StringPair sp = new StringPair(ec.getId(), s);
                 if (!hasReplacement(replacements, sp) && !ec.getId().equals(s))
                   replacements.add(sp);
@@ -1101,7 +1107,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     case REQUIRED:
       return ""+translate("sd.dict", "The codes SHALL be taken from ");
     default:
-      return ""+"??";
+      return ""+"?sd-conf?";
     }
   }
 
@@ -1772,7 +1778,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
   private String getSrcFile(String code) {
     StructureDefinition sd = context.fetchResource(StructureDefinition.class, ProfileUtilities.sdNs(code, null));
     if (sd == null)
-      return "??";
+      return "?sd-src?";
     else {
       String l = igp.getLinkForProfile(this.sd, sd.getUrl());
       if (l == null)

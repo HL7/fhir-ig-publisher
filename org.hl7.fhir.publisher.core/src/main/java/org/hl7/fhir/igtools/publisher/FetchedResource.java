@@ -149,7 +149,7 @@ public class FetchedResource {
   }
   
   public String fhirType() {
-    return resource != null ? resource.fhirType() : element != null ? element.fhirType() : "??";
+    return resource != null ? resource.fhirType() : element != null ? element.fhirType() : "?fr?";
   }
   public void setResEntry(ImplementationGuideDefinitionResourceComponent value) {
     this.resEntry = value;

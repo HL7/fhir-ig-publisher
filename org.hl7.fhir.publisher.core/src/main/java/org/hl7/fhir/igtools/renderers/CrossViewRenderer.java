@@ -20,6 +20,7 @@ import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.Narrative;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionSnapshotComponent;
+import org.hl7.fhir.r5.terminologies.TerminologyRenderer;
 import org.hl7.fhir.r5.utils.NarrativeGenerator;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.validation.ValidationOptions;
@@ -466,7 +467,7 @@ public class CrossViewRenderer {
       for (Coding t : list) {
         if (system == null || system.equals(t.getSystem())) {
           if (first) first = false; else b.append(", ");
-          String sys = NarrativeGenerator.describeSystem(t.getSystem());
+          String sys = TerminologyRenderer.describeSystem(t.getSystem());
           if (sys.equals(t.getSystem()))
             sys = null;
           if (sys == null) {

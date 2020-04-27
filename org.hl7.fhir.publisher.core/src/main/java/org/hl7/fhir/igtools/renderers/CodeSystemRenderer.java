@@ -60,8 +60,9 @@ public class CodeSystemRenderer extends BaseRenderer {
     StringBuilder b = new StringBuilder();
     b.append("<table class=\"grid\">\r\n");
     b.append(" <tbody><tr><td>"+translate("cs.summary", "Defining URL")+":</td><td>"+Utilities.escapeXml(cs.getUrl())+"</td></tr>\r\n");
-    if (cs.hasVersion())
+    if (cs.hasVersion()) {
       b.append(" <tr><td>"+translate("cs.summary", "Version")+":</td><td>"+Utilities.escapeXml(cs.getVersion())+"</td></tr>\r\n");
+    }
     if (cs.hasName()) {
       b.append(" <tr><td>"+translate("vs.summary", "Name")+":</td><td>"+Utilities.escapeXml(gt(cs.getNameElement()))+"</td></tr>\r\n");
     }
@@ -73,14 +74,30 @@ public class CodeSystemRenderer extends BaseRenderer {
     if (cs.hasDescription()) {
       b.append(" <tr><td>"+translate("vs.summary", "Definition")+":</td><td>"+processMarkdown("description", cs.getDescriptionElement())+"</td></tr>\r\n");
     }
-    if (cs.hasPublisher())
+    if (cs.hasPublisher()) {
       b.append(" <tr><td>"+translate("cs.summary", "Publisher")+":</td><td>"+Utilities.escapeXml(gt(cs.getPublisherElement()))+"</td></tr>\r\n");
-    if (CodeSystemUtilities.hasOID(cs))
+    }
+    if (CodeSystemUtilities.hasOID(cs)) {
       b.append(" <tr><td>"+translate("cs.summary", "OID")+":</td><td>"+CodeSystemUtilities.getOID(cs)+" ("+translate("cs.summary", "for OID based terminology systems")+")</td></tr>\r\n");
-    if (cs.hasCopyright())
+    }
+    if (cs.hasContent()) {
+      b.append(" <tr><td>"+translate("cs.summary", "Content Mode")+":</td><td>"+translate("cs.summary", cs.getContent().getDisplay())+"</td></tr>\r\n");      
+    }
+    if (cs.hasValueSet()) {
+      ValueSet vs = context.fetchResource(ValueSet.class, cs.getValueSet());
+      if (vs == null) {
+        b.append(" <tr><td>"+translate("cs.summary", "Value Set")+":</td><td>"+ cs.getValueSet()+" ("+translate("cs.summary", " is the value set for all codes in this code system")+")</td></tr>\r\n");
+      } else {
+        b.append(" <tr><td>"+translate("cs.summary", "Value Set")+":</td><td><a href=\""+vs.getUserString("path")+"\">"+ cs.getValueSet()+"</a> ("+translate("cs.summary", " is the value set for all codes in this code system")+")</td></tr>\r\n");        
+      }
+    }
+    if (cs.hasCopyright()) {
       b.append(" <tr><td>"+translate("cs.summary", "Copyright")+":</td><td>"+processMarkdown("copyright", cs.getCopyrightElement())+"</td></tr>\r\n");
-    if (ToolingExtensions.hasExtension(cs, ToolingExtensions.EXT_FMM_LEVEL))
-      b.append(" <tr><td><a class=\"fmm\" href=\"versions.html#maturity\" title=\"Maturity Level\">"+translate("cs.summary", "Maturity")+"</a>:</td><td>"+ToolingExtensions.readStringExtension(cs, ToolingExtensions.EXT_FMM_LEVEL)+"</td></tr>\r\n");
+    }
+    if (ToolingExtensions.hasExtension(cs, ToolingExtensions.EXT_FMM_LEVEL)) {
+      // We link to the current version of FHIR because for historical versions (e.g. DSTU2), maturity was captured in different places
+      b.append(" <tr><td><a class=\"fmm\" href=\"http://hl7.org/fhir/versions.html#maturity\" title=\"Maturity Level\">"+translate("cs.summary", "Maturity")+"</a>:</td><td>"+ToolingExtensions.readStringExtension(cs, ToolingExtensions.EXT_FMM_LEVEL)+"</td></tr>\r\n");
+    }
     if (xml || json || ttl) {
       b.append(" <tr><td>"+translate("cs.summary", "Source Resource")+":</td><td>");
       boolean first = true;
@@ -163,13 +180,18 @@ public class CodeSystemRenderer extends BaseRenderer {
 
   private boolean addLink(StringBuilder b, boolean first, ValueSet vc, ConceptSetComponent ed, Set<String> processed) {
     if (ed.hasSystem() && ed.getSystem().equals(cs.getUrl())) {
-      if (!processed.contains(vc.getUserString("path"))) {
+      String path = vc.getUserString("path");
+      if (!processed.contains(path)) {
         if (first) {
           first = false;
           b.append("<ul>\r\n");
         } 
-        b.append(" <li><a href=\""+vc.getUserString("path")+"\">"+Utilities.escapeXml(gt(vc.getNameElement()))+"</a></li>\r\n");
-        processed.add(vc.getUserString("path"));
+        if (path == null) {
+          System.out.println("No path for "+vc.getUrl());
+        } else {
+          b.append(" <li><a href=\""+path+"\">"+Utilities.escapeXml(gt(vc.getNameElement()))+"</a></li>\r\n");
+        }
+        processed.add(path);
       }
     }
     return first;

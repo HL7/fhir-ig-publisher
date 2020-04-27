@@ -227,7 +227,7 @@ public class FeedBuilder {
 
             String url = Utilities.pathURL(root(pub.link(forPackage)), s+".tgz");
             b.append("    <item>\r\n");
-            b.append("      <title>"+Utilities.escapeXml(s)+"</title>\r\n");
+            b.append("      <title>"+Utilities.escapeXml(s)+"#"+pub.getVersion()+"</title>\r\n");
             b.append("      <description>"+Utilities.escapeXml(npm.description())+"</description>\r\n");
             b.append("      <link>"+Utilities.escapeXml(url)+"</link>\r\n");
             b.append("      <guid isPermaLink=\"true\">"+Utilities.escapeXml(url)+"</guid>\r\n");

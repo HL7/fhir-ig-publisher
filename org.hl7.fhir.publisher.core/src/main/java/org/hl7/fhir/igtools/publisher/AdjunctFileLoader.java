@@ -6,10 +6,16 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.hl7.fhir.igtools.publisher.CqlSubSystem.CqlSourceFileInformation;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.ObjectConverter;
 import org.hl7.fhir.r5.model.Attachment;
+import org.hl7.fhir.r5.model.Base;
 import org.hl7.fhir.r5.model.Base64BinaryType;
+import org.hl7.fhir.r5.model.Library;
+import org.hl7.fhir.r5.model.Property;
+import org.hl7.fhir.r5.model.RelatedArtifact.RelatedArtifactType;
+import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
@@ -20,10 +26,12 @@ import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
 
 public class AdjunctFileLoader {
 
+  private CqlSubSystem cql;
   private List<String> binaryPaths;
 
-  public AdjunctFileLoader(List<String> binaryPaths) {
+  public AdjunctFileLoader(List<String> binaryPaths, CqlSubSystem cql) {
     this.binaryPaths = binaryPaths;
+    this.cql = cql;
   }
 
   private class ElementWithPath {
@@ -39,63 +47,141 @@ public class AdjunctFileLoader {
     }
     public Element getElement() {
       return element;
+    }  
+  }
+  
+  private class AttachmentWithPath {
+    private String path;
+    private Attachment attachment;
+    public AttachmentWithPath(String path, Attachment attachment) {
+      super();
+      this.path = path;
+      this.attachment = attachment;
     }
+    public String getPath() {
+      return path;
+    }
+    public Attachment getAttachment() {
+      return attachment;
+    }
+  
     
   }
-  public boolean replaceAttachments(FetchedFile f, Element e) {
-    List<ElementWithPath> attachments = makeListOfAttachments(e);
-    for (ElementWithPath att : attachments) {
-      String fn = checkReplaceable(att.element);
+  
+  
+  /**
+   * second invocation, for metadata resources 
+   * 
+   * @param f
+   * @param r
+   * @return
+   */
+  public boolean replaceAttachments2(FetchedFile f, FetchedResource r) {
+    boolean res = false;
+    List<AttachmentWithPath> attachments = makeListOfAttachments(r.getResource());
+    for (AttachmentWithPath att : attachments) {
+      String fn = checkReplaceable(att.getAttachment());
       if (fn != null) {
         Attachment a;
         try {
           a = loadFile(fn);
-          if (a == null) {
-            f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.element.line(), att.element.col(), att.getPath(), "Unable to find Adjunct Binary "+fn, IssueSeverity.ERROR));
-          } else {
-            att.element.getChildren().clear();
-            if (a.hasContentType()) {
-              att.element.setChildValue("contentType", a.getContentType());
-            } else {
-              f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.element.line(), att.element.col(), att.getPath(), "Unknown file type "+fn, IssueSeverity.ERROR));
-            }
-            att.element.setProperty("data".hashCode(), "data", new Base64BinaryType(a.getData()));
-          }
-          if (e.fhirType().equals("Library") && "text/cql".equals(a.getContentType())) {
+          res = true;
+          att.getAttachment().setId(null);
+          att.getAttachment().setData(a.getData());
+          att.getAttachment().setContentType(a.getContentType());
+          // Library - post processing needed
+          if (r.getResource() instanceof Library && "text/cql".equals(a.getContentType())) {
             // we just injected CQL into a library 
-            performLibraryCQLProcessing(e, a.getData());
-          }
-        } catch (Exception ex) {
-          f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.element.line(), att.element.col(), att.getPath(), "Error Loading "+fn+": " +ex.getMessage(), IssueSeverity.ERROR));
-        }
-      }
-    }
-    // special cases:
-    // binary - not an attachment 
-    if (e.fhirType().equals("Binary")) {
-      String n = e.getChildValue("data");
-      if (n != null && n.startsWith("ig-loader-")) {
-        String fn = n.substring(10);
-        try {
-          Attachment a = loadFile(fn);
-          if (a == null) {
-            f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, e.line(), e.col(), "Binary", "Unable to find Adjunct Binary "+fn, IssueSeverity.ERROR));
-          } else {
-            if (a.hasContentType()) {
-              e.setChildValue("contentType", a.getContentType());
-            } else {
-              f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, e.line(), e.col(), "Binary", "Unknown file type "+fn, IssueSeverity.ERROR));
+            try {
+              performLibraryCQLProcessing(f, (Library) r.getResource(), a);
+            } catch (Exception ex) {
+              f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.EXCEPTION, att.getPath(), "Error processing CQL: " +ex.getMessage(), IssueSeverity.ERROR));              
             }
-            e.setProperty("data".hashCode(), "data", new Base64BinaryType(a.getData()));
           }
         } catch (Exception ex) {
-          f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, e.line(), e.col(), "Binary", "Error Loading "+fn+": " +ex.getMessage(), IssueSeverity.ERROR));
+          f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.getPath(), "Error Loading "+fn+": " +ex.getMessage(), IssueSeverity.ERROR));
         }
-        
       }
     }
-    // Library - post processing needed
-    return false;
+    return res;    
+  }
+  
+  /**
+   * This services is invoked twice. The first time, on the elemnt model, as soon as a resource is loaded. 
+   * But it will be invoked a second time for Metadata resources, once the metdata resource has been loaded,
+   * so we ignore them the first time around
+   * 
+   * @param f
+   * @param r
+   * @param metadataResourceNames
+   * @return
+   */
+  public boolean replaceAttachments1(FetchedFile f, FetchedResource r, List<String> metadataResourceNames) {    
+    if (r.getElement().fhirType().equals("Binary")) {
+      return processBinary(f, r.getElement());
+    } else if (!Utilities.existsInList(r.getElement().fhirType(), metadataResourceNames)) {
+      return processByElement(f, r.getElement());
+    } else {
+      return false;
+    }
+  }
+
+  private boolean processByElement(FetchedFile f, Element e) {
+    boolean res = false;
+    List<ElementWithPath> attachments = makeListOfAttachments(e);
+    for (ElementWithPath att : attachments) {
+      String fn = checkReplaceable(att.getElement());
+      if (fn != null) {
+        Attachment a;
+        try {
+          a = loadFile(fn);
+          res = true;
+          addAttachment(f, att, fn, a);
+        } catch (Exception ex) {
+          f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.getElement().line(), att.getElement().col(), att.getPath(), "Error Loading "+fn+": " +ex.getMessage(), IssueSeverity.ERROR));
+        }
+      }
+    }
+    return res;
+  }
+
+  public boolean processBinary(FetchedFile f, Element e) {
+    boolean res = false;
+    String n = e.getChildValue("data");
+    if (n != null && n.startsWith("ig-loader-")) {
+      String fn = n.substring(10);
+      try {
+        Attachment a = loadFile(fn);
+        if (a == null) {
+          f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, e.line(), e.col(), "Binary", "Unable to find Adjunct Binary "+fn, IssueSeverity.ERROR));
+        } else {
+          res = true;
+          if (a.hasContentType()) {
+            e.setChildValue("contentType", a.getContentType());
+          } else {
+            f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, e.line(), e.col(), "Binary", "Unknown file type "+fn, IssueSeverity.ERROR));
+          }
+          e.setProperty("data".hashCode(), "data", new Base64BinaryType(a.getData()));
+        }
+      } catch (Exception ex) {
+        f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, e.line(), e.col(), "Binary", "Error Loading "+fn+": " +ex.getMessage(), IssueSeverity.ERROR));
+      }
+    }
+    return res;
+  }
+
+  public void addAttachment(FetchedFile f, ElementWithPath att, String fn, Attachment a) {
+    if (a == null) {
+      f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.getElement().line(), att.getElement().col(), att.getPath(), "Unable to find Adjunct Binary "+fn, IssueSeverity.ERROR));
+    } else {
+      att.getElement().getChildren().clear();
+      if (a.hasContentType()) {
+        att.getElement().setChildValue("contentType", a.getContentType());
+      } else {
+        f.getErrors().add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, att.getElement().line(), att.getElement().col(), att.getPath(), "Unknown file type "+fn, IssueSeverity.ERROR));
+      }
+      att.getElement().setProperty("data".hashCode(), "data", new Base64BinaryType(a.getData()));
+    }
   }
 
   private Attachment loadFile(String fn) throws FileNotFoundException, IOException {
@@ -105,6 +191,7 @@ public class AdjunctFileLoader {
         Attachment att = new Attachment();
         att.setContentType(determineContentType(Utilities.getFileExtension(fn)));
         att.setData(TextFile.fileToBytes(f));
+        att.setUrl(f.getAbsolutePath());
         return att;
       }
     }
@@ -145,6 +232,20 @@ public class AdjunctFileLoader {
     return value.substring(10);
   }
 
+  private String checkReplaceable(Attachment att) {
+    if (att.hasData() || att.hasUrl() || att.hasContentType() || att.hasSize() || att.hasTitle()) {
+      return null;
+    }
+    if (!att.hasId()) {
+      return null;
+    }
+    String value = att.getId();
+    if (value == null || !value.startsWith("ig-loader-")) {
+      return null;
+    }
+    return value.substring(10);
+  }
+
   private List<ElementWithPath> makeListOfAttachments(Element element) {
     List<ElementWithPath> res = new ArrayList<>();
     listAttachments(res, element.getChildren(), element.fhirType());
@@ -173,7 +274,43 @@ public class AdjunctFileLoader {
     }    
   }
   
-  private void performLibraryCQLProcessing(Element e, byte[] data) {
+
+  private List<AttachmentWithPath> makeListOfAttachments(Resource r) {
+    List<AttachmentWithPath> res = new ArrayList<>();
+    listAttachments(res, r, r.fhirType());
+    return res;
+  }
+
+  private void listAttachments(List<AttachmentWithPath> res, Base focus, String path) {
+    if (focus instanceof Attachment) {
+      res.add(new AttachmentWithPath(path, (Attachment) focus));
+    } else {
+      for (Property p : focus.children()) {
+        if (p.getMaxCardinality() > 1) {
+          int i = 0;
+          for (Base b : p.getValues()) {
+            listAttachments(res, b, path+"."+p.getName()+"{"+i+"]");
+            i++;
+          }
+        } else if (p.hasValues()) {
+          listAttachments(res, p.getValues().get(0), path+"."+p.getName());
+        }
+      }
+    }       
+  }
+
+  private void performLibraryCQLProcessing(FetchedFile f, Library lib, Attachment attachment) {
+    CqlSourceFileInformation info = cql.getFileInformation(attachment.getUrl());
+    if (info != null) {
+      f.getErrors().addAll(info.getErrors());
+      lib.addContent().setContentType("application/elm+xml").setData(info.getElm());
+      lib.getDataRequirement().clear();
+      lib.getDataRequirement().addAll(info.getDataRequirements());
+      lib.getRelatedArtifact().removeIf(n -> n.getType() == RelatedArtifactType.DEPENDSON);
+      lib.getRelatedArtifact().addAll(info.getRelatedArtifacts());
+    } else {
+      f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, "Library", "No cql info found for "+f.getName(), IssueSeverity.ERROR));      
+    }
     
   }
 

@@ -89,8 +89,10 @@ public class ValueSetRenderer extends BaseRenderer {
       b.append(" <tr><td>"+translate("vs.summary", "OID")+":</td><td>"+ValueSetUtilities.getOID(vs)+" ("+translate("vs.summary", "for OID based terminology systems")+")</td></tr>\r\n");
     if (vs.hasCopyright())
       b.append(" <tr><td>"+translate("vs.summary", "Copyright")+":</td><td>"+processMarkdown("copyright", vs.getCopyrightElement())+"</td></tr>\r\n");
-    if (ToolingExtensions.hasExtension(vs, ToolingExtensions.EXT_FMM_LEVEL))
-      b.append(" <tr><td><a class=\"fmm\" href=\"versions.html#maturity\" title=\"Maturity Level\">"+translate("cs.summary", "Maturity")+"</a>:</td><td>"+ToolingExtensions.readStringExtension(vs, ToolingExtensions.EXT_FMM_LEVEL)+"</td></tr>\r\n");
+    if (ToolingExtensions.hasExtension(vs, ToolingExtensions.EXT_FMM_LEVEL)) {
+      // Use hard-coded spec link to point to current spec because DSTU2 had maturity listed on a different page
+      b.append(" <tr><td><a class=\"fmm\" href=\"http://hl7.org/fhir/versions.html#maturity\" title=\"Maturity Level\">"+translate("cs.summary", "Maturity")+"</a>:</td><td>"+ToolingExtensions.readStringExtension(vs, ToolingExtensions.EXT_FMM_LEVEL)+"</td></tr>\r\n");
+    }
     if (xml || json || ttl) {
       b.append(" <tr><td>"+translate("vs.summary", "Source Resource")+":</td><td>");
       boolean first = true;
@@ -127,7 +129,7 @@ public class ValueSetRenderer extends BaseRenderer {
     ValueSet vsc = vs.copy();
     vsc.setText(null);
     gen.generate(null, vsc, vsc, false);
-    return "<h3>Definition</h3>\r\n" + new XhtmlComposer(XhtmlComposer.HTML).compose(vsc.getText().getDiv());
+    return "<h3>Logical Definition (CLD)</h3>\r\n" + new XhtmlComposer(XhtmlComposer.HTML).compose(vsc.getText().getDiv());
   }
 
   public String xref() throws FHIRException {
@@ -186,7 +188,12 @@ public class ValueSetRenderer extends BaseRenderer {
                 first = false;
                 b.append("<ul>\r\n");
               }
-              b.append(" <li><a href=\""+sd.getUserString("path")+"\">"+Utilities.escapeXml(sd.present())+"</a></li>\r\n");
+              String path = sd.getUserString("path");
+              if (path == null) {
+                System.out.println("No path for "+sd.getUrl());
+              } else {
+                b.append(" <li><a href=\""+path+"\">"+Utilities.escapeXml(sd.present())+"</a></li>\r\n");
+              }
               break;
             }
           }
@@ -202,7 +209,12 @@ public class ValueSetRenderer extends BaseRenderer {
             first = false;
             b.append("<ul>\r\n");
           }
-          b.append(" <li><a href=\""+q.getUserString("path")+"\">"+Utilities.escapeXml(q.present())+"</a></li>\r\n");
+          String path = q.getUserString("path");
+          if (path == null) {
+            System.out.println("No path for "+q.getUrl());
+          } else {
+            b.append(" <li><a href=\""+path+"\">"+Utilities.escapeXml(q.present())+"</a></li>\r\n");
+          }
           break;
         }
       }
