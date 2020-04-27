@@ -1479,24 +1479,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           this.translator.setLang(language);
         }
       } else if (p.getCode().equals("languages") && p.hasValue()) {
-        System.out.println("Languages parameter found. No support yet.");
-        /*
-        if(this.translator == null) {
-            this.translator = new TranslationImplementation();
-          }
-        final String languages = p.getValue();
-        if(languages != null && languages.length() > 0) {
-          final String firstLanguage = Arrays.stream(languages.split(","))
-                  .map(String::trim)
-                  .filter(s -> s.length() > 0)
-                  .findFirst()
-                  .orElseGet(() -> {
-                    System.out.println("Language parameter defined, but no valid languages found");
-                    return null;
-                  });
-          ((TranslationImplementation)this.translator).setLang(firstLanguage);
-        }
-        */
+        logDebugMessage(LogCategory.INIT, "Languages parameter found. No support yet.");
       }
       count++;
     }
@@ -7122,7 +7105,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
         exitCode = 1;
       } finally {
-        self.translator.printKeys();
+        if(self.translator != null && self.translator.harvestEnabled()) {
+          self.translator.printKeys();
+        }
         if (self.mode == IGBuildMode.MANUAL) {
           TextFile.stringToFile(buildReport(getNamedParam(args, "-ig"), getNamedParam(args, "-source"), self.filelog.toString(), Utilities.path(self.qaDir, "validation.txt")), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher.log"), false);
         }

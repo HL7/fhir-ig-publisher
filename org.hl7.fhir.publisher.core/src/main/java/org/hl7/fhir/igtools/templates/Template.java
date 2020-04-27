@@ -125,6 +125,7 @@ public class Template {
       consoleLogger.setOutputPrintStream(System.out);
       consoleLogger.setMessageOutputLevel(Project.MSG_INFO);
       antProject.addBuildListener(consoleLogger);
+      // If xslt is to be localized, language tag needs to be injected here.
       antProject.setBasedir(root);
       antProject.setProperty("ig.root", root);
       antProject.setProperty("ig.template", templateDir);
