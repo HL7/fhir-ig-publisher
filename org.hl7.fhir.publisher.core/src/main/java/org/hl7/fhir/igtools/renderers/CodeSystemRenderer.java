@@ -77,6 +77,9 @@ public class CodeSystemRenderer extends BaseRenderer {
     if (cs.hasPublisher()) {
       b.append(" <tr><td>"+translate("cs.summary", "Publisher")+":</td><td>"+Utilities.escapeXml(gt(cs.getPublisherElement()))+"</td></tr>\r\n");
     }
+    if (cs.hasExtension(ToolingExtensions.EXT_WORKGROUP)) {
+      b.append(" <tr><td>"+translate("vs.summary", "Committee")+":</td><td>"+renderCommitteeLink(cs)+"</td></tr>\r\n");
+    }
     if (CodeSystemUtilities.hasOID(cs)) {
       b.append(" <tr><td>"+translate("cs.summary", "OID")+":</td><td>"+CodeSystemUtilities.getOID(cs)+" ("+translate("cs.summary", "for OID based terminology systems")+")</td></tr>\r\n");
     }

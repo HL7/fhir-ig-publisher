@@ -29,8 +29,13 @@ import org.hl7.fhir.r5.conformance.ProfileUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.PrimitiveType;
 import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
+import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.r5.model.CodeSystem;
+import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
 import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
 import org.hl7.fhir.r5.utils.NarrativeGenerator;
+import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.TranslatingUtilities;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
@@ -147,6 +152,21 @@ public class BaseRenderer extends TranslatingUtilities {
     case DRAFT: return "draft";
     case RETIRED: return "retired";
     default: return "Unknown";
+    }
+  }
+
+  protected String renderCommitteeLink(CanonicalResource cr) {
+    String code = ToolingExtensions.readStringExtension(cr, ToolingExtensions.EXT_WORKGROUP);
+    CodeSystem cs = context.fetchCodeSystem("http://terminology.hl7.org/CodeSystem/hl7-work-group");
+    if (cs == null || !cs.hasUserData("path"))
+      return code;
+    else {
+      ConceptDefinitionComponent cd = CodeSystemUtilities.findCode(cs.getConcept(), code);
+      if (cd == null) {
+        return code;        
+      } else {
+        return "<a href=\""+cs.getUserString("path")+"#"+cd.getCode()+"\">"+cd.getDisplay()+"</a>";
+      }
     }
   }
 
