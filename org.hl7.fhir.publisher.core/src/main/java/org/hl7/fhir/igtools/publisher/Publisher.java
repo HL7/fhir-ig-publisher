@@ -805,8 +805,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       f.print(tx);
       f.println("</head></html>");
       f.close();
-    }
-    
+    } 
   }
 
 
@@ -1322,9 +1321,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Exception: "+ioex.getMessage());
       throw ioex;
     }    
-    if (pumpHandler.errorCount == -1) {
-      log("Sushi has failed - no errors count in the output. Complete output from running Sushi : " + pumpHandler.getBufferString());      
-    } else if (pumpHandler.errorCount > 0) {
+    if (pumpHandler.errorCount > 0) {
       throw new IOException("Sushi failed with errors. Complete output from running Sushi : " + pumpHandler.getBufferString());
     }
   }
