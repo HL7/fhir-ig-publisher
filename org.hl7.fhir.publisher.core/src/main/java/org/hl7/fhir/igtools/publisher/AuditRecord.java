@@ -28,7 +28,6 @@ public class AuditRecord {
   }
   private String path;
   private AuditEventAction action;
-  private Coding type;
   private DateTimeType date;
   private String comment;
   private Map<Coding, AuditEventActor> actors = new HashMap<>();
@@ -38,18 +37,14 @@ public class AuditRecord {
     super();
   }
   
-  public AuditRecord(AuditEventAction action, Coding type, DateTimeType date, String comment) {
+  public AuditRecord(AuditEventAction action, DateTimeType date, String comment) {
     super();
     this.action = action;
-    this.type = type;
     this.date = date;
     this.comment = comment;
   }
   public AuditEventAction getAction() {
     return action;
-  }
-  public Coding getType() {
-    return type;
   }
   public DateTimeType getDate() {
     return date;
@@ -63,10 +58,6 @@ public class AuditRecord {
 
   public void setAction(AuditEventAction action) {
     this.action = action;
-  }
-
-  public void setType(Coding type) {
-    this.type = type;
   }
 
   public void setDate(DateTimeType date) {

@@ -2,20 +2,35 @@ package org.hl7.fhir.igtools.renderers;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import org.hl7.fhir.igtools.publisher.AuditRecord;
 import org.hl7.fhir.igtools.publisher.AuditRecord.AuditEventActor;
+import org.hl7.fhir.igtools.renderers.HistoryGenerator.HistoryListSorter;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.DateTimeType;
+import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.model.AuditEvent.AuditEventAction;
+import org.hl7.fhir.r5.model.CodeSystem;
+import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
 public class HistoryGenerator {
+
+  public class HistoryListSorter implements Comparator<AuditRecord> {
+
+    @Override
+    public int compare(AuditRecord arg0, AuditRecord arg1) {
+      return -arg0.getDate().getValue().compareTo(arg1.getDate().getValue());
+    }
+
+  }
 
   private SimpleWorkerContext context;
 
@@ -27,21 +42,70 @@ public class HistoryGenerator {
     if (r.getAudits().isEmpty()) {
       return null;
     } else {
+      // prep
+      Collections.sort(r.getAudits(), new HistoryListSorter());
+      List<Coding> actorTypes = scanActors(r.getAudits());
+      
+      // framework
       XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
       div.hr();
-      div.para().b().tx("history");
+      div.para().b().tx("History");
       XhtmlNode tbl = div.table("grid");
+      
+      // headers
       XhtmlNode tr = tbl.tr();
-      List<Coding> actorTypes = scanActors(r.getAudits());
       tr.td().b().tx("Date");
       tr.td().b().tx("Action");
-      tr.td().b().tx("Type");
       for (Coding c : actorTypes) {
-        tr.td().b().tx(c.getCode());        
+        CodeSystem cs = context.fetchCodeSystem(c.getSystem());
+        XhtmlNode td = tr.td().b(); 
+        if (cs != null && cs.hasUserData("path")) {
+          ConceptDefinitionComponent cd = CodeSystemUtilities.getCode(cs, c.getCode());
+          td.ah(cs.getUserString("path")+"#"+cs.getId()+"-"+c.getCode()).tx(cd != null && cd.hasDisplay() ? cd.getDisplay() : c.hasDisplay() ? c.getDisplay() : c.getCode());
+        } else {
+          td.tx(c.getCode());
+        }
       }
       tr.td().b().tx("Comment");
+      // rows
+      for (AuditRecord a : r.getAudits()) {
+        tr = tbl.tr();
+        tr.td().ah(a.getPath()).tx(a.getDate().asStringValue().substring(0, 10));
+
+        XhtmlNode td = tr.td(); 
+        CodeSystem cs = context.fetchCodeSystem("http://hl7.org/fhir/audit-event-action");
+        if (cs != null && cs.hasUserData("path")) {
+          ConceptDefinitionComponent cd = CodeSystemUtilities.getCode(cs, a.getAction().toCode());
+          td.ah(cs.getUserString("path")+"#"+cs.getId()+"-"+a.getAction().toCode()).tx(cd != null ? cd.getDisplay() : a.getAction().toCode());
+        } else {
+          td.tx(a.getAction().toCode());
+        }
+
+        for (Coding c : actorTypes) {
+          AuditEventActor aa = getActor(a, c);
+          td = tr.td();
+          if (aa != null) {
+            if (aa.getReference() != null) {
+              td.ah(aa.getReference()).tx(aa.getDisplay());
+            } else {
+              td.tx(aa.getDisplay());
+            }
+          }
+        }
+        if (a.getComment() != null)
+        tr.td().tx(a.getComment());
+      }
       return div;
     }
+  }
+
+  private AuditEventActor getActor(AuditRecord a, Coding c) {
+    for (Coding t : a.getActors().keySet()) {
+      if (t.matches(c)) {
+        return a.getActors().get(c);
+      }
+    }
+    return null;
   }
 
   private List<Coding> scanActors(List<AuditRecord> audits) {

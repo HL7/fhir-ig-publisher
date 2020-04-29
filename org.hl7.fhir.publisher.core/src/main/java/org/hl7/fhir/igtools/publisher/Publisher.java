@@ -900,7 +900,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (ae.hasPurposeOfEvent()) {
       res.setComment(ae.getPurposeOfEventFirstRep().getText());
     }
-    res.setType(ae.getType());
     for (AuditEventAgentComponent agent : ae.getAgent()) {
       for (Coding c : agent.getType().getCoding()) {
         res.getActors().put(c, res.new AuditEventActor(agent.hasName() ? agent.getName() : agent.getWho().hasDisplay() ? agent.getWho().getDisplay() : agent.getAltId(), agent.getWho().getReference()));
