@@ -3330,8 +3330,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             res.setName(r.getTitle());
           else
             res.setName(r.getId());
-        if (!res.hasDescription() && ((CanonicalResource)r.getResource()).hasDescription()) {
-          res.setDescription(((CanonicalResource)r.getResource()).getDescription().trim());
+        if (!res.hasDescription() && r.getElement().hasChild("description")) {
+          res.setDescription(r.getElement().getChildValue("description").trim());
         }
         res.setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
       }
