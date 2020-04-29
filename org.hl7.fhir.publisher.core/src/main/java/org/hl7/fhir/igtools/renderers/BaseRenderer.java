@@ -165,7 +165,7 @@ public class BaseRenderer extends TranslatingUtilities {
       if (cd == null) {
         return code;        
       } else {
-        return "<a href=\""+cs.getUserString("path")+"#"+cd.getCode()+"\">"+cd.getDisplay()+"</a>";
+        return "<a href=\""+cs.getUserString("path")+"#"+cs.getId()+"-"+cd.getCode()+"\">"+cd.getDisplay()+"</a>";
       }
     }
   }

@@ -35,7 +35,7 @@ cd C:\work\org.hl7.fhir\fhir-ig-publisher
 
 call "C:\tools\versionNotes.exe" -fileName C:\work\org.hl7.fhir\latest-ig-publisher\release-notes-publisher.md -version %newver% -fileDest C:\temp\current-release-notes-publisher.md -url https://storage.googleapis.com/ig-build/org.hl7.fhir.publisher.jar -maven https://oss.sonatype.org/service/local/artifact/maven/redirect?r=snapshots&g=org.hl7.fhir.publisher&a=org.hl7.fhir.publisher.cli&v=%newver%-SNAPSHOT&e=jar
 
-gsutil cp -a public-read org.hl7.fhir.publisher.cli\target\org.hl7.fhir.publisher.cli-%newver%-SNAPSHOT.jar gs://ig-build/org.hl7.fhir.publisher.jar
+call gsutil cp -a public-read org.hl7.fhir.publisher.cli\target\org.hl7.fhir.publisher.cli-%newver%-SNAPSHOT.jar gs://ig-build/org.hl7.fhir.publisher.jar
 cd c:\work\org.hl7.fhir\latest-ig-publisher
 call git commit -a -m "Release new version %newver%-SNAPSHOT"
 call git push origin master
