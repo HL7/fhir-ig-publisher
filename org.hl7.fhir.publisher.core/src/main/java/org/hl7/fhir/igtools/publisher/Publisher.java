@@ -3292,19 +3292,25 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       loadAsElementModel(f, f.getBundle(), null);
       List<Element> entries = new ArrayList<Element>();
       f.getBundle().getElement().getNamedChildren("entry", entries);
+      int i = -1;
       for (Element bnde : entries) {
+        i++;
         Element res = bnde.getNamedChild("resource"); 
-        FetchedResource r = f.addResource();
-        r.setElement(res);
-        r.setId(res.getIdBase());
-        List<Element> profiles = new ArrayList<Element>();
-        Element meta = res.getNamedChild("meta");
-        if (meta != null)
-          meta.getNamedChildren("profile", profiles);
-        for (Element p : profiles)
-          r.getStatedProfiles().add(p.primitiveValue());
-        r.setTitle(r.getElement().getChildValue("name"));
-        igpkp.findConfiguration(f, r);
+        if (res == null) {
+          f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, "Bundle.element["+i+"]", "All entries must have resources when loading a bundle", IssueSeverity.ERROR));
+        } else {
+          FetchedResource r = f.addResource();
+          r.setElement(res);
+          r.setId(res.getIdBase());
+          List<Element> profiles = new ArrayList<Element>();
+          Element meta = res.getNamedChild("meta");
+          if (meta != null)
+            meta.getNamedChildren("profile", profiles);
+          for (Element p : profiles)
+            r.getStatedProfiles().add(p.primitiveValue());
+          r.setTitle(r.getElement().getChildValue("name"));
+          igpkp.findConfiguration(f, r);
+        }
       }
     } else
       f = altMap.get("Bundle/"+name);
@@ -3324,8 +3330,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             res.setName(r.getTitle());
           else
             res.setName(r.getId());
-        if (!res.hasDescription())
+        if (!res.hasDescription() && ((CanonicalResource)r.getResource()).hasDescription()) {
           res.setDescription(((CanonicalResource)r.getResource()).getDescription().trim());
+        }
         res.setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
       }
       res.setUserData("loaded.resource", r);
