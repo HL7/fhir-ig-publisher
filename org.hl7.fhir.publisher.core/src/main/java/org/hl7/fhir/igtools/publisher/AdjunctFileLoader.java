@@ -304,10 +304,15 @@ public class AdjunctFileLoader {
     if (info != null) {
       f.getErrors().addAll(info.getErrors());
       lib.addContent().setContentType("application/elm+xml").setData(info.getElm());
+      if (info.getJsonElm() != null) {
+        lib.addContent().setContentType("application/elm+json").setData(info.getJsonElm());
+      }
       lib.getDataRequirement().clear();
       lib.getDataRequirement().addAll(info.getDataRequirements());
       lib.getRelatedArtifact().removeIf(n -> n.getType() == RelatedArtifactType.DEPENDSON);
       lib.getRelatedArtifact().addAll(info.getRelatedArtifacts());
+      lib.getParameter().clear();
+      lib.getParameter().addAll(info.getParameters());
     } else {
       f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, "Library", "No cql info found for "+f.getName(), IssueSeverity.ERROR));      
     }

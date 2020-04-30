@@ -85,6 +85,9 @@ public class ValueSetRenderer extends BaseRenderer {
     }
     if (vs.hasPublisher())
       b.append(" <tr><td>"+translate("vs.summary", "Publisher")+":</td><td>"+Utilities.escapeXml(gt(vs.getPublisherElement()))+"</td></tr>\r\n");
+    if (vs.hasExtension(ToolingExtensions.EXT_WORKGROUP)) {
+      b.append(" <tr><td>"+translate("vs.summary", "Committee")+":</td><td>"+renderCommitteeLink(vs)+"</td></tr>\r\n");
+    }
     if (ValueSetUtilities.hasOID(vs))
       b.append(" <tr><td>"+translate("vs.summary", "OID")+":</td><td>"+ValueSetUtilities.getOID(vs)+" ("+translate("vs.summary", "for OID based terminology systems")+")</td></tr>\r\n");
     if (vs.hasCopyright())

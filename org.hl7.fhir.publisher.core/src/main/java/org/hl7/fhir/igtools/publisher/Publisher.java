@@ -120,6 +120,7 @@ import org.hl7.fhir.igtools.publisher.utils.IGWebSiteMaintainer;
 import org.hl7.fhir.igtools.renderers.BaseRenderer;
 import org.hl7.fhir.igtools.renderers.CodeSystemRenderer;
 import org.hl7.fhir.igtools.renderers.CrossViewRenderer;
+import org.hl7.fhir.igtools.renderers.HistoryGenerator;
 import org.hl7.fhir.igtools.renderers.JsonXhtmlRenderer;
 import org.hl7.fhir.igtools.renderers.OperationDefinitionRenderer;
 import org.hl7.fhir.igtools.renderers.StructureDefinitionRenderer;
@@ -149,6 +150,10 @@ import org.hl7.fhir.r5.elementmodel.TurtleParser;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.XmlParser;
+import org.hl7.fhir.r5.model.AuditEvent;
+import org.hl7.fhir.r5.model.AuditEvent.AuditEventAction;
+import org.hl7.fhir.r5.model.AuditEvent.AuditEventAgentComponent;
+import org.hl7.fhir.r5.model.AuditEvent.AuditEventEntityComponent;
 import org.hl7.fhir.r5.model.Base;
 import org.hl7.fhir.r5.model.Bundle;
 import org.hl7.fhir.r5.model.Bundle.BundleEntryComponent;
@@ -805,8 +810,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       f.print(tx);
       f.println("</head></html>");
       f.close();
-    }
-    
+    } 
   }
 
 
@@ -826,6 +830,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         log("Unhandled Exception: " +ex.toString());
         throw(ex);
       }
+      log("Processing AuditEvents");
+      processAuditEvents();
       log("Generating Outputs in "+outputDir);
       generate();
       long endTime = System.nanoTime();
@@ -847,6 +853,69 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       throw e;
     }
+  }
+
+  private void processAuditEvents() throws FHIRFormatError, DefinitionException, FHIRException, IOException {
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.fhirType().equals("AuditEvent")) { 
+          logDebugMessage(LogCategory.PROGRESS, "Process AuditEvent "+f.getName()+" : "+r.getId());
+          processAuditEvent(igpkp.getLinkFor(r, true), r.getElement());
+        } else if (r.fhirType().equals("Bundle")) {
+          List<Element> entries = r.getElement().getChildrenByName("entry");
+          for (int i = 0; i < entries.size(); i++) {
+            Element entry = entries.get(i);
+            Element res = entry.getNamedChild("resource");
+            if (res != null & res.fhirType().equals("AuditEvent")) {
+               logDebugMessage(LogCategory.PROGRESS, "Process AuditEvent "+f.getName()+" : "+r.getId()+".entry["+i+"]");
+               processAuditEvent(igpkp.getLinkFor(r, true), res);
+            }
+          }
+        }
+      }
+    }    
+  }
+
+  private void processAuditEvent(String path, Element resource) throws FHIRFormatError, DefinitionException, FHIRException, IOException {
+    AuditEvent ae = (AuditEvent) convertFromElement(resource);
+    for (AuditEventEntityComponent entity : ae.getEntity()) {
+      if (entity.getWhat().hasReference()) {
+        String[] ref = entity.getWhat().getReference().split("\\/");
+        int i = chooseType(ref);
+        if (i >= 0) {
+          FetchedResource res = fetchByResource(ref[i], ref[i+1]);
+          if (res != null) {
+            res.getAudits().add(processAudit(path, ae));
+          }
+        }
+      }
+    }
+  }
+
+  private AuditRecord processAudit(String path, AuditEvent ae) {
+    AuditRecord res = new AuditRecord();
+    res.setPath(path);
+    res.setAction(ae.getAction());
+    res.setDate(ae.getPeriod().getEndElement());
+    if (ae.hasPurposeOfEvent()) {
+      res.setComment(ae.getPurposeOfEventFirstRep().getText());
+    }
+    for (AuditEventAgentComponent agent : ae.getAgent()) {
+      for (Coding c : agent.getType().getCoding()) {
+        res.getActors().put(c, res.new AuditEventActor(agent.hasName() ? agent.getName() : agent.getWho().hasDisplay() ? agent.getWho().getDisplay() : agent.getAltId(), agent.getWho().getReference()));
+      }
+    }
+    return res;
+  }
+
+  private int chooseType(String[] ref) {
+    int res = -1;
+    for (int i = 0; i < ref.length-1; i++) { // note -1 - don't bother checking the last value, which might also be a resource name (e.g StructureDefinition/XXX)
+      if (context.getResourceNames().contains(ref[i])) {
+        res = i;
+      }
+    }
+    return res;
   }
 
   private void recordOutcome(Exception ex, ValidationPresenter val) {
@@ -1322,9 +1391,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Exception: "+ioex.getMessage());
       throw ioex;
     }    
-    if (pumpHandler.errorCount == -1) {
-      log("Sushi has failed - no errors count in the output. Complete output from running Sushi : " + pumpHandler.getBufferString());      
-    } else if (pumpHandler.errorCount > 0) {
+    if (pumpHandler.errorCount > 0) {
       throw new IOException("Sushi failed with errors. Complete output from running Sushi : " + pumpHandler.getBufferString());
     }
   }
@@ -3225,19 +3292,25 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       loadAsElementModel(f, f.getBundle(), null);
       List<Element> entries = new ArrayList<Element>();
       f.getBundle().getElement().getNamedChildren("entry", entries);
+      int i = -1;
       for (Element bnde : entries) {
+        i++;
         Element res = bnde.getNamedChild("resource"); 
-        FetchedResource r = f.addResource();
-        r.setElement(res);
-        r.setId(res.getIdBase());
-        List<Element> profiles = new ArrayList<Element>();
-        Element meta = res.getNamedChild("meta");
-        if (meta != null)
-          meta.getNamedChildren("profile", profiles);
-        for (Element p : profiles)
-          r.getStatedProfiles().add(p.primitiveValue());
-        r.setTitle(r.getElement().getChildValue("name"));
-        igpkp.findConfiguration(f, r);
+        if (res == null) {
+          f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, "Bundle.element["+i+"]", "All entries must have resources when loading a bundle", IssueSeverity.ERROR));
+        } else {
+          FetchedResource r = f.addResource();
+          r.setElement(res);
+          r.setId(res.getIdBase());
+          List<Element> profiles = new ArrayList<Element>();
+          Element meta = res.getNamedChild("meta");
+          if (meta != null)
+            meta.getNamedChildren("profile", profiles);
+          for (Element p : profiles)
+            r.getStatedProfiles().add(p.primitiveValue());
+          r.setTitle(r.getElement().getChildValue("name"));
+          igpkp.findConfiguration(f, r);
+        }
       }
     } else
       f = altMap.get("Bundle/"+name);
@@ -3257,8 +3330,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             res.setName(r.getTitle());
           else
             res.setName(r.getId());
-        if (!res.hasDescription())
-          res.setDescription(((CanonicalResource)r.getResource()).getDescription().trim());
+        if (!res.hasDescription() && r.getElement().hasChild("description")) {
+          res.setDescription(r.getElement().getChildValue("description").trim());
+        }
         res.setReference(new Reference().setReference(r.getElement().fhirType()+"/"+r.getId()));
       }
       res.setUserData("loaded.resource", r);
@@ -6369,7 +6443,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       String html = xhtml == null ? "" : new XhtmlComposer(XhtmlComposer.XML).compose(xhtml);
       fragment(r.getElement().fhirType()+"-"+r.getId()+"-html", html, f.getOutputNames(), r, vars, null);
     }
+
+    if (igpkp.wantGen(r, "history")) {
+      XhtmlNode xhtml = new HistoryGenerator(context).generate(r);
+      String html = xhtml == null ? "" : new XhtmlComposer(XhtmlComposer.XML).compose(xhtml);
+      fragment(r.getElement().fhirType()+"-"+r.getId()+"-history", html, f.getOutputNames(), r, vars, null);
+    }
    
+
     //  NarrativeGenerator gen = new NarrativeGenerator(null, null, context);
     //  gen.generate(f.getElement(), false);
     //  xhtml = getXhtml(f);

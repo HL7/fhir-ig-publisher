@@ -1,9 +1,11 @@
 package org.hl7.fhir.igtools.publisher;
 
 import java.io.*;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.cqframework.cql.cql2elm.*;
 import org.cqframework.cql.cql2elm.model.TranslatedLibrary;
@@ -33,6 +35,7 @@ public class CqlSubSystem {
    */
   public class CqlSourceFileInformation {
     private byte[] elm;
+    private byte[] jsonElm;
     private List<ValidationMessage> errors = new ArrayList<>();
     private List<DataRequirement> dataRequirements = new ArrayList<>();
     private List<RelatedArtifact> relatedArtifacts = new ArrayList<>();
@@ -42,6 +45,12 @@ public class CqlSubSystem {
     }
     public void setElm(byte[] elm) {
       this.elm = elm;
+    }
+    public byte[] getJsonElm() {
+      return jsonElm;
+    }
+    public void setJsonElm(byte[] jsonElm) {
+      this.jsonElm = jsonElm;
     }
     public List<ValidationMessage> getErrors() {
       return errors;
@@ -223,15 +232,32 @@ public class CqlSubSystem {
     return result;
   }
 
+  /**
+   * Reads configuration file named cql-options.json from the given folder if present. Otherwise returns default options.
+   * @param folder
+   * @return
+   */
+  private CqlTranslatorOptions getTranslatorOptions(String folder) {
+    String optionsFileName = folder + File.separator + "cql-options.json";
+    CqlTranslatorOptions options = null;
+    File file = new File(optionsFileName);
+    if (file.exists()) {
+      options = CqlTranslatorOptionsMapper.fromFile(file.getAbsolutePath());
+    }
+    else {
+      options = CqlTranslatorOptions.defaultOptions();
+      if (!options.getFormats().contains(CqlTranslator.Format.XML)) {
+        options.getFormats().add(CqlTranslator.Format.XML);
+      }
+    }
+
+    return options;
+  }
+
   private void translateFolder(String folder) {
     logger.logMessage(String.format("Translating CQL source in folder %s", folder));
 
-    // TODO: Readconfig - CqlTranslator.Options, outputFormat: { XML, JSON, BOTH }, validateUnits, errorLevel, signatureLevel
-    CqlTranslator.Options[] options = getDefaultOptions();
-    String format = "XML";
-    CqlTranslatorException.ErrorSeverity errorLevel = CqlTranslatorException.ErrorSeverity.Info;
-    LibraryBuilder.SignatureLevel signatureLevel = LibraryBuilder.SignatureLevel.None;
-    boolean validateUnits = true;
+    CqlTranslatorOptions options = getTranslatorOptions(folder);
 
     // Setup
     // Construct DefaultLibrarySourceProvider
@@ -246,7 +272,7 @@ public class CqlSubSystem {
 
     // foreach *.cql file
     for (File file : new File(folder).listFiles(getCqlFilenameFilter())) {
-      translateFile(modelManager, libraryManager, file, format, validateUnits, errorLevel, signatureLevel, options);
+      translateFile(modelManager, libraryManager, file, options);
     }
   }
 
@@ -294,9 +320,7 @@ public class CqlSubSystem {
     }
   }
 
-  private void translateFile(ModelManager modelManager, LibraryManager libraryManager, File file, String format,
-                             boolean validateUnits, CqlTranslatorException.ErrorSeverity errorLevel,
-                             LibraryBuilder.SignatureLevel signatureLevel, CqlTranslator.Options[] options) {
+  private void translateFile(ModelManager modelManager, LibraryManager libraryManager, File file, CqlTranslatorOptions options) {
     logger.logMessage(String.format("Translating CQL source in file %s", file.toString()));
     CqlSourceFileInformation result = new CqlSourceFileInformation();
     fileMap.put(file.getAbsoluteFile().toString(), result);
@@ -305,7 +329,7 @@ public class CqlSubSystem {
 
       // translate toXML
       CqlTranslator translator = CqlTranslator.fromFile(namespaceInfo, file, modelManager, libraryManager,
-              validateUnits ? ucumService : null, errorLevel, signatureLevel, options);
+              options.getValidateUnits() ? ucumService : null, options);
 
       // record errors and warnings
       for (CqlTranslatorException exception : translator.getExceptions()) {
@@ -319,7 +343,14 @@ public class CqlSubSystem {
       }
       else {
         // convert to base64 bytes
+        // NOTE: Publication tooling requires XML content
         result.setElm(translator.toXml().getBytes());
+        if (options.getFormats().contains(CqlTranslator.Format.JSON)) {
+          result.setJsonElm(translator.toJson().getBytes());
+        }
+        if (options.getFormats().contains(CqlTranslator.Format.JXSON)) {
+          result.setJsonElm(translator.toJxson().getBytes());
+        }
 
         // TODO: Report context, requires 1.5 translator (ContextDef)
         // NOTE: In STU3, only Patient context is supported
@@ -338,22 +369,24 @@ public class CqlSubSystem {
         // Extract dataRequirement data
         result.dataRequirements.addAll(extractDataRequirements(translator.toRetrieves(), translator.getTranslatedLibrary(), libraryManager));
 
+        // Validate result types are supported types
+        List<ValidationMessage> defMessages = new ArrayList<>();
+        for (ExpressionDef def : translator.toELM().getStatements().getDef()) {
+          if (!(def instanceof FunctionDef)) {
+            toFHIRResultTypeCode(def.getResultType(), def.getName(), defMessages);
+          }
+        }
+        for (ValidationMessage defMessage : defMessages) {
+          result.getErrors().add(new ValidationMessage(defMessage.getSource(), defMessage.getType(), file.getName(),
+                  defMessage.getMessage(), defMessage.getLevel()));
+        }
+
         logger.logMessage("CQL translation completed successfully.");
       }
     }
     catch (Exception e) {
       result.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.EXCEPTION, file.getName(), "CQL Processing failed with exception: "+e.getMessage(), IssueSeverity.ERROR));
     }
-  }
-
-  private CqlTranslator.Options[] getDefaultOptions() {
-    // Default options based on recommended settings: http://build.fhir.org/ig/HL7/cqf-measures/using-cql.html#translation-to-elm
-    ArrayList<CqlTranslator.Options> options = new ArrayList<>();
-    options.add(CqlTranslator.Options.EnableAnnotations);
-    options.add(CqlTranslator.Options.EnableLocators);
-    options.add(CqlTranslator.Options.DisableListDemotion);
-    options.add(CqlTranslator.Options.DisableListPromotion);
-    return options.toArray(new CqlTranslator.Options[options.size()]);
   }
 
   private FilenameFilter getCqlFilenameFilter() {
@@ -471,15 +504,55 @@ public class CqlSubSystem {
   private ParameterDefinition toParameterDefinition(ParameterDef def, List<ValidationMessage> messages) {
     org.hl7.cql.model.DataType parameterType = def.getResultType() instanceof ListType ? ((ListType)def.getResultType()).getElementType() : def.getResultType();
 
+    AtomicBoolean isList = new AtomicBoolean(false);
+    Enumerations.FHIRAllTypes typeCode = Enumerations.FHIRAllTypes.fromCode(toFHIRParameterTypeCode(parameterType, def.getName(), isList, messages));
+
     return new ParameterDefinition()
             .setName(def.getName())
             .setUse(Enumerations.OperationParameterUse.IN)
             .setMin(0)
-            .setMax(def.getResultType() instanceof ListType ? "*" : "1")
-            .setType(Enumerations.FHIRAllTypes.fromCode(toFHIRTypeCode(parameterType, def.getName(), messages)));
+            .setMax(isList.get() ? "*" : "1")
+            .setType(typeCode);
   }
 
-  private String toFHIRTypeCode(org.hl7.cql.model.DataType dataType, String parameterName, List<ValidationMessage> messages) {
+  private String toFHIRResultTypeCode(org.hl7.cql.model.DataType dataType, String defName, List<ValidationMessage> messages) {
+    AtomicBoolean isValid = new AtomicBoolean(true);
+    AtomicBoolean isList = new AtomicBoolean(false);
+    String resultCode = toFHIRTypeCode(dataType, isValid, isList);
+    if (!isValid.get()) {
+      // Issue a warning that the result type is not supported
+      messages.add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.NOTSUPPORTED, "CQL Library Packaging",
+              String.format("Result type %s of definition %s is not supported; implementations may not be able to use the result of this expression",
+                      dataType.toLabel(), defName), IssueSeverity.WARNING));
+    }
+
+    return resultCode;
+  }
+
+  private String toFHIRParameterTypeCode(org.hl7.cql.model.DataType dataType, String parameterName, AtomicBoolean isList, List<ValidationMessage> messages) {
+    AtomicBoolean isValid = new AtomicBoolean(true);
+    String resultCode = toFHIRTypeCode(dataType, isValid, isList);
+    if (!isValid.get()) {
+      // Issue a warning that the parameter type is not supported
+      messages.add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.NOTSUPPORTED, "CQL Library Packaging",
+              String.format("Parameter type %s of parameter %s is not supported; reported as FHIR.Any", dataType.toLabel(), parameterName), IssueSeverity.WARNING));
+    }
+
+    return resultCode;
+  }
+
+  private String toFHIRTypeCode(org.hl7.cql.model.DataType dataType, AtomicBoolean isValid, AtomicBoolean isList) {
+    isList.set(false);
+    if (dataType instanceof ListType) {
+      isList.set(true);
+      return toFHIRTypeCode(((ListType)dataType).getElementType(), isValid);
+    }
+
+    return toFHIRTypeCode(dataType, isValid);
+  }
+
+  private String toFHIRTypeCode(org.hl7.cql.model.DataType dataType, AtomicBoolean isValid) {
+    isValid.set(true);
     if (dataType instanceof NamedType) {
       switch (((NamedType)dataType).getName()) {
         case "System.Boolean": return "boolean";
@@ -495,22 +568,23 @@ public class CqlSubSystem {
         case "System.Code": return "Coding";
         case "System.Concept": return "CodeableConcept";
       }
+
+      if ("FHIR".equals(((NamedType)dataType).getNamespace())) {
+        return ((NamedType)dataType).getSimpleName();
+      }
     }
 
     if (dataType instanceof IntervalType) {
       if (((IntervalType)dataType).getPointType() instanceof NamedType) {
         switch (((NamedType)((IntervalType)dataType).getPointType()).getName()) {
           case "System.Date":
-          case "System.DateTime":
-          case "System.Time": return "Period";
+          case "System.DateTime": return "Period";
           case "System.Quantity": return "Range";
         }
       }
     }
 
-    // Issue a warning that the parameter type is not supported
-    messages.add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.NOTSUPPORTED, "CQL Library Packaging",
-            String.format("Parameter type %s of parameter %s is not supported; reported as FHIR.Any", dataType.toLabel(), parameterName), IssueSeverity.WARNING));
+    isValid.set(false);
     return "Any";
   }
 
