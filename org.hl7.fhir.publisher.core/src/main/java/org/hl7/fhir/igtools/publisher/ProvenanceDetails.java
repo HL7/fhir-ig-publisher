@@ -3,6 +3,7 @@ package org.hl7.fhir.igtools.publisher;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.hl7.fhir.r5.model.BaseDateTimeType;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.DateTimeType;
 import org.hl7.fhir.r5.model.Reference;
@@ -12,7 +13,7 @@ public class ProvenanceDetails {
  
   private String path;
   private Coding action;
-  private DateTimeType date;
+  private BaseDateTimeType date;
   private String comment;
   private Map<Coding, Reference> actors = new HashMap<>();
   
@@ -21,7 +22,7 @@ public class ProvenanceDetails {
     super();
   }
   
-  public ProvenanceDetails(Coding action, DateTimeType date, String comment) {
+  public ProvenanceDetails(Coding action, BaseDateTimeType date, String comment) {
     super();
     this.action = action;
     this.date = date;
@@ -30,7 +31,7 @@ public class ProvenanceDetails {
   public Coding getAction() {
     return action;
   }
-  public DateTimeType getDate() {
+  public BaseDateTimeType getDate() {
     return date;
   }
   public String getComment() {

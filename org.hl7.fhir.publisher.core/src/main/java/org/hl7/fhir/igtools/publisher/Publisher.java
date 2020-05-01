@@ -904,7 +904,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     ProvenanceDetails res = new ProvenanceDetails();
     res.setPath(path);
     res.setAction(pv.getActivity().getCodingFirstRep());
-    res.setDate(pv.hasOccurredPeriod() ? pv.getOccurredPeriod().getEndElement() : pv.getOccurredDateTimeType());
+    res.setDate(pv.hasOccurredPeriod() ? pv.getOccurredPeriod().getEndElement() : pv.hasOccurredDateTimeType() ? pv.getOccurredDateTimeType() : pv.getRecordedElement());
     if (pv.hasReason()) {
       res.setComment(pv.getReasonFirstRep().getText());
     }
