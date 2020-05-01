@@ -45,7 +45,7 @@ public class ProvenanceDetails {
     this.action = action;
   }
 
-  public void setDate(DateTimeType date) {
+  public void setDate(BaseDateTimeType date) {
     this.date = date;
   }
 
