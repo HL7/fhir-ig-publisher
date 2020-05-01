@@ -1,49 +1,33 @@
 package org.hl7.fhir.igtools.publisher;
 
-import org.hl7.fhir.r5.model.AuditEvent.AuditEventAction;
-
 import java.util.HashMap;
 import java.util.Map;
 
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.DateTimeType;
+import org.hl7.fhir.r5.model.Reference;
 
-public class AuditRecord {
+public class ProvenanceDetails {
 
-  public class AuditEventActor {
-    private String display;
-    private String reference;
-    
-    public AuditEventActor(String display, String reference) {
-      super();
-      this.display = display;
-      this.reference = reference;
-    }
-    public String getDisplay() {
-      return display;
-    }
-    public String getReference() {
-      return reference;
-    }
-  }
+ 
   private String path;
-  private AuditEventAction action;
+  private Coding action;
   private DateTimeType date;
   private String comment;
-  private Map<Coding, AuditEventActor> actors = new HashMap<>();
+  private Map<Coding, Reference> actors = new HashMap<>();
   
   
-  public AuditRecord() {
+  public ProvenanceDetails() {
     super();
   }
   
-  public AuditRecord(AuditEventAction action, DateTimeType date, String comment) {
+  public ProvenanceDetails(Coding action, DateTimeType date, String comment) {
     super();
     this.action = action;
     this.date = date;
     this.comment = comment;
   }
-  public AuditEventAction getAction() {
+  public Coding getAction() {
     return action;
   }
   public DateTimeType getDate() {
@@ -52,11 +36,11 @@ public class AuditRecord {
   public String getComment() {
     return comment;
   }
-  public Map<Coding, AuditEventActor> getActors() {
+  public Map<Coding, Reference> getActors() {
     return actors;
   }
 
-  public void setAction(AuditEventAction action) {
+  public void setAction(Coding action) {
     this.action = action;
   }
 

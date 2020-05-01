@@ -19,7 +19,6 @@ import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.I18nConstants;
 import org.hl7.fhir.igtools.publisher.realm.USRealmBusinessRules.ProfilePair;
-import org.hl7.fhir.r5.conformance.ProfileComparer;
 import org.hl7.fhir.r5.conformance.ProfileUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.PackageVersion;
@@ -205,12 +204,12 @@ public class USRealmBusinessRules extends RealmBusinessRules {
 
   @Override
   public void finishChecks() {
-    ProfileComparer comp;
-    if (DO_PROFILE_COMPARISON) {
-//      Utilities.createDirectory(Utilities.path(dstDir, "us-core-comparisons"));
-//      comp = new ProfileComparer(context, keygen, Utilities.path(dstDir, "us-core-comparisons"));
-      
-    }
+//    ProfileComparer comp;
+//    if (DO_PROFILE_COMPARISON) {
+////      Utilities.createDirectory(Utilities.path(dstDir, "us-core-comparisons"));
+////      comp = new ProfileComparer(context, keygen, Utilities.path(dstDir, "us-core-comparisons"));
+//      
+//    }
 
     /**
      *             try {
