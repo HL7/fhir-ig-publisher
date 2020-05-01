@@ -104,7 +104,7 @@ public class HistoryGenerator {
   private Reference getActor(ProvenanceDetails pd, Coding c) {
     for (Coding t : pd.getActors().keySet()) {
       if (t.matches(c)) {
-        return pd.getActors().get(c);
+        return pd.getActors().get(t);
       }
     }
     return null;
