@@ -216,6 +216,7 @@ import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.openapi.OpenApiGenerator;
 import org.hl7.fhir.r5.openapi.Writer;
+import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceContext;
 import org.hl7.fhir.r5.terminologies.ValueSetExpander.ValueSetExpansionOutcome;
 import org.hl7.fhir.r5.test.utils.ToolsHelper;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
@@ -232,7 +233,6 @@ import org.hl7.fhir.r5.utils.NarrativeGenerator;
 import org.hl7.fhir.r5.utils.NarrativeGenerator.ILiquidTemplateProvider;
 import org.hl7.fhir.r5.utils.NarrativeGenerator.IReferenceResolver;
 import org.hl7.fhir.r5.utils.NarrativeGenerator.ITypeParser;
-import org.hl7.fhir.r5.utils.NarrativeGenerator.ResourceContext;
 import org.hl7.fhir.r5.utils.NarrativeGenerator.ResourceWithReference;
 import org.hl7.fhir.r5.utils.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.StructureMapUtilities.StructureMapAnalysis;
@@ -2193,7 +2193,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void loadPubPack() throws FHIRException, IOException {
     NpmPackage npm = pcm.loadPackage("hl7.fhir.pubpack", "0.0.4");
     context.loadFromPackage(npm, null);
-    npm = pcm.loadPackage("hl7.fhir.xver-extensions", "0.0.3");
+    npm = pcm.loadPackage("hl7.fhir.xver-extensions", "0.0.4");
     context.loadFromPackage(npm, null);
   }
 

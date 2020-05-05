@@ -175,7 +175,7 @@ public class CodeSystemRenderer extends BaseRenderer {
         first = addLink(b, first, vc, ed, processed);
     }
     if (first)
-      b.append("<p>"+translate("cs.xref", "This CodeSystem is not used")+"</p>\r\n");
+      b.append("<p>"+translate("cs.xref", "This CodeSystem is not used here; it may be used elsewhere")+"</p>\r\n");
     else
       b.append("</ul>\r\n");
     return b.toString();

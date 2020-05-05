@@ -30,8 +30,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.hl7.fhir.r5.model.DomainResource;
+import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceContext;
 import org.hl7.fhir.r5.utils.NarrativeGenerator.ILiquidTemplateProvider;
-import org.hl7.fhir.r5.utils.NarrativeGenerator.ResourceContext;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 
