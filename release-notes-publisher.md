@@ -6,7 +6,8 @@ title: FHIR IGPublisher Release Notes
 
 ## Current (not released yet)
 
-(no changes yet)
+* Vaidator: Update cross-version extension support for new preview of R5 published
+
 
 ## v1.0.88 (2020-05-02)
 
