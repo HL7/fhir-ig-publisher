@@ -6,11 +6,11 @@ title: FHIR IGPublisher Release Notes
 
 ## Current (not released yet)
 
-* Vaidator: Update cross-version extension support for new preview of R5 published
-
+* Validator: Update cross-version extension support for new preview of R5 published
+* Validator: Check proper use of urn:ietf:rfc:3986 identifiers
+* Renderer: Fix rendering bug in value set definitions
 
 ## v1.0.88 (2020-05-02)
-
 
 * Bump version for new preview release of R5
 

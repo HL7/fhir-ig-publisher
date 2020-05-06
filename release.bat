@@ -1,7 +1,7 @@
 @echo off
 
-set oldver=1.0.87
-set newver=1.0.88
+set oldver=1.0.88
+set newver=1.0.89
 
 echo ..
 echo =============================================================================
@@ -33,7 +33,7 @@ IF %ERRORLEVEL% NEQ 0 (
 rem call C:\work\org.hl7.fhir\test-igs\upgrade.bat
 cd C:\work\org.hl7.fhir\fhir-ig-publisher
 
-call "C:\tools\versionNotes.exe" -fileName C:\work\org.hl7.fhir\latest-ig-publisher\release-notes-publisher.md -version %newver% -fileDest C:\temp\current-release-notes-publisher.md -url https://storage.googleapis.com/ig-build/org.hl7.fhir.publisher.jar -maven https://oss.sonatype.org/service/local/artifact/maven/redirect?r=snapshots&g=org.hl7.fhir.publisher&a=org.hl7.fhir.publisher.cli&v=%newver%-SNAPSHOT&e=jar
+call "C:\tools\versionNotes.exe" -fileName C:\work\org.hl7.fhir\fhir-ig-publisher\release-notes-publisher.md -version %newver% -fileDest C:\temp\current-release-notes-publisher.md -url https://storage.googleapis.com/ig-build/org.hl7.fhir.publisher.jar -maven https://oss.sonatype.org/service/local/artifact/maven/redirect?r=snapshots&g=org.hl7.fhir.publisher&a=org.hl7.fhir.publisher.cli&v=%newver%-SNAPSHOT&e=jar
 
 call gsutil cp -a public-read org.hl7.fhir.publisher.cli\target\org.hl7.fhir.publisher.cli-%newver%-SNAPSHOT.jar gs://ig-build/org.hl7.fhir.publisher.jar
 cd c:\work\org.hl7.fhir\latest-ig-publisher
