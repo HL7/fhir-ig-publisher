@@ -46,7 +46,7 @@ public class FetchedResource {
   private HashSet<FetchedResource> statedExamples = new HashSet<FetchedResource>();
   private HashSet<FetchedResource> foundExamples = new HashSet<FetchedResource>();
   private ImplementationGuideDefinitionResourceComponent resEntry;
-  private List<AuditRecord> audits = new ArrayList<>();
+  private List<ProvenanceDetails> audits = new ArrayList<>();
 
   public Resource getResource() {
     return resource;
@@ -170,7 +170,7 @@ public class FetchedResource {
   public void setValidateAsResource(boolean validateAsResource) {
     this.validateAsResource = validateAsResource;
   }
-  public List<AuditRecord> getAudits() {
+  public List<ProvenanceDetails> getAudits() {
     return audits;
   }
   

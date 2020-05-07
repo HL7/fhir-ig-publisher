@@ -6,13 +6,13 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
-import org.hl7.fhir.igtools.publisher.AuditRecord;
-import org.hl7.fhir.igtools.publisher.AuditRecord.AuditEventActor;
+import org.hl7.fhir.igtools.publisher.ProvenanceDetails;
 import org.hl7.fhir.igtools.renderers.HistoryGenerator.HistoryListSorter;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.DateTimeType;
+import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.model.AuditEvent.AuditEventAction;
 import org.hl7.fhir.r5.model.CodeSystem;
@@ -23,10 +23,10 @@ import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
 public class HistoryGenerator {
 
-  public class HistoryListSorter implements Comparator<AuditRecord> {
+  public class HistoryListSorter implements Comparator<ProvenanceDetails> {
 
     @Override
-    public int compare(AuditRecord arg0, AuditRecord arg1) {
+    public int compare(ProvenanceDetails arg0, ProvenanceDetails arg1) {
       return -arg0.getDate().getValue().compareTo(arg1.getDate().getValue());
     }
 
@@ -68,21 +68,21 @@ public class HistoryGenerator {
       }
       tr.td().b().tx("Comment");
       // rows
-      for (AuditRecord a : r.getAudits()) {
+      for (ProvenanceDetails pd : r.getAudits()) {
         tr = tbl.tr();
-        tr.td().ah(a.getPath()).tx(a.getDate().asStringValue().substring(0, 10));
+        tr.td().ah(pd.getPath()).tx(pd.getDate().asStringValue().substring(0, 10));
 
         XhtmlNode td = tr.td(); 
-        CodeSystem cs = context.fetchCodeSystem("http://hl7.org/fhir/audit-event-action");
+        CodeSystem cs = context.fetchCodeSystem(pd.getAction().getSystem());
         if (cs != null && cs.hasUserData("path")) {
-          ConceptDefinitionComponent cd = CodeSystemUtilities.getCode(cs, a.getAction().toCode());
-          td.ah(cs.getUserString("path")+"#"+cs.getId()+"-"+a.getAction().toCode()).tx(cd != null ? cd.getDisplay() : a.getAction().toCode());
+          ConceptDefinitionComponent cd = CodeSystemUtilities.getCode(cs, pd.getAction().getCode());
+          td.ah(cs.getUserString("path")+"#"+cs.getId()+"-"+pd.getAction().getCode()).tx(cd != null ? cd.getDisplay() : pd.getAction().getCode());
         } else {
-          td.tx(a.getAction().toCode());
+          td.tx(pd.getAction().getCode());
         }
 
         for (Coding c : actorTypes) {
-          AuditEventActor aa = getActor(a, c);
+          Reference aa = getActor(pd, c);
           td = tr.td();
           if (aa != null) {
             if (aa.getReference() != null) {
@@ -92,25 +92,27 @@ public class HistoryGenerator {
             }
           }
         }
-        if (a.getComment() != null)
-        tr.td().tx(a.getComment());
+        td = tr.td();
+        if (pd.getComment() != null) { 
+          td.tx(pd.getComment());
+        }
       }
       return div;
     }
   }
 
-  private AuditEventActor getActor(AuditRecord a, Coding c) {
-    for (Coding t : a.getActors().keySet()) {
+  private Reference getActor(ProvenanceDetails pd, Coding c) {
+    for (Coding t : pd.getActors().keySet()) {
       if (t.matches(c)) {
-        return a.getActors().get(c);
+        return pd.getActors().get(t);
       }
     }
     return null;
   }
 
-  private List<Coding> scanActors(List<AuditRecord> audits) {
+  private List<Coding> scanActors(List<ProvenanceDetails> audits) {
     List<Coding> res = new ArrayList<>();
-    for (AuditRecord a : audits) {
+    for (ProvenanceDetails a : audits) {
       for (Coding c : a.getActors().keySet()) {
         boolean found = false;
         for (Coding t : res) {
