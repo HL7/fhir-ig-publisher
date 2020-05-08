@@ -281,6 +281,9 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
         bc.setUserData("path", specPath("valueset-object-lifecycle-events.html"));
       } else if (bc.hasUrl() && bc.getUrl().equals("http://hl7.org/fhir/ValueSet/performer-function")) {
         bc.setUserData("path", specPath("valueset-performer-function.html"));
+      } else if (bc.hasUrl() && bc.getUrl().equals("http://hl7.org/fhir/ValueSet/written-language")) {
+        bc.setUserData("path", specPath("valueset-written-language.html"));
+        
 //      else
 //        System.out.println("No path for "+bc.getUrl());
       }

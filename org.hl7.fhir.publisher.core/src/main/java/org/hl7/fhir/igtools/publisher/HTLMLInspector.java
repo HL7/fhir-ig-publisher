@@ -179,6 +179,7 @@ public class HTLMLInspector {
   private List<String> manual = new ArrayList<String>(); // pages that will be provided manually when published, so allowed to be broken links
   private ILoggingService log;
   private boolean forHL7;
+  private boolean requirePublishBox;
   private List<String> igs;
   private PackageCacheManager pcm;
   private Map<String, SpecMapManager> otherSpecs = new HashMap<String, SpecMapManager>();
@@ -191,12 +192,13 @@ public class HTLMLInspector {
   private boolean missingPublishBox;
   private Set<String> exceptions = new HashSet<>();
 
-  public HTLMLInspector(String rootFolder, List<SpecMapManager> specs, ILoggingService log, String canonical) {
+  public HTLMLInspector(String rootFolder, List<SpecMapManager> specs, ILoggingService log, String canonical, String packageId) {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
     this.log = log;
     this.canonical = canonical;
     this.forHL7 = canonical.contains("hl7.org/fhir");
+    requirePublishBox = Utilities.startsWithInList(packageId, "hl7."); 
   }
 
   public void setAltRootFolder(String altRootFolder) throws IOException {
@@ -240,11 +242,17 @@ public class HTLMLInspector {
           }
         }
         if (check && !findExemptionComment(lf.getXhtml())) {
-          messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, s, "The html source does not contain the publish box" 
-            + (first ? " "+RELEASE_HTML_MARKER+" (see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations)" : ""), IssueSeverity.ERROR));
+          if (requirePublishBox) {
+            messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, s, "The html source does not contain the publish box" 
+              + (first ? " "+RELEASE_HTML_MARKER+" (see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations)" : ""), IssueSeverity.ERROR));
+          } else if (first) {
+            messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, s, "The html source does not contain the publish box; this is recommended for publishing support",
+                "The html source does not contain the publish box; this is recommended for publishing support  (see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations). Note that this is mandatory for HL7 specifications, and on the ci-build, but in other cases it's still recommended (this is only reported once, but applies for all pages)", IssueSeverity.INFORMATION));            
+            
+          }
           missingPublishBox = true;
+          first = false;
         }
-        first = false;
       }
       if (lf.getXhtml() != null)
         if (checkLinks(s, "", lf.getXhtml(), null, messages, false) != NodeChangeType.NONE) { // returns true if changed
@@ -720,7 +728,7 @@ public class HTLMLInspector {
   }
 
   public static void main(String[] args) throws Exception {
-    HTLMLInspector inspector = new HTLMLInspector(args[0], null, null, "http://hl7.org/fhir/us/core");
+    HTLMLInspector inspector = new HTLMLInspector(args[0], null, null, "http://hl7.org/fhir/us/core", "hl7.fhir.us.core");
     inspector.setStrict(false);
     List<ValidationMessage> linkmsgs = inspector.check("test text");
     int bl = 0;

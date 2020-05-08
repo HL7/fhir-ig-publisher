@@ -8,6 +8,14 @@ title: FHIR IGPublisher Release Notes
 
 (no changes yet)
 
+## v1.0.90 (2020-05-08)
+
+
+* fix bug checkling link messages 
+* improve error message for syntax issues in warnings file
+* Fix bug checking publish box for non-HL7 implementation guides 
+* Fix bug not consistently populating version in data file for templates
+
 ## v1.0.89 (2020-05-06)
 
 
@@ -225,4 +233,4 @@ title: FHIR IGPublisher Release Notes
 
 ## v1.0.61 (2020-02-02)
 
-* This relea
+* This rele
