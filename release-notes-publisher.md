@@ -6,6 +6,11 @@ title: FHIR IGPublisher Release Notes
 
 ## Current (not released yet)
 
+(no changes yet)
+
+## v1.0.91 (2020-05-09)
+
+
 * Fix bug processing redirects for UTG release
 
 ## v1.0.90 (2020-05-08)
@@ -232,4 +237,4 @@ title: FHIR IGPublisher Release Notes
 
 ## v1.0.61 (2020-02-02)
 
-* This rele
+* This rel
