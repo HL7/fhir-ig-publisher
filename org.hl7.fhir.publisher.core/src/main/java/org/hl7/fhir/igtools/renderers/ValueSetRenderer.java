@@ -235,7 +235,7 @@ public class ValueSetRenderer extends BaseRenderer {
     }
     
     if (first)
-      b.append("<p>"+translate("vs.usage", "This value set is not used")+"</p>\r\n");
+      b.append("<p>"+translate("vs.usage", "This value set is not used here; it may be used elsewhere (e.g. specifications and/or implementations that use this content)")+"</p>\r\n");
     else
       b.append("</ul>\r\n");
     return b.toString();
