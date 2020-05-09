@@ -6,10 +6,9 @@ title: FHIR IGPublisher Release Notes
 
 ## Current (not released yet)
 
-(no changes yet)
+* Fix bug processing redirects for UTG release
 
 ## v1.0.90 (2020-05-08)
-
 
 * fix bug checkling link messages 
 * improve error message for syntax issues in warnings file
