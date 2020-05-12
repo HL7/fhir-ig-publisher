@@ -8,6 +8,33 @@ title: FHIR IGPublisher Release Notes
 
 (no changes yet)
 
+## v1.0.94 (2020-05-12)
+
+
+* Release for version of main FHIR build
+
+## v1.0.93 (2020-05-11)
+
+* update to v4.4.0 internally
+
+## v1.0.92 (2020-05-10)
+
+
+* Package System: Change to use different secondary package server
+* Renderer: Improve wording for dode systems and value sets that aren't used
+
+## v1.0.91 (2020-05-09)
+
+
+* Fix bug processing redirects for UTG release
+
+## v1.0.90 (2020-05-08)
+
+* fix bug checkling link messages 
+* improve error message for syntax issues in warnings file
+* Fix bug checking publish box for non-HL7 implementation guides 
+* Fix bug not consistently populating version in data file for templates
+
 ## v1.0.89 (2020-05-06)
 
 
@@ -225,4 +252,4 @@ title: FHIR IGPublisher Release Notes
 
 ## v1.0.61 (2020-02-02)
 
-* This relea
+* This 

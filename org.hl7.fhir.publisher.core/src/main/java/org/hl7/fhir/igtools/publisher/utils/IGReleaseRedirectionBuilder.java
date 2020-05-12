@@ -249,6 +249,9 @@ public class IGReleaseRedirectionBuilder {
   }
 
   private String rulePrefix() {
+    if (folder.equals(websiteRootFolder)) {
+      return "";
+    }
     String t = folder.substring(websiteRootFolder.length()+1);
     t = t.replace("/", ".").replace("\\", ".");
     return t+".";

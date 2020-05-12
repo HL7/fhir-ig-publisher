@@ -1710,7 +1710,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     igpkp.loadSpecPaths(specMaps.get(0));
     fetcher.setPkp(igpkp);
     
-    inspector = new HTLMLInspector(outputDir, specMaps, this, igpkp.getCanonical());
+    inspector = new HTLMLInspector(outputDir, specMaps, this, igpkp.getCanonical(), sourceIg.getPackageId());
     inspector.getManual().add("full-ig.zip");
     if (historyPage != null) {
       inspector.getManual().add(historyPage);
@@ -2045,7 +2045,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       businessVersion = configuration.getAsJsonPrimitive("fixed-business-version").getAsString();
     }
     
-    inspector = new HTLMLInspector(outputDir, specMaps, this, igpkp.getCanonical());
+    inspector = new HTLMLInspector(outputDir, specMaps, this, igpkp.getCanonical(), configuration.has("npm-name") ? configuration.get("npm-name").getAsString() : null);
     inspector.getManual().add("full-ig.zip");
     historyPage = ostr(paths, "history");
     if (historyPage != null) {
@@ -2247,7 +2247,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               reason = l.substring(2);
             } else {
               if (reason == null) { 
-                errors.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, path, "Supressed messages file has errors with no reason", IssueSeverity.ERROR));
+                errors.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, path, "Supressed messages file has errors with no reason ("+l+")", IssueSeverity.ERROR));
                 suppressedMessages.put(l, "?pub-msg-1?");
               } else {
                 suppressedMessages.put(l, reason);
@@ -5674,7 +5674,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     data.addProperty("igId", publishedIg.getId());
     data.addProperty("igName", publishedIg.getName());
     data.addProperty("packageId", npmName);
-    data.addProperty("igVer", businessVersion);
+    data.addProperty("igVer", businessVersion == null ? publishedIg.getVersion() : businessVersion);
     data.addProperty("errorCount", getErrorCount());
     data.addProperty("version", version);
     data.addProperty("revision", specMaps.get(0).getBuild());

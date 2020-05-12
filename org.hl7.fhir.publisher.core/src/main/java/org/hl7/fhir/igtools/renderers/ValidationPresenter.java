@@ -299,7 +299,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     List<ValidationMessage> passList = new ArrayList<ValidationMessage>();
     Set<String> msgs = new HashSet<>();
     for (ValidationMessage message : messages) {
-      if (!(suppressedMessages.contains(message.getDisplay()) || suppressedMessages.contains(message.getMessage())) || canSuppressErrors || message.getLevel().isError()) {
+      if (!(suppressedMessages.contains(message.getDisplay()) || suppressedMessages.contains(message.getMessage())) && (canSuppressErrors || !message.getLevel().isError())) {
         if (!msgs.contains(message.getLocation()+"|"+message.getMessage())) {
           passList.add(message);
           msgs.add(message.getLocation()+"|"+message.getMessage());
