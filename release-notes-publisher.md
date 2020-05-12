@@ -8,8 +8,12 @@ title: FHIR IGPublisher Release Notes
 
 (no changes yet)
 
-## v1.0.93 (2020-05-11)
+## v1.0.94 (2020-05-12)
 
+
+* Release for version of main FHIR build
+
+## v1.0.93 (2020-05-11)
 
 * update to v4.4.0 internally
 
@@ -248,4 +252,4 @@ title: FHIR IGPublisher Release Notes
 
 ## v1.0.61 (2020-02-02)
 
-* This r
+* This 
