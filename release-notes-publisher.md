@@ -6,10 +6,11 @@ title: FHIR IGPublisher Release Notes
 
 ## Current (not released yet)
 
-(no changes yet)
+* Validator: fix fatal NPE validating bundles when resource is missing
+* Validator: Fix to check invariants on Elements with type redirections (e.g. ValueSet.compose.exclude)
+* Renderer: fix rendering of ValueSet exclusions
 
 ## v1.0.94 (2020-05-12)
-
 
 * Release for version of main FHIR build
 

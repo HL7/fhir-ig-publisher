@@ -38,9 +38,10 @@ import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
+import org.hl7.fhir.r5.renderers.RendererFactory;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
-import org.hl7.fhir.r5.utils.NarrativeGenerator;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
@@ -51,7 +52,7 @@ public class CodeSystemRenderer extends BaseRenderer {
 
   private CodeSystem cs;
 
-  public CodeSystemRenderer(IWorkerContext context, String prefix, CodeSystem cs, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, NarrativeGenerator gen) {
+  public CodeSystemRenderer(IWorkerContext context, String prefix, CodeSystem cs, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
     super(context, prefix, igp, maps, markdownEngine, packge, gen);
     this.cs = cs;
   }
@@ -150,7 +151,8 @@ public class CodeSystemRenderer extends BaseRenderer {
       CodeSystem csc = cs.copy();
       csc.setId(cs.getId()); // because that's not copied
       csc.setText(null);
-      gen.generate(csc, outputTracker);
+      RendererFactory.factory(csc, gen).render(csc);
+
       return new XhtmlComposer(XhtmlComposer.HTML).compose(csc.getText().getDiv());
 //    }
   }

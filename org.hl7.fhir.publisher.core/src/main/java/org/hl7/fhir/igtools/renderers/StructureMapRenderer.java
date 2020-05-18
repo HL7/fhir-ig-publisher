@@ -31,7 +31,7 @@ import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureMap;
-import org.hl7.fhir.r5.utils.NarrativeGenerator;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.utils.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.StructureMapUtilities.StructureMapAnalysis;
@@ -48,7 +48,7 @@ public class StructureMapRenderer extends BaseRenderer {
   private StructureMapAnalysis analysis;
   private String destDir;
 
-  public StructureMapRenderer(IWorkerContext context, String prefix, StructureMap map, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, NarrativeGenerator gen) {
+  public StructureMapRenderer(IWorkerContext context, String prefix, StructureMap map, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
     super(context, prefix, igp, maps, markdownEngine, packge, gen);
     this.map = map;
     this.destDir = destDir;

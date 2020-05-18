@@ -216,7 +216,17 @@ import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.openapi.OpenApiGenerator;
 import org.hl7.fhir.r5.openapi.Writer;
+import org.hl7.fhir.r5.renderers.BundleRenderer;
+import org.hl7.fhir.r5.renderers.RendererFactory;
+import org.hl7.fhir.r5.renderers.utils.BaseWrappers.ResourceWrapper;
+import org.hl7.fhir.r5.renderers.utils.DirectWrappers;
+import org.hl7.fhir.r5.renderers.utils.ElementWrappers;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext.ITypeParser;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext.ResourceRendererMode;
+import org.hl7.fhir.r5.renderers.utils.Resolver.IReferenceResolver;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceContext;
+import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceWithReference;
 import org.hl7.fhir.r5.terminologies.ValueSetExpander.ValueSetExpansionOutcome;
 import org.hl7.fhir.r5.test.utils.ToolsHelper;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
@@ -229,11 +239,6 @@ import org.hl7.fhir.r5.utils.LiquidEngine;
 import org.hl7.fhir.r5.utils.MappingSheetParser;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator.Category;
-import org.hl7.fhir.r5.utils.NarrativeGenerator;
-import org.hl7.fhir.r5.utils.NarrativeGenerator.ILiquidTemplateProvider;
-import org.hl7.fhir.r5.utils.NarrativeGenerator.IReferenceResolver;
-import org.hl7.fhir.r5.utils.NarrativeGenerator.ITypeParser;
-import org.hl7.fhir.r5.utils.NarrativeGenerator.ResourceWithReference;
 import org.hl7.fhir.r5.utils.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.StructureMapUtilities.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
@@ -565,7 +570,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private String adHocTmpDir;
 
-  private NarrativeGenerator gen;
+  private RenderingContext rc;
 
   private List<ContactDetail> contacts;
   private List<UsageContext> contexts;
@@ -882,9 +887,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private void processProvenance(String path, Element resource, Resource r) throws FHIRFormatError, DefinitionException, FHIRException, IOException, EOperationOutcome {
     Provenance pv =  (Provenance) (r == null ? convertFromElement(resource) : r);
-    pv.setText(null);
-    boolean ext = gen.generate(pv);
-    gen.inject(resource, pv.getText().getDiv(), ext ? NarrativeStatus.EXTENSIONS : NarrativeStatus.GENERATED);
+    RendererFactory.factory(r, rc).render(pv);
     
     for (Reference entity : pv.getTarget()) {
       if (entity.hasReference()) {
@@ -968,7 +971,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
   @Override
-  public ResourceWithReference resolve(String url) {
+  public ResourceWithReference resolve(RenderingContext context, String url) {
     String[] parts = url.split("\\/");
     if (parts.length < 2)
       return null;
@@ -976,12 +979,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (FetchedResource r : f.getResources()) {
         if (r.getElement() != null && r.getElement().fhirType().equals(parts[0]) && r.getId().equals(parts[1])) {
           String path = igpkp.getLinkFor(r, true);
-          return new ResourceWithReference(path, gen.new ResourceWrapperMetaElement(r.getElement()));
+          return new ResourceWithReference(path, new ElementWrappers.ResourceWrapperMetaElement(context, r.getElement()));
         }
         if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
           if (url.equals(((CanonicalResource) r.getResource()).getUrl())) {
             String path = igpkp.getLinkFor(r, true);
-            return new ResourceWithReference(path, gen.new ResourceWrapperDirect(r.getResource()));            
+            return new ResourceWithReference(path, new DirectWrappers.ResourceWrapperDirect(context, r.getResource()));            
           }
         }
       }
@@ -1009,21 +1012,27 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId());
           if (r.getResource() != null && isConvertableResource(r.getResource().fhirType())) {
             boolean regen = false;
-            gen.setDefinitionsTarget(igpkp.getDefinitionsName(r));
-            if (r.getResource() instanceof DomainResource && !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv()))
-              regen = gen.generate((DomainResource) r.getResource(), otherFilesStartup);
-            if (r.getResource() instanceof Bundle)
-              regen = gen.generate((Bundle) r.getResource(), false, otherFilesStartup);
+            rc.setDefinitionsTarget(igpkp.getDefinitionsName(r));
+            if (r.getResource() instanceof DomainResource && !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv())) {
+              regen = true;
+              RendererFactory.factory(r.getResource(), rc).render((DomainResource) r.getResource());
+            } else if (r.getResource() instanceof Bundle) {
+              regen = true;
+              new BundleRenderer(rc).render((Bundle) r.getResource());
+            }
             if (regen)
               r.setElement(convertToElement(r.getResource()));
           } else {
+            RenderingContext lrc = rc.copy().setParser(getTypeLoader(f,r));
             if ("http://hl7.org/fhir/StructureDefinition/DomainResource".equals(r.getElement().getProperty().getStructure().getBaseDefinition()) && !hasNarrative(r.getElement())) {
-              gen.generate(r.getElement(), true, getTypeLoader(f,r));
+              ResourceWrapper rw = new ElementWrappers.ResourceWrapperMetaElement(lrc, r.getElement());
+              RendererFactory.factory(rw, lrc).render(rw);
             } else if (r.getElement().fhirType().equals("Bundle")) {
               for (Element e : r.getElement().getChildrenByName("entry")) {
                 Element res = e.getNamedChild("resource");
                 if (res!=null && "http://hl7.org/fhir/StructureDefinition/DomainResource".equals(res.getProperty().getStructure().getBaseDefinition()) && !hasNarrative(res)) {
-                  gen.generate(new ResourceContext(r.getElement(), res), res, true, getTypeLoader(f,r));
+                  ResourceWrapper rw = new ElementWrappers.ResourceWrapperMetaElement(lrc, res);
+                  RendererFactory.factory(rw, lrc).render(rw);
                 }
               }
             }
@@ -2952,11 +2961,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, execTime.getTime());
     execTime = Calendar.getInstance();
 
-    gen = new NarrativeGenerator("", "", context, this).setLiquidServices(templateProvider, validator.getExternalHostServices());
-    gen.setCorePath(checkAppendSlash(specPath));
-    gen.setDestDir(Utilities.path(tempDir));
-    gen.setPkp(igpkp);
-    gen.getCodeSystemPropList().addAll(codeSystemProps );
+    rc = new RenderingContext(context, markdownEngine, ValidationOptions.defaults(), checkAppendSlash(specPath), null, ResourceRendererMode.IG);
+    rc.setTemplateProvider(templateProvider);
+    rc.setResolver(this);    
+    rc.setServices(validator.getExternalHostServices());
+    rc.setDestDir(Utilities.path(tempDir));
+    rc.setProfileUtilities(new ProfileUtilities(context, new ArrayList<ValidationMessage>(), igpkp));
+    rc.getCodeSystemPropList().addAll(codeSystemProps );
 
     if (igMode) {
       boolean failed = false;
@@ -5896,7 +5907,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     list.append(" <li><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a> "+Utilities.escapeXml(desc.asStringValue())+"</li>\r\n");
     lists.append(" <li><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a></li>\r\n");
-    table.append(" <tr><td><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a> </td><td>"+new BaseRenderer(context, null, igpkp, specMaps, markdownEngine, packge, gen).processMarkdown("description", desc )+"</td></tr>\r\n");
+    table.append(" <tr><td><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a> </td><td>"+new BaseRenderer(context, null, igpkp, specMaps, markdownEngine, packge, rc).processMarkdown("description", desc )+"</td></tr>\r\n");
     
     if (listMM != null) {
       String mm = "";
@@ -5909,7 +5920,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       listMM.append(" <li><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a>"+mm+" "+Utilities.escapeXml(desc.asStringValue())+"</li>\r\n");
       listsMM.append(" <li><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a>"+mm+"</li>\r\n");
-      tableMM.append(" <tr><td><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a> </td><td>"+new BaseRenderer(context, null, igpkp, specMaps, markdownEngine, packge, gen).processMarkdown("description", desc )+"</td><td>"+mm+"</td></tr>\r\n");
+      tableMM.append(" <tr><td><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a> </td><td>"+new BaseRenderer(context, null, igpkp, specMaps, markdownEngine, packge, rc).processMarkdown("description", desc )+"</td><td>"+mm+"</td></tr>\r\n");
     }
   }
 
@@ -6108,7 +6119,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
   private void generateOutputsOperationDefinition(FetchedFile f, FetchedResource r, OperationDefinition od, Map<String, String> vars, boolean regen) throws FHIRException, IOException {
-    OperationDefinitionRenderer odr = new OperationDefinitionRenderer(context, checkAppendSlash(specPath), od, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, fileList, gen);
+    OperationDefinitionRenderer odr = new OperationDefinitionRenderer(context, checkAppendSlash(specPath), od, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, fileList, rc);
     if (igpkp.wantGen(r, "summary"))
       fragment("OperationDefinition-"+od.getId()+"-summary", odr.summary(), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "idempotence"))
@@ -6609,7 +6620,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
    * @throws Exception
    */
   private void generateOutputsCodeSystem(FetchedFile f, FetchedResource fr, CodeSystem cs, Map<String, String> vars) throws Exception {
-    CodeSystemRenderer csr = new CodeSystemRenderer(context, specPath, cs, igpkp, specMaps, markdownEngine, packge, gen);
+    CodeSystemRenderer csr = new CodeSystemRenderer(context, specPath, cs, igpkp, specMaps, markdownEngine, packge, rc);
     if (igpkp.wantGen(fr, "summary"))
       fragment("CodeSystem-"+cs.getId()+"-summary", csr.summary(igpkp.wantGen(fr, "xml"), igpkp.wantGen(fr, "json"), igpkp.wantGen(fr, "ttl")), f.getOutputNames(), fr, vars, null);
     if (igpkp.wantGen(fr, "content"))
@@ -6630,7 +6641,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
    * @throws Exception
    */
   private void generateOutputsValueSet(FetchedFile f, FetchedResource r, ValueSet vs, Map<String, String> vars) throws Exception {
-    ValueSetRenderer vsr = new ValueSetRenderer(context, specPath, vs, igpkp, specMaps, markdownEngine, packge, gen);
+    ValueSetRenderer vsr = new ValueSetRenderer(context, specPath, vs, igpkp, specMaps, markdownEngine, packge, rc);
     if (igpkp.wantGen(r, "summary"))
       fragment("ValueSet-"+vs.getId()+"-summary", vsr.summary(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl")), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "cld"))
@@ -6647,14 +6658,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (exp.getValueset() != null) {
         expansions.add(exp.getValueset());
                 
-        NarrativeGenerator gen = new NarrativeGenerator("", null, context).setLiquidServices(templateProvider, validator.getExternalHostServices());
-        gen.setTooCostlyNoteNotEmpty("This value set has >1000 codes in it. In order to keep the publication size manageable, only a selection (1000 codes) of the whole set of codes is shown");
-        gen.setTooCostlyNoteEmpty("This value set cannot be expanded because of the way it is defined - it has an infinite number of members");
-        gen.setTooCostlyNoteNotEmptyDependent("One of this value set's dependencies has >1000 codes in it. In order to keep the publication size manageable, only a selection of the whole set of codes is shown");
-        gen.setTooCostlyNoteEmptyDependent("This value set cannot be expanded because of the way it is defined - one of it's dependents has an infinite number of members");
+        RenderingContext lrc = rc.copy();
+        lrc.setTooCostlyNoteNotEmpty("This value set has >1000 codes in it. In order to keep the publication size manageable, only a selection (1000 codes) of the whole set of codes is shown");
+        lrc.setTooCostlyNoteEmpty("This value set cannot be expanded because of the way it is defined - it has an infinite number of members");
+        lrc.setTooCostlyNoteNotEmptyDependent("One of this value set's dependencies has >1000 codes in it. In order to keep the publication size manageable, only a selection of the whole set of codes is shown");
+        lrc.setTooCostlyNoteEmptyDependent("This value set cannot be expanded because of the way it is defined - one of it's dependents has an infinite number of members");
         exp.getValueset().setCompose(null);
-        exp.getValueset().setText(null);
-        gen.generate(null, exp.getValueset(), false);
+        exp.getValueset().setText(null);  
+        RendererFactory.factory(exp.getValueset(), lrc).render(exp.getValueset());
         String html = new XhtmlComposer(XhtmlComposer.XML).compose(exp.getValueset().getText().getDiv());
         fragment("ValueSet-"+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null);
         
@@ -6731,7 +6742,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "json-schema"))
       fragmentError("StructureDefinition-"+sd.getId()+"-json-schema", "yet to be done: json schema as html", null, f.getOutputNames());
 
-    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, fileList, gen, allInvariants);
+    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, fileList, rc, allInvariants);
     if (igpkp.wantGen(r, "summary"))
       fragment("StructureDefinition-"+sd.getId()+"-summary", sdr.summary(), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "header"))
@@ -6824,7 +6835,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void generateOutputsStructureMap(FetchedFile f, FetchedResource r, StructureMap map, Map<String,String> vars) throws Exception {
-    StructureMapRenderer smr = new StructureMapRenderer(context, checkAppendSlash(specPath), map, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, gen);
+    StructureMapRenderer smr = new StructureMapRenderer(context, checkAppendSlash(specPath), map, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, rc);
     if (igpkp.wantGen(r, "summary"))
       fragment("StructureMap-"+map.getId()+"-summary", smr.summary(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl")), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "content"))
@@ -6840,7 +6851,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   }
 
-  private XhtmlNode getXhtml(FetchedResource r) throws FHIRException {
+  private XhtmlNode getXhtml(FetchedResource r) throws FHIRException, IOException, EOperationOutcome {
     if (r.getResource() != null && r.getResource() instanceof DomainResource) {
       DomainResource dr = (DomainResource) r.getResource();
       if (dr.getText().hasDiv())
@@ -6848,10 +6859,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     if (r.getResource() != null && r.getResource() instanceof Bundle) {
       Bundle b = (Bundle) r.getResource();
-      return new NarrativeGenerator("",  null, context).setLiquidServices(templateProvider, validator.getExternalHostServices()).renderBundle(b);
+      return new BundleRenderer(rc).render(b);
     }
     if (r.getElement().fhirType().equals("Bundle")) {
-      return new NarrativeGenerator("",  null, context).renderBundle(r.getElement());
+      return new BundleRenderer(rc).render(new ElementWrappers.ResourceWrapperMetaElement(rc, r.getElement()));
     } else {
       return getHtmlForResource(r.getElement());
     }
