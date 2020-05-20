@@ -736,13 +736,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void packageTemplate() throws IOException {
     Utilities.createDirectory(outputDir);
     long startTime = System.nanoTime();
-    JsonObject j = new JsonObject();
-    j.addProperty("url", templateInfo.get("canonical").getAsString());
-    j.addProperty("package-id", templateInfo.get("name").getAsString());
-    j.addProperty("ig-ver", templateInfo.get("version").getAsString());
-    j.addProperty("date", new SimpleDateFormat("EEE, dd MMM, yyyy HH:mm:ss Z", new Locale("en", "US")).format(execTime.getTime()));
-    j.addProperty("version", Constants.VERSION);
-    j.addProperty("tool", Constants.VERSION+" ("+ToolsVersion.TOOLS_VERSION+")");
+    JsonObject qaJson = new JsonObject();
+    qaJson.addProperty("url", templateInfo.get("canonical").getAsString());
+    qaJson.addProperty("package-id", templateInfo.get("name").getAsString());
+    qaJson.addProperty("ig-ver", templateInfo.get("version").getAsString());
+    qaJson.addProperty("date", new SimpleDateFormat("EEE, dd MMM, yyyy HH:mm:ss Z", new Locale("en", "US")).format(execTime.getTime()));
+    qaJson.addProperty("version", Constants.VERSION);
+    qaJson.addProperty("tool", Constants.VERSION+" ("+ToolsVersion.TOOLS_VERSION+")");
     try {
       File od = new File(outputDir);
       FileUtils.cleanDirectory(od);
@@ -760,11 +760,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     } catch (Exception e) {
        e.printStackTrace();
-       j.addProperty("exception", e.getMessage());
+       qaJson.addProperty("exception", e.getMessage());
     }
     long endTime = System.nanoTime();
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
-    String json = gson.toJson(j);
+    String json = gson.toJson(qaJson);
     TextFile.stringToFile(json, Utilities.path(outputDir, "qa.json"), false);
 
     ZipGenerator zip = new ZipGenerator(Utilities.path(tempDir, "full-ig.zip"));
@@ -863,7 +863,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
-  private void processProvenanceDetails() throws FHIRFormatError, DefinitionException, FHIRException, IOException, EOperationOutcome {
+  private void processProvenanceDetails() throws Exception {
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.fhirType().equals("Provenance")) { 
@@ -885,9 +885,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }    
   }
 
-  private void processProvenance(String path, Element resource, Resource r) throws FHIRFormatError, DefinitionException, FHIRException, IOException, EOperationOutcome {
+  private void processProvenance(String path, Element resource, Resource r) throws Exception {
     Provenance pv =  (Provenance) (r == null ? convertFromElement(resource) : r);
-    RendererFactory.factory(r, rc).render(pv);
+    RendererFactory.factory(pv, rc.setParser(getTypeLoader(null))).render(pv);
     
     for (Reference entity : pv.getTarget()) {
       if (entity.hasReference()) {
@@ -1045,13 +1045,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private boolean isConvertableResource(String t) {
-    return Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "Conformance", "CapabilityStatement", "Questionnaire", 
+    return Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "Conformance", "CapabilityStatement", "Questionnaire", "NamingSystem", 
         "ConceptMap", "OperationOutcome", "CompartmentDefinition", "OperationDefinition", "ImplementationGuide");
   }
 
 
   private ITypeParser getTypeLoader(FetchedFile f, FetchedResource r) throws Exception {
     String ver = r.getConfig() == null ? null : ostr(r.getConfig(), "version");
+    return getTypeLoader(ver);
+  }
+  
+  private ITypeParser getTypeLoader(String ver) throws Exception {
     if (ver == null)
       ver = version; // fall back to global version
     if (VersionUtilities.isR3Ver(ver)) {
@@ -2541,7 +2545,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     String webref = pi.getWebLocation();
     
-    SpecMapManager igm = new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion());
+    SpecMapManager igm = pi.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion()) : SpecMapManager.createForSimplifier(pi);
     igm.setName(name);
     igm.setBase(canonical);
     igm.setBase2(pi.url());
@@ -2617,7 +2621,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (u != null) {
           String p = igm.getPath(u);
           if (p == null)
-            throw new Exception("Internal error in IG "+name+" map: No identity found for "+u);
+            throw new Exception("Internal error in IG "+pi.name()+"#"+pi.version()+" map: No identity found for "+u);
+          if (!r.hasId()) {
+            r.setId(tail(u));
+          }
           r.setUserData("path", webref+"/"+ igpkp.doReplacements(p, r, null, null));
           String v = ((CanonicalResource) r).getVersion();
           if (v!=null) {
@@ -2989,8 +2996,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           }
           if (rg != null) {
             if (!rg.hasName()) {
-              if (r.getElement().hasChild("title"))
+              if (r.getElement().hasChild("title")) {
                 rg.setName(r.getElement().getChildValue("title"));
+              } else if (r.getElement().hasExtension("http://hl7.org/fhir/5.0/StructureDefinition/extension-NamingSystem.title")) {
+                rg.setName(r.getElement().getExtensionValue("http://hl7.org/fhir/5.0/StructureDefinition/extension-NamingSystem.title").primitiveValue());                
+              }
             }
             if (!rg.hasDescription()) {
               if (r.getElement().hasChild("description")) {
@@ -5375,6 +5385,34 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     String json = gson.toJson(data);
     TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "structuredefinitions.json"), false);
 
+    // now, list the profiles - all the profiles
+    data = new JsonObject();
+    i = 0;
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        JsonObject item = new JsonObject();
+        data.add(r.fhirType()+"/"+r.getId(), item);
+        item.addProperty("history", r.hasHistory());
+        item.addProperty("index", i);
+        item.addProperty("path", r.getElement().getUserString("path"));
+        if (r.getResource() != null) {
+          if (r.getResource() instanceof CanonicalResource) {
+            CanonicalResource cr = (CanonicalResource) r.getResource();
+            item.addProperty("url", cr.getUrl());
+            item.addProperty("name", cr.getName());
+            item.addProperty("title", cr.getTitle());
+            item.addProperty("version", cr.getVersion());
+            item.addProperty("date", cr.getDateElement().primitiveValue());
+            item.addProperty("status", cr.getStatus().toCode());
+          }
+        }
+        i++;
+      }
+    }
+
+    json = gson.toJson(data);
+    TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "resources.json"), false);
+
     if (publishedIg.getDefinition().hasPage()) {
       JsonObject pages = new JsonObject();
       addPageData(pages, publishedIg.getDefinition().getPage(), "0", "");
@@ -6537,7 +6575,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
 
     if (igpkp.wantGen(r, "history")) {
-      XhtmlNode xhtml = new HistoryGenerator(context).generate(r);
+      XhtmlNode xhtml = new HistoryGenerator(rc).generate(r);
       String html = xhtml == null ? "" : new XhtmlComposer(XhtmlComposer.XML).compose(xhtml);
       fragment(r.getElement().fhirType()+"-"+r.getId()+"-history", html, f.getOutputNames(), r, vars, null);
     }

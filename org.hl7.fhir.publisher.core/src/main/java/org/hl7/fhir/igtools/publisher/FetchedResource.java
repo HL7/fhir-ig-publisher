@@ -173,6 +173,9 @@ public class FetchedResource {
   public List<ProvenanceDetails> getAudits() {
     return audits;
   }
+  public boolean hasHistory() {
+    return !audits.isEmpty();
+  }
   
   
 }
