@@ -9,6 +9,10 @@ title: FHIR IGPublisher Release Notes
 * Validator: fix fatal NPE validating bundles when resource is missing
 * Validator: Fix to check invariants on Elements with type redirections (e.g. ValueSet.compose.exclude)
 * Renderer: fix rendering of ValueSet exclusions
+* Renderer: Add improved Questionnaire rendering options
+* Renderer: Add improved NamingSystem rendering
+* Add resources.json to data directory for better layout control
+* Fix bug where NamingSystem.title not being picked up correctly 
 
 ## v1.0.94 (2020-05-12)
 
