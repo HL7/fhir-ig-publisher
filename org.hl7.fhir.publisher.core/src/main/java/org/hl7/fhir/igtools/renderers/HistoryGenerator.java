@@ -9,10 +9,13 @@ import java.util.List;
 import org.hl7.fhir.igtools.publisher.ProvenanceDetails;
 import org.hl7.fhir.igtools.renderers.HistoryGenerator.HistoryListSorter;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
+import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.DateTimeType;
 import org.hl7.fhir.r5.model.Reference;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceWithReference;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.model.AuditEvent.AuditEventAction;
 import org.hl7.fhir.r5.model.CodeSystem;
@@ -32,9 +35,9 @@ public class HistoryGenerator {
 
   }
 
-  private SimpleWorkerContext context;
+  private RenderingContext context;
 
-  public HistoryGenerator(SimpleWorkerContext context) {
+  public HistoryGenerator(RenderingContext context) {
     this.context = context;    
   }
 
@@ -57,7 +60,7 @@ public class HistoryGenerator {
       tr.td().b().tx("Date");
       tr.td().b().tx("Action");
       for (Coding c : actorTypes) {
-        CodeSystem cs = context.fetchCodeSystem(c.getSystem());
+        CodeSystem cs = context.getWorker().fetchCodeSystem(c.getSystem());
         XhtmlNode td = tr.td().b(); 
         if (cs != null && cs.hasUserData("path")) {
           ConceptDefinitionComponent cd = CodeSystemUtilities.getCode(cs, c.getCode());
@@ -73,7 +76,7 @@ public class HistoryGenerator {
         tr.td().ah(pd.getPath()).tx(pd.getDate().asStringValue().substring(0, 10));
 
         XhtmlNode td = tr.td(); 
-        CodeSystem cs = context.fetchCodeSystem(pd.getAction().getSystem());
+        CodeSystem cs = context.getWorker().fetchCodeSystem(pd.getAction().getSystem());
         if (cs != null && cs.hasUserData("path")) {
           ConceptDefinitionComponent cd = CodeSystemUtilities.getCode(cs, pd.getAction().getCode());
           td.ah(cs.getUserString("path")+"#"+cs.getId()+"-"+pd.getAction().getCode()).tx(cd != null ? cd.getDisplay() : pd.getAction().getCode());
@@ -86,7 +89,12 @@ public class HistoryGenerator {
           td = tr.td();
           if (aa != null) {
             if (aa.getReference() != null) {
-              td.ah(aa.getReference()).tx(aa.getDisplay());
+              ResourceWithReference rr = context.getResolver().resolve(context, aa.getReference());
+              if (rr == null) {
+                td.tx(aa.getDisplay());
+              } else {
+                td.ah(rr.getReference()).tx(aa.getDisplay());                
+              }
             } else {
               td.tx(aa.getDisplay());
             }
