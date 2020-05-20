@@ -2820,8 +2820,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         sourceIg = (ImplementationGuide) parse(igf);
       publishedIg = sourceIg.copy();
       FetchedResource igr = igf.addResource();
-      loadAsElementModel(igf, igr, null);
+//      loadAsElementModel(igf, igr, null);
       igr.setResource(publishedIg);
+      igr.setElement(convertToElement(publishedIg));
       igr.setId(sourceIg.getId()).setTitle(publishedIg.getName());
     } else {
       // special case; the source is updated during the build, so we track it differently
