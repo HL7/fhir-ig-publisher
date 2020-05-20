@@ -123,6 +123,7 @@ import org.hl7.fhir.igtools.renderers.CrossViewRenderer;
 import org.hl7.fhir.igtools.renderers.HistoryGenerator;
 import org.hl7.fhir.igtools.renderers.JsonXhtmlRenderer;
 import org.hl7.fhir.igtools.renderers.OperationDefinitionRenderer;
+import org.hl7.fhir.igtools.renderers.QuestionnaireRenderer;
 import org.hl7.fhir.igtools.renderers.StructureDefinitionRenderer;
 import org.hl7.fhir.igtools.renderers.StructureMapRenderer;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter;
@@ -197,6 +198,7 @@ import org.hl7.fhir.r5.model.Parameters;
 import org.hl7.fhir.r5.model.PrimitiveType;
 import org.hl7.fhir.r5.model.Provenance;
 import org.hl7.fhir.r5.model.Provenance.ProvenanceAgentComponent;
+import org.hl7.fhir.r5.model.Questionnaire;
 import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.ResourceFactory;
@@ -6140,6 +6142,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             case StructureMap:
               generateOutputsStructureMap(f, r, (StructureMap) r.getResource(), vars);
               break;
+            case Questionnaire:
+              generateOutputsQuestionnaire(f, r, (Questionnaire) r.getResource(), vars);
             default:
               // nothing to do...
             }
@@ -6887,6 +6891,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     // summary table
     // profile index
 
+  }
+
+  private void generateOutputsQuestionnaire(FetchedFile f, FetchedResource r, Questionnaire q, Map<String,String> vars) throws Exception {
+    QuestionnaireRenderer qr = new QuestionnaireRenderer(context, checkAppendSlash(specPath), q, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, rc);
+    if (igpkp.wantGen(r, "summary"))
+      fragment("Questionnaire-"+q.getId()+"-summary", qr.summary(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl")), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "content"))
+      fragment("Questionnaire-"+q.getId()+"-tree", qr.tree(), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "profiles"))
+      fragment("Questionnaire-"+q.getId()+"-form", qr.form(), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "links"))
+      fragment("Questionnaire-"+q.getId()+"-links", qr.links(), f.getOutputNames(), r, vars, null);
   }
 
   private XhtmlNode getXhtml(FetchedResource r) throws FHIRException, IOException, EOperationOutcome {
