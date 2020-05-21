@@ -85,6 +85,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   int err = 0;
   int warn = 0;
   int info = 0;
+  int link = 0;
   private String root;
   private String packageId;
   private String altPackageId;
@@ -129,8 +130,19 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     }
     
     List<ValidationMessage> linkErrors = filterMessages(allErrors, true, filteredMessages.keySet()); 
+    for (ValidationMessage vm : linkErrors) {
+      if (vm.getSource() == Source.LinkChecker) {
+        link++;
+      } else if (vm.getLevel().equals(ValidationMessage.IssueSeverity.FATAL)||vm.getLevel().equals(ValidationMessage.IssueSeverity.ERROR))
+        err++;
+      else if (vm.getLevel().equals(ValidationMessage.IssueSeverity.WARNING))
+        warn++;
+      else
+        info++;
+    }
+    
     StringBuilder b = new StringBuilder();
-    b.append(genHeader(title, err, warn, info, linkErrors.size(), filteredMessages.size()));
+    b.append(genHeader(title, err, warn, info, link, filteredMessages.size()));
     b.append(genSummaryRowInteral(linkErrors));
     files = sorted(files);
     for (FetchedFile f : files) 
@@ -156,6 +168,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       b.append(genEnd());
     }    
     b.append(genSuppressedMessages(filteredMessages));
+    b.append("<a name=\"sorted\"> </a>\r\n<p><b>Errors sorted by type</b></p>\r\n");
     for (String n : messageIdNames()) {
       List<FiledValidationMessage> fvml = new ArrayList<>();    
       for (FetchedFile f : files) {
@@ -220,7 +233,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     b.append(genFooterTxt(title));
     TextFile.stringToFile(b.toString(), Utilities.changeFileExt(path, ".txt"));
     
-    String summary = "Errors: " + err + "  Warnings: " + warn + "  Info: " + info;
+    String summary = "Errors: " + err + ", Warnings: " + warn + ", Info: " + info+", Broken Links = "+link;
     return path + "\r\n" + summary;
   }
 

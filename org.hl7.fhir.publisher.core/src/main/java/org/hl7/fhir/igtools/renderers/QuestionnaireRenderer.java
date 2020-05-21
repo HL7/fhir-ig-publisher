@@ -24,14 +24,18 @@ package org.hl7.fhir.igtools.renderers;
 import java.io.IOException;
 import java.util.List;
 
+import org.hl7.fhir.exceptions.DefinitionException;
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.model.Questionnaire;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureMap;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.r5.utils.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.StructureMapUtilities.StructureMapAnalysis;
@@ -40,40 +44,33 @@ import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 
-public class StructureMapRenderer extends BaseRenderer {
+public class QuestionnaireRenderer extends BaseRenderer {
 
 
-  private StructureMapUtilities utils;
-  private StructureMap map;
-  private StructureMapAnalysis analysis;
+  private Questionnaire q;
   private String destDir;
 
-  public StructureMapRenderer(IWorkerContext context, String prefix, StructureMap map, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
+  public QuestionnaireRenderer(IWorkerContext context, String prefix, Questionnaire q, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
     super(context, prefix, igp, maps, markdownEngine, packge, gen);
-    this.map = map;
+    this.q = q;
     this.destDir = destDir;
-    utils = new StructureMapUtilities(context, null, igp);
-    analysis = (StructureMapAnalysis) map.getUserData("analysis");
   }
 
   public String summary(FetchedResource r, boolean xml, boolean json, boolean ttl) throws Exception {
 //    return "[--Summary goes here--]";
     StringBuilder b = new StringBuilder();
     b.append("<table class=\"grid\">\r\n");
-    b.append(" <tbody><tr><td>"+translate("sm.summary", "Defining URL")+":</td><td>"+Utilities.escapeXml(map.getUrl())+"</td></tr>\r\n");
-    if (map.hasVersion())
-      b.append(" <tr><td>"+translate("cs.summary", "Version")+":</td><td>"+Utilities.escapeXml(map.getVersion())+"</td></tr>\r\n");
-    b.append(" <tr><td>"+translate("sm.summary", "Name")+":</td><td>"+Utilities.escapeXml(gt(map.getNameElement()))+"</td></tr>\r\n");
-    if (map.hasDescription())
-      b.append(" <tr><td>"+translate("sm.summary", "Definition")+":</td><td>"+processMarkdown("description", map.getDescriptionElement())+"</td></tr>\r\n");
-    if (map.hasPublisher())
-      b.append(" <tr><td>"+translate("sm.summary", "Publisher")+":</td><td>"+Utilities.escapeXml(gt(map.getPublisherElement()))+"</td></tr>\r\n");
-    if (map.hasCopyright())
-      b.append(" <tr><td>"+translate("sm.summary", "Copyright")+":</td><td>"+processMarkdown("copyright", map.getCopyrightElement())+"</td></tr>\r\n");
-    if (ToolingExtensions.hasExtension(map, ToolingExtensions.EXT_FMM_LEVEL)) {
-      // Use hard-coded spec link to point to current spec because DSTU2 had maturity listed on a different page
-      b.append(" <tr><td><a class=\"fmm\" href=\"http://hl7.org/fhir/versions.html#maturity\" title=\"Maturity Level\">"+translate("cs.summary", "Maturity")+"</a>:</td><td>"+ToolingExtensions.readStringExtension(map, ToolingExtensions.EXT_FMM_LEVEL)+"</td></tr>\r\n");
-    }
+    b.append(" <tbody><tr><td>"+translate("sm.summary", "Defining URL")+":</td><td>"+Utilities.escapeXml(q.getUrl())+"</td></tr>\r\n");
+    if (q.hasVersion())
+      b.append(" <tr><td>"+translate("cs.summary", "Version")+":</td><td>"+Utilities.escapeXml(q.getVersion())+"</td></tr>\r\n");
+    b.append(" <tr><td>"+translate("sm.summary", "Name")+":</td><td>"+Utilities.escapeXml(gt(q.getNameElement()))+"</td></tr>\r\n");
+    if (q.hasDescription())
+      b.append(" <tr><td>"+translate("sm.summary", "Definition")+":</td><td>"+processMarkdown("description", q.getDescriptionElement())+"</td></tr>\r\n");
+    if (q.hasPublisher())
+      b.append(" <tr><td>"+translate("sm.summary", "Publisher")+":</td><td>"+Utilities.escapeXml(gt(q.getPublisherElement()))+"</td></tr>\r\n");
+    if (q.hasCopyright())
+      b.append(" <tr><td>"+translate("sm.summary", "Copyright")+":</td><td>"+processMarkdown("copyright", q.getCopyrightElement())+"</td></tr>\r\n");
+
     if (xml || json || ttl) {
       b.append(" <tr><td>"+translate("sm.summary", "Source Resource")+":</td><td>");
       boolean first = true;
@@ -99,32 +96,20 @@ public class StructureMapRenderer extends BaseRenderer {
     return b.toString();    
   }
 
-  public String profiles() {
-    StringBuilder b = new StringBuilder();
-    b.append("<ul>\r\n");
-    for (StructureDefinition sd : analysis.getProfiles()) {
-      b.append("  <li><a href=\""+sd.getUserString("path")+"\">"+Utilities.escapeXml(gt(sd.getNameElement()))+"</a></li>\r\n");
-    }
-    b.append("</ul>\r\n");
-    return b.toString();
+  public String tree() throws IOException, FHIRFormatError, DefinitionException, FHIRException, EOperationOutcome {
+    org.hl7.fhir.r5.renderers.QuestionnaireRenderer qr = new org.hl7.fhir.r5.renderers.QuestionnaireRenderer(gen);
+    qr.setTree(true);
+    return new XhtmlComposer(XhtmlComposer.HTML).compose(qr.build(q));
   }
 
-  public String script() throws FHIRException {
-    return StructureMapUtilities.render(map);
+  public String form() throws IOException, FHIRFormatError, DefinitionException, FHIRException, EOperationOutcome {
+    org.hl7.fhir.r5.renderers.QuestionnaireRenderer qr = new org.hl7.fhir.r5.renderers.QuestionnaireRenderer(gen);
+    qr.setTree(false);
+    return new XhtmlComposer(XhtmlComposer.HTML).compose(qr.build(q));
   }
 
-  public String content() throws IOException {
-    if (analysis == null) {
-      try {
-        analysis = utils.analyse(null, map);
-      } catch (FHIRException e) {
-        return "Error in Map: "+e.getMessage();  
-      }
-      map.setUserData("analysis", analysis);
-    }      
-    return new XhtmlComposer(XhtmlComposer.HTML).compose(analysis.getSummary());
+  public String links() throws IOException, FHIRFormatError, DefinitionException, FHIRException, EOperationOutcome {
+    return "<p>No external links yet</p>\r\n";
   }
 
-
-  
 }
