@@ -23,6 +23,9 @@ package org.hl7.fhir.igtools.publisher;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -42,6 +45,7 @@ import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.terminologies.ImplicitValueSets;
 import org.hl7.fhir.r5.utils.IResourceValidator.IValidatorResourceFetcher;
 import org.hl7.fhir.r5.utils.IResourceValidator.ReferenceValidationPolicy;
+import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
 import org.hl7.fhir.utilities.cache.PackageCacheManager;
@@ -221,6 +225,13 @@ public class ValidationServices implements IValidatorResourceFetcher {
   @Override
   public void setLocale(Locale locale) {
     
+  }
+
+  @Override
+  public byte[] fetchRaw(String source) throws MalformedURLException, IOException {
+    URL url = new URL(source);
+    URLConnection c = url.openConnection();
+    return TextFile.streamToBytes(c.getInputStream());
   }
 
 }

@@ -514,8 +514,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
         if (vs != null) {
           if (ref.contains("|")) {
             br.url = vs.getUserString("versionpath");
-            if (br.url==null) {
-              System.out.println("Unable to find version-specific path for reference - defaulting to version-independent reference: " + ref);
+            if (br.url == null) {
               br.url = vs.getUserString("path");
             }
             br.display = vs.getName() + " (" + vs.getVersion() + ")"; 
