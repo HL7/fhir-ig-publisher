@@ -1797,7 +1797,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     else if (npmName.contains("hl7") || npmName.contains("argonaut") || npmName.contains("ihe"))
       extensionTracker.setoptIn(true);
     else if (useStatsOptOut != null) 
-      extensionTracker.setoptIn(useStatsOptOut);
+      extensionTracker.setoptIn(!useStatsOptOut);
     else
       extensionTracker.setoptIn(!ini.getBooleanProperty("IG", "usage-stats-opt-out"));
     log("Initialization complete");
