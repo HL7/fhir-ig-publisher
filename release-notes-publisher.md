@@ -6,7 +6,7 @@ title: FHIR IGPublisher Release Notes
 
 ## Current (not released yet)
 
-(no changes yet)
+* Snapshot Generator: Fix for Core issue #95 - recursion on profile definition
 
 ## v1.0.95 (2020-05-22)
 

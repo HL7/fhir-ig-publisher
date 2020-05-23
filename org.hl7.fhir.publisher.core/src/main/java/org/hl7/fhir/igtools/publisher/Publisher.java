@@ -1794,7 +1794,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     if (mode == IGBuildMode.AUTOBUILD)
       extensionTracker.setoptIn(true);
-    else if (npmName.contains("hl7") || npmName.contains("argonaut") || npmName.contains("ihe"))
+    else if (npmName.contains("hl7.") || npmName.contains("argonaut.") || npmName.contains("ihe."))
       extensionTracker.setoptIn(true);
     else if (useStatsOptOut != null) 
       extensionTracker.setoptIn(!useStatsOptOut);
@@ -5401,11 +5401,21 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           if (r.getResource() instanceof CanonicalResource) {
             CanonicalResource cr = (CanonicalResource) r.getResource();
             item.addProperty("url", cr.getUrl());
-            item.addProperty("name", cr.getName());
-            item.addProperty("title", cr.getTitle());
-            item.addProperty("version", cr.getVersion());
-            item.addProperty("date", cr.getDateElement().primitiveValue());
-            item.addProperty("status", cr.getStatus().toCode());
+            if (cr.hasName()) {
+              item.addProperty("name", cr.getName());
+            }
+            if (cr.hasTitle()) {
+              item.addProperty("title", cr.getTitle());
+            }
+            if (cr.hasVersion()) {
+              item.addProperty("version", cr.getVersion());
+            }
+            if (cr.hasDate()) {
+              item.addProperty("date", cr.getDateElement().primitiveValue());
+            }
+            if (cr.hasStatus()) {
+              item.addProperty("status", cr.getStatus().toCode());
+            }
           }
         }
         i++;
@@ -7031,13 +7041,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       igPack = s;
   }
 
-  private static boolean hasParam(String[] args, String param) {
-    for (String a : args)
-      if (a.equals(param))
-        return true;
-    return false;
-  }
-
   private static String getNamedParam(String[] args, String param) {
     boolean found = false;
     for (String a : args) {
@@ -7142,11 +7145,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   
   public static void main(String[] args) throws Exception {
     int exitCode = 0;
-    if (hasParam(args, "-gui") || args.length == 0) {
+    if (hasNamedParam(args, "-gui") || args.length == 0) {
       runGUI();
       // Returning here ends the main thread but leaves the GUI running
       return; 
-    } else if (hasParam(args, "-help") || hasParam(args, "-?") || hasParam(args, "/?") || hasParam(args, "?")) {
+    } else if (hasNamedParam(args, "-help") || hasNamedParam(args, "-?") || hasNamedParam(args, "/?") || hasNamedParam(args, "?")) {
       System.out.println("");
       System.out.println("To use this publisher to publish a FHIR Implementation Guide, run ");
       System.out.println("with the commands");
@@ -7182,7 +7185,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       System.out.println("or you can configure the proxy using -Dhttp.proxyHost=<ip> -Dhttp.proxyPort=<port> -Dhttps.proxyHost=<ip> -Dhttps.proxyPort=<port>");
       System.out.println("");
       System.out.println("For additional information, see http://wiki.hl7.org/index.php?title=Proposed_new_FHIR_IG_build_Process");
-    } else if (hasParam(args, "-convert")) {
+    } else if (hasNamedParam(args, "-convert")) {
       // convert a igpack.zip to a package.tgz
       IGPack2NpmConvertor conv = new IGPack2NpmConvertor();
       conv.setSource(getNamedParam(args, "-source"));
@@ -7192,7 +7195,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       conv.setLicense(getNamedParam(args, "-license"));
       conv.setWebsite(getNamedParam(args, "-website"));
       conv.execute();
-    } else if (hasParam(args, "-delete-current")) {
+    } else if (hasNamedParam(args, "-delete-current")) {
       if (!args[0].equals("-delete-current"))
         throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history} (first argument is not -delete-current)");
       if (args.length < 4)
@@ -7210,7 +7213,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history} ({history} not a directory ("+history+"))");
       IGReleaseVersionDeleter deleter = new IGReleaseVersionDeleter();
       deleter.clear(f.getAbsolutePath(), fh.getAbsolutePath());
-    } else if (hasParam(args, "-publish-update")) {
+    } else if (hasNamedParam(args, "-publish-update")) {
       if (!args[0].equals("-publish-update"))
         throw new Error("-publish-update must have the format -publish-update -folder {folder} -registry {registry}/fhir-ig-list.json (first argument is not -publish-update)");
       if (args.length < 3)
@@ -7232,7 +7235,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       IGRegistryMaintainer reg = "n/a".equals(registry) ? null : new IGRegistryMaintainer(registry);
       IGWebSiteMaintainer.execute(f.getAbsolutePath(), reg, doCore);
       reg.finish();      
-    } else if (hasParam(args, "-multi")) {
+    } else if (hasNamedParam(args, "-multi")) {
       int i = 1;
       for (String ig : TextFile.fileToString(getNamedParam(args, "-multi")).split("\\r?\\n")) {
         if (!ig.startsWith(";")) {
@@ -7241,9 +7244,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           Publisher self = new Publisher();
           self.setConfigFile(determineActualIG(ig, null));
           self.setTxServer(getNamedParam(args, "-tx"));
-          if (hasParam(args, "-resetTx"))
+          if (hasNamedParam(args, "-resetTx"))
             self.setCacheOption(CacheOption.CLEAR_ALL);
-          else if (hasParam(args, "-resetTxErrors"))
+          else if (hasNamedParam(args, "-resetTxErrors"))
             self.setCacheOption(CacheOption.CLEAR_ERRORS);
           else
             self.setCacheOption(CacheOption.LEAVE);
@@ -7280,14 +7283,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         self.setMode(IGBuildMode.AUTOBUILD);
         self.targetOutput = getNamedParam(args, "-target");
       }
-      if (hasParam(args, "-source")) {
+      if (hasNamedParam(args, "-source")) {
         // run with standard template. this is publishing lite
         self.setSourceDir(getNamedParam(args, "-source"));
         self.setDestDir(getNamedParam(args, "-destination"));
         self.specifiedVersion = getNamedParam(args, "-version");
-      } else if(!hasParam(args, "-ig") && args.length == 1 && new File(args[0]).exists()) {
+      } else if(!hasNamedParam(args, "-ig") && args.length == 1 && new File(args[0]).exists()) {
         self.setConfigFile(args[0]);
-      } else if (hasParam(args, "-prompt")) {
+      } else if (hasNamedParam(args, "-prompt")) {
         IniFile ini = new IniFile("publisher.ini");
         String last = ini.getStringProperty("execute", "path");
         boolean ok = false;
@@ -7321,14 +7324,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           self.setConfigFile(Utilities.path(last, "ig.json"));
         else
           self.setConfigFile(last);
-      } else if (hasParam(args, "-simplifier")) {
-        if (!hasParam(args, "-destination"))
+      } else if (hasNamedParam(args, "-simplifier")) {
+        if (!hasNamedParam(args, "-destination"))
           throw new Exception("A destination folder (-destination) must be provided for the output from processing the simplifier IG");
-        if (!hasParam(args, "-canonical"))
+        if (!hasNamedParam(args, "-canonical"))
           throw new Exception("A canonical URL (-canonical) must be provided in order to process a simplifier IG");
-        if (!hasParam(args, "-npm-name"))
+        if (!hasNamedParam(args, "-npm-name"))
           throw new Exception("A package name (-npm-name) must be provided in order to process a simplifier IG");
-        if (!hasParam(args, "-license"))
+        if (!hasNamedParam(args, "-license"))
           throw new Exception("A license code (-license) must be provided in order to process a simplifier IG");
         List<String> packages = new ArrayList<String>();
         for (int i = 0; i < args.length; i++) {
@@ -7357,23 +7360,23 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       self.setTxServer(getNamedParam(args, "-tx"));
       self.setPackagesFolder(getNamedParam(args, "-packages"));
-      self.watch = hasParam(args, "-watch");
-      self.debug = hasParam(args, "-debug");
-      self.cacheVersion = hasParam(args, "-cacheVersion");
-      if (hasParam(args, "-publish")) {
+      self.watch = hasNamedParam(args, "-watch");
+      self.debug = hasNamedParam(args, "-debug");
+      self.cacheVersion = hasNamedParam(args, "-cacheVersion");
+      if (hasNamedParam(args, "-publish")) {
         self.setMode(IGBuildMode.PUBLICATION);
         self.targetOutput = getNamedParam(args, "-publish");        
         self.targetOutputNested = getNamedParam(args, "-nested");        
       }
-      if (hasParam(args, "-resetTx"))
+      if (hasNamedParam(args, "-resetTx"))
         self.setCacheOption(CacheOption.CLEAR_ALL);
-      else if (hasParam(args, "-resetTxErrors"))
+      else if (hasNamedParam(args, "-resetTxErrors"))
         self.setCacheOption(CacheOption.CLEAR_ERRORS);
       else
         self.setCacheOption(CacheOption.LEAVE);
       try {
         self.execute();
-        if (hasParam(args, "-no-errors")) {
+        if (hasNamedParam(args, "-no-errors")) {
           exitCode = self.countErrs(self.errors) > 0 ? 1 : 0;
         }
       } catch (Exception e) {
