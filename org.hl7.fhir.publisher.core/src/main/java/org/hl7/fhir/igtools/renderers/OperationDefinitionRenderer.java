@@ -70,8 +70,8 @@ import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionMappingCompo
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.DataType;
 import org.hl7.fhir.r5.model.ValueSet;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.utils.ElementDefinitionUtilities;
-import org.hl7.fhir.r5.utils.NarrativeGenerator;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
@@ -91,7 +91,7 @@ public class OperationDefinitionRenderer extends BaseRenderer {
   private String destDir;
   private List<FetchedFile> files;
 
-  public OperationDefinitionRenderer(IWorkerContext context, String prefix, OperationDefinition od, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, NarrativeGenerator gen) {
+  public OperationDefinitionRenderer(IWorkerContext context, String prefix, OperationDefinition od, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen) {
     super(context, prefix, igp, maps, markdownEngine, packge, gen);
     this.od = od;
     this.destDir = destDir;

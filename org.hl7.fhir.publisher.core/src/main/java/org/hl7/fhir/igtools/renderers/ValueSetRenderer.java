@@ -47,9 +47,10 @@ import org.hl7.fhir.r5.model.TriggerDefinition;
 import org.hl7.fhir.r5.model.UriType;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
+import org.hl7.fhir.r5.renderers.RendererFactory;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
-import org.hl7.fhir.r5.utils.NarrativeGenerator;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
@@ -61,7 +62,7 @@ public class ValueSetRenderer extends BaseRenderer {
 
   private ValueSet vs;
 
-  public ValueSetRenderer(IWorkerContext context, String prefix, ValueSet vs, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, NarrativeGenerator gen) {
+  public ValueSetRenderer(IWorkerContext context, String prefix, ValueSet vs, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
     super(context, prefix, igp, maps, markdownEngine, packge, gen);
     this.vs = vs; 
   }
@@ -131,7 +132,7 @@ public class ValueSetRenderer extends BaseRenderer {
     }
     ValueSet vsc = vs.copy();
     vsc.setText(null);
-    gen.generate(null, vsc, vsc, false);
+    RendererFactory.factory(vsc, gen).render(vsc);
     return "<h3>Logical Definition (CLD)</h3>\r\n" + new XhtmlComposer(XhtmlComposer.HTML).compose(vsc.getText().getDiv());
   }
 

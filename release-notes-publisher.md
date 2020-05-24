@@ -6,10 +6,23 @@ title: FHIR IGPublisher Release Notes
 
 ## Current (not released yet)
 
-(no changes yet)
+* Snapshot Generator: Fix for Core issue #95 - recursion on profile definition
+
+## v1.0.95 (2020-05-22)
+
+
+* Validator: fix fatal NPE validating bundles when resource is missing
+* Validator: Fix to check invariants on Elements with type redirections (e.g. ValueSet.compose.exclude)
+* Validator: Fix to validate code units on Quantity 
+* Validator: Add validation for Attachment & check maxSize extension on base64Binary
+* Renderer: fix rendering of ValueSet exclusions
+* Renderer: Add improved Questionnaire rendering options
+* Renderer: Add improved NamingSystem rendering
+* Add resources.json to data directory for better layout control
+* Fix bug where NamingSystem.title not being picked up correctly 
+* Provisional Support for Simplifier packages 
 
 ## v1.0.94 (2020-05-12)
-
 
 * Release for version of main FHIR build
 
@@ -252,4 +265,4 @@ title: FHIR IGPublisher Release Notes
 
 ## v1.0.61 (2020-02-02)
 
-* This 
+* This

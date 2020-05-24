@@ -35,6 +35,8 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.model.Constants;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.cache.NpmPackage;
+import org.hl7.fhir.utilities.cache.ToolsVersion;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 
 import com.google.gson.Gson;
@@ -65,6 +67,8 @@ public class SpecMapManager {
   private Set<String> targetSet = new HashSet<String>();
   private Set<String> imageSet = new HashSet<String>();
   private String version;
+  private NpmPackage pi;
+  private boolean fromSimplifier;
 
   public SpecMapManager(String npmName, String igVersion, String toolVersion, String buildId, Calendar genDate, String webUrl) {
     spec = new JsonObject();
@@ -74,8 +78,10 @@ public class SpecMapManager {
     spec.addProperty("tool-version", toolVersion);
     spec.addProperty("tool-build", buildId);
     spec.addProperty("webUrl", webUrl);
-    spec.addProperty("date", new SimpleDateFormat("yyyy-MM-dd", new Locale("en", "US")).format(genDate.getTime()));
-    spec.addProperty("date-time", new SimpleDateFormat("yyyyMMddhhmmssZ", new Locale("en", "US")).format(genDate.getTime()));
+    if (genDate != null) {
+      spec.addProperty("date", new SimpleDateFormat("yyyy-MM-dd", new Locale("en", "US")).format(genDate.getTime()));
+      spec.addProperty("date-time", new SimpleDateFormat("yyyyMMddhhmmssZ", new Locale("en", "US")).format(genDate.getTime()));
+    }
     paths = new JsonObject();
     spec.add("paths", paths);
     pages = new JsonObject();
@@ -147,8 +153,10 @@ public class SpecMapManager {
       return null;
     }
     if (paths.has(url)) {
-      return strOpt(paths, url);
-      
+      return strOpt(paths, url);      
+    }
+    if (fromSimplifier) {
+      return "https://simplifier.net/resolve?scope="+pi.name()+"@"+pi.version()+"&canonical="+url;
     }
     if (url.matches(Constants.URI_REGEX)) {
       int cc = 0;
@@ -163,6 +171,7 @@ public class SpecMapManager {
       return strOpt(paths, u);
       
     }
+    
     return null;
   }
 
@@ -326,6 +335,13 @@ public class SpecMapManager {
     List<String> res = new ArrayList<String>();
     for (Entry<String, JsonElement> e : pages.entrySet()) 
       res.add(e.getKey());
+    return res;
+  }
+
+  public static SpecMapManager createForSimplifier(NpmPackage pi) {
+    SpecMapManager res = new SpecMapManager(pi.name(), pi.fhirVersion(), ToolsVersion.TOOLS_VERSION_STR, null, null, pi.url());
+    res.fromSimplifier = true;
+    res.pi = pi;
     return res;
   }
 

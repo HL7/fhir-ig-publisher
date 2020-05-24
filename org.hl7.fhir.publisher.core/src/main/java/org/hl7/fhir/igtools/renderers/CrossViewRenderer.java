@@ -20,8 +20,8 @@ import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.Narrative;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionSnapshotComponent;
+import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.TerminologyRenderer;
-import org.hl7.fhir.r5.utils.NarrativeGenerator;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.validation.ValidationOptions;
 
@@ -373,7 +373,7 @@ public class CrossViewRenderer {
           if (cat.isEmpty()) {
             b.append("<p>All the observations have the no assigned category</p>\r\n");            
           } else {
-            b.append("<p>All the observations have the category "+new NarrativeGenerator("", "", context).describeCoding(cat, false)+"</p>\r\n");
+            b.append("<p>All the observations have the category "+new DataRenderer(context).displayCoding(cat)+"</p>\r\n");
           }
           hasCat = false;
         }
