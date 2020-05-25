@@ -225,6 +225,7 @@ import org.hl7.fhir.r5.renderers.utils.DirectWrappers;
 import org.hl7.fhir.r5.renderers.utils.ElementWrappers;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.ITypeParser;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext.QuestionnaireRendererMode;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.ResourceRendererMode;
 import org.hl7.fhir.r5.renderers.utils.Resolver.IReferenceResolver;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceContext;
@@ -6907,12 +6908,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     QuestionnaireRenderer qr = new QuestionnaireRenderer(context, checkAppendSlash(specPath), q, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, rc);
     if (igpkp.wantGen(r, "summary"))
       fragment("Questionnaire-"+q.getId()+"-summary", qr.summary(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl")), f.getOutputNames(), r, vars, null);
-    if (igpkp.wantGen(r, "content"))
-      fragment("Questionnaire-"+q.getId()+"-tree", qr.tree(), f.getOutputNames(), r, vars, null);
-    if (igpkp.wantGen(r, "profiles"))
-      fragment("Questionnaire-"+q.getId()+"-form", qr.form(), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "tree"))
+      fragment("Questionnaire-"+q.getId()+"-tree", qr.render(QuestionnaireRendererMode.TREE), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "form"))
+      fragment("Questionnaire-"+q.getId()+"-form", qr.render(QuestionnaireRendererMode.FORM), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "links"))
-      fragment("Questionnaire-"+q.getId()+"-links", qr.links(), f.getOutputNames(), r, vars, null);
+      fragment("Questionnaire-"+q.getId()+"-links", qr.render(QuestionnaireRendererMode.LINKS), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "logic"))
+      fragment("Questionnaire-"+q.getId()+"-links", qr.render(QuestionnaireRendererMode.LINKS), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "dict"))
+      fragment("Questionnaire-"+q.getId()+"-dict", qr.render(QuestionnaireRendererMode.DEFNS), f.getOutputNames(), r, vars, null);
   }
 
   private XhtmlNode getXhtml(FetchedResource r) throws FHIRException, IOException, EOperationOutcome {

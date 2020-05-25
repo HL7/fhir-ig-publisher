@@ -35,6 +35,7 @@ import org.hl7.fhir.r5.model.Questionnaire;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureMap;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext.QuestionnaireRendererMode;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.r5.utils.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
@@ -96,20 +97,10 @@ public class QuestionnaireRenderer extends BaseRenderer {
     return b.toString();    
   }
 
-  public String tree() throws IOException, FHIRFormatError, DefinitionException, FHIRException, EOperationOutcome {
+  public String render(QuestionnaireRendererMode mode) throws IOException, FHIRFormatError, DefinitionException, FHIRException, EOperationOutcome {
     org.hl7.fhir.r5.renderers.QuestionnaireRenderer qr = new org.hl7.fhir.r5.renderers.QuestionnaireRenderer(gen);
-    qr.setTree(true);
+    gen.setQuestionnaireMode(mode);
     return new XhtmlComposer(XhtmlComposer.HTML).compose(qr.build(q));
-  }
-
-  public String form() throws IOException, FHIRFormatError, DefinitionException, FHIRException, EOperationOutcome {
-    org.hl7.fhir.r5.renderers.QuestionnaireRenderer qr = new org.hl7.fhir.r5.renderers.QuestionnaireRenderer(gen);
-    qr.setTree(false);
-    return new XhtmlComposer(XhtmlComposer.HTML).compose(qr.build(q));
-  }
-
-  public String links() throws IOException, FHIRFormatError, DefinitionException, FHIRException, EOperationOutcome {
-    return "<p>No external links yet</p>\r\n";
   }
 
 }
