@@ -6,6 +6,11 @@ title: FHIR IGPublisher Release Notes
 
 ## Current (not released yet)
 
+* Snapshot Generator: Fix for Core issue #95 - recursion on profile definition
+
+## v1.0.95 (2020-05-22)
+
+
 * Validator: fix fatal NPE validating bundles when resource is missing
 * Validator: Fix to check invariants on Elements with type redirections (e.g. ValueSet.compose.exclude)
 * Validator: Fix to validate code units on Quantity 
@@ -260,4 +265,4 @@ title: FHIR IGPublisher Release Notes
 
 ## v1.0.61 (2020-02-02)
 
-* This 
+* This
