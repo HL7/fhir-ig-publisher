@@ -6915,7 +6915,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "links"))
       fragment("Questionnaire-"+q.getId()+"-links", qr.render(QuestionnaireRendererMode.LINKS), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "logic"))
-      fragment("Questionnaire-"+q.getId()+"-links", qr.render(QuestionnaireRendererMode.LINKS), f.getOutputNames(), r, vars, null);
+      fragment("Questionnaire-"+q.getId()+"-logic", qr.render(QuestionnaireRendererMode.LINKS), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "dict"))
       fragment("Questionnaire-"+q.getId()+"-dict", qr.render(QuestionnaireRendererMode.DEFNS), f.getOutputNames(), r, vars, null);
   }
