@@ -21,7 +21,7 @@ call "C:\tools\fnr.exe" -dir "C:\work\org.hl7.fhir\build" -fileMask "*.xml" -fin
 call "C:\tools\fnr.exe" -dir "C:\work\org.hl7.fhir\latest-ig-publisher" -fileMask "*.html" -find "%oldver%" -replace "%newver%" -count 1
 call "C:\tools\fnr.exe" -dir "C:\work\org.hl7.fhir\latest-ig-publisher" -fileMask "*.json" -find "%oldver%" -replace "%newver%" -count 1
 call "C:\tools\fnr.exe" -dir "C:\work\org.hl7.fhir\test-igs" -fileMask "*.bat" -find "%oldver%" -replace "%newver%" -count 1
-rem call mvn clean deploy -Dmaven.test.redirectTestOutputToFile=false -DdeployAtEnd=true 
+call mvn clean deploy -Dmaven.test.redirectTestOutputToFile=false -DdeployAtEnd=true 
 IF %ERRORLEVEL% NEQ 0 ( 
   GOTO DONE
 )
