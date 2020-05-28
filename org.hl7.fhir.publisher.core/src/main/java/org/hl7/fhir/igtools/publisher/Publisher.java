@@ -1341,7 +1341,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (parts[2].equals("uv")) {
         return new Coding("http://unstats.un.org/unsd/methods/m49/m49.htm", "001", "World");
       } else {
-        return new Coding("urn:iso:std:iso:3166:-2", parts[2].toUpperCase(), null);
+        return new Coding("urn:iso:std:iso:3166", parts[2].toUpperCase(), null);
       }
     } else {
       return null;
@@ -2971,7 +2971,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, execTime.getTime());
     execTime = Calendar.getInstance();
 
-    rc = new RenderingContext(context, markdownEngine, ValidationOptions.defaults(), checkAppendSlash(specPath), null, ResourceRendererMode.IG);
+    rc = new RenderingContext(context, markdownEngine, ValidationOptions.defaults(), checkAppendSlash(specPath), "", null, ResourceRendererMode.IG);
     rc.setTemplateProvider(templateProvider);
     rc.setResolver(this);    
     rc.setServices(validator.getExternalHostServices());
@@ -6230,7 +6230,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   public class ListViewSorterByName implements Comparator<ListItemEntry> {
     @Override
     public int compare(ListItemEntry arg0, ListItemEntry arg1) {
-      return arg0.getName().compareTo(arg1.getName());
+      return arg0.getName().toLowerCase().compareTo(arg1.getName().toLowerCase());
     }
   }
 
@@ -6274,19 +6274,25 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     String script = igpkp.getProperty(r, "list-script");
     String types = igpkp.getProperty(r, "list-types"); 
     genListViews(f, r, resource, list, script, "no", null);
-    if (types != null)
-      for (String t : types.split("\\|"))
+    if (types != null) {
+      for (String t : types.split("\\|")) {
         genListViews(f, r, resource, list, script, "no", t.trim());
+      }
+    }
     Collections.sort(list, new ListViewSorterById());
     genListViews(f, r, resource, list, script, "id", null);
-    if (types != null)
-      for (String t : types.split("\\|"))
+    if (types != null) {
+      for (String t : types.split("\\|")) {
         genListViews(f, r, resource, list, script, "id", t.trim());
+      }
+    }
     Collections.sort(list, new ListViewSorterByName());
     genListViews(f, r, resource, list, script, "name", null);
-    if (types != null)
-      for (String t : types.split("\\|"))
+    if (types != null) {
+      for (String t : types.split("\\|")) {
         genListViews(f, r, resource, list, script, "name", t.trim());
+      }
+    }
     
     // now, if the list has a package-id extension, generate the package for the list
     if (resource.hasExtension(ToolingExtensions.EXT_LIST_PACKAGE)) {
@@ -6584,7 +6590,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
 
     if (igpkp.wantGen(r, "html")) {
-      XhtmlNode xhtml = getXhtml(r);
+      XhtmlNode xhtml = getXhtml(f, r);
       String html = xhtml == null ? "" : new XhtmlComposer(XhtmlComposer.XML).compose(xhtml);
       fragment(r.getElement().fhirType()+"-"+r.getId()+"-html", html, f.getOutputNames(), r, vars, null);
     }
@@ -6920,7 +6926,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       fragment("Questionnaire-"+q.getId()+"-dict", qr.render(QuestionnaireRendererMode.DEFNS), f.getOutputNames(), r, vars, null);
   }
 
-  private XhtmlNode getXhtml(FetchedResource r) throws FHIRException, IOException, EOperationOutcome {
+  private XhtmlNode getXhtml(FetchedFile f, FetchedResource r) throws Exception {
     if (r.getResource() != null && r.getResource() instanceof DomainResource) {
       DomainResource dr = (DomainResource) r.getResource();
       if (dr.getText().hasDiv())
@@ -6931,7 +6937,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return new BundleRenderer(rc).render(b);
     }
     if (r.getElement().fhirType().equals("Bundle")) {
-      return new BundleRenderer(rc).render(new ElementWrappers.ResourceWrapperMetaElement(rc, r.getElement()));
+      RenderingContext lrc = rc.copy().setParser(getTypeLoader(f, r));
+      return new BundleRenderer(lrc).render(new ElementWrappers.ResourceWrapperMetaElement(lrc, r.getElement()));
     } else {
       return getHtmlForResource(r.getElement());
     }
