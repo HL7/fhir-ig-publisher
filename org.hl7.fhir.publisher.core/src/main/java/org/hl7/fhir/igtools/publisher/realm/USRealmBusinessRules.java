@@ -115,7 +115,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
       }
       if (t == null) {
         StringBuilder b = new StringBuilder();
-        ValidationMessage vm = new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.baseDefinition", "US FHIR Usage rules require that all profiles on "+sd.getType()+
+        ValidationMessage vm = new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, sd.getUrl(), "US FHIR Usage rules require that all profiles on "+sd.getType()+
             (matches(usCoreProfiles, sd.getType()) > 1 ? " derive from one of the base US profiles" : " derive from the core US profile"),
             IssueSeverity.WARNING).setMessageId(I18nConstants.US_CORE_DERIVATION); 
         b.append(vm.getMessage());
