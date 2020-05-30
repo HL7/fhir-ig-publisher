@@ -246,7 +246,6 @@ import org.hl7.fhir.r5.utils.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.StructureMapUtilities.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
-import org.hl7.fhir.r5.utils.formats.Turtle;
 import org.hl7.fhir.utilities.CSFile;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.IniFile;
@@ -265,6 +264,7 @@ import org.hl7.fhir.utilities.cache.PackageCacheManager;
 import org.hl7.fhir.utilities.cache.PackageGenerator.PackageType;
 import org.hl7.fhir.utilities.json.JSONUtil;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.turtle.Turtle;
 import org.hl7.fhir.utilities.cache.ToolsVersion;
 import org.hl7.fhir.utilities.validation.ValidationOptions;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
@@ -1698,7 +1698,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     logDebugMessage(LogCategory.INIT, "Load Terminology Cache from "+vsCache);
     context.initTS(vsCache);
     if (expParams != null) {
-      context.setExpansionProfile((Parameters) VersionConvertor_40_50.convertResource(FormatUtilities.loadFile(expParams)));
+      context.setExpansionProfile((Parameters) VersionConvertor_40_50.convertResource(FormatUtilities.loadFile(Utilities.path(Utilities.getDirectoryForFile(igName), expParams))));
     } else if (!expParamMap.isEmpty()) {
       context.setExpansionProfile(new Parameters());      
     }
@@ -2511,7 +2511,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       logMessage("Dependency '"+idForDep(dep)+"' has no id, so can't be referred to in markdown in the IG");
       name = "u"+Utilities.makeUuidLC().replace("-", "");
     }
-    if (!Utilities.isToken(name))
+    if (!isValidIGToken(name))
       throw new Exception("IG Name must be a valid token ("+name+")");
     String canonical = determineCanonical(dep.getUri(), "ImplementationGuide.dependency["+index+"].url");
     String packageId = dep.getPackageId();
@@ -2561,6 +2561,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     
   }
 
+
+  private boolean isValidIGToken(String tail) {
+      if (tail == null || tail.length() == 0)
+        return false;
+      boolean result = Utilities.isAlphabetic(tail.charAt(0));
+      for (int i = 1; i < tail.length(); i++) {
+        result = result && (Utilities.isAlphabetic(tail.charAt(i)) || Utilities.isDigit(tail.charAt(i)) || (tail.charAt(i) == '_'));
+      }
+      return result;
+
+  }
 
   private String idForDep(ImplementationGuideDependsOnComponent dep) {
     if (dep.hasPackageId()) {
@@ -2645,7 +2656,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   
   private void loadIg(JsonObject dep) throws Exception {
     String name = str(dep, "name");
-    if (!Utilities.isToken(name))
+    if (!isValidIGToken(name))
       throw new Exception("IG Name must be a valid token ("+name+")");
     String canonical = ostr(dep, "location");
     String igver = ostr(dep, "version");
@@ -6921,7 +6932,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "links"))
       fragment("Questionnaire-"+q.getId()+"-links", qr.render(QuestionnaireRendererMode.LINKS), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "logic"))
-      fragment("Questionnaire-"+q.getId()+"-logic", qr.render(QuestionnaireRendererMode.LINKS), f.getOutputNames(), r, vars, null);
+      fragment("Questionnaire-"+q.getId()+"-logic", qr.render(QuestionnaireRendererMode.LOGIC), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "dict"))
       fragment("Questionnaire-"+q.getId()+"-dict", qr.render(QuestionnaireRendererMode.DEFNS), f.getOutputNames(), r, vars, null);
   }

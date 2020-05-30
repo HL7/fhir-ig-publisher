@@ -8,6 +8,16 @@ title: FHIR IGPublisher Release Notes
 
 (no changes yet)
 
+## v1.0.98 (2020-05-30)
+
+
+* Snapshot Generator: Add more testing for type consistency when profiling elements
+* Snapshot Generator: Fix bug constraining elements once they are sliced
+* Validator: Add support for http://hl7.org/fhir/StructureDefinition/elementdefinition-xml-name for CDA use
+* Renderer: fix bug rendering contained resource by profile 
+* Renderer: fix bug rendering content references in profiles
+* Renderer: fix problem rendering paths
+
 ## v1.0.97 (2020-05-27)
 
 
@@ -280,4 +290,4 @@ title: FHIR IGPublisher Release Notes
 
 ## v1.0.61 (2020-02-02)
 
-* T
+* 

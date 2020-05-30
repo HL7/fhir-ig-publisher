@@ -77,7 +77,7 @@ public class QuestionnaireRenderer extends BaseRenderer {
       boolean first = true;
       String filename = igp.getProperty(r, "format");
       if (filename == null)
-        filename = "ValueSet-"+r.getId()+".{{[fmt]}}.html";
+        filename = "Questionnaire-"+r.getId()+".{{[fmt]}}.html";
       if (xml) {
         first = false;
         b.append("<a href=\""+igp.doReplacements(filename,  r,  null, "xml")+"\">"+translate("sm.summary", "XML")+"</a>");
