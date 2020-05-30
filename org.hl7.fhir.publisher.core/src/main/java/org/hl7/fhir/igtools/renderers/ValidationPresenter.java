@@ -80,7 +80,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   }
 
   private static final String INTERNAL_LINK = "internal";
-  private static final boolean NO_FILTER = true;
+  private static final boolean NO_FILTER = false;
   private String statedVersion;
   private IGKnowledgeProvider provider;
   private IGKnowledgeProvider altProvider;
@@ -318,16 +318,26 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     List<ValidationMessage> passList = new ArrayList<ValidationMessage>();
     Set<String> msgs = new HashSet<>();
     for (ValidationMessage message : messages) {
-      if (NO_FILTER || (!(suppressedMessages.contains(message.getDisplay()) || suppressedMessages.contains(message.getMessage())) && (canSuppressErrors || !message.getLevel().isError()))) {
-        if (NO_FILTER || (!msgs.contains(message.getLocation()+"|"+message.getMessage()))) {
-          passList.add(message);
-          msgs.add(message.getLocation()+"|"+message.getMessage());
+      boolean passesFilter = true;
+      if (canSuppressErrors || !message.getLevel().isError()) {
+        if (suppressedMessages.contains(message.getDisplay()) || suppressedMessages.contains(message.getMessage())) {
+          passesFilter = false;
+        } else if (msgs.contains(message.getLocation()+"|"+message.getMessage())) {
+          passesFilter = false;
         }
+      }
+      if (NO_FILTER) {
+        passesFilter = true;
+      }
+      if (passesFilter) {
+        passList.add(message);
+        msgs.add(message.getLocation()+"|"+message.getMessage());        
+      } else {
       }
     }
     return passList;
   }
-  
+
 
   
   // HTML templating
