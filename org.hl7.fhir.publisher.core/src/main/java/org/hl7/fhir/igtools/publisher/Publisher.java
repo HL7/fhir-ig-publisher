@@ -5419,6 +5419,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             if (cr.hasTitle()) {
               item.addProperty("title", cr.getTitle());
             }
+            item.addProperty("source", f.getPath().substring(repoRoot.length()));
             if (cr.hasVersion()) {
               item.addProperty("version", cr.getVersion());
             }
