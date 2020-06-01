@@ -1772,6 +1772,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     otherFilesStartup.add(Utilities.path(tempDir, "_data"));
     otherFilesStartup.add(Utilities.path(tempDir, "_data", "fhir.json"));
     otherFilesStartup.add(Utilities.path(tempDir, "_data", "structuredefinitions.json"));
+    otherFilesStartup.add(Utilities.path(tempDir, "_data", "questionnaires.json"));
     otherFilesStartup.add(Utilities.path(tempDir, "_data", "pages.json"));
     otherFilesStartup.add(Utilities.path(tempDir, "_includes"));
 
@@ -2147,6 +2148,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     otherFilesStartup.add(Utilities.path(tempDir, "_data"));
     otherFilesStartup.add(Utilities.path(tempDir, "_data", "fhir.json"));
     otherFilesStartup.add(Utilities.path(tempDir, "_data", "structuredefinitions.json"));
+    otherFilesStartup.add(Utilities.path(tempDir, "_data", "questionnaires.json"));
     otherFilesStartup.add(Utilities.path(tempDir, "_data", "pages.json"));
     otherFilesStartup.add(Utilities.path(tempDir, "_includes"));
 
@@ -5398,6 +5400,33 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
     String json = gson.toJson(data);
     TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "structuredefinitions.json"), false);
+
+    // now, list the profiles - all the profiles
+    data = new JsonObject();
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getElement().fhirType().equals("Questionnaire")) {
+          Questionnaire q = (Questionnaire) r.getResource();
+
+          JsonObject item = new JsonObject();
+          data.add(q.getId(), item);
+          item.addProperty("index", i);
+          item.addProperty("url", q.getUrl());
+          item.addProperty("name", q.getName());
+          item.addProperty("path", q.getUserString("path"));
+          item.addProperty("status", q.getStatus().toCode());
+          item.addProperty("date", q.getDate().toString());
+          item.addProperty("publisher", q.getPublisher());
+          item.addProperty("copyright", q.getCopyright());
+          item.addProperty("description", q.getDescription());
+          i++;
+        }
+      }
+    }
+    
+    gson = new GsonBuilder().setPrettyPrinting().create();
+    json = gson.toJson(data);
+    TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "questionnaires.json"), false);
 
     // now, list the profiles - all the profiles
     data = new JsonObject();
