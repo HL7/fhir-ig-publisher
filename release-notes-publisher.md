@@ -6,10 +6,9 @@ title: FHIR IGPublisher Release Notes
 
 ## Current (not released yet)
 
-(no changes yet)
+* Renderer: Add support for toBase64 & fromBase64 to liquid template FHIRPath
 
 ## v1.0.98 (2020-05-30)
-
 
 * Snapshot Generator: Add more testing for type consistency when profiling elements
 * Snapshot Generator: Fix bug constraining elements once they are sliced
