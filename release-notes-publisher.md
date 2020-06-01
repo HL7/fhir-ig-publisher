@@ -4,9 +4,16 @@ title: FHIR IGPublisher Release Notes
 
 # FHIR IGPublisher Release Notes
 
-## Current (not released yet)
+## Current (not released yet) 
+(no changes yet)
+
+## v1.0.99 (2020-06-01)
+
+
 
 * Renderer: Add support for toBase64 & fromBase64 to liquid template FHIRPath
+* Renderer: fix Questionnaire paths
+* Template sub-system: Define questionnaires.json file for templates to access information about questionnaires
 
 ## v1.0.98 (2020-05-30)
 
@@ -289,4 +296,4 @@ title: FHIR IGPublisher Release Notes
 
 ## v1.0.61 (2020-02-02)
 
-* 
+*
