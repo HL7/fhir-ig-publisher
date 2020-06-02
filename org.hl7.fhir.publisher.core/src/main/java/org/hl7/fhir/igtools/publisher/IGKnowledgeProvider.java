@@ -220,13 +220,13 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     JsonObject cfg = null;
     if (defaultConfig != null) {
       cfg = defaultConfig.getAsJsonObject(r.getElement().fhirType());
-    }
-    if (cfg != null && hasBoolean(cfg, code)) {
-      return getBoolean(cfg, code);
-    }
-    cfg = defaultConfig.getAsJsonObject("Any");
-    if (cfg != null && hasBoolean(cfg, code)) {
-      return getBoolean(cfg, code);
+      if (cfg != null && hasBoolean(cfg, code)) {
+        return getBoolean(cfg, code);
+      }
+      cfg = defaultConfig.getAsJsonObject("Any");
+      if (cfg != null && hasBoolean(cfg, code)) {
+        return getBoolean(cfg, code);
+      }
     }
     return true;
   }
