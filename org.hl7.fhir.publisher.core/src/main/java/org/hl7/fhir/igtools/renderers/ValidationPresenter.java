@@ -59,6 +59,7 @@ import org.stringtemplate.v4.ST;
 
 public class ValidationPresenter extends TranslatingUtilities implements Comparator<FetchedFile> {
 
+
   public class FiledValidationMessage {
 
     private FetchedFile f;
@@ -79,6 +80,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   }
 
   private static final String INTERNAL_LINK = "internal";
+  private static final boolean NO_FILTER = false;
   private String statedVersion;
   private IGKnowledgeProvider provider;
   private IGKnowledgeProvider altProvider;
@@ -283,7 +285,8 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
 
   private String genSuppressedMessages(Map<String, String> msgs) {
     StringBuilder b = new StringBuilder();
-    b.append("<a name=\"suppressed\"> </a>\r\n<p><b>Suppressed Error Messages</b></p>\r\n");
+    b.append("<a name=\"suppressed\"> </a>\r\n<p><b>Suppressed Messages (Warnings, hints, broken links)</b></p>\r\n");
+    boolean found = false;
     Map<String, List<String>> inverted = new HashMap<>();
     for (Entry<String, String> e : msgs.entrySet()) {
       if (!inverted.containsKey(e.getValue())) {
@@ -297,6 +300,9 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
         b.append(" <li>"+Utilities.escapeXml(m)+"</li>\r\n");
       }
       b.append("</ul>\r\n");
+    }
+    if (!found) {
+      b.append("<p>No suppressed messsages</p>");
     }
     return b.toString();
   }
@@ -312,16 +318,26 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     List<ValidationMessage> passList = new ArrayList<ValidationMessage>();
     Set<String> msgs = new HashSet<>();
     for (ValidationMessage message : messages) {
-      if (!(suppressedMessages.contains(message.getDisplay()) || suppressedMessages.contains(message.getMessage())) && (canSuppressErrors || !message.getLevel().isError())) {
-        if (!msgs.contains(message.getLocation()+"|"+message.getMessage())) {
-          passList.add(message);
-          msgs.add(message.getLocation()+"|"+message.getMessage());
+      boolean passesFilter = true;
+      if (canSuppressErrors || !message.getLevel().isError()) {
+        if (suppressedMessages.contains(message.getDisplay()) || suppressedMessages.contains(message.getMessage())) {
+          passesFilter = false;
+        } else if (msgs.contains(message.getLocation()+"|"+message.getMessage())) {
+          passesFilter = false;
         }
+      }
+      if (NO_FILTER) {
+        passesFilter = true;
+      }
+      if (passesFilter) {
+        passList.add(message);
+        msgs.add(message.getLocation()+"|"+message.getMessage());        
+      } else {
       }
     }
     return passList;
   }
-  
+
 
   
   // HTML templating

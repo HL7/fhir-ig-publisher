@@ -683,6 +683,9 @@ public class HTLMLInspector {
     boolean resolved = Utilities.existsInList(ref);
     if (ref.startsWith("data:"))
       resolved = true;
+    if (ref.startsWith("./")) {
+      ref = ref.substring(2);
+    }
     if (!resolved)
       resolved = manual.contains(ref);
     if (!resolved && specs != null){

@@ -172,6 +172,31 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     return s;
   }
 
+  public String doReplacements(String s, FetchedResource r, Resource res, Map<String, String> vars, String format, String prefixForContained) throws FHIRException {
+    if (Utilities.noString(s))
+      return s;
+    if (r.getId()== null) {
+      throw new FHIRException("Error doing replacements - no id defined in resource: " + (r.getTitle()== null ? "NO TITLE EITHER" : r.getTitle()));
+    }
+    s = s.replace("{{[title]}}", r.getTitle() == null ? "?title?" : r.getTitle());
+    s = s.replace("{{[name]}}", res.getId()+(format==null? "": "-"+format)+"-html");
+    s = s.replace("{{[id]}}", prefixForContained+res.getId());
+    if (format!=null)
+      s = s.replace("{{[fmt]}}", format);
+    s = s.replace("{{[type]}}", res.fhirType());
+    s = s.replace("{{[uid]}}", res.fhirType()+"="+prefixForContained+res.getId());
+    if (vars != null) {
+      for (String n : vars.keySet()) {
+        String v = vars.get(n);
+        if (v == null) {
+          v = "";
+        }
+        s = s == null ? "" : s.replace("{{["+n+"]}}", v);
+      }
+    }
+    return s;
+  }
+
   public String doReplacements(String s, Resource r, Map<String, String> vars, String format) {
     if (Utilities.noString(s))
       return s;
@@ -195,15 +220,39 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     JsonObject cfg = null;
     if (defaultConfig != null) {
       cfg = defaultConfig.getAsJsonObject(r.getElement().fhirType());
-    }
-    if (cfg != null && hasBoolean(cfg, code)) {
-      return getBoolean(cfg, code);
-    }
-    cfg = defaultConfig.getAsJsonObject("Any");
-    if (cfg != null && hasBoolean(cfg, code)) {
-      return getBoolean(cfg, code);
+      if (cfg != null && hasBoolean(cfg, code)) {
+        return getBoolean(cfg, code);
+      }
+      cfg = defaultConfig.getAsJsonObject("Any");
+      if (cfg != null && hasBoolean(cfg, code)) {
+        return getBoolean(cfg, code);
+      }
     }
     return true;
+  }
+
+  public String getPropertyContained(FetchedResource r, String propertyName, Resource contained) {
+    if (contained == null && r.getConfig() != null && hasString(r.getConfig(), propertyName)) {
+      return getString(r.getConfig(), propertyName);
+    }
+    if (defaultConfig != null && contained != null) {
+      JsonObject cfg = null;
+      if (cfg==null && "StructureDefinition".equals(contained.fhirType())) {
+        cfg = defaultConfig.getAsJsonObject(contained.fhirType()+":"+getSDType(contained));
+        if (cfg != null && hasString(cfg, propertyName)) {
+          return getString(cfg, propertyName);        
+        }
+      }
+      cfg = defaultConfig.getAsJsonObject(contained.fhirType());
+      if (cfg != null && hasString(cfg, propertyName)) {
+        return getString(cfg, propertyName);
+      }
+      cfg = defaultConfig.getAsJsonObject("Any");
+      if (cfg != null && hasString(cfg, propertyName)) {
+        return getString(cfg, propertyName);
+      }
+    }
+    return null;
   }
 
   public String getProperty(FetchedResource r, String propertyName) {
@@ -211,7 +260,6 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       return getString(r.getConfig(), propertyName);
     }
     if (defaultConfig != null) {
-      
       JsonObject cfg = null;
       if (r.isExample()) {
         cfg = defaultConfig.getAsJsonObject("example");
@@ -234,6 +282,15 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     return null;
   }
 
+  public static String getSDType(Resource r) {
+    StructureDefinition sd = (StructureDefinition) r;
+    if ("Extension".equals(sd.getType())) {
+      return "extension";
+    }
+//    if (sd.getKind() == StructureDefinitionKind.LOGICAL)
+    return sd.getKind().toCode() + (sd.getAbstract() ? ":abstract" : "");    
+  }
+  
   public static String getSDType(FetchedResource r) {
     if ("Extension".equals(r.getElement().getChildValue("type"))) {
       return "extension";
@@ -242,6 +299,25 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     return r.getElement().getChildValue("kind") + ("true".equals(r.getElement().getChildValue("abstract")) ? ":abstract" : "");
   }
 
+  public boolean hasProperty(FetchedResource r, String propertyName, Resource contained) {
+    if (r.getConfig() != null && hasString(r.getConfig(), propertyName))
+      return true;
+    if (defaultConfig != null && contained != null) {
+      JsonObject cfg = defaultConfig.getAsJsonObject(contained.fhirType());
+      if (cfg != null && hasString(cfg, propertyName))
+        return true;
+    }
+    if (defaultConfig != null) {
+      JsonObject cfg = defaultConfig.getAsJsonObject(r.getElement().fhirType());
+      if (cfg != null && hasString(cfg, propertyName))
+        return true;
+      cfg = defaultConfig.getAsJsonObject("Any");
+      if (cfg != null && hasString(cfg, propertyName))
+        return true;
+    }
+    return false;    
+  }
+  
   public boolean hasProperty(FetchedResource r, String propertyName) {
     if (r.getConfig() != null && hasString(r.getConfig(), propertyName))
       return true;
@@ -362,6 +438,14 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       bc.setUserData("path", pathPattern.replace("[type]", r.getElement().fhirType()).replace("[id]", r.getId()));
     else
       bc.setUserData("path", r.getElement().fhirType()+"/"+r.getId()+".html");
+    for (Resource cont : bc.getContained()) {
+      if (base != null) 
+        cont.setUserData("path", doReplacements(base, r, cont, null, null, bc.getId()+"_"));
+      else if (pathPattern != null)
+        cont.setUserData("path", pathPattern.replace("[type]", r.getElement().fhirType()).replace("[id]", bc.getId()+"_"+cont.getId()));
+      else
+        cont.setUserData("path", r.getElement().fhirType()+"/"+bc.getId()+"_"+r.getId()+".html");
+    }
   }
 
   private void error(FetchedFile f, String path, String msg, String msgId) {
@@ -592,6 +676,19 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       return base;
     }
     return r.getElement().fhirType()+"-"+r.getId()+".html";
+  }
+
+  public String getLinkFor(FetchedResource r, boolean replace, Resource contained) {
+    String base = getProperty(r, "base");
+    if (base!=null) {
+      if (replace) {
+        base = base.replace("{{[id]}}", r.getId());
+        base = base.replace("{{[type]}}", r.getElement().fhirType());
+      }
+      base = base.replace(".html", "_"+contained.getId()+".html");
+      return base;
+    }
+    return r.getElement().fhirType()+"-"+r.getId()+"_"+contained.getId()+".html";
   }
 
   public IWorkerContext getContext() {

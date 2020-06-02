@@ -4,7 +4,38 @@ title: FHIR IGPublisher Release Notes
 
 # FHIR IGPublisher Release Notes
 
-## Current (not released yet)
+## Current (not released yet) 
+(no changes yet)
+
+## v1.0.99 (2020-06-01)
+
+
+
+* Renderer: Add support for toBase64 & fromBase64 to liquid template FHIRPath
+* Renderer: fix Questionnaire paths
+* Template sub-system: Define questionnaires.json file for templates to access information about questionnaires
+
+## v1.0.98 (2020-05-30)
+
+* Snapshot Generator: Add more testing for type consistency when profiling elements
+* Snapshot Generator: Fix bug constraining elements once they are sliced
+* Validator: Add support for http://hl7.org/fhir/StructureDefinition/elementdefinition-xml-name for CDA use
+* Renderer: fix bug rendering contained resource by profile 
+* Renderer: fix bug rendering content references in profiles
+* Renderer: fix problem rendering paths
+
+## v1.0.97 (2020-05-27)
+
+
+(no changes yet)
+
+## v1.0.97 (2020-05-27)
+
+
+(no changes yet)
+
+## v1.0.96 (2020-05-26)
+
 
 * Snapshot Generator: Fix for Core issue #95 - recursion on profile definition
 
@@ -265,4 +296,4 @@ title: FHIR IGPublisher Release Notes
 
 ## v1.0.61 (2020-02-02)
 
-* This
+*
