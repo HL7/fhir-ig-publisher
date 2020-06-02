@@ -140,101 +140,102 @@ public class ValueSetRenderer extends BaseRenderer {
     StringBuilder b = new StringBuilder();
     boolean first = true;
     b.append("\r\n");
-    Set<String> sdurls = new HashSet<String>();
-    Set<String> vsurls = new HashSet<String>();
-    Set<String> pdurls = new HashSet<String>();
-    Set<String> qurls = new HashSet<String>();
-    for (CanonicalResource sd : context.allConformanceResources()) {
-      if (sd instanceof StructureDefinition)
-        sdurls.add(sd.getUrl());
-      if (sd instanceof ValueSet)
-        vsurls.add(sd.getUrl());
-      if (sd instanceof PlanDefinition)
-        pdurls.add(sd.getUrl());
-      if (sd instanceof Questionnaire && sd.hasUrl())
-        qurls.add(sd.getUrl());
-    }
-    
-    for (String url : sorted(vsurls)) {
-      ValueSet vc = context.fetchResource(ValueSet.class, url);
-      for (ConceptSetComponent t : vc.getCompose().getInclude()) {
-        for (UriType ed : t.getValueSet()) {
-          if (ed.getValueAsString().equals(vs.getUrl())) {
-            if (first) {
-              first = false;
-              b.append("<ul>\r\n");
-            }
-            b.append(" <li>"+translate("vs.usage", "Included into ")+"<a href=\""+vc.getUserString("path")+"\">"+Utilities.escapeXml(gt(vc.getNameElement()))+"</a></li>\r\n");
-            break;
-          }
-        }
+    if (vs.hasUrl()) {
+      Set<String> sdurls = new HashSet<String>();
+      Set<String> vsurls = new HashSet<String>();
+      Set<String> pdurls = new HashSet<String>();
+      Set<String> qurls = new HashSet<String>();
+      for (CanonicalResource sd : context.allConformanceResources()) {
+        if (sd instanceof StructureDefinition)
+          sdurls.add(sd.getUrl());
+        if (sd instanceof ValueSet)
+          vsurls.add(sd.getUrl());
+        if (sd instanceof PlanDefinition)
+          pdurls.add(sd.getUrl());
+        if (sd instanceof Questionnaire && sd.hasUrl())
+          qurls.add(sd.getUrl());
       }
-      for (ConceptSetComponent t : vc.getCompose().getExclude()) {
-        for (UriType ed : t.getValueSet()) {
-          if (ed.getValueAsString().equals(vs.getUrl())) {
-            if (first) {
-              first = false;
-              b.append("<ul>\r\n");
-            }
-            b.append(" <li>"+translate("vs.usage", "Excluded from ")+"<a href=\""+vc.getUserString("path")+"\">"+Utilities.escapeXml(gt(vc.getNameElement()))+"</a></li>\r\n");
-            break;
-          }
-        }
-      }
-    }
-    for (String url : sorted(sdurls)) {
-      StructureDefinition sd = context.fetchResource(StructureDefinition.class, url);
-      if (sd != null) {
-        for (ElementDefinition ed : sd.getSnapshot().getElement()) {
-          if (ed.hasBinding() && ed.getBinding().hasValueSet()) {
-            if ((ed.getBinding().hasValueSet() && ed.getBinding().getValueSet().equals(vs.getUrl()))) {
+
+      for (String url : sorted(vsurls)) {
+        ValueSet vc = context.fetchResource(ValueSet.class, url);
+        for (ConceptSetComponent t : vc.getCompose().getInclude()) {
+          for (UriType ed : t.getValueSet()) {
+            if (ed.getValueAsString().equals(vs.getUrl())) {
               if (first) {
                 first = false;
                 b.append("<ul>\r\n");
               }
-              String path = sd.getUserString("path");
-              if (path == null) {
-                System.out.println("No path for "+sd.getUrl());
-              } else {
-                b.append(" <li><a href=\""+path+"\">"+Utilities.escapeXml(sd.present())+"</a></li>\r\n");
+              b.append(" <li>"+translate("vs.usage", "Included into ")+"<a href=\""+vc.getUserString("path")+"\">"+Utilities.escapeXml(gt(vc.getNameElement()))+"</a></li>\r\n");
+              break;
+            }
+          }
+        }
+        for (ConceptSetComponent t : vc.getCompose().getExclude()) {
+          for (UriType ed : t.getValueSet()) {
+            if (ed.getValueAsString().equals(vs.getUrl())) {
+              if (first) {
+                first = false;
+                b.append("<ul>\r\n");
               }
+              b.append(" <li>"+translate("vs.usage", "Excluded from ")+"<a href=\""+vc.getUserString("path")+"\">"+Utilities.escapeXml(gt(vc.getNameElement()))+"</a></li>\r\n");
               break;
             }
           }
         }
       }
-    }
-    
-    for (String url : sorted(qurls)) {
-      Questionnaire q = context.fetchResource(Questionnaire.class, url);
-      if (q != null) {
-        if (questionnaireUsesValueSet(q.getItem(), vs.getUrl())) {
+      for (String url : sorted(sdurls)) {
+        StructureDefinition sd = context.fetchResource(StructureDefinition.class, url);
+        if (sd != null) {
+          for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+            if (ed.hasBinding() && ed.getBinding().hasValueSet()) {
+              if ((ed.getBinding().hasValueSet() && ed.getBinding().getValueSet().equals(vs.getUrl()))) {
+                if (first) {
+                  first = false;
+                  b.append("<ul>\r\n");
+                }
+                String path = sd.getUserString("path");
+                if (path == null) {
+                  System.out.println("No path for "+sd.getUrl());
+                } else {
+                  b.append(" <li><a href=\""+path+"\">"+Utilities.escapeXml(sd.present())+"</a></li>\r\n");
+                }
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      for (String url : sorted(qurls)) {
+        Questionnaire q = context.fetchResource(Questionnaire.class, url);
+        if (q != null) {
+          if (questionnaireUsesValueSet(q.getItem(), vs.getUrl())) {
+            if (first) {
+              first = false;
+              b.append("<ul>\r\n");
+            }
+            String path = q.getUserString("path");
+            if (path == null) {
+              System.out.println("No path for "+q.getUrl());
+            } else {
+              b.append(" <li><a href=\""+path+"\">"+Utilities.escapeXml(q.present())+"</a></li>\r\n");
+            }
+            break;
+          }
+        }
+      }
+
+      for (String u : sorted(pdurls)) {
+        PlanDefinition pd = context.fetchResource(PlanDefinition.class, u);
+        if (referencesValueSet(pd)) {
           if (first) {
             first = false;
             b.append("<ul>\r\n");
           }
-          String path = q.getUserString("path");
-          if (path == null) {
-            System.out.println("No path for "+q.getUrl());
-          } else {
-            b.append(" <li><a href=\""+path+"\">"+Utilities.escapeXml(q.present())+"</a></li>\r\n");
-          }
-          break;
+          b.append(" <li>Used as a trigger criteria in <a href=\""+pd.getUserString("path")+"\">"+Utilities.escapeXml(pd.present())+"</a></li>\r\n");
         }
       }
     }
-    
-    for (String u : sorted(pdurls)) {
-      PlanDefinition pd = context.fetchResource(PlanDefinition.class, u);
-      if (referencesValueSet(pd)) {
-        if (first) {
-          first = false;
-          b.append("<ul>\r\n");
-        }
-        b.append(" <li>Used as a trigger criteria in <a href=\""+pd.getUserString("path")+"\">"+Utilities.escapeXml(pd.present())+"</a></li>\r\n");
-      }
-    }
-    
     if (first)
       b.append("<p>"+translate("vs.usage", "This value set is not used here; it may be used elsewhere (e.g. specifications and/or implementations that use this content)")+"</p>\r\n");
     else

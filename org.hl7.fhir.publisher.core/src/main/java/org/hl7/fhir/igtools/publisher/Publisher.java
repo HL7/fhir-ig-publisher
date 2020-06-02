@@ -4026,7 +4026,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (FetchedResource r : f.getResources()) {
         if (r.getElement().fhirType().equals(type)) {
           logDebugMessage(LogCategory.PROGRESS, "process res: "+r.fhirType()+"/"+r.getId());
-          if (r.getResource() == null)
+          if (r.getResource() == null) {
             try {
               if (f.getBundleType() == FetchedBundleType.NATIVE) {
                 r.setResource(parseInternal(f, r));
@@ -4037,6 +4037,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             } catch (Exception e) {
               throw new Exception("Error parsing "+f.getName()+": "+e.getMessage(), e);
             }
+          }
           if (r.getResource() instanceof CanonicalResource) {
             CanonicalResource bc = (CanonicalResource) r.getResource();
             if (bc == null) {
@@ -4048,7 +4049,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                 if (!bc.fhirType().equals("CapabilityStatement") || !bc.getUrl().contains("/Conformance/")) {
                   f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, bc.getUrl(), "Conformance resource "+f.getPath()+" - the canonical URL ("+Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), 
                       bc.getId())+") does not match the URL ("+bc.getUrl()+")", IssueSeverity.ERROR).setMessageId(I18nConstants.RESOURCE_CANONICAL_MISMATCH));
-                // throw new Exception("Error: conformance resource "+f.getPath()+" canonical URL ("+Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())+") does not match the URL ("+bc.getUrl()+")");
+                  // throw new Exception("Error: conformance resource "+f.getPath()+" canonical URL ("+Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())+") does not match the URL ("+bc.getUrl()+")");
                 }
               }
             } else if (bc.hasId()) {
@@ -4078,14 +4079,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               bc.getUseContext().clear();
               bc.getUseContext().addAll(contexts);
             }
-// Todo: Enable these
+            // Todo: Enable these
             if (copyright != null) {
-//              altered = true;
-//              bc.setCopyright(copyright);
+              //              altered = true;
+              //              bc.setCopyright(copyright);
             }
             if (license != null) {
-//              altered = true;
-//              bc.setLicense(license);
+              //              altered = true;
+              //              bc.setLicense(license);
             }
             if (jurisdictions != null && !jurisdictions.isEmpty()) {
               altered = true;
@@ -4097,7 +4098,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               bc.setPublisher(publisher);
             }
 
-            
+
             if (!bc.hasDate()) {
               altered = true;
               bc.setDateElement(new DateTimeType(execTime));
@@ -4140,7 +4141,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                   context.cacheResourceFromPackage(mr, new PackageVersion(publishedIg.getPackageId(), publishedIg.getVersion()));
                 } else
                   logDebugMessage(LogCategory.PROGRESS, "Ignoring resource "+type+"/"+mr.getId()+" in Bundle "+f.getName()+" because it has no canonical URL");
-                 
+
               }
             }
           }
@@ -4148,7 +4149,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
   }
-  
+
   private boolean replaceLiquidTags(DomainResource resource) {
     if (!resource.hasText() || !resource.getText().hasDiv()) {
       return false;
@@ -6124,7 +6125,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         saveNativeResourceOutputs(f, r);
     }    
   }
-  private void generateHtmlOutputs(FetchedFile f, boolean regen) throws TransformerException, IOException, FHIRException {
+  private void generateHtmlOutputs(FetchedFile f, boolean regen) throws Exception {
     if (f.getProcessMode() == FetchedFile.PROCESS_NONE) {
       String dst = tempDir;
       if (f.getRelativePath().startsWith(File.separator))
@@ -6159,64 +6160,90 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else {
       saveFileOutputs(f);
       for (FetchedResource r : f.getResources()) {
-        try {
-          logDebugMessage(LogCategory.PROGRESS, "Produce outputs for "+r.getElement().fhirType()+"/"+r.getId());
-          Map<String, String> vars = makeVars(r);
-          saveDirectResourceOutputs(f, r, vars);
-
-          // now, start generating resource type specific stuff
-          if (r.getResource() != null) { // we only do this for conformance resources we've already loaded
-            switch (r.getResource().getResourceType()) {
-            case CodeSystem:
-              generateOutputsCodeSystem(f, r, (CodeSystem) r.getResource(), vars);
-              break;
-            case ValueSet:
-              generateOutputsValueSet(f, r, (ValueSet) r.getResource(), vars);
-              break;
-            case ConceptMap:
-              generateOutputsConceptMap(f, r, (ConceptMap) r.getResource(), vars);
-              break;
-
-            case List:
-              generateOutputsList(f, r, (ListResource) r.getResource(), vars);      
-              break;
-              
-            case CapabilityStatement:
-              generateOutputsCapabilityStatement(f, r, (CapabilityStatement) r.getResource(), vars);
-              break;
-            case StructureDefinition:
-              generateOutputsStructureDefinition(f, r, (StructureDefinition) r.getResource(), vars, regen);
-              break;
-            case OperationDefinition:
-              generateOutputsOperationDefinition(f, r, (OperationDefinition) r.getResource(), vars, regen);
-              break;
-            case StructureMap:
-              generateOutputsStructureMap(f, r, (StructureMap) r.getResource(), vars);
-              break;
-            case Questionnaire:
-              generateOutputsQuestionnaire(f, r, (Questionnaire) r.getResource(), vars);
-            default:
-              // nothing to do...
+        logDebugMessage(LogCategory.PROGRESS, "Produce outputs for "+r.fhirType()+"/"+r.getId());
+        Map<String, String> vars = makeVars(r);
+        makeTemplates(f, r, vars);
+        saveDirectResourceOutputs(f, r, r.getResource(), vars);
+        if (r.getResource() != null) {
+          generateResourceHtml(f, regen, r, r.getResource(), vars, "");
+          if (r.getResource() instanceof CanonicalResource) {
+            CanonicalResource container = (CanonicalResource) r.getResource();
+            for (Resource contained : container.getContained()) {              
+              String prefixForContained = r.getResource().getId()+"_";
+              makeTemplatesContained(f, r, contained, vars, prefixForContained);
+              saveDirectResourceOutputsContained(f, r, contained, vars, prefixForContained);
+              if (contained instanceof CanonicalResource) {
+                CanonicalResource cr = ((CanonicalResource) contained).copy();
+                cr.copyUserData(container);
+                if (!cr.hasUrl()) {
+                  cr.setUrl(container.getUrl()+"#"+contained.getId());
+                }
+                if (!cr.hasVersion()) {
+                  cr.setVersion(container.getVersion());
+                }
+                generateResourceHtml(f, regen, r, cr, vars, prefixForContained);                  
+              } else {
+                generateResourceHtml(f, regen, r, contained, vars, prefixForContained);
+              }
             }
-          }
-        } catch (Exception e) {
-          log("Exception generating resource "+f.getName()+"::"+r.getElement().fhirType()+"/"+r.getId()+": "+e.getMessage());
-          e.printStackTrace();
-          for (StackTraceElement m : e.getStackTrace()) {
-              log("   "+m.toString());
           }
         }
       }
     }
   }
 
+  public void generateResourceHtml(FetchedFile f, boolean regen, FetchedResource r, Resource res, Map<String, String> vars, String prefixForContainer) {
+    try {
 
-  private void generateOutputsOperationDefinition(FetchedFile f, FetchedResource r, OperationDefinition od, Map<String, String> vars, boolean regen) throws FHIRException, IOException {
+      // now, start generating resource type specific stuff
+      switch (res.getResourceType()) {
+      case CodeSystem:
+        generateOutputsCodeSystem(f, r, (CodeSystem) res, vars, prefixForContainer);
+        break;
+      case ValueSet:
+        generateOutputsValueSet(f, r, (ValueSet) res, vars, prefixForContainer);
+        break;
+      case ConceptMap:
+        generateOutputsConceptMap(f, r, (ConceptMap) res, vars, prefixForContainer);
+        break;
+
+      case List:
+        generateOutputsList(f, r, (ListResource) res, vars, prefixForContainer);      
+        break;
+        
+      case CapabilityStatement:
+        generateOutputsCapabilityStatement(f, r, (CapabilityStatement) res, vars, prefixForContainer);
+        break;
+      case StructureDefinition:
+        generateOutputsStructureDefinition(f, r, (StructureDefinition) res, vars, regen, prefixForContainer);
+        break;
+      case OperationDefinition:
+        generateOutputsOperationDefinition(f, r, (OperationDefinition) res, vars, regen, prefixForContainer);
+        break;
+      case StructureMap:
+        generateOutputsStructureMap(f, r, (StructureMap) res, vars, prefixForContainer);
+        break;
+      case Questionnaire:
+        generateOutputsQuestionnaire(f, r, (Questionnaire) res, vars, prefixForContainer);
+      default:
+        // nothing to do...
+      }
+    } catch (Exception e) {
+      log("Exception generating resource "+f.getName()+"::"+r.fhirType()+"/"+r.getId()+(!Utilities.noString(prefixForContainer) ? "#"+res.getId() : "")+": "+e.getMessage());
+      e.printStackTrace();
+      for (StackTraceElement m : e.getStackTrace()) {
+          log("   "+m.toString());
+      }
+    }
+  }
+
+
+  private void generateOutputsOperationDefinition(FetchedFile f, FetchedResource r, OperationDefinition od, Map<String, String> vars, boolean regen, String prefixForContainer) throws FHIRException, IOException {
     OperationDefinitionRenderer odr = new OperationDefinitionRenderer(context, checkAppendSlash(specPath), od, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, fileList, rc);
     if (igpkp.wantGen(r, "summary"))
-      fragment("OperationDefinition-"+od.getId()+"-summary", odr.summary(), f.getOutputNames(), r, vars, null);
+      fragment("OperationDefinition-"+prefixForContainer+od.getId()+"-summary", odr.summary(), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "idempotence"))
-      fragment("OperationDefinition-"+od.getId()+"-idempotence", odr.idempotence(), f.getOutputNames(), r, vars, null);
+      fragment("OperationDefinition-"+prefixForContainer+od.getId()+"-idempotence", odr.idempotence(), f.getOutputNames(), r, vars, null);
   }
 
   public class ListItemEntry {
@@ -6275,7 +6302,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
 
-  private void generateOutputsList(FetchedFile f, FetchedResource r, ListResource resource, Map<String, String> vars) throws IOException, FHIRException {
+  private void generateOutputsList(FetchedFile f, FetchedResource r, ListResource resource, Map<String, String> vars, String prefixForContainer) throws IOException, FHIRException {
     // we have 4 kinds of outputs:
     //  * list: a series of <li><a href="{{link}}">{{name}}</a> {{desc}}</li>
     //  * list-simple: a series of <li><a href="{{link}}">{{name}}]</a></li>
@@ -6571,24 +6598,45 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
-  private void saveDirectResourceOutputs(FetchedFile f, FetchedResource r, Map<String, String> vars) throws FileNotFoundException, Exception {
-    String baseName = igpkp.getProperty(r, "base");
-    if (r.getResource() != null && r.getResource() instanceof StructureDefinition) {
-      if (igpkp.hasProperty(r, "template-base-"+((StructureDefinition) r.getResource()).getKind().toCode().toLowerCase()))
-        genWrapper(f, r, igpkp.getProperty(r, "template-base-"+((StructureDefinition) r.getResource()).getKind().toCode().toLowerCase()), baseName, f.getOutputNames(), vars, null, "");
+  private void makeTemplatesContained(FetchedFile f, FetchedResource r, Resource res, Map<String, String> vars, String prefixForContained) throws FileNotFoundException, Exception {
+    String baseName = igpkp.getPropertyContained(r, "base", res);
+    if (res != null && res instanceof StructureDefinition) {
+      if (igpkp.hasProperty(r, "template-base-"+((StructureDefinition) res).getKind().toCode().toLowerCase(), res))
+        genWrapperContained(f, r, res, igpkp.getPropertyContained(r, "template-base-"+((StructureDefinition) res).getKind().toCode().toLowerCase(), res), baseName, f.getOutputNames(), vars, null, "", prefixForContained);
       else
-        genWrapper(f, r, igpkp.getProperty(r, "template-base"), baseName, f.getOutputNames(), vars, null, "");
+        genWrapperContained(f, r, res, igpkp.getPropertyContained(r, "template-base", res), baseName, f.getOutputNames(), vars, null, "", prefixForContained);
     } else
-      genWrapper(f, r, igpkp.getProperty(r, "template-base"), baseName, f.getOutputNames(), vars, null, "");
-    genWrapper(null, r, igpkp.getProperty(r, "template-defns"), igpkp.getProperty(r, "defns"), f.getOutputNames(), vars, null, "definitions");
+      genWrapperContained(f, r, res, igpkp.getPropertyContained(r, "template-base", res), baseName, f.getOutputNames(), vars, null, "", prefixForContained);
+    genWrapperContained(null, r, res, igpkp.getPropertyContained(r, "template-defns", res), igpkp.getPropertyContained(r, "defns", res), f.getOutputNames(), vars, null, "definitions", prefixForContained);
     for (String templateName : extraTemplates.keySet()) {
       String output = igpkp.getProperty(r, templateName);
        if (output == null)
         output = r.getElement().fhirType()+"-"+r.getId()+"-"+templateName+".html";
-      genWrapper(null, r, igpkp.getProperty(r, "template-"+templateName), output, f.getOutputNames(), vars, null, templateName);
+      genWrapperContained(null, r, res, igpkp.getPropertyContained(r, "template-"+templateName, res), output, f.getOutputNames(), vars, null, templateName, prefixForContained);
     }
-    if (igpkp.wantGen(r, "maturity") && r.getResource() != null)
-      fragment(r.getResource().fhirType()+"-"+r.getId()+"-maturity",  genFmmBanner(r), f.getOutputNames());
+  }
+  
+  private void makeTemplates(FetchedFile f, FetchedResource r, Map<String, String> vars) throws FileNotFoundException, Exception {
+    String baseName = igpkp.getPropertyContained(r, "base", null);
+    if (r.getResource() != null && r.getResource() instanceof StructureDefinition) {
+      if (igpkp.hasProperty(r, "template-base-"+((StructureDefinition) r.getResource()).getKind().toCode().toLowerCase(), null))
+        genWrapper(f, r, igpkp.getPropertyContained(r, "template-base-"+((StructureDefinition) r.getResource()).getKind().toCode().toLowerCase(), null), baseName, f.getOutputNames(), vars, null, "");
+      else
+        genWrapper(f, r, igpkp.getPropertyContained(r, "template-base", null), baseName, f.getOutputNames(), vars, null, "");
+    } else
+      genWrapper(f, r, igpkp.getPropertyContained(r, "template-base", null), baseName, f.getOutputNames(), vars, null, "");
+    genWrapper(null, r, igpkp.getPropertyContained(r, "template-defns", null), igpkp.getPropertyContained(r, "defns", null), f.getOutputNames(), vars, null, "definitions");
+    for (String templateName : extraTemplates.keySet()) {
+      String output = igpkp.getProperty(r, templateName);
+       if (output == null)
+        output = r.getElement().fhirType()+"-"+r.getId()+"-"+templateName+".html";
+      genWrapper(null, r, igpkp.getPropertyContained(r, "template-"+templateName, null), output, f.getOutputNames(), vars, null, templateName);
+    }
+  }
+  
+  private void saveDirectResourceOutputs(FetchedFile f, FetchedResource r, Resource res, Map<String, String> vars) throws FileNotFoundException, Exception {
+   if (igpkp.wantGen(r, "maturity") && res != null)
+      fragment(res.fhirType()+"-"+r.getId()+"-maturity",  genFmmBanner(r), f.getOutputNames());
 
     String template = igpkp.getProperty(r, "template-format");
     if (igpkp.wantGen(r, "xml")) {
@@ -6641,12 +6689,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       fragment(r.getElement().fhirType()+"-"+r.getId()+"-history", html, f.getOutputNames(), r, vars, null);
     }
    
-
     //  NarrativeGenerator gen = new NarrativeGenerator(null, null, context);
     //  gen.generate(f.getElement(), false);
     //  xhtml = getXhtml(f);
     //  html = xhtml == null ? "" : new XhtmlComposer().compose(xhtml);
     //  fragment(f.getId()+"-gen-html", html);
+  }
+
+  private void saveDirectResourceOutputsContained(FetchedFile f, FetchedResource r, Resource res, Map<String, String> vars, String prefixForContained) throws FileNotFoundException, Exception {
+    if (igpkp.wantGen(r, "history")) {
+      String html = "";
+      fragment(res.fhirType()+"-"+prefixForContained+res.getId()+"-history", html, f.getOutputNames(), r, vars, null);
+    }
   }
 
   private String genFmmBanner(FetchedResource r) throws FHIRException {
@@ -6666,7 +6720,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     else
       return "";
   }
-
 
   private void genWrapper(FetchedFile ff, FetchedResource r, String template, String outputName, Set<String> outputTracker, Map<String, String> vars, String format, String extension) throws FileNotFoundException, IOException, FHIRException {
     if (template != null && !template.isEmpty()) {
@@ -6689,10 +6742,43 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
       if (!existsAsPage) {
-        template = fetcher.openAsString(Utilities.path(fetcher.pathForFile(configFile), template));
+         template = fetcher.openAsString(Utilities.path(fetcher.pathForFile(configFile), template));
         template = igpkp.doReplacements(template, r, vars, format);
 
         outputName = determineOutputName(outputName, r, vars, format, extension);
+        if (!outputName.contains("#")) {
+          String path = Utilities.path(tempDir, outputName);
+          checkMakeFile(TextFile.stringToBytes(template, false), path, outputTracker);
+        }
+      }
+    }
+  }
+
+  private void genWrapperContained(FetchedFile ff, FetchedResource r, Resource res, String template, String outputName, Set<String> outputTracker, Map<String, String> vars, String format, String extension, String prefixForContained) throws FileNotFoundException, IOException, FHIRException {
+    if (template != null && !template.isEmpty()) {
+      boolean existsAsPage = false;
+      if (ff != null) {
+        String fn = igpkp.getLinkFor(r, true, res);
+        for (String pagesDir: pagesDirs) {
+          if (altMap.containsKey("page/"+Utilities.path(pagesDir, fn))) {
+            existsAsPage = true;
+            break;
+          }
+        }
+        if (!existsAsPage && !prePagesDirs.isEmpty()) {
+          for (String prePagesDir : prePagesDirs) {
+            if (altMap.containsKey("page/"+Utilities.path(prePagesDir, fn))) {
+              existsAsPage = true;
+              break;
+            }
+          }
+        }
+      }
+      if (!existsAsPage) {
+        template = fetcher.openAsString(Utilities.path(fetcher.pathForFile(configFile), template));
+        template = igpkp.doReplacements(template, r, res, vars, format, prefixForContained);
+
+        outputName = determineOutputName(outputName, r, res, vars, format, extension, prefixForContained);
         if (!outputName.contains("#")) {
           String path = Utilities.path(tempDir, outputName);
           checkMakeFile(TextFile.stringToBytes(template, false), path, outputTracker);
@@ -6709,6 +6795,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return outputName;
   }
 
+  private String determineOutputName(String outputName, FetchedResource r, Resource res, Map<String, String> vars, String format, String extension, String prefixForContained) throws FHIRException {
+    if (outputName == null)
+      outputName = "{{[type]}}-{{[id]}}"+(extension.equals("")? "":"-"+extension)+(format==null? "": ".{{[fmt]}}")+".html";
+    if (outputName.contains("{{["))
+      outputName = igpkp.doReplacements(outputName, r, res, vars, format, prefixForContained);
+    return outputName;
+  }
+
   /**
    * Generate:
    *   summary
@@ -6718,14 +6812,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
    * @throws org.hl7.fhir.exceptions.FHIRException
    * @throws Exception
    */
-  private void generateOutputsCodeSystem(FetchedFile f, FetchedResource fr, CodeSystem cs, Map<String, String> vars) throws Exception {
+  private void generateOutputsCodeSystem(FetchedFile f, FetchedResource fr, CodeSystem cs, Map<String, String> vars, String prefixForContainer) throws Exception {
     CodeSystemRenderer csr = new CodeSystemRenderer(context, specPath, cs, igpkp, specMaps, markdownEngine, packge, rc);
     if (igpkp.wantGen(fr, "summary"))
-      fragment("CodeSystem-"+cs.getId()+"-summary", csr.summary(igpkp.wantGen(fr, "xml"), igpkp.wantGen(fr, "json"), igpkp.wantGen(fr, "ttl")), f.getOutputNames(), fr, vars, null);
+      fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-summary", csr.summary(igpkp.wantGen(fr, "xml"), igpkp.wantGen(fr, "json"), igpkp.wantGen(fr, "ttl")), f.getOutputNames(), fr, vars, null);
     if (igpkp.wantGen(fr, "content"))
-      fragment("CodeSystem-"+cs.getId()+"-content", csr.content(otherFilesRun), f.getOutputNames(), fr, vars, null);
+      fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-content", csr.content(otherFilesRun), f.getOutputNames(), fr, vars, null);
     if (igpkp.wantGen(fr, "xref"))
-      fragment("CodeSystem-"+cs.getId()+"-xref", csr.xref(), f.getOutputNames(), fr, vars, null);
+      fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-xref", csr.xref(), f.getOutputNames(), fr, vars, null);
   }
 
   /**
@@ -6739,19 +6833,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
    * @throws org.hl7.fhir.exceptions.FHIRException
    * @throws Exception
    */
-  private void generateOutputsValueSet(FetchedFile f, FetchedResource r, ValueSet vs, Map<String, String> vars) throws Exception {
+  private void generateOutputsValueSet(FetchedFile f, FetchedResource r, ValueSet vs, Map<String, String> vars, String prefixForContainer) throws Exception {
     ValueSetRenderer vsr = new ValueSetRenderer(context, specPath, vs, igpkp, specMaps, markdownEngine, packge, rc);
     if (igpkp.wantGen(r, "summary"))
-      fragment("ValueSet-"+vs.getId()+"-summary", vsr.summary(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl")), f.getOutputNames(), r, vars, null);
+      fragment("ValueSet-"+prefixForContainer+vs.getId()+"-summary", vsr.summary(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl")), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "cld"))
       try {
-        fragment("ValueSet-"+vs.getId()+"-cld", vsr.cld(otherFilesRun), f.getOutputNames(), r, vars, null);
+        fragment("ValueSet-"+prefixForContainer+vs.getId()+"-cld", vsr.cld(otherFilesRun), f.getOutputNames(), r, vars, null);
       } catch (Exception e) {
         fragmentError(vs.getId()+"-cld", e.getMessage(), null, f.getOutputNames());
       }
 
     if (igpkp.wantGen(r, "xref"))
-      fragment("ValueSet-"+vs.getId()+"-xref", vsr.xref(), f.getOutputNames(), r, vars, null);
+      fragment("ValueSet-"+prefixForContainer+vs.getId()+"-xref", vsr.xref(), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "expansion")) {
       ValueSetExpansionOutcome exp = context.expandVS(vs, true, true);
       if (exp.getValueset() != null) {
@@ -6766,18 +6860,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         exp.getValueset().setText(null);  
         RendererFactory.factory(exp.getValueset(), lrc).render(exp.getValueset());
         String html = new XhtmlComposer(XhtmlComposer.XML).compose(exp.getValueset().getText().getDiv());
-        fragment("ValueSet-"+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null);
+        fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null);
         
       } else {
         if (exp.getError() != null) { 
-          fragmentError("ValueSet-"+vs.getId()+"-expansion", "No Expansion for this valueset (not supported by Publication Tooling)", "Publication Tooling Error: "+exp.getError(), f.getOutputNames());
+          fragmentError("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", "No Expansion for this valueset (not supported by Publication Tooling)", "Publication Tooling Error: "+exp.getError(), f.getOutputNames());
           if (exp.getError().contains("Unable to provide support")) {
             f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, vs.getId(), exp.getError(), IssueSeverity.WARNING).setTxLink(exp.getTxLink()));
           } else {
             f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, vs.getId(), exp.getError(), IssueSeverity.ERROR).setTxLink(exp.getTxLink()));
           }
         } else {
-          fragmentError("ValueSet-"+vs.getId()+"-expansion", "No Expansion for this valueset (not supported by Publication Tooling)", "Unknown Error", f.getOutputNames());
+          fragmentError("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", "No Expansion for this valueset (not supported by Publication Tooling)", "Unknown Error", f.getOutputNames());
           f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, vs.getId(), "Unknown Error expanding ValueSet", IssueSeverity.ERROR).setTxLink(exp.getTxLink()));
         }
       }
@@ -6799,19 +6893,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
    * @param resource
    * @throws IOException
    */
-  private void generateOutputsConceptMap(FetchedFile f, FetchedResource r, ConceptMap cm, Map<String, String> vars) throws IOException, FHIRException {
+  private void generateOutputsConceptMap(FetchedFile f, FetchedResource r, ConceptMap cm, Map<String, String> vars, String prefixForContainer) throws IOException, FHIRException {
     if (igpkp.wantGen(r, "summary"))
-      fragmentError("ConceptMap-"+cm.getId()+"-summary", "yet to be done: concept map summary", null, f.getOutputNames());
+      fragmentError("ConceptMap-"+prefixForContainer+cm.getId()+"-summary", "yet to be done: concept map summary", null, f.getOutputNames());
     if (igpkp.wantGen(r, "content"))
-      fragmentError("ConceptMap-"+cm.getId()+"-content", "yet to be done: table presentation of the concept map", null, f.getOutputNames());
+      fragmentError("ConceptMap-"+prefixForContainer+cm.getId()+"-content", "yet to be done: table presentation of the concept map", null, f.getOutputNames());
     if (igpkp.wantGen(r, "xref"))
-      fragmentError("ConceptMap-"+cm.getId()+"-xref", "yet to be done: list of all places where concept map is used", null, f.getOutputNames());
+      fragmentError("ConceptMap-"+prefixForContainer+cm.getId()+"-xref", "yet to be done: list of all places where concept map is used", null, f.getOutputNames());
     MappingSheetParser p = new MappingSheetParser();
     if (igpkp.wantGen(r, "sheet") && p.isSheet(cm))
-      fragment("ConceptMap-"+cm.getId()+"-sheet", p.genSheet(cm), f.getOutputNames(), r, vars, null);
+      fragment("ConceptMap-"+prefixForContainer+cm.getId()+"-sheet", p.genSheet(cm), f.getOutputNames(), r, vars, null);
   }
 
-  private void generateOutputsCapabilityStatement(FetchedFile f, FetchedResource r, CapabilityStatement cpbs, Map<String, String> vars) throws Exception {
+  private void generateOutputsCapabilityStatement(FetchedFile f, FetchedResource r, CapabilityStatement cpbs, Map<String, String> vars, String prefixForContainer) throws Exception {
     if (igpkp.wantGen(r, "swagger") || igpkp.wantGen(r, "openapi")) {
       Writer oa = null;
       if (openApiTemplate != null) 
@@ -6827,10 +6921,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
-  private void generateOutputsStructureDefinition(FetchedFile f, FetchedResource r, StructureDefinition sd, Map<String, String> vars, boolean regen) throws Exception {
+  private void generateOutputsStructureDefinition(FetchedFile f, FetchedResource r, StructureDefinition sd, Map<String, String> vars, boolean regen, String prefixForContainer) throws Exception {
     // todo : generate shex itself
     if (igpkp.wantGen(r, "shex"))
-      fragmentError("StructureDefinition-"+sd.getId()+"-shex", "yet to be done: shex as html", null, f.getOutputNames());
+      fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-shex", "yet to be done: shex as html", null, f.getOutputNames());
 
     // todo : generate json schema itself. JSON Schema generator
 //    if (igpkp.wantGen(r, ".schema.json")) {
@@ -6839,63 +6933,63 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 //      new ProfileUtilities(context, errors, igpkp).generateSchematrons(new FileOutputStream(path), sd);
 //    }
     if (igpkp.wantGen(r, "json-schema"))
-      fragmentError("StructureDefinition-"+sd.getId()+"-json-schema", "yet to be done: json schema as html", null, f.getOutputNames());
+      fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-json-schema", "yet to be done: json schema as html", null, f.getOutputNames());
 
     StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, fileList, rc, allInvariants);
     if (igpkp.wantGen(r, "summary"))
-      fragment("StructureDefinition-"+sd.getId()+"-summary", sdr.summary(), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-summary", sdr.summary(), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "header"))
-      fragment("StructureDefinition-"+sd.getId()+"-header", sdr.header(), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-header", sdr.header(), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "diff"))
-      fragment("StructureDefinition-"+sd.getId()+"-diff", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "snapshot"))
-      fragment("StructureDefinition-"+sd.getId()+"-snapshot", sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot", sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "snapshot-by-mustsupport"))
-      fragment("StructureDefinition-"+sd.getId()+"-snapshot-by-mustsupport", sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport", sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "grid"))
-      fragment("StructureDefinition-"+sd.getId()+"-grid", sdr.grid(igpkp.getDefinitionsName(r), otherFilesRun), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-grid", sdr.grid(igpkp.getDefinitionsName(r), otherFilesRun), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "pseudo-xml"))
-      fragmentError("StructureDefinition-"+sd.getId()+"-pseudo-xml", "yet to be done: Xml template", null, f.getOutputNames());
+      fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-pseudo-xml", "yet to be done: Xml template", null, f.getOutputNames());
     if (igpkp.wantGen(r, "pseudo-json"))
-      fragment("StructureDefinition-"+sd.getId()+"-pseudo-json", sdr.pseudoJson(), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-pseudo-json", sdr.pseudoJson(), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "pseudo-ttl"))
-      fragmentError("StructureDefinition-"+sd.getId()+"-pseudo-ttl", "yet to be done: Turtle template", null, f.getOutputNames());
+      fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-pseudo-ttl", "yet to be done: Turtle template", null, f.getOutputNames());
     if (igpkp.wantGen(r, "uml"))
-      fragmentError("StructureDefinition-"+sd.getId()+"-uml", "yet to be done: UML as SVG", null, f.getOutputNames());
+      fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-uml", "yet to be done: UML as SVG", null, f.getOutputNames());
     if (igpkp.wantGen(r, "tx"))
-      fragment("StructureDefinition-"+sd.getId()+"-tx", sdr.tx(includeHeadings, false), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx", sdr.tx(includeHeadings, false), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "tx-must-support"))
-      fragment("StructureDefinition-"+sd.getId()+"-tx-must-support", sdr.tx(includeHeadings, true), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx-must-support", sdr.tx(includeHeadings, true), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "tx-diff"))
-      fragment("StructureDefinition-"+sd.getId()+"-tx-diff", sdr.txDiff(includeHeadings, false), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx-diff", sdr.txDiff(includeHeadings, false), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "tx-diff-must-support"))
-      fragment("StructureDefinition-"+sd.getId()+"-tx-diff-must-support", sdr.txDiff(includeHeadings, true), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx-diff-must-support", sdr.txDiff(includeHeadings, true), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "inv"))
-      fragment("StructureDefinition-"+sd.getId()+"-inv", sdr.inv(includeHeadings), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-inv", sdr.inv(includeHeadings), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "dict"))
-      fragment("StructureDefinition-"+sd.getId()+"-dict", sdr.dict(true), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-dict", sdr.dict(true), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "dict-active"))
-      fragment("StructureDefinition-"+sd.getId()+"-dict-active", sdr.dict(false), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-dict-active", sdr.dict(false), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "maps"))
-      fragment("StructureDefinition-"+sd.getId()+"-maps", sdr.mappings(false), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps", sdr.mappings(false), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "maps"))
-      fragment("StructureDefinition-"+sd.getId()+"-maps-all", sdr.mappings(true), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps-all", sdr.mappings(true), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "xref"))
-      fragment("StructureDefinition-"+sd.getId()+"-sd-xref", sdr.references(), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-sd-xref", sdr.references(), f.getOutputNames(), r, vars, null);
     if (sd.getDerivation() == TypeDerivationRule.CONSTRAINT && igpkp.wantGen(r, "span"))
-      fragment("StructureDefinition-"+sd.getId()+"-span", sdr.span(true, igpkp.getCanonical(), otherFilesRun), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-span", sdr.span(true, igpkp.getCanonical(), otherFilesRun), f.getOutputNames(), r, vars, null);
     if (sd.getDerivation() == TypeDerivationRule.CONSTRAINT && igpkp.wantGen(r, "spanall"))
-      fragment("StructureDefinition-"+sd.getId()+"-spanall", sdr.span(true, igpkp.getCanonical(), otherFilesRun), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-spanall", sdr.span(true, igpkp.getCanonical(), otherFilesRun), f.getOutputNames(), r, vars, null);
 
     if (igpkp.wantGen(r, "example-list"))
-      fragment("StructureDefinition-example-list-"+sd.getId(), sdr.exampleList(fileList, true), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-example-list-"+prefixForContainer+sd.getId(), sdr.exampleList(fileList, true), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "example-table"))
-      fragment("StructureDefinition-example-table-"+sd.getId(), sdr.exampleTable(fileList, true), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-example-table-"+prefixForContainer+sd.getId(), sdr.exampleTable(fileList, true), f.getOutputNames(), r, vars, null);
 
     if (igpkp.wantGen(r, "example-list-all"))
-      fragment("StructureDefinition-example-list-all-"+sd.getId(), sdr.exampleList(fileList, false), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-example-list-all-"+prefixForContainer+sd.getId(), sdr.exampleList(fileList, false), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "example-table-all"))
-      fragment("StructureDefinition-example-table-all-"+sd.getId(), sdr.exampleTable(fileList, false), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-example-table-all-"+prefixForContainer+sd.getId(), sdr.exampleTable(fileList, false), f.getOutputNames(), r, vars, null);
 
     String sdPrefix = newIg ? "StructureDefinition-" : "";
     if (igpkp.wantGen(r, "csv")) {
@@ -6926,23 +7020,23 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       npm.addFile(Category.SCHEMATRON, sdPrefix + r.getId()+".sch", IOUtils.toByteArray(Utilities.path(tempDir, sdPrefix + r.getId()+".sch")));
     }
     if (igpkp.wantGen(r, "sch"))
-      fragmentError("StructureDefinition-"+sd.getId()+"-sch", "yet to be done: schematron as html", null, f.getOutputNames());
+      fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-sch", "yet to be done: schematron as html", null, f.getOutputNames());
   }
 
   private String checkAppendSlash(String s) {
     return s.endsWith("/") ? s : s+"/";
   }
 
-  private void generateOutputsStructureMap(FetchedFile f, FetchedResource r, StructureMap map, Map<String,String> vars) throws Exception {
+  private void generateOutputsStructureMap(FetchedFile f, FetchedResource r, StructureMap map, Map<String,String> vars, String prefixForContainer) throws Exception {
     StructureMapRenderer smr = new StructureMapRenderer(context, checkAppendSlash(specPath), map, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, rc);
     if (igpkp.wantGen(r, "summary"))
-      fragment("StructureMap-"+map.getId()+"-summary", smr.summary(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl")), f.getOutputNames(), r, vars, null);
+      fragment("StructureMap-"+prefixForContainer+map.getId()+"-summary", smr.summary(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl")), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "content"))
-      fragment("StructureMap-"+map.getId()+"-content", smr.content(), f.getOutputNames(), r, vars, null);
+      fragment("StructureMap-"+prefixForContainer+map.getId()+"-content", smr.content(), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "profiles"))
-      fragment("StructureMap-"+map.getId()+"-profiles", smr.profiles(), f.getOutputNames(), r, vars, null);
+      fragment("StructureMap-"+prefixForContainer+map.getId()+"-profiles", smr.profiles(), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "script"))
-      fragment("StructureMap-"+map.getId()+"-script", smr.script(), f.getOutputNames(), r, vars, null);
+      fragment("StructureMap-"+prefixForContainer+map.getId()+"-script", smr.script(), f.getOutputNames(), r, vars, null);
 // to generate:
     // map file
     // summary table
@@ -6950,20 +7044,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   }
 
-  private void generateOutputsQuestionnaire(FetchedFile f, FetchedResource r, Questionnaire q, Map<String,String> vars) throws Exception {
-    QuestionnaireRenderer qr = new QuestionnaireRenderer(context, checkAppendSlash(specPath), q, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, rc);
+  private void generateOutputsQuestionnaire(FetchedFile f, FetchedResource r, Questionnaire q, Map<String,String> vars, String prefixForContainer) throws Exception {
+    QuestionnaireRenderer qr = new QuestionnaireRenderer(context, checkAppendSlash(specPath), q, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, rc.copy().setDefinitionsTarget(igpkp.getDefinitionsName(r)));
     if (igpkp.wantGen(r, "summary"))
-      fragment("Questionnaire-"+q.getId()+"-summary", qr.summary(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl")), f.getOutputNames(), r, vars, null);
+      fragment("Questionnaire-"+prefixForContainer+q.getId()+"-summary", qr.summary(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl")), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "tree"))
-      fragment("Questionnaire-"+q.getId()+"-tree", qr.render(QuestionnaireRendererMode.TREE), f.getOutputNames(), r, vars, null);
+      fragment("Questionnaire-"+prefixForContainer+q.getId()+"-tree", qr.render(QuestionnaireRendererMode.TREE), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "form"))
-      fragment("Questionnaire-"+q.getId()+"-form", qr.render(QuestionnaireRendererMode.FORM), f.getOutputNames(), r, vars, null);
+      fragment("Questionnaire-"+prefixForContainer+q.getId()+"-form", qr.render(QuestionnaireRendererMode.FORM), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "links"))
-      fragment("Questionnaire-"+q.getId()+"-links", qr.render(QuestionnaireRendererMode.LINKS), f.getOutputNames(), r, vars, null);
+      fragment("Questionnaire-"+prefixForContainer+q.getId()+"-links", qr.render(QuestionnaireRendererMode.LINKS), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "logic"))
-      fragment("Questionnaire-"+q.getId()+"-logic", qr.render(QuestionnaireRendererMode.LOGIC), f.getOutputNames(), r, vars, null);
+      fragment("Questionnaire-"+prefixForContainer+q.getId()+"-logic", qr.render(QuestionnaireRendererMode.LOGIC), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "dict"))
-      fragment("Questionnaire-"+q.getId()+"-dict", qr.render(QuestionnaireRendererMode.DEFNS), f.getOutputNames(), r, vars, null);
+      fragment("Questionnaire-"+prefixForContainer+q.getId()+"-dict", qr.render(QuestionnaireRendererMode.DEFNS), f.getOutputNames(), r, vars, null);
   }
 
   private XhtmlNode getXhtml(FetchedFile f, FetchedResource r) throws Exception {
