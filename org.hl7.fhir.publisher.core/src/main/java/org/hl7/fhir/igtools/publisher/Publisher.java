@@ -6617,20 +6617,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
   
   private void makeTemplates(FetchedFile f, FetchedResource r, Map<String, String> vars) throws FileNotFoundException, Exception {
-    String baseName = igpkp.getPropertyContained(r, "base", null);
+    String baseName = igpkp.getProperty(r, "base");
     if (r.getResource() != null && r.getResource() instanceof StructureDefinition) {
       if (igpkp.hasProperty(r, "template-base-"+((StructureDefinition) r.getResource()).getKind().toCode().toLowerCase(), null))
-        genWrapper(f, r, igpkp.getPropertyContained(r, "template-base-"+((StructureDefinition) r.getResource()).getKind().toCode().toLowerCase(), null), baseName, f.getOutputNames(), vars, null, "");
+        genWrapper(f, r, igpkp.getProperty(r, "template-base-"+((StructureDefinition) r.getResource()).getKind().toCode().toLowerCase()), baseName, f.getOutputNames(), vars, null, "");
       else
-        genWrapper(f, r, igpkp.getPropertyContained(r, "template-base", null), baseName, f.getOutputNames(), vars, null, "");
+        genWrapper(f, r, igpkp.getProperty(r, "template-base"), baseName, f.getOutputNames(), vars, null, "");
     } else
-      genWrapper(f, r, igpkp.getPropertyContained(r, "template-base", null), baseName, f.getOutputNames(), vars, null, "");
-    genWrapper(null, r, igpkp.getPropertyContained(r, "template-defns", null), igpkp.getPropertyContained(r, "defns", null), f.getOutputNames(), vars, null, "definitions");
+      genWrapper(f, r, igpkp.getProperty(r, "template-base"), baseName, f.getOutputNames(), vars, null, "");
+    genWrapper(null, r, igpkp.getProperty(r, "template-defns"), igpkp.getProperty(r, "defns"), f.getOutputNames(), vars, null, "definitions");
     for (String templateName : extraTemplates.keySet()) {
       String output = igpkp.getProperty(r, templateName);
        if (output == null)
         output = r.getElement().fhirType()+"-"+r.getId()+"-"+templateName+".html";
-      genWrapper(null, r, igpkp.getPropertyContained(r, "template-"+templateName, null), output, f.getOutputNames(), vars, null, templateName);
+      genWrapper(null, r, igpkp.getProperty(r, "template-"+templateName), output, f.getOutputNames(), vars, null, templateName);
     }
   }
   
