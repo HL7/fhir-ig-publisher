@@ -260,7 +260,7 @@ import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.ZipGenerator;
 import org.hl7.fhir.utilities.cache.NpmPackage;
-import org.hl7.fhir.utilities.cache.PackageCacheManager;
+import org.hl7.fhir.utilities.cache.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.cache.PackageGenerator.PackageType;
 import org.hl7.fhir.utilities.json.JSONUtil;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
@@ -595,7 +595,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private NPMPackageGenerator npm;
 
-  private PackageCacheManager pcm;
+  private FilesystemPackageCacheManager pcm;
 
   private TemplateManager templateManager;
 
@@ -660,6 +660,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private boolean noTerminologyHL7Org;
 
   private Coding expectedJurisdiction;
+
+  private boolean noFSH;
 
   
   private class PreProcessInfo {
@@ -1299,7 +1301,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   public void initialize() throws Exception {
     firstExecution = true;
-    pcm = new PackageCacheManager(mode == null || mode == IGBuildMode.MANUAL || mode == IGBuildMode.PUBLICATION, ToolsVersion.TOOLS_VERSION);
+    pcm = new FilesystemPackageCacheManager(mode == null || mode == IGBuildMode.MANUAL || mode == IGBuildMode.PUBLICATION, ToolsVersion.TOOLS_VERSION);
     if (mode == IGBuildMode.PUBLICATION)
       log("Build Formal Publication package, intended for "+getTargetOutput());
     
@@ -1314,7 +1316,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     fetcher.setRootDir(rootDir);
     fetcher.setResourceDirs(resourceDirs);
     File fsh = new File(Utilities.path(focusDir(), "fsh"));
-    if (fsh.exists() && fsh.isDirectory()) {
+    if (fsh.exists() && fsh.isDirectory() && !noFSH) {
       runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())));
     }
     IniFile ini = checkNewIg();
@@ -2359,7 +2361,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       Utilities.createDirectory(adHocTmpDir);
     Utilities.clearDirectory(adHocTmpDir);
 
-    PackageCacheManager pcm = new PackageCacheManager(true, ToolsVersion.TOOLS_VERSION);
+    FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager(true, ToolsVersion.TOOLS_VERSION);
     
     NpmPackage npm = null; 
     if (specifiedVersion == null) {
@@ -7524,6 +7526,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         self.setCacheOption(CacheOption.CLEAR_ERRORS);
       else
         self.setCacheOption(CacheOption.LEAVE);
+      if (hasNamedParam(args, "-no-sushi")) {
+        self.noFSH = true;
+      }
       try {
         self.execute();
         if (hasNamedParam(args, "-no-errors")) {

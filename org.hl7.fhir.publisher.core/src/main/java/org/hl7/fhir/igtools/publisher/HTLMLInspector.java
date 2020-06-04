@@ -47,8 +47,8 @@ import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService.LogCategory;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
-import org.hl7.fhir.utilities.cache.PackageCacheManager;
-import org.hl7.fhir.utilities.cache.PackageCacheManager.VersionHistory;
+import org.hl7.fhir.utilities.cache.FilesystemPackageCacheManager;
+import org.hl7.fhir.utilities.cache.FilesystemPackageCacheManager.VersionHistory;
 import org.hl7.fhir.utilities.json.JSONUtil;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
@@ -181,7 +181,7 @@ public class HTLMLInspector {
   private boolean forHL7;
   private boolean requirePublishBox;
   private List<String> igs;
-  private PackageCacheManager pcm;
+  private FilesystemPackageCacheManager pcm;
   private Map<String, SpecMapManager> otherSpecs = new HashMap<String, SpecMapManager>();
   private Map<String, String> specList = new HashMap<>();
   private List<String> errorPackages = new ArrayList<>();
@@ -782,7 +782,7 @@ public class HTLMLInspector {
     return igs;
   }
 
-  public void setPcm(PackageCacheManager pcm) {
+  public void setPcm(FilesystemPackageCacheManager pcm) {
     this.pcm = pcm; 
   }
 

@@ -56,7 +56,7 @@ import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
-import org.hl7.fhir.utilities.cache.PackageCacheManager;
+import org.hl7.fhir.utilities.cache.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.cache.ToolsVersion;
 import org.hl7.fhir.utilities.json.JSONUtil;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
@@ -149,7 +149,7 @@ public class PackageReleaser {
   private File xml;
   private IniFile config;
 
-  private PackageCacheManager pcm;
+  private FilesystemPackageCacheManager pcm;
 
 
   // 2 parameters: source of package, package dest folder
@@ -165,7 +165,7 @@ public class PackageReleaser {
   }
 
   private void release(String source, String dest) throws Exception {
-    pcm = new PackageCacheManager(true, ToolsVersion.TOOLS_VERSION);
+    pcm = new FilesystemPackageCacheManager(true, ToolsVersion.TOOLS_VERSION);
     System.out.println("Load hl7.fhir.r4.core");
     r4 = org.hl7.fhir.r4.context.SimpleWorkerContext.fromPackage(pcm.loadPackage("hl7.fhir.r4.core", "4.0.1"));
     System.out.println("Load hl7.fhir.r3.core");

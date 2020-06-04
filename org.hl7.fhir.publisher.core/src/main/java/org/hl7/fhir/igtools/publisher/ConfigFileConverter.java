@@ -63,7 +63,7 @@ import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.TerminologyServiceOptions;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.cache.PackageCacheManager;
+import org.hl7.fhir.utilities.cache.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.cache.ToolsVersion;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.hl7.fhir.utilities.validation.ValidationOptions;
@@ -82,7 +82,7 @@ public class ConfigFileConverter {
    * @throws Exception 
    * 
    */
-  public void convert(String configFile, IWorkerContext context, PackageCacheManager pcm) throws Exception {
+  public void convert(String configFile, IWorkerContext context, FilesystemPackageCacheManager pcm) throws Exception {
     JsonObject configuration = JsonTrackingParser.parseJsonFile(configFile);
     if (configuration.has("redirect")) { // redirect to support auto-build for complex projects with IG folder in subdirectory
       String redirectFile = Utilities.path(Utilities.getDirectoryForFile(configFile), configuration.get("redirect").getAsString());

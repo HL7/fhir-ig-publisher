@@ -30,7 +30,7 @@ import org.hl7.fhir.r5.utils.KeyGenerator;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
-import org.hl7.fhir.utilities.cache.PackageCacheManager;
+import org.hl7.fhir.utilities.cache.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.cache.ToolsVersion;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
@@ -165,7 +165,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
     for (JsonElement e : pl.getAsJsonArray("list")) {
       JsonObject v = (JsonObject) e;
       if (v.has("fhirversion") && VersionUtilities.versionsCompatible(version, v.get("fhirversion").getAsString())) {
-        return new PackageCacheManager(true, ToolsVersion.TOOLS_VERSION).loadPackage("hl7.fhir.us.core", v.get("version").getAsString());
+        return new FilesystemPackageCacheManager(true, ToolsVersion.TOOLS_VERSION).loadPackage("hl7.fhir.us.core", v.get("version").getAsString());
       }
     }
     return null;
