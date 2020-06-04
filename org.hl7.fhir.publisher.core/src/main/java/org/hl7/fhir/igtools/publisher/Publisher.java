@@ -3014,8 +3014,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             if (!rg.hasName()) {
               if (r.getElement().hasChild("title")) {
                 rg.setName(r.getElement().getChildValue("title"));
-              } else if (r.getElement().hasExtension("http://hl7.org/fhir/5.0/StructureDefinition/extension-NamingSystem.title")) {
-                rg.setName(r.getElement().getExtensionValue("http://hl7.org/fhir/5.0/StructureDefinition/extension-NamingSystem.title").primitiveValue());                
+              } else if (r.getElement().hasExtension("http://hl7.org/fhir/tools/StructureDefinition/extension-title")) {
+                rg.setName(r.getElement().getExtensionValue("http://hl7.org/fhir/tools/StructureDefinition/extension-title").primitiveValue());                
               }
             }
             if (!rg.hasDescription()) {
