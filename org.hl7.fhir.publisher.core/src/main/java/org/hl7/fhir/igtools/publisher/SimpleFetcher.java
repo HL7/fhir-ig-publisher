@@ -47,6 +47,7 @@ public class SimpleFetcher implements IFetchFile {
   private IGKnowledgeProvider pkp;
   private List<String> resourceDirs;
   private ILoggingService log;
+  private String rootDir;
   
   public SimpleFetcher(ILoggingService log) {
     this.log = log;
@@ -62,12 +63,21 @@ public class SimpleFetcher implements IFetchFile {
     this.pkp = pkp;
   }
 
+  public String getRootDir() {
+    return rootDir;
+  }
+
+  @Override
+  public void setRootDir(String rootDir) {
+    this.rootDir = rootDir;
+  }
+
   @Override
   public FetchedFile fetch(String path) throws Exception {
     File f = new File(path);
     if (!f.exists())
       throw new Exception("Unable to find file "+path);
-    FetchedFile ff = new FetchedFile();
+    FetchedFile ff = new FetchedFile(path);
     ff.setPath(f.getCanonicalPath());
     ff.setName(fileTitle(path));
     ff.setTime(f.lastModified());
@@ -116,7 +126,7 @@ public class SimpleFetcher implements IFetchFile {
     }
     if (f==null)
       throw new Exception("Unable to find file "+path+".xml or "+path+".json");
-    FetchedFile ff = new FetchedFile();
+    FetchedFile ff = new FetchedFile(new File(rootDir).toURI().relativize(new File(path).toURI()).getPath());
     ff.setPath(f.getCanonicalPath());
     ff.setName(fileTitle(path));
     ff.setTime(f.lastModified());
@@ -307,7 +317,7 @@ public class SimpleFetcher implements IFetchFile {
   }
   
   private void addFile(List<FetchedFile> res, File f, String cnt) throws IOException {
-    FetchedFile ff = new FetchedFile();
+    FetchedFile ff = new FetchedFile(new File(rootDir).toURI().relativize(f.toURI()).getPath());
     ff.setPath(f.getCanonicalPath());
     ff.setName(fileTitle(f.getCanonicalPath()));
     ff.setTime(f.lastModified());

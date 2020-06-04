@@ -1311,6 +1311,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Also loading Packages from "+packagesFolder);
       pcm.loadFromFolder(packagesFolder);
     }
+    fetcher.setRootDir(rootDir);
     fetcher.setResourceDirs(resourceDirs);
     File fsh = new File(Utilities.path(focusDir(), "fsh"));
     if (fsh.exists() && fsh.isDirectory()) {
@@ -2902,6 +2903,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (binaryPaths.size() > 0) {
       cql.execute();
     }
+    fetcher.setRootDir(rootDir);
     // load any bundles
     if (sourceDir != null || igpkp.isAutoPath())
       needToBuild = loadResources(needToBuild, igf);
@@ -4818,7 +4820,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     CanonicalResource bc = (CanonicalResource) res;
 
-    FetchedFile f = new FetchedFile();
+    FetchedFile f = new FetchedFile(bc.getUserString("path"));
     FetchedResource r = f.addResource();
     r.setResource(res);
     r.setId(bc.getId());
@@ -5438,6 +5440,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         data.add(r.fhirType()+"/"+r.getId(), item);
         item.addProperty("history", r.hasHistory());
         item.addProperty("index", i);
+        item.addProperty("source", f.getStatedPath());
         item.addProperty("path", r.getElement().getUserString("path"));
         if (r.getResource() != null) {
           if (r.getResource() instanceof CanonicalResource) {
