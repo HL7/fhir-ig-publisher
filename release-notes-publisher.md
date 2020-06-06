@@ -5,7 +5,15 @@ title: FHIR IGPublisher Release Notes
 # FHIR IGPublisher Release Notes
 
 ## Current (not released yet) 
+* Package sub-System: fix bug re-initializing package system
+* Validator: fix paths in error messages
+* Validator: fix questionnaire error message
+* Renderer: Fix bug generating NamingSystem narrative and pick up NamingSystem title using new extension
 * Expose the source file in _data/resources.json to support editing & pull requests etc
+* Add command -no-sushi to request not to run sushi before hand (only applies where it would be appropriate to fun sushi in the first place)
+* Fix problem not loading the right version of the ImplementationGuide resource
+* Fix NPE loading config when not set properly
+* Render contained resources to their own pages & add contained resources to data files
 
 ## v1.0.99 (2020-06-01)
 
