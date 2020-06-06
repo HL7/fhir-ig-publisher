@@ -5,6 +5,11 @@ title: FHIR IGPublisher Release Notes
 # FHIR IGPublisher Release Notes
 
 ## Current (not released yet) 
+(no changes yet)
+
+## v1.0.100 (2020-06-07)
+
+
 * Package sub-System: fix bug re-initializing package system
 * Validator: fix paths in error messages
 * Validator: fix questionnaire error message
@@ -302,4 +307,3 @@ title: FHIR IGPublisher Release Notes
 
 ## v1.0.61 (2020-02-02)
 
-*
