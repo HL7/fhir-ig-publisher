@@ -14,11 +14,14 @@ import java.util.UUID;
 
 import org.hl7.fhir.convertors.VersionConvertor_30_50;
 import org.hl7.fhir.convertors.VersionConvertor_40_50;
+import org.hl7.fhir.exceptions.DefinitionException;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.I18nConstants;
 import org.hl7.fhir.igtools.publisher.realm.USRealmBusinessRules.ProfilePair;
+import org.hl7.fhir.r5.comparison.ComparisonRenderer;
+import org.hl7.fhir.r5.comparison.ComparisonSession;
 import org.hl7.fhir.r5.conformance.ProfileUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.PackageVersion;
@@ -203,7 +206,16 @@ public class USRealmBusinessRules extends RealmBusinessRules {
   }
 
   @Override
-  public void finishChecks() {
+  public void finishChecks() throws DefinitionException, FHIRFormatError, IOException {
+    try {
+    ComparisonSession session = new ComparisonSession(context);
+    session.setDebug(true);
+    for (ProfilePair c : comparisons) {
+      System.out.println("US Core Comparison: compare "+c.local+" to "+c.uscore);
+      session.compare(c.uscore, c.local);      
+    }
+    new ComparisonRenderer(context, Utilities.path(dstDir, "us-core-comparisons")).render();
+    System.out.println("US Core Comparisons Finished");
 //    ProfileComparer comp;
 //    if (DO_PROFILE_COMPARISON) {
 ////      Utilities.createDirectory(Utilities.path(dstDir, "us-core-comparisons"));
@@ -231,5 +243,8 @@ public class USRealmBusinessRules extends RealmBusinessRules {
             }
 
      */
+    } catch (Throwable e) {
+      System.out.println("US Core Comparison failed: "+e.getMessage()+" (Note: this is under development; ignore this)");
+    }
   }
 }
