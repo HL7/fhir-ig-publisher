@@ -3696,7 +3696,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         ok = ok || cc.hasCoding(expectedJurisdiction);
       }
       if (!ok) {
-        f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, resource.fhirType()+".jurisdiction", "The resource "+verb+" declare it's jurisdiction to match the package id ("+npmName+", jurisdiction = "+expectedJurisdiction.toString()+")",
+        f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, resource.fhirType()+".jurisdiction", "The resource "+verb+" declare its jurisdiction to match the package id ("+npmName+", jurisdiction = "+expectedJurisdiction.toString()+")",
             error).setMessageId(I18nConstants.RESOURCE_JURISDICTION_MISMATCH));
       }
     }
