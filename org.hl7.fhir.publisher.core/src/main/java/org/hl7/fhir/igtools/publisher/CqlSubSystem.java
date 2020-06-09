@@ -358,7 +358,7 @@ public class CqlSubSystem {
         // Extract relatedArtifact data (models, libraries, code systems, and value sets)
         result.relatedArtifacts.addAll(extractRelatedArtifacts(translator.toELM()));
 
-        // Extract parameter data
+        // Extract parameter data and validate result types are supported types
         List<ValidationMessage> paramMessages = new ArrayList<>();
         result.parameters.addAll(extractParameters(translator.toELM(), paramMessages));
         for (ValidationMessage paramMessage : paramMessages) {
@@ -368,18 +368,6 @@ public class CqlSubSystem {
 
         // Extract dataRequirement data
         result.dataRequirements.addAll(extractDataRequirements(translator.toRetrieves(), translator.getTranslatedLibrary(), libraryManager));
-
-        // Validate result types are supported types
-        List<ValidationMessage> defMessages = new ArrayList<>();
-        for (ExpressionDef def : translator.toELM().getStatements().getDef()) {
-          if (!(def instanceof FunctionDef)) {
-            toFHIRResultTypeCode(def.getResultType(), def.getName(), defMessages);
-          }
-        }
-        for (ValidationMessage defMessage : defMessages) {
-          result.getErrors().add(new ValidationMessage(defMessage.getSource(), defMessage.getType(), file.getName(),
-                  defMessage.getMessage(), defMessage.getLevel()));
-        }
 
         logger.logMessage("CQL translation completed successfully.");
       }
@@ -442,6 +430,14 @@ public class CqlSubSystem {
     if (library.getParameters() != null && !library.getParameters().getDef().isEmpty()) {
       for (ParameterDef def : library.getParameters().getDef()) {
         result.add(toParameterDefinition(def, messages));
+      }
+    }
+
+    if (library.getStatements() != null && !library.getStatements().getDef().isEmpty()) {
+      for (ExpressionDef def : library.getStatements().getDef()) {
+        if (!(def instanceof FunctionDef) && (def.getAccessLevel() == null || def.getAccessLevel() == AccessModifier.PUBLIC)) {
+          result.add(toOutputParameterDefinition(def, messages));
+        }
       }
     }
 
@@ -515,9 +511,20 @@ public class CqlSubSystem {
             .setType(typeCode);
   }
 
-  private String toFHIRResultTypeCode(org.hl7.cql.model.DataType dataType, String defName, List<ValidationMessage> messages) {
-    AtomicBoolean isValid = new AtomicBoolean(true);
+  private ParameterDefinition toOutputParameterDefinition(ExpressionDef def, List<ValidationMessage> messages) {
     AtomicBoolean isList = new AtomicBoolean(false);
+    Enumerations.FHIRAllTypes typeCode = Enumerations.FHIRAllTypes.fromCode(toFHIRResultTypeCode(def.getResultType(), def.getName(), isList, messages));
+
+    return new ParameterDefinition()
+            .setName(def.getName())
+            .setUse(Enumerations.OperationParameterUse.OUT)
+            .setMin(0)
+            .setMax(isList.get() ? "*" : "1")
+            .setType(typeCode);
+  }
+
+  private String toFHIRResultTypeCode(org.hl7.cql.model.DataType dataType, String defName, AtomicBoolean isList, List<ValidationMessage> messages) {
+    AtomicBoolean isValid = new AtomicBoolean(true);
     String resultCode = toFHIRTypeCode(dataType, isValid, isList);
     if (!isValid.get()) {
       // Issue a warning that the result type is not supported
