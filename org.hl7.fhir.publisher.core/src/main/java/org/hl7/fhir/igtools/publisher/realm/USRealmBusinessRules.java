@@ -214,7 +214,12 @@ public class USRealmBusinessRules extends RealmBusinessRules {
       System.out.println("US Core Comparison: compare "+c.local+" to "+c.uscore);
       session.compare(c.uscore, c.local);      
     }
-    new ComparisonRenderer(context, Utilities.path(dstDir, "us-core-comparisons")).render();
+    Utilities.createDirectory(Utilities.path(dstDir, "us-core-comparisons"));
+    ComparisonRenderer cr = new ComparisonRenderer(context, Utilities.path(dstDir, "us-core-comparisons"), session);
+    cr.getTemplates().put("CodeSystem", new String(context.getBinaries().get("template-comparison-CodeSystem.html")));
+    cr.getTemplates().put("ValueSet", new String(context.getBinaries().get("template-comparison-ValueSet.html")));
+    cr.getTemplates().put("Profile", new String(context.getBinaries().get("template-comparison-Profile.html")));
+    cr.render();
     System.out.println("US Core Comparisons Finished");
 //    ProfileComparer comp;
 //    if (DO_PROFILE_COMPARISON) {
@@ -245,6 +250,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
      */
     } catch (Throwable e) {
       System.out.println("US Core Comparison failed: "+e.getMessage()+" (Note: this is under development; ignore this)");
+      e.printStackTrace();
     }
   }
 }
