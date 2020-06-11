@@ -718,7 +718,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             long endTime = System.nanoTime();
             processTxLog(Utilities.path(destDir != null ? destDir : outputDir, "qa-tx.html"));
             ValidationPresenter val = new ValidationPresenter(version, businessVersion, igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
-                new BallotChecker(repoRoot).check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), "v"+IGVersionUtil.getVersion(), fetchCurrentIGPubVersion());
+                new BallotChecker(repoRoot).check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), "v"+IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules);
             log("Finished. "+presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
             recordOutcome(null, val);
           }
@@ -850,7 +850,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       long endTime = System.nanoTime();
       clean();
       ValidationPresenter val = new ValidationPresenter(version, businessVersion, igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
-          new BallotChecker(repoRoot).check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), "v"+IGVersionUtil.getVersion(), fetchCurrentIGPubVersion());
+          new BallotChecker(repoRoot).check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), "v"+IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules);
       if (isChild()) {
         log("Finished. "+presentDuration(endTime - startTime));      
       } else {
@@ -2212,7 +2212,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void loadPubPack() throws FHIRException, IOException {
-    NpmPackage npm = pcm.loadPackage("hl7.fhir.pubpack", "0.0.5");
+    NpmPackage npm = pcm.loadPackage("hl7.fhir.pubpack", "0.0.6");
     context.loadFromPackage(npm, null);
     npm = pcm.loadPackage("hl7.fhir.xver-extensions", "0.0.4");
     context.loadFromPackage(npm, null);
@@ -3656,7 +3656,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
   private void checkConformanceResources() throws IOException {
-    realmRules.startChecks();
+    realmRules.startChecks(publishedIg);
     logDebugMessage(LogCategory.PROGRESS, "check profiles");
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
@@ -5373,6 +5373,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           }
           item.addProperty("status", sd.getStatus().toCode());
           item.addProperty("date", sd.getDate().toString());
+          item.addProperty("abstract", sd.getAbstract());
+          if (sd.hasDerivation()) {
+            item.addProperty("derivation", sd.getDerivation().toCode());
+          }
           item.addProperty("publisher", sd.getPublisher());
           item.addProperty("copyright", sd.getCopyright());
           item.addProperty("description", sd.getDescription());
@@ -7230,7 +7234,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     else
       System.out.println(msg);
     
-    if (mode == IGBuildMode.MANUAL) {
+    if (mode == IGBuildMode.MANUAL || mode == null) {
       try {
         String logPath = Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher-tmp.log");
         if (filelog==null) {
@@ -7421,16 +7425,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     } else {
       Publisher self = new Publisher();
-      System.out.println("FHIR IG Publisher "+IGVersionUtil.getVersionString());
-      System.out.println("Detected Java version: " + System.getProperty("java.version")+" from "+System.getProperty("java.home")+" on "+System.getProperty("os.arch")+" ("+System.getProperty("sun.arch.data.model")+"bit). "+toMB(Runtime.getRuntime().maxMemory())+"MB available");
-      System.out.print("Parameters:");
+      self.logMessage("FHIR IG Publisher "+IGVersionUtil.getVersionString());
+      self.logMessage("Detected Java version: " + System.getProperty("java.version")+" from "+System.getProperty("java.home")+" on "+System.getProperty("os.arch")+" ("+System.getProperty("sun.arch.data.model")+"bit). "+toMB(Runtime.getRuntime().maxMemory())+"MB available");
+      String s = "Parameters:";
       for (int i = 0; i < args.length; i++) {
-          System.out.print(" "+args[i]);
+          s = s + " "+args[i];
       }      
-      System.out.println();
-      System.out.print("dir = "+System.getProperty("user.dir")+", path = "+System.getenv("PATH"));
-      System.out.println();
-      System.out.println("Run time = "+nowAsString(self.execTime)+" ("+nowAsDate(self.execTime)+")");
+      self.logMessage(s);
+      self.logMessage("");
+      self.logMessage("dir = "+System.getProperty("user.dir")+", path = "+System.getenv("PATH"));
+      self.logMessage("");
+      self.logMessage("Run time = "+nowAsString(self.execTime)+" ("+nowAsDate(self.execTime)+")");
       if (hasNamedParam(args, "-auto-ig-build")) {
         self.setMode(IGBuildMode.AUTOBUILD);
         self.targetOutput = getNamedParam(args, "-target");
