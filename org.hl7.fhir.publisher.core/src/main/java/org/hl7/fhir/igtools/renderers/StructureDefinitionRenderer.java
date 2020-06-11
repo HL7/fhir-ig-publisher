@@ -139,34 +139,41 @@ public class StructureDefinitionRenderer extends BaseRenderer {
 
       for (ElementDefinition ed : sd.getDifferential().getElement()) {
         if (ed.getPath().contains(".")) {
-          if (ed.getMin() == 1)
-            if (parentChainHasOptional(ed, sd))
+          if (ed.getMin() == 1) {
+            if (parentChainHasOptional(ed, sd)) {
               requiredNesteds++;
-            else
+            } else {
               requiredOutrights++;
-          if ("0".equals(ed.getMax()))
+            }
+          }
+          if ("0".equals(ed.getMax())) {
             prohibits++;
-          if (ed.getMustSupport())
+          }
+          if (ed.getMustSupport()) {
             supports++;
-          if (ed.hasFixed())
+          }
+          if (ed.hasFixed()) {
             fixeds++;
+          }
 
           for (TypeRefComponent t : ed.getType()) {
             if (t.hasProfile() && !igp.isDatatype(t.getProfile().get(0).getValue().substring(40))) {
-              if (ed.getPath().endsWith(".extension"))
+              if (ed.getPath().endsWith(".extension")) {
                 tryAdd(ext, summariseExtension(t.getProfile(), false, prefix));
-              else if (ed.getPath().endsWith(".modifierExtension"))
+              } else if (ed.getPath().endsWith(".modifierExtension")) {
                 tryAdd(ext, summariseExtension(t.getProfile(), true, prefix));
-              else
+              } else {
                 tryAdd(refs, describeProfile(t.getProfile().get(0).getValue(), prefix));
+              }
             } 
             if (t.hasTargetProfile()) {
               tryAdd(refs, describeProfile(t.getTargetProfile().get(0).getValue(), prefix));
             } 
           }
 
-          if (ed.hasSlicing() && !ed.getPath().endsWith(".extension") && !ed.getPath().endsWith(".modifierExtension"))
+          if (ed.hasSlicing() && !ed.getPath().endsWith(".extension") && !ed.getPath().endsWith(".modifierExtension")) {
             tryAdd(slices, describeSlice(ed.getPath(), ed.getSlicing()));
+          }
         }
       }
       StringBuilder res = new StringBuilder("<a name=\"summary\"> </a>\r\n<p><b>\r\n"+translate("sd.summary", "Summary")+"\r\n</b></p>\r\n");
