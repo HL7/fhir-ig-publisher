@@ -20,31 +20,41 @@
         <artifactId>org.hl7.fhir.core</artifactId>
         <version>5.0.7-SNAPSHOT</version>
     </parent>
+
+    <modules>
+        <module>org.hl7.fhir.publisher.core</module>
+        <module>org.hl7.fhir.publisher.cli</module>
+    </modules>
+
+    <groupId>org.hl7.fhir.publisher</groupId>
+    <artifactId>org.hl7.fhir.publisher</artifactId>
+    <version>1.0.100-SNAPSHOT</version> <!-- See the note above -->
+    <packaging>pom</packaging>
+
+    <name>HL7 FHIR IG Publisher</name>
+
     <properties>
         <core_version>5.0.7-SNAPSHOT</core_version>
         <maven.test.skip>true</maven.test.skip>
     </properties>
-    <version>1.0.100-SNAPSHOT</version> <!-- See the note above -->
 
-    <packaging>pom</packaging>
-    <groupId>org.hl7.fhir.publisher</groupId>
-    <artifactId>org.hl7.fhir.publisher</artifactId>
-    <name>HL7 FHIR IG Publisher</name>
+    <distributionManagement>
+        <snapshotRepository>
+            <id>ossrh</id>
+            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+        </snapshotRepository>
+        <repository>
+            <id>ossrh</id>
+            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+        </repository>
+    </distributionManagement>
 
     <repositories>
-        <repository>
-            <id>oss-snapshot</id>
-            <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
-            <snapshots>
-                <enabled>true</enabled>
-            </snapshots>
-        </repository>
         <repository>
             <id>local</id>
             <url>file://${basedir}/lib</url>
         </repository>
     </repositories>
-
 
     <organization>
         <name>Health Level 7</name>
@@ -157,15 +167,6 @@
             <artifactId>xmlbeans</artifactId>
             <version>3.0.2</version>
         </dependency>
-
-		<!--
-        <dependency>
-            <groupId>plantuml</groupId>
-            <artifactId>plantuml-jar-asl</artifactId>
-            <version>1.2019.10</version>
-		  </dependency>
-		  -->
-
     </dependencies>
 
     <dependencyManagement>
@@ -258,48 +259,36 @@
                         <exclude>**/*r4*/**</exclude>
                     </excludes>
                 </configuration>
-            </plugin>        
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-gpg-plugin</artifactId>
+                <version>1.6</version>
+                <executions>
+                    <execution>
+                        <id>sign-artifacts</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>sign</goal>
+                        </goals>
+                        <configuration>
+                            <keyname>${gpg.keyname}</keyname>
+                            <passphraseServerId>${gpg.keyname}</passphraseServerId>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.sonatype.plugins</groupId>
+                <artifactId>nexus-staging-maven-plugin</artifactId>
+                <version>1.6.7</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <serverId>ossrh</serverId>
+                    <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+                    <autoReleaseAfterClose>true</autoReleaseAfterClose>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
-
-    <modules>
-        <module>org.hl7.fhir.publisher.core</module>
-        <module>org.hl7.fhir.publisher.cli</module>
-    </modules>
-
-    <profiles>
-        <profile>
-            <id>SIGN_ARTIFACTS</id>
-            <activation>
-                <property>
-                    <name>gpg.keyname</name>
-                </property>
-            </activation>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-gpg-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>sign-artifacts</id>
-                                <phase>verify</phase>
-                                <goals>
-                                    <goal>sign</goal>
-                                </goals>
-                                <configuration>
-                                    <gpgArguments>
-                                        <arg>--pinentry-mode</arg>
-                                        <arg>loopback</arg>
-                                    </gpgArguments>
-                                    <passphraseServerId>${gpg.keyname}</passphraseServerId>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
-
 </project>
