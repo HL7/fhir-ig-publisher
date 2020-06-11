@@ -22,7 +22,6 @@ pool:
 
 variables:
   currentImage: $(imageName)
-  codecov: $(CODECOV_TOKEN)
   VERSION:
 
 steps:
