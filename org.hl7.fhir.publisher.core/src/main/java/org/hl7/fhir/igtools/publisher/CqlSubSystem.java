@@ -479,6 +479,11 @@ public class CqlSubSystem {
     String name = NamespaceManager.getNamePart(path);
 
     if (uri != null) {
+      // The translator has no way to correctly infer the namespace of the FHIRHelpers library, since it will happily provide that source to any namespace that wants it
+      // So override the declaration here so that it points back to the FHIRHelpers library in the base specification
+      if (name.equals("FHIRHelpers") && !uri.equals("http://hl7.org/fhir")) {
+        uri = "http://hl7.org/fhir";
+      }
       return String.format("%s/Library/%s%s", uri, name, version != null ? ("|" + version) : "");
     }
 
@@ -619,32 +624,15 @@ public class CqlSubSystem {
         cfc.setValueSet(toReference(resolveValueSetRef(vsr, library, libraryManager)));
       }
 
+      if (retrieve.getCodes() instanceof org.hl7.elm.r1.ToList) {
+        org.hl7.elm.r1.ToList toList = (org.hl7.elm.r1.ToList)retrieve.getCodes();
+        resolveCodeFilterCodes(cfc, toList.getOperand(), library, libraryManager);
+      }
+
       if (retrieve.getCodes() instanceof org.hl7.elm.r1.List) {
         org.hl7.elm.r1.List codeList = (org.hl7.elm.r1.List)retrieve.getCodes();
         for (Expression e : codeList.getElement()) {
-          if (e instanceof org.hl7.elm.r1.CodeRef) {
-            CodeRef cr = (CodeRef)e;
-            cfc.addCode(toCoding(toCode(resolveCodeRef(cr, library, libraryManager)), library, libraryManager));
-          }
-
-          if (e instanceof org.hl7.elm.r1.Code) {
-            cfc.addCode(toCoding((org.hl7.elm.r1.Code)e, library, libraryManager));
-          }
-
-          if (e instanceof org.hl7.elm.r1.ConceptRef) {
-            ConceptRef cr = (ConceptRef)e;
-            org.hl7.fhir.r5.model.CodeableConcept c = toCodeableConcept(toConcept(resolveConceptRef(cr, library, libraryManager), library, libraryManager), library, libraryManager);
-            for (org.hl7.fhir.r5.model.Coding code : c.getCoding()) {
-              cfc.addCode(code);
-            }
-          }
-
-          if (e instanceof org.hl7.elm.r1.Concept) {
-            org.hl7.fhir.r5.model.CodeableConcept c = toCodeableConcept((org.hl7.elm.r1.Concept)e, library, libraryManager);
-            for (org.hl7.fhir.r5.model.Coding code : c.getCoding()) {
-              cfc.addCode(code);
-            }
-          }
+          resolveCodeFilterCodes(cfc, e, library, libraryManager);
         }
       }
 
@@ -654,6 +642,33 @@ public class CqlSubSystem {
     // TODO: Set date range filters if literal
 
     return dr;
+  }
+
+  private void resolveCodeFilterCodes(org.hl7.fhir.r5.model.DataRequirement.DataRequirementCodeFilterComponent cfc, Expression e,
+                                      TranslatedLibrary library, LibraryManager libraryManager) {
+    if (e instanceof org.hl7.elm.r1.CodeRef) {
+      CodeRef cr = (CodeRef)e;
+      cfc.addCode(toCoding(toCode(resolveCodeRef(cr, library, libraryManager)), library, libraryManager));
+    }
+
+    if (e instanceof org.hl7.elm.r1.Code) {
+      cfc.addCode(toCoding((org.hl7.elm.r1.Code)e, library, libraryManager));
+    }
+
+    if (e instanceof org.hl7.elm.r1.ConceptRef) {
+      ConceptRef cr = (ConceptRef)e;
+      org.hl7.fhir.r5.model.CodeableConcept c = toCodeableConcept(toConcept(resolveConceptRef(cr, library, libraryManager), library, libraryManager), library, libraryManager);
+      for (org.hl7.fhir.r5.model.Coding code : c.getCoding()) {
+        cfc.addCode(code);
+      }
+    }
+
+    if (e instanceof org.hl7.elm.r1.Concept) {
+      org.hl7.fhir.r5.model.CodeableConcept c = toCodeableConcept((org.hl7.elm.r1.Concept)e, library, libraryManager);
+      for (org.hl7.fhir.r5.model.Coding code : c.getCoding()) {
+        cfc.addCode(code);
+      }
+    }
   }
 
   private org.hl7.fhir.r5.model.Coding toCoding(Code code, TranslatedLibrary library, LibraryManager libraryManager) {
