@@ -4065,6 +4065,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             if (replaceLiquidTags(bc)) {
               altered = true;
             }
+            if (bc.fhirType().equals("CodeSystem")) {
+              context.clearTSCache(bc.getUrl());
+            }
             if (businessVersion != null) {
               if (!bc.hasVersion()) {
                 altered = true;
@@ -6874,10 +6877,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         
       } else {
         if (exp.getError() != null) { 
-          fragmentError("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", "No Expansion for this valueset (not supported by Publication Tooling)", "Publication Tooling Error: "+exp.getError(), f.getOutputNames());
           if (exp.getError().contains("Unable to provide support")) {
+            fragmentErrorHtml("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", "No Expansion for this valueset (Unknown Code System<!-- "+Utilities.escapeXml(exp.getError())+" -->)", "Publication Tooling Error: "+Utilities.escapeXml(exp.getError()), f.getOutputNames());
             f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, "ValueSet.where(id = '"+vs.getId()+"')", exp.getError(), IssueSeverity.WARNING).setTxLink(exp.getTxLink()));
           } else {
+            fragmentErrorHtml("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", "No Expansion for this valueset (not supported by Publication Tooling<!-- "+Utilities.escapeXml(exp.getError())+" -->)", "Publication Tooling Error: "+Utilities.escapeXml(exp.getError()), f.getOutputNames());
             f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, "ValueSet.where(id = '"+vs.getId()+"')", exp.getError(), IssueSeverity.ERROR).setTxLink(exp.getTxLink()));
           }
         } else {
@@ -6893,6 +6897,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       fragment(name, "<p><span style=\"color: maroon; font-weight: bold\">"+Utilities.escapeXml(error)+"</span></p>\r\n", outputTracker);
     else
       fragment(name, "<p><span style=\"color: maroon; font-weight: bold\" title=\""+Utilities.escapeXml(overlay)+"\">"+Utilities.escapeXml(error)+"</span></p>\r\n", outputTracker);
+  }
+
+  private void fragmentErrorHtml(String name, String error, String overlay, Set<String> outputTracker) throws IOException, FHIRException {
+    if (Utilities.noString(overlay))
+      fragment(name, "<p><span style=\"color: maroon; font-weight: bold\">"+error+"</span></p>\r\n", outputTracker);
+    else
+      fragment(name, "<p><span style=\"color: maroon; font-weight: bold\" title=\""+overlay+"\">"+error+"</span></p>\r\n", outputTracker);
   }
 
   /**
