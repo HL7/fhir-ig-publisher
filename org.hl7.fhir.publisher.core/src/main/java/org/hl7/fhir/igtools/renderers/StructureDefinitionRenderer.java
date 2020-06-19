@@ -319,7 +319,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
 
   private String summariseValue(DataType fixed) throws FHIRException {
     if (fixed instanceof org.hl7.fhir.r5.model.PrimitiveType)
-      return ((org.hl7.fhir.r5.model.PrimitiveType) fixed).asStringValue();
+      return Utilities.escapeXml(((org.hl7.fhir.r5.model.PrimitiveType) fixed).asStringValue());
     if (fixed instanceof CodeableConcept) 
       return summarise((CodeableConcept) fixed);
     if (fixed instanceof Coding) 
@@ -357,7 +357,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     if (cs == null) 
       return "<span title=\""+coding.getSystem()+"\">"+coding.getCode()+"</a>"+(!coding.hasDisplay() ? "" : "(\""+gt(coding.getDisplayElement())+"\")");
     else
-      return "<a title=\""+cs.present()+"\" href=\""+cs.getUserData("path")+"#"+cs.getId()+"-"+coding.getCode()+"\">"+coding.getCode()+"</a>"+(!coding.hasDisplay() ? "" : "(\""+gt(coding.getDisplayElement())+"\")");
+      return "<a title=\""+cs.present()+"\" href=\""+Utilities.escapeXml(cs.getUserString("path"))+"#"+cs.getId()+"-"+coding.getCode()+"\">"+coding.getCode()+"</a>"+(!coding.hasDisplay() ? "" : "(\""+gt(coding.getDisplayElement())+"\")");
   }
 
   public String diff(String defnFile, Set<String> outputTracker) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
@@ -551,13 +551,13 @@ public class StructureDefinitionRenderer extends BaseRenderer {
       BindingResolution br = igp.resolveBinding(sd, ToolingExtensions.readStringExtension(tx, ToolingExtensions.EXT_MAX_VALUESET), path);
       b.append("<br/>");
       b.append("<a style=\"font-weight:bold\" title=\"Max Value Set Extension\" href=\""+prefix+"extension-elementdefinition-maxvalueset.html\">Max Binding</a>: ");             
-      b.append((br.url == null ? Utilities.escapeXml(br.display) : "<a href=\""+ (Utilities.isAbsoluteUrl(br.url) || !igp.prependLinks() ? br.url : prefix+br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>"));
+      b.append((br.url == null ? Utilities.escapeXml(br.display) : "<a href=\""+ Utilities.escapeXml((Utilities.isAbsoluteUrl(br.url) || !igp.prependLinks() ? br.url : prefix+br.url))+"\">"+Utilities.escapeXml(br.display)+"</a>"));
     }
     if (tx.hasExtension(ToolingExtensions.EXT_MIN_VALUESET)) {
       BindingResolution br = igp.resolveBinding(sd, ToolingExtensions.readStringExtension(tx, ToolingExtensions.EXT_MIN_VALUESET), path);
       b.append("<br/>");
       b.append("<a style=\"font-weight:bold\" title=\"Min Value Set Extension\" href=\""+prefix+"extension-elementdefinition-minvalueset.html\">Min Binding</a>: ");             
-      b.append((br.url == null ? Utilities.escapeXml(br.display) : "<a href=\""+ (Utilities.isAbsoluteUrl(br.url) || !igp.prependLinks() ? br.url : prefix+br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>"));
+      b.append((br.url == null ? Utilities.escapeXml(br.display) : "<a href=\""+ Utilities.escapeXml((Utilities.isAbsoluteUrl(br.url) || !igp.prependLinks() ? br.url : prefix+br.url))+"\">"+Utilities.escapeXml(br.display)+"</a>"));
     }      
     b.append("</td></tr>\r\n");
   }
@@ -566,7 +566,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     String uri = tx.getValueSet();
     String name = getSpecialValueSetName(uri);
     if (name != null) {
-      brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\""+uri+"\">"+Utilities.escapeXml(name)+"</a>";
+      brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\""+Utilities.escapeXml(uri)+"\">"+Utilities.escapeXml(name)+"</a>";
       brd.vsn = name;
     } else {
       ValueSet vs = context.fetchResource(ValueSet.class, canonicalise(uri));
@@ -575,17 +575,17 @@ public class StructureDefinitionRenderer extends BaseRenderer {
         if (br.url == null)
           brd.vss = "<code>"+Utilities.escapeXml(br.display)+"</code>";
         else if (Utilities.isAbsoluteUrl(br.url))
-          brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\""+br.url+"\">"+Utilities.escapeXml(br.display)+"</a>";
+          brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\""+Utilities.escapeXml(br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>";
         else
-          brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\""+prefix+br.url+"\">"+Utilities.escapeXml(br.display)+"</a>";
+          brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\""+Utilities.escapeXml(prefix+br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>";
       } else { 
         String p = vs.getUserString("path");
         if (p == null)
           brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\"??\">"+Utilities.escapeXml(gt(vs.getNameElement()))+" ("+translate("sd.tx", "missing link")+")</a>";
         else if (p.startsWith("http:"))
-          brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\""+p+"\">"+Utilities.escapeXml(gt(vs.getNameElement()))+"</a>";
+          brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\""+Utilities.escapeXml(p)+"\">"+Utilities.escapeXml(gt(vs.getNameElement()))+"</a>";
         else
-          brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\""+p+"\">"+Utilities.escapeXml(gt(vs.getNameElement()))+"</a>";
+          brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\""+Utilities.escapeXml(p)+"\">"+Utilities.escapeXml(gt(vs.getNameElement()))+"</a>";
         StringType title = vs.hasTitleElement() ? vs.getTitleElement() : vs.getNameElement();
         if (title != null)
           brd.vsn = gt(title);
@@ -991,7 +991,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
         b.append(t.getProfile());
       else {
         String pth = p.getUserString("path");
-        b.append("<a href=\""+pth+"\" title=\""+t.getProfile()+"\">");
+        b.append("<a href=\""+Utilities.escapeXml(pth)+"\" title=\""+t.getProfile()+"\">");
         b.append(p.getName());
         b.append("</a>");
       }
@@ -1524,11 +1524,11 @@ public class StructureDefinitionRenderer extends BaseRenderer {
         b.append("\"");
     } else {
       b.append("{");
-      b.append("<span style=\"color: darkgreen\"><a href=\"" +suffix(getSrcFile(type.getWorkingCode()), type.getWorkingCode()) + "\">" + type.getWorkingCode()+ "</a></span>");
+      b.append("<span style=\"color: darkgreen\"><a href=\"" +Utilities.escapeXml(suffix(getSrcFile(type.getWorkingCode()), type.getWorkingCode())) + "\">" + type.getWorkingCode()+ "</a></span>");
       if (type.hasProfile()) {
         StructureDefinition tsd = context.fetchResource(StructureDefinition.class, type.getProfile().get(0).getValue());
         if (tsd != null)
-          b.append(" (as <span style=\"color: darkgreen\"><a href=\"" + tsd.getUserString("path")+ "#"+tsd.getType() + "\">" + tsd.getName()+ "</a></span>)");
+          b.append(" (as <span style=\"color: darkgreen\"><a href=\"" + Utilities.escapeXml(tsd.getUserString("path"))+ "#"+tsd.getType() + "\">" + tsd.getName()+ "</a></span>)");
         else 
           b.append(" (as <span style=\"color: darkgreen\">"+type.getProfile()+ "</span>)");
       }
@@ -1536,9 +1536,9 @@ public class StructureDefinitionRenderer extends BaseRenderer {
         if (type.getTargetProfile().get(0).getValue().startsWith("http://hl7.org/fhir/StructureDefinition/")) {
           String t = type.getTargetProfile().get(0).getValue().substring(40);
           if (hasType(t))
-            b.append("(<span style=\"color: darkgreen\"><a href=\"" +suffix(getSrcFile(t), t) + "\">" + t+ "</a></span>)");
+            b.append("(<span style=\"color: darkgreen\"><a href=\"" +Utilities.escapeXml(suffix(getSrcFile(t), t)) + "\">" + t+ "</a></span>)");
           else if (hasResource(t))
-            b.append("(<span style=\"color: darkgreen\"><a href=\"" + prefix+ t.toLowerCase()+ ".html\">" + t+ "</a></span>)");
+            b.append("(<span style=\"color: darkgreen\"><a href=\"" +Utilities.escapeXml(prefix+ t.toLowerCase())+ ".html\">" + t+ "</a></span>)");
           else
             b.append("("+t+")");
         } else

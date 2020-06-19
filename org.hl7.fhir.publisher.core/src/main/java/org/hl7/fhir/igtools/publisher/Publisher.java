@@ -2644,7 +2644,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           if (!r.hasId()) {
             r.setId(tail(u));
           }
-          r.setUserData("path", webref+"/"+ igpkp.doReplacements(p, r, null, null));
+          if (Utilities.isAbsoluteUrl(p)) {
+            r.setUserData("path", igpkp.doReplacements(p, r, null, null));            
+          } else {
+            r.setUserData("path", webref+"/"+ igpkp.doReplacements(p, r, null, null));
+          }
           String v = ((CanonicalResource) r).getVersion();
           if (v!=null) {
             u = u + "|" + v;
@@ -5372,7 +5376,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           StructureDefinition base = sd.hasBaseDefinition() ? context.fetchResource(StructureDefinition.class, sd.getBaseDefinition()) : null;
           if (base != null) {
             item.addProperty("basename", base.getName());
-            item.addProperty("basepath", base.getUserString("path"));
+            item.addProperty("basepath", Utilities.escapeXml(base.getUserString("path")));
           }
           item.addProperty("status", sd.getStatus().toCode());
           item.addProperty("date", sd.getDate().toString());
