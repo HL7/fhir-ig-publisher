@@ -1,42 +1,31 @@
 # This pipeline produces a SNAPSHOT build for each of the sub modules in
-# the core library, and publishes them to ossrh. 
-trigger:
-  branches:
-    include:
-    - master
-
+# the ig library, and publishes them to ossrh. 
 pr: none
+
+trigger:
+- master
 
 pool:
   vmImage: "ubuntu-16.04"
 
 variables:
-  currentModule: $(module)
+  currentImage: $(imageName)
 
 steps:
-  # Signing, for now, occurs for all builds, SNAPSHOT or release. So we need a valid
-  # signing key. The next two steps download the public and private keys from the
-  # secure library files. 
-  - task: DownloadSecureFile@1
-    displayName: 'Download public key.'
+  # Runs 'mvn package'
+  - task: Maven@3
     inputs:
-      secureFile: public.key
+      mavenPomFile: 'pom.xml'
+      mavenOptions: '-Xmx3072m'
+      javaHomeOption: 'JDKVersion'
+      jdkVersionOption: '1.8'
+      jdkArchitectureOption: 'x64'
+      publishJUnitResults: true
+      testResultsFiles: '**/surefire-reports/TEST-*.xml'
+      goals: 'package'
 
-  - task: DownloadSecureFile@1
-    displayName: 'Download private key.'
-    inputs:
-      secureFile: private.key
-
-  # Import both the private and public keys into gpg for signing.
-  - bash: |
-      gpg --import --no-tty --batch --yes $(Agent.TempDirectory)/public.key
-      gpg --import --no-tty --batch --yes $(Agent.TempDirectory)/private.key
-      gpg --list-keys --keyid-format LONG
-      gpg --list-secret-keys --keyid-format LONG
-    displayName: 'Import signing keys.'
-
-  # For creating the snapshot release with maven, we need to build a fake settings.xml 
-  # for it to read from. This is done for the master branch merges only.
+  # For creating the snapshot release with maven, we need to build a fake settings.xml for it to read from.
+  # This is done for the master branch merges only.
   - bash: |
       cat >$(System.DefaultWorkingDirectory)/settings.xml <<EOL
       <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -78,6 +67,27 @@ steps:
       </settings>
       EOL
     displayName: 'Create .mvn/settings.xml'
+
+  # Signing, for now, occurs for all builds, SNAPSHOT or release. So we need a valid
+  # signing key. The next two steps download the public and private keys from the
+  # secure library files. 
+  - task: DownloadSecureFile@1
+    displayName: 'Download public key.'
+    inputs:
+      secureFile: public.key
+
+  - task: DownloadSecureFile@1
+    displayName: 'Download private key.'
+    inputs:
+      secureFile: private.key
+
+  # Import both the private and public keys into gpg for signing.
+  - bash: |
+      gpg --import --no-tty --batch --yes $(Agent.TempDirectory)/public.key
+      gpg --import --no-tty --batch --yes $(Agent.TempDirectory)/private.key
+      gpg --list-keys --keyid-format LONG
+      gpg --list-secret-keys --keyid-format LONG
+    displayName: 'Import signing keys.'
 
   # Deploy the SNAPSHOT artifact to sonatype nexus.
   # This is done for the master branch merges only.
