@@ -54,6 +54,22 @@
             <id>local</id>
             <url>file://${basedir}/lib</url>
         </repository>
+        <repository>
+            <id>oss-sonatype</id>
+            <name>oss-sonatype</name>
+            <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+        <repository>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+            <id>bintray-dnault-maven</id>
+            <name>bintray</name>
+            <url>https://dl.bintray.com/dnault/maven</url>
+        </repository>
     </repositories>
 
     <organization>
@@ -62,7 +78,6 @@
     </organization>
 
     <dependencies>
-
         <dependency>
             <groupId>ca.uhn.hapi.fhir</groupId>
             <artifactId>org.hl7.fhir.r5</artifactId>
