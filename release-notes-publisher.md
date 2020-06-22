@@ -4,12 +4,9 @@ title: FHIR IGPublisher Release Notes
 
 # FHIR IGPublisher Release Notes
 
-## Current (not released yet) 
-* Snapshot Generator: Improved error messages when snapshot generation fails when slicing something that doesn't repeat
-* Validator: adjust check on Attachment to only be an warning (when no meaningful content exists)
-* Renderer: Fix bug rendering DiagnosticReports with multiple categories
-* CQL Framework: Added output parameters to library generation
-* US Realm: Add comparison with US Core
+## Current (not released yet) 
+
+ Please update all release notes in RELESE_NOTES.md file.
 
 ## v1.0.100 (2020-06-07)
 
