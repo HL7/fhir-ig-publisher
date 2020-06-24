@@ -5570,7 +5570,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       if (!type.equals(cr.fhirType())) {
         type = cr.fhirType();
-        XhtmlNode h = tbl.tr().style("background-color: #eeeeee").td().colspan("5").h2();
+        XhtmlNode h = tbl.tr().style("background-color: #eeeeee").td().colspan("5").h3();
         h.an(type);
         h.tx(type);
       }
