@@ -18,13 +18,13 @@
     <parent>
         <groupId>ca.uhn.hapi.fhir</groupId>
         <artifactId>org.hl7.fhir.core</artifactId>
-        <version>5.0.6-SNAPSHOT</version>
+        <version>5.0.9-SNAPSHOT</version>
     </parent>
     <properties>
-        <core_version>5.0.6-SNAPSHOT</core_version>
+        <core_version>5.0.9-SNAPSHOT</core_version>
         <maven.test.skip>true</maven.test.skip>
     </properties>
-    <version>1.0.99-SNAPSHOT</version> <!-- See the note above -->
+    <version>1.0.100-SNAPSHOT</version> <!-- See the note above -->
 
     <packaging>pom</packaging>
     <groupId>org.hl7.fhir.publisher</groupId>
@@ -45,14 +45,12 @@
         </repository>
     </repositories>
 
-
     <organization>
         <name>Health Level 7</name>
         <url>http://hl7.org</url>
     </organization>
 
     <dependencies>
-
         <dependency>
             <groupId>ca.uhn.hapi.fhir</groupId>
             <artifactId>org.hl7.fhir.r5</artifactId>
@@ -258,7 +256,7 @@
                         <exclude>**/*r4*/**</exclude>
                     </excludes>
                 </configuration>
-            </plugin>        
+            </plugin>
         </plugins>
     </build>
 
@@ -277,28 +275,28 @@
             </activation>
             <build>
                 <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-gpg-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>sign-artifacts</id>
-                                <phase>verify</phase>
-                                <goals>
-                                    <goal>sign</goal>
-                                </goals>
-                                <configuration>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-gpg-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>sign-artifacts</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>sign</goal>
+                        </goals>
+                        <configuration>
                                     <gpgArguments>
                                         <arg>--pinentry-mode</arg>
                                         <arg>loopback</arg>
                                     </gpgArguments>
-                                    <passphraseServerId>${gpg.keyname}</passphraseServerId>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
+                            <passphraseServerId>${gpg.keyname}</passphraseServerId>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
         </profile>
     </profiles>
 

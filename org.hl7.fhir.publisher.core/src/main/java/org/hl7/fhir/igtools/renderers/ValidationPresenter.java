@@ -39,6 +39,7 @@ import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
+import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter.FiledValidationMessage;
 import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.model.Bundle;
@@ -95,9 +96,10 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private String ballotCheck;
   private String toolsVersion;
   private String currentToolsVersion;
+  private RealmBusinessRules realm;
 
   public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, String ballotCheck, 
-      String toolsVersion, String currentToolsVersion) {
+      String toolsVersion, String currentToolsVersion, RealmBusinessRules realm) {
     super();
     this.statedVersion = statedVersion;
     this.igVersion = igVersion;
@@ -107,6 +109,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     this.packageId = packageId;
     this.altPackageId = altPackageId;
     this.ballotCheck = ballotCheck;
+    this.realm = realm;
     this.toolsVersion = toolsVersion;
     this.currentToolsVersion = currentToolsVersion;
   }
@@ -371,6 +374,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       "$versionCheck$\r\n"+
       "$suppressedmsgssummary$"+
       " <p>HL7 Publication check:</p> $ballotCheck$\r\n"+
+      " <p>Realm check:</p> $realmCheck$\r\n"+
       " <table class=\"grid\">\r\n"+
       "   <tr>\r\n"+
       "     <td><b>Filename</b></td><td><b>Errors</b></td><td><b>Information messages &amp; Warnings</b></td>\r\n"+
@@ -481,6 +485,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("packageId", packageId);
     t.add("canonical", provider.getCanonical());
     t.add("ballotCheck", ballotCheck);
+    t.add("realmCheck", realm.checkHtml());
     if (msgCount == 0)
       t.add("suppressedmsgssummary", "<p>No Suppressed Errors</p>\r\n");
     else
@@ -502,6 +507,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("packageId", packageId);
     t.add("canonical", provider.getCanonical());
     t.add("ballotCheck", ballotCheck);
+    t.add("realmCheck", realm.checkText());
     return t.render();
   }
 

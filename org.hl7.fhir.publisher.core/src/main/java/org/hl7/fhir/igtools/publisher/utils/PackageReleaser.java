@@ -31,14 +31,14 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
-import org.hl7.fhir.convertors.R3ToR5Loader;
-import org.hl7.fhir.convertors.R4ToR5Loader;
 import org.hl7.fhir.convertors.VersionConvertor_10_30;
 import org.hl7.fhir.convertors.VersionConvertor_10_40;
 import org.hl7.fhir.convertors.VersionConvertor_14_50;
 import org.hl7.fhir.convertors.VersionConvertor_30_40;
 import org.hl7.fhir.convertors.VersionConvertor_30_50;
 import org.hl7.fhir.convertors.VersionConvertor_40_50;
+import org.hl7.fhir.convertors.loaders.R3ToR5Loader;
+import org.hl7.fhir.convertors.loaders.R4ToR5Loader;
 import org.hl7.fhir.dstu2.formats.JsonParser;
 import org.hl7.fhir.dstu2.model.StructureDefinition;
 import org.hl7.fhir.exceptions.FHIRException;
@@ -56,7 +56,7 @@ import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
-import org.hl7.fhir.utilities.cache.PackageCacheManager;
+import org.hl7.fhir.utilities.cache.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.cache.ToolsVersion;
 import org.hl7.fhir.utilities.json.JSONUtil;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
@@ -149,7 +149,7 @@ public class PackageReleaser {
   private File xml;
   private IniFile config;
 
-  private PackageCacheManager pcm;
+  private FilesystemPackageCacheManager pcm;
 
 
   // 2 parameters: source of package, package dest folder
@@ -165,7 +165,7 @@ public class PackageReleaser {
   }
 
   private void release(String source, String dest) throws Exception {
-    pcm = new PackageCacheManager(true, ToolsVersion.TOOLS_VERSION);
+    pcm = new FilesystemPackageCacheManager(true, ToolsVersion.TOOLS_VERSION);
     System.out.println("Load hl7.fhir.r4.core");
     r4 = org.hl7.fhir.r4.context.SimpleWorkerContext.fromPackage(pcm.loadPackage("hl7.fhir.r4.core", "4.0.1"));
     System.out.println("Load hl7.fhir.r3.core");

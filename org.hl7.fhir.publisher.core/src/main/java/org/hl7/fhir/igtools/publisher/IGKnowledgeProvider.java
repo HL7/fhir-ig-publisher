@@ -479,7 +479,13 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   }
   
   public String specPath(String path) {
-    return Utilities.pathURL(pathToSpec, path);
+    if (Utilities.isAbsoluteUrl(path)) {
+      return path;
+    } else {
+      assert pathToSpec != null;
+      return Utilities.pathURL(pathToSpec, path);
+    }
+      
   }
 
   public String specPath() {

@@ -48,7 +48,7 @@ import org.hl7.fhir.r5.utils.IResourceValidator.ReferenceValidationPolicy;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
-import org.hl7.fhir.utilities.cache.PackageCacheManager;
+import org.hl7.fhir.utilities.cache.FilesystemPackageCacheManager;
 
 public class ValidationServices implements IValidatorResourceFetcher {
 

@@ -39,7 +39,7 @@ import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
 import org.hl7.fhir.utilities.cache.NpmPackage.NpmPackageFolder;
-import org.hl7.fhir.utilities.cache.PackageCacheManager;
+import org.hl7.fhir.utilities.cache.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.cache.PackageGenerator.PackageType;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 
@@ -50,7 +50,7 @@ import com.google.gson.JsonObject;
 
 public class TemplateManager {
 
-  private PackageCacheManager pcm;
+  private FilesystemPackageCacheManager pcm;
   private ILoggingService logger;
   private List<JsonObject> configs = new ArrayList<JsonObject>();
   boolean canExecute;
@@ -58,7 +58,7 @@ public class TemplateManager {
   String templateReason;
   String ghUrl;
 
-  public TemplateManager(PackageCacheManager pcm, ILoggingService logger, String ghUrl) {
+  public TemplateManager(FilesystemPackageCacheManager pcm, ILoggingService logger, String ghUrl) {
     this.pcm = pcm;
     this.logger = logger;
     this.ghUrl = ghUrl;
@@ -219,7 +219,7 @@ public class TemplateManager {
       return true;
     if (template.equals(id))
       return true;
-    if (template.matches(PackageCacheManager.PACKAGE_VERSION_REGEX) && template.startsWith(id+"#"))
+    if (template.matches(FilesystemPackageCacheManager.PACKAGE_VERSION_REGEX) && template.startsWith(id+"#"))
       return true;
     return false;
   }
@@ -234,10 +234,10 @@ public class TemplateManager {
         }
       }
 
-      if (template.matches(PackageCacheManager.PACKAGE_REGEX)) {
+      if (template.matches(FilesystemPackageCacheManager.PACKAGE_REGEX)) {
         return pcm.loadPackage(template, "current");
       }
-      if (template.matches(PackageCacheManager.PACKAGE_VERSION_REGEX)) {
+      if (template.matches(FilesystemPackageCacheManager.PACKAGE_VERSION_REGEX)) {
         String[] p = template.split("\\#");
         return pcm.loadPackage(p[0], p[1]);
       }
@@ -260,7 +260,7 @@ public class TemplateManager {
         InputStream zip = connection.getInputStream();
         return NpmPackage.fromZip(zip, true, url.toString()); 
       }
-      throw new FHIRException("Unable to load template from "+template);
+      throw new FHIRException("Unable to load template from "+template+" cannot find template. Use a github URL, a local directory, or #[folder] for a contained template");
     } catch (Exception e) {
       throw new FHIRException("Error loading template "+template+": "+e.getMessage(), e);
     }

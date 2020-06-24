@@ -14,15 +14,19 @@ import java.util.UUID;
 
 import org.hl7.fhir.convertors.VersionConvertor_30_50;
 import org.hl7.fhir.convertors.VersionConvertor_40_50;
+import org.hl7.fhir.exceptions.DefinitionException;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.I18nConstants;
 import org.hl7.fhir.igtools.publisher.realm.USRealmBusinessRules.ProfilePair;
+import org.hl7.fhir.r5.comparison.ComparisonRenderer;
+import org.hl7.fhir.r5.comparison.ComparisonSession;
 import org.hl7.fhir.r5.conformance.ProfileUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.PackageVersion;
 import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
@@ -30,7 +34,7 @@ import org.hl7.fhir.r5.utils.KeyGenerator;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
-import org.hl7.fhir.utilities.cache.PackageCacheManager;
+import org.hl7.fhir.utilities.cache.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.cache.ToolsVersion;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
@@ -38,6 +42,7 @@ import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
 
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
@@ -62,17 +67,18 @@ public class USRealmBusinessRules extends RealmBusinessRules {
     public StructureDefinition getUscore() {
       return uscore;
     }
-    
+
   }
 
-  private static final boolean DO_PROFILE_COMPARISON = true;
- 
   List<StructureDefinition> usCoreProfiles;
   private IWorkerContext context;
   private String version;
   private String dstDir;
   private KeyGenerator keygen;
+  private List<StructureDefinition> problems = new ArrayList<>();
   private List<ProfilePair> comparisons = new ArrayList<>();
+
+  private String name;
 
   public USRealmBusinessRules(IWorkerContext context, String version, String dstDir, String canonical) {
     super();
@@ -84,7 +90,8 @@ public class USRealmBusinessRules extends RealmBusinessRules {
 
 
   @Override
-  public void startChecks() throws IOException {
+  public void startChecks(ImplementationGuide ig) throws IOException {
+    this.name = ig.present();
   }
 
   @Override
@@ -114,17 +121,17 @@ public class USRealmBusinessRules extends RealmBusinessRules {
         t = context.fetchResource(StructureDefinition.class, t.getBaseDefinition());
       }
       if (t == null) {
+        problems.add(sd);
         StringBuilder b = new StringBuilder();
-        ValidationMessage vm = new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.baseDefinition", "US FHIR Usage rules require that all profiles on "+sd.getType()+
+        ValidationMessage vm = new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"').baseDefinition", "US FHIR Usage rules require that all profiles on "+sd.getType()+
             (matches(usCoreProfiles, sd.getType()) > 1 ? " derive from one of the base US profiles" : " derive from the core US profile"),
             IssueSeverity.WARNING).setMessageId(I18nConstants.US_CORE_DERIVATION); 
         b.append(vm.getMessage());
         f.getErrors().add(vm);
-        if (DO_PROFILE_COMPARISON) {
-          // actually, that should be an error, but US realm doesn't have a proper base, so we're going to report the differences against the base
-          for (StructureDefinition candidate : candidateProfiles(sd.getType())) {
-            comparisons.add(new ProfilePair(f.getErrors(), sd, candidate));
-          }
+        // actually, that should be an error, but US realm doesn't have a proper base, so we're going to report the differences against the base
+        for (StructureDefinition candidate : candidateProfiles(sd.getType())) {
+          comparisons.add(new ProfilePair(f.getErrors(), sd, candidate));
+          b.append(". <a href=\"us-core-comparisons/sd-"+candidate.getId()+"-"+sd.getId()+".html\">Comparison with "+candidate.present()+"</a>");
         }
         vm.setHtml(b.toString());
       }
@@ -165,7 +172,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
     for (JsonElement e : pl.getAsJsonArray("list")) {
       JsonObject v = (JsonObject) e;
       if (v.has("fhirversion") && VersionUtilities.versionsCompatible(version, v.get("fhirversion").getAsString())) {
-        return new PackageCacheManager(true, ToolsVersion.TOOLS_VERSION).loadPackage("hl7.fhir.us.core", v.get("version").getAsString());
+        return new FilesystemPackageCacheManager(true, ToolsVersion.TOOLS_VERSION).loadPackage("hl7.fhir.us.core", v.get("version").getAsString());
       }
     }
     return null;
@@ -182,14 +189,14 @@ public class USRealmBusinessRules extends RealmBusinessRules {
     }
 
   }
-  
+
   private JsonObject fetchJson(String source) throws IOException {
     URL url = new URL(source+"?nocache=" + System.currentTimeMillis());
     HttpURLConnection c = (HttpURLConnection) url.openConnection();
     c.setInstanceFollowRedirects(true);
     return JsonTrackingParser.parseJson(c.getInputStream());
   }
-  
+
   @Override
   public void checkCR(FetchedFile f, CanonicalResource resource) {
     // no checks    
@@ -203,33 +210,45 @@ public class USRealmBusinessRules extends RealmBusinessRules {
   }
 
   @Override
-  public void finishChecks() {
-//    ProfileComparer comp;
-//    if (DO_PROFILE_COMPARISON) {
-////      Utilities.createDirectory(Utilities.path(dstDir, "us-core-comparisons"));
-////      comp = new ProfileComparer(context, keygen, Utilities.path(dstDir, "us-core-comparisons"));
-//      
-//    }
+  public void finishChecks() throws DefinitionException, FHIRFormatError, IOException {
+    try {
+      ComparisonSession session = new ComparisonSession(context, "Comparison of "+name+" with US-Core");
+      //    session.setDebug(true);
+      for (ProfilePair c : comparisons) {
+        System.out.println("US Core Comparison: compare "+c.local+" to "+c.uscore);
+        session.compare(c.uscore, c.local);      
+      }
+      Utilities.createDirectory(Utilities.path(dstDir, "us-core-comparisons"));
+      ComparisonRenderer cr = new ComparisonRenderer(context, Utilities.path(dstDir, "us-core-comparisons"), session);
+      cr.getTemplates().put("CodeSystem", new String(context.getBinaries().get("template-comparison-CodeSystem.html")));
+      cr.getTemplates().put("ValueSet", new String(context.getBinaries().get("template-comparison-ValueSet.html")));
+      cr.getTemplates().put("Profile", new String(context.getBinaries().get("template-comparison-Profile.html")));
+      cr.getTemplates().put("Index", new String(context.getBinaries().get("template-comparison-index.html")));
+      cr.render();
+      System.out.println("US Core Comparisons Finished");
+    } catch (Throwable e) {
+      System.out.println("US Core Comparison failed: "+e.getMessage());
+      e.printStackTrace();
+    }
+  }
 
-    /**
-     *             try {
-              comp.setLeftLink("../"+sd.getUserString("path"));
-              comp.setLeftName("This IG: "+sd.present());          
-              comp.setLeftPrefix("..");
-              comp.setRightLink("http://hl7.org/fhir/us/core/StructureDefinition-"+candidate.getId()+".html");
-              comp.setRightName("US-Core: "+candidate.present());
-              comp.setId(sd.getId()+"-"+candidate.getId());
-              comp.setTitle(": "+sd.present()+" and US-Core "+candidate.present());
-              comp.compareProfiles(sd, candidate);
-              File htmlFile = new File(comp.generate());
-              b.append(". <a href=\"us-core-comparisons/"+htmlFile.getName()+"\">Comparison with "+candidate.present()+"</a>");
-            } catch (Exception e) {
-              ValidationMessage vm1 = new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, "StructureDefinition", "Internal exception comparing to US Core "+ sd.present()+": "+e.getMessage(),
-                  IssueSeverity.ERROR).setMessageId("US_CORE_COMPARISON_EXCEPTION"); 
-              f.getErrors().add(vm1);
-              e.printStackTrace();
-            }
 
-     */
+  @Override
+  public String checkHtml() {
+    if (problems == null || problems.isEmpty()) {
+      return "All OK";
+    } else {
+      return "<ul><li><a href=\"us-core-comparisons/index.html\">"+Integer.toString(problems.size())+" Profiles not based on US Core</a></li></ul>";      
+    }
+  }
+ 
+
+  @Override
+  public String checkText() {
+    if (problems == null || problems.isEmpty()) {
+      return "All OK";
+    } else {
+      return Integer.toString(problems.size())+" Profiles not based on US Core";
+    }
   }
 }
