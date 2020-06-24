@@ -179,6 +179,7 @@ import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
 import org.hl7.fhir.r5.model.ExpressionNode;
 import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.FhirPublication;
+import org.hl7.fhir.r5.model.Identifier;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.ImplementationGuide.GuidePageGeneration;
 import org.hl7.fhir.r5.utils.GuideParameterCode;
@@ -242,6 +243,7 @@ import org.hl7.fhir.r5.utils.LiquidEngine;
 import org.hl7.fhir.r5.utils.MappingSheetParser;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator.Category;
+import org.hl7.fhir.r5.utils.ResourceSorters;
 import org.hl7.fhir.r5.utils.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.StructureMapUtilities.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
@@ -272,6 +274,7 @@ import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
+import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.utilities.xhtml.XhtmlParser;
@@ -5337,6 +5340,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     generateResourceReferences();
 
     generateDataFile();
+    generateCanonicalSummary();
     
     CrossViewRenderer cvr = new CrossViewRenderer(igpkp.getCanonical(), context);
     for (FetchedFile f : fileList) {
@@ -5499,6 +5503,87 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
+
+  private void generateCanonicalSummary() throws IOException {
+    List<CanonicalResource> crlist = new ArrayList<>();
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
+          crlist.add((CanonicalResource) r.getResource());
+        }
+      }
+    }
+    Collections.sort(crlist, new ResourceSorters.CanonicalResourceSortByUrl());
+    JsonArray list = new JsonArray();
+    for (CanonicalResource cr : crlist) {
+      JsonObject obj = new JsonObject();
+      obj.addProperty("url", cr.getUrl());
+      obj.addProperty("id", cr.getId());
+      obj.addProperty("type", cr.fhirType());
+      obj.addProperty("version", cr.getVersion());
+      obj.addProperty("name", cr.getName());
+      JsonArray oids = new JsonArray();
+      JsonArray urls = new JsonArray();
+      for (Identifier id : cr.getIdentifier()) {
+        if ("urn:ietf:rfc:3986".equals(id.getSystem()) && id.hasValue()) {
+          if (id.getValue().startsWith("urn:oid:")) {
+            oids.add(id.getValue().substring(8));
+          } else {
+            urls.add(id.getValue());
+          }
+        }
+      }
+      if (oids.size() > 0) {
+        obj.add("oids", oids);
+      }
+      if (urls.size() > 0) {
+        obj.add("alt-urls", urls);
+      }
+      list.add(obj);
+    }
+    Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    String json = gson.toJson(list);
+    TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "canonicals.json"), false);
+    TextFile.stringToFile(json, Utilities.path(tempDir, "canonicals.json"), false);
+    otherFilesRun.add(Utilities.path(tempDir, "canonicals.json"));
+    
+    Collections.sort(crlist, new ResourceSorters.CanonicalResourceSortByTypeId());    
+    XhtmlNode tbl = new XhtmlNode(NodeType.Element, "table").setAttribute("class", "grid");
+    XhtmlNode tr = tbl.tr();
+    tr.td().b().tx("Canonical");
+    tr.td().b().tx("Id");
+    tr.td().b().tx("Version");
+    tr.td().b().tx("Oids");
+    tr.td().b().tx("Other URLS");
+    String type = "";
+    for (CanonicalResource cr : crlist) {
+      CommaSeparatedStringBuilder bu = new CommaSeparatedStringBuilder(); 
+      CommaSeparatedStringBuilder bo = new CommaSeparatedStringBuilder(); 
+      for (Identifier id : cr.getIdentifier()) {
+        if ("urn:ietf:rfc:3986".equals(id.getSystem()) && id.hasValue()) {
+          if (id.getValue().startsWith("urn:oid:")) {
+            bo.append(id.getValue().substring(8));
+          } else {
+            bu.append(id.getValue());
+          }
+        }
+      }
+      if (!type.equals(cr.fhirType())) {
+        type = cr.fhirType();
+        XhtmlNode h = tbl.tr().style("background-color: #eeeeee").td().colspan("5").h2();
+        h.an(type);
+        h.tx(type);
+      }
+      tr = tbl.tr();
+      tr.td().ah(cr.getUserString("path")).tx(cr.getUrl());
+      tr.td().tx(cr.getId());
+      tr.td().tx(cr.getVersion());
+      tr.td().tx(bo.toString());
+      tr.td().tx(bu.toString());      
+    }
+    String xhtml = new XhtmlComposer(true).compose(tbl);
+    fragment("canonical-index", xhtml, otherFilesRun);
+  }
 
   public String license() throws Exception {
     if (Utilities.noString(license)) {
@@ -6541,22 +6626,29 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
     new org.hl7.fhir.r5.elementmodel.JsonParser(context).compose(r.getElement(), bs, OutputStyle.NORMAL, igpkp.getCanonical());
     npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, r.getElement().fhirType()+"-"+r.getId()+".json", bs.toByteArray());
+    String path = Utilities.path(tempDir, "_includes", r.getElement().fhirType()+"-"+r.getId()+".json");
+    String json = new String(bs.toByteArray());
+    TextFile.stringToFile(json, path);
+    path = Utilities.path(tempDir, "_includes", r.getElement().fhirType()+"-"+r.getId()+".escaped.json");
+    json = Utilities.escapeXml(json);
+    TextFile.stringToFile(json, path);
+    
     if (igpkp.wantGen(r, "xml") || forHL7orFHIR()) {
-      String path = Utilities.path(tempDir, r.getElement().fhirType()+"-"+r.getId()+".xml");
+      path = Utilities.path(tempDir, r.getElement().fhirType()+"-"+r.getId()+".xml");
       f.getOutputNames().add(path);
       FileOutputStream stream = new FileOutputStream(path);
       new org.hl7.fhir.r5.elementmodel.XmlParser(context).compose(r.getElement(), stream, OutputStyle.PRETTY, igpkp.getCanonical());
       stream.close();
     }
     if (igpkp.wantGen(r, "json") || forHL7orFHIR()) {
-      String path = Utilities.path(tempDir, r.getElement().fhirType()+"-"+r.getId()+".json");
+      path = Utilities.path(tempDir, r.getElement().fhirType()+"-"+r.getId()+".json");
       f.getOutputNames().add(path);
       FileOutputStream stream = new FileOutputStream(path);
       new org.hl7.fhir.r5.elementmodel.JsonParser(context).compose(r.getElement(), stream, OutputStyle.PRETTY, igpkp.getCanonical());
       stream.close();
     } 
     if (igpkp.wantGen(r, "ttl")) {
-      String path = Utilities.path(tempDir, r.getElement().fhirType()+"-"+r.getId()+".ttl");
+      path = Utilities.path(tempDir, r.getElement().fhirType()+"-"+r.getId()+".ttl");
       f.getOutputNames().add(path);
       FileOutputStream stream = new FileOutputStream(path);
       new org.hl7.fhir.r5.elementmodel.TurtleParser(context).compose(r.getElement(), stream, OutputStyle.PRETTY, igpkp.getCanonical());
