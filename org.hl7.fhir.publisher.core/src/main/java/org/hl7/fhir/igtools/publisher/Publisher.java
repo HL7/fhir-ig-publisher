@@ -5525,11 +5525,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       JsonArray oids = new JsonArray();
       JsonArray urls = new JsonArray();
       for (Identifier id : cr.getIdentifier()) {
-        if ("urn:ietf:rfc:3986".equals(id.getSystem()) && id.hasValue()) {
-          if (id.getValue().startsWith("urn:oid:")) {
-            oids.add(id.getValue().substring(8));
-          } else {
-            urls.add(id.getValue());
+        if (id != null) {
+          if("urn:ietf:rfc:3986".equals(id.getSystem()) && id.hasValue()) {
+            if (id.getValue().startsWith("urn:oid:")) {
+              oids.add(id.getValue().substring(8));
+            } else {
+              urls.add(id.getValue());
+            }
           }
         }
       }
@@ -5560,11 +5562,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       CommaSeparatedStringBuilder bu = new CommaSeparatedStringBuilder(); 
       CommaSeparatedStringBuilder bo = new CommaSeparatedStringBuilder(); 
       for (Identifier id : cr.getIdentifier()) {
-        if ("urn:ietf:rfc:3986".equals(id.getSystem()) && id.hasValue()) {
-          if (id.getValue().startsWith("urn:oid:")) {
-            bo.append(id.getValue().substring(8));
-          } else {
-            bu.append(id.getValue());
+        if (id != null) {
+          if ("urn:ietf:rfc:3986".equals(id.getSystem()) && id.hasValue()) {
+            if (id.getValue().startsWith("urn:oid:")) {
+              bo.append(id.getValue().substring(8));
+            } else {
+              bu.append(id.getValue());
+            }
           }
         }
       }
