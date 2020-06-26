@@ -299,7 +299,7 @@ public class HTLMLInspector {
 
   private void listFiles(String folder, List<String> loadList) {
     for (File f : new File(folder).listFiles()) {
-      if (!exceptions.contains(f.getAbsolutePath())) {
+      if (!Utilities.startsWithInList(f.getAbsolutePath(), exceptions)) {
         if (f.isDirectory()) {
           listFiles(f.getAbsolutePath(), loadList);
         } else {

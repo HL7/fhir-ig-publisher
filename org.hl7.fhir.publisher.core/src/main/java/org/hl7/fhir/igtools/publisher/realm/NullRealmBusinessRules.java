@@ -20,7 +20,7 @@ public class NullRealmBusinessRules extends RealmBusinessRules {
     // nothing        
   }
 
-  public void addOtherFiles(Set<String> otherFilesRun) {
+  public void addOtherFiles(Set<String> otherFilesRun, String outputDir) {
     // nothing            
   }
 

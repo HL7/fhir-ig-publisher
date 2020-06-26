@@ -3689,7 +3689,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   
   private RealmBusinessRules makeRealmBusinessRules() {
     if (expectedJurisdiction != null && expectedJurisdiction.getCode().equals("US")) {
-      return new USRealmBusinessRules(context, version, tempDir, igpkp.getCanonical());
+      return new USRealmBusinessRules(context, version, tempDir, igpkp.getCanonical(), igpkp);
     } else {
       return new NullRealmBusinessRules();
     }
@@ -4643,7 +4643,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Submitting Usage Stats failed: "+e.getMessage());
     }
     
-    realmRules.addOtherFiles(otherFilesRun);
+    realmRules.addOtherFiles(otherFilesRun, outputDir);
     otherFilesRun.add(Utilities.path(tempDir, "usage-stats.json"));
     
     cleanOutput(tempDir);
@@ -4722,7 +4722,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         statusMessage = Utilities.escapeXml(sourceIg.present())+" - Local Development build (v"+businessVersion+"). See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>";
       }
               
-      realmRules.addOtherFiles(inspector.getExceptions());
+      realmRules.addOtherFiles(inspector.getExceptions(), outputDir);
       List<ValidationMessage> linkmsgs = inspector.check(statusMessage);
       int bl = 0;
       int lf = 0;
