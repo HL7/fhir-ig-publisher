@@ -4,7 +4,12 @@ title: FHIR IGPublisher Release Notes
 
 # FHIR IGPublisher Release Notes
 
-## Current (not released yet) 
+## Current (not released yet) 
+(no changes yet)
+
+## v1.0.101 (2020-06-30)
+
+
 
 *  Validator: Two significant bug fixes for the validator (thanks Mark Burnett from Babylon Health for finding them):
   * The validator was not enforcing type restrictions when some profiles restricted elements with choices to a single type
@@ -319,4 +324,4 @@ title: FHIR IGPublisher Release Notes
 * Snapshot generation: handle profiles on Bundle.entry.resource properly
 
 ## v1.0.61 (2020-02-02)
-
+
