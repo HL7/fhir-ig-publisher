@@ -666,6 +666,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private boolean noFSH;
 
+  private Set<String> loadedIds;
+
+  private boolean duplicateInputResourcesDetected;
+
   
   private class PreProcessInfo {
     private String xsltName;
@@ -2914,6 +2918,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       cql.execute();
     }
     fetcher.setRootDir(rootDir);
+    loadedIds = new HashSet<>();
+    duplicateInputResourcesDetected = false;
     // load any bundles
     if (sourceDir != null || igpkp.isAutoPath())
       needToBuild = loadResources(needToBuild, igf);
@@ -2953,6 +2959,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (f!=null)
           igpkp.findConfiguration(f, r);
       }
+    }
+    if (duplicateInputResourcesDetected) {
+      throw new Error("Unable to continue because duplicate input resources were identified");
     }
 
     // load static pages
@@ -3356,6 +3365,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (res == null) {
           f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, "Bundle.element["+i+"]", "All entries must have resources when loading a bundle", IssueSeverity.ERROR));
         } else {
+          checkResourceUnique(res.fhirType()+"/"+res.getIdBase());
           FetchedResource r = f.addResource();
           r.setElement(res);
           r.setId(res.getIdBase());
@@ -3481,6 +3491,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       f.setBundleType(FetchedBundleType.SPREADSHEET);
       f.getBundle().setResource(bnd);
       for (BundleEntryComponent b : bnd.getEntry()) {
+        checkResourceUnique(b.getResource().fhirType()+"/"+b.getResource().getIdBase());
         FetchedResource r = f.addResource();
         r.setResource(b.getResource());
         r.setId(b.getResource().getId());
@@ -3495,6 +3506,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (String id : f.getValuesetsToLoad().keySet()) {
       if (!knownValueSetIds.contains(id)) {
         String vr = f.getValuesetsToLoad().get(id);
+        checkResourceUnique("ValueSet/"+id);
+
         FetchedFile fv = fetcher.fetchFlexible(vr);
         boolean vrchanged = noteFile("sp-ValueSet/"+vr, fv);
         if (vrchanged) {
@@ -3848,6 +3861,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     
     if (e != null) {
       try {
+        checkResourceUnique(e.fhirType()+"/"+e.getIdBase());
         boolean altered = false;
 
         String id = e.getChildValue("id");
@@ -3935,6 +3949,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         throw new Exception("Unable to determine type for  "+file.getName()+": " +ex.getMessage(), ex);
       }
     }
+  }
+
+  public void checkResourceUnique(String tid) throws Error {
+    if (loadedIds.contains(tid)) {
+      System.out.println("Duplicate Resource in IG: "+tid);
+      duplicateInputResourcesDetected = true;
+    }
+    loadedIds.add(tid);
   }
 
   private ImplementationGuideDefinitionResourceComponent findIGReference(String type, String id) {
@@ -6748,8 +6770,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
   
   private void saveDirectResourceOutputs(FetchedFile f, FetchedResource r, Resource res, Map<String, String> vars) throws FileNotFoundException, Exception {
-   if (igpkp.wantGen(r, "maturity") && res != null)
+    if (igpkp.wantGen(r, "maturity") && res != null) {
       fragment(res.fhirType()+"-"+r.getId()+"-maturity",  genFmmBanner(r), f.getOutputNames());
+    }
+    if (igpkp.wantGen(r, "validate")) {
+      fragment(r.fhirType()+"-"+r.getId()+"-validate",  genValidation(f, r), f.getOutputNames());
+    }
 
     String template = igpkp.getProperty(r, "template-format");
     if (igpkp.wantGen(r, "xml")) {
@@ -6832,6 +6858,25 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         "</tr></tbody></table>";
     else
       return "";
+  }
+
+  private String genValidation(FetchedFile f, FetchedResource r) throws FHIRException {
+    StringBuilder b = new StringBuilder();
+    String version = mode == IGBuildMode.AUTOBUILD ? "current" : mode == IGBuildMode.PUBLICATION ? publishedIg.getVersion() : "dev";
+    if (isExample(f, r)) {
+      // we're going to use javascript to determine the relative path of this for the user.
+      b.append("<p><b>Validation Links:</b></p><ul><li><a href=\"https://confluence.hl7.org/display/FHIR/Using+the+FHIR+Validator\">Validate using FHIR Validator</a> (Java): <code id=\"vl-"+r.fhirType()+"-"+r.getId()+"\">$cmd$</code></li></ul>\r\n");  
+      b.append("<script type=\"text/javascript\">\r\n");
+      b.append("  var x = window.location.href;\r\n");
+      b.append("  document.getElementById(\"vl-"+r.fhirType()+"-"+r.getId()+"\").innerHTML = \"java -jar [path]/org.hl7.fhir.validator.jar -ig "+publishedIg.getPackageId()+"#"+version+" \"+x.substr(0, x.lastIndexOf(\".\")).replace(\"file:///\", \"\") + \".json\";\r\n");
+      b.append("</script>\r\n");
+    } else if (r.getResource() instanceof StructureDefinition) {
+      b.append("<p>Validate this resource:</b></p><ul><li><a href=\"https://confluence.hl7.org/display/FHIR/Using+the+FHIR+Validator\">Validate using FHIR Validator</a> (Java): <code>"+
+          "java -jar [path]/org.hl7.fhir.validator.jar -ig "+publishedIg.getPackageId()+"#"+version+" -profile "+((StructureDefinition) r.getResource()).getUrl()+" [resource-to-validate]"+
+          "</code></li></ul>\r\n");        
+    } else {
+    } 
+    return b.toString();
   }
 
   private void genWrapper(FetchedFile ff, FetchedResource r, String template, String outputName, Set<String> outputTracker, Map<String, String> vars, String format, String extension) throws FileNotFoundException, IOException, FHIRException {
