@@ -9,7 +9,8 @@ pool:
   vmImage: "ubuntu-16.04"
 
 variables:
-  currentImage: $(imageName)
+- group: PGP_VAR_GROUP
+- group: SONATYPE_VAR_GROUP
 
 steps:
   # Runs 'mvn package'
