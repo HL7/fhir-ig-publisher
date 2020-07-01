@@ -205,11 +205,8 @@ public class USRealmBusinessRules extends RealmBusinessRules {
     // no checks    
   }
 
-
   public void addOtherFiles(Set<String> otherFilesRun, String outputDir) throws IOException {
-    if (comparisons.size() > 0) {
-      otherFilesRun.add(Utilities.path(outputDir, "us-core-comparisons"));
-    }
+    otherFilesRun.add(Utilities.path(outputDir, "us-core-comparisons"));
   }
 
   @Override
@@ -234,7 +231,6 @@ public class USRealmBusinessRules extends RealmBusinessRules {
       e.printStackTrace();
     }
   }
-
 
   @Override
   public String checkHtml() {

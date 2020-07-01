@@ -190,6 +190,7 @@ public class HTLMLInspector {
   private String statusText;
   private List<String> exemptHtmlPatterns = new ArrayList<>();
   private boolean missingPublishBox;
+  private List<String> missingPublishBoxList = new ArrayList<>();
   private Set<String> exceptions = new HashSet<>();
 
   public HTLMLInspector(String rootFolder, List<SpecMapManager> specs, ILoggingService log, String canonical, String packageId) {
@@ -251,6 +252,7 @@ public class HTLMLInspector {
             
           }
           missingPublishBox = true;
+          missingPublishBoxList.add(s.substring(rootFolder.length()+1));
           first = false;
         }
       }
@@ -796,6 +798,15 @@ public class HTLMLInspector {
 
   public Set<String> getExceptions() {
     return exceptions;
+  }
+
+  public String getMissingPublishboxSummary() {
+    if (missingPublishBoxList.size() > 10) {
+      return Integer.toString(missingPublishBoxList.size())+" files";
+    } else {
+      return missingPublishBoxList.toString();
+    }
+
   }
 
   
