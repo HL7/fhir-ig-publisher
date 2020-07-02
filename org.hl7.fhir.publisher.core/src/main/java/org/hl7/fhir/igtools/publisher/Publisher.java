@@ -105,6 +105,7 @@ import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.exceptions.PathEngineException;
 import org.hl7.fhir.igtools.publisher.FetchedFile.FetchedBundleType;
 import org.hl7.fhir.igtools.publisher.IFetchFile.FetchState;
+import org.hl7.fhir.igtools.publisher.ProvenanceDetails.ProvenanceDetailsTarget;
 import org.hl7.fhir.igtools.publisher.Publisher.IGBuildMode;
 import org.hl7.fhir.igtools.publisher.Publisher.JsonDependency;
 import org.hl7.fhir.igtools.publisher.Publisher.ListItemEntry;
@@ -884,21 +885,45 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           logDebugMessage(LogCategory.PROGRESS, "Process Provenance "+f.getName()+" : "+r.getId());
           processProvenance(igpkp.getLinkFor(r, true), r.getElement(), r.getResource());
         } else if (r.fhirType().equals("Bundle")) {
-          Bundle b = (Bundle) r.getResource();
-          List<Element> entries = r.getElement().getChildrenByName("entry");
-          for (int i = 0; i < entries.size(); i++) {
-            Element entry = entries.get(i);
-            Element res = entry.getNamedChild("resource");
-            if (res != null && "Provenance".equals(res.fhirType())) {
-              logDebugMessage(LogCategory.PROGRESS, "Process Provenance "+f.getName()+" : "+r.getId()+".entry["+i+"]");
-              processProvenance(igpkp.getLinkFor(r, true), res, b == null ? null : b.getEntry().get(i).getResource());
-            }
-          }
+          processProvenanceEntries(f, r);
         }
       }
     }    
   }
 
+  public void processProvenanceEntries(FetchedFile f, FetchedResource r) throws Exception {
+    Bundle b = (Bundle) r.getResource();
+    List<Element> entries = r.getElement().getChildrenByName("entry");
+    for (int i = 0; i < entries.size(); i++) {
+      Element entry = entries.get(i);
+      Element res = entry.getNamedChild("resource");
+      if (res != null && "Provenance".equals(res.fhirType())) {
+        logDebugMessage(LogCategory.PROGRESS, "Process Provenance "+f.getName()+" : "+r.getId()+".entry["+i+"]");
+        processProvenance(igpkp.getLinkFor(r, true), res, b == null ? null : b.getEntry().get(i).getResource());
+      }
+    }
+  }
+
+  private ProvenanceDetails processProvenanceForBundle(FetchedFile f, String path, Element r) throws Exception {
+    Provenance pv = (Provenance) convertFromElement(r);
+    ProvenanceDetails pd = processProvenance(path, pv);
+
+    for (Reference entity : pv.getTarget()) {
+      String ref = entity.getReference();
+      FetchedResource target = getResourceForRef(f, ref);
+      String p, d;
+      if (target == null) {
+        p = null;
+        d = entity.hasDisplay() ? entity.getDisplay() : ref;
+      } else {
+        p = igpkp.getLinkFor(target, true);
+        d = target.getTitle() != null ? target.getTitle() : entity.hasDisplay() ? entity.getDisplay() : ref;
+      }
+      pd.getTargets().add(pd.new ProvenanceDetailsTarget(p, d));
+    }    
+    return pd;    
+  }
+  
   private void processProvenance(String path, Element resource, Resource r) throws Exception {
     Provenance pv =  (Provenance) (r == null ? convertFromElement(resource) : r);
     RendererFactory.factory(pv, rc.setParser(getTypeLoader(null))).render(pv);
@@ -6835,8 +6860,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     if (igpkp.wantGen(r, "html")) {
       XhtmlNode xhtml = getXhtml(f, r);
-      String html = xhtml == null ? "" : new XhtmlComposer(XhtmlComposer.XML).compose(xhtml);
-      fragment(r.getElement().fhirType()+"-"+r.getId()+"-html", html, f.getOutputNames(), r, vars, null);
+      if (xhtml == null && HistoryGenerator.allEntriesAreHistoryProvenance(r.getElement())) {
+        RenderingContext ctxt = rc.copy().setParser(getTypeLoader(f, r));
+        List<ProvenanceDetails> entries = loadProvenanceForBundle(igpkp.getLinkFor(r, true), r.getElement(), f);
+        xhtml = new HistoryGenerator(ctxt).generateForBundle(entries); 
+        fragment(r.getElement().fhirType()+"-"+r.getId()+"-html", new XhtmlComposer(XhtmlComposer.XML).compose(xhtml), f.getOutputNames(), r, vars, null);
+      } else {
+        String html = xhtml == null ? "" : new XhtmlComposer(XhtmlComposer.XML).compose(xhtml);
+        fragment(r.getElement().fhirType()+"-"+r.getId()+"-html", html, f.getOutputNames(), r, vars, null);
+      }
     }
 
     if (igpkp.wantGen(r, "history")) {
@@ -6850,6 +6882,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     //  xhtml = getXhtml(f);
     //  html = xhtml == null ? "" : new XhtmlComposer().compose(xhtml);
     //  fragment(f.getId()+"-gen-html", html);
+  }
+
+  private List<ProvenanceDetails> loadProvenanceForBundle(String path, Element bnd, FetchedFile f) throws Exception {
+    List<ProvenanceDetails> ret = new ArrayList<>();
+    List<Element> entries = bnd.getChildrenByName("entry");
+    for (int i = 0; i < entries.size(); i++) {
+      Element entry = entries.get(i);
+      Element res = entry.getNamedChild("resource");
+      if (res != null && "Provenance".equals(res.fhirType())) {
+        ret.add(processProvenanceForBundle(f, path, res));
+      }
+    }
+    return ret;
   }
 
   private void saveDirectResourceOutputsContained(FetchedFile f, FetchedResource r, Resource res, Map<String, String> vars, String prefixForContained) throws FileNotFoundException, Exception {
