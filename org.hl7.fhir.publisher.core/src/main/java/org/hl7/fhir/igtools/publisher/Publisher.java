@@ -1763,6 +1763,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.setHintAboutNonMustSupport(hintAboutNonMustSupport);
     validator.setAnyExtensionsAllowed(anyExtensionsAllowed);
     validator.setAllowExamples(true);
+    validator.setCrumbTrails(true);
     
     pvalidator = new ProfileValidator(context);
     csvalidator = new CodeSystemValidator(context);
@@ -2114,6 +2115,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.setHintAboutNonMustSupport(bool(configuration, "hintAboutNonMustSupport"));
     validator.setAnyExtensionsAllowed(bool(configuration, "anyExtensionsAllowed"));
     validator.setAllowExamples(true);
+    validator.setCrumbTrails(true);
     
     pvalidator = new ProfileValidator(context);
     csvalidator = new CodeSystemValidator(context);
@@ -5543,11 +5545,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     JsonArray list = new JsonArray();
     for (CanonicalResource cr : crlist) {
       JsonObject obj = new JsonObject();
-      obj.addProperty("url", cr.getUrl());
       obj.addProperty("id", cr.getId());
       obj.addProperty("type", cr.fhirType());
-      obj.addProperty("version", cr.getVersion());
-      obj.addProperty("name", cr.getName());
+      if (cr.hasUrl()) {
+        obj.addProperty("url", cr.getUrl());
+      }
+      if (cr.hasVersion()) {
+        obj.addProperty("version", cr.getVersion());
+      }
+      if (cr.hasName()) {
+        obj.addProperty("name", cr.getName());
+      }
       JsonArray oids = new JsonArray();
       JsonArray urls = new JsonArray();
       for (Identifier id : cr.getIdentifier()) {
