@@ -1,39 +1,5 @@
-@echo off
-
-set oldver=1.0.100
-set newver=1.0.101
-
-echo ..
-echo =============================================================================
-echo upgrade and release fhir IG Publisher from %oldver%-SNAPSHOT to %newver%-SNAPSHOT
-echo =============================================================================
-echo ..
-
-call mvn versions:set -DnewVersion=%newver%-SNAPSHOT
-
-cd C:\work\org.hl7.fhir\fhir-ig-publisher
-
-rmdir /S/Q C:\Users\graha\.fhir\packages
-call C:\work\org.hl7.fhir\test-igs\update.bat
-cd C:\work\org.hl7.fhir\fhir-ig-publisher
-
-call "C:\tools\fnr.exe" -dir "C:\work\org.hl7.fhir\build" -fileMask "*.xml" -find "%oldver%-SNAPSHOT" -replace "%newver%-SNAPSHOT" -count 1
-call "C:\tools\fnr.exe" -dir "C:\work\org.hl7.fhir\latest-ig-publisher" -fileMask "*.html" -find "%oldver%" -replace "%newver%" -count 1
-call "C:\tools\fnr.exe" -dir "C:\work\org.hl7.fhir\latest-ig-publisher" -fileMask "*.json" -find "%oldver%" -replace "%newver%" -count 1
-call "C:\tools\fnr.exe" -dir "C:\work\org.hl7.fhir\test-igs" -fileMask "*.bat" -find "%oldver%" -replace "%newver%" -count 1
-call mvn clean deploy -Dmaven.test.redirectTestOutputToFile=false -DdeployAtEnd=true 
-IF %ERRORLEVEL% NEQ 0 ( 
-  GOTO DONE
-)
-
-rem call C:\work\org.hl7.fhir\test-igs\upgrade.bat
-cd C:\work\org.hl7.fhir\fhir-ig-publisher
 
 call "C:\tools\versionNotes.exe" -fileName C:\work\org.hl7.fhir\fhir-ig-publisher\release-notes-publisher.md -version %newver% -fileDest C:\temp\current-release-notes-publisher.md -url https://storage.googleapis.com/ig-build/org.hl7.fhir.publisher.jar -maven https://oss.sonatype.org/service/local/artifact/maven/redirect?r=snapshots&g=org.hl7.fhir.publisher&a=org.hl7.fhir.publisher.cli&v=%newver%-SNAPSHOT&e=jar
-
-call git commit -t v%newver% -a -m "Release new version %newver%"
-call git tag v%newver%
-call git push origin master
 
 call gsutil cp -a public-read org.hl7.fhir.publisher.cli\target\org.hl7.fhir.publisher.cli-%newver%-SNAPSHOT.jar gs://ig-build/org.hl7.fhir.publisher.jar
 cd c:\work\org.hl7.fhir\latest-ig-publisher
