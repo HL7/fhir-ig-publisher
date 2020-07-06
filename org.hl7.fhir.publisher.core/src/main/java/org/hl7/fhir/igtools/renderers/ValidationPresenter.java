@@ -805,7 +805,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     if (!toolsVersion.equals(currentToolsVersion)) {
       b.append(", which is out of date. The current version is ");
       b.append(currentToolsVersion);      
-      b.append(" <a href=\"https://storage.googleapis.com/ig-build/org.hl7.fhir.publisher.jar\">Download Latest</a>");
+      b.append(" <a href=\"https://github.com/HL7/fhir-ig-publisher/releases/latest/download/publisher.jar\">Download Latest</a>");
     }
     b.append("</p>");
     return b.toString();

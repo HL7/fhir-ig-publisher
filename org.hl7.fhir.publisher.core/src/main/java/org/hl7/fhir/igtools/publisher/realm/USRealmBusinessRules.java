@@ -23,6 +23,7 @@ import org.hl7.fhir.igtools.publisher.realm.USRealmBusinessRules.ProfilePair;
 import org.hl7.fhir.r5.comparison.ComparisonRenderer;
 import org.hl7.fhir.r5.comparison.ComparisonSession;
 import org.hl7.fhir.r5.conformance.ProfileUtilities;
+import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.PackageVersion;
 import org.hl7.fhir.r5.model.CanonicalResource;
@@ -79,13 +80,15 @@ public class USRealmBusinessRules extends RealmBusinessRules {
   private List<ProfilePair> comparisons = new ArrayList<>();
 
   private String name;
+  private ProfileKnowledgeProvider pkp;
 
-  public USRealmBusinessRules(IWorkerContext context, String version, String dstDir, String canonical) {
+  public USRealmBusinessRules(IWorkerContext context, String version, String dstDir, String canonical, ProfileKnowledgeProvider pkp) {
     super();
     this.context = context;
     this.version = version;
     this.dstDir = dstDir;
     this.keygen = new KeyGenerator(canonical);
+    this.pkp = pkp;
   }
 
 
@@ -202,17 +205,14 @@ public class USRealmBusinessRules extends RealmBusinessRules {
     // no checks    
   }
 
-
-  public void addOtherFiles(Set<String> otherFilesRun) throws IOException {
-    if (comparisons.size() > 0) {
-      otherFilesRun.add(Utilities.path(dstDir, "us-core-comparisons"));
-    }
+  public void addOtherFiles(Set<String> otherFilesRun, String outputDir) throws IOException {
+    otherFilesRun.add(Utilities.path(outputDir, "us-core-comparisons"));
   }
 
   @Override
   public void finishChecks() throws DefinitionException, FHIRFormatError, IOException {
     try {
-      ComparisonSession session = new ComparisonSession(context, "Comparison of "+name+" with US-Core");
+      ComparisonSession session = new ComparisonSession(context, "Comparison of "+name+" with US-Core", pkp);
       //    session.setDebug(true);
       for (ProfilePair c : comparisons) {
         System.out.println("US Core Comparison: compare "+c.local+" to "+c.uscore);
@@ -231,7 +231,6 @@ public class USRealmBusinessRules extends RealmBusinessRules {
       e.printStackTrace();
     }
   }
-
 
   @Override
   public String checkHtml() {

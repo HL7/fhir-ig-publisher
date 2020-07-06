@@ -1,19 +1,24 @@
 package org.hl7.fhir.igtools.renderers;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
 import org.hl7.fhir.igtools.publisher.ProvenanceDetails;
+import org.hl7.fhir.igtools.publisher.ProvenanceDetails.ProvenanceDetailsTarget;
 import org.hl7.fhir.igtools.renderers.HistoryGenerator.HistoryListSorter;
+import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
+import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.DateTimeType;
 import org.hl7.fhir.r5.model.Reference;
+import org.hl7.fhir.r5.renderers.utils.ElementWrappers.ResourceWrapperMetaElement;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceWithReference;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
@@ -45,9 +50,14 @@ public class HistoryGenerator {
     if (r.getAudits().isEmpty()) {
       return null;
     } else {
+      return internalGenerate(r.getAudits(), false);
+    }
+  }
+  
+  public XhtmlNode internalGenerate(List<ProvenanceDetails> entries, boolean showTargets) throws IOException {
       // prep
-      Collections.sort(r.getAudits(), new HistoryListSorter());
-      List<Coding> actorTypes = scanActors(r.getAudits());
+      Collections.sort(entries, new HistoryListSorter());
+      List<Coding> actorTypes = scanActors(entries);
       
       // framework
       XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
@@ -57,6 +67,9 @@ public class HistoryGenerator {
       
       // headers
       XhtmlNode tr = tbl.tr();
+      if (showTargets) {
+        tr.td().b().tx("Resource");        
+      }
       tr.td().b().tx("Date");
       tr.td().b().tx("Action");
       for (Coding c : actorTypes) {
@@ -71,9 +84,23 @@ public class HistoryGenerator {
       }
       tr.td().b().tx("Comment");
       // rows
-      for (ProvenanceDetails pd : r.getAudits()) {
+      for (ProvenanceDetails pd : entries) {
         tr = tbl.tr();
-        tr.td().ah(pd.getPath()).tx(pd.getDate().asStringValue().substring(0, 10));
+        if (showTargets) {
+          XhtmlNode td = tr.td();
+          boolean first = true;
+          for (ProvenanceDetailsTarget t : pd.getTargets()) {
+            if (first) first = false; else td.tx(", "); 
+            if (t.getPath() == null) {
+              td.tx(t.getDisplay());             
+            } else {
+              td.ah(t.getPath()).tx(t.getDisplay());
+            }
+          }
+        }
+        
+        tr.td().ah(pd.getPath()).tx(pd.getDate().asStringValue().substring(0, 10));          
+        
 
         XhtmlNode td = tr.td(); 
         CodeSystem cs = context.getWorker().fetchCodeSystem(pd.getAction().getSystem());
@@ -107,7 +134,6 @@ public class HistoryGenerator {
       }
       return div;
     }
-  }
 
   private Reference getActor(ProvenanceDetails pd, Coding c) {
     for (Coding t : pd.getActors().keySet()) {
@@ -134,5 +160,22 @@ public class HistoryGenerator {
     return res;
   }
 
+  public static boolean allEntriesAreHistoryProvenance(Element resource) throws UnsupportedEncodingException, FHIRException, IOException {
+    if (!resource.fhirType().equals("Bundle")) {
+      return false;
+    }
+    List<Element> entries = resource.getChildrenByName("entry");
+    for (Element be : entries) {
+      if (!"Provenance".equals(be.getNamedChild("resource").fhirType())) {
+        return false;
+      }
+    }
+    return !entries.isEmpty();
+  }
 
+  public XhtmlNode generateForBundle(List<ProvenanceDetails> entries) throws IOException {
+    return internalGenerate(entries, true);
+  }
+
+  
 }

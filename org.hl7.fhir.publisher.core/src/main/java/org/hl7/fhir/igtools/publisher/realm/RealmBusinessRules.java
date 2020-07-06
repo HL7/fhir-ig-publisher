@@ -17,7 +17,7 @@ public abstract class RealmBusinessRules {
   public abstract void checkCR(FetchedFile f, CanonicalResource resource);
   public abstract void finishChecks() throws DefinitionException, FHIRFormatError, IOException;
   
-  public abstract void addOtherFiles(Set<String> otherFilesRun) throws IOException;
+  public abstract void addOtherFiles(Set<String> otherFilesRun, String outputDir) throws IOException;
   public abstract String checkHtml();
   public abstract String checkText();
 
