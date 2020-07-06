@@ -1057,6 +1057,8 @@ public class IgSpreadsheetParser {
     ex.setAbstract(false);
     if ("http://hl7.org/fhir".equals(base))
       ex.setVersion(Constants.VERSION);
+    else
+      ex.setVersion(sheet.getColumn(row, "Version"));
 
     String context = null;
     if (Utilities.noString(name))
