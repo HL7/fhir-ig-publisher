@@ -924,18 +924,24 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return pd;    
   }
   
-  private void processProvenance(String path, Element resource, Resource r) throws Exception {
-    Provenance pv =  (Provenance) (r == null ? convertFromElement(resource) : r);
-    RendererFactory.factory(pv, rc.setParser(getTypeLoader(null))).render(pv);
-    
-    for (Reference entity : pv.getTarget()) {
-      if (entity.hasReference()) {
-        String[] ref = entity.getReference().split("\\/");
-        int i = chooseType(ref);
-        if (i >= 0) {
-          FetchedResource res = fetchByResource(ref[i], ref[i+1]);
-          if (res != null) {
-            res.getAudits().add(processProvenance(path, pv));
+  private void processProvenance(String path, Element resource, Resource r) {
+    Provenance pv = null;
+    try {
+      pv = (Provenance) (r == null ? convertFromElement(resource) : r);
+      RendererFactory.factory(pv, rc.setParser(getTypeLoader(null))).render(pv);
+    } catch (Exception e) {
+      // nothing, if there's a problem, we'll take it up elsewhere
+    }
+    if (pv != null) {
+      for (Reference entity : pv.getTarget()) {
+        if (entity.hasReference()) {
+          String[] ref = entity.getReference().split("\\/");
+          int i = chooseType(ref);
+          if (i >= 0) {
+            FetchedResource res = fetchByResource(ref[i], ref[i+1]);
+            if (res != null) {
+              res.getAudits().add(processProvenance(path, pv));
+            }
           }
         }
       }

@@ -129,8 +129,9 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
           err++;
         else if (vm.getLevel().equals(ValidationMessage.IssueSeverity.WARNING))
           warn++;
-        else
+        else if (!vm.isSignpost()) {
           info++;
+        }
       }
     }
     
@@ -142,8 +143,9 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
         err++;
       else if (vm.getLevel().equals(ValidationMessage.IssueSeverity.WARNING))
         warn++;
-      else
+      else if (!vm.isSignpost()) {
         info++;
+      }
     }
     
     StringBuilder b = new StringBuilder();
@@ -246,7 +248,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
 
   private void getMatchingMessages(FetchedFile f, String n, List<FiledValidationMessage> fvml, Map<String, String> filteredMessages) {
     for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages.keySet())) {
-      if (n.equals(vm.getMessageId())) {
+      if (n.equals(vm.getMessageId()) && !vm.isSignpost()) {
         fvml.add(new FiledValidationMessage(f, vm));
       }
     }
@@ -561,7 +563,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     if ("0".equals(ec))
       t.add("color", "#EFFFEF");
     else
-      t.add("color", colorForLevel(IssueSeverity.ERROR));
+      t.add("color", colorForLevel(IssueSeverity.ERROR, false));
       
     return t.render();
   }
@@ -578,7 +580,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     if ("0".equals(ec))
       t.add("color", "#EFFFEF");
     else
-      t.add("color", colorForLevel(IssueSeverity.ERROR));
+      t.add("color", colorForLevel(IssueSeverity.ERROR, false));
       
     return t.render();
   }
@@ -621,7 +623,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private Object otherCount(List<ValidationMessage> list) {
     int c = 0;
     for (ValidationMessage vm : list) {
-      if (vm.getLevel() == IssueSeverity.INFORMATION || vm.getLevel() == IssueSeverity.WARNING)
+      if (!vm.isSignpost() && (vm.getLevel() == IssueSeverity.INFORMATION || vm.getLevel() == IssueSeverity.WARNING))
         c++;
     }
     return Integer.toString(c);
@@ -691,9 +693,9 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       t.add("path", makeLocal(vm.getLocation())+lineCol(vm));
       t.add("pathlink", vm.getLocationLink());
     }
-    t.add("level", vm.isSlicingHint() ? "Slicing Information" : vm.getLevel().toCode());
-    t.add("color", colorForLevel(vm.getLevel()));
-    t.add("halfcolor", halfColorForLevel(vm.getLevel()));
+    t.add("level", vm.isSlicingHint() ? "Slicing Information" : vm.isSignpost() ? "Process Info" : vm.getLevel().toCode());
+    t.add("color", colorForLevel(vm.getLevel(), vm.isSignpost()));
+    t.add("halfcolor", halfColorForLevel(vm.getLevel(), vm.isSignpost()));
     t.add("id", "l"+id);
     t.add("msg", vm.getHtml());
     t.add("msgdetails", vm.isSlicingHint() ? vm.getSliceHtml() : vm.getHtml());
@@ -720,13 +722,14 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       t.add("path", makeLocal(vm.getLocation())+lineCol(vm));
       t.add("pathlink", vm.getLocationLink());
     }
-    t.add("level", vm.isSlicingHint() ? "Slicing Information" : vm.getLevel().toCode());
-    t.add("color", colorForLevel(vm.getLevel()));
-    t.add("halfcolor", halfColorForLevel(vm.getLevel()));
+    t.add("level", vm.isSlicingHint() ? "Slicing Information" : vm.isSignpost() ? "Process Info" : vm.getLevel().toCode());
+    t.add("color", colorForLevel(vm.getLevel(), vm.isSignpost()));
+    t.add("halfcolor", halfColorForLevel(vm.getLevel(), vm.isSignpost()));
     t.add("msg", vm.getHtml());
     t.add("msgdetails", vm.isSlicingHint() ? vm.getSliceHtml() : vm.getHtml());
     return t.render();
   }
+  
   private String lineCol(ValidationMessage vm) {
     return vm.getLine() > 0 ? " (l"+vm.getLine()+"/c"+vm.getCol()+")" : "";
   }
@@ -735,12 +738,15 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     ST t = template(detailsTemplateText);
     t.add("path", vm.getLocation());
     t.add("level", vm.getLevel().toCode());
-    t.add("color", colorForLevel(vm.getLevel()));
+    t.add("color", colorForLevel(vm.getLevel(), vm.isSignpost()));
     t.add("msg", vm.getHtml());
     return t.render();
   }
 
-  private String colorForLevel(IssueSeverity level) {
+  private String colorForLevel(IssueSeverity level, boolean signpost) {
+    if (signpost) {
+      return "#d6feff";
+    }
     switch (level) {
     case ERROR:
       return "#ffcccc";
@@ -753,7 +759,10 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     }
   }
 
-  private String halfColorForLevel(IssueSeverity level) {
+  private String halfColorForLevel(IssueSeverity level, boolean signpost) {
+    if (signpost) {
+      return "#e3feff";
+    }
     switch (level) {
     case ERROR:
       return "#ffeeee";
