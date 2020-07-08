@@ -2964,7 +2964,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     int i = 0;
     for (ImplementationGuideDefinitionResourceComponent res : publishedIg.getDefinition().getResource()) {
       if (!res.hasReference())
-        throw new Exception("Missing source reference on a reesource in the IG with the name '"+res.getName()+"' (index = "+i+")");
+        throw new Exception("Missing source reference on a resource in the IG with the name '"+res.getName()+"' (index = "+i+")");
       i++;
       FetchedFile f = null;
       if (!bndIds.contains(res.getReference().getReference()) && !res.hasUserData("loaded.resource")) { // todo: this doesn't work for differential builds
@@ -3658,11 +3658,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (String s : metadataResourceNames()) 
       load(s);
     generateSnapshots();
+    generateNarratives();
     for (String s : metadataResourceNames()) 
       validate(s);
     
     loadLists();
-    generateNarratives();
     checkConformanceResources();
     generateLogicalMaps();
 //    load("StructureMap"); // todo: this is a problem...
@@ -8090,7 +8090,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   
   private String fetchCurrentIGPubVersion() {
     if (currVer == null) {
-      
       try {
         JsonObject json = fetchJson("https://fhir.github.io/latest-ig-publisher/tools.json");
         currVer = json.getAsJsonObject("publisher").get("version").getAsString();
