@@ -8087,12 +8087,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     parentInspector.getManual().add("../"+historyPage);
     parentInspector.getSpecMaps().addAll(specMaps);
   }
-  
+
   private String fetchCurrentIGPubVersion() {
     if (currVer == null) {
       try {
-        JsonObject json = fetchJson("https://fhir.github.io/latest-ig-publisher/tools.json");
-        currVer = json.getAsJsonObject("publisher").get("version").getAsString();
+        // This calls the GitHub api, to fetch the info on the latest release. As part of our release process, we name
+        // all tagged releases as the version number. ex: "1.1.2".
+        // This value can be grabbed from the "tag_name" field, or the "name" field of the returned JSON.
+        JsonObject json = fetchJson("https://api.github.com/repos/HL7/fhir-ig-publisher/releases/latest");
+        currVer = json.getAsJsonObject().get("name").getAsString();
       } catch (IOException e) {
         currVer = "?pub-ver-1?";
       }
