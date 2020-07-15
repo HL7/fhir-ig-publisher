@@ -2597,7 +2597,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
     String webref = pi.getWebLocation();
-    
+    webref = fixPackageUrl(webref);
+
     SpecMapManager igm = pi.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion()) : SpecMapManager.createForSimplifier(pi);
     igm.setName(name);
     igm.setBase(canonical);
@@ -2751,6 +2752,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     String location = dep.has("location") ? dep.get("location").getAsString() : ""; 
     if (location.startsWith(".."))
       webref = location;
+    webref = fixPackageUrl(webref);
     
     String ver = pi.fhirVersion();
     SpecMapManager igm = new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), ver);
@@ -2766,6 +2768,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     jsonDependencies .add(new JsonDependency(name, canonical, pi.name(), pi.version()));
   }
 
+
+  // workaround for past publishing problem
+  private String fixPackageUrl(String webref) {
+    if (webref.equals("file://C:\\GitHub\\hl7.fhir.us.qicore#4.0.0\\output")) {
+      return "http://hl7.org/fhir/us/qicore/STU4";
+    }
+    return webref;
+  }
 
   private NpmPackage resolveDependency(String canonical, String packageId, String igver) throws Exception {
     if (packageId != null) 
