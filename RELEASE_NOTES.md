@@ -6,4 +6,5 @@
 * Renderer: fix rendering of must-support view 
 * Renderer: fix rendering of multiple type profiles 
 * Renderer: fix bundle rendering
+* Renderer: process markdown when generating lists of resources
 * Fix check for current version number
