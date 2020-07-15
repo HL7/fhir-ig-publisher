@@ -303,7 +303,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     if (ed.getUserData("path") == null)
       return "<li><a href=\""+"extension-"+ed.getId().toLowerCase()+".html\">"+url+"</a>"+(modifier ? " (<b>"+translate("sd.summary", "Modifier")+"</b>) " : "")+"</li>\r\n";    
     else
-      return "<li><a href=\""+ed.getUserString("path")+"\">"+url+"</a>"+(modifier ? " (<b>"+translate("sd.summary", "Modifier")+"</b>) " : "")+"</li>\r\n";    
+      return "<li><a href=\""+Utilities.escapeXml(ed.getUserString("path"))+"\">"+url+"</a>"+(modifier ? " (<b>"+translate("sd.summary", "Modifier")+"</b>) " : "")+"</li>\r\n";    
   }
 
   private String describeProfile(String url, String prefix) throws Exception {
@@ -313,9 +313,8 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     StructureDefinition ed = context.fetchResource(StructureDefinition.class, url);
     if (ed == null)
       return "<li>"+translate("sd.summary", "unable to summarise profile %s (no profile found)",url)+"</li>";
-    return "<li><a href=\""+ed.getUserString("path")+"\">"+url+"</a></li>\r\n";    
+    return "<li><a href=\""+Utilities.escapeXml(ed.getUserString("path"))+"\">"+url+"</a></li>\r\n";    
   }
-
 
   private String summariseValue(DataType fixed) throws FHIRException {
     if (fixed instanceof org.hl7.fhir.r5.model.PrimitiveType)
@@ -381,18 +380,26 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     {
       XhtmlComposer composer = new XhtmlComposer(XhtmlComposer.HTML);
       StructureDefinition sdCopy = sd.copy();
+      Set<ElementDefinition> mustSupport = new HashSet<>();
+      
       List<ElementDefinition> mustSupportElements = new ArrayList<ElementDefinition>();
 
       // Scan through all the properties checking for must support elements
       // and clear properties in the cloned StructureDefinition that we don't want to
       // show in the custom view
+      scanForMustSupport(mustSupport, sdCopy.getSnapshot().getElement(), sdCopy.getSnapshot().getElementFirstRep(), new ArrayList<>());
       for (ElementDefinition ed : sdCopy.getSnapshot().getElement()) {
-        if (ed.hasMustSupport() && ed.getMustSupport() || !ed.getPath().contains(".")) {
+        if (mustSupport.contains(ed)) {
           ElementDefinition edCopy = ed.copy();
           if (edCopy.hasExample())
             edCopy.getExample().clear();
-          if (edCopy.hasBinding())
+          if (!edCopy.getMustSupport()) {
+            if (edCopy.getPath().contains(".")) {
+              edCopy.setUserData("render.opaque", true);
+            }
             edCopy.setBinding(null);
+            ed.getConstraint().clear();
+          }
           edCopy.setMustSupport(false);
           mustSupportElements.add(edCopy);
         }
@@ -402,6 +409,22 @@ public class StructureDefinitionRenderer extends BaseRenderer {
       org.hl7.fhir.utilities.xhtml.XhtmlNode table = utils.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, prefix, "", false, false, outputTracker, true);
 
       return composer.compose(table);
+    }
+  }
+
+  private void scanForMustSupport(Set<ElementDefinition> mustSupport, List<ElementDefinition> elements, ElementDefinition element, List<ElementDefinition> parents) {
+    if (parents.isEmpty() || element.hasMustSupport() && element.getMustSupport()) {
+      mustSupport.add(element);
+      for (ElementDefinition parent : parents) {
+        mustSupport.add(parent);
+      }
+    }
+    List<ElementDefinition> children = getChildren(elements, element);
+    for (ElementDefinition child : children) {
+      List<ElementDefinition> np = new ArrayList<>();
+      np.addAll(parents);
+      np.add(element);
+      scanForMustSupport(mustSupport, elements, child, np);
     }
   }
 
@@ -1010,7 +1033,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
           b.append(tp.getValue());
         else {
           String pth = p.getUserString("path");
-          b.append("<a href=\""+pth+"\" title=\""+tp.getValue()+"\">");
+          b.append("<a href=\""+Utilities.escapeXml(pth)+"\" title=\""+tp.getValue()+"\">");
           b.append(p.getName());
           b.append("</a>");
         }
@@ -1079,18 +1102,18 @@ public class StructureDefinitionRenderer extends BaseRenderer {
         return def.getDescription();
       BindingResolution br = igp.resolveBinding(sd, def, path);
       String defDesc = def.getDescription()==null ? "" : Utilities.escapeXml(def.getDescription()) + "<br/>";
-      String s = defDesc+conf(def)+ "<a href=\""+br.url+"\">"+Utilities.escapeXml(br.display)+"</a>"+confTail(def);
+      String s = defDesc+conf(def)+ "<a href=\""+Utilities.escapeXml(br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>"+confTail(def);
       if (def.hasExtension(ToolingExtensions.EXT_MAX_VALUESET)) {
         br = igp.resolveBinding(sd, ToolingExtensions.readStringExtension(def, ToolingExtensions.EXT_MAX_VALUESET), path);
         s = s + "<br/>";
         s = s + "<a style=\"font-weight:bold\" title=\"Max Value Set Extension\" href=\""+prefix+"extension-elementdefinition-maxvalueset.html\">Max Binding</a>: ";             
-        s = s + (br.url == null ? Utilities.escapeXml(br.display) : "<a href=\""+ (Utilities.isAbsoluteUrl(br.url) || !igp.prependLinks() ? br.url : prefix+br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>");
+        s = s + (br.url == null ? Utilities.escapeXml(br.display) : "<a href=\""+ (Utilities.isAbsoluteUrl(br.url) || !igp.prependLinks() ? Utilities.escapeXml(br.url) : prefix+br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>");
       }
       if (def.hasExtension(ToolingExtensions.EXT_MIN_VALUESET)) {
         br = igp.resolveBinding(sd, ToolingExtensions.readStringExtension(def, ToolingExtensions.EXT_MIN_VALUESET), path);
         s = s + "<br/>";
         s = s + "<a style=\"font-weight:bold\" title=\"Min Value Set Extension\" href=\""+prefix+"extension-elementdefinition-minvalueset.html\">Min Binding</a>: ";             
-        s = s + (br.url == null ? Utilities.escapeXml(br.display) : "<a href=\""+ (Utilities.isAbsoluteUrl(br.url) || !igp.prependLinks() ? br.url : prefix+br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>");
+        s = s + (br.url == null ? Utilities.escapeXml(br.display) : "<a href=\""+ (Utilities.isAbsoluteUrl(br.url) || !igp.prependLinks() ? Utilities.escapeXml(br.url) : prefix+br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>");
       }      
       return s;
     }
@@ -1186,7 +1209,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
         if (url == null)
           s.append("<a name=\""+map.getIdentity() +"\"> </a><h3>"+translate("sd.maps", "Mappings for %s (%s)", Utilities.escapeXml(gt(map.getNameElement())), Utilities.escapeXml(map.getUri()))+"</h3>");
         else
-          s.append("<a name=\""+map.getIdentity() +"\"> </a><h3>"+translate("sd.maps", "Mappings for %s (<a href=\""+url+"\">%s</a>)", Utilities.escapeXml(gt(map.getNameElement())), Utilities.escapeXml(map.getUri()))+"</h3>");
+          s.append("<a name=\""+map.getIdentity() +"\"> </a><h3>"+translate("sd.maps", "Mappings for %s (<a href=\""+Utilities.escapeXml(url)+"\">%s</a>)", Utilities.escapeXml(gt(map.getNameElement())), Utilities.escapeXml(map.getUri()))+"</h3>");
         if (map.hasComment())
           s.append("<p>"+Utilities.escapeXml(gt(map.getCommentElement()))+"</p>");
 //        else if (specmaps != null && preambles.has(map.getUri()))   
@@ -1314,7 +1337,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
       b.append("<p>\r\n");
       StructureDefinition sdb = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition());
       if (sdb != null)
-        b.append(translate("sd.header", "This profile builds on")+" <a href=\""+sdb.getUserString("path")+"\">"+gt(sdb.getNameElement())+"</a>.");
+        b.append(translate("sd.header", "This profile builds on")+" <a href=\""+Utilities.escapeXml(sdb.getUserString("path"))+"\">"+gt(sdb.getNameElement())+"</a>.");
       else
         b.append(translate("sd.header", "This profile builds on")+" "+sd.getBaseDefinition()+".");
       b.append("</p>\r\n");
@@ -1335,7 +1358,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
             if (Utilities.noString(name))
               name = "example";
             String ref = igp.getLinkFor(r, true);
-            b.append(" <li><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a></li>\r\n");
+            b.append(" <li><a href=\""+Utilities.escapeXml(ref)+"\">"+Utilities.escapeXml(name)+"</a></li>\r\n");
           }
         }
       }
@@ -1357,7 +1380,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
               title = f.getTitle();
             String ref = igp.getLinkFor(r, true);
             b.append(" <tr>\r\n");
-            b.append("   <td><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a></td>\r\n");
+            b.append("   <td><a href=\""+Utilities.escapeXml(ref)+"\">"+Utilities.escapeXml(name)+"</a></td>\r\n");
             b.append("   <td>"+Utilities.escapeXml(title)+"</td>\r\n");
             b.append(" </tr>\r\n");
           }
