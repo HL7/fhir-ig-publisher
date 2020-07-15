@@ -192,6 +192,7 @@ public class HTLMLInspector {
   private boolean missingPublishBox;
   private List<String> missingPublishBoxList = new ArrayList<>();
   private Set<String> exceptions = new HashSet<>();
+  private boolean referencesValidatorPack;
 
   public HTLMLInspector(String rootFolder, List<SpecMapManager> specs, ILoggingService log, String canonical, String packageId) {
     this.rootFolder = rootFolder.replace("/", File.separator);
@@ -256,10 +257,15 @@ public class HTLMLInspector {
           first = false;
         }
       }
-      if (lf.getXhtml() != null)
+      if (lf.getXhtml() != null) {
+        referencesValidatorPack = false;
         if (checkLinks(s, "", lf.getXhtml(), null, messages, false) != NodeChangeType.NONE) { // returns true if changed
           saveFile(lf);
         }
+        if (referencesValidatorPack) {
+          messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, s, "The html source references validator.pack which is deprecated. Change the IG to describe the use of the package system instead", IssueSeverity.ERROR));                      
+        }
+      }
     }
  
     log.logDebugMessage(LogCategory.HTML, "Checking Other Links");
@@ -457,18 +463,28 @@ public class HTLMLInspector {
 
   private NodeChangeType checkLinks(String s, String path, XhtmlNode x, String uuid, List<ValidationMessage> messages, boolean inPre) throws IOException {
     boolean changed = false;
-    if (x.getName() != null)
+    if (x.getName() != null) {
       path = path + "/"+ x.getName();
-    if ("title".equals(x.getName()) && Utilities.noString(x.allText()))
+    } else {
+      if (x.getContent() != null && x.getContent().contains("validator.pack")) {
+        referencesValidatorPack = true;
+      }
+    }
+    if ("title".equals(x.getName()) && Utilities.noString(x.allText())) {
       x.addText("?html-link?");
-    if ("a".equals(x.getName()) && x.hasAttribute("href"))
+    }
+    if ("a".equals(x.getName()) && x.hasAttribute("href")) {
       changed = checkResolveLink(s, x.getLocation(), path, x.getAttribute("href"), x.allText(), messages, uuid);
-    if ("img".equals(x.getName()) && x.hasAttribute("src"))
+    }
+    if ("img".equals(x.getName()) && x.hasAttribute("src")) {
       changed = checkResolveImageLink(s, x.getLocation(), path, x.getAttribute("src"), messages, uuid) || changed;
-    if ("link".equals(x.getName()))
+    }
+    if ("link".equals(x.getName())) {
       changed = checkLinkElement(s, x.getLocation(), path, x.getAttribute("href"), messages, uuid) || changed;
-    if ("script".equals(x.getName()))
+    }
+    if ("script".equals(x.getName())) {
       checkScriptElement(s, x.getLocation(), path, x, messages);
+    }
     String nuid = UUID.randomUUID().toString().toLowerCase();
     boolean nchanged = false;
     boolean nSelfChanged = false;
@@ -510,13 +526,17 @@ public class HTLMLInspector {
 
   private boolean checkResolveLink(String filename, Location loc, String path, String ref, String text, List<ValidationMessage> messages, String uuid) throws IOException {
     links++;
-    String rref = ref;
+    String rref = Utilities.URLDecode(ref);
     if ((rref.startsWith("http:") || rref.startsWith("https:") ) && (rref.endsWith(".sch") || rref.endsWith(".xsd") || rref.endsWith(".shex"))) { // work around for the fact that spec.internals does not track all these minor things 
       rref = Utilities.changeFileExt(ref, ".html");
     }
-    if (rref.startsWith("./"))
+    if (rref.startsWith("./")) {
       rref = rref.substring(2);
+    }
     
+    if (rref.contains("validator.pack")) {
+      referencesValidatorPack = true;
+    }
     String tgtList = "";
     boolean resolved = Utilities.existsInList(ref, "qa.html", "http://hl7.org/fhir", "http://hl7.org", "http://www.hl7.org", "http://hl7.org/fhir/search.cfm") || 
         ref.startsWith("http://gforge.hl7.org/gf/project/fhir/tracker/") || ref.startsWith("mailto:") || ref.startsWith("javascript:");
@@ -538,8 +558,9 @@ public class HTLMLInspector {
     
     if (!resolved) {
       String fref = Utilities.path(Utilities.getDirectoryForFile(filename), ref);
-      if (fref.equals(Utilities.path(rootFolder, "qa.html")))
+      if (fref.equals(Utilities.path(rootFolder, "qa.html"))) {
         resolved = true;
+      }
     }
     // special case end-points that are always valid:
      if (!resolved)
@@ -552,8 +573,9 @@ public class HTLMLInspector {
         resolved = true;
         if (specs != null) {
           for (SpecMapManager spec : specs) {
-            if (rref.startsWith(spec.getBase()))
+            if (rref.startsWith(spec.getBase())) {
               resolved = false;
+            }
           }
         }
       } else { 
