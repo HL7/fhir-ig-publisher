@@ -19,7 +19,6 @@ steps:
             echo "Your RELEASE_NOTES.md file is empty. Please provide release notes before creating a release."
             exit 1
       fi
-      displayName: 'RELEASE_NOTES.md check'
 
   # This task pulls the <version> value from the pom.xml file, so we can set it to the variable $version
   - task: PowerShell@2
