@@ -113,7 +113,12 @@ public class TemplateManager {
     boolean noScripts = true;
     JsonObject config = null;
     if (npm.hasFile(Utilities.path("package", "$root"), "config.json")) {
-      config = JsonTrackingParser.parseJson(npm.load(Utilities.path("package", "$root"), "config.json"));
+      try {
+        config = JsonTrackingParser.parseJson(npm.load(Utilities.path("package", "$root"), "config.json"));
+      } catch (Exception e) {
+        TextFile.streamToFile(npm.load(Utilities.path("package", "$root"), "config.json"), Utilities.path("[tmp]", npm.name()+"#"+npm.version()+"$config.json"));
+        throw new FHIRException("Error parsing "+npm.name()+"#"+npm.version()+"#"+Utilities.path("package", "$root", "config.json")+": "+e.getMessage(), e);
+      }
       configs.add(config);
       noScripts = !config.has("script") && !config.has("targets");
     }  

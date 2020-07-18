@@ -1823,6 +1823,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (sourceIg.hasLicense())
       license = sourceIg.getLicense().toCode();
     npmName = sourceIg.getPackageId();
+    if (Utilities.noString(npmName)) {
+      throw new Error("No packageId provided in the implementation guide resource - cannot build this IG");
+    }
     appendTrailingSlashInDataFile = true;
     includeHeadings = template.getIncludeHeadings();
     igArtifactsPage = template.getIGArtifactsPage();
@@ -2594,7 +2597,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
     String webref = pi.getWebLocation();
-    
+    webref = fixPackageUrl(webref);
+
     SpecMapManager igm = pi.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion()) : SpecMapManager.createForSimplifier(pi);
     igm.setName(name);
     igm.setBase(canonical);
@@ -2748,6 +2752,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     String location = dep.has("location") ? dep.get("location").getAsString() : ""; 
     if (location.startsWith(".."))
       webref = location;
+    webref = fixPackageUrl(webref);
     
     String ver = pi.fhirVersion();
     SpecMapManager igm = new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), ver);
@@ -2763,6 +2768,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     jsonDependencies .add(new JsonDependency(name, canonical, pi.name(), pi.version()));
   }
 
+
+  // workaround for past publishing problem
+  private String fixPackageUrl(String webref) {
+    if (webref.equals("file://C:\\GitHub\\hl7.fhir.us.qicore#4.0.0\\output")) {
+      return "http://hl7.org/fhir/us/qicore/STU4";
+    }
+    return webref;
+  }
 
   private NpmPackage resolveDependency(String canonical, String packageId, String igver) throws Exception {
     if (packageId != null) 
@@ -6147,10 +6160,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     fragment("table-logicals-mm", tableMM.toString(), otherFilesRun);
   }
 
-  private void genEntryItem(
-        StringBuilder list, StringBuilder lists, StringBuilder table, 
-        StringBuilder listMM, StringBuilder listsMM, StringBuilder tableMM, 
-        FetchedFile f, FetchedResource r, String name, String prefixType) throws Exception {
+  private void genEntryItem(StringBuilder list, StringBuilder lists, StringBuilder table, StringBuilder listMM, StringBuilder listsMM, StringBuilder tableMM, FetchedFile f, FetchedResource r, String name, String prefixType) throws Exception {
     String ref = igpkp.doReplacements(igpkp.getLinkFor(r, false), r, null, null);
     if (Utilities.noString(ref))
       throw new Exception("No reference found for "+r.getId());
@@ -6159,18 +6169,30 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         ref = ref.substring(0, ref.lastIndexOf("."))+"."+prefixType+ref.substring(ref.lastIndexOf("."));
       else
         ref = ref+"."+prefixType;
-    PrimitiveType desc = new StringType(r.getTitle());
-    if (!r.hasTitle())
-      desc = new StringType(f.getTitle());
+    String desc = r.getTitle();
+    String descSrc = "Resource Title";
+    if (!r.hasTitle()) {
+      desc = f.getTitle();
+      descSrc = "File Title";
+    }
     if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
       name = ((CanonicalResource) r.getResource()).present();
-      desc = getDesc((CanonicalResource) r.getResource(), desc);
+      String d = getDesc((CanonicalResource) r.getResource()).asStringValue();
+      if (d != null) {
+        desc = markdownEngine.process(d, descSrc);
+        descSrc = "Canonical Resource";
+      }
     } else if (r.getElement() != null && r.getElement().hasChild("description")) {
-      desc = new StringType(r.getElement().getChildValue("description"));
+      String d = new StringType(r.getElement().getChildValue("description")).asStringValue();
+      if (d != null) {
+        desc = markdownEngine.process(d, descSrc);
+        // new BaseRenderer(context, null, igpkp, specMaps, markdownEngine, packge, rc).processMarkdown("description", desc )
+        descSrc = "Canonical Resource Source";
+      }
     }
-    list.append(" <li><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a> "+Utilities.escapeXml(desc.asStringValue())+"</li>\r\n");
+    list.append(" <li><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a> "+desc+"</li>\r\n");
     lists.append(" <li><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a></li>\r\n");
-    table.append(" <tr><td><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a> </td><td>"+new BaseRenderer(context, null, igpkp, specMaps, markdownEngine, packge, rc).processMarkdown("description", desc )+"</td></tr>\r\n");
+    table.append(" <tr><td><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a> </td><td>"+desc+"</td></tr>\r\n");
     
     if (listMM != null) {
       String mm = "";
@@ -6181,9 +6203,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           mm = " <a class=\"fmm\" href=\"http://hl7.org/fhir/versions.html#maturity\" title=\"Maturity Level\">"+fmm+"</a>";
         }
       }
-      listMM.append(" <li><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a>"+mm+" "+Utilities.escapeXml(desc.asStringValue())+"</li>\r\n");
+      listMM.append(" <li><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a>"+mm+" "+desc+"</li>\r\n");
       listsMM.append(" <li><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a>"+mm+"</li>\r\n");
-      tableMM.append(" <tr><td><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a> </td><td>"+new BaseRenderer(context, null, igpkp, specMaps, markdownEngine, packge, rc).processMarkdown("description", desc )+"</td><td>"+mm+"</td></tr>\r\n");
+      tableMM.append(" <tr><td><a href=\""+ref+"\">"+Utilities.escapeXml(name)+"</a> </td><td>"+desc+"</td><td>"+mm+"</td></tr>\r\n");
     }
   }
 
@@ -6263,10 +6285,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   @SuppressWarnings("rawtypes")
-  private PrimitiveType getDesc(CanonicalResource r, PrimitiveType desc) {
-    if (r.hasDescription())
-      return r.getDescriptionElement();
-    return desc;
+  private PrimitiveType getDesc(CanonicalResource r) {
+    return r.getDescriptionElement();
   }
 
   private Number getErrorCount() {
@@ -6794,7 +6814,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (String templateName : extraTemplates.keySet()) {
       String output = igpkp.getProperty(r, templateName);
        if (output == null)
-        output = r.getElement().fhirType()+"-"+r.getId()+"-"+templateName+".html";
+        output = r.getElement().fhirType()+"-"+r.getId()+"_"+res.getId()+"-"+templateName+".html";
       genWrapperContained(null, r, res, igpkp.getPropertyContained(r, "template-"+templateName, res), output, f.getOutputNames(), vars, null, templateName, prefixForContained);
     }
   }
@@ -7926,8 +7946,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   public String getJekyllCommand() {
     return this.jekyllCommand;
   }
-
-
 
   public static String determineActualIG(String ig, IGBuildMode mode) throws Exception {
     File f = new File(ig);
