@@ -148,7 +148,7 @@ public class SpecMapManager {
     return str(spec, "webUrl");
   }
 
-  public String getPath(String url) throws Exception {
+  public String getPath(String url) throws FHIRException {
     if (url == null) {
       return null;
     }
