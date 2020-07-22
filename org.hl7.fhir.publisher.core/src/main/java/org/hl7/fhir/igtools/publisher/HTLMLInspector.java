@@ -47,6 +47,7 @@ import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService.LogCategory;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
+import org.hl7.fhir.utilities.cache.PackageHacker;
 import org.hl7.fhir.utilities.cache.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.cache.FilesystemPackageCacheManager.VersionHistory;
 import org.hl7.fhir.utilities.json.JSONUtil;
@@ -537,6 +538,9 @@ public class HTLMLInspector {
     if (rref.contains("validator.pack")) {
       referencesValidatorPack = true;
     }
+    if (ref.startsWith("data:")) {
+      return true;
+    }
     String tgtList = "";
     boolean resolved = Utilities.existsInList(ref, "qa.html", "http://hl7.org/fhir", "http://hl7.org", "http://www.hl7.org", "http://hl7.org/fhir/search.cfm") || 
         ref.startsWith("http://gforge.hl7.org/gf/project/fhir/tracker/") || ref.startsWith("mailto:") || ref.startsWith("javascript:");
@@ -691,7 +695,7 @@ public class HTLMLInspector {
       pi = pcm.addPackageToCache(id, ver, src, url);
     }    
     SpecMapManager sm = new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.getNpm().getAsJsonObject("dependencies").get("hl7.fhir.core").getAsString());
-    sm.setBase(url);
+    sm.setBase(PackageHacker.fixPackageUrl(url));
     return sm;
   }
 

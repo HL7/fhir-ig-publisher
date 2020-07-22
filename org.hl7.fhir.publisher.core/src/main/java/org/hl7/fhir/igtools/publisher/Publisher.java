@@ -268,6 +268,7 @@ import org.hl7.fhir.utilities.ZipGenerator;
 import org.hl7.fhir.utilities.cache.NpmPackage;
 import org.hl7.fhir.utilities.cache.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.cache.PackageGenerator.PackageType;
+import org.hl7.fhir.utilities.cache.PackageHacker;
 import org.hl7.fhir.utilities.json.JSONUtil;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.hl7.fhir.utilities.turtle.Turtle;
@@ -1748,7 +1749,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient(webTxServer.getAddress(), FhirPublication.fromCode(version)), txLog));
     
     loadPubPack();
-    if (!dependsOnUTG(sourceIg.getDependsOn())) {
+    if (!dependsOnUTG(sourceIg.getDependsOn()) && !sourceIg.getPackageId().contains("hl7.terminology")) {
       loadUTG();
     }
     igpkp = new IGKnowledgeProvider(context, checkAppendSlash(specPath), determineCanonical(sourceIg.getUrl(), "ImplementationGuide.url"), template.config(), errors, VersionUtilities.isR2Ver(version), template);
@@ -2105,7 +2106,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       throw new Exception("You must define a canonicalBase in the json file");
 
     loadPubPack();
-    if (!dependsOnUTG(configuration.getAsJsonArray("dependencyList"))) {
+    if (!dependsOnUTG(configuration.getAsJsonArray("dependencyList")) && !npmName.contains("hl7.terminology")) {
       loadUTG();
     }
 
@@ -2626,12 +2627,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
     String webref = pi.getWebLocation();
-    webref = fixPackageUrl(webref);
+    webref = PackageHacker.fixPackageUrl(webref);
 
     SpecMapManager igm = pi.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion()) : SpecMapManager.createForSimplifier(pi);
     igm.setName(name);
     igm.setBase(canonical);
-    igm.setBase2(pi.url());
+    igm.setBase2(PackageHacker.fixPackageUrl(pi.url()));
     specMaps.add(igm);
     if (!VersionUtilities.versionsCompatible(version, igm.getVersion())) {
       log("Version mismatch. This IG is version "+version+", while the IG '"+name+"' is from version "+igm.getVersion()+" (will try to run anyway)");
@@ -2727,13 +2728,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     String location = dep.has("location") ? dep.get("location").getAsString() : ""; 
     if (location.startsWith(".."))
       webref = location;
-    webref = fixPackageUrl(webref);
+    webref = PackageHacker.fixPackageUrl(webref);
     
     String ver = pi.fhirVersion();
     SpecMapManager igm = new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), ver);
     igm.setName(name);
-    igm.setBase(webref);
-    igm.setBase2(canonical);
+    igm.setBase2(PackageHacker.fixPackageUrl(webref));
+    igm.setBase(canonical);
     specMaps.add(igm);
     if (!VersionUtilities.versionsCompatible(version, igm.getVersion())) {
       log("Version mismatch. This IG is for FHIR version "+version+", while the IG '"+name+"' is for FHIR version "+igm.getVersion()+" (will try to run anyway)");
@@ -2743,14 +2744,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     jsonDependencies .add(new JsonDependency(name, canonical, pi.name(), pi.version()));
   }
 
-
-  // workaround for past publishing problem
-  private String fixPackageUrl(String webref) {
-    if (webref.equals("file://C:\\GitHub\\hl7.fhir.us.qicore#4.0.0\\output")) {
-      return "http://hl7.org/fhir/us/qicore/STU4";
-    }
-    return webref;
-  }
 
   private NpmPackage resolveDependency(String canonical, String packageId, String igver) throws Exception {
     if (packageId != null) 
@@ -2871,7 +2864,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   public SpecMapManager loadSpecDetails(byte[] bs) throws IOException {
     SpecMapManager map = new SpecMapManager(bs, version);
-    map.setBase(specPath);
+    map.setBase(PackageHacker.fixPackageUrl(specPath));
     specMaps.add(map);
     return map;
   }
