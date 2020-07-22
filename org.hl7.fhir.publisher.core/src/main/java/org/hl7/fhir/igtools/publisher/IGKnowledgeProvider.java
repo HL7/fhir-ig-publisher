@@ -336,7 +336,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     return doReplacements(getProperty(r, "defns"), r, null, null);
   }
 
-  // base specification only
+  // base specification only, only the old json style
   public void loadSpecPaths(SpecMapManager paths) throws Exception {
     this.specPaths = paths;
     for (CanonicalResource bc : context.allConformanceResources()) {
@@ -344,7 +344,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       if (s == null) {
         s = paths.getPath(bc.getUrl());
       }
-      if (s == null && bc instanceof CodeSystem) { // work around f                                                                                                                  or an R2 issue) 
+      if (s == null && bc instanceof CodeSystem) { // work around for an R2 issue) 
         CodeSystem cs = (CodeSystem) bc;
         s = paths.getPath(cs.getValueSet());
       }
@@ -485,7 +485,6 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       assert pathToSpec != null;
       return Utilities.pathURL(pathToSpec, path);
     }
-      
   }
 
   public String specPath() {
