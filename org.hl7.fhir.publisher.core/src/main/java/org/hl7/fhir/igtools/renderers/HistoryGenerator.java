@@ -18,11 +18,14 @@ import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.DateTimeType;
 import org.hl7.fhir.r5.model.Reference;
+import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.renderers.utils.ElementWrappers.ResourceWrapperMetaElement;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceWithReference;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.model.AuditEvent.AuditEventAction;
+import org.hl7.fhir.r5.model.Bundle;
+import org.hl7.fhir.r5.model.Bundle.BundleEntryComponent;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
 import org.hl7.fhir.utilities.xhtml.NodeType;
@@ -171,6 +174,18 @@ public class HistoryGenerator {
       }
     }
     return !entries.isEmpty();
+  }
+
+  public static boolean allEntriesAreHistoryProvenance(Resource resource) throws UnsupportedEncodingException, FHIRException, IOException {
+    if (!resource.fhirType().equals("Bundle")) {
+      return false;
+    }
+    for (BundleEntryComponent be : ((Bundle) resource).getEntry()) {
+      if (!"Provenance".equals(be.getResource().fhirType())) {
+        return false;
+      }
+    }
+    return ((Bundle) resource).hasEntry();
   }
 
   public XhtmlNode generateForBundle(List<ProvenanceDetails> entries) throws IOException {

@@ -892,6 +892,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   public void processProvenanceEntries(FetchedFile f, FetchedResource r) throws Exception {
     Bundle b = (Bundle) r.getResource();
+    if (!r.isExample()) {
+      return;
+    }
     List<Element> entries = r.getElement().getChildrenByName("entry");
     for (int i = 0; i < entries.size(); i++) {
       Element entry = entries.get(i);
@@ -6343,7 +6346,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                 }
                 generateResourceHtml(f, regen, r, cr, vars, prefixForContained);                  
               } else {
-                generateResourceHtml(f, regen, r, contained, vars, prefixForContained);
+                if (igpkp.wantGen(r, "html")) {
+                  XhtmlNode xhtml = contained instanceof DomainResource ? ((DomainResource) contained).getText().getDiv() : null;
+                  String html = xhtml == null ? "" : new XhtmlComposer(XhtmlComposer.XML).compose(xhtml);
+                  fragment(contained.fhirType()+"-"+prefixForContained+contained.getId()+"-html", html, f.getOutputNames(), r, vars, prefixForContained);
+//                  fragment(contained.fhirType()+"-"+contained.getId()+"-html", html, f.getOutputNames(), r, vars, prefixForContained);
+                }
+                generateResourceHtml(f, regen, r, contained, vars, prefixForContained);                
               }
             }
           }
@@ -6357,7 +6366,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
-  public void generateResourceHtml(FetchedFile f, boolean regen, FetchedResource r, Resource res, Map<String, String> vars, String prefixForContainer) {
+  public boolean generateResourceHtml(FetchedFile f, boolean regen, FetchedResource r, Resource res, Map<String, String> vars, String prefixForContainer) {
+    boolean result = true;
     try {
 
       // now, start generating resource type specific stuff
@@ -6392,6 +6402,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         generateOutputsQuestionnaire(f, r, (Questionnaire) res, vars, prefixForContainer);
       default:
         // nothing to do...
+        result = false;
       }
     } catch (Exception e) {
       log("Exception generating resource "+f.getName()+"::"+r.fhirType()+"/"+r.getId()+(!Utilities.noString(prefixForContainer) ? "#"+res.getId() : "")+": "+e.getMessage());
@@ -6400,6 +6411,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           log("   "+m.toString());
       }
     }
+    return result;
   }
 
 
