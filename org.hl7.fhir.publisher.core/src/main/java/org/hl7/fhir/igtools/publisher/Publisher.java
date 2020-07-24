@@ -121,6 +121,7 @@ import org.hl7.fhir.igtools.publisher.utils.IGWebSiteMaintainer;
 import org.hl7.fhir.igtools.renderers.BaseRenderer;
 import org.hl7.fhir.igtools.renderers.CodeSystemRenderer;
 import org.hl7.fhir.igtools.renderers.CrossViewRenderer;
+import org.hl7.fhir.igtools.renderers.DependencyRenderer;
 import org.hl7.fhir.igtools.renderers.HistoryGenerator;
 import org.hl7.fhir.igtools.renderers.JsonXhtmlRenderer;
 import org.hl7.fhir.igtools.renderers.OperationDefinitionRenderer;
@@ -256,6 +257,7 @@ import org.hl7.fhir.utilities.CSFile;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.JsonMerger;
+import org.hl7.fhir.utilities.Logger;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.NDJsonWriter;
@@ -640,7 +642,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private List<String> bundles = new ArrayList<>();
   private List<String> mappings = new ArrayList<>();
   private List<String> generateVersions = new ArrayList<>();
-  RealmBusinessRules realmRules;
+  private RealmBusinessRules realmRules;
+  private PreviousVersionComparator previousVersionComparator;
 
   private IGPublisherLiquidTemplateServices templateProvider;
 
@@ -671,6 +674,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private Set<String> loadedIds;
 
   private boolean duplicateInputResourcesDetected;
+
+  private List<String> comparisonVersions;
 
   
   private class PreProcessInfo {
@@ -727,7 +732,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             long endTime = System.nanoTime();
             processTxLog(Utilities.path(destDir != null ? destDir : outputDir, "qa-tx.html"));
             ValidationPresenter val = new ValidationPresenter(version, businessVersion, igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
-                new BallotChecker(repoRoot).check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), "v"+IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules);
+                new BallotChecker(repoRoot).check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), "v"+IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator,
+                new DependencyRenderer(pcm, outputDir).render(publishedIg));
             log("Finished. "+presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
             recordOutcome(null, val);
           }
@@ -859,7 +865,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       long endTime = System.nanoTime();
       clean();
       ValidationPresenter val = new ValidationPresenter(version, businessVersion, igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
-          new BallotChecker(repoRoot).check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), "v"+IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules);
+          new BallotChecker(repoRoot).check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), "v"+IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator,
+          new DependencyRenderer(pcm, outputDir).render(publishedIg));
       if (isChild()) {
         log("Finished. "+presentDuration(endTime - startTime));      
       } else {
@@ -1371,6 +1378,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       initializeFromJson();
     expectedJurisdiction = checkForJurisdiction();
     realmRules = makeRealmBusinessRules();
+    previousVersionComparator = makePreviousVersionComparator();
   }
   
   private Coding checkForJurisdiction() {
@@ -1638,6 +1646,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         businessVersion = sourceIg.getVersion();
       } else if (p.getCode().equals("generate-version")) {     
         generateVersions.add(p.getValue());
+      } else if (p.getCode().equals("version-comparison")) {     
+        if (comparisonVersions == null) {
+          comparisonVersions = new ArrayList<>();
+        }
+        if ("n/a".equals(p.getValue())) {
+          comparisonVersions.add(p.getValue());
+        }        
       } else if (p.getCode().equals("validation")) {
         if (p.getValue().equals("check-must-support"))
           hintAboutNonMustSupport = true;
@@ -2109,7 +2124,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       throw new Exception("You must define a canonicalBase in the json file");
 
     loadPubPack();
-    if (!dependsOnUTG(configuration.getAsJsonArray("dependencyList")) && !npmName.contains("hl7.terminology")) {
+    if (!dependsOnUTG(configuration.getAsJsonArray("dependencyList")) && (npmName == null || !npmName.contains("hl7.terminology"))) {
       loadUTG();
     }
 
@@ -2487,7 +2502,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     Utilities.createDirectory(Utilities.path(adHocTmpDir, "pages"));
   }
 
-  private SimpleWorkerContext  loadCorePackage() throws Exception {
+  private SimpleWorkerContext loadCorePackage() throws Exception {
     NpmPackage pi = null;
     
     String v = version.equals(Constants.VERSION) ? "current" : version;
@@ -2524,7 +2539,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     
     SpecMapManager spm = loadSpecDetails(TextFile.streamToBytes(pi.load("other", "spec.internals")));
     SimpleWorkerContext sp;
-    IContextResourceLoader loader = makeLoader(version, new PublisherLoader(pi, spm, specPath, igpkp));
+    IContextResourceLoader loader = new PublisherLoader(pi, spm, specPath, igpkp).makeLoader();
     sp = SimpleWorkerContext.fromPackage(pi, loader);
     sp.loadBinariesFromFolder(pi);
     
@@ -2536,26 +2551,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
     return sp;    
-  }
-
-
-  private IContextResourceLoader makeLoader(String ver, PublisherLoader loader) {
-    // there's no penalty for listing resources that don't exist, so we just all the relevant possibilities for all versions 
-    String[] types = new String[] {"CodeSystem", "ValueSet", "ConceptMap", "NamingSystem",
-                                   "StructureDefinition", "StructureMap", 
-                                   "SearchParameter", "OperationDefinition", "CapabilityStatement", "Conformance",
-                                   "Questionnaire", "ImplementationGuide" };
-    if (VersionUtilities.isR2Ver(ver)) {
-      return new R2ToR5Loader(types, loader);
-    } else if (VersionUtilities.isR2BVer(ver)) {
-      return new R2016MayToR5Loader(types, loader);
-    } else if (VersionUtilities.isR3Ver(ver)) {
-      return new R3ToR5Loader(types, loader);
-    } else if (VersionUtilities.isR4Ver(ver)) {
-      return new R4ToR5Loader(types, loader);
-    } else {
-      return new R5ToR5Loader(types, loader);
-    }
   }
   
   private int getBuildVersionForCorePackage(NpmPackage pi) throws IOException {
@@ -2682,7 +2677,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
   public void loadFromPackage(String name, String canonical, NpmPackage pi, String webref, SpecMapManager igm) throws IOException {
-    IContextResourceLoader loader = makeLoader(pi.fhirVersion(), new PublisherLoader(pi, igm, webref, igpkp));
+    IContextResourceLoader loader = new PublisherLoader(pi, igm, webref, igpkp).makeLoader();
     context.loadFromPackage(pi, loader);
   }
 
@@ -3697,6 +3692,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private void checkConformanceResources() throws IOException {
     realmRules.startChecks(publishedIg);
+    previousVersionComparator.startChecks(publishedIg);
     logDebugMessage(LogCategory.PROGRESS, "check profiles");
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
@@ -3715,9 +3711,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           CodeSystem cs = (CodeSystem) r.getResource();
           f.getErrors().addAll(csvalidator.validate(cs, false));
         }
+        if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
+          previousVersionComparator.check((CanonicalResource) r.getResource());
+        }
       }
     }
     realmRules.finishChecks();
+    previousVersionComparator.finishChecks();
   }
   
   private RealmBusinessRules makeRealmBusinessRules() {
@@ -3728,6 +3728,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
+  private PreviousVersionComparator makePreviousVersionComparator() {
+    if (comparisonVersions == null) {
+      comparisonVersions = new ArrayList<>();
+      comparisonVersions.add("{last}");
+    }
+    return new PreviousVersionComparator(context, version, tempDir, igpkp.getCanonical(), igpkp, logger, comparisonVersions);
+  }
 
   private void checkJurisdiction(FetchedFile f, CanonicalResource resource, IssueSeverity error, String verb) {
     if (expectedJurisdiction != null) {
@@ -4699,6 +4706,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     
     realmRules.addOtherFiles(otherFilesRun, outputDir);
+    previousVersionComparator.addOtherFiles(otherFilesRun, outputDir);
     otherFilesRun.add(Utilities.path(tempDir, "usage-stats.json"));
     
     cleanOutput(tempDir);
@@ -4778,6 +4786,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
               
       realmRules.addOtherFiles(inspector.getExceptions(), outputDir);
+      previousVersionComparator.addOtherFiles(inspector.getExceptions(), outputDir);
       List<ValidationMessage> linkmsgs = inspector.check(statusMessage);
       int bl = 0;
       int lf = 0;
