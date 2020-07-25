@@ -1880,7 +1880,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private boolean dependsOnUTG(List<ImplementationGuideDependsOnComponent> dependsOn) {
     for (ImplementationGuideDependsOnComponent d : dependsOn) {
-      if (d.hasPackageId() & d.getPackageId().contains("hl7.terminology")) {
+      if (d.hasPackageId() && d.getPackageId().contains("hl7.terminology")) {
         return true;
       }
       if (d.hasUri() & d.getUri().contains("terminology.hl7")) {
@@ -2124,13 +2124,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       throw new Exception("You must define a canonicalBase in the json file");
 
     loadPubPack();
-    if (!dependsOnUTG(configuration.getAsJsonArray("dependencyList")) && (npmName == null || !npmName.contains("hl7.terminology"))) {
-      loadUTG();
-    }
 
     igpkp = new IGKnowledgeProvider(context, checkAppendSlash(specPath), cb.getAsString(), configuration, errors, VersionUtilities.isR2Ver(version), null);
     igpkp.loadSpecPaths(specMaps.get(0));
     fetcher.setPkp(igpkp);
+    
+    if (!dependsOnUTG(configuration.getAsJsonArray("dependencyList")) && (npmName == null || !npmName.contains("hl7.terminology"))) {
+      loadUTG();
+    }
 
     if (configuration.has("fixed-business-version")) {
       businessVersion = configuration.getAsJsonPrimitive("fixed-business-version").getAsString();
@@ -2301,7 +2302,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     if (vs != null) {
       NpmPackage npm = pcm.loadPackage(vs, null);
-      context.loadFromPackage(npm, null);
+      SpecMapManager spm = new SpecMapManager(TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.fhirVersion());
+      IContextResourceLoader loader = new PublisherLoader(npm, spm, npm.getWebLocation(), igpkp).makeLoader();
+      context.loadFromPackage(npm, loader);
     }
   }
 
@@ -2749,7 +2752,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     
     JsonObject pl;
     logDebugMessage(LogCategory.INIT, "Fetch Package history from "+Utilities.pathURL(canonical, "package-list.json"));
-    pl = fetchJson(Utilities.pathURL(canonical, "package-list.json"));
+    try {
+      pl = fetchJson(Utilities.pathURL(canonical, "package-list.json"));
+    } catch (Exception e) {
+      return null;
+    }
     if (!canonical.equals(pl.get("canonical").getAsString()))
       throw new Exception("Canonical mismatch fetching package list for "+canonical+"#"+igver+", package-list.json says "+pl.get("canonical"));
     for (JsonElement e : pl.getAsJsonArray("list")) {
@@ -3728,7 +3735,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
-  private PreviousVersionComparator makePreviousVersionComparator() {
+  private PreviousVersionComparator makePreviousVersionComparator() throws IOException {
+    if (isTemplate()) {
+      return null;
+    }
     if (comparisonVersions == null) {
       comparisonVersions = new ArrayList<>();
       comparisonVersions.add("{last}");

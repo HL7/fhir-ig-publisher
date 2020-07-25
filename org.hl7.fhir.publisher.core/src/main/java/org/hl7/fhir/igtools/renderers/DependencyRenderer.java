@@ -41,7 +41,12 @@ public class DependencyRenderer {
 
     Row row = addBaseRow(gen, model, ig);
     for (ImplementationGuideDependsOnComponent d : ig.getDependsOn()) {
-      addPackageRow(gen, row.getSubRows(), resolve(d));
+      try {
+        NpmPackage p = resolve(d);
+        addPackageRow(gen, row.getSubRows(), p, d.getVersion());
+      } catch (Exception e) {
+        addErrorRow(gen, row.getSubRows(), d.getPackageId(), d.getVersion(), d.getUri(), e.getMessage());
+      }
     }
     // create the table
     // add the rows 
@@ -50,7 +55,7 @@ public class DependencyRenderer {
     return new XhtmlComposer(false).compose(x);
   }
 
-  private void addPackageRow(HierarchicalTableGenerator gen, List<Row> rows, NpmPackage npm) throws FHIRException, IOException {
+  private void addPackageRow(HierarchicalTableGenerator gen, List<Row> rows, NpmPackage npm, String originalVersion) throws FHIRException, IOException {
     if (!npm.isCore()) {
       String idv = npm.name()+"#"+npm.version();
       boolean isNew = !ids.contains(idv);
@@ -58,15 +63,24 @@ public class DependencyRenderer {
       String comment = "";
       if (!isNew) {
         comment = "see above";
-      } else if (!fver.equals(npm.fhirVersion())) {
+      } else if (!VersionUtilities.versionsCompatible(fver, npm.fhirVersion())) {
         comment = "FHIR Version Mismatch";
       } else if ("current".equals(npm.version())) {
         comment = "Cannot be published with a dependency on a current build version";
+      } else if (!npm.version().equals(originalVersion)) {
+        comment = "Matched to latest patch release";
       }
       Row row = addRow(gen, rows, npm.name(), npm.version(), "current".equals(npm.version()), npm.fhirVersion(), !VersionUtilities.versionsCompatible(fver, npm.fhirVersion()), npm.canonical(), comment);
       if (isNew) {
         for (String d : npm.dependencies()) {
-          addPackageRow(gen, row.getSubRows(), resolve(d));
+          String id = d.substring(0, d.indexOf("#"));
+          String version = d.substring(d.indexOf("#")+1);
+          try {
+            NpmPackage p = resolve(id, version);
+            addPackageRow(gen, row.getSubRows(), p, d.substring(d.indexOf("#")+1));
+          } catch (Exception e) {
+            addErrorRow(gen, row.getSubRows(), id, version, null, e.getMessage());
+          }
         }
       }
     }
@@ -74,13 +88,22 @@ public class DependencyRenderer {
 
   private NpmPackage resolve(ImplementationGuideDependsOnComponent d) throws FHIRException, IOException {
     if (d.hasPackageId()) {
-      return pcm.loadPackage(d.getPackageId(), d.getVersion());
+      return resolve(d.getPackageId(), d.getVersion());
     }
-    throw new Error("Not supported yet");
+    String pid = pcm.getPackageId(d.getUri());
+    if (pid == null) {
+      throw new FHIRException("Unable to resolve canonical URL to package Id");
+    }
+    return resolve(pid, d.getVersion());
   }
 
-  private NpmPackage resolve(String dep) throws FHIRException, IOException {
-    return pcm.loadPackage(dep);
+  private NpmPackage resolve(String id, String version) throws FHIRException, IOException {
+    if (VersionUtilities.isCorePackage(id)) {
+      version = VersionUtilities.getCurrentVersion(version);
+      return pcm.loadPackage(id, version);      
+    } else {
+      return pcm.loadPackage(id, version);
+    }
   }
 
   private Row addBaseRow(HierarchicalTableGenerator gen, TableModel model, ImplementationGuide ig) {
@@ -112,6 +135,18 @@ public class DependencyRenderer {
     }
 
     return row;
+  }
+
+  private void addErrorRow(HierarchicalTableGenerator gen, List<Row> rows, String id, String ver, String uri, String message) {
+    Row row = gen.new Row();
+    rows.add(row);
+    row.setIcon("icon-fhir-16.png", "NPM Package");
+    row.getCells().add(gen.new Cell(null, null, id, null, null));
+    row.getCells().add(gen.new Cell(null, null, ver, null, null));
+    row.getCells().add(gen.new Cell(null, null, null, null, null));
+    row.getCells().add(gen.new Cell(null, null, uri, null, null));
+    row.getCells().add(gen.new Cell(null, null, message, null, null));
+    row.setColor("#ffcccc");
   }
 
   private TableModel createTable(HierarchicalTableGenerator gen) {
