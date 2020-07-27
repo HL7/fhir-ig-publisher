@@ -824,10 +824,10 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     } else {
       b.append("<span>IG Publisher Version: ");
     }
-    b.append(toolsVersion);
+    b.append("v"+toolsVersion);
     if (!toolsVersion.equals(currentToolsVersion)) {
       b.append(", which is out of date. The current version is ");
-      b.append(currentToolsVersion);      
+      b.append("v"+currentToolsVersion);      
       b.append(" <a href=\"https://github.com/HL7/fhir-ig-publisher/releases/latest/download/publisher.jar\">Download Latest</a>");
     }
     b.append("</span>");
