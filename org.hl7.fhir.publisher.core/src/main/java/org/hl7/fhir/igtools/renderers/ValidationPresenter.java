@@ -39,6 +39,7 @@ import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
+import org.hl7.fhir.igtools.publisher.PreviousVersionComparator;
 import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter.FiledValidationMessage;
 import org.hl7.fhir.r5.formats.XmlParser;
@@ -97,9 +98,10 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private String toolsVersion;
   private String currentToolsVersion;
   private RealmBusinessRules realm;
+  private PreviousVersionComparator previousVersionComparator;
 
   public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, String ballotCheck, 
-      String toolsVersion, String currentToolsVersion, RealmBusinessRules realm) {
+      String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, String dependencies) {
     super();
     this.statedVersion = statedVersion;
     this.igVersion = igVersion;
@@ -112,6 +114,8 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     this.realm = realm;
     this.toolsVersion = toolsVersion;
     this.currentToolsVersion = currentToolsVersion;
+    this.previousVersionComparator = previousVersionComparator;
+    this.dependencies = dependencies;
   }
 
   private List<FetchedFile> sorted(List<FetchedFile> files) {
@@ -373,10 +377,15 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       "<body style=\"margin: 20px; background-color: #ffffff\">\r\n"+
       " <h1>Validation Results for $title$</h1>\r\n"+
       " <p>Generated $time$, FHIR version $version$ for $packageId$#$igversion$ (canonical = <a href=\"$canonical$\">$canonical$</a> (<a href=\"$canonical$/history.html\">history</a>))</p>\r\n"+
-      "$versionCheck$\r\n"+
-      "$suppressedmsgssummary$"+
-      " <p>HL7 Publication check:</p> $ballotCheck$\r\n"+
-      " <p>Realm check:</p> $realmCheck$\r\n"+
+      "<table class=\"grid\">"+
+      " <tr><td colspan=2><b>Quality Checks</b></td></tr>\r\n"+
+      " <tr><td>Publisher Version:</td><td>$versionCheck$</td></tr>\r\n"+
+      " <tr><td>Supressed Messages:</td><td>$suppressedmsgssummary$</td></tr>\r\n"+
+      " <tr><td>Dependency Checks:</td><td>$dependencyCheck$</td></tr>\r\n"+
+      " <tr><td>HL7 Publication Rules:</td><td>$ballotCheck$</td></tr>\r\n"+
+      " <tr><td>Realm rules:</td><td>$realmCheck$</td></tr>\r\n"+
+      " <tr><td>Previous Version Comparison:</td><td> $previousVersion$</td></tr>\r\n"+
+      "</table>\r\n"+
       " <table class=\"grid\">\r\n"+
       "   <tr>\r\n"+
       "     <td><b>Filename</b></td><td><b>Errors</b></td><td><b>Information messages &amp; Warnings</b></td>\r\n"+
@@ -467,6 +476,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   
   private final String footerTemplateText = 
       "\r\n";
+  private String dependencies;
   
   private ST template(String t) {
     return new ST(t, '$', '$');
@@ -488,10 +498,12 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("canonical", provider.getCanonical());
     t.add("ballotCheck", ballotCheck);
     t.add("realmCheck", realm.checkHtml());
+    t.add("dependencyCheck", dependencies);
+    t.add("previousVersion", previousVersionComparator.checkHtml());
     if (msgCount == 0)
-      t.add("suppressedmsgssummary", "<p>No Suppressed Errors</p>\r\n");
+      t.add("suppressedmsgssummary", "No Suppressed Errors\r\n");
     else
-      t.add("suppressedmsgssummary", "<p><a href=\"#suppressed\">"+msgCount+" Suppressed "+Utilities.pluralize("Error", msgCount)+"</a></p>\r\n");
+      t.add("suppressedmsgssummary", "<a href=\"#suppressed\">"+msgCount+" Suppressed "+Utilities.pluralize("Error", msgCount)+"</a>\r\n");
     return t.render();
   }
 
@@ -510,6 +522,8 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("canonical", provider.getCanonical());
     t.add("ballotCheck", ballotCheck);
     t.add("realmCheck", realm.checkText());
+    t.add("dependencyCheck", dependencies);
+    t.add("previousVersion", previousVersionComparator.checkHtml());
     return t.render();
   }
 
@@ -806,17 +820,17 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private String versionCheckHtml() {
     StringBuilder b = new StringBuilder();
     if (!toolsVersion.equals(currentToolsVersion)) {
-      b.append("<p style=\"background-color: #ffcccc\">IG Publisher Version: ");
+      b.append("<span style=\"background-color: #ffcccc\">IG Publisher Version: ");
     } else {
-      b.append("<p>IG Publisher Version: ");
+      b.append("<span>IG Publisher Version: ");
     }
-    b.append(toolsVersion);
+    b.append("v"+toolsVersion);
     if (!toolsVersion.equals(currentToolsVersion)) {
       b.append(", which is out of date. The current version is ");
-      b.append(currentToolsVersion);      
+      b.append("v"+currentToolsVersion);      
       b.append(" <a href=\"https://github.com/HL7/fhir-ig-publisher/releases/latest/download/publisher.jar\">Download Latest</a>");
     }
-    b.append("</p>");
+    b.append("</span>");
     return b.toString();
   }
   

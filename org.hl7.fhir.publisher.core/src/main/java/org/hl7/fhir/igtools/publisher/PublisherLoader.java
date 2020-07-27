@@ -1,13 +1,25 @@
 package org.hl7.fhir.igtools.publisher;
 
+import org.hl7.fhir.convertors.loaders.R2016MayToR5Loader;
+import org.hl7.fhir.convertors.loaders.R2ToR5Loader;
+import org.hl7.fhir.convertors.loaders.R3ToR5Loader;
+import org.hl7.fhir.convertors.loaders.R4ToR5Loader;
+import org.hl7.fhir.convertors.loaders.R5ToR5Loader;
+
+import java.io.IOException;
+
 import org.hl7.fhir.convertors.loaders.BaseLoaderR5.ILoaderKnowledgeProvider;
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.r5.context.IWorkerContext.IContextResourceLoader;
 import org.hl7.fhir.r5.context.SimpleWorkerContext.ILoadFilter;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
+
+import com.google.gson.JsonSyntaxException;
 
 public class PublisherLoader implements ILoaderKnowledgeProvider {
 
@@ -24,11 +36,33 @@ public class PublisherLoader implements ILoaderKnowledgeProvider {
     this.igpkp = igpkp;
   }
 
+  public IContextResourceLoader makeLoader() {
+    // there's no penalty for listing resources that don't exist, so we just all the relevant possibilities for all versions 
+    String[] types = new String[] {"CodeSystem", "ValueSet", "ConceptMap", "NamingSystem",
+                                   "StructureDefinition", "StructureMap", 
+                                   "SearchParameter", "OperationDefinition", "CapabilityStatement", "Conformance",
+                                   "Questionnaire", "ImplementationGuide" };
+    if (VersionUtilities.isR2Ver(npm.fhirVersion())) {
+      return new R2ToR5Loader(types, this);
+    } else if (VersionUtilities.isR2BVer(npm.fhirVersion())) {
+      return new R2016MayToR5Loader(types, this);
+    } else if (VersionUtilities.isR3Ver(npm.fhirVersion())) {
+      return new R3ToR5Loader(types, this);
+    } else if (VersionUtilities.isR4Ver(npm.fhirVersion())) {
+      return new R4ToR5Loader(types, this);
+    } else {
+      return new R5ToR5Loader(types, this);
+    }
+  }
   @Override
   public String getResourcePath(Resource resource) {
+   
     if (isCore()) {
       return getCorePath(resource);
     } else {
+      if (pathToSpec == null || igpkp == null) {
+        return null;
+      }
       return getIgPath(resource);
     }
   }
@@ -138,6 +172,11 @@ public class PublisherLoader implements ILoaderKnowledgeProvider {
       return ref.substring(ref.lastIndexOf("/")+1);
     else
       return ref;
+  }
+
+  @Override
+  public ILoaderKnowledgeProvider forNewPackage(NpmPackage npm) throws JsonSyntaxException, IOException {
+    return new PublisherLoader(npm, SpecMapManager.fromPackage(npm), npm.getWebLocation(), igpkp);
   }
 
 }
