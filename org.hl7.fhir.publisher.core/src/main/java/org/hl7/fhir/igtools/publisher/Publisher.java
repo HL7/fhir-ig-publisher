@@ -887,11 +887,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void processProvenanceDetails() throws Exception {
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
-        if (r.fhirType().equals("Provenance")) { 
-          logDebugMessage(LogCategory.PROGRESS, "Process Provenance "+f.getName()+" : "+r.getId());
-          processProvenance(igpkp.getLinkFor(r, true), r.getElement(), r.getResource());
-        } else if (r.fhirType().equals("Bundle")) {
-          processProvenanceEntries(f, r);
+        if (!r.isExample()) {
+          if (r.fhirType().equals("Provenance")) { 
+            logDebugMessage(LogCategory.PROGRESS, "Process Provenance "+f.getName()+" : "+r.getId());
+            processProvenance(igpkp.getLinkFor(r, true), r.getElement(), r.getResource());
+          } else if (r.fhirType().equals("Bundle")) {
+            processProvenanceEntries(f, r);
+          }
         }
       }
     }    
@@ -899,9 +901,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   public void processProvenanceEntries(FetchedFile f, FetchedResource r) throws Exception {
     Bundle b = (Bundle) r.getResource();
-    if (!r.isExample()) {
-      return;
-    }
     List<Element> entries = r.getElement().getChildrenByName("entry");
     for (int i = 0; i < entries.size(); i++) {
       Element entry = entries.get(i);
