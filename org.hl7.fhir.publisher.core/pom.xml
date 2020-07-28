@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.hl7.fhir.publisher</groupId>
         <artifactId>org.hl7.fhir.publisher</artifactId>
-        <version>1.1.2-SNAPSHOT</version>
+        <version>1.1.6-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -23,32 +23,32 @@
         <dependency>
             <groupId>info.cqframework</groupId>
             <artifactId>cql</artifactId>
-            <version>1.4.9-SNAPSHOT</version>
+            <version>1.5.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>info.cqframework</groupId>
             <artifactId>model</artifactId>
-            <version>1.4.9-SNAPSHOT</version>
+            <version>1.5.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>info.cqframework</groupId>
             <artifactId>elm</artifactId>
-            <version>1.4.9-SNAPSHOT</version>
+            <version>1.5.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>info.cqframework</groupId>
             <artifactId>cql-to-elm</artifactId>
-            <version>1.4.9-SNAPSHOT</version>
+            <version>1.5.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>info.cqframework</groupId>
             <artifactId>quick</artifactId>
-            <version>1.4.9-SNAPSHOT</version>
+            <version>1.5.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>info.cqframework</groupId>
             <artifactId>qdm</artifactId>
-            <version>1.4.9-SNAPSHOT</version>
+            <version>1.5.0-SNAPSHOT</version>
         </dependency>
         <!-- JAXB-API, used by CQL-to-ELM translator, but no longer loaded by default -->
         <dependency>

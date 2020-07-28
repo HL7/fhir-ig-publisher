@@ -109,6 +109,10 @@ public class SpecMapManager {
     }
   }
 
+  public static SpecMapManager fromPackage(NpmPackage pi) throws JsonSyntaxException, IOException {
+    return new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion());
+  }
+
   public void path(String url, String path) {
     paths.addProperty(url, path);
   }
@@ -148,7 +152,7 @@ public class SpecMapManager {
     return str(spec, "webUrl");
   }
 
-  public String getPath(String url) throws Exception {
+  public String getPath(String url) throws FHIRException {
     if (url == null) {
       return null;
     }

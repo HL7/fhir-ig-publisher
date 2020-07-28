@@ -68,7 +68,6 @@ public class USRealmBusinessRules extends RealmBusinessRules {
     public StructureDefinition getUscore() {
       return uscore;
     }
-
   }
 
   List<StructureDefinition> usCoreProfiles;
@@ -212,14 +211,14 @@ public class USRealmBusinessRules extends RealmBusinessRules {
   @Override
   public void finishChecks() throws DefinitionException, FHIRFormatError, IOException {
     try {
-      ComparisonSession session = new ComparisonSession(context, "Comparison of "+name+" with US-Core", pkp);
+      ComparisonSession session = new ComparisonSession(context, context, "Comparison of "+name+" with US-Core", pkp);
       //    session.setDebug(true);
       for (ProfilePair c : comparisons) {
         System.out.println("US Core Comparison: compare "+c.local+" to "+c.uscore);
         session.compare(c.uscore, c.local);      
       }
       Utilities.createDirectory(Utilities.path(dstDir, "us-core-comparisons"));
-      ComparisonRenderer cr = new ComparisonRenderer(context, Utilities.path(dstDir, "us-core-comparisons"), session);
+      ComparisonRenderer cr = new ComparisonRenderer(context, context, Utilities.path(dstDir, "us-core-comparisons"), session);
       cr.getTemplates().put("CodeSystem", new String(context.getBinaries().get("template-comparison-CodeSystem.html")));
       cr.getTemplates().put("ValueSet", new String(context.getBinaries().get("template-comparison-ValueSet.html")));
       cr.getTemplates().put("Profile", new String(context.getBinaries().get("template-comparison-Profile.html")));
@@ -237,7 +236,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
     if (problems == null || problems.isEmpty()) {
       return "All OK";
     } else {
-      return "<ul><li><a href=\"us-core-comparisons/index.html\">"+Integer.toString(problems.size())+" Profiles not based on US Core</a></li></ul>";      
+      return "<a href=\"us-core-comparisons/index.html\">"+Integer.toString(problems.size())+" Profiles not based on US Core</a>";      
     }
   }
  
