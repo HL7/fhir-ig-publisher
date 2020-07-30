@@ -6013,8 +6013,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
 
     for (SpecMapManager sm : specMaps) {
-      if (sm.getName() != null)
+      if (sm.getName() != null) {
         data.addProperty(sm.getName(), appendTrailingSlashInDataFile ? sm.getBase() : Utilities.appendForwardSlash(sm.getBase()));
+        if (!data.has("ver")) {
+          data.add("ver", new JsonObject());
+        }
+        data.getAsJsonObject("ver").addProperty(sm.getName(), appendTrailingSlashInDataFile ? sm.getBase2() : Utilities.appendForwardSlash(sm.getBase2()));
+      }
     }
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
     String json = gson.toJson(data);
