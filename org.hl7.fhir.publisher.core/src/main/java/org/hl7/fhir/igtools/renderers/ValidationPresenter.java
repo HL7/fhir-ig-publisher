@@ -501,9 +501,9 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("dependencyCheck", dependencies);
     t.add("previousVersion", previousVersionComparator.checkHtml());
     if (msgCount == 0)
-      t.add("suppressedmsgssummary", "No Suppressed Errors\r\n");
+      t.add("suppressedmsgssummary", "No Suppressed Issues\r\n");
     else
-      t.add("suppressedmsgssummary", "<a href=\"#suppressed\">"+msgCount+" Suppressed "+Utilities.pluralize("Error", msgCount)+"</a>\r\n");
+      t.add("suppressedmsgssummary", "<a href=\"#suppressed\">"+msgCount+" Suppressed "+Utilities.pluralize("Issue", msgCount)+"</a>\r\n");
     return t.render();
   }
 
