@@ -526,6 +526,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private String specPath;
   private String qaDir;
   private String version;
+  private long fshTimeout = FSH_TIMEOUT;
   private Map<String, String> suppressedMessages = new HashMap<>();
 
   private String igName;
@@ -1445,7 +1446,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
-  private void runFsh(File file) throws IOException {
+  private void runFsh(File file) throws IOException { 
+    String inif = Utilities.path(Utilities.getDirectoryForFile(file.getAbsolutePath()), "fsh.ini");
+    IniFile ini = new IniFile(new FileInputStream(inif));
+    if (ini.hasProperty("FSH", "timeout")) {
+      fshTimeout = ini.getLongProperty("FSH", "timeout") * 1000;
+    }
     log("Run Sushi on "+file.getAbsolutePath());
     DefaultExecutor exec = new DefaultExecutor();
     exec.setExitValue(0);
@@ -1453,9 +1459,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     PumpStreamHandler pump = new PumpStreamHandler(pumpHandler);
     exec.setStreamHandler(pump);
     exec.setWorkingDirectory(file);
-    ExecuteWatchdog watchdog = new ExecuteWatchdog(FSH_TIMEOUT);
+    ExecuteWatchdog watchdog = new ExecuteWatchdog(fshTimeout);
     exec.setWatchdog(watchdog);
-    
+   
     try {
       if (SystemUtils.IS_OS_WINDOWS)
         exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C sushi ./fsh -o ."));
