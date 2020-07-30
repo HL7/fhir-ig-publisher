@@ -568,7 +568,7 @@ public class HTLMLInspector {
     }
     // special case end-points that are always valid:
      if (!resolved)
-      resolved = Utilities.existsInList(ref, "http://hl7.org/fhir/fhir-spec-r4.zip", "http://hl7.org/fhir/R4/fhir-spec-r4.zip", "http://hl7.org/fhir/STU3/fhir-spec.zip", "http://hl7.org/fhir/DSTU2/fhir-spec.zip", 
+      resolved = Utilities.existsInList(ref, "http://hl7.org/fhir/fhir-spec.zip", "http://hl7.org/fhir/R4/fhir-spec.zip", "http://hl7.org/fhir/STU3/fhir-spec.zip", "http://hl7.org/fhir/DSTU2/fhir-spec.zip", 
           "http://hl7.org/fhir-issues", "http://hl7.org/registry") || 
           matchesTarget(ref, "http://hl7.org", "http://hl7.org/fhir/DSTU2", "http://hl7.org/fhir/STU3", "http://hl7.org/fhir/R4", "http://hl7.org/fhir/smart-app-launch", "http://hl7.org/fhir/validator");
     
@@ -608,53 +608,6 @@ public class HTLMLInspector {
           }
         }
       }
-    }
-    if (!resolved) {
-//      if (specList.isEmpty()) {
-//        pcm.listAllIds(specList);
-//      }
-//      for (String id : specList.keySet()) {
-//        String url = specList.get(id);
-//        if (!"http://hl7.org/fhir".equals(url)) {
-//          if (matchesTarget(ref, url))
-//            resolved = true;
-//          if (ref.startsWith(url) && !errorPackages.contains(url)) {
-//            // now, iterate the package list to see if we have a version match
-//            JsonObject plist = null; 
-//            try {
-//              plist = fetchJson(Utilities.pathURL(url, "package-list.json"));
-//            } catch (Exception e) {
-//              errorPackages.add(url);
-//              System.out.println("Error #1 checking links for "+url+": "+e.getMessage()+" (resolving "+ref+")");
-//            }
-//            if (plist != null) {
-//              for (JsonElement vere : plist.getAsJsonArray("list")) {
-//                JsonObject ver = (JsonObject) vere;
-//                String sver = JSONUtil.str(ver, "version");
-//                String v = JSONUtil.str(plist, "package-id")+"#"+sver;
-//                if (!errorPackages.contains(v)) {
-//                  try {
-//                    if (ref.startsWith(JSONUtil.str(ver, "url"))) {
-//                      SpecMapManager sm = otherSpecs.get(v);
-//                      if (sm == null) {
-//                        sm = loadSpecMap(JSONUtil.str(plist, "package-id"), sver, JSONUtil.str(ver, "url"));
-//                        otherSpecs.put(v, sm);
-//                      }
-//                      if (sm.getBase().equals(rref) || (sm.getBase()).equals(rref+"/") || sm.hasTarget(rref)) {
-//                        resolved = true;
-//                        break;
-//                      }
-//                    }
-//                  } catch (Exception e) {
-//                    errorPackages.add(v);
-//                    System.out.println("Error #2 checking links for "+v+": "+e.getMessage()+" (resolving "+ref+")");
-//                  }
-//                }
-//              }
-//            }
-//          }
-//        }
-//      }
     }
     if (resolved) {
       return false;
