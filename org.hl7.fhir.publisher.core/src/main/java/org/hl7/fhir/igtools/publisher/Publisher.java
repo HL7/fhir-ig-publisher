@@ -1447,10 +1447,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void runFsh(File file) throws IOException { 
-    String inif = Utilities.path(Utilities.getDirectoryForFile(file.getAbsolutePath()), "fsh.ini");
-    IniFile ini = new IniFile(new FileInputStream(inif));
-    if (ini.hasProperty("FSH", "timeout")) {
-      fshTimeout = ini.getLongProperty("FSH", "timeout") * 1000;
+    File inif = new File(Utilities.path(Utilities.getDirectoryForFile(file.getAbsolutePath()), "fsh.ini"));
+    if (inif.exists()) {
+      IniFile ini = new IniFile(new FileInputStream(inif));
+      if (ini.hasProperty("FSH", "timeout")) {
+        fshTimeout = ini.getLongProperty("FSH", "timeout") * 1000;
+      }
     }
     log("Run Sushi on "+file.getAbsolutePath());
     DefaultExecutor exec = new DefaultExecutor();
@@ -1461,7 +1463,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     exec.setWorkingDirectory(file);
     ExecuteWatchdog watchdog = new ExecuteWatchdog(fshTimeout);
     exec.setWatchdog(watchdog);
-   
     try {
       if (SystemUtils.IS_OS_WINDOWS)
         exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C sushi ./fsh -o ."));
@@ -2290,7 +2291,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void loadPubPack() throws FHIRException, IOException {
-    NpmPackage npm = pcm.loadPackage("hl7.fhir.pubpack", "0.0.6");
+    NpmPackage npm = pcm.loadPackage("hl7.fhir.pubpack", "0.0.7");
     context.loadFromPackage(npm, null);
     npm = pcm.loadPackage("hl7.fhir.xver-extensions", "0.0.4");
     context.loadFromPackage(npm, null);
@@ -3748,7 +3749,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       comparisonVersions = new ArrayList<>();
       comparisonVersions.add("{last}");
     }
-    return new PreviousVersionComparator(context, version, tempDir, igpkp.getCanonical(), igpkp, logger, comparisonVersions);
+    return new PreviousVersionComparator(context, version, rootDir, tempDir, igpkp.getCanonical(), igpkp, logger, comparisonVersions);
   }
 
   private void checkJurisdiction(FetchedFile f, CanonicalResource resource, IssueSeverity error, String verb) {

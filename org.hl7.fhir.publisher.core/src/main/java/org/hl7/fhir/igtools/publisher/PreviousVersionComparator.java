@@ -1,5 +1,8 @@
 package org.hl7.fhir.igtools.publisher;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.DateFormat;
@@ -30,6 +33,7 @@ import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.UsageContext;
 import org.hl7.fhir.r5.utils.KeyGenerator;
+import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Logger;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
@@ -76,10 +80,12 @@ public class PreviousVersionComparator {
     private SimpleWorkerContext context;    
     private List<CanonicalResource> resources = new ArrayList<>();
     private String errMsg;
+    private IniFile ini;
     
-    public VersionInstance(String version) {
+    public VersionInstance(String version, IniFile ini) {
       super();
       this.version = version;
+      this.ini = ini;
     }
   }
 
@@ -96,8 +102,9 @@ public class PreviousVersionComparator {
   private ILoggingService logger;
   private List<CanonicalResource> resources;
   
-  public PreviousVersionComparator(SimpleWorkerContext context, String version, String dstDir, String canonical, ProfileKnowledgeProvider pkp, ILoggingService logger, List<String> versions) {
+  public PreviousVersionComparator(SimpleWorkerContext context, String version, String rootDir, String dstDir, String canonical, ProfileKnowledgeProvider pkp, ILoggingService logger, List<String> versions) {
     super();
+        
     this.context = context;
     this.version = version;
     this.dstDir = dstDir;
@@ -105,13 +112,13 @@ public class PreviousVersionComparator {
     this.pkp = pkp;
     this.logger = logger;
     try {
-      processVersions(canonical, versions);
+      processVersions(canonical, versions, rootDir);
     } catch (Exception e) {
       errMsg = "Unable to find version history at "+canonical+" ("+e.getMessage()+")";
     }
   }
 
-  private void processVersions(String canonical, List<String> versions) throws IOException {
+  private void processVersions(String canonical, List<String> versions, String rootDir) throws IOException {
     JsonArray publishedVersions = null;
     for (String v : versions) {
       if (Utilities.existsInList(v, "{last}", "{current}")) {
@@ -137,22 +144,31 @@ public class PreviousVersionComparator {
           if(last == null) {
             throw new FHIRException("no {last} version found in package-list.json");
           } else {
-            versionList.add(new VersionInstance(last));
+            versionList.add(new VersionInstance(last, makeIni(rootDir, last)));
           }
         } 
         if ("{current}".equals(v)) {
           if(last == null) {
             throw new FHIRException("no {current} version found in package-list.json");
           } else {
-            versionList.add(new VersionInstance(major));
+            versionList.add(new VersionInstance(major, makeIni(rootDir, major)));
           }
         } 
       } else {
-        versionList.add(new VersionInstance(v));
+        versionList.add(new VersionInstance(v, makeIni(rootDir, v)));
       }
     }
   }
     
+  private IniFile makeIni(String rootDir, String v) throws IOException {
+    File ini = new File(Utilities.path(rootDir, "url-map-v-"+v+".ini"));
+    if (ini.exists()) {
+      return new IniFile(new FileInputStream(ini));
+    } else {
+      return null;
+    }
+  }
+
   private JsonArray fetchVersionHistory(String canonical) { 
     try {
       String ppl = Utilities.pathURL(canonical, "package-list.json");
@@ -172,7 +188,7 @@ public class PreviousVersionComparator {
         }
       }
     } catch (Exception e) {
-      throw new FHIRException("Problem with package-lists.json at "+canonical+": "+e.getMessage(), e);
+      throw new FHIRException("Problem with package-list.json at "+canonical+": "+e.getMessage(), e);
     }
   }
 
@@ -224,12 +240,13 @@ public class PreviousVersionComparator {
       for (VersionInstance vi : versionList) {
         Set<String> set = new HashSet<>();
         for (CanonicalResource rl : vi.resources) {
-          comparisons.add(new ProfilePair(rl, findByUrl(rl.getUrl(), resources)));
+          comparisons.add(new ProfilePair(rl, findByUrl(rl.getUrl(), resources, vi.ini)));
           set.add(rl.getUrl());      
         }
         for (CanonicalResource rr : resources) {
-          if (!set.contains(rr.getUrl())) {
-            comparisons.add(new ProfilePair(findByUrl(rr.getUrl(), vi.resources), rr));
+          String url = fixForIniMap(rr.getUrl(), vi.ini);
+          if (!set.contains(url)) {
+            comparisons.add(new ProfilePair(findByUrl(url, vi.resources, null), rr));
           }
         }
 
@@ -254,6 +271,16 @@ public class PreviousVersionComparator {
       }
     }
   }
+private String fixForIniMap(String url, IniFile ini) {
+    if (ini == null) {
+      return url;
+    }
+    if (ini.hasProperty("urls", url)) {
+      return ini.getStringProperty("urls", url);
+    }
+    return url;
+  }
+
 //
 //  private void buildindexPage(String path) throws IOException {
 //    StringBuilder b = new StringBuilder();
@@ -301,9 +328,9 @@ public class PreviousVersionComparator {
 //  }
 
 
-  private CanonicalResource findByUrl(String url, List<CanonicalResource> list) {
+  private CanonicalResource findByUrl(String url, List<CanonicalResource> list, IniFile ini) {
     for (CanonicalResource r : list) {
-      if (r.getUrl().equals(url)) {
+      if (fixForIniMap(r.getUrl(), ini).equals(url)) {
         return r;
       }
     }
