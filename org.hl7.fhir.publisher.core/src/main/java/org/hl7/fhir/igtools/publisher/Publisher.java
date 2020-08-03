@@ -225,6 +225,7 @@ import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.openapi.OpenApiGenerator;
 import org.hl7.fhir.r5.openapi.Writer;
 import org.hl7.fhir.r5.renderers.BundleRenderer;
+import org.hl7.fhir.r5.renderers.ParametersRenderer;
 import org.hl7.fhir.r5.renderers.RendererFactory;
 import org.hl7.fhir.r5.renderers.utils.BaseWrappers.ResourceWrapper;
 import org.hl7.fhir.r5.renderers.utils.DirectWrappers;
@@ -235,6 +236,7 @@ import org.hl7.fhir.r5.renderers.utils.RenderingContext.QuestionnaireRendererMod
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.ResourceRendererMode;
 import org.hl7.fhir.r5.renderers.utils.Resolver.IReferenceResolver;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceContext;
+import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceContextType;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceWithReference;
 import org.hl7.fhir.r5.terminologies.ValueSetExpander.ValueSetExpansionOutcome;
 import org.hl7.fhir.r5.test.utils.ToolsHelper;
@@ -850,8 +852,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       long startTime = System.nanoTime();
       log("Processing Conformance Resources");
       loadConformance();
-      log("Generating Narratives");
-      generateNarratives();
       log("Validating Resources");
       try {
         validate();
@@ -1041,6 +1041,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             return new ResourceWithReference(path, new DirectWrappers.ResourceWrapperDirect(context, r.getResource()));            
           }
         }
+        if (r.getElement().fhirType().equals("Bundle")) {
+          List<Element> entries = r.getElement().getChildrenByName("entry");
+          for (Element entry : entries) {
+            Element res = entry.getNamedChild("resource");
+            if (res != null && res.fhirType().equals(parts[0]) && res.getNamedChildValue("id").equals(parts[1])) {
+              String path = igpkp.getLinkFor(r, true)+"#"+parts[0]+"_"+parts[1];
+              return new ResourceWithReference(path, new ElementWrappers.ResourceWrapperMetaElement(context, r.getElement()));
+            }
+          }
+        }
       }
     }
     for (SpecMapManager sp : specMaps) {
@@ -1061,7 +1071,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void generateNarratives() throws Exception {
     logDebugMessage(LogCategory.PROGRESS, "gen narratives");
     for (FetchedFile f : fileList) {
-      for (FetchedResource r : f.getResources()) {
+      for (FetchedResource r : f.getResources()) {        
         if (r.getExampleUri()==null || genExampleNarratives) {
           logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId());
           if (r.getResource() != null && isConvertableResource(r.getResource().fhirType())) {
@@ -1073,6 +1083,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             } else if (r.getResource() instanceof Bundle) {
               regen = true;
               new BundleRenderer(rc).render((Bundle) r.getResource());
+            } else if (r.getResource() instanceof Parameters) {
+              regen = true;
+              Parameters p = (Parameters) r.getResource();
+              new ParametersRenderer(rc, new ResourceContext(ResourceContextType.PARAMETERS , p, null)).render(p);
+            } else if (r.getResource() instanceof DomainResource) {
+              checkExistingNarrative(f, r, ((DomainResource) r.getResource()).getText().getDiv());
             }
             if (regen)
               r.setElement(convertToElement(r.getResource()));
@@ -1086,9 +1102,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                 Element res = e.getNamedChild("resource");
                 if (res!=null && "http://hl7.org/fhir/StructureDefinition/DomainResource".equals(res.getProperty().getStructure().getBaseDefinition()) && !hasNarrative(res)) {
                   ResourceWrapper rw = new ElementWrappers.ResourceWrapperMetaElement(lrc, res);
-                  RendererFactory.factory(rw, lrc).render(rw);
+                  RendererFactory.factory(rw, lrc, new ResourceContext(ResourceContextType.BUNDLE, r.getElement(), res)).render(rw);
                 }
               }
+            } else if ("http://hl7.org/fhir/StructureDefinition/DomainResource".equals(r.getElement().getProperty().getStructure().getBaseDefinition()) && hasNarrative(r.getElement())) {
+              checkExistingNarrative(f, r, r.getElement().getNamedChild("text").getNamedChild("div").getXhtml());
             }
           }
         } else {
@@ -1096,6 +1114,25 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
     }
+  }
+
+  private void checkExistingNarrative(FetchedFile f, FetchedResource r, XhtmlNode xhtml) {
+    boolean hasGenNarrative = scanForGeneratedNarrative(xhtml);
+    if (hasGenNarrative) {
+      f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, r.fhirType()+".text.div", "Resource has provided narrative, but the narrative indicates that it is generated - remove the narrative or fix it up", IssueSeverity.ERROR));
+    }    
+  }
+
+  private boolean scanForGeneratedNarrative(XhtmlNode x) {
+    if (x.getContent() != null && x.getContent().contains("Generated Narrative")) {
+      return true;
+    }
+    for (XhtmlNode c : x.getChildNodes()) {
+      if (scanForGeneratedNarrative(c)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private boolean isConvertableResource(String t) {
@@ -3650,8 +3687,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     loadInfo();
     for (String s : metadataResourceNames()) 
       load(s);
+    log("Generating Snapshots");
     generateSnapshots();
+    log("Generating Narratives");
     generateNarratives();
+    log("Validating Conformance Resources");
     for (String s : metadataResourceNames()) 
       validate(s);
     
@@ -4413,7 +4453,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
         fpe.check(null, sd, ed.getPath(), n);
       } catch (Exception e) {
-        f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, "StructureDefinition.where(url = '"+sd.getUrl()+"').snapshot.element.where('apth = '"+ed.getPath()+"').constraint.where(key = '"+inv.getKey()+"')", e.getMessage(), IssueSeverity.ERROR));
+        f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, "StructureDefinition.where(url = '"+sd.getUrl()+"').snapshot.element.where('path = '"+ed.getPath()+"').constraint.where(key = '"+inv.getKey()+"')", e.getMessage(), IssueSeverity.ERROR));
       }
     }
   }
@@ -7400,9 +7440,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       Bundle b = (Bundle) r.getResource();
       return new BundleRenderer(rc).render(b);
     }
+    if (r.getResource() != null && r.getResource() instanceof Parameters) {
+      Parameters p = (Parameters) r.getResource();
+      return new ParametersRenderer(rc, new ResourceContext(ResourceContextType.PARAMETERS, p, null)).render(p);
+    }
     if (r.getElement().fhirType().equals("Bundle")) {
       RenderingContext lrc = rc.copy().setParser(getTypeLoader(f, r));
       return new BundleRenderer(lrc).render(new ElementWrappers.ResourceWrapperMetaElement(lrc, r.getElement()));
+    } else if (r.getElement().fhirType().equals("Parameters")) {
+      RenderingContext lrc = rc.copy().setParser(getTypeLoader(f, r));
+      return new ParametersRenderer(lrc, new ResourceContext(ResourceContextType.PARAMETERS, r.getElement(), r.getElement())).render(new ElementWrappers.ResourceWrapperMetaElement(lrc, r.getElement()));
     } else {
       return getHtmlForResource(r.getElement());
     }
