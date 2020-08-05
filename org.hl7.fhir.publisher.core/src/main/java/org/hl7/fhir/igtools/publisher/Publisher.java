@@ -1045,7 +1045,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           List<Element> entries = r.getElement().getChildrenByName("entry");
           for (Element entry : entries) {
             Element res = entry.getNamedChild("resource");
-            if (res != null && res.fhirType().equals(parts[0]) && res.getNamedChildValue("id").equals(parts[1])) {
+            if (res != null && res.fhirType().equals(parts[0]) && res.hasChild("id") && res.getNamedChildValue("id").equals(parts[1])) {
               String path = igpkp.getLinkFor(r, true)+"#"+parts[0]+"_"+parts[1];
               return new ResourceWithReference(path, new ElementWrappers.ResourceWrapperMetaElement(context, r.getElement()));
             }
@@ -1926,7 +1926,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (d.hasPackageId() && d.getPackageId().contains("hl7.terminology")) {
         return true;
       }
-      if (d.hasUri() & d.getUri().contains("terminology.hl7")) {
+      if (d.hasUri() && d.getUri().contains("terminology.hl7")) {
         return true;
       }
     }
@@ -3076,6 +3076,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     rc.setServices(validator.getExternalHostServices());
     rc.setDestDir(Utilities.path(tempDir));
     rc.setProfileUtilities(new ProfileUtilities(context, new ArrayList<ValidationMessage>(), igpkp));
+    rc.setQuestionnaireMode(QuestionnaireRendererMode.TREE);
     rc.getCodeSystemPropList().addAll(codeSystemProps );
 
     if (igMode) {

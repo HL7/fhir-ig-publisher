@@ -205,7 +205,9 @@ public class PreviousVersionComparator {
           for (String id : current.listResources("StructureDefinition", "ValueSet", "CodeSystem")) {
             filename = id;
             CanonicalResource curr = (CanonicalResource) loadResourceFromPackage(current, id, current.fhirVersion());
-            vi.resources.add(curr);
+            if (curr != null) {
+              vi.resources.add(curr);
+            }
           }
           NpmPackage core = pcm.loadPackage(VersionUtilities.packageForVersion(current.fhirVersion()), VersionUtilities.getCurrentVersion(current.fhirVersion()));
           vi.context = SimpleWorkerContext.fromPackage(core, new PublisherLoader(core, SpecMapManager.fromPackage(core), core.getWebLocation(), null).makeLoader());
@@ -230,6 +232,8 @@ public class PreviousVersionComparator {
       return VersionConvertor_30_50.convertResource(new org.hl7.fhir.dstu3.formats.JsonParser().parse(s), true);
     } else if (VersionUtilities.isR4Ver(version)) {
       return VersionConvertor_40_50.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(s));
+    } else if (VersionUtilities.isR5Ver(version)) {
+      return new org.hl7.fhir.r5.formats.JsonParser().parse(s);
     } else {
       return null;
     }
