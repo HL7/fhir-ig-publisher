@@ -41,7 +41,8 @@ public class PublisherLoader implements ILoaderKnowledgeProvider {
     String[] types = new String[] {"CodeSystem", "ValueSet", "ConceptMap", "NamingSystem",
                                    "StructureDefinition", "StructureMap", 
                                    "SearchParameter", "OperationDefinition", "CapabilityStatement", "Conformance",
-                                   "Questionnaire", "ImplementationGuide" };
+                                   "Questionnaire", "ImplementationGuide",
+                                   "Measure"};
     if (VersionUtilities.isR2Ver(npm.fhirVersion())) {
       return new R2ToR5Loader(types, this);
     } else if (VersionUtilities.isR2BVer(npm.fhirVersion())) {
