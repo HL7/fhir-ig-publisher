@@ -1041,6 +1041,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             return new ResourceWithReference(path, new DirectWrappers.ResourceWrapperDirect(context, r.getResource()));            
           }
         }
+      }
+    }
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
         if (r.getElement().fhirType().equals("Bundle")) {
           List<Element> entries = r.getElement().getChildrenByName("entry");
           for (Element entry : entries) {
@@ -5502,6 +5506,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           if (base != null) {
             item.addProperty("basename", base.getName());
             item.addProperty("basepath", Utilities.escapeXml(base.getUserString("path")));
+          } else if ("http://hl7.org/fhir/StructureDefinition/Base".equals(sd.getBaseDefinition())) {
+            item.addProperty("basename", "Base");
+            item.addProperty("basepath", "http://hl7.org/fhir/StructureDefinition/Element");            
           }
           item.addProperty("status", sd.getStatus().toCode());
           item.addProperty("date", sd.getDate().toString());
