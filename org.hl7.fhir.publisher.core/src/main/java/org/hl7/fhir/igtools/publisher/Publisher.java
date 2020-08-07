@@ -1026,6 +1026,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   @Override
   public ResourceWithReference resolve(RenderingContext context, String url) {
+    if (url == null) {
+      return null;
+    }
     String[] parts = url.split("\\/");
     if (parts.length < 2)
       return null;
@@ -6998,6 +7001,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       String html = "";
       fragment(res.fhirType()+"-"+prefixForContained+res.getId()+"-history", html, f.getOutputNames(), r, vars, null);
     }
+    if (igpkp.wantGen(r, "html")) {
+      XhtmlNode xhtml = getXhtml(f, r, res);
+      if (xhtml == null && HistoryGenerator.allEntriesAreHistoryProvenance(r.getElement())) {
+        RenderingContext ctxt = rc.copy().setParser(getTypeLoader(f, r));
+        List<ProvenanceDetails> entries = loadProvenanceForBundle(igpkp.getLinkFor(r, true), r.getElement(), f);
+        xhtml = new HistoryGenerator(ctxt).generateForBundle(entries); 
+        fragment(res.fhirType()+"-"+prefixForContained+res.getId()+"-html", new XhtmlComposer(XhtmlComposer.XML).compose(xhtml), f.getOutputNames(), r, vars, null);
+      } else {
+        String html = xhtml == null ? "" : new XhtmlComposer(XhtmlComposer.XML).compose(xhtml);
+        fragment(res.fhirType()+"-"+prefixForContained+res.getId()+"-html", html, f.getOutputNames(), r, vars, null);
+      }
+    }
   }
 
   private String genFmmBanner(FetchedResource r) throws FHIRException {
@@ -7462,6 +7477,25 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return getHtmlForResource(r.getElement());
     }
   }
+  
+  private XhtmlNode getXhtml(FetchedFile f, FetchedResource r, Resource resource) throws Exception {
+    if (resource instanceof DomainResource) {
+      DomainResource dr = (DomainResource) resource;
+      if (dr.getText().hasDiv())
+        return dr.getText().getDiv();
+    }
+    if (resource instanceof Bundle) {
+      Bundle b = (Bundle) resource;
+      return new BundleRenderer(rc).render(b);
+    }
+    if (resource instanceof Parameters) {
+      Parameters p = (Parameters) resource;
+      return new ParametersRenderer(rc, new ResourceContext(ResourceContextType.PARAMETERS, p, null)).render(p);
+    }
+    RenderingContext lrc = rc.copy().setParser(getTypeLoader(f, r));
+    return RendererFactory.factory(resource, lrc).build(resource);
+  }
+
 
   private XhtmlNode getHtmlForResource(Element element) {
     Element text = element.getNamedChild("text");
