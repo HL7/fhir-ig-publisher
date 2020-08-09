@@ -1026,6 +1026,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   @Override
   public ResourceWithReference resolve(RenderingContext context, String url) {
+    if (url == null) {
+      return null;
+    }
     String[] parts = url.split("\\/");
     if (parts.length < 2)
       return null;
@@ -1041,11 +1044,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             return new ResourceWithReference(path, new DirectWrappers.ResourceWrapperDirect(context, r.getResource()));            
           }
         }
+      }
+    }
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
         if (r.getElement().fhirType().equals("Bundle")) {
           List<Element> entries = r.getElement().getChildrenByName("entry");
           for (Element entry : entries) {
             Element res = entry.getNamedChild("resource");
-            if (res != null && res.fhirType().equals(parts[0]) && res.getNamedChildValue("id").equals(parts[1])) {
+            if (res != null && res.fhirType().equals(parts[0]) && res.hasChild("id") && res.getNamedChildValue("id").equals(parts[1])) {
               String path = igpkp.getLinkFor(r, true)+"#"+parts[0]+"_"+parts[1];
               return new ResourceWithReference(path, new ElementWrappers.ResourceWrapperMetaElement(context, r.getElement()));
             }
@@ -1926,7 +1933,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (d.hasPackageId() && d.getPackageId().contains("hl7.terminology")) {
         return true;
       }
-      if (d.hasUri() & d.getUri().contains("terminology.hl7")) {
+      if (d.hasUri() && d.getUri().contains("terminology.hl7")) {
         return true;
       }
     }
@@ -3076,6 +3083,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     rc.setServices(validator.getExternalHostServices());
     rc.setDestDir(Utilities.path(tempDir));
     rc.setProfileUtilities(new ProfileUtilities(context, new ArrayList<ValidationMessage>(), igpkp));
+    rc.setQuestionnaireMode(QuestionnaireRendererMode.TREE);
     rc.getCodeSystemPropList().addAll(codeSystemProps );
 
     if (igMode) {
@@ -5501,6 +5509,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           if (base != null) {
             item.addProperty("basename", base.getName());
             item.addProperty("basepath", Utilities.escapeXml(base.getUserString("path")));
+          } else if ("http://hl7.org/fhir/StructureDefinition/Base".equals(sd.getBaseDefinition())) {
+            item.addProperty("basename", "Base");
+            item.addProperty("basepath", "http://hl7.org/fhir/StructureDefinition/Element");            
           }
           item.addProperty("status", sd.getStatus().toCode());
           item.addProperty("date", sd.getDate().toString());
@@ -6990,6 +7001,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       String html = "";
       fragment(res.fhirType()+"-"+prefixForContained+res.getId()+"-history", html, f.getOutputNames(), r, vars, null);
     }
+    if (igpkp.wantGen(r, "html")) {
+      XhtmlNode xhtml = getXhtml(f, r, res);
+      if (xhtml == null && HistoryGenerator.allEntriesAreHistoryProvenance(r.getElement())) {
+        RenderingContext ctxt = rc.copy().setParser(getTypeLoader(f, r));
+        List<ProvenanceDetails> entries = loadProvenanceForBundle(igpkp.getLinkFor(r, true), r.getElement(), f);
+        xhtml = new HistoryGenerator(ctxt).generateForBundle(entries); 
+        fragment(res.fhirType()+"-"+prefixForContained+res.getId()+"-html", new XhtmlComposer(XhtmlComposer.XML).compose(xhtml), f.getOutputNames(), r, vars, null);
+      } else {
+        String html = xhtml == null ? "" : new XhtmlComposer(XhtmlComposer.XML).compose(xhtml);
+        fragment(res.fhirType()+"-"+prefixForContained+res.getId()+"-html", html, f.getOutputNames(), r, vars, null);
+      }
+    }
   }
 
   private String genFmmBanner(FetchedResource r) throws FHIRException {
@@ -7454,6 +7477,25 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return getHtmlForResource(r.getElement());
     }
   }
+  
+  private XhtmlNode getXhtml(FetchedFile f, FetchedResource r, Resource resource) throws Exception {
+    if (resource instanceof DomainResource) {
+      DomainResource dr = (DomainResource) resource;
+      if (dr.getText().hasDiv())
+        return dr.getText().getDiv();
+    }
+    if (resource instanceof Bundle) {
+      Bundle b = (Bundle) resource;
+      return new BundleRenderer(rc).render(b);
+    }
+    if (resource instanceof Parameters) {
+      Parameters p = (Parameters) resource;
+      return new ParametersRenderer(rc, new ResourceContext(ResourceContextType.PARAMETERS, p, null)).render(p);
+    }
+    RenderingContext lrc = rc.copy().setParser(getTypeLoader(f, r));
+    return RendererFactory.factory(resource, lrc).build(resource);
+  }
+
 
   private XhtmlNode getHtmlForResource(Element element) {
     Element text = element.getNamedChild("text");
