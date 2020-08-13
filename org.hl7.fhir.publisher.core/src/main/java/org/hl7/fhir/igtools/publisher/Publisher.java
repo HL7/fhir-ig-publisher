@@ -1577,7 +1577,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (templateName == null)
       throw new Exception("You must nominate a template - consult the IG Publisher documentation");
     igName = Utilities.path(repoRoot, ini.getStringProperty("IG", "ig"));
-    sourceIg = (ImplementationGuide) VersionConvertor_40_50.convertResource(FormatUtilities.loadFile(igName));
+    try {
+      sourceIg = (ImplementationGuide) VersionConvertor_40_50.convertResource(FormatUtilities.loadFile(igName));
+    } catch (Exception e) {
+      throw new Exception("Error Parsing File "+igName+": "+e.getMessage(), e);
+    }
     template = templateManager.loadTemplate(templateName, rootDir, sourceIg.getPackageId(), mode == IGBuildMode.AUTOBUILD);
 
     if (template.hasExtraTemplates()) {
@@ -2595,7 +2599,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     IContextResourceLoader loader = new PublisherLoader(pi, spm, specPath, igpkp).makeLoader();
     sp = SimpleWorkerContext.fromPackage(pi, loader);
     sp.loadBinariesFromFolder(pi);
-    
+    sp.setCacheId(UUID.randomUUID().toString());
     if (!version.equals(Constants.VERSION)) {
       // If it wasn't a 4.0 source, we need to set the ids because they might not have been set in the source
       ProfileUtilities utils = new ProfileUtilities(context, new ArrayList<ValidationMessage>(), igpkp);
@@ -6438,12 +6442,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                 }
                 generateResourceHtml(f, regen, r, cr, vars, prefixForContained);                  
               } else {
-                if (igpkp.wantGen(r, "html")) {
-                  XhtmlNode xhtml = contained instanceof DomainResource ? ((DomainResource) contained).getText().getDiv() : null;
-                  String html = xhtml == null ? "" : new XhtmlComposer(XhtmlComposer.XML).compose(xhtml);
-                  fragment(contained.fhirType()+"-"+prefixForContained+contained.getId()+"-html", html, f.getOutputNames(), r, vars, prefixForContained);
-//                  fragment(contained.fhirType()+"-"+contained.getId()+"-html", html, f.getOutputNames(), r, vars, prefixForContained);
-                }
                 generateResourceHtml(f, regen, r, contained, vars, prefixForContained);                
               }
             }
@@ -7007,10 +7005,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         RenderingContext ctxt = rc.copy().setParser(getTypeLoader(f, r));
         List<ProvenanceDetails> entries = loadProvenanceForBundle(igpkp.getLinkFor(r, true), r.getElement(), f);
         xhtml = new HistoryGenerator(ctxt).generateForBundle(entries); 
-        fragment(res.fhirType()+"-"+prefixForContained+res.getId()+"-html", new XhtmlComposer(XhtmlComposer.XML).compose(xhtml), f.getOutputNames(), r, vars, null);
+        fragment(res.fhirType()+"-"+prefixForContained+res.getId()+"-html", new XhtmlComposer(XhtmlComposer.XML).compose(xhtml), f.getOutputNames(), r, vars, prefixForContained);
       } else {
         String html = xhtml == null ? "" : new XhtmlComposer(XhtmlComposer.XML).compose(xhtml);
-        fragment(res.fhirType()+"-"+prefixForContained+res.getId()+"-html", html, f.getOutputNames(), r, vars, null);
+        fragment(res.fhirType()+"-"+prefixForContained+res.getId()+"-html", html, f.getOutputNames(), r, vars, prefixForContained);
       }
     }
   }
