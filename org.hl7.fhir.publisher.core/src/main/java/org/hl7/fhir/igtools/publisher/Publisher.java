@@ -121,6 +121,7 @@ import org.hl7.fhir.igtools.publisher.utils.IGWebSiteMaintainer;
 import org.hl7.fhir.igtools.renderers.BaseRenderer;
 import org.hl7.fhir.igtools.renderers.CodeSystemRenderer;
 import org.hl7.fhir.igtools.renderers.CrossViewRenderer;
+import org.hl7.fhir.igtools.renderers.HTAAnalysisRenderer;
 import org.hl7.fhir.igtools.renderers.DependencyRenderer;
 import org.hl7.fhir.igtools.renderers.HistoryGenerator;
 import org.hl7.fhir.igtools.renderers.JsonXhtmlRenderer;
@@ -736,7 +737,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             processTxLog(Utilities.path(destDir != null ? destDir : outputDir, "qa-tx.html"));
             ValidationPresenter val = new ValidationPresenter(version, businessVersion, igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
                 new BallotChecker(repoRoot).check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator,
-                new DependencyRenderer(pcm, outputDir).render(publishedIg));
+                new DependencyRenderer(pcm, outputDir).render(publishedIg), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()));
             log("Finished. "+presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
             recordOutcome(null, val);
           }
@@ -867,7 +868,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       clean();
       ValidationPresenter val = new ValidationPresenter(version, businessVersion, igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
           new BallotChecker(repoRoot).check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator,
-          new DependencyRenderer(pcm, outputDir).render(publishedIg));
+          new DependencyRenderer(pcm, outputDir).render(publishedIg), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()));
       if (isChild()) {
         log("Finished. "+presentDuration(endTime - startTime));      
       } else {
