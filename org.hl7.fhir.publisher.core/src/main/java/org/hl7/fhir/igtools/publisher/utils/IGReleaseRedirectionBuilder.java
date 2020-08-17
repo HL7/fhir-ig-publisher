@@ -145,7 +145,9 @@ public class IGReleaseRedirectionBuilder {
       // we need to generate a web config, and the redirectors
       Set<String> rtl = listResourceTypes(map);
       if (rtl.isEmpty()) {
-        System.out.println("!!! empty map, "+folder);
+        if (!folder.contains("smart-app-launch") && !folder.contains("davinci-deqm")) {
+          System.out.println("!!! empty map, "+folder);
+        }
       } else {
         generateWebConfig(rtl);
         for (String rt : rtl) {
@@ -157,9 +159,9 @@ public class IGReleaseRedirectionBuilder {
               String path = Utilities.path(folder, s, "index.asp");
               String p = s.replace("/", "-");
               String litPath = Utilities.path(folder, p)+".html";
-              if (!new File(litPath+".xml").exists() && !new File(litPath+".json").exists()) 
+              if (!new File(litPath+".xml").exists() && !new File(litPath+".json").exists()) { 
                 litPath = Utilities.path(folder, tail(map.get(s)));
-              File file = new File(Utilities.changeFileExt(litPath, ".xml"));
+              } File file = new File(Utilities.changeFileExt(litPath, ".xml"));
               if (file.exists() && new File(Utilities.changeFileExt(litPath, ".json")).exists()) {
                 createAspRedirect(path, map.get(s), Utilities.pathURL(vpath, head(file.getName())));
               }
@@ -396,11 +398,14 @@ public class IGReleaseRedirectionBuilder {
     Map<String, String> res = new HashMap<>();
     for (Entry<String, JsonElement> p : json.getAsJsonObject("paths").entrySet()) {
       String key = p.getKey();
-      if (key.contains("|"))
+      if (key.contains("|")) {
         key = key.substring(0,  key.indexOf("|"));
+      }
       if (key.length() >= canonical.length()+1 && key.startsWith(canonical)) {
-      String value = p.getValue().getAsString();
-      res.put(key.substring(canonical.length()+1), Utilities.pathURL(vpath, value));
+        String value = p.getValue().getAsString();
+        res.put(key.substring(canonical.length()+1), Utilities.pathURL(vpath, value));
+      } else if (key.contains("/")) {
+        res.put(key, Utilities.pathURL(vpath, p.getValue().getAsString()));        
       }
     }
     return res;

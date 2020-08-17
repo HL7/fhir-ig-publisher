@@ -188,7 +188,7 @@ public class PreviousVersionComparator {
         }
       }
     } catch (Exception e) {
-      throw new FHIRException("Problem with package-list.json at "+canonical+": "+e.getMessage(), e);
+      throw new FHIRException("Problem #1 with package-list.json at "+canonical+": "+e.getMessage(), e);
     }
   }
 

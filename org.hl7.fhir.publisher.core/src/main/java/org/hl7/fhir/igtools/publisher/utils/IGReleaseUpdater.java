@@ -113,8 +113,9 @@ public class IGReleaseUpdater {
           if (!o.has("version"))
            throw new Error(folder+" has Version without version");
           if (!JSONUtil.str(o, "version").equals("current")) {
-            if (o.has("current"))
+            if (o.has("current") && o.get("current").getAsBoolean() && o.has("path") && o.get("path").getAsString().startsWith(canonical+"/")) {
               root = o;
+            }
           }
         }
         boolean save = false;
@@ -134,6 +135,9 @@ public class IGReleaseUpdater {
             else {
               String path = JSONUtil.str(o, "path");
               String vf = Utilities.path(path.replace(url, rootFolder));
+              if (!o.has("sequence")) {
+                throw new Error("No Sequence value for version "+v+" in "+f);
+              }
               if (!path.endsWith(".html")) {
                 if (!(new File(vf).exists()))
                   errs.add("version "+v+" path "+vf+" not found (canonical = "+canonical+", path = "+path+")");
@@ -142,8 +146,9 @@ public class IGReleaseUpdater {
                   save = updateStatement(vf, null, ignoreList, json, o, errs, root, canonical, folder, canonical.equals("http://hl7.org/fhir"), false) | save;
                 }
               }
-              if (o.has("current"))
+              if (o.has("current") && o.get("current").getAsBoolean() && o.has("path") && o.get("path").getAsString().startsWith(canonical+"/")) {
                 root = o;
+              }
               if (reg != null) {
                 if (JSONUtil.str(o, "status").equals("release") || JSONUtil.str(o, "status").equals("trial-use") || JSONUtil.str(o, "status").equals("update")) {
                   reg.seeRelease(rc, JSONUtil.str(o, "status").equals("update") ? "STU Update" : JSONUtil.str(o, "sequence"), JSONUtil.str(o, "version"), JSONUtil.str(o, "fhirversion", "fhir-version"), JSONUtil.str(o, "path"));
@@ -154,8 +159,9 @@ public class IGReleaseUpdater {
             }
           }
         }
-        if (root != null)
+        if (root != null) {
           updateStatement(folder, folders, ignoreList, json, root, errs, root, canonical, folder, canonical.equals("http://hl7.org/fhir"), true);
+        }
         if (save)
           TextFile.stringToFile(new GsonBuilder().setPrettyPrinting().create().toJson(json), f, false);
         File ht = new File(Utilities.path(folder, "history.template"));
@@ -266,18 +272,19 @@ public class IGReleaseUpdater {
           JSONUtil.str(ig, "title"), new SimpleDateFormat("yyyy-MM-dd", new Locale("en", "US")).parse(JSONUtil.str(version, "date")), JSONUtil.str(version, "path"), canonical);
     }
     IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(vf, canonical, JSONUtil.str(version, "path"), rootFolder);
-    if (serverType == ServerType.APACHE)
+    if (serverType == ServerType.APACHE) {
       rb.buildApacheRedirections();
-    else if (serverType == ServerType.ASP2)
+    } else if (serverType == ServerType.ASP2) {
       rb.buildNewAspRedirections(isCore, isCore && vf.equals(rootFolder));
-    else if (serverType == ServerType.ASP1)
+    } else if (serverType == ServerType.ASP1) {
       rb.buildOldAspRedirections();
-    else if (serverType == ServerType.LITESPEED)
+    } else if (serverType == ServerType.LITESPEED) {
       rb.buildLitespeedRedirections();
-    else if (!canonical.contains("hl7.org/fhir"))
+    } else if (!canonical.contains("hl7.org/fhir")) {
       rb.buildApacheRedirections();
-    else
+    } else {
       rb.buildOldAspRedirections();
+    }
     System.out.println("  .. "+rb.getCountTotal()+" redirections ("+rb.getCountUpdated()+" created/updated)");
     new DownloadBuilder(vf, canonical, isCurrent ?  canonical: JSONUtil.str(version, "path")).execute();
     if (!isCurrent && serverType == ServerType.ASP2) {

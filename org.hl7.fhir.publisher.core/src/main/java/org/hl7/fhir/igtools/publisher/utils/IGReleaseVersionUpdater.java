@@ -71,12 +71,18 @@ public class IGReleaseVersionUpdater {
 
   private void updateFiles(String fragment, File dir, int level) throws FileNotFoundException, IOException {
     for (File f : dir.listFiles()) {
-      if (ignoreList != null && ignoreList.contains(f.getAbsolutePath()))
+      if (ignoreList != null && ignoreList.contains(f.getAbsolutePath())) {
         continue;
-      if (ignoreListOuter != null && ignoreListOuter.contains(f.getAbsolutePath()))
+      }
+      if (ignoreListOuter != null && ignoreListOuter.contains(f.getAbsolutePath())) {
         continue;
-      if (Utilities.existsInList(f.getName(), "modeldoc", "quick", "qa.html", "history.html", "directory.html", "qa-tx.html"))
+      }
+      if (Utilities.existsInList(f.getName(), "modeldoc", "quick", "qa.html", "qa.min.html", "history.html", "directory.html", "qa-tx.html", "us-core-comparisons")) {
         continue;
+      }
+      if (f.getName().startsWith("comparison-v")) {
+        continue;
+      }
       
       if (f.isDirectory() && !Utilities.existsInList(f.getName(), "html")) {
         updateFiles(fragment, f, level+1);
