@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map.Entry;
 
+import org.apache.commons.io.FileUtils;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.utils.IGRegistryMaintainer.ImplementationGuideEntry;
 import org.hl7.fhir.igtools.publisher.utils.IGReleaseUpdater.ServerType;
@@ -119,14 +120,22 @@ public class IGReleaseUpdater {
           }
         }
         boolean save = false;
-        ImplementationGuideEntry rc = reg == null ? null : reg.seeIg(JSONUtil.str(json, "package-id"), canonical, JSONUtil.str(json, "title"));
+        ImplementationGuideEntry rc = reg == null ? null : reg.seeIg(JSONUtil.str(json, "package-id"), canonical, JSONUtil.str(json, "title"), JSONUtil.str(json, "category"));
+        if (!json.has("category")) {
+          if (Utilities.noString(rc.getCategory())) {
+            errs.add(f+" has no category value");            
+          } else {
+            json.addProperty("category", rc.getCategory());
+            save = true;
+          }
+        }
         boolean hasRelease = false;
         List<String> folders = new ArrayList<>();
         for (JsonElement n : list) {
           JsonObject o = (JsonObject) n;
           if (JSONUtil.str(o, "version").equals("current")) {
             if (reg != null) {
-              reg.seeCiBuild(rc, JSONUtil.str(o, "path"));
+              reg.seeCiBuild(rc, JSONUtil.str(o, "path"), f);
             }
           } else {
             String v = JSONUtil.str(o, "version");
@@ -153,7 +162,7 @@ public class IGReleaseUpdater {
                 if (JSONUtil.str(o, "status").equals("release") || JSONUtil.str(o, "status").equals("trial-use") || JSONUtil.str(o, "status").equals("update")) {
                   reg.seeRelease(rc, JSONUtil.str(o, "status").equals("update") ? "STU Update" : JSONUtil.str(o, "sequence"), JSONUtil.str(o, "version"), JSONUtil.str(o, "fhirversion", "fhir-version"), JSONUtil.str(o, "path"));
                   hasRelease = true;
-                } else if (!hasRelease && FHIRVersion.isValidCode(JSONUtil.str(o, "fhirversion", "fhir-version")))
+                } else if (!hasRelease && VersionUtilities.packageForVersion(JSONUtil.str(o, "fhirversion", "fhir-version")) != null)
                   reg.seeCandidate(rc, JSONUtil.str(o, "sequence")+" "+Utilities.titleize(JSONUtil.str(o, "status")), JSONUtil.str(o, "version"), JSONUtil.str(o, "fhirversion", "fhir-version"), JSONUtil.str(o, "path"));
               }
             }
@@ -173,6 +182,8 @@ public class IGReleaseUpdater {
             html = html.replace("[%title%]", json.get("title").getAsString());
           while (html.contains("[%json%]"))
             html = html.replace("[%json%]", jsonv);
+          html = html.replace("assets/", "assets-hist/");
+          html = html.replace("dist/", "dist-hist/");
           TextFile.stringToFile(html, Utilities.path(folder, "history.html"), false);
         }
         ht = new File(Utilities.path(folder, "directory.template"));
@@ -186,6 +197,8 @@ public class IGReleaseUpdater {
             html = html.replace("[%json%]", jsonv);
           TextFile.stringToFile(html, Utilities.path(folder, "directory.html"), false);
         }
+        checkCopyFolderFromRoot(folder, "dist-hist");
+        checkCopyFolderFromRoot(folder, "assets-hist");
       }
         
     } catch (Exception e) {e.printStackTrace();
@@ -199,6 +212,27 @@ public class IGReleaseUpdater {
         System.out.println("    "+s);
       }      
     }
+  }
+
+  private void checkCopyFolderFromRoot(String focus, String name) throws IOException {
+    File f = new File(Utilities.path(focus, name));
+    if (!f.exists() || f.isDirectory()) {
+      if (f.exists()) {
+        Utilities.clearDirectory(f.getAbsolutePath());
+      }
+
+      File src = new File(Utilities.path(rootFolder, name));
+      if (!src.exists()) {
+        System.out.println("History Error: "+src.getAbsolutePath()+" doe not exist");        
+      } else if (!src.isDirectory()) {
+        System.out.println("History Error: "+src.getAbsolutePath()+" is a file, not a directory");
+      } else {
+        FileUtils.copyDirectory(src, f);
+      }
+    } else  {
+      System.out.println("History Error: "+f.getAbsolutePath()+" is a file, not a directory");
+    }
+    
   }
 
   private void scrubApostrophes(JsonObject json) {
