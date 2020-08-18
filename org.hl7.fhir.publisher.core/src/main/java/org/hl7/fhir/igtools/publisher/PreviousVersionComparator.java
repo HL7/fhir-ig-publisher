@@ -32,7 +32,6 @@ import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.UsageContext;
-import org.hl7.fhir.r5.utils.KeyGenerator;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Logger;
 import org.hl7.fhir.utilities.Utilities;
@@ -92,8 +91,6 @@ public class PreviousVersionComparator {
   private SimpleWorkerContext context;
   private String version;
   private String dstDir;
-  private KeyGenerator keygen;
-  private List<StructureDefinition> problems = new ArrayList<>();
   private List<ProfilePair> comparisons = new ArrayList<>();
   private ProfileKnowledgeProvider pkp;
   private String errMsg;
@@ -108,7 +105,6 @@ public class PreviousVersionComparator {
     this.context = context;
     this.version = version;
     this.dstDir = dstDir;
-    this.keygen = new KeyGenerator(canonical);
     this.pkp = pkp;
     this.logger = logger;
     try {
@@ -205,6 +201,7 @@ public class PreviousVersionComparator {
           for (String id : current.listResources("StructureDefinition", "ValueSet", "CodeSystem")) {
             filename = id;
             CanonicalResource curr = (CanonicalResource) loadResourceFromPackage(current, id, current.fhirVersion());
+            curr.setUserData("path", Utilities.pathURL(current.getWebLocation(), curr.fhirType()+"-"+curr.getId()+".html")); // to do - actually refactor to use the correct algorithm
             if (curr != null) {
               vi.resources.add(curr);
             }
@@ -267,7 +264,7 @@ public class PreviousVersionComparator {
           cr.getTemplates().put("ValueSet", new String(context.getBinaries().get("template-comparison-ValueSet.html")));
           cr.getTemplates().put("Profile", new String(context.getBinaries().get("template-comparison-Profile.html")));
           cr.getTemplates().put("Index", new String(context.getBinaries().get("template-comparison-index.html")));
-          cr.render();
+          cr.render("Version "+vi.version, "Current Build");
         } catch (Throwable e) {
           errMsg = "Current Version Comparison failed: "+e.getMessage();
           e.printStackTrace();
