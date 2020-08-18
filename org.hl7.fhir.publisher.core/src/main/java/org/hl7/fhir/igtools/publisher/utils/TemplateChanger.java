@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.igtools.publisher.utils.IGReleaseUpdater.ServerType;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;

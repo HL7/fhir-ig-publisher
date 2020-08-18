@@ -1,5 +1,14 @@
 package org.hl7.fhir.igtools.spreadsheets;
 
+import java.io.ByteArrayInputStream;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 /*-
  * #%L
  * org.hl7.fhir.publisher.core
@@ -27,19 +36,64 @@ import org.hl7.fhir.r5.conformance.ProfileUtilities;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.XmlParser;
-import org.hl7.fhir.r5.model.*;
+import org.hl7.fhir.r5.model.Base64BinaryType;
+import org.hl7.fhir.r5.model.BooleanType;
+import org.hl7.fhir.r5.model.Bundle;
 import org.hl7.fhir.r5.model.Bundle.BundleEntryComponent;
 import org.hl7.fhir.r5.model.Bundle.BundleType;
+import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.r5.model.CanonicalType;
+import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeSystem.CodeSystemContentMode;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
+import org.hl7.fhir.r5.model.CodeType;
+import org.hl7.fhir.r5.model.CodeableConcept;
+import org.hl7.fhir.r5.model.Constants;
 import org.hl7.fhir.r5.model.ContactPoint.ContactPointSystem;
-import org.hl7.fhir.r5.model.ElementDefinition.*;
+import org.hl7.fhir.r5.model.DataType;
+import org.hl7.fhir.r5.model.DateTimeType;
+import org.hl7.fhir.r5.model.DateType;
+import org.hl7.fhir.r5.model.DecimalType;
+import org.hl7.fhir.r5.model.ElementDefinition;
+import org.hl7.fhir.r5.model.ElementDefinition.ConstraintSeverity;
+import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
+import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionConstraintComponent;
+import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionMappingComponent;
+import org.hl7.fhir.r5.model.ElementDefinition.PropertyRepresentation;
+import org.hl7.fhir.r5.model.ElementDefinition.SlicingRules;
+import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
+import org.hl7.fhir.r5.model.Enumerations;
 import org.hl7.fhir.r5.model.Enumerations.BindingStrength;
 import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
-import org.hl7.fhir.r5.model.Enumerations.SearchParamType;
-import org.hl7.fhir.r5.model.OperationDefinition.OperationDefinitionParameterComponent;
 import org.hl7.fhir.r5.model.Enumerations.QuantityComparator;
-import org.hl7.fhir.r5.model.StructureDefinition.*;
+import org.hl7.fhir.r5.model.Enumerations.SearchParamType;
+import org.hl7.fhir.r5.model.Extension;
+import org.hl7.fhir.r5.model.Factory;
+import org.hl7.fhir.r5.model.IdType;
+import org.hl7.fhir.r5.model.Identifier;
+import org.hl7.fhir.r5.model.InstantType;
+import org.hl7.fhir.r5.model.IntegerType;
+import org.hl7.fhir.r5.model.OidType;
+import org.hl7.fhir.r5.model.OperationDefinition;
+import org.hl7.fhir.r5.model.OperationDefinition.OperationDefinitionParameterComponent;
+import org.hl7.fhir.r5.model.Period;
+import org.hl7.fhir.r5.model.PositiveIntType;
+import org.hl7.fhir.r5.model.Quantity;
+import org.hl7.fhir.r5.model.Reference;
+import org.hl7.fhir.r5.model.SearchParameter;
+import org.hl7.fhir.r5.model.StringType;
+import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.r5.model.StructureDefinition.ExtensionContextType;
+import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
+import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
+import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionMappingComponent;
+import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
+import org.hl7.fhir.r5.model.TimeType;
+import org.hl7.fhir.r5.model.UnsignedIntType;
+import org.hl7.fhir.r5.model.UriType;
+import org.hl7.fhir.r5.model.UrlType;
+import org.hl7.fhir.r5.model.UuidType;
+import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptReferenceComponent;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.model.ValueSet.ValueSetComposeComponent;
@@ -52,18 +106,8 @@ import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
-import org.hl7.fhir.utilities.xhtml.XhtmlParser;
 import org.hl7.fhir.utilities.xls.XLSXmlParser;
 import org.hl7.fhir.utilities.xls.XLSXmlParser.Sheet;
-import org.hl7.fhir.utilities.xml.XMLUtil;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import java.io.ByteArrayInputStream;
-import java.math.BigDecimal;
-import java.util.*;
 
 public class IgSpreadsheetParser {
 

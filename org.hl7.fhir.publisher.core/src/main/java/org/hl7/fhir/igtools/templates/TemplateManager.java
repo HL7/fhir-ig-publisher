@@ -34,12 +34,11 @@ import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
-import org.hl7.fhir.utilities.JsonMerger;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.cache.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.cache.NpmPackage;
 import org.hl7.fhir.utilities.cache.NpmPackage.NpmPackageFolder;
-import org.hl7.fhir.utilities.cache.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.cache.PackageGenerator.PackageType;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 

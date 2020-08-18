@@ -1,12 +1,9 @@
 package org.hl7.fhir.igtools.publisher.utils;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 
-import org.apache.commons.lang3.StringUtils;
-import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.ZipGenerator;

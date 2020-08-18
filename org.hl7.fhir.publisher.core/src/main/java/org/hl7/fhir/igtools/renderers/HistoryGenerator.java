@@ -7,29 +7,22 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
-import org.hl7.fhir.igtools.publisher.ProvenanceDetails;
-import org.hl7.fhir.igtools.publisher.ProvenanceDetails.ProvenanceDetailsTarget;
-import org.hl7.fhir.igtools.renderers.HistoryGenerator.HistoryListSorter;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
-import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider;
-import org.hl7.fhir.r5.context.SimpleWorkerContext;
+import org.hl7.fhir.igtools.publisher.ProvenanceDetails;
+import org.hl7.fhir.igtools.publisher.ProvenanceDetails.ProvenanceDetailsTarget;
 import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.DateTimeType;
-import org.hl7.fhir.r5.model.Reference;
-import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.renderers.utils.ElementWrappers.ResourceWrapperMetaElement;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceWithReference;
-import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
-import org.hl7.fhir.r5.model.AuditEvent.AuditEventAction;
 import org.hl7.fhir.r5.model.Bundle;
 import org.hl7.fhir.r5.model.Bundle.BundleEntryComponent;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
+import org.hl7.fhir.r5.model.Coding;
+import org.hl7.fhir.r5.model.Reference;
+import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceWithReference;
+import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.utilities.xhtml.NodeType;
-import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
 public class HistoryGenerator {

@@ -2,21 +2,16 @@ package org.hl7.fhir.igtools.renderers;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
-import org.hl7.fhir.igtools.renderers.HTAAnalysisRenderer.CopyRightAnalysis;
-import org.hl7.fhir.igtools.renderers.HTAAnalysisRenderer.CopyRightUsageAnalysis;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.ConceptMap;
-import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.utilities.MarkDownProcessor;

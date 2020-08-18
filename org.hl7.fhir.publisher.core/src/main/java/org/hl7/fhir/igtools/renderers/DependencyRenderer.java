@@ -14,13 +14,8 @@ import org.hl7.fhir.utilities.cache.BasePackageCacheManager;
 import org.hl7.fhir.utilities.cache.NpmPackage;
 import org.hl7.fhir.utilities.cache.PackageHacker;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
-import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Cell;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Row;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.TableModel;
-import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Title;
-
-import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
-
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 

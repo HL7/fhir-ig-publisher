@@ -24,17 +24,13 @@ package org.hl7.fhir.igtools.publisher;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.hl7.fhir.r5.model.DomainResource;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.ILiquidTemplateProvider;
-import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceContext;
 import org.hl7.fhir.utilities.TextFile;
-import org.hl7.fhir.utilities.Utilities;
 
 public class IGPublisherLiquidTemplateServices implements ILiquidTemplateProvider {
 

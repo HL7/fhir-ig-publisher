@@ -41,7 +41,6 @@ import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.PreviousVersionComparator;
 import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
-import org.hl7.fhir.igtools.renderers.ValidationPresenter.FiledValidationMessage;
 import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.model.Bundle;
 import org.hl7.fhir.r5.model.Bundle.BundleEntryComponent;

@@ -7,7 +7,6 @@ import java.util.Map;
 
 import org.hl7.fhir.r5.model.BaseDateTimeType;
 import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.DateTimeType;
 import org.hl7.fhir.r5.model.Reference;
 
 public class ProvenanceDetails {
