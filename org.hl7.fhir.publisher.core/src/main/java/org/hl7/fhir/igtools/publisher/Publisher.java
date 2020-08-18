@@ -1409,6 +1409,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     fetcher.setRootDir(rootDir);
     fetcher.setResourceDirs(resourceDirs);
+    if (focusDir().contains(" ")) {
+      throw new Error("There is a space in the folder path: \""+focusDir()+"\". Please fix your directory arrangement to remove the space and try again");
+    }
     File fsh = new File(Utilities.path(focusDir(), "fsh"));
     if (fsh.exists() && fsh.isDirectory() && !noFSH) {
       runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())));
