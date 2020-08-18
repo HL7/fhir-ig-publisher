@@ -6249,7 +6249,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
       name = ((CanonicalResource) r.getResource()).present();
-      String d = getDesc((CanonicalResource) r.getResource()).asStringValue();
+      String d = getDesc((CanonicalResource) r.getResource());
       if (d != null) {
         desc = markdownEngine.process(d, descSrc);
         descSrc = "Canonical Resource";
@@ -6357,8 +6357,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   @SuppressWarnings("rawtypes")
-  private PrimitiveType getDesc(CanonicalResource r) {
-    return r.getDescriptionElement();
+  private String getDesc(CanonicalResource r) {
+    if (r.hasDescriptionElement()) {
+      r.getDescriptionElement().asStringValue();
+    }
+    return null;
   }
 
   private Number getErrorCount() {
