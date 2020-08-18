@@ -2,21 +2,16 @@ package org.hl7.fhir.igtools.renderers;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
-import org.hl7.fhir.igtools.renderers.HTAAnalysisRenderer.CopyRightAnalysis;
-import org.hl7.fhir.igtools.renderers.HTAAnalysisRenderer.CopyRightUsageAnalysis;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.ConceptMap;
-import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.utilities.MarkDownProcessor;
@@ -154,9 +149,9 @@ public class HTAAnalysisRenderer {
           suggestions = suggestions + usage.suggestions;
           b.append(" <tr>\r\n");
           if (usage.cr.hasUserData("path")) {
-            b.append("  <td><a href=\""+usage.cr.getUserString("path")+"\">"+usage.cr.getUrl()+"</a></td>\r\n");
+            b.append("  <td><a href=\""+usage.cr.getUserString("path")+"\">"+tail(usage.cr.getUrl())+"</a></td>\r\n");
           } else {
-            b.append("  <td>"+usage.cr.getUrl()+"</td>\r\n");
+            b.append("  <td>"+tail(usage.cr.getUrl())+"</td>\r\n");
           }
           b.append("  <td>"+usage.cr.present()+"</td>\r\n");
           b.append("  <td>"+presentUsageCopyright(analysis.copyright, usage.cr.getCopyright())+"</td>\r\n");
@@ -181,6 +176,10 @@ public class HTAAnalysisRenderer {
     } catch (Exception e) {
       return "Exception generating HTA Analysis: "+e.getMessage();
     }
+  }
+
+  private String tail(String url) {
+    return url.contains("/") ? url.substring(url.lastIndexOf("/")+1) : url;
   }
 
   private String presentUsageCopyright(String copy, String ucopy) {

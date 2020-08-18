@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 
@@ -74,6 +73,10 @@ public class BallotChecker {
         errors.add("package-list.json: No Canonical URL");
       else if (!json.get("canonical").getAsString().equals(canonical))
         errors.add("package-list.json: canonical is wrong - is '"+json.get("canonical").getAsString()+"' should be '"+canonical+"'");
+
+      if (!json.has("category")) {
+        errors.add("package-list.json: No category entry for the registry category (talk to FHIR product director on #IG Creation for assistance). Note: existing IGs already have a category in the existing package-list.json on the hl7.org website - update your package-list.json from there");
+      }
 
       JsonArray list = json.getAsJsonArray("list");
       boolean found = false;

@@ -2,15 +2,9 @@ package org.hl7.fhir.igtools.publisher;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -19,32 +13,22 @@ import org.hl7.fhir.convertors.VersionConvertor_30_50;
 import org.hl7.fhir.convertors.VersionConvertor_40_50;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
-import org.hl7.fhir.igtools.publisher.realm.USRealmBusinessRules.ProfilePair;
 import org.hl7.fhir.r5.comparison.ComparisonRenderer;
 import org.hl7.fhir.r5.comparison.ComparisonSession;
 import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider;
-import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
-import org.hl7.fhir.r5.context.IWorkerContext.PackageVersion;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.UsageContext;
-import org.hl7.fhir.r5.utils.KeyGenerator;
 import org.hl7.fhir.utilities.IniFile;
-import org.hl7.fhir.utilities.Logger;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.Logger.LogMessageType;
-import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.cache.BasePackageCacheManager;
 import org.hl7.fhir.utilities.cache.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.cache.NpmPackage;
 import org.hl7.fhir.utilities.cache.ToolsVersion;
 import org.hl7.fhir.utilities.json.JSONUtil;
-import org.hl7.fhir.utilities.validation.ValidationMessage;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -92,8 +76,6 @@ public class PreviousVersionComparator {
   private SimpleWorkerContext context;
   private String version;
   private String dstDir;
-  private KeyGenerator keygen;
-  private List<StructureDefinition> problems = new ArrayList<>();
   private List<ProfilePair> comparisons = new ArrayList<>();
   private ProfileKnowledgeProvider pkp;
   private String errMsg;
@@ -108,7 +90,6 @@ public class PreviousVersionComparator {
     this.context = context;
     this.version = version;
     this.dstDir = dstDir;
-    this.keygen = new KeyGenerator(canonical);
     this.pkp = pkp;
     this.logger = logger;
     try {
@@ -205,6 +186,7 @@ public class PreviousVersionComparator {
           for (String id : current.listResources("StructureDefinition", "ValueSet", "CodeSystem")) {
             filename = id;
             CanonicalResource curr = (CanonicalResource) loadResourceFromPackage(current, id, current.fhirVersion());
+            curr.setUserData("path", Utilities.pathURL(current.getWebLocation(), curr.fhirType()+"-"+curr.getId()+".html")); // to do - actually refactor to use the correct algorithm
             if (curr != null) {
               vi.resources.add(curr);
             }
@@ -267,7 +249,7 @@ public class PreviousVersionComparator {
           cr.getTemplates().put("ValueSet", new String(context.getBinaries().get("template-comparison-ValueSet.html")));
           cr.getTemplates().put("Profile", new String(context.getBinaries().get("template-comparison-Profile.html")));
           cr.getTemplates().put("Index", new String(context.getBinaries().get("template-comparison-index.html")));
-          cr.render();
+          cr.render("Version "+vi.version, "Current Build");
         } catch (Throwable e) {
           errMsg = "Current Version Comparison failed: "+e.getMessage();
           e.printStackTrace();

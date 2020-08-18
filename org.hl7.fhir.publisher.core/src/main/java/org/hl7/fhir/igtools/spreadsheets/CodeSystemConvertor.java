@@ -23,7 +23,6 @@ package org.hl7.fhir.igtools.spreadsheets;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.util.Map;
 
 import org.hl7.fhir.r5.context.CanonicalResourceManager;
 import org.hl7.fhir.r5.context.IWorkerContext.PackageVersion;

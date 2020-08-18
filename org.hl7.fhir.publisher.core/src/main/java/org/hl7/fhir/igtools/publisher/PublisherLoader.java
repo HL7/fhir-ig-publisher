@@ -1,17 +1,15 @@
 package org.hl7.fhir.igtools.publisher;
 
+import java.io.IOException;
+
+import org.hl7.fhir.convertors.loaders.BaseLoaderR5.ILoaderKnowledgeProvider;
 import org.hl7.fhir.convertors.loaders.R2016MayToR5Loader;
 import org.hl7.fhir.convertors.loaders.R2ToR5Loader;
 import org.hl7.fhir.convertors.loaders.R3ToR5Loader;
 import org.hl7.fhir.convertors.loaders.R4ToR5Loader;
 import org.hl7.fhir.convertors.loaders.R5ToR5Loader;
-
-import java.io.IOException;
-
-import org.hl7.fhir.convertors.loaders.BaseLoaderR5.ILoaderKnowledgeProvider;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.context.IWorkerContext.IContextResourceLoader;
-import org.hl7.fhir.r5.context.SimpleWorkerContext.ILoadFilter;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.Resource;

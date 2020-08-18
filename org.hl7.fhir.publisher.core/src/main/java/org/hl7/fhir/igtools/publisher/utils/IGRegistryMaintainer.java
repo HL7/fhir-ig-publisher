@@ -23,11 +23,7 @@ package org.hl7.fhir.igtools.publisher.utils;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 import org.hl7.fhir.utilities.TextFile;
@@ -54,7 +50,7 @@ public class IGRegistryMaintainer {
       this.name = name;
       this.version = version;
       this.fhirVersion = fhirVersion;
-      this.path = path;
+      this.path = removeTrailingSlash(path);
     }
     
     public String getName() {
@@ -81,6 +77,7 @@ public class IGRegistryMaintainer {
     private String cibuild;
     private List<PublicationEntry> releases = new ArrayList<>();
     private List<PublicationEntry> candidates = new ArrayList<>();
+    private JsonObject entry;
     
     public ImplementationGuideEntry(String packageId, String canonical, String title) {
       super();
@@ -109,23 +106,56 @@ public class IGRegistryMaintainer {
       return candidates;
     }
 
+    public String getCategory() {
+      return JSONUtil.str(entry, "category");
+    }
   }
 
   private String path;
   private List<ImplementationGuideEntry> igs = new ArrayList<>();
+  private JsonObject json;
 
-  public IGRegistryMaintainer(String path) {
+  public IGRegistryMaintainer(String path) throws JsonSyntaxException, FileNotFoundException, IOException {
     this.path = path;
+    if (path != null) {
+      json = (JsonObject) new JsonParser().parse(TextFile.fileToString(path));
+    }
   }
 
-  public ImplementationGuideEntry seeIg(String packageId, String canonical, String title) {
+  public String removeTrailingSlash(String p) {
+    return p.endsWith("/") ? p.substring(0,  p.length()-1) : p;
+  }
+
+  public ImplementationGuideEntry seeIg(String packageId, String canonical, String title, String category) {
     ImplementationGuideEntry ig = new ImplementationGuideEntry(packageId, canonical, title);
     igs.add(ig);
+    ig.entry = JSONUtil.findByStringProp(json.getAsJsonArray("guides"), "npm-name", ig.packageId);
+    if (ig.entry == null) {
+      ig.entry = new JsonObject();
+      json.getAsJsonArray("guides").add(ig.entry);
+      ig.entry.addProperty("name", ig.title);
+      ig.entry.addProperty("category", Utilities.noString(category) ? "??" : category);
+      ig.entry.addProperty("npm-name", ig.packageId);
+      ig.entry.addProperty("description", "??");
+      ig.entry.addProperty("authority", getAuthority(ig.canonical));
+      ig.entry.addProperty("country", getCountry(ig.canonical));
+      ig.entry.addProperty("history", getHistoryPage(ig.canonical));
+      JsonArray a = new JsonArray();
+      ig.entry.add("language", a);
+      a.add(new JsonPrimitive("en"));
+    } 
+    if (!ig.entry.has("category") && !Utilities.noString(category)) {
+      ig.entry.addProperty("category", category);      
+    }
     return ig;
   }
 
-  public void seeCiBuild(ImplementationGuideEntry ig, String path) {
-    ig.cibuild = path;
+  public void seeCiBuild(ImplementationGuideEntry ig, String path, String source) {
+    if (path.startsWith("https://build.fhir.org/ig")) {
+      System.out.println("Error in "+source+":path to build.fhir.org should not use https://");
+      path = path.replace("https://build.fhir.org/ig", "http://build.fhir.org/ig");
+    }
+    ig.cibuild = removeTrailingSlash(path);
   }
 
   public void seeRelease(ImplementationGuideEntry ig, String name, String version, String fhirVersion, String path) {
@@ -139,41 +169,23 @@ public class IGRegistryMaintainer {
   }
 
   public void finish() throws JsonSyntaxException, FileNotFoundException, IOException {
-    if (path != null) {
-      // load the file
-      JsonObject json = (JsonObject) new JsonParser().parse(TextFile.fileToString(path)); // use gson parser to preseve property order
+    if (json != null) {
       for (ImplementationGuideEntry ig : igs) {
-        JsonObject e = JSONUtil.findByStringProp(json.getAsJsonArray("guides"), "npm-name", ig.packageId);
-        if (e == null) {
-          e = new JsonObject();
-          json.getAsJsonArray("guides").add(e);
-          e.addProperty("name", ig.title);
-          e.addProperty("category", "??");
-          e.addProperty("npm-name", ig.packageId);
-          e.addProperty("description", "??");
-          e.addProperty("authority", getAuthority(ig.canonical));
-          e.addProperty("country", getCountry(ig.canonical));
-          e.addProperty("history", getHistoryPage(ig.canonical));
-          e.addProperty("canonical", ig.canonical);
-          e.addProperty("ci-build", ig.cibuild);
-          JsonArray a = new JsonArray();
-          e.add("language", a);
-          a.add(new JsonPrimitive("en"));
-        } else {
-          if (!e.has("canonical") || !e.get("canonical").getAsString().equals(ig.canonical)) {
-            e.remove("canonical");
-            e.addProperty("canonical", ig.canonical);
-          }
-          if (!e.has("ci-build") || !e.get("ci-build").getAsString().equals(ig.cibuild)) {
-            e.remove("ci-build");
-            e.addProperty("ci-build", ig.cibuild);
-          }
+        if (!ig.entry.has("canonical") || !ig.entry.get("canonical").getAsString().equals(ig.canonical)) {
+          ig.entry.remove("canonical");
+          ig.entry.addProperty("canonical", ig.canonical);
         }
-        if (e.has("editions")) {
-          e.remove("editions");
+        if (!ig.entry.has("ci-build") || !ig.entry.get("ci-build").getAsString().equals(ig.cibuild)) {
+          ig.entry.remove("ci-build");
+          ig.entry.addProperty("ci-build", ig.cibuild);
+        }      
+
+        if (ig.entry.has("editions")) {
+          ig.entry.remove("editions");
         }
+        
         JsonArray a = new JsonArray();
-        e.add("editions", a);
+        ig.entry.add("editions", a);
         if (!ig.getCandidates().isEmpty()) {
           PublicationEntry p = ig.getCandidates().get(0);
           a.add(makeEdition(p, ig.packageId));

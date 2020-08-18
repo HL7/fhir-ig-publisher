@@ -1,16 +1,12 @@
 package org.hl7.fhir.igtools.publisher.realm;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 
 import org.hl7.fhir.convertors.VersionConvertor_30_50;
 import org.hl7.fhir.convertors.VersionConvertor_40_50;
@@ -19,10 +15,8 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.I18nConstants;
-import org.hl7.fhir.igtools.publisher.realm.USRealmBusinessRules.ProfilePair;
 import org.hl7.fhir.r5.comparison.ComparisonRenderer;
 import org.hl7.fhir.r5.comparison.ComparisonSession;
-import org.hl7.fhir.r5.conformance.ProfileUtilities;
 import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.PackageVersion;
@@ -31,11 +25,10 @@ import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
-import org.hl7.fhir.r5.utils.KeyGenerator;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.cache.NpmPackage;
 import org.hl7.fhir.utilities.cache.FilesystemPackageCacheManager;
+import org.hl7.fhir.utilities.cache.NpmPackage;
 import org.hl7.fhir.utilities.cache.ToolsVersion;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
@@ -43,7 +36,6 @@ import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
 
-import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
@@ -74,7 +66,6 @@ public class USRealmBusinessRules extends RealmBusinessRules {
   private IWorkerContext context;
   private String version;
   private String dstDir;
-  private KeyGenerator keygen;
   private List<StructureDefinition> problems = new ArrayList<>();
   private List<ProfilePair> comparisons = new ArrayList<>();
 
@@ -86,7 +77,6 @@ public class USRealmBusinessRules extends RealmBusinessRules {
     this.context = context;
     this.version = version;
     this.dstDir = dstDir;
-    this.keygen = new KeyGenerator(canonical);
     this.pkp = pkp;
   }
 
@@ -103,6 +93,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
       NpmPackage uscore = fetchLatestUSCore();
       for (String id : uscore.listResources("StructureDefinition", "ValueSet", "CodeSystem")) {
         CanonicalResource usd = (CanonicalResource) loadResourceFromPackage(uscore, id);
+        usd.setUserData("path", Utilities.pathURL(uscore.getWebLocation(), usd.fhirType()+"-"+usd.getId()+".html"));
         if (usd instanceof StructureDefinition) {
           usCoreProfiles.add((StructureDefinition) usd);
         }
@@ -223,7 +214,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
       cr.getTemplates().put("ValueSet", new String(context.getBinaries().get("template-comparison-ValueSet.html")));
       cr.getTemplates().put("Profile", new String(context.getBinaries().get("template-comparison-Profile.html")));
       cr.getTemplates().put("Index", new String(context.getBinaries().get("template-comparison-index.html")));
-      cr.render();
+      cr.render("US Realm", "Current Build");
       System.out.println("US Core Comparisons Finished");
     } catch (Throwable e) {
       System.out.println("US Core Comparison failed: "+e.getMessage());

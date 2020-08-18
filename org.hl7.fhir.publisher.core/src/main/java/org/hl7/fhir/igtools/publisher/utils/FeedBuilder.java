@@ -15,8 +15,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-import org.hl7.fhir.igtools.publisher.utils.FeedBuilder.Publication;
-import org.hl7.fhir.igtools.publisher.utils.FeedBuilder.PublicationSorter;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
