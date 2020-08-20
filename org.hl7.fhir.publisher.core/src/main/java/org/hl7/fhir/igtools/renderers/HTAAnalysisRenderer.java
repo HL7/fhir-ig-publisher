@@ -171,7 +171,7 @@ public class HTAAnalysisRenderer {
       } else if (errs + warnings == 0) {
         return "<a href=\"qa-hta.html\">All OK, "+suggestions+" "+Utilities.pluralize("suggestion", suggestions)+"</a>";
       } else {
-        return "<a href=\"qa-hta.html\"><span style=\"background-color: #ffcccc\">"+errs+warnings+" "+Utilities.pluralize("issues", errs+warnings)+"</span></a>";
+        return "<a href=\"qa-hta.html\"><span style=\"background-color: #ffcccc\">"+(errs+warnings)+" "+Utilities.pluralize("issue", errs+warnings)+"</span></a>";
       }
     } catch (Exception e) {
       return "Exception generating HTA Analysis: "+e.getMessage();

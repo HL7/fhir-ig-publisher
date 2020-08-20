@@ -44,6 +44,7 @@ import org.hl7.fhir.utilities.Utilities;
 
 public class SimpleFetcher implements IFetchFile {
 
+  private static final String[] EXTENSIONS = new String[] {".xml", ".json", ".map", ".phinvads"};
   private IGKnowledgeProvider pkp;
   private List<String> resourceDirs;
   private ILoggingService log;
@@ -196,29 +197,14 @@ public class SimpleFetcher implements IFetchFile {
       
       if (Utilities.noString(fn)) {
         // no source in the json file.
-        fn = findFile(dirs, type.toLowerCase()+"-"+id+".xml");
-        if (fn == null) // Added to support Forge's file naming convention
-          fn = findFile(dirs, id+"."+type.toLowerCase()+".xml");
-        if (fn == null)
-          fn = findFile(dirs, type.toLowerCase()+"-"+id+".json");
-        if (fn == null)
-          fn = findFile(dirs, type.toLowerCase()+"/"+id+".xml");
-        if (fn == null)
-          fn = findFile(dirs, type.toLowerCase()+"/"+id+".json");
-        if (fn == null)
-          fn = findFile(dirs, id+".xml");
-        if (fn == null)
-          fn = findFile(dirs, id+".json");
-        if (fn == null) 
-          fn = findFile(dirs, type+"-"+id+".xml");
-        if (fn == null) 
-          fn = findFile(dirs, id+"."+type+".xml");
-        if (fn == null)
-          fn = findFile(dirs, type+"-"+id+".json");
-        if (fn == null)
-          fn = findFile(dirs, type+"/"+id+".xml");
-        if (fn == null)
-          fn = findFile(dirs, type+"/"+id+".json");
+        fn = findFileInSet(dirs, 
+              type.toLowerCase()+"-"+id,
+              id+"."+type.toLowerCase(), // Added to support Forge's file naming convention
+              type.toLowerCase()+"/"+id,
+              id,
+              type+"-"+id,
+              id+"."+type,
+              type+"/"+id);
         if (fn == null)
           throw new Exception("Unable to find the source file for "+type+"/"+id+": not specified, so tried "+type+"-"+id+".xml, "+id+"."+type+".xml, "+type+"-"+id+".json, "+type+"/"+id+".xml, "+type+"/"+id+".json, "+id+".xml, and "+id+".json (and lowercase resource name variants) in dirs "+dirs.toString());
       } else {
@@ -234,6 +220,26 @@ public class SimpleFetcher implements IFetchFile {
     } else {
       throw new Exception("Unknown source reference type for implementation guide");
     }
+  }
+  
+  String findFileInSet(List<String> dirs, String... names) throws IOException {
+    for (String f : names) {
+      String fn = findFileMultiExt(dirs, f);
+      if (fn != null) {
+        return fn;
+      }
+    }
+    return null;
+  }
+
+  String findFileMultiExt(List<String> dirs, String name) throws IOException {
+    for (String ex : EXTENSIONS) {
+      String fn = findFile(dirs, name+ex);
+      if (fn != null ) {
+        return fn;
+      }
+    }
+    return null;
   }
 
   String findFile(List<String> dirs, String name) throws IOException {
