@@ -96,7 +96,16 @@ public class IGReleaseRedirectionBuilder {
   
   private static final String WC_START = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + 
       "<configuration>\n" + 
-      "  <system.webServer>\n" + 
+      "  <system.webServer>\n" +
+      "    <defaultDocument>\n" +
+      "      <files>\n" +
+      "        <add value=\"index.asp\" />\n" +
+      "      </files>\n" +
+      "    </defaultDocument>\n" +    
+      "    <staticContent>\n" +
+      "      <remove fileExtension=\".html\" />\n" +
+      "      <mimeMap fileExtension=\".html\" mimeType=\"text/html;charset=UTF-8\" />\n" +
+      "    </staticContent>\n" +
       "    <rewrite>\n" + 
       "      <rules>\n";
   
@@ -202,6 +211,8 @@ public class IGReleaseRedirectionBuilder {
             "    Response.Redirect(\""+link+"\");\r\n");
       }
     }
+    b.append("  else if (id == \"index\")\r\n" + 
+        "    Response.Redirect(\""+root+".html\");\r\n");
     b.append(     
         "\r\n" + 
         "%>\r\n" + 
