@@ -1031,7 +1031,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       String fp = sp.getBase()+"/"+url;
       String path;
       try {
-        path = sp.getPath(fp);
+        path = sp.getPath(fp, null);
       } catch (Exception e) {
         path = null;
       }
