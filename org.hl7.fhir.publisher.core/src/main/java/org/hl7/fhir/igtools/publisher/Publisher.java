@@ -104,6 +104,7 @@ import org.hl7.fhir.igtools.renderers.JsonXhtmlRenderer;
 import org.hl7.fhir.igtools.renderers.OperationDefinitionRenderer;
 import org.hl7.fhir.igtools.renderers.QuestionnaireRenderer;
 import org.hl7.fhir.igtools.renderers.QuestionnaireResponseRenderer;
+import org.hl7.fhir.igtools.renderers.StatusRenderer;
 import org.hl7.fhir.igtools.renderers.StructureDefinitionRenderer;
 import org.hl7.fhir.igtools.renderers.StructureMapRenderer;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter;
@@ -2302,10 +2303,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     logDebugMessage(LogCategory.INIT, "Initialization complete");
     // now, do regeneration
     JsonArray regenlist = configuration.getAsJsonArray("regenerate");
-    if (regenlist != null)
-      for (JsonElement regen : regenlist)
+    if (regenlist != null) {
+      for (JsonElement regen : regenlist) {
         regenList.add(((JsonPrimitive) regen).getAsString());
-
+      }
+    }
   }
 
   private void loadPubPack() throws FHIRException, IOException {
@@ -5584,6 +5586,31 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               item.addProperty("status", cr.getStatus().toCode());
             }
           }
+          if (r.getResource() instanceof DomainResource) {
+            org.hl7.fhir.igtools.renderers.StatusRenderer.ResourceStatusInformation info = StatusRenderer.analyse((DomainResource) r.getResource());
+            JsonObject jo = new JsonObject();
+            if (info.getColorClass() != null) {
+              jo.addProperty("class", info.getColorClass());
+            }
+            if (info.getFmm() != null) {
+              jo.addProperty("fmm", info.getFmm());
+            }
+            if (info.getOwner() != null) {
+              jo.addProperty("owner", info.getOwner());
+            }
+            if (info.getOwnerLink() != null) {
+              jo.addProperty("link", info.getOwnerLink());
+            }
+            if (info.getSstatus() != null) {
+              jo.addProperty("standards-status", info.getSstatus());
+            }
+            if (info.getStatus() != null) {
+              jo.addProperty("status", info.getStatus());
+            }
+            if (!jo.entrySet().isEmpty()) {
+              item.add("status", jo);
+            }
+          }
         }
         i++;
       }
@@ -6888,6 +6915,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       fragment(r.fhirType()+"-"+r.getId()+"-validate",  genValidation(f, r), f.getOutputNames());
     }
 
+    if (igpkp.wantGen(r, "status") && res instanceof DomainResource) {
+      fragment(r.fhirType()+"-"+r.getId()+"-status",  genStatus(f, r, res), f.getOutputNames());
+    }
+
     String template = igpkp.getProperty(r, "template-format");
     if (igpkp.wantGen(r, "xml")) {
       if (tool == GenerationTool.Jekyll)
@@ -7003,6 +7034,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return "";
   }
 
+  private String genStatus(FetchedFile f, FetchedResource r, Resource resource) throws FHIRException {
+    org.hl7.fhir.igtools.renderers.StatusRenderer.ResourceStatusInformation info = StatusRenderer.analyse((DomainResource) resource);
+    return StatusRenderer.render(info);
+  }
+  
   private String genValidation(FetchedFile f, FetchedResource r) throws FHIRException {
     StringBuilder b = new StringBuilder();
     String version = mode == IGBuildMode.AUTOBUILD ? "current" : mode == IGBuildMode.PUBLICATION ? publishedIg.getVersion() : "dev";
