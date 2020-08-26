@@ -162,8 +162,8 @@ public class StructureDefinitionRenderer extends BaseRenderer {
                 tryAdd(refs, describeProfile(t.getProfile().get(0).getValue(), prefix));
               }
             } 
-            if (t.hasTargetProfile()) {
-              tryAdd(refs, describeProfile(t.getTargetProfile().get(0).getValue(), prefix));
+            for (CanonicalType ct : t.getTargetProfile()) {
+              tryAdd(refs, describeProfile(ct.getValue(), prefix));
             } 
           }
 
