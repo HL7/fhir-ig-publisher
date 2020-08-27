@@ -279,7 +279,7 @@ public class IGPack2NpmConvertor {
         String r = s.equals(canonical) ? "" : s.substring(canonical.length() + 1);
         ManifestResourceComponent ra = getMatchingResource(r, ig);
         if (ra != null && !ra.hasRelativePath())
-          ra.setRelativePath(spm.getPath(s));
+          ra.setRelativePath(spm.getPath(s, null));
       }
     }
     for (String s : spm.getImages()) {

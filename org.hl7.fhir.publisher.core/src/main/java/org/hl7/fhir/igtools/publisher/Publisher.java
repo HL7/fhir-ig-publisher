@@ -104,6 +104,7 @@ import org.hl7.fhir.igtools.renderers.JsonXhtmlRenderer;
 import org.hl7.fhir.igtools.renderers.OperationDefinitionRenderer;
 import org.hl7.fhir.igtools.renderers.QuestionnaireRenderer;
 import org.hl7.fhir.igtools.renderers.QuestionnaireResponseRenderer;
+import org.hl7.fhir.igtools.renderers.StatusRenderer;
 import org.hl7.fhir.igtools.renderers.StructureDefinitionRenderer;
 import org.hl7.fhir.igtools.renderers.StructureMapRenderer;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter;
@@ -996,42 +997,60 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (url == null) {
       return null;
     }
+    
     String[] parts = url.split("\\/");
-    if (parts.length < 2)
-      return null;
-    for (FetchedFile f : fileList) {
-      for (FetchedResource r : f.getResources()) {
-        if (r.getElement() != null && r.getElement().fhirType().equals(parts[0]) && r.getId().equals(parts[1])) {
-          String path = igpkp.getLinkFor(r, true);
-          return new ResourceWithReference(path, new ElementWrappers.ResourceWrapperMetaElement(context, r.getElement()));
-        }
-        if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
-          if (url.equals(((CanonicalResource) r.getResource()).getUrl())) {
+    if (parts.length >= 2 && !Utilities.startsWithInList(url, "urn:uuid:", "urn:oid:", "cid:")) {
+      for (FetchedFile f : fileList) {
+        for (FetchedResource r : f.getResources()) {
+          if (r.getElement() != null && r.getElement().fhirType().equals(parts[0]) && r.getId().equals(parts[1])) {
             String path = igpkp.getLinkFor(r, true);
-            return new ResourceWithReference(path, new DirectWrappers.ResourceWrapperDirect(context, r.getResource()));            
+            return new ResourceWithReference(path, new ElementWrappers.ResourceWrapperMetaElement(context, r.getElement()));
+          }
+          if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
+            if (url.equals(((CanonicalResource) r.getResource()).getUrl())) {
+              String path = igpkp.getLinkFor(r, true);
+              return new ResourceWithReference(path, new DirectWrappers.ResourceWrapperDirect(context, r.getResource()));            
+            }
+          }
+        }
+      }
+      for (FetchedFile f : fileList) {
+        for (FetchedResource r : f.getResources()) {
+          if (r.getElement().fhirType().equals("Bundle")) {
+            List<Element> entries = r.getElement().getChildrenByName("entry");
+            for (Element entry : entries) {
+              Element res = entry.getNamedChild("resource");
+              if (res != null && res.fhirType().equals(parts[0]) && res.hasChild("id") && res.getNamedChildValue("id").equals(parts[1])) {
+                String path = igpkp.getLinkFor(r, true)+"#"+parts[0]+"_"+parts[1];
+                return new ResourceWithReference(path, new ElementWrappers.ResourceWrapperMetaElement(context, r.getElement()));
+              }
+            }
           }
         }
       }
     }
     for (FetchedFile f : fileList) {
+      System.out.println(f.toString());
       for (FetchedResource r : f.getResources()) {
         if (r.getElement().fhirType().equals("Bundle")) {
           List<Element> entries = r.getElement().getChildrenByName("entry");
           for (Element entry : entries) {
             Element res = entry.getNamedChild("resource");
-            if (res != null && res.fhirType().equals(parts[0]) && res.hasChild("id") && res.getNamedChildValue("id").equals(parts[1])) {
-              String path = igpkp.getLinkFor(r, true)+"#"+parts[0]+"_"+parts[1];
+            String fu = entry.getNamedChildValue("fullUrl");
+            if (res != null && fu != null && fu.equals(url)) {
+              String path = igpkp.getLinkFor(r, true)+"#"+fu.replace(":", "-");
               return new ResourceWithReference(path, new ElementWrappers.ResourceWrapperMetaElement(context, r.getElement()));
             }
           }
         }
       }
     }
+    
     for (SpecMapManager sp : specMaps) {
       String fp = sp.getBase()+"/"+url;
       String path;
       try {
-        path = sp.getPath(fp);
+        path = sp.getPath(fp, null);
       } catch (Exception e) {
         path = null;
       }
@@ -1461,7 +1480,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void runFsh(File file) throws IOException { 
-    File inif = new File(Utilities.path(Utilities.getDirectoryForFile(file.getAbsolutePath()), "fsh.ini"));
+    File inif = new File(Utilities.path(file.getAbsolutePath(), "fsh.ini"));
+    if (!inif.exists()) {
+      inif = new File(Utilities.path(Utilities.getDirectoryForFile(file.getAbsolutePath()), "fsh.ini"));
+    }
     if (inif.exists()) {
       IniFile ini = new IniFile(new FileInputStream(inif));
       if (ini.hasProperty("FSH", "timeout")) {
@@ -1478,10 +1500,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     ExecuteWatchdog watchdog = new ExecuteWatchdog(fshTimeout);
     exec.setWatchdog(watchdog);
     try {
-      if (SystemUtils.IS_OS_WINDOWS)
+      if (SystemUtils.IS_OS_WINDOWS) {
         exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C sushi ./fsh -o ."));
-      else
+      } else {
         exec.execute(org.apache.commons.exec.CommandLine.parse("sushi ./fsh -o ."));
+      }
     } catch (IOException ioex) {
       log("Sushi couldn't be run. Complete output from running Sushi : " + pumpHandler.getBufferString());
       log("Note: Check that Sushi is installed correctly (\"npm install -g fsh-sushi\". On windows, get npm from https://www.npmjs.com/get-npm)");
@@ -2302,10 +2325,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     logDebugMessage(LogCategory.INIT, "Initialization complete");
     // now, do regeneration
     JsonArray regenlist = configuration.getAsJsonArray("regenerate");
-    if (regenlist != null)
-      for (JsonElement regen : regenlist)
+    if (regenlist != null) {
+      for (JsonElement regen : regenlist) {
         regenList.add(((JsonPrimitive) regen).getAsString());
-
+      }
+    }
   }
 
   private void loadPubPack() throws FHIRException, IOException {
@@ -4688,6 +4712,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         validator.validate(r.getElement(), errs, res, res.getUserString("profile"));
       }
     } else {
+      validator.setNoCheckAggregation(r.isExample() && ToolingExtensions.readBoolExtension(r.getResEntry(), "http://hl7.org/fhir/StructureDefinition/igpublisher-no-check-aggregation"));
       if (r.getElement().hasUserData("profile")) {
         String ref = r.getElement().getUserString("profile");
         if (!Utilities.isAbsoluteUrl(ref)) {
@@ -5582,6 +5607,31 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             }
             if (cr.hasStatus()) {
               item.addProperty("status", cr.getStatus().toCode());
+            }
+          }
+          if (r.getResource() instanceof DomainResource) {
+            org.hl7.fhir.igtools.renderers.StatusRenderer.ResourceStatusInformation info = StatusRenderer.analyse((DomainResource) r.getResource());
+            JsonObject jo = new JsonObject();
+            if (info.getColorClass() != null) {
+              jo.addProperty("class", info.getColorClass());
+            }
+            if (info.getFmm() != null) {
+              jo.addProperty("fmm", info.getFmm());
+            }
+            if (info.getOwner() != null) {
+              jo.addProperty("owner", info.getOwner());
+            }
+            if (info.getOwnerLink() != null) {
+              jo.addProperty("link", info.getOwnerLink());
+            }
+            if (info.getSstatus() != null) {
+              jo.addProperty("standards-status", info.getSstatus());
+            }
+            if (info.getStatus() != null) {
+              jo.addProperty("status", info.getStatus());
+            }
+            if (!jo.entrySet().isEmpty()) {
+              item.add("status", jo);
             }
           }
         }
@@ -6888,6 +6938,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       fragment(r.fhirType()+"-"+r.getId()+"-validate",  genValidation(f, r), f.getOutputNames());
     }
 
+    if (igpkp.wantGen(r, "status") && res instanceof DomainResource) {
+      fragment(r.fhirType()+"-"+r.getId()+"-status",  genStatus(f, r, res), f.getOutputNames());
+    }
+
     String template = igpkp.getProperty(r, "template-format");
     if (igpkp.wantGen(r, "xml")) {
       if (tool == GenerationTool.Jekyll)
@@ -7003,6 +7057,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return "";
   }
 
+  private String genStatus(FetchedFile f, FetchedResource r, Resource resource) throws FHIRException {
+    org.hl7.fhir.igtools.renderers.StatusRenderer.ResourceStatusInformation info = StatusRenderer.analyse((DomainResource) resource);
+    return StatusRenderer.render(info);
+  }
+  
   private String genValidation(FetchedFile f, FetchedResource r) throws FHIRException {
     StringBuilder b = new StringBuilder();
     String version = mode == IGBuildMode.AUTOBUILD ? "current" : mode == IGBuildMode.PUBLICATION ? publishedIg.getVersion() : "dev";

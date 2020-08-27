@@ -152,12 +152,15 @@ public class SpecMapManager {
     return str(spec, "webUrl");
   }
 
-  public String getPath(String url) throws FHIRException {
+  public String getPath(String url, String def) throws FHIRException {
     if (url == null) {
       return null;
     }
     if (paths.has(url)) {
       return strOpt(paths, url);      
+    }
+    if (def != null) {
+      return def;
     }
     if (fromSimplifier) {
       return "https://simplifier.net/resolve?scope="+pi.name()+"@"+pi.version()+"&canonical="+url;
