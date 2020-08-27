@@ -1500,10 +1500,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     ExecuteWatchdog watchdog = new ExecuteWatchdog(fshTimeout);
     exec.setWatchdog(watchdog);
     try {
-      if (SystemUtils.IS_OS_WINDOWS)
+      if (SystemUtils.IS_OS_WINDOWS) {
         exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C sushi ./fsh -o ."));
-      else
+      } else {
         exec.execute(org.apache.commons.exec.CommandLine.parse("sushi ./fsh -o ."));
+      }
     } catch (IOException ioex) {
       log("Sushi couldn't be run. Complete output from running Sushi : " + pumpHandler.getBufferString());
       log("Note: Check that Sushi is installed correctly (\"npm install -g fsh-sushi\". On windows, get npm from https://www.npmjs.com/get-npm)");
