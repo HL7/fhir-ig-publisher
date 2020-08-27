@@ -997,37 +997,55 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (url == null) {
       return null;
     }
+    
     String[] parts = url.split("\\/");
-    if (parts.length < 2)
-      return null;
-    for (FetchedFile f : fileList) {
-      for (FetchedResource r : f.getResources()) {
-        if (r.getElement() != null && r.getElement().fhirType().equals(parts[0]) && r.getId().equals(parts[1])) {
-          String path = igpkp.getLinkFor(r, true);
-          return new ResourceWithReference(path, new ElementWrappers.ResourceWrapperMetaElement(context, r.getElement()));
-        }
-        if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
-          if (url.equals(((CanonicalResource) r.getResource()).getUrl())) {
+    if (parts.length >= 2 && !Utilities.startsWithInList(url, "urn:uuid:", "urn:oid:", "cid:")) {
+      for (FetchedFile f : fileList) {
+        for (FetchedResource r : f.getResources()) {
+          if (r.getElement() != null && r.getElement().fhirType().equals(parts[0]) && r.getId().equals(parts[1])) {
             String path = igpkp.getLinkFor(r, true);
-            return new ResourceWithReference(path, new DirectWrappers.ResourceWrapperDirect(context, r.getResource()));            
+            return new ResourceWithReference(path, new ElementWrappers.ResourceWrapperMetaElement(context, r.getElement()));
+          }
+          if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
+            if (url.equals(((CanonicalResource) r.getResource()).getUrl())) {
+              String path = igpkp.getLinkFor(r, true);
+              return new ResourceWithReference(path, new DirectWrappers.ResourceWrapperDirect(context, r.getResource()));            
+            }
+          }
+        }
+      }
+      for (FetchedFile f : fileList) {
+        for (FetchedResource r : f.getResources()) {
+          if (r.getElement().fhirType().equals("Bundle")) {
+            List<Element> entries = r.getElement().getChildrenByName("entry");
+            for (Element entry : entries) {
+              Element res = entry.getNamedChild("resource");
+              if (res != null && res.fhirType().equals(parts[0]) && res.hasChild("id") && res.getNamedChildValue("id").equals(parts[1])) {
+                String path = igpkp.getLinkFor(r, true)+"#"+parts[0]+"_"+parts[1];
+                return new ResourceWithReference(path, new ElementWrappers.ResourceWrapperMetaElement(context, r.getElement()));
+              }
+            }
           }
         }
       }
     }
     for (FetchedFile f : fileList) {
+      System.out.println(f.toString());
       for (FetchedResource r : f.getResources()) {
         if (r.getElement().fhirType().equals("Bundle")) {
           List<Element> entries = r.getElement().getChildrenByName("entry");
           for (Element entry : entries) {
             Element res = entry.getNamedChild("resource");
-            if (res != null && res.fhirType().equals(parts[0]) && res.hasChild("id") && res.getNamedChildValue("id").equals(parts[1])) {
-              String path = igpkp.getLinkFor(r, true)+"#"+parts[0]+"_"+parts[1];
+            String fu = entry.getNamedChildValue("fullUrl");
+            if (res != null && fu != null && fu.equals(url)) {
+              String path = igpkp.getLinkFor(r, true)+"#"+fu.replace(":", "-");
               return new ResourceWithReference(path, new ElementWrappers.ResourceWrapperMetaElement(context, r.getElement()));
             }
           }
         }
       }
     }
+    
     for (SpecMapManager sp : specMaps) {
       String fp = sp.getBase()+"/"+url;
       String path;
@@ -1462,7 +1480,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void runFsh(File file) throws IOException { 
-    File inif = new File(Utilities.path(Utilities.getDirectoryForFile(file.getAbsolutePath()), "fsh.ini"));
+    File inif = new File(Utilities.path(file.getAbsolutePath(), "fsh.ini"));
+    if (!inif.exists()) {
+      inif = new File(Utilities.path(Utilities.getDirectoryForFile(file.getAbsolutePath()), "fsh.ini"));
+    }
     if (inif.exists()) {
       IniFile ini = new IniFile(new FileInputStream(inif));
       if (ini.hasProperty("FSH", "timeout")) {
@@ -4690,6 +4711,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         validator.validate(r.getElement(), errs, res, res.getUserString("profile"));
       }
     } else {
+      validator.setNoCheckAggregation(r.isExample() && ToolingExtensions.readBoolExtension(r.getResEntry(), "http://hl7.org/fhir/StructureDefinition/igpublisher-no-check-aggregation"));
       if (r.getElement().hasUserData("profile")) {
         String ref = r.getElement().getUserString("profile");
         if (!Utilities.isAbsoluteUrl(ref)) {
