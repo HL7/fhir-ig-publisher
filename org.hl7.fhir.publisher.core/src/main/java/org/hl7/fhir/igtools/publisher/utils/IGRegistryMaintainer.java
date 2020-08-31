@@ -82,6 +82,12 @@ public class IGRegistryMaintainer {
     public ImplementationGuideEntry(String packageId, String canonical, String title) {
       super();
       this.packageId = packageId;
+      if (canonical == null) {
+        throw new Error("No canonical");
+      }
+      if (canonical == null || canonical.endsWith("/")) {
+        throw new Error("Canonical ends with /: "+canonical);
+      }
       this.canonical = canonical;
       this.title = title;
     }
@@ -177,7 +183,7 @@ public class IGRegistryMaintainer {
         }
         if (!ig.entry.has("ci-build") || !ig.entry.get("ci-build").getAsString().equals(ig.cibuild)) {
           ig.entry.remove("ci-build");
-          ig.entry.addProperty("ci-build", ig.cibuild);
+          ig.entry.addProperty("ci-build", dropTrailingSlash(ig.cibuild));
         }      
 
         if (ig.entry.has("editions")) {
@@ -234,9 +240,13 @@ public class IGRegistryMaintainer {
     }
     if (!e.has("url") || !e.get("url").getAsString().equals(p.getPath())) {
       e.remove("url");
-      e.addProperty("url", p.getPath());
+      e.addProperty("url", dropTrailingSlash(p.getPath()));
     }
     return e;
+  }
+
+  private String dropTrailingSlash(String p) {
+    return p != null && p.endsWith("/") ? p.substring(0, p.length()-1) : p;
   }
 
   private String getHistoryPage(String canonical) {
