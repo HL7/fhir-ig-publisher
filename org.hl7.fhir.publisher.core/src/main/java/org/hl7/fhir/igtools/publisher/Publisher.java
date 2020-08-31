@@ -1383,6 +1383,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     File fsh = new File(Utilities.path(focusDir(), "fsh"));
     if (fsh.exists() && fsh.isDirectory() && !noFSH) {
       runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())));
+    } else {
+      File fsh2 = new File(Utilities.path(focusDir(), "input", "fsh"));
+      if (fsh2.exists() && fsh2.isDirectory() && !noFSH) {
+        runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())));   
+      }
     }
     IniFile ini = checkNewIg();
     if (ini != null) {
