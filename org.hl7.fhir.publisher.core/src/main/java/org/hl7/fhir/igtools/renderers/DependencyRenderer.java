@@ -25,11 +25,13 @@ public class DependencyRenderer {
   private String dstFolder;
   private Set<String> ids = new HashSet<>();
   private String fver;
+  private String npmName;
   
-  public DependencyRenderer(BasePackageCacheManager pcm, String dstFolder) {
+  public DependencyRenderer(BasePackageCacheManager pcm, String dstFolder, String npmName) {
     super();
     this.pcm = pcm;
     this.dstFolder = dstFolder;
+    this.npmName = npmName;
   }
 
   public String render(ImplementationGuide ig) throws FHIRException, IOException {
@@ -139,7 +141,17 @@ public class DependencyRenderer {
     if (canonical.contains("/ImplementationGuide/")) {
       canonical = canonical.substring(0, canonical.indexOf("/ImplementationGuide/"));
     }
-    return addRow(gen, model.getRows(), id, ver, false, fver, false, canonical, web, "");
+    String comment = null;
+    if (!id.equals(npmName)) {
+      comment = "Expected Package Id is "+npmName;
+    } else if (id.startsWith("hl7") && !id.startsWith("hl7.fhir.")) {
+      comment = "HL7 Packages must have an id that starts with hl7.fhir.";
+    }
+    Row row = addRow(gen, model.getRows(), id, ver, false, fver, false, canonical, web, comment);
+    if (comment != null) {
+      row.getCells().get(5).addStyle("background-color: #ffcccc");
+    }
+    return row;
   }
 
   private Row addRow(HierarchicalTableGenerator gen, List<Row> rows, String id, String ver, boolean verError, String fver, boolean fverError, String canonical, String web, String problems) {
