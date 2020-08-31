@@ -94,7 +94,7 @@ public class IGReleaseRedirectionBuilder {
       "    \r\n"+
       "You should not be seeing this page. If you do, PHP has failed badly.\r\n";
   
-  private static final String WC_START = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + 
+  private static final String WC_START_ROOT = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + 
       "<configuration>\n" + 
       "  <system.webServer>\n" +
       "    <defaultDocument>\n" +
@@ -102,6 +102,16 @@ public class IGReleaseRedirectionBuilder {
       "        <add value=\"index.asp\" />\n" +
       "      </files>\n" +
       "    </defaultDocument>\n" +    
+      "    <staticContent>\n" +
+      "      <remove fileExtension=\".html\" />\n" +
+      "      <mimeMap fileExtension=\".html\" mimeType=\"text/html;charset=UTF-8\" />\n" +
+      "    </staticContent>\n" +
+      "    <rewrite>\n" + 
+      "      <rules>\n";
+  
+  private static final String WC_START_OTHER = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + 
+      "<configuration>\n" + 
+      "  <system.webServer>\n" +
       "    <staticContent>\n" +
       "      <remove fileExtension=\".html\" />\n" +
       "      <mimeMap fileExtension=\".html\" mimeType=\"text/html;charset=UTF-8\" />\n" +
@@ -158,7 +168,7 @@ public class IGReleaseRedirectionBuilder {
           System.out.println("!!! empty map, "+folder);
         }
       } else {
-        generateWebConfig(rtl);
+        generateWebConfig(rtl, isCoreRoot);
         for (String rt : rtl) {
           generateRedirect(rt, map);
         }
@@ -236,9 +246,9 @@ public class IGReleaseRedirectionBuilder {
     
   }
 
-  private void generateWebConfig(Set<String> rtl) throws IOException {
+  private void generateWebConfig(Set<String> rtl, boolean root) throws IOException {
     StringBuilder b = new StringBuilder();
-    b.append(WC_START);
+    b.append(root ?  WC_START_ROOT : WC_START_OTHER);
     countTotal++;
     for (String rt : rtl) { 
       if (!Utilities.existsInList(rt, "v2", "v3")) {
