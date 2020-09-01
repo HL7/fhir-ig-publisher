@@ -728,6 +728,7 @@ public class PackageReleaser {
       addTextChild(item, "guid", Utilities.pathURL(linkRoot, npm.name(), npm.version(), "package.tgz")).setAttribute("isPermaLink", "true");
       addTextChild(item, "dc:creator", "FHIR Project");
       addTextChild(item, "fhir:kind", npm.type());
+      addTextChild(item, "fhir:version", npm.fhirVersion());
       addTextChild(item, "pubDate", df.format(new Date()));
       txt = rss.createTextNode("\n    ");
       item.appendChild(txt);

@@ -1,5 +1,7 @@
 package org.hl7.fhir.igtools.publisher.utils;
 
+import java.io.BufferedReader;
+
 /*-
  * #%L
  * org.hl7.fhir.publisher.core
@@ -23,6 +25,7 @@ package org.hl7.fhir.igtools.publisher.utils;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -73,11 +76,13 @@ public class IGReleaseUpdater {
   private IGRegistryMaintainer reg;
   private ServerType serverType;
   private List<String> ignoreList = new ArrayList<>();
+  private File sft;
 
-  public IGReleaseUpdater(String folder, String url, String rootFolder, IGRegistryMaintainer reg, ServerType serverType, List<String> otherSpecs) throws IOException {
+  public IGReleaseUpdater(String folder, String url, String rootFolder, IGRegistryMaintainer reg, ServerType serverType, List<String> otherSpecs, File sft) throws IOException {
     this.folder = folder;
     this.url = url;
     this.rootFolder = rootFolder;
+    this.sft = sft;
     if (!"".equals("http://hl7.org/fhir")) { // keep the main spec out of the registry
       this.reg = reg;
     }
@@ -88,7 +93,7 @@ public class IGReleaseUpdater {
         for (String s : ini.getPropertyNames("ig-dirs")) {
           this.ignoreList.add(Utilities.path(folder, s));
         }
-      }
+      }      
     }
     this.ignoreList.addAll(otherSpecs);
   }
@@ -102,6 +107,7 @@ public class IGReleaseUpdater {
       else {
         JsonObject json = JsonTrackingParser.parseJsonFile(f);
         String canonical = JSONUtil.str(json, "canonical");
+
         JsonArray list = json.getAsJsonArray("list");
         JsonObject root = null;
         System.out.println("Update "+folder+" for "+canonical);
@@ -148,7 +154,7 @@ public class IGReleaseUpdater {
                   errs.add("version "+v+" path "+vf+" not found (canonical = "+canonical+", path = "+path+")");
                 else {
                   folders.add(vf);
-                  save = updateStatement(vf, null, ignoreList, json, o, errs, root, canonical, folder, canonical.equals("http://hl7.org/fhir"), false) | save;
+                  save = updateStatement(vf, null, ignoreList, json, o, errs, root, canonical, folder, canonical.equals("http://hl7.org/fhir"), false, list) | save;
                 }
               }
               if (o.has("current") && o.get("current").getAsBoolean() && o.has("path") && o.get("path").getAsString().startsWith(canonical+"/")) {
@@ -165,7 +171,7 @@ public class IGReleaseUpdater {
           }
         }
         if (root != null) {
-          updateStatement(folder, folders, ignoreList, json, root, errs, root, canonical, folder, canonical.equals("http://hl7.org/fhir"), true);
+          updateStatement(folder, folders, ignoreList, json, root, errs, root, canonical, folder, canonical.equals("http://hl7.org/fhir"), true, list);
         }
         if (save)
           TextFile.stringToFile(new GsonBuilder().setPrettyPrinting().create().toJson(json), f, false);
@@ -174,10 +180,8 @@ public class IGReleaseUpdater {
           scrubApostrophes(json);
           String jsonv = new GsonBuilder().create().toJson(json);
           String html = TextFile.fileToString(ht);
-          while (html.contains("[%title%]"))
-            html = html.replace("[%title%]", json.get("title").getAsString());
-          while (html.contains("[%json%]"))
-            html = html.replace("[%json%]", jsonv);
+          html = fixParameter(html, "title", json.get("title").getAsString());
+          html = fixParameter(html, "json", jsonv);
           html = html.replace("assets/", "assets-hist/");
           html = html.replace("dist/", "dist-hist/");
           TextFile.stringToFile(html, Utilities.path(folder, "history.html"), false);
@@ -187,10 +191,8 @@ public class IGReleaseUpdater {
           scrubApostrophes(json);
           String jsonv = new GsonBuilder().create().toJson(json);
           String html = TextFile.fileToString(ht);
-          while (html.contains("[%title%]"))
-            html = html.replace("[%title%]", json.get("title").getAsString());
-          while (html.contains("[%json%]"))
-            html = html.replace("[%json%]", jsonv);
+          html = fixParameter(html, "title", json.get("title").getAsString());
+          html = fixParameter(html, "json", jsonv);
           TextFile.stringToFile(html, Utilities.path(folder, "directory.html"), false);
         }
         checkCopyFolderFromRoot(folder, "dist-hist");
@@ -208,6 +210,20 @@ public class IGReleaseUpdater {
         System.out.println("    "+s);
       }      
     }
+  }
+
+  private String summariseDate(String d) {
+    if (d == null || d.length() < 10) {
+      return "??";
+    }
+    return d.substring(0,7);
+  }
+
+  private String fixParameter(String html, String name, String value) {
+    while (html.contains("[%"+name+"%]")) {
+      html = html.replace("[%"+name+"%]", value);
+    }
+    return html;
   }
 
   private void checkCopyFolderFromRoot(String focus, String name) throws IOException {
@@ -286,7 +302,8 @@ public class IGReleaseUpdater {
 //      System.out.println("There is a problem in the package-list.json file: "+path+" contains an apostrophe (\"'\")");
 //  }
 //
-  private boolean updateStatement(String vf, List<String> ignoreList, List<String> ignoreListOuter, JsonObject ig, JsonObject version, List<String> errs, JsonObject root, String canonical, String canonicalPath, boolean isCore, boolean isCurrent) throws FileNotFoundException, IOException, FHIRException, ParseException {
+  private boolean updateStatement(String vf, List<String> ignoreList, List<String> ignoreListOuter, JsonObject ig, JsonObject version, List<String> errs, JsonObject root, String canonical, String canonicalPath, boolean isCore, 
+      boolean isCurrent, JsonArray list) throws FileNotFoundException, IOException, FHIRException, ParseException {
 
     boolean vc = false;
     String fragment = genFragment(ig, version, root, canonical, ignoreList != null, isCore);
@@ -332,7 +349,43 @@ public class IGReleaseUpdater {
     checkFileExists(vf, "package.tgz");
     checkFileExists(vf, "qa.html");
     checkFileExists(vf, isCore ? "fhir-spec.zip" : "full-ig.zip");
+    
+    if (sft != null) {
+      String html = TextFile.fileToString(sft);
+      html = fixParameter(html, "title", JSONUtil.str(ig, "title"));
+      html = fixParameter(html, "id", JSONUtil.str(ig, "package-id"));
+      html = fixParameter(html, "version", isCurrent ? "All Versions" : JSONUtil.str(version, "version"));
+      html = fixParameter(html, "path", isCurrent ? canonicalPath : JSONUtil.str(version, "path"));
+      html = fixParameter(html, "history", isCurrent ? "history.html" : "../history.html");
+      html = fixParameter(html, "search-list", searchLinks(isCurrent, version, canonicalPath, list));
+      html = fixParameter(html, "note", isCurrent ? "this search searches all versions of the "+JSONUtil.str(ig, "title")+", including balloted versions. You can also search specific versions" :
+        "this search searches version "+JSONUtil.str(version, "version")+" of the "+JSONUtil.str(ig, "title")+". You can also search other versions, or all versions at once");
+      html = fixParameter(html, "prefix", "");            
+      TextFile.stringToFile(html, Utilities.path(vf, "searchform.html"), false);          
+    }
+
     return vc;
+  }
+
+  private String searchLinks(boolean root, JsonObject focus, String canonical, JsonArray list) {
+    StringBuilder b = new StringBuilder();
+    if (!root) {
+      b.append(" <li><a href=\""+canonical+"/searchform.html\">All Versions</a></li>\r\n");
+    }
+    for (JsonElement n : list) {
+      JsonObject o = (JsonObject) n;
+      if (!JSONUtil.str(o, "version").equals("current")) {
+        String v = JSONUtil.str(o, "version");
+        String path = JSONUtil.str(o, "path");
+        String date = JSONUtil.str(o, "date");
+        if (o == focus && !root) {
+          b.append(" <li>"+JSONUtil.str(o, "sequence")+" "+Utilities.titleize(JSONUtil.str(o, "status"))+" (v"+v+", "+summariseDate(date)+") (this version)</li>\r\n");
+        } else {
+          b.append(" <li><a href=\""+path+"/searchform.html\">"+JSONUtil.str(o, "sequence")+" "+Utilities.titleize(JSONUtil.str(o, "status"))+" (v"+v+", "+summariseDate(date)+")</a></li>\r\n");
+        }
+      }
+    }
+    return b.toString();
   }
 
   private void checkFileExists(String vf, String name) throws IOException {
@@ -473,7 +526,7 @@ public class IGReleaseUpdater {
   }
 
   public static void main(String[] args) throws Exception {
-    new IGReleaseUpdater(args[0], args[1], args[2], null, ServerType.ASP2, null).check();
+    new IGReleaseUpdater(args[0], args[1], args[2], null, ServerType.ASP2, null, null).check();
   }
   
 }

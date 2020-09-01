@@ -226,8 +226,10 @@ import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
+import org.hl7.fhir.utilities.TimeTracker.Session;
 import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.TimeTracker;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.ZipGenerator;
@@ -535,8 +537,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private boolean makeQA = true;
   private CqlSubSystem cql;
 
-  private long globalStart;
-
   private ILoggingService logger = this;
 
   private HTLMLInspector inspector;
@@ -645,6 +645,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private List<String> comparisonVersions;
 
+  private TimeTracker tt;
+
   
   private class PreProcessInfo {
     private String xsltName;
@@ -671,7 +673,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
   public void execute() throws Exception {
-    globalStart = System.nanoTime();
+    tt = new TimeTracker();
     initialize();
     if (isBuildingTemplate) {
       packageTemplate();
@@ -702,8 +704,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             processTxLog(Utilities.path(destDir != null ? destDir : outputDir, "qa-tx.html"));
             ValidationPresenter val = new ValidationPresenter(version, businessVersion, igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
                 new BallotChecker(repoRoot).check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator,
-                new DependencyRenderer(pcm, outputDir).render(publishedIg), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()));
-            log("Finished. "+presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
+                new DependencyRenderer(pcm, outputDir, npmName).render(publishedIg), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()));
+            log("Finished. "+Utilities.presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
             recordOutcome(null, val);
           }
         }
@@ -765,7 +767,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     Utilities.copyFile(Utilities.path(tempDir, "full-ig.zip"), Utilities.path(outputDir, "full-ig.zip"));
 
     // registeringg the package locally
-    log("Finished. "+presentDuration(endTime - startTime)+". Output in "+outputDir);
+    log("Finished. "+Utilities.presentDuration(endTime - startTime)+". Output in "+outputDir);
   }
 
 
@@ -815,9 +817,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   public void createIg() throws Exception, IOException, EOperationOutcome, FHIRException {
     try {
+      TimeTracker.Session tts = tt.start("loading");
       load();
+      tts.end();
 
-      long startTime = System.nanoTime();
+      tts = tt.start("generate");
       log("Processing Conformance Resources");
       loadConformance();
       log("Validating Resources");
@@ -831,16 +835,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       processProvenanceDetails();
       log("Generating Outputs in "+outputDir);
       generate();
-      long endTime = System.nanoTime();
       clean();
       ValidationPresenter val = new ValidationPresenter(version, businessVersion, igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
           new BallotChecker(repoRoot).check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator,
-          new DependencyRenderer(pcm, outputDir).render(publishedIg), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()));
+          new DependencyRenderer(pcm, outputDir, npmName).render(publishedIg), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()));
+      tts.end();
       if (isChild()) {
-        log("Finished. "+presentDuration(endTime - startTime));      
+        log("Finished. "+tt.report());      
       } else {
         processTxLog(Utilities.path(destDir != null ? destDir : outputDir, "qa-tx.html"));
-        log("Finished. "+presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
+        log("Finished. "+tt.report());      
+        log("Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
       }
       recordOutcome(null, val);
     } catch (Exception e) {
@@ -1062,6 +1067,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void generateNarratives() throws Exception {
+    Session tts = tt.start("narrative generation");
     logDebugMessage(LogCategory.PROGRESS, "gen narratives");
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {        
@@ -1107,6 +1113,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
     }
+    tts.end();
   }
 
   private void checkExistingNarrative(FetchedFile f, FetchedResource r, XhtmlNode xhtml) {
@@ -1354,30 +1361,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return p.getAsString();
   }
 
-  private String presentDuration(long duration) {
-    duration = duration / 1000000;
-    String res = "";    // ;
-    long days       = TimeUnit.MILLISECONDS.toDays(duration);
-    long hours      = TimeUnit.MILLISECONDS.toHours(duration) -
-        TimeUnit.DAYS.toHours(TimeUnit.MILLISECONDS.toDays(duration));
-    long minutes    = TimeUnit.MILLISECONDS.toMinutes(duration) -
-        TimeUnit.HOURS.toMinutes(TimeUnit.MILLISECONDS.toHours(duration));
-    long seconds    = TimeUnit.MILLISECONDS.toSeconds(duration) -
-        TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(duration));
-    long millis     = TimeUnit.MILLISECONDS.toMillis(duration) -
-        TimeUnit.SECONDS.toMillis(TimeUnit.MILLISECONDS.toSeconds(duration));
-
-    if (days > 0)
-      res = String.format("%dd %02d:%02d:%02d.%04d", days, hours, minutes, seconds, millis);
-    else if (hours > 0)
-      res = String.format("%02d:%02d:%02d.%04d", hours, minutes, seconds, millis);
-    else //
-      res = String.format("%02d:%02d.%04d", minutes, seconds, millis);
-//    else
-//      res = String.format("%02d.%04d", seconds, millis);
-    return res;
-  }
-
   public void initialize() throws Exception {
     firstExecution = true;
     pcm = new FilesystemPackageCacheManager(mode == null || mode == IGBuildMode.MANUAL || mode == IGBuildMode.PUBLICATION, ToolsVersion.TOOLS_VERSION);
@@ -1400,6 +1383,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     File fsh = new File(Utilities.path(focusDir(), "fsh"));
     if (fsh.exists() && fsh.isDirectory() && !noFSH) {
       runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())));
+    } else {
+      File fsh2 = new File(Utilities.path(focusDir(), "input", "fsh"));
+      if (fsh2.exists() && fsh2.isDirectory() && !noFSH) {
+        runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())));   
+      }
     }
     IniFile ini = checkNewIg();
     if (ini != null) {
@@ -3220,6 +3208,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (template != null) {
       if (debug)
         waitForInput("before OnGenerate");
+      Session tts = tt.start("template");
       List<String> newFileList = new ArrayList<String>();
       checkOutcomes(template.beforeGenerateEvent(publishedIg, tempDir, otherFilesRun, newFileList));
       for (String newFile: newFileList) {
@@ -3241,6 +3230,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       igPages.clear();
       if (publishedIg.getDefinition().hasPage())
         loadIgPages(publishedIg.getDefinition().getPage(), igPages);
+      tts.end();
       if (debug)
         waitForInput("after OnGenerate");
     }
@@ -3273,8 +3263,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (template != null) {
       if (debug)
         waitForInput("before OnJekyll");
+      Session tts = tt.start("template");
       List<String> newFileList = new ArrayList<String>();
       checkOutcomes(template.beforeJekyllEvent(publishedIg, newFileList));
+      tts.end();
       if (debug)
         waitForInput("after OnJekyll");
     }
@@ -3284,7 +3276,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (template != null) {
       if (debug)
         waitForInput("before OnJekyll");
+      Session tts = tt.start("template");
       checkOutcomes(template.onCheckEvent(publishedIg));
+      tts.end();
       if (debug)
         waitForInput("after OnJekyll");
     }
@@ -3750,9 +3744,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
   private void checkConformanceResources() throws IOException {
-    realmRules.startChecks(publishedIg);
-    previousVersionComparator.startChecks(publishedIg);
-    logDebugMessage(LogCategory.PROGRESS, "check profiles");
+    logDebugMessage(LogCategory.PROGRESS, "check profiles & code systems");
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getElement().fhirType().equals("StructureDefinition")) {
@@ -3760,9 +3752,25 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           StructureDefinition sd = (StructureDefinition) r.getResource();
           f.getErrors().addAll(pvalidator.validate(sd, false));
           checkJurisdiction(f, (CanonicalResource) r.getResource(), IssueSeverity.ERROR, "must");
-          realmRules.checkSD(f, sd);
         } else if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
           checkJurisdiction(f, (CanonicalResource) r.getResource(), IssueSeverity.WARNING, "should");
+        }
+        if (r.getElement().fhirType().equals("CodeSystem")) {
+          logDebugMessage(LogCategory.PROGRESS, "process CodeSystem: "+r.getId());
+          CodeSystem cs = (CodeSystem) r.getResource();
+          f.getErrors().addAll(csvalidator.validate(cs, false));
+        }
+      }
+    }
+    logDebugMessage(LogCategory.PROGRESS, "check profiles & code systems");
+    Session tts = tt.start("realm-rules");
+    realmRules.startChecks(publishedIg);
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getElement().fhirType().equals("StructureDefinition")) {
+          StructureDefinition sd = (StructureDefinition) r.getResource();
+          realmRules.checkSD(f, sd);
+        } else if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
           realmRules.checkCR(f, (CanonicalResource) r.getResource());
         }
         if (r.getElement().fhirType().equals("CodeSystem")) {
@@ -3770,13 +3778,22 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           CodeSystem cs = (CodeSystem) r.getResource();
           f.getErrors().addAll(csvalidator.validate(cs, false));
         }
+      }
+    }
+    realmRules.finishChecks();
+    tts.end();
+    logDebugMessage(LogCategory.PROGRESS, "check profiles & code systems");
+    tts = tt.start("previous-version");
+    previousVersionComparator.startChecks(publishedIg);
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
         if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
           previousVersionComparator.check((CanonicalResource) r.getResource());
         }
       }
     }
-    realmRules.finishChecks();
     previousVersionComparator.finishChecks();
+    tts.end();
   }
   
   private RealmBusinessRules makeRealmBusinessRules() {
@@ -4693,6 +4710,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void validate(FetchedFile file, FetchedResource r) throws Exception {
+    Session tts = tt.start("validation");
     List<ValidationMessage> errs = new ArrayList<ValidationMessage>();
     r.getElement().setUserData("igpub.context.file", file);
     r.getElement().setUserData("igpub.context.resource", r);
@@ -4730,6 +4748,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (r.getConfig() == null) {
       igpkp.findConfiguration(file, r);
     }
+    tts.end();
   }
 
   private void generate() throws Exception {
@@ -5420,6 +5439,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }*/
 
   private boolean runJekyll() throws IOException, InterruptedException {
+    Session tts = tt.start("jekyll");
+
     DefaultExecutor exec = new DefaultExecutor();
     exec.setExitValue(0);
     MyFilterHandler pumpHandler = new MyFilterHandler();
@@ -5437,7 +5458,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 	    } else {
 	      exec.execute(org.apache.commons.exec.CommandLine.parse(jekyllCommand+" build --destination \""+outputDir+"\""));
 	    }
+	    tts.end();
     } catch (IOException ioex) {
+      tts.end();
       if (pumpHandler.observedToSucceed) {
         log("Jekyll claimed to succeed, but returned an error. Proceeding anyway");
       } else {
@@ -7059,7 +7082,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private String genStatus(FetchedFile f, FetchedResource r, Resource resource) throws FHIRException {
     org.hl7.fhir.igtools.renderers.StatusRenderer.ResourceStatusInformation info = StatusRenderer.analyse((DomainResource) resource);
-    return StatusRenderer.render(info);
+    return StatusRenderer.render(igpkp.specPath(), info);
   }
   
   private String genValidation(FetchedFile f, FetchedResource r) throws FHIRException {
@@ -7489,8 +7512,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         return dr.getText().getDiv();
     }
     if (r.getResource() != null && r.getResource() instanceof Bundle) {
+      RenderingContext lrc = rc.copy().setParser(getTypeLoader(f, r));
       Bundle b = (Bundle) r.getResource();
-      return new BundleRenderer(rc).render(b);
+      return new BundleRenderer(lrc).render(b);
     }
     if (r.getResource() != null && r.getResource() instanceof Parameters) {
       Parameters p = (Parameters) r.getResource();
@@ -7668,7 +7692,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   @Override
   public void logMessage(String msg) {
     if (firstExecution)
-      System.out.println(Utilities.padRight(msg, ' ', 80)+" ("+presentDuration(System.nanoTime()-globalStart)+")");
+      System.out.println(Utilities.padRight(msg, ' ', 80)+" ("+tt.clock()+")");
     else
       System.out.println(msg);
     

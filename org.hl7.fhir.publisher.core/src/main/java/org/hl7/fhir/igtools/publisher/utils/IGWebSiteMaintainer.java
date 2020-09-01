@@ -60,6 +60,13 @@ public class IGWebSiteMaintainer {
       throw new Error("This web site contains IGs that are registered in the implementation guide registry, and you must pass in a reference to the registry");
     ServerType serverType = ServerType.fromCode(ini.getStringProperty("website", "server"));
     
+    File sft = null;
+    if (ini.hasProperty("website", "search-template")) {
+      sft = new File(Utilities.path(folder, ini.getStringProperty("website", "search-template")));
+      if (!sft.exists()) {
+        throw new Error("Search form "+sft.getAbsolutePath()+" not found");
+      }
+    }
     System.out.println("Update the website at "+folder);
     System.out.println("The public URL is at "+url);
     if (reg == null)
@@ -79,7 +86,7 @@ public class IGWebSiteMaintainer {
       return;
 
     for (String s : igs) {
-      new IGReleaseUpdater(s, url, folder, reg, serverType, igs).check();
+      new IGReleaseUpdater(s, url, folder, reg, serverType, igs, sft).check();
     }
     System.out.println("==================== ");
     System.out.println("Processing Feeds for "+folder);

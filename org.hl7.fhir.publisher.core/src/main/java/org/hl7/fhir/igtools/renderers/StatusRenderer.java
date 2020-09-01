@@ -130,25 +130,38 @@ public class StatusRenderer {
   }
 
 
-  public static String render(ResourceStatusInformation info) {
+  public static String render(String src, ResourceStatusInformation info) {
     StringBuilder b = new StringBuilder();
     b.append("<table class=\"");
     b.append(info.getColorClass());
     b.append("\"><tr>");
     if (info.getOwnerLink() != null) {
-    b.append("<td><a href=\"");
+    b.append("<td>Publisher: <a href=\"");
     b.append(info.getOwnerLink());
     b.append("\">");
     b.append(Utilities.escapeXml(info.getOwner()));
     b.append("</a></td><td>");
     } else {
-      b.append("<td>");
+      b.append("<td>Publisher: ");
       b.append(Utilities.escapeXml(info.getOwner()));
       b.append("</td><td>");
     }
+    b.append("<a href=\""+src+"/versions.html#maturity\">Status</a>: ");
     b.append(info.getStatus());
     b.append("</td><td>");
-    b.append(info.getFmm());
+    b.append("<a href=\""+src+"/versions.html#maturity\">Maturity Level</a>: ");
+    if (info.getFmm() != null) {
+      b.append(info.getFmm());
+    } else {
+      b.append("N/A");      
+    }
+    b.append("</td><td>");
+    b.append("<a href=\""+src+"/versions.html#std-process\">Standards Status</a>: ");
+    if (info.getSstatus() != null) {
+      b.append(info.getSstatus());
+    } else {
+      b.append("N/A");      
+    }
     b.append("</td></tr></table>\r\n");
     return b.toString();
   }
