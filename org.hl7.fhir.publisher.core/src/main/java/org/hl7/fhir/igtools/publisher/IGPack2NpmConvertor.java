@@ -209,7 +209,9 @@ public class IGPack2NpmConvertor {
 
         if (files.containsKey("spec.internals"))
           loadSpecInternals(ig, files.get("spec.internals"), version, canonical, files);
-        NPMPackageGenerator npm = new NPMPackageGenerator(dest != null ? dest : Utilities.path(Utilities.getDirectoryForFile(f.getAbsolutePath()), "package.tgz"), canonical, Utilities.noString(website) ? canonical : website, PackageType.IG, ig, new Date());
+        String destFile = dest != null ? dest : Utilities.path(Utilities.getDirectoryForFile(f.getAbsolutePath()), "package.tgz");
+        String url = Utilities.noString(website) ? canonical : website;
+        NPMPackageGenerator npm = new NPMPackageGenerator(destFile, canonical, url, PackageType.IG, ig, new Date(), false);
         ByteArrayOutputStream bs = new ByteArrayOutputStream();
         new JsonParser().setOutputStyle(OutputStyle.NORMAL).compose(bs, ig);
         npm.addFile(Category.RESOURCE, "ig-r4.json", bs.toByteArray());

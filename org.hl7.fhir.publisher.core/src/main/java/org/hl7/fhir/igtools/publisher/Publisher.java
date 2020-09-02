@@ -441,6 +441,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
+  public class TypeParserR5 implements ITypeParser {
+
+    @Override
+    public Base parseType(String xml, String type) throws IOException, FHIRException {
+      return new org.hl7.fhir.r5.formats.XmlParser().parseType(xml, type); 
+    }
+  }
+
 
 
   public enum IGBuildMode { MANUAL, AUTOBUILD, WEBSERVER, PUBLICATION }
@@ -647,6 +655,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private TimeTracker tt;
 
+  private boolean publishing = false;
+
   
   private class PreProcessInfo {
     private String xsltName;
@@ -710,7 +720,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           }
         }
       } else {
-        log("Done");
+        log("Done"+(publishing ? " - this IG is not suitable for publication (consult Confluence for publishing advice)" : ""));
       }
     }
     if (templateLoaded && new File(rootDir).exists()) {
@@ -739,7 +749,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     try {
       File od = new File(outputDir);
       FileUtils.cleanDirectory(od);
-      npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), templateInfo, execTime.getTime());
+      npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), templateInfo, execTime.getTime(), !publishing);
       npm.loadFiles(rootDir, new File(rootDir), ".git", "output", "package");
       npm.finish();
 
@@ -1158,7 +1168,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else if (VersionUtilities.isR2Ver(ver)) {
       return new TypeParserR2();
     } else if (ver.equals(Constants.VERSION)) {
-      return null;
+      return new TypeParserR5();
     } else
       throw new FHIRException("Unsupported version "+ver);
   }
@@ -1559,7 +1569,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       throw new Exception("You must nominate a template - consult the IG Publisher documentation");
     igName = Utilities.path(repoRoot, ini.getStringProperty("IG", "ig"));
     try {
-      sourceIg = (ImplementationGuide) VersionConvertor_40_50.convertResource(FormatUtilities.loadFile(igName));
+      try {
+        sourceIg = (ImplementationGuide) org.hl7.fhir.r5.formats.FormatUtilities.loadFile(igName);
+      } catch (Exception e) {
+        sourceIg = (ImplementationGuide) VersionConvertor_40_50.convertResource(FormatUtilities.loadFile(igName));
+      }
     } catch (Exception e) {
       throw new Exception("Error Parsing File "+igName+": "+e.getMessage(), e);
     }
@@ -3060,7 +3074,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (!dep.hasPackageId()) 
         throw new FHIRException("Unknown package id for "+dep.getUri());
     }
-    npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, execTime.getTime());
+    npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, execTime.getTime(), !publishing);
     execTime = Calendar.getInstance();
 
     rc = new RenderingContext(context, markdownEngine, ValidationOptions.defaults(), checkAppendSlash(specPath), "", null, ResourceRendererMode.IG);
@@ -6679,7 +6693,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       String id = ToolingExtensions.readStringExtension(ext, "id");
       String name = ToolingExtensions.readStringExtension(ext, "name");
       String dfn = Utilities.path(tempDir, id+".tgz");
-      NPMPackageGenerator gen = NPMPackageGenerator.subset(npm, dfn, id, name, execTime.getTime());
+      NPMPackageGenerator gen = NPMPackageGenerator.subset(npm, dfn, id, name, execTime.getTime(), !publishing);
       for (ListItemEntry i : list) {
         if (i.element != null) {
           ByteArrayOutputStream bs = new ByteArrayOutputStream();
@@ -8005,7 +8019,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       self.cacheVersion = hasNamedParam(args, "-cacheVersion");
       if (hasNamedParam(args, "-publish")) {
         self.setMode(IGBuildMode.PUBLICATION);
-        self.targetOutput = getNamedParam(args, "-publish");        
+        self.targetOutput = getNamedParam(args, "-publish");   
+        self.publishing  = true;
         self.targetOutputNested = getNamedParam(args, "-nested");        
       }
       if (hasNamedParam(args, "-resetTx")) {

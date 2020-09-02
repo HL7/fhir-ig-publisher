@@ -50,6 +50,9 @@ public class IGPackageChecker {
       checkJsonProp(pf, json, "name", pckId);
       checkJsonProp(pf, json, "url", url);
       checkJsonProp(pf, json, "canonical", canonical);
+      if (pck.isNotForPublication()) {
+        throw new Error("Error: the package at "+pf+" is not suitable for publication");
+      }
       if (!json.has("fhirVersions")) {
         System.out.println("Problem #2 with "+pf+": missing fhirVersions");
       } else {
@@ -129,7 +132,7 @@ public class IGPackageChecker {
     } else {
       fhirversions.add(fhirversion);
     }
-    NPMPackageGenerator npm = new NPMPackageGenerator(file, canonical, vpath, PackageType.IG, ig, date, fhirversions);
+    NPMPackageGenerator npm = new NPMPackageGenerator(file, canonical, vpath, PackageType.IG, ig, date, fhirversions, true);
     for (File f : new File(folder).listFiles()) {
       if (f.getName().endsWith(".openapi.json")) {
         byte[] src = TextFile.fileToBytes(f.getAbsolutePath());
