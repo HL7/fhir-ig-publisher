@@ -33,7 +33,6 @@ public class HTAAnalysisRenderer {
       super();
       notes = "";
     }
-
   }
 
   public class CopyRightAnalysis {
@@ -250,6 +249,9 @@ public class HTAAnalysisRenderer {
     }
     if ("http://loinc.org".equals(url)) {
       return "This material contains content from LOINC (http://loinc.org). LOINC is copyright © 1995-2020, Regenstrief Institute, Inc. and the Logical Observation Identifiers Names and Codes (LOINC) Committee and is available at no cost under the license at http://loinc.org/license. LOINC® is a registered United States trademark of Regenstrief Institute, Inc";
+    }
+    if ("http://www.ama-assn.org/go/cpt".equals(url)) {
+      return "Current Procedural Terminology (CPT) is copyright 2020 American Medical Association. All rights reserved";
     }
     return null;
   }
