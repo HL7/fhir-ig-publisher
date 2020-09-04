@@ -1099,7 +1099,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
       // return TerminologyNotesGenerator.describeBinding(prefix, d.getBinding(), page);
       ElementDefinitionBindingComponent def = d.getBinding();
       if (!def.hasValueSet()) 
-        return def.getDescription();
+        return processMarkdown("Binding.description", def.getDescriptionElement());
       BindingResolution br = igp.resolveBinding(sd, def, path);
       String defDesc = def.getDescription()==null ? "" : Utilities.escapeXml(def.getDescription()) + "<br/>";
       String s = defDesc+conf(def)+ "<a href=\""+Utilities.escapeXml(br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>"+confTail(def);
