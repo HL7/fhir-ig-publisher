@@ -7914,6 +7914,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       Publisher self = new Publisher();
       self.logMessage("FHIR IG Publisher "+IGVersionUtil.getVersionString());
       self.logMessage("Detected Java version: " + System.getProperty("java.version")+" from "+System.getProperty("java.home")+" on "+System.getProperty("os.arch")+" ("+System.getProperty("sun.arch.data.model")+"bit). "+toMB(Runtime.getRuntime().maxMemory())+"MB available");
+      if (!"64".equals(System.getProperty("sun.arch.data.model"))) {
+        self.logMessage("Attention: you should upgrade your Java to a 64bit version in order to be able to run this program without running out of memory");        
+      }
       String s = "Parameters:";
       for (int i = 0; i < args.length; i++) {
           s = s + " "+args[i];
