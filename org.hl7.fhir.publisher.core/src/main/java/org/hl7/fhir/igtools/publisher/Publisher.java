@@ -45,6 +45,7 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -4249,13 +4250,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               bc.getUseContext().addAll(contexts);
             }
             // Todo: Enable these
-            if (copyright != null) {
-              //              altered = true;
-              //              bc.setCopyright(copyright);
+            if (copyright != null && !bc.hasCopyright()) {
+             altered = true;
+             bc.setCopyright(copyright);
             }
-            if (license != null) {
-              //              altered = true;
-              //              bc.setLicense(license);
+            if (bc.getCopyright().contains("{{{year}}}")) {
+              bc.setCopyright(bc.getCopyright().replace("{{{year}}}", Integer.toString(Calendar.getInstance().get(Calendar.YEAR))));
+              altered = true;
             }
             if (jurisdictions != null && !jurisdictions.isEmpty()) {
               altered = true;
@@ -4744,7 +4745,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         validator.validate(r.getElement(), errs, res, res.getUserString("profile"));
       }
     } else {
-      validator.setNoCheckAggregation(r.isExample() && ToolingExtensions.readBoolExtension(r.getResEntry(), "http://hl7.org/fhir/StructureDefinition/igpublisher-no-check-aggregation"));
+      validator.setNoCheckAggregation(r.isExample() && ToolingExtensions.readBoolExtension(r.getResEntry(), "http://hl7.org/fhir/tools/StructureDefinition/igpublisher-no-check-aggregation"));
       if (r.getElement().hasUserData("profile")) {
         String ref = r.getElement().getUserString("profile");
         if (!Utilities.isAbsoluteUrl(ref)) {
