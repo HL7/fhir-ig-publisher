@@ -4254,7 +4254,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
              altered = true;
              bc.setCopyright(copyright);
             }
-            if (bc.getCopyright().contains("{{{year}}}")) {
+            if (bc.hasCopyright() && bc.getCopyright().contains("{{{year}}}")) {
               bc.setCopyright(bc.getCopyright().replace("{{{year}}}", Integer.toString(Calendar.getInstance().get(Calendar.YEAR))));
               altered = true;
             }
