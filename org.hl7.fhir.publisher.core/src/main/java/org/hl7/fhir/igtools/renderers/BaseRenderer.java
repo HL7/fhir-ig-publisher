@@ -23,6 +23,7 @@ package org.hl7.fhir.igtools.renderers;
 
 import java.util.List;
 
+import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.conformance.ProfileUtilities;
@@ -63,11 +64,16 @@ public class BaseRenderer extends TranslatingUtilities {
   }
 
   @SuppressWarnings("rawtypes")
-  public String processMarkdown(String location, PrimitiveType md) throws Exception {
+  public String processMarkdown(String location, PrimitiveType md) throws FHIRException {
     String text = gt(md);
+    return processMarkdown(location, text);
+  }
+  
+  public String processMarkdown(String location, String text) throws FHIRException {
 	  try {
-	    if (text == null)
+	    if (text == null) {
 	      return "";
+	    }
 	    // 1. custom FHIR extensions
 	    text = text.replace("||", "\r\n\r\n");
 	    while (text.contains("[[[")) {
@@ -115,7 +121,7 @@ public class BaseRenderer extends TranslatingUtilities {
 	    String s = markdownEngine.process(checkEscape(text), location);
 	    return s;
 	  } catch (Throwable e) {
-		  throw new Exception ("Error processing string: " + text, e);
+		  throw new FHIRException("Error processing string: " + text, e);
 	  }
 
   }
