@@ -570,13 +570,13 @@ public class StructureDefinitionRenderer extends BaseRenderer {
       BindingResolution br = igp.resolveBinding(sd, ToolingExtensions.readStringExtension(tx, ToolingExtensions.EXT_MAX_VALUESET), path);
       b.append("<br/>");
       b.append("<a style=\"font-weight:bold\" title=\"Max Value Set Extension\" href=\""+prefix+"extension-elementdefinition-maxvalueset.html\">Max Binding</a>: ");             
-      b.append((br.url == null ? Utilities.escapeXml(br.display) : "<a href=\""+ Utilities.escapeXml((Utilities.isAbsoluteUrl(br.url) || !igp.prependLinks() ? br.url : prefix+br.url))+"\">"+Utilities.escapeXml(br.display)+"</a>"));
+      b.append((br.url == null ? processMarkdown("binding", br.display) : "<a href=\""+ Utilities.escapeXml((Utilities.isAbsoluteUrl(br.url) || !igp.prependLinks() ? br.url : prefix+br.url))+"\">"+Utilities.escapeXml(br.display)+"</a>"));
     }
     if (tx.hasExtension(ToolingExtensions.EXT_MIN_VALUESET)) {
       BindingResolution br = igp.resolveBinding(sd, ToolingExtensions.readStringExtension(tx, ToolingExtensions.EXT_MIN_VALUESET), path);
       b.append("<br/>");
       b.append("<a style=\"font-weight:bold\" title=\"Min Value Set Extension\" href=\""+prefix+"extension-elementdefinition-minvalueset.html\">Min Binding</a>: ");             
-      b.append((br.url == null ? Utilities.escapeXml(br.display) : "<a href=\""+ Utilities.escapeXml((Utilities.isAbsoluteUrl(br.url) || !igp.prependLinks() ? br.url : prefix+br.url))+"\">"+Utilities.escapeXml(br.display)+"</a>"));
+      b.append((br.url == null ? processMarkdown("binding", br.display) : "<a href=\""+ Utilities.escapeXml((Utilities.isAbsoluteUrl(br.url) || !igp.prependLinks() ? br.url : prefix+br.url))+"\">"+Utilities.escapeXml(br.display)+"</a>"));
     }      
     b.append("</td></tr>\r\n");
   }
@@ -592,7 +592,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
       if (vs == null) {
         BindingResolution br = igp.resolveActualUrl(uri);
         if (br.url == null)
-          brd.vss = "<code>"+Utilities.escapeXml(br.display)+"</code>";
+          brd.vss = "<code>"+processMarkdown("binding", br.display)+"</code>";
         else if (Utilities.isAbsoluteUrl(br.url))
           brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\""+Utilities.escapeXml(br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>";
         else
@@ -1107,13 +1107,13 @@ public class StructureDefinitionRenderer extends BaseRenderer {
         br = igp.resolveBinding(sd, ToolingExtensions.readStringExtension(def, ToolingExtensions.EXT_MAX_VALUESET), path);
         s = s + "<br/>";
         s = s + "<a style=\"font-weight:bold\" title=\"Max Value Set Extension\" href=\""+prefix+"extension-elementdefinition-maxvalueset.html\">Max Binding</a>: ";             
-        s = s + (br.url == null ? Utilities.escapeXml(br.display) : "<a href=\""+ (Utilities.isAbsoluteUrl(br.url) || !igp.prependLinks() ? Utilities.escapeXml(br.url) : prefix+br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>");
+        s = s + (br.url == null ? processMarkdown("binding", br.display) : "<a href=\""+ (Utilities.isAbsoluteUrl(br.url) || !igp.prependLinks() ? Utilities.escapeXml(br.url) : prefix+br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>");
       }
       if (def.hasExtension(ToolingExtensions.EXT_MIN_VALUESET)) {
         br = igp.resolveBinding(sd, ToolingExtensions.readStringExtension(def, ToolingExtensions.EXT_MIN_VALUESET), path);
         s = s + "<br/>";
         s = s + "<a style=\"font-weight:bold\" title=\"Min Value Set Extension\" href=\""+prefix+"extension-elementdefinition-minvalueset.html\">Min Binding</a>: ";             
-        s = s + (br.url == null ? Utilities.escapeXml(br.display) : "<a href=\""+ (Utilities.isAbsoluteUrl(br.url) || !igp.prependLinks() ? Utilities.escapeXml(br.url) : prefix+br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>");
+        s = s + (br.url == null ? processMarkdown("binding", br.display) : "<a href=\""+ (Utilities.isAbsoluteUrl(br.url) || !igp.prependLinks() ? Utilities.escapeXml(br.url) : prefix+br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>");
       }      
       return s;
     }
