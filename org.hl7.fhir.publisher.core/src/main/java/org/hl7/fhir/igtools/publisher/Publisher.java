@@ -1842,7 +1842,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       loadIg(dep, i);
       i++;
     }
-
+    generateLoadedSnapshots();
+    
     // set up validator;
     validator = new InstanceValidator(context, new IGPublisherHostServices()); // todo: host services for reference resolution....
     validator.setAllowXsiLocation(true);
@@ -1907,6 +1908,37 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     else
       extensionTracker.setoptIn(!ini.getBooleanProperty("IG", "usage-stats-opt-out"));
     log("Initialization complete");
+  }
+
+  private void generateLoadedSnapshots() {
+    for (StructureDefinition sd : context.allStructures()) {
+      if (!sd.hasSnapshot() && sd.hasBaseDefinition()) {
+        generateSnapshot(sd);
+      }
+    }
+  }
+
+  private void generateSnapshot(StructureDefinition sd) {
+    List<ValidationMessage> messages = new ArrayList<>();
+    ProfileUtilities utils = new ProfileUtilities(context, messages, igpkp);
+    StructureDefinition base = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition());
+    if (base == null) {
+      System.out.println("Cannot find or generate snapshot for base definition "+sd.getBaseDefinition()+" from "+sd.getUrl());
+    } else {
+      if (!base.hasSnapshot()) {
+        generateSnapshot(base);
+      }
+      utils.setIds(sd, true);
+      try {
+        utils.generateSnapshot(base, sd, sd.getUrl(), Utilities.extractBaseUrl(base.getUserString("path")), sd.getName());
+        if (!sd.hasSnapshot()) {
+          System.out.println("Unable to generate snapshot for "+sd.getUrl()+": "+messages.toString());        
+        }
+      } catch (Exception e) {
+        System.out.println("Exception generating snapshot for "+sd.getUrl()+": "+e.getMessage());        
+      }      
+    }
+    
   }
 
   private boolean dependsOnUTG(JsonArray arr) throws Exception {
@@ -2211,6 +2243,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
 
+    generateLoadedSnapshots();
+    
     JsonArray cspl = configuration.getAsJsonArray("code.system.property.list");
     if (cspl != null) {
       for (JsonElement csp : cspl) {
@@ -4074,11 +4108,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
         if ((altered && r.getResource() != null) || (ver.equals(Constants.VERSION) && r.getResource() == null))
           r.setResource(new ObjectConverter(context).convert(r.getElement()));
-        if ((altered && r.getResource() == null))
-          if (file.getContentType().contains("json"))
+        if ((altered && r.getResource() == null)) {
+          if (file.getContentType().contains("json")) {
             saveToJson(file, e);
-          else if (file.getContentType().contains("xml"))
+          } else if (file.getContentType().contains("xml")) {
             saveToXml(file, e);
+          }
+        }
       } catch ( Exception ex ) {
         throw new Exception("Unable to determine type for  "+file.getName()+": " +ex.getMessage(), ex);
       }
@@ -4095,8 +4131,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private ImplementationGuideDefinitionResourceComponent findIGReference(String type, String id) {
     for (ImplementationGuideDefinitionResourceComponent r : publishedIg.getDefinition().getResource()) {
-      if (r.hasReference() && r.getReference().getReference().equals(type+"/"+id))
+      if (r.hasReference() && r.getReference().getReference().equals(type+"/"+id)) {
         return r;
+      }
     }
     return null;
   }
@@ -4106,8 +4143,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     xp.setAllowXsiLocation(true);
     xp.setupValidation(ValidationPolicy.EVERYTHING, file.getErrors());
     Element res = xp.parse(new ByteArrayInputStream(file.getSource()));
-    if (res == null)
+    if (res == null) {
       throw new Exception("Unable to parse XML for "+file.getName());
+    }
     return res;
   }
 
@@ -4147,15 +4185,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       org.hl7.fhir.r4.model.Resource r4 = new org.hl7.fhir.r4.formats.XmlParser().parse(src);
       org.hl7.fhir.r5.model.Resource r5 = VersionConvertor_40_50.convertResource(r4);
       new org.hl7.fhir.r5.formats.XmlParser().compose(dst, r5);
-    } else 
+    } else {
       throw new Exception("Conversion from "+srcV+" to "+dstV+" is not supported yet"); // because the only know reason to do this is 3.0.1 --> 1.40
+    }
     org.hl7.fhir.r5.elementmodel.XmlParser xp = new org.hl7.fhir.r5.elementmodel.XmlParser(context);
     xp.setAllowXsiLocation(true);
     xp.setupValidation(ValidationPolicy.EVERYTHING, file.getErrors());
     file.getErrors().clear();
     Element res = xp.parse(new ByteArrayInputStream(dst.toByteArray()));
-    if (res == null)
+    if (res == null) {
       throw new Exception("Unable to parse XML for "+file.getName());
+    }
     return res;
   }
 
@@ -4390,12 +4430,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             }
           }
         }
-      }
-    }
-
-    for (StructureDefinition derived : context.allStructures()) {
-      if (!derived.hasSnapshot() && derived.hasBaseDefinition()) {
-        throw new Exception("No snapshot found on "+derived.getUrl());
       }
     }
   }
