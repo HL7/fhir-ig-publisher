@@ -159,6 +159,10 @@ public class SpecMapManager {
     if (paths.has(url)) {
       return strOpt(paths, url);      
     }
+    String path = getSpecialPath(url);
+    if (path != null) {
+      return path;
+    }
     if (def != null) {
       return def;
     }
@@ -179,6 +183,14 @@ public class SpecMapManager {
       
     }
     
+    return null;
+  }
+
+  // hack around things missing in spec.internals 
+  private String getSpecialPath(String url) {
+    if ("http://hl7.org/fhir/ValueSet/iso3166-1-3".equals(url)) {
+      return Utilities.pathURL(base, "valueset-iso3166-1-3.html");
+    }
     return null;
   }
 

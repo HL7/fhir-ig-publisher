@@ -4290,7 +4290,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               bc.getUseContext().addAll(contexts);
             }
             // Todo: Enable these
-            if (copyright != null && !bc.hasCopyright()) {
+            if (copyright != null && !bc.hasCopyright() && bc.supportsCopyright()) {
              altered = true;
              bc.setCopyright(copyright);
             }
