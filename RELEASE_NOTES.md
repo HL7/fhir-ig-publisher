@@ -1,1 +1,0 @@
-* Fix NPE loading resources
