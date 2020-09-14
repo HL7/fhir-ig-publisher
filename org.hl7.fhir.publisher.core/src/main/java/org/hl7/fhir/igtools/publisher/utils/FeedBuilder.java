@@ -293,6 +293,7 @@ public class FeedBuilder {
     for (JsonElement e : JSONUtil.forceArray(json, "list")) {
       JsonObject v = (JsonObject) e;
       String version = JSONUtil.str(v, "version");
+      String vpackageId = v.has("package-id") ? JSONUtil.str(v, "package-id") : packageId;
       if (!"current".equals(version)) {
         String desc = JSONUtil.str(v, "desc");
         if (Utilities.noString(desc))
@@ -317,7 +318,7 @@ public class FeedBuilder {
             subPackages.add(a.getAsString());
           }
         }
-        pubs.add(new Publication(packageId, title, canonical, version, desc, date, path, status, sequence, fhirversion, kind, getCorrectPath(path, rootUrl, rootFolder), subPackages));
+        pubs.add(new Publication(vpackageId, title, canonical, version, desc, date, path, status, sequence, fhirversion, kind, getCorrectPath(path, rootUrl, rootFolder), subPackages));
       }
     }
   }
