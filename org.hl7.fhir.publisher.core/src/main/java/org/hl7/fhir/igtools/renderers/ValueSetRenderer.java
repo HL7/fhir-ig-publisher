@@ -132,6 +132,9 @@ public class ValueSetRenderer extends BaseRenderer {
     }
     ValueSet vsc = vs.copy();
     vsc.setText(null);
+    if (vsc.hasCompose()) {
+      vsc.setExpansion(null); // we don't want to render an expansion by mistake
+    }
     RendererFactory.factory(vsc, gen).render(vsc);
     return "<h3>Logical Definition (CLD)</h3>\r\n" + new XhtmlComposer(XhtmlComposer.HTML).compose(vsc.getText().getDiv());
   }
