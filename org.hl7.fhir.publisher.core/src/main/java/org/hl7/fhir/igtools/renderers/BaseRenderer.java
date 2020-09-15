@@ -152,15 +152,6 @@ public class BaseRenderer extends TranslatingUtilities {
       return uri;
   }
 
-  protected String describeStatus(PublicationStatus status, boolean experimental) {
-    switch (status) {
-    case ACTIVE: return experimental ? "Experimental" : "Active"; 
-    case DRAFT: return "draft";
-    case RETIRED: return "retired";
-    default: return "Unknown";
-    }
-  }
-
   protected String renderCommitteeLink(CanonicalResource cr) {
     String code = ToolingExtensions.readStringExtension(cr, ToolingExtensions.EXT_WORKGROUP);
     CodeSystem cs = context.fetchCodeSystem("http://terminology.hl7.org/CodeSystem/hl7-work-group");

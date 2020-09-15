@@ -223,7 +223,7 @@ public class HTLMLInspector {
     log.logDebugMessage(LogCategory.HTML, "Loading Files");
     // load files
     int i = 0;
-    int c = loadList.size() / 20;
+    int c = loadList.size() / 40;
     for (String s : loadList) {
       loadFile(s, rootFolder, messages);
       if (i == c) {
@@ -240,7 +240,7 @@ public class HTLMLInspector {
     // check links
     boolean first = true;
     i = 0;
-    c = cache.size() / 20;
+    c = cache.size() / 40;
     for (String s : sorted(cache.keySet())) {
       log.logDebugMessage(LogCategory.HTML, "Check "+s);
       LoadedFile lf = cache.get(s);
