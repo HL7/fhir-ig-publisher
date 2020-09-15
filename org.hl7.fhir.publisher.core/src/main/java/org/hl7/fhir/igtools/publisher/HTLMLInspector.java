@@ -112,19 +112,21 @@ public class HTLMLInspector {
   public class LoadedFile {
     private String filename;
     private long lastModified;
-    private XhtmlNode xhtml;
     private int iteration;
     private Set<String> targets = new HashSet<String>();
     private Boolean hl7State;
+    private boolean exempt;
     private String path;
+    private boolean hasXhtml;
 
-    public LoadedFile(String filename, String path, long lastModified, XhtmlNode xhtml, int iteration, Boolean hl7State) {
+    public LoadedFile(String filename, String path, long lastModified, int iteration, Boolean hl7State, boolean exempt, boolean hasXhtml) {
       this.filename = filename;
       this.lastModified = lastModified;
-      this.xhtml = xhtml;
       this.iteration = iteration;
       this.hl7State = hl7State;
       this.path = path;
+      this.exempt = exempt;
+      this.hasXhtml = hasXhtml;
     }
 
     public long getLastModified() {
@@ -139,8 +141,8 @@ public class HTLMLInspector {
       this.iteration = iteration;
     }
 
-    public XhtmlNode getXhtml() {
-      return xhtml;
+    public boolean isExempt() {
+      return exempt;
     }
 
     public Set<String> getTargets() {
@@ -153,6 +155,10 @@ public class HTLMLInspector {
 
     public Boolean getHl7State() {
       return hl7State;
+    }
+
+    public boolean isHasXhtml() {
+      return hasXhtml;
     }
     
   }
@@ -216,15 +222,25 @@ public class HTLMLInspector {
 
     log.logDebugMessage(LogCategory.HTML, "Loading Files");
     // load files
+    int i = 0;
+    int c = loadList.size() / 20;
     for (String s : loadList) {
       loadFile(s, rootFolder, messages);
+      if (i == c) {
+        System.out.print(".");
+        i = 0;
+      }
+      i++;
     }
+    System.out.println();
 
 
     log.logDebugMessage(LogCategory.HTML, "Checking Files");
     links = 0;
     // check links
     boolean first = true;
+    i = 0;
+    c = cache.size() / 20;
     for (String s : sorted(cache.keySet())) {
       log.logDebugMessage(LogCategory.HTML, "Check "+s);
       LoadedFile lf = cache.get(s);
@@ -236,7 +252,7 @@ public class HTLMLInspector {
             break;
           }
         }
-        if (check && !findExemptionComment(lf.getXhtml())) {
+        if (check && !lf.isExempt()) {
           if (requirePublishBox) {
             messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, s, "The html source does not contain the publish box" 
               + (first ? " "+RELEASE_HTML_MARKER+" (see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations)" : ""), IssueSeverity.ERROR));
@@ -250,16 +266,23 @@ public class HTLMLInspector {
           first = false;
         }
       }
-      if (lf.getXhtml() != null) {
+      if (lf.isHasXhtml()) {
+        XhtmlNode x = new XhtmlParser().setMustBeWellFormed(strict).parse(new FileInputStream(lf.filename), null);
         referencesValidatorPack = false;
-        if (checkLinks(s, "", lf.getXhtml(), null, messages, false) != NodeChangeType.NONE) { // returns true if changed
-          saveFile(lf);
+        if (checkLinks(s, "", x, null, messages, false) != NodeChangeType.NONE) { // returns true if changed
+          saveFile(lf, x);
         }
         if (referencesValidatorPack) {
           messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, s, "The html source references validator.pack which is deprecated. Change the IG to describe the use of the package system instead", IssueSeverity.ERROR));                      
         }
       }
+      if (i == c) {
+        System.out.print(".");
+        i = 0;
+      }
+      i++;
     }
+    System.out.println();
  
     log.logDebugMessage(LogCategory.HTML, "Checking Other Links");
     // check other links:
@@ -280,10 +303,10 @@ public class HTLMLInspector {
     return res;
   }
 
-  private void saveFile(LoadedFile lf) throws IOException {
+  private void saveFile(LoadedFile lf, XhtmlNode x) throws IOException {
     new File(lf.getFilename()).delete();
     FileOutputStream f = new FileOutputStream(lf.getFilename());
-    new XhtmlComposer(XhtmlComposer.HTML).composeDocument(f, lf.getXhtml());
+    new XhtmlComposer(XhtmlComposer.HTML).composeDocument(f, x);
     f.close();
   }
 
@@ -329,8 +352,9 @@ public class HTLMLInspector {
       }
     } catch (FHIRFormatError | IOException e) {
       x = null;
-      if (htmlName || !(e.getMessage().startsWith("Unable to Parse HTML - does not start with tag.") || e.getMessage().startsWith("Malformed XHTML")))
-    	messages.add(new ValidationMessage(Source.LinkChecker, IssueType.STRUCTURE, s, e.getMessage(), IssueSeverity.ERROR).setLocationLink(makeLocal(f.getAbsolutePath())));    	
+      if (htmlName || !(e.getMessage().startsWith("Unable to Parse HTML - does not start with tag.") || e.getMessage().startsWith("Malformed XHTML"))) {
+    	  messages.add(new ValidationMessage(Source.LinkChecker, IssueType.STRUCTURE, s, e.getMessage(), IssueSeverity.ERROR).setLocationLink(makeLocal(f.getAbsolutePath())));
+      }
     }
     if (x != null) {
       String src;
@@ -346,7 +370,7 @@ public class HTLMLInspector {
         hl7State = false;
       }
     }
-    LoadedFile lf = new LoadedFile(s, getPath(s, base), f.lastModified(), x, iteration, hl7State);
+    LoadedFile lf = new LoadedFile(s, getPath(s, base), f.lastModified(), iteration, hl7State, findExemptionComment(x), x != null);
     cache.put(s, lf);
     if (x != null) {
       checkHtmlStructure(s, x, messages);
@@ -407,6 +431,9 @@ public class HTLMLInspector {
   }
 
   private boolean findExemptionComment(XhtmlNode x) {
+    if (x == null) {
+      return false;
+    }
     for (XhtmlNode c : x.getChildNodes()) {
       if (c.getNodeType() == NodeType.Comment && x.getContent() != null && x.getContent().trim().equals("frameset content"))
         return true;
