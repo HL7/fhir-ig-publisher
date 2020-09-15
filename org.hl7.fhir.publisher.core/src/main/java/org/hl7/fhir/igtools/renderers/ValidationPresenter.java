@@ -698,7 +698,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     }
     if (link != null) { 
       link = link.replace("{{[id]}}", f.getResources().get(0).getId());
-      link = link.replace("{{[type]}}", f.getResources().get(0).getElement().fhirType());
+      link = link.replace("{{[type]}}", f.getResources().get(0).fhirType());
     }
     
     t.add("xlink", link);
@@ -770,7 +770,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     }
     if (link != null) { 
       link = link.replace("{{[id]}}", f.getResources().get(0).getId());
-      link = link.replace("{{[type]}}", f.getResources().get(0).getElement().fhirType());
+      link = link.replace("{{[type]}}", f.getResources().get(0).fhirType());
     }
     
     t.add("xlink", link);

@@ -12,7 +12,7 @@ import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.cache.NpmPackage;
 
-public class OperationDefinitionRenderer extends BaseRenderer {
+public class OperationDefinitionRenderer extends CanonicalRenderer {
   public static final String RIM_MAPPING = "http://hl7.org/v3";
   public static final String v2_MAPPING = "http://hl7.org/v2";
   public static final String LOINC_MAPPING = "http://loinc.org";
@@ -24,7 +24,7 @@ public class OperationDefinitionRenderer extends BaseRenderer {
   private List<FetchedFile> files;
 
   public OperationDefinitionRenderer(IWorkerContext context, String prefix, OperationDefinition od, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen) {
-    super(context, prefix, igp, maps, markdownEngine, packge, gen);
+    super(context, prefix, od, destDir, igp, maps, markdownEngine, packge, gen);
     this.od = od;
     this.destDir = destDir;
     utils = new ProfileUtilities(context, null, igp);
@@ -36,6 +36,10 @@ public class OperationDefinitionRenderer extends BaseRenderer {
   public void setTranslator(org.hl7.fhir.utilities.TranslationServices translator) {
     super.setTranslator(translator);
     utils.setTranslator(translator);
+  }
+
+  @Override
+  protected void genSummaryRowsSpecific(StringBuilder b) {
   }
 
   public String summary() {

@@ -42,6 +42,7 @@ import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.XmlParser;
+import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeableConcept;
@@ -68,6 +69,7 @@ import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionMappingCompo
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.utils.ElementDefinitionUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
@@ -76,7 +78,7 @@ import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 
-public class StructureDefinitionRenderer extends BaseRenderer {
+public class StructureDefinitionRenderer extends CanonicalRenderer {
   public class BindingResolutionDetails {
     private String vss;
     private String vsn;
@@ -100,7 +102,7 @@ public class StructureDefinitionRenderer extends BaseRenderer {
   private boolean allInvariants;
 
   public StructureDefinitionRenderer(IWorkerContext context, String prefix, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants) {
-    super(context, prefix, igp, maps, markdownEngine, packge, gen);
+    super(context, prefix, sd, destDir, igp, maps, markdownEngine, packge, gen);
     this.sd = sd;
     this.destDir = destDir;
     utils = new ProfileUtilities(context, null, igp);
@@ -1983,5 +1985,8 @@ public class StructureDefinitionRenderer extends BaseRenderer {
     return res;
   }
 
+  @Override
+  protected void genSummaryRowsSpecific(StringBuilder b) {
+  }
   
 }

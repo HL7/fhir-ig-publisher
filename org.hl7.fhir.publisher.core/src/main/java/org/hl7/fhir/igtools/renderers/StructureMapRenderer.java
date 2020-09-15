@@ -40,7 +40,7 @@ import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 
-public class StructureMapRenderer extends BaseRenderer {
+public class StructureMapRenderer extends CanonicalRenderer {
 
 
   private StructureMapUtilities utils;
@@ -49,54 +49,15 @@ public class StructureMapRenderer extends BaseRenderer {
   private String destDir;
 
   public StructureMapRenderer(IWorkerContext context, String prefix, StructureMap map, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
-    super(context, prefix, igp, maps, markdownEngine, packge, gen);
+    super(context, prefix, map, destDir, igp, maps, markdownEngine, packge, gen);
     this.map = map;
     this.destDir = destDir;
     utils = new StructureMapUtilities(context, null, igp);
     analysis = (StructureMapAnalysis) map.getUserData("analysis");
   }
 
-  public String summary(FetchedResource r, boolean xml, boolean json, boolean ttl) throws Exception {
-//    return "[--Summary goes here--]";
-    StringBuilder b = new StringBuilder();
-    b.append("<table class=\"grid\">\r\n");
-    b.append(" <tbody><tr><td>"+translate("sm.summary", "Defining URL")+":</td><td>"+Utilities.escapeXml(map.getUrl())+"</td></tr>\r\n");
-    if (map.hasVersion())
-      b.append(" <tr><td>"+translate("cs.summary", "Version")+":</td><td>"+Utilities.escapeXml(map.getVersion())+"</td></tr>\r\n");
-    b.append(" <tr><td>"+translate("sm.summary", "Name")+":</td><td>"+Utilities.escapeXml(gt(map.getNameElement()))+"</td></tr>\r\n");
-    if (map.hasDescription())
-      b.append(" <tr><td>"+translate("sm.summary", "Definition")+":</td><td>"+processMarkdown("description", map.getDescriptionElement())+"</td></tr>\r\n");
-    if (map.hasPublisher())
-      b.append(" <tr><td>"+translate("sm.summary", "Publisher")+":</td><td>"+Utilities.escapeXml(gt(map.getPublisherElement()))+"</td></tr>\r\n");
-    if (map.hasCopyright())
-      b.append(" <tr><td>"+translate("sm.summary", "Copyright")+":</td><td>"+processMarkdown("copyright", map.getCopyrightElement())+"</td></tr>\r\n");
-    if (ToolingExtensions.hasExtension(map, ToolingExtensions.EXT_FMM_LEVEL)) {
-      // Use hard-coded spec link to point to current spec because DSTU2 had maturity listed on a different page
-      b.append(" <tr><td><a class=\"fmm\" href=\"http://hl7.org/fhir/versions.html#maturity\" title=\"Maturity Level\">"+translate("cs.summary", "Maturity")+"</a>:</td><td>"+ToolingExtensions.readStringExtension(map, ToolingExtensions.EXT_FMM_LEVEL)+"</td></tr>\r\n");
-    }
-    if (xml || json || ttl) {
-      b.append(" <tr><td>"+translate("sm.summary", "Source Resource")+":</td><td>");
-      boolean first = true;
-      String filename = igp.getProperty(r, "format");
-      if (filename == null)
-        filename = "ValueSet-"+r.getId()+".{{[fmt]}}.html";
-      if (xml) {
-        first = false;
-        b.append("<a href=\""+igp.doReplacements(filename,  r,  null, "xml")+"\">"+translate("sm.summary", "XML")+"</a>");
-      }
-      if (json) {
-        if (first) first = false; else b.append(" / ");
-        b.append("<a href=\""+igp.doReplacements(filename,  r,  null, "json")+"\">"+translate("sm.summary", "JSON")+"</a>");
-      }
-      if (ttl) {
-        if (first) first = false; else b.append(" / ");
-        b.append("<a href=\""+igp.doReplacements(filename,  r,  null, "ttl")+"\">"+translate("sm.summary", "Turtle")+"</a>");
-      }
-      b.append("</td></tr>\r\n");
-    }
-    b.append("</tbody></table>\r\n");
-
-    return b.toString();    
+  @Override
+  protected void genSummaryRowsSpecific(StringBuilder b) {
   }
 
   public String profiles() {

@@ -40,56 +40,20 @@ import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 
-public class QuestionnaireRenderer extends BaseRenderer {
+public class QuestionnaireRenderer extends CanonicalRenderer {
 
 
   private Questionnaire q;
   private String destDir;
 
   public QuestionnaireRenderer(IWorkerContext context, String prefix, Questionnaire q, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
-    super(context, prefix, igp, maps, markdownEngine, packge, gen);
+    super(context, prefix, q, destDir, igp, maps, markdownEngine, packge, gen);
     this.q = q;
     this.destDir = destDir;
   }
 
-  public String summary(FetchedResource r, boolean xml, boolean json, boolean ttl) throws Exception {
-//    return "[--Summary goes here--]";
-    StringBuilder b = new StringBuilder();
-    b.append("<table class=\"grid\">\r\n");
-    b.append(" <tbody><tr><td>"+translate("sm.summary", "Defining URL")+":</td><td>"+Utilities.escapeXml(q.getUrl())+"</td></tr>\r\n");
-    if (q.hasVersion())
-      b.append(" <tr><td>"+translate("cs.summary", "Version")+":</td><td>"+Utilities.escapeXml(q.getVersion())+"</td></tr>\r\n");
-    b.append(" <tr><td>"+translate("sm.summary", "Name")+":</td><td>"+Utilities.escapeXml(gt(q.getNameElement()))+"</td></tr>\r\n");
-    if (q.hasDescription())
-      b.append(" <tr><td>"+translate("sm.summary", "Definition")+":</td><td>"+processMarkdown("description", q.getDescriptionElement())+"</td></tr>\r\n");
-    if (q.hasPublisher())
-      b.append(" <tr><td>"+translate("sm.summary", "Publisher")+":</td><td>"+Utilities.escapeXml(gt(q.getPublisherElement()))+"</td></tr>\r\n");
-    if (q.hasCopyright())
-      b.append(" <tr><td>"+translate("sm.summary", "Copyright")+":</td><td>"+processMarkdown("copyright", q.getCopyrightElement())+"</td></tr>\r\n");
-
-    if (xml || json || ttl) {
-      b.append(" <tr><td>"+translate("sm.summary", "Source Resource")+":</td><td>");
-      boolean first = true;
-      String filename = igp.getProperty(r, "format");
-      if (filename == null)
-        filename = "Questionnaire-"+r.getId()+".{{[fmt]}}.html";
-      if (xml) {
-        first = false;
-        b.append("<a href=\""+igp.doReplacements(filename,  r,  null, "xml")+"\">"+translate("sm.summary", "XML")+"</a>");
-      }
-      if (json) {
-        if (first) first = false; else b.append(" / ");
-        b.append("<a href=\""+igp.doReplacements(filename,  r,  null, "json")+"\">"+translate("sm.summary", "JSON")+"</a>");
-      }
-      if (ttl) {
-        if (first) first = false; else b.append(" / ");
-        b.append("<a href=\""+igp.doReplacements(filename,  r,  null, "ttl")+"\">"+translate("sm.summary", "Turtle")+"</a>");
-      }
-      b.append("</td></tr>\r\n");
-    }
-    b.append("</tbody></table>\r\n");
-
-    return b.toString();    
+  @Override
+  protected void genSummaryRowsSpecific(StringBuilder b) {
   }
 
   public String render(QuestionnaireRendererMode mode) throws IOException, FHIRFormatError, DefinitionException, FHIRException, EOperationOutcome {
