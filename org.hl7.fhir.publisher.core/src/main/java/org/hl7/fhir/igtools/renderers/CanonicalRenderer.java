@@ -85,7 +85,7 @@ public class CanonicalRenderer extends BaseRenderer {
     }
     if (cr.hasCopyright())
       b.append(" <tr><td>"+translate("cr.summary", "Copyright")+":</td><td>"+processMarkdown("copyright", cr.getCopyrightElement())+"</td></tr>\r\n");
-    if (ToolingExtensions.hasExtension(vs, ToolingExtensions.EXT_FMM_LEVEL)) {
+    if (ToolingExtensions.hasExtension(cr, ToolingExtensions.EXT_FMM_LEVEL)) {
       // Use hard-coded spec link to point to current spec because DSTU2 had maturity listed on a different page
       b.append(" <tr><td><a class=\"fmm\" href=\"http://hl7.org/fhir/versions.html#maturity\" title=\"Maturity Level\">"+translate("cs.summary", "Maturity")+"</a>:</td><td>"+ToolingExtensions.readStringExtension(cr, ToolingExtensions.EXT_FMM_LEVEL)+"</td></tr>\r\n");
     }    
