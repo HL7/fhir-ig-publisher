@@ -1,1 +1,0 @@
-* Fix rendering bug
