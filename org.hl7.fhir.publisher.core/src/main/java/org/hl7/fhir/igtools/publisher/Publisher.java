@@ -6629,7 +6629,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         generateOutputsQuestionnaire(f, r, (Questionnaire) res, vars, prefixForContainer);
       default:
         if (res instanceof CanonicalResource) {
-          generateOutputsCanonical(f, r, (Questionnaire) res, vars, prefixForContainer);          
+          generateOutputsCanonical(f, r, (CanonicalResource) res, vars, prefixForContainer);          
         }
         // nothing to do...
         result = false;
