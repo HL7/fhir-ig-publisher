@@ -177,9 +177,9 @@ public class FetchedResource {
   public String fhirType() {
     return type != null ? type : resource != null ? resource.fhirType() : element != null ? element.fhirType() : "?fr?";
   }
+  
   public void setResEntry(ImplementationGuideDefinitionResourceComponent value) {
     this.resEntry = value;
-    
   }
 
   /**
@@ -203,9 +203,11 @@ public class FetchedResource {
   }
 
   public void trim() {
-    trimmed = true;
-    element.clear();
-    element = null;
+    if (!fhirType().equals("StructureDefinition")) {
+      trimmed = true;
+      element.clear();
+      element = null;
+    }
   }
   
 }
