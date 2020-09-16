@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.publisher.utils;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -38,7 +39,7 @@ public class IGPackageChecker {
     this.packageId = packageId;
   }
 
-  public void check(String ver, String pckId, String fhirversion, String name, Date date, String url, String canonical) throws IOException, FHIRException {
+  public void check(String ver, String pckId, String fhirversion, String name, Date date, String url, String canonical, String jurisdiction) throws IOException, FHIRException {
     String pf = Utilities.path(folder, "package.tgz");
     File f = new File(pf);
     if (!f.exists()) {
@@ -50,6 +51,9 @@ public class IGPackageChecker {
       checkJsonProp(pf, json, "name", pckId);
       checkJsonProp(pf, json, "url", url);
       checkJsonProp(pf, json, "canonical", canonical);
+      if (jurisdiction != null) {
+        checkChangeJsonProp(pck, pf, json, "jurisdiction", jurisdiction);
+      }
       if (pck.isNotForPublication()) {
         throw new Error("Error: the package at "+pf+" is not suitable for publication");
       }
@@ -105,6 +109,16 @@ public class IGPackageChecker {
       System.out.println("Problem #14 with "+pf+": missing "+propName);
     } else if (!json.get(propName).getAsString().equals(value)) {
       System.out.println("Problem #15 with "+pf+": expected "+propName+" "+value+" but found "+json.get(propName).getAsString());
+    }
+  }
+
+  public void checkChangeJsonProp(NpmPackage pck, String pf, JsonObject json, String propName, String value) throws FileNotFoundException, IOException {
+    if (!json.has(propName) || !json.get(propName).getAsString().equals(value)) {
+      if (json.has(propName)) {
+        json.remove(propName);
+      }
+      json.addProperty(propName, value);
+      pck.save(new FileOutputStream(pf));      
     }
   }
 

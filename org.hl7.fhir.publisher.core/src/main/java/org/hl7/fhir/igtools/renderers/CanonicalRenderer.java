@@ -30,9 +30,11 @@ import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.r5.model.DateTimeType;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureMap;
 import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
+import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.utils.StructureMapUtilities;
@@ -72,7 +74,13 @@ public class CanonicalRenderer extends BaseRenderer {
       b.append(" <tr><td>"+translate("cs.summary", "Version")+":</td><td>"+Utilities.escapeXml(cr.getVersion())+"</td></tr>\r\n");
     }
     if (cr.hasName()) {
-      b.append(" <tr><td>"+translate("cr.summary", "Name")+":</td><td>"+Utilities.escapeXml(gt(cr.getNameElement()))+(cr.hasTitle() ? "\""+Utilities.escapeXml(gt(cr.getTitleElement()))+"\"" : "")+"</td></tr>\r\n");
+      String name = gt(cr.getNameElement());
+      String title = gt(cr.getTitleElement());
+      if (title != null && !title.equalsIgnoreCase(name)) {
+        b.append(" <tr><td>"+translate("cr.summary", "Name")+":</td><td>"+Utilities.escapeXml(name)+" (\""+Utilities.escapeXml(title)+"\")</td></tr>\r\n");        
+      } else {
+        b.append(" <tr><td>"+translate("cr.summary", "Name")+":</td><td>"+Utilities.escapeXml(name)+"</td></tr>\r\n");
+      }
     }
     b.append(" <tr><td>"+translate("cs.summary", "Status")+":</td><td>"+describeStatus(cr)+"</td></tr>\r\n");
     if (cr.hasDescription()) {
@@ -119,15 +127,16 @@ public class CanonicalRenderer extends BaseRenderer {
   }
 
   protected String describeStatus(CanonicalResource cr) {
-    return describeStatus(cr.getStatus(), cr.getExperimental());
+    return describeStatus(cr.getStatus(), cr.hasExperimental() ? cr.getExperimental() : false, cr.hasDate() ? cr.getDateElement() : null);
   }
 
-  protected String describeStatus(PublicationStatus status, boolean experimental) {
+  protected String describeStatus(PublicationStatus status, boolean experimental, DateTimeType dt) {
+    String sfx = " as of "+new DataRenderer(context).display(dt);
     switch (status) {
-    case ACTIVE: return experimental ? "Experimental" : "Active"; 
-    case DRAFT: return "draft";
-    case RETIRED: return "retired";
-    default: return "Unknown";
+    case ACTIVE: return (experimental ? "Experimental" : "Active")+sfx; 
+    case DRAFT: return "Draft"+sfx;
+    case RETIRED: return "retired"+sfx;
+    default: return "Unknown"+sfx;
     }
   }
 
