@@ -75,7 +75,7 @@ public class CanonicalRenderer extends BaseRenderer {
     }
     if (cr.hasName()) {
       String name = gt(cr.getNameElement());
-      String title = gt(cr.getTitleElement());
+      String title = cr.hasTitle() ? gt(cr.getTitleElement()) : null;
       if (title != null && !title.equalsIgnoreCase(name)) {
         b.append(" <tr><td>"+translate("cr.summary", "Name")+":</td><td>"+Utilities.escapeXml(name)+" (\""+Utilities.escapeXml(title)+"\")</td></tr>\r\n");        
       } else {
