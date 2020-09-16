@@ -24,6 +24,7 @@ import java.io.BufferedReader;
 
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
@@ -35,8 +36,16 @@ import java.util.Locale;
 import java.util.Map.Entry;
 
 import org.apache.commons.io.FileUtils;
+import org.hl7.fhir.convertors.VersionConvertor_10_50;
+import org.hl7.fhir.convertors.VersionConvertor_30_50;
+import org.hl7.fhir.convertors.VersionConvertor_40_50;
+import org.hl7.fhir.dstu2.formats.JsonParser;
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.utils.IGRegistryMaintainer.ImplementationGuideEntry;
+import org.hl7.fhir.r5.model.CodeableConcept;
+import org.hl7.fhir.r5.model.Coding;
+import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
@@ -199,7 +208,8 @@ public class IGReleaseUpdater {
         checkCopyFolderFromRoot(folder, "assets-hist");
       }
         
-    } catch (Exception e) {e.printStackTrace();
+    } catch (Exception e) {
+      e.printStackTrace();
       errs.add(e.getMessage());
     }
     if (errs.size() == 0)
@@ -315,8 +325,9 @@ public class IGReleaseUpdater {
     System.out.println("  .. "+igvu.getClonedTotal()+" clones checked, "+igvu.getClonedCount()+" updated");
     if (!isCore) {
       IGPackageChecker pc = new IGPackageChecker(vf, canonical, JSONUtil.str(version, "path"), JSONUtil.str(ig, "package-id"));
-      pc.check(JSONUtil.str(version, "version"), JSONUtil.str(ig, "package-id"), JSONUtil.str(version, "fhirversion", "fhirversion"), 
-          JSONUtil.str(ig, "title"), new SimpleDateFormat("yyyy-MM-dd", new Locale("en", "US")).parse(JSONUtil.str(version, "date")), JSONUtil.str(version, "path"), canonical);
+      String fv = JSONUtil.str(version, "fhirversion", "fhirversion");
+      pc.check(JSONUtil.str(version, "version"), JSONUtil.str(ig, "package-id"), fv, 
+          JSONUtil.str(ig, "title"), new SimpleDateFormat("yyyy-MM-dd", new Locale("en", "US")).parse(JSONUtil.str(version, "date")), JSONUtil.str(version, "path"), canonical, getJurisdiction(vf, fv, ig, version));
     }
     IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(vf, canonical, JSONUtil.str(version, "path"), rootFolder);
     if (serverType == ServerType.APACHE) {
@@ -365,6 +376,95 @@ public class IGReleaseUpdater {
     }
 
     return vc;
+  }
+
+  private String getJurisdiction(String vf, String fv, JsonObject ig, JsonObject version) throws FHIRFormatError, FHIRException, FileNotFoundException, IOException {
+    String inferred = readJurisdictionFromPackageIg(version.has("package-id") ? version.get("package-id").getAsString() : ig.get("package-id").getAsString());
+        
+    // first, we're going to look in the directory to find a set of IG resources.
+    List<String> igs = findCandidateIgs(vf);
+    // then we choose the most likely one
+    if (igs.size() != 1) {
+      System.out.println("Candidate IG resources = "+igs.toString()+". Using "+inferred);
+      return inferred;
+    }
+    String igf = igs.get(0);
+    ImplementationGuide igr;
+    // then we parse it using the specified version
+    try {
+      igr = loadIg(Utilities.path(vf, igf), fv);
+    } catch (Exception e) {
+      System.out.println("Failed to read IG resource "+Utilities.path(vf, igf)+" ("+fv+"): "+e.getMessage());
+      e.printStackTrace();
+      System.out.println("Using "+inferred);
+      return inferred;
+    }
+    
+    if (igr == null) {
+      System.out.println("Can't load IG resource "+Utilities.path(vf, igf)+" ("+fv+"). Using "+inferred);
+      return inferred;      
+    }
+    // then we see if it has a jurisdiction
+    if (!igr.hasJurisdiction()) {
+      System.out.println("IG resource "+igf+": no Jurisdiction. Using "+inferred);
+      return inferred;
+    }
+    for (CodeableConcept cc : igr.getJurisdiction()) {
+      for (Coding c : cc.getCoding()) {
+        String res = c.getSystem()+"#"+c.getCode();
+        if (inferred != null && !inferred.equals(res)) {
+          System.out.println("IG resource "+igs.toString()+": Jurisdiction mismatch. Found "+res+" but package implies "+inferred);          
+        }
+        return res;
+      }
+    }
+    System.out.println("IG resource "+igs.toString()+": no Jurisdiction found. Using "+inferred);
+    return inferred;
+  }
+
+  private ImplementationGuide loadIg(String igf, String fv) throws FHIRFormatError, FHIRException, FileNotFoundException, IOException {
+    FileInputStream fs = new FileInputStream(igf);
+    try {
+      if (VersionUtilities.isR2Ver(fv)) {
+        return (ImplementationGuide) VersionConvertor_10_50.convertResource(new org.hl7.fhir.dstu2.formats.XmlParser().parse(fs));
+      }
+      if (VersionUtilities.isR3Ver(fv)) {
+        return (ImplementationGuide) VersionConvertor_30_50.convertResource(new org.hl7.fhir.dstu3.formats.XmlParser().parse(fs), true);
+      }
+      if (VersionUtilities.isR4Ver(fv)) {
+        return (ImplementationGuide) VersionConvertor_40_50.convertResource(new org.hl7.fhir.r4.formats.XmlParser().parse(fs));
+      }
+      if (VersionUtilities.isR3Ver(fv)) {
+        return (ImplementationGuide) new org.hl7.fhir.r5.formats.XmlParser().parse(fs);
+      }
+      return null;
+    } finally {
+      fs.close();
+    }
+  }
+
+  private String readJurisdictionFromPackageIg(String id) {
+    String[] p = id.split("\\.");
+    if (p.length >= 3 && "hl7".equals(p[0]) && "fhir".equals(p[1])) {
+     if ("uv".equals(p[2])) {
+       return "http://unstats.un.org/unsd/methods/m49/m49.htm#001";
+     }
+     if ("us".equals(p[2])) {
+       return "urn:iso:std:iso:3166#US";
+     }
+     return null;
+    }
+    return null;
+  }
+
+  private List<String> findCandidateIgs(String vf) {
+    List<String> res = new ArrayList<>();
+    for (String f : new File(vf).list()) {
+      if (f.endsWith(".xml") && f.startsWith("ImplementationGuide-")) {
+        res.add(f);
+      }
+    }
+    return res;
   }
 
   private String searchLinks(boolean root, JsonObject focus, String canonical, JsonArray list) {
