@@ -2397,7 +2397,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void loadPubPack() throws FHIRException, IOException {
     NpmPackage npm = pcm.loadPackage("hl7.fhir.pubpack", "0.0.7");
     context.loadFromPackage(npm, null);
-    npm = pcm.loadPackage("hl7.fhir.xver-extensions", "0.0.4");
+    npm = pcm.loadPackage("hl7.fhir.xver-extensions", "0.0.5");
     context.loadFromPackage(npm, null);
   }
 
@@ -6627,6 +6627,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         break;
       case Questionnaire:
         generateOutputsQuestionnaire(f, r, (Questionnaire) res, vars, prefixForContainer);
+        break;
       default:
         if (res instanceof CanonicalResource) {
           generateOutputsCanonical(f, r, (CanonicalResource) res, vars, prefixForContainer);          
@@ -7678,9 +7679,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void generateOutputsCanonical(FetchedFile f, FetchedResource r, CanonicalResource cr, Map<String,String> vars, String prefixForContainer) throws Exception {
     CanonicalRenderer smr = new CanonicalRenderer(context, checkAppendSlash(specPath), cr, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, rc);
     if (igpkp.wantGen(r, "summary"))
-      fragment("StructureMap-"+prefixForContainer+cr.getId()+"-summary", smr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl")), f.getOutputNames(), r, vars, null);
+      fragment(cr.fhirType()+"-"+prefixForContainer+cr.getId()+"-summary", smr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl")), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "summary-table"))
-      fragment("StructureMap-"+prefixForContainer+cr.getId()+"-summary-table", smr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl")), f.getOutputNames(), r, vars, null);
+      fragment(cr.fhirType()+"-"+prefixForContainer+cr.getId()+"-summary-table", smr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl")), f.getOutputNames(), r, vars, null);
   }
 
   private void generateOutputsQuestionnaire(FetchedFile f, FetchedResource r, Questionnaire q, Map<String,String> vars, String prefixForContainer) throws Exception {
