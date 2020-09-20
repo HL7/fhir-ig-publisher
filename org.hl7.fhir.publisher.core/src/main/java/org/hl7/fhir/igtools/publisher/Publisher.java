@@ -135,6 +135,7 @@ import org.hl7.fhir.r5.elementmodel.TurtleParser;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.XmlParser;
+import org.hl7.fhir.r5.model.Attachment;
 import org.hl7.fhir.r5.model.Base;
 import org.hl7.fhir.r5.model.Bundle;
 import org.hl7.fhir.r5.model.Bundle.BundleEntryComponent;
@@ -169,6 +170,7 @@ import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionPa
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.SPDXLicense;
+import org.hl7.fhir.r5.model.Library;
 import org.hl7.fhir.r5.model.ListResource;
 import org.hl7.fhir.r5.model.ListResource.ListResourceEntryComponent;
 import org.hl7.fhir.r5.model.OperationDefinition;
@@ -229,6 +231,7 @@ import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
+import org.hl7.fhir.utilities.MimeType;
 import org.hl7.fhir.utilities.TimeTracker.Session;
 import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.TextFile;
@@ -6628,6 +6631,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       case Questionnaire:
         generateOutputsQuestionnaire(f, r, (Questionnaire) res, vars, prefixForContainer);
         break;
+      case Library:
+        generateOutputsLibrary(f, r, (Library) res, vars, prefixForContainer);
+        break;
       default:
         if (res instanceof CanonicalResource) {
           generateOutputsCanonical(f, r, (CanonicalResource) res, vars, prefixForContainer);          
@@ -7684,6 +7690,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       fragment(cr.fhirType()+"-"+prefixForContainer+cr.getId()+"-summary-table", smr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl")), f.getOutputNames(), r, vars, null);
   }
 
+  private void generateOutputsLibrary(FetchedFile f, FetchedResource r, Library lib, Map<String,String> vars, String prefixForContainer) throws Exception {
+    int counter = 0;
+    for (Attachment att : lib.getContent()) {
+      String extension = MimeType.getExtension(att.getContentType());
+      if (extension != null && att.hasData()) {
+        String filename = "Library-"+r.getId()+(counter == 0 ? "" : "-"+Integer.toString(counter))+"."+extension;
+        TextFile.bytesToFile(att.getData(), Utilities.path(tempDir, filename));
+        otherFilesRun.add(Utilities.path(tempDir, filename));
+      }
+      counter++;
+    }
+  }
+  
   private void generateOutputsQuestionnaire(FetchedFile f, FetchedResource r, Questionnaire q, Map<String,String> vars, String prefixForContainer) throws Exception {
     QuestionnaireRenderer qr = new QuestionnaireRenderer(context, checkAppendSlash(specPath), q, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, rc.copy().setDefinitionsTarget(igpkp.getDefinitionsName(r)));
     if (igpkp.wantGen(r, "summary"))

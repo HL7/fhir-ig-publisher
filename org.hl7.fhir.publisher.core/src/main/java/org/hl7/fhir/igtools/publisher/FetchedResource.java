@@ -205,7 +205,9 @@ public class FetchedResource {
   public void trim() {
     if (!fhirType().equals("StructureDefinition")) {
       trimmed = true;
-      element.clear();
+      if (element != null) {
+        element.clear();
+      }
       element = null;
     }
   }
