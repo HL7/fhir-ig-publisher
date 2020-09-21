@@ -36,6 +36,12 @@ import org.hl7.fhir.utilities.Utilities;
 
 import com.google.gson.JsonSyntaxException;
 
+/**
+ * This assumes the web site is laid out as documented on Confluence
+ * 
+ * @author graha
+ *
+ */
 public class IGWebSiteMaintainer {
 
   public static void main(String[] args) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
