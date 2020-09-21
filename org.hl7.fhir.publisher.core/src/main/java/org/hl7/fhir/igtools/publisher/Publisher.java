@@ -97,6 +97,7 @@ import org.hl7.fhir.igtools.publisher.realm.USRealmBusinessRules;
 import org.hl7.fhir.igtools.publisher.utils.IGRegistryMaintainer;
 import org.hl7.fhir.igtools.publisher.utils.IGReleaseVersionDeleter;
 import org.hl7.fhir.igtools.publisher.utils.IGWebSiteMaintainer;
+import org.hl7.fhir.igtools.publisher.utils.PublicationProcess;
 import org.hl7.fhir.igtools.renderers.CanonicalRenderer;
 import org.hl7.fhir.igtools.renderers.CodeSystemRenderer;
 import org.hl7.fhir.igtools.renderers.CrossViewRenderer;
@@ -747,7 +748,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           }
         }
       } else {
-        log("Done"+(publishing ? " - this IG is not suitable for publication (consult Confluence for publishing advice)" : ""));
+        log("Done"+(!publishing && mode != IGBuildMode.AUTOBUILD ? ". Note that this IG has not been built in a fashion suitable for publication (consult Confluence for publishing advice if you are actually building with intent to publish)" : ""));
       }
     }
     if (templateLoaded && new File(rootDir).exists()) {
@@ -8106,6 +8107,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       IGReleaseVersionDeleter deleter = new IGReleaseVersionDeleter();
       deleter.clear(f.getAbsolutePath(), fh.getAbsolutePath());
+    } else if (hasNamedParam(args, "-go-publish")) {
+      new PublicationProcess().publish(getNamedParam(args, "-source"), getNamedParam(args, "-destination"), hasNamedParam(args, "-milestone"), getNamedParam(args, "-registry"), getNamedParam(args, "-history"));
     } else if (hasNamedParam(args, "-publish-update")) {
       if (!args[0].equals("-publish-update")) {
         throw new Error("-publish-update must have the format -publish-update -folder {folder} -registry {registry}/fhir-ig-list.json (first argument is not -publish-update)");
@@ -8122,6 +8125,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (Utilities.noString(registry)) {
         throw new Error("-publish-update must have the format -publish-update -url {url} -root {root} -registry {registry}/fhir-ig-list.json (-registry parameter not found)");
       }
+      String filter = getNamedParam(args, "-filter");
+
       if (!"n/a".equals(registry)) {
         File fr = new File(registry);
         if (!fr.exists() || fr.isDirectory()) {
@@ -8131,7 +8136,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       boolean doCore = "true".equals(getNamedParam(args, "-core"));
       
       IGRegistryMaintainer reg = "n/a".equals(registry) ? null : new IGRegistryMaintainer(registry);
-      IGWebSiteMaintainer.execute(f.getAbsolutePath(), reg, doCore);
+      IGWebSiteMaintainer.execute(f.getAbsolutePath(), reg, doCore, filter);
       reg.finish();      
     } else if (hasNamedParam(args, "-multi")) {
       int i = 1;
@@ -8321,7 +8326,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
     }
-    System.exit(exitCode);
+    if (!hasNamedParam(args, "-no-exit")) {
+      System.exit(exitCode);
+    }
   }
 
   private static String generateIGFromSimplifier(String folder, String output, String canonical, String npmName, String license, List<String> packages) throws Exception {
