@@ -92,11 +92,11 @@ public class SimpleFetcher implements IFetchFile {
       }
     } else if (!isIgnoredFile(f.getName())) {
       ff.setFolder(false);   
-      if (path.endsWith("json"))
+      if (path.endsWith("json")) {
         ff.setContentType("application/fhir+json");
-      else if (path.endsWith("xml"))
+      } else if (path.endsWith("xml")) {
         ff.setContentType("application/fhir+xml");
-
+      }
       InputStream ss = new FileInputStream(f);
       byte[] b = new byte[ss.available()];
       ss.read(b, 0, ss.available());
@@ -117,25 +117,27 @@ public class SimpleFetcher implements IFetchFile {
     for (String dir : resourceDirs) {
       path = Utilities.path(dir, name);
       f = new File(path+".xml");
-      if (f.exists())
+      if (f.exists()) {
         break;
-      else {
+      } else {
         f = new File(path+".json");
-        if (f.exists())
+        if (f.exists()) {
           break;
+        }
       }
     }
-    if (f==null)
+    if (f==null) {
       throw new Exception("Unable to find file "+path+".xml or "+path+".json");
+    }
     FetchedFile ff = new FetchedFile(new File(rootDir).toURI().relativize(new File(path).toURI()).getPath());
     ff.setPath(f.getCanonicalPath());
     ff.setName(fileTitle(path));
     ff.setTime(f.lastModified());
-    if (f.getName().endsWith("json"))
+    if (f.getName().endsWith("json")) {
       ff.setContentType("application/fhir+json");
-    else if (f.getName().endsWith("xml"))
+    } else if (f.getName().endsWith("xml")) {
       ff.setContentType("application/fhir+xml");
-    
+    }
     InputStream ss = new FileInputStream(f);
     byte[] b = new byte[ss.available()];
     ss.read(b, 0, ss.available());
@@ -159,10 +161,11 @@ public class SimpleFetcher implements IFetchFile {
   static String fileTitle(String path) {
     if (path.contains(".")) {
       String ext = path.substring(path.lastIndexOf(".")+1);
-      if (Utilities.isInteger(ext))
+      if (Utilities.isInteger(ext)) {
         return path;
-      else
+      } else {
         return path.substring(0, path.lastIndexOf("."));
+      }
     } else
       return path;
   }
@@ -170,10 +173,11 @@ public class SimpleFetcher implements IFetchFile {
   @Override
   public boolean canFetchFlexible(String name) throws Exception {
     for (String dir : resourceDirs) {
-      if (new File(dir + File.separator + name + ".xml").exists())
+      if (new File(dir + File.separator + name + ".xml").exists()) {
         return true;
-      else if(new File(dir + File.separator + name + ".json").exists())
+      } else if(new File(dir + File.separator + name + ".json").exists()) {
         return true;
+      }
     }
     return false;
   }

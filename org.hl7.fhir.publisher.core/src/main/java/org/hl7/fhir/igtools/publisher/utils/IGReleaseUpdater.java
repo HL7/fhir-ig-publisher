@@ -33,6 +33,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Map.Entry;
 
 import org.apache.commons.io.FileUtils;
@@ -86,11 +87,13 @@ public class IGReleaseUpdater {
   private ServerType serverType;
   private List<String> ignoreList = new ArrayList<>();
   private File sft;
+  private boolean fullUpdate;
 
-  public IGReleaseUpdater(String folder, String url, String rootFolder, IGRegistryMaintainer reg, ServerType serverType, List<String> otherSpecs, File sft) throws IOException {
+  public IGReleaseUpdater(String folder, String url, String rootFolder, IGRegistryMaintainer reg, ServerType serverType, List<String> otherSpecs, File sft, boolean full) throws IOException {
     this.folder = folder;
     this.url = url;
     this.rootFolder = rootFolder;
+    this.fullUpdate = full;
     this.sft = sft;
     if (!"".equals("http://hl7.org/fhir")) { // keep the main spec out of the registry
       this.reg = reg;
@@ -107,7 +110,7 @@ public class IGReleaseUpdater {
     this.ignoreList.addAll(otherSpecs);
   }
 
-  public void check()  {
+  public void check(Map<String, IndexMaintainer> indexes)  {
     List<String> errs = new ArrayList<>(); 
     try {
       String f = Utilities.path(folder, "package-list.json");
@@ -116,6 +119,8 @@ public class IGReleaseUpdater {
       else {
         JsonObject json = JsonTrackingParser.parseJsonFile(f);
         String canonical = JSONUtil.str(json, "canonical");
+        String packageId = json.get("package-id").getAsString();
+        String realm = Utilities.charCount(packageId, '.') > 1 ? packageId.split("\\.")[2] : null;
 
         JsonArray list = json.getAsJsonArray("list");
         JsonObject root = null;
@@ -155,6 +160,10 @@ public class IGReleaseUpdater {
             else {
               String path = JSONUtil.str(o, "path");
               String vf = Utilities.path(path.replace(url, rootFolder));
+              if (indexes.containsKey(realm)) {
+                indexes.get(realm).seeEntry(packageId, json, o);
+              }
+
               if (!o.has("sequence")) {
                 throw new Error("No Sequence value for version "+v+" in "+f);
               }
@@ -314,7 +323,9 @@ public class IGReleaseUpdater {
 //
   private boolean updateStatement(String vf, List<String> ignoreList, List<String> ignoreListOuter, JsonObject ig, JsonObject version, List<String> errs, JsonObject root, String canonical, String canonicalPath, boolean isCore, 
       boolean isCurrent, JsonArray list) throws FileNotFoundException, IOException, FHIRException, ParseException {
-
+    if (!fullUpdate) {
+      return false;
+    }
     boolean vc = false;
     String fragment = genFragment(ig, version, root, canonical, ignoreList != null, isCore);
     System.out.println("  "+vf+": "+fragment);
@@ -626,7 +637,7 @@ public class IGReleaseUpdater {
   }
 
   public static void main(String[] args) throws Exception {
-    new IGReleaseUpdater(args[0], args[1], args[2], null, ServerType.ASP2, null, null).check();
+    new IGReleaseUpdater(args[0], args[1], args[2], null, ServerType.ASP2, null, null, true).check(null);
   }
   
 }

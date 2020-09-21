@@ -97,6 +97,7 @@ import org.hl7.fhir.igtools.publisher.realm.USRealmBusinessRules;
 import org.hl7.fhir.igtools.publisher.utils.IGRegistryMaintainer;
 import org.hl7.fhir.igtools.publisher.utils.IGReleaseVersionDeleter;
 import org.hl7.fhir.igtools.publisher.utils.IGWebSiteMaintainer;
+import org.hl7.fhir.igtools.publisher.utils.PublicationProcess;
 import org.hl7.fhir.igtools.renderers.CanonicalRenderer;
 import org.hl7.fhir.igtools.renderers.CodeSystemRenderer;
 import org.hl7.fhir.igtools.renderers.CrossViewRenderer;
@@ -135,6 +136,7 @@ import org.hl7.fhir.r5.elementmodel.TurtleParser;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.XmlParser;
+import org.hl7.fhir.r5.model.Attachment;
 import org.hl7.fhir.r5.model.Base;
 import org.hl7.fhir.r5.model.Bundle;
 import org.hl7.fhir.r5.model.Bundle.BundleEntryComponent;
@@ -169,6 +171,7 @@ import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionPa
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.SPDXLicense;
+import org.hl7.fhir.r5.model.Library;
 import org.hl7.fhir.r5.model.ListResource;
 import org.hl7.fhir.r5.model.ListResource.ListResourceEntryComponent;
 import org.hl7.fhir.r5.model.OperationDefinition;
@@ -229,6 +232,7 @@ import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
+import org.hl7.fhir.utilities.MimeType;
 import org.hl7.fhir.utilities.TimeTracker.Session;
 import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.TextFile;
@@ -744,7 +748,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           }
         }
       } else {
-        log("Done"+(publishing ? " - this IG is not suitable for publication (consult Confluence for publishing advice)" : ""));
+        log("Done"+(!publishing && mode != IGBuildMode.AUTOBUILD ? ". Note that this IG has not been built in a fashion suitable for publication (consult Confluence for publishing advice if you are actually building with intent to publish)" : ""));
       }
     }
     if (templateLoaded && new File(rootDir).exists()) {
@@ -6628,6 +6632,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       case Questionnaire:
         generateOutputsQuestionnaire(f, r, (Questionnaire) res, vars, prefixForContainer);
         break;
+      case Library:
+        generateOutputsLibrary(f, r, (Library) res, vars, prefixForContainer);
+        break;
       default:
         if (res instanceof CanonicalResource) {
           generateOutputsCanonical(f, r, (CanonicalResource) res, vars, prefixForContainer);          
@@ -7684,6 +7691,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       fragment(cr.fhirType()+"-"+prefixForContainer+cr.getId()+"-summary-table", smr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl")), f.getOutputNames(), r, vars, null);
   }
 
+  private void generateOutputsLibrary(FetchedFile f, FetchedResource r, Library lib, Map<String,String> vars, String prefixForContainer) throws Exception {
+    int counter = 0;
+    for (Attachment att : lib.getContent()) {
+      String extension = MimeType.getExtension(att.getContentType());
+      if (extension != null && att.hasData()) {
+        String filename = "Library-"+r.getId()+(counter == 0 ? "" : "-"+Integer.toString(counter))+"."+extension;
+        TextFile.bytesToFile(att.getData(), Utilities.path(tempDir, filename));
+        otherFilesRun.add(Utilities.path(tempDir, filename));
+      }
+      counter++;
+    }
+  }
+  
   private void generateOutputsQuestionnaire(FetchedFile f, FetchedResource r, Questionnaire q, Map<String,String> vars, String prefixForContainer) throws Exception {
     QuestionnaireRenderer qr = new QuestionnaireRenderer(context, checkAppendSlash(specPath), q, Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, rc.copy().setDefinitionsTarget(igpkp.getDefinitionsName(r)));
     if (igpkp.wantGen(r, "summary"))
@@ -8087,6 +8107,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       IGReleaseVersionDeleter deleter = new IGReleaseVersionDeleter();
       deleter.clear(f.getAbsolutePath(), fh.getAbsolutePath());
+    } else if (hasNamedParam(args, "-go-publish")) {
+      new PublicationProcess().publish(getNamedParam(args, "-source"), getNamedParam(args, "-destination"), hasNamedParam(args, "-milestone"), getNamedParam(args, "-registry"), getNamedParam(args, "-history"));
     } else if (hasNamedParam(args, "-publish-update")) {
       if (!args[0].equals("-publish-update")) {
         throw new Error("-publish-update must have the format -publish-update -folder {folder} -registry {registry}/fhir-ig-list.json (first argument is not -publish-update)");
@@ -8103,6 +8125,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (Utilities.noString(registry)) {
         throw new Error("-publish-update must have the format -publish-update -url {url} -root {root} -registry {registry}/fhir-ig-list.json (-registry parameter not found)");
       }
+      String filter = getNamedParam(args, "-filter");
+
       if (!"n/a".equals(registry)) {
         File fr = new File(registry);
         if (!fr.exists() || fr.isDirectory()) {
@@ -8112,7 +8136,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       boolean doCore = "true".equals(getNamedParam(args, "-core"));
       
       IGRegistryMaintainer reg = "n/a".equals(registry) ? null : new IGRegistryMaintainer(registry);
-      IGWebSiteMaintainer.execute(f.getAbsolutePath(), reg, doCore);
+      IGWebSiteMaintainer.execute(f.getAbsolutePath(), reg, doCore, filter);
       reg.finish();      
     } else if (hasNamedParam(args, "-multi")) {
       int i = 1;
@@ -8302,7 +8326,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
     }
-    System.exit(exitCode);
+    if (!hasNamedParam(args, "-no-exit")) {
+      System.exit(exitCode);
+    }
   }
 
   private static String generateIGFromSimplifier(String folder, String output, String canonical, String npmName, String license, List<String> packages) throws Exception {

@@ -26,7 +26,9 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.hl7.fhir.igtools.publisher.utils.IGReleaseUpdater.ServerType;
 import org.hl7.fhir.utilities.IniFile;
@@ -34,13 +36,19 @@ import org.hl7.fhir.utilities.Utilities;
 
 import com.google.gson.JsonSyntaxException;
 
+/**
+ * This assumes the web site is laid out as documented on Confluence
+ * 
+ * @author graha
+ *
+ */
 public class IGWebSiteMaintainer {
 
   public static void main(String[] args) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
-    execute(args[0], args.length > 1 ? new IGRegistryMaintainer(args[1]) : null, args.length >= 3 && "true".equals(args[2]));
+    execute(args[0], args.length > 1 ? new IGRegistryMaintainer(args[1]) : null, args.length >= 3 && "true".equals(args[2]), null);
   }
   
-  public static void execute(String folder, IGRegistryMaintainer reg, boolean doCore) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
+  public static void execute(String folder, IGRegistryMaintainer reg, boolean doCore, String filter) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
     File f = new File(folder);
     if (!f.exists())
       throw new IOException("Folder "+folder+" not found");
@@ -80,13 +88,25 @@ public class IGWebSiteMaintainer {
     for (String s : igs) {
       System.out.println(" - "+s);
     }
-    System.out.print("Enter y to continue: ");    
-    int r = System.in.read();
-    if (r != 'y')
-      return;
-
+    if (filter == null ) {
+      System.out.print("Enter y to continue: ");    
+      int r = System.in.read();
+      if (r != 'y')
+        return;
+    }
+    
+    Map<String, IndexMaintainer> indexes = new HashMap<>();
+    if (ini.hasSection("indexes")) {
+      for (String realm : ini.getPropertyNames("indexes")) {
+        String[] p = ini.getStringProperty("indexes", realm).split("\\;");
+        indexes.put(realm, new IndexMaintainer(realm, p[0], Utilities.path(folder, p[1]), Utilities.path(folder, ini.getStringProperty("website", "index-template"))));        
+      }
+    }
     for (String s : igs) {
-      new IGReleaseUpdater(s, url, folder, reg, serverType, igs, sft).check();
+      new IGReleaseUpdater(s, url, folder, reg, serverType, igs, sft, filter == null || filter.equals(s)).check(indexes);
+    }
+    for (IndexMaintainer index : indexes.values()) {
+      index.execute();
     }
     System.out.println("==================== ");
     System.out.println("Processing Feeds for "+folder);

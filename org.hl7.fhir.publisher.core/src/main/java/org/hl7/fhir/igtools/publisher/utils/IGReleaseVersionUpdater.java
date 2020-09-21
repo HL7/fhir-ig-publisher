@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.util.List;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 
@@ -36,7 +37,7 @@ public class IGReleaseVersionUpdater {
 
   private int countTotal = 0;
   private int countUpdated = 0;
-  
+
   private static final String START_HTML_MARKER = "<!--ReleaseHeader--><p id=\"publish-box\">";
   private static final String START_HTML_MARKER_MILESTONE = "<!--ReleaseHeader--><p id=\"publish-box-milestone\">";
   private static final String START_HTML_MARKER_MILESTONE_WS = "<!-- ReleaseHeader --><p id=\"publish-box\">";
@@ -47,7 +48,7 @@ public class IGReleaseVersionUpdater {
   private static final String START_PUB_BOX = "<p id=\"publish-box\">";
   private static final String PUB_STYLE = "#publish-box";
   private static final String CSS = "#publish-box {  list-style: none;  padding: 0; }\np#publish-box { background-color: yellow; border:1px solid maroon; padding: 5px;}\nimg#publish-box { vertical-align: baseline; }\n#markdown-toc li{font-size: 1em;}\n";
-  
+
   private String folder;
   private List<String> ignoreList;
   private Object version;
@@ -55,7 +56,7 @@ public class IGReleaseVersionUpdater {
   private String currentFolder;
   private int clonedCount;
   private int clonedTotal;
- 
+
 
   public IGReleaseVersionUpdater(String folder, List<String> ignoreList, List<String> ignoreListOuter, JsonObject version, String currentFolder) {
     this.folder = folder;
@@ -77,13 +78,13 @@ public class IGReleaseVersionUpdater {
       if (ignoreListOuter != null && ignoreListOuter.contains(f.getAbsolutePath())) {
         continue;
       }
-      if (Utilities.existsInList(f.getName(), "modeldoc", "quick", "qa.html", "qa.min.html", "history.html", "directory.html", "qa-tx.html", "us-core-comparisons")) {
+      if (Utilities.existsInList(f.getName(), "modeldoc", "quick", "qa.html", "qa-hta.html", "qa.min.html", "history.html", "directory.html", "qa-tx.html", "us-core-comparisons", "searchform.html")) {
         continue;
       }
       if (f.getName().startsWith("comparison-v")) {
         continue;
       }
-      
+
       if (f.isDirectory() && !Utilities.existsInList(f.getName(), "html")) {
         updateFiles(fragment, f, level+1);
       }
@@ -172,7 +173,7 @@ public class IGReleaseVersionUpdater {
     clonedTotal = 0;
     checkXmlJsonClones(new File(vf));
   }
-  
+
   private void checkXmlJsonClones(File dir) throws IOException {
     for (File f : dir.listFiles()) {
       if (f.isDirectory()) {
@@ -225,5 +226,5 @@ public class IGReleaseVersionUpdater {
     return clonedTotal;
   }
 
-  
+
 }
