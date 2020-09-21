@@ -1,1 +1,0 @@
-* Improvements to rendering
