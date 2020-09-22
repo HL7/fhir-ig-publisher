@@ -91,14 +91,16 @@ public class USRealmBusinessRules extends RealmBusinessRules {
     if (usCoreProfiles == null) {
       usCoreProfiles = new ArrayList<>();
       NpmPackage uscore = fetchLatestUSCore();
-      for (String id : uscore.listResources("StructureDefinition", "ValueSet", "CodeSystem")) {
-        CanonicalResource usd = (CanonicalResource) loadResourceFromPackage(uscore, id);
-        usd.setUserData("path", Utilities.pathURL(uscore.getWebLocation(), usd.fhirType()+"-"+usd.getId()+".html"));
-        if (usd instanceof StructureDefinition) {
-          usCoreProfiles.add((StructureDefinition) usd);
-        }
-        if (!context.hasResource(Resource.class, usd.getUrl())) {
-          context.cacheResourceFromPackage(usd, new PackageVersion(uscore.id(), uscore.version()));
+      if (uscore != null) {
+        for (String id : uscore.listResources("StructureDefinition", "ValueSet", "CodeSystem")) {
+          CanonicalResource usd = (CanonicalResource) loadResourceFromPackage(uscore, id);
+          usd.setUserData("path", Utilities.pathURL(uscore.getWebLocation(), usd.fhirType()+"-"+usd.getId()+".html"));
+          if (usd instanceof StructureDefinition) {
+            usCoreProfiles.add((StructureDefinition) usd);
+          }
+          if (!context.hasResource(Resource.class, usd.getUrl())) {
+            context.cacheResourceFromPackage(usd, new PackageVersion(uscore.id(), uscore.version()));
+          }
         }
       }
     }
