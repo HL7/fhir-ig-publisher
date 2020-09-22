@@ -155,7 +155,7 @@ public class FetchedResource {
   }  
 
   public boolean isExample() {
-    return (this.exampleUri != null) || (resEntry != null && resEntry.hasExample());
+    return (this.exampleUri != null) || (resEntry != null && resEntry.hasExample() && (!resEntry.hasExampleBooleanType() && !resEntry.getExampleBooleanType().booleanValue()));
   }  
 
   public HashSet<FetchedResource> getFoundExamples() {
