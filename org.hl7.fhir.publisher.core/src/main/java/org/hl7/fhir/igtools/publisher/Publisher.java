@@ -135,6 +135,7 @@ import org.hl7.fhir.r5.elementmodel.ParserBase.ValidationPolicy;
 import org.hl7.fhir.r5.elementmodel.TurtleParser;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.JsonParser;
+import org.hl7.fhir.r5.formats.RdfParser;
 import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.model.Attachment;
 import org.hl7.fhir.r5.model.Base;
@@ -5304,7 +5305,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           } else if (fmt.equals(FhirFormat.XML)) {
             new XmlParser().compose(bs, r.getResource());
           } else if (fmt.equals(FhirFormat.TURTLE)) {
-            new TurtleParser(context).compose(r.getElement(), bs, OutputStyle.PRETTY, igpkp.getCanonical());
+            new RdfParser().compose(bs, r.getResource());
           }
         }
         zip.addBytes(r.fhirType()+"-"+r.getId()+"."+fmt.getExtension(), bs.toByteArray(), false);
