@@ -49,7 +49,7 @@ public class XmlXHtmlRenderer implements IXMLWriter {
   private String href;
   private List<ElementDecoration> decorations1 = new ArrayList<ElementDecoration>();
   private List<ElementDecoration> decorations2 = new ArrayList<ElementDecoration>();
-  
+
   protected boolean condition(boolean bTest, String message) throws IOException {
     if (!bTest)
       throw new IOException(message);
@@ -68,7 +68,7 @@ public class XmlXHtmlRenderer implements IXMLWriter {
     attributes = null;
     started = true;
     b = new StringBuilder();
-    b.append("<pre class=\"xml\">\r\n");
+    b.append("<pre class=\"xml\"><code class=\"language-xml\">\r\n");
   }
 
   private void checkStarted () throws IOException {
@@ -518,7 +518,7 @@ public class XmlXHtmlRenderer implements IXMLWriter {
     checkStarted();
     if (!levels.empty()) 
       throw new IOException("Called end() before exiting all opened elements");
-    b.append("</pre>\r\n");
+    b.append("</code></pre>\r\n");
   }
   
   @Override
