@@ -830,11 +830,18 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (d.hasContentReference())
       tableRow(b, translate("sd.dict", "Type"), null, "See "+d.getContentReference().substring(1));
     else
-      tableRowNE(b, translate("sd.dict", "Type"), "datatypes.html", describeTypes(d.getType()) + processSecondary(mode, value));
+      tableRowNE(b, translate("sd.dict", "Type"), "datatypes.html", describeTypes(d.getType(), false) + processSecondary(mode, value));
     if (d.getPath().endsWith("[x]"))
       tableRowNE(b, translate("sd.dict", "[x] Note"), null, translate("sd.dict", "See %sChoice of Data Types%s for further information about how to use [x]", "<a href=\""+prefix+"formats.html#choice\">", "</a>"));
     tableRow(b, translate("sd.dict", "Is Modifier"), "conformance-rules.html#ismodifier", displayBoolean(d.getIsModifier()));
     tableRow(b, translate("sd.dict", "Must Support"), "conformance-rules.html#mustSupport", displayBoolean(d.getMustSupport()));
+    if (d.getMustSupport()) {
+      if (hasMustSupportTypes(d.getType())) {
+        tableRowNE(b, translate("sd.dict", "Must Support Types"), "datatypes.html", describeTypes(d.getType(), true));
+      } else if (hasChoices(d.getType())) {
+        tableRowNE(b, translate("sd.dict", "Must Support Types"), "datatypes.html", "No must-support rules about the choice of types/profiles");        
+      }
+    }  
     tableRowNE(b, translate("sd.dict", "Requirements"),  null, processMarkdown(profile.getName(), d.getRequirementsElement()));
     tableRowHint(b, translate("sd.dict", "Alternate Names"), translate("sd.dict", "Other names by which this resource/element may be known"), null, describeAliases(d.getAlias()));
     tableRowNE(b, translate("sd.dict", "Comments"),  null, processMarkdown(profile.getName(), d.getCommentElement()));
@@ -847,6 +854,15 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     tableRowNE(b, translate("sd.dict", "Invariants"), null, invariants(d.getConstraint()));
     tableRow(b, translate("sd.dict", "LOINC Code"), null, getMapping(profile, d, LOINC_MAPPING));
     tableRow(b, translate("sd.dict", "SNOMED-CT Code"), null, getMapping(profile, d, SNOMED_MAPPING));
+  }
+
+  private boolean hasChoices(List<TypeRefComponent> types) {
+    for (TypeRefComponent type : types) {
+      if (type.getProfile().size() > 1 || type.getTargetProfile().size() > 1) {
+        return true;
+      }
+    }
+    return types.size() > 1;
   }
 
   private void generateSlicing(StringBuilder b, StructureDefinition profile, ElementDefinition ed, ElementDefinitionSlicingComponent slicing) throws IOException {
@@ -952,32 +968,58 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
   }
 
-  private String describeTypes(List<TypeRefComponent> types) throws Exception {
+  private boolean hasMustSupportTypes(List<TypeRefComponent> types) {
+    for (TypeRefComponent tr : types) {
+      if (ProfileUtilities.isMustSupport(tr)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private String describeTypes(List<TypeRefComponent> types, boolean mustSupportOnly) throws Exception {
     if (types.isEmpty())
       return "";
 
     StringBuilder b = new StringBuilder();
-    if (types.size() == 1)
-      describeType(b, types.get(0));
-    else {
+    if ((!mustSupportOnly && types.size() == 1) || (mustSupportOnly && mustSupportCount(types) == 1)) {
+      if (!mustSupportOnly || ProfileUtilities.isMustSupport(types.get(0))) {
+        describeType(b, types.get(0), mustSupportOnly);
+      }
+    } else {
       boolean first = true;
       b.append(translate("sd.dict", "Choice of")+": ");
       for (TypeRefComponent t : types) {
-        if (first)
-          first = false;
-        else
-          b.append(", ");
-        describeType(b, t);
+        if (!mustSupportOnly || ProfileUtilities.isMustSupport(t)) {
+          if (first) {
+            first = false;
+          } else {
+            b.append(", ");
+          }
+          describeType(b, t, mustSupportOnly);
+        }
       }
     }
     return b.toString();
   }
 
-  private void describeType(StringBuilder b, TypeRefComponent t) throws Exception {
-    if (t.getWorkingCode() == null)
+  private int mustSupportCount(List<TypeRefComponent> types) {
+    int c = 0;
+    for (TypeRefComponent tr : types) {
+      if (ProfileUtilities.isMustSupport(tr)) {
+        c++;
+      }
+    }
+    return c;
+  }
+
+  private void describeType(StringBuilder b, TypeRefComponent t, boolean mustSupportOnly) throws Exception {
+    if (t.getWorkingCode() == null) {
       return;
-    if (t.getWorkingCode().startsWith("="))
+    }
+    if (t.getWorkingCode().startsWith("=")) {
       return;
+    }
 
     if (t.getWorkingCode().startsWith("xs:")) {
       b.append(t.getWorkingCode());
@@ -1000,42 +1042,47 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         b.append("\">");
         b.append(t.getWorkingCode());
         b.append("</a>");
-      } else 
+      } else {
         b.append(t.getWorkingCode());
+      }
     }
-    if (t.hasProfile()) {
+    if ((!mustSupportOnly && t.hasProfile()) || ProfileUtilities.isMustSupport(t.getProfile())) {
       b.append("(");
       boolean first = true;
       for (CanonicalType pt : t.getProfile()) {
-        if (first) first = false; else b.append(", ");
-        StructureDefinition p = context.fetchResource(StructureDefinition.class, pt.getValue());
-        if (p == null)
-          b.append(t.getProfile());
-        else {
-          String pth = p.getUserString("path");
-          b.append("<a href=\""+Utilities.escapeXml(pth)+"\" title=\""+t.getProfile()+"\">");
-          b.append(p.getName());
-          b.append("</a>");
+        if (!mustSupportOnly || ProfileUtilities.isMustSupport(pt)) {
+          if (first) first = false; else b.append(", ");
+          StructureDefinition p = context.fetchResource(StructureDefinition.class, pt.getValue());
+          if (p == null)
+            b.append(t.getProfile());
+          else {
+            String pth = p.getUserString("path");
+            b.append("<a href=\""+Utilities.escapeXml(pth)+"\" title=\""+t.getProfile()+"\">");
+            b.append(p.getName());
+            b.append("</a>");
+          }
         }
       }
       b.append(")");
     }
-    if (t.hasTargetProfile()) {
+    if ((!mustSupportOnly && t.hasTargetProfile()) || ProfileUtilities.isMustSupport(t.getTargetProfile())) {
       b.append("(");
       boolean first = true;
       for (CanonicalType tp : t.getTargetProfile()) {
-        if (first)
-          first = false;
-        else
-          b.append(" | ");
-        StructureDefinition p = context.fetchResource(StructureDefinition.class, tp.getValue());
-        if (p == null)
-          b.append(tp.getValue());
-        else {
-          String pth = p.getUserString("path");
-          b.append("<a href=\""+Utilities.escapeXml(pth)+"\" title=\""+tp.getValue()+"\">");
-          b.append(p.getName());
-          b.append("</a>");
+        if (!mustSupportOnly || ProfileUtilities.isMustSupport(tp)) {
+          if (first)
+            first = false;
+          else
+            b.append(" | ");
+          StructureDefinition p = context.fetchResource(StructureDefinition.class, tp.getValue());
+          if (p == null)
+            b.append(tp.getValue());
+          else {
+            String pth = p.getUserString("path");
+            b.append("<a href=\""+Utilities.escapeXml(pth)+"\" title=\""+tp.getValue()+"\">");
+            b.append(p.getName());
+            b.append("</a>");
+          }
         }
       }
       b.append(")");
@@ -1046,7 +1093,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     switch (mode) {
     case 1 : return "";
     case 2 : return "  ("+translate("sd.dict", "Complex Extension")+")";
-    case 3 : return "  ("+translate("sd.dict", "Extension Type")+": "+describeTypes(value.getType())+")";
+    case 3 : return "  ("+translate("sd.dict", "Extension Type")+": "+describeTypes(value.getType(), false)+")";
     default: return "";
     }
   }
