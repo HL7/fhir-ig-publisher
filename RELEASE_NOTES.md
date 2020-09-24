@@ -9,6 +9,3 @@
 * History Subsystem: fix interpreting ImplementationGuide.definition.resource.example incorrectly
 * USCore comparison: fix NPE for R5
 * Fix using wrong RDFGenerator
-
-
-
