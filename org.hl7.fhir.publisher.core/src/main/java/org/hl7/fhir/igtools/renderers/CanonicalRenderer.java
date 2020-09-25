@@ -13,6 +13,7 @@ import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.MarkDownProcessor;
+import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.cache.NpmPackage;
 
@@ -44,14 +45,11 @@ public class CanonicalRenderer extends BaseRenderer {
     if (cr.hasVersion()) {
       b.append(" <tr><td>"+translate("cs.summary", "Version")+":</td><td>"+Utilities.escapeXml(cr.getVersion())+"</td></tr>\r\n");
     }
-    if (cr.hasName()) {
-      String name = gt(cr.getNameElement());
-      String title = cr.hasTitle() ? gt(cr.getTitleElement()) : null;
-      if (title != null && !title.equalsIgnoreCase(name)) {
-        b.append(" <tr><td>"+translate("cr.summary", "Name")+":</td><td>"+Utilities.escapeXml(name)+" (\""+Utilities.escapeXml(title)+"\")</td></tr>\r\n");        
-      } else {
-        b.append(" <tr><td>"+translate("cr.summary", "Name")+":</td><td>"+Utilities.escapeXml(name)+"</td></tr>\r\n");
-      }
+    String name = cr.hasName() ? gt(cr.getNameElement()) : null;
+    String title = cr.hasTitle() ? gt(cr.getTitleElement()) : null;
+    b.append(" <tr><td>"+translate("cr.summary", "Name")+":</td><td>"+Utilities.escapeXml(name)+"</td></tr>\r\n");
+    if (title != null && !title.equalsIgnoreCase(name)) {
+      b.append(" <tr><td>"+translate("cr.summary", "Title")+":</td><td>"+Utilities.escapeXml(title)+"</td></tr>\r\n");
     }
     b.append(" <tr><td>"+translate("cs.summary", "Status")+":</td><td>"+describeStatus(cr)+"</td></tr>\r\n");
     if (cr.hasDescription()) {
@@ -98,16 +96,41 @@ public class CanonicalRenderer extends BaseRenderer {
   }
 
   protected String describeStatus(CanonicalResource cr) {
-    return describeStatus(cr.getStatus(), cr.hasExperimental() ? cr.getExperimental() : false, cr.hasDate() ? cr.getDateElement() : null);
+    String s = describeStatus(cr.getStatus(), cr.hasExperimental() ? cr.getExperimental() : false, cr.hasDate() ? cr.getDateElement() : null, ToolingExtensions.readBooleanExtension(cr, "http://hl7.org/fhir/StructureDefinition/valueset-deprecated"));
+    if (cr.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
+      s = s + presentStandardsStatus(ToolingExtensions.readStringExtension(cr, ToolingExtensions.EXT_STANDARDS_STATUS));
+    }
+    return s;
   }
 
-  protected String describeStatus(PublicationStatus status, boolean experimental, DateTimeType dt) {
+  private String presentStandardsStatus(String code) {
+    String pfx = " (<a href=\"http://hl7.org/fhir/codesystem-standards-status.html#"+code+"\">Standards Status</a>: ";
+    switch (code) {
+    case "draft" : return pfx+"Draft)"; 
+    case "normative" : return pfx+"Normative)"; 
+    case "trial-use" : return pfx+"Trial Use)"; 
+    case "informative" : return pfx+"Informative)"; 
+    case "deprecated" : return pfx+"<span style=\"color: maroon; font-weight: bold\">Deprecated</span>)"; 
+    case "external" : return pfx+"External)"; 
+    }
+    return "";
+  }
+
+  protected String describeStatus(PublicationStatus status, boolean experimental, DateTimeType dt, Boolean deprecated) {
     String sfx = " as of "+new DataRenderer(context).display(dt);
-    switch (status) {
-    case ACTIVE: return (experimental ? "Experimental" : "Active")+sfx; 
-    case DRAFT: return "Draft"+sfx;
-    case RETIRED: return "retired"+sfx;
-    default: return "Unknown"+sfx;
+    if (deprecated != null && deprecated) {
+      if (status == PublicationStatus.RETIRED) {
+        return "Deprecated + Retired"+sfx;
+      } else {
+        return "Deprecated"+sfx; 
+      }
+    } else {
+      switch (status) {
+      case ACTIVE: return (experimental ? "Experimental" : "Active")+sfx; 
+      case DRAFT: return "Draft"+sfx;
+      case RETIRED: return "Retired"+sfx;
+      default: return "Unknown"+sfx;
+      }
     }
   }
 
