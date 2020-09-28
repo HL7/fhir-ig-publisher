@@ -103,5 +103,5 @@ steps:
     inputs:
       mavenPomFile: '$(System.DefaultWorkingDirectory)/pom.xml'
       goals: deploy
-      options: '--settings $(System.DefaultWorkingDirectory)/settings.xml -Dmaven.test.skip -DdeployToGitHub'
+      options: '--settings $(System.DefaultWorkingDirectory)/settings.xml -Dmaven.test.skip -pl "!org.hl7.fhir.publisher.cli" -DdeployToGitHub'
       publishJUnitResults: false
