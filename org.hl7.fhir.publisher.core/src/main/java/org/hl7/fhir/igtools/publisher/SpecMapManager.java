@@ -35,9 +35,9 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.model.Constants;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.cache.NpmPackage;
-import org.hl7.fhir.utilities.cache.ToolsVersion;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.npm.ToolsVersion;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;

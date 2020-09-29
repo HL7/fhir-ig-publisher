@@ -10,7 +10,7 @@ import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.OperationDefinition;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.utilities.MarkDownProcessor;
-import org.hl7.fhir.utilities.cache.NpmPackage;
+import org.hl7.fhir.utilities.npm.NpmPackage;
 
 public class OperationDefinitionRenderer extends CanonicalRenderer {
   public static final String RIM_MAPPING = "http://hl7.org/v3";

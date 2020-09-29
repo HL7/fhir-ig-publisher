@@ -7,8 +7,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.cache.NpmPackage;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.npm.NpmPackage;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
