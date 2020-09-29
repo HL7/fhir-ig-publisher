@@ -241,13 +241,13 @@ import org.hl7.fhir.utilities.TimeTracker;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.ZipGenerator;
-import org.hl7.fhir.utilities.cache.FilesystemPackageCacheManager;
-import org.hl7.fhir.utilities.cache.NpmPackage;
-import org.hl7.fhir.utilities.cache.PackageGenerator.PackageType;
-import org.hl7.fhir.utilities.cache.PackageHacker;
-import org.hl7.fhir.utilities.cache.ToolsVersion;
 import org.hl7.fhir.utilities.json.JSONUtil;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
+import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.npm.PackageHacker;
+import org.hl7.fhir.utilities.npm.ToolsVersion;
+import org.hl7.fhir.utilities.npm.PackageGenerator.PackageType;
 import org.hl7.fhir.utilities.turtle.Turtle;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
@@ -749,7 +749,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           }
         }
       } else {
-        log("Done"+(!publishing && mode != IGBuildMode.AUTOBUILD ? ". Note that this IG has not been built in a fashion suitable for publication (consult Confluence for publishing advice if you are actually building with intent to publish)" : ""));
+        log("Done"+(!publishing && mode != IGBuildMode.AUTOBUILD ? ". Note that this IG is good for your local use but is not suitable for use as a final publication (consult Confluence for publishing advice if you are actually building with intent to publish)" : ""));
       }
     }
     if (templateLoaded && new File(rootDir).exists()) {
@@ -8042,6 +8042,21 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       runGUI();
       // Returning here ends the main thread but leaves the GUI running
       return; 
+    } else if (hasNamedParam(args, "-package")) {
+      System.out.println("FHIR IG Publisher "+IGVersionUtil.getVersionString());
+      System.out.println("Detected Java version: " + System.getProperty("java.version")+" from "+System.getProperty("java.home")+" on "+System.getProperty("os.arch")+" ("+System.getProperty("sun.arch.data.model")+"bit). "+toMB(Runtime.getRuntime().maxMemory())+"MB available");
+      String s = "Parameters:";
+      for (int i = 0; i < args.length; i++) {
+          s = s + " "+args[i];
+      }      
+      System.out.println(s);
+      System.out.println("dir = "+System.getProperty("user.dir")+", path = "+System.getenv("PATH"));
+      FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager(!hasNamedParam(args, "system"), ToolsVersion.TOOLS_VERSION);
+      System.out.println("Cache = "+pcm.getFolder());
+      for (String p : getNamedParam(args, "-package").split("\\;")) {
+        NpmPackage npm = pcm.loadPackage(p);
+        System.out.println("OK: "+npm.name()+"#"+npm.version()+" for FHIR version(s) "+npm.fhirVersionList()+" with canonical "+npm.canonical());
+      }
     } else if (hasNamedParam(args, "-help") || hasNamedParam(args, "-?") || hasNamedParam(args, "/?") || hasNamedParam(args, "?")) {
       System.out.println("");
       System.out.println("To use this publisher to publish a FHIR Implementation Guide, run ");
