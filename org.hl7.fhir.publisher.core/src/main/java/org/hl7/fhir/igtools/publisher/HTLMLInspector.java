@@ -370,7 +370,7 @@ public class HTLMLInspector {
         hl7State = false;
       }
     }
-    LoadedFile lf = new LoadedFile(s, getPath(s, base), f.lastModified(), iteration, hl7State, findExemptionComment(x), x != null);
+    LoadedFile lf = new LoadedFile(s, getPath(s, base), f.lastModified(), iteration, hl7State, findExemptionComment(x) || Utilities.existsInList(f.getName(), "searchform.html"), x != null);
     cache.put(s, lf);
     if (x != null) {
       checkHtmlStructure(s, x, messages);
@@ -532,7 +532,8 @@ public class HTLMLInspector {
 
   private void checkScriptElement(String filename, Location loc, String path, XhtmlNode x, List<ValidationMessage> messages) {
     String src = x.getAttribute("src");
-    if (!Utilities.noString(src) && Utilities.isAbsoluteUrl(src))
+    if (!Utilities.noString(src) && Utilities.isAbsoluteUrl(src) && !Utilities.existsInList(src, 
+        "http://hl7.org/fhir/history-cm.js", "http://hl7.org/fhir/assets-hist/js/jquery.js"))
       messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, filename+(loc == null ? "" : " at "+loc.toString()), "The <script> src '"+src+"' is llegal", IssueSeverity.FATAL));    
   }
 

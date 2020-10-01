@@ -5,10 +5,17 @@ import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.StructureDefinition;
 
 public class NullRealmBusinessRules extends RealmBusinessRules {
+
+  private String realm;
+
+  public NullRealmBusinessRules(String realm) {
+    this.realm = realm;
+  }
 
   @Override
   public void checkSD(FetchedFile f, StructureDefinition sd) throws IOException {
@@ -42,6 +49,11 @@ public class NullRealmBusinessRules extends RealmBusinessRules {
   @Override
   public String checkText() {
     return "n/a";
+  }
+
+  @Override
+  public String code() {
+    return realm == null ? "n/a" : realm;
   }
 
 }

@@ -56,6 +56,7 @@ public class TemplateManager {
   String templateThatCantExecute;
   String templateReason;
   String ghUrl;
+  List<String> templateList = new ArrayList<>();
 
   public TemplateManager(FilesystemPackageCacheManager pcm, ILoggingService logger, String ghUrl) {
     this.pcm = pcm;
@@ -92,6 +93,7 @@ public class TemplateManager {
     NpmPackage npm = loadPackage(template, rootFolder);
     if (!npm.isType(PackageType.TEMPLATE))
       throw new FHIRException("The referenced package '"+template+"' does not have the correct type - is "+npm.type()+" but should be a template");
+    templateList.add(npm.name()+"#"+npm.version());
     loadedIds.add(npm.name());
     if (npm.getNpm().has("base")) {
       String baseTemplate = npm.getNpm().get("base").getAsString();
@@ -286,6 +288,10 @@ public class TemplateManager {
     } else {
       throw new FHIRException("Template syntax in URL referring to a github repository was not understood: "+template);
     }
+  }
+
+  public List<String> listTemplates() {
+    return templateList;
   }
   
 }

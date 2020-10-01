@@ -113,6 +113,7 @@ import org.hl7.fhir.igtools.renderers.StructureDefinitionRenderer;
 import org.hl7.fhir.igtools.renderers.StructureMapRenderer;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter;
 import org.hl7.fhir.igtools.renderers.ValueSetRenderer;
+import org.hl7.fhir.igtools.renderers.VersionCheckRenderer;
 import org.hl7.fhir.igtools.renderers.XmlXHtmlRenderer;
 import org.hl7.fhir.igtools.spreadsheets.IgSpreadsheetParser;
 import org.hl7.fhir.igtools.spreadsheets.MappingSpace;
@@ -388,7 +389,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
 
     @Override
-    public List<Base> executeFunction(Object appContext, String functionName, List<List<Base>> parameters) {
+    public List<Base> executeFunction(Object appContext, List<Base> focus, String functionName, List<List<Base>> parameters) {
       throw new NotImplementedException("Not done yet (IGPublisherHostServices.executeFunction)");
     }
 
@@ -686,6 +687,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private boolean publishing = false;
 
+  private String igrealm;
+
   
   private class PreProcessInfo {
     private String xsltName;
@@ -741,9 +744,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             clean();
             long endTime = System.nanoTime();
             processTxLog(Utilities.path(destDir != null ? destDir : outputDir, "qa-tx.html"));
+            BallotChecker bc = new BallotChecker(repoRoot);
             ValidationPresenter val = new ValidationPresenter(version, businessVersion, igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
-                new BallotChecker(repoRoot).check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator,
-                new DependencyRenderer(pcm, outputDir, npmName).render(publishedIg), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()));
+                bc.check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator,
+                new DependencyRenderer(pcm, outputDir, npmName, templateManager).render(publishedIg), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
+                new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate());
             log("Finished. "+Utilities.presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
             recordOutcome(null, val);
           }
@@ -875,9 +880,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Generating Outputs in "+outputDir);
       generate();
       clean();
+      BallotChecker bc = new BallotChecker(repoRoot);
       ValidationPresenter val = new ValidationPresenter(version, businessVersion, igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
-          new BallotChecker(repoRoot).check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator,
-          new DependencyRenderer(pcm, outputDir, npmName).render(publishedIg), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()));
+          bc.check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator,
+          new DependencyRenderer(pcm, outputDir, npmName, templateManager).render(publishedIg), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
+          new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate());
       tts.end();
       if (isChild()) {
         log("Finished. "+tt.report());      
@@ -1454,8 +1461,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     if (Utilities.existsInList(parts[1], "fhir") && !Utilities.existsInList(parts[1], "nothing-yet")) {
       if (parts[2].equals("uv")) {
+        igrealm = "uv";
         return new Coding("http://unstats.un.org/unsd/methods/m49/m49.htm", "001", "World");
       } else {
+        igrealm = parts[2];
         return new Coding("urn:iso:std:iso:3166", parts[2].toUpperCase(), null);
       }
     } else {
@@ -2868,7 +2877,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     JsonObject pl;
     logDebugMessage(LogCategory.INIT, "Fetch Package history from "+Utilities.pathURL(canonical, "package-list.json"));
     try {
-      pl = fetchJson(Utilities.pathURL(canonical, "package-list.json"));
+      pl = JsonTrackingParser.fetchJson(Utilities.pathURL(canonical, "package-list.json"));
     } catch (Exception e) {
       return null;
     }
@@ -2884,13 +2893,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return null;
   }
 
-  private JsonObject fetchJson(String source) throws IOException {
-    URL url = new URL(source+"?nocache=" + System.currentTimeMillis());
-    HttpURLConnection c = (HttpURLConnection) url.openConnection();
-    c.setInstanceFollowRedirects(true);
-    return JsonTrackingParser.parseJson(c.getInputStream());
-  }
-
+ 
   private String fetchFromURL(String source, String name) throws Exception {
     String filename = Utilities.path(vsCache, name+".cache");
     if (new File(filename).exists())
@@ -3879,7 +3882,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (expectedJurisdiction != null && expectedJurisdiction.getCode().equals("US")) {
       return new USRealmBusinessRules(context, version, tempDir, igpkp.getCanonical(), igpkp);
     } else {
-      return new NullRealmBusinessRules();
+      return new NullRealmBusinessRules(igrealm);
     }
   }
 
@@ -4910,6 +4913,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       createToc(childPublisher.getPublishedIg().getDefinition().getPage(), igArtifactsPage, nestedIgOutput);
     }
+    fixSearchForm();
     templateBeforeJekyll();
 
     if (runTool()) {
@@ -4986,6 +4990,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       Utilities.copyFile(Utilities.path(tempDir, "full-ig.zip"), Utilities.path(outputDir, "full-ig.zip"));
       log("Final .zip built");
     }
+  }
+
+  private void fixSearchForm() throws IOException {
+    String sfn = Utilities.path(tempDir, "searchform.html");
+    if (new File(sfn).exists() ) {
+      String sf = TextFile.fileToString(sfn);
+      sf = sf.replace("{{title}}", publishedIg.present());
+      sf = sf.replace("{{url}}", targetUrl());
+      TextFile.stringToFile(sf, sfn);      
+    }    
   }
 
   private void printMemUsage() {
@@ -8595,7 +8609,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         // This calls the GitHub api, to fetch the info on the latest release. As part of our release process, we name
         // all tagged releases as the version number. ex: "1.1.2".
         // This value can be grabbed from the "tag_name" field, or the "name" field of the returned JSON.
-        JsonObject json = fetchJson("https://api.github.com/repos/HL7/fhir-ig-publisher/releases/latest");
+        JsonObject json = JsonTrackingParser.fetchJson("https://api.github.com/repos/HL7/fhir-ig-publisher/releases/latest");
         currVer = json.getAsJsonObject().get("name").getAsString();
       } catch (IOException e) {
         currVer = "?pub-ver-1?";

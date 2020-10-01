@@ -36,9 +36,18 @@ import com.google.gson.JsonObject;
 public class BallotChecker {
 
   private String folder;
+  JsonObject pl = null;
   
-  public BallotChecker(String folder) {
+  public BallotChecker(String folder) throws IOException {
     this.folder = folder;
+    String plfn = Utilities.path(folder, "package-list.json");
+    File f = new File(plfn);
+    if (f.exists()) {
+      try {
+        pl = JsonTrackingParser.parseJson(f);
+      } catch (Exception e) {
+      }
+    }
   }
 
   public String check(String canonical, String packageId, String version, String historyPage, String fhirVersion) throws IOException { 
@@ -50,19 +59,21 @@ public class BallotChecker {
       errors.add("History Page '"+Utilities.escapeXml(historyPage)+"' is wrong (ig.json#paths/history) - must be '"+Utilities.escapeXml(Utilities.pathURL(canonical, "history.html"))+"'");
     }
     
-    JsonObject json = null;
-    String plfn = Utilities.path(folder, "package-list.json");
-    File f = new File(plfn);
-    if (!f.exists())
-      errors.add("package-list.json: file not found in "+folder);
-    else {
-      try {
-        json = JsonTrackingParser.parseJson(f);
-      } catch (Exception e) {
-        errors.add("package-list.json: " +Utilities.escapeXml(e.getMessage()));
+    if (pl == null) {
+      String plfn = Utilities.path(folder, "package-list.json");
+      File f = new File(plfn);
+      if (!f.exists()) {
+        errors.add("package-list.json: file not found in "+folder);
+      } else {
+        try {
+          JsonTrackingParser.parseJson(f);
+        } catch (Exception e) {
+          errors.add("package-list.json: " +Utilities.escapeXml(e.getMessage()));
+        }
       }
     }
     
+    JsonObject json = pl;
     if (json != null) {
       if (!json.has("package-id"))
         errors.add("package-list.json: No Package Id");
@@ -126,6 +137,10 @@ public class BallotChecker {
       b.append("</ul>\r\n");
       return b.toString();
     }              
+  }
+
+  public JsonObject getPackageList() {
+    return pl;
   }
 
 }

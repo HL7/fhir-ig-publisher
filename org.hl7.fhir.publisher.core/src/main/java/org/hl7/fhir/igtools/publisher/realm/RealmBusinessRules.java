@@ -20,5 +20,6 @@ public abstract class RealmBusinessRules {
   public abstract void addOtherFiles(Set<String> otherFilesRun, String outputDir) throws IOException;
   public abstract String checkHtml();
   public abstract String checkText();
+  public abstract String code();
 
 }

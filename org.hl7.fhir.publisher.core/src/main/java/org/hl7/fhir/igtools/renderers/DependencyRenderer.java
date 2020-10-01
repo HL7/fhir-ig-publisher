@@ -6,14 +6,17 @@ import java.util.List;
 import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.igtools.templates.TemplateManager;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
+import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.npm.BasePackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageHacker;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
+import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Row;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.TableModel;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
@@ -26,12 +29,14 @@ public class DependencyRenderer {
   private Set<String> ids = new HashSet<>();
   private String fver;
   private String npmName;
+  private TemplateManager templateManager;
   
-  public DependencyRenderer(BasePackageCacheManager pcm, String dstFolder, String npmName) {
+  public DependencyRenderer(BasePackageCacheManager pcm, String dstFolder, String npmName, TemplateManager templateManager) {
     super();
     this.pcm = pcm;
     this.dstFolder = dstFolder;
     this.npmName = npmName;
+    this.templateManager = templateManager;
   }
 
   public String render(ImplementationGuide ig) throws FHIRException, IOException {
@@ -53,7 +58,25 @@ public class DependencyRenderer {
     // add the rows 
     // render it       
     XhtmlNode x = gen.generate(model, dstFolder, 0, null);
-    return new XhtmlComposer(false).compose(x);
+    XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
+    div.add(x);
+    div.add(makeTemplateTable());
+    return new XhtmlComposer(false).compose(div);
+  }
+
+  private XhtmlNode makeTemplateTable() {
+    XhtmlNode p = new XhtmlNode(NodeType.Element, "para");
+    CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder(" -> ");
+    if (templateManager != null) {
+      for (String  t : templateManager.listTemplates()) {
+        b.append(t);
+      }
+      p.tx("Templates: "+b.toString());
+    } else {
+      p.tx("No templates used");
+    }
+    
+    return p;
   }
 
   private String determineRealmForIg(String packageId) {

@@ -242,4 +242,10 @@ public class USRealmBusinessRules extends RealmBusinessRules {
       return Integer.toString(problems.size())+" Profiles not based on US Core";
     }
   }
+
+
+  @Override
+  public String code() {
+    return "US";
+  }
 }

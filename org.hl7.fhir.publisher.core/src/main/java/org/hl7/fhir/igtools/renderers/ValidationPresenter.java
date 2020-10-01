@@ -94,12 +94,17 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private String ballotCheck;
   private String toolsVersion;
   private String currentToolsVersion;
+  private String versionRulesCheck;
   private RealmBusinessRules realm;
   private PreviousVersionComparator previousVersionComparator;
   private String csAnalysis;
+  private String igcode;
+  private String igCodeError;
+  private String igrealm;
+  private String igRealmError;
 
   public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, String ballotCheck, 
-      String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, String dependencies, String csAnalysis) {
+      String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, String dependencies, String csAnalysis, String versionRulesCheck) {
     super();
     this.statedVersion = statedVersion;
     this.igVersion = igVersion;
@@ -115,6 +120,30 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     this.previousVersionComparator = previousVersionComparator;
     this.dependencies = dependencies;
     this.csAnalysis = csAnalysis;
+    this.versionRulesCheck = versionRulesCheck;
+    determineCode();
+  }
+
+  private void determineCode() {
+    if (provider.getCanonical().startsWith("http://hl7.org/fhir")) {
+      String[] u = provider.getCanonical().split("\\/");
+      String ucode = u[u.length-1];
+      String[] p = packageId.split("\\.");
+      String pcode = p[p.length-1];
+      igcode = ucode;
+      if (!ucode.equals(pcode)) {
+        igCodeError = "Error: codes in canonical and package id are different: "+ucode+" vs "+pcode+".";
+      }
+      igrealm = p[p.length-2];
+      String urealm = u[u.length-2];
+      if (!igrealm.equals(urealm)) {
+        igRealmError = "Error: realms in canonical and package id are different: "+igrealm+" vs "+urealm;
+      } else if (!igrealm.equalsIgnoreCase(realm.code())) {
+        igRealmError = "Error: realms in IG definition and package id are different: "+igrealm+" vs "+realm.code();
+      }
+    } else {
+      this.igcode = "n/a";
+    }
   }
 
   private List<FetchedFile> sorted(List<FetchedFile> files) {
@@ -405,11 +434,13 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       "<table class=\"grid\">"+
       " <tr><td colspan=2><b>Quality Checks</b></td></tr>\r\n"+
       " <tr><td>Publisher Version:</td><td>$versionCheck$</td></tr>\r\n"+
+      " <tr><td>Publication Code:</td><td>$igcode$<span style=\"color: maroon; font-weight: bold\"> $igcodeerror$</span>. PackageId = $packageId$, Canonical = $canonical$</td></tr>\r\n"+
+      " <tr><td>Realm Check:</td><td>$realm$ <span style=\"color: maroon; font-weight: bold\">$igrealmerror$</span> : $realmCheck$</td></tr>\r\n"+
+      " <tr><td>Version Check:</td><td>$versionRulesCheck$</td></tr>\r\n"+
       " <tr><td>Supressed Messages:</td><td>$suppressedmsgssummary$</td></tr>\r\n"+
       " <tr><td>Dependency Checks:</td><td>$dependencyCheck$</td></tr>\r\n"+
-      " <tr><td>HL7 Publication Rules:</td><td>$ballotCheck$</td></tr>\r\n"+
+      " <tr><td>HL7 Publication Rules:</td><td>Code = $igcode$. $ballotCheck$</td></tr>\r\n"+
       " <tr><td>HTA Analysis:</td><td>$csAnalysis$</td></tr>\r\n"+
-      " <tr><td>Realm rules:</td><td>$realmCheck$</td></tr>\r\n"+
       " <tr><td>Previous Version Comparison:</td><td> $previousVersion$</td></tr>\r\n"+
       " <tr><td>Summary:</td><td> broken links = $links$, errors = $err$, warn = $warn$, info = $info$</td></tr>\r\n"+
       "</table>\r\n"+
@@ -525,6 +556,11 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("canonical", provider.getCanonical());
     t.add("ballotCheck", ballotCheck);
     t.add("realmCheck", realm.checkHtml());
+    t.add("igcode", igcode);
+    t.add("igcodeerror", igCodeError);
+    t.add("igrealmerror", igRealmError);
+    t.add("versionRulesCheck", versionRulesCheck);
+    t.add("realm", igrealm);
     t.add("dependencyCheck", dependencies);
     t.add("csAnalysis", csAnalysis);
     t.add("otherFileName", allIssues ? "Errors Only" : "Full QA Report");
@@ -552,7 +588,12 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("canonical", provider.getCanonical());
     t.add("ballotCheck", ballotCheck);
     t.add("realmCheck", realm.checkText());
+    t.add("igcode", igcode);
+    t.add("igcodeerror", igCodeError);
+    t.add("igrealmerror", igRealmError);
+    t.add("realm", igrealm);
     t.add("dependencyCheck", dependencies);
+    t.add("versionRulesCheck", versionRulesCheck);
     t.add("csAnalysis", csAnalysis);
     t.add("previousVersion", previousVersionComparator.checkHtml());
     return t.render();
