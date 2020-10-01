@@ -58,7 +58,10 @@ public class BallotChecker {
     if (!Utilities.existsInList(historyPage, Utilities.pathURL(canonical, "history.html"))) {
       errors.add("History Page '"+Utilities.escapeXml(historyPage)+"' is wrong (ig.json#paths/history) - must be '"+Utilities.escapeXml(Utilities.pathURL(canonical, "history.html"))+"'");
     }
-    
+    if (new File(Utilities.path(folder, "output", "package-list.json")).exists()) {
+      errors.add("There is a package-list.json in the output folder - cannot publish while it is there");      
+    }
+      
     if (pl == null) {
       String plfn = Utilities.path(folder, "package-list.json");
       File f = new File(plfn);

@@ -46,7 +46,7 @@ public class VersionCheckRenderer {
         return packageVersion+": "+error("package-list.json has no path for this version");
       } else {
         CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder(". ");
-        b.append(packageVersion+" = ok. Step <code>"+ver.get("status").getAsString()+"</code> in sequence <code>"+ver.get("sequence").getAsString()+"</code>, to be published at "+ver.get("path").getAsString());  
+        b.append(packageVersion+" = ok. Step <code>"+ver.get("status").getAsString()+"</code> in sequence <code>"+ver.get("sequence").getAsString()+"</code>, to be published at "+ver.get("path").getAsString()+" (subdir = "+subdir(canonical, JSONUtil.str(ver, "path"))+")");  
         JsonObject pubPl = getPublishedPackageList();
         if (pubPl == null) {
           if (packageVersion.startsWith("0.")) {
@@ -94,6 +94,10 @@ public class VersionCheckRenderer {
         return b.toString();
       }
     }
+  }
+
+  private String subdir(String canonical, String path) {
+    return path.startsWith(canonical) && path.length() > canonical.length() + 1 ? path.substring(canonical.length()+1) : "??";
   }
 
   private JsonObject getPublishedPackageList() {
