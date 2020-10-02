@@ -33,11 +33,13 @@ public class VersionCheckRenderer {
     if (packageVersion == null) {
       return error("No version specified");
     } else if ("current".equals(packageVersion)) {
-      return packageVersion+": "+error("Canno publish while version is 'current'");
+      return packageVersion+": "+error("Cannot publish while version is 'current'");
     } else if (!VersionUtilities.isSemVer(packageVersion)) {
       return packageVersion+": "+error("Version does not conform to semver rules");
     } else if (!packageVersion.equals(igVersion)) {
       return packageVersion+": "+error("Mismatch between package version and IG version ("+igVersion+")");
+    } else if (packageList == null) {
+      return packageVersion+": "+error("no package-list.json - the guide is not ready for publishing");
     } else {
       JsonObject ver = getVersion(packageList);
       if (ver == null) {
