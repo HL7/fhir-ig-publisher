@@ -6508,7 +6508,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   @SuppressWarnings("rawtypes")
   private String getDesc(CanonicalResource r) {
     if (r.hasDescriptionElement()) {
-      r.getDescriptionElement().asStringValue();
+      return r.getDescriptionElement().asStringValue();
     }
     return null;
   }
