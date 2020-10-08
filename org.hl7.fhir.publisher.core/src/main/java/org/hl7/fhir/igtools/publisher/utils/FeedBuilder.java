@@ -196,61 +196,65 @@ public class FeedBuilder {
     b.append("    <ttl>600</ttl>\r\n");
     
     for (Publication pub : pubs) {
-      if (forPackage && !pub.isSemVer()) {
-        System.out.println("Ignoring package "+pub.title(forPackage)+" as the version ("+pub.getVersion()+") does not conform to semver");
-      } else if (forPackage && !packageExists(pub.folder, pub.subPackages)) {
-        System.out.println("Ignoring package "+pub.title(forPackage)+" as the actual package could not be found at "+pub.folder);
-      } else {
-        String desc = pub.desc();
-        if (forPackage && new File(Utilities.path(pub.folder, "package.tgz")).exists()) {
-          // open the package, check the details and get the description
-          NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(pub.folder, "package.tgz")));
-          if (!(npm.name()+"#"+npm.version()).equals(pub.title(forPackage)))
-            System.out.println("id mismatch in "+Utilities.path(pub.folder, "package.tgz")+" - expected "+pub.title(forPackage)+" but found "+npm.name()+"#"+npm.version());
-          desc = npm.description();
-          String pver = npm.version();
-          if (!pver.equals(pub.version)) {
-            System.out.println("Version mismatch - package-list.json says "+pub.version+", actual package says "+pver);
-          }
-          
-        }
-        if (forPackage) {
-          for (String s : pub.subPackages) {
-            // open the package, check the details and get the description
-            NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(pub.folder, s+".tgz")), Utilities.path(pub.folder, s+".tgz"));
-            if (!npm.name().equals(s))
-              System.out.println("id mismatch in "+Utilities.path(pub.folder, s+".tgz")+" - expected "+s+" but found "+npm.name());
-            if (!npm.version().equals(pub.version))
-              System.out.println("version mismatch in "+Utilities.path(pub.folder, s+".tgz")+" - expected "+pub.version+" but found "+npm.version());
-
-            String url = Utilities.pathURL(root(pub.link(forPackage)), s+".tgz");
-            b.append("    <item>\r\n");
-            b.append("      <title>"+Utilities.escapeXml(s)+"#"+pub.getVersion()+"</title>\r\n");
-            b.append("      <description>"+Utilities.escapeXml(npm.description())+"</description>\r\n");
-            b.append("      <link>"+Utilities.escapeXml(url)+"</link>\r\n");
-            b.append("      <guid isPermaLink=\"true\">"+Utilities.escapeXml(url)+"</guid>\r\n");
-            b.append("      <dc:creator>"+orgName+"</dc:creator>\r\n");
-            b.append("      <fhir:version>"+pub.fhirVersion()+"</fhir:version>\r\n");
-            b.append("      <fhir:kind>"+pub.kind()+"</fhir:kind>\r\n");
-            b.append("      <pubDate>"+pub.presentDate()+"</pubDate>\r\n");
-            b.append("    </item>\r\n"); 
-          }
-        }
-        b.append("    <item>\r\n");
-        b.append("      <title>"+Utilities.escapeXml(pub.title(forPackage))+"</title>\r\n");
-        b.append("      <description>"+Utilities.escapeXml(desc)+"</description>\r\n");
-        b.append("      <link>"+Utilities.escapeXml(pub.link(forPackage))+"</link>\r\n");
-        b.append("      <guid isPermaLink=\"true\">"+Utilities.escapeXml(pub.link(forPackage))+"</guid>\r\n");
-        b.append("      <dc:creator>"+orgName+"</dc:creator>\r\n");
-        b.append("      <fhir:version>"+pub.fhirVersion()+"</fhir:version>\r\n");
-        b.append("      <fhir:kind>"+pub.kind()+"</fhir:kind>\r\n");
-        b.append("      <pubDate>"+pub.presentDate()+"</pubDate>\r\n");
-        b.append("    </item>\r\n");
-      }
+      processPublication(orgName, forPackage, b, pub);
     }
     b.append("  </channel>\r\n");
     b.append("</rss>\r\n");
     return b.toString();
+  }
+
+  public void processPublication(String orgName, boolean forPackage, StringBuilder b, Publication pub) throws IOException, FileNotFoundException {
+    if (forPackage && !pub.isSemVer()) {
+      System.out.println("Ignoring package "+pub.title(forPackage)+" as the version ("+pub.getVersion()+") does not conform to semver");
+    } else if (forPackage && !packageExists(pub.folder, pub.subPackages)) {
+      System.out.println("Ignoring package "+pub.title(forPackage)+" as the actual package could not be found at "+pub.folder);
+    } else {
+      String desc = pub.desc();
+      if (forPackage && new File(Utilities.path(pub.folder, "package.tgz")).exists()) {
+        // open the package, check the details and get the description
+        NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(pub.folder, "package.tgz")));
+        if (!(npm.name()+"#"+npm.version()).equals(pub.title(forPackage)))
+          System.out.println("id mismatch in "+Utilities.path(pub.folder, "package.tgz")+" - expected "+pub.title(forPackage)+" but found "+npm.name()+"#"+npm.version());
+        desc = npm.description();
+        String pver = npm.version();
+        if (!pver.equals(pub.version)) {
+          System.out.println("Version mismatch - package-list.json says "+pub.version+", actual package says "+pver);
+        }
+        
+      }
+      if (forPackage) {
+        for (String s : pub.subPackages) {
+          // open the package, check the details and get the description
+          NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(pub.folder, s+".tgz")), Utilities.path(pub.folder, s+".tgz"));
+          if (!npm.name().equals(s))
+            System.out.println("id mismatch in "+Utilities.path(pub.folder, s+".tgz")+" - expected "+s+" but found "+npm.name());
+          if (!npm.version().equals(pub.version))
+            System.out.println("version mismatch in "+Utilities.path(pub.folder, s+".tgz")+" - expected "+pub.version+" but found "+npm.version());
+
+          String url = Utilities.pathURL(root(pub.link(forPackage)), s+".tgz");
+          b.append("    <item>\r\n");
+          b.append("      <title>"+Utilities.escapeXml(s)+"#"+pub.getVersion()+"</title>\r\n");
+          b.append("      <description>"+Utilities.escapeXml(npm.description())+"</description>\r\n");
+          b.append("      <link>"+Utilities.escapeXml(url)+"</link>\r\n");
+          b.append("      <guid isPermaLink=\"true\">"+Utilities.escapeXml(url)+"</guid>\r\n");
+          b.append("      <dc:creator>"+orgName+"</dc:creator>\r\n");
+          b.append("      <fhir:version>"+pub.fhirVersion()+"</fhir:version>\r\n");
+          b.append("      <fhir:kind>"+pub.kind()+"</fhir:kind>\r\n");
+          b.append("      <pubDate>"+pub.presentDate()+"</pubDate>\r\n");
+          b.append("    </item>\r\n"); 
+        }
+      }
+      b.append("    <item>\r\n");
+      b.append("      <title>"+Utilities.escapeXml(pub.title(forPackage))+"</title>\r\n");
+      b.append("      <description>"+Utilities.escapeXml(desc)+"</description>\r\n");
+      b.append("      <link>"+Utilities.escapeXml(pub.link(forPackage))+"</link>\r\n");
+      b.append("      <guid isPermaLink=\"true\">"+Utilities.escapeXml(pub.link(forPackage))+"</guid>\r\n");
+      b.append("      <dc:creator>"+orgName+"</dc:creator>\r\n");
+      b.append("      <fhir:version>"+pub.fhirVersion()+"</fhir:version>\r\n");
+      b.append("      <fhir:kind>"+pub.kind()+"</fhir:kind>\r\n");
+      b.append("      <pubDate>"+pub.presentDate()+"</pubDate>\r\n");
+      b.append("    </item>\r\n");
+    }
   }
 
   private String root(String link) {
@@ -330,6 +334,6 @@ public class FeedBuilder {
   }
 
   public static void main(String[] args) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
-    new FeedBuilder().execute("C:\\web\\hl7.org\\fhir", "C:\\web\\hl7.org\\fhir\\package-feed.xml", "C:\\web\\hl7.org\\fhir\\publication-feed.xml", "HL7, Inc", "http://hl7.org/fhir/package-feed.xml", "http://hl7.org/fhir");
+    new FeedBuilder().execute("M:\\web\\hl7.org\\fhir", "M:\\web\\hl7.org\\fhir\\package-feed.xml", "M:\\web\\hl7.org\\fhir\\publication-feed.xml", "HL7, Inc", "http://hl7.org/fhir/package-feed.xml", "http://hl7.org/fhir");
   }
 }
