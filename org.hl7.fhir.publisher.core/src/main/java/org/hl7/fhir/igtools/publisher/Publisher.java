@@ -1522,10 +1522,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (!inif.exists()) {
       inif = new File(Utilities.path(Utilities.getDirectoryForFile(file.getAbsolutePath()), "fsh.ini"));
     }
+    String fshVersion = null;
     if (inif.exists()) {
       IniFile ini = new IniFile(new FileInputStream(inif));
       if (ini.hasProperty("FSH", "timeout")) {
         fshTimeout = ini.getLongProperty("FSH", "timeout") * 1000;
+      }
+      if (ini.hasProperty("FSH", "sushi-version")) {
+        fshVersion = ini.getStringProperty("FSH", "sushi-version");
       }
     }
     log("Run Sushi on "+file.getAbsolutePath());
@@ -1537,11 +1541,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     exec.setWorkingDirectory(file);
     ExecuteWatchdog watchdog = new ExecuteWatchdog(fshTimeout);
     exec.setWatchdog(watchdog);
+    String cmd = fshVersion == null ? "sushi" : "npx fsh-sushi@"+fshVersion;
     try {
       if (SystemUtils.IS_OS_WINDOWS) {
-        exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C sushi ./fsh -o ."));
+        exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C "+cmd+" ./fsh -o ."));
       } else {
-        exec.execute(org.apache.commons.exec.CommandLine.parse("sushi ./fsh -o ."));
+        exec.execute(org.apache.commons.exec.CommandLine.parse(cmd+" ./fsh -o ."));
       }
     } catch (IOException ioex) {
       log("Sushi couldn't be run. Complete output from running Sushi : " + pumpHandler.getBufferString());
