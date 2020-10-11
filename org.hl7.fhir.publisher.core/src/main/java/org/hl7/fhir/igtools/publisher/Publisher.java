@@ -5781,6 +5781,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       addPageData(pages, publishedIg.getDefinition().getPage(), "0", "");
       //   gson = new GsonBuilder().setPrettyPrinting().create();
       //   json = gson.toJson(pages);
+      Entry<String, JsonElement> priorEntry = null;
+      for (Entry<String, JsonElement> entry: pages.entrySet()) {
+        if (priorEntry!=null) {
+          String priorPageUrl = priorEntry.getKey();
+          String currentPageUrl = entry.getKey();
+          JsonObject priorPageData = priorEntry.getValue().getAsJsonObject();
+          JsonObject currentPageData = entry.getValue().getAsJsonObject();
+          priorPageData.addProperty("next", currentPageUrl);
+          currentPageData.addProperty("previous", priorPageUrl);
+        }
+        
+        priorEntry = entry;
+      }
       json = pages.toString();
       TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "pages.json"), false);
 
