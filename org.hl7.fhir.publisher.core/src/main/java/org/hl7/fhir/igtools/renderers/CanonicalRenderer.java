@@ -41,12 +41,25 @@ public class CanonicalRenderer extends BaseRenderer {
   }
 
   private void genSummaryCore1(StringBuilder b) {
-    b.append("<tr><td>"+translate("cr.summary", "Defining URL")+":</td><td>"+Utilities.escapeXml(cr.getUrl())+"</td></tr>\r\n");
+    if (cr.hasUrl()) {
+      b.append("<tr><td>"+translate("cr.summary", "Defining URL")+":</td><td>"+Utilities.escapeXml(cr.getUrl())+"</td></tr>\r\n");
+    } else if (cr.hasExtension("http://hl7.org/fhir/5.0/StructureDefinition/extension-NamingSystem.url")) {
+      b.append("<tr><td>"+translate("cr.summary", "Defining URL")+":</td><td>"+Utilities.escapeXml(ToolingExtensions.readStringExtension(cr, "http://hl7.org/fhir/5.0/StructureDefinition/extension-NamingSystem.url"))+"</td></tr>\r\n");      
+    } else {
+      b.append("<tr><td>"+translate("cr.summary", "Defining URL")+":</td><td></td></tr>\r\n");      
+    }
+    
     if (cr.hasVersion()) {
       b.append(" <tr><td>"+translate("cs.summary", "Version")+":</td><td>"+Utilities.escapeXml(cr.getVersion())+"</td></tr>\r\n");
+    } else if (cr.hasExtension("http://terminology.hl7.org/StructureDefinition/ext-namingsystem-version")) {
+      b.append(" <tr><td>"+translate("cs.summary", "Version")+":</td><td>"+Utilities.escapeXml(ToolingExtensions.readStringExtension(cr, "http://terminology.hl7.org/StructureDefinition/ext-namingsystem-version"))+"</td></tr>\r\n");
     }
     String name = cr.hasName() ? gt(cr.getNameElement()) : null;
     String title = cr.hasTitle() ? gt(cr.getTitleElement()) : null;
+    if (title == null) {
+      title = ToolingExtensions.readStringExtension(cr, "http://hl7.org/fhir/tools/StructureDefinition/extension-title");
+    }
+
     b.append(" <tr><td>"+translate("cr.summary", "Name")+":</td><td>"+Utilities.escapeXml(name)+"</td></tr>\r\n");
     if (title != null && !title.equalsIgnoreCase(name)) {
       b.append(" <tr><td>"+translate("cr.summary", "Title")+":</td><td>"+Utilities.escapeXml(title)+"</td></tr>\r\n");
