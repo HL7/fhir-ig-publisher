@@ -130,7 +130,7 @@ public class PublicationProcess {
     check(res, canonical.equals(JSONUtil.str(plPub, "canonical")), "Source Package List has the wrong canonical: "+JSONUtil.str(plPub, "canonical")+" (should be "+canonical+")");
     check(res, plSrc.has("category"), "No Entry found in source package-list for 'category'");
     check(res, plPub.has("category"), "No Entry found in dest package-list 'category'");
-    check(res, !JSONUtil.str(plSrc, "category").equals(JSONUtil.str(plPub, "category")), "Category values differ between source and publication package-list");
+    check(res, JSONUtil.str(plSrc, "category").equals(JSONUtil.str(plPub, "category")), "Category values differ between source and publication package-list: "+JSONUtil.str(plSrc, "category")+" vs " +JSONUtil.str(plPub, "category"));
 
     JsonObject vSrc = JSONUtil.findByStringProp(plSrc.getAsJsonArray("list"), "version", version);
     JsonObject vPub = JSONUtil.findByStringProp(plPub.getAsJsonArray("list"), "version", version);
