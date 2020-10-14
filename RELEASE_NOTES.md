@@ -6,3 +6,4 @@
 * Validator: enforce constraints in root slicing definitions as well as in the slices
 * Validate Profile on type in profile - must be for the right type
 * Publication Process: fix bug in category comparison in publication process
+
