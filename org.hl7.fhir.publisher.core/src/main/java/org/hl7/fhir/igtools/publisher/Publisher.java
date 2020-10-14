@@ -1897,6 +1897,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.setAnyExtensionsAllowed(anyExtensionsAllowed);
     validator.setAllowExamples(true);
     validator.setCrumbTrails(true);
+    validator.setWantCheckSnapshotUnchanged(true);
     
     pvalidator = new ProfileValidator(context);
     csvalidator = new CodeSystemValidator(context);
@@ -2306,6 +2307,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.setAnyExtensionsAllowed(bool(configuration, "anyExtensionsAllowed"));
     validator.setAllowExamples(true);
     validator.setCrumbTrails(true);
+    validator.setWantCheckSnapshotUnchanged(true);
     
     pvalidator = new ProfileValidator(context);
     csvalidator = new CodeSystemValidator(context);
@@ -5047,22 +5049,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 }
 
   private void updateImplementationGuide() throws Exception {
-    for (ImplementationGuideDefinitionResourceComponent res : publishedIg.getDefinition().getResource()) {
-      FetchedResource r = null;
-      for (FetchedFile tf : fileList) {
-        for (FetchedResource tr : tf.getResources()) {
-          if (tr.getLocalRef().equals(res.getReference().getReference())) {
-            r = tr;
-          }
-        }
-      }
-      if (r != null) {
-        String path = igpkp.doReplacements(igpkp.getLinkFor(r, false), r, null, null);
-        res.addExtension().setUrl("http://hl7.org/fhir/StructureDefinition/implementationguide-page").setValue(new UriType(path));
-        inspector.addLinkToCheck("Implementation Guide", path, "fake generated link");
-      }
-    }
-
     FetchedResource r = altMap.get(IG_NAME).getResources().get(0);
     if (!publishedIg.hasText() || !publishedIg.getText().hasDiv()) {
       publishedIg.setText(((ImplementationGuide)r.getResource()).getText());
@@ -5073,6 +5059,22 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
     new JsonParser().setOutputStyle(OutputStyle.NORMAL).compose(bs, publishedIg);
     npm.addFile(Category.RESOURCE, "ig-r4.json", bs.toByteArray());
+    
+    for (ImplementationGuideDefinitionResourceComponent res : publishedIg.getDefinition().getResource()) {
+      FetchedResource rt = null;
+      for (FetchedFile tf : fileList) {
+        for (FetchedResource tr : tf.getResources()) {
+          if (tr.getLocalRef().equals(res.getReference().getReference())) {
+            rt = tr;
+          }
+        }
+      }
+      if (rt != null) {
+        String path = igpkp.doReplacements(igpkp.getLinkFor(rt, false), rt, null, null);
+        res.addExtension().setUrl("http://hl7.org/fhir/StructureDefinition/implementationguide-page").setValue(new UriType(path));
+        inspector.addLinkToCheck("Implementation Guide", path, "fake generated link");
+      }
+    }
   }
 
   private String checkPlural(String word, int c) {
