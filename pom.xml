@@ -70,6 +70,13 @@
             </snapshots>
         </repository>
         <repository>
+            <id>github-releases</id>
+            <url>https://maven.pkg.github.com/hapifhir/org.hl7.fhir.core/</url>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+        <repository>
             <id>local</id>
             <url>file://${basedir}/lib</url>
         </repository>
