@@ -1148,8 +1148,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       if (!def.hasValueSet()) 
         return processMarkdown("Binding.description", def.getDescriptionElement());
       BindingResolution br = igp.resolveBinding(sd, def, path);
-      String defDesc = def.getDescription()==null ? "" : Utilities.escapeXml(def.getDescription()) + "<br/>";
-      String s = defDesc+conf(def)+ "<a href=\""+Utilities.escapeXml(br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>"+confTail(def);
+      String s = conf(def)+ "<a href=\""+Utilities.escapeXml(br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>"+confTail(def);
       if (def.hasExtension(ToolingExtensions.EXT_MAX_VALUESET)) {
         br = igp.resolveBinding(sd, ToolingExtensions.readStringExtension(def, ToolingExtensions.EXT_MAX_VALUESET), path);
         s = s + "<br/>";
@@ -1161,9 +1160,29 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         s = s + "<br/>";
         s = s + "<a style=\"font-weight:bold\" title=\"Min Value Set Extension\" href=\""+prefix+"extension-elementdefinition-minvalueset.html\">Min Binding</a>: ";             
         s = s + (br.url == null ? processMarkdown("binding", br.display) : "<a href=\""+ (Utilities.isAbsoluteUrl(br.url) || !igp.prependLinks() ? Utilities.escapeXml(br.url) : prefix+br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>");
-      }      
+      }
+      if (def.hasDescription()) {
+        String desc = processMarkdown("Binding.description", def.getDescriptionElement());
+        if (desc != null) {
+          if (desc.length() > 4 && desc.substring(4).contains("<p>")) {
+            s = s + "<br/>" + desc;
+          } else {
+            s = s + "\r\n" + stripPara(desc);
+          }
+        }
+      }
       return s;
     }
+  }
+
+  private String stripPara(String s) {
+    if (s.startsWith("<p>")) {
+      s = s.substring(3);
+    }
+    if (s.endsWith("</p>")) {
+      s = s.substring(0, s.length()-4);
+    }
+    return s;
   }
 
   private String confTail(ElementDefinitionBindingComponent def) {
