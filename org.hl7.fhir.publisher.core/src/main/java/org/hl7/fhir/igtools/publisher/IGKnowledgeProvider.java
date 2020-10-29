@@ -69,8 +69,9 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   private boolean autoPath = false;
   private boolean noXhtml;
   private Template template;
+  private List<String> listedURLExemptions;
   
-  public IGKnowledgeProvider(IWorkerContext context, String pathToSpec, String canonical, JsonObject igs, List<ValidationMessage> errors, boolean noXhtml, Template template) throws Exception {
+  public IGKnowledgeProvider(IWorkerContext context, String pathToSpec, String canonical, JsonObject igs, List<ValidationMessage> errors, boolean noXhtml, Template template, List<String> listedURLExemptions) throws Exception {
     super();
     this.context = context;
     this.pathToSpec = pathToSpec;
@@ -80,8 +81,10 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     this.noXhtml = noXhtml;
     this.canonical = canonical;
     this.template = template;
+    this.listedURLExemptions = listedURLExemptions;
     loadPaths(igs);
   }
+  
   private void loadPaths(JsonObject igs) throws Exception {
     JsonElement e = igs.get("path-pattern");
     if (e != null)
@@ -422,7 +425,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   public void checkForPath(FetchedFile f, FetchedResource r, CanonicalResource bc, boolean inner) throws FHIRException {
     if (!bc.hasUrl())
       error(f, bc.fhirType()+".url", "Resource has no url: "+bc.getId(), I18nConstants.RESOURCE_ID_NO_URL);
-    else if (bc.getUrl().startsWith(canonical) && !bc.getUrl().endsWith("/"+bc.getId()))
+    else if (bc.getUrl().startsWith(canonical) && !bc.getUrl().endsWith("/"+bc.getId()) && !listedURLExemptions.contains(bc.getUrl()))
       error(f, bc.fhirType()+".url","Resource id/url mismatch: "+bc.getId()+"/"+bc.getUrl(), I18nConstants.RESOURCE_ID_MISMATCH);
     if (!inner && !r.getId().equals(bc.getId()))
       error(f, bc.fhirType()+".id", "Resource id/loaded id mismatch: "+r.getId()+"/"+bc.getUrl(), I18nConstants.RESOURCE_ID_LOADED_MISMATCH);
