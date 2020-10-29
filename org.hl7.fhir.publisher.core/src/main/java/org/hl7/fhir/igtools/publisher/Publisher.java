@@ -1522,10 +1522,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (!inif.exists()) {
       inif = new File(Utilities.path(Utilities.getDirectoryForFile(file.getAbsolutePath()), "fsh.ini"));
     }
+    String fshVersion = null;
     if (inif.exists()) {
       IniFile ini = new IniFile(new FileInputStream(inif));
       if (ini.hasProperty("FSH", "timeout")) {
         fshTimeout = ini.getLongProperty("FSH", "timeout") * 1000;
+      }
+      if (ini.hasProperty("FSH", "sushi-version")) {
+        fshVersion = ini.getStringProperty("FSH", "sushi-version");
       }
     }
     log("Run Sushi on "+file.getAbsolutePath());
@@ -1537,11 +1541,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     exec.setWorkingDirectory(file);
     ExecuteWatchdog watchdog = new ExecuteWatchdog(fshTimeout);
     exec.setWatchdog(watchdog);
+    String cmd = fshVersion == null ? "sushi" : "npx fsh-sushi@"+fshVersion;
     try {
       if (SystemUtils.IS_OS_WINDOWS) {
-        exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C sushi ./fsh -o ."));
+        exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C "+cmd+" ./fsh -o ."));
       } else {
-        exec.execute(org.apache.commons.exec.CommandLine.parse("sushi ./fsh -o ."));
+        exec.execute(org.apache.commons.exec.CommandLine.parse(cmd+" ./fsh -o ."));
       }
     } catch (IOException ioex) {
       log("Sushi couldn't be run. Complete output from running Sushi : " + pumpHandler.getBufferString());
@@ -1892,6 +1897,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.setAnyExtensionsAllowed(anyExtensionsAllowed);
     validator.setAllowExamples(true);
     validator.setCrumbTrails(true);
+    validator.setWantCheckSnapshotUnchanged(true);
     
     pvalidator = new ProfileValidator(context);
     csvalidator = new CodeSystemValidator(context);
@@ -2301,6 +2307,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.setAnyExtensionsAllowed(bool(configuration, "anyExtensionsAllowed"));
     validator.setAllowExamples(true);
     validator.setCrumbTrails(true);
+    validator.setWantCheckSnapshotUnchanged(true);
     
     pvalidator = new ProfileValidator(context);
     csvalidator = new CodeSystemValidator(context);
@@ -2308,6 +2315,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       pvalidator.setCheckAggregation(true);
     if (configuration.has("check-mustSupport") && configuration.get("check-mustSupport").getAsBoolean())
       pvalidator.setCheckMustSupport(true);
+    if (configuration.has("show-reference-messages") && configuration.get("show-reference-messages").getAsBoolean())
+      validator.setShowMessagesFromReferences(true);
 
     if (paths.get("extension-domains") instanceof JsonArray) {
       for (JsonElement e : (JsonArray) paths.get("extension-domains"))
@@ -5042,22 +5051,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 }
 
   private void updateImplementationGuide() throws Exception {
-    for (ImplementationGuideDefinitionResourceComponent res : publishedIg.getDefinition().getResource()) {
-      FetchedResource r = null;
-      for (FetchedFile tf : fileList) {
-        for (FetchedResource tr : tf.getResources()) {
-          if (tr.getLocalRef().equals(res.getReference().getReference())) {
-            r = tr;
-          }
-        }
-      }
-      if (r != null) {
-        String path = igpkp.doReplacements(igpkp.getLinkFor(r, false), r, null, null);
-        res.addExtension().setUrl("http://hl7.org/fhir/StructureDefinition/implementationguide-page").setValue(new UriType(path));
-        inspector.addLinkToCheck("Implementation Guide", path, "fake generated link");
-      }
-    }
-
     FetchedResource r = altMap.get(IG_NAME).getResources().get(0);
     if (!publishedIg.hasText() || !publishedIg.getText().hasDiv()) {
       publishedIg.setText(((ImplementationGuide)r.getResource()).getText());
@@ -5068,6 +5061,22 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
     new JsonParser().setOutputStyle(OutputStyle.NORMAL).compose(bs, publishedIg);
     npm.addFile(Category.RESOURCE, "ig-r4.json", bs.toByteArray());
+    
+    for (ImplementationGuideDefinitionResourceComponent res : publishedIg.getDefinition().getResource()) {
+      FetchedResource rt = null;
+      for (FetchedFile tf : fileList) {
+        for (FetchedResource tr : tf.getResources()) {
+          if (tr.getLocalRef().equals(res.getReference().getReference())) {
+            rt = tr;
+          }
+        }
+      }
+      if (rt != null) {
+        String path = igpkp.doReplacements(igpkp.getLinkFor(rt, false), rt, null, null);
+        res.addExtension().setUrl("http://hl7.org/fhir/StructureDefinition/implementationguide-page").setValue(new UriType(path));
+        inspector.addLinkToCheck("Implementation Guide", path, "fake generated link");
+      }
+    }
   }
 
   private String checkPlural(String word, int c) {
@@ -5791,7 +5800,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           priorPageData.addProperty("next", currentPageUrl);
           currentPageData.addProperty("previous", priorPageUrl);
         }
-        
         priorEntry = entry;
       }
       json = pages.toString();
