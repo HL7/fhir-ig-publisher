@@ -2320,6 +2320,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       pvalidator.setCheckAggregation(true);
     if (configuration.has("check-mustSupport") && configuration.get("check-mustSupport").getAsBoolean())
       pvalidator.setCheckMustSupport(true);
+    if (configuration.has("show-reference-messages") && configuration.get("show-reference-messages").getAsBoolean())
+      validator.setShowMessagesFromReferences(true);
 
     if (paths.get("extension-domains") instanceof JsonArray) {
       for (JsonElement e : (JsonArray) paths.get("extension-domains"))
@@ -5793,6 +5795,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       addPageData(pages, publishedIg.getDefinition().getPage(), "0", "");
       //   gson = new GsonBuilder().setPrettyPrinting().create();
       //   json = gson.toJson(pages);
+      Entry<String, JsonElement> priorEntry = null;
+      for (Entry<String, JsonElement> entry: pages.entrySet()) {
+        if (priorEntry!=null) {
+          String priorPageUrl = priorEntry.getKey();
+          String currentPageUrl = entry.getKey();
+          JsonObject priorPageData = priorEntry.getValue().getAsJsonObject();
+          JsonObject currentPageData = entry.getValue().getAsJsonObject();
+          priorPageData.addProperty("next", currentPageUrl);
+          currentPageData.addProperty("previous", priorPageUrl);
+        }
+
+        priorEntry = entry;
+      }
       json = pages.toString();
       TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "pages.json"), false);
 
