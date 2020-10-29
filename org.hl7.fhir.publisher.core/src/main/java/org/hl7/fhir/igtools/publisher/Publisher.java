@@ -574,6 +574,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private String jekyllCommand = "jekyll";
   private boolean makeQA = true;
   private CqlSubSystem cql;
+  private IniFile apiKeyFile;
 
   private ILoggingService logger = this;
 
@@ -754,7 +755,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           }
         }
       } else {
-        log("Done"+(!publishing && mode != IGBuildMode.AUTOBUILD ? ". Note that this IG is good for your local use but is not suitable for use as a final publication (consult Confluence for publishing advice if you are actually building with intent to publish)" : ""));
+        log("Done"+(!publishing && mode != IGBuildMode.AUTOBUILD ? ". This IG has been built using the 'normal' process for local use. If building to host on an an external website, use the process documented [yet to be documented]])" : ""));
       }
     }
     if (templateLoaded && new File(rootDir).exists()) {
@@ -1415,6 +1416,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (mode == IGBuildMode.PUBLICATION)
       log("Build Formal Publication package, intended for "+getTargetOutput());
     
+    if (apiKeyFile == null) {
+      apiKeyFile = new IniFile(Utilities.path(System.getProperty("user.home"), "apikeys.ini"));
+    }
+    System.out.println("API keys loaded from "+apiKeyFile.getFileName());
     templateManager = new TemplateManager(pcm, logger, gh());
     templateProvider = new IGPublisherLiquidTemplateServices();
     extensionTracker = new ExtensionTracker();
@@ -1544,9 +1549,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     String cmd = fshVersion == null ? "sushi" : "npx fsh-sushi@"+fshVersion;
     try {
       if (SystemUtils.IS_OS_WINDOWS) {
-        exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C "+cmd+" ./fsh -o ."));
+        exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C "+cmd+" . -o ."));
       } else {
-        exec.execute(org.apache.commons.exec.CommandLine.parse(cmd+" ./fsh -o ."));
+        exec.execute(org.apache.commons.exec.CommandLine.parse(cmd+" . -o ."));
       }
     } catch (IOException ioex) {
       log("Sushi couldn't be run. Complete output from running Sushi : " + pumpHandler.getBufferString());
@@ -1861,7 +1866,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient(webTxServer.getAddress(), FhirPublication.fromCode(version)), txLog));
     
     loadPubPack();
-    igpkp = new IGKnowledgeProvider(context, checkAppendSlash(specPath), determineCanonical(sourceIg.getUrl(), "ImplementationGuide.url"), template.config(), errors, VersionUtilities.isR2Ver(version), template);
+    igpkp = new IGKnowledgeProvider(context, checkAppendSlash(specPath), determineCanonical(sourceIg.getUrl(), "ImplementationGuide.url"), template.config(), errors, VersionUtilities.isR2Ver(version), template, listedURLExemptions);
     if (autoLoad) {
       igpkp.setAutoPath(true);
     }
@@ -2252,7 +2257,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     loadPubPack();
 
-    igpkp = new IGKnowledgeProvider(context, checkAppendSlash(specPath), cb.getAsString(), configuration, errors, VersionUtilities.isR2Ver(version), null);
+    igpkp = new IGKnowledgeProvider(context, checkAppendSlash(specPath), cb.getAsString(), configuration, errors, VersionUtilities.isR2Ver(version), null, listedURLExemptions);
     igpkp.loadSpecPaths(specMaps.get(0));
     fetcher.setPkp(igpkp);
     
@@ -2468,7 +2473,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         relativePath = str(pp, "relativePath");
       }
       PreProcessInfo ppinfo = new PreProcessInfo(prePagesXslt, relativePath);
-      preProcessInfo.put(path.toLowerCase(), ppinfo);
+      preProcessInfo.put(path, ppinfo);
     }
   }
 
@@ -3407,7 +3412,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private boolean loadPrePages(FetchedFile dir, String basePath) throws Exception {
     boolean changed = false;
-    PreProcessInfo ppinfo = preProcessInfo.get(basePath.toLowerCase());
+    PreProcessInfo ppinfo = preProcessInfo.get(basePath);
     if (ppinfo==null) {
       System.out.println("PreProcessInfo hash:" + preProcessInfo.toString());
       throw new Exception("Unable to find preProcessInfo for basePath: " + basePath);
@@ -6055,7 +6060,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
 
     for (String prePagesDir: prePagesDirs) {
-      PreProcessInfo ppinfo = preProcessInfo.get(prePagesDir.toLowerCase());
+      PreProcessInfo ppinfo = preProcessInfo.get(prePagesDir);
       String baseFile = prePagesDir + File.separator;
       if (ppinfo.relativePath.equals("")) {
         baseFile = baseFile + "_includes" + File.separator;
@@ -8232,6 +8237,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         self.setMode(IGBuildMode.AUTOBUILD);
         self.targetOutput = getNamedParam(args, "-target");
       }
+      if (hasNamedParam(args, "-api-key-file")) {
+        self.apiKeyFile = new IniFile(new File(getNamedParam(args, "-api-key-file")).getAbsolutePath());
+      }
+
       if (hasNamedParam(args, "-source")) {
         // run with standard template. this is publishing lite
         self.setSourceDir(getNamedParam(args, "-source"));
