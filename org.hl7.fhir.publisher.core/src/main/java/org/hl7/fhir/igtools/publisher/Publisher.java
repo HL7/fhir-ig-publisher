@@ -5805,7 +5805,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           priorPageData.addProperty("next", currentPageUrl);
           currentPageData.addProperty("previous", priorPageUrl);
         }
-
         priorEntry = entry;
       }
       json = pages.toString();
