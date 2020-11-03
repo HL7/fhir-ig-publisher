@@ -14,18 +14,6 @@ variables:
 - group: GIT_VAR_GROUP
 
 steps:
-  # Runs 'mvn package'
-  - task: Maven@3
-    inputs:
-      mavenPomFile: 'pom.xml'
-      mavenOptions: '-Xmx3072m'
-      javaHomeOption: 'JDKVersion'
-      jdkVersionOption: '1.8'
-      jdkArchitectureOption: 'x64'
-      publishJUnitResults: true
-      testResultsFiles: '**/surefire-reports/TEST-*.xml'
-      goals: 'package'
-
   # For creating the snapshot release with maven, we need to build a fake settings.xml for it to read from.
   # This is done for the master branch merges only.
   - bash: |
@@ -69,6 +57,19 @@ steps:
       </settings>
       EOL
     displayName: 'Create .mvn/settings.xml'
+
+  # Runs 'mvn package'
+  - task: Maven@3
+    inputs:
+      mavenPomFile: 'pom.xml'
+      mavenOptions: '-Xmx3072m'
+      options: '--settings $(System.DefaultWorkingDirectory)/settings.xml'
+      javaHomeOption: 'JDKVersion'
+      jdkVersionOption: '1.8'
+      jdkArchitectureOption: 'x64'
+      publishJUnitResults: true
+      testResultsFiles: '**/surefire-reports/TEST-*.xml'
+      goals: 'package'
 
   # Signing, for now, occurs for all builds, SNAPSHOT or release. So we need a valid
   # signing key. The next two steps download the public and private keys from the
