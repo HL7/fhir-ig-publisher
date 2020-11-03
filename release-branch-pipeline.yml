@@ -7,10 +7,10 @@ pool:
   vmImage: "ubuntu-16.04"
 
 variables:
-  VERSION:
-  - group: PGP_VAR_GROUP
-  - group: SONATYPE_VAR_GROUP
-  - group: GIT_VAR_GROUP 
+- group: PGP_VAR_GROUP
+- group: SONATYPE_VAR_GROUP
+- group: GIT_VAR_GROUP 
+- name: VERSION
 
 steps:
   # Checks if the release notes file is populated. Exits if it is not.
