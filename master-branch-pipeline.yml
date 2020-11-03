@@ -99,7 +99,7 @@ steps:
     inputs:
       mavenPomFile: '$(System.DefaultWorkingDirectory)/pom.xml'
       goals: deploy
-      options: '--settings $(System.DefaultWorkingDirectory)/settings.xml -DdeployToSonatype'
+      options: '--settings $(System.DefaultWorkingDirectory)/settings.xml -DdeployToSonatype -e'
       publishJUnitResults: false
 
   # Deploy the SNAPSHOT artifact to GitHub packages.
@@ -109,5 +109,5 @@ steps:
     inputs:
       mavenPomFile: '$(System.DefaultWorkingDirectory)/pom.xml'
       goals: deploy
-      options: '--settings $(System.DefaultWorkingDirectory)/settings.xml -Dmaven.test.skip -pl "!org.hl7.fhir.publisher.cli" -DdeployToGitHub'
+      options: '--settings $(System.DefaultWorkingDirectory)/settings.xml -Dmaven.test.skip -pl "!org.hl7.fhir.publisher.cli" -DdeployToGitHub -e'
       publishJUnitResults: false
