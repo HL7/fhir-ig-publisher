@@ -95,17 +95,28 @@ public class PublicationProcess {
     NpmPackage npm = NpmPackage.fromPackage(loadFile("Source package", Utilities.path(source, "output", "package.tgz")));
     String id = npm.name();
     String[] p = id.split("\\.");
-    if (!check(res, p.length == 4 && "hl7".equals(p[0]) && "fhir".equals(p[1]), "Package Id is not valid = must have 4 parts (hl7.fhir.[realm].[code]")) {
-      return res;
-    }
-    String realm = p[2];
-    String code = p[3];
+    boolean tho = false;
+    String realm = null;
+    String code = null;
     String canonical = npm.canonical();
-    if (!check(res, canonical != null && canonical.equals("http://hl7.org/fhir/"+realm+"/"+code), "canonical URL of "+canonical+" does not match the required canonical of http://hl7.org/fhir/"+realm+"/"+code)) {
-      return res;
-    }
-    if (!check(res, canonical.startsWith(url), "Proposed canonical '"+canonical+"' does not match the web site URL '"+url+"'")) {
-      return res;
+    if (id.equals("hl7.terminology")) {
+      tho = true;
+      if (!check(res, npm.canonical().equals("http://terminology.hl7.org") && url.equals("http://terminology.hl7.org"), "Proposed canonical '"+npm.canonical()+"' does not match the web site URL '"+url+"' with a value of http://terminology.hl7.org")) {
+        return res;
+      }
+      
+    } else {
+      if (!check(res, p.length == 4 && "hl7".equals(p[0]) && "fhir".equals(p[1]), "Package Id is not valid = must have 4 parts (hl7.fhir.[realm].[code]")) {
+        return res;
+      }
+      realm = p[2];
+      code = p[3];
+      if (!check(res, canonical != null && canonical.equals("http://hl7.org/fhir/"+realm+"/"+code), "canonical URL of "+canonical+" does not match the required canonical of http://hl7.org/fhir/"+realm+"/"+code)) {
+        return res;
+      }
+      if (!check(res, canonical.startsWith(url), "Proposed canonical '"+canonical+"' does not match the web site URL '"+url+"'")) {
+        return res;
+      }
     }
 
     String version = npm.version();
@@ -113,7 +124,7 @@ public class PublicationProcess {
       return res;
     }
     
-    String destination = Utilities.path(rootFolder, realm, code);
+    String destination = tho ? rootFolder : Utilities.path(rootFolder, realm, code);
     if (!check(res, new File(Utilities.path(destination, "package-list.json")).exists(), "Destination '"+destination+"' does not contain a package-list.json - must be set up manually for first publication")) {
       return res;
     }
