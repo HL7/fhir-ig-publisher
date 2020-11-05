@@ -39,7 +39,7 @@ public class PublicationProcess {
    *  - realm matches what was proposed and authorised.
    *  - code hasn't been changed since last published and matches what was approved by FMG
    *  - there are no publication issues outstanding
-   *  - reamining qa issues are ok
+   *  - remaining qa issues are ok
    *  
    * If this is a milestone:
    *   - TSC has approved the publication
@@ -67,6 +67,7 @@ public class PublicationProcess {
       e.printStackTrace();
     }
   }
+  
   public List<ValidationMessage> publishInner(String source, String rootFolder, boolean milestone, String registrySource, String history) throws Exception {
     List<ValidationMessage> res = new ArrayList<>();
 

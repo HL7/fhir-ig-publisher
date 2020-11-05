@@ -507,6 +507,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private static final long JEKYLL_TIMEOUT = 60000 * 5; // 5 minutes.... 
   private static final long FSH_TIMEOUT = 60000 * 1; // 1 minutes.... 
 
+  private static final int PRISM_SIZE_LIMIT = 16384;
+
   private String configFile;
   private String sourceDir;
   private String destDir;
@@ -3405,7 +3407,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         dir.setRelativePath("");
         if (!dir.isFolder())
           throw new Exception("pre-processed page reference is not a folder");
-        if (loadPrePages(dir, dir.getPath()))
+        if (loadPrePages(dir, dir.getStatedPath()))
           changed = true;
       }
     }
@@ -7133,9 +7135,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         genWrapper(null, r, template, igpkp.getProperty(r, "format"), f.getOutputNames(), vars, "ttl", "");
     }
 
+    org.hl7.fhir.r5.elementmodel.XmlParser xp = new org.hl7.fhir.r5.elementmodel.XmlParser(context);
+    ByteArrayOutputStream bs = new ByteArrayOutputStream();
+    xp.compose(r.getElement(), bs, OutputStyle.NORMAL, null);
+    int size = bs.size();
+    
     if (igpkp.wantGen(r, "xml-html")) {
       XmlXHtmlRenderer x = new XmlXHtmlRenderer();
-      org.hl7.fhir.r5.elementmodel.XmlParser xp = new org.hl7.fhir.r5.elementmodel.XmlParser(context);
+      x.setPrism(size < PRISM_SIZE_LIMIT);
       xp.setLinkResolver(igpkp);
       xp.setShowDecorations(false);
       xp.compose(r.getElement(), x);
@@ -7143,6 +7150,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     if (igpkp.wantGen(r, "json-html")) {
       JsonXhtmlRenderer j = new JsonXhtmlRenderer();
+      j.setPrism(size < PRISM_SIZE_LIMIT);
       org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(context);
       jp.setLinkResolver(igpkp);
       jp.compose(r.getElement(), j);
