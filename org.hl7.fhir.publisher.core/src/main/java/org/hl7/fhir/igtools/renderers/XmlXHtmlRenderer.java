@@ -49,6 +49,7 @@ public class XmlXHtmlRenderer implements IXMLWriter {
   private String href;
   private List<ElementDecoration> decorations1 = new ArrayList<ElementDecoration>();
   private List<ElementDecoration> decorations2 = new ArrayList<ElementDecoration>();
+  private boolean prism;
 
   protected boolean condition(boolean bTest, String message) throws IOException {
     if (!bTest)
@@ -56,7 +57,18 @@ public class XmlXHtmlRenderer implements IXMLWriter {
     return bTest;
   }
 
+  
   // -- writing context ------------------------------------------------
+
+  public boolean isPrism() {
+    return prism;
+  }
+
+
+  public void setPrism(boolean prism) {
+    this.prism = prism;
+  }
+
 
   /* (non-Javadoc)
    * @see org.eclipse.ohf.utilities.xml.IXMLWriter#start()
@@ -68,7 +80,11 @@ public class XmlXHtmlRenderer implements IXMLWriter {
     attributes = null;
     started = true;
     b = new StringBuilder();
-    b.append("<pre class=\"xml\"><code class=\"language-xml\">\r\n");
+    if (prism) {
+      b.append("<pre class=\"xml\"><code class=\"language-xml\">\r\n");
+    } else {
+      b.append("<pre class=\"xml\"><code>\r\n");
+    }
   }
 
   private void checkStarted () throws IOException {
