@@ -52,9 +52,9 @@ public class PublicationProcess {
    * @param destination - the root folder of the local copy of files for the web site to which the IG is being published. 
    * @throws Exception 
    */
-  public void publish(String source, String rootFolder, boolean milestone, String registrySource, String history) throws Exception {
+  public void publish(String source, String rootFolder, boolean milestone, String registrySource, String history, String temp) throws Exception {
     try {
-      List<ValidationMessage> res = publishInner(source, rootFolder, milestone, registrySource, history);
+      List<ValidationMessage> res = publishInner(source, rootFolder, milestone, registrySource, history, temp);
       if (res.size() == 0) {
         System.out.println("Success");
       } else {
@@ -68,7 +68,7 @@ public class PublicationProcess {
     }
   }
   
-  public List<ValidationMessage> publishInner(String source, String rootFolder, boolean milestone, String registrySource, String history) throws Exception {
+  public List<ValidationMessage> publishInner(String source, String rootFolder, boolean milestone, String registrySource, String history, String temp) throws Exception {
     List<ValidationMessage> res = new ArrayList<>();
 
     // check the wider context
@@ -174,7 +174,7 @@ public class PublicationProcess {
     
     // well, we've run out of things to test... time to actually try...
     if (res.size() == 0) {
-      doPublish(fSource, fOutput, qa, destination, destVer, pathVer, fRoot, ini, plPub, vSrc, fRegistry, npm, milestone, fHistory);
+      doPublish(fSource, fOutput, qa, destination, destVer, pathVer, fRoot, ini, plPub, vSrc, fRegistry, npm, milestone, fHistory, temp);
     }        
     return res;
     
@@ -216,19 +216,19 @@ public class PublicationProcess {
     return new FileInputStream(f);
   }
 
-  private void doPublish(File fSource, File fOutput, JsonObject qa, String destination, String destVer, String pathVer, File fRoot, IniFile ini, JsonObject plPub, JsonObject vSrc, File fRegistry, NpmPackage npm, boolean milestone, File history) throws Exception {
+  private void doPublish(File fSource, File fOutput, JsonObject qa, String destination, String destVer, String pathVer, File fRoot, IniFile ini, JsonObject plPub, JsonObject vSrc, File fRegistry, NpmPackage npm, boolean milestone, File history, String tempDir) throws Exception {
     // ok. all our tests have passed.
     // 1. do the publication build(s)
     System.out.println("All checks passed. Do the publication builds");        
 
     // create a temporary copy and build in that:
-    File temp = cloneToTemp(fSource, npm.name()+"#"+npm.version());
+    File temp = cloneToTemp(tempDir, fSource, npm.name()+"#"+npm.version());
     File tempM = null; 
     System.out.println("Build IG at "+fSource.getAbsolutePath()+": final copy suitable for publication (in "+temp.getAbsolutePath()+")");        
     runBuild(qa, temp.getAbsolutePath(), new String[] {"-ig", temp.getAbsolutePath(), "-resetTx", "-publish", pathVer, "-no-exit"});
 
     if (milestone) {
-      tempM = cloneToTemp(temp, npm.name()+"#"+npm.version()+"-milestone");
+      tempM = cloneToTemp(tempDir, temp, npm.name()+"#"+npm.version()+"-milestone");
       System.out.println("Build IG at "+fSource.getAbsolutePath()+": final copy suitable for publication (in "+tempM.getAbsolutePath()+") (milestone build)");        
       runBuild(qa, tempM.getAbsolutePath(), new String[] {"-ig", tempM.getAbsolutePath(), "-publish", pathVer, "-milestone", "-no-exit"});      
     }
@@ -266,8 +266,11 @@ public class PublicationProcess {
     System.out.println("Finished Publishing");
   }
 
-  private File cloneToTemp(File fSource, String name) throws IOException {
-    String dest = Utilities.path("[tmp]", name);
+  private File cloneToTemp(String tempDir, File fSource, String name) throws IOException {
+    if (tempDir == null) {
+      tempDir = "[tmp]";
+    }
+    String dest = Utilities.path(tempDir, name);
     System.out.println("Prepare Build space in "+dest);        
     File fDest = new File(dest);
     if (!fDest.exists()) {
