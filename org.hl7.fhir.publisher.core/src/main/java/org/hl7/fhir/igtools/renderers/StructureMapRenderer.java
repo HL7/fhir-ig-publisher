@@ -46,8 +46,8 @@ public class StructureMapRenderer extends CanonicalRenderer {
   private StructureMapAnalysis analysis;
   private String destDir;
 
-  public StructureMapRenderer(IWorkerContext context, String prefix, StructureMap map, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
-    super(context, prefix, map, destDir, igp, maps, markdownEngine, packge, gen);
+  public StructureMapRenderer(IWorkerContext context, String corePath, StructureMap map, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
+    super(context, corePath, map, destDir, igp, maps, markdownEngine, packge, gen);
     this.map = map;
     this.destDir = destDir;
     utils = new StructureMapUtilities(context, null, igp);

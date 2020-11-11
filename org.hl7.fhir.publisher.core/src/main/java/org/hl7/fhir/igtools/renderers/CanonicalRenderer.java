@@ -23,8 +23,8 @@ public class CanonicalRenderer extends BaseRenderer {
   private CanonicalResource cr;
   private String destDir;
 
-  public CanonicalRenderer(IWorkerContext context, String prefix, CanonicalResource cr, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
-    super(context, prefix, igp, maps, markdownEngine, packge, gen);
+  public CanonicalRenderer(IWorkerContext context, String corePath, CanonicalResource cr, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
+    super(context, corePath, igp, maps, markdownEngine, packge, gen);
     this.cr = cr;
     this.destDir = destDir;
   }

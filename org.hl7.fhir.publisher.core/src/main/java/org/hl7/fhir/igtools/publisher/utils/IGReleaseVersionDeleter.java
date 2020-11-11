@@ -46,10 +46,11 @@ public class IGReleaseVersionDeleter {
     List<String> igs = listIgs(folder);
     List<String> hist = listHistoryFolder(historyRepo);
     hist.add("package-list.json");
+    hist.add("publish.ini");
     int i = 0;
     for (File f : new File(folder).listFiles()) {
       String rn = f.getAbsolutePath().substring(folder.length()+1);
-      if (!igs.contains(rn) && !hist.contains(rn)) {
+      if (!igs.contains(rn) && !hist.contains(rn) && !rn.endsWith(".template")) {
           System.out.println("Delete "+rn);
           if (f.isDirectory())
             Utilities.clearDirectory(f.getAbsolutePath());

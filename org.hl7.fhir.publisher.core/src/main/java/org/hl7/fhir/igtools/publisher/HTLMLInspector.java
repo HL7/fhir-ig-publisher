@@ -566,6 +566,8 @@ public class HTLMLInspector {
         ref.startsWith("http://gforge.hl7.org/gf/project/fhir/tracker/") || ref.startsWith("mailto:") || ref.startsWith("javascript:");
     if (!resolved && forHL7)
       resolved = Utilities.pathURL(canonical, "history.html").equals(ref) || ref.equals("searchform.html"); 
+    if (!resolved )
+      resolved = filename.contains("searchform.html") && ref.equals("history.html"); 
     if (!resolved)
       resolved = manual.contains(rref);
     if (!resolved && specs != null){
