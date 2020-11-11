@@ -8176,7 +8176,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       IGReleaseVersionDeleter deleter = new IGReleaseVersionDeleter();
       deleter.clear(f.getAbsolutePath(), fh.getAbsolutePath());
     } else if (hasNamedParam(args, "-go-publish")) {
-      new PublicationProcess().publish(getNamedParam(args, "-source"), getNamedParam(args, "-destination"), hasNamedParam(args, "-milestone"), getNamedParam(args, "-registry"), getNamedParam(args, "-history"));
+      new PublicationProcess().publish(getNamedParam(args, "-source"), getNamedParam(args, "-destination"), hasNamedParam(args, "-milestone"), getNamedParam(args, "-registry"), getNamedParam(args, "-history"), getNamedParam(args, "-temp"));
     } else if (hasNamedParam(args, "-publish-update")) {
       if (!args[0].equals("-publish-update")) {
         throw new Error("-publish-update must have the format -publish-update -folder {folder} -registry {registry}/fhir-ig-list.json (first argument is not -publish-update)");
