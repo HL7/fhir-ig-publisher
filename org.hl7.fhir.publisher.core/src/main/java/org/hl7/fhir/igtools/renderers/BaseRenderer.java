@@ -43,7 +43,8 @@ import org.hl7.fhir.utilities.npm.NpmPackage;
 
 public class BaseRenderer extends TranslatingUtilities {
   protected IWorkerContext context;
-  protected String prefix;
+  protected String corePath;
+  protected String prefix; // path to relative root of IG, if not the same directory (currenly always is)
   protected IGKnowledgeProvider igp;
   protected List<SpecMapManager> specmaps;
   protected NpmPackage packge;
@@ -51,10 +52,10 @@ public class BaseRenderer extends TranslatingUtilities {
   protected RenderingContext gen;
 
 
-  public BaseRenderer(IWorkerContext context, String prefix, IGKnowledgeProvider igp, List<SpecMapManager> specmaps, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
+  public BaseRenderer(IWorkerContext context, String corePath, IGKnowledgeProvider igp, List<SpecMapManager> specmaps, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
     super();
     this.context = context;
-    this.prefix = prefix;
+    this.corePath = corePath;
     this.igp = igp;
     this.specmaps = specmaps;
     this.markdownEngine = markdownEngine;
@@ -110,7 +111,7 @@ public class BaseRenderer extends TranslatingUtilities {
 	        if (text.substring(i, i+2).equals("](") && i+7 <= text.length()) {
 	          // The following can go horribly wrong if i+7 > text.length(), thus the check on i+7 above and the Throwable catch around the whole method just in case. 
 	          if (!text.substring(i, i+7).equals("](http:") && !text.substring(i, i+8).equals("](https:") && !text.substring(i, i+3).equals("](.")) { 
-	            text = text.substring(0, i)+"]("+prefix+text.substring(i+2);
+	            text = text.substring(0, i)+"]("+corePath+text.substring(i+2);
 	          }
 	        }
 	        i--;
@@ -164,6 +165,14 @@ public class BaseRenderer extends TranslatingUtilities {
         return "<a href=\""+cs.getUserString("path")+"#"+cs.getId()+"-"+cd.getCode()+"\">"+cd.getDisplay()+"</a>";
       }
     }
+  }
+
+  public String getPrefix() {
+    return prefix;
+  }
+
+  public void setPrefix(String prefix) {
+    this.prefix = prefix;
   }
 
 }

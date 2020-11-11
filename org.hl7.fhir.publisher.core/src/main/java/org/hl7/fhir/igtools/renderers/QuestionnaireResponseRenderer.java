@@ -45,8 +45,8 @@ public class QuestionnaireResponseRenderer extends BaseRenderer {
   private Element qr;
   private String destDir;
 
-  public QuestionnaireResponseRenderer(IWorkerContext context, String prefix, Element qr, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
-    super(context, prefix, igp, maps, markdownEngine, packge, gen);
+  public QuestionnaireResponseRenderer(IWorkerContext context, String corePath, Element qr, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
+    super(context, corePath, igp, maps, markdownEngine, packge, gen);
     this.qr = qr;
     this.destDir = destDir;
   }

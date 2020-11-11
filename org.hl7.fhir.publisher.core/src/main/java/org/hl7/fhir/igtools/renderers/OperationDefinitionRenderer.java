@@ -23,8 +23,8 @@ public class OperationDefinitionRenderer extends CanonicalRenderer {
   private String destDir;
   private List<FetchedFile> files;
 
-  public OperationDefinitionRenderer(IWorkerContext context, String prefix, OperationDefinition od, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen) {
-    super(context, prefix, od, destDir, igp, maps, markdownEngine, packge, gen);
+  public OperationDefinitionRenderer(IWorkerContext context, String corePath, OperationDefinition od, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen) {
+    super(context, corePath, od, destDir, igp, maps, markdownEngine, packge, gen);
     this.od = od;
     this.destDir = destDir;
     utils = new ProfileUtilities(context, null, igp);
