@@ -44,7 +44,7 @@ import org.hl7.fhir.utilities.npm.NpmPackage;
 public class BaseRenderer extends TranslatingUtilities {
   protected IWorkerContext context;
   protected String corePath;
-  protected String prefix; // path to relative root of IG, if not the same directory (currenly always is)
+  protected String prefix = ""; // path to relative root of IG, if not the same directory (currenly always is)
   protected IGKnowledgeProvider igp;
   protected List<SpecMapManager> specmaps;
   protected NpmPackage packge;

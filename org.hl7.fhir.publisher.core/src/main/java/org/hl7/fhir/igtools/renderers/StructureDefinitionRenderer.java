@@ -582,7 +582,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   public void txDetails(ElementDefinitionBindingComponent tx, BindingResolutionDetails brd, boolean inherited) {
-    String uri = tx.getValueSet();
+    String uri = tx.getValueSet().trim();
     String name = getSpecialValueSetName(uri);
     if (name != null) {
       brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\""+Utilities.escapeXml(uri)+"\">"+Utilities.escapeXml(name)+"</a>";
@@ -596,9 +596,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         else if (Utilities.isAbsoluteUrl(br.url))
           brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\""+Utilities.escapeXml(br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>";
         else {
-          brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\""+Utilities.escapeXml(corePath+br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>";
-          throw new Error("investigate this (prefix)");
-        }
+          brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\""+Utilities.escapeXml(prefix+br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>";
+       }
       } else { 
         String p = vs.getUserString("path");
         if (p == null)
