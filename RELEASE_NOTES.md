@@ -1,1 +1,0 @@
-* Renderer: fix bug with wrong base url for terminology reference (and remove debugging code)
