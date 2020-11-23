@@ -582,7 +582,10 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   public void txDetails(ElementDefinitionBindingComponent tx, BindingResolutionDetails brd, boolean inherited) {
-    String uri = tx.getValueSet().trim();
+    String uri = null;
+    if (tx.getValueSet() != null) {
+       uri = tx.getValueSet().trim();
+    }
     String name = getSpecialValueSetName(uri);
     if (name != null) {
       brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\""+Utilities.escapeXml(uri)+"\">"+Utilities.escapeXml(name)+"</a>";
