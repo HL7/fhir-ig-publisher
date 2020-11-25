@@ -83,6 +83,8 @@ public class PreviousVersionComparator {
   private List<VersionInstance> versionList = new ArrayList<>();
   private ILoggingService logger;
   private List<CanonicalResource> resources;
+  private String lastName;
+  private String lastUrl;
   
   public PreviousVersionComparator(SimpleWorkerContext context, String version, String rootDir, String dstDir, String canonical, ProfileKnowledgeProvider pkp, ILoggingService logger, List<String> versions) {
     super();
@@ -114,9 +116,13 @@ public class PreviousVersionComparator {
             if (!"ci-build".equals(JSONUtil.str(o, "status"))) {
               if (last == null) {
                 last = JSONUtil.str(o, "version");
+                lastUrl = JSONUtil.str(o, "path");
+                lastName = JSONUtil.str(o, "version");
               }
               if (o.has("current") && o.get("current").getAsBoolean()) {
                 major = JSONUtil.str(o, "version");
+                lastUrl = JSONUtil.str(o, "path");
+                lastName = JSONUtil.str(o, "sequence");                
               }
             }
           }
@@ -348,6 +354,18 @@ private String fixForIniMap(String url, IniFile ini) {
     if (errMsg == null) {
       resources.add(resource);
     }
+  }
+
+  public boolean hasLast() {
+    return lastUrl != null;
+  }
+
+  public String getLastName() {
+    return lastName;
+  }
+
+  public String getLastUrl() {
+    return lastUrl;
   }
 
 }
