@@ -60,11 +60,15 @@ public class StructureMapRenderer extends CanonicalRenderer {
 
   public String profiles() {
     StringBuilder b = new StringBuilder();
-    b.append("<ul>\r\n");
-    for (StructureDefinition sd : analysis.getProfiles()) {
-      b.append("  <li><a href=\""+sd.getUserString("path")+"\">"+Utilities.escapeXml(gt(sd.getNameElement()))+"</a></li>\r\n");
-    }
-    b.append("</ul>\r\n");
+    if (analysis == null) {
+      b.append("<p>Analysis is not available</p>\r\n");
+    } else { 
+      b.append("<ul>\r\n");
+      for (StructureDefinition sd : analysis.getProfiles()) {
+        b.append("  <li><a href=\""+sd.getUserString("path")+"\">"+Utilities.escapeXml(gt(sd.getNameElement()))+"</a></li>\r\n");
+      }
+      b.append("</ul>\r\n");
+    } 
     return b.toString();
   }
 
