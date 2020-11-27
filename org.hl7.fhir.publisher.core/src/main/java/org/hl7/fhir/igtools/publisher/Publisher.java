@@ -1945,6 +1945,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (Extension e : sourceIg.getExtensionsByUrl(IGHelper.EXT_SPREADSHEET)) {
       spreadsheets.add(e.getValue().primitiveValue());
     }
+    ToolingExtensions.removeExtension(sourceIg, IGHelper.EXT_SPREADSHEET);
+
     for (Extension e : sourceIg.getExtensionsByUrl(IGHelper.EXT_MAPPING_CSV)) {
       mappings.add(e.getValue().primitiveValue());
     }
@@ -2820,11 +2822,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
   public void loadFromPackage(String name, String canonical, NpmPackage pi, String webref, SpecMapManager igm) throws IOException {
+    for (String dep : pi.dependencies()) {
+      if (!context.hasPackage(dep)) {
+        NpmPackage dpi = pcm.loadPackage(dep);
+        if (dpi == null) {
+          logDebugMessage(LogCategory.CONTEXT, "Unable to find package dependency "+dep+". Will proceed, but likely to be be errors in qz.html etc");
+        } else {
+          logDebugMessage(LogCategory.PROGRESS, "Load package dependency "+dep);
+          loadFromPackage(dpi.title(), dpi.canonical(), dpi, dpi.url(), new SpecMapManager(TextFile.streamToBytes(dpi.load("other", "spec.internals")), dpi.fhirVersion()));          
+        }
+      }
+    }
     IContextResourceLoader loader = new PublisherLoader(pi, igm, webref, igpkp).makeLoader();
     context.loadFromPackage(pi, loader);
   }
-
-
 
   private void loadIg(JsonObject dep) throws Exception {
     String name = str(dep, "name");
@@ -3304,8 +3315,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private void templateBeforeGenerate() throws IOException, FHIRException {
     if (template != null) {
-      if (debug)
+      if (debug) {
         waitForInput("before OnGenerate");
+      }
       Session tts = tt.start("template");
       List<String> newFileList = new ArrayList<String>();
       checkOutcomes(template.beforeGenerateEvent(publishedIg, tempDir, otherFilesRun, newFileList));
@@ -3326,11 +3338,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
       igPages.clear();
-      if (publishedIg.getDefinition().hasPage())
+      if (publishedIg.getDefinition().hasPage()) {
         loadIgPages(publishedIg.getDefinition().getPage(), igPages);
+      }
       tts.end();
-      if (debug)
+      if (debug) {
         waitForInput("after OnGenerate");
+      }
     }
     cleanUpExtensions(publishedIg);
   }
@@ -3817,7 +3831,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
-
   private void loadInfo() {
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
@@ -3827,7 +3840,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
   }
-
 
   private void scanForUsageStats() {
     logDebugMessage(LogCategory.PROGRESS, "scanForUsageStats");
@@ -6231,6 +6243,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     ig.addProperty("experimental", publishedIg.getExperimental());
     ig.addProperty("publisher", publishedIg.getPublisher());
     ig.addProperty("gitstatus", getGitStatus());
+    if (previousVersionComparator != null && previousVersionComparator.hasLast() && !targetUrl().startsWith("file:")) {
+      JsonObject diff = new JsonObject();
+      data.add("diff", diff);
+      diff.addProperty("name", Utilities.encodeUri(previousVersionComparator.getLastName()));
+      diff.addProperty("current", Utilities.encodeUri(targetUrl()));
+      diff.addProperty("previous", Utilities.encodeUri(previousVersionComparator.getLastUrl()));
+    }
+    
     if (publishedIg.hasContact()) {
       JsonArray jc = new JsonArray();
       ig.add("contact", jc);
@@ -7838,7 +7858,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (r.getResource() != null && r.getResource() instanceof Bundle) {
       RenderingContext lrc = rc.copy().setParser(getTypeLoader(f, r));
       Bundle b = (Bundle) r.getResource();
-      return new BundleRenderer(lrc).render(b);
+      BundleRenderer br = new BundleRenderer(lrc);
+      if (br.canRender(b)) {
+        return br.render(b);
+      }
     }
     if (r.getResource() != null && r.getResource() instanceof Parameters) {
       Parameters p = (Parameters) r.getResource();
@@ -8037,8 +8060,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   @Override
   public void logDebugMessage(LogCategory category, String msg) {
-    if (logOptions.contains(category.toString().toLowerCase()))
+    if (logOptions.contains(category.toString().toLowerCase())) {
       logMessage(msg);
+  }
   }
 
   public static void prop(StringBuilder b, String name, String value) {

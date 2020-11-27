@@ -191,6 +191,9 @@ public class SpecMapManager {
     if ("http://hl7.org/fhir/ValueSet/iso3166-1-3".equals(url)) {
       return Utilities.pathURL(base, "valueset-iso3166-1-3.html");
     }
+    if ("http://hl7.org/fhir/ValueSet/iso3166-1-2".equals(url)) {
+      return Utilities.pathURL(base, "valueset-iso3166-1-2.html");
+    }
     return null;
   }
 
