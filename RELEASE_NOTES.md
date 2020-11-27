@@ -5,4 +5,5 @@
 * Validator: Add support for instance-name and instance-description extensions
 * Renderer: fix broken links associated with valueset-iso3166-1-2
 * Renderer: fix bug rendering analysis for structure maps
+* Renderer: fix rendering of bundles in R5
 * Add previous version information to fhir.json for version differencing links in template
