@@ -36,6 +36,7 @@ import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.Manager;
 import org.hl7.fhir.r5.elementmodel.Manager.FhirFormat;
 import org.hl7.fhir.r5.elementmodel.ObjectConverter;
+import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.OperationDefinition;
 import org.hl7.fhir.r5.model.Questionnaire;
@@ -228,6 +229,16 @@ public class ValidationServices implements IValidatorResourceFetcher {
     URL url = new URL(source);
     URLConnection c = url.openConnection();
     return TextFile.streamToBytes(c.getInputStream());
+  }
+
+  @Override
+  public CanonicalResource fetchCanonicalResource(String url) {
+    return null;
+  }
+
+  @Override
+  public boolean fetchesCanonicalResource(String url) {
+    return false;
   }
 
 }

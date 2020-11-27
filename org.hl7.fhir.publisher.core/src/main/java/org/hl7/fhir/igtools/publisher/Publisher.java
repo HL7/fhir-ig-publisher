@@ -7858,7 +7858,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (r.getResource() != null && r.getResource() instanceof Bundle) {
       RenderingContext lrc = rc.copy().setParser(getTypeLoader(f, r));
       Bundle b = (Bundle) r.getResource();
-      return new BundleRenderer(lrc).render(b);
+      BundleRenderer br = new BundleRenderer(lrc);
+      if (br.canRender(b)) {
+        return br.render(b);
+      }
     }
     if (r.getResource() != null && r.getResource() instanceof Parameters) {
       Parameters p = (Parameters) r.getResource();
