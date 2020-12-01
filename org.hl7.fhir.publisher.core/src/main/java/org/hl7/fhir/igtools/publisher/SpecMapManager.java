@@ -32,6 +32,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.igtools.publisher.SpecMapManager.SpecialPackageType;
 import org.hl7.fhir.r5.model.Constants;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
@@ -56,6 +57,10 @@ import com.google.gson.JsonSyntaxException;
  */
 public class SpecMapManager {
 
+  public enum SpecialPackageType {
+    Simplifier, PhinVads, Vsac
+  }
+
   private JsonObject spec;
   private JsonObject paths;
   private JsonObject pages;
@@ -68,7 +73,7 @@ public class SpecMapManager {
   private Set<String> imageSet = new HashSet<String>();
   private String version;
   private NpmPackage pi;
-  private boolean fromSimplifier;
+  private SpecialPackageType special;
 
   public SpecMapManager(String npmName, String igVersion, String toolVersion, String buildId, Calendar genDate, String webUrl) {
     spec = new JsonObject();
@@ -166,8 +171,12 @@ public class SpecMapManager {
     if (def != null) {
       return def;
     }
-    if (fromSimplifier) {
-      return "https://simplifier.net/resolve?scope="+pi.name()+"@"+pi.version()+"&canonical="+url;
+    if (special != null) {
+      switch (special) {
+      case Simplifier: return "https://simplifier.net/resolve?scope="+pi.name()+"@"+pi.version()+"&canonical="+url;
+      case PhinVads:  return "??phinvads??";
+      case Vsac: return url.replace("http://cts.nlm.nih.gov/fhir/ValueSet/", "https://vsac.nlm.nih.gov/valueset/")+"/expansion";
+      }
     }
     if (url.matches(Constants.URI_REGEX)) {
       int cc = 0;
@@ -326,6 +335,9 @@ public class SpecMapManager {
   }
 
   public boolean hasImage(String tgt) {
+    if (tgt == null) {
+      return false;
+    }
     if (tgt.startsWith(base+"/"))
       tgt = tgt.substring(base.length()+1);
     else if (tgt.startsWith(base))
@@ -360,9 +372,15 @@ public class SpecMapManager {
     return res;
   }
 
-  public static SpecMapManager createForSimplifier(NpmPackage pi) {
+  public static SpecMapManager createSpecialPackage(NpmPackage pi) {
     SpecMapManager res = new SpecMapManager(pi.name(), pi.fhirVersion(), ToolsVersion.TOOLS_VERSION_STR, null, null, pi.url());
-    res.fromSimplifier = true;
+    if (pi.name().equals("us.cdc.phinvads")) {
+      res.special = SpecialPackageType.PhinVads;
+    } else if (pi.name().equals("us.nlm.vsac")) {
+      res.special = SpecialPackageType.Vsac;
+    } else {
+      res.special = SpecialPackageType.Simplifier;  
+    }
     res.pi = pi;
     return res;
   }

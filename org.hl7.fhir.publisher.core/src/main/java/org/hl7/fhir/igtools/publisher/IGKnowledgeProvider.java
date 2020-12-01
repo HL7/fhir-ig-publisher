@@ -616,6 +616,10 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
             br.url = vs.getUserString("path");
             br.display = vs.getName(); 
           }
+        } else if (ref.startsWith("http://cts.nlm.nih.gov/fhir/ValueSet/")) {          
+          String oid = ref.substring("http://cts.nlm.nih.gov/fhir/ValueSet/".length());
+          br.url = "https://vsac.nlm.nih.gov/valueset/"+oid+"/expansion";  
+          br.display = "VSAC "+oid;
         } else if (Utilities.isAbsoluteUrl(ref) && (!ref.startsWith("http://hl7.org") || !ref.startsWith("http://terminology.hl7.org"))) {
           br.url = ref;  
           br.display = ref;
