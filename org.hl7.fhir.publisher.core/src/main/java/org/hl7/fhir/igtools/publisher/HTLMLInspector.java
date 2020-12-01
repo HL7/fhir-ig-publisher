@@ -701,6 +701,9 @@ public class HTLMLInspector {
       }
     }
     if (!resolved) {
+      ;resolved = Utilities.existsInList(ref, "http://hl7.org/fhir/assets-hist/images/fhir-logo-www.png", "http://hl7.org/fhir/assets-hist/images/hl7-logo-n.png"); 
+    }
+    if (!resolved) {
       if (ref.startsWith("http://") || ref.startsWith("https://")) {
         resolved = true;
         if (specs != null) {

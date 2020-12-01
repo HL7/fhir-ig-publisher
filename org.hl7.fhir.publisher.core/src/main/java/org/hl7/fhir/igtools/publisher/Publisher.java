@@ -1432,16 +1432,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     fetcher.setRootDir(rootDir);
     fetcher.setResourceDirs(resourceDirs);
-    if (focusDir().contains(" ")) {
+    if (configFile != null && focusDir().contains(" ")) {
       throw new Error("There is a space in the folder path: \""+focusDir()+"\". Please fix your directory arrangement to remove the space and try again");
     }
-    File fsh = new File(Utilities.path(focusDir(), "fsh"));
-    if (fsh.exists() && fsh.isDirectory() && !noFSH) {
-      runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())));
-    } else {
-      File fsh2 = new File(Utilities.path(focusDir(), "input", "fsh"));
-      if (fsh2.exists() && fsh2.isDirectory() && !noFSH) {
-        runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())));   
+    if (configFile != null) {
+      File fsh = new File(Utilities.path(focusDir(), "fsh"));
+      if (fsh.exists() && fsh.isDirectory() && !noFSH) {
+        runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())));
+      } else {
+        File fsh2 = new File(Utilities.path(focusDir(), "input", "fsh"));
+        if (fsh2.exists() && fsh2.isDirectory() && !noFSH) {
+          runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())));   
+        }
       }
     }
     IniFile ini = checkNewIg();
@@ -2772,7 +2774,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     String webref = pi.getWebLocation();
     webref = PackageHacker.fixPackageUrl(webref);
 
-    SpecMapManager igm = pi.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion()) : SpecMapManager.createForSimplifier(pi);
+    SpecMapManager igm = pi.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion()) : SpecMapManager.createSpecialPackage(pi);
     igm.setName(name);
     igm.setBase(canonical);
     igm.setBase2(PackageHacker.fixPackageUrl(pi.url()));
@@ -2829,7 +2831,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           logDebugMessage(LogCategory.CONTEXT, "Unable to find package dependency "+dep+". Will proceed, but likely to be be errors in qz.html etc");
         } else {
           logDebugMessage(LogCategory.PROGRESS, "Load package dependency "+dep);
-          loadFromPackage(dpi.title(), dpi.canonical(), dpi, dpi.url(), new SpecMapManager(TextFile.streamToBytes(dpi.load("other", "spec.internals")), dpi.fhirVersion()));          
+          SpecMapManager smm = new SpecMapManager(TextFile.streamToBytes(dpi.load("other", "spec.internals")), dpi.fhirVersion());
+          smm.setName(dpi.name());
+          smm.setBase(dpi.canonical());
+          smm.setBase2(PackageHacker.fixPackageUrl(dpi.url()));
+          specMaps.add(smm);
+          loadFromPackage(dpi.title(), dpi.canonical(), dpi, dpi.url(), smm);          
         }
       }
     }
