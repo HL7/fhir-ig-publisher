@@ -2826,18 +2826,26 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   public void loadFromPackage(String name, String canonical, NpmPackage pi, String webref, SpecMapManager igm) throws IOException {
     for (String dep : pi.dependencies()) {
-      if (!context.hasPackage(dep)) {
-        NpmPackage dpi = pcm.loadPackage(dep);
-        if (dpi == null) {
-          logDebugMessage(LogCategory.CONTEXT, "Unable to find package dependency "+dep+". Will proceed, but likely to be be errors in qz.html etc");
+      if (!context.hasPackage(dep)) {        
+        String coreVersion = VersionUtilities.getVersionForPackage(dep);
+        if (coreVersion != null) {
+          log("Ignore Core Dependency on FHIR version "+coreVersion+", from package '"+pi.name()+"#"+pi.version()+"'");
         } else {
-          logDebugMessage(LogCategory.PROGRESS, "Load package dependency "+dep);
-          SpecMapManager smm = dpi.hasFile("other", "spec.internals") ?  new SpecMapManager(TextFile.streamToBytes(dpi.load("other", "spec.internals")), dpi.fhirVersion()) : SpecMapManager.createSpecialPackage(dpi);
-          smm.setName(dpi.name());
-          smm.setBase(dpi.canonical());
-          smm.setBase2(PackageHacker.fixPackageUrl(dpi.url()));
-          specMaps.add(smm);
-          loadFromPackage(dpi.title(), dpi.canonical(), dpi, dpi.url(), smm);          
+          NpmPackage dpi = pcm.loadPackage(dep);
+          if (dpi == null) {
+            logDebugMessage(LogCategory.CONTEXT, "Unable to find package dependency "+dep+". Will proceed, but likely to be be errors in qz.html etc");
+          } else {
+            if (!VersionUtilities.versionsCompatible(version, pi.fhirVersion())) {
+              log("Version mismatch. This IG is for FHIR version "+version+", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion()+" (will ignore that and try to run anyway)");
+            }
+            logDebugMessage(LogCategory.PROGRESS, "Load package dependency "+dep);
+            SpecMapManager smm = dpi.hasFile("other", "spec.internals") ?  new SpecMapManager(TextFile.streamToBytes(dpi.load("other", "spec.internals")), dpi.fhirVersion()) : SpecMapManager.createSpecialPackage(dpi);
+            smm.setName(dpi.name());
+            smm.setBase(dpi.canonical());
+            smm.setBase2(PackageHacker.fixPackageUrl(dpi.url()));
+            specMaps.add(smm);
+            loadFromPackage(dpi.title(), dpi.canonical(), dpi, dpi.url(), smm);          
+          }
         }
       }
     }
@@ -2897,7 +2905,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     igm.setBase(canonical);
     specMaps.add(igm);
     if (!VersionUtilities.versionsCompatible(version, igm.getVersion())) {
-      log("Version mismatch. This IG is for FHIR version "+version+", while the IG '"+name+"' is for FHIR version "+igm.getVersion()+" (will try to run anyway)");
+      log("Version mismatch. This IG is for FHIR version "+version+", while the IG '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+igm.getVersion()+" (will try to run anyway)");
     }
     
     loadFromPackage(name, canonical, pi, webref, igm);
