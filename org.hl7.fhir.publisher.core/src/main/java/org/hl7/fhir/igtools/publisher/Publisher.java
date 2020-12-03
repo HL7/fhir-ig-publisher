@@ -228,6 +228,7 @@ import org.hl7.fhir.r5.utils.ResourceSorters;
 import org.hl7.fhir.r5.utils.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.StructureMapUtilities.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
+import org.hl7.fhir.r5.utils.XVerExtensionManager;
 import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
 import org.hl7.fhir.utilities.CSFile;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
@@ -506,15 +507,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private static final long JEKYLL_TIMEOUT = 60000 * 5; // 5 minutes.... 
   private static final long FSH_TIMEOUT = 60000 * 1; // 1 minutes.... 
-
+  public static String txServerProd = "http://tx.fhir.org";
+  public static String txServerDev = "http://local.fhir.org:960";
   private static final int PRISM_SIZE_LIMIT = 16384;
 
   private String configFile;
   private String sourceDir;
   private String destDir;
   private FHIRToolingClient webTxServer;
-  private static String txServer = "http://tx.fhir.org";
-//  private static String txServer = "http://local.fhir.org:960";
+  private String txServer;
   private String igPack = "";
   private boolean watch;
   private boolean debug;
@@ -524,7 +525,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private boolean newIg = false;
 
   private Publisher childPublisher = null;
-  private String childOutput = "";
   private GenerationTool tool;
   private boolean genExampleNarratives = true;
 
@@ -546,6 +546,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private InstanceValidator validator;
   private ProfileValidator pvalidator;
   private CodeSystemValidator csvalidator;
+  private XVerExtensionManager xverManager;
   private IGKnowledgeProvider igpkp;
   private List<SpecMapManager> specMaps = new ArrayList<SpecMapManager>();
   private boolean firstExecution;
@@ -1898,7 +1899,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     generateLoadedSnapshots();
     
     // set up validator;
-    validator = new InstanceValidator(context, new IGPublisherHostServices()); // todo: host services for reference resolution....
+    validator = new InstanceValidator(context, new IGPublisherHostServices(), context.getXVer()); // todo: host services for reference resolution....
     validator.setAllowXsiLocation(true);
     validator.setNoBindingMsgSuppressed(true);
     validator.setNoExtensibleWarnings(true);
@@ -1908,8 +1909,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.setCrumbTrails(true);
     validator.setWantCheckSnapshotUnchanged(true);
     
-    pvalidator = new ProfileValidator(context);
-    csvalidator = new CodeSystemValidator(context);
+    pvalidator = new ProfileValidator(context, context.getXVer());
+    csvalidator = new CodeSystemValidator(context, context.getXVer());
     pvalidator.setCheckAggregation(checkAggregation);
     pvalidator.setCheckMustSupport(hintAboutNonMustSupport);
     validator.setShowMessagesFromReferences(showReferenceMessages);
@@ -2310,7 +2311,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     
     // ;
-    validator = new InstanceValidator(context, new IGPublisherHostServices()); // todo: host services for reference resolution....
+    validator = new InstanceValidator(context, new IGPublisherHostServices(), context.getXVer()); // todo: host services for reference resolution....
     validator.setAllowXsiLocation(true);
     validator.setNoBindingMsgSuppressed(true);
     validator.setNoExtensibleWarnings(true);
@@ -2320,8 +2321,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.setCrumbTrails(true);
     validator.setWantCheckSnapshotUnchanged(true);
     
-    pvalidator = new ProfileValidator(context);
-    csvalidator = new CodeSystemValidator(context);
+    pvalidator = new ProfileValidator(context, context.getXVer());
+    csvalidator = new CodeSystemValidator(context, context.getXVer());
     if (configuration.has("check-aggregation") && configuration.get("check-aggregation").getAsBoolean())
       pvalidator.setCheckAggregation(true);
     if (configuration.has("check-mustSupport") && configuration.get("check-mustSupport").getAsBoolean())
@@ -2831,7 +2832,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           logDebugMessage(LogCategory.CONTEXT, "Unable to find package dependency "+dep+". Will proceed, but likely to be be errors in qz.html etc");
         } else {
           logDebugMessage(LogCategory.PROGRESS, "Load package dependency "+dep);
-          SpecMapManager smm = new SpecMapManager(TextFile.streamToBytes(dpi.load("other", "spec.internals")), dpi.fhirVersion());
+          SpecMapManager smm = dpi.hasFile("other", "spec.internals") ?  new SpecMapManager(TextFile.streamToBytes(dpi.load("other", "spec.internals")), dpi.fhirVersion()) : SpecMapManager.createSpecialPackage(dpi);
           smm.setName(dpi.name());
           smm.setBase(dpi.canonical());
           smm.setBase2(PackageHacker.fixPackageUrl(dpi.url()));
@@ -4509,7 +4510,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     ProfileUtilities utils = new ProfileUtilities(context, f.getErrors(), igpkp);
     StructureDefinition base = sd.hasBaseDefinition() ? fetchSnapshotted(sd.getBaseDefinition()) : null;
     utils.setIds(sd, true);
-
+    utils.setXver(context.getXVer());
     if (base == null) {
       throw new Exception("Cannot find or generate snapshot for base definition ("+sd.getBaseDefinition()+" from "+sd.getUrl()+")");
     }
@@ -8078,7 +8079,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     b.append("\r\n");
   }
   
-  public static String buildReport(String ig, String source, String log, String qafile) throws Exception {
+  public static String buildReport(String ig, String source, String log, String qafile, String tx) throws Exception {
     StringBuilder b = new StringBuilder();
     b.append("= Log =\r\n");
     b.append(log);
@@ -8089,7 +8090,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     prop(b, "current.dir:", getCurentDirectory());
     prop(b, "source", source);
     prop(b, "user.dir", System.getProperty("user.home"));
-    prop(b, "tx.server", txServer);
+    prop(b, "tx.server", tx);
     prop(b, "tx.cache", Utilities.path(System.getProperty("user.home"), "fhircache"));
     prop(b, "system.type", System.getProperty("sun.arch.data.model"));
     prop(b, "system.cores", Integer.toString(Runtime.getRuntime().availableProcessors()));   
@@ -8245,7 +8246,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           System.out.println("Publish IG "+ig);
           Publisher self = new Publisher();
           self.setConfigFile(determineActualIG(ig, null));
-          self.setTxServer(getNamedParam(args, "-tx"));
+          setTxServerValue(args, self);
           if (hasNamedParam(args, "-resetTx")) {
             self.setCacheOption(CacheOption.CLEAR_ALL);
           } else if (hasNamedParam(args, "-resetTxErrors")) {
@@ -8263,7 +8264,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             e.printStackTrace();
             break;
           }
-          TextFile.stringToFile(buildReport(ig, null, self.filelog.toString(), Utilities.path(self.qaDir, "validation.txt")), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher-"+Integer.toString(i)+".log"), false);
+          TextFile.stringToFile(buildReport(ig, null, self.filelog.toString(), Utilities.path(self.qaDir, "validation.txt"), self.txServer), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher-"+Integer.toString(i)+".log"), false);
           System.out.println("=======================================================================================");
           System.out.println("");
           System.out.println("");
@@ -8294,6 +8295,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         self.apiKeyFile = new IniFile(new File(getNamedParam(args, "-api-key-file")).getAbsolutePath());
       }
 
+      setTxServerValue(args, self);
       if (hasNamedParam(args, "-source")) {
         // run with standard template. this is publishing lite
         self.setSourceDir(getNamedParam(args, "-source"));
@@ -8425,12 +8427,22 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         exitCode = 1;
       } finally {
         if (self.mode == IGBuildMode.MANUAL) {
-          TextFile.stringToFile(buildReport(getNamedParam(args, "-ig"), getNamedParam(args, "-source"), self.filelog.toString(), Utilities.path(self.qaDir, "validation.txt")), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher.log"), false);
+          TextFile.stringToFile(buildReport(getNamedParam(args, "-ig"), getNamedParam(args, "-source"), self.filelog.toString(), Utilities.path(self.qaDir, "validation.txt"), self.txServer), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher.log"), false);
         }
       }
     }
     if (!hasNamedParam(args, "-no-exit")) {
       System.exit(exitCode);
+    }
+  }
+
+  public static void setTxServerValue(String[] args, Publisher self) {
+    if (hasNamedParam(args, "-tx")) {
+      self.setTxServer(getNamedParam(args, "-tx"));
+    } else if (hasNamedParam(args, "-devtx")) {
+      self.setTxServer(txServerDev);
+    } else {
+      self.setTxServer(txServerProd);
     }
   }
 
@@ -8743,6 +8755,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     Publisher self = new Publisher();
     self.setConfigFile(Publisher.determineActualIG(path, IGBuildMode.PUBLICATION));
     self.execute();
+    self.setTxServer(txServerProd);
     if (self.countErrs(self.errors) > 0) {
       throw new Exception("Building IG '"+path+"' caused an error");
     }
