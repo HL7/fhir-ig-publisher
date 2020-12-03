@@ -435,7 +435,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       " <tr><td colspan=2><b>Quality Checks</b></td></tr>\r\n"+
       " <tr><td>Publisher Version:</td><td>$versionCheck$</td></tr>\r\n"+
       " <tr><td>Publication Code:</td><td>$igcode$<span style=\"color: maroon; font-weight: bold\"> $igcodeerror$</span>. PackageId = $packageId$, Canonical = $canonical$</td></tr>\r\n"+
-      " <tr><td>Realm Check:</td><td>$realm$ <span style=\"color: maroon; font-weight: bold\">$igrealmerror$</span> : $realmCheck$</td></tr>\r\n"+
+      " <tr><td>Realm Check for $realm$:</td><td><span style=\"color: maroon; font-weight: bold\">$igrealmerror$</span>$realmCheck$</td></tr>\r\n"+
       " <tr><td>Version Check:</td><td>$versionRulesCheck$</td></tr>\r\n"+
       " <tr><td>Supressed Messages:</td><td>$suppressedmsgssummary$</td></tr>\r\n"+
       " <tr><td>Dependency Checks:</td><td>$dependencyCheck$</td></tr>\r\n"+

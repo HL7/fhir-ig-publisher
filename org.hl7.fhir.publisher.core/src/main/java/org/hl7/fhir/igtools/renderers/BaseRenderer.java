@@ -93,11 +93,13 @@ public class BaseRenderer extends TranslatingUtilities {
 	        String[] paths = parts[0].split("\\.");
 	        StructureDefinition p = new ProfileUtilities(context, null, null).getProfile(null, paths[0]);
 	        if (p != null) {
-	          String suffix = (paths.length > 1) ? "-definitions.html#"+parts[0] : ".html";
-	          if (p.getUserData("filename") == null)
-	            url = paths[0].toLowerCase()+suffix;
+	          if (p.getUserData("path") == null)
+	            url = paths[0].toLowerCase();
 	          else
-	            url = p.getUserData("filename")+suffix;
+	            url = p.getUserString("path");
+	          if (paths.length > 1) {
+	            url = url.replace(".html", "-definitions.html#"+parts[0]);
+	          }
 	        } else {
 	          throw new Exception("Unresolved logical URL '"+linkText+"' in markdown");
 	        }

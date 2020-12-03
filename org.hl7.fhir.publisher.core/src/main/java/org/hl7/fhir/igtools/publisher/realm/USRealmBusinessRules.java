@@ -22,6 +22,8 @@ import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.PackageVersion;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.ImplementationGuide;
+import org.hl7.fhir.r5.model.Parameters;
+import org.hl7.fhir.r5.model.Parameters.ParametersParameterComponent;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
@@ -61,6 +63,8 @@ public class USRealmBusinessRules extends RealmBusinessRules {
       return uscore;
     }
   }
+
+  private static final Object US_SNOMED = "http://snomed.info/sct/731000124108";
 
   List<StructureDefinition> usCoreProfiles;
   private IWorkerContext context;
@@ -226,13 +230,34 @@ public class USRealmBusinessRules extends RealmBusinessRules {
 
   @Override
   public String checkHtml() {
-    if (problems == null || problems.isEmpty()) {
-      return "All OK";
+    String sct;
+    if (!context.getCodeSystemsUsed().contains("http://snomed.info/sct")) {
+      sct = "<p>Snomed: The IG doesn't use SNOMED CT</p>";      
     } else {
-      return "<a href=\"us-core-comparisons/index.html\">"+Integer.toString(problems.size())+" Profiles not based on US Core</a>";      
+      String sctVer = getSnomedVersion(context.getExpansionParameters());
+      if (US_SNOMED.equals(sctVer)) {
+        sct = "<p>Snomed: The IG specifies the US edition of SNOMED CT <b>&#10003;</b> </p>";
+      } else {
+        sct = "<p>Snomed: <span style=\"background-color: #ffcccc\">The IG does not specify the US edition of SNOMED CT version in the parameters (<code>"+US_SNOMED+"</code>)</span></p>";
+      }
+    }
+    if (problems == null || problems.isEmpty()) {
+      return sct+"<p>Profiles: All OK</p>";
+    } else {
+      return sct+"<p><a href=\"us-core-comparisons/index.html\">"+Integer.toString(problems.size())+" Profiles not based on US Core</a></p>";      
     }
   }
  
+
+  private String getSnomedVersion(Parameters params) {
+    for (ParametersParameterComponent p : params.getParameter()) {
+      if ("system-version".equals(p.getName()) && p.hasPrimitiveValue() && p.primitiveValue().startsWith("http://snomed.info/sct/")) {
+        return p.primitiveValue();
+      }
+    }
+    return null;
+  }
+
 
   @Override
   public String checkText() {
