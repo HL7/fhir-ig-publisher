@@ -102,11 +102,12 @@
             <artifactId>validation-api</artifactId>
             <version>1.1.0.Final</version>
         </dependency>
-        <dependency>
-            <groupId>org.eclipse.jgit</groupId>
-            <artifactId>org.eclipse.jgit</artifactId>
-            <version>5.9.0.202009080501-r</version>
-        </dependency>
+<!--   TODO, figure out why this causes issues     -->
+<!--        <dependency>-->
+<!--            <groupId>org.eclipse.jgit</groupId>-->
+<!--            <artifactId>org.eclipse.jgit</artifactId>-->
+<!--            <version>5.9.0.202009080501-r</version>-->
+<!--        </dependency>-->
     </dependencies>
 
     <build>

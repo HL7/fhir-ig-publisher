@@ -1,0 +1,1 @@
+* Hotfix to get publisher building again
