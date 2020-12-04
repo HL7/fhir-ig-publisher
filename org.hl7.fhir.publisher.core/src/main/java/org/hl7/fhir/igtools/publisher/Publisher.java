@@ -76,6 +76,11 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.SystemUtils;
+import org.eclipse.jgit.api.CloneCommand;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.InvalidRemoteException;
+import org.eclipse.jgit.api.errors.TransportException;
 import org.hl7.fhir.convertors.VersionConvertorAdvisor50;
 import org.hl7.fhir.convertors.VersionConvertor_10_50;
 import org.hl7.fhir.convertors.VersionConvertor_14_30;
@@ -8310,7 +8315,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         self.setDestDir(getNamedParam(args, "-destination"));
         self.specifiedVersion = getNamedParam(args, "-version");
       } else if(!hasNamedParam(args, "-ig") && args.length == 1 && new File(args[0]).exists()) {
-        self.setConfigFile(args[0]);
+        self.setConfigFile(determineActualIG(args[0], IGBuildMode.MANUAL));
       } else if (hasNamedParam(args, "-prompt")) {
         IniFile ini = new IniFile("publisher.ini");
         String last = ini.getStringProperty("execute", "path");
@@ -8344,9 +8349,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         ini.setStringProperty("execute", "path", last, null);
         ini.save();
         if (new File(last).isDirectory()) {
-          self.setConfigFile(Utilities.path(last, "ig.json"));
+          self.setConfigFile(determineActualIG(Utilities.path(last, "ig.json"), IGBuildMode.MANUAL));
         } else {
-          self.setConfigFile(last);
+          self.setConfigFile(determineActualIG(last, IGBuildMode.MANUAL));
         }
       } else if (hasNamedParam(args, "-simplifier")) {
         if (!hasNamedParam(args, "-destination")) {
@@ -8540,6 +8545,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   public static String determineActualIG(String ig, IGBuildMode mode) throws Exception {
+    if (ig.startsWith("http://") || ig.startsWith("https://")) {
+      ig = convertUrlToLocalIg(ig);
+    }
     File f = new File(ig);
     if (!f.exists() && mode == IGBuildMode.AUTOBUILD) {
       String s = Utilities.getDirectoryForFile(ig);
@@ -8555,6 +8563,77 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
+
+  private static String convertUrlToLocalIg(String ig) throws IOException, InvalidRemoteException, TransportException, GitAPIException {
+    String org = null;
+    String repo = null;
+    String branch = null;
+    String[] p = ig.split("\\/");
+    if (p.length > 5 && (ig.startsWith("https://build.fhir.org/ig") || ig.startsWith("http://build.fhir.org/ig"))) {
+      org = p[4];
+      repo = p[5]; 
+      if (p.length >= 8) {
+        if (!"branches".equals(p[6])) {
+          throw new Error("Unable to understand IG location "+ig);
+        } else {
+          branch = p[7];
+        }
+      }  
+    } if (p.length > 4 && (ig.startsWith("https://github.com/") || ig.startsWith("http://github.com/"))) {
+      org = p[3];
+      repo = p[4];
+      if (p.length > 6) {
+        if (!"tree".equals(p[5])) {
+          throw new Error("Unable to understand IG location "+ig);
+        } else {
+          branch = p[6];
+        }
+      }
+    } 
+    if (org == null || repo == null) {
+      throw new Error("Unable to understand IG location "+ig);
+    }
+    String folder = Utilities.path("[tmp]", "fhir-igs", makeFileName(org), makeFileName(repo), branch == null ? "master" : makeFileName(branch));
+    File f = new File(folder);
+    if (f.exists() && !f.isDirectory()) {
+      f.delete();
+    }
+    if (!f.exists()) {
+      Utilities.createDirectory(folder);
+    }
+    try {
+      gitClone(org, repo, branch, folder);
+    } catch (Exception e) {
+      System.out.println("Git clone failed: "+e.getMessage());
+      System.out.println("Clear Directory and try again");
+      Utilities.clearDirectory(folder);
+      gitClone(org, repo, branch, folder);
+    }
+    return folder;
+  }
+
+  private static void gitClone(String org, String repo, String branch, String folder) throws InvalidRemoteException, TransportException, GitAPIException {
+    System.out.println("Git clone : https://github.com/"+org+"/"+repo+(branch == null ? "" : "/tree/"+branch)+" to "+folder);    
+    CloneCommand git = Git.cloneRepository().setURI("https://github.com/"+org+"/"+repo).setDirectory(new File(folder));
+    if (branch != null) {
+      git = git.setBranch(branch);
+    }
+    git.call();
+  }
+
+  private static String makeFileName(String org) {
+    StringBuilder b = new StringBuilder();
+    for (char ch : org.toCharArray()) {
+      if (isValidFileNameChar(ch)) {
+        b.append(ch);
+      }
+    }
+    return b.toString();
+  }
+
+  private static boolean isValidFileNameChar(char ch) {
+    return Character.isDigit(ch) || Character.isAlphabetic(ch) || ch == '.' || ch == '-' || ch == '_' || ch == '#'  || ch == '$';
+  }
 
   private String getToolingVersion() {
     InputStream vis = Publisher.class.getResourceAsStream("/version.info");

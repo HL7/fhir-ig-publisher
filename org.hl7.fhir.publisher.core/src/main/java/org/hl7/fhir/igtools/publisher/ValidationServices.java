@@ -172,7 +172,7 @@ public class ValidationServices implements IValidatorResourceFetcher {
 
 
   @Override
-  public boolean resolveURL(Object appContext, String path, String url) throws IOException {
+  public boolean resolveURL(Object appContext, String path, String url, String type) throws IOException {
     if (otherUrls.contains(url))
       return true;
 
