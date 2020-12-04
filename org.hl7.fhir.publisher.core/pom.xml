@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.hl7.fhir.publisher</groupId>
         <artifactId>org.hl7.fhir.publisher</artifactId>
-        <version>1.1.46-SNAPSHOT</version>
+        <version>1.1.49-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -102,11 +102,12 @@
             <artifactId>validation-api</artifactId>
             <version>1.1.0.Final</version>
         </dependency>
-        <dependency>
-            <groupId>org.eclipse.jgit</groupId>
-            <artifactId>org.eclipse.jgit</artifactId>
-            <version>5.9.0.202009080501-r</version>
-        </dependency>
+<!--   TODO, figure out why this causes issues     -->
+<!--        <dependency>-->
+<!--            <groupId>org.eclipse.jgit</groupId>-->
+<!--            <artifactId>org.eclipse.jgit</artifactId>-->
+<!--            <version>5.9.0.202009080501-r</version>-->
+<!--        </dependency>-->
     </dependencies>
 
     <build>
