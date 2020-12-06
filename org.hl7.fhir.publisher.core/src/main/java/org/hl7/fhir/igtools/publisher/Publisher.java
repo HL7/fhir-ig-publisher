@@ -76,11 +76,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.SystemUtils;
-import org.eclipse.jgit.api.CloneCommand;
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.InvalidRemoteException;
-import org.eclipse.jgit.api.errors.TransportException;
 import org.hl7.fhir.convertors.VersionConvertorAdvisor50;
 import org.hl7.fhir.convertors.VersionConvertor_10_50;
 import org.hl7.fhir.convertors.VersionConvertor_14_30;
@@ -8564,7 +8559,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
 
-  private static String convertUrlToLocalIg(String ig) throws IOException, InvalidRemoteException, TransportException, GitAPIException {
+  private static String convertUrlToLocalIg(String ig) throws IOException {
     String org = null;
     String repo = null;
     String branch = null;
@@ -8601,25 +8596,26 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (!f.exists()) {
       Utilities.createDirectory(folder);
     }
-    try {
-      gitClone(org, repo, branch, folder);
-    } catch (Exception e) {
-      System.out.println("Git clone failed: "+e.getMessage());
-      System.out.println("Clear Directory and try again");
-      Utilities.clearDirectory(folder);
-      gitClone(org, repo, branch, folder);
-    }
-    return folder;
+    throw new Error("Not supported right now");
+//    try {
+////      gitClone(org, repo, branch, folder);
+//    } catch (Exception e) {
+//      System.out.println("Git clone failed: "+e.getMessage());
+//      System.out.println("Clear Directory and try again");
+//      Utilities.clearDirectory(folder);
+////      gitClone(org, repo, branch, folder);
+//    }
+//    return folder;
   }
 
-  private static void gitClone(String org, String repo, String branch, String folder) throws InvalidRemoteException, TransportException, GitAPIException {
-    System.out.println("Git clone : https://github.com/"+org+"/"+repo+(branch == null ? "" : "/tree/"+branch)+" to "+folder);    
-    CloneCommand git = Git.cloneRepository().setURI("https://github.com/"+org+"/"+repo).setDirectory(new File(folder));
-    if (branch != null) {
-      git = git.setBranch(branch);
-    }
-    git.call();
-  }
+//  private static void gitClone(String org, String repo, String branch, String folder) throws InvalidRemoteException, TransportException, GitAPIException {
+//    System.out.println("Git clone : https://github.com/"+org+"/"+repo+(branch == null ? "" : "/tree/"+branch)+" to "+folder);    
+//    CloneCommand git = Git.cloneRepository().setURI("https://github.com/"+org+"/"+repo).setDirectory(new File(folder));
+//    if (branch != null) {
+//      git = git.setBranch(branch);
+//    }
+//    git.call();
+//  }
 
   private static String makeFileName(String org) {
     StringBuilder b = new StringBuilder();
