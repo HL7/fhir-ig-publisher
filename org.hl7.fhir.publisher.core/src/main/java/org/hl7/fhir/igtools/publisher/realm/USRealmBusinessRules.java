@@ -251,8 +251,8 @@ public class USRealmBusinessRules extends RealmBusinessRules {
 
   private String getSnomedVersion(Parameters params) {
     for (ParametersParameterComponent p : params.getParameter()) {
-      if ("system-version".equals(p.getName()) && p.hasPrimitiveValue() && p.primitiveValue().startsWith("http://snomed.info/sct/")) {
-        return p.primitiveValue();
+      if ("system-version".equals(p.getName()) && p.hasValue() && p.getValue().hasPrimitiveValue() && p.getValue().primitiveValue().startsWith("http://snomed.info/sct|")) {
+        return p.getValue().primitiveValue().substring("http://snomed.info/sct|".length());
       }
     }
     return null;
