@@ -98,6 +98,7 @@ import org.hl7.fhir.igtools.publisher.utils.IGRegistryMaintainer;
 import org.hl7.fhir.igtools.publisher.utils.IGReleaseVersionDeleter;
 import org.hl7.fhir.igtools.publisher.utils.IGWebSiteMaintainer;
 import org.hl7.fhir.igtools.publisher.utils.PublicationProcess;
+import org.hl7.fhir.igtools.publisher.utils.PublisherConsoleLogger;
 import org.hl7.fhir.igtools.renderers.CanonicalRenderer;
 import org.hl7.fhir.igtools.renderers.CodeSystemRenderer;
 import org.hl7.fhir.igtools.renderers.CrossViewRenderer;
@@ -225,8 +226,8 @@ import org.hl7.fhir.r5.utils.MappingSheetParser;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator.Category;
 import org.hl7.fhir.r5.utils.ResourceSorters;
-import org.hl7.fhir.r5.utils.StructureMapUtilities;
-import org.hl7.fhir.r5.utils.StructureMapUtilities.StructureMapAnalysis;
+import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
+import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.XVerExtensionManager;
 import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
@@ -511,6 +512,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   public static String txServerDev = "http://local.fhir.org:960";
   private static final int PRISM_SIZE_LIMIT = 16384;
 
+  private String consoleLog;
   private String configFile;
   private String sourceDir;
   private String destDir;
@@ -718,6 +720,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return relativePath;
     }
   }
+
   public void execute() throws Exception {
     tt = new TimeTracker();
     initialize();
@@ -814,7 +817,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     zip.close();
     Utilities.copyFile(Utilities.path(tempDir, "full-ig.zip"), Utilities.path(outputDir, "full-ig.zip"));
 
-    // registeringg the package locally
+    // registering the package locally
     log("Finished. "+Utilities.presentDuration(endTime - startTime)+". Output in "+outputDir);
   }
 
@@ -1168,10 +1171,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void checkExistingNarrative(FetchedFile f, FetchedResource r, XhtmlNode xhtml) {
-    boolean hasGenNarrative = scanForGeneratedNarrative(xhtml);
-    if (hasGenNarrative) {
-      f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, r.fhirType()+".text.div", "Resource has provided narrative, but the narrative indicates that it is generated - remove the narrative or fix it up", IssueSeverity.ERROR));
-    }    
+    if (xhtml != null) {
+      boolean hasGenNarrative = scanForGeneratedNarrative(xhtml);
+      if (hasGenNarrative) {
+        f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, r.fhirType()+".text.div", "Resource has provided narrative, but the narrative indicates that it is generated - remove the narrative or fix it up", IssueSeverity.ERROR));
+      }
+    }
   }
 
   private boolean scanForGeneratedNarrative(XhtmlNode x) {
@@ -1422,7 +1427,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (apiKeyFile == null) {
       apiKeyFile = new IniFile(Utilities.path(System.getProperty("user.home"), "apikeys.ini"));
     }
-    System.out.println("API keys loaded from "+apiKeyFile.getFileName());
+    log("API keys loaded from "+apiKeyFile.getFileName());
     templateManager = new TemplateManager(pcm, logger, gh());
     templateProvider = new IGPublisherLiquidTemplateServices();
     extensionTracker = new ExtensionTracker();
@@ -8057,21 +8062,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (firstExecution)
       System.out.println(Utilities.padRight(msg, ' ', 80)+" ("+tt.clock()+")");
     else
-      System.out.println(msg);
-    
-    if (mode == IGBuildMode.MANUAL || mode == null) {
-      try {
-        String logPath = Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher-tmp.log");
-        if (filelog==null) {
-          filelog = new StringBuilder();
-          System.out.println("File log: " + logPath);
-        }
-        filelog.append(msg+"\r\n");
-        TextFile.stringToFile(filelog.toString(), logPath, false);
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
-    }
+      System.out.println(msg);    
   }
 
   @Override
@@ -8133,12 +8124,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else if (hasNamedParam(args, "-package")) {
       System.out.println("FHIR IG Publisher "+IGVersionUtil.getVersionString());
       System.out.println("Detected Java version: " + System.getProperty("java.version")+" from "+System.getProperty("java.home")+" on "+System.getProperty("os.arch")+" ("+System.getProperty("sun.arch.data.model")+"bit). "+toMB(Runtime.getRuntime().maxMemory())+"MB available");
+      System.out.println("dir = "+System.getProperty("user.dir")+", path = "+System.getenv("PATH"));
       String s = "Parameters:";
       for (int i = 0; i < args.length; i++) {
           s = s + " "+args[i];
       }      
       System.out.println(s);
-      System.out.println("dir = "+System.getProperty("user.dir")+", path = "+System.getenv("PATH"));
       FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager(!hasNamedParam(args, "system"), ToolsVersion.TOOLS_VERSION);
       System.out.println("Cache = "+pcm.getFolder());
       for (String p : getNamedParam(args, "-package").split("\\;")) {
@@ -8281,20 +8272,28 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     } else {
       Publisher self = new Publisher();
+      String consoleLog = getNamedParam(args, "log");
+      if (consoleLog == null) {     
+        consoleLog =  Utilities.path("[tmp]", "fhir-ig-publisher-tmp.log");
+      }
+      PublisherConsoleLogger logger = new PublisherConsoleLogger();
+      if (!hasNamedParam(args, "-auto-ig-build") && !hasNamedParam(args, "-publish-process")) {
+        logger.start(consoleLog);
+      }
+        
       self.logMessage("FHIR IG Publisher "+IGVersionUtil.getVersionString());
-      self.logMessage("Detected Java version: " + System.getProperty("java.version")+" from "+System.getProperty("java.home")+" on "+System.getProperty("os.arch")+" ("+System.getProperty("sun.arch.data.model")+"bit). "+toMB(Runtime.getRuntime().maxMemory())+"MB available");
+      self.logMessage("Detected Java version: " + System.getProperty("java.version")+" from "+System.getProperty("java.home")+" on "+System.getProperty("os.name")+"/"+System.getProperty("os.arch")+" ("+System.getProperty("sun.arch.data.model")+"bit). "+toMB(Runtime.getRuntime().maxMemory())+"MB available");
       if (!"64".equals(System.getProperty("sun.arch.data.model"))) {
         self.logMessage("Attention: you should upgrade your Java to a 64bit version in order to be able to run this program without running out of memory");        
       }
+      self.logMessage("dir = "+System.getProperty("user.dir")+", path = "+System.getenv("PATH"));
       String s = "Parameters:";
       for (int i = 0; i < args.length; i++) {
           s = s + " "+args[i];
       }      
       self.logMessage(s);
+      self.logMessage("Start Clock @ "+nowAsString(self.execTime)+" ("+nowAsDate(self.execTime)+")");
       self.logMessage("");
-      self.logMessage("dir = "+System.getProperty("user.dir")+", path = "+System.getenv("PATH"));
-      self.logMessage("");
-      self.logMessage("Run time = "+nowAsString(self.execTime)+" ("+nowAsDate(self.execTime)+")");
       if (hasNamedParam(args, "-auto-ig-build")) {
         self.setMode(IGBuildMode.AUTOBUILD);
         self.targetOutput = getNamedParam(args, "-target");
@@ -8438,6 +8437,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           TextFile.stringToFile(buildReport(getNamedParam(args, "-ig"), getNamedParam(args, "-source"), self.filelog.toString(), Utilities.path(self.qaDir, "validation.txt"), self.txServer), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher.log"), false);
         }
       }
+      logger.stop();
     }
     if (!hasNamedParam(args, "-no-exit")) {
       System.exit(exitCode);

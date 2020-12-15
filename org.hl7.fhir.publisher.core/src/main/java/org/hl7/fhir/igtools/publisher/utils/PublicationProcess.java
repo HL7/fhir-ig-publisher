@@ -53,8 +53,10 @@ public class PublicationProcess {
    * @throws Exception 
    */
   public void publish(String source, String rootFolder, boolean milestone, String registrySource, String history, String temp) throws Exception {
+    PublisherConsoleLogger logger = new PublisherConsoleLogger();
+    logger.start(Utilities.path("[tmp]", "publication-process.log"));
     try {
-      List<ValidationMessage> res = publishInner(source, rootFolder, milestone, registrySource, history, temp);
+      List<ValidationMessage> res = publishInner(source, rootFolder, milestone, registrySource, history, temp, logger);
       if (res.size() == 0) {
         System.out.println("Success");
       } else {
@@ -66,9 +68,10 @@ public class PublicationProcess {
       System.out.println("Exception publishing: "+e.getMessage());
       e.printStackTrace();
     }
+    System.out.println("Full log in "+logger.getFilename());
   }
   
-  public List<ValidationMessage> publishInner(String source, String rootFolder, boolean milestone, String registrySource, String history, String temp) throws Exception {
+  public List<ValidationMessage> publishInner(String source, String rootFolder, boolean milestone, String registrySource, String history, String temp, PublisherConsoleLogger logger) throws Exception {
     List<ValidationMessage> res = new ArrayList<>();
 
     // check the wider context
@@ -174,7 +177,7 @@ public class PublicationProcess {
     
     // well, we've run out of things to test... time to actually try...
     if (res.size() == 0) {
-      doPublish(fSource, fOutput, qa, destination, destVer, pathVer, fRoot, ini, plPub, vSrc, fRegistry, npm, milestone, fHistory, temp);
+      doPublish(fSource, fOutput, qa, destination, destVer, pathVer, fRoot, ini, plPub, vSrc, fRegistry, npm, milestone, fHistory, temp, logger);
     }        
     return res;
     
@@ -216,7 +219,7 @@ public class PublicationProcess {
     return new FileInputStream(f);
   }
 
-  private void doPublish(File fSource, File fOutput, JsonObject qa, String destination, String destVer, String pathVer, File fRoot, IniFile ini, JsonObject plPub, JsonObject vSrc, File fRegistry, NpmPackage npm, boolean milestone, File history, String tempDir) throws Exception {
+  private void doPublish(File fSource, File fOutput, JsonObject qa, String destination, String destVer, String pathVer, File fRoot, IniFile ini, JsonObject plPub, JsonObject vSrc, File fRegistry, NpmPackage npm, boolean milestone, File history, String tempDir, PublisherConsoleLogger logger) throws Exception {
     // ok. all our tests have passed.
     // 1. do the publication build(s)
     System.out.println("All checks passed. Do the publication builds");        
@@ -264,6 +267,8 @@ public class PublicationProcess {
     Publisher.main(new String[] { "-publish-update", "-folder", fRoot.getAbsolutePath(), "-registry", fRegistry.getAbsolutePath(), "-filter", destination, "-no-exit"});
 
     System.out.println("Finished Publishing");
+    logger.stop();
+    FileUtils.copyFile(new File(logger.getFilename()), new File(Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".log")));    
   }
 
   private File cloneToTemp(String tempDir, File fSource, String name) throws IOException {
