@@ -5,7 +5,7 @@
     <parent>
         <artifactId>org.hl7.fhir.publisher</artifactId>
         <groupId>org.hl7.fhir.publisher</groupId>
-        <version>1.1.52-SNAPSHOT</version>
+        <version>1.1.53-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -94,7 +94,7 @@
                     <groupId>org.sonatype.plugins</groupId>
                     <artifactId>nexus-staging-maven-plugin</artifactId>
                     <configuration>
-                        <skip>true</skip>
+                        <skipStaging>true</skipStaging>
                     </configuration>
                 </plugin>
                 <plugin>
