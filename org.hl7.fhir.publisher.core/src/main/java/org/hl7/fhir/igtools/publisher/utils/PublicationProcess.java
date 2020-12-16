@@ -150,6 +150,7 @@ public class PublicationProcess {
     JsonObject vSrc = JSONUtil.findByStringProp(plSrc.getAsJsonArray("list"), "version", version);
     JsonObject vPub = JSONUtil.findByStringProp(plPub.getAsJsonArray("list"), "version", version);
     
+    check(res, plPub.getAsJsonArray("list").size() > 0, "Dest package-list has no existent version (should have ci-build entry)");
     check(res, vSrc != null, "No Entry found in source package-list for v"+version);
     check(res, vPub == null, "Found an entry in the publication package-list for v"+version+" - it looks like it has already been published");
     check(res, vSrc.has("desc") || vSrc.has("descmd"), "Source Package list has no description for v"+version);
@@ -302,12 +303,11 @@ public class PublicationProcess {
     }
     JsonArray oldArr = plPub.getAsJsonArray("list");
     JsonArray newArr = new JsonArray();
-    for (int i = 0; i < oldArr.size(); i++) {
-      if (i == 1) {
-        newArr.add(vSrc);
-      }
+    newArr.add(oldArr.get(0)); // the ci-build entry
+    newArr.add(vSrc);
+    for (int i = 1; i < oldArr.size(); i++) {
       JsonObject v = (JsonObject) oldArr.get(i);
-      if (milestone && i > 0 && v.has("current")) {
+      if (milestone && v.has("current")) {
         v.remove("current");      
       }
       newArr.add(v);
