@@ -560,7 +560,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("igcodeerror", igCodeError);
     t.add("igrealmerror", igRealmError);
     t.add("versionRulesCheck", versionRulesCheck);
-    t.add("realm", igrealm.toUpperCase());
+    t.add("realm", igrealm == null ? "n/a" : igrealm.toUpperCase());
     t.add("dependencyCheck", dependencies);
     t.add("csAnalysis", csAnalysis);
     t.add("otherFileName", allIssues ? "Errors Only" : "Full QA Report");
@@ -591,7 +591,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("igcode", igcode);
     t.add("igcodeerror", igCodeError);
     t.add("igrealmerror", igRealmError);
-    t.add("realm", igrealm);
+    t.add("realm", igrealm == null ? "n/a" : igrealm.toUpperCase());
     t.add("dependencyCheck", dependencies);
     t.add("versionRulesCheck", versionRulesCheck);
     t.add("csAnalysis", csAnalysis);
