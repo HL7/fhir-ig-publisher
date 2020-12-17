@@ -244,6 +244,12 @@ public class PublicationProcess {
     System.out.println("");        
     System.out.println("ok. All checks passed. Publish v"+npm.version()+" to "+destVer);        
 
+    // check to see if there's a history; if there isn't, copy it in
+    if (!new File(Utilities.path(destination, "history.html")).exists()) {
+      System.out.println("Copy history from "+history.getAbsolutePath()+" to "+destination);    
+      Utilities.copyDirectory(history.getAbsolutePath(), destination, null);
+    }
+
     // 3. create the folder {root}/{realm}/{code}/{subdir}
     System.out.println("Copy the IG to "+destVer);    
     Utilities.createDirectory(destVer);
@@ -262,7 +268,7 @@ public class PublicationProcess {
       System.out.println("Copy to directory");        
       FileUtils.copyDirectory(new File(Utilities.path(tempM.getAbsolutePath(), "output")), new File(destination));
     }
-
+    
     // finally
     System.out.println("Rebuild everything for "+Utilities.path(destination, "package-list.json"));
     Publisher.main(new String[] { "-publish-update", "-folder", fRoot.getAbsolutePath(), "-registry", fRegistry.getAbsolutePath(), "-filter", destination, "-no-exit"});
