@@ -752,8 +752,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             long endTime = System.nanoTime();
             processTxLog(Utilities.path(destDir != null ? destDir : outputDir, "qa-tx.html"));
             BallotChecker bc = new BallotChecker(repoRoot);
-            ValidationPresenter val = new ValidationPresenter(version, businessVersion, igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
-                bc.check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator,
+            ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
+                bc.check(igpkp.getCanonical(), npmName, workingVersion(), historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator,
                 new DependencyRenderer(pcm, outputDir, npmName, templateManager).render(publishedIg), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
                 new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate());
             log("Finished. "+Utilities.presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
@@ -888,8 +888,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       generate();
       clean();
       BallotChecker bc = new BallotChecker(repoRoot);
-      ValidationPresenter val = new ValidationPresenter(version, businessVersion, igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
-          bc.check(igpkp.getCanonical(), npmName, businessVersion, historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator,
+      ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
+          bc.check(igpkp.getCanonical(), npmName, workingVersion(), historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator,
           new DependencyRenderer(pcm, outputDir, npmName, templateManager).render(publishedIg), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
           new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate());
       tts.end();
@@ -4998,11 +4998,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Checking Output HTML");
       String statusMessage;
       if (mode == IGBuildMode.AUTOBUILD) { 
-        statusMessage = Utilities.escapeXml(sourceIg.present())+", published by "+Utilities.escapeXml(sourceIg.getPublisher())+". This is not an authorized publication; it is the continuous build for version "+businessVersion+"). This version is based on the current content of <a href=\""+gh()+"\">"+gh()+"</a> and changes regularly. See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>"; 
+        statusMessage = Utilities.escapeXml(sourceIg.present())+", published by "+Utilities.escapeXml(sourceIg.getPublisher())+". This is not an authorized publication; it is the continuous build for version "+workingVersion()+"). This version is based on the current content of <a href=\""+gh()+"\">"+gh()+"</a> and changes regularly. See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>"; 
       } else if (mode == IGBuildMode.PUBLICATION) { 
         statusMessage = "Publication Build: This will be filled in by the publication tooling"; 
       } else { 
-        statusMessage = Utilities.escapeXml(sourceIg.present())+" - Local Development build (v"+businessVersion+"). See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>";
+        statusMessage = Utilities.escapeXml(sourceIg.present())+" - Local Development build (v"+workingVersion()+"). See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>";
       }
               
       realmRules.addOtherFiles(inspector.getExceptions(), outputDir);
@@ -6238,7 +6238,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     data.addProperty("igId", publishedIg.getId());
     data.addProperty("igName", publishedIg.getName());
     data.addProperty("packageId", npmName);
-    data.addProperty("igVer", businessVersion == null ? publishedIg.getVersion() : businessVersion);
+    data.addProperty("igVer", workingVersion());
     data.addProperty("errorCount", getErrorCount());
     data.addProperty("version", version);
     data.addProperty("revision", specMaps.get(0).getBuild());
@@ -6256,10 +6256,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     ig.addProperty("name", publishedIg.getName());
     ig.addProperty("title", publishedIg.getTitle());
     ig.addProperty("url", publishedIg.getUrl());
-    if (businessVersion!=null)
-      ig.addProperty("version", businessVersion);
-    else
-      ig.addProperty("version", publishedIg.getVersion());
+    ig.addProperty("version", workingVersion());
     ig.addProperty("status", publishedIg.getStatusElement().asStringValue());
     ig.addProperty("experimental", publishedIg.getExperimental());
     ig.addProperty("publisher", publishedIg.getPublisher());
@@ -6308,6 +6305,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
     String json = gson.toJson(data);
     TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "fhir.json"), false);
+  }
+
+  public String workingVersion() {
+    return businessVersion == null ? publishedIg.getVersion() : businessVersion;
   }
 
   private String getGitStatus() throws IOException {
