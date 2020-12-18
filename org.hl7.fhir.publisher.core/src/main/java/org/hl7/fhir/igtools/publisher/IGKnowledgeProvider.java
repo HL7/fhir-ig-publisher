@@ -621,7 +621,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
           br.url = "https://vsac.nlm.nih.gov/valueset/"+oid+"/expansion";  
           br.display = "VSAC "+oid;
         } else if (Utilities.isAbsoluteUrl(ref) && (!ref.startsWith("http://hl7.org") || !ref.startsWith("http://terminology.hl7.org"))) {
-          br.url = ref;  
+          br.url = Utilities.encodeUri(ref);  
           br.display = ref;
         } else if (vs == null) {
           br.url = ref+".html"; // broken link, 
