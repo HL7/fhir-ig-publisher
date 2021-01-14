@@ -70,6 +70,9 @@ public class PublisherLoader implements ILoaderKnowledgeProvider {
     if (r instanceof CanonicalResource) {
       String u = ((CanonicalResource) r).getUrl();
       if (u != null) {
+        if (u.contains("|")) {
+          u = u.substring(0, u.indexOf("|"));
+        }
         String p = spm.getPath(u, r.getMeta().getSource());
         if (p == null) {
           throw new FHIRException("Internal error in IG "+npm.name()+"#"+npm.version()+" map: No identity found for "+u);
@@ -83,14 +86,17 @@ public class PublisherLoader implements ILoaderKnowledgeProvider {
         } else {
           path = pathToSpec+"/"+ igpkp.doReplacements(p, r, null, null);
         }
+        r.setUserData("path", path);
         String v = ((CanonicalResource) r).getVersion();
         if (v != null) {
           u = u + "|" + v;
           p = spm.getPath(u, r.getMeta().getSource());
           if (p == null) {
             System.out.println("In IG "+npm.name()+"#"+npm.version()+" map: No identity found for "+u);
+          } else {
+            String vp = pathToSpec+"/"+ igpkp.doReplacements(p, r, null, null);
+            r.setUserData("versionpath", vp);
           }
-          r.setUserData("versionpath", igpkp.getCanonical()+"/"+ igpkp.doReplacements(p, r, null, null));
         }
         return path;
       } 

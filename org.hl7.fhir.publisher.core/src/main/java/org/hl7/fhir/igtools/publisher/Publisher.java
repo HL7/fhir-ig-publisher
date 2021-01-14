@@ -6903,8 +6903,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (ListItemEntry i : list) {
       if (type == null || type.equals(i.getType())) {
         String s = template;
-        if (s.contains("{{link}}"))
+        if (s.contains("{{link}}")) {
           s = s.replace("{{link}}", i.getLink());
+        }
         if (s.contains("{{name}}"))
           s = s.replace("{{name}}", i.getName());
         if (s.contains("{{desc}}"))
@@ -6928,10 +6929,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private String getListLink(FetchedResource lr) {
-    if (lr.getResource() != null)
-      return lr.getResource().getUserString("path");
+    String res;
+    if (lr.getResource() != null && lr.getResource().hasUserData("path"))
+      res = lr.getResource().getUserString("path");
     else
-      return igpkp.getLinkFor(lr, true);
+      res = igpkp.getLinkFor(lr, true);
+    return res;
   }
 
   private String getListName(FetchedResource lr) {
