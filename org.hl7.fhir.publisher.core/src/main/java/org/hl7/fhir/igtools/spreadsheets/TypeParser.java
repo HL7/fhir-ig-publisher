@@ -193,7 +193,7 @@ public class TypeParser {
           }
       } else if (t.isWildcardType()) {
         // this list is filled out manually because it may be running before the types referred to have been loaded
-        for (String n : TypesUtilities.wildcardTypes()) {
+        for (String n : TypesUtilities.wildcardTypes(context.getVersion())) {
           TypeRefComponent tc = new TypeRefComponent().setCode(n);
           if (t.getVersioning() != null)
             tc.setVersioning(t.getVersioning());
