@@ -187,6 +187,14 @@
             <artifactId>xmlbeans</artifactId>
             <version>3.0.2</version>
         </dependency>
+
+        <!-- OKHTTP had to be marked as optional in the r5 project, but the publisher needs to pull it in, this is
+         a quick fix on the weekend, until I have time to figure out how to do it cleanly -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>4.9.0</version>
+        </dependency>
     </dependencies>
 
     <build>
