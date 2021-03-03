@@ -1474,6 +1474,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (Utilities.existsInList(parts[1], "terminology")) {
       return null;
     }
+    if (Utilities.existsInList(parts[1], "fhir") && Utilities.existsInList(parts[2], "cda")) {
+      return null;
+    }
     if (Utilities.existsInList(parts[1], "fhir") && !Utilities.existsInList(parts[1], "nothing-yet")) {
       if (parts[2].equals("uv")) {
         igrealm = "uv";
@@ -2486,6 +2489,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (pp.has("relativePath")) {
         relativePath = str(pp, "relativePath");
       }
+      System.out.println("Pre-Process: "+path+" = "+relativePath+"/"+prePagesXslt);
       PreProcessInfo ppinfo = new PreProcessInfo(prePagesXslt, relativePath);
       preProcessInfo.put(path, ppinfo);
     }
@@ -6624,7 +6628,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         } else
           checkMakeFile(f.getSource(), dst, f.getOutputNames());
       } catch (IOException e) {
-        log("Exception generating page "+dst+": "+e.getMessage());
+        log("Exception generating page "+dst+" for "+f.getRelativePath()+" in "+tempDir+": "+e.getMessage());
+         
       }
     } else if (f.getProcessMode() == FetchedFile.PROCESS_XSLT) {
 //      String dst = tempDir + f.getPath().substring(prePagesDir.length());
@@ -6640,7 +6645,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         } else
           checkMakeFile(transform(f.getSource(), f.getXslt()), dst, f.getOutputNames());
       } catch (Exception e) {
-        log("Exception generating page "+dst+": "+e.getMessage());
+        log("Exception generating xslt page "+dst+" for "+f.getRelativePath()+" in "+tempDir+": "+e.getMessage());
       }
     } else {
       saveFileOutputs(f);
