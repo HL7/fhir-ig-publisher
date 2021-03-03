@@ -46,6 +46,7 @@ import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeableConcept;
 import org.hl7.fhir.r5.model.Coding;
+import org.hl7.fhir.r5.model.ContactPoint;
 import org.hl7.fhir.r5.model.DataType;
 import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
@@ -321,7 +322,13 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return summarise((Coding) fixed);
     if (fixed instanceof Quantity) 
       return summarise((Quantity) fixed);
+    if (fixed instanceof ContactPoint) 
+      return summarise((ContactPoint) fixed);
     throw new FHIRException("Generating text summary of fixed value not yet done for type "+fixed.getClass().getName());
+  }
+
+  private String summarise(ContactPoint cp) {
+    return cp.getValue();
   }
 
 
