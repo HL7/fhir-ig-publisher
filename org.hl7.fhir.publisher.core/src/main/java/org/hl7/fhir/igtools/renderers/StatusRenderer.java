@@ -118,7 +118,7 @@ public class StatusRenderer {
 
   private static String readOwner(DomainResource resource) {
     if (resource instanceof CanonicalResource) {
-      return ((CanonicalResource) resource).getPublisher();
+      return ((CanonicalResource) resource).hasPublisher() ? ((CanonicalResource) resource).getPublisher() : null;
     }
     return null;
   }

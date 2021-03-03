@@ -2489,7 +2489,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (pp.has("relativePath")) {
         relativePath = str(pp, "relativePath");
       }
-      System.out.println("Pre-Process: "+path+" = "+relativePath+"/"+prePagesXslt);
+      System.out.println("Pre-Process: "+path+" = "+relativePath+" | "+prePagesXslt);
       PreProcessInfo ppinfo = new PreProcessInfo(prePagesXslt, relativePath);
       preProcessInfo.put(path, ppinfo);
     }
@@ -3454,6 +3454,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private boolean loadPrePages(FetchedFile dir, String basePath) throws Exception {
+    System.out.println("loadPrePages from " + dir+" as "+basePath);
     boolean changed = false;
     PreProcessInfo ppinfo = preProcessInfo.get(basePath);
     if (ppinfo==null) {
@@ -7797,7 +7798,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void generateOutputsLibrary(FetchedFile f, FetchedResource r, Library lib, Map<String,String> vars, String prefixForContainer) throws Exception {
     int counter = 0;
     for (Attachment att : lib.getContent()) {
-      String extension = MimeType.getExtension(att.getContentType());
+      String extension = att.hasContentType() ? MimeType.getExtension(att.getContentType()) : null;
       if (extension != null && att.hasData()) {
         String filename = "Library-"+r.getId()+(counter == 0 ? "" : "-"+Integer.toString(counter))+"."+extension;
         TextFile.bytesToFile(att.getData(), Utilities.path(tempDir, filename));
