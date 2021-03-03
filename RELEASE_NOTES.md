@@ -1,1 +1,0 @@
-* more debugging for UTG, and fix bug in Citation summary
