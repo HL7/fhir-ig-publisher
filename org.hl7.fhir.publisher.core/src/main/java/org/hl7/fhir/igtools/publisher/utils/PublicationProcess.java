@@ -89,7 +89,7 @@ public class PublicationProcess {
     
     // check the output
     File fOutput = checkDirectory(Utilities.path(source, "output"), res, "Publication Source");
-    File fQA = checkFile(Utilities.path(source, "output", "qa.json"), res, "Publication Source");
+    File fQA = checkFile(Utilities.path(source, "output", "qa.json"), res, "Publication QA info");
     if (res.size() > 0) {
       return res;
     }
@@ -153,6 +153,9 @@ public class PublicationProcess {
     check(res, plPub.getAsJsonArray("list").size() > 0, "Dest package-list has no existent version (should have ci-build entry)");
     check(res, vSrc != null, "No Entry found in source package-list for v"+version);
     check(res, vPub == null, "Found an entry in the publication package-list for v"+version+" - it looks like it has already been published");
+    if (vSrc == null) { 
+      return res;
+    }
     check(res, vSrc.has("desc") || vSrc.has("descmd"), "Source Package list has no description for v"+version);
     String pathVer = JSONUtil.str(vSrc, "path");
     String vCode = pathVer.substring(pathVer.lastIndexOf("/")+1);

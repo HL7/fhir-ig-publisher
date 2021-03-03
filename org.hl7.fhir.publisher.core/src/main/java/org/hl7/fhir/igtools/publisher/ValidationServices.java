@@ -220,8 +220,8 @@ public class ValidationServices implements IValidatorResourceFetcher {
   }
 
   @Override
-  public void setLocale(Locale locale) {
-    
+  public IValidatorResourceFetcher setLocale(Locale locale) {
+    return this;
   }
 
   @Override

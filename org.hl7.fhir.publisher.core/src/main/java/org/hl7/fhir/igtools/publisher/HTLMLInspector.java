@@ -481,6 +481,9 @@ public class HTLMLInspector {
       targets.add(x.getAttribute("name"));
     if (x.hasAttribute("id"))
       targets.add(x.getAttribute("id"));
+    if (Utilities.existsInList(x.getName(), "h1", "h2", "h3", "h4", "h5", "h6")) {
+      targets.add(urlify(x.allText()));      
+    }
     for (XhtmlNode c : x.getChildNodes())
       listTargets(c, targets);
   }
@@ -576,8 +579,10 @@ public class HTLMLInspector {
       resolved = manual.contains(rref);
     if (!resolved && specs != null){
       for (SpecMapManager spec : specs) {
-        resolved = resolved || spec.getBase().equals(rref) || (spec.getBase()).equals(rref+"/") || spec.hasTarget(rref) || 
+        if (!resolved && spec.getBase() != null) {
+          resolved = resolved || spec.getBase().equals(rref) || (spec.getBase()).equals(rref+"/") || spec.hasTarget(rref) || 
             Utilities.existsInList(rref, Utilities.pathURL(spec.getBase(), "definitions.json.zip"), Utilities.pathURL(spec.getBase(), "full-ig.zip"), Utilities.pathURL(spec.getBase(), "definitions.xml.zip"), Utilities.pathURL(spec.getBase(), "package.tgz"));
+        }
         if (!resolved && spec.getBase2() != null) {
           resolved = spec.getBase2().equals(rref) || (spec.getBase2()).equals(rref+"/") || 
               Utilities.existsInList(rref, Utilities.pathURL(spec.getBase2(), "definitions.json.zip"), Utilities.pathURL(spec.getBase2(), "definitions.xml.zip"), Utilities.pathURL(spec.getBase2(), "package.tgz"), Utilities.pathURL(spec.getBase2(), "full-ig.zip")); 
@@ -607,7 +612,7 @@ public class HTLMLInspector {
         resolved = true;
         if (specs != null) {
           for (SpecMapManager spec : specs) {
-            if (rref.startsWith(spec.getBase())) {
+            if (spec.getBase() != null && rref.startsWith(spec.getBase())) {
               resolved = false;
             }
           }
@@ -634,7 +639,7 @@ public class HTLMLInspector {
             resolved = true;
           else { 
             resolved = f.targets.contains(name);
-            tgtList = " (valid targets: "+(f.targets.size() > 20 ? Integer.toString(f.targets.size())+" targets"  :  f.targets.toString())+")";
+            tgtList = " (valid targets: "+(f.targets.size() > 40 ? Integer.toString(f.targets.size())+" targets"  :  f.targets.toString())+")";
             for (String s : f.targets) {
               if (s.equalsIgnoreCase(name)) {
                 tgtList = (" - case is wrong ('"+s+"')");
@@ -706,7 +711,7 @@ public class HTLMLInspector {
       resolved = manual.contains(ref);
     if (!resolved && specs != null){
       for (SpecMapManager spec : specs) {
-        resolved = resolved || spec.hasImage(ref); 
+        resolved = resolved || (spec.getBase() != null && spec.hasImage(ref)); 
       }
     }
     if (!resolved) {
@@ -823,8 +828,30 @@ public class HTLMLInspector {
     } else {
       return missingPublishBoxList.toString();
     }
-
   }
 
+
+  // adapted from anchor.min, which is used to generate these things on the flt 
+  private String urlify(String a) {
+    String repl = "-& +$,:;=?@\"#{}()[]|^~[`%!'<>].*";
+    String elim = "/\\";
+    StringBuilder b = new StringBuilder();
+    boolean nextDash = false;
+    for (char ch : a.toCharArray()) {
+      if (elim.indexOf(ch) == -1) {
+        if (repl.indexOf(ch) == -1) {
+          if (nextDash) {
+            b.append("-");
+          }
+          nextDash = false;
+          b.append(Character.toLowerCase(ch));
+        } else {
+          nextDash = true;
+        }
+      }
+    }
+    String s = b.toString().trim();
+    return s;
+  }
   
 }
