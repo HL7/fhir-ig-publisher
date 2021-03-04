@@ -482,7 +482,9 @@ public class HTLMLInspector {
     if (x.hasAttribute("id"))
       targets.add(x.getAttribute("id"));
     if (Utilities.existsInList(x.getName(), "h1", "h2", "h3", "h4", "h5", "h6")) {
-      targets.add(urlify(x.allText()));      
+      if (x.allText() != null) {
+        targets.add(urlify(x.allText()));
+      }
     }
     for (XhtmlNode c : x.getChildNodes())
       listTargets(c, targets);
