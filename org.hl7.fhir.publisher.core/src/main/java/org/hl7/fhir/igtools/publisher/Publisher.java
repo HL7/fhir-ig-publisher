@@ -3477,6 +3477,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     for (String link : dir.getFiles()) {
       FetchedFile f = fetcher.fetch(link);
+      System.out.println("find pre-page "+f.getPath()+" at "+link+" from "+basePath);
       f.setRelativePath(f.getPath().substring(basePath.length()+1));
       if (f.isFolder())
         changed = loadPrePages(f, basePath) || changed;
