@@ -3454,7 +3454,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private boolean loadPrePages(FetchedFile dir, String basePath) throws Exception {
-    System.out.println("loadPrePages from " + dir+" as "+basePath);
+    System.out.println("loadPrePages from " + dir+ " as "+basePath);
     boolean changed = false;
     PreProcessInfo ppinfo = preProcessInfo.get(basePath);
     if (ppinfo==null) {
