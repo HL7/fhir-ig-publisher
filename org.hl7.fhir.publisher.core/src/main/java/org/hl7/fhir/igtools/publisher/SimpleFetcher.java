@@ -80,7 +80,7 @@ public class SimpleFetcher implements IFetchFile {
       throw new Exception("Unable to find file "+path);
     FetchedFile ff = new FetchedFile(path);
     ff.setPath(f.getCanonicalPath());
-    ff.setName(fileTitle(path));
+    ff.setName(f.isDirectory() ? path : fileTitle(path));
     ff.setTime(f.lastModified());
     if (f.isDirectory()) {
       ff.setContentType("application/directory");
