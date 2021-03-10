@@ -18,13 +18,13 @@
     <parent>
         <groupId>ca.uhn.hapi.fhir</groupId>
         <artifactId>org.hl7.fhir.core</artifactId>
-        <version>5.3.4</version>
+        <version>5.3.5</version>
     </parent>
 
     <version>1.1.64-SNAPSHOT</version> <!-- See the note above -->
 
     <properties>
-        <core_version>5.3.4</core_version>
+        <core_version>5.3.5</core_version>
         <maven.test.skip>true</maven.test.skip>
     </properties>
 
