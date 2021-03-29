@@ -35,6 +35,7 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.lang.reflect.InvocationTargetException;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Paths;
@@ -58,6 +59,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 
 import javax.swing.UIManager;
@@ -578,6 +580,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private List<String> listedURLExemptions = new ArrayList<String>();
   private String jekyllCommand = "jekyll";
   private boolean makeQA = true;
+  private boolean bundleReferencesResolve = true;
   private CqlSubSystem cql;
   private IniFile apiKeyFile;
 
@@ -1726,6 +1729,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         useStatsOptOut = "true".equals(p.getValue());
       } else if (p.getCode().equals("extension-domain")) {
         extensionDomains.add(p.getValue());
+      } else if (p.getCode().equals("bundle-references-resolve")) {
+        bundleReferencesResolve = "true".equals(p.getValue());        
       } else if (p.getCode().equals("active-tables")) {
         HierarchicalTableGenerator.ACTIVE_TABLES = "true".equals(p.getValue());
       } else if (p.getCode().equals("ig-expansion-parameters")) {     
@@ -1924,7 +1929,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.setShowMessagesFromReferences(showReferenceMessages);
     validator.getExtensionDomains().addAll(extensionDomains);
     validator.getExtensionDomains().add(IGHelper.EXT_PRIVATE_BASE);
-    validationFetcher = new ValidationServices(context, igpkp, fileList, npmList );
+    validationFetcher = new ValidationServices(context, igpkp, fileList, npmList, bundleReferencesResolve);
     validator.setFetcher(validationFetcher);
     validator.setTracker(this);
     for (String s : context.getBinaries().keySet()) {
@@ -2364,7 +2369,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (!suppressPath.isEmpty())
         loadSuppressedMessages(Utilities.path(rootDir, suppressPath), "ConfigFile.suppressedWarningFile");
     }
-    validationFetcher = new ValidationServices(context, igpkp, fileList, npmList );
+    validationFetcher = new ValidationServices(context, igpkp, fileList, npmList, bool(configuration, "bundleReferencesResolve"));
     validator.setFetcher(validationFetcher);
     validator.setTracker(this);
     for (String s : context.getBinaries().keySet())
@@ -8573,7 +8578,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private static String convertUrlToLocalIg(String ig) throws IOException {
     String org = null;
     String repo = null;
-    String branch = null;
+    String branch = "master"; // todo: main?
     String[] p = ig.split("\\/");
     if (p.length > 5 && (ig.startsWith("https://build.fhir.org/ig") || ig.startsWith("http://build.fhir.org/ig"))) {
       org = p[4];
@@ -8607,16 +8612,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (!f.exists()) {
       Utilities.createDirectory(folder);
     }
-    throw new Error("Not supported right now");
-//    try {
-////      gitClone(org, repo, branch, folder);
-//    } catch (Exception e) {
-//      System.out.println("Git clone failed: "+e.getMessage());
-//      System.out.println("Clear Directory and try again");
-//      Utilities.clearDirectory(folder);
-////      gitClone(org, repo, branch, folder);
-//    }
-//    return folder;
+    Utilities.clearDirectory(f.getAbsolutePath());
+    
+    String ghUrl = "https://github.com/"+org+"/"+repo+"/archive/refs/heads/"+branch+".zip";
+    InputStream zip = fetchGithubUrl(ghUrl);
+    Utilities.unzip(zip, Paths.get(f.getAbsolutePath()));
+    return Utilities.path(folder, repo+"-"+branch);
+  }
+
+  private static InputStream fetchGithubUrl(String ghUrl) throws IOException {
+    URL url = new URL(ghUrl+"?nocache=" + System.currentTimeMillis());
+    HttpURLConnection c = (HttpURLConnection) url.openConnection();
+    c.setInstanceFollowRedirects(true);
+    return c.getInputStream();
   }
 
 //  private static void gitClone(String org, String repo, String branch, String folder) throws InvalidRemoteException, TransportException, GitAPIException {
