@@ -48,6 +48,7 @@ import org.hl7.fhir.r5.utils.IResourceValidator.IValidatorResourceFetcher;
 import org.hl7.fhir.r5.utils.IResourceValidator.ReferenceValidationPolicy;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 
 public class ValidationServices implements IValidatorResourceFetcher {
@@ -58,14 +59,16 @@ public class ValidationServices implements IValidatorResourceFetcher {
   private List<NpmPackage> packages;
   private List<String> otherUrls = new ArrayList<>();
   private List<String> mappingUrls = new ArrayList<>();
+  private boolean bundleReferencesResolve;
   
   
-  public ValidationServices(IWorkerContext context, IGKnowledgeProvider ipg, List<FetchedFile> files, List<NpmPackage> packages) {
+  public ValidationServices(IWorkerContext context, IGKnowledgeProvider ipg, List<FetchedFile> files, List<NpmPackage> packages, boolean bundleReferencesResolve) {
     super();
     this.context = context;
     this.ipg = ipg;
     this.files = files;
     this.packages = packages;
+    this.bundleReferencesResolve = bundleReferencesResolve;
     initOtherUrls();
   }
 
@@ -167,7 +170,11 @@ public class ValidationServices implements IValidatorResourceFetcher {
 
   @Override
   public ReferenceValidationPolicy validationPolicy(Object appContext, String path, String url) {
-    return ReferenceValidationPolicy.CHECK_EXISTS_AND_TYPE;
+    if (path.startsWith("Bundle.") && !bundleReferencesResolve) {
+      return ReferenceValidationPolicy.CHECK_TYPE_IF_EXISTS;
+    } else {
+      return ReferenceValidationPolicy.CHECK_EXISTS_AND_TYPE;
+    }
   }
 
 
