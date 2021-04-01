@@ -18,20 +18,50 @@
     <parent>
         <groupId>ca.uhn.hapi.fhir</groupId>
         <artifactId>org.hl7.fhir.core</artifactId>
-        <version>4.2.19-SNAPSHOT</version>
+        <version>5.3.7</version>
     </parent>
+
+    <version>1.1.66-SNAPSHOT</version> <!-- See the note above -->
+
     <properties>
-        <core_version>4.2.19-SNAPSHOT</core_version>
+        <core_version>5.3.7</core_version>
         <maven.test.skip>true</maven.test.skip>
     </properties>
-    <version>1.0.82-SNAPSHOT</version> <!-- See the note above -->
 
-    <packaging>pom</packaging>
     <groupId>org.hl7.fhir.publisher</groupId>
     <artifactId>org.hl7.fhir.publisher</artifactId>
+    <packaging>pom</packaging>
     <name>HL7 FHIR IG Publisher</name>
 
+    <organization>
+        <name>Health Level 7</name>
+        <url>http://hl7.org</url>
+    </organization>
+
+    <modules>
+        <module>org.hl7.fhir.publisher.core</module>
+        <module>org.hl7.fhir.publisher.cli</module>
+    </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.apache.ant</groupId>
+                <artifactId>ant</artifactId>
+                <version>1.10.5</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <repositories>
+        <repository>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+            <id>bintray-dnault-maven</id>
+            <name>bintray</name>
+            <url>https://dl.bintray.com/dnault/maven</url>
+        </repository>
         <repository>
             <id>oss-snapshot</id>
             <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
@@ -40,19 +70,19 @@
             </snapshots>
         </repository>
         <repository>
+            <id>github-releases</id>
+            <url>https://maven.pkg.github.com/hapifhir/org.hl7.fhir.core/</url>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+        <repository>
             <id>local</id>
             <url>file://${basedir}/lib</url>
         </repository>
-    </repositories>
-
-
-    <organization>
-        <name>Health Level 7</name>
-        <url>http://hl7.org</url>
-    </organization>
+    </repositories> 
 
     <dependencies>
-
         <dependency>
             <groupId>ca.uhn.hapi.fhir</groupId>
             <artifactId>org.hl7.fhir.r5</artifactId>
@@ -77,7 +107,7 @@
         <dependency>
             <groupId>org.fhir</groupId>
             <artifactId>ucum</artifactId>
-            <version>1.0.2</version>
+            <version>1.0.3</version>
         </dependency>
 
         <dependency>
@@ -158,25 +188,14 @@
             <version>3.0.2</version>
         </dependency>
 
-		<!--
+        <!-- OKHTTP had to be marked as optional in the r5 project, but the publisher needs to pull it in, this is
+         a quick fix on the weekend, until I have time to figure out how to do it cleanly -->
         <dependency>
-            <groupId>plantuml</groupId>
-            <artifactId>plantuml-jar-asl</artifactId>
-            <version>1.2019.10</version>
-		  </dependency>
-		  -->
-
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>4.9.0</version>
+        </dependency>
     </dependencies>
-
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>org.apache.ant</groupId>
-                <artifactId>ant</artifactId>
-                <version>1.10.5</version>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
 
     <build>
         <plugins>
@@ -258,28 +277,35 @@
                         <exclude>**/*r4*/**</exclude>
                     </excludes>
                 </configuration>
-            </plugin>        
+            </plugin>
         </plugins>
     </build>
 
-    <modules>
-        <module>org.hl7.fhir.publisher.core</module>
-        <module>org.hl7.fhir.publisher.cli</module>
-    </modules>
-
     <profiles>
         <profile>
-            <id>SIGN_ARTIFACTS</id>
+            <id>github-repo</id>
             <activation>
+                <activeByDefault>false</activeByDefault>
                 <property>
-                    <name>gpg.keyname</name>
+                    <name>deployToGitHub</name>
                 </property>
             </activation>
+            <distributionManagement>
+                <snapshotRepository>
+                    <id>github</id>
+                    <url>https://maven.pkg.github.com/HL7/fhir-ig-publisher</url>
+                </snapshotRepository>
+                <repository>
+                    <id>github</id>
+                    <url>https://maven.pkg.github.com/HL7/fhir-ig-publisher</url>
+                </repository>
+            </distributionManagement>
             <build>
                 <plugins>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-gpg-plugin</artifactId>
+                        <version>1.6</version>
                         <executions>
                             <execution>
                                 <id>sign-artifacts</id>
@@ -288,10 +314,59 @@
                                     <goal>sign</goal>
                                 </goals>
                                 <configuration>
-                                    <gpgArguments>
-                                        <arg>--pinentry-mode</arg>
-                                        <arg>loopback</arg>
-                                    </gpgArguments>
+                                    <keyname>${gpg.keyname}</keyname>
+                                    <passphraseServerId>${gpg.keyname}</passphraseServerId>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>ossrh-repo</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+                <property>
+                    <name>deployToSonatype</name>
+                </property>
+            </activation>
+            <distributionManagement>
+                <snapshotRepository>
+                    <id>ossrh</id>
+                    <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+                </snapshotRepository>
+                <repository>
+                    <id>ossrh</id>
+                    <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+                </repository>
+            </distributionManagement>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.sonatype.plugins</groupId>
+                        <artifactId>nexus-staging-maven-plugin</artifactId>
+                        <version>1.6.7</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <serverId>ossrh</serverId>
+                            <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+                            <autoReleaseAfterClose>true</autoReleaseAfterClose>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>1.6</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                                <configuration>
+                                    <keyname>${gpg.keyname}</keyname>
                                     <passphraseServerId>${gpg.keyname}</passphraseServerId>
                                 </configuration>
                             </execution>
@@ -301,5 +376,4 @@
             </build>
         </profile>
     </profiles>
-
 </project>

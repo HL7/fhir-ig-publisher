@@ -1,12 +1,9 @@
 package org.hl7.fhir.igtools.publisher.utils;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 
-import org.apache.commons.lang3.StringUtils;
-import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.ZipGenerator;
@@ -62,15 +59,12 @@ public class DownloadBuilder {
   private ZipGenerator zip;
   private int counter;
   private String zipfilename;
-  private IniFile ini;
-
   
   public DownloadBuilder(String srcFolder, String canonical, String url) {
     super();
     this.srcFolder = srcFolder;
     this.canonical = canonical;
     this.url = url;
-    ini = new IniFile("c:\\temp\\fhir-downloads.ini");
   }
 
   private boolean isCore() {
@@ -89,8 +83,6 @@ public class DownloadBuilder {
   
   private boolean check() throws IOException {
     zipfilename = isCore() ? "fhir-spec" : "full-ig";
-    if (!CURRENT_VERSION.equals(ini.getStringProperty("download-formats", srcFolder)))
-      return false;
     File z = new File(Utilities.path(srcFolder, zipfilename+".zip"));
     if (!z.exists())
       return false;
@@ -99,8 +91,6 @@ public class DownloadBuilder {
 
   private void finish() throws IOException {
     zip.close();  
-    ini.setStringProperty("download-formats", srcFolder, CURRENT_VERSION, null);
-    ini.save();
   }
 
   private void start() throws FileNotFoundException, IOException {

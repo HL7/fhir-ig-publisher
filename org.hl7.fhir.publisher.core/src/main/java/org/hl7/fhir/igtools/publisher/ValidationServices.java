@@ -23,6 +23,9 @@ package org.hl7.fhir.igtools.publisher;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -33,6 +36,7 @@ import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.Manager;
 import org.hl7.fhir.r5.elementmodel.Manager.FhirFormat;
 import org.hl7.fhir.r5.elementmodel.ObjectConverter;
+import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.OperationDefinition;
 import org.hl7.fhir.r5.model.Questionnaire;
@@ -42,9 +46,10 @@ import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.terminologies.ImplicitValueSets;
 import org.hl7.fhir.r5.utils.IResourceValidator.IValidatorResourceFetcher;
 import org.hl7.fhir.r5.utils.IResourceValidator.ReferenceValidationPolicy;
+import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.cache.NpmPackage;
-import org.hl7.fhir.utilities.cache.PackageCacheManager;
+import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.npm.NpmPackage;
 
 public class ValidationServices implements IValidatorResourceFetcher {
 
@@ -54,14 +59,16 @@ public class ValidationServices implements IValidatorResourceFetcher {
   private List<NpmPackage> packages;
   private List<String> otherUrls = new ArrayList<>();
   private List<String> mappingUrls = new ArrayList<>();
+  private boolean bundleReferencesResolve;
   
   
-  public ValidationServices(IWorkerContext context, IGKnowledgeProvider ipg, List<FetchedFile> files, List<NpmPackage> packages) {
+  public ValidationServices(IWorkerContext context, IGKnowledgeProvider ipg, List<FetchedFile> files, List<NpmPackage> packages, boolean bundleReferencesResolve) {
     super();
     this.context = context;
     this.ipg = ipg;
     this.files = files;
     this.packages = packages;
+    this.bundleReferencesResolve = bundleReferencesResolve;
     initOtherUrls();
   }
 
@@ -108,12 +115,9 @@ public class ValidationServices implements IValidatorResourceFetcher {
         count++;
         Element ber = be.getNamedChild("resource");
         if (ber != null) {
-          if (!be.hasChild("fullUrl")) {
-            String bundleId = ((Element) appContext).getChildValue("id");
-            throw new FHIRException("No fullUrl on entry #" + count + " in Bundle " + bundleId);
-          }
-          if (be.getChildByName("fullUrl").equals(url))
+          if (be.hasChild("fullUrl") && be.getChildByName("fullUrl").equals(url)) {
             return ber;
+          }
           if (parts.length == 2 && ber.fhirType().equals(parts[0]) && ber.hasChild("id") && ber.getChildValue("id").equals(parts[1])) 
             return ber;
         }        
@@ -166,12 +170,16 @@ public class ValidationServices implements IValidatorResourceFetcher {
 
   @Override
   public ReferenceValidationPolicy validationPolicy(Object appContext, String path, String url) {
-    return ReferenceValidationPolicy.CHECK_EXISTS_AND_TYPE;
+    if (path.startsWith("Bundle.") && !bundleReferencesResolve) {
+      return ReferenceValidationPolicy.CHECK_TYPE_IF_EXISTS;
+    } else {
+      return ReferenceValidationPolicy.CHECK_EXISTS_AND_TYPE;
+    }
   }
 
 
   @Override
-  public boolean resolveURL(Object appContext, String path, String url) throws IOException {
+  public boolean resolveURL(Object appContext, String path, String url, String type) throws IOException {
     if (otherUrls.contains(url))
       return true;
 
@@ -219,8 +227,25 @@ public class ValidationServices implements IValidatorResourceFetcher {
   }
 
   @Override
-  public void setLocale(Locale locale) {
-    
+  public IValidatorResourceFetcher setLocale(Locale locale) {
+    return this;
+  }
+
+  @Override
+  public byte[] fetchRaw(String source) throws MalformedURLException, IOException {
+    URL url = new URL(source);
+    URLConnection c = url.openConnection();
+    return TextFile.streamToBytes(c.getInputStream());
+  }
+
+  @Override
+  public CanonicalResource fetchCanonicalResource(String url) {
+    return null;
+  }
+
+  @Override
+  public boolean fetchesCanonicalResource(String url) {
+    return false;
   }
 
 }

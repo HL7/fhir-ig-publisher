@@ -32,9 +32,9 @@ import java.util.Set;
 
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.cache.NpmPackage;
 import org.hl7.fhir.utilities.json.JSONUtil;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.npm.NpmPackage;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -94,9 +94,28 @@ public class IGReleaseRedirectionBuilder {
       "    \r\n"+
       "You should not be seeing this page. If you do, PHP has failed badly.\r\n";
   
-  private static final String WC_START = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + 
+  private static final String WC_START_ROOT = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + 
       "<configuration>\n" + 
-      "  <system.webServer>\n" + 
+      "  <system.webServer>\n" +
+      "    <defaultDocument>\n" +
+      "      <files>\n" +
+      "        <add value=\"index.asp\" />\n" +
+      "      </files>\n" +
+      "    </defaultDocument>\n" +    
+      "    <staticContent>\n" +
+      "      <remove fileExtension=\".html\" />\n" +
+      "      <mimeMap fileExtension=\".html\" mimeType=\"text/html;charset=UTF-8\" />\n" +
+      "    </staticContent>\n" +
+      "    <rewrite>\n" + 
+      "      <rules>\n";
+  
+  private static final String WC_START_OTHER = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + 
+      "<configuration>\n" + 
+      "  <system.webServer>\n" +
+      "    <staticContent>\n" +
+      "      <remove fileExtension=\".html\" />\n" +
+      "      <mimeMap fileExtension=\".html\" mimeType=\"text/html;charset=UTF-8\" />\n" +
+      "    </staticContent>\n" +
       "    <rewrite>\n" + 
       "      <rules>\n";
   
@@ -145,9 +164,11 @@ public class IGReleaseRedirectionBuilder {
       // we need to generate a web config, and the redirectors
       Set<String> rtl = listResourceTypes(map);
       if (rtl.isEmpty()) {
-        System.out.println("!!! empty map, "+folder);
+        if (!folder.contains("smart-app-launch") && !folder.contains("davinci-deqm")) {
+          System.out.println("!!! empty map, "+folder);
+        }
       } else {
-        generateWebConfig(rtl);
+        generateWebConfig(rtl, isCoreRoot);
         for (String rt : rtl) {
           generateRedirect(rt, map);
         }
@@ -157,9 +178,9 @@ public class IGReleaseRedirectionBuilder {
               String path = Utilities.path(folder, s, "index.asp");
               String p = s.replace("/", "-");
               String litPath = Utilities.path(folder, p)+".html";
-              if (!new File(litPath+".xml").exists() && !new File(litPath+".json").exists()) 
+              if (!new File(litPath+".xml").exists() && !new File(litPath+".json").exists()) { 
                 litPath = Utilities.path(folder, tail(map.get(s)));
-              File file = new File(Utilities.changeFileExt(litPath, ".xml"));
+              } File file = new File(Utilities.changeFileExt(litPath, ".xml"));
               if (file.exists() && new File(Utilities.changeFileExt(litPath, ".json")).exists()) {
                 createAspRedirect(path, map.get(s), Utilities.pathURL(vpath, head(file.getName())));
               }
@@ -200,6 +221,8 @@ public class IGReleaseRedirectionBuilder {
             "    Response.Redirect(\""+link+"\");\r\n");
       }
     }
+    b.append("  else if (id == \"index\")\r\n" + 
+        "    Response.Redirect(\""+root+".html\");\r\n");
     b.append(     
         "\r\n" + 
         "%>\r\n" + 
@@ -223,9 +246,9 @@ public class IGReleaseRedirectionBuilder {
     
   }
 
-  private void generateWebConfig(Set<String> rtl) throws IOException {
+  private void generateWebConfig(Set<String> rtl, boolean root) throws IOException {
     StringBuilder b = new StringBuilder();
-    b.append(WC_START);
+    b.append(root ?  WC_START_ROOT : WC_START_OTHER);
     countTotal++;
     for (String rt : rtl) { 
       if (!Utilities.existsInList(rt, "v2", "v3")) {
@@ -249,6 +272,9 @@ public class IGReleaseRedirectionBuilder {
   }
 
   private String rulePrefix() {
+    if (folder.equals(websiteRootFolder)) {
+      return "";
+    }
     String t = folder.substring(websiteRootFolder.length()+1);
     t = t.replace("/", ".").replace("\\", ".");
     return t+".";
@@ -393,11 +419,14 @@ public class IGReleaseRedirectionBuilder {
     Map<String, String> res = new HashMap<>();
     for (Entry<String, JsonElement> p : json.getAsJsonObject("paths").entrySet()) {
       String key = p.getKey();
-      if (key.contains("|"))
+      if (key.contains("|")) {
         key = key.substring(0,  key.indexOf("|"));
+      }
       if (key.length() >= canonical.length()+1 && key.startsWith(canonical)) {
-      String value = p.getValue().getAsString();
-      res.put(key.substring(canonical.length()+1), Utilities.pathURL(vpath, value));
+        String value = p.getValue().getAsString();
+        res.put(key.substring(canonical.length()+1), Utilities.pathURL(vpath, value));
+      } else if (key.contains("/")) {
+        res.put(key, Utilities.pathURL(vpath, p.getValue().getAsString()));        
       }
     }
     return res;

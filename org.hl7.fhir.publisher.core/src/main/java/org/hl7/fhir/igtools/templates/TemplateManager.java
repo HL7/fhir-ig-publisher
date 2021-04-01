@@ -34,14 +34,13 @@ import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
-import org.hl7.fhir.utilities.JsonMerger;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.cache.NpmPackage;
-import org.hl7.fhir.utilities.cache.NpmPackage.NpmPackageFolder;
-import org.hl7.fhir.utilities.cache.PackageCacheManager;
-import org.hl7.fhir.utilities.cache.PackageGenerator.PackageType;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
+import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.npm.NpmPackage.NpmPackageFolder;
+import org.hl7.fhir.utilities.npm.PackageGenerator.PackageType;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -50,15 +49,16 @@ import com.google.gson.JsonObject;
 
 public class TemplateManager {
 
-  private PackageCacheManager pcm;
+  private FilesystemPackageCacheManager pcm;
   private ILoggingService logger;
   private List<JsonObject> configs = new ArrayList<JsonObject>();
   boolean canExecute;
   String templateThatCantExecute;
   String templateReason;
   String ghUrl;
+  List<String> templateList = new ArrayList<>();
 
-  public TemplateManager(PackageCacheManager pcm, ILoggingService logger, String ghUrl) {
+  public TemplateManager(FilesystemPackageCacheManager pcm, ILoggingService logger, String ghUrl) {
     this.pcm = pcm;
     this.logger = logger;
     this.ghUrl = ghUrl;
@@ -93,6 +93,7 @@ public class TemplateManager {
     NpmPackage npm = loadPackage(template, rootFolder);
     if (!npm.isType(PackageType.TEMPLATE))
       throw new FHIRException("The referenced package '"+template+"' does not have the correct type - is "+npm.type()+" but should be a template");
+    templateList.add(npm.name()+"#"+npm.version());
     loadedIds.add(npm.name());
     if (npm.getNpm().has("base")) {
       String baseTemplate = npm.getNpm().get("base").getAsString();
@@ -113,7 +114,12 @@ public class TemplateManager {
     boolean noScripts = true;
     JsonObject config = null;
     if (npm.hasFile(Utilities.path("package", "$root"), "config.json")) {
-      config = JsonTrackingParser.parseJson(npm.load(Utilities.path("package", "$root"), "config.json"));
+      try {
+        config = JsonTrackingParser.parseJson(npm.load(Utilities.path("package", "$root"), "config.json"));
+      } catch (Exception e) {
+        TextFile.streamToFile(npm.load(Utilities.path("package", "$root"), "config.json"), Utilities.path("[tmp]", npm.name()+"#"+npm.version()+"$config.json"));
+        throw new FHIRException("Error parsing "+npm.name()+"#"+npm.version()+"#"+Utilities.path("package", "$root", "config.json")+": "+e.getMessage(), e);
+      }
       configs.add(config);
       noScripts = !config.has("script") && !config.has("targets");
     }  
@@ -121,7 +127,7 @@ public class TemplateManager {
       for (NpmPackageFolder f : npm.getFolders().values()) {
         for (String n : f.listFiles()) {
           String s = extension(n);
-          if (!Utilities.existsInList(s, ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini", ".eot", ".otf", ".svg", ".ttf", ".woff", ".txt", ".yml")) {
+          if (!Utilities.existsInList(s, ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini", ".eot", ".otf", ".svg", ".ttf", ".woff", ".txt", ".yml", ".gitignore")) {
             noScripts = false;
             ext.add(s);
             break;
@@ -203,10 +209,13 @@ public class TemplateManager {
         "fhir.base.template",
         "hl7.base.template",
         "hl7.fhir.template",
+        "hl7.au.base.template",
+        "hl7.au.fhir.template",
         "hl7.utg.template",
         "hl7.be.fhir.template",
         "hl7.cda.template",
         "hl7.davinci.template",
+        "openhie.fhir.template",
         "ihe.fhir.template")) {
       canExecute = false;
       templateThatCantExecute = template;
@@ -219,7 +228,7 @@ public class TemplateManager {
       return true;
     if (template.equals(id))
       return true;
-    if (template.matches(PackageCacheManager.PACKAGE_VERSION_REGEX) && template.startsWith(id+"#"))
+    if (template.matches(FilesystemPackageCacheManager.PACKAGE_VERSION_REGEX) && template.startsWith(id+"#"))
       return true;
     return false;
   }
@@ -234,17 +243,20 @@ public class TemplateManager {
         }
       }
 
-      if (template.matches(PackageCacheManager.PACKAGE_REGEX)) {
+      if (template.matches(FilesystemPackageCacheManager.PACKAGE_REGEX)) {
         return pcm.loadPackage(template, "current");
       }
-      if (template.matches(PackageCacheManager.PACKAGE_VERSION_REGEX)) {
+      if (template.matches(FilesystemPackageCacheManager.PACKAGE_VERSION_REGEX)) {
         String[] p = template.split("\\#");
         return pcm.loadPackage(p[0], p[1]);
       }
       File f = new File(template);
+      if (!f.exists()) {
+        f = new File(Utilities.path(rootFolder, template));
+      }
       if (f.exists()) {
         if (f.isDirectory()) {
-          return NpmPackage.fromFolder(template);
+          return NpmPackage.fromFolder(f.getAbsolutePath());
         } else {
           return NpmPackage.fromPackage(new FileInputStream(template));
         }
@@ -260,7 +272,7 @@ public class TemplateManager {
         InputStream zip = connection.getInputStream();
         return NpmPackage.fromZip(zip, true, url.toString()); 
       }
-      throw new FHIRException("Unable to load template from "+template);
+      throw new FHIRException("Unable to load template from "+template+" cannot find template. Use a github URL, a local directory, or #[folder] for a contained template");
     } catch (Exception e) {
       throw new FHIRException("Error loading template "+template+": "+e.getMessage(), e);
     }
@@ -277,6 +289,10 @@ public class TemplateManager {
     } else {
       throw new FHIRException("Template syntax in URL referring to a github repository was not understood: "+template);
     }
+  }
+
+  public List<String> listTemplates() {
+    return templateList;
   }
   
 }

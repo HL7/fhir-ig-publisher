@@ -24,16 +24,13 @@ package org.hl7.fhir.igtools.publisher;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.hl7.fhir.r5.model.DomainResource;
-import org.hl7.fhir.r5.utils.NarrativeGenerator.ILiquidTemplateProvider;
-import org.hl7.fhir.r5.utils.NarrativeGenerator.ResourceContext;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext.ILiquidTemplateProvider;
 import org.hl7.fhir.utilities.TextFile;
-import org.hl7.fhir.utilities.Utilities;
 
 public class IGPublisherLiquidTemplateServices implements ILiquidTemplateProvider {
 
@@ -57,9 +54,14 @@ public class IGPublisherLiquidTemplateServices implements ILiquidTemplateProvide
   }
 
   @Override
-  public String findTemplate(ResourceContext rcontext, DomainResource r) {
+  public String findTemplate(RenderingContext rcontext, DomainResource r) {
     String s = r.fhirType();
     return templates.get(s.toLowerCase());
+  }
+
+  @Override
+  public String findTemplate(RenderingContext rcontext, String name) {
+    return templates.get(name.toLowerCase());
   }
 
 }

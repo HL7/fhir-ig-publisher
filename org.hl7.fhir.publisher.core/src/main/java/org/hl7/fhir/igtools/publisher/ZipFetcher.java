@@ -37,9 +37,9 @@ import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.r5.formats.FormatUtilities;
 import org.hl7.fhir.r5.model.CanonicalType;
+import org.hl7.fhir.r5.model.DataType;
 import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.DataType;
 import org.hl7.fhir.r5.model.UriType;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
@@ -67,7 +67,7 @@ public class ZipFetcher implements IFetchFile {
         String entryName = entry.getName();
 		  myLogger.logMessage(String.format("Found entry: {}", entryName));
 
-        FetchedFile ff = new FetchedFile();
+        FetchedFile ff = new FetchedFile(entryName);
         ff.setPath(entryName);
         ff.setName(SimpleFetcher.fileTitle(entryName));
         ff.setTime(entry.getTime());
@@ -289,6 +289,12 @@ public class ZipFetcher implements IFetchFile {
 
   private String normalisePath(String filename) {
     return filename.replace("\\", "/");
+  }
+
+  @Override
+  public void setRootDir(String rootDir) {
+    // TODO Auto-generated method stub
+    
   }
 
 }

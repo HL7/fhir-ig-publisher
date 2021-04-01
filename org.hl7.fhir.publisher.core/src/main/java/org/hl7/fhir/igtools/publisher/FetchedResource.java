@@ -34,6 +34,8 @@ import com.google.gson.JsonObject;
 public class FetchedResource {
   private String id;
   private String title;
+  private boolean trimmed;
+  private String type;
   private Resource resource;
   private Element element;
   private JsonObject config;
@@ -46,34 +48,50 @@ public class FetchedResource {
   private HashSet<FetchedResource> statedExamples = new HashSet<FetchedResource>();
   private HashSet<FetchedResource> foundExamples = new HashSet<FetchedResource>();
   private ImplementationGuideDefinitionResourceComponent resEntry;
+  private List<ProvenanceDetails> audits = new ArrayList<>();
 
   public Resource getResource() {
     return resource;
   }
+
   public void setResource(Resource resource) {
     this.resource = resource;
   }
+  
   public Element getElement() {
+    if (trimmed) {
+      throw new Error("Access element after it is unloaded");
+    }
     return element;
   }
+  
   public FetchedResource setElement(Element element) {
+    if (trimmed) {
+      throw new Error("Access element after it is unloaded");
+    }
+
     this.element = element;
+    type = element.fhirType();
     return this;
   }
 
   public String getId() {
     return id;
   }
+  
   public FetchedResource setId(String id) {
     this.id = id;
     return this;
   }
+  
   public Boolean hasTitle() {
     return title != null;
   }
+  
   public String getTitle() {
-    return title == null ? element.fhirType()+"/" + id : title;
+    return title == null ? type+"/" + id : title;
   }
+  
   public FetchedResource setTitle(String title) {
     this.title = title;
     return this;
@@ -82,6 +100,7 @@ public class FetchedResource {
   public JsonObject getConfig() {
     return config;
   }
+  
   public void setConfig(JsonObject config) {
     this.config = config;
   }
@@ -89,9 +108,11 @@ public class FetchedResource {
   public boolean isValidated() {
     return validated;
   }
+  
   public void setValidated(boolean validated) {
     this.validated = validated;
   }
+  
   public List<String> getProfiles(boolean statedOnly) {
     List<String> res = new ArrayList<>();
     res.addAll(statedProfiles);
@@ -100,24 +121,29 @@ public class FetchedResource {
     }
     return res;
   }
+  
   public List<String> getStatedProfiles() {
     return statedProfiles;
   }
+  
   public List<String> getFoundProfiles() {
     return foundProfiles;
   }
+  
   public String getUrlTail() {
-    return "/"+element.fhirType()+"/"+id;
+    return "/"+type+"/"+id;
   }
+  
   public boolean isSnapshotted() {
     return snapshotted;
   }
+  
   public void setSnapshotted(boolean snapshotted) {
-    this.snapshotted = snapshotted;
-    
+    this.snapshotted = snapshotted;  
   }
-  public Object getLocalRef() {
-    return element.fhirType()+"/"+id;
+  
+  public String getLocalRef() {
+    return type+"/"+id;
   }
 
   public String getExampleUri() {
@@ -129,7 +155,7 @@ public class FetchedResource {
   }  
 
   public boolean isExample() {
-    return (this.exampleUri != null);
+    return (this.exampleUri != null) || (resEntry != null && resEntry.hasExample() && (!resEntry.hasExampleBooleanType() && !resEntry.getExampleBooleanType().booleanValue()));
   }  
 
   public HashSet<FetchedResource> getFoundExamples() {
@@ -149,11 +175,11 @@ public class FetchedResource {
   }
   
   public String fhirType() {
-    return resource != null ? resource.fhirType() : element != null ? element.fhirType() : "?fr?";
+    return type != null ? type : resource != null ? resource.fhirType() : element != null ? element.fhirType() : "?fr?";
   }
+  
   public void setResEntry(ImplementationGuideDefinitionResourceComponent value) {
     this.resEntry = value;
-    
   }
 
   /**
@@ -169,6 +195,21 @@ public class FetchedResource {
   public void setValidateAsResource(boolean validateAsResource) {
     this.validateAsResource = validateAsResource;
   }
-  
+  public List<ProvenanceDetails> getAudits() {
+    return audits;
+  }
+  public boolean hasHistory() {
+    return !audits.isEmpty();
+  }
+
+  public void trim() {
+    if (!fhirType().equals("StructureDefinition")) {
+      trimmed = true;
+      if (element != null) {
+        element.clear();
+      }
+      element = null;
+    }
+  }
   
 }

@@ -1,17 +1,11 @@
 package org.hl7.fhir.igtools.publisher.utils;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.text.DateFormat;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -31,8 +25,6 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
-import org.hl7.fhir.convertors.R3ToR5Loader;
-import org.hl7.fhir.convertors.R4ToR5Loader;
 import org.hl7.fhir.convertors.VersionConvertor_10_30;
 import org.hl7.fhir.convertors.VersionConvertor_10_40;
 import org.hl7.fhir.convertors.VersionConvertor_14_50;
@@ -43,23 +35,16 @@ import org.hl7.fhir.dstu2.formats.JsonParser;
 import org.hl7.fhir.dstu2.model.StructureDefinition;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
-import org.hl7.fhir.igtools.publisher.IGVersionUtil;
-import org.hl7.fhir.igtools.publisher.Publisher;
-import org.hl7.fhir.igtools.publisher.Publisher.CacheOption;
-import org.hl7.fhir.igtools.publisher.Publisher.IGBuildMode;
-import org.hl7.fhir.igtools.publisher.utils.PackageReleaser.VersionDecision;
-import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.utils.StructureMapUtilities;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.cache.NpmPackage;
-import org.hl7.fhir.utilities.cache.PackageCacheManager;
-import org.hl7.fhir.utilities.cache.ToolsVersion;
 import org.hl7.fhir.utilities.json.JSONUtil;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
+import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.npm.ToolsVersion;
 import org.hl7.fhir.utilities.xml.XMLUtil;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -149,7 +134,7 @@ public class PackageReleaser {
   private File xml;
   private IniFile config;
 
-  private PackageCacheManager pcm;
+  private FilesystemPackageCacheManager pcm;
 
 
   // 2 parameters: source of package, package dest folder
@@ -165,7 +150,7 @@ public class PackageReleaser {
   }
 
   private void release(String source, String dest) throws Exception {
-    pcm = new PackageCacheManager(true, ToolsVersion.TOOLS_VERSION);
+    pcm = new FilesystemPackageCacheManager(true, ToolsVersion.TOOLS_VERSION);
     System.out.println("Load hl7.fhir.r4.core");
     r4 = org.hl7.fhir.r4.context.SimpleWorkerContext.fromPackage(pcm.loadPackage("hl7.fhir.r4.core", "4.0.1"));
     System.out.println("Load hl7.fhir.r3.core");
@@ -743,6 +728,7 @@ public class PackageReleaser {
       addTextChild(item, "guid", Utilities.pathURL(linkRoot, npm.name(), npm.version(), "package.tgz")).setAttribute("isPermaLink", "true");
       addTextChild(item, "dc:creator", "FHIR Project");
       addTextChild(item, "fhir:kind", npm.type());
+      addTextChild(item, "fhir:version", npm.fhirVersion());
       addTextChild(item, "pubDate", df.format(new Date()));
       txt = rss.createTextNode("\n    ");
       item.appendChild(txt);

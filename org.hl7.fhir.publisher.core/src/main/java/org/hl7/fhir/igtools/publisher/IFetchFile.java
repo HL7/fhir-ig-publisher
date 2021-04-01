@@ -50,4 +50,5 @@ public interface IFetchFile {
   void setResourceDirs(List<String> theResourceDirs);
   InputStream openAsStream(String filename) throws FileNotFoundException;
   String openAsString(String path) throws FileNotFoundException, IOException;
+  void setRootDir(String rootDir);
 }

@@ -8,7 +8,6 @@ import java.util.List;
 
 import org.hl7.fhir.igtools.publisher.CqlSubSystem.CqlSourceFileInformation;
 import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.elementmodel.ObjectConverter;
 import org.hl7.fhir.r5.model.Attachment;
 import org.hl7.fhir.r5.model.Base;
 import org.hl7.fhir.r5.model.Base64BinaryType;
@@ -16,7 +15,6 @@ import org.hl7.fhir.r5.model.Library;
 import org.hl7.fhir.r5.model.Property;
 import org.hl7.fhir.r5.model.RelatedArtifact.RelatedArtifactType;
 import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
@@ -304,10 +302,15 @@ public class AdjunctFileLoader {
     if (info != null) {
       f.getErrors().addAll(info.getErrors());
       lib.addContent().setContentType("application/elm+xml").setData(info.getElm());
+      if (info.getJsonElm() != null) {
+        lib.addContent().setContentType("application/elm+json").setData(info.getJsonElm());
+      }
       lib.getDataRequirement().clear();
       lib.getDataRequirement().addAll(info.getDataRequirements());
       lib.getRelatedArtifact().removeIf(n -> n.getType() == RelatedArtifactType.DEPENDSON);
       lib.getRelatedArtifact().addAll(info.getRelatedArtifacts());
+      lib.getParameter().clear();
+      lib.getParameter().addAll(info.getParameters());
     } else {
       f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, "Library", "No cql info found for "+f.getName(), IssueSeverity.ERROR));      
     }

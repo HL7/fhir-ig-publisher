@@ -59,7 +59,12 @@ public class FetchedFile {
   private List<String> files; // if it's a folder
   private int processMode;
   private Set<String> outputNames = new HashSet<String>();
+  private String statedPath;  
   
+  public FetchedFile(String statedPath) {
+    super();
+    this.statedPath = statedPath;
+  }
   public String getPath() {
     return path;
   }
@@ -120,9 +125,7 @@ public class FetchedFile {
     this.hash =Arrays.hashCode(source);
   }
   
-  public void dropSource() {
-    source = null;  
-  }
+
   public List<FetchedResource> getResources() {
     return resources;
   }
@@ -186,6 +189,16 @@ public class FetchedFile {
   @Override
   public String toString() {
     return "FetchedFile["+name+"]";
+  }
+  public String getStatedPath() {
+    return statedPath;
+  }
+  public void trim() {
+    source = null;
+    for (FetchedResource r : resources) {
+      r.trim();
+    }
+    
   }
   
 }

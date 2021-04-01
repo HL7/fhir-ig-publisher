@@ -3,25 +3,19 @@ package org.hl7.fhir.igtools.renderers;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
-import org.hl7.fhir.igtools.renderers.CrossViewRenderer.ObsListSorter;
-import org.hl7.fhir.r4.model.CanonicalType;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.ValidationResult;
+import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeableConcept;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.Narrative;
 import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionSnapshotComponent;
-import org.hl7.fhir.r5.terminologies.TerminologyRenderer;
-import org.hl7.fhir.r5.utils.NarrativeGenerator;
+import org.hl7.fhir.r5.renderers.DataRenderer;
+import org.hl7.fhir.r5.renderers.TerminologyRenderer;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.validation.ValidationOptions;
 
@@ -373,7 +367,7 @@ public class CrossViewRenderer {
           if (cat.isEmpty()) {
             b.append("<p>All the observations have the no assigned category</p>\r\n");            
           } else {
-            b.append("<p>All the observations have the category "+new NarrativeGenerator("", "", context).describeCoding(cat, false)+"</p>\r\n");
+            b.append("<p>All the observations have the category "+new DataRenderer(context).displayCoding(cat)+"</p>\r\n");
           }
           hasCat = false;
         }

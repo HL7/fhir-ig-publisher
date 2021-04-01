@@ -32,10 +32,13 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.igtools.publisher.SpecMapManager.SpecialPackageType;
 import org.hl7.fhir.r5.model.Constants;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.npm.ToolsVersion;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -54,6 +57,10 @@ import com.google.gson.JsonSyntaxException;
  */
 public class SpecMapManager {
 
+  public enum SpecialPackageType {
+    Simplifier, PhinVads, Vsac
+  }
+
   private JsonObject spec;
   private JsonObject paths;
   private JsonObject pages;
@@ -65,6 +72,8 @@ public class SpecMapManager {
   private Set<String> targetSet = new HashSet<String>();
   private Set<String> imageSet = new HashSet<String>();
   private String version;
+  private NpmPackage pi;
+  private SpecialPackageType special;
 
   public SpecMapManager(String npmName, String igVersion, String toolVersion, String buildId, Calendar genDate, String webUrl) {
     spec = new JsonObject();
@@ -74,8 +83,10 @@ public class SpecMapManager {
     spec.addProperty("tool-version", toolVersion);
     spec.addProperty("tool-build", buildId);
     spec.addProperty("webUrl", webUrl);
-    spec.addProperty("date", new SimpleDateFormat("yyyy-MM-dd", new Locale("en", "US")).format(genDate.getTime()));
-    spec.addProperty("date-time", new SimpleDateFormat("yyyyMMddhhmmssZ", new Locale("en", "US")).format(genDate.getTime()));
+    if (genDate != null) {
+      spec.addProperty("date", new SimpleDateFormat("yyyy-MM-dd", new Locale("en", "US")).format(genDate.getTime()));
+      spec.addProperty("date-time", new SimpleDateFormat("yyyyMMddhhmmssZ", new Locale("en", "US")).format(genDate.getTime()));
+    }
     paths = new JsonObject();
     spec.add("paths", paths);
     pages = new JsonObject();
@@ -101,6 +112,10 @@ public class SpecMapManager {
       for (JsonElement e : images) {
         imageSet.add(((JsonPrimitive) e).getAsString());
     }
+  }
+
+  public static SpecMapManager fromPackage(NpmPackage pi) throws JsonSyntaxException, IOException {
+    return new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion());
   }
 
   public void path(String url, String path) {
@@ -142,13 +157,26 @@ public class SpecMapManager {
     return str(spec, "webUrl");
   }
 
-  public String getPath(String url) throws Exception {
+  public String getPath(String url, String def) throws FHIRException {
     if (url == null) {
       return null;
     }
     if (paths.has(url)) {
-      return strOpt(paths, url);
-      
+      return strOpt(paths, url);      
+    }
+    String path = getSpecialPath(url);
+    if (path != null) {
+      return path;
+    }
+    if (def != null) {
+      return def;
+    }
+    if (special != null) {
+      switch (special) {
+      case Simplifier: return "https://simplifier.net/resolve?scope="+pi.name()+"@"+pi.version()+"&canonical="+url;
+      case PhinVads:  return "??phinvads??";
+      case Vsac: return url.replace("http://cts.nlm.nih.gov/fhir/ValueSet/", "https://vsac.nlm.nih.gov/valueset/")+"/expansion";
+      }
     }
     if (url.matches(Constants.URI_REGEX)) {
       int cc = 0;
@@ -162,6 +190,18 @@ public class SpecMapManager {
       String u = url.substring(cursor+2);
       return strOpt(paths, u);
       
+    }
+    
+    return null;
+  }
+
+  // hack around things missing in spec.internals 
+  private String getSpecialPath(String url) {
+    if ("http://hl7.org/fhir/ValueSet/iso3166-1-3".equals(url)) {
+      return Utilities.pathURL(base, "valueset-iso3166-1-3.html");
+    }
+    if ("http://hl7.org/fhir/ValueSet/iso3166-1-2".equals(url)) {
+      return Utilities.pathURL(base, "valueset-iso3166-1-2.html");
     }
     return null;
   }
@@ -295,6 +335,9 @@ public class SpecMapManager {
   }
 
   public boolean hasImage(String tgt) {
+    if (tgt == null) {
+      return false;
+    }
     if (tgt.startsWith(base+"/"))
       tgt = tgt.substring(base.length()+1);
     else if (tgt.startsWith(base))
@@ -326,6 +369,19 @@ public class SpecMapManager {
     List<String> res = new ArrayList<String>();
     for (Entry<String, JsonElement> e : pages.entrySet()) 
       res.add(e.getKey());
+    return res;
+  }
+
+  public static SpecMapManager createSpecialPackage(NpmPackage pi) {
+    SpecMapManager res = new SpecMapManager(pi.name(), pi.fhirVersion(), ToolsVersion.TOOLS_VERSION_STR, null, null, pi.url());
+    if (pi.name().equals("us.cdc.phinvads")) {
+      res.special = SpecialPackageType.PhinVads;
+    } else if (pi.name().equals("us.nlm.vsac")) {
+      res.special = SpecialPackageType.Vsac;
+    } else {
+      res.special = SpecialPackageType.Simplifier;  
+    }
+    res.pi = pi;
     return res;
   }
 

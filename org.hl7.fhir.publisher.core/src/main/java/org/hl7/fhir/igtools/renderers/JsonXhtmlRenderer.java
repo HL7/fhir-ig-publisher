@@ -52,13 +52,27 @@ public class JsonXhtmlRenderer extends TranslatingUtilities implements JsonCreat
   public void setIndent(String indent) {
     this.indent = indent;
   }
-  
+
+  private boolean prism;
+
+  public boolean isPrism() {
+    return prism;
+  }
+
+  public void setPrism(boolean prism) {
+    this.prism = prism;
+  }
+
   @Override
   public void beginObject() throws IOException {
     checkInArray();
     if (b == null) {
       b = new StringBuilder();
-      b.append("<pre class=\"json\">\r\n");
+      if (prism) {
+        b.append("<pre class=\"json\"><code class=\"language-json\">\r\n");
+      } else {
+        b.append("<pre class=\"json\"><code>\r\n");
+      }
     }
     levels.add(0, new LevelInfo(false));
     b.append("{\r\n");
@@ -169,7 +183,7 @@ public class JsonXhtmlRenderer extends TranslatingUtilities implements JsonCreat
 
   @Override
   public void finish() throws IOException {
-    b.append("</pre>\r\n");
+    b.append("</code></pre>\r\n");
   }
 
   @Override

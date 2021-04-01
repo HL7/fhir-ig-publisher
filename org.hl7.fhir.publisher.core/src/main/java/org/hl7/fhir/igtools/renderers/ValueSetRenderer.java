@@ -30,14 +30,13 @@ import java.util.List;
 import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.DataRequirement;
 import org.hl7.fhir.r5.model.DataRequirement.DataRequirementCodeFilterComponent;
 import org.hl7.fhir.r5.model.ElementDefinition;
-import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.PlanDefinition;
 import org.hl7.fhir.r5.model.PlanDefinition.PlanDefinitionActionComponent;
 import org.hl7.fhir.r5.model.Questionnaire;
@@ -47,75 +46,30 @@ import org.hl7.fhir.r5.model.TriggerDefinition;
 import org.hl7.fhir.r5.model.UriType;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
+import org.hl7.fhir.r5.renderers.RendererFactory;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
-import org.hl7.fhir.r5.utils.NarrativeGenerator;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.cache.NpmPackage;
+import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
-public class ValueSetRenderer extends BaseRenderer {
+public class ValueSetRenderer extends CanonicalRenderer {
 
   private ValueSet vs;
 
-  public ValueSetRenderer(IWorkerContext context, String prefix, ValueSet vs, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, NarrativeGenerator gen) {
-    super(context, prefix, igp, maps, markdownEngine, packge, gen);
+  public ValueSetRenderer(IWorkerContext context, String corePath, ValueSet vs, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
+    super(context, corePath, vs, null, igp, maps, markdownEngine, packge, gen);
     this.vs = vs; 
   }
 
-  public String summary(FetchedResource r, boolean xml, boolean json, boolean ttl) throws Exception {
-    StringBuilder b = new StringBuilder();
-    b.append("<table class=\"grid\">\r\n");
-    b.append(" <tbody><tr><td>"+translate("vs.summary", "Defining URL")+":</td><td>"+Utilities.escapeXml(vs.getUrl())+"</td></tr>\r\n");
-    if (vs.hasVersion()) {
-      b.append(" <tr><td>"+translate("cs.summary", "Version")+":</td><td>"+Utilities.escapeXml(vs.getVersion())+"</td></tr>\r\n");
+  @Override
+  protected void genSummaryRowsSpecific(StringBuilder b) {
+    if (ValueSetUtilities.hasOID(vs)) {
+      b.append(" <tr><td>"+translate("cr.summary", "OID")+":</td><td>"+ValueSetUtilities.getOID(vs)+" ("+translate("cr.summary", "for OID based terminology systems")+")</td></tr>\r\n");
     }
-    if (vs.hasName()) {
-      b.append(" <tr><td>"+translate("vs.summary", "Name")+":</td><td>"+Utilities.escapeXml(gt(vs.getNameElement()))+"</td></tr>\r\n");
-    }
-    b.append(" <tr><td>"+translate("cs.summary", "Status")+":</td><td>"+describeStatus(vs.getStatus(), vs.getExperimental())+"</td></tr>\r\n");
-    if (vs.hasTitle()) {
-      b.append(" <tr><td>"+translate("vs.summary", "Title")+":</td><td>"+Utilities.escapeXml(gt(vs.getTitleElement()))+"</td></tr>\r\n");
-    }
-    if (vs.hasDescription()) {
-      b.append(" <tr><td>"+translate("vs.summary", "Definition")+":</td><td>"+processMarkdown("description", vs.getDescriptionElement())+"</td></tr>\r\n");
-    }
-    if (vs.hasPublisher())
-      b.append(" <tr><td>"+translate("vs.summary", "Publisher")+":</td><td>"+Utilities.escapeXml(gt(vs.getPublisherElement()))+"</td></tr>\r\n");
-    if (ValueSetUtilities.hasOID(vs))
-      b.append(" <tr><td>"+translate("vs.summary", "OID")+":</td><td>"+ValueSetUtilities.getOID(vs)+" ("+translate("vs.summary", "for OID based terminology systems")+")</td></tr>\r\n");
-    if (vs.hasCopyright())
-      b.append(" <tr><td>"+translate("vs.summary", "Copyright")+":</td><td>"+processMarkdown("copyright", vs.getCopyrightElement())+"</td></tr>\r\n");
-    if (ToolingExtensions.hasExtension(vs, ToolingExtensions.EXT_FMM_LEVEL)) {
-      // Use hard-coded spec link to point to current spec because DSTU2 had maturity listed on a different page
-      b.append(" <tr><td><a class=\"fmm\" href=\"http://hl7.org/fhir/versions.html#maturity\" title=\"Maturity Level\">"+translate("cs.summary", "Maturity")+"</a>:</td><td>"+ToolingExtensions.readStringExtension(vs, ToolingExtensions.EXT_FMM_LEVEL)+"</td></tr>\r\n");
-    }
-    if (xml || json || ttl) {
-      b.append(" <tr><td>"+translate("vs.summary", "Source Resource")+":</td><td>");
-      boolean first = true;
-      String filename = igp.getProperty(r, "format");
-      if (filename == null)
-        filename = "ValueSet-"+r.getId()+".{{[fmt]}}.html";
-      if (xml) {
-        first = false;
-        b.append("<a href=\""+igp.doReplacements(filename,  r,  null, "xml")+"\">"+translate("vs.summary", "XML")+"</a>");
-      }
-      if (json) {
-        if (first) first = false; else b.append(" / ");
-        b.append("<a href=\""+igp.doReplacements(filename,  r,  null, "json")+"\">"+translate("vs.summary", "JSON")+"</a>");
-      }
-      if (ttl) {
-        if (first) first = false; else b.append(" / ");
-        b.append("<a href=\""+igp.doReplacements(filename,  r,  null, "ttl")+"\">"+translate("vs.summary", "Turtle")+"</a>");
-      }
-      b.append("</td></tr>\r\n");
-    }
-    b.append("</tbody></table>\r\n");
-
-    return b.toString();
   }
 
   public String cld(Set<String> outputTracker) throws EOperationOutcome, FHIRException, IOException, org.hl7.fhir.exceptions.FHIRException  {
@@ -128,7 +82,10 @@ public class ValueSetRenderer extends BaseRenderer {
     }
     ValueSet vsc = vs.copy();
     vsc.setText(null);
-    gen.generate(null, vsc, vsc, false);
+    if (vsc.hasCompose()) {
+      vsc.setExpansion(null); // we don't want to render an expansion by mistake
+    }
+    RendererFactory.factory(vsc, gen).render(vsc);
     return "<h3>Logical Definition (CLD)</h3>\r\n" + new XhtmlComposer(XhtmlComposer.HTML).compose(vsc.getText().getDiv());
   }
 
@@ -136,103 +93,104 @@ public class ValueSetRenderer extends BaseRenderer {
     StringBuilder b = new StringBuilder();
     boolean first = true;
     b.append("\r\n");
-    Set<String> sdurls = new HashSet<String>();
-    Set<String> vsurls = new HashSet<String>();
-    Set<String> pdurls = new HashSet<String>();
-    Set<String> qurls = new HashSet<String>();
-    for (CanonicalResource sd : context.allConformanceResources()) {
-      if (sd instanceof StructureDefinition)
-        sdurls.add(sd.getUrl());
-      if (sd instanceof ValueSet)
-        vsurls.add(sd.getUrl());
-      if (sd instanceof PlanDefinition)
-        pdurls.add(sd.getUrl());
-      if (sd instanceof Questionnaire && sd.hasUrl())
-        qurls.add(sd.getUrl());
-    }
-    
-    for (String url : sorted(vsurls)) {
-      ValueSet vc = context.fetchResource(ValueSet.class, url);
-      for (ConceptSetComponent t : vc.getCompose().getInclude()) {
-        for (UriType ed : t.getValueSet()) {
-          if (ed.getValueAsString().equals(vs.getUrl())) {
-            if (first) {
-              first = false;
-              b.append("<ul>\r\n");
-            }
-            b.append(" <li>"+translate("vs.usage", "Included into ")+"<a href=\""+vc.getUserString("path")+"\">"+Utilities.escapeXml(gt(vc.getNameElement()))+"</a></li>\r\n");
-            break;
-          }
-        }
+    if (vs.hasUrl()) {
+      Set<String> sdurls = new HashSet<String>();
+      Set<String> vsurls = new HashSet<String>();
+      Set<String> pdurls = new HashSet<String>();
+      Set<String> qurls = new HashSet<String>();
+      for (CanonicalResource sd : context.allConformanceResources()) {
+        if (sd instanceof StructureDefinition)
+          sdurls.add(sd.getUrl());
+        if (sd instanceof ValueSet)
+          vsurls.add(sd.getUrl());
+        if (sd instanceof PlanDefinition)
+          pdurls.add(sd.getUrl());
+        if (sd instanceof Questionnaire && sd.hasUrl())
+          qurls.add(sd.getUrl());
       }
-      for (ConceptSetComponent t : vc.getCompose().getExclude()) {
-        for (UriType ed : t.getValueSet()) {
-          if (ed.getValueAsString().equals(vs.getUrl())) {
-            if (first) {
-              first = false;
-              b.append("<ul>\r\n");
-            }
-            b.append(" <li>"+translate("vs.usage", "Excluded from ")+"<a href=\""+vc.getUserString("path")+"\">"+Utilities.escapeXml(gt(vc.getNameElement()))+"</a></li>\r\n");
-            break;
-          }
-        }
-      }
-    }
-    for (String url : sorted(sdurls)) {
-      StructureDefinition sd = context.fetchResource(StructureDefinition.class, url);
-      if (sd != null) {
-        for (ElementDefinition ed : sd.getSnapshot().getElement()) {
-          if (ed.hasBinding() && ed.getBinding().hasValueSet()) {
-            if ((ed.getBinding().hasValueSet() && ed.getBinding().getValueSet().equals(vs.getUrl()))) {
+
+      for (String url : sorted(vsurls)) {
+        ValueSet vc = context.fetchResource(ValueSet.class, url);
+        for (ConceptSetComponent t : vc.getCompose().getInclude()) {
+          for (UriType ed : t.getValueSet()) {
+            if (ed.getValueAsString().equals(vs.getUrl())) {
               if (first) {
                 first = false;
                 b.append("<ul>\r\n");
               }
-              String path = sd.getUserString("path");
-              if (path == null) {
-                System.out.println("No path for "+sd.getUrl());
-              } else {
-                b.append(" <li><a href=\""+path+"\">"+Utilities.escapeXml(sd.present())+"</a></li>\r\n");
+              b.append(" <li>"+translate("vs.usage", "Included into ")+"<a href=\""+vc.getUserString("path")+"\">"+Utilities.escapeXml(gt(vc.getNameElement()))+"</a></li>\r\n");
+              break;
+            }
+          }
+        }
+        for (ConceptSetComponent t : vc.getCompose().getExclude()) {
+          for (UriType ed : t.getValueSet()) {
+            if (ed.getValueAsString().equals(vs.getUrl())) {
+              if (first) {
+                first = false;
+                b.append("<ul>\r\n");
               }
+              b.append(" <li>"+translate("vs.usage", "Excluded from ")+"<a href=\""+vc.getUserString("path")+"\">"+Utilities.escapeXml(gt(vc.getNameElement()))+"</a></li>\r\n");
               break;
             }
           }
         }
       }
-    }
-    
-    for (String url : sorted(qurls)) {
-      Questionnaire q = context.fetchResource(Questionnaire.class, url);
-      if (q != null) {
-        if (questionnaireUsesValueSet(q.getItem(), vs.getUrl())) {
+      for (String url : sorted(sdurls)) {
+        StructureDefinition sd = context.fetchResource(StructureDefinition.class, url);
+        if (sd != null) {
+          for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+            if (ed.hasBinding() && ed.getBinding().hasValueSet()) {
+              if ((ed.getBinding().hasValueSet() && ed.getBinding().getValueSet().equals(vs.getUrl()))) {
+                if (first) {
+                  first = false;
+                  b.append("<ul>\r\n");
+                }
+                String path = sd.getUserString("path");
+                if (path == null) {
+                  System.out.println("No path for "+sd.getUrl());
+                } else {
+                  b.append(" <li><a href=\""+path+"\">"+Utilities.escapeXml(sd.present())+"</a></li>\r\n");
+                }
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      for (String url : sorted(qurls)) {
+        Questionnaire q = context.fetchResource(Questionnaire.class, url);
+        if (q != null) {
+          if (questionnaireUsesValueSet(q.getItem(), vs.getUrl())) {
+            if (first) {
+              first = false;
+              b.append("<ul>\r\n");
+            }
+            String path = q.getUserString("path");
+            if (path == null) {
+              System.out.println("No path for "+q.getUrl());
+            } else {
+              b.append(" <li><a href=\""+path+"\">"+Utilities.escapeXml(q.present())+"</a></li>\r\n");
+            }
+            break;
+          }
+        }
+      }
+
+      for (String u : sorted(pdurls)) {
+        PlanDefinition pd = context.fetchResource(PlanDefinition.class, u);
+        if (referencesValueSet(pd)) {
           if (first) {
             first = false;
             b.append("<ul>\r\n");
           }
-          String path = q.getUserString("path");
-          if (path == null) {
-            System.out.println("No path for "+q.getUrl());
-          } else {
-            b.append(" <li><a href=\""+path+"\">"+Utilities.escapeXml(q.present())+"</a></li>\r\n");
-          }
-          break;
+          b.append(" <li>Used as a trigger criteria in <a href=\""+pd.getUserString("path")+"\">"+Utilities.escapeXml(pd.present())+"</a></li>\r\n");
         }
       }
     }
-    
-    for (String u : sorted(pdurls)) {
-      PlanDefinition pd = context.fetchResource(PlanDefinition.class, u);
-      if (referencesValueSet(pd)) {
-        if (first) {
-          first = false;
-          b.append("<ul>\r\n");
-        }
-        b.append(" <li>Used as a trigger criteria in <a href=\""+pd.getUserString("path")+"\">"+Utilities.escapeXml(pd.present())+"</a></li>\r\n");
-      }
-    }
-    
     if (first)
-      b.append("<p>"+translate("vs.usage", "This value set is not used")+"</p>\r\n");
+      b.append("<p>"+translate("vs.usage", "This value set is not used here; it may be used elsewhere (e.g. specifications and/or implementations that use this content)")+"</p>\r\n");
     else
       b.append("</ul>\r\n");
     return b.toString();

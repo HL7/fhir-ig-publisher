@@ -39,7 +39,8 @@ import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
-import org.hl7.fhir.igtools.renderers.ValidationPresenter.FiledValidationMessage;
+import org.hl7.fhir.igtools.publisher.PreviousVersionComparator;
+import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
 import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.model.Bundle;
 import org.hl7.fhir.r5.model.Bundle.BundleEntryComponent;
@@ -59,6 +60,7 @@ import org.stringtemplate.v4.ST;
 
 public class ValidationPresenter extends TranslatingUtilities implements Comparator<FetchedFile> {
 
+
   public class FiledValidationMessage {
 
     private FetchedFile f;
@@ -74,17 +76,17 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     public ValidationMessage getVm() {
       return vm;
     }
-    
-
   }
 
   private static final String INTERNAL_LINK = "internal";
+  private static final boolean NO_FILTER = false;
   private String statedVersion;
   private IGKnowledgeProvider provider;
   private IGKnowledgeProvider altProvider;
   int err = 0;
   int warn = 0;
   int info = 0;
+  int link = 0;
   private String root;
   private String packageId;
   private String altPackageId;
@@ -92,9 +94,17 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private String ballotCheck;
   private String toolsVersion;
   private String currentToolsVersion;
+  private String versionRulesCheck;
+  private RealmBusinessRules realm;
+  private PreviousVersionComparator previousVersionComparator;
+  private String csAnalysis;
+  private String igcode;
+  private String igCodeError;
+  private String igrealm;
+  private String igRealmError;
 
   public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, String ballotCheck, 
-      String toolsVersion, String currentToolsVersion) {
+      String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, String dependencies, String csAnalysis, String versionRulesCheck) {
     super();
     this.statedVersion = statedVersion;
     this.igVersion = igVersion;
@@ -104,8 +114,36 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     this.packageId = packageId;
     this.altPackageId = altPackageId;
     this.ballotCheck = ballotCheck;
+    this.realm = realm;
     this.toolsVersion = toolsVersion;
     this.currentToolsVersion = currentToolsVersion;
+    this.previousVersionComparator = previousVersionComparator;
+    this.dependencies = dependencies;
+    this.csAnalysis = csAnalysis;
+    this.versionRulesCheck = versionRulesCheck;
+    determineCode();
+  }
+
+  private void determineCode() {
+    if (provider.getCanonical().startsWith("http://hl7.org/fhir")) {
+      String[] u = provider.getCanonical().split("\\/");
+      String ucode = u[u.length-1];
+      String[] p = packageId.split("\\.");
+      String pcode = p[p.length-1];
+      igcode = ucode;
+      if (!ucode.equals(pcode)) {
+        igCodeError = "Error: codes in canonical and package id are different: "+ucode+" vs "+pcode+".";
+      }
+      igrealm = p[p.length-2];
+      String urealm = u[u.length-2];
+      if (!igrealm.equals(urealm)) {
+        igRealmError = "Error: realms in canonical and package id are different: "+igrealm+" vs "+urealm;
+      } else if (!igrealm.equalsIgnoreCase(realm.code())) {
+        igRealmError = "Error: realms in IG definition and package id are different: "+igrealm+" vs "+realm.code();
+      }
+    } else {
+      this.igcode = "n/a";
+    }
   }
 
   private List<FetchedFile> sorted(List<FetchedFile> files) {
@@ -123,54 +161,27 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
           err++;
         else if (vm.getLevel().equals(ValidationMessage.IssueSeverity.WARNING))
           warn++;
-        else
+        else if (!vm.isSignpost()) {
           info++;
+        }
       }
     }
     
     List<ValidationMessage> linkErrors = filterMessages(allErrors, true, filteredMessages.keySet()); 
-    StringBuilder b = new StringBuilder();
-    b.append(genHeader(title, err, warn, info, linkErrors.size(), filteredMessages.size()));
-    b.append(genSummaryRowInteral(linkErrors));
-    files = sorted(files);
-    for (FetchedFile f : files) 
-      b.append(genSummaryRow(f, filteredMessages));
-    b.append(genEnd());
-    b.append(genStartInternal());
-    int id = 0;
     for (ValidationMessage vm : linkErrors) {
-      b.append(genDetails(vm, id));
-      id++;
-    }
-    b.append(genEnd());
-    for (FetchedFile f : files) {
-      b.append(genStart(f));
-      if (f.getErrors().size() > 0)
-        b.append(startTemplateErrors);
-      else
-        b.append(startTemplateNoErrors);
-      for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages.keySet())) {
-        b.append(genDetails(vm, id));
-        id++;
-      }
-      b.append(genEnd());
-    }    
-    b.append(genSuppressedMessages(filteredMessages));
-    for (String n : messageIdNames()) {
-      List<FiledValidationMessage> fvml = new ArrayList<>();    
-      for (FetchedFile f : files) {
-        getMatchingMessages(f, n, fvml, filteredMessages);
-      }
-      if (fvml.size() > 0) {
-        b.append(genGroupStart(n));
-        for (FiledValidationMessage fvm : fvml) {
-          b.append(genGroupDetails(fvm.getF(), fvm.getVm()));
-        }
-        b.append(genGroupEnd());
+      if (vm.getSource() == Source.LinkChecker) {
+        link++;
+      } else if (vm.getLevel().equals(ValidationMessage.IssueSeverity.FATAL)||vm.getLevel().equals(ValidationMessage.IssueSeverity.ERROR))
+        err++;
+      else if (vm.getLevel().equals(ValidationMessage.IssueSeverity.WARNING))
+        warn++;
+      else if (!vm.isSignpost()) {
+        info++;
       }
     }
-    b.append(genFooter(title));
-    TextFile.stringToFile(b.toString(), path);
+    
+    files = genQAHtml(title, files, path, filteredMessages, linkErrors, false);
+    files = genQAHtml(title, files, path, filteredMessages, linkErrors, true);
 
     Bundle validationBundle = new Bundle().setType(Bundle.BundleType.COLLECTION);
     OperationOutcome oo = new OperationOutcome();
@@ -200,7 +211,15 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     new XmlParser().compose(s, validationBundle, true);
     s.close();
 
-    b = new StringBuilder();
+    genQAText(title, files, path, filteredMessages, linkErrors);
+    
+    String summary = "Errors: " + err + ", Warnings: " + warn + ", Info: " + info+", Broken Links = "+link;
+    return path + "\r\n" + summary;
+  }
+
+  public void genQAText(String title, List<FetchedFile> files, String path, Map<String, String> filteredMessages, List<ValidationMessage> linkErrors)
+      throws IOException {
+    StringBuilder b = new StringBuilder();
     b.append(genHeaderTxt(title, err, warn, info));
     b.append(genSummaryRowTxtInternal(linkErrors));
     files = sorted(files);
@@ -219,16 +238,75 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     }    
     b.append(genFooterTxt(title));
     TextFile.stringToFile(b.toString(), Utilities.changeFileExt(path, ".txt"));
-    
-    String summary = "Errors: " + err + "  Warnings: " + warn + "  Info: " + info;
-    return path + "\r\n" + summary;
+  }
+
+  public List<FetchedFile> genQAHtml(String title, List<FetchedFile> files, String path, Map<String, String> filteredMessages, List<ValidationMessage> linkErrors, boolean allIssues) throws IOException {
+    StringBuilder b = new StringBuilder();
+    b.append(genHeader(title, err, warn, info, link, filteredMessages.size(), allIssues, path));
+    b.append(genSummaryRowInteral(linkErrors));
+    files = sorted(files);
+    for (FetchedFile f : files) {
+      if (allIssues || hasIssues(f, filteredMessages)) {
+        b.append(genSummaryRow(f, filteredMessages));
+      }
+    }
+    b.append(genEnd());
+    b.append(genStartInternal());
+    int id = 0;
+    for (ValidationMessage vm : linkErrors) {
+      b.append(genDetails(vm, id));
+      id++;
+    }
+    b.append(genEnd());
+    for (FetchedFile f : files) {
+      if (allIssues || hasIssues(f, filteredMessages)) {
+        b.append(genStart(f));
+        if (f.getErrors().size() > 0)
+          b.append(startTemplateErrors);
+        else
+          b.append(startTemplateNoErrors);
+        for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages.keySet())) {
+          b.append(genDetails(vm, id));
+          id++;
+        }
+        b.append(genEnd());
+      }
+    }    
+    b.append(genSuppressedMessages(filteredMessages));
+    b.append("<a name=\"sorted\"> </a>\r\n<p><b>Errors sorted by type</b></p>\r\n");
+    for (String n : messageIdNames()) {
+      List<FiledValidationMessage> fvml = new ArrayList<>();    
+      for (FetchedFile f : files) {
+        getMatchingMessages(f, n, fvml, filteredMessages);
+      }
+      if (fvml.size() > 0) {
+        b.append(genGroupStart(n));
+        for (FiledValidationMessage fvm : fvml) {
+          b.append(genGroupDetails(fvm.getF(), fvm.getVm()));
+        }
+        b.append(genGroupEnd());
+      }
+    }
+    b.append(genFooter(title));
+    TextFile.stringToFile(b.toString(), allIssues ? path : Utilities.changeFileExt(path, ".min.html"));
+    return files;
   }
 
 
 
+  private boolean hasIssues(FetchedFile f, Map<String, String> filteredMessages) {
+    List<ValidationMessage> uniqueErrors = filterMessages(f.getErrors(), false, filteredMessages.keySet());
+    for (ValidationMessage vm : uniqueErrors) {
+      if (vm.getLevel() != IssueSeverity.INFORMATION) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private void getMatchingMessages(FetchedFile f, String n, List<FiledValidationMessage> fvml, Map<String, String> filteredMessages) {
     for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages.keySet())) {
-      if (n.equals(vm.getMessageId())) {
+      if (n.equals(vm.getMessageId()) && !vm.isSignpost()) {
         fvml.add(new FiledValidationMessage(f, vm));
       }
     }
@@ -270,7 +348,8 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
 
   private String genSuppressedMessages(Map<String, String> msgs) {
     StringBuilder b = new StringBuilder();
-    b.append("<a name=\"suppressed\"> </a>\r\n<p><b>Suppressed Error Messages</b></p>\r\n");
+    b.append("<a name=\"suppressed\"> </a>\r\n<p><b>Suppressed Messages (Warnings, hints, broken links)</b></p>\r\n");
+    boolean found = false;
     Map<String, List<String>> inverted = new HashMap<>();
     for (Entry<String, String> e : msgs.entrySet()) {
       if (!inverted.containsKey(e.getValue())) {
@@ -284,6 +363,9 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
         b.append(" <li>"+Utilities.escapeXml(m)+"</li>\r\n");
       }
       b.append("</ul>\r\n");
+    }
+    if (!found) {
+      b.append("<p>No suppressed messsages</p>");
     }
     return b.toString();
   }
@@ -299,16 +381,26 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     List<ValidationMessage> passList = new ArrayList<ValidationMessage>();
     Set<String> msgs = new HashSet<>();
     for (ValidationMessage message : messages) {
-      if (!(suppressedMessages.contains(message.getDisplay()) || suppressedMessages.contains(message.getMessage())) || canSuppressErrors || message.getLevel().isError()) {
-        if (!msgs.contains(message.getLocation()+"|"+message.getMessage())) {
-          passList.add(message);
-          msgs.add(message.getLocation()+"|"+message.getMessage());
+      boolean passesFilter = true;
+      if (canSuppressErrors || !message.getLevel().isError()) {
+        if (suppressedMessages.contains(message.getDisplay()) || suppressedMessages.contains(message.getMessage()) || suppressedMessages.contains(message.getMessageId()) ) {
+          passesFilter = false;
+        } else if (msgs.contains(message.getLocation()+"|"+message.getMessage())) {
+          passesFilter = false;
         }
+      }
+      if (NO_FILTER) {
+        passesFilter = true;
+      }
+      if (passesFilter) {
+        passList.add(message);
+        msgs.add(message.getLocation()+"|"+message.getMessage());        
+      } else {
       }
     }
     return passList;
   }
-  
+
 
   
   // HTML templating
@@ -338,18 +430,28 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       "</head>\r\n"+
       "<body style=\"margin: 20px; background-color: #ffffff\">\r\n"+
       " <h1>Validation Results for $title$</h1>\r\n"+
-      " <p>Generated $time$, FHIR version $version$ for $packageId$#$igversion$ (canonical = <a href=\"$canonical$\">$canonical$</a> (<a href=\"$canonical$/history.html\">history</a>))</p>\r\n"+
-      "$versionCheck$\r\n"+
-      "$suppressedmsgssummary$"+
-      " <p>HL7 Publication check:</p> $ballotCheck$\r\n"+
+      " <p>Generated $time$, FHIR version $version$ for $packageId$#$igversion$ (canonical = <a href=\"$canonical$\">$canonical$</a> (<a href=\"$canonical$/history.html\">history</a>)). See <a href=\"$otherFilePath$\">$otherFileName$</a></p>\r\n"+
+      "<table class=\"grid\">"+
+      " <tr><td colspan=2><b>Quality Checks</b></td></tr>\r\n"+
+      " <tr><td>Publisher Version:</td><td>$versionCheck$</td></tr>\r\n"+
+      " <tr><td>Publication Code:</td><td>$igcode$<span style=\"color: maroon; font-weight: bold\"> $igcodeerror$</span>. PackageId = $packageId$, Canonical = $canonical$</td></tr>\r\n"+
+      " <tr><td>Realm Check for $realm$:</td><td><span style=\"color: maroon; font-weight: bold\">$igrealmerror$</span>$realmCheck$</td></tr>\r\n"+
+      " <tr><td>Version Check:</td><td>$versionRulesCheck$</td></tr>\r\n"+
+      " <tr><td>Supressed Messages:</td><td>$suppressedmsgssummary$</td></tr>\r\n"+
+      " <tr><td>Dependency Checks:</td><td>$dependencyCheck$</td></tr>\r\n"+
+      " <tr><td>HL7 Publication Rules:</td><td>Code = $igcode$. $ballotCheck$</td></tr>\r\n"+
+      " <tr><td>HTA Analysis:</td><td>$csAnalysis$</td></tr>\r\n"+
+      " <tr><td>Previous Version Comparison:</td><td> $previousVersion$</td></tr>\r\n"+
+      " <tr><td>Summary:</td><td> broken links = $links$, errors = $err$, warn = $warn$, info = $info$</td></tr>\r\n"+
+      "</table>\r\n"+
       " <table class=\"grid\">\r\n"+
       "   <tr>\r\n"+
-      "     <td><b>Filename</b></td><td><b>Errors</b></td><td><b>Information messages &amp; Warnings</b></td>\r\n"+
+      "     <td><b>Filename</b></td><td><b>Errors</b></td><td><b>Warnings</b></td><td><b>Hints</b></td>\r\n"+
       "   </tr>\r\n";
   
   private final String summaryTemplate = 
       "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><a href=\"#$link$\"><b>$filename$</b></a></td><td><b>$errcount$</b></td><td><b>$other$</b></td>\r\n"+
+      "     <td><a href=\"#$link$\"><b>$filename$</b></a></td><td><b>$errcount$</b></td><td><b>$warningcount$</b></td><td><b>$infocount$</b></td>\r\n"+
       "   </tr>\r\n";
   
   private final String endTemplate = 
@@ -382,7 +484,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
 
   private final String detailsTemplate = 
       "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b></td>\r\n"+
+      "     <td><b>$path$</b></td><td><b>$level$</b></td><td title=\"$mid$\"><b>$msg$</b></td>\r\n"+
       "   </tr>\r\n";
   
   private final String groupDetailsTemplate = 
@@ -419,7 +521,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       "Generated $time$. FHIR version $version$ for $packageId$#$igversion$ (canonical = $canonical$)\r\n\r\n";
   
   private final String summaryTemplateText = 
-      " $filename$ : $errcount$ / $other$\r\n";
+      " $filename$ : $errcount$ / $warningcount$ / $infocount$\r\n";
   
   private final String endTemplateText = 
       "\r\n";
@@ -432,12 +534,13 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   
   private final String footerTemplateText = 
       "\r\n";
+  private String dependencies;
   
   private ST template(String t) {
     return new ST(t, '$', '$');
   }
 
-  private String genHeader(String title, int err, int warn, int info, int links, int msgCount) {
+  private String genHeader(String title, int err, int warn, int info, int links, int msgCount, boolean allIssues, String path) {
     ST t = template(headerTemplate);
     t.add("version", statedVersion);
     t.add("igversion", igVersion);
@@ -452,10 +555,21 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("packageId", packageId);
     t.add("canonical", provider.getCanonical());
     t.add("ballotCheck", ballotCheck);
+    t.add("realmCheck", realm.checkHtml());
+    t.add("igcode", igcode);
+    t.add("igcodeerror", igCodeError);
+    t.add("igrealmerror", igRealmError);
+    t.add("versionRulesCheck", versionRulesCheck);
+    t.add("realm", igrealm == null ? "n/a" : igrealm.toUpperCase());
+    t.add("dependencyCheck", dependencies);
+    t.add("csAnalysis", csAnalysis);
+    t.add("otherFileName", allIssues ? "Errors Only" : "Full QA Report");
+    t.add("otherFilePath", allIssues ? Utilities.getFileNameForName(Utilities.changeFileExt(path, ".min.html")) : Utilities.getFileNameForName(path));
+    t.add("previousVersion", previousVersionComparator.checkHtml());
     if (msgCount == 0)
-      t.add("suppressedmsgssummary", "<p>No Suppressed Errors</p>\r\n");
+      t.add("suppressedmsgssummary", "No Suppressed Issues\r\n");
     else
-      t.add("suppressedmsgssummary", "<p><a href=\"#suppressed\">"+msgCount+" Suppressed "+Utilities.pluralize("Error", msgCount)+"</a></p>\r\n");
+      t.add("suppressedmsgssummary", "<a href=\"#suppressed\">"+msgCount+" Suppressed "+Utilities.pluralize("Issue", msgCount)+"</a>\r\n");
     return t.render();
   }
 
@@ -473,6 +587,15 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("packageId", packageId);
     t.add("canonical", provider.getCanonical());
     t.add("ballotCheck", ballotCheck);
+    t.add("realmCheck", realm.checkText());
+    t.add("igcode", igcode);
+    t.add("igcodeerror", igCodeError);
+    t.add("igrealmerror", igRealmError);
+    t.add("realm", igrealm == null ? "n/a" : igrealm.toUpperCase());
+    t.add("dependencyCheck", dependencies);
+    t.add("versionRulesCheck", versionRulesCheck);
+    t.add("csAnalysis", csAnalysis);
+    t.add("previousVersion", previousVersionComparator.checkHtml());
     return t.render();
   }
 
@@ -522,11 +645,12 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("filename", "Build Errors");
     String ec = errCount(list);
     t.add("errcount", ec);
-    t.add("other", otherCount(list));
+    t.add("warningcount", warningCount(list));
+    t.add("infocount", infoCount(list));
     if ("0".equals(ec))
       t.add("color", "#EFFFEF");
     else
-      t.add("color", colorForLevel(IssueSeverity.ERROR));
+      t.add("color", colorForLevel(IssueSeverity.ERROR, false));
       
     return t.render();
   }
@@ -539,11 +663,12 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("filename", f.getName());
     String ec = errCount(uniqueErrors);
     t.add("errcount", ec);
-    t.add("other", otherCount(uniqueErrors));
+    t.add("warningcount", warningCount(uniqueErrors));
+    t.add("infocount", infoCount(uniqueErrors));
     if ("0".equals(ec))
       t.add("color", "#EFFFEF");
     else
-      t.add("color", colorForLevel(IssueSeverity.ERROR));
+      t.add("color", colorForLevel(IssueSeverity.ERROR, false));
       
     return t.render();
   }
@@ -553,7 +678,8 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("filename", f.getName());
     String ec = errCount(f.getErrors());
     t.add("errcount", ec);
-    t.add("other", otherCount(f.getErrors()));
+    t.add("warningcount", warningCount(f.getErrors()));
+    t.add("infocount", infoCount(f.getErrors()));
       
     return t.render();
   }
@@ -563,7 +689,8 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("filename", "Build Errors");
     String ec = errCount(linkErrors);
     t.add("errcount", ec);
-    t.add("other", otherCount(linkErrors));
+    t.add("warningcount", warningCount(linkErrors));
+    t.add("infocount", infoCount(linkErrors));
       
     return t.render();
   }
@@ -583,10 +710,19 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     return Integer.toString(c);
   }
 
-  private Object otherCount(List<ValidationMessage> list) {
+  private String warningCount(List<ValidationMessage> list) {
     int c = 0;
     for (ValidationMessage vm : list) {
-      if (vm.getLevel() == IssueSeverity.INFORMATION || vm.getLevel() == IssueSeverity.WARNING)
+      if (vm.getLevel() == IssueSeverity.WARNING)
+        c++;
+    }
+    return Integer.toString(c);
+  }
+
+  private String infoCount(List<ValidationMessage> list) {
+    int c = 0;
+    for (ValidationMessage vm : list) {
+      if (vm.getLevel() == IssueSeverity.INFORMATION)
         c++;
     }
     return Integer.toString(c);
@@ -603,7 +739,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     }
     if (link != null) { 
       link = link.replace("{{[id]}}", f.getResources().get(0).getId());
-      link = link.replace("{{[type]}}", f.getResources().get(0).getElement().fhirType());
+      link = link.replace("{{[type]}}", f.getResources().get(0).fhirType());
     }
     
     t.add("xlink", link);
@@ -629,9 +765,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("path", "n/a");
     t.add("xlink", "");
     return t.render();
-  }
-
-  
+  } 
 
   private String genStartTxtInternal() {
     ST t = template(startTemplateText);
@@ -649,17 +783,17 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     return t.render();
   }
   
-  
   private String genDetails(ValidationMessage vm, int id) {
     ST t = template(vm.isSlicingHint() ? detailsTemplateWithExtraDetails : vm.getLocationLink() != null ? detailsTemplateWithLink : vm.getTxLink() != null ? detailsTemplateTx : detailsTemplate);
     if (vm.getLocation()!=null) {
       t.add("path", makeLocal(vm.getLocation())+lineCol(vm));
       t.add("pathlink", vm.getLocationLink());
     }
-    t.add("level", vm.isSlicingHint() ? "Slicing Information" : vm.getLevel().toCode());
-    t.add("color", colorForLevel(vm.getLevel()));
-    t.add("halfcolor", halfColorForLevel(vm.getLevel()));
+    t.add("level", vm.isSlicingHint() ? "Slicing Information" : vm.isSignpost() ? "Process Info" : vm.getLevel().toCode());
+    t.add("color", colorForLevel(vm.getLevel(), vm.isSignpost()));
+    t.add("halfcolor", halfColorForLevel(vm.getLevel(), vm.isSignpost()));
     t.add("id", "l"+id);
+    t.add("mid", vm.getMessageId());
     t.add("msg", vm.getHtml());
     t.add("msgdetails", vm.isSlicingHint() ? vm.getSliceHtml() : vm.getHtml());
     t.add("tx", "qa-tx.html#l"+vm.getTxLink());
@@ -677,7 +811,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     }
     if (link != null) { 
       link = link.replace("{{[id]}}", f.getResources().get(0).getId());
-      link = link.replace("{{[type]}}", f.getResources().get(0).getElement().fhirType());
+      link = link.replace("{{[type]}}", f.getResources().get(0).fhirType());
     }
     
     t.add("xlink", link);
@@ -685,13 +819,14 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       t.add("path", makeLocal(vm.getLocation())+lineCol(vm));
       t.add("pathlink", vm.getLocationLink());
     }
-    t.add("level", vm.isSlicingHint() ? "Slicing Information" : vm.getLevel().toCode());
-    t.add("color", colorForLevel(vm.getLevel()));
-    t.add("halfcolor", halfColorForLevel(vm.getLevel()));
+    t.add("level", vm.isSlicingHint() ? "Slicing Information" : vm.isSignpost() ? "Process Info" : vm.getLevel().toCode());
+    t.add("color", colorForLevel(vm.getLevel(), vm.isSignpost()));
+    t.add("halfcolor", halfColorForLevel(vm.getLevel(), vm.isSignpost()));
     t.add("msg", vm.getHtml());
     t.add("msgdetails", vm.isSlicingHint() ? vm.getSliceHtml() : vm.getHtml());
     return t.render();
   }
+  
   private String lineCol(ValidationMessage vm) {
     return vm.getLine() > 0 ? " (l"+vm.getLine()+"/c"+vm.getCol()+")" : "";
   }
@@ -700,12 +835,15 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     ST t = template(detailsTemplateText);
     t.add("path", vm.getLocation());
     t.add("level", vm.getLevel().toCode());
-    t.add("color", colorForLevel(vm.getLevel()));
+    t.add("color", colorForLevel(vm.getLevel(), vm.isSignpost()));
     t.add("msg", vm.getHtml());
     return t.render();
   }
 
-  private String colorForLevel(IssueSeverity level) {
+  private String colorForLevel(IssueSeverity level, boolean signpost) {
+    if (signpost) {
+      return "#d6feff";
+    }
     switch (level) {
     case ERROR:
       return "#ffcccc";
@@ -718,7 +856,10 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     }
   }
 
-  private String halfColorForLevel(IssueSeverity level) {
+  private String halfColorForLevel(IssueSeverity level, boolean signpost) {
+    if (signpost) {
+      return "#e3feff";
+    }
     switch (level) {
     case ERROR:
       return "#ffeeee";
@@ -761,19 +902,24 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
 
   private String versionCheckHtml() {
     StringBuilder b = new StringBuilder();
-    if (!toolsVersion.equals(currentToolsVersion)) {
-      b.append("<p style=\"background-color: #ffcccc\">IG Publisher Version: ");
+    if (toolsVersion.equals("DEV-VERSION")) {
+      b.append("<span style=\"background-color: #ccffcc\">IG Publisher Version: ");
+      b.append("Current Dev Version");
+      b.append("</span>");
     } else {
-      b.append("<p>IG Publisher Version: ");
+      if (!toolsVersion.equals(currentToolsVersion)) {
+        b.append("<span style=\"background-color: #ffcccc\">IG Publisher Version: ");
+      } else {
+        b.append("<span>IG Publisher Version: ");
+      }
+      b.append("v"+toolsVersion);
+      if (!toolsVersion.equals(currentToolsVersion)) {
+        b.append(", which is out of date. The current version is ");
+        b.append("v"+currentToolsVersion);      
+        b.append(" <a href=\"https://github.com/HL7/fhir-ig-publisher/releases/latest/download/publisher.jar\">Download Latest</a>");
+      }
     }
-    b.append(toolsVersion);
-    if (!toolsVersion.equals(currentToolsVersion)) {
-      b.append(", which is out of date. The current version is ");
-      b.append(currentToolsVersion);      
-      b.append(" <a href=\"https://fhir.github.io/latest-ig-publisher/org.hl7.fhir.publisher.jar\">Download Latest</a>");
-    }
-    b.append("</p>");
+    b.append("</span>");
     return b.toString();
-  }
-  
+  }  
 }

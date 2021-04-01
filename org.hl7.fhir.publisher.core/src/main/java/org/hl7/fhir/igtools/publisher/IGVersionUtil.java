@@ -1,5 +1,8 @@
 package org.hl7.fhir.igtools.publisher;
 
+import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
+import static org.apache.commons.lang3.StringUtils.left;
+
 /*
  * #%L
  * HAPI FHIR - Core Library
@@ -21,19 +24,12 @@ package org.hl7.fhir.igtools.publisher;
  */
 
 import java.io.InputStream;
-import java.text.SimpleDateFormat;
 import java.time.Duration;
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.Properties;
 
 import org.hl7.fhir.r5.model.InstantType;
 import org.hl7.fhir.utilities.Utilities;
-
-import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
-import static org.apache.commons.lang3.StringUtils.left;
 
 /**
  * Used internally by HAPI to log the version of the HAPI FHIR framework

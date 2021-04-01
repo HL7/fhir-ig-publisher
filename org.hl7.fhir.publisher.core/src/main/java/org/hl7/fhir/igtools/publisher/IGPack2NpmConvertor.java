@@ -56,13 +56,13 @@ import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator.Category;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.cache.PackageCacheManager;
-import org.hl7.fhir.utilities.cache.ToolsVersion;
-import org.hl7.fhir.utilities.cache.PackageGenerator.PackageType;
+import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
+import org.hl7.fhir.utilities.npm.ToolsVersion;
+import org.hl7.fhir.utilities.npm.PackageGenerator.PackageType;
 
 public class IGPack2NpmConvertor {
 
-  private PackageCacheManager pcm;
+  private FilesystemPackageCacheManager pcm;
   private Scanner scanner;
   private List<String> paths;
 
@@ -161,7 +161,7 @@ public class IGPack2NpmConvertor {
   }
 
   private void init() throws IOException {
-    pcm = new PackageCacheManager(true, ToolsVersion.TOOLS_VERSION);
+    pcm = new FilesystemPackageCacheManager(true, ToolsVersion.TOOLS_VERSION);
     scanner = new Scanner(System. in);
     paths = new ArrayList<String>();
   }
@@ -209,7 +209,9 @@ public class IGPack2NpmConvertor {
 
         if (files.containsKey("spec.internals"))
           loadSpecInternals(ig, files.get("spec.internals"), version, canonical, files);
-        NPMPackageGenerator npm = new NPMPackageGenerator(dest != null ? dest : Utilities.path(Utilities.getDirectoryForFile(f.getAbsolutePath()), "package.tgz"), canonical, Utilities.noString(website) ? canonical : website, PackageType.IG, ig, new Date());
+        String destFile = dest != null ? dest : Utilities.path(Utilities.getDirectoryForFile(f.getAbsolutePath()), "package.tgz");
+        String url = Utilities.noString(website) ? canonical : website;
+        NPMPackageGenerator npm = new NPMPackageGenerator(destFile, canonical, url, PackageType.IG, ig, new Date(), false);
         ByteArrayOutputStream bs = new ByteArrayOutputStream();
         new JsonParser().setOutputStyle(OutputStyle.NORMAL).compose(bs, ig);
         npm.addFile(Category.RESOURCE, "ig-r4.json", bs.toByteArray());
@@ -279,7 +281,7 @@ public class IGPack2NpmConvertor {
         String r = s.equals(canonical) ? "" : s.substring(canonical.length() + 1);
         ManifestResourceComponent ra = getMatchingResource(r, ig);
         if (ra != null && !ra.hasRelativePath())
-          ra.setRelativePath(spm.getPath(s));
+          ra.setRelativePath(spm.getPath(s, null));
       }
     }
     for (String s : spm.getImages()) {

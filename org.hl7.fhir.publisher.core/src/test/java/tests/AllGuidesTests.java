@@ -3,20 +3,16 @@ package tests;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.IOException;
 
 import org.apache.commons.io.IOUtils;
 import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.publisher.Publisher.CacheOption;
-import org.hl7.fhir.r5.test.utils.TestingUtilities;
-import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import com.google.gson.JsonObject;
-
-import junit.framework.Assert;
 
 public class AllGuidesTests {
 
@@ -37,7 +33,7 @@ private static final String VER = "1.0.53";
 
   private void testIg(String id, String path) throws Exception {
     if (!new File(ROOT_DIR).exists()) {
-      Assert.assertTrue(true);
+      Assertions.assertTrue(true);
       return;
     }
     System.out.println("=======================================================================================");
@@ -65,9 +61,9 @@ private static final String VER = "1.0.53";
     int pWarn = previous.has("warnings") ? previous.get("warnings").getAsInt() : 0;
     int cHint = current.has("hints") ? current.get("hints").getAsInt() : 0;
     int pHint = previous.has("hints") ? previous.get("hints").getAsInt() : 0;
-    Assert.assertTrue("Error count has increased from "+pErr+" to "+cErr, cErr <= pErr);
-    Assert.assertTrue("Warning count has increased from "+pWarn+" to "+cWarn, cWarn <= pWarn);
-    Assert.assertTrue("Hint count has increased from "+pHint+" to "+cHint, cHint <= pHint);
+    Assertions.assertTrue(cErr <= pErr, "Error count has increased from "+pErr+" to "+cErr);
+    Assertions.assertTrue(cWarn <= pWarn, "Warning count has increased from "+pWarn+" to "+cWarn);
+    Assertions.assertTrue(cHint <= pHint, "Hint count has increased from "+pHint+" to "+cHint);
     System.out.println("=======================================================================================");
     System.out.println("");
   }

@@ -23,33 +23,39 @@ package org.hl7.fhir.igtools.renderers;
 
 import java.util.List;
 
+import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.conformance.ProfileUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.r5.model.CodeSystem;
+import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
 import org.hl7.fhir.r5.model.PrimitiveType;
 import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
-import org.hl7.fhir.r5.utils.NarrativeGenerator;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
+import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.TranslatingUtilities;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.cache.NpmPackage;
+import org.hl7.fhir.utilities.npm.NpmPackage;
 
 public class BaseRenderer extends TranslatingUtilities {
   protected IWorkerContext context;
-  protected String prefix;
+  protected String corePath;
+  protected String prefix = ""; // path to relative root of IG, if not the same directory (currenly always is)
   protected IGKnowledgeProvider igp;
   protected List<SpecMapManager> specmaps;
   protected NpmPackage packge;
   private MarkDownProcessor markdownEngine;
-  protected NarrativeGenerator gen;
+  protected RenderingContext gen;
 
 
-  public BaseRenderer(IWorkerContext context, String prefix, IGKnowledgeProvider igp, List<SpecMapManager> specmaps, MarkDownProcessor markdownEngine, NpmPackage packge, NarrativeGenerator gen) {
+  public BaseRenderer(IWorkerContext context, String corePath, IGKnowledgeProvider igp, List<SpecMapManager> specmaps, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
     super();
     this.context = context;
-    this.prefix = prefix;
+    this.corePath = corePath;
     this.igp = igp;
     this.specmaps = specmaps;
     this.markdownEngine = markdownEngine;
@@ -58,11 +64,16 @@ public class BaseRenderer extends TranslatingUtilities {
   }
 
   @SuppressWarnings("rawtypes")
-  public String processMarkdown(String location, PrimitiveType md) throws Exception {
+  public String processMarkdown(String location, PrimitiveType md) throws FHIRException {
     String text = gt(md);
+    return processMarkdown(location, text);
+  }
+  
+  public String processMarkdown(String location, String text) throws FHIRException {
 	  try {
-	    if (text == null)
+	    if (text == null) {
 	      return "";
+	    }
 	    // 1. custom FHIR extensions
 	    text = text.replace("||", "\r\n\r\n");
 	    while (text.contains("[[[")) {
@@ -82,11 +93,13 @@ public class BaseRenderer extends TranslatingUtilities {
 	        String[] paths = parts[0].split("\\.");
 	        StructureDefinition p = new ProfileUtilities(context, null, null).getProfile(null, paths[0]);
 	        if (p != null) {
-	          String suffix = (paths.length > 1) ? "-definitions.html#"+parts[0] : ".html";
-	          if (p.getUserData("filename") == null)
-	            url = paths[0].toLowerCase()+suffix;
+	          if (p.getUserData("path") == null)
+	            url = paths[0].toLowerCase();
 	          else
-	            url = p.getUserData("filename")+suffix;
+	            url = p.getUserString("path");
+	          if (paths.length > 1) {
+	            url = url.replace(".html", "-definitions.html#"+parts[0]);
+	          }
 	        } else {
 	          throw new Exception("Unresolved logical URL '"+linkText+"' in markdown");
 	        }
@@ -100,7 +113,7 @@ public class BaseRenderer extends TranslatingUtilities {
 	        if (text.substring(i, i+2).equals("](") && i+7 <= text.length()) {
 	          // The following can go horribly wrong if i+7 > text.length(), thus the check on i+7 above and the Throwable catch around the whole method just in case. 
 	          if (!text.substring(i, i+7).equals("](http:") && !text.substring(i, i+8).equals("](https:") && !text.substring(i, i+3).equals("](.")) { 
-	            text = text.substring(0, i)+"]("+prefix+text.substring(i+2);
+	            text = text.substring(0, i)+"]("+corePath+text.substring(i+2);
 	          }
 	        }
 	        i--;
@@ -110,7 +123,7 @@ public class BaseRenderer extends TranslatingUtilities {
 	    String s = markdownEngine.process(checkEscape(text), location);
 	    return s;
 	  } catch (Throwable e) {
-		  throw new Exception ("Error processing string: " + text, e);
+		  throw new FHIRException("Error processing string: " + text, e);
 	  }
 
   }
@@ -141,13 +154,27 @@ public class BaseRenderer extends TranslatingUtilities {
       return uri;
   }
 
-  protected String describeStatus(PublicationStatus status, boolean experimental) {
-    switch (status) {
-    case ACTIVE: return experimental ? "Experimental" : "Active"; 
-    case DRAFT: return "draft";
-    case RETIRED: return "retired";
-    default: return "Unknown";
+  protected String renderCommitteeLink(CanonicalResource cr) {
+    String code = ToolingExtensions.readStringExtension(cr, ToolingExtensions.EXT_WORKGROUP);
+    CodeSystem cs = context.fetchCodeSystem("http://terminology.hl7.org/CodeSystem/hl7-work-group");
+    if (cs == null || !cs.hasUserData("path"))
+      return code;
+    else {
+      ConceptDefinitionComponent cd = CodeSystemUtilities.findCode(cs.getConcept(), code);
+      if (cd == null) {
+        return code;        
+      } else {
+        return "<a href=\""+cs.getUserString("path")+"#"+cs.getId()+"-"+cd.getCode()+"\">"+cd.getDisplay()+"</a>";
+      }
     }
+  }
+
+  public String getPrefix() {
+    return prefix;
+  }
+
+  public void setPrefix(String prefix) {
+    this.prefix = prefix;
   }
 
 }

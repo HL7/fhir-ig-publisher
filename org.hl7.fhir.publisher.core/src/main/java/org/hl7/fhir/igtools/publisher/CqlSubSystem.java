@@ -1,30 +1,66 @@
 package org.hl7.fhir.igtools.publisher;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FilenameFilter;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.cqframework.cql.cql2elm.*;
+import org.cqframework.cql.cql2elm.CqlTranslator;
+import org.cqframework.cql.cql2elm.CqlTranslatorException;
+import org.cqframework.cql.cql2elm.CqlTranslatorOptions;
+import org.cqframework.cql.cql2elm.CqlTranslatorOptionsMapper;
+import org.cqframework.cql.cql2elm.DefaultLibrarySourceProvider;
+import org.cqframework.cql.cql2elm.FhirLibrarySourceProvider;
+import org.cqframework.cql.cql2elm.LibraryManager;
+import org.cqframework.cql.cql2elm.LibrarySourceProvider;
+import org.cqframework.cql.cql2elm.ModelManager;
+import org.cqframework.cql.cql2elm.NamespaceInfo;
+import org.cqframework.cql.cql2elm.NamespaceManager;
 import org.cqframework.cql.cql2elm.model.TranslatedLibrary;
 import org.cqframework.cql.elm.tracking.TrackBack;
-import org.fhir.ucum.UcumEssenceService;
-import org.fhir.ucum.UcumException;
 import org.fhir.ucum.UcumService;
-import org.hl7.cql.model.*;
-import org.hl7.elm.r1.*;
+import org.hl7.cql.model.IntervalType;
+import org.hl7.cql.model.ListType;
+import org.hl7.cql.model.NamedType;
+import org.hl7.elm.r1.AccessModifier;
+import org.hl7.elm.r1.Code;
+import org.hl7.elm.r1.CodeDef;
+import org.hl7.elm.r1.CodeRef;
+import org.hl7.elm.r1.CodeSystemDef;
+import org.hl7.elm.r1.CodeSystemRef;
+import org.hl7.elm.r1.Concept;
+import org.hl7.elm.r1.ConceptDef;
+import org.hl7.elm.r1.ConceptRef;
 import org.hl7.elm.r1.Expression;
+import org.hl7.elm.r1.ExpressionDef;
+import org.hl7.elm.r1.FunctionDef;
+import org.hl7.elm.r1.IncludeDef;
+import org.hl7.elm.r1.ParameterDef;
+import org.hl7.elm.r1.Retrieve;
+import org.hl7.elm.r1.UsingDef;
+import org.hl7.elm.r1.ValueSetDef;
+import org.hl7.elm.r1.ValueSetRef;
+import org.hl7.elm.r1.VersionedIdentifier;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
-import org.hl7.fhir.igtools.publisher.CqlSubSystem.CqlSourceFileInformation;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
-import org.hl7.fhir.r5.model.*;
+import org.hl7.fhir.r5.model.DataRequirement;
+import org.hl7.fhir.r5.model.Enumerations;
 import org.hl7.fhir.r5.model.Library;
-import org.hl7.fhir.utilities.cache.NpmPackage;
+import org.hl7.fhir.r5.model.ParameterDefinition;
+import org.hl7.fhir.r5.model.RelatedArtifact;
+import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
-import org.w3._1999.xhtml.P;
 
 public class CqlSubSystem {
 
@@ -33,6 +69,7 @@ public class CqlSubSystem {
    */
   public class CqlSourceFileInformation {
     private byte[] elm;
+    private byte[] jsonElm;
     private List<ValidationMessage> errors = new ArrayList<>();
     private List<DataRequirement> dataRequirements = new ArrayList<>();
     private List<RelatedArtifact> relatedArtifacts = new ArrayList<>();
@@ -42,6 +79,12 @@ public class CqlSubSystem {
     }
     public void setElm(byte[] elm) {
       this.elm = elm;
+    }
+    public byte[] getJsonElm() {
+      return jsonElm;
+    }
+    public void setJsonElm(byte[] jsonElm) {
+      this.jsonElm = jsonElm;
     }
     public List<ValidationMessage> getErrors() {
       return errors;
@@ -223,15 +266,32 @@ public class CqlSubSystem {
     return result;
   }
 
+  /**
+   * Reads configuration file named cql-options.json from the given folder if present. Otherwise returns default options.
+   * @param folder
+   * @return
+   */
+  private CqlTranslatorOptions getTranslatorOptions(String folder) {
+    String optionsFileName = folder + File.separator + "cql-options.json";
+    CqlTranslatorOptions options = null;
+    File file = new File(optionsFileName);
+    if (file.exists()) {
+      options = CqlTranslatorOptionsMapper.fromFile(file.getAbsolutePath());
+    }
+    else {
+      options = CqlTranslatorOptions.defaultOptions();
+      if (!options.getFormats().contains(CqlTranslator.Format.XML)) {
+        options.getFormats().add(CqlTranslator.Format.XML);
+      }
+    }
+
+    return options;
+  }
+
   private void translateFolder(String folder) {
     logger.logMessage(String.format("Translating CQL source in folder %s", folder));
 
-    // TODO: Readconfig - CqlTranslator.Options, outputFormat: { XML, JSON, BOTH }, validateUnits, errorLevel, signatureLevel
-    CqlTranslator.Options[] options = getDefaultOptions();
-    String format = "XML";
-    CqlTranslatorException.ErrorSeverity errorLevel = CqlTranslatorException.ErrorSeverity.Info;
-    LibraryBuilder.SignatureLevel signatureLevel = LibraryBuilder.SignatureLevel.None;
-    boolean validateUnits = true;
+    CqlTranslatorOptions options = getTranslatorOptions(folder);
 
     // Setup
     // Construct DefaultLibrarySourceProvider
@@ -246,7 +306,7 @@ public class CqlSubSystem {
 
     // foreach *.cql file
     for (File file : new File(folder).listFiles(getCqlFilenameFilter())) {
-      translateFile(modelManager, libraryManager, file, format, validateUnits, errorLevel, signatureLevel, options);
+      translateFile(modelManager, libraryManager, file, options);
     }
   }
 
@@ -294,9 +354,7 @@ public class CqlSubSystem {
     }
   }
 
-  private void translateFile(ModelManager modelManager, LibraryManager libraryManager, File file, String format,
-                             boolean validateUnits, CqlTranslatorException.ErrorSeverity errorLevel,
-                             LibraryBuilder.SignatureLevel signatureLevel, CqlTranslator.Options[] options) {
+  private void translateFile(ModelManager modelManager, LibraryManager libraryManager, File file, CqlTranslatorOptions options) {
     logger.logMessage(String.format("Translating CQL source in file %s", file.toString()));
     CqlSourceFileInformation result = new CqlSourceFileInformation();
     fileMap.put(file.getAbsoluteFile().toString(), result);
@@ -305,7 +363,7 @@ public class CqlSubSystem {
 
       // translate toXML
       CqlTranslator translator = CqlTranslator.fromFile(namespaceInfo, file, modelManager, libraryManager,
-              validateUnits ? ucumService : null, errorLevel, signatureLevel, options);
+              options.getValidateUnits() ? ucumService : null, options);
 
       // record errors and warnings
       for (CqlTranslatorException exception : translator.getExceptions()) {
@@ -319,7 +377,14 @@ public class CqlSubSystem {
       }
       else {
         // convert to base64 bytes
+        // NOTE: Publication tooling requires XML content
         result.setElm(translator.toXml().getBytes());
+        if (options.getFormats().contains(CqlTranslator.Format.JSON)) {
+          result.setJsonElm(translator.toJson().getBytes());
+        }
+        if (options.getFormats().contains(CqlTranslator.Format.JXSON)) {
+          result.setJsonElm(translator.toJxson().getBytes());
+        }
 
         // TODO: Report context, requires 1.5 translator (ContextDef)
         // NOTE: In STU3, only Patient context is supported
@@ -327,7 +392,7 @@ public class CqlSubSystem {
         // Extract relatedArtifact data (models, libraries, code systems, and value sets)
         result.relatedArtifacts.addAll(extractRelatedArtifacts(translator.toELM()));
 
-        // Extract parameter data
+        // Extract parameter data and validate result types are supported types
         List<ValidationMessage> paramMessages = new ArrayList<>();
         result.parameters.addAll(extractParameters(translator.toELM(), paramMessages));
         for (ValidationMessage paramMessage : paramMessages) {
@@ -344,16 +409,6 @@ public class CqlSubSystem {
     catch (Exception e) {
       result.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.EXCEPTION, file.getName(), "CQL Processing failed with exception: "+e.getMessage(), IssueSeverity.ERROR));
     }
-  }
-
-  private CqlTranslator.Options[] getDefaultOptions() {
-    // Default options based on recommended settings: http://build.fhir.org/ig/HL7/cqf-measures/using-cql.html#translation-to-elm
-    ArrayList<CqlTranslator.Options> options = new ArrayList<>();
-    options.add(CqlTranslator.Options.EnableAnnotations);
-    options.add(CqlTranslator.Options.EnableLocators);
-    options.add(CqlTranslator.Options.DisableListDemotion);
-    options.add(CqlTranslator.Options.DisableListPromotion);
-    return options.toArray(new CqlTranslator.Options[options.size()]);
   }
 
   private FilenameFilter getCqlFilenameFilter() {
@@ -412,6 +467,14 @@ public class CqlSubSystem {
       }
     }
 
+    if (library.getStatements() != null && !library.getStatements().getDef().isEmpty()) {
+      for (ExpressionDef def : library.getStatements().getDef()) {
+        if (!(def instanceof FunctionDef) && (def.getAccessLevel() == null || def.getAccessLevel() == AccessModifier.PUBLIC)) {
+          result.add(toOutputParameterDefinition(def, messages));
+        }
+      }
+    }
+
     return result;
   }
 
@@ -450,6 +513,11 @@ public class CqlSubSystem {
     String name = NamespaceManager.getNamePart(path);
 
     if (uri != null) {
+      // The translator has no way to correctly infer the namespace of the FHIRHelpers library, since it will happily provide that source to any namespace that wants it
+      // So override the declaration here so that it points back to the FHIRHelpers library in the base specification
+      if (name.equals("FHIRHelpers") && !uri.equals("http://hl7.org/fhir")) {
+        uri = "http://hl7.org/fhir";
+      }
       return String.format("%s/Library/%s%s", uri, name, version != null ? ("|" + version) : "");
     }
 
@@ -471,15 +539,66 @@ public class CqlSubSystem {
   private ParameterDefinition toParameterDefinition(ParameterDef def, List<ValidationMessage> messages) {
     org.hl7.cql.model.DataType parameterType = def.getResultType() instanceof ListType ? ((ListType)def.getResultType()).getElementType() : def.getResultType();
 
+    AtomicBoolean isList = new AtomicBoolean(false);
+    Enumerations.FHIRAllTypes typeCode = Enumerations.FHIRAllTypes.fromCode(toFHIRParameterTypeCode(parameterType, def.getName(), isList, messages));
+
     return new ParameterDefinition()
             .setName(def.getName())
             .setUse(Enumerations.OperationParameterUse.IN)
             .setMin(0)
-            .setMax(def.getResultType() instanceof ListType ? "*" : "1")
-            .setType(Enumerations.FHIRAllTypes.fromCode(toFHIRTypeCode(parameterType, def.getName(), messages)));
+            .setMax(isList.get() ? "*" : "1")
+            .setType(typeCode);
   }
 
-  private String toFHIRTypeCode(org.hl7.cql.model.DataType dataType, String parameterName, List<ValidationMessage> messages) {
+  private ParameterDefinition toOutputParameterDefinition(ExpressionDef def, List<ValidationMessage> messages) {
+    AtomicBoolean isList = new AtomicBoolean(false);
+    Enumerations.FHIRAllTypes typeCode = Enumerations.FHIRAllTypes.fromCode(toFHIRResultTypeCode(def.getResultType(), def.getName(), isList, messages));
+
+    return new ParameterDefinition()
+            .setName(def.getName())
+            .setUse(Enumerations.OperationParameterUse.OUT)
+            .setMin(0)
+            .setMax(isList.get() ? "*" : "1")
+            .setType(typeCode);
+  }
+
+  private String toFHIRResultTypeCode(org.hl7.cql.model.DataType dataType, String defName, AtomicBoolean isList, List<ValidationMessage> messages) {
+    AtomicBoolean isValid = new AtomicBoolean(true);
+    String resultCode = toFHIRTypeCode(dataType, isValid, isList);
+    if (!isValid.get()) {
+      // Issue a warning that the result type is not supported
+      messages.add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.NOTSUPPORTED, "CQL Library Packaging",
+              String.format("Result type %s of definition %s is not supported; implementations may not be able to use the result of this expression",
+                      dataType.toLabel(), defName), IssueSeverity.WARNING));
+    }
+
+    return resultCode;
+  }
+
+  private String toFHIRParameterTypeCode(org.hl7.cql.model.DataType dataType, String parameterName, AtomicBoolean isList, List<ValidationMessage> messages) {
+    AtomicBoolean isValid = new AtomicBoolean(true);
+    String resultCode = toFHIRTypeCode(dataType, isValid, isList);
+    if (!isValid.get()) {
+      // Issue a warning that the parameter type is not supported
+      messages.add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.NOTSUPPORTED, "CQL Library Packaging",
+              String.format("Parameter type %s of parameter %s is not supported; reported as FHIR.Any", dataType.toLabel(), parameterName), IssueSeverity.WARNING));
+    }
+
+    return resultCode;
+  }
+
+  private String toFHIRTypeCode(org.hl7.cql.model.DataType dataType, AtomicBoolean isValid, AtomicBoolean isList) {
+    isList.set(false);
+    if (dataType instanceof ListType) {
+      isList.set(true);
+      return toFHIRTypeCode(((ListType)dataType).getElementType(), isValid);
+    }
+
+    return toFHIRTypeCode(dataType, isValid);
+  }
+
+  private String toFHIRTypeCode(org.hl7.cql.model.DataType dataType, AtomicBoolean isValid) {
+    isValid.set(true);
     if (dataType instanceof NamedType) {
       switch (((NamedType)dataType).getName()) {
         case "System.Boolean": return "boolean";
@@ -495,22 +614,23 @@ public class CqlSubSystem {
         case "System.Code": return "Coding";
         case "System.Concept": return "CodeableConcept";
       }
+
+      if ("FHIR".equals(((NamedType)dataType).getNamespace())) {
+        return ((NamedType)dataType).getSimpleName();
+      }
     }
 
     if (dataType instanceof IntervalType) {
       if (((IntervalType)dataType).getPointType() instanceof NamedType) {
         switch (((NamedType)((IntervalType)dataType).getPointType()).getName()) {
           case "System.Date":
-          case "System.DateTime":
-          case "System.Time": return "Period";
+          case "System.DateTime": return "Period";
           case "System.Quantity": return "Range";
         }
       }
     }
 
-    // Issue a warning that the parameter type is not supported
-    messages.add(new ValidationMessage(ValidationMessage.Source.Publisher, IssueType.NOTSUPPORTED, "CQL Library Packaging",
-            String.format("Parameter type %s of parameter %s is not supported; reported as FHIR.Any", dataType.toLabel(), parameterName), IssueSeverity.WARNING));
+    isValid.set(false);
     return "Any";
   }
 
@@ -538,32 +658,15 @@ public class CqlSubSystem {
         cfc.setValueSet(toReference(resolveValueSetRef(vsr, library, libraryManager)));
       }
 
+      if (retrieve.getCodes() instanceof org.hl7.elm.r1.ToList) {
+        org.hl7.elm.r1.ToList toList = (org.hl7.elm.r1.ToList)retrieve.getCodes();
+        resolveCodeFilterCodes(cfc, toList.getOperand(), library, libraryManager);
+      }
+
       if (retrieve.getCodes() instanceof org.hl7.elm.r1.List) {
         org.hl7.elm.r1.List codeList = (org.hl7.elm.r1.List)retrieve.getCodes();
         for (Expression e : codeList.getElement()) {
-          if (e instanceof org.hl7.elm.r1.CodeRef) {
-            CodeRef cr = (CodeRef)e;
-            cfc.addCode(toCoding(toCode(resolveCodeRef(cr, library, libraryManager)), library, libraryManager));
-          }
-
-          if (e instanceof org.hl7.elm.r1.Code) {
-            cfc.addCode(toCoding((org.hl7.elm.r1.Code)e, library, libraryManager));
-          }
-
-          if (e instanceof org.hl7.elm.r1.ConceptRef) {
-            ConceptRef cr = (ConceptRef)e;
-            org.hl7.fhir.r5.model.CodeableConcept c = toCodeableConcept(toConcept(resolveConceptRef(cr, library, libraryManager), library, libraryManager), library, libraryManager);
-            for (org.hl7.fhir.r5.model.Coding code : c.getCoding()) {
-              cfc.addCode(code);
-            }
-          }
-
-          if (e instanceof org.hl7.elm.r1.Concept) {
-            org.hl7.fhir.r5.model.CodeableConcept c = toCodeableConcept((org.hl7.elm.r1.Concept)e, library, libraryManager);
-            for (org.hl7.fhir.r5.model.Coding code : c.getCoding()) {
-              cfc.addCode(code);
-            }
-          }
+          resolveCodeFilterCodes(cfc, e, library, libraryManager);
         }
       }
 
@@ -573,6 +676,33 @@ public class CqlSubSystem {
     // TODO: Set date range filters if literal
 
     return dr;
+  }
+
+  private void resolveCodeFilterCodes(org.hl7.fhir.r5.model.DataRequirement.DataRequirementCodeFilterComponent cfc, Expression e,
+                                      TranslatedLibrary library, LibraryManager libraryManager) {
+    if (e instanceof org.hl7.elm.r1.CodeRef) {
+      CodeRef cr = (CodeRef)e;
+      cfc.addCode(toCoding(toCode(resolveCodeRef(cr, library, libraryManager)), library, libraryManager));
+    }
+
+    if (e instanceof org.hl7.elm.r1.Code) {
+      cfc.addCode(toCoding((org.hl7.elm.r1.Code)e, library, libraryManager));
+    }
+
+    if (e instanceof org.hl7.elm.r1.ConceptRef) {
+      ConceptRef cr = (ConceptRef)e;
+      org.hl7.fhir.r5.model.CodeableConcept c = toCodeableConcept(toConcept(resolveConceptRef(cr, library, libraryManager), library, libraryManager), library, libraryManager);
+      for (org.hl7.fhir.r5.model.Coding code : c.getCoding()) {
+        cfc.addCode(code);
+      }
+    }
+
+    if (e instanceof org.hl7.elm.r1.Concept) {
+      org.hl7.fhir.r5.model.CodeableConcept c = toCodeableConcept((org.hl7.elm.r1.Concept)e, library, libraryManager);
+      for (org.hl7.fhir.r5.model.Coding code : c.getCoding()) {
+        cfc.addCode(code);
+      }
+    }
   }
 
   private org.hl7.fhir.r5.model.Coding toCoding(Code code, TranslatedLibrary library, LibraryManager libraryManager) {

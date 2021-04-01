@@ -23,7 +23,6 @@ package org.hl7.fhir.igtools.publisher;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -33,23 +32,19 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import org.apache.commons.math3.random.ISAACRandom;
-import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService.LogCategory;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.cache.NpmPackage;
-import org.hl7.fhir.utilities.cache.PackageCacheManager;
-import org.hl7.fhir.utilities.cache.PackageCacheManager.VersionHistory;
-import org.hl7.fhir.utilities.json.JSONUtil;
+import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
+import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.npm.PackageHacker;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
@@ -58,11 +53,9 @@ import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode.Location;
-
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-
 import org.hl7.fhir.utilities.xhtml.XhtmlParser;
+
+import com.google.gson.JsonObject;
 
 //import org.owasp.html.Handler;
 //import org.owasp.html.HtmlChangeListener;
@@ -119,19 +112,21 @@ public class HTLMLInspector {
   public class LoadedFile {
     private String filename;
     private long lastModified;
-    private XhtmlNode xhtml;
     private int iteration;
     private Set<String> targets = new HashSet<String>();
     private Boolean hl7State;
+    private boolean exempt;
     private String path;
+    private boolean hasXhtml;
 
-    public LoadedFile(String filename, String path, long lastModified, XhtmlNode xhtml, int iteration, Boolean hl7State) {
+    public LoadedFile(String filename, String path, long lastModified, int iteration, Boolean hl7State, boolean exempt, boolean hasXhtml) {
       this.filename = filename;
       this.lastModified = lastModified;
-      this.xhtml = xhtml;
       this.iteration = iteration;
       this.hl7State = hl7State;
       this.path = path;
+      this.exempt = exempt;
+      this.hasXhtml = hasXhtml;
     }
 
     public long getLastModified() {
@@ -146,8 +141,8 @@ public class HTLMLInspector {
       this.iteration = iteration;
     }
 
-    public XhtmlNode getXhtml() {
-      return xhtml;
+    public boolean isExempt() {
+      return exempt;
     }
 
     public Set<String> getTargets() {
@@ -160,6 +155,10 @@ public class HTLMLInspector {
 
     public Boolean getHl7State() {
       return hl7State;
+    }
+
+    public boolean isHasXhtml() {
+      return hasXhtml;
     }
     
   }
@@ -179,8 +178,9 @@ public class HTLMLInspector {
   private List<String> manual = new ArrayList<String>(); // pages that will be provided manually when published, so allowed to be broken links
   private ILoggingService log;
   private boolean forHL7;
+  private boolean requirePublishBox;
   private List<String> igs;
-  private PackageCacheManager pcm;
+  private FilesystemPackageCacheManager pcm;
   private Map<String, SpecMapManager> otherSpecs = new HashMap<String, SpecMapManager>();
   private Map<String, String> specList = new HashMap<>();
   private List<String> errorPackages = new ArrayList<>();
@@ -189,14 +189,17 @@ public class HTLMLInspector {
   private String statusText;
   private List<String> exemptHtmlPatterns = new ArrayList<>();
   private boolean missingPublishBox;
+  private List<String> missingPublishBoxList = new ArrayList<>();
   private Set<String> exceptions = new HashSet<>();
+  private boolean referencesValidatorPack;
 
-  public HTLMLInspector(String rootFolder, List<SpecMapManager> specs, ILoggingService log, String canonical) {
+  public HTLMLInspector(String rootFolder, List<SpecMapManager> specs, ILoggingService log, String canonical, String packageId) {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
     this.log = log;
     this.canonical = canonical;
     this.forHL7 = canonical.contains("hl7.org/fhir");
+    requirePublishBox = Utilities.startsWithInList(packageId, "hl7."); 
   }
 
   public void setAltRootFolder(String altRootFolder) throws IOException {
@@ -219,15 +222,25 @@ public class HTLMLInspector {
 
     log.logDebugMessage(LogCategory.HTML, "Loading Files");
     // load files
+    int i = 0;
+    int c = loadList.size() / 40;
     for (String s : loadList) {
       loadFile(s, rootFolder, messages);
+      if (i == c) {
+        System.out.print(".");
+        i = 0;
+      }
+      i++;
     }
+    System.out.println();
 
 
     log.logDebugMessage(LogCategory.HTML, "Checking Files");
     links = 0;
     // check links
     boolean first = true;
+    i = 0;
+    c = cache.size() / 40;
     for (String s : sorted(cache.keySet())) {
       log.logDebugMessage(LogCategory.HTML, "Check "+s);
       LoadedFile lf = cache.get(s);
@@ -239,18 +252,41 @@ public class HTLMLInspector {
             break;
           }
         }
-        if (check && !findExemptionComment(lf.getXhtml())) {
-          messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, s, "The html source does not contain the publish box" 
-            + (first ? " "+RELEASE_HTML_MARKER+" (see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations)" : ""), IssueSeverity.ERROR));
+        if (check && !lf.isExempt()) {
+          if (requirePublishBox) {
+            messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, s, "The html source does not contain the publish box" 
+              + (first ? " "+RELEASE_HTML_MARKER+" (see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations)" : ""), IssueSeverity.ERROR));
+          } else if (first) {
+            messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, s, "The html source does not contain the publish box; this is recommended for publishing support",
+                "The html source does not contain the publish box; this is recommended for publishing support  (see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations). Note that this is mandatory for HL7 specifications, and on the ci-build, but in other cases it's still recommended (this is only reported once, but applies for all pages)", IssueSeverity.INFORMATION));            
+            
+          }
           missingPublishBox = true;
+          missingPublishBoxList.add(s.substring(rootFolder.length()+1));
+          first = false;
         }
-        first = false;
       }
-      if (lf.getXhtml() != null)
-        if (checkLinks(s, "", lf.getXhtml(), null, messages, false) != NodeChangeType.NONE) { // returns true if changed
-          saveFile(lf);
+      if (lf.isHasXhtml()) {
+        XhtmlNode x = new XhtmlParser().setMustBeWellFormed(strict).parse(new FileInputStream(lf.filename), null);
+        referencesValidatorPack = false;
+        if (checkLinks(s, "", x, null, messages, false) != NodeChangeType.NONE) { // returns true if changed
+          saveFile(lf, x);
         }
+        if (referencesValidatorPack) {
+          if (lf.getHl7State() != null && lf.getHl7State()) {
+            messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, s, "The html source references validator.pack which is deprecated. Change the IG to describe the use of the package system instead", IssueSeverity.ERROR));                      
+          } else {
+            messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, s, "The html source references validator.pack which is deprecated. Change the IG to describe the use of the package system instead", IssueSeverity.WARNING));                                  
+          }
+        }
+      }
+      if (i == c) {
+        System.out.print(".");
+        i = 0;
+      }
+      i++;
     }
+    System.out.println();
  
     log.logDebugMessage(LogCategory.HTML, "Checking Other Links");
     // check other links:
@@ -271,10 +307,10 @@ public class HTLMLInspector {
     return res;
   }
 
-  private void saveFile(LoadedFile lf) throws IOException {
+  private void saveFile(LoadedFile lf, XhtmlNode x) throws IOException {
     new File(lf.getFilename()).delete();
     FileOutputStream f = new FileOutputStream(lf.getFilename());
-    new XhtmlComposer(XhtmlComposer.HTML).composeDocument(f, lf.getXhtml());
+    new XhtmlComposer(XhtmlComposer.HTML).composeDocument(f, x);
     f.close();
   }
 
@@ -291,7 +327,7 @@ public class HTLMLInspector {
 
   private void listFiles(String folder, List<String> loadList) {
     for (File f : new File(folder).listFiles()) {
-      if (!exceptions.contains(f.getAbsolutePath())) {
+      if (!Utilities.startsWithInList(f.getAbsolutePath(), exceptions)) {
         if (f.isDirectory()) {
           listFiles(f.getAbsolutePath(), loadList);
         } else {
@@ -320,8 +356,9 @@ public class HTLMLInspector {
       }
     } catch (FHIRFormatError | IOException e) {
       x = null;
-      if (htmlName || !(e.getMessage().startsWith("Unable to Parse HTML - does not start with tag.") || e.getMessage().startsWith("Malformed XHTML")))
-    	messages.add(new ValidationMessage(Source.Publisher, IssueType.STRUCTURE, s, e.getMessage(), IssueSeverity.ERROR));    	
+      if (htmlName || !(e.getMessage().startsWith("Unable to Parse HTML - does not start with tag.") || e.getMessage().startsWith("Malformed XHTML"))) {
+    	  messages.add(new ValidationMessage(Source.LinkChecker, IssueType.STRUCTURE, s, e.getMessage(), IssueSeverity.ERROR).setLocationLink(makeLocal(f.getAbsolutePath())));
+      }
     }
     if (x != null) {
       String src;
@@ -337,7 +374,7 @@ public class HTLMLInspector {
         hl7State = false;
       }
     }
-    LoadedFile lf = new LoadedFile(s, getPath(s, base), f.lastModified(), x, iteration, hl7State);
+    LoadedFile lf = new LoadedFile(s, getPath(s, base), f.lastModified(), iteration, hl7State, findExemptionComment(x) || Utilities.existsInList(f.getName(), "searchform.html"), x != null);
     cache.put(s, lf);
     if (x != null) {
       checkHtmlStructure(s, x, messages);
@@ -398,6 +435,9 @@ public class HTLMLInspector {
   }
 
   private boolean findExemptionComment(XhtmlNode x) {
+    if (x == null) {
+      return false;
+    }
     for (XhtmlNode c : x.getChildNodes()) {
       if (c.getNodeType() == NodeType.Comment && x.getContent() != null && x.getContent().trim().equals("frameset content"))
         return true;
@@ -441,24 +481,39 @@ public class HTLMLInspector {
       targets.add(x.getAttribute("name"));
     if (x.hasAttribute("id"))
       targets.add(x.getAttribute("id"));
+    if (Utilities.existsInList(x.getName(), "h1", "h2", "h3", "h4", "h5", "h6")) {
+      if (x.allText() != null) {
+        targets.add(urlify(x.allText()));
+      }
+    }
     for (XhtmlNode c : x.getChildNodes())
       listTargets(c, targets);
   }
 
   private NodeChangeType checkLinks(String s, String path, XhtmlNode x, String uuid, List<ValidationMessage> messages, boolean inPre) throws IOException {
     boolean changed = false;
-    if (x.getName() != null)
+    if (x.getName() != null) {
       path = path + "/"+ x.getName();
-    if ("title".equals(x.getName()) && Utilities.noString(x.allText()))
+    } else {
+      if (x.getContent() != null && x.getContent().contains("validator.pack")) {
+        referencesValidatorPack = true;
+      }
+    }
+    if ("title".equals(x.getName()) && Utilities.noString(x.allText())) {
       x.addText("?html-link?");
-    if ("a".equals(x.getName()) && x.hasAttribute("href"))
+    }
+    if ("a".equals(x.getName()) && x.hasAttribute("href")) {
       changed = checkResolveLink(s, x.getLocation(), path, x.getAttribute("href"), x.allText(), messages, uuid);
-    if ("img".equals(x.getName()) && x.hasAttribute("src"))
+    }
+    if ("img".equals(x.getName()) && x.hasAttribute("src")) {
       changed = checkResolveImageLink(s, x.getLocation(), path, x.getAttribute("src"), messages, uuid) || changed;
-    if ("link".equals(x.getName()))
+    }
+    if ("link".equals(x.getName())) {
       changed = checkLinkElement(s, x.getLocation(), path, x.getAttribute("href"), messages, uuid) || changed;
-    if ("script".equals(x.getName()))
+    }
+    if ("script".equals(x.getName())) {
       checkScriptElement(s, x.getLocation(), path, x, messages);
+    }
     String nuid = UUID.randomUUID().toString().toLowerCase();
     boolean nchanged = false;
     boolean nSelfChanged = false;
@@ -486,7 +541,8 @@ public class HTLMLInspector {
 
   private void checkScriptElement(String filename, Location loc, String path, XhtmlNode x, List<ValidationMessage> messages) {
     String src = x.getAttribute("src");
-    if (!Utilities.noString(src) && Utilities.isAbsoluteUrl(src))
+    if (!Utilities.noString(src) && Utilities.isAbsoluteUrl(src) && !Utilities.existsInList(src, 
+        "http://hl7.org/fhir/history-cm.js", "http://hl7.org/fhir/assets-hist/js/jquery.js"))
       messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, filename+(loc == null ? "" : " at "+loc.toString()), "The <script> src '"+src+"' is llegal", IssueSeverity.FATAL));    
   }
 
@@ -500,50 +556,67 @@ public class HTLMLInspector {
 
   private boolean checkResolveLink(String filename, Location loc, String path, String ref, String text, List<ValidationMessage> messages, String uuid) throws IOException {
     links++;
-    String rref = ref;
+    String rref = Utilities.URLDecode(ref);
     if ((rref.startsWith("http:") || rref.startsWith("https:") ) && (rref.endsWith(".sch") || rref.endsWith(".xsd") || rref.endsWith(".shex"))) { // work around for the fact that spec.internals does not track all these minor things 
       rref = Utilities.changeFileExt(ref, ".html");
     }
-    if (rref.startsWith("./"))
+    if (rref.startsWith("./")) {
       rref = rref.substring(2);
+    }
     
+    if (rref.contains("validator.pack")) {
+      referencesValidatorPack = true;
+    }
+    if (ref.startsWith("data:")) {
+      return true;
+    }
     String tgtList = "";
     boolean resolved = Utilities.existsInList(ref, "qa.html", "http://hl7.org/fhir", "http://hl7.org", "http://www.hl7.org", "http://hl7.org/fhir/search.cfm") || 
         ref.startsWith("http://gforge.hl7.org/gf/project/fhir/tracker/") || ref.startsWith("mailto:") || ref.startsWith("javascript:");
     if (!resolved && forHL7)
-      resolved = Utilities.pathURL(canonical, "history.html").equals(ref); 
+      resolved = Utilities.pathURL(canonical, "history.html").equals(ref) || ref.equals("searchform.html"); 
+    if (!resolved )
+      resolved = filename.contains("searchform.html") && ref.equals("history.html"); 
     if (!resolved)
       resolved = manual.contains(rref);
     if (!resolved && specs != null){
       for (SpecMapManager spec : specs) {
-        resolved = resolved || spec.getBase().equals(rref) || (spec.getBase()).equals(rref+"/") || spec.hasTarget(rref) || 
-            Utilities.existsInList(rref, Utilities.pathURL(spec.getBase(), "definitions.json.zip"), Utilities.pathURL(spec.getBase(), "definitions.xml.zip"), Utilities.pathURL(spec.getBase(), "package.tgz"));
+        if (!resolved && spec.getBase() != null) {
+          resolved = resolved || spec.getBase().equals(rref) || (spec.getBase()).equals(rref+"/") || spec.hasTarget(rref) || 
+            Utilities.existsInList(rref, Utilities.pathURL(spec.getBase(), "definitions.json.zip"), Utilities.pathURL(spec.getBase(), "full-ig.zip"), Utilities.pathURL(spec.getBase(), "definitions.xml.zip"), Utilities.pathURL(spec.getBase(), "package.tgz"));
+        }
         if (!resolved && spec.getBase2() != null) {
           resolved = spec.getBase2().equals(rref) || (spec.getBase2()).equals(rref+"/") || 
-              Utilities.existsInList(rref, Utilities.pathURL(spec.getBase2(), "definitions.json.zip"), Utilities.pathURL(spec.getBase2(), "definitions.xml.zip"), Utilities.pathURL(spec.getBase2(), "package.tgz"));
-          
+              Utilities.existsInList(rref, Utilities.pathURL(spec.getBase2(), "definitions.json.zip"), Utilities.pathURL(spec.getBase2(), "definitions.xml.zip"), Utilities.pathURL(spec.getBase2(), "package.tgz"), Utilities.pathURL(spec.getBase2(), "full-ig.zip")); 
         }
       }
     }
     
     if (!resolved) {
       String fref = Utilities.path(Utilities.getDirectoryForFile(filename), ref);
-      if (fref.equals(Utilities.path(rootFolder, "qa.html")))
+      if (fref.equals(Utilities.path(rootFolder, "qa.html"))) {
         resolved = true;
+      }
     }
     // special case end-points that are always valid:
      if (!resolved)
-      resolved = Utilities.existsInList(ref, "http://hl7.org/fhir/fhir-spec-r4.zip", "http://hl7.org/fhir/R4/fhir-spec-r4.zip", "http://hl7.org/fhir/STU3/fhir-spec.zip", "http://hl7.org/fhir/DSTU2/fhir-spec.zip", 
+      resolved = Utilities.existsInList(ref, "http://hl7.org/fhir/fhir-spec.zip", "http://hl7.org/fhir/R4/fhir-spec.zip", "http://hl7.org/fhir/STU3/fhir-spec.zip", "http://hl7.org/fhir/DSTU2/fhir-spec.zip", 
           "http://hl7.org/fhir-issues", "http://hl7.org/registry") || 
           matchesTarget(ref, "http://hl7.org", "http://hl7.org/fhir/DSTU2", "http://hl7.org/fhir/STU3", "http://hl7.org/fhir/R4", "http://hl7.org/fhir/smart-app-launch", "http://hl7.org/fhir/validator");
+
+     // external terminology resources 
+    if (!resolved) {
+     resolved = Utilities.startsWithInList(ref, "http://cts.nlm.nih.gov/fhir"); 
+    }
     
     if (!resolved) {
       if (rref.startsWith("http://") || rref.startsWith("https://") || rref.startsWith("ftp://") || rref.startsWith("tel:")) {
         resolved = true;
         if (specs != null) {
           for (SpecMapManager spec : specs) {
-            if (rref.startsWith(spec.getBase()))
+            if (spec.getBase() != null && rref.startsWith(spec.getBase())) {
               resolved = false;
+            }
           }
         }
       } else { 
@@ -568,57 +641,15 @@ public class HTLMLInspector {
             resolved = true;
           else { 
             resolved = f.targets.contains(name);
-            tgtList = " (valid targets: "+(f.targets.size() > 20 ? Integer.toString(f.targets.size())+" targets"  :  f.targets.toString())+")";
+            tgtList = " (valid targets: "+(f.targets.size() > 40 ? Integer.toString(f.targets.size())+" targets"  :  f.targets.toString())+")";
+            for (String s : f.targets) {
+              if (s.equalsIgnoreCase(name)) {
+                tgtList = (" - case is wrong ('"+s+"')");
+              }
+            }
           }
         }
       }
-    }
-    if (!resolved) {
-//      if (specList.isEmpty()) {
-//        pcm.listAllIds(specList);
-//      }
-//      for (String id : specList.keySet()) {
-//        String url = specList.get(id);
-//        if (!"http://hl7.org/fhir".equals(url)) {
-//          if (matchesTarget(ref, url))
-//            resolved = true;
-//          if (ref.startsWith(url) && !errorPackages.contains(url)) {
-//            // now, iterate the package list to see if we have a version match
-//            JsonObject plist = null; 
-//            try {
-//              plist = fetchJson(Utilities.pathURL(url, "package-list.json"));
-//            } catch (Exception e) {
-//              errorPackages.add(url);
-//              System.out.println("Error #1 checking links for "+url+": "+e.getMessage()+" (resolving "+ref+")");
-//            }
-//            if (plist != null) {
-//              for (JsonElement vere : plist.getAsJsonArray("list")) {
-//                JsonObject ver = (JsonObject) vere;
-//                String sver = JSONUtil.str(ver, "version");
-//                String v = JSONUtil.str(plist, "package-id")+"#"+sver;
-//                if (!errorPackages.contains(v)) {
-//                  try {
-//                    if (ref.startsWith(JSONUtil.str(ver, "url"))) {
-//                      SpecMapManager sm = otherSpecs.get(v);
-//                      if (sm == null) {
-//                        sm = loadSpecMap(JSONUtil.str(plist, "package-id"), sver, JSONUtil.str(ver, "url"));
-//                        otherSpecs.put(v, sm);
-//                      }
-//                      if (sm.getBase().equals(rref) || (sm.getBase()).equals(rref+"/") || sm.hasTarget(rref)) {
-//                        resolved = true;
-//                        break;
-//                      }
-//                    }
-//                  } catch (Exception e) {
-//                    errorPackages.add(v);
-//                    System.out.println("Error #2 checking links for "+v+": "+e.getMessage()+" (resolving "+ref+")");
-//                  }
-//                }
-//              }
-//            }
-//          }
-//        }
-//      }
     }
     if (resolved) {
       return false;
@@ -659,7 +690,7 @@ public class HTLMLInspector {
       pi = pcm.addPackageToCache(id, ver, src, url);
     }    
     SpecMapManager sm = new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.getNpm().getAsJsonObject("dependencies").get("hl7.fhir.core").getAsString());
-    sm.setBase(url);
+    sm.setBase(PackageHacker.fixPackageUrl(url));
     return sm;
   }
 
@@ -675,12 +706,18 @@ public class HTLMLInspector {
     boolean resolved = Utilities.existsInList(ref);
     if (ref.startsWith("data:"))
       resolved = true;
+    if (ref.startsWith("./")) {
+      ref = ref.substring(2);
+    }
     if (!resolved)
       resolved = manual.contains(ref);
     if (!resolved && specs != null){
       for (SpecMapManager spec : specs) {
-        resolved = resolved || spec.hasImage(ref); 
+        resolved = resolved || (spec.getBase() != null && spec.hasImage(ref)); 
       }
+    }
+    if (!resolved) {
+      ;resolved = Utilities.existsInList(ref, "http://hl7.org/fhir/assets-hist/images/fhir-logo-www.png", "http://hl7.org/fhir/assets-hist/images/hl7-logo-n.png"); 
     }
     if (!resolved) {
       if (ref.startsWith("http://") || ref.startsWith("https://")) {
@@ -720,7 +757,7 @@ public class HTLMLInspector {
   }
 
   public static void main(String[] args) throws Exception {
-    HTLMLInspector inspector = new HTLMLInspector(args[0], null, null, "http://hl7.org/fhir/us/core");
+    HTLMLInspector inspector = new HTLMLInspector(args[0], null, null, "http://hl7.org/fhir/us/core", "hl7.fhir.us.core");
     inspector.setStrict(false);
     List<ValidationMessage> linkmsgs = inspector.check("test text");
     int bl = 0;
@@ -771,7 +808,7 @@ public class HTLMLInspector {
     return igs;
   }
 
-  public void setPcm(PackageCacheManager pcm) {
+  public void setPcm(FilesystemPackageCacheManager pcm) {
     this.pcm = pcm; 
   }
 
@@ -787,5 +824,36 @@ public class HTLMLInspector {
     return exceptions;
   }
 
+  public String getMissingPublishboxSummary() {
+    if (missingPublishBoxList.size() > 10) {
+      return Integer.toString(missingPublishBoxList.size())+" files";
+    } else {
+      return missingPublishBoxList.toString();
+    }
+  }
+
+
+  // adapted from anchor.min, which is used to generate these things on the flt 
+  private String urlify(String a) {
+    String repl = "-& +$,:;=?@\"#{}()[]|^~[`%!'<>].*";
+    String elim = "/\\";
+    StringBuilder b = new StringBuilder();
+    boolean nextDash = false;
+    for (char ch : a.toCharArray()) {
+      if (elim.indexOf(ch) == -1) {
+        if (repl.indexOf(ch) == -1) {
+          if (nextDash) {
+            b.append("-");
+          }
+          nextDash = false;
+          b.append(Character.toLowerCase(ch));
+        } else {
+          nextDash = true;
+        }
+      }
+    }
+    String s = b.toString().trim();
+    return s;
+  }
   
 }

@@ -1,60 +1,28 @@
 package org.hl7.fhir.igtools.publisher.utils;
 
-/*-
- * #%L
- * org.hl7.fhir.publisher.core
- * %%
- * Copyright (C) 2014 - 2019 Health Level 7
- * %%
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * 
- *      http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- * #L%
- */
-
-
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.model.Enumerations.FHIRVersion;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.ImplementationGuide.SPDXLicense;
-import org.hl7.fhir.r5.test.utils.ToolsHelper;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator.Category;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.cache.NpmPackage;
-import org.hl7.fhir.utilities.cache.NpmPackageIndexBuilder;
-import org.hl7.fhir.utilities.cache.PackageGenerator.PackageType;
 import org.hl7.fhir.utilities.json.JSONUtil;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.npm.PackageGenerator.PackageType;
 
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
 public class IGPackageChecker {
@@ -71,7 +39,7 @@ public class IGPackageChecker {
     this.packageId = packageId;
   }
 
-  public void check(String ver, String pckId, String fhirversion, String name, Date date, String url, String canonical) throws IOException, FHIRException {
+  public void check(String ver, String pckId, String fhirversion, String name, Date date, String url, String canonical, String jurisdiction) throws IOException, FHIRException {
     String pf = Utilities.path(folder, "package.tgz");
     File f = new File(pf);
     if (!f.exists()) {
@@ -83,44 +51,50 @@ public class IGPackageChecker {
       checkJsonProp(pf, json, "name", pckId);
       checkJsonProp(pf, json, "url", url);
       checkJsonProp(pf, json, "canonical", canonical);
+      if (jurisdiction != null) {
+        checkChangeJsonProp(pck, pf, json, "jurisdiction", jurisdiction);
+      }
+      if (pck.isNotForPublication()) {
+        throw new Error("Error: the package at "+pf+" is not suitable for publication");
+      }
       if (!json.has("fhirVersions")) {
-        System.out.println("Problem with "+pf+": missing fhirVersions");
+        System.out.println("Problem #2 with "+pf+": missing fhirVersions");
       } else {
         if (json.getAsJsonArray("fhirVersions").size() == 0) {
-          System.out.println("Problem with "+pf+": fhirVersions size = "+json.getAsJsonArray("fhirVersions").size());          
+          System.out.println("Problem #3 with "+pf+": fhirVersions size = "+json.getAsJsonArray("fhirVersions").size());          
         }
-        if (!json.getAsJsonArray("fhirVersions").get(0).getAsString().equals(fhirversion)) {
-          System.out.println("Problem with "+pf+": fhirVersions value mismatch (expected "+fhirversion+", found "+json.getAsJsonArray("fhirVersions").get(0).getAsString());
+        if (!VersionUtilities.versionsCompatible(json.getAsJsonArray("fhirVersions").get(0).getAsString(), fhirversion)) {
+          System.out.println("Problem #4 with "+pf+": fhirVersions value mismatch (expected "+(fhirversion.contains("|") ? "one of "+fhirversion : fhirversion)+", found "+json.getAsJsonArray("fhirVersions").get(0).getAsString()+")");
         }
       }
       if (json.has("dependencies")) {
         JsonObject dep = json.getAsJsonObject("dependencies");
         if (dep.has("hl7.fhir.core")) {
-          System.out.println("Problem with "+pf+": found hl7.fhir.core in dependencies");
+          System.out.println("Problem #5 with "+pf+": found hl7.fhir.core in dependencies");
         }  
         if (fhirversion.startsWith("1.0")) {
           if (!dep.has("hl7.fhir.r2.core")) {
-            System.out.println("Problem with "+pf+": R2 guide doesn't list R2 in it's dependencies");
-          } else if (!fhirversion.equals(JSONUtil.str(dep, "hl7.fhir.r2.core"))) {
-            System.out.println("Problem with "+pf+": fhirVersions value mismatch on hl7.fhir.r2.core (expected "+fhirversion+", found "+JSONUtil.str(dep, "hl7.fhir.r2.core"));
+            System.out.println("Problem #6 with "+pf+": R2 guide doesn't list R2 in it's dependencies");
+          } else if (!VersionUtilities.versionsCompatible(fhirversion, JSONUtil.str(dep, "hl7.fhir.r2.core"))) {
+            System.out.println("Problem #7 with "+pf+": fhirVersions value mismatch on hl7.fhir.r2.core (expected "+fhirversion+", found "+JSONUtil.str(dep, "hl7.fhir.r2.core"));
           }
         } else if (fhirversion.startsWith("1.4")) {
           if (!dep.has("hl7.fhir.r2b.core")) {
-            System.out.println("Problem with "+pf+": R2B guide doesn't list R2B in it's dependencies");
-          } else if (!fhirversion.equals(JSONUtil.str(dep, "hl7.fhir.r2b.core"))) {
-            System.out.println("Problem with "+pf+": fhirVersions value mismatch on hl7.fhir.r2b.core (expected "+fhirversion+", found "+JSONUtil.str(dep, "hl7.fhir.r2b.core"));
+            System.out.println("Problem #8 with "+pf+": R2B guide doesn't list R2B in it's dependencies");
+          } else if (!VersionUtilities.versionsCompatible(fhirversion, JSONUtil.str(dep, "hl7.fhir.r2b.core"))) {
+            System.out.println("Problem #9 with "+pf+": fhirVersions value mismatch on hl7.fhir.r2b.core (expected "+fhirversion+", found "+JSONUtil.str(dep, "hl7.fhir.r2b.core"));
           }          
         } else if (fhirversion.startsWith("3.0")) {
           if (!dep.has("hl7.fhir.r3.core")) {
-            System.out.println("Problem with "+pf+": R3 guide doesn't list R3 in it's dependencies");
-          } else if (!fhirversion.equals(JSONUtil.str(dep, "hl7.fhir.r3.core"))) {
-            System.out.println("Problem with "+pf+": fhirVersions value mismatch on hl7.fhir.r3.core (expected "+fhirversion+", found "+JSONUtil.str(dep, "hl7.fhir.r3.core"));
+            System.out.println("Problem #10 with "+pf+": R3 guide doesn't list R3 in it's dependencies");
+          } else if (!VersionUtilities.versionsCompatible(fhirversion, JSONUtil.str(dep, "hl7.fhir.r3.core"))) {
+            System.out.println("Problem #11 with "+pf+": fhirVersions value mismatch on hl7.fhir.r3.core (expected "+fhirversion+", found "+JSONUtil.str(dep, "hl7.fhir.r3.core"));
           }
         } else if (fhirversion.startsWith("4.0")) {
           if (!dep.has("hl7.fhir.r4.core")) {
-            System.out.println("Problem with "+pf+": R4 guide doesn't list R4 in it's dependencies");
-          } else if (!fhirversion.equals(JSONUtil.str(dep, "hl7.fhir.r4.core"))) {
-            System.out.println("Problem with "+pf+": fhirVersions value mismatch on hl7.fhir.r4.core (expected "+fhirversion+", found "+JSONUtil.str(dep, "hl7.fhir.r4.core"));
+            System.out.println("Problem #12 with "+pf+": R4 guide doesn't list R4 in it's dependencies");
+          } else if (!VersionUtilities.versionsCompatible(fhirversion, JSONUtil.str(dep, "hl7.fhir.r4.core"))) {
+            System.out.println("Problem #13 with "+pf+": fhirVersions value mismatch on hl7.fhir.r4.core (expected "+fhirversion+", found "+JSONUtil.str(dep, "hl7.fhir.r4.core"));
           }
         }
       }
@@ -132,9 +106,19 @@ public class IGPackageChecker {
 
   public void checkJsonProp(String pf, JsonObject json, String propName, String value) {
     if (!json.has(propName)) {
-      System.out.println("Problem with "+pf+": missing "+propName);
+      System.out.println("Problem #14 with "+pf+": missing "+propName);
     } else if (!json.get(propName).getAsString().equals(value)) {
-      System.out.println("Problem with "+pf+": expected "+propName+" "+value+" but found "+json.get(propName).getAsString());
+      System.out.println("Problem #15 with "+pf+": expected "+propName+" "+value+" but found "+json.get(propName).getAsString());
+    }
+  }
+
+  public void checkChangeJsonProp(NpmPackage pck, String pf, JsonObject json, String propName, String value) throws FileNotFoundException, IOException {
+    if (!json.has(propName) || !json.get(propName).getAsString().equals(value)) {
+      if (json.has(propName)) {
+        json.remove(propName);
+      }
+      json.addProperty(propName, value);
+      pck.save(new FileOutputStream(pf));      
     }
   }
 
@@ -162,7 +146,7 @@ public class IGPackageChecker {
     } else {
       fhirversions.add(fhirversion);
     }
-    NPMPackageGenerator npm = new NPMPackageGenerator(file, canonical, vpath, PackageType.IG, ig, date, fhirversions);
+    NPMPackageGenerator npm = new NPMPackageGenerator(file, canonical, vpath, PackageType.IG, ig, date, fhirversions, true);
     for (File f : new File(folder).listFiles()) {
       if (f.getName().endsWith(".openapi.json")) {
         byte[] src = TextFile.fileToBytes(f.getAbsolutePath());

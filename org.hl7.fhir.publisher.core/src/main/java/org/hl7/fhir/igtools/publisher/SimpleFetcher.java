@@ -35,18 +35,20 @@ import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService.LogCategory;
 import org.hl7.fhir.r5.formats.FormatUtilities;
 import org.hl7.fhir.r5.model.CanonicalType;
+import org.hl7.fhir.r5.model.DataType;
 import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.DataType;
 import org.hl7.fhir.r5.model.UriType;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 
 public class SimpleFetcher implements IFetchFile {
 
+  private static final String[] EXTENSIONS = new String[] {".xml", ".json", ".map", ".phinvads"};
   private IGKnowledgeProvider pkp;
   private List<String> resourceDirs;
   private ILoggingService log;
+  private String rootDir;
   
   public SimpleFetcher(ILoggingService log) {
     this.log = log;
@@ -62,14 +64,23 @@ public class SimpleFetcher implements IFetchFile {
     this.pkp = pkp;
   }
 
+  public String getRootDir() {
+    return rootDir;
+  }
+
+  @Override
+  public void setRootDir(String rootDir) {
+    this.rootDir = rootDir;
+  }
+
   @Override
   public FetchedFile fetch(String path) throws Exception {
     File f = new File(path);
     if (!f.exists())
       throw new Exception("Unable to find file "+path);
-    FetchedFile ff = new FetchedFile();
+    FetchedFile ff = new FetchedFile(path);
     ff.setPath(f.getCanonicalPath());
-    ff.setName(fileTitle(path));
+    ff.setName(f.isDirectory() ? path : fileTitle(path));
     ff.setTime(f.lastModified());
     if (f.isDirectory()) {
       ff.setContentType("application/directory");
@@ -81,11 +92,11 @@ public class SimpleFetcher implements IFetchFile {
       }
     } else if (!isIgnoredFile(f.getName())) {
       ff.setFolder(false);   
-      if (path.endsWith("json"))
+      if (path.endsWith("json")) {
         ff.setContentType("application/fhir+json");
-      else if (path.endsWith("xml"))
+      } else if (path.endsWith("xml")) {
         ff.setContentType("application/fhir+xml");
-
+      }
       InputStream ss = new FileInputStream(f);
       byte[] b = new byte[ss.available()];
       ss.read(b, 0, ss.available());
@@ -106,25 +117,27 @@ public class SimpleFetcher implements IFetchFile {
     for (String dir : resourceDirs) {
       path = Utilities.path(dir, name);
       f = new File(path+".xml");
-      if (f.exists())
+      if (f.exists()) {
         break;
-      else {
+      } else {
         f = new File(path+".json");
-        if (f.exists())
+        if (f.exists()) {
           break;
+        }
       }
     }
-    if (f==null)
+    if (f==null) {
       throw new Exception("Unable to find file "+path+".xml or "+path+".json");
-    FetchedFile ff = new FetchedFile();
+    }
+    FetchedFile ff = new FetchedFile(new File(rootDir).toURI().relativize(new File(path).toURI()).getPath());
     ff.setPath(f.getCanonicalPath());
     ff.setName(fileTitle(path));
     ff.setTime(f.lastModified());
-    if (f.getName().endsWith("json"))
+    if (f.getName().endsWith("json")) {
       ff.setContentType("application/fhir+json");
-    else if (f.getName().endsWith("xml"))
+    } else if (f.getName().endsWith("xml")) {
       ff.setContentType("application/fhir+xml");
-    
+    }
     InputStream ss = new FileInputStream(f);
     byte[] b = new byte[ss.available()];
     ss.read(b, 0, ss.available());
@@ -148,10 +161,11 @@ public class SimpleFetcher implements IFetchFile {
   static String fileTitle(String path) {
     if (path.contains(".")) {
       String ext = path.substring(path.lastIndexOf(".")+1);
-      if (Utilities.isInteger(ext))
+      if (Utilities.isInteger(ext)) {
         return path;
-      else
+      } else {
         return path.substring(0, path.lastIndexOf("."));
+      }
     } else
       return path;
   }
@@ -159,10 +173,11 @@ public class SimpleFetcher implements IFetchFile {
   @Override
   public boolean canFetchFlexible(String name) throws Exception {
     for (String dir : resourceDirs) {
-      if (new File(dir + File.separator + name + ".xml").exists())
+      if (new File(dir + File.separator + name + ".xml").exists()) {
         return true;
-      else if(new File(dir + File.separator + name + ".json").exists())
+      } else if(new File(dir + File.separator + name + ".json").exists()) {
         return true;
+      }
     }
     return false;
   }
@@ -186,29 +201,14 @@ public class SimpleFetcher implements IFetchFile {
       
       if (Utilities.noString(fn)) {
         // no source in the json file.
-        fn = findFile(dirs, type.toLowerCase()+"-"+id+".xml");
-        if (fn == null) // Added to support Forge's file naming convention
-          fn = findFile(dirs, id+"."+type.toLowerCase()+".xml");
-        if (fn == null)
-          fn = findFile(dirs, type.toLowerCase()+"-"+id+".json");
-        if (fn == null)
-          fn = findFile(dirs, type.toLowerCase()+"/"+id+".xml");
-        if (fn == null)
-          fn = findFile(dirs, type.toLowerCase()+"/"+id+".json");
-        if (fn == null)
-          fn = findFile(dirs, id+".xml");
-        if (fn == null)
-          fn = findFile(dirs, id+".json");
-        if (fn == null) 
-          fn = findFile(dirs, type+"-"+id+".xml");
-        if (fn == null) 
-          fn = findFile(dirs, id+"."+type+".xml");
-        if (fn == null)
-          fn = findFile(dirs, type+"-"+id+".json");
-        if (fn == null)
-          fn = findFile(dirs, type+"/"+id+".xml");
-        if (fn == null)
-          fn = findFile(dirs, type+"/"+id+".json");
+        fn = findFileInSet(dirs, 
+              type.toLowerCase()+"-"+id,
+              id+"."+type.toLowerCase(), // Added to support Forge's file naming convention
+              type.toLowerCase()+"/"+id,
+              id,
+              type+"-"+id,
+              id+"."+type,
+              type+"/"+id);
         if (fn == null)
           throw new Exception("Unable to find the source file for "+type+"/"+id+": not specified, so tried "+type+"-"+id+".xml, "+id+"."+type+".xml, "+type+"-"+id+".json, "+type+"/"+id+".xml, "+type+"/"+id+".json, "+id+".xml, and "+id+".json (and lowercase resource name variants) in dirs "+dirs.toString());
       } else {
@@ -224,6 +224,26 @@ public class SimpleFetcher implements IFetchFile {
     } else {
       throw new Exception("Unknown source reference type for implementation guide");
     }
+  }
+  
+  String findFileInSet(List<String> dirs, String... names) throws IOException {
+    for (String f : names) {
+      String fn = findFileMultiExt(dirs, f);
+      if (fn != null) {
+        return fn;
+      }
+    }
+    return null;
+  }
+
+  String findFileMultiExt(List<String> dirs, String name) throws IOException {
+    for (String ex : EXTENSIONS) {
+      String fn = findFile(dirs, name+ex);
+      if (fn != null ) {
+        return fn;
+      }
+    }
+    return null;
   }
 
   String findFile(List<String> dirs, String name) throws IOException {
@@ -307,7 +327,7 @@ public class SimpleFetcher implements IFetchFile {
   }
   
   private void addFile(List<FetchedFile> res, File f, String cnt) throws IOException {
-    FetchedFile ff = new FetchedFile();
+    FetchedFile ff = new FetchedFile(new File(rootDir).toURI().relativize(f.toURI()).getPath());
     ff.setPath(f.getCanonicalPath());
     ff.setName(fileTitle(f.getCanonicalPath()));
     ff.setTime(f.lastModified());

@@ -33,13 +33,12 @@ import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.r5.conformance.ProfileUtilities;
 import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider;
 import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService.LogCategory;
 import org.hl7.fhir.r5.elementmodel.ParserBase;
 import org.hl7.fhir.r5.elementmodel.Property;
 import org.hl7.fhir.r5.formats.FormatUtilities;
+import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
-import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
@@ -70,8 +69,9 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   private boolean autoPath = false;
   private boolean noXhtml;
   private Template template;
+  private List<String> listedURLExemptions;
   
-  public IGKnowledgeProvider(IWorkerContext context, String pathToSpec, String canonical, JsonObject igs, List<ValidationMessage> errors, boolean noXhtml, Template template) throws Exception {
+  public IGKnowledgeProvider(IWorkerContext context, String pathToSpec, String canonical, JsonObject igs, List<ValidationMessage> errors, boolean noXhtml, Template template, List<String> listedURLExemptions) throws Exception {
     super();
     this.context = context;
     this.pathToSpec = pathToSpec;
@@ -81,8 +81,10 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     this.noXhtml = noXhtml;
     this.canonical = canonical;
     this.template = template;
+    this.listedURLExemptions = listedURLExemptions;
     loadPaths(igs);
   }
+  
   private void loadPaths(JsonObject igs) throws Exception {
     JsonElement e = igs.get("path-pattern");
     if (e != null)
@@ -158,8 +160,33 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     s = s.replace("{{[id]}}", r.getId());
     if (format!=null)
       s = s.replace("{{[fmt]}}", format);
-    s = s.replace("{{[type]}}", r.getElement().fhirType());
-    s = s.replace("{{[uid]}}", r.getElement().fhirType()+"="+r.getId());
+    s = s.replace("{{[type]}}", r.fhirType());
+    s = s.replace("{{[uid]}}", r.fhirType()+"="+r.getId());
+    if (vars != null) {
+      for (String n : vars.keySet()) {
+        String v = vars.get(n);
+        if (v == null) {
+          v = "";
+        }
+        s = s == null ? "" : s.replace("{{["+n+"]}}", v);
+      }
+    }
+    return s;
+  }
+
+  public String doReplacements(String s, FetchedResource r, Resource res, Map<String, String> vars, String format, String prefixForContained) throws FHIRException {
+    if (Utilities.noString(s))
+      return s;
+    if (r.getId()== null) {
+      throw new FHIRException("Error doing replacements - no id defined in resource: " + (r.getTitle()== null ? "NO TITLE EITHER" : r.getTitle()));
+    }
+    s = s.replace("{{[title]}}", r.getTitle() == null ? "?title?" : r.getTitle());
+    s = s.replace("{{[name]}}", res.getId()+(format==null? "": "-"+format)+"-html");
+    s = s.replace("{{[id]}}", prefixForContained+res.getId());
+    if (format!=null)
+      s = s.replace("{{[fmt]}}", format);
+    s = s.replace("{{[type]}}", res.fhirType());
+    s = s.replace("{{[uid]}}", res.fhirType()+"="+prefixForContained+res.getId());
     if (vars != null) {
       for (String n : vars.keySet()) {
         String v = vars.get(n);
@@ -180,8 +207,8 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     s = s.replace("{{[id]}}", r.getId());
     if (format!=null)
       s = s.replace("{{[fmt]}}", format);
-//    s = s.replace("{{[type]}}", r.getElement().fhirType());
-//    s = s.replace("{{[uid]}}", r.getElement().fhirType()+"="+r.getId());
+//    s = s.replace("{{[type]}}", r.fhirType());
+//    s = s.replace("{{[uid]}}", r.fhirType()+"="+r.getId());
     if (vars != null) {
       for (String n : vars.keySet())
         s = s.replace("{{["+n+"]}}", vars.get(n));
@@ -194,16 +221,40 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       return getBoolean(r.getConfig(), code);
     JsonObject cfg = null;
     if (defaultConfig != null) {
-      cfg = defaultConfig.getAsJsonObject(r.getElement().fhirType());
-    }
-    if (cfg != null && hasBoolean(cfg, code)) {
-      return getBoolean(cfg, code);
-    }
-    cfg = defaultConfig.getAsJsonObject("Any");
-    if (cfg != null && hasBoolean(cfg, code)) {
-      return getBoolean(cfg, code);
+      cfg = defaultConfig.getAsJsonObject(r.fhirType());
+      if (cfg != null && hasBoolean(cfg, code)) {
+        return getBoolean(cfg, code);
+      }
+      cfg = defaultConfig.getAsJsonObject("Any");
+      if (cfg != null && hasBoolean(cfg, code)) {
+        return getBoolean(cfg, code);
+      }
     }
     return true;
+  }
+
+  public String getPropertyContained(FetchedResource r, String propertyName, Resource contained) {
+    if (contained == null && r.getConfig() != null && hasString(r.getConfig(), propertyName)) {
+      return getString(r.getConfig(), propertyName);
+    }
+    if (defaultConfig != null && contained != null) {
+      JsonObject cfg = null;
+      if (cfg==null && "StructureDefinition".equals(contained.fhirType())) {
+        cfg = defaultConfig.getAsJsonObject(contained.fhirType()+":"+getSDType(contained));
+        if (cfg != null && hasString(cfg, propertyName)) {
+          return getString(cfg, propertyName);        
+        }
+      }
+      cfg = defaultConfig.getAsJsonObject(contained.fhirType());
+      if (cfg != null && hasString(cfg, propertyName)) {
+        return getString(cfg, propertyName);
+      }
+      cfg = defaultConfig.getAsJsonObject("Any");
+      if (cfg != null && hasString(cfg, propertyName)) {
+        return getString(cfg, propertyName);
+      }
+    }
+    return null;
   }
 
   public String getProperty(FetchedResource r, String propertyName) {
@@ -211,18 +262,17 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       return getString(r.getConfig(), propertyName);
     }
     if (defaultConfig != null) {
-      
       JsonObject cfg = null;
       if (r.isExample()) {
         cfg = defaultConfig.getAsJsonObject("example");
       }
-      if (cfg==null && "StructureDefinition".equals(r.getElement().fhirType())) {
+      if (cfg==null && "StructureDefinition".equals(r.fhirType())) {
         cfg = defaultConfig.getAsJsonObject(r.fhirType()+":"+getSDType(r));
         if (cfg != null && hasString(cfg, propertyName)) {
           return getString(cfg, propertyName);        
         }
       }
-      cfg = defaultConfig.getAsJsonObject(r.getElement().fhirType());
+      cfg = defaultConfig.getAsJsonObject(r.fhirType());
   	  if (cfg != null && hasString(cfg, propertyName)) {
   	    return getString(cfg, propertyName);
   	  }
@@ -234,6 +284,15 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     return null;
   }
 
+  public static String getSDType(Resource r) {
+    StructureDefinition sd = (StructureDefinition) r;
+    if ("Extension".equals(sd.getType())) {
+      return "extension";
+    }
+//    if (sd.getKind() == StructureDefinitionKind.LOGICAL)
+    return sd.getKind().toCode() + (sd.getAbstract() ? ":abstract" : "");    
+  }
+  
   public static String getSDType(FetchedResource r) {
     if ("Extension".equals(r.getElement().getChildValue("type"))) {
       return "extension";
@@ -242,11 +301,30 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     return r.getElement().getChildValue("kind") + ("true".equals(r.getElement().getChildValue("abstract")) ? ":abstract" : "");
   }
 
+  public boolean hasProperty(FetchedResource r, String propertyName, Resource contained) {
+    if (r.getConfig() != null && hasString(r.getConfig(), propertyName))
+      return true;
+    if (defaultConfig != null && contained != null) {
+      JsonObject cfg = defaultConfig.getAsJsonObject(contained.fhirType());
+      if (cfg != null && hasString(cfg, propertyName))
+        return true;
+    }
+    if (defaultConfig != null) {
+      JsonObject cfg = defaultConfig.getAsJsonObject(r.fhirType());
+      if (cfg != null && hasString(cfg, propertyName))
+        return true;
+      cfg = defaultConfig.getAsJsonObject("Any");
+      if (cfg != null && hasString(cfg, propertyName))
+        return true;
+    }
+    return false;    
+  }
+  
   public boolean hasProperty(FetchedResource r, String propertyName) {
     if (r.getConfig() != null && hasString(r.getConfig(), propertyName))
       return true;
     if (defaultConfig != null) {
-      JsonObject cfg = defaultConfig.getAsJsonObject(r.getElement().fhirType());
+      JsonObject cfg = defaultConfig.getAsJsonObject(r.fhirType());
       if (cfg != null && hasString(cfg, propertyName))
         return true;
       cfg = defaultConfig.getAsJsonObject("Any");
@@ -260,17 +338,17 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     return doReplacements(getProperty(r, "defns"), r, null, null);
   }
 
-  // base specification only
+  // base specification only, only the old json style
   public void loadSpecPaths(SpecMapManager paths) throws Exception {
     this.specPaths = paths;
     for (CanonicalResource bc : context.allConformanceResources()) {
       String s = getOverride(bc.getUrl());
       if (s == null) {
-        s = paths.getPath(bc.getUrl());
+        s = paths.getPath(bc.getUrl(), bc.getMeta().getSource());
       }
-      if (s == null && bc instanceof CodeSystem) { // work around f                                                                                                                  or an R2 issue) 
+      if (s == null && bc instanceof CodeSystem) { // work around for an R2 issue) 
         CodeSystem cs = (CodeSystem) bc;
-        s = paths.getPath(cs.getValueSet());
+        s = paths.getPath(cs.getValueSet(), null);
       }
       if (s != null) {
         bc.setUserData("path", specPath(s));
@@ -281,6 +359,9 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
         bc.setUserData("path", specPath("valueset-object-lifecycle-events.html"));
       } else if (bc.hasUrl() && bc.getUrl().equals("http://hl7.org/fhir/ValueSet/performer-function")) {
         bc.setUserData("path", specPath("valueset-performer-function.html"));
+      } else if (bc.hasUrl() && bc.getUrl().equals("http://hl7.org/fhir/ValueSet/written-language")) {
+        bc.setUserData("path", specPath("valueset-written-language.html"));
+        
 //      else
 //        System.out.println("No path for "+bc.getUrl());
       }
@@ -327,15 +408,15 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       if (r.isExample()) {
         cfg = defaultConfig.getAsJsonObject("example");
       }        
-      if (cfg == null && r.getElement().fhirType().equals("StructureDefinition")) {
+      if (cfg == null && r.fhirType().equals("StructureDefinition")) {
         cfg = defaultConfig.getAsJsonObject(r.fhirType()+":"+getSDType(r));
       }
       if (cfg == null)
-        cfg = template.getConfig(r.getElement().fhirType(), r.getId());        
+        cfg = template.getConfig(r.fhirType(), r.getId());        
       r.setConfig(cfg);
     }
     if (r.getConfig() == null && resourceConfig != null) {
-      JsonObject e = resourceConfig.getAsJsonObject(r.getElement().fhirType()+"/"+r.getId());
+      JsonObject e = resourceConfig.getAsJsonObject(r.fhirType()+"/"+r.getId());
       if (e != null)
         r.setConfig(e);
     }
@@ -344,7 +425,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   public void checkForPath(FetchedFile f, FetchedResource r, CanonicalResource bc, boolean inner) throws FHIRException {
     if (!bc.hasUrl())
       error(f, bc.fhirType()+".url", "Resource has no url: "+bc.getId(), I18nConstants.RESOURCE_ID_NO_URL);
-    else if (bc.getUrl().startsWith(canonical) && !bc.getUrl().endsWith("/"+bc.getId()))
+    else if (bc.getUrl().startsWith(canonical) && !bc.getUrl().endsWith("/"+bc.getId()) && !listedURLExemptions.contains(bc.getUrl()))
       error(f, bc.fhirType()+".url","Resource id/url mismatch: "+bc.getId()+"/"+bc.getUrl(), I18nConstants.RESOURCE_ID_MISMATCH);
     if (!inner && !r.getId().equals(bc.getId()))
       error(f, bc.fhirType()+".id", "Resource id/loaded id mismatch: "+r.getId()+"/"+bc.getUrl(), I18nConstants.RESOURCE_ID_LOADED_MISMATCH);
@@ -356,9 +437,17 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     if (base != null) 
       bc.setUserData("path", doReplacements(base, r, null, null));
     else if (pathPattern != null)
-      bc.setUserData("path", pathPattern.replace("[type]", r.getElement().fhirType()).replace("[id]", r.getId()));
+      bc.setUserData("path", pathPattern.replace("[type]", r.fhirType()).replace("[id]", r.getId()));
     else
-      bc.setUserData("path", r.getElement().fhirType()+"/"+r.getId()+".html");
+      bc.setUserData("path", r.fhirType()+"/"+r.getId()+".html");
+    for (Resource cont : bc.getContained()) {
+      if (base != null) 
+        cont.setUserData("path", doReplacements(base, r, cont, null, null, bc.getId()+"_"));
+      else if (pathPattern != null)
+        cont.setUserData("path", pathPattern.replace("[type]", r.fhirType()).replace("[id]", bc.getId()+"_"+cont.getId()));
+      else
+        cont.setUserData("path", r.fhirType()+"/"+bc.getId()+"_"+r.getId()+".html");
+    }
   }
 
   private void error(FetchedFile f, String path, String msg, String msgId) {
@@ -392,7 +481,12 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   }
   
   public String specPath(String path) {
-    return Utilities.pathURL(pathToSpec, path);
+    if (Utilities.isAbsoluteUrl(path)) {
+      return path;
+    } else {
+      assert pathToSpec != null;
+      return Utilities.pathURL(pathToSpec, path);
+    }
   }
 
   public String specPath() {
@@ -511,8 +605,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
         if (vs != null) {
           if (ref.contains("|")) {
             br.url = vs.getUserString("versionpath");
-            if (br.url==null) {
-              System.out.println("Unable to find version-specific path for reference - defaulting to version-independent reference: " + ref);
+            if (br.url == null) {
               br.url = vs.getUserString("path");
             }
             br.display = vs.getName() + " (" + vs.getVersion() + ")"; 
@@ -523,8 +616,12 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
             br.url = vs.getUserString("path");
             br.display = vs.getName(); 
           }
+        } else if (ref.startsWith("http://cts.nlm.nih.gov/fhir/ValueSet/")) {          
+          String oid = ref.substring("http://cts.nlm.nih.gov/fhir/ValueSet/".length());
+          br.url = "https://vsac.nlm.nih.gov/valueset/"+oid+"/expansion";  
+          br.display = "VSAC "+oid;
         } else if (Utilities.isAbsoluteUrl(ref) && (!ref.startsWith("http://hl7.org") || !ref.startsWith("http://terminology.hl7.org"))) {
-          br.url = ref;  
+          br.url = Utilities.encodeUri(ref);  
           br.display = ref;
         } else if (vs == null) {
           br.url = ref+".html"; // broken link, 
@@ -585,11 +682,24 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     if (base!=null) {
       if (replace) {
         base = base.replace("{{[id]}}", r.getId());
-        base = base.replace("{{[type]}}", r.getElement().fhirType());
+        base = base.replace("{{[type]}}", r.fhirType());
       }
       return base;
     }
-    return r.getElement().fhirType()+"-"+r.getId()+".html";
+    return r.fhirType()+"-"+r.getId()+".html";
+  }
+
+  public String getLinkFor(FetchedResource r, boolean replace, Resource contained) {
+    String base = getProperty(r, "base");
+    if (base!=null) {
+      if (replace) {
+        base = base.replace("{{[id]}}", r.getId());
+        base = base.replace("{{[type]}}", r.fhirType());
+      }
+      base = base.replace(".html", "_"+contained.getId()+".html");
+      return base;
+    }
+    return r.fhirType()+"-"+r.getId()+"_"+contained.getId()+".html";
   }
 
   public IWorkerContext getContext() {
