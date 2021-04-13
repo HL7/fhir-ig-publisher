@@ -158,6 +158,7 @@ public class PreviousVersionComparator {
 
   private JsonArray fetchVersionHistory(String canonical) { 
     try {
+      canonical = PastProcessHackerUtilities.actualUrl(canonical); // hack for old publishing process problems 
       String ppl = Utilities.pathURL(canonical, "package-list.json");
       logger.logMessage("Fetch "+ppl+" for version check");
       JsonObject pl = JSONUtil.fetchJson(ppl);
