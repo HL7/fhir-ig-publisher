@@ -33,6 +33,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
@@ -180,6 +181,7 @@ import org.hl7.fhir.r5.model.Library;
 import org.hl7.fhir.r5.model.ListResource;
 import org.hl7.fhir.r5.model.ListResource.ListResourceEntryComponent;
 import org.hl7.fhir.r5.model.OperationDefinition;
+import org.hl7.fhir.r5.model.OperationOutcome;
 import org.hl7.fhir.r5.model.Parameters;
 import org.hl7.fhir.r5.model.Provenance;
 import org.hl7.fhir.r5.model.Provenance.ProvenanceAgentComponent;
@@ -227,6 +229,7 @@ import org.hl7.fhir.r5.utils.LiquidEngine;
 import org.hl7.fhir.r5.utils.MappingSheetParser;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator.Category;
+import org.hl7.fhir.r5.utils.OperationOutcomeUtilities;
 import org.hl7.fhir.r5.utils.ResourceSorters;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
@@ -1178,6 +1181,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       boolean hasGenNarrative = scanForGeneratedNarrative(xhtml);
       if (hasGenNarrative) {
         f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, r.fhirType()+".text.div", "Resource has provided narrative, but the narrative indicates that it is generated - remove the narrative or fix it up", IssueSeverity.ERROR));
+        r.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, r.fhirType()+".text.div", "Resource has provided narrative, but the narrative indicates that it is generated - remove the narrative or fix it up", IssueSeverity.ERROR));
       }
     }
   }
@@ -4550,10 +4554,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             utils.sortDifferential(base, sd, "profile " + sd.getUrl(), errors, true);
           } catch (Exception e) {
             f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.EXCEPTION, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "Exception generating snapshot: "+e.getMessage(), IssueSeverity.ERROR));
+            r.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.EXCEPTION, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "Exception generating snapshot: "+e.getMessage(), IssueSeverity.ERROR));
           }
         }
         for (String s : errors) {
           f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, "StructureDefinition.where(url = '"+sd.getUrl()+"')", s, IssueSeverity.ERROR));
+          r.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, "StructureDefinition.where(url = '"+sd.getUrl()+"')", s, IssueSeverity.ERROR));
         }
         utils.setIds(sd, true);
 
@@ -4592,22 +4598,22 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() instanceof StructureDefinition && !r.isSnapshotted()) {
           StructureDefinition sd = (StructureDefinition) r.getResource();
-          validateExpressions(f, sd);
+          validateExpressions(f, sd, r);
         }
       }
     }
   }
 
-  private void validateExpressions(FetchedFile f, StructureDefinition sd) {
+  private void validateExpressions(FetchedFile f, StructureDefinition sd, FetchedResource r) {
     FHIRPathEngine fpe = new FHIRPathEngine(context);
     for (ElementDefinition ed : sd.getSnapshot().getElement()) {
       for (ElementDefinitionConstraintComponent inv : ed.getConstraint()) {
-        validateExpression(f, sd, fpe, ed, inv);
+        validateExpression(f, sd, fpe, ed, inv, r);
       }
     }
   }
 
-  private void validateExpression(FetchedFile f, StructureDefinition sd, FHIRPathEngine fpe, ElementDefinition ed, ElementDefinitionConstraintComponent inv) {
+  private void validateExpression(FetchedFile f, StructureDefinition sd, FHIRPathEngine fpe, ElementDefinition ed, ElementDefinitionConstraintComponent inv, FetchedResource r) {
     if (inv.hasExpression()) {
       try {
         ExpressionNode n = (ExpressionNode) inv.getUserData("validator.expression.cache");
@@ -4618,6 +4624,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         fpe.check(null, sd, ed.getPath(), n);
       } catch (Exception e) {
         f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, "StructureDefinition.where(url = '"+sd.getUrl()+"').snapshot.element.where('path = '"+ed.getPath()+"').constraint.where(key = '"+inv.getKey()+"')", e.getMessage(), IssueSeverity.ERROR));
+        r.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, "StructureDefinition.where(url = '"+sd.getUrl()+"').snapshot.element.where('path = '"+ed.getPath()+"').constraint.where(key = '"+inv.getKey()+"')", e.getMessage(), IssueSeverity.ERROR));
       }
     }
   }
@@ -4765,19 +4772,23 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               int cI = countFoundExamples(sd.getUrl());
               if (cE + cI == 0) {
                 f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this profile", IssueSeverity.WARNING));
+                r.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this profile", IssueSeverity.WARNING));
               } else if (cE == 0) {
                 f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no explicitly linked examples for this profile", IssueSeverity.INFORMATION));
+                r.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no explicitly linked examples for this profile", IssueSeverity.INFORMATION));
               }
             } else if (sd.getKind() == StructureDefinitionKind.COMPLEXTYPE) {
               if (sd.getType().equals("Extension")) {
                 int c = countUsages(getFixedUrl(sd));
                 if (c == 0) {
                   f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this extension", IssueSeverity.WARNING));
+                  r.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this extension", IssueSeverity.WARNING));
                 }
               } else {
                 int cI = countFoundExamples(sd.getUrl());
                 if (cI == 0) {
                   f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this data type profile", IssueSeverity.WARNING));
+                  r.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this data type profile", IssueSeverity.WARNING));
                 }
               }
             }
@@ -4885,6 +4896,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     for (ValidationMessage vm : errs) {
       file.getErrors().add(vm.setLocation(r.fhirType()+"/"+r.getId()+": "+vm.getLocation()));
+      r.getErrors().add(vm.setLocation(r.fhirType()+"/"+r.getId()+": "+vm.getLocation()));
     }
     r.setValidated(true);
     if (r.getConfig() == null) {
@@ -4982,6 +4994,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (!changeList.isEmpty()) {
         File df = makeSpecFile();
         npm.addFile(Category.OTHER, "spec.internals", TextFile.fileToBytes(df.getAbsolutePath()));
+        npm.addFile(Category.OTHER, "validation-summary.json", validationSummaryJson());
+        npm.addFile(Category.OTHER, "validation-oo.json", validationSummaryOO());
         npm.finish();
         
         if (mode == null || mode == IGBuildMode.MANUAL) {
@@ -5050,6 +5064,54 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       Utilities.copyFile(Utilities.path(tempDir, "full-ig.zip"), Utilities.path(outputDir, "full-ig.zip"));
       log("Final .zip built");
     }
+  }
+
+  private byte[] validationSummaryOO() throws IOException {
+    Bundle bnd = new Bundle();
+    bnd.setType(BundleType.COLLECTION);
+    bnd.setTimestamp(new Date());
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        OperationOutcome oo = new OperationOutcome();
+        oo.setId(r.fhirType()+"-"+r.getId());
+        bnd.addEntry().setFullUrl(igpkp.getCanonical()+"/OperationOutcome/"+oo.getId()).setResource(oo);
+        for (ValidationMessage vm : r.getErrors()) {
+          if (!vm.getLevel().isHint())
+          oo.addIssue(OperationOutcomeUtilities.convertToIssue(vm, oo));
+        }
+      }
+    }
+    return new JsonParser().composeBytes(bnd);
+  }
+
+  private byte[] validationSummaryJson() throws UnsupportedEncodingException {
+    JsonObject json = new JsonObject();
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        JsonObject rd = new JsonObject();
+        json.add(r.fhirType()+"/"+r.getId(), rd);
+        createValidationSummary(rd, r);
+      }
+    }
+    return JsonTrackingParser.write(json).getBytes("UTF-8");
+  }
+
+  private void createValidationSummary(JsonObject fd, FetchedResource r) {
+    int e = 0;
+    int w = 0;
+    int i = 0;
+    for (ValidationMessage vm : r.getErrors()) {
+      if (vm.getLevel() == IssueSeverity.INFORMATION) {
+        i++;
+      } else if (vm.getLevel() == IssueSeverity.WARNING) {
+        w++;
+      } else {
+        e++;
+      }
+    }
+    fd.addProperty("errors", e);
+    fd.addProperty("warnings", w);
+//    fd.addProperty("hints", i);
   }
 
   private void fixSearchForm() throws IOException {
@@ -5251,6 +5313,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           String uc = ((CanonicalResource) r.getResource()).getUrl();
           if (uc != null && !u.equals(uc) && !isListedURLExemption(uc) && !isExampleResource((CanonicalResource) r.getResource()) && adHocTmpDir == null) {
             f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, f.getName(), "URL Mismatch "+u+" vs "+uc, IssueSeverity.ERROR));
+            r.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, f.getName(), "URL Mismatch "+u+" vs "+uc, IssueSeverity.ERROR));
           }
           if (uc != null && !u.equals(uc)) {
             map.path(uc, igpkp.getLinkFor(r, true));
@@ -7594,13 +7657,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             if (exp.getError().contains("Unable to provide support")) {
               fragmentErrorHtml("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", "No Expansion for this valueset (Unknown Code System<!-- "+Utilities.escapeXml(exp.getAllErrors().toString())+" -->)", "Publication Tooling Error: "+Utilities.escapeXml(exp.getAllErrors().toString()), f.getOutputNames());
               f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, "ValueSet.where(id = '"+vs.getId()+"')", exp.getError(), IssueSeverity.WARNING).setTxLink(exp.getTxLink()));
+              r.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, "ValueSet.where(id = '"+vs.getId()+"')", exp.getError(), IssueSeverity.WARNING).setTxLink(exp.getTxLink()));
             } else {
               fragmentErrorHtml("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", "No Expansion for this valueset (not supported by Publication Tooling<!-- "+Utilities.escapeXml(exp.getAllErrors().toString())+" -->)", "Publication Tooling Error: "+Utilities.escapeXml(exp.getAllErrors().toString()), f.getOutputNames());
               f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, "ValueSet.where(id = '"+vs.getId()+"')", exp.getError(), IssueSeverity.ERROR).setTxLink(exp.getTxLink()));
+              r.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, "ValueSet.where(id = '"+vs.getId()+"')", exp.getError(), IssueSeverity.ERROR).setTxLink(exp.getTxLink()));
             }
           } else {
             fragmentError("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", "No Expansion for this valueset (not supported by Publication Tooling)", "Unknown Error", f.getOutputNames());
             f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, "ValueSet.where(id = '"+vs.getId()+"')", "Unknown Error expanding ValueSet", IssueSeverity.ERROR).setTxLink(exp.getTxLink()));
+            r.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, "ValueSet.where(id = '"+vs.getId()+"')", "Unknown Error expanding ValueSet", IssueSeverity.ERROR).setTxLink(exp.getTxLink()));
           }
         }
       }

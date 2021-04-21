@@ -27,6 +27,7 @@ import java.util.List;
 
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
+import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.r5.model.Resource;
 
 import com.google.gson.JsonObject;
@@ -49,6 +50,7 @@ public class FetchedResource {
   private HashSet<FetchedResource> foundExamples = new HashSet<FetchedResource>();
   private ImplementationGuideDefinitionResourceComponent resEntry;
   private List<ProvenanceDetails> audits = new ArrayList<>();
+  private List<ValidationMessage> errors = new ArrayList<ValidationMessage>();
 
   public Resource getResource() {
     return resource;
@@ -211,5 +213,8 @@ public class FetchedResource {
       element = null;
     }
   }
-  
+
+  public List<ValidationMessage> getErrors() {
+    return errors;
+  }
 }
