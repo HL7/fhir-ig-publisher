@@ -2522,9 +2522,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               exampleTemplates.add(templateName);
             if (templateName.endsWith("-history"))
               historyTemplates.add(templateName);
-          } else if (((JsonObject)template).get("isExamples").getAsBoolean()) {
+          } else if (((JsonObject)template).has("isExamples") && ((JsonObject)template).get("isExamples").getAsBoolean()) {
             exampleTemplates.add(templateName);
-          } else if (((JsonObject)template).get("isExamples").getAsBoolean()) {
+          } else if (((JsonObject)template).has("isHistory") && ((JsonObject)template).get("isHistory").getAsBoolean()) {
             historyTemplates.add(templateName);
           }            
         }
@@ -5232,9 +5232,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
       if (rt != null) {
-        String path = igpkp.doReplacements(igpkp.getLinkFor(rt, false), rt, null, null);
-        res.addExtension().setUrl("http://hl7.org/fhir/StructureDefinition/implementationguide-page").setValue(new UriType(path));
-        inspector.addLinkToCheck("Implementation Guide", path, "fake generated link");
+          String path = igpkp.doReplacements(igpkp.getLinkFor(rt, false), rt, null, null);
+          res.addExtension().setUrl("http://hl7.org/fhir/StructureDefinition/implementationguide-page").setValue(new UriType(path));
+          inspector.addLinkToCheck("Implementation Guide", path, "fake generated link");
       }
     }
   }
