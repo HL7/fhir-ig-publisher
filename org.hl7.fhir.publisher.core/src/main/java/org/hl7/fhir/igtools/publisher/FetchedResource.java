@@ -51,6 +51,7 @@ public class FetchedResource {
   private ImplementationGuideDefinitionResourceComponent resEntry;
   private List<ProvenanceDetails> audits = new ArrayList<>();
   private List<ValidationMessage> errors = new ArrayList<ValidationMessage>();
+  private boolean isProvenance = false;
 
   public Resource getResource() {
     return resource;
@@ -216,5 +217,13 @@ public class FetchedResource {
 
   public List<ValidationMessage> getErrors() {
     return errors;
+  }
+  
+  public boolean getProvenance() {
+    return this.isProvenance;
+  }
+
+  public void setProvenance(boolean isProvenance) {
+    this.isProvenance = isProvenance;
   }
 }

@@ -927,16 +927,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (!r.isExample()) {
           if (r.fhirType().equals("Provenance")) { 
             logDebugMessage(LogCategory.PROGRESS, "Process Provenance "+f.getName()+" : "+r.getId());
-            processProvenance(igpkp.getLinkFor(r, true), r.getElement(), r.getResource());
+            if (processProvenance(igpkp.getLinkFor(r, true), r.getElement(), r.getResource()))
+              r.setProvenance(true);
           } else if (r.fhirType().equals("Bundle")) {
-            processProvenanceEntries(f, r);
+            if (processProvenanceEntries(f, r))
+              r.setProvenance(true);              
           }
         }
       }
     }    
   }
 
-  public void processProvenanceEntries(FetchedFile f, FetchedResource r) throws Exception {
+  public boolean processProvenanceEntries(FetchedFile f, FetchedResource r) throws Exception {
+    boolean isHistory = true;
     Bundle b = (Bundle) r.getResource();
     List<Element> entries = r.getElement().getChildrenByName("entry");
     for (int i = 0; i < entries.size(); i++) {
@@ -944,9 +947,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       Element res = entry.getNamedChild("resource");
       if (res != null && "Provenance".equals(res.fhirType())) {
         logDebugMessage(LogCategory.PROGRESS, "Process Provenance "+f.getName()+" : "+r.getId()+".entry["+i+"]");
-        processProvenance(igpkp.getLinkFor(r, true), res, b == null ? null : b.getEntry().get(i).getResource());
+        if (processProvenance(igpkp.getLinkFor(r, true), res, b == null ? null : b.getEntry().get(i).getResource()))
+          isHistory = true;
       }
     }
+    return isHistory;
   }
 
   private ProvenanceDetails processProvenanceForBundle(FetchedFile f, String path, Element r) throws Exception {
@@ -969,7 +974,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return pd;    
   }
   
-  private void processProvenance(String path, Element resource, Resource r) {
+  private boolean processProvenance(String path, Element resource, Resource r) {
+    boolean containsHistory = false;
     Provenance pv = null;
     try {
       pv = (Provenance) (r == null ? convertFromElement(resource) : r);
@@ -986,11 +992,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             FetchedResource res = fetchByResource(ref[i], ref[i+1]);
             if (res != null) {
               res.getAudits().add(processProvenance(path, pv));
+              containsHistory = true;
             }
           }
         }
       }
     }
+    return containsHistory;
   }
 
   private ProvenanceDetails processProvenance(String path, Provenance pv) {
@@ -5232,9 +5240,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
       if (rt != null) {
+        if (!rt.getProvenance()) {
+          // Don't expose a page for a resource that is just provenance information
           String path = igpkp.doReplacements(igpkp.getLinkFor(rt, false), rt, null, null);
           res.addExtension().setUrl("http://hl7.org/fhir/StructureDefinition/implementationguide-page").setValue(new UriType(path));
           inspector.addLinkToCheck("Implementation Guide", path, "fake generated link");
+        }
       }
     }
   }
