@@ -45,6 +45,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
@@ -645,7 +646,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private boolean includeHeadings;
   private String openApiTemplate;
-  private Map<String, String> extraTemplates = new HashMap<>();
+  private Collection<String> extraTemplateList = new ArrayList<String>(); // List of templates in order they should appear when navigating next/prev
+  private Map<String, String> extraTemplates = new HashMap<String, String>();
+  private Collection<String> historyTemplates = new ArrayList<String>(); // What templates should only be turned on if there's history
+  private Collection<String> exampleTemplates = new ArrayList<String>(); // What templates should only be turned on if there are examples
   private String license;
   private String htmlTemplate;
   private String mdTemplate;
@@ -923,16 +927,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (!r.isExample()) {
           if (r.fhirType().equals("Provenance")) { 
             logDebugMessage(LogCategory.PROGRESS, "Process Provenance "+f.getName()+" : "+r.getId());
-            processProvenance(igpkp.getLinkFor(r, true), r.getElement(), r.getResource());
+            if (processProvenance(igpkp.getLinkFor(r, true), r.getElement(), r.getResource()))
+              r.setProvenance(true);
           } else if (r.fhirType().equals("Bundle")) {
-            processProvenanceEntries(f, r);
+            if (processProvenanceEntries(f, r))
+              r.setProvenance(true);              
           }
         }
       }
     }    
   }
 
-  public void processProvenanceEntries(FetchedFile f, FetchedResource r) throws Exception {
+  public boolean processProvenanceEntries(FetchedFile f, FetchedResource r) throws Exception {
+    boolean isHistory = true;
     Bundle b = (Bundle) r.getResource();
     List<Element> entries = r.getElement().getChildrenByName("entry");
     for (int i = 0; i < entries.size(); i++) {
@@ -940,9 +947,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       Element res = entry.getNamedChild("resource");
       if (res != null && "Provenance".equals(res.fhirType())) {
         logDebugMessage(LogCategory.PROGRESS, "Process Provenance "+f.getName()+" : "+r.getId()+".entry["+i+"]");
-        processProvenance(igpkp.getLinkFor(r, true), res, b == null ? null : b.getEntry().get(i).getResource());
+        if (processProvenance(igpkp.getLinkFor(r, true), res, b == null ? null : b.getEntry().get(i).getResource()))
+          isHistory = true;
       }
     }
+    return isHistory;
   }
 
   private ProvenanceDetails processProvenanceForBundle(FetchedFile f, String path, Element r) throws Exception {
@@ -965,7 +974,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return pd;    
   }
   
-  private void processProvenance(String path, Element resource, Resource r) {
+  private boolean processProvenance(String path, Element resource, Resource r) {
+    boolean containsHistory = false;
     Provenance pv = null;
     try {
       pv = (Provenance) (r == null ? convertFromElement(resource) : r);
@@ -982,11 +992,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             FetchedResource res = fetchByResource(ref[i], ref[i+1]);
             if (res != null) {
               res.getAudits().add(processProvenance(path, pv));
+              containsHistory = true;
             }
           }
         }
       }
     }
+    return containsHistory;
   }
 
   private ProvenanceDetails processProvenance(String path, Provenance pv) {
@@ -2473,13 +2485,56 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private void processExtraTemplates(JsonArray templates) throws Exception {
     if (templates!=null) {
+      boolean hasDefns = false;  // is definitions page in list of templates?
+      boolean hasFormat = false; // are format pages in list of templates?
+      boolean setExtras = false; // See if templates explicitly declare which are examples/history or whether we need to infer by name
+      String name = null;
       for (JsonElement template : templates) {
         if (template.isJsonPrimitive())
-          extraTemplates.put(template.getAsString(), template.getAsString());
+          name = template.getAsString();
         else {
           if (!((JsonObject)template).has("name") || !((JsonObject)template).has("description"))
             throw new Exception("extraTemplates must be an array of objects with 'name' and 'description' properties");
-          extraTemplates.put(((JsonObject)template).get("name").getAsString(), ((JsonObject)template).get("description").getAsString());
+          name = ((JsonObject)template).get("name").getAsString();
+          if (((JsonObject)template).has("isHistory") || ((JsonObject)template).has("isExamples"))
+            setExtras = true;
+        }
+        if (name.equals("defns"))
+          hasDefns = true;
+        else if (name.equals("format"))
+          hasFormat = true;
+        
+      }
+      if (!hasDefns) {
+        extraTemplateList.add("defns");
+        extraTemplates.put("defns", "Definitions");
+      }
+      if (!hasFormat) {
+        extraTemplateList.add("format");
+        extraTemplates.put("format", "FMT Representation");
+      }
+      for (JsonElement template : templates) {
+        if (template.isJsonPrimitive()) {
+          extraTemplateList.add(template.getAsString());
+          extraTemplates.put(template.getAsString(), template.getAsString());
+          if (template.equals("examples"))
+            exampleTemplates.add(template.getAsString());
+          if (template.getAsString().endsWith("-history"))
+            historyTemplates.add(template.getAsString());
+        } else {
+          String templateName = ((JsonObject)template).get("name").getAsString();
+          extraTemplateList.add(templateName);
+          extraTemplates.put(templateName, ((JsonObject)template).get("description").getAsString());
+          if (!setExtras) {
+            if (templateName.equals("examples"))
+              exampleTemplates.add(templateName);
+            if (templateName.endsWith("-history"))
+              historyTemplates.add(templateName);
+          } else if (((JsonObject)template).has("isExamples") && ((JsonObject)template).get("isExamples").getAsBoolean()) {
+            exampleTemplates.add(templateName);
+          } else if (((JsonObject)template).has("isHistory") && ((JsonObject)template).get("isHistory").getAsBoolean()) {
+            historyTemplates.add(templateName);
+          }            
         }
       }
     }
@@ -5185,9 +5240,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
       if (rt != null) {
-        String path = igpkp.doReplacements(igpkp.getLinkFor(rt, false), rt, null, null);
-        res.addExtension().setUrl("http://hl7.org/fhir/StructureDefinition/implementationguide-page").setValue(new UriType(path));
-        inspector.addLinkToCheck("Implementation Guide", path, "fake generated link");
+        if (!rt.getProvenance()) {
+          // Don't expose a page for a resource that is just provenance information
+          String path = igpkp.doReplacements(igpkp.getLinkFor(rt, false), rt, null, null);
+          res.addExtension().setUrl("http://hl7.org/fhir/StructureDefinition/implementationguide-page").setValue(new UriType(path));
+          inspector.addLinkToCheck("Implementation Guide", path, "fake generated link");
+        }
       }
     }
   }
@@ -6100,37 +6158,36 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     FetchedResource r = resources.get(source);
     if (r==null) {
       addPageDataRow(pages, source, title, label + (page.hasPage() ? ".0" : ""), breadcrumb + breadCrumbForPage(page, false), null);
+//      addPageDataRow(pages, source, title, label + (page.hasPage() ? ".0" : ""), breadcrumb + breadCrumbForPage(page, false), null);
     } else {
-      addPageDataRow(pages, source, title, label, breadcrumb + breadCrumbForPage(page, false), r.getStatedExamples());
-    }
-    if ( r != null ) {
       Map<String, String> vars = makeVars(r);
       String outputName = determineOutputName(igpkp.getProperty(r, "base"), r, vars, null, "");
-      if (igpkp.wantGen(r, "xml")) {
-        outputName = determineOutputName(igpkp.getProperty(r, "format"), r, vars, "xml", "");
-        addPageDataRow(pages, outputName, page.getTitle() + " - XML Representation", label, breadcrumb + breadCrumbForPage(page, false), null);
-      }
-      if (igpkp.wantGen(r, "json")) {
-        outputName = determineOutputName(igpkp.getProperty(r, "format"), r, vars, "json", "");
-        addPageDataRow(pages, outputName, page.getTitle() + " - JSON Representation", label, breadcrumb + breadCrumbForPage(page, false), null);
-      }
-      if (igpkp.wantGen(r, "ttl")) {
-        outputName = determineOutputName(igpkp.getProperty(r, "format"), r, vars, "ttl", "");
-        addPageDataRow(pages, outputName, page.getTitle() + " - TTL Representation", label, breadcrumb + breadCrumbForPage(page, false), null);
-      }
-
-      if (page.hasGeneration() && page.getGeneration().equals(GuidePageGeneration.GENERATED) /*page.getKind().equals(ImplementationGuide.GuidePageKind.RESOURCE) */) {
-        outputName = determineOutputName(igpkp.getProperty(r, "defns"), r, vars, null, "definitions");
-        addPageDataRow(pages, outputName, page.getTitle() + " - Definitions", label, breadcrumb + breadCrumbForPage(page, false), null);
-        for (String templateName : extraTemplates.keySet()) {
-          String templateDesc = extraTemplates.get(templateName);
-          outputName = igpkp.getProperty(r, templateName);
-          if (outputName == null) {
-            outputName = r.fhirType()+"-"+r.getId()+"-"+templateName+".html";
-          } else {
-            outputName = igpkp.doReplacements(outputName, r, vars, "");
-          }
-          addPageDataRow(pages, outputName, page.getTitle() + " - " + templateDesc, label, breadcrumb + breadCrumbForPage(page, false), null);
+      addPageDataRow(pages, outputName, title, label, breadcrumb + breadCrumbForPage(page, false), r.getStatedExamples());
+//      addPageDataRow(pages, source, title, label, breadcrumb + breadCrumbForPage(page, false), r.getStatedExamples());
+      for (String templateName: extraTemplateList) {
+        if (r.getConfig().get("template-"+templateName)!=null && !r.getConfig().get("template-"+templateName).getAsString().isEmpty()) {
+          if (templateName.equals("format")) {
+            String templateDesc = extraTemplates.get(templateName);
+            for (String format: template.getFormats()) {
+              String formatTemplateDesc = templateDesc.replace("FMT", format.toUpperCase());
+              if (igpkp.wantGen(r, format)) {
+                outputName = determineOutputName(igpkp.getProperty(r, "format"), r, vars, format, "");
+                addPageDataRow(pages, outputName, page.getTitle() + " - " + formatTemplateDesc, label, breadcrumb + breadCrumbForPage(page, false), null);
+              }
+            }
+          } else if (page.hasGeneration() && page.getGeneration().equals(GuidePageGeneration.GENERATED) /*page.getKind().equals(ImplementationGuide.GuidePageKind.RESOURCE) */) {
+            boolean showPage = true;
+            if (historyTemplates.contains(templateName) && r.getAudits().isEmpty())
+              showPage = false;
+            if (exampleTemplates.contains(templateName) && r.getStatedExamples().isEmpty())
+              showPage = false;
+            if (showPage) {
+              String templateDesc = extraTemplates.get(templateName);
+              outputName = igpkp.getProperty(r, templateName);
+              outputName = igpkp.doReplacements(outputName, r, vars, "");
+              addPageDataRow(pages, outputName, page.getTitle() + " - " + templateDesc, label, breadcrumb + breadCrumbForPage(page, false), null);
+            }
+          }          
         }
       }
     }
@@ -7199,10 +7256,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       genWrapperContained(f, r, res, igpkp.getPropertyContained(r, "template-base", res), baseName, f.getOutputNames(), vars, null, "", prefixForContained);
     genWrapperContained(null, r, res, igpkp.getPropertyContained(r, "template-defns", res), igpkp.getPropertyContained(r, "defns", res), f.getOutputNames(), vars, null, "definitions", prefixForContained);
     for (String templateName : extraTemplates.keySet()) {
-      String output = igpkp.getProperty(r, templateName);
-       if (output == null)
-        output = r.fhirType()+"-"+r.getId()+"_"+res.getId()+"-"+templateName+".html";
-      genWrapperContained(null, r, res, igpkp.getPropertyContained(r, "template-"+templateName, res), output, f.getOutputNames(), vars, null, templateName, prefixForContained);
+      if (!templateName.equals("format") && !templateName.equals("defns")) {
+        String output = igpkp.getProperty(r, templateName);
+         if (output == null)
+          output = r.fhirType()+"-"+r.getId()+"_"+res.getId()+"-"+templateName+".html";
+        genWrapperContained(null, r, res, igpkp.getPropertyContained(r, "template-"+templateName, res), output, f.getOutputNames(), vars, null, templateName, prefixForContained);
+      }
     }
   }
   
@@ -7217,10 +7276,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       genWrapper(f, r, igpkp.getProperty(r, "template-base"), baseName, f.getOutputNames(), vars, null, "");
     genWrapper(null, r, igpkp.getProperty(r, "template-defns"), igpkp.getProperty(r, "defns"), f.getOutputNames(), vars, null, "definitions");
     for (String templateName : extraTemplates.keySet()) {
-      String output = igpkp.getProperty(r, templateName);
-       if (output == null)
-        output = r.fhirType()+"-"+r.getId()+"-"+templateName+".html";
-      genWrapper(null, r, igpkp.getProperty(r, "template-"+templateName), output, f.getOutputNames(), vars, null, templateName);
+      if (!templateName.equals("format") && !templateName.equals("defns")) {
+        String output = igpkp.getProperty(r, templateName);
+         if (output == null)
+          output = r.fhirType()+"-"+r.getId()+"-"+templateName+".html";
+        genWrapper(null, r, igpkp.getProperty(r, "template-"+templateName), output, f.getOutputNames(), vars, null, templateName);
+      }
     }
   }
   

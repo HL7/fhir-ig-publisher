@@ -26,6 +26,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -157,7 +158,20 @@ public class Template {
   public JsonArray getExtraTemplates() {
     return extraTemplates;
   }
-    
+
+  public Collection<String> getFormats() {
+    Collection<String> formatList = new ArrayList<String>();
+    if (configuration.has("formats")) {
+      for (JsonElement format: configuration.getAsJsonArray("formats"))
+        formatList.add(format.getAsString());
+    } else {
+      formatList.add("xml");
+      formatList.add("json");
+      formatList.add("ttl");
+    }
+    return formatList;
+  }
+  
   private ImplementationGuide runScriptTarget(String target, Map<String, List<ValidationMessage>> messages, ImplementationGuide ig, List<String> fileNames, int modifyIg) throws IOException, FHIRException {
     if (!canExecute) {
       throw new FHIRException("Unable to execute '"+target+"' in script '"+script+"' as the template '"+templateThatCantExecute+"' is not trusted (reason: "+templateReason+")");
