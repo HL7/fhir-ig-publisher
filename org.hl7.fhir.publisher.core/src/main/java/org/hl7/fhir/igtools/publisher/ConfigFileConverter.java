@@ -28,11 +28,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map.Entry;
 
-import org.hl7.fhir.convertors.VersionConvertorAdvisor50;
 import org.hl7.fhir.convertors.VersionConvertor_10_50;
 import org.hl7.fhir.convertors.VersionConvertor_14_50;
 import org.hl7.fhir.convertors.VersionConvertor_30_50;
 import org.hl7.fhir.convertors.VersionConvertor_40_50;
+import org.hl7.fhir.convertors.advisors.VersionConvertorAdvisor50;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.ValidationResult;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
