@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -102,9 +103,10 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private String igCodeError;
   private String igrealm;
   private String igRealmError;
+  private String copyrightYear;
 
   public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, String ballotCheck, 
-      String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, String dependencies, String csAnalysis, String versionRulesCheck) {
+      String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, String dependencies, String csAnalysis, String versionRulesCheck, String copyrightYear) {
     super();
     this.statedVersion = statedVersion;
     this.igVersion = igVersion;
@@ -121,6 +123,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     this.dependencies = dependencies;
     this.csAnalysis = csAnalysis;
     this.versionRulesCheck = versionRulesCheck;
+    this.copyrightYear = copyrightYear;
     determineCode();
   }
 
@@ -439,7 +442,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       " <tr><td>Version Check:</td><td>$versionRulesCheck$</td></tr>\r\n"+
       " <tr><td>Supressed Messages:</td><td>$suppressedmsgssummary$</td></tr>\r\n"+
       " <tr><td>Dependency Checks:</td><td>$dependencyCheck$</td></tr>\r\n"+
-      " <tr><td>HL7 Publication Rules:</td><td>Code = $igcode$. $ballotCheck$</td></tr>\r\n"+
+      " <tr><td>Publication Rules:</td><td>Code = $igcode$. $ballotCheck$ $copyrightYearCheck$</td></tr>\r\n"+
       " <tr><td>HTA Analysis:</td><td>$csAnalysis$</td></tr>\r\n"+
       " <tr><td>Previous Version Comparison:</td><td> $previousVersion$</td></tr>\r\n"+
       " <tr><td>Summary:</td><td> broken links = $links$, errors = $err$, warn = $warn$, info = $info$</td></tr>\r\n"+
@@ -555,6 +558,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("packageId", packageId);
     t.add("canonical", provider.getCanonical());
     t.add("ballotCheck", ballotCheck);
+    t.add("copyrightYearCheck", checkCopyRightYear());
     t.add("realmCheck", realm.checkHtml());
     t.add("igcode", igcode);
     t.add("igcodeerror", igCodeError);
@@ -586,6 +590,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("info",  Integer.toString(info));
     t.add("packageId", packageId);
     t.add("canonical", provider.getCanonical());
+    t.add("copyrightYearCheck", checkCopyRightYear());
     t.add("ballotCheck", ballotCheck);
     t.add("realmCheck", realm.checkText());
     t.add("igcode", igcode);
@@ -599,6 +604,26 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     return t.render();
   }
 
+  private String checkCopyRightYear() {
+    if (copyrightYear == null) {
+      return "<br/>The IG resource does not contain a copyrightYear parameter.";
+    } else if (copyrightYear.endsWith("+") && copyrightYear.length() == 5) {
+      String s = copyrightYear.substring(0, 4);
+      if (Utilities.isInteger(s)) {
+        int y = Integer.parseInt(s);
+        if (y > Calendar.getInstance().get(Calendar.YEAR)) {
+          return "<br/><br/><span style=\"background-color: #ffcccc\">The copyrightYear parameter ('"+copyrightYear+"') in the IG resource looks wrong - should not be after this year</span>";                  
+        } else {
+          return "<br/><br/>The copyrightYear parameter ('"+copyrightYear+"') in the IG resource is good";          
+        }
+      } else {
+        return "<br/><br/><span style=\"background-color: #ffcccc\">The copyrightYear parameter ('"+copyrightYear+"') in the IG resource can't be understood - expecting YYYY+</span>";        
+      }
+    } else {
+      return "<br/><br/><span style=\"background-color: #ffcccc\">The copyrightYear parameter ('"+copyrightYear+"') in the IG resource can't be understood - expecting YYYY+</span>";        
+    }
+  }
+    
   private String genEnd() {
     ST t = template(endTemplate);
     t.add("version", Constants.VERSION);

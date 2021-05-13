@@ -101,6 +101,7 @@ public class PublicationProcess {
     String id = npm.name();
     String[] p = id.split("\\.");
     boolean tho = false;
+    boolean cql = false;
     String realm = null;
     String code = null;
     String canonical = PastProcessHackerUtilities.actualUrl(npm.canonical());
@@ -108,10 +109,15 @@ public class PublicationProcess {
       tho = true;
       if (!check(res, npm.canonical().equals("http://terminology.hl7.org") && url.equals("http://terminology.hl7.org"), "Proposed canonical '"+npm.canonical()+"' does not match the web site URL '"+url+"' with a value of http://terminology.hl7.org")) {
         return res;
-      }
+      }      
+    } else if (id.equals("hl7.cql")) {
+      cql = true;
+      if (!check(res, npm.canonical().equals("http://cql.hl7.org") && url.equals("http://cql.hl7.org"), "Proposed canonical '"+npm.canonical()+"' does not match the web site URL '"+url+"' with a value of http://cql.hl7.org")) {
+        return res;
+      }      
       
     } else {
-      if (!check(res, p.length == 4 && "hl7".equals(p[0]) && "fhir".equals(p[1]), "Package Id is not valid = must have 4 parts (hl7.fhir.[realm].[code]")) {
+      if (!check(res, p.length == 4 && "hl7".equals(p[0]) && "fhir".equals(p[1]), "Package Id '"+id+"' is not valid:  must have 4 parts (hl7.fhir.[realm].[code]")) {
         return res;
       }
       realm = p[2];
@@ -129,7 +135,7 @@ public class PublicationProcess {
       return res;
     }
     
-    String destination = tho ? rootFolder : PastProcessHackerUtilities.useRealm(realm, code) ? Utilities.path(rootFolder, realm, code) :  Utilities.path(rootFolder, code);
+    String destination = tho || cql ? rootFolder : PastProcessHackerUtilities.useRealm(realm, code) ? Utilities.path(rootFolder, realm, code) :  Utilities.path(rootFolder, code);
     if (!check(res, new File(Utilities.path(destination, "package-list.json")).exists(), "Destination '"+destination+"' does not contain a package-list.json - must be set up manually for first publication")) {
       return res;
     }

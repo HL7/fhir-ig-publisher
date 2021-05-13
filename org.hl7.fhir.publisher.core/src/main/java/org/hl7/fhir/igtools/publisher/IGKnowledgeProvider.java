@@ -70,6 +70,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   private boolean noXhtml;
   private Template template;
   private List<String> listedURLExemptions;
+  private Set<String> summaryRows = new HashSet<>();
   
   public IGKnowledgeProvider(IWorkerContext context, String pathToSpec, String canonical, JsonObject igs, List<ValidationMessage> errors, boolean noXhtml, Template template, List<String> listedURLExemptions) throws Exception {
     super();
@@ -738,6 +739,10 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   @Override
   public String getLinkForUrl(String corePath, String s) {
     return context.getLinkForUrl(corePath, s);
+  }
+
+  public Set<String> summaryRows() {
+    return summaryRows ;
   }
 
   

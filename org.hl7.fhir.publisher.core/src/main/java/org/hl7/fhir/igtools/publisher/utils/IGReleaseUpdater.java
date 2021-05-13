@@ -374,6 +374,9 @@ public class IGReleaseUpdater {
     
     if (sft != null) {
       String html = TextFile.fileToString(sft);
+      if (true) {
+        throw new Error("This needs to be checked for profile path");
+      }
       html = fixParameter(html, "title", JSONUtil.str(ig, "title"));
       html = fixParameter(html, "id", JSONUtil.str(ig, "package-id"));
       html = fixParameter(html, "version", isCurrent ? "All Versions" : JSONUtil.str(version, "version"));
@@ -611,6 +614,8 @@ public class IGReleaseUpdater {
       return decorate(sequence)+" Update";
     else if ("normative+trial-use".equals(status))
       return decorate(sequence+" - Mixed Normative and STU");
+    else if ("normative".equals(status))
+      return decorate(sequence+" - Normative");
     else 
       throw new Error("unknown status "+status);
   }
