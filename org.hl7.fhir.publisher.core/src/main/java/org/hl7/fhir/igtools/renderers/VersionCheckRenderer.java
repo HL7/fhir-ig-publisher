@@ -108,7 +108,7 @@ public class VersionCheckRenderer {
       JsonObject json = JsonTrackingParser.fetchJson(Utilities.pathURL(PastProcessHackerUtilities.actualUrl(canonical), "package-list.json"));
       return json;
     } catch (Exception e) {
-      System.out.println("Outcome of trying to fetch existing package-list,json: "+e.getMessage());
+      System.out.println("Outcome of trying to fetch existing package-list.json: "+e.getMessage());
       return null;
     }
   }

@@ -2061,7 +2061,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   @Override
-  protected void genSummaryRowsSpecific(StringBuilder b) {
+  protected void genSummaryRowsSpecific(StringBuilder b, Set<String> rows) {
   }
   
 }

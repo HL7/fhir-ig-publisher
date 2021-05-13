@@ -23,6 +23,7 @@ package org.hl7.fhir.igtools.renderers;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
@@ -55,7 +56,7 @@ public class StructureMapRenderer extends CanonicalRenderer {
   }
 
   @Override
-  protected void genSummaryRowsSpecific(StringBuilder b) {
+  protected void genSummaryRowsSpecific(StringBuilder b, Set<String> rows) {
   }
 
   public String profiles() {

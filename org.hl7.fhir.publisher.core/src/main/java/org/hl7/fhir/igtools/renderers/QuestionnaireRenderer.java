@@ -23,6 +23,7 @@ package org.hl7.fhir.igtools.renderers;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 import org.hl7.fhir.exceptions.DefinitionException;
 import org.hl7.fhir.exceptions.FHIRException;
@@ -51,7 +52,7 @@ public class QuestionnaireRenderer extends CanonicalRenderer {
   }
 
   @Override
-  protected void genSummaryRowsSpecific(StringBuilder b) {
+  protected void genSummaryRowsSpecific(StringBuilder b, Set<String> rows) {
   }
 
   public String render(QuestionnaireRendererMode mode) throws IOException, FHIRFormatError, DefinitionException, FHIRException, EOperationOutcome {

@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -81,6 +82,7 @@ public class Template {
   private JsonArray extraTemplates;
   private JsonArray preProcess;
   private String templateReason;
+  private Set<String> summaryRows = new HashSet<>();
   
   /** unpack the template into /template 
    * 
@@ -139,6 +141,10 @@ public class Template {
 
     if (configuration.has("pre-process")) {
       preProcess = (JsonArray)configuration.get("pre-process");
+    }
+    if (configuration.has("summaryRows")) {
+      for (String s : configuration.get("summaryRows").getAsString().split("\\ "))
+      summaryRows.add(s);
     }
   }
 
@@ -375,6 +381,11 @@ public class Template {
       return messages;
     } else
       return null;
+  }
+
+
+  public void loadSummaryRows(Set<String> rows) {
+    rows.addAll(summaryRows);   
   }
 
   
