@@ -782,6 +782,7 @@ public class XmlXHtmlRenderer implements IXMLWriter {
     decorations1.add(decoration);
   }
 
-
-  
+  @Override
+  public void setSchemaLocation(String s, String s1) throws IOException {
+  }
 }
