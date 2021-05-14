@@ -1,1 +1,0 @@
-* Fix bug preventing IGs from being published
