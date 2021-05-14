@@ -1275,7 +1275,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return b.toString();
   }
 
-  public String mappings(boolean complete) {
+  public String mappings(boolean complete, boolean diff) {
     if (sd.getMapping().isEmpty())
       return "<p>"+translate("sd.maps", "No Mappings")+"</p>";
     else {
@@ -1296,7 +1296,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
         s.append(" <tr><td colspan=\"3\"><b>"+Utilities.escapeXml(gt(sd.getNameElement()))+"</b></td></tr>\r\n");
         String path = null;
-        for (ElementDefinition e : sd.getSnapshot().getElement()) {
+        for (ElementDefinition e : diff ? sd.getDifferential().getElement() : sd.getSnapshot().getElement()) {
           if (path == null || !e.getPath().startsWith(path)) {
             path = null;
             if (e.hasMax() && e.getMax().equals("0") || !(complete || hasMappings(e, map))) {
