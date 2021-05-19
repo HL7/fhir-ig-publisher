@@ -942,7 +942,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   public boolean processProvenanceEntries(FetchedFile f, FetchedResource r) throws Exception {
-    boolean isHistory = true;
+    boolean isHistory = false;
     Bundle b = (Bundle) r.getResource();
     List<Element> entries = r.getElement().getChildrenByName("entry");
     for (int i = 0; i < entries.size(); i++) {
