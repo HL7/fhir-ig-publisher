@@ -24,7 +24,7 @@
     <version>1.1.73-SNAPSHOT</version> <!-- See the note above -->
 
     <properties>
-        <core_version>5.3.14</core_version>
+        <core_version>5.4.1</core_version>
         <kotlin.version>1.5.0</kotlin.version>
         <maven.test.skip>true</maven.test.skip>
     </properties>
