@@ -40,6 +40,7 @@ import org.apache.commons.io.FileUtils;
 import org.hl7.fhir.convertors.VersionConvertor_10_50;
 import org.hl7.fhir.convertors.VersionConvertor_30_50;
 import org.hl7.fhir.convertors.VersionConvertor_40_50;
+import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_30_50;
 import org.hl7.fhir.dstu2.formats.JsonParser;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
@@ -443,7 +444,7 @@ public class IGReleaseUpdater {
         return (ImplementationGuide) VersionConvertor_10_50.convertResource(new org.hl7.fhir.dstu2.formats.XmlParser().parse(fs));
       }
       if (VersionUtilities.isR3Ver(fv)) {
-        return (ImplementationGuide) VersionConvertor_30_50.convertResource(new org.hl7.fhir.dstu3.formats.XmlParser().parse(fs), true);
+        return (ImplementationGuide) VersionConvertor_30_50.convertResource(new org.hl7.fhir.dstu3.formats.XmlParser().parse(fs), new BaseAdvisor_30_50(false));
       }
       if (VersionUtilities.isR4Ver(fv)) {
         return (ImplementationGuide) VersionConvertor_40_50.convertResource(new org.hl7.fhir.r4.formats.XmlParser().parse(fs));

@@ -30,7 +30,7 @@ public class LibraryLoader implements ILibraryReader {
       return (Library) VersionConvertor_14_50.convertResource(res);
     } else if (VersionUtilities.isR3Ver(version)) {
       org.hl7.fhir.dstu3.model.Resource res = new org.hl7.fhir.dstu3.formats.JsonParser().parse(stream);
-      return (Library) VersionConvertor_30_50.convertResource(res, false);
+      return (Library) VersionConvertor_30_50.convertResource(res);
     } else if (VersionUtilities.isR4Ver(version)) {
       org.hl7.fhir.r4.model.Resource res = new org.hl7.fhir.r4.formats.JsonParser().parse(stream);
       return (Library) VersionConvertor_40_50.convertResource(res);

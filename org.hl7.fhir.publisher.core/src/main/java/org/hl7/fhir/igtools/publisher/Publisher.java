@@ -85,7 +85,7 @@ import org.hl7.fhir.convertors.VersionConvertor_14_30;
 import org.hl7.fhir.convertors.VersionConvertor_14_50;
 import org.hl7.fhir.convertors.VersionConvertor_30_50;
 import org.hl7.fhir.convertors.VersionConvertor_40_50;
-import org.hl7.fhir.convertors.advisors.VersionConvertorAdvisor50;
+import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
 import org.hl7.fhir.convertors.misc.NpmPackageVersionConverter;
 import org.hl7.fhir.convertors.txClient.TerminologyClientFactory;
 import org.hl7.fhir.exceptions.DefinitionException;
@@ -94,7 +94,6 @@ import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.exceptions.PathEngineException;
 import org.hl7.fhir.igtools.publisher.FetchedFile.FetchedBundleType;
 import org.hl7.fhir.igtools.publisher.IFetchFile.FetchState;
-import org.hl7.fhir.igtools.publisher.Publisher.CopyRightUsageStatement;
 import org.hl7.fhir.igtools.publisher.realm.NullRealmBusinessRules;
 import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
 import org.hl7.fhir.igtools.publisher.realm.USRealmBusinessRules;
@@ -4343,7 +4342,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       new org.hl7.fhir.dstu2016may.formats.XmlParser().compose(dst, r14);
     } else if (VersionUtilities.isR3Ver(srcV) && Constants.VERSION.equals(dstV)) {
       org.hl7.fhir.dstu3.model.Resource r3 = new org.hl7.fhir.dstu3.formats.XmlParser().parse(src);
-      org.hl7.fhir.r5.model.Resource r5 = VersionConvertor_30_50.convertResource(r3, false);
+      org.hl7.fhir.r5.model.Resource r5 = VersionConvertor_30_50.convertResource(r3);
       new org.hl7.fhir.r5.formats.XmlParser().compose(dst, r5);
     } else if (VersionUtilities.isR4Ver(srcV) && Constants.VERSION.equals(dstV)) {
       org.hl7.fhir.r4.model.Resource r4 = new org.hl7.fhir.r4.formats.XmlParser().parse(src);
@@ -4750,7 +4749,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       } else {
         throw new Exception("Unable to determine file type for "+name);
       }
-      return VersionConvertor_30_50.convertResource(res, false);
+      return VersionConvertor_30_50.convertResource(res);
     } else if (VersionUtilities.isR4Ver(parseVersion)) {
       org.hl7.fhir.r4.model.Resource res;
       if (contentType.contains("json")) {
@@ -4781,7 +4780,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         throw new Exception("Unable to determine file type for "+name);
       }
 
-      VersionConvertorAdvisor50 advisor = new IGR2ConvertorAdvisor5();
+      BaseAdvisor_10_50 advisor = new IGR2ConvertorAdvisor5();
       return VersionConvertor_10_50.convertResource(res, advisor);
     } else if (parseVersion.equals(Constants.VERSION)) {
       if (contentType.contains("json")) {
@@ -5302,7 +5301,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
     if (VersionUtilities.isR3Ver(version)) {
       org.hl7.fhir.dstu3.formats.JsonParser jp = new org.hl7.fhir.dstu3.formats.JsonParser();
-      jp.compose(bs, VersionConvertor_30_50.convertResource(res, false));
+      jp.compose(bs, VersionConvertor_30_50.convertResource(res));
     } else if (VersionUtilities.isR4Ver(version)) {
       org.hl7.fhir.r4.formats.JsonParser jp = new org.hl7.fhir.r4.formats.JsonParser();
       jp.compose(bs, VersionConvertor_40_50.convertResource(res));
@@ -5326,7 +5325,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     ByteArrayInputStream bi = new ByteArrayInputStream(bs.toByteArray());
     if (VersionUtilities.isR3Ver(version)) {
       org.hl7.fhir.dstu3.formats.JsonParser jp = new org.hl7.fhir.dstu3.formats.JsonParser();
-      return  VersionConvertor_30_50.convertResource(jp.parse(bi), false);
+      return  VersionConvertor_30_50.convertResource(jp.parse(bi));
     } else if (VersionUtilities.isR4Ver(version)) {
       org.hl7.fhir.r4.formats.JsonParser jp = new org.hl7.fhir.r4.formats.JsonParser();
       return  VersionConvertor_40_50.convertResource(jp.parse(bi));
@@ -5475,7 +5474,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (FetchedResource r : files) {
         ByteArrayOutputStream bs = new ByteArrayOutputStream();
         if (VersionUtilities.isR3Ver(version)) {
-          org.hl7.fhir.dstu3.model.Resource r3 = VersionConvertor_30_50.convertResource(r.getResource(), false);
+          org.hl7.fhir.dstu3.model.Resource r3 = VersionConvertor_30_50.convertResource(r.getResource());
           if (fmt.equals(FhirFormat.JSON)) {
             new org.hl7.fhir.dstu3.formats.JsonParser().compose(bs, r3);
           } else if (fmt.equals(FhirFormat.XML)) {
@@ -5502,7 +5501,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             new org.hl7.fhir.dstu2016may.formats.RdfParser().compose(bs, r14);
           }
         } else if (VersionUtilities.isR2Ver(version)) {
-          VersionConvertorAdvisor50 advisor = new IGR2ConvertorAdvisor5();
+          BaseAdvisor_10_50 advisor = new IGR2ConvertorAdvisor5();
           org.hl7.fhir.dstu2.model.Resource r14 = VersionConvertor_10_50.convertResource(r.getResource(), advisor);
           if (fmt.equals(FhirFormat.JSON)) {
             new org.hl7.fhir.dstu2.formats.JsonParser().compose(bs, r14);
@@ -5548,7 +5547,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
           try {
             ByteArrayOutputStream bs = new ByteArrayOutputStream();
-            org.hl7.fhir.dstu3.model.Resource r3 = VersionConvertor_30_50.convertResource(r.getResource(), false);
+            org.hl7.fhir.dstu3.model.Resource r3 = VersionConvertor_30_50.convertResource(r.getResource());
             new org.hl7.fhir.dstu3.formats.JsonParser().compose(bs, r3);
             zip.addBytes(r.fhirType()+"-"+r.getId()+".json", bs.toByteArray(), false);
           } catch (Exception e) {
@@ -5577,13 +5576,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
           ByteArrayOutputStream bs = new ByteArrayOutputStream();
           if (VersionUtilities.isR3Ver(version)) {
-            new org.hl7.fhir.dstu3.formats.JsonParser().compose(bs, VersionConvertor_30_50.convertResource(r.getResource(), false));
+            new org.hl7.fhir.dstu3.formats.JsonParser().compose(bs, VersionConvertor_30_50.convertResource(r.getResource()));
           } else if (VersionUtilities.isR4Ver(version)) {
             new org.hl7.fhir.r4.formats.JsonParser().compose(bs, VersionConvertor_40_50.convertResource(r.getResource()));
           } else if (VersionUtilities.isR2BVer(version)) {
             new org.hl7.fhir.dstu2016may.formats.JsonParser().compose(bs, VersionConvertor_14_50.convertResource(r.getResource()));
           } else if (VersionUtilities.isR2Ver(version)) {
-            VersionConvertorAdvisor50 advisor = new IGR2ConvertorAdvisor5();
+            BaseAdvisor_10_50 advisor = new IGR2ConvertorAdvisor5();
             new org.hl7.fhir.dstu2.formats.JsonParser().compose(bs, VersionConvertor_10_50.convertResource(r.getResource(), advisor));
           } else if (version.equals(Constants.VERSION)) {
             new JsonParser().compose(bs, r.getResource());
@@ -5730,22 +5729,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
-/*  private boolean passJekyllFilter(String s) {
-    if (Utilities.noString(s))
-      return false;
-    if (s.contains("Source:"))
-      return false;
-    if (s.contains("Destination:"))
-      return false;
-    if (s.contains("Configuration"))
-      return false;
-    if (s.contains("Incremental build:"))
-      return false;
-    if (s.contains("Auto-regeneration:"))
-      return false;
-    return true;
-  }*/
-
   private boolean runJekyll() throws IOException, InterruptedException {
     Session tts = tt.start("jekyll");
 
@@ -5757,8 +5740,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     exec.setWorkingDirectory(new File(tempDir));
     ExecuteWatchdog watchdog = new ExecuteWatchdog(JEKYLL_TIMEOUT);
     exec.setWatchdog(watchdog);
-    
-//    dumpVars();
 
     try {
 	    if (SystemUtils.IS_OS_WINDOWS) {
@@ -7662,7 +7643,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
    *   summary
    *   content as html
    *   xref
-   * @param resource
    * @throws org.hl7.fhir.exceptions.FHIRException
    * @throws Exception
    */
@@ -7770,7 +7750,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
    *   summary
    *   content as html
    *   xref
-   * @param resource
    * @throws IOException
    */
   private void generateOutputsConceptMap(FetchedFile f, FetchedResource r, ConceptMap cm, Map<String, String> vars, String prefixForContainer) throws IOException, FHIRException {
@@ -8118,7 +8097,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
    * 
    * see https://stackoverflow.com/questions/24102498/escaping-double-curly-braces-inside-a-markdown-code-block-in-jekyll
    * 
-   * @param fixedContent
    * @return
    */
   private String wrapLiquid(String content) {

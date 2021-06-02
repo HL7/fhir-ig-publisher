@@ -21,7 +21,7 @@ package org.hl7.fhir.igtools.publisher;
  */
 
 
-import org.hl7.fhir.convertors.advisors.VersionConvertorAdvisor40;
+import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_40;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.CodeSystem;
 import org.hl7.fhir.r4.model.ValueSet;
@@ -29,7 +29,7 @@ import org.hl7.fhir.r5.model.FhirPublication;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public class IGR2ConvertorAdvisor implements VersionConvertorAdvisor40 {
+public class IGR2ConvertorAdvisor extends BaseAdvisor_10_40 {
     @Override
     public boolean ignoreEntry(@Nullable Bundle.BundleEntryComponent bundleEntryComponent, @NotNull FhirPublication fhirPublication) {
         return false;
