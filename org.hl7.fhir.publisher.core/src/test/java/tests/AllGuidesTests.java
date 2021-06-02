@@ -54,7 +54,12 @@ private static final String VER = "1.0.53";
     }
     
     JsonObject current = JsonTrackingParser.parseJson(new FileInputStream(Utilities.path(ROOT_DIR, id, "output", "qa.json")));
-    JsonObject previous = JsonTrackingParser.parseJson(new FileInputStream(Utilities.path(ROOT_DIR, "records", id+"-qa.json")));
+    JsonObject previous = null;
+    if (new File(Utilities.path(ROOT_DIR, "records", id+"-qa.json")).exists()) {
+      previous = JsonTrackingParser.parseJson(new FileInputStream(Utilities.path(ROOT_DIR, "records", id+"-qa.json")));
+    } else {
+      previous = new JsonObject();      
+    }
     int cErr = current.has("errs") ? current.get("errs").getAsInt() : 0;
     int pErr = previous.has("errs") ? previous.get("errs").getAsInt() : 0;
     int cWarn = current.has("warnings") ? current.get("warnings").getAsInt() : 0;
@@ -89,7 +94,7 @@ private static final String VER = "1.0.53";
 
   @Test
   public void testUSCore() throws Exception {
-    testIg("hl7.fhir.us.core", "ig.json");
+    testIg("hl7.fhir.us.core", null);
   }
 
   @Test
@@ -100,7 +105,7 @@ private static final String VER = "1.0.53";
 
   @Test
   public void testECR() throws Exception {
-    testIg("hl7.fhir.us.ecr", "ig.json");
+    testIg("hl7.fhir.us.ecr", "ig.ini");
   }
 
   @Test
@@ -113,7 +118,18 @@ private static final String VER = "1.0.53";
     testIg("hl7.fhir.au.base", "ig.json");
   }
 
-  
+
+  @Test
+  public void testSample() throws Exception {
+    testIg("example.fhir.uv.myig", null);
+  }
+
+  @Test
+  public void testGuidance() throws Exception {
+    testIg("hl7.fhir.uv.howto", null);
+  }
+
+
 //
 //  @Test
 //  public void testOldIg() throws Exception {
