@@ -941,7 +941,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   public boolean processProvenanceEntries(FetchedFile f, FetchedResource r) throws Exception {
-    boolean isHistory = true;
+    boolean isHistory = false;
     Bundle b = (Bundle) r.getResource();
     List<Element> entries = r.getElement().getChildrenByName("entry");
     for (int i = 0; i < entries.size(); i++) {
@@ -6182,6 +6182,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             if (showPage) {
               String templateDesc = extraTemplates.get(templateName);
               outputName = igpkp.getProperty(r, templateName);
+              if (outputName==null)
+                throw new FHIRException("Error in publisher template.  Unable to find file-path property " + templateName + " for resource type " + r.fhirType() + " when property template-" + templateName + " is defined.");
               outputName = igpkp.doReplacements(outputName, r, vars, "");
               addPageDataRow(pages, outputName, page.getTitle() + " - " + templateDesc, label, breadcrumb + breadCrumbForPage(page, false), null);
             }
