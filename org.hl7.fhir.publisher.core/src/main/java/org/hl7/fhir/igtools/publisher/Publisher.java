@@ -5854,7 +5854,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (FetchedResource r: examples) {
       FetchedResource baseRes = getResourceForUri(r.getExampleUri());
       if (baseRes == null) {
-        errors.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, r.fhirType()+"/"+r.getId(), "Unable to find profile " + r.getExampleUri() + " nominated as the profile for which resource " + r.getUrlTail()+" is an example", IssueSeverity.ERROR));
+        // We only yell if the resource doesn't exist, not only if it doesn't exist in the current IG.
+        if (context.fetchResource(StructureDefinition.class, r.getExampleUri())==null)
+          errors.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, r.fhirType()+"/"+r.getId(), "Unable to find profile " + r.getExampleUri() + " nominated as the profile for which resource " + r.getUrlTail()+" is an example", IssueSeverity.ERROR));
       } else {
         baseRes.addStatedExample(r);
       }
