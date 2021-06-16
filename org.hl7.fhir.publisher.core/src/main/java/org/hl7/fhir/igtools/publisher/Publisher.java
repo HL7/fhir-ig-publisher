@@ -8745,7 +8745,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     String ghUrl = "https://github.com/"+org+"/"+repo+"/archive/refs/heads/"+branch+".zip";
     InputStream zip = fetchGithubUrl(ghUrl);
     Utilities.unzip(zip, Paths.get(f.getAbsolutePath()));
-    return Utilities.path(folder, repo+"-"+branch);
+    for (File fd : f.listFiles()) {
+      if (fd.isDirectory()) {
+        return fd.getAbsolutePath();        
+      }
+    }
+    throw new Error("Extracting GitHub source failed.");
   }
 
   private static InputStream fetchGithubUrl(String ghUrl) throws IOException {
