@@ -75,6 +75,10 @@ public class SpecMapManager {
   private NpmPackage pi;
   private SpecialPackageType special;
 
+  private SpecMapManager() {
+    
+  }
+  
   public SpecMapManager(String npmName, String igVersion, String toolVersion, String buildId, Calendar genDate, String webUrl) {
     spec = new JsonObject();
     if (npmName != null)
@@ -115,8 +119,13 @@ public class SpecMapManager {
   }
 
   public static SpecMapManager fromPackage(NpmPackage pi) throws JsonSyntaxException, IOException {
-    return new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion());
+    if (pi.hasFile("other", "spec.internals")) {
+      return new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion());      
+    } else {
+      return new SpecMapManager();
+    }
   }
+
 
   public void path(String url, String path) {
     paths.addProperty(url, path);
