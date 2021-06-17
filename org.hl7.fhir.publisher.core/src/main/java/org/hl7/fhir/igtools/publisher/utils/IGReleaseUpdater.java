@@ -375,9 +375,6 @@ public class IGReleaseUpdater {
     
     if (sft != null) {
       String html = TextFile.fileToString(sft);
-      if (true) {
-        throw new Error("This needs to be checked for profile path");
-      }
       html = fixParameter(html, "title", JSONUtil.str(ig, "title"));
       html = fixParameter(html, "id", JSONUtil.str(ig, "package-id"));
       html = fixParameter(html, "version", isCurrent ? "All Versions" : JSONUtil.str(version, "version"));
