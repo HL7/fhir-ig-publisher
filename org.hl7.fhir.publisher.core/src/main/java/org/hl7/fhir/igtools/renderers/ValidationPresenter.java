@@ -39,14 +39,20 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.FetchedFile;
+import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.PreviousVersionComparator;
 import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
+import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.context.IWorkerContext.PackageDetails;
+import org.hl7.fhir.r5.context.IWorkerContext.PackageVersion;
+import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.model.Bundle;
 import org.hl7.fhir.r5.model.Bundle.BundleEntryComponent;
 import org.hl7.fhir.r5.model.Constants;
 import org.hl7.fhir.r5.model.OperationOutcome;
+import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.utils.FHIRPathEngine;
 import org.hl7.fhir.r5.utils.OperationOutcomeUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
@@ -61,6 +67,141 @@ import org.stringtemplate.v4.ST;
 
 public class ValidationPresenter extends TranslatingUtilities implements Comparator<FetchedFile> {
 
+
+  private class ProfileSignpostBuilder {
+
+    private StringBuilder output = new StringBuilder();
+
+    private Integer analyseLoc(String location) {
+      if (location.startsWith("Bundle/") && location.contains(".entry[")) {
+        String index = location.substring(location.indexOf(".entry[")+7);
+        index = index.substring(0, index.indexOf("]"));
+        return Integer.parseInt(index);
+      }
+      System.out.println("no loc for "+location);
+      return -1;
+    }
+
+    private String getSpecName(String url) {
+      if (url.startsWith("http://hl7.org/fhir/StructureDefinition/")) {
+        return "<a href=\"http://hl7.org/fhir\">fhir</a>.";
+      }
+      PackageVersion pck = context.getPackageForUrl(url);
+      if (pck != null) {
+        if (pck.getId().equals(packageId)) {
+          return "<i>this.</i>";
+        }
+        PackageDetails det = context.getPackage(pck);
+        if (det != null) {
+          return "<a href=\""+det.getWeb()+"\">"+det.getName()+"</a>.";
+        }
+        return pck.getId()+".";
+      }
+      return "";
+    }
+
+
+    public void analyse(FetchedResource r, boolean only) {
+      Element e = r.getElement();
+      String root = only ? "" : r.fhirType() + "/"+r.getId()+": ";
+      StringBuilder b = new StringBuilder();
+      showMessages(b, root, e);
+      output.append(b.toString());      
+    }
+
+    private void showMessages(StringBuilder b, String root, Element e) {
+      if (e.hasMessages()) {
+        b.append("<li>"+root+e.getPath()+": Validated against "+analyse(e.getMessages())+"</li>");
+      }
+      for (Element c : e.getChildren()) {
+        showMessages(b, root, c);
+      }
+    }
+
+    public boolean hasContent() {
+      return output.length() > 0;
+    }
+
+    public String build() {
+      return output.toString();
+    }
+
+    public String analyse(List<ValidationMessage> vmlist) {
+      String base = context.formatMessage(I18nConstants.VALIDATION_VAL_PROFILE_SIGNPOST_BASE);
+      List<String> list = new ArrayList<>();
+      List<String> others = new ArrayList<>();
+      for (ValidationMessage vm : vmlist) {
+        if (vm.getMessage().startsWith(base)) {
+          String s = vm.getMessage().substring(base.length()).trim();
+          String url = s.contains(" ") ? s.substring(0, s.indexOf(" ")) : s;
+          s = s.contains(" ") ? s.substring(s.indexOf(" ")) : "";
+          String specName = getSpecName(url);
+          StructureDefinition sd = context.fetchResource(StructureDefinition.class, url);
+          String l = null;
+          if (sd != null) {
+            l = specName+"<a href=\""+sd.getUserString("path")+"\">"+sd.present()+"</a>"+s;
+          } else {
+            l = "<a href=\""+url+"\">"+url+"</a>"+s;          
+          } 
+          if (!list.contains(l)) {
+            list.add(l);
+          }
+        } else {
+          others.add(vm.getMessage());
+        }
+      }
+      return list(list);
+    }
+
+//
+//    public int count() {
+//      int res = 0;
+//      for (List<String> i : entries.values()) {
+//        res = res + i.size();
+//      }
+//      return res + others.size();
+//    }
+//
+//    public String build() {
+//      StringBuilder b = new StringBuilder();
+//      b.append("<ul>\r\n");
+//      if (entries.containsKey(-1)) {
+//        b.append("<li>Validated against "+list(entries.get(-1))+"</li>\r\n");        
+//      }
+//      for (Integer i : sorted(entries.keySet())) {
+//        if (i >= 0) {
+//          b.append("<li>Entry "+Integer.toString(i)+" Validated against "+list(entries.get(i))+"</li>\r\n");        
+//        }
+//      }
+//      for (String s : others) {
+//        b.append("<li>"+s+"</li>\r\n");
+//      }
+//      b.append("</ul>\r\n");
+//      return b.toString();
+//    }
+//
+//    private List<Integer> sorted(Set<Integer> keySet) {
+//      List<Integer> res = new ArrayList<>();
+//      res.addAll(keySet);
+//      Collections.sort(res);
+//      return res;
+//    }
+//
+    private String list(List<String> list) {
+      StringBuilder b = new StringBuilder(); 
+      for (int i = 0; i < list.size(); i++) {
+        if (i > 0 && i == list.size()-1) {
+          b.append(" and ");
+        } else if (i > 0) {
+          b.append(", ");
+        }
+        b.append(list.get(i));
+      }
+      return b.toString();
+    }
+
+
+  }
 
   public class FiledValidationMessage {
 
@@ -104,9 +245,10 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private String igrealm;
   private String igRealmError;
   private String copyrightYear;
+  private IWorkerContext context;
 
   public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, String ballotCheck, 
-      String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, String dependencies, String csAnalysis, String versionRulesCheck, String copyrightYear) {
+      String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, String dependencies, String csAnalysis, String versionRulesCheck, String copyrightYear, IWorkerContext context) {
     super();
     this.statedVersion = statedVersion;
     this.igVersion = igVersion;
@@ -124,6 +266,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     this.csAnalysis = csAnalysis;
     this.versionRulesCheck = versionRulesCheck;
     this.copyrightYear = copyrightYear;
+    this.context = context;
     determineCode();
   }
 
@@ -183,8 +326,8 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       }
     }
     
-    files = genQAHtml(title, files, path, filteredMessages, linkErrors, false);
     files = genQAHtml(title, files, path, filteredMessages, linkErrors, true);
+    files = genQAHtml(title, files, path, filteredMessages, linkErrors, false);
 
     Bundle validationBundle = new Bundle().setType(Bundle.BundleType.COLLECTION);
     OperationOutcome oo = new OperationOutcome();
@@ -264,7 +407,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     for (FetchedFile f : files) {
       if (allIssues || hasIssues(f, filteredMessages)) {
         b.append(genStart(f));
-        if (f.getErrors().size() > 0)
+        if (countNonSignpostMessages(f, filteredMessages))
           b.append(startTemplateErrors);
         else
           b.append(startTemplateNoErrors);
@@ -296,6 +439,16 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   }
 
 
+
+  private boolean countNonSignpostMessages(FetchedFile f, Map<String, String> filteredMessages) {
+    List<ValidationMessage> uniqueErrors = filterMessages(f.getErrors(), false, filteredMessages.keySet());
+    for (ValidationMessage vm : uniqueErrors) {
+      if (!vm.isSignpost()) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   private boolean hasIssues(FetchedFile f, Map<String, String> filteredMessages) {
     List<ValidationMessage> uniqueErrors = filterMessages(f.getErrors(), false, filteredMessages.keySet());
@@ -395,6 +548,9 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       if (NO_FILTER) {
         passesFilter = true;
       }
+      if (message.isSignpost()) {
+        passesFilter = false;        
+      }
       if (passesFilter) {
         passList.add(message);
         msgs.add(message.getLocation()+"|"+message.getMessage());        
@@ -467,6 +623,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       "<hr/>\r\n"+
       "<a name=\"$link$\"> </a>\r\n"+
       "<h2><a href=\"$xlink$\">$path$</a></h2>\r\n"+
+      " $signposts$\r\n"+
       " <table class=\"grid\">\r\n";
   
   private final String groupStartTemplate = 
@@ -766,12 +923,20 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       link = link.replace("{{[id]}}", f.getResources().get(0).getId());
       link = link.replace("{{[type]}}", f.getResources().get(0).fhirType());
     }
+    ProfileSignpostBuilder psb = new ProfileSignpostBuilder();
     
+    for (FetchedResource r : f.getResources()) {
+      psb.analyse(r, f.getResources().size() == 1); 
+    }
+    if (psb.hasContent()) {
+      t.add("signposts", "<ul style=\"font-size: 7px\">"+psb.build()+"</ul>\r\n");            
+    } else {
+      t.add("signposts", "");      
+    }
     t.add("xlink", link);
     return t.render();
   }
-  
-  private String genGroupStart(String n) {
+    private String genGroupStart(String n) {
     ST t = template(groupStartTemplate);
     t.add("name", n);
     return t.render();
@@ -811,7 +976,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private String genDetails(ValidationMessage vm, int id) {
     ST t = template(vm.isSlicingHint() ? detailsTemplateWithExtraDetails : vm.getLocationLink() != null ? detailsTemplateWithLink : vm.getTxLink() != null ? detailsTemplateTx : detailsTemplate);
     if (vm.getLocation()!=null) {
-      t.add("path", makeLocal(vm.getLocation())+lineCol(vm));
+      t.add("path", stripId(makeLocal(vm.getLocation())+lineCol(vm)));
       t.add("pathlink", vm.getLocationLink());
     }
     t.add("level", vm.isSlicingHint() ? "Slicing Information" : vm.isSignpost() ? "Process Info" : vm.getLevel().toCode());
@@ -823,6 +988,13 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("msgdetails", vm.isSlicingHint() ? vm.getSliceHtml() : vm.getHtml());
     t.add("tx", "qa-tx.html#l"+vm.getTxLink());
     return t.render();
+  }
+
+  private String stripId(String loc) {
+    if (loc.contains(": ")) {
+      return loc.substring(loc.indexOf(": ")+2);
+    }
+    return loc;
   }
 
   private Object genGroupDetails(FetchedFile f, ValidationMessage vm) {

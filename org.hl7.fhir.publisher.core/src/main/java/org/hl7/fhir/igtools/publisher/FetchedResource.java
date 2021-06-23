@@ -35,7 +35,6 @@ import com.google.gson.JsonObject;
 public class FetchedResource {
   private String id;
   private String title;
-  private boolean trimmed;
   private String type;
   private Resource resource;
   private Element element;
@@ -62,17 +61,10 @@ public class FetchedResource {
   }
   
   public Element getElement() {
-    if (trimmed) {
-      throw new Error("Access element after it is unloaded");
-    }
     return element;
   }
   
   public FetchedResource setElement(Element element) {
-    if (trimmed) {
-      throw new Error("Access element after it is unloaded");
-    }
-
     this.element = element;
     type = element.fhirType();
     return this;
@@ -205,15 +197,6 @@ public class FetchedResource {
     return !audits.isEmpty();
   }
 
-  public void trim() {
-    if (!fhirType().equals("StructureDefinition")) {
-      trimmed = true;
-      if (element != null) {
-        element.clear();
-      }
-      element = null;
-    }
-  }
 
   public List<ValidationMessage> getErrors() {
     return errors;
