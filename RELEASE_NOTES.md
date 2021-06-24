@@ -5,5 +5,5 @@
 * Renderer: Fix up questionnaire rendering for old versions
 * Renderer: Add support for using https:// references to HL7 website (not enabled yet - further research required)
 * Renderer: Update pubpack to v0.0.9
-* QA report: fix problem where messages not suppressed properly
+* QA report: fix problem where some messages are not suppressed properly
  
