@@ -42,6 +42,7 @@ import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.PreviousVersionComparator;
+import org.hl7.fhir.igtools.publisher.SuppressedMessageInformation;
 import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.PackageDetails;
@@ -299,10 +300,10 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     return list;
   }
   
-  public String generate(String title, List<ValidationMessage> allErrors, List<FetchedFile> files, String path, Map<String, String> filteredMessages) throws IOException {
+  public String generate(String title, List<ValidationMessage> allErrors, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages) throws IOException {
     
     for (FetchedFile f : files) {
-      for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages.keySet())) {
+      for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages)) {
         if (vm.getLevel().equals(ValidationMessage.IssueSeverity.FATAL)||vm.getLevel().equals(ValidationMessage.IssueSeverity.ERROR))
           err++;
         else if (vm.getLevel().equals(ValidationMessage.IssueSeverity.WARNING))
@@ -313,7 +314,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       }
     }
     
-    List<ValidationMessage> linkErrors = filterMessages(allErrors, true, filteredMessages.keySet()); 
+    List<ValidationMessage> linkErrors = filterMessages(allErrors, true, filteredMessages); 
     for (ValidationMessage vm : linkErrors) {
       if (vm.getSource() == Source.LinkChecker) {
         link++;
@@ -348,7 +349,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
         oo = new OperationOutcome();
         validationBundle.addEntry(new BundleEntryComponent().setResource(oo));
         ToolingExtensions.addStringExtension(oo, ToolingExtensions.EXT_OO_FILE, f.getName());
-        for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages.keySet())) {
+        for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages)) {
           oo.getIssue().add(OperationOutcomeUtilities.convertToIssue(vm, oo));
         }
       }
@@ -363,7 +364,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     return path + "\r\n" + summary;
   }
 
-  public void genQAText(String title, List<FetchedFile> files, String path, Map<String, String> filteredMessages, List<ValidationMessage> linkErrors)
+  public void genQAText(String title, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, List<ValidationMessage> linkErrors)
       throws IOException {
     StringBuilder b = new StringBuilder();
     b.append(genHeaderTxt(title, err, warn, info));
@@ -378,7 +379,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     b.append(genEndTxt());
     for (FetchedFile f : files) {
       b.append(genStartTxt(f));
-      for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages.keySet()))
+      for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages))
         b.append(vm.getDisplay() + "\r\n");
       b.append(genEndTxt());
     }    
@@ -386,9 +387,9 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     TextFile.stringToFile(b.toString(), Utilities.changeFileExt(path, ".txt"));
   }
 
-  public List<FetchedFile> genQAHtml(String title, List<FetchedFile> files, String path, Map<String, String> filteredMessages, List<ValidationMessage> linkErrors, boolean allIssues) throws IOException {
+  public List<FetchedFile> genQAHtml(String title, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, List<ValidationMessage> linkErrors, boolean allIssues) throws IOException {
     StringBuilder b = new StringBuilder();
-    b.append(genHeader(title, err, warn, info, link, filteredMessages.size(), allIssues, path));
+    b.append(genHeader(title, err, warn, info, link, filteredMessages.count(), allIssues, path));
     b.append(genSummaryRowInteral(linkErrors));
     files = sorted(files);
     for (FetchedFile f : files) {
@@ -411,7 +412,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
           b.append(startTemplateErrors);
         else
           b.append(startTemplateNoErrors);
-        for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages.keySet())) {
+        for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages)) {
           b.append(genDetails(vm, id));
           id++;
         }
@@ -440,8 +441,8 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
 
 
 
-  private boolean countNonSignpostMessages(FetchedFile f, Map<String, String> filteredMessages) {
-    List<ValidationMessage> uniqueErrors = filterMessages(f.getErrors(), false, filteredMessages.keySet());
+  private boolean countNonSignpostMessages(FetchedFile f, SuppressedMessageInformation filteredMessages) {
+    List<ValidationMessage> uniqueErrors = filterMessages(f.getErrors(), false, filteredMessages);
     for (ValidationMessage vm : uniqueErrors) {
       if (!vm.isSignpost()) {
         return true;
@@ -450,8 +451,8 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     return false;
   }
 
-  private boolean hasIssues(FetchedFile f, Map<String, String> filteredMessages) {
-    List<ValidationMessage> uniqueErrors = filterMessages(f.getErrors(), false, filteredMessages.keySet());
+  private boolean hasIssues(FetchedFile f, SuppressedMessageInformation filteredMessages) {
+    List<ValidationMessage> uniqueErrors = filterMessages(f.getErrors(), false, filteredMessages);
     for (ValidationMessage vm : uniqueErrors) {
       if (vm.getLevel() != IssueSeverity.INFORMATION) {
         return true;
@@ -460,8 +461,8 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     return false;
   }
 
-  private void getMatchingMessages(FetchedFile f, String n, List<FiledValidationMessage> fvml, Map<String, String> filteredMessages) {
-    for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages.keySet())) {
+  private void getMatchingMessages(FetchedFile f, String n, List<FiledValidationMessage> fvml, SuppressedMessageInformation filteredMessages) {
+    for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages)) {
       if (n.equals(vm.getMessageId()) && !vm.isSignpost()) {
         fvml.add(new FiledValidationMessage(f, vm));
       }
@@ -502,20 +503,13 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     return msg.length() > 100 ? msg.substring(0, 100) : msg;
   }
 
-  private String genSuppressedMessages(Map<String, String> msgs) {
+  private String genSuppressedMessages(SuppressedMessageInformation msgs) {
     StringBuilder b = new StringBuilder();
     b.append("<a name=\"suppressed\"> </a>\r\n<p><b>Suppressed Messages (Warnings, hints, broken links)</b></p>\r\n");
     boolean found = false;
-    Map<String, List<String>> inverted = new HashMap<>();
-    for (Entry<String, String> e : msgs.entrySet()) {
-      if (!inverted.containsKey(e.getValue())) {
-        inverted.put(e.getValue(), new ArrayList<>());
-      }
-      inverted.get(e.getValue()).add(e.getKey());
-    }
-    for (String s : sorted(inverted.keySet())) {
+    for (String s : msgs.categories()) {
       b.append("<p><b>"+Utilities.escapeXml(s)+"</b></p><ul>\r\n");
-      for (String m : inverted.get(s)) {
+      for (String m : msgs.list(s)) {
         b.append(" <li>"+Utilities.escapeXml(m)+"</li>\r\n");
       }
       b.append("</ul>\r\n");
@@ -526,20 +520,14 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     return b.toString();
   }
 
-  private List<String> sorted(Set<String> keys) {
-    List<String> list = new ArrayList<>();
-    list.addAll(keys);
-    Collections.sort(list);
-    return list;
-  }
 
-  public static List<ValidationMessage> filterMessages(List<ValidationMessage> messages, boolean canSuppressErrors, Collection<String> suppressedMessages) {
+  public static List<ValidationMessage> filterMessages(List<ValidationMessage> messages, boolean canSuppressErrors, SuppressedMessageInformation suppressedMessages) {
     List<ValidationMessage> passList = new ArrayList<ValidationMessage>();
     Set<String> msgs = new HashSet<>();
     for (ValidationMessage message : messages) {
       boolean passesFilter = true;
       if (canSuppressErrors || !message.getLevel().isError()) {
-        if (suppressedMessages.contains(message.getDisplay()) || suppressedMessages.contains(message.getMessage()) || suppressedMessages.contains(message.getMessageId()) ) {
+        if (suppressedMessages.contains(message.getDisplay()) || suppressedMessages.contains(message.getMessage()) || suppressedMessages.contains(message.getHtml()) || suppressedMessages.contains(message.getMessageId()) ) {
           passesFilter = false;
         } else if (msgs.contains(message.getLocation()+"|"+message.getMessage())) {
           passesFilter = false;
@@ -552,6 +540,9 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
         passesFilter = false;        
       }
       if (passesFilter) {
+        if (message.getMessage().contains("australian-states-territories-2")) {
+          System.out.print(".");
+        }
         passList.add(message);
         msgs.add(message.getLocation()+"|"+message.getMessage());        
       } else {
@@ -559,8 +550,6 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     }
     return passList;
   }
-
-
   
   // HTML templating
   private final String headerTemplate = 
@@ -837,10 +826,10 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     return t.render();
   }
 
-  private String genSummaryRow(FetchedFile f, Map<String, String> filteredMessages) {
+  private String genSummaryRow(FetchedFile f, SuppressedMessageInformation filteredMessages) {
     ST t = template(summaryTemplate);
     t.add("link", makelink(f));
-    List<ValidationMessage> uniqueErrors = filterMessages(f.getErrors(), false, filteredMessages.keySet());
+    List<ValidationMessage> uniqueErrors = filterMessages(f.getErrors(), false, filteredMessages);
     
     t.add("filename", f.getName());
     String ec = errCount(uniqueErrors);
