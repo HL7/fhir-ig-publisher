@@ -545,7 +545,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private String version;
   private FhirPublication pubVersion;
   private long fshTimeout = FSH_TIMEOUT;
-  private Map<String, String> suppressedMessages = new HashMap<>();
+  private SuppressedMessageInformation suppressedMessages = new SuppressedMessageInformation();
 
   private String igName;
   private IGBuildMode mode; // for the IG publication infrastructure
@@ -1235,7 +1235,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return new TypeParserR14();
     } else if (VersionUtilities.isR2Ver(ver)) {
       return new TypeParserR2();
-    } else if (ver.equals(Constants.VERSION)) {
+    } else if (ver.equals(Constants.VERSION) || VersionUtilities.isR4BVer(ver)) {
       return new TypeParserR5();
     } else
       throw new FHIRException("Unsupported version "+ver);
@@ -2085,14 +2085,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       v = v.substring(0, v.lastIndexOf("."));
     }
     if (v.equals("1.0"))
-      return "http://hl7.org/fhir/DSTU2";
+      return PackageHacker.fixPackageUrl("http://hl7.org/fhir/DSTU2");
     if (v.equals("1.4"))
-      return "http://hl7.org/fhir/2016May";
+      return PackageHacker.fixPackageUrl("http://hl7.org/fhir/2016May");
     if (v.equals("3.0"))
-      return "http://hl7.org/fhir/STU3";
+      return PackageHacker.fixPackageUrl("http://hl7.org/fhir/STU3");
     if (v.equals("4.0"))
-      return "http://hl7.org/fhir/R4";
-    return "http://build.fhir.org";
+      return PackageHacker.fixPackageUrl("http://hl7.org/fhir/R4");
+    return PackageHacker.fixPackageUrl("http://build.fhir.org");
   }
 
 
@@ -2339,6 +2339,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         loadIg((JsonObject) dep);
       }
     }
+    copyrightYear = ostr(configuration, "copyrightYear");
 
     generateLoadedSnapshots();
     
@@ -2470,7 +2471,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void loadPubPack() throws FHIRException, IOException {
-    NpmPackage npm = pcm.loadPackage("hl7.fhir.pubpack", "0.0.7");
+    NpmPackage npm = pcm.loadPackage("hl7.fhir.pubpack", "0.0.9");
     context.loadFromPackage(npm, null);
     npm = pcm.loadPackage("hl7.fhir.xver-extensions", "0.0.5");
     context.loadFromPackage(npm, null);
@@ -2587,9 +2588,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             } else {
               if (reason == null) { 
                 errors.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, path, "Supressed messages file has errors with no reason ("+l+")", IssueSeverity.ERROR));
-                suppressedMessages.put(l, "?pub-msg-1?");
+                suppressedMessages.add(l, "?pub-msg-1?");
               } else {
-                suppressedMessages.put(l, reason);
+                suppressedMessages.add(l, reason);
               }
             }
           }
@@ -2602,13 +2603,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           char c = (char) r.read();
           if (c == '\r' || c == '\n') {
             if (b.length() > 0)
-              suppressedMessages.put(b.toString(), "?pub-msg-2?");
+              suppressedMessages.add(b.toString(), "?pub-msg-2?");
             b = new StringBuilder();
           } else
             b.append(c);
         }
         if (b.length() > 0)
-          suppressedMessages.put(b.toString(), "?pub-msg-3?");
+          suppressedMessages.add(b.toString(), "?pub-msg-3?");
         r.close();
       }
     }
@@ -4783,7 +4784,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
       BaseAdvisor_10_50 advisor = new IGR2ConvertorAdvisor5();
       return VersionConvertor_10_50.convertResource(res, advisor);
-    } else if (parseVersion.equals(Constants.VERSION)) {
+    } else if (parseVersion.equals(Constants.VERSION) || VersionUtilities.isR4BVer(parseVersion)) {
       if (contentType.contains("json")) {
         return new JsonParser(true, true).parse(source);
       } else if (contentType.contains("xml")) {
@@ -5106,7 +5107,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       List<ValidationMessage> linkmsgs = inspector.check(statusMessage);
       int bl = 0;
       int lf = 0;
-      for (ValidationMessage m : ValidationPresenter.filterMessages(linkmsgs, true, suppressedMessages.keySet())) {
+      for (ValidationMessage m : ValidationPresenter.filterMessages(linkmsgs, true, suppressedMessages)) {
         if (m.getLevel() == IssueSeverity.ERROR) {
           if (m.getType() == IssueType.NOTFOUND) {
             bl++;
@@ -5585,7 +5586,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           } else if (VersionUtilities.isR2Ver(version)) {
             BaseAdvisor_10_50 advisor = new IGR2ConvertorAdvisor5();
             new org.hl7.fhir.dstu2.formats.JsonParser().compose(bs, VersionConvertor_10_50.convertResource(r.getResource(), advisor));
-          } else if (version.equals(Constants.VERSION)) {
+          } else if (version.equals(Constants.VERSION) || VersionUtilities.isR4BVer(version)) {
             new JsonParser().compose(bs, r.getResource());
           } else {
             throw new Exception("Unsupported version "+version);
