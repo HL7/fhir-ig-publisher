@@ -45,6 +45,7 @@ import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.npm.PackageHacker;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
@@ -483,7 +484,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   
   public String specPath(String path) {
     if (Utilities.isAbsoluteUrl(path)) {
-      return path;
+      return PackageHacker.fixPackageUrl(path);
     } else {
       assert pathToSpec != null;
       return Utilities.pathURL(pathToSpec, path);
