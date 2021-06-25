@@ -7840,8 +7840,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx-diff", sdr.txDiff(includeHeadings, false), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "tx-diff-must-support"))
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx-diff-must-support", sdr.txDiff(includeHeadings, true), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "inv-diff"))
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-inv-diff", sdr.inv(includeHeadings, true), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "inv"))
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-inv", sdr.inv(includeHeadings), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-inv", sdr.inv(includeHeadings, false), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "dict"))
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-dict", sdr.dict(true), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "dict-active"))

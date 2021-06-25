@@ -66,6 +66,7 @@ import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionMappingComponent;
+import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionSnapshotComponent;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
@@ -633,10 +634,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return null;
   }
 
-  public String inv(boolean withHeadings) {
+  public String inv(boolean withHeadings, boolean diff) {
     List<String> txlist = new ArrayList<String>();
     Map<String, List<ElementDefinitionConstraintComponent>> txmap = new HashMap<String, List<ElementDefinitionConstraintComponent>>();
-    for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+    List<ElementDefinition> list = diff ? sd.getDifferential().getElement() : sd.getSnapshot().getElement();
+    for (ElementDefinition ed : list) {
       if (!"0".equals(ed.getMax())) {
         txlist.add(ed.getId());
         txmap.put(ed.getId(), ed.getConstraint());
