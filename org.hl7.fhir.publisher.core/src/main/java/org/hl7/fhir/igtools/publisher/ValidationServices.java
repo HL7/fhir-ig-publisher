@@ -44,10 +44,13 @@ import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.terminologies.ImplicitValueSets;
+import org.hl7.fhir.r5.utils.IResourceValidator;
 import org.hl7.fhir.r5.utils.IResourceValidator.IValidatorResourceFetcher;
 import org.hl7.fhir.r5.utils.IResourceValidator.ReferenceValidationPolicy;
+import org.hl7.fhir.utilities.SIDUtilities;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 
 public class ValidationServices implements IValidatorResourceFetcher {
@@ -58,19 +61,21 @@ public class ValidationServices implements IValidatorResourceFetcher {
   private List<NpmPackage> packages;
   private List<String> otherUrls = new ArrayList<>();
   private List<String> mappingUrls = new ArrayList<>();
+  private boolean bundleReferencesResolve;
   
   
-  public ValidationServices(IWorkerContext context, IGKnowledgeProvider ipg, List<FetchedFile> files, List<NpmPackage> packages) {
+  public ValidationServices(IWorkerContext context, IGKnowledgeProvider ipg, List<FetchedFile> files, List<NpmPackage> packages, boolean bundleReferencesResolve) {
     super();
     this.context = context;
     this.ipg = ipg;
     this.files = files;
     this.packages = packages;
+    this.bundleReferencesResolve = bundleReferencesResolve;
     initOtherUrls();
   }
 
   @Override
-  public Element fetch(Object appContext, String url) throws FHIRException, IOException {
+  public Element fetch(IResourceValidator validator, Object appContext, String url) throws FHIRException, IOException {
     if (url == null)
       return null;
     String turl = (!Utilities.isAbsoluteUrl(url)) ? Utilities.pathURL(ipg.getCanonical(), url) : url;
@@ -166,14 +171,21 @@ public class ValidationServices implements IValidatorResourceFetcher {
 
 
   @Override
-  public ReferenceValidationPolicy validationPolicy(Object appContext, String path, String url) {
-    return ReferenceValidationPolicy.CHECK_EXISTS_AND_TYPE;
+  public ReferenceValidationPolicy validationPolicy(IResourceValidator validator, Object appContext, String path, String url) {
+    if (path.startsWith("Bundle.") && !bundleReferencesResolve) {
+      return ReferenceValidationPolicy.CHECK_TYPE_IF_EXISTS;
+    } else {
+      return ReferenceValidationPolicy.CHECK_EXISTS_AND_TYPE;
+    }
   }
 
 
   @Override
-  public boolean resolveURL(Object appContext, String path, String url, String type) throws IOException {
+  public boolean resolveURL(IResourceValidator validator, Object appContext, String path, String url, String type) throws IOException {
     if (otherUrls.contains(url))
+      return true;
+
+    if (SIDUtilities.isKnownSID(url))
       return true;
 
     if (url.startsWith("http://hl7.org/fhirpath/System."))
@@ -203,14 +215,7 @@ public class ValidationServices implements IValidatorResourceFetcher {
 
   public void initOtherUrls() {
     otherUrls.clear();
-    otherUrls.add("http://hl7.org/fhir/sid/us-ssn");
-    otherUrls.add("http://hl7.org/fhir/sid/cvx");
-    otherUrls.add("http://hl7.org/fhir/sid/ndc");
-    otherUrls.add("http://hl7.org/fhir/sid/us-npi");
-    otherUrls.add("http://hl7.org/fhir/sid/icd-10");
-    otherUrls.add("http://hl7.org/fhir/sid/icd-10-vn");
-    otherUrls.add("http://hl7.org/fhir/sid/icd-10-cm");
-    otherUrls.add("http://hl7.org/fhir/sid/icd-9-cm");
+    otherUrls.addAll(SIDUtilities.allSystemsList());
     otherUrls.add("http://hl7.org/fhir/w5");
     otherUrls.add("http://hl7.org/fhir/fivews");
     otherUrls.add("http://hl7.org/fhir/workflow");
@@ -220,24 +225,24 @@ public class ValidationServices implements IValidatorResourceFetcher {
   }
 
   @Override
-  public void setLocale(Locale locale) {
-    
+  public IValidatorResourceFetcher setLocale(Locale locale) {
+    return this;
   }
 
   @Override
-  public byte[] fetchRaw(String source) throws MalformedURLException, IOException {
+  public byte[] fetchRaw(IResourceValidator validator, String source) throws MalformedURLException, IOException {
     URL url = new URL(source);
     URLConnection c = url.openConnection();
     return TextFile.streamToBytes(c.getInputStream());
   }
 
   @Override
-  public CanonicalResource fetchCanonicalResource(String url) {
+  public CanonicalResource fetchCanonicalResource(IResourceValidator validator, String url) {
     return null;
   }
 
   @Override
-  public boolean fetchesCanonicalResource(String url) {
+  public boolean fetchesCanonicalResource(IResourceValidator validator, String url) {
     return false;
   }
 

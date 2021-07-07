@@ -66,9 +66,11 @@ public class ValueSetRenderer extends CanonicalRenderer {
   }
 
   @Override
-  protected void genSummaryRowsSpecific(StringBuilder b) {
-    if (ValueSetUtilities.hasOID(vs)) {
-      b.append(" <tr><td>"+translate("cr.summary", "OID")+":</td><td>"+ValueSetUtilities.getOID(vs)+" ("+translate("cr.summary", "for OID based terminology systems")+")</td></tr>\r\n");
+  protected void genSummaryRowsSpecific(StringBuilder b, Set<String> rows) {
+    if (hasSummaryRow(rows, "oid")) {
+      if (ValueSetUtilities.hasOID(vs)) {
+        b.append(" <tr><td>"+translate("cr.summary", "OID")+":</td><td>"+ValueSetUtilities.getOID(vs)+" ("+translate("cr.summary", "for OID based terminology systems")+")</td></tr>\r\n");
+      }
     }
   }
 

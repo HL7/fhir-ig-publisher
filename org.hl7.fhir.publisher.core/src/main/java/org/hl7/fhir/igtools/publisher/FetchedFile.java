@@ -195,10 +195,6 @@ public class FetchedFile {
   }
   public void trim() {
     source = null;
-    for (FetchedResource r : resources) {
-      r.trim();
-    }
-    
   }
   
 }

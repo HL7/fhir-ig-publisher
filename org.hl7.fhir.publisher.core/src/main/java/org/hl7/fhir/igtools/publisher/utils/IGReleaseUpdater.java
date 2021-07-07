@@ -40,6 +40,7 @@ import org.apache.commons.io.FileUtils;
 import org.hl7.fhir.convertors.VersionConvertor_10_50;
 import org.hl7.fhir.convertors.VersionConvertor_30_50;
 import org.hl7.fhir.convertors.VersionConvertor_40_50;
+import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_30_50;
 import org.hl7.fhir.dstu2.formats.JsonParser;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
@@ -440,7 +441,7 @@ public class IGReleaseUpdater {
         return (ImplementationGuide) VersionConvertor_10_50.convertResource(new org.hl7.fhir.dstu2.formats.XmlParser().parse(fs));
       }
       if (VersionUtilities.isR3Ver(fv)) {
-        return (ImplementationGuide) VersionConvertor_30_50.convertResource(new org.hl7.fhir.dstu3.formats.XmlParser().parse(fs), true);
+        return (ImplementationGuide) VersionConvertor_30_50.convertResource(new org.hl7.fhir.dstu3.formats.XmlParser().parse(fs), new BaseAdvisor_30_50(false));
       }
       if (VersionUtilities.isR4Ver(fv)) {
         return (ImplementationGuide) VersionConvertor_40_50.convertResource(new org.hl7.fhir.r4.formats.XmlParser().parse(fs));
@@ -525,7 +526,7 @@ public class IGReleaseUpdater {
     } else {
       p1 = p1 + ". ";      
     }
-    String p2 = root == null ? "" : version == root ? "This is the current published version"+(currentPublication ? "" : " in it's permanent home (it will always be available at this URL)") : "The current version which supercedes this version is <a href=\""+(JSONUtil.str(root, "path").startsWith(canonical) ? canonical : JSONUtil.str(root, "path"))+"{{fn}}\">"+JSONUtil.str(root, "version")+"</a>";
+    String p2 = root == null ? "" : version == root ? "This is the current published version"+(currentPublication ? "" : " in its permanent home (it will always be available at this URL)") : "The current version which supercedes this version is <a href=\""+(JSONUtil.str(root, "path").startsWith(canonical) ? canonical : JSONUtil.str(root, "path"))+"{{fn}}\">"+JSONUtil.str(root, "version")+"</a>";
     String p3;
     if (canonical.equals("http://hl7.org/fhir"))
       p3 = " For a full list of available versions, see the <a href=\""+canonical+"/directory.html\">Directory of published versions <img src=\"external.png\" style=\"text-align: baseline\"></a>";
@@ -611,6 +612,8 @@ public class IGReleaseUpdater {
       return decorate(sequence)+" Update";
     else if ("normative+trial-use".equals(status))
       return decorate(sequence+" - Mixed Normative and STU");
+    else if ("normative".equals(status))
+      return decorate(sequence+" - Normative");
     else 
       throw new Error("unknown status "+status);
   }

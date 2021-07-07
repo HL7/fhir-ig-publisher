@@ -56,19 +56,25 @@ public class CodeSystemRenderer extends CanonicalRenderer {
   }
 
   @Override
-  protected void genSummaryRowsSpecific(StringBuilder b) {
-    if (cs.hasContent()) {
-      b.append(" <tr><td>"+translate("cs.summary", "Content")+":</td><td>"+translate("cs.summary", cs.getContent().getDisplay())+": "+describeContent(cs.getContent())+"</td></tr>\r\n");
+  protected void genSummaryRowsSpecific(StringBuilder b, Set<String> rows) {
+    if (hasSummaryRow(rows, "content")) {
+      if (cs.hasContent()) {
+        b.append(" <tr><td>"+translate("cs.summary", "Content")+":</td><td>"+translate("cs.summary", cs.getContent().getDisplay())+": "+describeContent(cs.getContent())+"</td></tr>\r\n");
+      }
     }
-    if (CodeSystemUtilities.hasOID(cs)) {
-      b.append(" <tr><td>"+translate("cs.summary", "OID")+":</td><td>"+CodeSystemUtilities.getOID(cs)+" ("+translate("cs.summary", "for OID based terminology systems")+")</td></tr>\r\n");
+    if (hasSummaryRow(rows, "oid")) {
+      if (CodeSystemUtilities.hasOID(cs)) {
+        b.append(" <tr><td>"+translate("cs.summary", "OID")+":</td><td>"+CodeSystemUtilities.getOID(cs)+" ("+translate("cs.summary", "for OID based terminology systems")+")</td></tr>\r\n");
+      }
     }
-    if (cs.hasValueSet()) {
-      ValueSet vs = context.fetchResource(ValueSet.class, cs.getValueSet());
-      if (vs == null) {
-        b.append(" <tr><td>"+translate("cs.summary", "Value Set")+":</td><td>"+ cs.getValueSet()+" ("+translate("cs.summary", " is the value set for all codes in this code system")+")</td></tr>\r\n");
-      } else {
-        b.append(" <tr><td>"+translate("cs.summary", "Value Set")+":</td><td><a href=\""+vs.getUserString("path")+"\">"+ cs.getValueSet()+"</a> ("+translate("cs.summary", " is the value set for all codes in this code system")+")</td></tr>\r\n");        
+    if (hasSummaryRow(rows, "cs.vs")) {
+      if (cs.hasValueSet()) {
+        ValueSet vs = context.fetchResource(ValueSet.class, cs.getValueSet());
+        if (vs == null) {
+          b.append(" <tr><td>"+translate("cs.summary", "Value Set")+":</td><td>"+ cs.getValueSet()+" ("+translate("cs.summary", " is the value set for all codes in this code system")+")</td></tr>\r\n");
+        } else {
+          b.append(" <tr><td>"+translate("cs.summary", "Value Set")+":</td><td><a href=\""+vs.getUserString("path")+"\">"+ cs.getValueSet()+"</a> ("+translate("cs.summary", " is the value set for all codes in this code system")+")</td></tr>\r\n");        
+        }
       }
     }
   }

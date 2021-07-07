@@ -1,6 +1,7 @@
 package org.hl7.fhir.igtools.renderers;
 
 import java.util.List;
+import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
@@ -39,7 +40,7 @@ public class OperationDefinitionRenderer extends CanonicalRenderer {
   }
 
   @Override
-  protected void genSummaryRowsSpecific(StringBuilder b) {
+  protected void genSummaryRowsSpecific(StringBuilder b, Set<String> rows) {
   }
 
   public String summary() {

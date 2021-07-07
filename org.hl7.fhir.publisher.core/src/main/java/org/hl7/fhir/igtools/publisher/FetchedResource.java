@@ -27,6 +27,7 @@ import java.util.List;
 
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
+import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.r5.model.Resource;
 
 import com.google.gson.JsonObject;
@@ -34,7 +35,6 @@ import com.google.gson.JsonObject;
 public class FetchedResource {
   private String id;
   private String title;
-  private boolean trimmed;
   private String type;
   private Resource resource;
   private Element element;
@@ -49,6 +49,8 @@ public class FetchedResource {
   private HashSet<FetchedResource> foundExamples = new HashSet<FetchedResource>();
   private ImplementationGuideDefinitionResourceComponent resEntry;
   private List<ProvenanceDetails> audits = new ArrayList<>();
+  private List<ValidationMessage> errors = new ArrayList<ValidationMessage>();
+  private boolean isProvenance = false;
 
   public Resource getResource() {
     return resource;
@@ -59,17 +61,10 @@ public class FetchedResource {
   }
   
   public Element getElement() {
-    if (trimmed) {
-      throw new Error("Access element after it is unloaded");
-    }
     return element;
   }
   
   public FetchedResource setElement(Element element) {
-    if (trimmed) {
-      throw new Error("Access element after it is unloaded");
-    }
-
     this.element = element;
     type = element.fhirType();
     return this;
@@ -202,14 +197,16 @@ public class FetchedResource {
     return !audits.isEmpty();
   }
 
-  public void trim() {
-    if (!fhirType().equals("StructureDefinition")) {
-      trimmed = true;
-      if (element != null) {
-        element.clear();
-      }
-      element = null;
-    }
+
+  public List<ValidationMessage> getErrors() {
+    return errors;
   }
   
+  public boolean getProvenance() {
+    return this.isProvenance;
+  }
+
+  public void setProvenance(boolean isProvenance) {
+    this.isProvenance = isProvenance;
+  }
 }

@@ -15,16 +15,16 @@
          tag and the <core_version> tags below.
     -->
 
-    <parent>
-        <groupId>ca.uhn.hapi.fhir</groupId>
-        <artifactId>org.hl7.fhir.core</artifactId>
-        <version>5.2.20</version>
-    </parent>
+<!--    <parent>-->
+<!--        <groupId>ca.uhn.hapi.fhir</groupId>-->
+<!--        <artifactId>org.hl7.fhir.core</artifactId>-->
+<!--        <version>5.3.14</version>-->
+<!--    </parent>-->
 
-    <version>1.1.60-SNAPSHOT</version> <!-- See the note above -->
+    <version>1.1.77-SNAPSHOT</version> <!-- See the note above -->
 
     <properties>
-        <core_version>5.2.20</core_version>
+        <core_version>5.4.8</core_version>
         <maven.test.skip>true</maven.test.skip>
     </properties>
 
@@ -80,7 +80,13 @@
             <id>local</id>
             <url>file://${basedir}/lib</url>
         </repository>
-    </repositories> 
+    </repositories>
+
+    <scm>
+        <connection>scm:git:git@github.com/HL7/fhir-ig-publisher.git</connection>
+        <url>scm:git:git@github.com:HL7/fhir-ig-publisher.git</url>
+        <developerConnection>scm:git:git@github.com:HL7/fhir-ig-publisher.git</developerConnection>
+    </scm>
 
     <dependencies>
         <dependency>
@@ -109,10 +115,10 @@
             <artifactId>ucum</artifactId>
             <version>1.0.3</version>
         </dependency>
-
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
+            <version>1.2.3</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -127,10 +133,12 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-compress</artifactId>
+            <version>1.20</version>
         </dependency>
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
+            <version>4.5.13</version>
             <exclusions>
                 <exclusion>
                     <artifactId>commons-logging</artifactId>
@@ -143,16 +151,19 @@
         <dependency>
             <groupId>com.atlassian.commonmark</groupId>
             <artifactId>commonmark</artifactId>
+            <version>0.12.1</version>
             <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>com.atlassian.commonmark</groupId>
             <artifactId>commonmark-ext-gfm-tables</artifactId>
+            <version>0.12.1</version>
             <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>com.github.rjeschke</groupId>
             <artifactId>txtmark</artifactId>
+            <version>0.13</version>
             <optional>true</optional>
         </dependency>
 
@@ -195,6 +206,19 @@
             <artifactId>okhttp</artifactId>
             <version>4.9.0</version>
         </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>5.7.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>5.7.1</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -211,8 +235,28 @@
                     <fork>false</fork>
                     <debug>true</debug>
                 </configuration>
-                <dependencies>
-                </dependencies>
+                <executions>
+                    <!-- Replacing default-compile as it is treated specially by maven -->
+                    <execution>
+                        <id>default-compile</id>
+                        <phase>none</phase>
+                    </execution>
+                    <!-- Replacing default-testCompile as it is treated specially by maven -->
+                    <execution>
+                        <id>default-testCompile</id>
+                        <phase>none</phase>
+                    </execution>
+                    <execution>
+                        <id>java-compile</id>
+                        <phase>compile</phase>
+                        <goals> <goal>compile</goal> </goals>
+                    </execution>
+                    <execution>
+                        <id>java-test-compile</id>
+                        <phase>test-compile</phase>
+                        <goals> <goal>testCompile</goal> </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.basepom.maven</groupId>

@@ -155,7 +155,7 @@ public class PackageReleaser {
     r4 = org.hl7.fhir.r4.context.SimpleWorkerContext.fromPackage(pcm.loadPackage("hl7.fhir.r4.core", "4.0.1"));
     System.out.println("Load hl7.fhir.r3.core");
     r3 = org.hl7.fhir.dstu3.context.SimpleWorkerContext.fromPackage(pcm.loadPackage("hl7.fhir.r3.core", "3.0.2"));
-    System.out.println("Scanning...");
+    System.out.println("Scanning "+source+" and comaparing to "+dest);
 
     SimpleDateFormat df = new SimpleDateFormat(RSS_DATE, new Locale("en", "US"));
     checkDest(dest);
@@ -308,7 +308,7 @@ public class PackageReleaser {
       } else if ("3.0".equals(outVer)) {
         new org.hl7.fhir.dstu3.formats.JsonParser().compose(new FileOutputStream(filename), sd);
       } else if ("4.0".equals(outVer)) {
-        org.hl7.fhir.r4.model.Resource r4 = VersionConvertor_30_40.convertResource(sd, false);
+        org.hl7.fhir.r4.model.Resource r4 = VersionConvertor_30_40.convertResource(sd);
         new org.hl7.fhir.r4.formats.JsonParser().compose(new FileOutputStream(filename), r4);
       } else {
         throw new Error("Unknown version "+outVer);
@@ -327,7 +327,7 @@ public class PackageReleaser {
         org.hl7.fhir.dstu2.model.Resource r2 = VersionConvertor_10_40.convertResource(sd);
         new org.hl7.fhir.dstu2.formats.JsonParser().compose(new FileOutputStream(filename), r2);
       } else if ("3.0".equals(outVer)) {
-        org.hl7.fhir.dstu3.model.Resource r3 = VersionConvertor_30_40.convertResource(sd, false);
+        org.hl7.fhir.dstu3.model.Resource r3 = VersionConvertor_30_40.convertResource(sd);
         new org.hl7.fhir.dstu3.formats.JsonParser().compose(new FileOutputStream(filename), r3);
       } else if ("4.0".equals(outVer)) {
         new org.hl7.fhir.r4.formats.JsonParser().compose(new FileOutputStream(filename), sd);
@@ -359,7 +359,7 @@ public class PackageReleaser {
             org.hl7.fhir.dstu2016may.model.Resource r2b = VersionConvertor_14_50.convertResource(r);
             new org.hl7.fhir.dstu2016may.formats.JsonParser().compose(new FileOutputStream(filename), r2b);
           } else if ("3.0".equals(outVer)) {
-            org.hl7.fhir.dstu3.model.Resource r3 = VersionConvertor_30_50.convertResource(r, false);
+            org.hl7.fhir.dstu3.model.Resource r3 = VersionConvertor_30_50.convertResource(r);
             new org.hl7.fhir.dstu3.formats.JsonParser().compose(new FileOutputStream(filename), r3);
           } else if ("4.0".equals(outVer)) {
             org.hl7.fhir.r4.model.Resource r4 = VersionConvertor_40_50.convertResource(r);
@@ -392,7 +392,7 @@ public class PackageReleaser {
       } else { // if (f.getName().endsWith(".json")) {
         r = new org.hl7.fhir.dstu3.formats.JsonParser().parse(new FileInputStream(f));
       }
-      return VersionConvertor_30_50.convertResource(r, false);
+      return VersionConvertor_30_50.convertResource(r);
     } else if ("4.0".equals(ver)) {
       org.hl7.fhir.r4.model.Resource r;
       if (f.getName().endsWith(".map")) {

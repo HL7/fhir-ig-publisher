@@ -45,6 +45,7 @@ import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.npm.PackageHacker;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
@@ -70,6 +71,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   private boolean noXhtml;
   private Template template;
   private List<String> listedURLExemptions;
+  private Set<String> summaryRows = new HashSet<>();
   
   public IGKnowledgeProvider(IWorkerContext context, String pathToSpec, String canonical, JsonObject igs, List<ValidationMessage> errors, boolean noXhtml, Template template, List<String> listedURLExemptions) throws Exception {
     super();
@@ -482,7 +484,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   
   public String specPath(String path) {
     if (Utilities.isAbsoluteUrl(path)) {
-      return path;
+      return PackageHacker.fixPackageUrl(path);
     } else {
       assert pathToSpec != null;
       return Utilities.pathURL(pathToSpec, path);
@@ -738,6 +740,10 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   @Override
   public String getLinkForUrl(String corePath, String s) {
     return context.getLinkForUrl(corePath, s);
+  }
+
+  public Set<String> summaryRows() {
+    return summaryRows ;
   }
 
   

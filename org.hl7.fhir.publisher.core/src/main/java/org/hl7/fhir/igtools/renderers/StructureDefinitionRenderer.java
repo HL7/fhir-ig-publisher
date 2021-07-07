@@ -46,6 +46,7 @@ import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeableConcept;
 import org.hl7.fhir.r5.model.Coding;
+import org.hl7.fhir.r5.model.ContactPoint;
 import org.hl7.fhir.r5.model.DataType;
 import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
@@ -65,6 +66,7 @@ import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionMappingComponent;
+import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionSnapshotComponent;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
@@ -321,7 +323,13 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return summarise((Coding) fixed);
     if (fixed instanceof Quantity) 
       return summarise((Quantity) fixed);
+    if (fixed instanceof ContactPoint) 
+      return summarise((ContactPoint) fixed);
     throw new FHIRException("Generating text summary of fixed value not yet done for type "+fixed.getClass().getName());
+  }
+
+  private String summarise(ContactPoint cp) {
+    return cp.getValue();
   }
 
 
@@ -626,10 +634,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return null;
   }
 
-  public String inv(boolean withHeadings) {
+  public String inv(boolean withHeadings, boolean diff) {
     List<String> txlist = new ArrayList<String>();
     Map<String, List<ElementDefinitionConstraintComponent>> txmap = new HashMap<String, List<ElementDefinitionConstraintComponent>>();
-    for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+    List<ElementDefinition> list = diff ? sd.getDifferential().getElement() : sd.getSnapshot().getElement();
+    for (ElementDefinition ed : list) {
       if (!"0".equals(ed.getMax())) {
         txlist.add(ed.getId());
         txmap.put(ed.getId(), ed.getConstraint());
@@ -1268,7 +1277,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return b.toString();
   }
 
-  public String mappings(boolean complete) {
+  public String mappings(boolean complete, boolean diff) {
     if (sd.getMapping().isEmpty())
       return "<p>"+translate("sd.maps", "No Mappings")+"</p>";
     else {
@@ -1289,7 +1298,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
         s.append(" <tr><td colspan=\"3\"><b>"+Utilities.escapeXml(gt(sd.getNameElement()))+"</b></td></tr>\r\n");
         String path = null;
-        for (ElementDefinition e : sd.getSnapshot().getElement()) {
+        for (ElementDefinition e : diff ? sd.getDifferential().getElement() : sd.getSnapshot().getElement()) {
           if (path == null || !e.getPath().startsWith(path)) {
             path = null;
             if (e.hasMax() && e.getMax().equals("0") || !(complete || hasMappings(e, map))) {
@@ -2054,7 +2063,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   @Override
-  protected void genSummaryRowsSpecific(StringBuilder b) {
+  protected void genSummaryRowsSpecific(StringBuilder b, Set<String> rows) {
   }
   
 }

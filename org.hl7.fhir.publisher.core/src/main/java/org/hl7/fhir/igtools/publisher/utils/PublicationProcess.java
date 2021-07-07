@@ -12,6 +12,7 @@ import java.util.List;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.hl7.fhir.igtools.publisher.PastProcessHackerUtilities;
 import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
@@ -89,7 +90,7 @@ public class PublicationProcess {
     
     // check the output
     File fOutput = checkDirectory(Utilities.path(source, "output"), res, "Publication Source");
-    File fQA = checkFile(Utilities.path(source, "output", "qa.json"), res, "Publication Source");
+    File fQA = checkFile(Utilities.path(source, "output", "qa.json"), res, "Publication QA info");
     if (res.size() > 0) {
       return res;
     }
@@ -100,22 +101,28 @@ public class PublicationProcess {
     String id = npm.name();
     String[] p = id.split("\\.");
     boolean tho = false;
+    boolean cql = false;
     String realm = null;
     String code = null;
-    String canonical = npm.canonical();
+    String canonical = PastProcessHackerUtilities.actualUrl(npm.canonical());
     if (id.equals("hl7.terminology")) {
       tho = true;
       if (!check(res, npm.canonical().equals("http://terminology.hl7.org") && url.equals("http://terminology.hl7.org"), "Proposed canonical '"+npm.canonical()+"' does not match the web site URL '"+url+"' with a value of http://terminology.hl7.org")) {
         return res;
-      }
+      }      
+    } else if (id.equals("hl7.cql")) {
+      cql = true;
+      if (!check(res, npm.canonical().equals("http://cql.hl7.org") && url.equals("http://cql.hl7.org"), "Proposed canonical '"+npm.canonical()+"' does not match the web site URL '"+url+"' with a value of http://cql.hl7.org")) {
+        return res;
+      }      
       
     } else {
-      if (!check(res, p.length == 4 && "hl7".equals(p[0]) && "fhir".equals(p[1]), "Package Id is not valid = must have 4 parts (hl7.fhir.[realm].[code]")) {
+      if (!check(res, p.length == 4 && "hl7".equals(p[0]) && "fhir".equals(p[1]), "Package Id '"+id+"' is not valid:  must have 4 parts (hl7.fhir.[realm].[code]")) {
         return res;
       }
       realm = p[2];
       code = p[3];
-      if (!check(res, canonical != null && canonical.equals("http://hl7.org/fhir/"+realm+"/"+code), "canonical URL of "+canonical+" does not match the required canonical of http://hl7.org/fhir/"+realm+"/"+code)) {
+      if (!check(res, canonical != null && (canonical.equals("http://hl7.org/fhir/"+realm+"/"+code)  || canonical.equals("http://hl7.org/fhir/smart-app-launch")), "canonical URL of "+canonical+" does not match the required canonical of http://hl7.org/fhir/"+realm+"/"+code)) {
         return res;
       }
       if (!check(res, canonical.startsWith(url), "Proposed canonical '"+canonical+"' does not match the web site URL '"+url+"'")) {
@@ -128,7 +135,7 @@ public class PublicationProcess {
       return res;
     }
     
-    String destination = tho ? rootFolder : Utilities.path(rootFolder, realm, code);
+    String destination = tho || cql ? rootFolder : PastProcessHackerUtilities.useRealm(realm, code) ? Utilities.path(rootFolder, realm, code) :  Utilities.path(rootFolder, code);
     if (!check(res, new File(Utilities.path(destination, "package-list.json")).exists(), "Destination '"+destination+"' does not contain a package-list.json - must be set up manually for first publication")) {
       return res;
     }
@@ -153,20 +160,22 @@ public class PublicationProcess {
     check(res, plPub.getAsJsonArray("list").size() > 0, "Dest package-list has no existent version (should have ci-build entry)");
     check(res, vSrc != null, "No Entry found in source package-list for v"+version);
     check(res, vPub == null, "Found an entry in the publication package-list for v"+version+" - it looks like it has already been published");
+    if (vSrc == null) { 
+      return res;
+    }
     check(res, vSrc.has("desc") || vSrc.has("descmd"), "Source Package list has no description for v"+version);
     String pathVer = JSONUtil.str(vSrc, "path");
     String vCode = pathVer.substring(pathVer.lastIndexOf("/")+1);
     
     check(res, pathVer.equals(Utilities.pathURL(canonical, vCode)), "Source Package list path v"+version+" is wrong - is '"+JSONUtil.str(vSrc, "path")+"', doesn't match canonical)");
     check(res, npm.fhirVersion().equals(JSONUtil.str(vSrc, "fhirversion")), "Source Package list fhir version for v"+version+" is wrong - is '"+JSONUtil.str(vSrc, "fhirversion")+"', should be '"+npm.fhirVersion()+"')");
-    // ok, the ids and canonicals are all lined up, and w're ready to publish 
-    
+    // ok, the ids and canonicals are all lined up, and w're ready to publish     
 
     check(res, id.equals(JSONUtil.str(qa, "package-id")), "Generated IG has wrong package "+JSONUtil.str(qa, "package-id"));
     check(res, version.equals(JSONUtil.str(qa, "ig-ver")), "Generated IG has wrong version "+JSONUtil.str(qa, "ig-ver"));
     check(res, qa.has("errs"), "Generated IG has no error count");
     check(res, npm.fhirVersion().equals(JSONUtil.str(qa, "version")), "Generated IG has wrong FHIR version "+JSONUtil.str(qa, "version"));
-    check(res, JSONUtil.str(qa, "url").startsWith(canonical), "Generated IG has wrong Canonical "+JSONUtil.str(qa, "url"));
+    check(res, JSONUtil.str(qa, "url").startsWith(canonical) || JSONUtil.str(qa, "url").startsWith(npm.canonical()), "Generated IG has wrong Canonical "+JSONUtil.str(qa, "url"));
     
     String destVer = Utilities.path(destination, vCode);
     if (!check(res, new File(destination).exists(), "Destination '"+destVer+"' not found - must be set up manually for first publication")) {

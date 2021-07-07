@@ -4,6 +4,7 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
+import org.hl7.fhir.igtools.publisher.PastProcessHackerUtilities;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
@@ -48,7 +49,7 @@ public class VersionCheckRenderer {
         return packageVersion+": "+error("package-list.json has no path for this version");
       } else {
         CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder(". ");
-        b.append(packageVersion+" = ok. Step <code>"+ver.get("status").getAsString()+"</code> in sequence <code>"+ver.get("sequence").getAsString()+"</code>, to be published at "+ver.get("path").getAsString()+" (subdir = "+subdir(canonical, JSONUtil.str(ver, "path"))+")");  
+        b.append(packageVersion+" = ok. Step <code>"+ver.get("status").getAsString()+"</code> in sequence <code>"+ver.get("sequence").getAsString()+"</code>, to be published at "+ver.get("path").getAsString()+" (subdir = "+subdir(PastProcessHackerUtilities.actualUrl(canonical), JSONUtil.str(ver, "path"))+")");  
         JsonObject pubPl = getPublishedPackageList();
         if (pubPl == null) {
           if (packageVersion.startsWith("0.")) {
@@ -67,7 +68,7 @@ public class VersionCheckRenderer {
             b.append(error("canonical mismatch between provided and published package-list.json files: "+JSONUtil.str(packageList, "canonical")+" vs "+JSONUtil.str(pubPl, "canonical")));        
           }
         }
-        if (!ver.get("path").getAsString().startsWith(canonical)) {
+        if (!ver.get("path").getAsString().startsWith(canonical) && !ver.get("path").getAsString().startsWith(PastProcessHackerUtilities.actualUrl(canonical))) {
           b.append(error("package-list.json path for this version does not start with the canonical URL ("+ver.get("path").getAsString()+" vs "+canonical+")"));
         } 
         String mostRecent = packageVersion;
@@ -104,10 +105,10 @@ public class VersionCheckRenderer {
 
   private JsonObject getPublishedPackageList() {
     try {
-      JsonObject json = JsonTrackingParser.fetchJson(Utilities.pathURL(canonical, "package-list.json"));
+      JsonObject json = JsonTrackingParser.fetchJson(Utilities.pathURL(PastProcessHackerUtilities.actualUrl(canonical), "package-list.json"));
       return json;
     } catch (Exception e) {
-      System.out.println("Outcome of trying to fetch existing package-list,json: "+e.getMessage());
+      System.out.println("Outcome of trying to fetch existing package-list.json: "+e.getMessage());
       return null;
     }
   }

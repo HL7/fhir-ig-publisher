@@ -10,6 +10,7 @@ import java.util.Set;
 
 import org.hl7.fhir.convertors.VersionConvertor_30_50;
 import org.hl7.fhir.convertors.VersionConvertor_40_50;
+import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_30_50;
 import org.hl7.fhir.exceptions.DefinitionException;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
@@ -177,10 +178,10 @@ public class USRealmBusinessRules extends RealmBusinessRules {
     return null;
   }
 
-  private Resource loadResourceFromPackage(NpmPackage uscore, String filename) throws FHIRFormatError, FHIRException, IOException {
+  private Resource loadResourceFromPackage(NpmPackage uscore, String filename) throws FHIRException, IOException {
     InputStream s = uscore.loadResource(filename);
     if (VersionUtilities.isR3Ver(version)) {
-      return VersionConvertor_30_50.convertResource(new org.hl7.fhir.dstu3.formats.JsonParser().parse(s), true);
+      return VersionConvertor_30_50.convertResource(new org.hl7.fhir.dstu3.formats.JsonParser().parse(s), new BaseAdvisor_30_50(false));
     } else if (VersionUtilities.isR4Ver(version)) {
       return VersionConvertor_40_50.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(s));
     } else {

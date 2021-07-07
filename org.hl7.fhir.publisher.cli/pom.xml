@@ -5,7 +5,7 @@
     <parent>
         <artifactId>org.hl7.fhir.publisher</artifactId>
         <groupId>org.hl7.fhir.publisher</groupId>
-        <version>1.1.60-SNAPSHOT</version>
+        <version>1.1.77-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -57,6 +57,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.1.2</version>
                 <executions>
                     <execution>
                         <id>unpack-dependencies</id>
@@ -86,6 +87,30 @@
                         </manifest>
                     </archive>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.0.0</version>
+                <executions>
+                    <execution>
+                        <id>default-cli</id>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>java</executable>
+                            <async>true</async>
+                            <asyncDestroyOnShutdown>true</asyncDestroyOnShutdown>
+                            <!-- optional -->
+                            <workingDirectory>/tmp</workingDirectory>
+                            <arguments>
+                                <argument>-jar</argument>
+                                <argument>${basedir}/target/org.hl7.fhir.publisher.cli-${project.version}.jar</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
         <pluginManagement>
