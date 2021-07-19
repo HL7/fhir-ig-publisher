@@ -1,0 +1,1 @@
+* Update core dependency to 5.4.9
