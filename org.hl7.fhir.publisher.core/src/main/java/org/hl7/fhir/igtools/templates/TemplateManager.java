@@ -105,7 +105,11 @@ public class TemplateManager {
         throw new FHIRException("Unable to resolve "+baseTemplate+" because it is not listed in the dependencies");
       }
       String ver = npm.getNpm().getAsJsonObject("dependencies").get(baseTemplate).getAsString();
-      installTemplate(baseTemplate+"#"+ver, rootFolder, templateDir, scriptIds, loadedIds, level + 1);
+
+      if (Utilities.noString(ver))
+        installTemplate(baseTemplate, rootFolder, templateDir, scriptIds, loadedIds, level + 1);
+      else
+        installTemplate(baseTemplate+"#"+ver, rootFolder, templateDir, scriptIds, loadedIds, level + 1);
     }
     // npm.debugDump("template");
     
