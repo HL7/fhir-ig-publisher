@@ -28,8 +28,11 @@ import com.google.gson.JsonPrimitive;
 import org.hl7.fhir.convertors.conv10_50.VersionConvertor_10_50;
 import org.hl7.fhir.convertors.conv14_50.VersionConvertor_14_50;
 import org.hl7.fhir.convertors.conv30_50.VersionConvertor_30_50;
-import org.hl7.fhir.convertors.VersionConvertor_40_50;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_10_50;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_14_50;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.ValidationResult;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
@@ -258,7 +261,7 @@ public class ConfigFileConverter {
                 res = new org.hl7.fhir.dstu3.formats.XmlParser().parse(new FileInputStream(filename));
             else
                 throw new Exception("Unable to determine file type for " + filename);
-            return VersionConvertor_30_50.convertResource(res);
+            return VersionConvertorFactory_30_50.convertResource(res);
         } else if (version.startsWith("1.4")) {
             org.hl7.fhir.dstu2016may.model.Resource res;
             if (filename.contains("json"))
@@ -267,7 +270,7 @@ public class ConfigFileConverter {
                 res = new org.hl7.fhir.dstu2016may.formats.XmlParser().parse(new FileInputStream(filename));
             else
                 throw new Exception("Unable to determine file type for " + filename);
-            return VersionConvertor_14_50.convertResource(res);
+            return VersionConvertorFactory_14_50.convertResource(res);
         } else if (version.startsWith("1.0")) {
             org.hl7.fhir.dstu2.model.Resource res;
             if (filename.contains("json"))
@@ -278,7 +281,7 @@ public class ConfigFileConverter {
                 throw new Exception("Unable to determine file type for " + filename);
 
             BaseAdvisor_10_50 advisor = new IGR2ConvertorAdvisor5();
-            return VersionConvertor_10_50.convertResource(res, advisor);
+            return VersionConvertorFactory_10_50.convertResource(res, advisor);
         } else if (version.startsWith("4.0")) {
             org.hl7.fhir.r4.model.Resource res;
             if (filename.contains("json"))
@@ -287,7 +290,7 @@ public class ConfigFileConverter {
                 res = new org.hl7.fhir.r4.formats.XmlParser().parse(new FileInputStream(filename));
             else
                 throw new Exception("Unable to determine file type for " + filename);
-            return VersionConvertor_40_50.convertResource(res);
+            return VersionConvertorFactory_40_50.convertResource(res);
         } else if (version.equals(Constants.VERSION)) {
             if (filename.contains("json"))
                 return new JsonParser().parse(new FileInputStream(filename));

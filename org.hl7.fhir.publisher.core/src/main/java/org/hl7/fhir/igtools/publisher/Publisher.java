@@ -80,7 +80,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.SystemUtils;
-import org.hl7.fhir.convertors.VersionConvertor_40_50;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
 import org.hl7.fhir.convertors.conv10_50.VersionConvertor_10_50;
 import org.hl7.fhir.convertors.conv10_50.datatypes10_50.Type10_50;
@@ -90,6 +89,7 @@ import org.hl7.fhir.convertors.conv14_50.datatypes14_50.Type14_50;
 import org.hl7.fhir.convertors.conv30_50.VersionConvertor_30_50;
 import org.hl7.fhir.convertors.conv30_50.datatypes30_50.Type30_50;
 import org.hl7.fhir.convertors.conv40_50.datatypes40_50.Type40_50;
+import org.hl7.fhir.convertors.factory.*;
 import org.hl7.fhir.convertors.misc.NpmPackageVersionConverter;
 import org.hl7.fhir.convertors.txClient.TerminologyClientFactory;
 import org.hl7.fhir.exceptions.DefinitionException;
@@ -451,7 +451,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     @Override
     public Base parseType(String xml, String type) throws IOException, FHIRException {
       org.hl7.fhir.dstu2.model.Type t = new org.hl7.fhir.dstu2.formats.XmlParser().parseType(xml, type); 
-      return Type10_50.convertType(t);
+      return VersionConvertorFactory_10_50.convertType(t);
     }
   }
 
@@ -460,7 +460,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     @Override
     public Base parseType(String xml, String type) throws IOException, FHIRException {
       org.hl7.fhir.dstu2016may.model.Type t = new org.hl7.fhir.dstu2016may.formats.XmlParser().parseType(xml, type); 
-      return Type14_50.convertType(t);
+      return VersionConvertorFactory_14_50.convertType(t);
     }
   }
 
@@ -469,7 +469,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     @Override
     public Base parseType(String xml, String type) throws IOException, FHIRException {
       org.hl7.fhir.dstu3.model.Type t = new org.hl7.fhir.dstu3.formats.XmlParser().parseType(xml, type); 
-      return Type30_50.convertType(t);
+      return VersionConvertorFactory_30_50.convertType(t);
     }
   }
 
@@ -478,7 +478,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     @Override
     public Base parseType(String xml, String type) throws IOException, FHIRException {
       org.hl7.fhir.r4.model.Type t = new org.hl7.fhir.r4.formats.XmlParser().parseType(xml, type); 
-      return Type40_50.convertType(t);
+      return VersionConvertorFactory_40_50.convertType(t);
     }
   }
 
@@ -1660,7 +1660,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       try {
         sourceIg = (ImplementationGuide) org.hl7.fhir.r5.formats.FormatUtilities.loadFile(igName);
       } catch (Exception e) {
-        sourceIg = (ImplementationGuide) VersionConvertor_40_50.convertResource(FormatUtilities.loadFile(igName));
+        sourceIg = (ImplementationGuide) VersionConvertorFactory_40_50.convertResource(FormatUtilities.loadFile(igName));
       }
     } catch (Exception e) {
       throw new Exception("Error Parsing File "+igName+": "+e.getMessage(), e);
@@ -1889,7 +1889,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     logDebugMessage(LogCategory.INIT, "Load Terminology Cache from "+vsCache);
     context.initTS(vsCache);
     if (expParams != null) {
-      context.setExpansionProfile((Parameters) VersionConvertor_40_50.convertResource(FormatUtilities.loadFile(Utilities.path(Utilities.getDirectoryForFile(igName), expParams))));
+      context.setExpansionProfile((Parameters) VersionConvertorFactory_40_50.convertResource(FormatUtilities.loadFile(Utilities.path(Utilities.getDirectoryForFile(igName), expParams))));
     } else if (!expParamMap.isEmpty()) {
       context.setExpansionProfile(new Parameters());      
     }
@@ -4266,7 +4266,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             res2 = new org.hl7.fhir.dstu2.formats.JsonParser().parse(file.getSource());
           else if (file.getContentType().contains("xml"))
             res2 = new org.hl7.fhir.dstu2.formats.XmlParser().parse(file.getSource());
-          org.hl7.fhir.r5.model.Resource res = VersionConvertor_10_50.convertResource(res2);
+          org.hl7.fhir.r5.model.Resource res = VersionConvertorFactory_10_50.convertResource(res2);
           e = convertToElement(res);
           r.setElement(e).setId(id).setTitle(e.getChildValue("name"));
           r.setResource(res);
@@ -4343,15 +4343,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     ByteArrayOutputStream dst = new ByteArrayOutputStream();
     if (VersionUtilities.isR3Ver(srcV) && VersionUtilities.isR2BVer(dstV)) {
       org.hl7.fhir.dstu3.model.Resource r3 = new org.hl7.fhir.dstu3.formats.XmlParser().parse(src);
-      org.hl7.fhir.dstu2016may.model.Resource r14 = VersionConvertor_14_30.convertResource(r3);
+      org.hl7.fhir.dstu2016may.model.Resource r14 = VersionConvertorFactory_14_30.convertResource(r3);
       new org.hl7.fhir.dstu2016may.formats.XmlParser().compose(dst, r14);
     } else if (VersionUtilities.isR3Ver(srcV) && Constants.VERSION.equals(dstV)) {
       org.hl7.fhir.dstu3.model.Resource r3 = new org.hl7.fhir.dstu3.formats.XmlParser().parse(src);
-      org.hl7.fhir.r5.model.Resource r5 = VersionConvertor_30_50.convertResource(r3);
+      org.hl7.fhir.r5.model.Resource r5 = VersionConvertorFactory_30_50.convertResource(r3);
       new org.hl7.fhir.r5.formats.XmlParser().compose(dst, r5);
     } else if (VersionUtilities.isR4Ver(srcV) && Constants.VERSION.equals(dstV)) {
       org.hl7.fhir.r4.model.Resource r4 = new org.hl7.fhir.r4.formats.XmlParser().parse(src);
-      org.hl7.fhir.r5.model.Resource r5 = VersionConvertor_40_50.convertResource(r4);
+      org.hl7.fhir.r5.model.Resource r5 = VersionConvertorFactory_40_50.convertResource(r4);
       new org.hl7.fhir.r5.formats.XmlParser().compose(dst, r5);
     } else {
       throw new Exception("Conversion from "+srcV+" to "+dstV+" is not supported yet"); // because the only know reason to do this is 3.0.1 --> 1.40
@@ -4754,7 +4754,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       } else {
         throw new Exception("Unable to determine file type for "+name);
       }
-      return VersionConvertor_30_50.convertResource(res);
+      return VersionConvertorFactory_30_50.convertResource(res);
     } else if (VersionUtilities.isR4Ver(parseVersion)) {
       org.hl7.fhir.r4.model.Resource res;
       if (contentType.contains("json")) {
@@ -4764,7 +4764,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       } else {
         throw new Exception("Unable to determine file type for "+name);
       }
-      return VersionConvertor_40_50.convertResource(res);
+      return VersionConvertorFactory_40_50.convertResource(res);
     } else if (VersionUtilities.isR2BVer(parseVersion)) {
       org.hl7.fhir.dstu2016may.model.Resource res;
       if (contentType.contains("json")) {
@@ -4774,7 +4774,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       } else {
         throw new Exception("Unable to determine file type for "+name);
       }
-      return VersionConvertor_14_50.convertResource(res);
+      return VersionConvertorFactory_14_50.convertResource(res);
     } else if (VersionUtilities.isR2Ver(parseVersion)) {
       org.hl7.fhir.dstu2.model.Resource res;
       if (contentType.contains("json")) {
@@ -4786,7 +4786,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
 
       BaseAdvisor_10_50 advisor = new IGR2ConvertorAdvisor5();
-      return VersionConvertor_10_50.convertResource(res, advisor);
+      return VersionConvertorFactory_10_50.convertResource(res, advisor);
     } else if (parseVersion.equals(Constants.VERSION) || VersionUtilities.isR4BVer(parseVersion)) {
       if (contentType.contains("json")) {
         return new JsonParser(true, true).parse(source);
@@ -5306,17 +5306,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
     if (VersionUtilities.isR3Ver(version)) {
       org.hl7.fhir.dstu3.formats.JsonParser jp = new org.hl7.fhir.dstu3.formats.JsonParser();
-      jp.compose(bs, VersionConvertor_30_50.convertResource(res));
+      jp.compose(bs, VersionConvertorFactory_30_50.convertResource(res));
     } else if (VersionUtilities.isR4Ver(version)) {
       org.hl7.fhir.r4.formats.JsonParser jp = new org.hl7.fhir.r4.formats.JsonParser();
-      jp.compose(bs, VersionConvertor_40_50.convertResource(res));
+      jp.compose(bs, VersionConvertorFactory_40_50.convertResource(res));
     } else if (VersionUtilities.isR2BVer(version)) {
       org.hl7.fhir.dstu2016may.formats.JsonParser jp = new org.hl7.fhir.dstu2016may.formats.JsonParser();
-      jp.compose(bs, VersionConvertor_14_50.convertResource(res));
+      jp.compose(bs, VersionConvertorFactory_14_50.convertResource(res));
     } else if (VersionUtilities.isR2Ver(version)) {
       org.hl7.fhir.dstu2.formats.JsonParser jp = new org.hl7.fhir.dstu2.formats.JsonParser();
-      jp.compose(bs, VersionConvertor_10_50.convertResource(res, new IGR2ConvertorAdvisor5()));
-    } else { // if (version.equals(Constants.VERSION)) {
+      jp.compose(bs, VersionConvertorFactory_10_50.convertResource(res, new IGR2ConvertorAdvisor5()));
+    } else {
       org.hl7.fhir.r5.formats.JsonParser jp = new org.hl7.fhir.r5.formats.JsonParser();
       jp.compose(bs, res);
     }
@@ -5330,16 +5330,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     ByteArrayInputStream bi = new ByteArrayInputStream(bs.toByteArray());
     if (VersionUtilities.isR3Ver(version)) {
       org.hl7.fhir.dstu3.formats.JsonParser jp = new org.hl7.fhir.dstu3.formats.JsonParser();
-      return  VersionConvertor_30_50.convertResource(jp.parse(bi));
+      return  VersionConvertorFactory_30_50.convertResource(jp.parse(bi));
     } else if (VersionUtilities.isR4Ver(version)) {
       org.hl7.fhir.r4.formats.JsonParser jp = new org.hl7.fhir.r4.formats.JsonParser();
-      return  VersionConvertor_40_50.convertResource(jp.parse(bi));
+      return  VersionConvertorFactory_40_50.convertResource(jp.parse(bi));
     } else if (VersionUtilities.isR2BVer(version)) {
       org.hl7.fhir.dstu2016may.formats.JsonParser jp = new org.hl7.fhir.dstu2016may.formats.JsonParser();
-      return  VersionConvertor_14_50.convertResource(jp.parse(bi));
+      return  VersionConvertorFactory_14_50.convertResource(jp.parse(bi));
     } else if (VersionUtilities.isR2Ver(version)) {
         org.hl7.fhir.dstu2.formats.JsonParser jp = new org.hl7.fhir.dstu2.formats.JsonParser();
-        return VersionConvertor_10_50.convertResource(jp.parse(bi));
+        return VersionConvertorFactory_10_50.convertResource(jp.parse(bi));
     } else { // if (version.equals(Constants.VERSION)) {
       org.hl7.fhir.r5.formats.JsonParser jp = new org.hl7.fhir.r5.formats.JsonParser();
       return jp.parse(bi);
@@ -5479,7 +5479,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (FetchedResource r : files) {
         ByteArrayOutputStream bs = new ByteArrayOutputStream();
         if (VersionUtilities.isR3Ver(version)) {
-          org.hl7.fhir.dstu3.model.Resource r3 = VersionConvertor_30_50.convertResource(r.getResource());
+          org.hl7.fhir.dstu3.model.Resource r3 = VersionConvertorFactory_30_50.convertResource(r.getResource());
           if (fmt.equals(FhirFormat.JSON)) {
             new org.hl7.fhir.dstu3.formats.JsonParser().compose(bs, r3);
           } else if (fmt.equals(FhirFormat.XML)) {
@@ -5488,7 +5488,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             new org.hl7.fhir.dstu3.formats.RdfParser().compose(bs, r3);
           }
         } else if (VersionUtilities.isR4Ver(version)) {
-          org.hl7.fhir.r4.model.Resource r4 = VersionConvertor_40_50.convertResource(r.getResource());
+          org.hl7.fhir.r4.model.Resource r4 = VersionConvertorFactory_40_50.convertResource(r.getResource());
           if (fmt.equals(FhirFormat.JSON)) {
             new org.hl7.fhir.r4.formats.JsonParser().compose(bs, r4);
           } else if (fmt.equals(FhirFormat.XML)) {
@@ -5497,7 +5497,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             new org.hl7.fhir.r4.formats.RdfParser().compose(bs, r4);
           }
         } else if (VersionUtilities.isR2BVer(version)) {
-          org.hl7.fhir.dstu2016may.model.Resource r14 = VersionConvertor_14_50.convertResource(r.getResource());
+          org.hl7.fhir.dstu2016may.model.Resource r14 = VersionConvertorFactory_14_50.convertResource(r.getResource());
           if (fmt.equals(FhirFormat.JSON)) {
             new org.hl7.fhir.dstu2016may.formats.JsonParser().compose(bs, r14);
           } else if (fmt.equals(FhirFormat.XML)) {
@@ -5507,7 +5507,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           }
         } else if (VersionUtilities.isR2Ver(version)) {
           BaseAdvisor_10_50 advisor = new IGR2ConvertorAdvisor5();
-          org.hl7.fhir.dstu2.model.Resource r14 = VersionConvertor_10_50.convertResource(r.getResource(), advisor);
+          org.hl7.fhir.dstu2.model.Resource r14 = VersionConvertorFactory_10_50.convertResource(r.getResource(), advisor);
           if (fmt.equals(FhirFormat.JSON)) {
             new org.hl7.fhir.dstu2.formats.JsonParser().compose(bs, r14);
           } else if (fmt.equals(FhirFormat.XML)) {
@@ -5552,7 +5552,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
           try {
             ByteArrayOutputStream bs = new ByteArrayOutputStream();
-            org.hl7.fhir.dstu3.model.Resource r3 = VersionConvertor_30_50.convertResource(r.getResource());
+            org.hl7.fhir.dstu3.model.Resource r3 = VersionConvertorFactory_30_50.convertResource(r.getResource());
             new org.hl7.fhir.dstu3.formats.JsonParser().compose(bs, r3);
             zip.addBytes(r.fhirType()+"-"+r.getId()+".json", bs.toByteArray(), false);
           } catch (Exception e) {
@@ -5581,14 +5581,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
           ByteArrayOutputStream bs = new ByteArrayOutputStream();
           if (VersionUtilities.isR3Ver(version)) {
-            new org.hl7.fhir.dstu3.formats.JsonParser().compose(bs, VersionConvertor_30_50.convertResource(r.getResource()));
+            new org.hl7.fhir.dstu3.formats.JsonParser().compose(bs, VersionConvertorFactory_30_50.convertResource(r.getResource()));
           } else if (VersionUtilities.isR4Ver(version)) {
-            new org.hl7.fhir.r4.formats.JsonParser().compose(bs, VersionConvertor_40_50.convertResource(r.getResource()));
+            new org.hl7.fhir.r4.formats.JsonParser().compose(bs, VersionConvertorFactory_40_50.convertResource(r.getResource()));
           } else if (VersionUtilities.isR2BVer(version)) {
-            new org.hl7.fhir.dstu2016may.formats.JsonParser().compose(bs, VersionConvertor_14_50.convertResource(r.getResource()));
+            new org.hl7.fhir.dstu2016may.formats.JsonParser().compose(bs, VersionConvertorFactory_14_50.convertResource(r.getResource()));
           } else if (VersionUtilities.isR2Ver(version)) {
             BaseAdvisor_10_50 advisor = new IGR2ConvertorAdvisor5();
-            new org.hl7.fhir.dstu2.formats.JsonParser().compose(bs, VersionConvertor_10_50.convertResource(r.getResource(), advisor));
+            new org.hl7.fhir.dstu2.formats.JsonParser().compose(bs, VersionConvertorFactory_10_50.convertResource(r.getResource(), advisor));
           } else if (version.equals(Constants.VERSION) || VersionUtilities.isR4BVer(version)) {
             new JsonParser().compose(bs, r.getResource());
           } else {
