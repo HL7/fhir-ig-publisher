@@ -2039,7 +2039,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private boolean usesExtension(Element focus) {
     for (Element child : focus.getChildren()) {
-      if (child.getName().equals("Extension") && sd.getUrl().equals(child.getChildValue("url")))
+      if (child.getName().equals("extension") && sd.getUrl().equals(child.getChildValue("url")))
         return true;
       if (usesExtension(child))
         return true;
