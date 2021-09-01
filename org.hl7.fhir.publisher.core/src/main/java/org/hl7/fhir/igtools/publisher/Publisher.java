@@ -4200,6 +4200,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     checkResourceUnique(e.fhirType()+"/"+e.getIdBase());        
     r.setElement(e).setId(bin.getId());
     r.setResource(bin);
+    r.setResEntry(srcForLoad);
+    srcForLoad.setUserData("loaded.resource", r);
+    r.setResEntry(srcForLoad);
+    if (srcForLoad.hasExampleCanonicalType()) {
+      r.getElement().setUserData("logical", srcForLoad.getExampleCanonicalType().getValue());
+      r.setExampleUri(srcForLoad.getExampleCanonicalType().getValue());
+    }
     igpkp.findConfiguration(file, r);
     srcForLoad.setUserData("loaded.resource", r);
   }
@@ -4981,6 +4988,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       } else if (res.hasUserData("profile")) {
         validator.validate(r.getElement(), errs, res, res.getUserString("profile"));
       }
+    } else if (r.getResource() != null && r.getResource() instanceof Binary && r.getExampleUri() != null) {
+      Binary bin = (Binary) r.getResource();
+      validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), FhirFormat.getFhirFormatFromMimeType(bin.getContentType()));    
+      
+      
     } else {
       validator.setNoCheckAggregation(r.isExample() && ToolingExtensions.readBoolExtension(r.getResEntry(), "http://hl7.org/fhir/tools/StructureDefinition/igpublisher-no-check-aggregation"));
       if (r.getElement().hasUserData("profile")) {
@@ -7389,8 +7401,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         xhtml = new HistoryGenerator(ctxt).generateForBundle(entries); 
         fragment(r.fhirType()+"-"+r.getId()+"-html", new XhtmlComposer(XhtmlComposer.XML).compose(xhtml), f.getOutputNames(), r, vars, null);
       } else if (r.getResource() instanceof Binary) {
+        String pfx = "";
+        if (r.getExampleUri() != null) {
+          StructureDefinition sd = context.fetchResource(StructureDefinition.class, r.getExampleUri());
+          if (sd != null && sd.getKind() == StructureDefinitionKind.LOGICAL) {
+            pfx = "<p>This content is an example of the <a href=\""+Utilities.escapeXml(sd.getUserString("path"))+"\">"+Utilities.escapeXml(sd.present())+"</a> Logical Model and is not a FHIR Resource</p>\r\n";
+          }          
+        }
         BinaryRenderer br = new BinaryRenderer(tempDir);
-        String html = br.display((Binary) r.getResource());
+        String html = pfx+br.display((Binary) r.getResource());
         for (String fn : br.getFilenames()) {
           otherFilesRun.add(Utilities.path(tempDir, fn));
         }
