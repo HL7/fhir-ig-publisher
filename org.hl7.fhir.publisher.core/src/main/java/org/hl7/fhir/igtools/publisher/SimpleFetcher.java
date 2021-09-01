@@ -209,6 +209,16 @@ public class SimpleFetcher implements IFetchFile {
               type+"-"+id,
               id+"."+type,
               type+"/"+id);
+        if (fn == null && "Binary".equals(type)) {
+          fn = findAnyFile(dirs, 
+              type.toLowerCase()+"-"+id,
+              id+"."+type.toLowerCase(), // Added to support Forge's file naming convention
+              type.toLowerCase()+"/"+id,
+              id,
+              type+"-"+id,
+              id+"."+type,
+              type+"/"+id);
+        }
         if (fn == null)
           throw new Exception("Unable to find the source file for "+type+"/"+id+": not specified, so tried "+type+"-"+id+".xml, "+id+"."+type+".xml, "+type+"-"+id+".json, "+type+"/"+id+".xml, "+type+"/"+id+".json, "+id+".xml, and "+id+".json (and lowercase resource name variants) in dirs "+dirs.toString());
       } else {
@@ -226,6 +236,27 @@ public class SimpleFetcher implements IFetchFile {
     }
   }
   
+  String findAnyFile(List<String> dirs, String... names) throws IOException {
+    for (String f : names) {
+      String fn = findFileAnyExt(dirs, f);
+      if (fn != null) {
+        return fn;
+      }
+    }
+    return null;
+  }
+
+  String findFileAnyExt(List<String> dirs, String name) throws IOException {
+    for (String dir : dirs) {
+      for (String fn : new File(dir).list()) {
+        if (fn.startsWith(name+".")) {
+          return Utilities.path(dir, fn);
+        }
+      }
+    }
+    return null;
+  }
+
   String findFileInSet(List<String> dirs, String... names) throws IOException {
     for (String f : names) {
       String fn = findFileMultiExt(dirs, f);
@@ -287,8 +318,10 @@ public class SimpleFetcher implements IFetchFile {
                   count++;
                   ok = true;
                 } catch (Exception e) {
-                  log.logMessage(e.getMessage() +" loading "+f);
-                  e.printStackTrace();
+                  if (!f.getName().startsWith("Binary-")) { // we don't notify here because Binary is special. 
+                    log.logMessage(e.getMessage() +" loading "+f);
+                    e.printStackTrace();
+                  }
                 }
               if (!ok && !Utilities.existsInList(ext, "xml", "ttl", "html", "txt")) {
                 try {
@@ -297,8 +330,10 @@ public class SimpleFetcher implements IFetchFile {
                   count++;
                   ok = true;
                 } catch (Exception e) {
-                  log.logMessage(e.getMessage() +" loading "+f);
-                  e.printStackTrace();
+                  if (!f.getName().startsWith("Binary-")) { // we don't notify here because Binary is special. 
+                    log.logMessage(e.getMessage() +" loading "+f);
+                    e.printStackTrace();
+                  }
                 }
               }
               if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt")) {
@@ -308,8 +343,10 @@ public class SimpleFetcher implements IFetchFile {
                   count++;
                   ok = true;
                 } catch (Exception e) {
-                  log.logMessage(e.getMessage() +" loading "+f);
-                  e.printStackTrace();
+                  if (!f.getName().startsWith("Binary-")) { // we don't notify here because Binary is special. 
+                    log.logMessage(e.getMessage() +" loading "+f);
+                    e.printStackTrace();
+                  }
                 }
               }
             }

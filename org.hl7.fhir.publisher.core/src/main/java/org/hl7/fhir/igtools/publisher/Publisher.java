@@ -148,6 +148,7 @@ import org.hl7.fhir.r5.formats.RdfParser;
 import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.model.Attachment;
 import org.hl7.fhir.r5.model.Base;
+import org.hl7.fhir.r5.model.Binary;
 import org.hl7.fhir.r5.model.Bundle;
 import org.hl7.fhir.r5.model.Bundle.BundleEntryComponent;
 import org.hl7.fhir.r5.model.Bundle.BundleType;
@@ -208,9 +209,14 @@ import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.openapi.OpenApiGenerator;
 import org.hl7.fhir.r5.openapi.Writer;
+import org.hl7.fhir.r5.renderers.BinaryRenderer;
 import org.hl7.fhir.r5.renderers.BundleRenderer;
 import org.hl7.fhir.r5.renderers.ParametersRenderer;
 import org.hl7.fhir.r5.renderers.RendererFactory;
+import org.hl7.fhir.r5.renderers.spreadsheets.CodeSystemSpreadsheetGenerator;
+import org.hl7.fhir.r5.renderers.spreadsheets.ConceptMapSpreadsheetGenerator;
+import org.hl7.fhir.r5.renderers.spreadsheets.StructureDefinitionSpreadsheetGenerator;
+import org.hl7.fhir.r5.renderers.spreadsheets.ValueSetSpreadsheetGenerator;
 import org.hl7.fhir.r5.renderers.utils.BaseWrappers.ResourceWrapper;
 import org.hl7.fhir.r5.renderers.utils.DirectWrappers;
 import org.hl7.fhir.r5.renderers.utils.ElementWrappers;
@@ -373,10 +379,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   public class IGPublisherHostServices implements IEvaluationContext {
 
     @Override
-    public Base resolveConstant(Object appContext, String name, boolean beforeContext) throws PathEngineException {
-//      if ("id".equals(name))
-        return null;
-//      throw new NotImplementedException("Not done yet @ IGPublisherHostServices.resolveConstant("+appContext.toString()+", \""+name+"\")");
+    public List<Base> resolveConstant(Object appContext, String name, boolean beforeContext) throws PathEngineException {
+       return new ArrayList<>();
     }
 
     @Override
@@ -1450,7 +1454,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Build Formal Publication package, intended for "+getTargetOutput());
     
     if (apiKeyFile == null) {
-      apiKeyFile = new IniFile(Utilities.path(System.getProperty("user.home"), "apikeys.ini"));
+      apiKeyFile = new IniFile(Utilities.path(System.getProperty("user.home"), "fhir-api-keys.ini"));
     }
     log("API keys loaded from "+apiKeyFile.getFileName());
     templateManager = new TemplateManager(pcm, logger, gh());
@@ -3210,8 +3214,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           f.setTitle(res.getName());
         boolean rchanged = noteFile(res, f);        
         needToBuild = rchanged || needToBuild;
-        if (rchanged) 
-          loadAsElementModel(f, f.addResource(), res);
+        if (rchanged) {
+          if (res.hasExtension(ToolingExtensions.EXT_BINARY_FORMAT)) {
+            loadAsBinaryResource(f, f.addResource(), res, res.getExtensionString(ToolingExtensions.EXT_BINARY_FORMAT));
+          } else {
+            loadAsElementModel(f, f.addResource(), res);
+          }
+        }
       }
       if (res.hasExampleCanonicalType()) {
         if (f != null && f.getResources().size()!=1)
@@ -4176,6 +4185,25 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 //  	}
   }
 
+  private void loadAsBinaryResource(FetchedFile file, FetchedResource r, ImplementationGuideDefinitionResourceComponent srcForLoad, String format) throws Exception {
+    file.getErrors().clear();
+    Binary bin = new Binary();
+    String id = srcForLoad.getReference().getReference();
+    if (id.startsWith("Binary/")) {
+      bin.setId(id.substring(7));
+    } else {
+      throw new Exception("Unable to determine Resource id from reference: "+id);
+    }
+    bin.setContent(file.getSource());
+    bin.setContentType(format);
+    Element e = new ObjectConverter(context).convert(bin);
+    checkResourceUnique(e.fhirType()+"/"+e.getIdBase());        
+    r.setElement(e).setId(bin.getId());
+    r.setResource(bin);
+    igpkp.findConfiguration(file, r);
+    srcForLoad.setUserData("loaded.resource", r);
+  }
+  
   private void loadAsElementModel(FetchedFile file, FetchedResource r, ImplementationGuideDefinitionResourceComponent srcForLoad) throws Exception {
     file.getErrors().clear();
     Element e = null;
@@ -7360,6 +7388,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         List<ProvenanceDetails> entries = loadProvenanceForBundle(igpkp.getLinkFor(r, true), r.getElement(), f);
         xhtml = new HistoryGenerator(ctxt).generateForBundle(entries); 
         fragment(r.fhirType()+"-"+r.getId()+"-html", new XhtmlComposer(XhtmlComposer.XML).compose(xhtml), f.getOutputNames(), r, vars, null);
+      } else if (r.getResource() instanceof Binary) {
+        BinaryRenderer br = new BinaryRenderer(tempDir);
+        String html = br.display((Binary) r.getResource());
+        for (String fn : br.getFilenames()) {
+          otherFilesRun.add(Utilities.path(tempDir, fn));
+        }
+        fragment(r.fhirType()+"-"+r.getId()+"-html", html, f.getOutputNames(), r, vars, null);
       } else {
         String html = xhtml == null ? "" : new XhtmlComposer(XhtmlComposer.XML).compose(xhtml);
         fragment(r.fhirType()+"-"+r.getId()+"-html", html, f.getOutputNames(), r, vars, null);
@@ -7669,6 +7704,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(fr, "xref")) {
       fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-xref", csr.xref(), f.getOutputNames(), fr, vars, null);
     }
+    
+    CodeSystemSpreadsheetGenerator vsg = new CodeSystemSpreadsheetGenerator(context);
+    if (igpkp.wantGen(fr, "xlsx") && vsg.canGenerate(cs)) {
+      String path = Utilities.path(tempDir, "CodeSystem-"+prefixForContainer + cs.getId()+".xlsx");
+      f.getOutputNames().add(path);
+      vsg.renderCodeSystem(cs);
+      vsg.finish(new FileOutputStream(path));
+    }
   }
 
   /**
@@ -7738,6 +7781,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
     }
+    ValueSetSpreadsheetGenerator vsg = new ValueSetSpreadsheetGenerator(context);
+    if (igpkp.wantGen(r, "xlsx") && vsg.canGenerate(vs)) {
+      String path = Utilities.path(tempDir, "ValueSet-"+prefixForContainer + r.getId()+".xlsx");
+      f.getOutputNames().add(path);
+      vsg.renderValueSet(vs);
+      vsg.finish(new FileOutputStream(path));
+    }
+
   }
 
   private void fragmentError(String name, String error, String overlay, Set<String> outputTracker) throws IOException, FHIRException {
@@ -7777,6 +7828,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     MappingSheetParser p = new MappingSheetParser();
     if (igpkp.wantGen(r, "sheet") && p.isSheet(cm)) {
       fragment("ConceptMap-"+prefixForContainer+cm.getId()+"-sheet", p.genSheet(cm), f.getOutputNames(), r, vars, null);
+    }
+    ConceptMapSpreadsheetGenerator cmg = new ConceptMapSpreadsheetGenerator(context);
+    if (igpkp.wantGen(r, "xlsx") && cmg.canGenerate(cm)) {
+      String path = Utilities.path(tempDir, prefixForContainer + r.getId()+".xlsx");
+      f.getOutputNames().add(path);
+      cmg.renderConceptMap(cm);
+      cmg.finish(new FileOutputStream(path));
     }
   }
 
@@ -7819,6 +7877,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     if (igpkp.wantGen(r, "header"))
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-header", sdr.header(), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "uses"))
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-uses", sdr.uses(), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "diff"))
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "snapshot"))
@@ -7895,7 +7955,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "xlsx")) {
       String path = Utilities.path(tempDir, sdPrefix + r.getId()+".xlsx");
       f.getOutputNames().add(path);
-      new ProfileUtilities(context, errors, igpkp).generateXlsx(new FileOutputStream(path), sd, true, true);
+      StructureDefinitionSpreadsheetGenerator sdg = new StructureDefinitionSpreadsheetGenerator(context, true, anyMustSupport(sd));
+      sdg.renderStructureDefinition(sd);
+      sdg.finish(new FileOutputStream(path));
     }
 
     if (!regen && sd.getKind() != StructureDefinitionKind.LOGICAL &&  igpkp.wantGen(r, "sch")) {
@@ -7906,6 +7968,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     if (igpkp.wantGen(r, "sch"))
       fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-sch", "yet to be done: schematron as html", null, f.getOutputNames());
+  }
+
+  private boolean anyMustSupport(StructureDefinition sd) {
+    for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+      if (ed.getMustSupport()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private String checkAppendSlash(String s) {
