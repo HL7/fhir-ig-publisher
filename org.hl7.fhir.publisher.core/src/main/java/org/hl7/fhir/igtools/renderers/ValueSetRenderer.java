@@ -75,7 +75,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
   }
 
   public String cld(Set<String> outputTracker) throws EOperationOutcome, FHIRException, IOException, org.hl7.fhir.exceptions.FHIRException  {
-    if (vs.hasText() && vs.getText().hasDiv()) {
+    if (vs.hasText() && !vs.getText().hasUserData("renderer.generated") && vs.getText().hasDiv()) {
       for (XhtmlNode n : vs.getText().getDiv().getChildNodes()) {
         if ("div".equals(n.getName()) && "cld".equals(n.getAttribute("id"))) {
           return "<h3>Definition</h3>\r\n" + new XhtmlComposer(XhtmlComposer.HTML).compose(n);
@@ -86,9 +86,12 @@ public class ValueSetRenderer extends CanonicalRenderer {
     vsc.setText(null);
     if (vsc.hasCompose()) {
       vsc.setExpansion(null); // we don't want to render an expansion by mistake
+      RendererFactory.factory(vsc, gen).render(vsc);
+      return "<h3>Logical Definition (CLD)</h3>\r\n" + new XhtmlComposer(XhtmlComposer.HTML).compose(vsc.getText().getDiv());
+    } else {
+      return "<h3>Logical Definition (CLD)</h3>\r\n<p>No formal definition provided for this ValueSet</p>\r\n";
+      
     }
-    RendererFactory.factory(vsc, gen).render(vsc);
-    return "<h3>Logical Definition (CLD)</h3>\r\n" + new XhtmlComposer(XhtmlComposer.HTML).compose(vsc.getText().getDiv());
   }
 
   public String xref() throws FHIRException {

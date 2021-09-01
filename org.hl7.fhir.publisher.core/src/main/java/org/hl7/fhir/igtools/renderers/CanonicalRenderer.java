@@ -174,5 +174,17 @@ public class CanonicalRenderer extends BaseRenderer {
     }
   }
 
+  protected void listResources(StringBuilder b, List<? extends CanonicalResource> list) {
+    boolean first = true;
+    for (CanonicalResource r : list) {
+      if (first) first = false; else b.append(", ");
+      String path = r.getUserString("path");
+      if (path != null) {
+        b.append("<a href=\""+Utilities.escapeXml(path)+"\">"+Utilities.escapeXml(r.present())+"</a>");
+      } else {
+        b.append(Utilities.escapeXml(r.present()));        
+      }
+    }    
+  }
 
 }
