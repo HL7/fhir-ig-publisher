@@ -6218,7 +6218,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       addPageDataRow(pages, outputName, title, label, breadcrumb + breadCrumbForPage(page, false), r.getStatedExamples());
 //      addPageDataRow(pages, source, title, label, breadcrumb + breadCrumbForPage(page, false), r.getStatedExamples());
       for (String templateName: extraTemplateList) {
-        if (r.getConfig().get("template-"+templateName)!=null && !r.getConfig().get("template-"+templateName).getAsString().isEmpty()) {
+        if (r.getConfig() !=null && r.getConfig().get("template-"+templateName)!=null && !r.getConfig().get("template-"+templateName).getAsString().isEmpty()) {
           if (templateName.equals("format")) {
             String templateDesc = extraTemplates.get(templateName);
             for (String format: template.getFormats()) {
