@@ -4991,8 +4991,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else if (r.getResource() != null && r.getResource() instanceof Binary && r.getExampleUri() != null) {
       Binary bin = (Binary) r.getResource();
       validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), FhirFormat.getFhirFormatFromMimeType(bin.getContentType()));    
-      
-      
     } else {
       validator.setNoCheckAggregation(r.isExample() && ToolingExtensions.readBoolExtension(r.getResEntry(), "http://hl7.org/fhir/tools/StructureDefinition/igpublisher-no-check-aggregation"));
       if (r.getElement().hasUserData("profile")) {
@@ -5018,6 +5016,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       igpkp.findConfiguration(file, r);
     }
     tts.end();
+  }
+
+  public FhirFormat getFhirFormatFromMimeType(String mt) {
+    if (mt.contains("/xml") || mt.contains("+xml")) {
+      return XML;
+    }
+    if (mt.contains("/json") || mt.contains("+json")) {
+      return JSON;
+    }
+    return null;
   }
 
   private void generate() throws Exception {
