@@ -244,7 +244,7 @@ public class TemplateManager {
       }
 
       if (template.matches(FilesystemPackageCacheManager.PACKAGE_REGEX)) {
-        return pcm.loadPackage(template, "current");
+        return pcm.loadPackage(template, null);
       }
       if (template.matches(FilesystemPackageCacheManager.PACKAGE_VERSION_REGEX)) {
         String[] p = template.split("\\#");
