@@ -42,6 +42,7 @@ import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.XmlParser;
+import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeableConcept;
@@ -62,6 +63,7 @@ import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.IdType;
 import org.hl7.fhir.r5.model.PrimitiveType;
 import org.hl7.fhir.r5.model.Quantity;
+import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
@@ -1427,6 +1429,55 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return b.toString();
   }
 
+  public String uses() throws Exception {
+    StringBuilder b = new StringBuilder();
+    List<StructureDefinition> derived = findDerived();
+    if (!derived.isEmpty()) {      
+      b.append("<p>\r\n");
+      b.append(translate("sd.header", "In this IG, the following structures are derived from this profile: "));
+      listResources(b, derived);
+      b.append("</p>\r\n");
+    }
+    List<StructureDefinition> users = findUses(); 
+    if (!users.isEmpty()) {
+      b.append("<p>\r\n");
+      b.append(translate("sd.header", "In this IG, the following structures refer to this profile: "));
+      listResources(b, users);
+      b.append("</p>\r\n");
+    }
+    return b.toString();
+  }
+
+
+  private List<StructureDefinition> findDerived() {
+    List<StructureDefinition> res = new ArrayList<>();
+    for (StructureDefinition t : context.allStructures()) {
+      if (sd.getUrl().equals(t.getBaseDefinition())) {
+        res.add(t);
+      }
+    }
+    return res;
+  }
+
+  private List<StructureDefinition> findUses() {
+    List<StructureDefinition> res = new ArrayList<>();
+    for (StructureDefinition t : context.allStructures()) {
+      boolean uses = false;
+      for (ElementDefinition ed : t.getSnapshot().getElement()) {
+        for (TypeRefComponent u : ed.getType()) {
+          if (u.hasProfile(sd.getUrl())) {
+            uses = true;
+          }
+        }
+      }
+      if (uses) {
+        res.add(t);
+      }
+    }
+    return res;
+  }
+
+
   public String exampleList(List<FetchedFile> fileList, boolean statedOnly) {
     StringBuilder b = new StringBuilder();
     for (FetchedFile f : fileList) {
@@ -1573,7 +1624,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (!complex && elem.getPath().endsWith(".extension"))
       return;
     
-    if (elem.getMax().equals("0"))
+    if ("0".equals(elem.getMax()))
       return;
     
     String indentS = "";
