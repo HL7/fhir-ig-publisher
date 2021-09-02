@@ -118,6 +118,7 @@ public class HTLMLInspector {
     private boolean exempt;
     private String path;
     private boolean hasXhtml;
+    private int id = 0;
 
     public LoadedFile(String filename, String path, long lastModified, int iteration, Boolean hl7State, boolean exempt, boolean hasXhtml) {
       this.filename = filename;
@@ -159,6 +160,11 @@ public class HTLMLInspector {
 
     public boolean isHasXhtml() {
       return hasXhtml;
+    }
+
+    public String getNextId() {
+      id++;
+      return Integer.toString(id );
     }
     
   }
@@ -269,7 +275,7 @@ public class HTLMLInspector {
       if (lf.isHasXhtml()) {
         XhtmlNode x = new XhtmlParser().setMustBeWellFormed(strict).parse(new FileInputStream(lf.filename), null);
         referencesValidatorPack = false;
-        if (checkLinks(s, "", x, null, messages, false) != NodeChangeType.NONE) { // returns true if changed
+        if (checkLinks(lf, s, "", x, null, messages, false) != NodeChangeType.NONE) { // returns true if changed
           saveFile(lf, x);
         }
         if (referencesValidatorPack) {
@@ -490,7 +496,7 @@ public class HTLMLInspector {
       listTargets(c, targets);
   }
 
-  private NodeChangeType checkLinks(String s, String path, XhtmlNode x, String uuid, List<ValidationMessage> messages, boolean inPre) throws IOException {
+  private NodeChangeType checkLinks(LoadedFile lf, String s, String path, XhtmlNode x, String uuid, List<ValidationMessage> messages, boolean inPre) throws IOException {
     boolean changed = false;
     if (x.getName() != null) {
       path = path + "/"+ x.getName();
@@ -514,11 +520,11 @@ public class HTLMLInspector {
     if ("script".equals(x.getName())) {
       checkScriptElement(s, x.getLocation(), path, x, messages);
     }
-    String nuid = UUID.randomUUID().toString().toLowerCase();
+    String nuid = genID(lf);
     boolean nchanged = false;
     boolean nSelfChanged = false;
     for (XhtmlNode c : x.getChildNodes()) { 
-      NodeChangeType ct = checkLinks(s, path, c, nuid, messages, inPre || "pre".equals(x.getName()));
+      NodeChangeType ct = checkLinks(lf, s, path, c, nuid, messages, inPre || "pre".equals(x.getName()));
       if (ct == NodeChangeType.SELF) {
         nSelfChanged = true;
         nchanged = true;
@@ -537,6 +543,10 @@ public class HTLMLInspector {
       return NodeChangeType.CHILD;
     else
       return NodeChangeType.NONE;
+  }
+
+  public String genID(LoadedFile lf) {
+    return "l"+lf.getNextId(); // UUID.randomUUID().toString().toLowerCase();
   }
 
   private void checkScriptElement(String filename, Location loc, String path, XhtmlNode x, List<ValidationMessage> messages) {
