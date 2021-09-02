@@ -2072,7 +2072,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (!examples.isEmpty())
       b.append(" <li>Examples for this "+sd.describeType()+": "+refList(examples)+"</li>\r\n");
     if (base.isEmpty() && refs.isEmpty() && trefs.isEmpty() && examples.isEmpty())
-      b.append(" <li>This "+sd.describeType()+" is not used in this Implementation Guide</li>\r\n");
+      b.append(" <li>This "+sd.describeType()+" is not used by any profiles in this Implementation Guide</li>\r\n");
     b.append("</ul>\r\n");
     return b.toString();
   }
