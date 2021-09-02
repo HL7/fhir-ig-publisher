@@ -72,6 +72,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private class ProfileSignpostBuilder {
 
     private StringBuilder output = new StringBuilder();
+    private int count;
 
     private Integer analyseLoc(String location) {
       if (location.startsWith("Bundle/") && location.contains(".entry[")) {
@@ -103,6 +104,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
 
 
     public void analyse(FetchedResource r, boolean only) {
+      count = 0;
       Element e = r.getElement();
       String root = only ? "" : r.fhirType() + "/"+r.getId()+": ";
       StringBuilder b = new StringBuilder();
@@ -146,6 +148,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
           } 
           if (!list.contains(l)) {
             list.add(l);
+            count++;
           }
         } else {
           others.add(vm.getMessage());
@@ -200,7 +203,10 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       }
       return b.toString();
     }
-
+    
+    public int count() {
+      return count;
+    }
 
   }
 
@@ -405,9 +411,11 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       id++;
     }
     b.append(genEnd());
+    int i = 0;
     for (FetchedFile f : files) {
       if (allIssues || hasIssues(f, filteredMessages)) {
-        b.append(genStart(f));
+        i++;
+        b.append(genStart(f, i));
         if (countNonSignpostMessages(f, filteredMessages))
           b.append(startTemplateErrors);
         else
@@ -561,6 +569,8 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       "  <link href=\"fhir.css\" rel=\"stylesheet\"/>\r\n"+
       "  <style>\r\n"+
       "    span.flip  { background-color: #4CAF50; color: white; border: solid 1px #a6d8a8; padding: 2px }\r\n"+
+      "    span.toggle  { background-color: #e6f2ff; color: black; border: solid 1px #0056b3; padding: 2px; font-size: 10px }\r\n"+
+      "    span.toggle  { font-size: 10px }\r\n"+
       "  </style>\r\n"+
       "  <script>\r\n"+
       "    function flip(id) {\r\n"+
@@ -572,6 +582,17 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       "      } else {\r\n"+
       "        div.style.display = 'none';\r\n"+
       "        span.innerHTML = 'Show Reasoning';\r\n"+
+      "      }\r\n"+
+      "    }\r\n"+
+      "    function toggle(id) {\r\n"+
+      "      var span = document.getElementById('s'+id);\r\n"+
+      "      var div = document.getElementById(id);\r\n"+
+      "      if (document.getElementById('s'+id).innerHTML == 'Show Validation Information') {\r\n"+
+      "        div.style.display = 'block';\r\n"+
+      "        span.innerHTML = 'Hide Validation Information';\r\n"+
+      "      } else {\r\n"+
+      "        div.style.display = 'none';\r\n"+
+      "        span.innerHTML = 'Show Validation Information';\r\n"+
       "      }\r\n"+
       "    }\r\n"+
       "  </script>\r\n"+
@@ -611,8 +632,8 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private final String startTemplate = 
       "<hr/>\r\n"+
       "<a name=\"$link$\"> </a>\r\n"+
-      "<h2><a href=\"$xlink$\">$path$</a></h2>\r\n"+
-      " $signposts$\r\n"+
+      "<h2><a href=\"$xlink$\">$path$</a> <span id=\"sv$id$\" class=\"toggle\" onclick=\"toggle('v$id$')\">Show Validation Information</span> <span class=\"vcount\" onclick=\"toggle('v$id$')\">$vsumm$</span></h2>\r\n"+
+      " <div style=\"border: 1px grey solid; display: none\" id=\"v$id$\">$signposts$</div>\r\n"+
       " <table class=\"grid\">\r\n";
   
   private final String groupStartTemplate = 
@@ -899,8 +920,9 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     return Integer.toString(c);
   }
 
-  private String genStart(FetchedFile f) {
+  private String genStart(FetchedFile f, int i) {
     ST t = template(startTemplate);
+    t.add("id", "i"+Integer.toString(i));
     t.add("link", makelink(f));
     t.add("filename", f.getName());
     t.add("path", makeLocal(f.getPath()));
@@ -922,6 +944,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     } else {
       t.add("signposts", "");      
     }
+    t.add("vsumm", "("+Integer.toString(psb.count())+")");            
     t.add("xlink", link);
     return t.render();
   }
