@@ -210,6 +210,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
         res.append("</p>");        
       }
+      
       if (!refs.isEmpty()) {
         res.append("<p><b>"+translate("sd.summary", "Structures")+"</b></p>\r\n<p>"+translate("sd.summary", "This structure refers to these other structures")+":</p>\r\n<ul>\r\n");
         for (String s : refs)
@@ -313,7 +314,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     StructureDefinition ed = context.fetchResource(StructureDefinition.class, url);
     if (ed == null)
       return "<li>"+translate("sd.summary", "unable to summarise profile %s (no profile found)",url)+"</li>";
-    return "<li><a href=\""+Utilities.escapeXml(ed.getUserString("path"))+"\">"+url+"</a></li>\r\n";    
+    return "<li><a href=\""+Utilities.escapeXml(ed.getUserString("path"))+"\">"+ed.present()+" <span style=\"font-size: 8px\">("+url+")</span></a></li>\r\n";    
   }
 
   private String summariseValue(DataType fixed) throws FHIRException {

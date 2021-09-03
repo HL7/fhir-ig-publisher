@@ -948,7 +948,8 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("xlink", link);
     return t.render();
   }
-    private String genGroupStart(String n) {
+    
+  private String genGroupStart(String n) {
     ST t = template(groupStartTemplate);
     t.add("name", n);
     return t.render();
@@ -967,7 +968,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("path", "n/a");
     t.add("xlink", "");
     return t.render();
-  } 
+  }
 
   private String genStartTxtInternal() {
     ST t = template(startTemplateText);
