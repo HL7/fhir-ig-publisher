@@ -781,7 +781,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           }
         }
       } else {
-        log("Done"+(!publishing && mode != IGBuildMode.AUTOBUILD ? ". This IG has been built using the 'normal' process for local use. If building to host on an an external website, use the process documented [yet to be documented]])" : ""));
+        log("Done"+(!publishing && mode != IGBuildMode.AUTOBUILD ? ". This IG has been built using the 'normal' process for local use. If building to host on an an external website, use the process documented on the HL7 confluence." : ""));
+	      // process specifically published  https://confluence.hl7.org/pages/viewpage.action?pageId=104580055
       }
     }
     if (templateLoaded && new File(rootDir).exists()) {
