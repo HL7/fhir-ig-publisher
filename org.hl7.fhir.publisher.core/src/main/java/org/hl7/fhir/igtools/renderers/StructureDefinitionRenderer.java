@@ -637,7 +637,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return null;
   }
 
-  public String inv(boolean withHeadings, boolean diff) {
+  public String invOldMode(boolean withHeadings, boolean diff) {
     List<String> txlist = new ArrayList<String>();
     Map<String, List<ElementDefinitionConstraintComponent>> txmap = new HashMap<String, List<ElementDefinitionConstraintComponent>>();
     List<ElementDefinition> list = diff ? sd.getDifferential().getElement() : sd.getSnapshot().getElement();

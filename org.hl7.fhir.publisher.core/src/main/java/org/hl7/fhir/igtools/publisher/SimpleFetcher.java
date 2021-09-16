@@ -313,7 +313,7 @@ public class SimpleFetcher implements IFetchFile {
               boolean ok = false;
               if (!Utilities.existsInList(ext, "json", "ttl", "html", "txt"))
                 try {
-                  org.hl7.fhir.r5.elementmodel.Element e = new org.hl7.fhir.r5.elementmodel.XmlParser(context).parse(new FileInputStream(f));
+                  org.hl7.fhir.r5.elementmodel.Element e = new org.hl7.fhir.r5.elementmodel.XmlParser(context).parseSingle(new FileInputStream(f));
                   addFile(res, f, e, "application/fhir+xml");
                   count++;
                   ok = true;
@@ -325,7 +325,7 @@ public class SimpleFetcher implements IFetchFile {
                 }
               if (!ok && !Utilities.existsInList(ext, "xml", "ttl", "html", "txt")) {
                 try {
-                  org.hl7.fhir.r5.elementmodel.Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parse(new FileInputStream(fn));
+                  org.hl7.fhir.r5.elementmodel.Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parseSingle(new FileInputStream(fn));
                   addFile(res, f, e, "application/fhir+json");
                   count++;
                   ok = true;
@@ -338,7 +338,7 @@ public class SimpleFetcher implements IFetchFile {
               }
               if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt")) {
                 try {
-                  org.hl7.fhir.r5.elementmodel.Element e = new org.hl7.fhir.r5.elementmodel.TurtleParser(context).parse(new FileInputStream(fn));
+                  org.hl7.fhir.r5.elementmodel.Element e = new org.hl7.fhir.r5.elementmodel.TurtleParser(context).parseSingle(new FileInputStream(fn));
                   addFile(res, f, e, "application/fhir+turtle");
                   count++;
                   ok = true;

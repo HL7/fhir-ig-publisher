@@ -104,7 +104,7 @@ public class ValidationServices implements IValidatorResourceFetcher {
             s = npm.loadExampleResource(ul[0], ul[1]);
           }
           if (s != null)
-            return Manager.makeParser(context, FhirFormat.JSON).parse(s);
+            return Manager.makeParser(context, FhirFormat.JSON).parseSingle(s);
         }
       }
     }

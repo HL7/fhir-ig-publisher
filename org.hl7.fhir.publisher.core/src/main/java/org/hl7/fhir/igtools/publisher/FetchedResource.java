@@ -36,6 +36,7 @@ public class FetchedResource {
   private String id;
   private String title;
   private String type;
+  private String path; // where published
   private Resource resource;
   private Element element;
   private JsonObject config;
@@ -209,4 +210,14 @@ public class FetchedResource {
   public void setProvenance(boolean isProvenance) {
     this.isProvenance = isProvenance;
   }
+
+  public String getPath() {
+    return path;
+  }
+
+  public void setPath(String path) {
+    this.path = path;
+  }
+  
+  
 }

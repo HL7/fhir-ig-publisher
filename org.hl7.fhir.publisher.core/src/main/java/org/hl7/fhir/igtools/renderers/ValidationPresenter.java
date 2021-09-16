@@ -253,9 +253,12 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private String igRealmError;
   private String copyrightYear;
   private IWorkerContext context;
+  private List<FetchedResource> noNarratives;
+  private List<FetchedResource> noValidation;
 
   public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, String ballotCheck, 
-      String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, String dependencies, String csAnalysis, String versionRulesCheck, String copyrightYear, IWorkerContext context) {
+      String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, String dependencies, String csAnalysis, String versionRulesCheck, String copyrightYear, IWorkerContext context, 
+      List<FetchedResource> noNarratives, List<FetchedResource> noValidation) {
     super();
     this.statedVersion = statedVersion;
     this.igVersion = igVersion;
@@ -274,6 +277,8 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     this.versionRulesCheck = versionRulesCheck;
     this.copyrightYear = copyrightYear;
     this.context = context;
+    this.noNarratives = noNarratives;
+    this.noValidation = noValidation;
     determineCode();
   }
 
@@ -298,6 +303,15 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       this.igcode = "n/a";
     }
   }
+
+  public List<FetchedResource> getNoNarratives() {
+    return noNarratives;
+  }
+
+  public List<FetchedResource> getNoValidation() {
+    return noValidation;
+  }
+
 
   private List<FetchedFile> sorted(List<FetchedFile> files) {
     List<FetchedFile> list = new ArrayList<FetchedFile>();
@@ -611,6 +625,8 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       " <tr><td>Publication Rules:</td><td>Code = $igcode$. $ballotCheck$ $copyrightYearCheck$</td></tr>\r\n"+
       " <tr><td>HTA Analysis:</td><td>$csAnalysis$</td></tr>\r\n"+
       " <tr><td>Previous Version Comparison:</td><td> $previousVersion$</td></tr>\r\n"+
+      "$noNarrative$"+
+      "$noValidation$"+
       " <tr><td>Summary:</td><td> broken links = $links$, errors = $err$, warn = $warn$, info = $info$</td></tr>\r\n"+
       "</table>\r\n"+
       " <table class=\"grid\">\r\n"+
@@ -737,11 +753,28 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("otherFileName", allIssues ? "Errors Only" : "Full QA Report");
     t.add("otherFilePath", allIssues ? Utilities.getFileNameForName(Utilities.changeFileExt(path, ".min.html")) : Utilities.getFileNameForName(path));
     t.add("previousVersion", previousVersionComparator.checkHtml());
+    t.add("noNarrative", genResourceList(noNarratives, "Narratives Suppressed"));
+    t.add("noValidation", genResourceList(noValidation, "Validation Suppressed"));
+
     if (msgCount == 0)
       t.add("suppressedmsgssummary", "No Suppressed Issues\r\n");
     else
       t.add("suppressedmsgssummary", "<a href=\"#suppressed\">"+msgCount+" Suppressed "+Utilities.pluralize("Issue", msgCount)+"</a>\r\n");
     return t.render();
+  }
+
+  private String genResourceList(List<FetchedResource> list, String name) {
+    if (list == null || list.size() == 0) {
+      return "";
+    }
+    StringBuilder b = new StringBuilder();
+    b.append("<tr><td>"+name+"</td><td>");
+    boolean first = true;
+    for (FetchedResource r : list) {
+      if (first) first = false; else b.append(", ");
+      b.append("<a href=\""+r.getPath()+"\">"+r.fhirType()+"/"+r.getId()+"</a>");
+    }
+    return b.toString();
   }
 
   private String genHeaderTxt(String title, int err, int warn, int info) {

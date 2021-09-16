@@ -542,6 +542,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private Publisher childPublisher = null;
   private GenerationTool tool;
   private boolean genExampleNarratives = true;
+  private List<String> noNarratives = new ArrayList<>();
+  private List<FetchedResource> noNarrativeResources = new ArrayList<>();
+  private List<String> noValidate = new ArrayList<>();
+  private List<FetchedResource> noValidateResources = new ArrayList<>();
 
   private List<String> resourceDirs = new ArrayList<String>();
   private List<String> pagesDirs = new ArrayList<String>();
@@ -775,7 +779,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
                 bc.check(igpkp.getCanonical(), npmName, workingVersion(), historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator,
                 new DependencyRenderer(pcm, outputDir, npmName, templateManager).render(publishedIg), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
-                new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate(), copyrightYear, context);
+                new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate(), copyrightYear, context,
+                    noNarrativeResources, noValidateResources);
             log("Finished. "+Utilities.presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
             recordOutcome(null, val);
           }
@@ -911,7 +916,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), rootDir, npmName, childPublisher == null? null : childPublisher.npmName, 
           bc.check(igpkp.getCanonical(), npmName, workingVersion(), historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator,
           new DependencyRenderer(pcm, outputDir, npmName, templateManager).render(publishedIg), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
-          new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate(), copyrightYear, context);
+          new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate(), copyrightYear, context, noNarrativeResources, noValidateResources);
       tts.end();
       if (isChild()) {
         log("Finished. "+tt.report());      
@@ -1154,40 +1159,49 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {        
         if (r.getExampleUri()==null || genExampleNarratives) {
-          logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId());
-          if (r.getResource() != null && isConvertableResource(r.getResource().fhirType())) {
-            boolean regen = false;
-            rc.setDefinitionsTarget(igpkp.getDefinitionsName(r));
-            if (r.getResource() instanceof DomainResource && !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv())) {
-              regen = true;
-              RendererFactory.factory(r.getResource(), rc).render((DomainResource) r.getResource());
-            } else if (r.getResource() instanceof Bundle) {
-              regen = true;
-              new BundleRenderer(rc).render((Bundle) r.getResource());
-            } else if (r.getResource() instanceof Parameters) {
-              regen = true;
-              Parameters p = (Parameters) r.getResource();
-              new ParametersRenderer(rc, new ResourceContext(ResourceContextType.PARAMETERS , p, null)).render(p);
-            } else if (r.getResource() instanceof DomainResource) {
-              checkExistingNarrative(f, r, ((DomainResource) r.getResource()).getText().getDiv());
+          if (!passesNarrativeFilter(r)) {
+            noNarrativeResources.add(r);
+            logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId()+" suppressed");
+            if (r.getResource() != null && r.getResource() instanceof DomainResource) {
+              ((DomainResource) r.getResource()).setText(null);
             }
-            if (regen)
-              r.setElement(convertToElement(r.getResource()));
+            r.getElement().removeChild("text");
           } else {
-            RenderingContext lrc = rc.copy().setParser(getTypeLoader(f,r));
-            if ("http://hl7.org/fhir/StructureDefinition/DomainResource".equals(r.getElement().getProperty().getStructure().getBaseDefinition()) && !hasNarrative(r.getElement())) {
-              ResourceWrapper rw = new ElementWrappers.ResourceWrapperMetaElement(lrc, r.getElement());
-              RendererFactory.factory(rw, lrc).render(rw);
-            } else if (r.fhirType().equals("Bundle")) {
-              for (Element e : r.getElement().getChildrenByName("entry")) {
-                Element res = e.getNamedChild("resource");
-                if (res!=null && "http://hl7.org/fhir/StructureDefinition/DomainResource".equals(res.getProperty().getStructure().getBaseDefinition()) && !hasNarrative(res)) {
-                  ResourceWrapper rw = new ElementWrappers.ResourceWrapperMetaElement(lrc, res);
-                  RendererFactory.factory(rw, lrc, new ResourceContext(ResourceContextType.BUNDLE, r.getElement(), res)).render(rw);
-                }
+            logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId());
+            if (r.getResource() != null && isConvertableResource(r.getResource().fhirType())) {
+              boolean regen = false;
+              rc.setDefinitionsTarget(igpkp.getDefinitionsName(r));
+              if (r.getResource() instanceof DomainResource && !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv())) {
+                regen = true;
+                RendererFactory.factory(r.getResource(), rc).render((DomainResource) r.getResource());
+              } else if (r.getResource() instanceof Bundle) {
+                regen = true;
+                new BundleRenderer(rc).render((Bundle) r.getResource());
+              } else if (r.getResource() instanceof Parameters) {
+                regen = true;
+                Parameters p = (Parameters) r.getResource();
+                new ParametersRenderer(rc, new ResourceContext(ResourceContextType.PARAMETERS , p, null)).render(p);
+              } else if (r.getResource() instanceof DomainResource) {
+                checkExistingNarrative(f, r, ((DomainResource) r.getResource()).getText().getDiv());
               }
-            } else if ("http://hl7.org/fhir/StructureDefinition/DomainResource".equals(r.getElement().getProperty().getStructure().getBaseDefinition()) && hasNarrative(r.getElement())) {
-              checkExistingNarrative(f, r, r.getElement().getNamedChild("text").getNamedChild("div").getXhtml());
+              if (regen)
+                r.setElement(convertToElement(r.getResource()));
+            } else {
+              RenderingContext lrc = rc.copy().setParser(getTypeLoader(f,r));
+              if ("http://hl7.org/fhir/StructureDefinition/DomainResource".equals(r.getElement().getProperty().getStructure().getBaseDefinition()) && !hasNarrative(r.getElement())) {
+                ResourceWrapper rw = new ElementWrappers.ResourceWrapperMetaElement(lrc, r.getElement());
+                RendererFactory.factory(rw, lrc).render(rw);
+              } else if (r.fhirType().equals("Bundle")) {
+                for (Element e : r.getElement().getChildrenByName("entry")) {
+                  Element res = e.getNamedChild("resource");
+                  if (res!=null && "http://hl7.org/fhir/StructureDefinition/DomainResource".equals(res.getProperty().getStructure().getBaseDefinition()) && !hasNarrative(res)) {
+                    ResourceWrapper rw = new ElementWrappers.ResourceWrapperMetaElement(lrc, res);
+                    RendererFactory.factory(rw, lrc, new ResourceContext(ResourceContextType.BUNDLE, r.getElement(), res)).render(rw);
+                  }
+                }
+              } else if ("http://hl7.org/fhir/StructureDefinition/DomainResource".equals(r.getElement().getProperty().getStructure().getBaseDefinition()) && hasNarrative(r.getElement())) {
+                checkExistingNarrative(f, r, r.getElement().getNamedChild("text").getNamedChild("div").getXhtml());
+              }
             }
           }
         } else {
@@ -1196,6 +1210,32 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
     tts.end();
+  }
+
+  private boolean passesNarrativeFilter(FetchedResource r) {
+    for (String s : noNarratives) {
+      String[] p = s.split("\\/");
+      if (p.length == 2) {
+        if (("*".equals(p[0]) || r.fhirType().equals(p[0])) &&
+            ("*".equals(p[1]) || r.getId().equals(p[1]))) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  private boolean passesValidationFilter(FetchedResource r) {
+    for (String s : noValidate) {
+      String[] p = s.split("\\/");
+      if (p.length == 2) {
+        if (("*".equals(p[0]) || r.fhirType().equals(p[0])) &&
+            ("*".equals(p[1]) || r.getId().equals(p[1]))) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   private void checkExistingNarrative(FetchedFile f, FetchedResource r, XhtmlNode xhtml) {
@@ -1722,6 +1762,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           genExampleNarratives = true;
         if ("examples".equals(p.getValue()))
           genExamples = true;
+      } else if (p.getCode().equals("no-narrative")) {
+        noNarratives.add(p.getValue());
+      } else if (p.getCode().equals("no-validate")) {
+        noValidate.add(p.getValue());
       } else if (p.getCode().equals("path-resource")) {
         resourceDirs.add(Utilities.path(rootDir, p.getValue()));
       } else if (p.getCode().equals("autoload-resources")) {     
@@ -4345,7 +4389,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     org.hl7.fhir.r5.elementmodel.XmlParser xp = new org.hl7.fhir.r5.elementmodel.XmlParser(context);
     xp.setAllowXsiLocation(true);
     xp.setupValidation(ValidationPolicy.EVERYTHING, file.getErrors());
-    Element res = xp.parse(new ByteArrayInputStream(file.getSource()));
+    Element res = xp.parseSingle(new ByteArrayInputStream(file.getSource()));
     if (res == null) {
       throw new Exception("Unable to parse XML for "+file.getName());
     }
@@ -4356,7 +4400,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(context);
     jp.setupValidation(ValidationPolicy.EVERYTHING, file.getErrors());
     jp.setAllowComments(true);
-    return jp.parse(new ByteArrayInputStream(file.getSource()));
+    return jp.parseSingle(new ByteArrayInputStream(file.getSource()));
   }
 
   private void saveToXml(FetchedFile file, Element e) throws Exception {
@@ -4395,7 +4439,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     xp.setAllowXsiLocation(true);
     xp.setupValidation(ValidationPolicy.EVERYTHING, file.getErrors());
     file.getErrors().clear();
-    Element res = xp.parse(new ByteArrayInputStream(dst.toByteArray()));
+    Element res = xp.parseSingle(new ByteArrayInputStream(dst.toByteArray()));
     if (res == null) {
       throw new Exception("Unable to parse XML for "+file.getName());
     }
@@ -4969,6 +5013,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void validate(FetchedFile file, FetchedResource r) throws Exception {
+    if (!passesValidationFilter(r)) {
+      noValidateResources.add(r);
+      return;
+    }
     Session tts = tt.start("validation");
     List<ValidationMessage> errs = new ArrayList<ValidationMessage>();
     r.getElement().setUserData("igpub.context.file", file);
@@ -4976,7 +5024,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (r.isValidateAsResource()) { 
       Resource res = r.getResource();
       if (res instanceof Bundle) {
-        validator.validate(r.getElement(), errs, r.getElement());
+        validator.validate(r.getElement(), errs, null, r.getElement());
 
         for (BundleEntryComponent be : ((Bundle) res).getEntry()) {
           Resource ber = be.getResource();
@@ -4998,9 +5046,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (!Utilities.isAbsoluteUrl(ref)) {
           ref = Utilities.pathURL(igpkp.getCanonical(), ref);
         }
-        validator.validate(r.getElement(), errs, r.getElement(), ref);
+        validator.validate(r.getElement(), errs, null, r.getElement(), ref);
       } else {
-        validator.validate(r.getElement(), errs, r.getElement());
+        validator.validate(r.getElement(), errs, null, r.getElement());
       }
     }
     for (ValidationMessage vm : errs) {
@@ -5369,7 +5417,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       jp.compose(bs, res);
     }
     ByteArrayInputStream bi = new ByteArrayInputStream(bs.toByteArray());
-    return new org.hl7.fhir.r5.elementmodel.JsonParser(context).parse(bi);
+    return new org.hl7.fhir.r5.elementmodel.JsonParser(context).parseSingle(bi);
   }
 
   private Resource convertFromElement(Element res) throws IOException, org.hl7.fhir.exceptions.FHIRException, FHIRFormatError, DefinitionException {
@@ -7324,18 +7372,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     String baseName = igpkp.getProperty(r, "base");
     if (r.getResource() != null && r.getResource() instanceof StructureDefinition) {
       if (igpkp.hasProperty(r, "template-base-"+((StructureDefinition) r.getResource()).getKind().toCode().toLowerCase(), null))
-        genWrapper(f, r, igpkp.getProperty(r, "template-base-"+((StructureDefinition) r.getResource()).getKind().toCode().toLowerCase()), baseName, f.getOutputNames(), vars, null, "");
+        genWrapper(f, r, igpkp.getProperty(r, "template-base-"+((StructureDefinition) r.getResource()).getKind().toCode().toLowerCase()), baseName, f.getOutputNames(), vars, null, "", true);
       else
-        genWrapper(f, r, igpkp.getProperty(r, "template-base"), baseName, f.getOutputNames(), vars, null, "");
+        genWrapper(f, r, igpkp.getProperty(r, "template-base"), baseName, f.getOutputNames(), vars, null, "", true);
     } else
-      genWrapper(f, r, igpkp.getProperty(r, "template-base"), baseName, f.getOutputNames(), vars, null, "");
-    genWrapper(null, r, igpkp.getProperty(r, "template-defns"), igpkp.getProperty(r, "defns"), f.getOutputNames(), vars, null, "definitions");
+      genWrapper(f, r, igpkp.getProperty(r, "template-base"), baseName, f.getOutputNames(), vars, null, "", true);
+    genWrapper(null, r, igpkp.getProperty(r, "template-defns"), igpkp.getProperty(r, "defns"), f.getOutputNames(), vars, null, "definitions", false);
     for (String templateName : extraTemplates.keySet()) {
       if (!templateName.equals("format") && !templateName.equals("defns")) {
         String output = igpkp.getProperty(r, templateName);
          if (output == null)
           output = r.fhirType()+"-"+r.getId()+"-"+templateName+".html";
-        genWrapper(null, r, igpkp.getProperty(r, "template-"+templateName), output, f.getOutputNames(), vars, null, templateName);
+        genWrapper(null, r, igpkp.getProperty(r, "template-"+templateName), output, f.getOutputNames(), vars, null, templateName, false);
       }
     }
   }
@@ -7359,16 +7407,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     String template = igpkp.getProperty(r, "template-format");
     if (igpkp.wantGen(r, "xml")) {
       if (tool == GenerationTool.Jekyll)
-        genWrapper(null, r, template, igpkp.getProperty(r, "format"), f.getOutputNames(), vars, "xml", "");
+        genWrapper(null, r, template, igpkp.getProperty(r, "format"), f.getOutputNames(), vars, "xml", "", false);
     }
     if (igpkp.wantGen(r, "json")) {
       if (tool == GenerationTool.Jekyll)
-        genWrapper(null, r, template, igpkp.getProperty(r, "format"), f.getOutputNames(), vars, "json", "");
+        genWrapper(null, r, template, igpkp.getProperty(r, "format"), f.getOutputNames(), vars, "json", "", false);
     } 
 
     if (igpkp.wantGen(r, "ttl")) {
       if (tool == GenerationTool.Jekyll)
-        genWrapper(null, r, template, igpkp.getProperty(r, "format"), f.getOutputNames(), vars, "ttl", "");
+        genWrapper(null, r, template, igpkp.getProperty(r, "format"), f.getOutputNames(), vars, "ttl", "", false);
     }
 
     org.hl7.fhir.r5.elementmodel.XmlParser xp = new org.hl7.fhir.r5.elementmodel.XmlParser(context);
@@ -7627,7 +7675,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return b.toString();
   }
 
-  private void genWrapper(FetchedFile ff, FetchedResource r, String template, String outputName, Set<String> outputTracker, Map<String, String> vars, String format, String extension) throws FileNotFoundException, IOException, FHIRException {
+  private void genWrapper(FetchedFile ff, FetchedResource r, String template, String outputName, Set<String> outputTracker, Map<String, String> vars, String format, String extension, boolean recordPath) throws FileNotFoundException, IOException, FHIRException {
     if (template != null && !template.isEmpty()) {
       boolean existsAsPage = false;
       if (ff != null) {
@@ -7654,6 +7702,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         outputName = determineOutputName(outputName, r, vars, format, extension);
         if (!outputName.contains("#")) {
           String path = Utilities.path(tempDir, outputName);
+          if (recordPath)
+            r.setPath(outputName);
           checkMakeFile(TextFile.stringToBytes(template, false), path, outputTracker);
         }
       }
@@ -7931,9 +7981,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "tx-diff-must-support"))
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx-diff-must-support", sdr.txDiff(includeHeadings, true), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "inv-diff"))
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-inv-diff", sdr.inv(includeHeadings, true), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-inv-diff", sdr.invOldMode(includeHeadings, true), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "inv"))
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-inv", sdr.inv(includeHeadings, false), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-inv", sdr.invOldMode(includeHeadings, false), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "dict"))
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-dict", sdr.dict(true), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "dict-active"))
@@ -8551,6 +8601,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       if (hasNamedParam(args, "-api-key-file")) {
         self.apiKeyFile = new IniFile(new File(getNamedParam(args, "-api-key-file")).getAbsolutePath());
+      }
+
+      if (hasNamedParam(args, "-no-narrative")) {
+        for (String p : getNamedParam(args, "-non-narrative").split("\\,")) {
+          self.noNarratives.add(p);
+        }
+      }
+      if (hasNamedParam(args, "-no-validate")) {
+        for (String p : getNamedParam(args, "-non-validate").split("\\,")) {
+          self.noValidate.add(p);
+        }
       }
 
       setTxServerValue(args, self);
