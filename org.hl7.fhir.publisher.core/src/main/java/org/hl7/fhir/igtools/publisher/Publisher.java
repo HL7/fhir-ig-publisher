@@ -719,6 +719,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private String copyrightYear;
 
+  private boolean noValidation;
+  private boolean noGenerate;
+
   
   private class PreProcessInfo {
     private String xsltName;
@@ -780,7 +783,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                 bc.check(igpkp.getCanonical(), npmName, workingVersion(), historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator,
                 new DependencyRenderer(pcm, outputDir, npmName, templateManager).render(publishedIg), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
                 new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate(), copyrightYear, context,
-                    noNarrativeResources, noValidateResources);
+                    noNarrativeResources, noValidateResources, noValidation, noGenerate);
             log("Finished. "+Utilities.presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
             recordOutcome(null, val);
           }
@@ -916,7 +919,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), rootDir, npmName, childPublisher == null? null : childPublisher.npmName, 
           bc.check(igpkp.getCanonical(), npmName, workingVersion(), historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator,
           new DependencyRenderer(pcm, outputDir, npmName, templateManager).render(publishedIg), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
-          new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate(), copyrightYear, context, noNarrativeResources, noValidateResources);
+          new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate(), copyrightYear, context, noNarrativeResources, noValidateResources, noValidation, noGenerate);
       tts.end();
       if (isChild()) {
         log("Finished. "+tt.report());      
@@ -4898,6 +4901,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void validate() throws Exception {
+    if (noValidation) {
+      return;
+    }
+    
     for (FetchedFile f : fileList) {
       logDebugMessage(LogCategory.PROGRESS, " .. validate "+f.getName());
       if (firstExecution) {
@@ -5157,10 +5164,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       createToc(childPublisher.getPublishedIg().getDefinition().getPage(), igArtifactsPage, nestedIgOutput);
     }
     fixSearchForm();
-    templateBeforeJekyll();
+    if (!noGenerate) {
+      templateBeforeJekyll();
+    }
 
     if (runTool()) {
-      templateOnCheck();
+      if (!noGenerate) {
+        templateOnCheck();
+      }
 
       if (!changeList.isEmpty()) {
         File df = makeSpecFile();
@@ -5203,7 +5214,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               
       realmRules.addOtherFiles(inspector.getExceptions(), outputDir);
       previousVersionComparator.addOtherFiles(inspector.getExceptions(), outputDir);
-      List<ValidationMessage> linkmsgs = inspector.check(statusMessage);
+      List<ValidationMessage> linkmsgs = noGenerate ? new ArrayList<ValidationMessage>() : inspector.check(statusMessage);
       int bl = 0;
       int lf = 0;
       for (ValidationMessage m : ValidationPresenter.filterMessages(linkmsgs, true, suppressedMessages)) {
@@ -5767,6 +5778,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private boolean runTool() throws Exception {
+    if (noGenerate) {
+      FileUtils.copyDirectory(new File(tempDir), new File(outputDir));
+      return true;
+    }
     switch (tool) {
     case Jekyll: return runJekyll();
     default:
@@ -6845,6 +6860,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }    
   }
   private void generateHtmlOutputs(FetchedFile f, boolean regen) throws Exception {
+    if (noGenerate) {
+      return;
+    }
+    
     if (f.getProcessMode() == FetchedFile.PROCESS_NONE) {
       String dst = tempDir;
       if (f.getRelativePath().startsWith(File.separator))
@@ -8612,6 +8631,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         for (String p : getNamedParam(args, "-non-validate").split("\\,")) {
           self.noValidate.add(p);
         }
+      }
+
+      if (hasNamedParam(args, "-validation-off")) {
+        self.noValidation = true;
+        System.out.println("Running without validation to shorten the run time (editor process only)");
+      }
+      if (hasNamedParam(args, "-generation-off")) {
+        self.noGenerate = true;
+        System.out.println("Running without generation to shorten the run time (editor process only)");
       }
 
       setTxServerValue(args, self);

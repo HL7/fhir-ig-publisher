@@ -255,10 +255,12 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private IWorkerContext context;
   private List<FetchedResource> noNarratives;
   private List<FetchedResource> noValidation;
+  private boolean noValidate;
+  private boolean noGenerate;
 
   public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, String ballotCheck, 
       String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, String dependencies, String csAnalysis, String versionRulesCheck, String copyrightYear, IWorkerContext context, 
-      List<FetchedResource> noNarratives, List<FetchedResource> noValidation) {
+      List<FetchedResource> noNarratives, List<FetchedResource> noValidation, boolean noValidate, boolean noGenerate) {
     super();
     this.statedVersion = statedVersion;
     this.igVersion = igVersion;
@@ -279,6 +281,8 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     this.context = context;
     this.noNarratives = noNarratives;
     this.noValidation = noValidation;
+    this.noValidate = noValidate;
+    this.noGenerate = noGenerate;
     determineCode();
   }
 
@@ -614,6 +618,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       "<body style=\"margin: 20px; background-color: #ffffff\">\r\n"+
       " <h1>Validation Results for $title$</h1>\r\n"+
       " <p>Generated $time$, FHIR version $version$ for $packageId$#$igversion$ (canonical = <a href=\"$canonical$\">$canonical$</a> (<a href=\"$canonical$/history.html\">history</a>)). See <a href=\"$otherFilePath$\">$otherFileName$</a></p>\r\n"+
+      "$warning$"+
       "<table class=\"grid\">"+
       " <tr><td colspan=2><b>Quality Checks</b></td></tr>\r\n"+
       " <tr><td>Publisher Version:</td><td>$versionCheck$</td></tr>\r\n"+
@@ -704,7 +709,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       "=========================================\r\n\r\n"+
       "err = $err$, warn = $warn$, info = $info$\r\n"+
       "$versionCheck$\r\n"+
-      "Generated $time$. FHIR version $version$ for $packageId$#$igversion$ (canonical = $canonical$)\r\n\r\n";
+      "Generated $time$. FHIR version $version$ for $packageId$#$igversion$ (canonical = $canonical$)\r\n$warning$\r\n";
   
   private final String summaryTemplateText = 
       " $filename$ : $errcount$ / $warningcount$ / $infocount$\r\n";
@@ -755,6 +760,17 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("previousVersion", previousVersionComparator.checkHtml());
     t.add("noNarrative", genResourceList(noNarratives, "Narratives Suppressed"));
     t.add("noValidation", genResourceList(noValidation, "Validation Suppressed"));
+    if (noGenerate || noValidate) {
+      if (noGenerate && noValidate) {
+        t.add("warning", "<p style=\"color: maroon; font-weight: bold\">Warning: This IG was generated with both validation and HTML generation off. Many kinds of errors will not be reported.</p>\r\n");        
+      } else if (noGenerate) {
+        t.add("warning", "<p style=\"color: maroon; font-weight: bold\">Warning: This IG was generated with HTML generation off. Some kinds of errors will not be reported.</p>\r\n");        
+      } else {
+        t.add("warning", "<p style=\"color: maroon; font-weight: bold\">Warning: This IG was generated with validation off. Many kinds of errors will not be reported.</p>\r\n");        
+      }      
+    } else {
+      t.add("warning", "");
+    }
 
     if (msgCount == 0)
       t.add("suppressedmsgssummary", "No Suppressed Issues\r\n");
@@ -801,6 +817,17 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("versionRulesCheck", versionRulesCheck);
     t.add("csAnalysis", csAnalysis);
     t.add("previousVersion", previousVersionComparator.checkHtml());
+    if (noGenerate || noValidate) {
+      if (noGenerate && noValidate) {
+        t.add("warning", "Warning: This IG was generated with both validation and HTML generation off. Many kinds of errors will not be reported.\r\n");        
+      } else if (noGenerate) {
+        t.add("warning", "Warning: This IG was generated with HTML generation off. Some kinds of errors will not be reported.\r\n");        
+      } else {
+        t.add("warning", "Warning: This IG was generated with validation off. Many kinds of errors will not be reported.\r\n");        
+      }      
+    } else {
+      t.add("warning", "");
+    }
     return t.render();
   }
 

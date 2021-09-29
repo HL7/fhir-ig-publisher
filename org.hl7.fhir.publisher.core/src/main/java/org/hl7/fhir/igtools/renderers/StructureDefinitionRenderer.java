@@ -73,11 +73,13 @@ import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.utils.ElementDefinitionUtilities;
+import org.hl7.fhir.r5.utils.PublicationHacker;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.npm.PackageHacker;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 
 public class StructureDefinitionRenderer extends CanonicalRenderer {
@@ -1162,7 +1164,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       // return TerminologyNotesGenerator.describeBinding(prefix, d.getBinding(), page);
       ElementDefinitionBindingComponent def = d.getBinding();
       if (!def.hasValueSet()) 
-        return processMarkdown("Binding.description", def.getDescriptionElement());
+        return processMarkdown("Binding.description", PublicationHacker.fixBindingDescriptions(context, def.getDescriptionElement()));
       BindingResolution br = igp.resolveBinding(sd, def, path);
       String s = conf(def)+ "<a href=\""+Utilities.escapeXml(br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>"+confTail(def);
       if (def.hasExtension(ToolingExtensions.EXT_MAX_VALUESET)) {
@@ -1178,7 +1180,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         s = s + (br.url == null ? processMarkdown("binding", br.display) : "<a href=\""+ (Utilities.isAbsoluteUrl(br.url) || !igp.prependLinks() ? Utilities.escapeXml(br.url) : corePath+br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>");
       }
       if (def.hasDescription()) {
-        String desc = processMarkdown("Binding.description", def.getDescriptionElement());
+        String desc = processMarkdown("Binding.description", PublicationHacker.fixBindingDescriptions(context, def.getDescriptionElement()));
         if (desc != null) {
           if (desc.length() > 4 && desc.substring(4).contains("<p>")) {
             s = s + "<br/>" + desc;
@@ -1190,6 +1192,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return s;
     }
   }
+
+
 
   private String stripPara(String s) {
     if (s.startsWith("<p>")) {
