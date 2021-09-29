@@ -2146,6 +2146,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return PackageHacker.fixPackageUrl("http://hl7.org/fhir/STU3");
     if (v.equals("4.0"))
       return PackageHacker.fixPackageUrl("http://hl7.org/fhir/R4");
+    if (v.equals("4.1"))
+      return PackageHacker.fixPackageUrl("http://hl7.org/fhir/2021Mar");
     return PackageHacker.fixPackageUrl("http://build.fhir.org");
   }
 

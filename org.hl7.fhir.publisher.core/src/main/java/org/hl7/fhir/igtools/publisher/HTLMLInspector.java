@@ -592,7 +592,7 @@ public class HTLMLInspector {
     if (!resolved && specs != null){
       for (SpecMapManager spec : specs) {
         if (!resolved && spec.getBase() != null) {
-          resolved = resolved || spec.getBase().equals(rref) || (spec.getBase()).equals(rref+"/") || spec.hasTarget(rref) || 
+          resolved = resolved || spec.getBase().equals(rref) || (spec.getBase()).equals(rref+"/") || (spec.getBase()+"/").equals(rref)|| spec.hasTarget(rref) || 
             Utilities.existsInList(rref, Utilities.pathURL(spec.getBase(), "definitions.json.zip"), Utilities.pathURL(spec.getBase(), "full-ig.zip"), Utilities.pathURL(spec.getBase(), "definitions.xml.zip"), Utilities.pathURL(spec.getBase(), "package.tgz"));
         }
         if (!resolved && spec.getBase2() != null) {
