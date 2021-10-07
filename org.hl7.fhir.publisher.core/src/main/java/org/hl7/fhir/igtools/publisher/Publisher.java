@@ -4910,6 +4910,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void validate() throws Exception {
+    if (noValidation) {
+      return;
+    }
     
     for (FetchedFile f : fileList) {
       logDebugMessage(LogCategory.PROGRESS, " .. validate "+f.getName());
