@@ -583,7 +583,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       BindingResolution br = igp.resolveBinding(sd, ToolingExtensions.readStringExtension(tx, ToolingExtensions.EXT_MAX_VALUESET), path);
       b.append("<br/>");
       b.append("<a style=\"font-weight:bold\" title=\"Max Value Set Extension\" href=\""+corePath+"extension-elementdefinition-maxvalueset.html\">Max Binding</a>: ");             
-      b.append((br.url == null ? processMarkdown("binding", br.display) : "<a href=\""+ Utilities.escapeXml((Utilities.isAbsoluteUrl(br.url) || !igp.prependLinks() ? br.url : corePath+br.url))+"\">"+Utilities.escapeXml(br.display)+"</a>"));
+      b.append((br.url == null ? processMarkdown("binding", br.display) : "<a href=\""+ Utilities.escapeXml((Utilities.isAbsoluteUrlLinkable(br.url) || !igp.prependLinks() ? br.url : corePath+br.url))+"\">"+Utilities.escapeXml(br.display)+"</a>"));
     }
     if (tx.hasExtension(ToolingExtensions.EXT_MIN_VALUESET)) {
       BindingResolution br = igp.resolveBinding(sd, ToolingExtensions.readStringExtension(tx, ToolingExtensions.EXT_MIN_VALUESET), path);
@@ -609,7 +609,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         BindingResolution br = igp.resolveActualUrl(uri);
         if (br.url == null)
           brd.vss = "<code>"+processMarkdown("binding", br.display)+"</code>";
-        else if (Utilities.isAbsoluteUrl(br.url))
+        else if (Utilities.isAbsoluteUrlLinkable(br.url))
           brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\""+Utilities.escapeXml(br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>";
         else {
           brd.vss = "<a style=\"opacity: "+opacityStr(inherited)+"\" href=\""+Utilities.escapeXml(prefix+br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>";
@@ -1171,13 +1171,13 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         br = igp.resolveBinding(sd, ToolingExtensions.readStringExtension(def, ToolingExtensions.EXT_MAX_VALUESET), path);
         s = s + "<br/>";
         s = s + "<a style=\"font-weight:bold\" title=\"Max Value Set Extension\" href=\""+corePath+"extension-elementdefinition-maxvalueset.html\">Max Binding</a>: ";             
-        s = s + (br.url == null ? processMarkdown("binding", br.display) : "<a href=\""+ (Utilities.isAbsoluteUrl(br.url) || !igp.prependLinks() ? Utilities.escapeXml(br.url) : corePath+br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>");
+        s = s + (br.url == null ? processMarkdown("binding", br.display) : "<a href=\""+ (Utilities.isAbsoluteUrlLinkable(br.url) || !igp.prependLinks() ? Utilities.escapeXml(br.url) : corePath+br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>");
       }
       if (def.hasExtension(ToolingExtensions.EXT_MIN_VALUESET)) {
         br = igp.resolveBinding(sd, ToolingExtensions.readStringExtension(def, ToolingExtensions.EXT_MIN_VALUESET), path);
         s = s + "<br/>";
         s = s + "<a style=\"font-weight:bold\" title=\"Min Value Set Extension\" href=\""+corePath+"extension-elementdefinition-minvalueset.html\">Min Binding</a>: ";             
-        s = s + (br.url == null ? processMarkdown("binding", br.display) : "<a href=\""+ (Utilities.isAbsoluteUrl(br.url) || !igp.prependLinks() ? Utilities.escapeXml(br.url) : corePath+br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>");
+        s = s + (br.url == null ? processMarkdown("binding", br.display) : "<a href=\""+ (Utilities.isAbsoluteUrlLinkable(br.url) || !igp.prependLinks() ? Utilities.escapeXml(br.url) : corePath+br.url)+"\">"+Utilities.escapeXml(br.display)+"</a>");
       }
       if (def.hasDescription()) {
         String desc = processMarkdown("Binding.description", PublicationHacker.fixBindingDescriptions(context, def.getDescriptionElement()));

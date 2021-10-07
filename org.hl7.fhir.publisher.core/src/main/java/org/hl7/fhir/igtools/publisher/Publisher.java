@@ -773,7 +773,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             loadConformance();
             generateNarratives();
             checkDependencies();
-            validate();
+            if (!noValidation) {
+              validate();
+            }
             generate();
             clean();
             long endTime = System.nanoTime();
@@ -903,12 +905,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       tts = tt.start("generate");
       log("Processing Conformance Resources");
       loadConformance();
-      log("Validating Resources");
-      try {
-        validate();
-      } catch (Exception ex){
-        log("Unhandled Exception: " +ex.toString());
-        throw(ex);
+      if (!noValidation) {
+        log("Validating Resources");
+        try {
+          validate();
+        } catch (Exception ex){
+          log("Unhandled Exception: " +ex.toString());
+          throw(ex);
+        }
       }
       log("Processing Provenance Records");
       processProvenanceDetails();
@@ -3968,9 +3972,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     generateSnapshots();
     log("Generating Narratives");
     generateNarratives();
-    log("Validating Conformance Resources");
-    for (String s : metadataResourceNames()) 
-      validate(s);
+    if (!noValidation) {
+      log("Validating Conformance Resources");
+      for (String s : metadataResourceNames()) {
+        validate(s);
+      }
+    }
     
     loadLists();
     checkConformanceResources();
@@ -4903,9 +4910,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void validate() throws Exception {
-    if (noValidation) {
-      return;
-    }
     
     for (FetchedFile f : fileList) {
       logDebugMessage(LogCategory.PROGRESS, " .. validate "+f.getName());
