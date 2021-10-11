@@ -119,6 +119,7 @@ public class BaseRenderer extends TranslatingUtilities {
 	        i--;
 	      }
 	    }
+	    text = ProfileUtilities.processRelativeUrls(text, "", corePath);
 	    // 3. markdown
 	    String s = markdownEngine.process(checkEscape(text), location);
 	    return s;
