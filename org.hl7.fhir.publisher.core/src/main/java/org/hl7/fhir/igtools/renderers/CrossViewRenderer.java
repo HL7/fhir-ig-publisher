@@ -469,7 +469,7 @@ public class CrossViewRenderer {
             if (cs != null)
               sys = cs.getTitle();
           }
-          ValidationResult vr = context.validateCode(ValidationOptions.defaults(), t.getSystem(), t.getCode(), null);
+          ValidationResult vr = context.validateCode(ValidationOptions.defaults(), t.getSystem(), t.getVersion(), t.getCode(), null);
           if (system != null) {
             if (vr != null & vr.getDisplay() != null) {
               b.append("<a href=\""+link+t.getCode()+"\" title=\""+vr.getDisplay()+"\">"+t.getCode()+"</a>");

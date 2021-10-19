@@ -525,6 +525,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   public static String txServerDev = "http://local.fhir.org:960";
   private static final int PRISM_SIZE_LIMIT = 16384;
 
+  private static final String FIXED_CACHE_VERSION = "2"; // invalidating validation cache becaise it was incomplete
+
   private String consoleLog;
   private String configFile;
   private String sourceDir;
@@ -1937,8 +1939,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else if (cacheOption == CacheOption.CLEAR_ERRORS) {
       log("Terminology Cache is at "+vsCache+". Clearing Errors now");
       logDebugMessage(LogCategory.INIT, "Deleted "+Integer.toString(clearErrors(vsCache))+" files");
-    } else
+    } else {
       log("Terminology Cache is at "+vsCache+". "+Integer.toString(Utilities.countFilesInDirectory(vsCache))+" files in cache");
+    }
     if (!new File(vsCache).exists())
       throw new Exception("Unable to access or create the cache directory at "+vsCache);
     logDebugMessage(LogCategory.INIT, "Load Terminology Cache from "+vsCache);
@@ -2679,16 +2682,25 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (Utilities.noString(version))
       return;
 
-    // we wipe the terminology cache if the terminology server cersion has changed
+    // we wipe the terminology cache if the terminology server version has changed
     File verFile = new File(Utilities.path(dir, "version.ctl"));
     if (verFile.exists()) {
       String ver = TextFile.fileToString(verFile);
-      if (!ver.equals(version)) {
-        logDebugMessage(LogCategory.INIT, "Terminology Server Version has changed from "+ver+" to "+version+", so clearing txCache");
+      if (!ver.equals(FIXED_CACHE_VERSION+"|"+version)) {
+        if (!ver.startsWith(FIXED_CACHE_VERSION+"|")) {
+          if (!ver.contains("|")) {
+            logDebugMessage(LogCategory.PROGRESS, "Terminology Cache Version has changed from 1 to "+FIXED_CACHE_VERSION+", so clearing txCache");
+          } else {
+            logDebugMessage(LogCategory.PROGRESS, "Terminology Cache Version has changed from "+ver.substring(0, ver.indexOf("|"))+" to "+FIXED_CACHE_VERSION+", so clearing txCache");
+          }
+        } else {
+          logDebugMessage(LogCategory.PROGRESS, "Terminology Server Version has changed from "+ver.substring(ver.indexOf("|")+1)+" to "+version+", so clearing txCache");
+        }
         Utilities.clearDirectory(dir);
+        context.clearTS();
       }
     }
-    TextFile.stringToFile(version, verFile, false);
+    TextFile.stringToFile(FIXED_CACHE_VERSION+"|"+version, verFile, false);
   }
 
 
