@@ -36,7 +36,6 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Paths;
@@ -59,9 +58,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 
 import javax.swing.UIManager;
@@ -81,15 +78,11 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.SystemUtils;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
-import org.hl7.fhir.convertors.conv10_50.VersionConvertor_10_50;
-import org.hl7.fhir.convertors.conv10_50.datatypes10_50.Type10_50;
-import org.hl7.fhir.convertors.conv14_30.VersionConvertor_14_30;
-import org.hl7.fhir.convertors.conv14_50.VersionConvertor_14_50;
-import org.hl7.fhir.convertors.conv14_50.datatypes14_50.Type14_50;
-import org.hl7.fhir.convertors.conv30_50.VersionConvertor_30_50;
-import org.hl7.fhir.convertors.conv30_50.datatypes30_50.Type30_50;
-import org.hl7.fhir.convertors.conv40_50.datatypes40_50.Type40_50;
-import org.hl7.fhir.convertors.factory.*;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_10_50;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_14_30;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_14_50;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
 import org.hl7.fhir.convertors.misc.NpmPackageVersionConverter;
 import org.hl7.fhir.convertors.txClient.TerminologyClientFactory;
 import org.hl7.fhir.exceptions.DefinitionException;
@@ -141,7 +134,6 @@ import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.Manager.FhirFormat;
 import org.hl7.fhir.r5.elementmodel.ObjectConverter;
 import org.hl7.fhir.r5.elementmodel.ParserBase.ValidationPolicy;
-import org.hl7.fhir.r5.elementmodel.TurtleParser;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.RdfParser;
@@ -241,21 +233,21 @@ import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator.Category;
 import org.hl7.fhir.r5.utils.OperationOutcomeUtilities;
 import org.hl7.fhir.r5.utils.ResourceSorters;
-import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
-import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.XVerExtensionManager;
 import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
+import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
+import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.utilities.CSFile;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.MimeType;
-import org.hl7.fhir.utilities.TimeTracker.Session;
 import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.TimeTracker;
+import org.hl7.fhir.utilities.TimeTracker.Session;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.ZipGenerator;
@@ -263,9 +255,9 @@ import org.hl7.fhir.utilities.json.JSONUtil;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.npm.PackageGenerator.PackageType;
 import org.hl7.fhir.utilities.npm.PackageHacker;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
-import org.hl7.fhir.utilities.npm.PackageGenerator.PackageType;
 import org.hl7.fhir.utilities.turtle.Turtle;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
@@ -524,6 +516,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   public static String txServerProd = "http://tx.fhir.org";
   public static String txServerDev = "http://local.fhir.org:960";
   private static final int PRISM_SIZE_LIMIT = 16384;
+
+  private static final String FIXED_CACHE_VERSION = "2"; // invalidating validation cache becaise it was incomplete
 
   private String consoleLog;
   private String configFile;
@@ -1937,8 +1931,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else if (cacheOption == CacheOption.CLEAR_ERRORS) {
       log("Terminology Cache is at "+vsCache+". Clearing Errors now");
       logDebugMessage(LogCategory.INIT, "Deleted "+Integer.toString(clearErrors(vsCache))+" files");
-    } else
+    } else {
       log("Terminology Cache is at "+vsCache+". "+Integer.toString(Utilities.countFilesInDirectory(vsCache))+" files in cache");
+    }
     if (!new File(vsCache).exists())
       throw new Exception("Unable to access or create the cache directory at "+vsCache);
     logDebugMessage(LogCategory.INIT, "Load Terminology Cache from "+vsCache);
@@ -2679,16 +2674,25 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (Utilities.noString(version))
       return;
 
-    // we wipe the terminology cache if the terminology server cersion has changed
+    // we wipe the terminology cache if the terminology server version has changed
     File verFile = new File(Utilities.path(dir, "version.ctl"));
     if (verFile.exists()) {
       String ver = TextFile.fileToString(verFile);
-      if (!ver.equals(version)) {
-        logDebugMessage(LogCategory.INIT, "Terminology Server Version has changed from "+ver+" to "+version+", so clearing txCache");
+      if (!ver.equals(FIXED_CACHE_VERSION+"|"+version)) {
+        if (!ver.startsWith(FIXED_CACHE_VERSION+"|")) {
+          if (!ver.contains("|")) {
+            logDebugMessage(LogCategory.PROGRESS, "Terminology Cache Version has changed from 1 to "+FIXED_CACHE_VERSION+", so clearing txCache");
+          } else {
+            logDebugMessage(LogCategory.PROGRESS, "Terminology Cache Version has changed from "+ver.substring(0, ver.indexOf("|"))+" to "+FIXED_CACHE_VERSION+", so clearing txCache");
+          }
+        } else {
+          logDebugMessage(LogCategory.PROGRESS, "Terminology Server Version has changed from "+ver.substring(ver.indexOf("|")+1)+" to "+version+", so clearing txCache");
+        }
         Utilities.clearDirectory(dir);
+        context.clearTS();
       }
     }
-    TextFile.stringToFile(version, verFile, false);
+    TextFile.stringToFile(FIXED_CACHE_VERSION+"|"+version, verFile, false);
   }
 
 

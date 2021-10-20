@@ -27,8 +27,8 @@ import java.util.List;
 
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
-import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.utilities.validation.ValidationMessage;
 
 import com.google.gson.JsonObject;
 
