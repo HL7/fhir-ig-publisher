@@ -32,7 +32,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.igtools.publisher.SpecMapManager.SpecialPackageType;
 import org.hl7.fhir.r5.model.Constants;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;

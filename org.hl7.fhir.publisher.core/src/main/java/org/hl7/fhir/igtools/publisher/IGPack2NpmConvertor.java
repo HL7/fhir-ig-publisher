@@ -39,7 +39,10 @@ import java.util.Scanner;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-import org.hl7.fhir.convertors.factory.*;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_10_50;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_14_50;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.JsonParser;
@@ -58,8 +61,8 @@ import org.hl7.fhir.r5.utils.NPMPackageGenerator.Category;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
-import org.hl7.fhir.utilities.npm.ToolsVersion;
 import org.hl7.fhir.utilities.npm.PackageGenerator.PackageType;
+import org.hl7.fhir.utilities.npm.ToolsVersion;
 
 public class IGPack2NpmConvertor {
 
