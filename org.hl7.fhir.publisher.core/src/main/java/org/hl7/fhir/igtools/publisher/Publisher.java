@@ -1954,10 +1954,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         txLog = null;
       } else {
         log("Connect to Terminology Server at "+txServer);
-        checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient(txServer, FhirPublication.fromCode(version)), txLog));
+        checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient(txServer, "fhir/publisher", FhirPublication.fromCode(version)), txLog));
       }
     } else 
-      checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient(webTxServer.getAddress(), FhirPublication.fromCode(version)), txLog));
+      checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient(webTxServer.getAddress(), "fhir/publisher", FhirPublication.fromCode(version)), txLog));
     
     loadPubPack();
     igpkp = new IGKnowledgeProvider(context, checkAppendSlash(specPath), determineCanonical(sourceIg.getUrl(), "ImplementationGuide.url"), template.config(), errors, VersionUtilities.isR2Ver(version), template, listedURLExemptions);
@@ -2339,14 +2339,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       } else {
         log("Connect to Terminology Server at "+txServer);
         try {
-          checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient(txServer, FhirPublication.fromCode(version)), txLog));
+          checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient(txServer, "fhir/publisher", FhirPublication.fromCode(version)), txLog));
         } catch (Exception e) {
           log("WARNING: Could not connect to terminology server - terminology content will likely not publish correctly ("+e.getMessage()+")");          
         }
       }
     } else 
       try {
-        checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient(webTxServer.getAddress(), FhirPublication.fromCode(version)), txLog));
+        checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient(webTxServer.getAddress(), "fhir/publisher", FhirPublication.fromCode(version)), txLog));
       } catch (Exception e) {
         log("WARNING: Could not connect to terminology server - terminology content will likely not publish correctly ("+e.getMessage()+")");          
       }
@@ -8073,7 +8073,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       String path = Utilities.path(tempDir, sdPrefix + r.getId()+".sch");
       f.getOutputNames().add(path);
       new ProfileUtilities(context, errors, igpkp).generateSchematrons(new FileOutputStream(path), sd);
-      npm.addFile(Category.SCHEMATRON, sdPrefix + r.getId()+".sch", IOUtils.toByteArray(Utilities.path(tempDir, sdPrefix + r.getId()+".sch")));
+      npm.addFile(Category.SCHEMATRON, sdPrefix + r.getId()+".sch", TextFile.fileToBytes(Utilities.path(tempDir, sdPrefix + r.getId()+".sch")));
     }
     if (igpkp.wantGen(r, "sch"))
       fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-sch", "yet to be done: schematron as html", null, f.getOutputNames());

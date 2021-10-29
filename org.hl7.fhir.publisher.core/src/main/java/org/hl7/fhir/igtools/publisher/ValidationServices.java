@@ -38,11 +38,14 @@ import org.hl7.fhir.r5.elementmodel.Manager.FhirFormat;
 import org.hl7.fhir.r5.elementmodel.ObjectConverter;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CodeSystem;
+import org.hl7.fhir.r5.model.NamingSystem;
 import org.hl7.fhir.r5.model.OperationDefinition;
 import org.hl7.fhir.r5.model.Questionnaire;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.ValueSet;
+import org.hl7.fhir.r5.model.NamingSystem.NamingSystemIdentifierType;
+import org.hl7.fhir.r5.model.NamingSystem.NamingSystemUniqueIdComponent;
 import org.hl7.fhir.r5.terminologies.ImplicitValueSets;
 import org.hl7.fhir.r5.utils.IResourceValidator;
 import org.hl7.fhir.r5.utils.IResourceValidator.IValidatorResourceFetcher;
@@ -194,6 +197,15 @@ public class ValidationServices implements IValidatorResourceFetcher {
       return true;
     }
     
+
+    for (CanonicalResource cr : context.allConformanceResources()) {
+      if (cr instanceof NamingSystem) {
+        if (hasURL((NamingSystem) cr, url)) {
+          return true;
+        }
+      }
+    }
+    
     if (url.startsWith("http://hl7.org/fhir"))
       try {
         return context.fetchResourceWithException(Resource.class, url) != null;
@@ -203,6 +215,16 @@ public class ValidationServices implements IValidatorResourceFetcher {
     // todo: what to do here?
     return true;
   }
+  
+  private boolean hasURL(NamingSystem ns, String url) {
+    for (NamingSystemUniqueIdComponent uid : ns.getUniqueId()) {
+      if (uid.getType() == NamingSystemIdentifierType.URI && uid.hasValue() && uid.getValue().equals(url)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
 
   public List<String> getOtherUrls() {
     return otherUrls;
