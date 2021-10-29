@@ -30,6 +30,7 @@ import org.hl7.fhir.dstu2.formats.JsonParser;
 import org.hl7.fhir.dstu2.model.StructureDefinition;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
+import org.hl7.fhir.igtools.publisher.utils.PackageReleaser.PackageReleaserScrubber;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.TextFile;
@@ -39,6 +40,7 @@ import org.hl7.fhir.utilities.json.JSONUtil;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.npm.NpmPackage.ITransformingLoader;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
 import org.hl7.fhir.utilities.xml.XMLUtil;
 import org.w3c.dom.Document;
@@ -53,6 +55,50 @@ import com.google.gson.JsonObject;
 
 public class PackageReleaser {
   
+  public class PackageReleaserScrubber implements ITransformingLoader {
+
+    private String ver;
+
+    public PackageReleaserScrubber(String ver) {
+      this.ver = ver;
+    }
+
+    @Override
+    public byte[] load(File f) {
+      try {
+        byte[] cnt = TextFile.fileToBytes(f);
+        if (!f.getName().endsWith(".json")) {
+          return cnt;
+        }
+        JsonObject json = JsonTrackingParser.parseJson(f);
+        byte[] cntp = JsonTrackingParser.writeBytes(json, true);
+        if (cntp != cnt) {
+          TextFile.bytesToFile(cntp, f);
+        }
+        cnt = JsonTrackingParser.writeBytes(json, false);
+        if (json.has("resourceType")) {
+          //  check that it's valid
+          if (VersionUtilities.isR2Ver(ver)) {
+            new org.hl7.fhir.dstu2.formats.JsonParser().parse(cnt);
+          } else if (VersionUtilities.isR2BVer(ver)) {
+            new org.hl7.fhir.dstu2016may.formats.JsonParser().parse(cnt);
+          } else if (VersionUtilities.isR3Ver(ver)) {
+            new org.hl7.fhir.dstu3.formats.JsonParser().parse(cnt);
+          } else if (VersionUtilities.isR4Ver(ver)) {
+            new org.hl7.fhir.r4.formats.JsonParser().parse(cnt);
+          } else if (VersionUtilities.isR5Ver(ver)) {
+            new org.hl7.fhir.r5.formats.JsonParser().parse(cnt);
+          } 
+        }
+        return cnt;
+      } catch (Exception e) {
+        throw new Error("Exception processing "+f.getAbsolutePath()+": "+e.getMessage(), e);
+      }
+      
+    }
+
+  }
+
   public enum VersionChangeType {
     NONE, PATCH, MINOR, MAJOR;
 
@@ -261,12 +307,16 @@ public class PackageReleaser {
       new File(Utilities.path(path, "output")).delete();
 
       NpmPackage npm = NpmPackage.fromFolder(path);
-      npm.loadAllFiles();
+      npm.loadAllFiles(makeLoader(npm.fhirVersion()));
       Utilities.createDirectory(Utilities.path(path, "output"));
       npm.save(new FileOutputStream(Utilities.path(path, "output", "package.tgz")));
     } catch (Throwable e) {
       throw new IOException("Error processing "+path+": "+e.getMessage(), e);
     }
+  }
+
+  private ITransformingLoader makeLoader(String ver) {
+    return new PackageReleaserScrubber(ver);
   }
 
   private void makeR2Structures(String path, String outVer) throws FHIRException, IOException {
