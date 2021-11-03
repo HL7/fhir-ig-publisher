@@ -40,6 +40,7 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Paths;
 import java.text.DateFormat;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -83,6 +84,7 @@ import org.hl7.fhir.convertors.factory.VersionConvertorFactory_14_30;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_14_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
+import org.hl7.fhir.convertors.misc.DicomPackageBuilder;
 import org.hl7.fhir.convertors.misc.NpmPackageVersionConverter;
 import org.hl7.fhir.convertors.txClient.TerminologyClientFactory;
 import org.hl7.fhir.exceptions.DefinitionException;
@@ -2875,7 +2877,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private Parameters makeExpProfile() {
     Parameters ep  = new Parameters();
-    ep.addParameter("profile-url", "dc8fd4bc-091a-424a-8a3b-6198ef146891"); // change this to blow the cache
+    ep.addParameter("x-system-cache-id", "dc8fd4bc-091a-424a-8a3b-6198ef146891"); // change this to blow the cache
     // all defaults....
     return ep;
   }
@@ -8469,6 +8471,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         NpmPackage npm = pcm.loadPackage(p);
         System.out.println("OK: "+npm.name()+"#"+npm.version()+" for FHIR version(s) "+npm.fhirVersionList()+" with canonical "+npm.canonical());
       }
+    } else if (hasNamedParam(args, "-dicom-gen")) {
+      DicomPackageBuilder pgen = new DicomPackageBuilder();
+      pgen.setSource(getNamedParam(args, "src"));
+      pgen.setDest(getNamedParam(args, "dst"));
+      if (hasNamedParam(args, "-pattern")) {
+        pgen.setPattern(getNamedParam(args, "-pattern"));
+      }
+      pgen.execute();
     } else if (hasNamedParam(args, "-help") || hasNamedParam(args, "-?") || hasNamedParam(args, "/?") || hasNamedParam(args, "?")) {
       System.out.println("");
       System.out.println("To use this publisher to publish a FHIR Implementation Guide, run ");

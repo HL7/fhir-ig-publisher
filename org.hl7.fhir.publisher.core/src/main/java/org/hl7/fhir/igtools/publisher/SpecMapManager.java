@@ -393,5 +393,13 @@ public class SpecMapManager {
     return res;
   }
 
+  public List<String> listTargets() {
+    List<String> res = new ArrayList<String>();
+    for (JsonElement n : targets) {
+      res.add(n.getAsString());
+    }
+    return res;
+  }
+
 
 }
