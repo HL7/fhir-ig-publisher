@@ -21,6 +21,7 @@ package org.hl7.fhir.igtools.renderers;
  */
 
 
+import java.util.Collections;
 import java.util.List;
 
 import org.hl7.fhir.exceptions.FHIRException;
@@ -119,7 +120,7 @@ public class BaseRenderer extends TranslatingUtilities {
 	        i--;
 	      }
 	    }
-	    text = ProfileUtilities.processRelativeUrls(text, "", corePath, context.getResourceNames());
+	    text = ProfileUtilities.processRelativeUrls(text, "", corePath, context.getResourceNames(), Collections.EMPTY_LIST);
 	    // 3. markdown
 	    String s = markdownEngine.process(checkEscape(text), location);
 	    return s;
