@@ -2,12 +2,12 @@ package org.hl7.fhir.igtools.publisher;
 
 import java.io.IOException;
 
-import org.hl7.fhir.convertors.loaders.BaseLoaderR5.ILoaderKnowledgeProvider;
-import org.hl7.fhir.convertors.loaders.R2016MayToR5Loader;
-import org.hl7.fhir.convertors.loaders.R2ToR5Loader;
-import org.hl7.fhir.convertors.loaders.R3ToR5Loader;
-import org.hl7.fhir.convertors.loaders.R4ToR5Loader;
-import org.hl7.fhir.convertors.loaders.R5ToR5Loader;
+import org.hl7.fhir.convertors.loaders.loaderR5.ILoaderKnowledgeProviderR5;
+import org.hl7.fhir.convertors.loaders.loaderR5.R2016MayToR5Loader;
+import org.hl7.fhir.convertors.loaders.loaderR5.R2ToR5Loader;
+import org.hl7.fhir.convertors.loaders.loaderR5.R3ToR5Loader;
+import org.hl7.fhir.convertors.loaders.loaderR5.R4ToR5Loader;
+import org.hl7.fhir.convertors.loaders.loaderR5.R5ToR5Loader;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.context.IWorkerContext.IContextResourceLoader;
 import org.hl7.fhir.r5.model.CanonicalResource;
@@ -19,7 +19,7 @@ import org.hl7.fhir.utilities.npm.NpmPackage;
 
 import com.google.gson.JsonSyntaxException;
 
-public class PublisherLoader implements ILoaderKnowledgeProvider {
+public class PublisherLoader implements ILoaderKnowledgeProviderR5 {
 
   private NpmPackage npm;
   private SpecMapManager spm;
@@ -182,7 +182,7 @@ public class PublisherLoader implements ILoaderKnowledgeProvider {
   }
 
   @Override
-  public ILoaderKnowledgeProvider forNewPackage(NpmPackage npm) throws JsonSyntaxException, IOException {
+  public ILoaderKnowledgeProviderR5 forNewPackage(NpmPackage npm) throws JsonSyntaxException, IOException {
     return new PublisherLoader(npm, SpecMapManager.fromPackage(npm), npm.getWebLocation(), igpkp);
   }
 
