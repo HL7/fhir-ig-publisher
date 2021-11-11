@@ -25,6 +25,7 @@ import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.JSONUtil;
+import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.hl7.fhir.utilities.npm.BasePackageCacheManager;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -161,7 +162,7 @@ public class PreviousVersionComparator {
       canonical = PastProcessHackerUtilities.actualUrl(canonical); // hack for old publishing process problems 
       String ppl = Utilities.pathURL(canonical, "package-list.json");
       logger.logMessage("Fetch "+ppl+" for version check");
-      JsonObject pl = JSONUtil.fetchJson(ppl);
+      JsonObject pl = JsonTrackingParser.fetchJson(ppl);
       if (!canonical.equals(JSONUtil.str(pl, "canonical"))) {
         throw new FHIRException("Mismatch canonical URL");
       } else if (!pl.has("package-id")) {

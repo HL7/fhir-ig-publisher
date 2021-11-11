@@ -183,7 +183,9 @@ public class SpecMapManager {
       switch (special) {
       case Simplifier: return "https://simplifier.net/resolve?scope="+pi.name()+"@"+pi.version()+"&canonical="+url;
       case PhinVads:  return "??phinvads??";
-      case Vsac: return url.replace("http://cts.nlm.nih.gov/fhir/ValueSet/", "https://vsac.nlm.nih.gov/valueset/")+"/expansion";
+      case Vsac: if (url.contains("cts.nlm.nih.gov")) {
+        return url.replace("http://cts.nlm.nih.gov/fhir/ValueSet/", "https://vsac.nlm.nih.gov/valueset/")+"/expansion";
+      }
       }
     }
     if (url.matches(Constants.URI_REGEX)) {
@@ -390,6 +392,14 @@ public class SpecMapManager {
       res.special = SpecialPackageType.Simplifier;  
     }
     res.pi = pi;
+    return res;
+  }
+
+  public Set<String> listTargets() {
+    Set<String> res = new HashSet<String>();
+    for (JsonElement n : targets) {
+      res.add(n.getAsString());
+    }
     return res;
   }
 

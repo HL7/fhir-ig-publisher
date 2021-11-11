@@ -53,6 +53,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
+import ca.uhn.fhir.util.JsonUtil;
+
 public class PackageReleaser {
   
   public class PackageReleaserScrubber implements ITransformingLoader {
@@ -265,6 +267,30 @@ public class PackageReleaser {
     }
   }
 
+  private void updateIndex(File file, JsonObject pl) throws FileNotFoundException, IOException {
+    StringBuilder b = new StringBuilder();
+    
+    for (JsonElement n : pl.getAsJsonArray("list")) { 
+      JsonObject v = (JsonObject) n;
+      String ver = JSONUtil.str(v, "version");
+      String desc = JSONUtil.str(v, "desc");
+      String date = JSONUtil.str(v, "date");
+      b.append("<li><a href=\""+ver+"/package.tgz\">"+ver+"</a>: "+Utilities.escapeJson(desc)+" ("+date+")</li>\r\n");
+    }    
+    String source = TextFile.fileToString(file);
+    int i = source.indexOf("id=\"releases-list\">");
+    if (i < 0) {
+      throw new Error("Version insertion point Not found in "+file.getAbsolutePath());      
+    }
+    String pfx = source.substring(0, i+21);
+    source = source.substring(i+21);
+    i = source.indexOf("</ul>");
+    source = source.substring(i);
+    source = pfx + b.toString()+source;
+    TextFile.stringToFile(source, file);
+  }
+  
+  
   private void updatePackagesList(String dest, List<VersionDecision> versionsList) throws IOException {
     boolean save = false;
     JsonObject pl = JsonTrackingParser.parseJson(new File(Utilities.path(dest, "package-list.json")));
@@ -757,6 +783,13 @@ public class PackageReleaser {
       Utilities.copyDirectory(Utilities.path(source, vd.getId(), "output"), Utilities.path(dest, npm.name()), null);
       Utilities.copyFile(Utilities.path(source, vd.getId(), "package-list.json"), Utilities.path(dest, npm.name(), "package-list.json"));
       
+      // update the index.html
+      File file = new File(Utilities.path(dest, npm.name(), "index.html"));
+      if (!file.exists()) {
+        throw new Error("not found: "+file.getAbsolutePath());
+      }
+      updateIndex(file, JsonTrackingParser.parseJson(new File(Utilities.path(dest, npm.name(), "package-list.json"))));            
+
       // update rss feed      
       Element item = rss.createElement("item");
       List<Element> list = XMLUtil.getNamedChildren(channel, "item");

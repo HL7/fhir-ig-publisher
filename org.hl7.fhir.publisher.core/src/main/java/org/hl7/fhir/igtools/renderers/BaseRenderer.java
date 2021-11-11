@@ -120,14 +120,13 @@ public class BaseRenderer extends TranslatingUtilities {
 	        i--;
 	      }
 	    }
-	    text = ProfileUtilities.processRelativeUrls(text, "", corePath, context.getResourceNames(), Collections.EMPTY_LIST);
+	    text = ProfileUtilities.processRelativeUrls(text, "", corePath, context.getResourceNames(), specmaps.get(0).listTargets());
 	    // 3. markdown
 	    String s = markdownEngine.process(checkEscape(text), location);
 	    return s;
 	  } catch (Throwable e) {
 		  throw new FHIRException("Error processing string: " + text, e);
 	  }
-
   }
 
   private String getBySpecMap(String linkText) throws Exception {
