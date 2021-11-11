@@ -21,6 +21,7 @@ package org.hl7.fhir.igtools.renderers;
  */
 
 
+import java.util.Collections;
 import java.util.List;
 
 import org.hl7.fhir.exceptions.FHIRException;

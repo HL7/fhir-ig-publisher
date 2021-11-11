@@ -1,5 +1,7 @@
 package org.hl7.fhir.igtools.renderers;
 
+import org.apache.xmlbeans.impl.config.NameSet;
+
 /*-
  * #%L
  * org.hl7.fhir.publisher.core
@@ -660,132 +662,128 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
 
     public String dict(boolean incProfiledOut) throws Exception {
-        int i = 1;
-        StringBuilder b = new StringBuilder();
-        b.append("<table class=\"dict\">\r\n");
+      int i = 1;
+      StringBuilder b = new StringBuilder();
+      b.append("<table class=\"dict\">\r\n");
+      
+      Map<String, ElementDefinition> allAnchors = new HashMap<>(); 
 
-        List<StringPair> replacements = new ArrayList<>();
-        for (ElementDefinition ec : sd.getSnapshot().getElement()) {
-            trimReplacements(replacements, ec.getId());
-            if (incProfiledOut || !"0".equals(ec.getMax())) {
-                if (isProfiledExtension(ec)) {
-                    StructureDefinition extDefn = context.fetchResource(StructureDefinition.class, ec.getType().get(0).getProfile().get(0).getValue());
-                    if (extDefn == null) {
-                        String title = ec.getId();
-                        b.append("  <tr><td colspan=\"2\" class=\"structure\"><span class=\"self-link-parent\"><a name=\"" + ec.getId() + "\"> </a><span style=\"color: grey\">" + Integer.toString(i++) + ".</span> <b>" + title + "</b>" + link(ec.getId()) + "</span></td></tr>\r\n");
-                        generateElementInner(b, sd, ec, 1, null);
-                    } else {
-                        String title = ec.getId();
-                        b.append("  <tr><td colspan=\"2\" class=\"structure\"><span class=\"self-link-parent\"><a name=\"" + ec.getId() + "\"> </a>");
-                        if (ec.getId().endsWith("[x]")) {
-                            Set<String> tl = new HashSet<String>();
-                            for (TypeRefComponent tr : ec.getType()) {
-                                String tc = tr.getWorkingCode();
-                                if (!tl.contains(tc)) {
-                                    tl.add(tc);
-                                    String s = ec.getId().replace("[x]", Utilities.capitalize(tc));
-                                    b.append("<a name=\"" + s + "\"> </a>");
-                                    replacements.add(new StringPair(ec.getId(), s));
-                                }
-                            }
-                        }
-                        b.append("<span style=\"color: grey\">" + Integer.toString(i++) + ".</span> <b>" + title + "</b>" + link(ec.getId()) + "</span></td></tr>\r\n");
-                        ElementDefinition valueDefn = getExtensionValueDefinition(extDefn);
-                        generateElementInner(b, sd, ec, valueDefn == null ? 2 : 3, valueDefn);
-//            generateElementInner(b, extDefn, extDefn.getSnapshot().getElement().get(0), valueDefn == null ? 2 : 3, valueDefn);
-                    }
-                } else {
-                    String title = ec.getId();
-                    b.append("  <tr><td colspan=\"2\" class=\"structure\"><span class=\"self-link-parent\"><a name=\"" + ec.getId() + "\"> </a>");
-                    if (ec.getPath().endsWith("[x]")) {
-                        Set<String> tl = new HashSet<String>();
-                        for (TypeRefComponent tr : ec.getType()) {
-                            String tc = tr.getWorkingCode();
-                            if (Utilities.isAbsoluteUrl(tc)) {
-                                StructureDefinition sd = context.fetchResource(StructureDefinition.class, tc);
-                                if (sd != null)
-                                    tc = sd.getType();
-                            }
-                            if (!tl.contains(tc)) {
-                                tl.add(tc);
-                                String s = ec.getId();
-                                if (s.contains(":") && s.lastIndexOf(":") > s.lastIndexOf("[x]")) {
-                                    s = s.substring(0, s.lastIndexOf(":"));
-                                }
-                                s = s.replace("[x]", Utilities.capitalize(tc));
-                                StringPair sp = new StringPair(ec.getId(), s);
-                                if (!hasReplacement(replacements, sp) && !ec.getId().equals(s))
-                                    replacements.add(sp);
-                                s = ec.getPath().replace("[x]", Utilities.capitalize(tc));
-                                sp = new StringPair(ec.getId(), s);
-                                if (!hasReplacement(replacements, sp))
-                                    replacements.add(sp);
-                            }
-                        }
-//          } else if (ec.hasBase() && ec.getBase().getPath().endsWith("[x]")) {
-//            String s = nottail(ec.getId())+"."+tail(ec.getBase().getPath());
-//            replacements.add(new StringPair(ec.getId(), s));
-//            b.append("<a name=\""+s+"\"> </a>");
-                    }
-//          else if (ec.hasSliceName()) {
-//            b.append("<a name=\""+ec.getPath()+"\"> </a>");
-//          } 
-                    Set<String> anchors = generateReplacements(ec.getId(), replacements);
-                    for (String s : anchors)
-                        b.append("<a name=\"" + s + "\"> </a>");
-                    b.append("<span style=\"color: grey\">" + Integer.toString(i++) + ".</span> <b>" + title + "</b>" + link(ec.getId()) + "</span></td></tr>\r\n");
-                    generateElementInner(b, sd, ec, 1, null);
-                    if (ec.hasSlicing())
-                        generateSlicing(b, sd, ec, ec.getSlicing());
-                }
+      List<ElementDefinition> stack = new ArrayList<>(); // keeps track of parents, for anchor generation
+      for (ElementDefinition ec : sd.getSnapshot().getElement()) {
+        addToStack(stack, ec);
+        generateAnchors(stack, allAnchors);  
+      }
+      
+      for (ElementDefinition ec : sd.getSnapshot().getElement()) {
+        if (incProfiledOut || !"0".equals(ec.getMax())) {
+          String anchors = makeAnchors(ec);
+          if (isProfiledExtension(ec)) {
+            StructureDefinition extDefn = context.fetchResource(StructureDefinition.class, ec.getType().get(0).getProfile().get(0).getValue());
+            if (extDefn == null) {
+              String title = ec.getId();
+              b.append("  <tr><td colspan=\"2\" class=\"structure\"><span class=\"self-link-parent\">"+anchors+"</a><span style=\"color: grey\">" + Integer.toString(i++) + ".</span> <b>" + title + "</b>" + link(ec.getId()) + "</span></td></tr>\r\n");
+              generateElementInner(b, sd, ec, 1, null);
+            } else {
+              String title = ec.getId();
+              b.append("  <tr><td colspan=\"2\" class=\"structure\"><span class=\"self-link-parent\">"+anchors+"</a>");
+              b.append("<span style=\"color: grey\">" + Integer.toString(i++) + ".</span> <b>" + title + "</b>" + link(ec.getId()) + "</span></td></tr>\r\n");
+              ElementDefinition valueDefn = getExtensionValueDefinition(extDefn);
+              generateElementInner(b, sd, ec, valueDefn == null ? 2 : 3, valueDefn);
+              //            generateElementInner(b, extDefn, extDefn.getSnapshot().getElement().get(0), valueDefn == null ? 2 : 3, valueDefn);
             }
+          } else {
+            String title = ec.getId();
+            b.append("  <tr><td colspan=\"2\" class=\"structure\"><span class=\"self-link-parent\">"+anchors);
+            b.append("<span style=\"color: grey\">" + Integer.toString(i++) + ".</span> <b>" + title + "</b>" + link(ec.getId()) + "</span></td></tr>\r\n");
+            generateElementInner(b, sd, ec, 1, null);
+            if (ec.hasSlicing())
+              generateSlicing(b, sd, ec, ec.getSlicing());
+          }
         }
-        b.append("</table>\r\n");
-        i++;
-        return b.toString();
+      }
+      b.append("</table>\r\n");
+      i++;
+      return b.toString();
+    }
+    
+    private void generateAnchors(List<ElementDefinition> stack, Map<String, ElementDefinition> allAnchors) {
+      List<String> list = new ArrayList<>();
+      list.add(stack.get(0).getId()); // initialise
+      for (int i = 1; i < stack.size(); i++) {
+        ElementDefinition ed = stack.get(i);
+        List<String> aliases = new ArrayList<>();
+        String name = tail(ed.getPath());
+        if (name.endsWith("[x]")) {
+          aliases.add(name); 
+          Set<String> tl = new HashSet<String>(); // guard against duplicate type names - can happn in some versions 
+          for (TypeRefComponent tr : ed.getType()) {
+            String tc = tr.getWorkingCode();
+            if (!tl.contains(tc)) {
+              aliases.add(name.replace("[x]", Utilities.capitalize(tc)));
+              aliases.add(name+":"+name.replace("[x]", Utilities.capitalize(tc)));
+              tl.add(tc);
+            }
+          }          
+        } else if (ed.hasSliceName()) {
+          aliases.add(name+":"+ed.getSliceName());    
+          // names.add(name); no good generating this?  
+        } else { 
+          aliases.add(name);
+        }
+        List<String> generated = new ArrayList<>();
+        for (String l : list) {
+          for (String a : aliases) {
+            generated.add(l+"."+a);
+          }
+        }
+        list.clear();
+        list.addAll(generated);
+      }
+      ElementDefinition ed = stack.get(stack.size()-1);
+      
+      // now we have all the possible names, but some of them might be inappropriate if we've 
+      // already generated a type slicer. On the other hand, if we've already done that, we're 
+      // going to steal any type specific ones off it. 
+      List<String> removed = new ArrayList<>();
+      for (String s : list) {
+        if (!allAnchors.containsKey(s)) {
+          allAnchors.put(s, ed);          
+        } else if (s.endsWith("[x]")) {
+          // that belongs on the earlier element
+          removed.add(s);
+        } else {
+          // we delete it from the other 
+          @SuppressWarnings("unchecked")
+          List<String> other = (List<String>) allAnchors.get(s).getUserData("dict.generator.anchors");
+          other.remove(s);
+          allAnchors.put(s, ed);          
+        }
+      }
+      list.removeAll(removed);      
+      ed.setUserData("dict.generator.anchors", list);
     }
 
-    private boolean hasReplacement(List<StringPair> replacements, StringPair sp) {
-        for (StringPair t : replacements) {
-            if (t.match.equals(sp.match) && t.replace.equals(sp.replace)) {
-                return true;
-            }
-        }
-        return false;
+    private void addToStack(List<ElementDefinition> stack, ElementDefinition ec) {
+      while (!stack.isEmpty() && !isParent(stack.get(stack.size()-1), ec)) {
+        stack.remove(stack.size()-1);
+      }
+      stack.add(ec);
     }
 
-    private void trimReplacements(List<StringPair> replacements, String id) {
-        List<StringPair> toRemove = new ArrayList<>();
-        for (StringPair p : replacements) {
-            if (!id.startsWith(p.match))
-                toRemove.add(p);
-        }
-        replacements.removeAll(toRemove);
-
+    private boolean isParent(ElementDefinition ed, ElementDefinition ec) {      
+      return ec.getPath().startsWith(ed.getPath()+".");
     }
 
-    private Set<String> generateReplacements(String id, List<StringPair> replacements) {
-        Set<String> res = new HashSet<>();
-        if (replacements.isEmpty())
-            return res;
-
-        Set<String> add = new HashSet<>();
-        res.add(id);
-        do {
-            add.clear();
-            for (String s : res) {
-                for (StringPair p : replacements) {
-                    if (s.startsWith(p.match)) {
-                        String r = p.replace + s.substring(p.match.length());
-                        if (!res.contains(r))
-                            add.add(r);
-                    }
-                }
-            }
-            res.addAll(add);
-        } while (!add.isEmpty());
-        res.remove(id);
-        return res;
+    private String makeAnchors(ElementDefinition ed) {
+      List<String> list = (List<String>) ed.getUserData("dict.generator.anchors");
+      StringBuilder b = new StringBuilder();
+      b.append("<a name=\"" + ed.getId() + "\"> </a>");
+      for (String s : list) {
+        if (!s.equals(ed.getId())) {
+          b.append("<a name=\"" + s + "\"> </a>");
+        }
+      }
+      return b.toString();
     }
 
     private String link(String id) {
@@ -794,11 +792,6 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
     private boolean isProfiledExtension(ElementDefinition ec) {
         return ec.getType().size() == 1 && "Extension".equals(ec.getType().get(0).getWorkingCode()) && ec.getType().get(0).hasProfile();
-    }
-
-
-    private String makePathLink(ElementDefinition element) {
-        return element.getId();
     }
 
     private ElementDefinition getExtensionValueDefinition(StructureDefinition extDefn) {

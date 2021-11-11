@@ -3344,7 +3344,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, execTime.getTime(), !publishing);
     execTime = Calendar.getInstance();
 
-    rc = new RenderingContext(context, markdownEngine, ValidationOptions.defaults(), checkAppendSlash(specPath), "", null, ResourceRendererMode.IG);
+    rc = new RenderingContext(context, markdownEngine, ValidationOptions.defaults(), checkAppendSlash(specPath), "", null, ResourceRendererMode.TECHNICAL);
     rc.setTemplateProvider(templateProvider);
     rc.setResolver(this);    
     rc.setServices(validator.getExternalHostServices());
@@ -5943,6 +5943,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           item.addProperty("index", i);
           item.addProperty("url", sd.getUrl());
           item.addProperty("name", sd.getName());
+          item.addProperty("title", sd.present());
           item.addProperty("path", sd.getUserString("path"));
           item.addProperty("kind", sd.getKind().toCode());
           item.addProperty("type", sd.getType());
