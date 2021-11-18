@@ -332,13 +332,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     private String type;
     private String id;
     private String title;
-    private String details;
+    private String description;
 
-    public ContainedResourceDetails(String type, String id, String title, String details) {
+    public ContainedResourceDetails(String type, String id, String title, String description) {
       this.type = type;
       this.id = id;
       this.title = title;
-      this.details = details;
+      this.description = description;
     }
 
     public String getType() {
@@ -353,8 +353,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return title;
     }
 
-    public String getDetails() {
-      return details;
+    public String getDescription() {
+      return description;
     }
 
   }
@@ -3732,7 +3732,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     for (String link : dir.getFiles()) {
       FetchedFile f = fetcher.fetch(link);
-      System.out.println("find pre-page "+f.getPath()+" at "+link+" from "+basePath);
+//      System.out.println("find pre-page "+f.getPath()+" at "+link+" from "+basePath);
       f.setRelativePath(f.getPath().substring(basePath.length()+1));
       if (f.isFolder())
         changed = loadPrePages(f, basePath) || changed;
@@ -5044,36 +5044,40 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.fhirType().equals("StructureDefinition")) {
-          StructureDefinition sd = (StructureDefinition) r.getResource();
-          if (!sd.getAbstract()) {
-            if (sd.getKind() == StructureDefinitionKind.RESOURCE) {
-              int cE = countStatedExamples(sd.getUrl());
-              int cI = countFoundExamples(sd.getUrl());
-              if (cE + cI == 0) {
-                f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this profile", IssueSeverity.WARNING));
-                r.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this profile", IssueSeverity.WARNING));
-              } else if (cE == 0) {
-                f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no explicitly linked examples for this profile", IssueSeverity.INFORMATION));
-                r.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no explicitly linked examples for this profile", IssueSeverity.INFORMATION));
-              }
-            } else if (sd.getKind() == StructureDefinitionKind.COMPLEXTYPE) {
-              if (sd.getType().equals("Extension")) {
-                int c = countUsages(getFixedUrl(sd));
-                if (c == 0) {
-                  f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this extension", IssueSeverity.WARNING));
-                  r.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this extension", IssueSeverity.WARNING));
-                }
-              } else {
-                int cI = countFoundExamples(sd.getUrl());
-                if (cI == 0) {
-                  f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this data type profile", IssueSeverity.WARNING));
-                  r.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this data type profile", IssueSeverity.WARNING));
-                }
-              }
-            }
-          }
+          validateSD(f, r);
         }
       }        
+    }
+  }
+
+  public void validateSD(FetchedFile f, FetchedResource r) {
+    StructureDefinition sd = (StructureDefinition) r.getResource();
+    if (!sd.getAbstract()) {
+      if (sd.getKind() == StructureDefinitionKind.RESOURCE) {
+        int cE = countStatedExamples(sd.getUrl());
+        int cI = countFoundExamples(sd.getUrl());
+        if (cE + cI == 0) {
+          f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this profile", IssueSeverity.WARNING));
+          r.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this profile", IssueSeverity.WARNING));
+        } else if (cE == 0) {
+          f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no explicitly linked examples for this profile", IssueSeverity.INFORMATION));
+          r.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no explicitly linked examples for this profile", IssueSeverity.INFORMATION));
+        }
+      } else if (sd.getKind() == StructureDefinitionKind.COMPLEXTYPE) {
+        if (sd.getType().equals("Extension")) {
+          int c = countUsages(getFixedUrl(sd));
+          if (c == 0) {
+            f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this extension", IssueSeverity.WARNING));
+            r.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this extension", IssueSeverity.WARNING));
+          }
+        } else {
+          int cI = countFoundExamples(sd.getUrl());
+          if (cI == 0) {
+            f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this data type profile", IssueSeverity.WARNING));
+            r.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this data type profile", IssueSeverity.WARNING));
+          }
+        }
+      }
     }
   }
 
@@ -5501,6 +5505,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           res.getExtension().add(ex);
           ex.addExtension("type", new CodeType(c.getType()));
           ex.addExtension("id", new IdType(c.getId()));
+          ex.addExtension("title", new IdType(c.getType()));
+          ex.addExtension("description", new IdType(c.getDescription()));
         }
       }
     }
@@ -6210,6 +6216,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             if (!jo.entrySet().isEmpty()) {
               item.add("status", jo);
             }
+          }
+          JsonArray contained = null;
+          for (ContainedResourceDetails crd : getContained(r.getElement())) {
+            if (contained == null) {
+              contained = new JsonArray();
+              item.add("contained", contained);
+            }
+            JsonObject jo = new JsonObject();
+            contained.add(jo);
+            jo.addProperty("type", crd.getType());
+            jo.addProperty("id", crd.getId());
+            jo.addProperty("title", crd.getType());
+            jo.addProperty("description", crd.getDescription());
           }
         }
         i++;
