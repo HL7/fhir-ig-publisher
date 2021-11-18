@@ -573,7 +573,7 @@ public class HTLMLInspector {
       rref = rref.substring(2);
     }
     if (rref.endsWith("/")) {
-      rref = rref.substring(0, ref.length()-1);
+      rref = rref.substring(0, rref.length()-1);
     }
     
     if (rref.contains("validator.pack")) {
