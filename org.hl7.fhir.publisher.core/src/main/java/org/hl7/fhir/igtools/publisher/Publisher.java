@@ -8718,6 +8718,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         throw new Error("-publish-update must have the format -publish-update -url {url} -root {root} -registry {registry}/fhir-ig-list.json (-registry parameter not found)");
       }
       String filter = getNamedParam(args, "-filter");
+      Boolean skipPrompt = hasNamedParam(args, "-noprompt");
 
       if (!"n/a".equals(registry)) {
         File fr = new File(registry);
@@ -8728,7 +8729,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       boolean doCore = "true".equals(getNamedParam(args, "-core"));
       
       IGRegistryMaintainer reg = "n/a".equals(registry) ? null : new IGRegistryMaintainer(registry);
-      IGWebSiteMaintainer.execute(f.getAbsolutePath(), reg, doCore, filter);
+      IGWebSiteMaintainer.execute(f.getAbsolutePath(), reg, doCore, filter, skipPrompt);
       reg.finish();      
     } else if (hasNamedParam(args, "-multi")) {
       int i = 1;
