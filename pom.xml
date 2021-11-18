@@ -25,7 +25,7 @@
 
     <properties>
 
-        <core_version>5.5.12</core_version>
+        <core_version>5.5.13</core_version>
         <maven.test.skip>true</maven.test.skip>
     </properties>
 
