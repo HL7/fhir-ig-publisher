@@ -65,6 +65,7 @@ import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
 import org.stringtemplate.v4.ST;
+import org.stringtemplate.v4.STErrorListener;
 
 public class ValidationPresenter extends TranslatingUtilities implements Comparator<FetchedFile> {
 
@@ -257,9 +258,11 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private List<FetchedResource> noValidation;
   private boolean noValidate;
   private boolean noGenerate;
+  private Set<String> r5Extensions;
 
   public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, String ballotCheck, 
-      String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, String dependencies, String csAnalysis, String versionRulesCheck, String copyrightYear, IWorkerContext context, 
+      String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, String dependencies, String csAnalysis, String versionRulesCheck, String copyrightYear, IWorkerContext context,
+      Set<String> r5Extensions,
       List<FetchedResource> noNarratives, List<FetchedResource> noValidation, boolean noValidate, boolean noGenerate) {
     super();
     this.statedVersion = statedVersion;
@@ -283,6 +286,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     this.noValidation = noValidation;
     this.noValidate = noValidate;
     this.noGenerate = noGenerate;
+    this.r5Extensions = r5Extensions;
     determineCode();
   }
 
@@ -629,6 +633,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       " <tr><td>Dependency Checks:</td><td>$dependencyCheck$</td></tr>\r\n"+
       " <tr><td>Publication Rules:</td><td>Code = $igcode$. $ballotCheck$ $copyrightYearCheck$</td></tr>\r\n"+
       " <tr><td>HTA Analysis:</td><td>$csAnalysis$</td></tr>\r\n"+
+      " <tr><td>R5 Dependencies:</td><td>$r5usage$</td></tr>\r\n"+
       " <tr><td>Previous Version Comparison:</td><td> $previousVersion$</td></tr>\r\n"+
       "$noNarrative$"+
       "$noValidation$"+
@@ -755,6 +760,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("realm", igrealm == null ? "n/a" : igrealm.toUpperCase());
     t.add("dependencyCheck", dependencies);
     t.add("csAnalysis", csAnalysis);
+    t.add("r5usage", genR5());
     t.add("otherFileName", allIssues ? "Errors Only" : "Full QA Report");
     t.add("otherFilePath", allIssues ? Utilities.getFileNameForName(Utilities.changeFileExt(path, ".min.html")) : Utilities.getFileNameForName(path));
     t.add("previousVersion", previousVersionComparator.checkHtml());
@@ -777,6 +783,22 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     else
       t.add("suppressedmsgssummary", "<a href=\"#suppressed\">"+msgCount+" Suppressed "+Utilities.pluralize("Issue", msgCount)+"</a>\r\n");
     return t.render();
+  }
+
+  private Object genR5() {
+    if (r5Extensions == null || r5Extensions.isEmpty()) {
+      return "<span style=\"color: grey\">(none)</span>";
+    } else {
+      StringBuilder b = new StringBuilder();
+      b.append("<ul>");
+      for (String url : r5Extensions) {
+        String s = url.substring(url.lastIndexOf("-")+1);
+        s = s.substring(0, s.indexOf("."));
+        b.append("<li><a href=\"http://build.fhir.org/"+s.toLowerCase()+".html\">"+Utilities.escapeXml(url)+"</a></li>");
+      }
+      b.append("</ul>");
+      return b.toString();
+    }
   }
 
   private String genResourceList(List<FetchedResource> list, String name) {
@@ -1023,10 +1045,13 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
 
   private String genStartInternal() {
     ST t = template(startTemplate);
+    t.add("id", "");
     t.add("link", INTERNAL_LINK);
     t.add("filename", "Build Errors");
     t.add("path", "n/a");
     t.add("xlink", "");
+    t.add("signposts", "");      
+    t.add("vsumm", "");            
     return t.render();
   }
 
@@ -1051,6 +1076,9 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     if (vm.getLocation()!=null) {
       t.add("path", stripId(makeLocal(vm.getLocation())+lineCol(vm)));
       t.add("pathlink", vm.getLocationLink());
+    } else {
+      t.add("path", "");
+      t.add("pathlink", "");      
     }
     t.add("level", vm.isSlicingHint() ? "Slicing Information" : vm.isSignpost() ? "Process Info" : vm.getLevel().toCode());
     t.add("color", colorForLevel(vm.getLevel(), vm.isSignpost()));

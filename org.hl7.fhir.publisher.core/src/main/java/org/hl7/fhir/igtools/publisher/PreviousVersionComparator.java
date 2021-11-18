@@ -248,7 +248,7 @@ public class PreviousVersionComparator {
           ComparisonSession session = new ComparisonSession(vi.context, context, "Comparison of v"+vi.version+" with this version", pkp);
           //    session.setDebug(true);
           for (ProfilePair c : comparisons) {
-            System.out.println("Version Comparison: compare "+vi.version+" to current for "+c.getUrl());
+//            System.out.println("Version Comparison: compare "+vi.version+" to current for "+c.getUrl());
             session.compare(c.left, c.right);      
           }
           Utilities.createDirectory(Utilities.path(dstDir, "comparison-v"+vi.version));
