@@ -8718,7 +8718,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         throw new Error("-publish-update must have the format -publish-update -url {url} -root {root} -registry {registry}/fhir-ig-list.json (-registry parameter not found)");
       }
       String filter = getNamedParam(args, "-filter");
-      Boolean skipPrompt = hasNamedParam(args, "-noprompt");
+      boolean skipPrompt = hasNamedParam(args, "-noconfirm");
 
       if (!"n/a".equals(registry)) {
         File fr = new File(registry);

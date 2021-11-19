@@ -48,7 +48,7 @@ public class IGWebSiteMaintainer {
     execute(args[0], args.length > 1 ? new IGRegistryMaintainer(args[1]) : null, args.length >= 3 && "true".equals(args[2]), null, null);
   }
   
-  public static void execute(String folder, IGRegistryMaintainer reg, boolean doCore, String filter, Boolean skipPrompt) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
+  public static void execute(String folder, IGRegistryMaintainer reg, boolean doCore, String filter, boolean skipPrompt) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
     File f = new File(folder);
     if (!f.exists())
       throw new IOException("Folder "+folder+" not found");
