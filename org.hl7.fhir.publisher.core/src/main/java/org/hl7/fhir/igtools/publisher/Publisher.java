@@ -2728,7 +2728,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (pp.has("relativePath")) {
         relativePath = str(pp, "relativePath");
       }
-      System.out.println("Pre-Process: "+path+" = "+relativePath+" | "+prePagesXslt);
+//      System.out.println("Pre-Process: "+path+" = "+relativePath+" | "+prePagesXslt);
       PreProcessInfo ppinfo = new PreProcessInfo(prePagesXslt, relativePath);
       preProcessInfo.put(path, ppinfo);
     }
@@ -8009,7 +8009,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         String html = "<p style=\"color: maroon\">Expansions are not generated for retired value sets</p>";
         fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null);
       } else {
-        ValueSetExpansionOutcome exp = context.expandVS(vs, true, true);
+        ValueSetExpansionOutcome exp = context.expandVS(vs, true, true, true);
         if (exp.getValueset() != null) {
           expansions.add(exp.getValueset());
 
