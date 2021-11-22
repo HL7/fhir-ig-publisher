@@ -45,10 +45,10 @@ import com.google.gson.JsonSyntaxException;
 public class IGWebSiteMaintainer {
 
   public static void main(String[] args) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
-    execute(args[0], args.length > 1 ? new IGRegistryMaintainer(args[1]) : null, args.length >= 3 && "true".equals(args[2]), null);
+    execute(args[0], args.length > 1 ? new IGRegistryMaintainer(args[1]) : null, args.length >= 3 && "true".equals(args[2]), null, false);
   }
   
-  public static void execute(String folder, IGRegistryMaintainer reg, boolean doCore, String filter) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
+  public static void execute(String folder, IGRegistryMaintainer reg, boolean doCore, String filter, boolean skipPrompt) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
     File f = new File(folder);
     if (!f.exists())
       throw new IOException("Folder "+folder+" not found");
@@ -88,7 +88,7 @@ public class IGWebSiteMaintainer {
     for (String s : igs) {
       System.out.println(" - "+s);
     }
-    if (filter == null ) {
+    if ((filter == null )&&(!skipPrompt)) {
       System.out.print("Enter y to continue: ");    
       int r = System.in.read();
       if (r != 'y')
