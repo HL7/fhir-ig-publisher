@@ -47,15 +47,17 @@ import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.NamingSystem.NamingSystemIdentifierType;
 import org.hl7.fhir.r5.model.NamingSystem.NamingSystemUniqueIdComponent;
 import org.hl7.fhir.r5.terminologies.ImplicitValueSets;
-import org.hl7.fhir.r5.utils.IResourceValidator;
-import org.hl7.fhir.r5.utils.IResourceValidator.IValidatorResourceFetcher;
-import org.hl7.fhir.r5.utils.IResourceValidator.ReferenceValidationPolicy;
+import org.hl7.fhir.r5.utils.validation.IResourceValidator;
+import org.hl7.fhir.r5.utils.validation.IValidatorResourceFetcher;
+import org.hl7.fhir.r5.utils.validation.IValidationPolicyAdvisor;
+import org.hl7.fhir.r5.utils.validation.constants.ContainedReferenceValidationPolicy;
+import org.hl7.fhir.r5.utils.validation.constants.ReferenceValidationPolicy;
 import org.hl7.fhir.utilities.SIDUtilities;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 
-public class ValidationServices implements IValidatorResourceFetcher {
+public class ValidationServices implements IValidatorResourceFetcher, IValidationPolicyAdvisor {
 
   private IWorkerContext context;
   private IGKnowledgeProvider ipg;
@@ -171,16 +173,19 @@ public class ValidationServices implements IValidatorResourceFetcher {
     return null;
   }
 
+  @Override
+  public ContainedReferenceValidationPolicy policyForContained(IResourceValidator validator, Object appContext, String containerType, String containerId, Element.SpecialElement containingResourceType, String path, String url) {
+    return ContainedReferenceValidationPolicy.CHECK_VALID;
+  }
 
   @Override
-  public ReferenceValidationPolicy validationPolicy(IResourceValidator validator, Object appContext, String path, String url) {
+  public ReferenceValidationPolicy policyForReference(IResourceValidator validator, Object appContext, String path, String url) {
     if (path.startsWith("Bundle.") && !bundleReferencesResolve) {
       return ReferenceValidationPolicy.CHECK_TYPE_IF_EXISTS;
     } else {
       return ReferenceValidationPolicy.CHECK_EXISTS_AND_TYPE;
     }
   }
-
 
   @Override
   public boolean resolveURL(IResourceValidator validator, Object appContext, String path, String url, String type) throws IOException {
