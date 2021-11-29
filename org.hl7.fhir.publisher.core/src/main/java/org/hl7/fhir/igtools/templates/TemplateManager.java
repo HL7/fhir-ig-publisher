@@ -274,6 +274,7 @@ public class TemplateManager {
       }
       throw new FHIRException("Unable to load template from "+template+" cannot find template. Use a github URL, a local directory, or #[folder] for a contained template");
     } catch (Exception e) {
+      e.printStackTrace();
       throw new FHIRException("Error loading template "+template+": "+e.getMessage(), e);
     }
   }

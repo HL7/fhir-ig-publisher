@@ -1,8 +1,12 @@
-# HAPI FHIR - HL7 FHIR Core Artifacts
+# HL7 FHIR IG Publisher Artifacts
 
 | CI Status (master) | Release Pipeline | Current Release | Latest SNAPSHOT |
 | :---: | :---: | :---: | :---: |
 | [![Build Status][Badge-AzurePipeline]][Link-AzurePipeline] | [![Build Status][Badge-AzureReleasePipeline]][Link-AzureReleasePipeline] | [![Release Artifacts][Badge-SonatypeReleases]][Link-GithubZipRelease] | [![Snapshot Artifact][Badge-SonatypeSnapshots]][Link-SonatypeSnapshots] |
+
+This is the code for the HL7 IG publisher: a tool to take a set of inputs
+and create a standard FHIR IG. The HL7 FHIR IG publisher does not provide 
+an authoring environment - that's left to other parties.
 
 ## CI/CD
 

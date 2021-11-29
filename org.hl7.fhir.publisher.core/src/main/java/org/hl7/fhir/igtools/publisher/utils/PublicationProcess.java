@@ -114,8 +114,19 @@ public class PublicationProcess {
       cql = true;
       if (!check(res, npm.canonical().equals("http://cql.hl7.org") && url.equals("http://cql.hl7.org"), "Proposed canonical '"+npm.canonical()+"' does not match the web site URL '"+url+"' with a value of http://cql.hl7.org")) {
         return res;
-      }      
-      
+      }            
+    } else if (id.startsWith("fhir.")) {
+      if (!check(res, p.length == 3 && "fhir".equals(p[0]), "Package Id '"+id+"' is not valid:  must have 4 parts (fhir.[org].[code]")) {
+        return res;
+      }
+      realm = p[1];
+      code = p[2];
+      if (!check(res, canonical != null && (canonical.equals("http://fhir.org/guides/"+realm+"/"+code)), "canonical URL of "+canonical+" does not match the required canonical of http://fhir.org/guides/"+realm+"/"+code)) {
+        return res;
+      }
+      if (!check(res, canonical.startsWith(url), "Proposed canonical '"+canonical+"' does not match the web site URL '"+url+"'")) {
+        return res;
+      }
     } else {
       if (!check(res, p.length == 4 && "hl7".equals(p[0]) && "fhir".equals(p[1]), "Package Id '"+id+"' is not valid:  must have 4 parts (hl7.fhir.[realm].[code]")) {
         return res;

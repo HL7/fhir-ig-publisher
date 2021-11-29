@@ -633,6 +633,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private boolean bundleReferencesResolve = true;
   private CqlSubSystem cql;
   private IniFile apiKeyFile;
+  private File killFile;    
 
   private ILoggingService logger = this;
 
@@ -1804,6 +1805,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     igMode = true;
     repoRoot = Utilities.getDirectoryForFile(ini.getFileName());
     rootDir = repoRoot;
+    killFile = new File(Utilities.path(rootDir, "ig-publisher.kill"));    
     // ok, first we load the template
     String templateName = ini.getStringProperty("IG", "template");
     if (templateName == null)
@@ -2106,6 +2108,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.setAllowExamples(true);
     validator.setCrumbTrails(true);
     validator.setWantCheckSnapshotUnchanged(true);
+    validator.setPolicyAdvisor(new PublisherValidationAdvisor());
     
     pvalidator = new ProfileValidator(context, context.getXVer());
     csvalidator = new CodeSystemValidator(context, context.getXVer());
@@ -2281,6 +2284,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       throw new Exception("Error Reading JSON Config file at "+configFile+": "+e.getMessage(), e);
     }
     repoRoot = Utilities.getDirectoryForFile(configFile);
+    killFile = new File(Utilities.path(repoRoot, "ig-publisher.kill"));    
+    
     if (configuration.has("redirect")) { // redirect to support auto-build for complex projects with IG folder in subdirectory
       String redirectFile = Utilities.path(Utilities.getDirectoryForFile(configFile), configuration.get("redirect").getAsString());
       log("Redirecting to Configuration from " + redirectFile);
@@ -8548,6 +8553,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       System.out.println(Utilities.padRight(msg, ' ', 80)+" ("+tt.clock()+")");
     else
       System.out.println(msg);    
+    if (killFile != null && killFile.exists()) {
+      killFile.delete();
+      System.out.println("Terminating Process now");    
+      System.exit(1);
+    }
   }
 
   @Override
