@@ -231,8 +231,6 @@ import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.r5.utils.FHIRPathEngine;
 import org.hl7.fhir.r5.utils.FHIRPathEngine.IEvaluationContext;
 import org.hl7.fhir.r5.utils.IGHelper;
-import org.hl7.fhir.r5.utils.IResourceValidator;
-import org.hl7.fhir.r5.utils.IResourceValidator.IValidationProfileUsageTracker;
 import org.hl7.fhir.r5.utils.LiquidEngine;
 import org.hl7.fhir.r5.utils.MappingSheetParser;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
@@ -245,6 +243,8 @@ import org.hl7.fhir.r5.utils.XVerExtensionManager.XVerExtensionStatus;
 import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
+import org.hl7.fhir.r5.utils.validation.IResourceValidator;
+import org.hl7.fhir.r5.utils.validation.IValidationProfileUsageTracker;
 import org.hl7.fhir.utilities.CSFile;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.IniFile;
@@ -2108,7 +2108,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.setAllowExamples(true);
     validator.setCrumbTrails(true);
     validator.setWantCheckSnapshotUnchanged(true);
-    validator.setPolicyAdvisor(new PublisherValidationAdvisor());
     
     pvalidator = new ProfileValidator(context, context.getXVer());
     csvalidator = new CodeSystemValidator(context, context.getXVer());
@@ -2119,6 +2118,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.getExtensionDomains().add(IGHelper.EXT_PRIVATE_BASE);
     validationFetcher = new ValidationServices(context, igpkp, fileList, npmList, bundleReferencesResolve);
     validator.setFetcher(validationFetcher);
+    validator.setPolicyAdvisor(validationFetcher);
     validator.setTracker(this);
     for (String s : context.getBinaries().keySet()) {
       if (needFile(s)) {
@@ -2567,6 +2567,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     validationFetcher = new ValidationServices(context, igpkp, fileList, npmList, bool(configuration, "bundleReferencesResolve"));
     validator.setFetcher(validationFetcher);
+    validator.setPolicyAdvisor(validationFetcher);
     validator.setTracker(this);
     for (String s : context.getBinaries().keySet())
       if (needFile(s)) {
@@ -6013,7 +6014,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     exec.setWatchdog(watchdog);
 
     try {
-      log("Run jekyll: "+jekyllCommand+" build --destination \""+outputDir+"\"");
+      log("Run jekyll: "+jekyllCommand+" build --destination \""+outputDir+"\" (in folder "+tempDir+")");
 	    if (SystemUtils.IS_OS_WINDOWS) {
 	      exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C "+jekyllCommand+" build --destination \""+outputDir+"\""));
 	    } else {
@@ -8612,7 +8613,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   
   public static void main(String[] args) throws Exception {
     int exitCode = 0;
-    if (hasNamedParam(args, "-gui") || args.length == 0) {
+    if (hasNamedParam(args, "-gui")) {
       runGUI();
       // Returning here ends the main thread but leaves the GUI running
       return; 
@@ -8639,7 +8640,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         pgen.setPattern(getNamedParam(args, "-pattern"));
       }
       pgen.execute();
-    } else if (hasNamedParam(args, "-help") || hasNamedParam(args, "-?") || hasNamedParam(args, "/?") || hasNamedParam(args, "?")) {
+    } else if (hasNamedParam(args, "-help") || hasNamedParam(args, "-?") || hasNamedParam(args, "/?") || hasNamedParam(args, "?") || args.length == 0) {
       System.out.println("");
       System.out.println("To use this publisher to publish a FHIR Implementation Guide, run ");
       System.out.println("with the commands");
@@ -8796,6 +8797,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           s = s + " "+args[i];
       }      
       self.logMessage(s);
+//      self.logMessage("=== Environment variables =====");
+//      for (String e : System.getenv().keySet()) {
+//        self.logMessage("  "+e+": "+System.getenv().get(e));
+//      }
       self.logMessage("Start Clock @ "+nowAsString(self.execTime)+" ("+nowAsDate(self.execTime)+")");
       self.logMessage("");
       if (hasNamedParam(args, "-auto-ig-build")) {

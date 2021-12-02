@@ -38,6 +38,7 @@ import org.hl7.fhir.r5.elementmodel.Manager.FhirFormat;
 import org.hl7.fhir.r5.elementmodel.ObjectConverter;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CodeSystem;
+import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.NamingSystem;
 import org.hl7.fhir.r5.model.OperationDefinition;
 import org.hl7.fhir.r5.model.Questionnaire;
@@ -47,15 +48,20 @@ import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.NamingSystem.NamingSystemIdentifierType;
 import org.hl7.fhir.r5.model.NamingSystem.NamingSystemUniqueIdComponent;
 import org.hl7.fhir.r5.terminologies.ImplicitValueSets;
-import org.hl7.fhir.r5.utils.IResourceValidator;
-import org.hl7.fhir.r5.utils.IResourceValidator.IValidatorResourceFetcher;
-import org.hl7.fhir.r5.utils.IResourceValidator.ReferenceValidationPolicy;
+import org.hl7.fhir.r5.utils.validation.IResourceValidator;
+import org.hl7.fhir.r5.utils.validation.IValidatorResourceFetcher;
+import org.hl7.fhir.r5.utils.validation.IValidationPolicyAdvisor;
+import org.hl7.fhir.r5.utils.validation.constants.BindingKind;
+import org.hl7.fhir.r5.utils.validation.constants.CodedContentValidationPolicy;
+import org.hl7.fhir.r5.utils.validation.constants.ContainedReferenceValidationPolicy;
+import org.hl7.fhir.r5.utils.validation.constants.ReferenceValidationPolicy;
 import org.hl7.fhir.utilities.SIDUtilities;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 
-public class ValidationServices implements IValidatorResourceFetcher {
+public class ValidationServices implements IValidatorResourceFetcher, IValidationPolicyAdvisor {
 
   private IWorkerContext context;
   private IGKnowledgeProvider ipg;
@@ -171,16 +177,19 @@ public class ValidationServices implements IValidatorResourceFetcher {
     return null;
   }
 
+  @Override
+  public ContainedReferenceValidationPolicy policyForContained(IResourceValidator validator, Object appContext, String containerType, String containerId, Element.SpecialElement containingResourceType, String path, String url) {
+    return ContainedReferenceValidationPolicy.CHECK_VALID;
+  }
 
   @Override
-  public ReferenceValidationPolicy validationPolicy(IResourceValidator validator, Object appContext, String path, String url) {
+  public ReferenceValidationPolicy policyForReference(IResourceValidator validator, Object appContext, String path, String url) {
     if (path.startsWith("Bundle.") && !bundleReferencesResolve) {
       return ReferenceValidationPolicy.CHECK_TYPE_IF_EXISTS;
     } else {
       return ReferenceValidationPolicy.CHECK_EXISTS_AND_TYPE;
     }
   }
-
 
   @Override
   public boolean resolveURL(IResourceValidator validator, Object appContext, String path, String url, String type) throws IOException {
@@ -265,6 +274,16 @@ public class ValidationServices implements IValidatorResourceFetcher {
   @Override
   public boolean fetchesCanonicalResource(IResourceValidator validator, String url) {
     return false;
+  }
+
+  @Override
+  public CodedContentValidationPolicy policyForCodedContent(IResourceValidator validator, Object appContext, String stackPath, ElementDefinition definition,
+      StructureDefinition structure, BindingKind kind, ValueSet valueSet, List<String> systems) {
+    if (VersionUtilities.isR4BVer(context.getVersion()) && 
+        "ImplementationGuide.definition.parameter.code".equals(definition.getBase().getPath())) {
+      return CodedContentValidationPolicy.IGNORE;
+    }
+    return CodedContentValidationPolicy.VALUESET;
   }
 
 }

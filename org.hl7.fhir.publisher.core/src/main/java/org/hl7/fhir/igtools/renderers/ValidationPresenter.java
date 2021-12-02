@@ -43,6 +43,7 @@ import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.PreviousVersionComparator;
 import org.hl7.fhir.igtools.publisher.SuppressedMessageInformation;
+import org.hl7.fhir.igtools.publisher.SuppressedMessageInformation.SuppressedMessage;
 import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.PackageDetails;
@@ -539,8 +540,9 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     boolean found = false;
     for (String s : msgs.categories()) {
       b.append("<p><b>"+Utilities.escapeXml(s)+"</b></p><ul>\r\n");
-      for (String m : msgs.list(s)) {
-        b.append(" <li>"+Utilities.escapeXml(m)+"</li>\r\n");
+      for (SuppressedMessage m : msgs.list(s)) {
+        found = true;
+        b.append(" <li>"+Utilities.escapeXml(m.getMessage())+" <span style=\"color: "+(m.getUseCount() == 0 ? "maroon" : "navy")+"\">("+m.getUseCount()+" uses)<span></li>\r\n");
       }
       b.append("</ul>\r\n");
     }

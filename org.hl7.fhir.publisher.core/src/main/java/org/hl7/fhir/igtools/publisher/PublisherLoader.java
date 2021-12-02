@@ -48,9 +48,9 @@ public class PublisherLoader implements ILoaderKnowledgeProviderR5 {
     } else if (VersionUtilities.isR3Ver(npm.fhirVersion())) {
       return new R3ToR5Loader(types, this);
     } else if (VersionUtilities.isR4Ver(npm.fhirVersion())) {
-      return new R4ToR5Loader(types, this);
+      return new R4ToR5Loader(types, this, npm.version());
     } else if (VersionUtilities.isR4BVer(npm.fhirVersion())) {
-      return new R4ToR5Loader(types, this);
+      return new R4ToR5Loader(types, this, npm.version());
     } else {
       return new R5ToR5Loader(types, this);
     }
