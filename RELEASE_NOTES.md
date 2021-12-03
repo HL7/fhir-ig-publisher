@@ -4,4 +4,5 @@
 * Renderer: update for rendering fix in core library for R3 resources
 * Renderer: Improve Code System supplement presentation
 * Renderer: Improve Date/time rendering
+* Renderer: count usage of suppressed messages
 
