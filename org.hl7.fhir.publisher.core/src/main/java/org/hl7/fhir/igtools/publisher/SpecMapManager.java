@@ -57,7 +57,7 @@ import com.google.gson.JsonSyntaxException;
 public class SpecMapManager {
 
   public enum SpecialPackageType {
-    Simplifier, PhinVads, Vsac
+    Simplifier, PhinVads, Vsac, Examples
   }
 
   private JsonObject spec;
@@ -165,7 +165,7 @@ public class SpecMapManager {
     return str(spec, "webUrl");
   }
 
-  public String getPath(String url, String def) throws FHIRException {
+  public String getPath(String url, String def, String rt, String id) throws FHIRException {
     if (url == null) {
       return null;
     }
@@ -186,6 +186,8 @@ public class SpecMapManager {
       case Vsac: if (url.contains("cts.nlm.nih.gov")) {
         return url.replace("http://cts.nlm.nih.gov/fhir/ValueSet/", "https://vsac.nlm.nih.gov/valueset/")+"/expansion";
       }
+      case Examples:
+        return str(spec, "webUrl")+"/"+rt.toLowerCase()+"-"+id.toLowerCase()+".html";
       }
     }
     if (url.matches(Constants.URI_REGEX)) {
@@ -388,6 +390,8 @@ public class SpecMapManager {
       res.special = SpecialPackageType.PhinVads;
     } else if (pi.name().equals("us.nlm.vsac")) {
       res.special = SpecialPackageType.Vsac;
+    } else if (pi.name().startsWith("hl7.fhir.") && pi.name().endsWith(".examples") ) {
+      res.special = SpecialPackageType.Examples;
     } else {
       res.special = SpecialPackageType.Simplifier;  
     }
@@ -403,5 +407,9 @@ public class SpecMapManager {
     return res;
   }
 
+
+  public SpecialPackageType getSpecial() {
+    return special;
+  }
 
 }

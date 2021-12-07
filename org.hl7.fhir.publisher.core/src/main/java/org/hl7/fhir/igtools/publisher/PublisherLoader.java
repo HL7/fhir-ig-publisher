@@ -75,7 +75,7 @@ public class PublisherLoader implements ILoaderKnowledgeProviderR5 {
         if (u.contains("|")) {
           u = u.substring(0, u.indexOf("|"));
         }
-        String p = spm.getPath(u, r.getMeta().getSource());
+        String p = spm.getPath(u, r.getMeta().getSource(), r.fhirType(), r.getId());
         if (p == null) {
           throw new FHIRException("Internal error in IG "+npm.name()+"#"+npm.version()+" map: No identity found for "+u);
         }
@@ -92,7 +92,7 @@ public class PublisherLoader implements ILoaderKnowledgeProviderR5 {
         String v = ((CanonicalResource) r).getVersion();
         if (v != null) {
           u = u + "|" + v;
-          p = spm.getPath(u, r.getMeta().getSource());
+          p = spm.getPath(u, r.getMeta().getSource(), r.fhirType(), r.getId());
           if (p == null) {
             System.out.println("In IG "+npm.name()+"#"+npm.version()+" map: No identity found for "+u);
           } else {
@@ -116,11 +116,11 @@ public class PublisherLoader implements ILoaderKnowledgeProviderR5 {
       CanonicalResource bc = (CanonicalResource) resource;
       String s = getOverride(bc.getUrl());
       if (s == null) {
-        s = spm.getPath(bc.getUrl(), resource.getMeta().getSource());
+        s = spm.getPath(bc.getUrl(), resource.getMeta().getSource(), resource.fhirType(), resource.getId());
       }
       if (s == null && bc instanceof CodeSystem) { // work around for an R2 issue) 
         CodeSystem cs = (CodeSystem) bc;
-        s = spm.getPath(cs.getValueSet(), resource.getMeta().getSource());
+        s = spm.getPath(cs.getValueSet(), resource.getMeta().getSource(), resource.fhirType(), resource.getId());
       }
       if (s != null) {
         return specPath(s);

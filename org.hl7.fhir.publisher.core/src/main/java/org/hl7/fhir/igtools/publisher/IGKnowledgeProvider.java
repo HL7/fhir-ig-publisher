@@ -346,11 +346,11 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     for (CanonicalResource bc : context.allConformanceResources()) {
       String s = getOverride(bc.getUrl());
       if (s == null) {
-        s = paths.getPath(bc.getUrl(), bc.getMeta().getSource());
+        s = paths.getPath(bc.getUrl(), bc.getMeta().getSource(), bc.fhirType(), bc.getId());
       }
       if (s == null && bc instanceof CodeSystem) { // work around for an R2 issue) 
         CodeSystem cs = (CodeSystem) bc;
-        s = paths.getPath(cs.getValueSet(), null);
+        s = paths.getPath(cs.getValueSet(), null, cs.fhirType(), cs.getId());
       }
       if (s != null) {
         bc.setUserData("path", specPath(s));

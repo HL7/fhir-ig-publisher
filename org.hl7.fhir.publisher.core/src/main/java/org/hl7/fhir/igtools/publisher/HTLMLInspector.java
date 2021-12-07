@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRFormatError;
+import org.hl7.fhir.igtools.publisher.SpecMapManager.SpecialPackageType;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService.LogCategory;
 import org.hl7.fhir.utilities.TextFile;
@@ -628,7 +629,7 @@ public class HTLMLInspector {
         resolved = true;
         if (specs != null) {
           for (SpecMapManager spec : specs) {
-            if (spec.getBase() != null && rref.startsWith(spec.getBase())) {
+            if (spec.getSpecial() != SpecialPackageType.Examples && spec.getBase() != null && rref.startsWith(spec.getBase())) {
               resolved = false;
             }
           }
