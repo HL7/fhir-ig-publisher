@@ -629,12 +629,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             if (withHeadings)
                 b.append("<h4>" + translate("sd.inv", "Constraints") + "</h4>\r\n");
             b.append("<table class=\"list\">\r\n");
-            b.append("<tr><td width=\"60\"><b>" + translate("sd.inv", "Id") + "</b></td><td><b>" + translate("sd.inv", "Path") + "</b></td><td><b>" + translate("sd.inv", "Details") + "</b></td><td><b>" + translate("sd.inv", "Requirements") + "</b></td></tr>\r\n");
+            b.append("<tr><td width=\"60\"><b>" + translate("sd.inv", "Id") + "</b></td><td><b>" + translate("sd.inv", "Grade") + "</b></td><td><b>" + translate("sd.inv", "Path") + "</b></td><td><b>" + translate("sd.inv", "Details") + "</b></td><td><b>" + translate("sd.inv", "Requirements") + "</b></td></tr>\r\n");
             for (String id : txlist) {
                 List<ElementDefinitionConstraintComponent> invs = txmap.get(id);
                 for (ElementDefinitionConstraintComponent inv : invs) {
                     if (!inv.hasSource() || inv.getSource().equals(sd.getUrl()) || allInvariants) {
-                        b.append("<tr><td>").append(inv.getKey()).append("</td><td>").append(id).append("</td><td>").append(Utilities.escapeXml(gt(inv.getHumanElement())))
+                        b.append("<tr><td>").append(inv.getKey()).append("</td><td>").append(grade(inv)).append("</td><td>").append(id).append("</td><td>").append(Utilities.escapeXml(gt(inv.getHumanElement())))
                                 .append("<br/>: ").append(Utilities.escapeXml(inv.getExpression())).append("</td><td>").append(Utilities.escapeXml(gt(inv.getRequirementsElement()))).append("</td></tr>\r\n");
                     }
                 }
@@ -642,6 +642,14 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             b.append("</table>\r\n");
             return b.toString();
         }
+    }
+
+    private String grade(ElementDefinitionConstraintComponent inv) {
+      if (inv.hasExtension(ToolingExtensions.EXT_BEST_PRACTICE)) {
+        return "Best Practice";
+      } else {
+        return gt(inv.getSeverityElement());
+      }
     }
 
     public class StringPair {

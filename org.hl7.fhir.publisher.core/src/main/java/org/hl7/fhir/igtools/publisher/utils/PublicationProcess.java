@@ -326,6 +326,8 @@ public class PublicationProcess {
     }
     if (milestone) {
       vSrc.addProperty("current", true);
+    } else if (vSrc.has("currrent")) {
+      vSrc.remove("current");      
     }
     JsonArray oldArr = plPub.getAsJsonArray("list");
     JsonArray newArr = new JsonArray();
