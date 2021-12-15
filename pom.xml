@@ -24,7 +24,7 @@
     <version>1.1.91-SNAPSHOT</version> <!-- See the note above -->
 
     <properties>
-        <core_version>5.6.9</core_version>
+        <core_version>5.6.15</core_version>
         <maven.test.skip>true</maven.test.skip>
     </properties>
 
