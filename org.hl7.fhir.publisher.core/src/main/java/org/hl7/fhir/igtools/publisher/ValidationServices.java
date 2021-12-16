@@ -193,29 +193,41 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
 
   @Override
   public boolean resolveURL(IResourceValidator validator, Object appContext, String path, String url, String type) throws IOException {
-    if (otherUrls.contains(url))
+    String u = url;
+    String v = null;
+    if (url.contains("|")) {
+      u = url.substring(0, url.indexOf("|"));
+      v = url.substring(url.indexOf("|")+1);
+    }
+    if (otherUrls.contains(u) || otherUrls.contains(url)) {
+      // ignore the version
       return true;
+    }
 
-    if (SIDUtilities.isKnownSID(url))
-      return true;
+    if (SIDUtilities.isKnownSID(u)) {
+      return (v == null) || !SIDUtilities.isInvalidVersion(u, v);
+    }
 
-    if (url.startsWith("http://hl7.org/fhirpath/System."))
-      return true;
+    if (u.startsWith("http://hl7.org/fhirpath/System.")) {
+      return (v == null || Utilities.existsInList(v, "2.0.0", "1.3.0", "1.2.0", "1.1.0", "1.0.0", "0.3.0", "0.2.0"));       
+    }
     
-    if (path.contains("StructureDefinition.mapping") && mappingUrls.contains(url)) {
+    if (path.contains("StructureDefinition.mapping") && (mappingUrls.contains(u) || mappingUrls.contains(url))) {
+      // ignore the version
       return true;
     }
     
 
     for (CanonicalResource cr : context.allConformanceResources()) {
       if (cr instanceof NamingSystem) {
-        if (hasURL((NamingSystem) cr, url)) {
+        if (hasURL((NamingSystem) cr, u)) {
+          // ignore the version?
           return true;
         }
       }
     }
     
-    if (url.startsWith("http://hl7.org/fhir"))
+    if (u.startsWith("http://hl7.org/fhir"))
       try {
         return context.fetchResourceWithException(Resource.class, url) != null;
       } catch (FHIRException e) {
