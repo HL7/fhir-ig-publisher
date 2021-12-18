@@ -171,7 +171,7 @@ public class DownloadBuilder {
 
   private String fixLinks(String html, int level) {
     html = html.replace("This is the current published version. ", "");
-    html = html.replace("This is the current published version in it's permanent home (it will always be available at this URL).", "");
+    html = html.replace("This is the current published version in its permanent home (it will always be available at this URL).", "");
     html = html.replace("<p id=\"publish-box\">", "<p id=\"publish-box\"> <b>This page is part of a downloaded copy of this specification.</b> ");
     
     int cursor = 0;
