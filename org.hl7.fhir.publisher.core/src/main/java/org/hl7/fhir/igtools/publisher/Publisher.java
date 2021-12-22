@@ -4223,7 +4223,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         ok = ok || cc.hasCoding(expectedJurisdiction);
       }
       if (!ok) {
-        f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, resource.fhirType()+".jurisdiction", "The resource "+verb+" declare its jurisdiction to match the package id ("+npmName+", jurisdiction = "+expectedJurisdiction.toString()+") (for FSH: 'jurisdiction: "+toFSH(expectedJurisdiction)+"')",
+        f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, resource.fhirType()+".jurisdiction", "The resource "+verb+" declare its jurisdiction to match the package id ("+npmName+", jurisdiction = "+expectedJurisdiction.toString()+") (for sushi-config.yaml: 'jurisdiction: "+toFSH(expectedJurisdiction)+"')",
             error).setMessageId(I18nConstants.RESOURCE_JURISDICTION_MISMATCH));
       }
     }
