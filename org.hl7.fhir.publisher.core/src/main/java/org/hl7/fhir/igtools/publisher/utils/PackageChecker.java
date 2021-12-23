@@ -43,7 +43,7 @@ public class PackageChecker {
           }
         }
       }
-    }    
+    }     
   }
 
   public void checkDep(String v, JsonObject deps, String id, String vc, String vf) {

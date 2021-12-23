@@ -38,6 +38,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.text.DateFormat;
 import java.text.ParseException;
@@ -821,8 +822,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                 new DependencyRenderer(pcm, outputDir, npmName, templateManager).render(publishedIg), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
                 new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate(), copyrightYear, context, scanForR5Extensions(),
                     noNarrativeResources, noValidateResources, noValidation, noGenerate);
-            log("Finished. "+Utilities.presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
+            log("Built. "+Utilities.presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
             recordOutcome(null, val);
+            log("Finished");
           }
         }
       } else {
@@ -962,13 +964,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           noNarrativeResources, noValidateResources, noValidation, noGenerate);
       tts.end();
       if (isChild()) {
-        log("Finished. "+tt.report());      
+        log("Built. "+tt.report());      
       } else {
         processTxLog(Utilities.path(destDir != null ? destDir : outputDir, "qa-tx.html"));
-        log("Finished. "+tt.report());      
+        log("Built. "+tt.report());      
         log("Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
       }
       recordOutcome(null, val);
+      log("Finished");      
     } catch (Exception e) {
       try {
         recordOutcome(e, null);        
@@ -1131,8 +1134,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     res.setPath(path);
     res.setAction(pv.getActivity().getCodingFirstRep());
     res.setDate(pv.hasOccurredPeriod() ? pv.getOccurredPeriod().getEndElement() : pv.hasOccurredDateTimeType() ? pv.getOccurredDateTimeType() : pv.getRecordedElement());
-    if (pv.hasReason()) {
-      res.setComment(pv.getReasonFirstRep().getText());
+    if (pv.getAuthorizationFirstRep().getConcept().hasText()) {
+      res.setComment(pv.getAuthorizationFirstRep().getConcept().getText());
     }
     for (ProvenanceAgentComponent agent : pv.getAgent()) {
       for (Coding c : agent.getType().getCoding()) {
@@ -5180,15 +5183,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), getFhirFormatFromMimeType(bin.getContentType()));    
     } else {
       validator.setNoCheckAggregation(r.isExample() && ToolingExtensions.readBoolExtension(r.getResEntry(), "http://hl7.org/fhir/tools/StructureDefinition/igpublisher-no-check-aggregation"));
+      List<StructureDefinition> profiles = new ArrayList<>();
+      
       if (r.getElement().hasUserData("profile")) {
-        String ref = r.getElement().getUserString("profile");
-        if (!Utilities.isAbsoluteUrl(ref)) {
-          ref = Utilities.pathURL(igpkp.getCanonical(), ref);
-        }
-        validator.validate(r.getElement(), errs, null, r.getElement(), ref);
-      } else {
-        validator.validate(r.getElement(), errs, null, r.getElement());
+        addProfile(profiles, r.getElement().getUserString("profile"), null);
       }
+      for (String s : r.getProfiles(false)) {
+        addProfile(profiles, s, r.fhirType());
+      }
+      validator.validate(r.getElement(), errs, null, r.getElement(), profiles);
     }
     for (ValidationMessage vm : errs) {
       String loc = r.fhirType()+"/"+r.getId();
@@ -5203,6 +5206,21 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       igpkp.findConfiguration(file, r);
     }
     tts.end();
+  }
+
+  private void addProfile(List<StructureDefinition> profiles, String ref, String rt) {
+    if (!Utilities.isAbsoluteUrl(ref)) {
+      ref = Utilities.pathURL(igpkp.getCanonical(), ref);
+    }
+    for (StructureDefinition sd : profiles) {
+      if (ref.equals(sd.getUrl())) {
+        return;
+      }
+    }
+    StructureDefinition sd = context.fetchResource(StructureDefinition.class, ref);
+    if (sd != null && (rt == null || sd.getType().equals(rt))) {
+      profiles.add(sd);
+    }    
   }
 
   public FhirFormat getFhirFormatFromMimeType(String mt) {
@@ -7044,9 +7062,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       try {
         if (f.isFolder()) {
           f.getOutputNames().add(dst);
-          Utilities.createDirectory(dst);
-        } else
+           Utilities.createDirectory(dst);
+        } else if (f.getPath().endsWith(".md")) {
+          checkMakeFile(stripFrontMatter(f.getSource()), dst, f.getOutputNames());          
+        } else {
           checkMakeFile(f.getSource(), dst, f.getOutputNames());
+        }
       } catch (IOException e) {
         log("Exception generating page "+dst+" for "+f.getRelativePath()+" in "+tempDir+": "+e.getMessage());
          
@@ -7105,6 +7126,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
     }
+  }
+
+  private byte[] stripFrontMatter(byte[] source) {
+    String src = new String(source, StandardCharsets.UTF_8);
+    if (src.startsWith("---")) {
+      String t = src.substring(3);
+      int i = t.indexOf("---");
+      if (i >= 0) {
+        src = t.substring(i+3);
+      }
+    }
+    return src.getBytes(StandardCharsets.UTF_8);
   }
 
   public boolean generateResourceHtml(FetchedFile f, boolean regen, FetchedResource r, Resource res, Map<String, String> vars, String prefixForContainer) {

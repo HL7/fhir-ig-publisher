@@ -13,22 +13,39 @@ public class SuppressedMessageInformation {
 
     @Override
     public int compare(SuppressedMessage o1, SuppressedMessage o2) {
-      return o1.message.compareTo(o2.message);
+      return o1.messageRaw.compareTo(o2.messageRaw);
     }
 
   }
 
   public class SuppressedMessage {
-    private String message;
+    private String messageRaw;
+    private String messageComp;
+    private int compType;
     private int useCount;
     
     public SuppressedMessage(String message) {
       super();
-      this.message = message;
+      this.messageRaw = message;
+      if (messageRaw.startsWith("%")) {
+        if (messageRaw.endsWith("%")) {
+          compType = 3;
+          messageComp = messageRaw.substring(1, messageRaw.length()-1).toLowerCase();
+        } else {
+          compType = 2;
+          messageComp = messageRaw.substring(1, messageRaw.length()).toLowerCase();
+        } 
+      } else if (messageRaw.endsWith("%")) {
+        compType = 1;
+        messageComp = messageRaw.substring(0, messageRaw.length()-1).toLowerCase();
+      } else {
+        compType = 0;
+        messageComp = messageRaw.toLowerCase();
+      }
     }
 
-    public String getMessage() {
-      return message;
+    public String getMessageRaw() {
+      return messageRaw;
     }
     
     public void use() {
@@ -37,6 +54,16 @@ public class SuppressedMessageInformation {
 
     public int getUseCount() {
       return useCount;
+    }
+
+    public boolean matches(String msg) {
+      switch (compType) {
+       case 0: return msg.equals(messageComp);
+       case 1: return msg.startsWith(messageComp);
+       case 2: return msg.endsWith(messageComp);
+       case 3: return msg.contains(messageComp);
+      }
+      return false;
     }
   }
   
@@ -51,9 +78,11 @@ public class SuppressedMessageInformation {
     if (message == null) {
       return false;
     }
+    String msg = message.toLowerCase();
     for (Category c : categories) {
       for (SuppressedMessage sm : c.messages) {
-        if (sm.message.contains(message)) {
+        boolean match = sm.matches(msg);
+        if (match) {
           sm.use();
           return true;
         }
