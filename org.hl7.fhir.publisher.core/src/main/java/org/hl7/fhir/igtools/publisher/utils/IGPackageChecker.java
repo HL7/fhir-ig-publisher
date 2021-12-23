@@ -37,7 +37,7 @@ public class IGPackageChecker {
     this.canonical = canonical;
     this.vpath = vpath;
     this.packageId = packageId;
-  }
+  } 
 
   public void check(String ver, String pckId, String fhirversion, String name, Date date, String url, String canonical, String jurisdiction) throws IOException, FHIRException {
     String pf = Utilities.path(folder, "package.tgz");
@@ -98,8 +98,12 @@ public class IGPackageChecker {
           }
         }
       }
-      if (pck.isChangedByLoader()) {
-        pck.save(new FileOutputStream(f));
+      if (pck.isChangedByLoader()) {        
+        System.out.println("Problem #14 with "+pf+": package was modified during loading due to some error");
+        // GDG 22-12-2021 - why do this? we shouldn't get to this circumstance, but if we do, we don't want to fix is this way
+//        FileOutputStream stream = new FileOutputStream(f);
+//        pck.save(stream);
+//        stream.close();
       }
     }
   }

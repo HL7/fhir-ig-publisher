@@ -62,7 +62,7 @@ public class PackageReleaser {
     private String ver;
 
     public PackageReleaserScrubber(String ver) {
-      this.ver = ver;
+      this.ver = ver; 
     }
 
     @Override
