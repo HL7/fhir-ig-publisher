@@ -6195,64 +6195,48 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         item.addProperty("history", r.hasHistory());
         item.addProperty("index", i);
         item.addProperty("source", f.getStatedPath());
-        item.addProperty("path", r.getElement().getUserString("path"));
+        String path = null;
+        if (r.getPath() != null) {
+          path = r.getPath();
+        } else if (r.getResource() != null) {
+          path = r.getResource().getUserString("path");
+        } else {
+          path = r.getElement().getUserString("path");
+        }
+        if (path != null) {
+          item.addProperty("path", path);
+        }
         if (r.getResource() != null) {
-          if (r.getResource() instanceof CanonicalResource) {
-            CanonicalResource cr = (CanonicalResource) r.getResource();
-            item.addProperty("url", cr.getUrl());
-            if (cr.hasName()) {
-              item.addProperty("name", cr.getName());
-            }
-            if (cr.hasTitle()) {
-              item.addProperty("title", cr.getTitle());
-            }
-            if (cr.hasVersion()) {
-              item.addProperty("version", cr.getVersion());
-            }
-            if (cr.hasDate()) {
-              item.addProperty("date", cr.getDateElement().primitiveValue());
-            }
-            if (cr.hasStatus()) {
-              item.addProperty("status", cr.getStatus().toCode());
-            }
+          populateResourceEntry(r, item, null);
+        }
+        JsonArray contained = null;
+        // contained resources get added twice - once as sub-entries under the resource that contains them, and once as an entry in their own right, for their own rendering 
+        for (ContainedResourceDetails crd : getContained(r.getElement())) {
+          if (contained == null) {
+            contained = new JsonArray();
+            item.add("contained", contained);
           }
-          if (r.getResource() instanceof DomainResource) {
-            org.hl7.fhir.igtools.renderers.StatusRenderer.ResourceStatusInformation info = StatusRenderer.analyse((DomainResource) r.getResource());
-            JsonObject jo = new JsonObject();
-            if (info.getColorClass() != null) {
-              jo.addProperty("class", info.getColorClass());
-            }
-            if (info.getFmm() != null) {
-              jo.addProperty("fmm", info.getFmm());
-            }
-            if (info.getOwner() != null) {
-              jo.addProperty("owner", info.getOwner());
-            }
-            if (info.getOwnerLink() != null) {
-              jo.addProperty("link", info.getOwnerLink());
-            }
-            if (info.getSstatus() != null) {
-              jo.addProperty("standards-status", info.getSstatus());
-            }
-            if (info.getStatus() != null) {
-              jo.addProperty("status", info.getStatus());
-            }
-            if (!jo.entrySet().isEmpty()) {
-              item.add("status", jo);
-            }
+          JsonObject jo = new JsonObject();
+          contained.add(jo);
+          jo.addProperty("type", crd.getType());
+          jo.addProperty("id", crd.getId());
+          jo.addProperty("title", crd.getType());
+          jo.addProperty("description", crd.getDescription());
+          
+          JsonObject citem = new JsonObject();
+          data.add(crd.getType()+"/"+r.getId()+"_"+crd.getId(), citem); 
+          citem.addProperty("history", r.hasHistory());
+          citem.addProperty("index", i);
+          citem.addProperty("source", f.getStatedPath()+"#"+crd.getId());
+          citem.addProperty("path", crd.getType()+"-"+r.getId()+"_"+crd.getId()+".html");// todo: is this always correct?
+          JsonObject container = new JsonObject();; 
+          citem.add("container", container);
+          container.addProperty("id", r.fhirType()+"/"+r.getId());
+          if (path != null) {
+            container.addProperty("path", path);
           }
-          JsonArray contained = null;
-          for (ContainedResourceDetails crd : getContained(r.getElement())) {
-            if (contained == null) {
-              contained = new JsonArray();
-              item.add("contained", contained);
-            }
-            JsonObject jo = new JsonObject();
-            contained.add(jo);
-            jo.addProperty("type", crd.getType());
-            jo.addProperty("id", crd.getId());
-            jo.addProperty("title", crd.getType());
-            jo.addProperty("description", crd.getDescription());
+          if (r.getResource() != null) {
+            populateResourceEntry(r, citem, crd);
           }
         }
         i++;
@@ -6285,6 +6269,66 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       createToc();
       if (htmlTemplate != null || mdTemplate != null) {
         applyPageTemplate(htmlTemplate, mdTemplate, publishedIg.getDefinition().getPage());
+      }
+    }
+  }
+
+
+//  private String type;
+//  private String id;
+//  private String title;
+//  private String description;
+  public void populateResourceEntry(FetchedResource r, JsonObject item, ContainedResourceDetails crd) {
+    if (r.getResource() instanceof CanonicalResource) {
+      CanonicalResource cr = (CanonicalResource) r.getResource();
+      if (crd != null) {
+        item.addProperty("url", cr.getUrl()+"#"+crd.getId());
+        if (crd.getTitle() != null) {
+          item.addProperty("name", crd.getTitle());          
+          item.addProperty("title", cr.getTitle());
+        }
+      } else {
+        item.addProperty("url", cr.getUrl());
+        if (cr.hasName()) {
+          item.addProperty("name", cr.getName());
+        }
+        if (cr.hasTitle()) {
+          item.addProperty("title", cr.getTitle());
+        }
+      }
+      if (cr.hasVersion()) {
+        item.addProperty("version", cr.getVersion());
+      }
+      if (cr.hasDate()) {
+        item.addProperty("date", cr.getDateElement().primitiveValue());
+      }
+      if (cr.hasStatus()) {
+        item.addProperty("status", cr.getStatus().toCode());
+      }
+    }
+    if (r.getResource() instanceof DomainResource) {
+      org.hl7.fhir.igtools.renderers.StatusRenderer.ResourceStatusInformation info = StatusRenderer.analyse((DomainResource) r.getResource());
+      JsonObject jo = new JsonObject();
+      if (info.getColorClass() != null) {
+        jo.addProperty("class", info.getColorClass());
+      }
+      if (info.getFmm() != null) {
+        jo.addProperty("fmm", info.getFmm());
+      }
+      if (info.getOwner() != null) {
+        jo.addProperty("owner", info.getOwner());
+      }
+      if (info.getOwnerLink() != null) {
+        jo.addProperty("link", info.getOwnerLink());
+      }
+      if (info.getSstatus() != null) {
+        jo.addProperty("standards-status", info.getSstatus());
+      }
+      if (info.getStatus() != null) {
+        jo.addProperty("status", info.getStatus());
+      }
+      if (!jo.entrySet().isEmpty()) {
+        item.add("status", jo);
       }
     }
   }
