@@ -238,6 +238,7 @@ import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator.Category;
 import org.hl7.fhir.r5.utils.OperationOutcomeUtilities;
 import org.hl7.fhir.r5.utils.ResourceSorters;
+import org.hl7.fhir.r5.utils.ResourceUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.XVerExtensionManager;
 import org.hl7.fhir.r5.utils.XVerExtensionManager.XVerExtensionStatus;
@@ -3467,6 +3468,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     rc.setProfileUtilities(new ProfileUtilities(context, new ArrayList<ValidationMessage>(), igpkp));
     rc.setQuestionnaireMode(QuestionnaireRendererMode.TREE);
     rc.getCodeSystemPropList().addAll(codeSystemProps );
+    if (publishedIg.hasJurisdiction()) {
+      Locale locale = null;
+      try {
+        locale = ResourceUtilities.getLocale(publishedIg);
+      } catch (Exception e) {
+        log("Error setting locale for jurisdiction: "+e.getMessage());
+      }
+      if (locale != null) {
+        rc.setLocale(locale);
+      }
+    }
 //    rc.setTargetVersion(pubVersion);
 
     if (igMode) {
