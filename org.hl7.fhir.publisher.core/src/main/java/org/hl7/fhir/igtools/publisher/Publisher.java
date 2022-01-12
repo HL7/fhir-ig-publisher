@@ -829,7 +829,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           }
         }
       } else {
-        log("Done"+(!publishing && mode != IGBuildMode.AUTOBUILD ? ". This IG has been built using the 'normal' process for local use. If building to host on an an external website, use the process documented [yet to be documented]])" : ""));
+        log("Done"+(!publishing && mode != IGBuildMode.AUTOBUILD ? ". This IG has been built using the 'normal' process for local use. If building to host on an an external website, use the process documented here: https://confluence.hl7.org/display/FHIR/Maintaining+a+FHIR+IG+Publication)" : ""));
       }
     }
     if (templateLoaded && new File(rootDir).exists()) {
@@ -5541,8 +5541,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           res.getExtension().add(ex);
           ex.addExtension("type", new CodeType(c.getType()));
           ex.addExtension("id", new IdType(c.getId()));
-          ex.addExtension("title", new IdType(c.getType()));
-          ex.addExtension("description", new IdType(c.getDescription()));
+          ex.addExtension("title", new StringType(c.getType()));
+          ex.addExtension("description", new StringType(c.getDescription()));
         }
       }
     }
