@@ -183,7 +183,7 @@ public class PreviousVersionComparator {
 
 
   public void startChecks(ImplementationGuide ig) {
-    if (errMsg == null) {
+    if (errMsg == null && pid != null) {
       resources = new ArrayList<>();
       for (VersionInstance vi : versionList) {
         String filename = "";
@@ -230,7 +230,7 @@ public class PreviousVersionComparator {
   }
 
   public void finishChecks() throws IOException {
-    if (errMsg == null) {
+    if (errMsg == null && pid != null) {
       for (VersionInstance vi : versionList) {
         Set<String> set = new HashSet<>();
         for (CanonicalResource rl : vi.resources) {
@@ -353,7 +353,7 @@ private String fixForIniMap(String url, IniFile ini) {
   }
 
   public void check(CanonicalResource resource) {
-    if (errMsg == null) {
+    if (errMsg == null && pid != null) {
       resources.add(resource);
     }
   }
