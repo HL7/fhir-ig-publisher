@@ -252,7 +252,9 @@ import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
+import org.hl7.fhir.utilities.SimpleHTTPClient.HTTPResult;
 import org.hl7.fhir.utilities.MimeType;
+import org.hl7.fhir.utilities.SimpleHTTPClient;
 import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.TimeTracker;
@@ -9227,11 +9229,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     throw new Error("Extracting GitHub source failed.");
   }
 
-  private static InputStream fetchGithubUrl(String ghUrl) throws IOException {
-    URL url = new URL(ghUrl+"?nocache=" + System.currentTimeMillis());
-    HttpURLConnection c = (HttpURLConnection) url.openConnection();
-    c.setInstanceFollowRedirects(true);
-    return c.getInputStream();
+  private static InputStream fetchGithubUrl(String ghUrl) throws IOException {    
+    SimpleHTTPClient http = new SimpleHTTPClient();
+    HTTPResult res = http.get(ghUrl+"?nocache=" + System.currentTimeMillis());
+    res.checkThrowException();
+    return new ByteArrayInputStream(res.getContent());
   }
 
 //  private static void gitClone(String org, String repo, String branch, String folder) throws InvalidRemoteException, TransportException, GitAPIException {

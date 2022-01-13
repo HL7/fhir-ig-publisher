@@ -1,5 +1,6 @@
 package org.hl7.fhir.igtools.publisher.realm;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -29,6 +30,9 @@ import org.hl7.fhir.r5.model.Parameters.ParametersParameterComponent;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
+import org.hl7.fhir.utilities.SimpleHTTPClient;
+import org.hl7.fhir.utilities.SimpleHTTPClient.HTTPResult;
+import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
@@ -169,7 +173,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
   }
 
   private NpmPackage fetchLatestUSCore() throws IOException {
-    JsonObject pl = fetchJson("http://hl7.org/fhir/us/core/package-list.json");
+    JsonObject pl = fetchJson("https://hl7.org/fhir/us/core/package-list.json");
     for (JsonElement e : pl.getAsJsonArray("list")) {
       JsonObject v = (JsonObject) e;
       if (v.has("fhirversion") && VersionUtilities.versionsCompatible(version, v.get("fhirversion").getAsString())) {
@@ -188,14 +192,13 @@ public class USRealmBusinessRules extends RealmBusinessRules {
     } else {
       return null;
     }
-
   }
 
-  private JsonObject fetchJson(String source) throws IOException {
-    URL url = new URL(source+"?nocache=" + System.currentTimeMillis());
-    HttpURLConnection c = (HttpURLConnection) url.openConnection();
-    c.setInstanceFollowRedirects(true);
-    return JsonTrackingParser.parseJson(c.getInputStream());
+  private JsonObject fetchJson(String source) throws IOException  {
+    SimpleHTTPClient http = new SimpleHTTPClient();
+    HTTPResult res = http.get(source+"?nocache=" + System.currentTimeMillis());
+    res.checkThrowException();
+    return JsonTrackingParser.parseJson(res.getContent());
   }
 
   @Override
