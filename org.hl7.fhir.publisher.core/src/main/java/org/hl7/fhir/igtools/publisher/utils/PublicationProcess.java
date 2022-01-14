@@ -133,7 +133,10 @@ public class PublicationProcess {
       }
       realm = p[2];
       code = p[3];
-      if (!check(res, canonical != null && (canonical.equals("http://hl7.org/fhir/"+realm+"/"+code)  || canonical.equals("http://hl7.org/fhir/smart-app-launch")), "canonical URL of "+canonical+" does not match the required canonical of http://hl7.org/fhir/"+realm+"/"+code)) {
+      if (!check(res, canonical == null, "canonical URL not found")) {
+        return res;
+      }
+      if (!performRealmCanonicalCheck(res, canonical, realm, code)) {
         return res;
       }
       if (!check(res, canonical.startsWith(url), "Proposed canonical '"+canonical+"' does not match the web site URL '"+url+"'")) {
@@ -202,6 +205,26 @@ public class PublicationProcess {
     }        
     return res;
     
+  }
+
+  private boolean performRealmCanonicalCheck(List<ValidationMessage> res, String canonical, String realm, String code) {
+    if ("dk".equals(realm)) {
+      return check(res, canonical.equals("http://hl7.dk/fhir/"+code), 
+          "canonical URL of "+canonical+" does not match the required canonical of http://hl7.dk/fhir/"+code);          
+    } else if ("ch".equals(realm)) {
+      return check(res, canonical.equals("http://fhir.ch/ig/"+code), 
+          "canonical URL of "+canonical+" does not match the required canonical of http://fhir.ch/ig/"+code);          
+    } else if ("be".equals(realm)) {
+      return check(res, canonical.equals("http://hl7belgium.org/profiles/fhir/"+code) || canonical.equals("http://ehealth.fgov.be/standards/fhir/"+code), 
+          "canonical URL of "+canonical+" does not match the required canonical of http://hl7.dk/fhir/"+code);          
+    } else {
+      // special case weirdity
+      if ("uv".equals(realm) && "smart-app-launch".equals(code)) {
+        return check(res, canonical.equals("http://hl7.org/fhir/smart-app-launch"), "canonical URL of "+canonical+" does not match the required canonical of http://hl7.org/fhir/smart-app-launch");
+      } else {
+        return check(res, canonical.equals("http://hl7.org/fhir/"+realm+"/"+code) || canonical.equals("http://hl7.org/fhir/smart-app-launch"), "canonical URL of "+canonical+" does not match the required canonical of http://hl7.org/fhir/"+realm+"/"+code);
+      }
+    }
   }
 
   private File checkDirectory(String filename, List<ValidationMessage> res, String name) throws Exception {

@@ -252,7 +252,9 @@ import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
+import org.hl7.fhir.utilities.SimpleHTTPClient.HTTPResult;
 import org.hl7.fhir.utilities.MimeType;
+import org.hl7.fhir.utilities.SimpleHTTPClient;
 import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.TimeTracker;
@@ -829,7 +831,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           }
         }
       } else {
-        log("Done"+(!publishing && mode != IGBuildMode.AUTOBUILD ? ". This IG has been built using the 'normal' process for local use. If building to host on an an external website, use the process documented [yet to be documented]])" : ""));
+        log("Done"+(!publishing && mode != IGBuildMode.AUTOBUILD ? ". This IG has been built using the 'normal' process for local use. If building to host on an an external website, use the process documented here: https://confluence.hl7.org/display/FHIR/Maintaining+a+FHIR+IG+Publication)" : ""));
       }
     }
     if (templateLoaded && new File(rootDir).exists()) {
@@ -5541,8 +5543,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           res.getExtension().add(ex);
           ex.addExtension("type", new CodeType(c.getType()));
           ex.addExtension("id", new IdType(c.getId()));
-          ex.addExtension("title", new IdType(c.getType()));
-          ex.addExtension("description", new IdType(c.getDescription()));
+          ex.addExtension("title", new StringType(c.getType()));
+          ex.addExtension("description", new StringType(c.getDescription()));
         }
       }
     }
@@ -9227,11 +9229,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     throw new Error("Extracting GitHub source failed.");
   }
 
-  private static InputStream fetchGithubUrl(String ghUrl) throws IOException {
-    URL url = new URL(ghUrl+"?nocache=" + System.currentTimeMillis());
-    HttpURLConnection c = (HttpURLConnection) url.openConnection();
-    c.setInstanceFollowRedirects(true);
-    return c.getInputStream();
+  private static InputStream fetchGithubUrl(String ghUrl) throws IOException {    
+    SimpleHTTPClient http = new SimpleHTTPClient();
+    HTTPResult res = http.get(ghUrl+"?nocache=" + System.currentTimeMillis());
+    res.checkThrowException();
+    return new ByteArrayInputStream(res.getContent());
   }
 
 //  private static void gitClone(String org, String repo, String branch, String folder) throws InvalidRemoteException, TransportException, GitAPIException {
