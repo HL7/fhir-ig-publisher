@@ -63,7 +63,7 @@ public class WebSiteLayoutRulesProviders {
             "canonical URL of "+canonical+" does not match the required canonical of http://fhir.ch/ig/"+code());          
       } else if ("be".equals(realm())) {
         ok = check(res, canonical.equals("http://hl7belgium.org/profiles/fhir/"+code()) || canonical.equals("http://ehealth.fgov.be/standards/fhir/"+code()), 
-            "canonical URL of "+canonical+" does not match the required canonical of http://hl7.dk/fhir/"+code());          
+            "canonical URL of "+canonical+" does not match the required canonical of http://hl7belgium.org/profiles/fhir/"+code()+" or http://ehealth.fgov.be/standards/fhir/"+code());          
       } else {
         // special case weirdity
         if ("uv".equals(realm()) && "smart-app-launch".equals(code())) {
@@ -100,8 +100,7 @@ public class WebSiteLayoutRulesProviders {
         }
       }
     }
-
-}
+  }
 
   public static class IHENamingRulesProvider extends DefaultNamingRulesProvider {
     public boolean checkNpmId(List<ValidationMessage> res) {
