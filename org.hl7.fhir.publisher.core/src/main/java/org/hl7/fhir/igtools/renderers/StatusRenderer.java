@@ -69,20 +69,25 @@ public class StatusRenderer {
 
 
   private static String getColor(ResourceStatusInformation info) {
-    if ("Draft".equals(info.getStatus())) {
+    return getColor(info.getStatus(), info.getSstatus(), info.getFmm());
+  }
+  
+  public static String getColor(String status, String standardStatus, String fmm) {
+    if ("Draft".equals(status)) {
       return "colsd";
     }
-    if (!"Active".equals(info.getStatus())) {
-      return "colsd";
+    if (!"Active".equals(status)) {
+      return "colsdp";
     }
-    if (info.getSstatus() == null)
-      return "0".equals(info.getFmm()) ? "colsd" : "colstu";
-    switch (info.getSstatus()) {
+    if (standardStatus == null)
+      return "0".equals(fmm) ? "colsd" : "colstu";
+    switch (standardStatus) {
     case "Draft": return "colsd";
-    case "Trial-Use": return "0".equals(info.getFmm()) ? "colsd" : "colstu"; 
+    case "Trial-Use": return "0".equals(fmm) ? "colsd" : "colstu"; 
     case "Normative": return "colsn";
     case "Informative": return "colsi";
-    case "Exteranl": return "colse";
+    case "External": return "colse";
+    case "Deprecated": return "colsdp";
     default:
       return "colsi";
     }
