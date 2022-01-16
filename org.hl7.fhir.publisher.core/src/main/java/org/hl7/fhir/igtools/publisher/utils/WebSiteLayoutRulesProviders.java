@@ -14,10 +14,7 @@ public class WebSiteLayoutRulesProviders {
   public interface WebSiteLayoutRulesProvider {
     public boolean checkNpmId(List<ValidationMessage> res);
     public boolean checkCanonicalAndUrl(List<ValidationMessage> res, String canonical, String url);
-    public boolean checkDirectory(List<ValidationMessage> res, String canonical);
-    public String realm();
-    public String code();
-    public String getFolder(String rootFolder) throws IOException;
+    public String getDestination(String rootFolder) throws IOException;
   }
   
   public static class DefaultNamingRulesProvider implements WebSiteLayoutRulesProvider {
@@ -33,30 +30,18 @@ public class WebSiteLayoutRulesProviders {
     }
 
     @Override
+    public boolean checkNpmId(List<ValidationMessage> res) {
+      return true;      
+    }
+    
+    @Override
     public boolean checkCanonicalAndUrl(List<ValidationMessage> res, String canonical, String url) {
       return true;
     }
-    
+        
     @Override
-    public boolean checkDirectory(List<ValidationMessage> res, String canonical) {
-      return false;
-    }
-    
-    public boolean checkNpmId(List<ValidationMessage> res) {
-      return false;      
-    }
-    
-    public String realm() {
-      return null;
-    }
-    
-    public String code() {
-      return null;      
-    }
-
-    @Override
-    public String getFolder(String rootFolder) throws IOException {
-      return Utilities.path(rootFolder, realm(), code());
+    public String getDestination(String rootFolder) throws IOException {
+      throw new Error("Must be overridden");
     }
   }
 
@@ -99,7 +84,7 @@ public class WebSiteLayoutRulesProviders {
     }  
     
     @Override
-    public String getFolder(String rootFolder) throws IOException {
+    public String getDestination(String rootFolder) throws IOException {
       if ("dk".equals(realm())) {
         return Utilities.path(rootFolder, code());
       } else if ("ch".equals(realm())) {
@@ -115,17 +100,37 @@ public class WebSiteLayoutRulesProviders {
         }
       }
     }
-  }
 
-  public static boolean useRealm(String realm, String code) {
-    if (realm.equals("uv") && code.equals("smart-app-launch")) {
-      return false;
-    }
-    return true;
-  }
-
+}
 
   public static class IHENamingRulesProvider extends DefaultNamingRulesProvider {
+    public boolean checkNpmId(List<ValidationMessage> res) {
+      return check(res, parts.length == 3 && "ihe".equals(parts[0]), 
+          "Package Id '"+id+"' is not valid:  must have 3 parts (hl7.fhir.[domain].[profile]");
+    }
+    
+    private String domain() {
+      return parts[1];
+    }
+    
+    private String profile() {
+      return parts[2];
+    }
+
+    public boolean checkCanonicalAndUrl(List<ValidationMessage> res, String canonical, String url) {
+      // IHE case differs, but not predictably, so we can't check case. 
+      // canonical is https://profiles.ihe.net/${domain}/${profile} - see https://chat.fhir.org/#narrow/stream/179252-IG-creation/topic/IG.20Release.20Publication.20procedure/near/268010908      
+      boolean ok = check(res, canonical.equalsIgnoreCase("https://profiles.ihe.net/"+domain()+"/"+profile()),
+          "canonical URL of "+canonical+" does not match the required canonical of https://profiles.ihe.net/"+domain()+"/"+profile());          
+      return check(res, canonical.startsWith(url), "Proposed canonical '"+canonical+"' does not match the web site URL '"+url+"'") && ok;
+    }
+
+
+    public String getDestination(String rootFolder) throws IOException {
+      // there's a case problem here: if IHI lowercases package names, but not canonicals or folder URLs, then the case of this will be wrong
+      // and can't upper case algorithmically. May have to pick up case from canonical?
+      return Utilities.path(rootFolder, domain(), profile());      
+    }
 
   }
 
@@ -138,21 +143,29 @@ public class WebSiteLayoutRulesProviders {
 
     @Override
     public boolean checkCanonicalAndUrl(List<ValidationMessage> res, String canonical, String url) {
-      return check(res, canonical != null && (canonical.equals("http://fhir.org/guides/"+realm()+"/"+code())), 
-          "canonical URL of "+canonical+" does not match the required canonical of http://fhir.org/guides/"+realm()+"/"+code()) &&
+      return check(res, canonical != null && (canonical.equals("http://fhir.org/guides/"+org()+"/"+code())), 
+          "canonical URL of "+canonical+" does not match the required canonical of http://fhir.org/guides/"+org()+"/"+code()) &&
           check(res, canonical.startsWith(url), "Proposed canonical '"+canonical+"' does not match the web site URL '"+url+"'");
     }
     
-    public String realm() {
+    public String org() {
       return parts[1];
     }
     
     public String code() {
       return parts[2];
     }
+    
+    public String getDestination(String rootFolder) throws IOException {
+      return Utilities.path(rootFolder, org(), code());      
+    }
+
   }
 
   public static class CQLNamingRulesProvider extends DefaultNamingRulesProvider {
+    public boolean checkNpmId(List<ValidationMessage> res) {
+      return true;
+    }
 
     @Override
     public boolean checkCanonicalAndUrl(List<ValidationMessage> res, String canonical, String url) {
@@ -162,13 +175,16 @@ public class WebSiteLayoutRulesProviders {
     
 
     @Override
-    public String getFolder(String rootFolder) throws IOException {
+    public String getDestination(String rootFolder) throws IOException {
       return rootFolder;
     }
     
   }
 
   public static class HL7TerminologyNamingRulesProvider extends DefaultNamingRulesProvider {
+    public boolean checkNpmId(List<ValidationMessage> res) {
+      return true;
+    }
 
     @Override
     public boolean checkCanonicalAndUrl(List<ValidationMessage> res, String canonical, String url) {
@@ -177,9 +193,11 @@ public class WebSiteLayoutRulesProviders {
     }
     
     @Override
-    public String getFolder(String rootFolder) throws IOException {
+    public String getDestination(String rootFolder) throws IOException {
       return rootFolder;
     }
+
+
   }
 
   public static WebSiteLayoutRulesProvider recogniseNpmId(String id, String[] p) {
