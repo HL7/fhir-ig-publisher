@@ -7157,7 +7157,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (r.getResource() != null) {
           generateResourceHtml(f, regen, r, r.getResource(), vars, "");
           if (r.getResource() instanceof DomainResource) {
-            DomainResource container = (CanonicalResource) r.getResource();
+            DomainResource container = (DomainResource) r.getResource();
             for (Resource contained : container.getContained()) {              
               String prefixForContained = r.getResource().getId()+"_";
               makeTemplatesContained(f, r, contained, vars, prefixForContained);
