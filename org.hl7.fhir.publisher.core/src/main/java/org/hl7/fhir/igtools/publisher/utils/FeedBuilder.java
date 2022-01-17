@@ -212,15 +212,18 @@ public class FeedBuilder {
       String desc = pub.desc();
       if (forPackage && new File(Utilities.path(pub.folder, "package.tgz")).exists()) {
         // open the package, check the details and get the description
-        NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(pub.folder, "package.tgz")));
-        if (!(npm.name()+"#"+npm.version()).equals(pub.title(forPackage)))
-          System.out.println("id mismatch in "+Utilities.path(pub.folder, "package.tgz")+" - expected "+pub.title(forPackage)+" but found "+npm.name()+"#"+npm.version());
-        desc = npm.description();
-        String pver = npm.version();
-        if (!pver.equals(pub.version)) {
-          System.out.println("Version mismatch - package-list.json says "+pub.version+", actual package says "+pver);
+        try {
+          NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(Utilities.path(pub.folder, "package.tgz")));
+          if (!(npm.name()+"#"+npm.version()).equals(pub.title(forPackage)))
+            System.out.println("id mismatch in "+Utilities.path(pub.folder, "package.tgz")+" - expected "+pub.title(forPackage)+" but found "+npm.name()+"#"+npm.version());
+          desc = npm.description();
+          String pver = npm.version();
+          if (!pver.equals(pub.version)) {
+            System.out.println("Version mismatch - package-list.json says "+pub.version+", actual package says "+pver);
+          }
+        } catch (Exception e) {
+          throw new IOException("Error processing "+Utilities.path(pub.folder, "package.tgz")+": "+e.getMessage());
         }
-        
       }
       if (forPackage) {
         for (String s : pub.subPackages) {

@@ -7153,37 +7153,82 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         Map<String, String> vars = makeVars(r);
         makeTemplates(f, r, vars);
         saveDirectResourceOutputs(f, r, r.getResource(), vars);
+        List<StringPair> clist = new ArrayList<>();
         if (r.getResource() != null) {
           generateResourceHtml(f, regen, r, r.getResource(), vars, "");
-          if (r.getResource() instanceof CanonicalResource) {
-            CanonicalResource container = (CanonicalResource) r.getResource();
+          if (r.getResource() instanceof DomainResource) {
+            DomainResource container = (DomainResource) r.getResource();
             for (Resource contained : container.getContained()) {              
               String prefixForContained = r.getResource().getId()+"_";
               makeTemplatesContained(f, r, contained, vars, prefixForContained);
-              saveDirectResourceOutputsContained(f, r, contained, vars, prefixForContained);
+              String fn = saveDirectResourceOutputsContained(f, r, contained, vars, prefixForContained);
               if (contained instanceof CanonicalResource) {
                 CanonicalResource cr = ((CanonicalResource) contained).copy();
                 cr.copyUserData(container);
-                if (!cr.hasUrl()) {
-                  cr.setUrl(container.getUrl()+"#"+contained.getId());
+                if (!(container instanceof CanonicalResource)) {
+                  if (!cr.hasUrl() || !cr.hasVersion()) {
+                    throw new FHIRException("Unable to publish: contained canonical resource in a non-canonical resource does not have url+version");
+                  }
+                } else {
+                  cr.copyUserData(container);
+                  if (!cr.hasUrl()) {
+                    cr.setUrl(((CanonicalResource) container).getUrl()+"#"+contained.getId());
+                  }
+                  if (!cr.hasVersion()) {
+                    cr.setVersion(((CanonicalResource) container).getVersion());
+                  }
                 }
-                if (!cr.hasVersion()) {
-                  cr.setVersion(container.getVersion());
-                }
-                generateResourceHtml(f, regen, r, cr, vars, prefixForContained);                  
+                generateResourceHtml(f, regen, r, cr, vars, prefixForContained);
+                clist.add(new StringPair(cr.present(), fn));
               } else {
-                generateResourceHtml(f, regen, r, contained, vars, prefixForContained);                
+                generateResourceHtml(f, regen, r, contained, vars, prefixForContained);
+                clist.add(new StringPair(contained.fhirType()+"/"+contained.getId(), fn));
               }
             }
           }
         } else {
+          // element contained
+          // TODO: figure this out
           if ("QuestionnaireResponse".equals(r.fhirType())) {
             String prefixForContained = "";
             generateOutputsQuestionnaireResponse(f, r, vars, prefixForContained);
           }
         }
+        if (igpkp.wantGen(r, "contained-index")) {
+          fragment(r.fhirType()+"-"+r.getId()+"-contained-index", genContainedIndex(r, clist), f.getOutputNames());
+        }
       }
     }
+  }
+
+  public class StringPair {
+    private String name;
+    private String value;
+
+    public StringPair(String name, String value) {
+      super();
+      this.name = name;
+      this.value = value;
+    }
+
+    public String getName() {
+      return name;
+    }
+
+    public String getValue() {
+      return value;
+    }
+  }
+  private String genContainedIndex(FetchedResource r, List<StringPair> clist) {
+    StringBuilder b = new StringBuilder();
+    if (clist.size() > 0) {
+      b.append("<ul>\r\n");
+      for (StringPair sp : clist) {
+        b.append("<li><a href=\""+sp.getValue()+"\">"+Utilities.escapeXml(sp.getName())+"</a></li>\r\n");        
+      }
+      b.append("</ul>\r\n");
+    }
+    return b.toString();
   }
 
   private byte[] stripFrontMatter(byte[] source) {
@@ -7783,7 +7828,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return ret;
   }
 
-  private void saveDirectResourceOutputsContained(FetchedFile f, FetchedResource r, Resource res, Map<String, String> vars, String prefixForContained) throws FileNotFoundException, Exception {
+  private String saveDirectResourceOutputsContained(FetchedFile f, FetchedResource r, Resource res, Map<String, String> vars, String prefixForContained) throws FileNotFoundException, Exception {
     if (igpkp.wantGen(r, "history")) {
       String html = "";
       fragment(res.fhirType()+"-"+prefixForContained+res.getId()+"-history", html, f.getOutputNames(), r, vars, null);
@@ -7800,6 +7845,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         fragment(res.fhirType()+"-"+prefixForContained+res.getId()+"-html", html, f.getOutputNames(), r, vars, prefixForContained);
       }
     }
+    return res.fhirType()+"-"+prefixForContained+res.getId()+".html"; // will be a broken link if wantGen(html) == false
   }
 
   private String genIpStatements(List<FetchedFile> files) throws FHIRException {
