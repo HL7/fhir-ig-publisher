@@ -86,7 +86,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
     vsc.setText(null);
     if (vsc.hasCompose()) {
       vsc.setExpansion(null); // we don't want to render an expansion by mistake
-      RendererFactory.factory(vsc, gen).render(vsc);
+      RendererFactory.factory(vsc, gen).renderOrError(vsc);
       return "<h3>Logical Definition (CLD)</h3>\r\n" + new XhtmlComposer(XhtmlComposer.HTML).compose(vsc.getText().getDiv());
     } else {
       return "<h3>Logical Definition (CLD)</h3>\r\n<p>No formal definition provided for this ValueSet</p>\r\n";

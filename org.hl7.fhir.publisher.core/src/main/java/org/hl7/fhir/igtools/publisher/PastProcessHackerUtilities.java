@@ -10,11 +10,5 @@ public class PastProcessHackerUtilities {
     return canonical;
   }
 
-  public static boolean useRealm(String realm, String code) {
-    if (realm.equals("uv") && code.equals("smart-app-launch")) {
-      return false;
-    }
-    return true;
-  }
-
+  
 }
