@@ -110,7 +110,7 @@ public class IGReleaseUpdater {
     this.ignoreList.addAll(otherSpecs);
   }
 
-  public void check(Map<String, IndexMaintainer> indexes)  {
+  public void check(Map<String, IndexMaintainer> indexes, boolean throwError) throws IOException  {
     List<String> errs = new ArrayList<>(); 
     try {
       String f = Utilities.path(folder, "package-list.json");
@@ -227,7 +227,10 @@ public class IGReleaseUpdater {
       System.out.println("");
       for (String s : errs) {
         System.out.println("    "+s);
-      }      
+      }  
+      if (throwError) {
+        throw new IOException("Error Processing "+folder+", cannot continue. ("+String.join("|", errs)+")");
+      }
     }
   }
 
@@ -639,7 +642,7 @@ public class IGReleaseUpdater {
   }
 
   public static void main(String[] args) throws Exception {
-    new IGReleaseUpdater(args[0], args[1], args[2], null, ServerType.ASP2, null, null, true).check(null);
+    new IGReleaseUpdater(args[0], args[1], args[2], null, ServerType.ASP2, null, null, true).check(null, false);
   }
   
 }
