@@ -1,0 +1,134 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Attach to Remote Program",
+      "request": "attach",
+      "hostName": "localhost",
+      "port": 5009
+    },
+    {
+      "type": "java",
+      "name": "Launch Current File",
+      "request": "launch",
+      "mainClass": "${file}"
+    },
+    {
+      "type": "java",
+      "name": "Launch HTLMLInspector",
+      "request": "launch",
+      "mainClass": "org.hl7.fhir.igtools.publisher.HTLMLInspector",
+      "projectName": "org.hl7.fhir.publisher.core"
+    },
+    {
+      "type": "java",
+      "name": "Launch IGPack2NpmConvertor",
+      "request": "launch",
+      "mainClass": "org.hl7.fhir.igtools.publisher.IGPack2NpmConvertor",
+      "projectName": "org.hl7.fhir.publisher.core"
+    },
+    {
+      "type": "java",
+      "name": "Launch Publisher",
+      "request": "launch",
+      "mainClass": "org.hl7.fhir.igtools.publisher.Publisher",
+      "projectName": "org.hl7.fhir.publisher.core",
+      "args": "-ig C:\\Users\\gkleinoscheg\\Downloads\\docker_fsh-ing-grounds\\ig.ini -no-sushi"
+    },
+    {
+      "type": "java",
+      "name": "Launch DownloadBuilder",
+      "request": "launch",
+      "mainClass": "org.hl7.fhir.igtools.publisher.utils.DownloadBuilder",
+      "projectName": "org.hl7.fhir.publisher.core"
+    },
+    {
+      "type": "java",
+      "name": "Launch FeedBuilder",
+      "request": "launch",
+      "mainClass": "org.hl7.fhir.igtools.publisher.utils.FeedBuilder",
+      "projectName": "org.hl7.fhir.publisher.core"
+    },
+    {
+      "type": "java",
+      "name": "Launch HTMLRedirectScanner",
+      "request": "launch",
+      "mainClass": "org.hl7.fhir.igtools.publisher.utils.HTMLRedirectScanner",
+      "projectName": "org.hl7.fhir.publisher.core"
+    },
+    {
+      "type": "java",
+      "name": "Launch IGRedirectorGenerator",
+      "request": "launch",
+      "mainClass": "org.hl7.fhir.igtools.publisher.utils.IGRedirectorGenerator",
+      "projectName": "org.hl7.fhir.publisher.core"
+    },
+    {
+      "type": "java",
+      "name": "Launch IGReleaseUpdater",
+      "request": "launch",
+      "mainClass": "org.hl7.fhir.igtools.publisher.utils.IGReleaseUpdater",
+      "projectName": "org.hl7.fhir.publisher.core"
+    },
+    {
+      "type": "java",
+      "name": "Launch IGReleaseVersionDeleter",
+      "request": "launch",
+      "mainClass": "org.hl7.fhir.igtools.publisher.utils.IGReleaseVersionDeleter",
+      "projectName": "org.hl7.fhir.publisher.core"
+    },
+    {
+      "type": "java",
+      "name": "Launch IGWebSiteMaintainer",
+      "request": "launch",
+      "mainClass": "org.hl7.fhir.igtools.publisher.utils.IGWebSiteMaintainer",
+      "projectName": "org.hl7.fhir.publisher.core"
+    },
+    {
+      "type": "java",
+      "name": "Launch ImageUpdater",
+      "request": "launch",
+      "mainClass": "org.hl7.fhir.igtools.publisher.utils.ImageUpdater",
+      "projectName": "org.hl7.fhir.publisher.core"
+    },
+    {
+      "type": "java",
+      "name": "Launch PackageChecker",
+      "request": "launch",
+      "mainClass": "org.hl7.fhir.igtools.publisher.utils.PackageChecker",
+      "projectName": "org.hl7.fhir.publisher.core"
+    },
+    {
+      "type": "java",
+      "name": "Launch PackageReleaser",
+      "request": "launch",
+      "mainClass": "org.hl7.fhir.igtools.publisher.utils.PackageReleaser",
+      "projectName": "org.hl7.fhir.publisher.core"
+    },
+    {
+      "type": "java",
+      "name": "Launch TemplateChanger",
+      "request": "launch",
+      "mainClass": "org.hl7.fhir.igtools.publisher.utils.TemplateChanger",
+      "projectName": "org.hl7.fhir.publisher.core"
+    },
+    {
+      "type": "java",
+      "name": "Launch TemplateReleaser",
+      "request": "launch",
+      "mainClass": "org.hl7.fhir.igtools.publisher.utils.TemplateReleaser",
+      "projectName": "org.hl7.fhir.publisher.core"
+    },
+    {
+      "type": "java",
+      "name": "Launch GraphicalPublisher",
+      "request": "launch",
+      "mainClass": "org.hl7.fhir.igtools.ui.GraphicalPublisher",
+      "projectName": "org.hl7.fhir.publisher.core"
+    }
+  ]
+}
