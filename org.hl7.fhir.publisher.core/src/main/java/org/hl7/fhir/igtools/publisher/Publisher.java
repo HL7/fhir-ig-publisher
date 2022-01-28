@@ -761,6 +761,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private boolean noValidation;
   private boolean noGenerate;
 
+  private String fmtDateTime = "yyyy-MM-dd hh:mm:ssZZZ";
+  private String fmtDate = "yyyy-MM-dd";
   
   private class PreProcessInfo {
     private String xsltName;
@@ -1932,6 +1934,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         openApiTemplate = p.getValue();
       } else if (p.getCode().equals("template-html")) {     
         htmlTemplate = p.getValue();
+      } else if (p.getCode().equals("format-date")) {     
+        fmtDate = p.getValue();
+      } else if (p.getCode().equals("format-datetime")) {     
+        fmtDateTime = p.getValue();
       } else if (p.getCode().equals("template-md")) {     
         mdTemplate = p.getValue();
       } else if (p.getCode().equals("path-binary")) {     
@@ -3481,6 +3487,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         rc.setLocale(locale);
       }
     }
+    rc.setDateFormatString(fmtDate);
+    rc.setDateTimeFormatString(fmtDateTime);
 //    rc.setTargetVersion(pubVersion);
 
     if (igMode) {
