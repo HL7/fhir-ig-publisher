@@ -761,6 +761,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private boolean noValidation;
   private boolean noGenerate;
 
+  private String fmtDateTime = "yyyy-MM-dd hh:mm:ssZZZ";
+  private String fmtDate = "yyyy-MM-dd";
   
   private class PreProcessInfo {
     private String xsltName;
@@ -1932,6 +1934,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         openApiTemplate = p.getValue();
       } else if (p.getCode().equals("template-html")) {     
         htmlTemplate = p.getValue();
+      } else if (p.getCode().equals("format-date")) {     
+        fmtDate = p.getValue();
+      } else if (p.getCode().equals("format-datetime")) {     
+        fmtDateTime = p.getValue();
       } else if (p.getCode().equals("template-md")) {     
         mdTemplate = p.getValue();
       } else if (p.getCode().equals("path-binary")) {     
@@ -3481,6 +3487,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         rc.setLocale(locale);
       }
     }
+    rc.setDateFormatString(fmtDate);
+    rc.setDateTimeFormatString(fmtDateTime);
 //    rc.setTargetVersion(pubVersion);
 
     if (igMode) {
@@ -7158,31 +7166,43 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           generateResourceHtml(f, regen, r, r.getResource(), vars, "");
           if (r.getResource() instanceof DomainResource) {
             DomainResource container = (DomainResource) r.getResource();
-            for (Resource contained : container.getContained()) {              
-              String prefixForContained = r.getResource().getId()+"_";
-              makeTemplatesContained(f, r, contained, vars, prefixForContained);
-              String fn = saveDirectResourceOutputsContained(f, r, contained, vars, prefixForContained);
-              if (contained instanceof CanonicalResource) {
-                CanonicalResource cr = ((CanonicalResource) contained).copy();
-                cr.copyUserData(container);
-                if (!(container instanceof CanonicalResource)) {
-                  if (!cr.hasUrl() || !cr.hasVersion()) {
-                    throw new FHIRException("Unable to publish: contained canonical resource in a non-canonical resource does not have url+version");
-                  }
-                } else {
+            List<Element> containedElements = r.getElement().getChildren("contained");
+            List<Resource> containedResources = container.getContained();
+            if (containedResources.size() > containedElements.size()) {
+              throw new Error("Error: containedResources.size ("+containedResources.size()+") > containedElements.size ("+containedElements.size()+")");
+            }
+            // we have a list of the elements, and of the resources. 
+            // The resources mught not be the same as the elements - they've been converted to R5. We'll use the resources 
+            // if that's ok, else we'll use the element (resources render better)
+            for (int i = 0; i < containedResources.size(); i++ ) {
+              Element containedElement = containedElements.get(i);
+              Resource containedResource = containedResources.get(i);
+              if (containedElement.fhirType().equals(containedResource.fhirType())) {
+                String prefixForContained = r.getResource().getId()+"_";
+                makeTemplatesContained(f, r, containedResource, vars, prefixForContained);
+                String fn = saveDirectResourceOutputsContained(f, r, containedResource, vars, prefixForContained);
+                if (containedResource instanceof CanonicalResource) {
+                  CanonicalResource cr = ((CanonicalResource) containedResource).copy();
                   cr.copyUserData(container);
-                  if (!cr.hasUrl()) {
-                    cr.setUrl(((CanonicalResource) container).getUrl()+"#"+contained.getId());
+                  if (!(container instanceof CanonicalResource)) {
+                    if (!cr.hasUrl() || !cr.hasVersion()) {
+                      throw new FHIRException("Unable to publish: contained canonical resource in a non-canonical resource does not have url+version");
+                    }
+                  } else {
+                    cr.copyUserData(container);
+                    if (!cr.hasUrl()) {
+                      cr.setUrl(((CanonicalResource) container).getUrl()+"#"+containedResource.getId());
+                    }
+                    if (!cr.hasVersion()) {
+                      cr.setVersion(((CanonicalResource) container).getVersion());
+                    }
                   }
-                  if (!cr.hasVersion()) {
-                    cr.setVersion(((CanonicalResource) container).getVersion());
-                  }
+                  generateResourceHtml(f, regen, r, cr, vars, prefixForContained);
+                  clist.add(new StringPair(cr.present(), fn));
+                } else {
+                  generateResourceHtml(f, regen, r, containedResource, vars, prefixForContained);
+                  clist.add(new StringPair(containedResource.fhirType()+"/"+containedResource.getId(), fn));
                 }
-                generateResourceHtml(f, regen, r, cr, vars, prefixForContained);
-                clist.add(new StringPair(cr.present(), fn));
-              } else {
-                generateResourceHtml(f, regen, r, contained, vars, prefixForContained);
-                clist.add(new StringPair(contained.fhirType()+"/"+contained.getId(), fn));
               }
             }
           }

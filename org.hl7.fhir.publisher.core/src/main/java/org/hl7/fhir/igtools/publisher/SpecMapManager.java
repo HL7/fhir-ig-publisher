@@ -57,7 +57,7 @@ import com.google.gson.JsonSyntaxException;
 public class SpecMapManager {
 
   public enum SpecialPackageType {
-    Simplifier, PhinVads, Vsac, Examples
+    Simplifier, PhinVads, Vsac, Examples, DICOM
   }
 
   private JsonObject spec;
@@ -188,6 +188,7 @@ public class SpecMapManager {
       }
       case Examples:
         return str(spec, "webUrl")+"/"+rt.toLowerCase()+"-"+id.toLowerCase()+".html";
+      case DICOM: return url;
       }
     }
     if (url.matches(Constants.URI_REGEX)) {
@@ -390,6 +391,8 @@ public class SpecMapManager {
       res.special = SpecialPackageType.PhinVads;
     } else if (pi.name().equals("us.nlm.vsac")) {
       res.special = SpecialPackageType.Vsac;
+    } else if (pi.name().equals("fhir.dicom")) {
+      res.special = SpecialPackageType.DICOM;
     } else if (pi.name().startsWith("hl7.fhir.") && pi.name().endsWith(".examples") ) {
       res.special = SpecialPackageType.Examples;
     } else {
