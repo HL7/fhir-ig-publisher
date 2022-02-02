@@ -1,10 +1,15 @@
 package org.hl7.fhir.igtools.renderers;
 
+import java.util.List;
+
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.ContactDetail;
 import org.hl7.fhir.r5.model.ContactPoint;
 import org.hl7.fhir.r5.model.ContactPoint.ContactPointSystem;
 import org.hl7.fhir.r5.model.DomainResource;
+import org.hl7.fhir.r5.model.Extension;
+import org.hl7.fhir.r5.model.IntegerType;
+import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.Utilities;
 
@@ -12,16 +17,25 @@ public class StatusRenderer {
 
   public static class ResourceStatusInformation {
     String fmm;
+    String fmmSupport;
     String owner;
     String ownerLink;
     String status;
     String sstatus;
+    String sstatusSupport;
+    String normVersion;
     String colorClass;
     public String getFmm() {
       return fmm;
     }
     public void setFmm(String fmm) {
       this.fmm = fmm;
+    }
+    public String getFmmSupport() {
+      return fmmSupport;
+    }
+    public void setFmmSupport(String fmmSupport) {
+      this.fmmSupport = fmmSupport;
     }
     public String getOwner() {
       return owner;
@@ -47,50 +61,102 @@ public class StatusRenderer {
     public void setSstatus(String sstatus) {
       this.sstatus = sstatus;
     }
+    public String getSstatusSupport() {
+      return sstatusSupport;
+    }
+    public void setSstatusSupport(String sstatusSupport) {
+      this.sstatusSupport = sstatusSupport;
+    }
+    public String getNormVersion() {
+      return normVersion;
+    }
+    public void setNormVersion(String normVersion) {
+      this.normVersion = normVersion;
+    }
     public String getColorClass() {
       return colorClass;
     }
     public void setColorClass(String colorClass) {
       this.colorClass = colorClass;
     }
+    public void processFmm(DomainResource resource) {
+      if (ToolingExtensions.hasExtension(resource, ToolingExtensions.EXT_FMM_LEVEL)) {
+        setFmm(ToolingExtensions.readStringExtension(resource, ToolingExtensions.EXT_FMM_LEVEL));
+        IntegerType fmm = resource.getExtensionByUrl(ToolingExtensions.EXT_FMM_LEVEL).getValueIntegerType();
+        if (fmm.hasExtension(ToolingExtensions.EXT_FMM_SUPPORT))
+          setFmmSupport(fmm.getExtensionByUrl(ToolingExtensions.EXT_FMM_SUPPORT).getValueStringType().getValue());
+        else if (fmm.hasExtension(ToolingExtensions.EXT_FMM_DERIVED)) {
+          List<Extension> derivations = fmm.getExtensionsByUrl(ToolingExtensions.EXT_FMM_DERIVED);
+          String s = "Inherited from ";
+          for (Extension ex: derivations) {
+            s += ", " + ex.getValueCanonicalType();
+          }
+          setFmmSupport(s);
+        }
+      }
+    }
+    public void processSstatus(DomainResource resource) {
+      if (ToolingExtensions.hasExtension(resource, ToolingExtensions.EXT_STANDARDS_STATUS)) {
+        setSstatus(ToolingExtensions.readStringExtension(resource, ToolingExtensions.EXT_STANDARDS_STATUS));
+        StringType sstatus = resource.getExtensionByUrl(ToolingExtensions.EXT_STANDARDS_STATUS).getValueStringType();
+        if (sstatus.hasExtension(ToolingExtensions.EXT_FMM_SUPPORT))
+          setFmmSupport(sstatus.getExtensionByUrl(ToolingExtensions.EXT_FMM_SUPPORT).getValueStringType().getValue());
+        else if (sstatus.hasExtension(ToolingExtensions.EXT_FMM_DERIVED)) {
+          List<Extension> derivations = sstatus.getExtensionsByUrl(ToolingExtensions.EXT_FMM_DERIVED);
+          String s = "Inherited from ";
+          for (Extension ex: derivations) {
+            s += ", " + ex.getValueCanonicalType();
+          }
+          setFmmSupport(s);
+        }
+      }
+    }
   }
-
 
   public static ResourceStatusInformation analyse(DomainResource resource) {
     ResourceStatusInformation info = new ResourceStatusInformation();
-    info.setFmm(readFmmStatus(resource));
+    info.processFmm(resource);
     info.setOwner(readOwner(resource));
     info.setOwnerLink(readOwnerLink(resource));
     info.setStatus(readStatus(resource));
-    info.setSstatus(readStandardsStatus(resource));
+    info.processSstatus(resource);
+    info.setNormVersion(readNormativeVersion(resource));
     info.setColorClass(getColor(info));
     return info;
   }
 
-
   private static String getColor(ResourceStatusInformation info) {
-    if ("Draft".equals(info.getStatus())) {
-      return "colsd";
-    }
-    if (!"Active".equals(info.getStatus())) {
-      return "colsd";
-    }
-    if (info.getSstatus() == null)
-      return "0".equals(info.getFmm()) ? "colsd" : "colstu";
-    switch (info.getSstatus()) {
-    case "Draft": return "colsd";
-    case "Trial-Use": return "0".equals(info.getFmm()) ? "colsd" : "colstu"; 
-    case "Normative": return "colsn";
-    case "Informative": return "colsi";
-    case "Exteranl": return "colse";
-    default:
-      return "colsi";
-    }
+	  return getColor(info.getStatus(), info.getSstatus(), info.getFmm());
+  }
+  
+  public static String getColor(String status, String sStatus, String fmm) {
+    if (sStatus != null)
+      switch (sStatus) {
+        case "Draft": return "colsd";
+        case "Trial-Use": return "0".equals(fmm) ? "colsd" : "colstu"; 
+        case "Normative": return "colsn";
+        case "Informative": return "colsi";
+        case "Deprecated": return "colsdp";
+        case "External": return "colse";
+      }
+    if (fmm != null)
+      return "0".equals(fmm) ? "colsd" : "colstu";
+    if (status != null)
+      switch (status) {
+        case "Draft": return "colsd";
+        case "Retired": return "colsdp"; 
+      }
+    return "colsi";
   }
 
 
   private static String readStandardsStatus(DomainResource resource) {
     return ToolingExtensions.readStringExtension(resource, ToolingExtensions.EXT_STANDARDS_STATUS);
+  }
+
+  
+  private static String readNormativeVersion(DomainResource resource) {
+    return ToolingExtensions.readStringExtension(resource, ToolingExtensions.EXT_NORMATIVE_VERSION);
   }
 
 
@@ -121,11 +187,6 @@ public class StatusRenderer {
       return ((CanonicalResource) resource).hasPublisher() ? ((CanonicalResource) resource).getPublisher() : null;
     }
     return null;
-  }
-
-
-  private static String readFmmStatus(DomainResource resource) {
-    return ToolingExtensions.readStringExtension(resource, ToolingExtensions.EXT_FMM_LEVEL);
   }
 
 
