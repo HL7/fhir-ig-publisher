@@ -8036,25 +8036,26 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                 String fn = saveDirectResourceOutputsContained(f, r, containedResource, vars, prefixForContained);
                 if (containedResource instanceof CanonicalResource) {
                   CanonicalResource cr = ((CanonicalResource) containedResource).copy();
-                cr.copyUserData(container);
-                if (!(container instanceof CanonicalResource)) {
-                  if (!cr.hasUrl() || !cr.hasVersion()) {
-//                    throw new FHIRException("Unable to publish: contained canonical resource in a non-canonical resource does not have url+version");
-                  }
-                } else {
                   cr.copyUserData(container);
-                  if (!cr.hasUrl()) {
-                      cr.setUrl(((CanonicalResource) container).getUrl()+"#"+containedResource.getId());
+                  if (!(container instanceof CanonicalResource)) {
+                    if (!cr.hasUrl() || !cr.hasVersion()) {
+//                    throw new FHIRException("Unable to publish: contained canonical resource in a non-canonical resource does not have url+version");
+                    }
+                  } else {
+                    cr.copyUserData(container);
+                    if (!cr.hasUrl()) {
+                        cr.setUrl(((CanonicalResource) container).getUrl()+"#"+containedResource.getId());
+                    }
+                    if (!cr.hasVersion()) {
+                      cr.setVersion(((CanonicalResource) container).getVersion());
+                    }
                   }
-                  if (!cr.hasVersion()) {
-                    cr.setVersion(((CanonicalResource) container).getVersion());
-                  }
+                  generateResourceHtml(f, regen, r, cr, vars, prefixForContained);
+                  clist.add(new StringPair(cr.present(), fn));
+                } else {
+                  generateResourceHtml(f, regen, r, containedResource, vars, prefixForContained);
+                  clist.add(new StringPair(containedResource.fhirType()+"/"+containedResource.getId(), fn));
                 }
-                generateResourceHtml(f, regen, r, cr, vars, prefixForContained);
-                clist.add(new StringPair(cr.present(), fn));
-              } else {
-                generateResourceHtml(f, regen, r, containedResource, vars, prefixForContained);
-                clist.add(new StringPair(containedResource.fhirType()+"/"+containedResource.getId(), fn));
               }
             }
           }
@@ -8066,7 +8067,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
-  public class StringPair {
+  class StringPair {
     private String name;
     private String value;
 
@@ -8084,6 +8085,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return value;
     }
   }
+  
   private String genContainedIndex(FetchedResource r, List<StringPair> clist) {
     StringBuilder b = new StringBuilder();
     if (clist.size() > 0) {
