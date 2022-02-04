@@ -8031,7 +8031,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               Element containedElement = containedElements.get(i);
               Resource containedResource = containedResources.get(i);
               if (containedElement.fhirType().equals(containedResource.fhirType())) {
-              String prefixForContained = r.getResource().getId()+"_";
+                String prefixForContained = r.getResource().getId()+"_";
                 makeTemplatesContained(f, r, containedResource, vars, prefixForContained);
                 String fn = saveDirectResourceOutputsContained(f, r, containedResource, vars, prefixForContained);
                 if (containedResource instanceof CanonicalResource) {
@@ -8044,7 +8044,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                   } else {
                     cr.copyUserData(container);
                     if (!cr.hasUrl()) {
-                        cr.setUrl(((CanonicalResource) container).getUrl()+"#"+containedResource.getId());
+                      cr.setUrl(((CanonicalResource) container).getUrl()+"#"+containedResource.getId());
                     }
                     if (!cr.hasVersion()) {
                       cr.setVersion(((CanonicalResource) container).getVersion());
