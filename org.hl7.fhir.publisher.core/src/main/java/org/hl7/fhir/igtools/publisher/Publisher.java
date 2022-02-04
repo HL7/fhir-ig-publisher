@@ -8025,7 +8025,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               throw new Error("Error: containedResources.size ("+containedResources.size()+") > containedElements.size ("+containedElements.size()+")");
             }
             // we have a list of the elements, and of the resources. 
-            // The resources mught not be the same as the elements - they've been converted to R5. We'll use the resources 
+            // The resources might not be the same as the elements - they've been converted to R5. We'll use the resources 
             // if that's ok, else we'll use the element (resources render better)
             for (int i = 0; i < containedResources.size(); i++ ) {
               Element containedElement = containedElements.get(i);
