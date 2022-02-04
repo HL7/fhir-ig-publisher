@@ -157,7 +157,7 @@ public class CanonicalRenderer extends BaseRenderer {
   }
 
   protected String describeStatus(PublicationStatus status, boolean experimental, DateTimeType dt, Boolean deprecated) {
-    String sfx = " as of "+new DataRenderer(context).display(dt);
+    String sfx = " as of "+new DataRenderer(gen).display(dt);
     if (deprecated != null && deprecated) {
       if (status == PublicationStatus.RETIRED) {
         return "Deprecated + Retired"+sfx;
