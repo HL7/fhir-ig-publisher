@@ -40,6 +40,7 @@ import org.hl7.fhir.r5.model.Enumerations.BindingStrength;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionMappingComponent;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
+import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.utils.ElementDefinitionUtilities;
 import org.hl7.fhir.r5.utils.PublicationHacker;
@@ -1406,9 +1407,13 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             b.append("</p>\r\n");
         }
         b.append("<p>\r\n");
-        b.append(translate("sd.header", "This profile was published on %s as a %s by %s.\r\n", toStr(sd.getDate()), egt(sd.getStatusElement()), gt(sd.getPublisherElement())));
+        b.append(translate("sd.header", "This profile was published on %s as a %s by %s.\r\n", renderDate(sd.getDateElement()), egt(sd.getStatusElement()), gt(sd.getPublisherElement())));
         b.append("</p>\r\n");
         return b.toString();
+    }
+
+    private String renderDate(DateTimeType date) {
+      return new DataRenderer(gen).display(date);
     }
 
     public String uses() throws Exception {

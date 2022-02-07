@@ -19,6 +19,7 @@ import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceWithReference;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
@@ -95,7 +96,7 @@ public class HistoryGenerator {
           }
         }
         
-        tr.td().ah(pd.getPath()).tx(pd.getDate().asStringValue().substring(0, 10));          
+        tr.td().ah(pd.getPath()).tx(new DataRenderer(context).display(pd.getDate()));          
         
 
         XhtmlNode td = tr.td(); 
