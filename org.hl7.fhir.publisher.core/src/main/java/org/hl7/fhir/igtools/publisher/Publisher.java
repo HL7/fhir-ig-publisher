@@ -2032,15 +2032,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       markdownEngine = new MarkDownProcessor(Dialect.DARING_FIREBALL);
     else
       markdownEngine = new MarkDownProcessor(Dialect.COMMON_MARK);
-    
-    // loading the specifications
-    context = loadCorePackage();
-    context.setProgress(true);
-    context.setIgnoreProfileErrors(true);
-    context.setLogger(logger);
-    context.setAllowLoadingDuplicates(true);
-    context.setExpandCodesLimit(1000);
-    context.setExpansionProfile(makeExpProfile());
 
     // initializing the tx sub-system
     Utilities.createDirectory(vsCache);
@@ -2059,7 +2050,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (!new File(vsCache).exists())
       throw new Exception("Unable to access or create the cache directory at "+vsCache);
     logDebugMessage(LogCategory.INIT, "Load Terminology Cache from "+vsCache);
-    context.initTS(vsCache);
+
+    // loading the specifications
+    context = loadCorePackage();
+    context.setProgress(true);
+    context.setIgnoreProfileErrors(true);
+    context.setLogger(logger);
+    context.setAllowLoadingDuplicates(true);
+    context.setExpandCodesLimit(1000);
+    context.setExpansionProfile(makeExpProfile());
+
+
     if (expParams != null) {
       context.setExpansionProfile((Parameters) VersionConvertorFactory_40_50.convertResource(FormatUtilities.loadFile(Utilities.path(Utilities.getDirectoryForFile(igName), expParams))));
     } else if (!expParamMap.isEmpty()) {
@@ -2436,7 +2437,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Terminology Cache is at "+vsCache+". "+Integer.toString(Utilities.countFilesInDirectory(vsCache))+" files in cache");
     if (!new File(vsCache).exists())
       throw new Exception("Unable to access or create the cache directory at "+vsCache);
-
+    log("Load Terminology Cache from "+vsCache);
+    
     context = loadCorePackage();
     context.setIgnoreProfileErrors(true);
     context.setProgress(true);
@@ -2450,8 +2452,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("exception generating new IG");
       e.printStackTrace();
     }
-    log("Load Terminology Cache from "+vsCache);
-    context.initTS(vsCache);
+
     String sct = str(configuration, "sct-edition", "http://snomed.info/sct/900000000000207008");
     context.getExpansionParameters().addParameter("system-version", "http://snomed.info/sct|"+sct);
     txLog = Utilities.createTempFile("fhir-ig-", ".log").getAbsolutePath();
@@ -2963,7 +2964,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     SpecMapManager spm = loadSpecDetails(TextFile.streamToBytes(pi.load("other", "spec.internals")));
     SimpleWorkerContext sp;
     IContextResourceLoader loader = new PublisherLoader(pi, spm, specPath, igpkp).makeLoader();
-    sp = SimpleWorkerContext.fromPackage(pi, loader);
+    sp = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(vsCache).fromPackage(pi, loader);
     sp.loadBinariesFromFolder(pi);
     sp.setCacheId(UUID.randomUUID().toString());
     if (!version.equals(Constants.VERSION)) {
