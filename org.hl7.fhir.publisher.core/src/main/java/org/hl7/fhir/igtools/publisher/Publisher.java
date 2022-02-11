@@ -72,6 +72,7 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.stream.StreamResult;
 import javax.xml.transform.stream.StreamSource;
 
+import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
 import org.apache.commons.exec.ExecuteWatchdog;
 import org.apache.commons.exec.PumpStreamHandler;
@@ -190,6 +191,7 @@ import org.hl7.fhir.r5.model.Parameters;
 import org.hl7.fhir.r5.model.Provenance;
 import org.hl7.fhir.r5.model.Provenance.ProvenanceAgentComponent;
 import org.hl7.fhir.r5.model.Questionnaire;
+import org.hl7.fhir.r5.model.QuestionnaireResponse;
 import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.ResourceFactory;
@@ -258,6 +260,7 @@ import org.hl7.fhir.utilities.SimpleHTTPClient;
 import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.TimeTracker;
+import org.hl7.fhir.utilities.ToolGlobalSettings;
 import org.hl7.fhir.utilities.TimeTracker.Session;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
@@ -1288,22 +1291,23 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId());
             if (r.getResource() != null && isConvertableResource(r.getResource().fhirType())) {
               boolean regen = false;
-              rc.setDefinitionsTarget(igpkp.getDefinitionsName(r));
+              RenderingContext lrc = rc.copy().setDefinitionsTarget(igpkp.getDefinitionsName(r));
               if (r.getResource() instanceof DomainResource && !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv())) {
                 regen = true;
-                RendererFactory.factory(r.getResource(), rc).render((DomainResource) r.getResource());
+                RendererFactory.factory(r.getResource(), lrc).render((DomainResource) r.getResource());
               } else if (r.getResource() instanceof Bundle) {
                 regen = true;
-                new BundleRenderer(rc).render((Bundle) r.getResource());
+                new BundleRenderer(lrc).render((Bundle) r.getResource());
               } else if (r.getResource() instanceof Parameters) {
                 regen = true;
                 Parameters p = (Parameters) r.getResource();
-                new ParametersRenderer(rc, new ResourceContext(ResourceContextType.PARAMETERS , p, null)).render(p);
+                new ParametersRenderer(lrc, new ResourceContext(ResourceContextType.PARAMETERS , p, null)).render(p);
               } else if (r.getResource() instanceof DomainResource) {
                 checkExistingNarrative(f, r, ((DomainResource) r.getResource()).getText().getDiv());
               }
-              if (regen)
+              if (regen) {
                 r.setElement(convertToElement(r.getResource()));
+              }
             } else {
               RenderingContext lrc = rc.copy().setParser(getTypeLoader(f,r));
               if ("http://hl7.org/fhir/StructureDefinition/DomainResource".equals(r.getElement().getProperty().getStructure().getBaseDefinition()) && !hasNarrative(r.getElement())) {
@@ -1750,6 +1754,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     try {
       if (SystemUtils.IS_OS_WINDOWS) {
         exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C "+cmd+" . -o ."));
+      } else if (ToolGlobalSettings.hasNpmPath()) {
+        ProcessBuilder processBuilder = new ProcessBuilder(new String("bash -c "+cmd));
+        Map<String, String> env = processBuilder.environment();
+        Map<String, String> vars = new HashMap<>();
+        vars.putAll(env);
+        String path = ToolGlobalSettings.getNpmPath()+":"+env.get("PATH");
+        vars.put("PATH", path);
+        exec.execute(org.apache.commons.exec.CommandLine.parse("bash -c "+cmd+" . -o ."), vars);
       } else {
         exec.execute(org.apache.commons.exec.CommandLine.parse(cmd+" . -o ."));
       }
@@ -6058,7 +6070,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Run jekyll: "+jekyllCommand+" build --destination \""+outputDir+"\" (in folder "+tempDir+")");
 	    if (SystemUtils.IS_OS_WINDOWS) {
 	      exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C "+jekyllCommand+" build --destination \""+outputDir+"\""));
-	    } else {
+	    } else if (ToolGlobalSettings.hasRubyPath()) {
+        ProcessBuilder processBuilder = new ProcessBuilder(new String("bash -c "+jekyllCommand));
+        Map<String, String> env = processBuilder.environment();
+        Map<String, String> vars = new HashMap<>();
+        vars.putAll(env);
+        String path = ToolGlobalSettings.getRubyPath()+":"+env.get("PATH");
+        vars.put("PATH", path);
+        CommandLine shellCommand = new CommandLine("bash").addArgument("-c").addArgument(jekyllCommand+" build --destination "+outputDir, false);        
+        exec.execute(shellCommand, vars);	    
+      } else {
 	      exec.execute(org.apache.commons.exec.CommandLine.parse(jekyllCommand+" build --destination \""+outputDir+"\""));
 	    }
 	    tts.end();
@@ -7117,7 +7138,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
   private void generateHtmlOutputs(FetchedFile f, boolean regen) throws Exception {
     if (noGenerate) {
-      return;
+      return; 
     }
     
     if (f.getProcessMode() == FetchedFile.PROCESS_NONE) {
@@ -8490,14 +8511,29 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void generateOutputsQuestionnaireResponse(FetchedFile f, FetchedResource r, Map<String,String> vars, String prefixForContainer) throws Exception {
-    QuestionnaireResponseRenderer qr = new QuestionnaireResponseRenderer(context, checkAppendSlash(specPath), r.getElement(), Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, 
-        rc.copy().setParser(getTypeLoader(f, r)).setDefinitionsTarget(igpkp.getDefinitionsName(r)));
+    RenderingContext lrc = rc.copy().setParser(getTypeLoader(f, r));
+    String qu = getQuestionnaireURL(r);
+    if (qu != null) {
+      Questionnaire q = context.fetchResource(Questionnaire.class, qu);
+      if (q != null && q.hasUserData("path")) {
+        lrc.setDefinitionsTarget(q.getUserString("path"));
+      }
+    }
+    
+    QuestionnaireResponseRenderer qr = new QuestionnaireResponseRenderer(context, checkAppendSlash(specPath), r.getElement(), Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, lrc);
     if (igpkp.wantGen(r, "tree"))
       fragment("QuestionnaireResponse-"+prefixForContainer+r.getId()+"-tree", qr.render(QuestionnaireRendererMode.TREE), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "form"))
       fragment("QuestionnaireResponse-"+prefixForContainer+r.getId()+"-form", qr.render(QuestionnaireRendererMode.FORM), f.getOutputNames(), r, vars, null);
   }
 
+
+  private String getQuestionnaireURL(FetchedResource r) {
+    if (r.getResource() != null && r.getResource() instanceof QuestionnaireResponse) {
+      return ((QuestionnaireResponse) r.getResource()).getQuestionnaire();
+    }
+    return r.getElement().getChildValue("questionnaire");
+  }
 
   private String getTitle(FetchedFile f, FetchedResource r) {
     if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {

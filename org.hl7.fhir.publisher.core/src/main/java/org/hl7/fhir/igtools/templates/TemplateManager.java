@@ -91,7 +91,7 @@ public class TemplateManager {
   private void installTemplate(String template, String rootFolder, String templateDir, List<String> scriptIds, ArrayList<String> loadedIds, int level) throws FHIRException, IOException {
     logger.logMessage(Utilities.padLeft("", ' ', level) + "Load Template from "+template);
     NpmPackage npm = loadPackage(template, rootFolder);
-    if (!npm.isType(PackageType.TEMPLATE))
+    if (!npm.isType(PackageType.IG_TEMPLATE))
       throw new FHIRException("The referenced package '"+template+"' does not have the correct type - is "+npm.type()+" but should be a template");
     templateList.add(npm.name()+"#"+npm.version());
     loadedIds.add(npm.name());
@@ -238,7 +238,7 @@ public class TemplateManager {
       if (template.startsWith("#")) {
         File f = new File(Utilities.path(rootFolder, template.substring(1)));
         if (f.exists() && f.isDirectory()) {
-          NpmPackage npm = NpmPackage.fromFolder(f.getAbsolutePath(), PackageType.TEMPLATE, "output", ".git");
+          NpmPackage npm = NpmPackage.fromFolder(f.getAbsolutePath(), PackageType.IG_TEMPLATE, "output", ".git");
           return npm;
         }
       }

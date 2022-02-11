@@ -296,7 +296,7 @@ public class FeedBuilder {
     String canonical = JSONUtil.str(json, "canonical");
     String kind = JSONUtil.str(json, "kind");
     if (Utilities.noString(kind))
-      kind = "fhir.ig";
+      kind = "IG";
     for (JsonElement e : JSONUtil.forceArray(json, "list")) {
       JsonObject v = (JsonObject) e;
       String version = JSONUtil.str(v, "version");
