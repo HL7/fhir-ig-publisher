@@ -815,7 +815,7 @@ public class IgSpreadsheetParser {
     }
     String regex = sheet.getColumn(row, "Regex");
     if (!Utilities.noString(regex) && e.hasType())
-      ToolingExtensions.addStringExtension(e.getType().get(0), ToolingExtensions.EXT_REGEX, regex);
+      ToolingExtensions.addStringExtension(e, ToolingExtensions.EXT_REGEX, regex);
 
     if ((path.endsWith(".extension") || path.endsWith(".modifierExtension")) && e.hasType() && e.getType().get(0).hasProfile() && Utilities.noString(profileName))
         throw new Exception("need to have a profile name if a profiled extension is referenced for "+ e.getType().get(0).getProfile());
