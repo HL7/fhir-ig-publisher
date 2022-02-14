@@ -617,7 +617,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private Map<String,String> countryNameForCode = null;
   private Map<String,String> countryCodeForNumeric = null;
   private Map<String,String> countryCodeFor2Letter = null;
+  private Map<String,String> shortCountryCode = null;
   private Map<String,String> stateNameForCode = null;
+  private List<String> ignoreFlags = null;
 
   private Publisher childPublisher = null;
   private GenerationTool tool;
@@ -6975,17 +6977,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               String code = translateCountryCode(cd.getCode()).toLowerCase();
               jNode.addProperty("name", displayForCountryCode(cd.getCode()));
               File flagFile = new File(vsCache + "/" + code + ".svg");
-              if (!flagFile.exists()) {
+              if (!flagFile.exists() && !ignoreFlags.contains(code)) {
                 URL url = new URL("https://restcountries.eu/data/" + code + ".svg");
                 try {
                   InputStream in = url.openStream();
                   Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
                 } catch (Exception e) {
-                  URL url2 = new URL("https://flagcdn.com/" + cd.getCode().toLowerCase() + ".svg");
+                  URL url2 = new URL("https://flagcdn.com/" + shortCountryCode.get(code.toUpperCase()).toLowerCase() + ".svg");
                   try {
                     InputStream in = url2.openStream();
                     Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
                   } catch (Exception e2) {
+                    ignoreFlags.add(code);
                     System.out.println("Unable to access " + url + " or " + url2);
                   }
                 }
@@ -7128,7 +7131,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       countryNameForCode = new HashMap<String,String>();
       countryCodeFor2Letter = new HashMap<String,String>();
       countryCodeForNumeric = new HashMap<String,String>();
+      shortCountryCode = new HashMap<String,String>();
       stateNameForCode = new HashMap<String,String>();
+      ignoreFlags = new ArrayList<String>();
       ValueSet char3 = context.fetchResource(ValueSet.class, "http://hl7.org/fhir/ValueSet/iso3166-1-3");
       ValueSet char2 = context.fetchResource(ValueSet.class, "http://hl7.org/fhir/ValueSet/iso3166-1-2");
       ValueSet num = context.fetchResource(ValueSet.class, "http://hl7.org/fhir/ValueSet/iso3166-1-N");
@@ -7181,6 +7186,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           }
         }
         countryCodeFor2Letter.put(c.getCode(), code);
+        shortCountryCode.put(code, c.getCode());
       }
       for (ValueSetExpansionContainsComponent c: numExpand.getValueset().getExpansion().getContains()) {
         String code = countryCodeForName.get(c.getDisplay());
