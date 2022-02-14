@@ -39,6 +39,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.text.DateFormat;
 import java.text.ParseException;
@@ -78,6 +79,7 @@ import org.apache.commons.exec.PumpStreamHandler;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.NotImplementedException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_10_50;
@@ -142,6 +144,7 @@ import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.RdfParser;
 import org.hl7.fhir.r5.formats.XmlParser;
+import org.hl7.fhir.r5.model.ActivityDefinition;
 import org.hl7.fhir.r5.model.Attachment;
 import org.hl7.fhir.r5.model.Base;
 import org.hl7.fhir.r5.model.Binary;
@@ -151,11 +154,19 @@ import org.hl7.fhir.r5.model.Bundle.BundleType;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.CapabilityStatement;
+import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementDocumentComponent;
+import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementMessagingComponent;
+import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementMessagingSupportedMessageComponent;
+import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestComponent;
+import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceComponent;
+import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceOperationComponent;
+import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceSearchParamComponent;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeType;
 import org.hl7.fhir.r5.model.CodeableConcept;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ConceptMap;
+import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
 import org.hl7.fhir.r5.model.Constants;
 import org.hl7.fhir.r5.model.ContactDetail;
 import org.hl7.fhir.r5.model.ContactPoint;
@@ -171,6 +182,9 @@ import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
 import org.hl7.fhir.r5.model.ExpressionNode;
 import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.FhirPublication;
+import org.hl7.fhir.r5.model.GraphDefinition;
+import org.hl7.fhir.r5.model.GraphDefinition.GraphDefinitionLinkComponent;
+import org.hl7.fhir.r5.model.GraphDefinition.GraphDefinitionLinkTargetComponent;
 import org.hl7.fhir.r5.model.IdType;
 import org.hl7.fhir.r5.model.Identifier;
 import org.hl7.fhir.r5.model.ImplementationGuide;
@@ -181,18 +195,30 @@ import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionPa
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.SPDXLicense;
+import org.hl7.fhir.r5.model.IntegerType;
 import org.hl7.fhir.r5.model.Library;
 import org.hl7.fhir.r5.model.ListResource;
 import org.hl7.fhir.r5.model.ListResource.ListResourceEntryComponent;
+import org.hl7.fhir.r5.model.Measure;
+import org.hl7.fhir.r5.model.MessageDefinition;
+import org.hl7.fhir.r5.model.MessageDefinition.MessageDefinitionAllowedResponseComponent;
+import org.hl7.fhir.r5.model.MessageDefinition.MessageDefinitionFocusComponent;
 import org.hl7.fhir.r5.model.OperationDefinition;
+import org.hl7.fhir.r5.model.OperationDefinition.OperationDefinitionParameterComponent;
 import org.hl7.fhir.r5.model.OperationOutcome;
 import org.hl7.fhir.r5.model.Parameters;
+import org.hl7.fhir.r5.model.PlanDefinition;
+import org.hl7.fhir.r5.model.PlanDefinition.PlanDefinitionActionComponent;
+import org.hl7.fhir.r5.model.Property;
 import org.hl7.fhir.r5.model.Provenance;
 import org.hl7.fhir.r5.model.Provenance.ProvenanceAgentComponent;
 import org.hl7.fhir.r5.model.Questionnaire;
+import org.hl7.fhir.r5.model.Questionnaire.QuestionnaireItemComponent;
 import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.ResourceFactory;
+import org.hl7.fhir.r5.model.SearchParameter;
+import org.hl7.fhir.r5.model.SearchParameter.SearchParameterComponentComponent;
 import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
@@ -201,15 +227,19 @@ import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.StructureMap;
 import org.hl7.fhir.r5.model.StructureMap.StructureMapModelMode;
 import org.hl7.fhir.r5.model.StructureMap.StructureMapStructureComponent;
+import org.hl7.fhir.r5.model.SubscriptionTopic;
+import org.hl7.fhir.r5.model.SubscriptionTopic.SubscriptionTopicResourceTriggerComponent;
 import org.hl7.fhir.r5.model.TypeDetails;
 import org.hl7.fhir.r5.model.UriType;
 import org.hl7.fhir.r5.model.UsageContext;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
+import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
 import org.hl7.fhir.r5.openapi.OpenApiGenerator;
 import org.hl7.fhir.r5.openapi.Writer;
 import org.hl7.fhir.r5.renderers.BinaryRenderer;
 import org.hl7.fhir.r5.renderers.BundleRenderer;
+import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.ParametersRenderer;
 import org.hl7.fhir.r5.renderers.RendererFactory;
 import org.hl7.fhir.r5.renderers.spreadsheets.CodeSystemSpreadsheetGenerator;
@@ -337,12 +367,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     private String id;
     private String title;
     private String description;
+    private CanonicalResource canonical;
 
-    public ContainedResourceDetails(String type, String id, String title, String description) {
+    public ContainedResourceDetails(String type, String id, String title, String description, CanonicalResource canonical) {
       this.type = type;
       this.id = id;
       this.title = title;
       this.description = description;
+      this.canonical = canonical;
     }
 
     public String getType() {
@@ -359,6 +391,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     public String getDescription() {
       return description;
+    }
+
+    public CanonicalResource getCanonical() {
+      return canonical;
     }
 
   }
@@ -545,6 +581,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   public static final boolean USE_COMMONS_EXEC = true;
+  public static final int FMM_DERIVATION_MAX = 5;
 
   public enum GenerationTool {
     Jekyll
@@ -576,6 +613,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private boolean cacheVersion;
   private boolean appendTrailingSlashInDataFile;
   private boolean newIg = false;
+  private Map<String,String> countryCodeForName = null;
+  private Map<String,String> countryNameForCode = null;
+  private Map<String,String> countryCodeForNumeric = null;
+  private Map<String,String> countryCodeFor2Letter = null;
+  private Map<String,String> stateNameForCode = null;
 
   private Publisher childPublisher = null;
   private GenerationTool tool;
@@ -601,6 +643,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private IFetchFile fetcher = new SimpleFetcher(this);
   private SimpleWorkerContext context; // 
+  private DataRenderer dr;
   private InstanceValidator validator;
   private ProfileValidator pvalidator;
   private CodeSystemValidator csvalidator;
@@ -612,6 +655,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private Map<String, MappingSpace> mappingSpaces = new HashMap<String, MappingSpace>();
   private Map<ImplementationGuideDefinitionResourceComponent, FetchedFile> fileMap = new HashMap<ImplementationGuideDefinitionResourceComponent, FetchedFile>();
   private Map<String, FetchedFile> altMap = new HashMap<String, FetchedFile>();
+  private Map<String, FetchedResource> canonicalResources = new HashMap<String, FetchedResource>();
   private List<FetchedFile> fileList = new ArrayList<FetchedFile>();
   private List<FetchedFile> changeList = new ArrayList<FetchedFile>();
   private List<String> fileNames = new ArrayList<String>();
@@ -662,6 +706,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private SPDXLicense licenseInfo;
   private String publisher;
   private String businessVersion;
+  private List<ContactDetail> defaultContacts;
+  private List<UsageContext> defaultContexts;
+  private String defaultCopyright;
+  private List<CodeableConcept> defaultJurisdictions;
+  private SPDXLicense defaultLicenseInfo;
+  private String defaultPublisher;
+  private String defaultBusinessVersion;
 
   private CacheOption cacheOption;
 
@@ -697,6 +748,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private boolean includeHeadings;
   private String openApiTemplate;
+  private boolean isPropagateStatus;
   private Collection<String> extraTemplateList = new ArrayList<String>(); // List of templates in order they should appear when navigating next/prev
   private Map<String, String> extraTemplates = new HashMap<String, String>();
   private Collection<String> historyTemplates = new ArrayList<String>(); // What templates should only be turned on if there's history
@@ -1270,6 +1322,461 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return null;
 
   }
+
+  /*
+   * Propagate status goes through all resources in the IG and propagates the FMM and Standards Status declarations from top-level artifacts
+   * to any dependencies that don't declare their own values.  If different statuses or maturity level would propagate to a dependency from
+   * different artifacts, the 'highest' FMM or most mature standards status will apply (Normative or Informative, then STU, then Draft).
+   * Information does not propagate to artifacts marked as examples or as experimental.
+   * Propagation is based on references.  E.g. the IG references everything (so its status will propagate everywhere by default).  If there
+   * are higher statuses on certain CapabilityStatements, Operations or Profiles, those status will propagate to the artifacts they reference,
+   * such as other profiles, ValueSets or CodeSystems.
+   * Propagation only happens within the context of an IG.  There is no propagation across artifacts present in other IG packages listed as
+   * dependencies.
+   */
+  private void propagateStatus() throws Exception {
+    Session tts = tt.start("propagating status");
+    logDebugMessage(LogCategory.PROGRESS, "propagating status");
+    IntegerType igFMM = sourceIg.hasExtension(ToolingExtensions.EXT_FMM_LEVEL) ? sourceIg.getExtensionByUrl(ToolingExtensions.EXT_FMM_LEVEL).getValueIntegerType() : null;
+    CodeType igStandardsStatus = sourceIg.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS) ? sourceIg.getExtensionByUrl(ToolingExtensions.EXT_STANDARDS_STATUS).getValueCodeType() : null;
+    String igNormVersion = sourceIg.hasExtension(ToolingExtensions.EXT_NORMATIVE_VERSION) ? sourceIg.getExtensionByUrl(ToolingExtensions.EXT_NORMATIVE_VERSION).getValueStringType().asStringValue() : null;
+    
+    // If IG doesn't declare FMM or standards status, nothing to do
+    if (igFMM == null && igStandardsStatus == null)
+      return;
+    
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (!r.isExample())
+          updateResourceStatus(r, igFMM, igStandardsStatus, igNormVersion, sourceIg.getUrl());
+      }
+    }
+    
+    updatePageStatus(publishedIg.getDefinition().getPage(), null, new CodeType("informative"), null);
+    tts.end();
+  }
+  
+  private void updatePageStatus(ImplementationGuideDefinitionPageComponent page, IntegerType parentFmm, CodeType parentStatus, String parentNormVersion) {
+    IntegerType fmm = null;
+    CodeType standardsStatus = page.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS) ? page.getExtensionByUrl(ToolingExtensions.EXT_STANDARDS_STATUS).getValueCodeType() : null;
+    String normVersion = sourceIg.hasExtension(ToolingExtensions.EXT_NORMATIVE_VERSION) ? sourceIg.getExtensionByUrl(ToolingExtensions.EXT_NORMATIVE_VERSION).getValueStringType().asStringValue() : null;
+    
+    Extension fmmExt = page.getExtensionByUrl(ToolingExtensions.EXT_FMM_LEVEL);
+      
+    if (parentStatus != null && standardsStatus == null) {
+      standardsStatus = parentStatus.copy();
+      page.addExtension(new Extension(ToolingExtensions.EXT_STANDARDS_STATUS, standardsStatus));
+      if (parentNormVersion != null && normVersion == null) {
+        normVersion = parentNormVersion;
+        page.addExtension(new Extension(ToolingExtensions.EXT_NORMATIVE_VERSION, new StringType(normVersion)));
+      }
+    } else {
+      parentNormVersion = null;
+    }
+
+    if (standardsStatus.getValue().equals("informative")) {
+      // We strip FMMs for informative artifacts
+      if (fmmExt != null)
+        page.getExtension().remove(fmmExt);
+    } else {
+      if (parentFmm != null && fmmExt == null) {
+        fmm = parentFmm.copy();
+        page.addExtension(new Extension(ToolingExtensions.EXT_FMM_LEVEL, fmm));        
+      } else if (fmmExt != null)
+        fmm = fmmExt.getValueIntegerType();
+    }
+    for (ImplementationGuideDefinitionPageComponent childPage: page.getPage()) {
+      FetchedResource res = resources.get(page.getNameUrlType().getValue());
+      if (res == null)
+        updatePageStatus(childPage, fmm, standardsStatus, normVersion);
+    }
+  }
+  
+  private void updateResourceStatus(Reference ref, IntegerType parentFmm, CodeType parentStatus, String parentNormVersion, String parentCanonical) {
+    String canonical = ref.getReference();
+    if (canonical == null)
+      return;
+    if (!canonical.contains("://"))
+      canonical = igpkp.getCanonical() + "/" + canonical;
+    FetchedResource r = canonicalResources.get(canonical);
+    if (r != null) {
+      updateResourceStatus(r, parentFmm, parentStatus, parentNormVersion, parentCanonical);
+    }
+  }
+
+  private void updateResourceStatus(CanonicalType canonical, IntegerType parentFmm, CodeType parentStatus, String parentNormVersion, String parentCanonical) {
+    FetchedResource r = canonicalResources.get(canonical.getValue());
+    if (r != null) {
+      updateResourceStatus(r, parentFmm, parentStatus, parentNormVersion, parentCanonical);
+    }
+  }
+
+  private void updateResourceStatus(FetchedResource r, IntegerType parentFmm, CodeType parentStatus, String parentNormVersion, String parentCanonical) {
+    // We only propagate status for resources that:
+    // - are canonical resources
+    // - aren't examples
+    // - aren't experimental
+    // - aren't one of these types:
+    //     ChargeItemDefinition, Citation, ConditionDefinition, Evidence, EvidenceReport, EvidenceVariable, ExampleScenario, ObservationDefinition, TestScript
+    boolean isInformative = false;
+    if (!(r.getResource() instanceof CanonicalResource))
+      return;
+    
+    CanonicalResource res = (CanonicalResource)r.getResource();
+
+    if (r.isExample())
+      isInformative = true;
+    else {
+      if (res.hasExperimental() && res.getExperimental())
+        isInformative = true;
+    
+      switch (res.getResourceType()) {
+        case ChargeItemDefinition :
+        case Citation:
+        case ConditionDefinition:
+        case EvidenceReport:
+        case EvidenceVariable:
+        case ExampleScenario:
+        case ObservationDefinition:
+        case TestScript:
+          isInformative = true;
+        default:
+          // We're in a resource we need to process, so continue on
+      }
+    }
+    
+    Extension statusExt = res.getExtensionByUrl(ToolingExtensions.EXT_STANDARDS_STATUS);
+    CodeType status = statusExt!=null ? statusExt.getValueCodeType() : null;
+    String statusNormVersion = res.hasExtension(ToolingExtensions.EXT_NORMATIVE_VERSION) ? res.getExtensionByUrl(ToolingExtensions.EXT_NORMATIVE_VERSION).getValueStringType().asStringValue() : null;
+    if (isInformative) {
+      if (status == null) {
+        CodeType code = new CodeType("informative");
+        code.addExtension(ToolingExtensions.EXT_FMM_DERIVED, new CanonicalType(parentCanonical));
+        res.addExtension(ToolingExtensions.EXT_STANDARDS_STATUS, code);
+      } else if (!status.getValue().equals("informative") && !status.getValue().equals("draft")) {
+        errors.add(new ValidationMessage(Source.Publisher, IssueType.INVALID, res.getResourceType() + " " + r.getId(), "If a resource is not implementable, is marked as experimental or example, the standards status can only be 'informative' or 'draft'.", IssueSeverity.ERROR));
+      }
+      
+    } else {
+      Extension fmmExt = res.getExtensionByUrl(ToolingExtensions.EXT_FMM_LEVEL);
+      IntegerType fmm = fmmExt!=null ? fmmExt.getValueIntegerType() : null;
+      
+      boolean fmmChanged = false;
+      if (parentFmm !=null) {
+        boolean addExtension = false;
+        if (fmm == null) {
+          addExtension = true;
+          
+        } else if (fmm.hasExtension(ToolingExtensions.EXT_FMM_DERIVED)) {
+          if (fmm.getValue() < parentFmm.getValue()) {
+            res.getExtension().remove(fmmExt);
+            addExtension = true;
+            
+          } else if (fmm.getValue() == parentFmm.getValue()) {
+            if (fmm.getExtensionsByUrl(ToolingExtensions.EXT_FMM_DERIVED).size() < FMM_DERIVATION_MAX)
+              fmm.addExtension(ToolingExtensions.EXT_FMM_DERIVED, new CanonicalType(parentCanonical));
+          }
+        }
+        if (addExtension) {
+          fmmChanged = true;
+          IntegerType newFmm = parentFmm.copy();
+          Extension e = new Extension(ToolingExtensions.EXT_FMM_LEVEL, newFmm);
+          newFmm.addExtension(ToolingExtensions.EXT_FMM_DERIVED, new CanonicalType(parentCanonical));
+          res.addExtension(e);        
+        }
+      }
+      
+      boolean statusChanged = false;
+      if (parentStatus != null) {
+        boolean addExtension = false;
+        if (status == null) {
+          addExtension = true;
+          
+        } else if (status.hasExtension(ToolingExtensions.EXT_FMM_DERIVED)) {
+          if (StandardsStatus.fromCode(parentStatus.getValue()).canDependOn(StandardsStatus.fromCode(status.getValue()))) {
+            res.getExtension().remove(statusExt);
+            addExtension = true;
+            
+          } else if (status.getValue() == parentStatus.getValue()) {
+            if (fmm.getExtensionsByUrl(ToolingExtensions.EXT_FMM_DERIVED).size() < FMM_DERIVATION_MAX)
+              fmm.addExtension(ToolingExtensions.EXT_FMM_DERIVED, new CanonicalType(parentCanonical));
+            
+          }
+        }
+        if (addExtension) {
+          statusChanged = true;
+          CodeType code = parentStatus.copy();
+          Extension e = new Extension(ToolingExtensions.EXT_STANDARDS_STATUS, code);
+          code.addExtension(ToolingExtensions.EXT_FMM_DERIVED, new CanonicalType(parentCanonical));
+          res.addExtension(e);
+          if (code.getCode().equals("normative")) {
+            res.addExtension(new Extension(ToolingExtensions.EXT_NORMATIVE_VERSION, new StringType(parentNormVersion)));
+            statusNormVersion = parentNormVersion;
+          }
+        } else {
+          parentNormVersion = null;
+        }
+      }
+      
+      // If we've changed things, need to propagate to children
+      if (fmmChanged || statusChanged) {
+        for (Extension e : getDescendantExtensions(res, "http://hl7.org/fhir/StructureDefinition/cqf-library")) {
+          updateResourceStatus((CanonicalType)e.getValue(), fmm, status, statusNormVersion, res.getUrl());
+        }
+        switch (res.getResourceType()) {
+          case ActivityDefinition:
+            ActivityDefinition ad = (ActivityDefinition)res;
+            for (CanonicalType canonical : ad.getLibrary()) {
+              updateResourceStatus(canonical, fmm, status, statusNormVersion, res.getUrl());
+            }
+            if (ad.hasProfile())
+              updateResourceStatus(ad.getProfileElement(), fmm, status, statusNormVersion, res.getUrl());
+            for (Reference ref : ad.getObservationRequirement()) {
+              updateResourceStatus(ref, fmm, status, statusNormVersion, res.getUrl());
+            }
+            for (Reference ref : ad.getObservationResultRequirement()) {
+              updateResourceStatus(ref, fmm, status, statusNormVersion, res.getUrl());
+            }
+            if (ad.hasTransform())
+              updateResourceStatus(ad.getTransformElement(), fmm, status, statusNormVersion, res.getUrl());
+            break;
+            
+          case CapabilityStatement:
+            CapabilityStatement cs = (CapabilityStatement)res;
+            for (CapabilityStatementRestComponent rest: cs.getRest()) {
+              for (CapabilityStatementRestResourceComponent resource: rest.getResource()) {
+                if (resource.hasProfile())
+                  updateResourceStatus(resource.getProfileElement(), fmm, status, statusNormVersion, res.getUrl());
+                for (CapabilityStatementRestResourceSearchParamComponent sp: resource.getSearchParam()) {
+                  if (sp.hasDefinition())
+                    updateResourceStatus(sp.getDefinitionElement(), fmm, status, statusNormVersion, res.getUrl());
+                }
+                for (CapabilityStatementRestResourceOperationComponent op: resource.getOperation()) {
+                  if (op.hasDefinition())
+                    updateResourceStatus(op.getDefinitionElement(), fmm, status, statusNormVersion, res.getUrl());
+                }
+              }
+              for (CapabilityStatementRestResourceSearchParamComponent sp: rest.getSearchParam()) {
+                if (sp.hasDefinition())
+                  updateResourceStatus(sp.getDefinitionElement(), fmm, status, statusNormVersion, res.getUrl());
+              }
+              for (CapabilityStatementRestResourceOperationComponent op: rest.getOperation()) {
+                if (op.hasDefinition())
+                  updateResourceStatus(op.getDefinitionElement(), fmm, status, statusNormVersion, res.getUrl());
+              }
+              for (CapabilityStatementMessagingComponent messaging: cs.getMessaging()) {
+                for (CapabilityStatementMessagingSupportedMessageComponent msg: messaging.getSupportedMessage()) {
+                  if (msg.hasDefinition())
+                    updateResourceStatus(msg.getDefinitionElement(), fmm, status, statusNormVersion, res.getUrl());
+                }
+              }
+              for (CapabilityStatementDocumentComponent doc: cs.getDocument()) {
+                updateResourceStatus(doc.getProfileElement(), fmm, status, statusNormVersion, res.getUrl());
+              }
+            }
+            break;
+            
+          case ConceptMap:
+            ConceptMap cm = (ConceptMap)res;
+            for (ConceptMapGroupComponent group: cm.getGroup()) {
+              if (group.hasUnmapped() && group.getUnmapped().hasUrl()) {
+                updateResourceStatus(group.getUnmapped().getUrlElement(), fmm, status, statusNormVersion, res.getUrl());              
+              }
+            }
+            break;
+            
+          case GraphDefinition:
+            GraphDefinition gd = (GraphDefinition)res;
+            if (gd.hasProfile())
+              updateResourceStatus(gd.getProfileElement(), fmm, status, statusNormVersion, res.getUrl());
+            for (GraphDefinitionLinkComponent link: gd.getLink()) {
+              for (GraphDefinitionLinkTargetComponent target: link.getTarget()) {
+                if (gd.hasProfile())
+                  updateResourceStatus(target.getProfileElement(), fmm, status, statusNormVersion, res.getUrl());
+              }
+            }
+            break;
+            
+          case ImplementationGuide:
+            ImplementationGuide ig = (ImplementationGuide)res;
+            for (ImplementationGuide.ImplementationGuideGlobalComponent global: ig.getGlobal()) {
+              updateResourceStatus((CanonicalType)global.getProfileElement(), fmm, status, statusNormVersion, res.getUrl());
+            }
+            if (ig.hasDefinition()) {
+              for (ImplementationGuide.ImplementationGuideDefinitionResourceComponent resource: ig.getDefinition().getResource()) {
+                updateResourceStatus(resource.getReference(), fmm, status, statusNormVersion, res.getUrl());
+              }
+            }
+            break;
+            
+          case Measure:
+            Measure m = (Measure)res;
+            for (CanonicalType library: m.getLibrary()) {
+              updateResourceStatus(library, fmm, status, statusNormVersion, res.getUrl());
+            }
+            break;
+            
+          case MessageDefinition:
+            MessageDefinition md = (MessageDefinition)res;
+            if (md.hasBase())
+              updateResourceStatus(md.getBaseElement(), fmm, status, statusNormVersion, res.getUrl());
+            for (CanonicalType parent: md.getParent()) {
+              updateResourceStatus(parent, fmm, status, statusNormVersion, res.getUrl());
+            }
+            for (MessageDefinitionFocusComponent focus : md.getFocus()) {
+              if (focus.hasProfile())
+                updateResourceStatus(focus.getProfileElement(), fmm, status, statusNormVersion, res.getUrl());
+            }
+            for (MessageDefinitionAllowedResponseComponent response : md.getAllowedResponse()) {
+              if (response.hasMessage())
+                updateResourceStatus(response.getMessageElement(), fmm, status, statusNormVersion, res.getUrl());
+            }
+            for (CanonicalType graph: md.getGraph()) {
+              updateResourceStatus(graph, fmm, status, statusNormVersion, res.getUrl());
+            }
+            break;
+            
+          case OperationDefinition:
+            OperationDefinition od = (OperationDefinition)res;
+            if (od.hasBase())
+              updateResourceStatus(od.getBaseElement(), fmm, status, statusNormVersion, res.getUrl());
+            if (od.hasInputProfile())
+              updateResourceStatus(od.getInputProfileElement(), fmm, status, statusNormVersion, res.getUrl());
+            if (od.hasOutputProfile())
+              updateResourceStatus(od.getOutputProfileElement(), fmm, status, statusNormVersion, res.getUrl());
+            for (OperationDefinitionParameterComponent param : od.getParameter()) {
+              for (CanonicalType profile: param.getTargetProfile()) {
+                updateResourceStatus(profile, fmm, status, statusNormVersion, res.getUrl());
+              }
+              if (param.hasBinding() && param.getBinding().hasValueSet()) {
+                updateResourceStatus(param.getBinding().getValueSetElement(), fmm, status, statusNormVersion, res.getUrl());              
+              }
+            }
+            break;
+            
+          case PlanDefinition:
+            PlanDefinition pd = (PlanDefinition)res;
+            for (CanonicalType library: pd.getLibrary()) {
+              updateResourceStatus(library, fmm, status, statusNormVersion, res.getUrl());
+            }
+            for (PlanDefinitionActionComponent action: pd.getAction()) {
+              if (action.hasDefinitionCanonicalType())
+                updateResourceStatus(action.getDefinitionCanonicalType(), fmm, status, statusNormVersion, res.getUrl());
+            }
+            break;
+            
+          case Questionnaire:
+            Questionnaire q = (Questionnaire)res;
+            for (CanonicalType derived: q.getDerivedFrom()) {
+              updateResourceStatus(derived, fmm, status, statusNormVersion, res.getUrl());
+            }
+            for (QuestionnaireItemComponent item: q.getItem()) {
+              if (item.hasAnswerValueSet())
+                updateResourceStatus(item.getAnswerValueSetElement(), fmm, status, statusNormVersion, res.getUrl());
+              for (Extension ext: item.getExtensionsByUrl("http://hl7.org/fhir/StructureDefinition/questionnaire-referenceProfile")) {
+                updateResourceStatus(ext.getValueCanonicalType(), fmm, status, statusNormVersion, res.getUrl());
+              }
+              for (Extension ext: item.getExtensionsByUrl("http://hl7.org/fhir/StructureDefinition/questionnaire-unitValueSet")) {
+                updateResourceStatus(ext.getValueCanonicalType(), fmm, status, statusNormVersion, res.getUrl());
+              }
+            }
+            break;
+            
+          case SearchParameter:
+            SearchParameter sp = (SearchParameter)res;
+            if (sp.hasDerivedFrom())
+              updateResourceStatus(sp.getDerivedFromElement(), fmm, status, statusNormVersion, res.getUrl());
+            for (SearchParameterComponentComponent comp: sp.getComponent()) {
+              if (comp.hasDefinition())
+                updateResourceStatus(comp.getDefinitionElement(), fmm, status, statusNormVersion, res.getUrl());
+            }
+            break;
+            
+          case StructureDefinition:
+            StructureDefinition sd = (StructureDefinition)res;
+            if (sd.hasBaseDefinition())
+              updateResourceStatus(sd.getBaseDefinitionElement(), fmm, status, statusNormVersion, res.getUrl());
+            for (ElementDefinition e: sd.getDifferential().getElement()) {
+              if (e.hasBinding() && e.getBinding().hasValueSet())
+                updateResourceStatus(e.getBinding().getValueSetElement(), fmm, status, statusNormVersion, res.getUrl());
+            }
+            break;
+            
+          case StructureMap:
+            StructureMap sm = (StructureMap)res;
+            for (CanonicalType imp: sm.getImport()) {
+              updateResourceStatus(imp, fmm, status, statusNormVersion, res.getUrl());
+            }
+            break;
+            
+          /* TODO: Add this once SubscriptionTopic is a canonical
+          case SubscriptionTopic:
+            SubscriptionTopic st = (SubscriptionTopic)res;
+            for (CanonicalType canonical: st.getDerivedFrom()) {
+              updateResourceStatus(canonical, fmm, status, statusNormVersion, res.getUrl());            
+            }
+            for (CanonicalType canonical: st.getDerivedFrom()) {
+              for (SubscriptionTopicResourceTriggerComponent trigger: st.getResourceTrigger()) {
+                for (SubscriptionTopicResourceTriggerCanFilterByComponent filter: trigger.getCanFilterBy()) {
+                  updateResourceStatus(filter.getSearchParamName(), fmm, status, statusNormVersion, res.getUrl());            
+                }
+              }
+            }
+            break;*/
+            
+          case ValueSet:
+            ValueSet vs = (ValueSet)res;
+            for (Extension ext: vs.getExtensionsByUrl("http://hl7.org/fhir/StructureDefinition/valueset-map")) {
+              updateResourceStatus(ext.getValueCanonicalType(), fmm, status, statusNormVersion, res.getUrl());
+            }
+            for (Extension ext: vs.getExtensionsByUrl("http://hl7.org/fhir/StructureDefinition/valueset-supplement")) {
+              updateResourceStatus(ext.getValueCanonicalType(), fmm, status, statusNormVersion, res.getUrl());
+            }
+            if (vs.hasCompose()) {
+              for (ConceptSetComponent compose: vs.getCompose().getInclude()) {
+                if (compose.hasSystem())
+                  updateResourceStatus(new CanonicalType(compose.getSystem()), fmm, status, statusNormVersion, res.getUrl());
+                for (CanonicalType valueSet: compose.getValueSet()) {
+                  updateResourceStatus(valueSet, fmm, status, statusNormVersion, res.getUrl());
+                }
+              }            
+              for (ConceptSetComponent compose: vs.getCompose().getExclude()) {
+                if (compose.hasSystem())
+                  updateResourceStatus(new CanonicalType(compose.getSystem()), fmm, status, statusNormVersion, res.getUrl());
+                for (CanonicalType valueSet: compose.getValueSet()) {
+                  updateResourceStatus(valueSet, fmm, status, statusNormVersion, res.getUrl());
+                }
+              }
+            }
+            break;
+            
+          // The following types don't actually have anything to cascade to - at least not yet
+          case CodeSystem:
+          case EventDefinition:
+          case Library:
+          case NamingSystem:
+          case TerminologyCapabilities:
+          default:
+              
+        }
+      }
+    }
+  }
+  
+  public List<Extension> getDescendantExtensions(Base e, String url) {
+    List<Extension> extensions = new ArrayList<Extension>();
+    for (Property childName: e.children()) {
+      String name = childName.getName().endsWith("[x]") ? childName.getName().substring(0, childName.getName().length()-3) : childName.getName();
+      for (Base b: e.listChildrenByName(name)) {
+        if (b instanceof org.hl7.fhir.r5.model.Element) {
+          org.hl7.fhir.r5.model.Element ce = (org.hl7.fhir.r5.model.Element)b;
+          extensions.addAll(ce.getExtensionsByUrl(url));
+          getDescendantExtensions(ce, url);
+        }
+      }
+    }
+    return extensions;
+  }  
 
   private void generateNarratives() throws Exception {
     Session tts = tt.start("narrative generation");
@@ -1926,6 +2433,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         bundleReferencesResolve = "true".equals(p.getValue());        
       } else if (p.getCode().equals("active-tables")) {
         HierarchicalTableGenerator.ACTIVE_TABLES = "true".equals(p.getValue());
+      } else if (p.getCode().equals("propagate-status")) {     
+        isPropagateStatus = p.getValue().equals("true");
       } else if (p.getCode().equals("ig-expansion-parameters")) {     
         expParamMap.put(p.getCode(), p.getValue());
       } else if (p.getCode().equals("special-url")) {     
@@ -1958,6 +2467,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         publisher = sourceIg.getPublisher();
       } else if (p.getCode().equals("apply-version") && p.getValue().equals("true")) {
         businessVersion = sourceIg.getVersion();
+      } else if (p.getCode().equals("default-contact") && p.getValue().equals("true")) {
+        defaultContacts = sourceIg.getContact();
+      } else if (p.getCode().equals("default-context") && p.getValue().equals("true")) {
+        defaultContexts = sourceIg.getUseContext();
+      } else if (p.getCode().equals("default-copyright") && p.getValue().equals("true")) {
+        defaultCopyright = sourceIg.getCopyright();
+      } else if (p.getCode().equals("default-jurisdiction") && p.getValue().equals("true")) {
+        defaultJurisdictions = sourceIg.getJurisdiction();
+      } else if (p.getCode().equals("default-license") && p.getValue().equals("true")) {
+        defaultLicenseInfo = sourceIg.getLicense();
+      } else if (p.getCode().equals("default-publisher") && p.getValue().equals("true")) {
+        defaultPublisher = sourceIg.getPublisher();
+      } else if (p.getCode().equals("default-version") && p.getValue().equals("true")) {
+        defaultBusinessVersion = sourceIg.getVersion();
       } else if (p.getCode().equals("generate-version")) {     
         generateVersions.add(p.getValue());
       } else if (p.getCode().equals("version-comparison")) {     
@@ -2032,6 +2555,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       markdownEngine = new MarkDownProcessor(Dialect.DARING_FIREBALL);
     else
       markdownEngine = new MarkDownProcessor(Dialect.COMMON_MARK);
+    
+    // loading the specifications
+    context = loadCorePackage();
+    context.setProgress(true);
+    context.setIgnoreProfileErrors(true);
+    context.setLogger(logger);
+    context.setAllowLoadingDuplicates(true);
+    context.setExpandCodesLimit(1000);
+    context.setExpansionProfile(makeExpProfile());
+    dr = new DataRenderer(context);
+
 
     // initializing the tx sub-system
     Utilities.createDirectory(vsCache);
@@ -3895,6 +4429,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       res.setUserData("loaded.resource", r);
       r.setResEntry(res);
+      if (r.getResource() instanceof CanonicalResource) {
+        CanonicalResource cr = (CanonicalResource)r.getResource();
+        if (!canonicalResources.containsKey(cr.getUrl())) {
+          canonicalResources.put(cr.getUrl(), r);
+          if (cr.hasVersion())
+            canonicalResources.put(cr.getUrl()+"#"+cr.getVersion(), r);
+        }
+      }
     }
     return changed || needToBuild;
   }
@@ -4115,6 +4657,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       load(s);
     log("Generating Snapshots");
     generateSnapshots();
+    if (isPropagateStatus) {
+      log("Propagating status");
+      propagateStatus();
+    }
     log("Generating Narratives");
     generateNarratives();
     if (!noValidation) {
@@ -4682,21 +5228,33 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                 altered = true;
                 bc.setVersion(businessVersion);
               }
+            } else if (defaultBusinessVersion != null && bc.getVersion().isEmpty()) {
+              altered = true;
+              bc.setVersion(defaultBusinessVersion);
             }
             if (contacts != null && !contacts.isEmpty()) {
               altered = true;
               bc.getContact().clear();
               bc.getContact().addAll(contacts);
+            } else if (!bc.hasContact() && defaultContacts != null && !defaultContacts.isEmpty()) {
+              altered = true;
+              bc.getContact().addAll(defaultContacts);
             }
             if (contexts != null && !contexts.isEmpty()) {
               altered = true;
               bc.getUseContext().clear();
               bc.getUseContext().addAll(contexts);
+            } else if (!bc.hasUseContext() && defaultContexts != null && !defaultContexts.isEmpty()) {
+              altered = true;
+              bc.getUseContext().addAll(defaultContexts);
             }
             // Todo: Enable these
             if (copyright != null && !bc.hasCopyright() && bc.supportsCopyright()) {
              altered = true;
              bc.setCopyright(copyright);
+            } else if (!bc.hasCopyright() && defaultCopyright != null) {
+              altered = true;
+              bc.setCopyright(defaultCopyright);
             }
             if (bc.hasCopyright() && bc.getCopyright().contains("{{{year}}}")) {
               bc.setCopyright(bc.getCopyright().replace("{{{year}}}", Integer.toString(Calendar.getInstance().get(Calendar.YEAR))));
@@ -4706,10 +5264,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               altered = true;
               bc.getJurisdiction().clear();
               bc.getJurisdiction().addAll(jurisdictions);
+            } else if (!bc.hasJurisdiction() && defaultJurisdictions != null && !defaultJurisdictions.isEmpty()) {
+              altered = true;
+              bc.getJurisdiction().addAll(defaultJurisdictions);
             }
             if (publisher != null) {
               altered = true;
               bc.setPublisher(publisher);
+            } else if (!bc.hasPublisher() && defaultPublisher != null) {
+              altered = true;
+              bc.setPublisher(defaultPublisher);
             }
 
 
@@ -5570,7 +6134,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (Utilities.noString(d)) {
         d = c.getChildValue("definition");
       }
-      list.add(new ContainedResourceDetails(c.fhirType(), c.getIdBase(), t, d));
+      CanonicalResource canonical = null;
+      if (Utilities.existsInList(c.fhirType(), VersionUtilities.getCanonicalResourceNames(context.getVersion()))) {
+        try {
+          canonical = (CanonicalResource)convertFromElement(c);
+        } catch (Exception ex) {
+          System.out.println("Error converting contained resource " + t + " - " + ex.getMessage());
+        }
+      }
+      list.add(new ContainedResourceDetails(c.fhirType(), c.getIdBase(), t, d, canonical));
     }
     return list;
   }
@@ -6296,47 +6868,201 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
-
-//  private String type;
-//  private String id;
-//  private String title;
-//  private String description;
-  public void populateResourceEntry(FetchedResource r, JsonObject item, ContainedResourceDetails crd) {
-    if (r.getResource() instanceof CanonicalResource) {
-      CanonicalResource cr = (CanonicalResource) r.getResource();
+  public void populateResourceEntry(FetchedResource r, JsonObject item, ContainedResourceDetails crd) throws Exception {
+    if (r.getResource() instanceof CanonicalResource || (crd!= null && crd.getCanonical() != null)) {
+      boolean containedCr = crd != null && crd.getCanonical() != null;
+      CanonicalResource cr = containedCr ? crd.getCanonical() : (CanonicalResource) r.getResource();
+      CanonicalResource pcr = r.getResource() instanceof CanonicalResource ? (CanonicalResource) r.getResource() : null;
       if (crd != null) {
-        item.addProperty("url", cr.getUrl()+"#"+crd.getId());
-        if (crd.getTitle() != null) {
-          item.addProperty("name", crd.getTitle());          
-          item.addProperty("title", cr.getTitle());
-        }
+        if (r.getResource() instanceof CanonicalResource)
+          item.addProperty("url", ((CanonicalResource)r.getResource()).getUrl()+"#"+crd.getId());
       } else {
         item.addProperty("url", cr.getUrl());
-        if (cr.hasName()) {
-          item.addProperty("name", cr.getName());
-        }
-        if (cr.hasTitle()) {
-          item.addProperty("title", cr.getTitle());
-        }
       }
-      if (cr.hasVersion()) {
-        item.addProperty("version", cr.getVersion());
+      if (cr.hasIdentifier()) {
+        List<String> ids = new ArrayList<String>();
+        for (Identifier id : cr.getIdentifier()) {
+          if (id.hasValue()) {
+            String label = dr.display(id.getType());
+            String idString = label!=null ? label + ":\u00A0" + id.getValue() : id.getValue();
+            ids.add(idString);
+          }
+        }
+        if (!ids.isEmpty())
+          item.addProperty("identifiers", String.join(", ", ids));
       }
+      if (pcr != null && pcr.hasVersion()) {
+        item.addProperty("version", pcr.getVersion());
+      }
+      if (cr.hasName()) {
+        item.addProperty("name", cr.getName());
+      }
+      if (cr.hasTitle()) {
+        item.addProperty("title", cr.getTitle());
+      }
+      item.addProperty("experimental", cr.getExperimental());
       if (cr.hasDate()) {
         item.addProperty("date", cr.getDateElement().primitiveValue());
       }
-      if (cr.hasStatus()) {
-        item.addProperty("status", cr.getStatus().toCode());
+      // status gets overridden later, and it appears in there
+      // publisher & description are exposed in domain resource as  'owner' & 'link'
+      if (cr.hasDescription()) {
+        item.addProperty("description", cr.getDescription());
       }
+      if (cr.hasUseContext() && !containedCr) {
+        List<String> contexts = new ArrayList<String>();
+        for (UsageContext uc : cr.getUseContext()) {
+          String label = dr.display(uc.getCode());
+          if (uc.hasValueCodeableConcept()) {
+            String value = dr.display(uc.getValueCodeableConcept());
+            if (value!=null) {
+              contexts.add(label + ":\u00A0" + value);
+            }
+          } else if (uc.hasValueQuantity()) {
+            String value = dr.display(uc.getValueQuantity());
+            if (value!=null)
+              contexts.add(label + ":\u00A0" + value);
+          } else if (uc.hasValueRange()) {
+            String value = dr.display(uc.getValueRange());
+            if (!value.isEmpty())
+              contexts.add(label + ":\u00A0" + value);
+            
+          } else if (uc.hasValueReference()) {
+            String value = null;
+            String reference = null;
+            if (uc.getValueReference().hasReference()) {
+              reference = uc.getValueReference().getReference().contains(":") ? "" : igpkp.getCanonical() + "/";
+              reference += uc.getValueReference().getReference();
+            }
+            if (uc.getValueReference().hasDisplay()) {
+              if (reference != null)
+                value = "[" + uc.getValueReference().getDisplay() + "](" + reference + ")";
+              else
+                value = uc.getValueReference().getDisplay();
+            } else if (reference!=null)
+              value = "[" + uc.getValueReference().getReference() + "](" + reference + ")";
+            else if (uc.getValueReference().hasIdentifier()) {
+              String idLabel = dr.display(uc.getValueReference().getIdentifier().getType());
+              value = idLabel!=null ? label + ":\u00A0" + uc.getValueReference().getIdentifier().getValue() : uc.getValueReference().getIdentifier().getValue();
+            }
+            if (value != null)
+              contexts.add(value);
+          } else if (uc.hasValue()) {
+            throw new FHIRException("Unsupported type for UsageContext.value - " + uc.getValue().fhirType());
+          }
+        }
+        if (!contexts.isEmpty())
+          item.addProperty("contexts", String.join(", ", contexts));              
+      }
+      if (cr.hasJurisdiction() && !containedCr) {
+        File flagDir = new File(tempDir + "/assets/images");
+        if (!flagDir.exists())
+          flagDir.mkdirs();
+        JsonArray jNodes = new JsonArray();
+        item.add("jurisdictions", jNodes);
+        ValueSet jvs = context.fetchResource(ValueSet.class, "http://hl7.org/fhir/ValueSet/jurisdiction");
+        for (CodeableConcept cc : cr.getJurisdiction()) {
+          JsonObject jNode = new JsonObject();
+          jNodes.add(jNode);
+          ValidationResult vr = jvs==null ? null : context.validateCode(new ValidationOptions("en-US"),  cc, jvs);
+          if (vr != null && vr.asCoding()!=null) {
+            Coding cd = vr.asCoding();
+            jNode.addProperty("code", cd.getCode());
+            if (cd.getSystem().equals("http://unstats.un.org/unsd/methods/m49/m49.htm") && cd.getCode().equals("001")) {
+              jNode.addProperty("name", "International");
+              jNode.addProperty("flag", "001");
+            } else if (cd.getSystem().equals("urn:iso:std:iso:3166")) {
+              String code = translateCountryCode(cd.getCode()).toLowerCase();
+              jNode.addProperty("name", displayForCountryCode(cd.getCode()));
+              File flagFile = new File(vsCache + "/" + code + ".svg");
+              if (!flagFile.exists()) {
+                URL url = new URL("https://restcountries.eu/data/" + code + ".svg");
+                try {
+                  InputStream in = url.openStream();
+                  Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
+                } catch (Exception e) {
+                  URL url2 = new URL("https://flagcdn.com/" + cd.getCode().toLowerCase() + ".svg");
+                  try {
+                    InputStream in = url2.openStream();
+                    Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
+                  } catch (Exception e2) {
+                    System.out.println("Unable to access " + url + " or " + url2);
+                  }
+                }
+              }
+              if (flagFile.exists()) {
+                FileUtils.copyFileToDirectory(flagFile, flagDir);
+                jNode.addProperty("flag", code);
+              }
+            } else if (cd.getSystem().equals("urn:iso:std:iso:3166:-2")) {
+              String code = cd.getCode();
+              String[] codeParts = cd.getCode().split("-");
+              jNode.addProperty("name", displayForStateCode(cd.getCode()) + " (" + displayForCountryCode(codeParts[0]) + ")");
+              File flagFile = new File(vsCache + "/" + code + ".svg");
+              if (!flagFile.exists()) {
+                URL url = new URL("http://flags.ox3.in/svg/" + codeParts[0].toLowerCase() + "/" + codeParts[1].toLowerCase() + ".svg");
+                try (InputStream in = url.openStream()) {
+                  Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
+                } catch (Exception e) {
+                  // If we can't find the file, that's ok.
+                }
+              }
+              if (flagFile.exists()) {
+                FileUtils.copyFileToDirectory(flagFile, flagDir);
+                jNode.addProperty("flag", code);
+              }
+            }
+          } else {
+            jNode.addProperty("name", dr.display(cc));
+          }
+        }
+      }
+      if (pcr != null && pcr.hasStatus())
+        item.addProperty("status", pcr.getStatus().toCode());
+      if (cr.hasPurpose())
+        item.addProperty("purpose", cr.getPurpose());              
+      if (cr.hasCopyright())
+        item.addProperty("copyright", cr.getCopyright());              
+      if (pcr!=null && pcr.hasExtension(ToolingExtensions.EXT_FMM_LEVEL)) {
+        IntegerType fmm = pcr.getExtensionByUrl(ToolingExtensions.EXT_FMM_LEVEL).getValueIntegerType();
+        item.addProperty("fmm", fmm.asStringValue());
+        if (fmm.hasExtension(ToolingExtensions.EXT_FMM_DERIVED)) {
+          String derivedFrom = "FMM derived from: ";
+          for (Extension ext: fmm.getExtensionsByUrl(ToolingExtensions.EXT_FMM_DERIVED)) {
+            derivedFrom += "\r\n" + ext.getValueCanonicalType().asStringValue();                  
+          }
+          item.addProperty("fmmSource", derivedFrom);
+        }
+      }
+      List<String> keywords = new ArrayList<String>();
+      if (r.getResource() instanceof StructureDefinition) {
+        StructureDefinition sd = (StructureDefinition)r.getResource();
+        if (sd.hasKeyword()) {
+          for (Coding coding : sd.getKeyword()) {
+            String value = dr.display(coding);
+            if (value != null)
+              keywords.add(value);
+          }
+        }
+      } else if (r.getResource() instanceof CodeSystem) {
+        CodeSystem cs = (CodeSystem)r.getResource();
+        for (Extension e : cs.getExtensionsByUrl(ToolingExtensions.EXT_CS_KEYWORD)) {
+          keywords.add(e.getValueStringType().asStringValue());
+        }
+      } else if (r.getResource() instanceof ValueSet) {
+        ValueSet vs = (ValueSet)r.getResource();
+        for (Extension e : vs.getExtensionsByUrl(ToolingExtensions.EXT_VS_KEYWORD)) {
+          keywords.add(e.getValueStringType().asStringValue());
+        }
+      }
+      if (!keywords.isEmpty())
+        item.addProperty("keywords", String.join(", ", keywords));              
     }
     if (r.getResource() instanceof DomainResource) {
       org.hl7.fhir.igtools.renderers.StatusRenderer.ResourceStatusInformation info = StatusRenderer.analyse((DomainResource) r.getResource());
       JsonObject jo = new JsonObject();
       if (info.getColorClass() != null) {
         jo.addProperty("class", info.getColorClass());
-      }
-      if (info.getFmm() != null) {
-        jo.addProperty("fmm", info.getFmm());
       }
       if (info.getOwner() != null) {
         jo.addProperty("owner", info.getOwner());
@@ -6346,6 +7072,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       if (info.getSstatus() != null) {
         jo.addProperty("standards-status", info.getSstatus());
+      } else if (sourceIg.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
+        jo.addProperty("standards-status","informative");
+      }
+      if (info.getSstatusSupport() != null) {
+        jo.addProperty("standards-status-support", info.getSstatusSupport());
+      }
+      if (info.getNormVersion() != null) {
+        item.addProperty("normativeVersion", info.getNormVersion());
+      }
+      if (info.getFmm() != null) {
+        jo.addProperty("fmm", info.getFmm());
+      }
+      if (info.getSstatusSupport() != null) {
+        jo.addProperty("fmm-support", info.getFmmSupport());
       }
       if (info.getStatus() != null) {
         jo.addProperty("status", info.getStatus());
@@ -6353,6 +7093,104 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (!jo.entrySet().isEmpty()) {
         item.add("status", jo);
       }
+    }
+  }
+  
+    // Turn a country code into a 3-character country code;
+    private String translateCountryCode(String code) throws Exception {
+      setupCountries();
+      String newCode = code;
+      if (StringUtils.isNumeric(code)) {
+        newCode = countryCodeForNumeric.get(code);
+        if (newCode == null)
+          throw new Exception("Unable to find numeric ISO country code: " + code);
+      } else if (code.length()==2) {
+        newCode = countryCodeFor2Letter.get(code);
+        if (newCode == null)
+          throw new Exception("Unable to find 2-char ISO country code: " + code);
+      }
+      return newCode.toUpperCase();
+    }
+    
+    private String displayForCountryCode(String code) throws Exception {
+      String newCode = translateCountryCode(code);
+      return countryNameForCode.get(newCode);
+    }
+    
+    private String displayForStateCode(String code) throws Exception {
+      return stateNameForCode.get(code);
+    }
+    
+    private void setupCountries() throws Exception {
+      if (countryCodeForName!=null)
+        return;
+      countryCodeForName = new HashMap<String,String>();
+      countryNameForCode = new HashMap<String,String>();
+      countryCodeFor2Letter = new HashMap<String,String>();
+      countryCodeForNumeric = new HashMap<String,String>();
+      stateNameForCode = new HashMap<String,String>();
+      ValueSet char3 = context.fetchResource(ValueSet.class, "http://hl7.org/fhir/ValueSet/iso3166-1-3");
+      ValueSet char2 = context.fetchResource(ValueSet.class, "http://hl7.org/fhir/ValueSet/iso3166-1-2");
+      ValueSet num = context.fetchResource(ValueSet.class, "http://hl7.org/fhir/ValueSet/iso3166-1-N");
+      ValueSet state = context.fetchResource(ValueSet.class, "http://hl7.org/fhir/ValueSet/jurisdiction");
+      if (char3==null || char2==null || num == null || state == null)
+        throw new Exception("Error retrieving ISO country-code & state value sets");
+      ValueSetExpansionOutcome char3Expand = context.expandVS(char3,true,false);
+      ValueSetExpansionOutcome char2Expand = context.expandVS(char2,true,false);
+      ValueSetExpansionOutcome numExpand = context.expandVS(num,true,false);
+      ValueSetExpansionOutcome stateExpand = context.expandVS(state,true,false);
+      if (!char3Expand.isOk() || !char2Expand.isOk() || !numExpand.isOk() || !stateExpand.isOk())
+        throw new Exception("Error expanding ISO country-code & state value sets");
+      for (ValueSetExpansionContainsComponent c: char3Expand.getValueset().getExpansion().getContains()) {
+        countryCodeForName.put(c.getDisplay(), c.getCode());
+        countryNameForCode.put(c.getCode(), c.getDisplay());      
+      }
+      for (ValueSetExpansionContainsComponent c: char2Expand.getValueset().getExpansion().getContains()) {
+        String code = countryCodeForName.get(c.getDisplay());
+        if (code==null) {
+          switch (c.getDisplay()) {
+            case "Åland Islands":
+              code = countryCodeForName.get("Eland Islands");
+              break;
+            case "Côte d''Ivoire":
+              code = countryCodeForName.get("Ctte d'Ivoire");
+              break;
+            case "Curaçao":
+              code = "Curagao";
+              break;
+            case "Korea, Democratic People''s Republic of":
+              code = "Korea, Democratic People's Republic of";
+              break;
+            case "Lao People''s Democratic Republic":
+              code = "Lao People's Democratic Republic";
+              break;
+            case "Réunion":
+              code = "Riunion";
+              break;
+            case "Saint Barthélemy":
+              code = countryCodeForName.get("Saint Barthilemy");
+              break;              
+            case "United Kingdom of Great Britain and Northern Ireland":
+              code = countryCodeForName.get("United Kingdom");
+              break;
+            case "Virgin Islands,":
+              code = countryCodeForName.get("Virgin Islands, U.S.");
+              break;
+            default:
+              throw new Exception("Unable to find 3-character code having same country code as ISO 2-char code " + c.getCode() + " - " + c.getDisplay());
+          }
+        }
+        countryCodeFor2Letter.put(c.getCode(), code);
+      }
+      for (ValueSetExpansionContainsComponent c: numExpand.getValueset().getExpansion().getContains()) {
+        String code = countryCodeForName.get(c.getDisplay());
+        if (code==null)
+          throw new Exception("Unable to find 3-character code having same country code as ISO numeric code " + c.getCode() + " - " + c.getDisplay());
+        countryCodeForNumeric.put(c.getCode(), code);
+      }
+      for (ValueSetExpansionContainsComponent c: stateExpand.getValueset().getExpansion().getContains()) {
+        if (c.getSystem().equals("urn:iso:std:iso:3166:-2"))
+          stateNameForCode.put(c.getCode(), c.getDisplay());
     }
   }
 
@@ -6529,8 +7367,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void addPageData(JsonObject pages, ImplementationGuideDefinitionPageComponent page, String source, String title, String label, String breadcrumb) throws FHIRException {
     FetchedResource r = resources.get(source);
     if (r==null) {
-      addPageDataRow(pages, source, title, label + (page.hasPage() ? ".0" : ""), breadcrumb + breadCrumbForPage(page, false), null);
-//      addPageDataRow(pages, source, title, label + (page.hasPage() ? ".0" : ""), breadcrumb + breadCrumbForPage(page, false), null);
+      String fmm = ToolingExtensions.readStringExtension(page, ToolingExtensions.EXT_FMM_LEVEL);
+      String status = ToolingExtensions.readStringExtension(page, ToolingExtensions.EXT_STANDARDS_STATUS);
+      String normVersion = ToolingExtensions.readStringExtension(page, ToolingExtensions.EXT_NORMATIVE_VERSION);
+      addPageDataRow(pages, source, title, label + (page.hasPage() ? ".0" : ""), fmm, status, normVersion, breadcrumb + breadCrumbForPage(page, false), null);
     } else {
       Map<String, String> vars = makeVars(r);
       String outputName = determineOutputName(igpkp.getProperty(r, "base"), r, vars, null, "");
@@ -6575,11 +7415,26 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
   private void addPageDataRow(JsonObject pages, String url, String title, String label, String breadcrumb, Set<FetchedResource> examples) throws FHIRException {
+    addPageDataRow(pages, url, title, label, null, null, null, breadcrumb, examples);
+  }
+
+  private void addPageDataRow(JsonObject pages, String url, String title, String label, String fmm, String status, String normVersion, String breadcrumb, Set<FetchedResource> examples) throws FHIRException {
     JsonObject jsonPage = new JsonObject();
     pages.add(url, jsonPage);
     jsonPage.addProperty("title", title);
     jsonPage.addProperty("label", label);
     jsonPage.addProperty("breadcrumb", breadcrumb);
+    if (fmm != null)
+      jsonPage.addProperty("fmm", fmm);
+    if (status != null) {
+      jsonPage.addProperty("status", status);
+      if (normVersion != null)
+        jsonPage.addProperty("normativeVersion", normVersion);
+    }
+    if (fmm != null || status != null) {
+      String statusClass = StatusRenderer.getColor("Active", status, fmm);
+      jsonPage.addProperty("statusclass", statusClass);        
+    }
 
     String baseUrl = url;
 
@@ -7163,6 +8018,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         makeTemplates(f, r, vars);
         saveDirectResourceOutputs(f, r, r.getResource(), vars);
         List<StringPair> clist = new ArrayList<>();
+        if (r.getResource() == null) {
+          try {
+            Resource container = convertFromElement(r.getElement());
+            r.setResource(container);
+          } catch (Exception e) {
+            logMessage("Unable to convert resource " + r.getTitle() + " " + e.getMessage());
+          }
+        }
         if (r.getResource() != null) {
           generateResourceHtml(f, regen, r, r.getResource(), vars, "");
           if (r.getResource() instanceof DomainResource) {
@@ -7173,7 +8036,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               throw new Error("Error: containedResources.size ("+containedResources.size()+") > containedElements.size ("+containedElements.size()+")");
             }
             // we have a list of the elements, and of the resources. 
-            // The resources mught not be the same as the elements - they've been converted to R5. We'll use the resources 
+            // The resources might not be the same as the elements - they've been converted to R5. We'll use the resources 
             // if that's ok, else we'll use the element (resources render better)
             for (int i = 0; i < containedResources.size(); i++ ) {
               Element containedElement = containedElements.get(i);
@@ -7187,7 +8050,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                   cr.copyUserData(container);
                   if (!(container instanceof CanonicalResource)) {
                     if (!cr.hasUrl() || !cr.hasVersion()) {
-                      throw new FHIRException("Unable to publish: contained canonical resource in a non-canonical resource does not have url+version");
+//                    throw new FHIRException("Unable to publish: contained canonical resource in a non-canonical resource does not have url+version");
                     }
                   } else {
                     cr.copyUserData(container);
@@ -7207,13 +8070,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               }
             }
           }
-        } else {
-          // element contained
-          // TODO: figure this out
-          if ("QuestionnaireResponse".equals(r.fhirType())) {
-            String prefixForContained = "";
-            generateOutputsQuestionnaireResponse(f, r, vars, prefixForContained);
-          }
         }
         if (igpkp.wantGen(r, "contained-index")) {
           fragment(r.fhirType()+"-"+r.getId()+"-contained-index", genContainedIndex(r, clist), f.getOutputNames());
@@ -7222,7 +8078,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
-  public class StringPair {
+  class StringPair {
     private String name;
     private String value;
 
@@ -7240,6 +8096,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return value;
     }
   }
+  
   private String genContainedIndex(FetchedResource r, List<StringPair> clist) {
     StringBuilder b = new StringBuilder();
     if (clist.size() > 0) {
