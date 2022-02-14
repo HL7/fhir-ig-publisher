@@ -1,1 +1,0 @@
-* Fix publisher jar classpath
