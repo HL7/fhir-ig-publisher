@@ -1,0 +1,1 @@
+* Use refactored SimpleWorkerContext from core
