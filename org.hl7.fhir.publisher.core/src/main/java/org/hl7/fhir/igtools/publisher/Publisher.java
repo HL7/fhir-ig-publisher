@@ -597,7 +597,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private static final long JEKYLL_TIMEOUT = 60000 * 5; // 5 minutes.... 
   private static final long FSH_TIMEOUT = 60000 * 5; // 5 minutes.... 
   public static String txServerProd = "http://tx.fhir.org";
-  public static String txServerDev = "http://local.fhir.org:960";
+  public static String txServerDev = "http://local.fhir.org:8080";
   private static final int PRISM_SIZE_LIMIT = 16384;
 
   private static final String FIXED_CACHE_VERSION = "2"; // invalidating validation cache becaise it was incomplete
@@ -2599,15 +2599,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       throw new Exception("Unable to access or create the cache directory at "+vsCache);
     logDebugMessage(LogCategory.INIT, "Load Terminology Cache from "+vsCache);
 
-    // loading the specifications
-    context = loadCorePackage();
-    context.setProgress(true);
-    context.setIgnoreProfileErrors(true);
-    context.setLogger(logger);
-    context.setAllowLoadingDuplicates(true);
-    context.setExpandCodesLimit(1000);
-    context.setExpansionProfile(makeExpProfile());
-
 
     if (expParams != null) {
       context.setExpansionProfile((Parameters) VersionConvertorFactory_40_50.convertResource(FormatUtilities.loadFile(Utilities.path(Utilities.getDirectoryForFile(igName), expParams))));
@@ -2994,6 +2985,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     context.setAllowLoadingDuplicates(true);
     context.setExpandCodesLimit(1000);
     context.setExpansionProfile(makeExpProfile());
+    dr = new DataRenderer(context);
     try {
       new ConfigFileConverter().convert(configFile, context, pcm);
     } catch (Exception e) {
@@ -6923,7 +6915,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (cr.hasTitle()) {
         item.addProperty("title", cr.getTitle());
       }
-      item.addProperty("experimental", cr.getExperimental());
+      if (cr.supportsExperimental()) {
+        item.addProperty("experimental", cr.getExperimental());
+      }
       if (cr.hasDate()) {
         item.addProperty("date", cr.getDateElement().primitiveValue());
       }
