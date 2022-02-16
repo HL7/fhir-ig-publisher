@@ -519,7 +519,7 @@ public class HTLMLInspector {
     }
     if ("script".equals(x.getName())) {
       checkScriptElement(s, x.getLocation(), path, x, messages);
-    }
+    } 
     String nuid = genID(lf);
     boolean nchanged = false;
     boolean nSelfChanged = false;
@@ -552,7 +552,7 @@ public class HTLMLInspector {
   private void checkScriptElement(String filename, Location loc, String path, XhtmlNode x, List<ValidationMessage> messages) {
     String src = x.getAttribute("src");
     if (!Utilities.noString(src) && Utilities.isAbsoluteUrl(src) && !Utilities.existsInList(src, 
-        "http://hl7.org/fhir/history-cm.js", "http://hl7.org/fhir/assets-hist/js/jquery.js"))
+        "http://hl7.org/fhir/history-cm.js", "http://hl7.org/fhir/assets-hist/js/jquery.js") && !src.contains("googletagmanager.com"))
       messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, filename+(loc == null ? "" : " at "+loc.toString()), "The <script> src '"+src+"' is llegal", IssueSeverity.FATAL));    
   }
 

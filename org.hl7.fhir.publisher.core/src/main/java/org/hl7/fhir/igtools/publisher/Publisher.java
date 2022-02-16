@@ -5447,7 +5447,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
         utils.setDefWebRoot(igpkp.getCanonical());
         try {
-          utils.generateSnapshot(base, sd, sd.getUrl(), Utilities.extractBaseUrl(base.getUserString("path")), sd.getName());
+          if (base.getUserString("webroot") != null) {            
+            utils.generateSnapshot(base, sd, sd.getUrl(), base.getUserString("webroot"), sd.getName());
+          } else {
+            utils.generateSnapshot(base, sd, sd.getUrl(), null, sd.getName());
+          }
         } catch (Exception e) { 
           throw new FHIRException("Unable to generate snapshot for "+sd.getUrl()+" in "+f.getName(), e);
         }
