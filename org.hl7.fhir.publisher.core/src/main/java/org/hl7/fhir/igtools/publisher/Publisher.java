@@ -5447,8 +5447,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
         utils.setDefWebRoot(igpkp.getCanonical());
         try {
-          if (Utilities.isAbsoluteUrl(base.getUserString("path"))) {            
-            utils.generateSnapshot(base, sd, sd.getUrl(), Utilities.extractBaseUrl(base.getUserString("path")), sd.getName());
+          if (base.getUserString("webroot") != null) {            
+            utils.generateSnapshot(base, sd, sd.getUrl(), base.getUserString("webroot"), sd.getName());
           } else {
             utils.generateSnapshot(base, sd, sd.getUrl(), null, sd.getName());
           }
