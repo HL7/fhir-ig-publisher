@@ -120,7 +120,7 @@ public class BaseRenderer extends TranslatingUtilities {
 	        i--;
 	      }
 	    }
-	    text = ProfileUtilities.processRelativeUrls(text, "", corePath, context.getResourceNames(), specmaps.get(0).listTargets());
+	    text = ProfileUtilities.processRelativeUrls(text, "", corePath, context.getResourceNames(), specmaps.get(0).listTargets(), false);
 	    // 3. markdown
 	    String s = markdownEngine.process(checkEscape(text), location);
 	    return s;

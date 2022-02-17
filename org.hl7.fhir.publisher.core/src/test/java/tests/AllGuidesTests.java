@@ -7,6 +7,7 @@ import java.io.FileOutputStream;
 import org.apache.commons.io.IOUtils;
 import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.publisher.Publisher.CacheOption;
+import org.hl7.fhir.utilities.ToolGlobalSettings;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.junit.jupiter.api.Assertions;
@@ -16,7 +17,6 @@ import com.google.gson.JsonObject;
 
 public class AllGuidesTests {
 
-private static final String ROOT_DIR = "C:\\work\\org.hl7.fhir\\test-igs";
 private static final String VER = "1.0.53";
 
 //  private void test(String path) throws Exception {
@@ -32,12 +32,12 @@ private static final String VER = "1.0.53";
 //  }
 
   private void testIg(String id, String path) throws Exception {
-    if (!new File(ROOT_DIR).exists()) {
+    if (!new File(ToolGlobalSettings.getTestIgsPath()).exists()) {
       Assertions.assertTrue(true);
       return;
     }
     System.out.println("=======================================================================================");
-    String p = (path == null ? Utilities.path(ROOT_DIR, id) : Utilities.path(ROOT_DIR, id, path));
+    String p = (path == null ? Utilities.path(ToolGlobalSettings.getTestIgsPath(), id) : Utilities.path(ToolGlobalSettings.getTestIgsPath(), id, path));
     System.out.println("Publish IG "+ p);
     Publisher pub = new Publisher();
     pub.setConfigFile(p);
@@ -47,16 +47,16 @@ private static final String VER = "1.0.53";
     
     System.out.println("===== Analysis ======================================================================");
     // to make diff programs easy to run
-    IOUtils.copy(new FileInputStream(Utilities.path(ROOT_DIR, id, "output", "qa.json")), new FileOutputStream(Utilities.path(ROOT_DIR, "records", id+"-qa-gen.json")));
-    IOUtils.copy(new FileInputStream(Utilities.path(ROOT_DIR, id, "output", "qa.html")), new FileOutputStream(Utilities.path(ROOT_DIR, "records", id+"-qa-gen.html")));
-    if (new File(Utilities.path(ROOT_DIR, id, "output", "qa.txt")).exists()) {
-      IOUtils.copy(new FileInputStream(Utilities.path(ROOT_DIR, id, "output", "qa.txt")), new FileOutputStream(Utilities.path(ROOT_DIR, "records", id+"-qa-gen.txt")));
+    IOUtils.copy(new FileInputStream(Utilities.path(ToolGlobalSettings.getTestIgsPath(), id, "output", "qa.json")), new FileOutputStream(Utilities.path(ToolGlobalSettings.getTestIgsPath(), "records", id+"-qa-gen.json")));
+    IOUtils.copy(new FileInputStream(Utilities.path(ToolGlobalSettings.getTestIgsPath(), id, "output", "qa.html")), new FileOutputStream(Utilities.path(ToolGlobalSettings.getTestIgsPath(), "records", id+"-qa-gen.html")));
+    if (new File(Utilities.path(ToolGlobalSettings.getTestIgsPath(), id, "output", "qa.txt")).exists()) {
+      IOUtils.copy(new FileInputStream(Utilities.path(ToolGlobalSettings.getTestIgsPath(), id, "output", "qa.txt")), new FileOutputStream(Utilities.path(ToolGlobalSettings.getTestIgsPath(), "records", id+"-qa-gen.txt")));
     }
     
-    JsonObject current = JsonTrackingParser.parseJson(new FileInputStream(Utilities.path(ROOT_DIR, id, "output", "qa.json")));
+    JsonObject current = JsonTrackingParser.parseJson(new FileInputStream(Utilities.path(ToolGlobalSettings.getTestIgsPath(), id, "output", "qa.json")));
     JsonObject previous = null;
-    if (new File(Utilities.path(ROOT_DIR, "records", id+"-qa.json")).exists()) {
-      previous = JsonTrackingParser.parseJson(new FileInputStream(Utilities.path(ROOT_DIR, "records", id+"-qa.json")));
+    if (new File(Utilities.path(ToolGlobalSettings.getTestIgsPath(), "records", id+"-qa.json")).exists()) {
+      previous = JsonTrackingParser.parseJson(new FileInputStream(Utilities.path(ToolGlobalSettings.getTestIgsPath(), "records", id+"-qa.json")));
     } else {
       previous = new JsonObject();      
     }
@@ -79,17 +79,17 @@ private static final String VER = "1.0.53";
 
   @Test
   public void testTemplateBase() throws Exception {
-    testIg("fhir.base.template", null);
+    testIg("fhir.base.template.ig", null);
   }
 
   @Test
   public void test_TemplateHL7() throws Exception {
-    testIg("hl7.base.template", null);
+    testIg("hl7.base.template.ig", null);
   }
 
   @Test
   public void testTemplateHL7FHIR() throws Exception {
-    testIg("hl7.fhir.template", null);
+    testIg("hl7.fhir.template.ig", null);
   }
 
   @Test

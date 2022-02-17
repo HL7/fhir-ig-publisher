@@ -89,6 +89,7 @@ public class PublisherLoader implements ILoaderKnowledgeProviderR5 {
           path = pathToSpec+"/"+ igpkp.doReplacements(p, r, null, null);
         }
         r.setUserData("path", path);
+        r.setUserData("webroot", pathToSpec);
         String v = ((CanonicalResource) r).getVersion();
         if (v != null) {
           u = u + "|" + v;
@@ -184,6 +185,11 @@ public class PublisherLoader implements ILoaderKnowledgeProviderR5 {
   @Override
   public ILoaderKnowledgeProviderR5 forNewPackage(NpmPackage npm) throws JsonSyntaxException, IOException {
     return new PublisherLoader(npm, SpecMapManager.fromPackage(npm), npm.getWebLocation(), igpkp);
+  }
+
+  @Override
+  public String getWebRoot() {
+    return pathToSpec;
   }
 
 }

@@ -72,7 +72,7 @@ import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.stream.StreamResult;
 import javax.xml.transform.stream.StreamSource;
-
+import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
 import org.apache.commons.exec.ExecuteWatchdog;
 import org.apache.commons.exec.PumpStreamHandler;
@@ -213,6 +213,7 @@ import org.hl7.fhir.r5.model.Property;
 import org.hl7.fhir.r5.model.Provenance;
 import org.hl7.fhir.r5.model.Provenance.ProvenanceAgentComponent;
 import org.hl7.fhir.r5.model.Questionnaire;
+import org.hl7.fhir.r5.model.QuestionnaireResponse;
 import org.hl7.fhir.r5.model.Questionnaire.QuestionnaireItemComponent;
 import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.model.Resource;
@@ -289,6 +290,7 @@ import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.TimeTracker;
 import org.hl7.fhir.utilities.TimeTracker.Session;
+import org.hl7.fhir.utilities.ToolGlobalSettings;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.ZipGenerator;
@@ -595,7 +597,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private static final long JEKYLL_TIMEOUT = 60000 * 5; // 5 minutes.... 
   private static final long FSH_TIMEOUT = 60000 * 5; // 5 minutes.... 
   public static String txServerProd = "http://tx.fhir.org";
-  public static String txServerDev = "http://local.fhir.org:960";
+  public static String txServerDev = "http://local.fhir.org:8080";
   private static final int PRISM_SIZE_LIMIT = 16384;
 
   private static final String FIXED_CACHE_VERSION = "2"; // invalidating validation cache becaise it was incomplete
@@ -617,7 +619,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private Map<String,String> countryNameForCode = null;
   private Map<String,String> countryCodeForNumeric = null;
   private Map<String,String> countryCodeFor2Letter = null;
+  private Map<String,String> shortCountryCode = null;
   private Map<String,String> stateNameForCode = null;
+  private List<String> ignoreFlags = null;
 
   private Publisher childPublisher = null;
   private GenerationTool tool;
@@ -813,6 +817,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private boolean noValidation;
   private boolean noGenerate;
 
+  private String fmtDateTime = "yyyy-MM-dd hh:mm:ssZZZ";
+  private String fmtDate = "yyyy-MM-dd";
   
   private class PreProcessInfo {
     private String xsltName;
@@ -1793,22 +1799,24 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId());
             if (r.getResource() != null && isConvertableResource(r.getResource().fhirType())) {
               boolean regen = false;
-              rc.setDefinitionsTarget(igpkp.getDefinitionsName(r));
+              RenderingContext lrc = rc.copy().setDefinitionsTarget(igpkp.getDefinitionsName(r));
+              lrc.setDefinitionsTarget(igpkp.getDefinitionsName(r));
               if (r.getResource() instanceof DomainResource && !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv())) {
                 regen = true;
-                RendererFactory.factory(r.getResource(), rc).render((DomainResource) r.getResource());
+                RendererFactory.factory(r.getResource(), lrc).render((DomainResource) r.getResource());
               } else if (r.getResource() instanceof Bundle) {
                 regen = true;
-                new BundleRenderer(rc).render((Bundle) r.getResource());
+                new BundleRenderer(lrc).render((Bundle) r.getResource());
               } else if (r.getResource() instanceof Parameters) {
                 regen = true;
                 Parameters p = (Parameters) r.getResource();
-                new ParametersRenderer(rc, new ResourceContext(ResourceContextType.PARAMETERS , p, null)).render(p);
+                new ParametersRenderer(lrc, new ResourceContext(ResourceContextType.PARAMETERS , p, null)).render(p);
               } else if (r.getResource() instanceof DomainResource) {
                 checkExistingNarrative(f, r, ((DomainResource) r.getResource()).getText().getDiv());
               }
-              if (regen)
+              if (regen) {
                 r.setElement(convertToElement(r.getResource()));
+              }
             } else {
               RenderingContext lrc = rc.copy().setParser(getTypeLoader(f,r));
               if ("http://hl7.org/fhir/StructureDefinition/DomainResource".equals(r.getElement().getProperty().getStructure().getBaseDefinition()) && !hasNarrative(r.getElement())) {
@@ -2255,6 +2263,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     try {
       if (SystemUtils.IS_OS_WINDOWS) {
         exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C "+cmd+" . -o ."));
+      } else if (ToolGlobalSettings.hasNpmPath()) {
+        ProcessBuilder processBuilder = new ProcessBuilder(new String("bash -c "+cmd));
+        Map<String, String> env = processBuilder.environment();
+        Map<String, String> vars = new HashMap<>();
+        vars.putAll(env);
+        String path = ToolGlobalSettings.getNpmPath()+":"+env.get("PATH");
+        vars.put("PATH", path);
+        exec.execute(org.apache.commons.exec.CommandLine.parse("bash -c "+cmd+" . -o ."), vars);
       } else {
         exec.execute(org.apache.commons.exec.CommandLine.parse(cmd+" . -o ."));
       }
@@ -2441,6 +2457,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         openApiTemplate = p.getValue();
       } else if (p.getCode().equals("template-html")) {     
         htmlTemplate = p.getValue();
+      } else if (p.getCode().equals("format-date")) {     
+        fmtDate = p.getValue();
+      } else if (p.getCode().equals("format-datetime")) {     
+        fmtDateTime = p.getValue();
       } else if (p.getCode().equals("template-md")) {     
         mdTemplate = p.getValue();
       } else if (p.getCode().equals("path-binary")) {     
@@ -2560,6 +2580,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     context.setExpansionProfile(makeExpProfile());
     dr = new DataRenderer(context);
 
+
     // initializing the tx sub-system
     Utilities.createDirectory(vsCache);
     if (cacheOption == CacheOption.CLEAR_ALL) {
@@ -2577,7 +2598,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (!new File(vsCache).exists())
       throw new Exception("Unable to access or create the cache directory at "+vsCache);
     logDebugMessage(LogCategory.INIT, "Load Terminology Cache from "+vsCache);
-    context.initTS(vsCache);
+
+
     if (expParams != null) {
       context.setExpansionProfile((Parameters) VersionConvertorFactory_40_50.convertResource(FormatUtilities.loadFile(Utilities.path(Utilities.getDirectoryForFile(igName), expParams))));
     } else if (!expParamMap.isEmpty()) {
@@ -2954,6 +2976,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Terminology Cache is at "+vsCache+". "+Integer.toString(Utilities.countFilesInDirectory(vsCache))+" files in cache");
     if (!new File(vsCache).exists())
       throw new Exception("Unable to access or create the cache directory at "+vsCache);
+    log("Load Terminology Cache from "+vsCache);
 
     context = loadCorePackage();
     context.setIgnoreProfileErrors(true);
@@ -2962,14 +2985,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     context.setAllowLoadingDuplicates(true);
     context.setExpandCodesLimit(1000);
     context.setExpansionProfile(makeExpProfile());
+    dr = new DataRenderer(context);
     try {
       new ConfigFileConverter().convert(configFile, context, pcm);
     } catch (Exception e) {
       log("exception generating new IG");
       e.printStackTrace();
     }
-    log("Load Terminology Cache from "+vsCache);
-    context.initTS(vsCache);
+
     String sct = str(configuration, "sct-edition", "http://snomed.info/sct/900000000000207008");
     context.getExpansionParameters().addParameter("system-version", "http://snomed.info/sct|"+sct);
     txLog = Utilities.createTempFile("fhir-ig-", ".log").getAbsolutePath();
@@ -3481,7 +3504,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     SpecMapManager spm = loadSpecDetails(TextFile.streamToBytes(pi.load("other", "spec.internals")));
     SimpleWorkerContext sp;
     IContextResourceLoader loader = new PublisherLoader(pi, spm, specPath, igpkp).makeLoader();
-    sp = SimpleWorkerContext.fromPackage(pi, loader);
+    sp = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(vsCache).fromPackage(pi, loader);
     sp.loadBinariesFromFolder(pi);
     sp.setCacheId(UUID.randomUUID().toString());
     if (!version.equals(Constants.VERSION)) {
@@ -4005,6 +4028,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         rc.setLocale(locale);
       }
     }
+    rc.setDateFormatString(fmtDate);
+    rc.setDateTimeFormatString(fmtDateTime);
 //    rc.setTargetVersion(pubVersion);
 
     if (igMode) {
@@ -5422,7 +5447,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
         utils.setDefWebRoot(igpkp.getCanonical());
         try {
-          utils.generateSnapshot(base, sd, sd.getUrl(), Utilities.extractBaseUrl(base.getUserString("path")), sd.getName());
+          if (base.getUserString("webroot") != null) {            
+            utils.generateSnapshot(base, sd, sd.getUrl(), base.getUserString("webroot"), sd.getName());
+          } else {
+            utils.generateSnapshot(base, sd, sd.getUrl(), null, sd.getName());
+          }
         } catch (Exception e) { 
           throw new FHIRException("Unable to generate snapshot for "+sd.getUrl()+" in "+f.getName(), e);
         }
@@ -6611,6 +6640,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Run jekyll: "+jekyllCommand+" build --destination \""+outputDir+"\" (in folder "+tempDir+")");
 	    if (SystemUtils.IS_OS_WINDOWS) {
 	      exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C "+jekyllCommand+" build --destination \""+outputDir+"\""));
+	    } else if (ToolGlobalSettings.hasRubyPath()) {
+        ProcessBuilder processBuilder = new ProcessBuilder(new String("bash -c "+jekyllCommand));
+        Map<String, String> env = processBuilder.environment();
+        Map<String, String> vars = new HashMap<>();
+        vars.putAll(env);
+        String path = ToolGlobalSettings.getRubyPath()+":"+env.get("PATH");
+        vars.put("PATH", path);
+        CommandLine shellCommand = new CommandLine("bash").addArgument("-c").addArgument(jekyllCommand+" build --destination "+outputDir, false);        
+        exec.execute(shellCommand, vars);     
 	    } else {
 	      exec.execute(org.apache.commons.exec.CommandLine.parse(jekyllCommand+" build --destination \""+outputDir+"\""));
 	    }
@@ -6881,7 +6919,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (cr.hasTitle()) {
         item.addProperty("title", cr.getTitle());
       }
+      if (cr.supportsExperimental()) {
       item.addProperty("experimental", cr.getExperimental());
+      }
       if (cr.hasDate()) {
         item.addProperty("date", cr.getDateElement().primitiveValue());
       }
@@ -6956,17 +6996,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               String code = translateCountryCode(cd.getCode()).toLowerCase();
               jNode.addProperty("name", displayForCountryCode(cd.getCode()));
               File flagFile = new File(vsCache + "/" + code + ".svg");
-              if (!flagFile.exists()) {
+              if (!flagFile.exists() && !ignoreFlags.contains(code)) {
                 URL url = new URL("https://restcountries.eu/data/" + code + ".svg");
                 try {
                   InputStream in = url.openStream();
                   Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
                 } catch (Exception e) {
-                  URL url2 = new URL("https://flagcdn.com/" + cd.getCode().toLowerCase() + ".svg");
+                  URL url2 = new URL("https://flagcdn.com/" + shortCountryCode.get(code.toUpperCase()).toLowerCase() + ".svg");
                   try {
                     InputStream in = url2.openStream();
                     Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
                   } catch (Exception e2) {
+                    ignoreFlags.add(code);
                     System.out.println("Unable to access " + url + " or " + url2);
                   }
                 }
@@ -7109,7 +7150,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       countryNameForCode = new HashMap<String,String>();
       countryCodeFor2Letter = new HashMap<String,String>();
       countryCodeForNumeric = new HashMap<String,String>();
+      shortCountryCode = new HashMap<String,String>();
       stateNameForCode = new HashMap<String,String>();
+      ignoreFlags = new ArrayList<String>();
       ValueSet char3 = context.fetchResource(ValueSet.class, "http://hl7.org/fhir/ValueSet/iso3166-1-3");
       ValueSet char2 = context.fetchResource(ValueSet.class, "http://hl7.org/fhir/ValueSet/iso3166-1-2");
       ValueSet num = context.fetchResource(ValueSet.class, "http://hl7.org/fhir/ValueSet/iso3166-1-N");
@@ -7162,6 +7205,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           }
         }
         countryCodeFor2Letter.put(c.getCode(), code);
+        shortCountryCode.put(code, c.getCode());
       }
       for (ValueSetExpansionContainsComponent c: numExpand.getValueset().getExpansion().getContains()) {
         String code = countryCodeForName.get(c.getDisplay());
@@ -8011,12 +8055,23 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           generateResourceHtml(f, regen, r, r.getResource(), vars, "");
           if (r.getResource() instanceof DomainResource) {
             DomainResource container = (DomainResource) r.getResource();
-            for (Resource contained : container.getContained()) {              
+            List<Element> containedElements = r.getElement().getChildren("contained");
+            List<Resource> containedResources = container.getContained();
+            if (containedResources.size() > containedElements.size()) {
+              throw new Error("Error: containedResources.size ("+containedResources.size()+") > containedElements.size ("+containedElements.size()+")");
+            }
+            // we have a list of the elements, and of the resources. 
+            // The resources might not be the same as the elements - they've been converted to R5. We'll use the resources 
+            // if that's ok, else we'll use the element (resources render better)
+            for (int i = 0; i < containedResources.size(); i++ ) {
+              Element containedElement = containedElements.get(i);
+              Resource containedResource = containedResources.get(i);
+              if (containedElement.fhirType().equals(containedResource.fhirType())) {
               String prefixForContained = r.getResource().getId()+"_";
-              makeTemplatesContained(f, r, contained, vars, prefixForContained);
-              String fn = saveDirectResourceOutputsContained(f, r, contained, vars, prefixForContained);
-              if (contained instanceof CanonicalResource) {
-                CanonicalResource cr = ((CanonicalResource) contained).copy();
+                makeTemplatesContained(f, r, containedResource, vars, prefixForContained);
+                String fn = saveDirectResourceOutputsContained(f, r, containedResource, vars, prefixForContained);
+                if (containedResource instanceof CanonicalResource) {
+                  CanonicalResource cr = ((CanonicalResource) containedResource).copy();
                 cr.copyUserData(container);
                 if (!(container instanceof CanonicalResource)) {
                   if (!cr.hasUrl() || !cr.hasVersion()) {
@@ -8025,7 +8080,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                 } else {
                   cr.copyUserData(container);
                   if (!cr.hasUrl()) {
-                    cr.setUrl(((CanonicalResource) container).getUrl()+"#"+contained.getId());
+                      cr.setUrl(((CanonicalResource) container).getUrl()+"#"+containedResource.getId());
                   }
                   if (!cr.hasVersion()) {
                     cr.setVersion(((CanonicalResource) container).getVersion());
@@ -8034,10 +8089,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                 generateResourceHtml(f, regen, r, cr, vars, prefixForContained);
                 clist.add(new StringPair(cr.present(), fn));
               } else {
-                generateResourceHtml(f, regen, r, contained, vars, prefixForContained);
-                clist.add(new StringPair(contained.fhirType()+"/"+contained.getId(), fn));
+                  generateResourceHtml(f, regen, r, containedResource, vars, prefixForContained);
+                  clist.add(new StringPair(containedResource.fhirType()+"/"+containedResource.getId(), fn));
               }
             }
+            }
+          }
+        } else {
+          // element contained
+          // TODO: figure this out
+          if ("QuestionnaireResponse".equals(r.fhirType())) {
+            String prefixForContained = "";
+            generateOutputsQuestionnaireResponse(f, r, vars, prefixForContained);
           }
         }
         if (igpkp.wantGen(r, "contained-index")) {
@@ -8047,7 +8110,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
-  public class StringPair {
+  class StringPair {
     private String name;
     private String value;
 
@@ -8065,6 +8128,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return value;
     }
   }
+  
   private String genContainedIndex(FetchedResource r, List<StringPair> clist) {
     StringBuilder b = new StringBuilder();
     if (clist.size() > 0) {
@@ -9315,12 +9379,28 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void generateOutputsQuestionnaireResponse(FetchedFile f, FetchedResource r, Map<String,String> vars, String prefixForContainer) throws Exception {
-    QuestionnaireResponseRenderer qr = new QuestionnaireResponseRenderer(context, checkAppendSlash(specPath), r.getElement(), Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, 
-        rc.copy().setParser(getTypeLoader(f, r)).setDefinitionsTarget(igpkp.getDefinitionsName(r)));
+    RenderingContext lrc = rc.copy().setParser(getTypeLoader(f, r));
+    String qu = getQuestionnaireURL(r);
+    if (qu != null) {
+      Questionnaire q = context.fetchResource(Questionnaire.class, qu);
+      if (q != null && q.hasUserData("path")) {
+        lrc.setDefinitionsTarget(q.getUserString("path"));
+      }
+    }
+    
+
+    QuestionnaireResponseRenderer qr = new QuestionnaireResponseRenderer(context, checkAppendSlash(specPath), r.getElement(), Utilities.path(tempDir), igpkp, specMaps, markdownEngine, packge, lrc);
     if (igpkp.wantGen(r, "tree"))
       fragment("QuestionnaireResponse-"+prefixForContainer+r.getId()+"-tree", qr.render(QuestionnaireRendererMode.TREE), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "form"))
       fragment("QuestionnaireResponse-"+prefixForContainer+r.getId()+"-form", qr.render(QuestionnaireRendererMode.FORM), f.getOutputNames(), r, vars, null);
+  }
+
+  private String getQuestionnaireURL(FetchedResource r) {
+    if (r.getResource() != null && r.getResource() instanceof QuestionnaireResponse) {
+      return ((QuestionnaireResponse) r.getResource()).getQuestionnaire();
+    }
+    return r.getElement().getChildValue("questionnaire");
   }
 
 
