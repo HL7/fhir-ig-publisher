@@ -3568,8 +3568,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       throw new Exception("You must specify a version for the IG "+packageId+" ("+canonical+")");
     
     NpmPackage pi = packageId == null ? null : pcm.loadPackageFromCacheOnly(packageId, igver);
-    if (pi != null)
-      npmList.add(pi);
     if (pi == null) {
       pi = resolveDependency(canonical, packageId, igver);
       if (pi == null) {
@@ -3579,6 +3577,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           throw new Exception("Unknown Package "+packageId+"#"+igver);
       }
     }
+    if (pi != null)
+      npmList.add(pi);
     logDebugMessage(LogCategory.INIT, "Load "+name+" ("+canonical+") from "+packageId+"#"+igver);
 
     if (dep.hasUri() && !dep.getUri().contains("/ImplementationGuide/")) {
