@@ -26,6 +26,7 @@ public class SuppressedMessageInformation {
     
     public SuppressedMessage(String message) {
       super();
+      message = message.trim();
       this.messageRaw = message;
       if (messageRaw.startsWith("%")) {
         if (messageRaw.endsWith("%")) {
@@ -78,7 +79,7 @@ public class SuppressedMessageInformation {
     if (message == null) {
       return false;
     }
-    String msg = message.toLowerCase();
+    String msg = message.toLowerCase().trim();
     for (Category c : categories) {
       for (SuppressedMessage sm : c.messages) {
         boolean match = sm.matches(msg);
