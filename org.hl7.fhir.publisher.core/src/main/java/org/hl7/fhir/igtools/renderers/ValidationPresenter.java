@@ -572,9 +572,6 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
         passesFilter = false;        
       }
       if (passesFilter) {
-        if (message.getMessage().contains("australian-states-territories-2")) {
-          System.out.print(".");
-        }
         passList.add(message);
         msgs.add(message.getLocation()+"|"+message.getMessage());        
       } else {
