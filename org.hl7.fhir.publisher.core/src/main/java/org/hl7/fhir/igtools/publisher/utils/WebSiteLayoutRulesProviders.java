@@ -62,7 +62,7 @@ public class WebSiteLayoutRulesProviders {
         ok = check(res, canonical.equals("http://fhir.ch/ig/"+code()), 
             "canonical URL of "+canonical+" does not match the required canonical of http://fhir.ch/ig/"+code());          
       } else if ("be".equals(realm())) {
-        ok = check(res, canonical.equals("http://hl7belgium.org/profiles/fhir/"+code()) || canonical.equals("http://ehealth.fgov.be/standards/fhir/"+code()), 
+        ok = check(res, canonical.equals("http://hl7belgium.org/profiles/fhir/"+code()) || canonical.equals("https://ehealth.fgov.be/standards/fhir/"+code()), 
             "canonical URL of "+canonical+" does not match the required canonical of http://hl7belgium.org/profiles/fhir/"+code()+" or https://ehealth.fgov.be/standards/fhir/"+code());          
       } else {
         // special case weirdity
