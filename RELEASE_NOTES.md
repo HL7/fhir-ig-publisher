@@ -1,0 +1,1 @@
+Publication Process: Fix issues handling dist-hist and assets-hist
