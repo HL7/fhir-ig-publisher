@@ -1084,7 +1084,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
               for (Enumeration<AggregationMode> a :t.getAggregation()) {
                 if (!firstMode)
                   b.append(", ");
-                b.append(" <a href=\"" + prefix + "codesystem-resource-aggregation-mode.html#content\" title=\""+ProfileUtilities.hintForAggregation(a.getValue())+"\">{" + ProfileUtilities.codeForAggregation(a.getValue()) + "</a>");
+                b.append(" <a href=\"" + corePath + "codesystem-resource-aggregation-mode.html#content\" title=\""+ProfileUtilities.hintForAggregation(a.getValue())+"\">{" + ProfileUtilities.codeForAggregation(a.getValue()) + "}</a>");
                 firstMode = false;
               }
             }

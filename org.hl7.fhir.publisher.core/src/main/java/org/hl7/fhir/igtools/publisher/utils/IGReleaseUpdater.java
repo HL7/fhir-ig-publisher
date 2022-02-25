@@ -168,9 +168,13 @@ public class IGReleaseUpdater {
                 throw new Error("No Sequence value for version "+v+" in "+f);
               }
               if (!path.endsWith(".html")) {
-                if (!(new File(vf).exists()))
-                  errs.add("version "+v+" path "+vf+" not found (canonical = "+canonical+", path = "+path+")");
-                else {
+                if (!(new File(vf).exists())) {
+                  if (Utilities.isAbsoluteUrl(vf)) {
+                    System.out.println("--- ignoring version "+v+" as it appears to be a reference to an external target ('"+path+"')");
+                  } else {
+                    errs.add("version "+v+" path "+vf+" not found (canonical = "+canonical+", path = "+path+")");
+                  }
+                } else {
                   folders.add(vf);
                   save = updateStatement(vf, null, ignoreList, json, o, errs, root, canonical, folder, canonical.equals("http://hl7.org/fhir"), false, list) | save;
                 }
