@@ -168,9 +168,13 @@ public class IGReleaseUpdater {
                 throw new Error("No Sequence value for version "+v+" in "+f);
               }
               if (!path.endsWith(".html")) {
-                if (!(new File(vf).exists()))
-                  errs.add("version "+v+" path "+vf+" not found (canonical = "+canonical+", path = "+path+")");
-                else {
+                if (!(new File(vf).exists())) {
+                  if (Utilities.isAbsoluteUrl(vf)) {
+                    System.out.println("--- ignoring version "+v+" as it appears to be a reference to an external target ('"+path+"')");
+                  } else {
+                    errs.add("version "+v+" path "+vf+" not found (canonical = "+canonical+", path = "+path+")");
+                  }
+                } else {
                   folders.add(vf);
                   save = updateStatement(vf, null, ignoreList, json, o, errs, root, canonical, folder, canonical.equals("http://hl7.org/fhir"), false, list) | save;
                 }
@@ -200,8 +204,9 @@ public class IGReleaseUpdater {
           String html = TextFile.fileToString(ht);
           html = fixParameter(html, "title", json.get("title").getAsString());
           html = fixParameter(html, "json", jsonv);
-          html = html.replace("assets/", "assets-hist/");
-          html = html.replace("dist/", "dist-hist/");
+          // disabled GDG 23-02-2022: get this right in the template instead
+//          html = html.replace("assets/", "assets-hist/");
+//          html = html.replace("dist/", "dist-hist/");
           TextFile.stringToFile(html, Utilities.path(folder, "history.html"), false);
         }
         ht = new File(Utilities.path(folder, "directory.template"));
@@ -213,8 +218,10 @@ public class IGReleaseUpdater {
           html = fixParameter(html, "json", jsonv);
           TextFile.stringToFile(html, Utilities.path(folder, "directory.html"), false);
         }
-        checkCopyFolderFromRoot(folder, "dist-hist");
-        checkCopyFolderFromRoot(folder, "assets-hist");
+        if (!folder.equals(rootFolder)) {
+          checkCopyFolderFromRoot(folder, "dist-hist");
+          checkCopyFolderFromRoot(folder, "assets-hist");
+        }
       }
         
     } catch (Exception e) {
@@ -249,16 +256,19 @@ public class IGReleaseUpdater {
   }
 
   private void checkCopyFolderFromRoot(String focus, String name) throws IOException {
+    File src = new File(Utilities.path(rootFolder, name));
+    if (!src.exists()) {
+      System.out.println("History Note: "+src.getAbsolutePath()+" doe not exist, so ignoring it");        
+      return; // if the named folder doesn't exist in root, we don't try to copy it
+    }
+    
     File f = new File(Utilities.path(focus, name));
     if (!f.exists() || f.isDirectory()) {
       if (f.exists()) {
         Utilities.clearDirectory(f.getAbsolutePath());
       }
 
-      File src = new File(Utilities.path(rootFolder, name));
-      if (!src.exists()) {
-        System.out.println("History Error: "+src.getAbsolutePath()+" doe not exist");        
-      } else if (!src.isDirectory()) {
+      if (!src.isDirectory()) {
         System.out.println("History Error: "+src.getAbsolutePath()+" is a file, not a directory");
       } else {
         FileUtils.copyDirectory(src, f);
@@ -266,7 +276,6 @@ public class IGReleaseUpdater {
     } else  {
       System.out.println("History Error: "+f.getAbsolutePath()+" is a file, not a directory");
     }
-    
   }
 
   private void scrubApostrophes(JsonObject json) {

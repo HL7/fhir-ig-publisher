@@ -35,6 +35,7 @@ import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.model.*;
+import org.hl7.fhir.r5.model.Enumeration;
 import org.hl7.fhir.r5.model.ElementDefinition.*;
 import org.hl7.fhir.r5.model.Enumerations.BindingStrength;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
@@ -50,6 +51,7 @@ import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
+import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Piece;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -1076,6 +1078,17 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
                     }
                 }
             }
+            if (!t.getAggregation().isEmpty()) {
+              b.append(" : ");
+              boolean firstMode = true;
+              for (Enumeration<AggregationMode> a :t.getAggregation()) {
+                if (!firstMode)
+                  b.append(", ");
+                b.append(" <a href=\"" + corePath + "codesystem-resource-aggregation-mode.html#content\" title=\""+ProfileUtilities.hintForAggregation(a.getValue())+"\">{" + ProfileUtilities.codeForAggregation(a.getValue()) + "}</a>");
+                firstMode = false;
+              }
+            }
+            
             b.append(")");
         }
     }
