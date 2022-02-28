@@ -49,6 +49,7 @@ public class IGWebSiteMaintainer {
   }
   
   public static void execute(String folder, IGRegistryMaintainer reg, boolean doCore, String filter, boolean skipPrompt) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
+    System.out.println("Update publication at '"+folder+"' with filter '"+filter+"'");
     File f = new File(folder);
     if (!f.exists())
       throw new IOException("Folder "+folder+" not found");

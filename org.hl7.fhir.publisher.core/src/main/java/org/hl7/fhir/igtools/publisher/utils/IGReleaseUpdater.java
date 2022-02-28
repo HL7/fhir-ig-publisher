@@ -153,11 +153,13 @@ public class IGReleaseUpdater {
             if (reg != null) {
               reg.seeCiBuild(rc, JSONUtil.str(o, "path"), f);
             }
+            System.out.println("-- ignoring current build entry");
           } else {
             String v = JSONUtil.str(o, "version");
-            if (!o.has("path"))
+            if (!o.has("path")) {
+              System.out.println("-- ignoring version "+v+" as it has no path");
               errs.add("version "+v+" has no path'"); 
-            else {
+            } else {
               String path = JSONUtil.str(o, "path");
               String vf = Utilities.path(path.replace(url, rootFolder));
               if (indexes.containsKey(realm)) {
@@ -170,14 +172,18 @@ public class IGReleaseUpdater {
               if (!path.endsWith(".html")) {
                 if (!(new File(vf).exists())) {
                   if (Utilities.isAbsoluteUrl(vf)) {
-                    System.out.println("--- ignoring version "+v+" as it appears to be a reference to an external target ('"+path+"')");
+                    System.out.println("-- ignoring version "+v+" as it appears to be a reference to an external target ('"+path+"')");
                   } else {
+                    System.out.println("-- ignoring version "+v+" as path not found ('"+path+"')");
                     errs.add("version "+v+" path "+vf+" not found (canonical = "+canonical+", path = "+path+")");
                   }
                 } else {
+                  System.out.println("-- updating version "+v+" in '"+vf+"'");
                   folders.add(vf);
                   save = updateStatement(vf, null, ignoreList, json, o, errs, root, canonical, folder, canonical.equals("http://hl7.org/fhir"), false, list) | save;
                 }
+              } else {
+                System.out.println("-- ignoring version "+v+" as it is an invalid path");
               }
               if (o.has("current") && o.get("current").getAsBoolean() && o.has("path") && o.get("path").getAsString().startsWith(canonical+"/")) {
                 root = o;
@@ -258,7 +264,7 @@ public class IGReleaseUpdater {
   private void checkCopyFolderFromRoot(String focus, String name) throws IOException {
     File src = new File(Utilities.path(rootFolder, name));
     if (!src.exists()) {
-      System.out.println("History Note: "+src.getAbsolutePath()+" doe not exist, so ignoring it");        
+      System.out.println("History Note: "+src.getAbsolutePath()+" does not exist, so ignoring it");        
       return; // if the named folder doesn't exist in root, we don't try to copy it
     }
     
