@@ -83,6 +83,7 @@ public class IGWebSiteMaintainer {
     else
       System.out.println("Update the public registry at "+reg.getPath());
     System.out.println("The server type is "+serverType);
+    System.out.println("The filter is '"+filter+"'");
     System.out.println("looking for IGs in "+folder);
     List<String> igs = scanForIgs(folder, doCore);
     System.out.println("found "+igs.size()+" IGs to update:");
