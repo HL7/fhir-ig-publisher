@@ -105,7 +105,7 @@ public class IGWebSiteMaintainer {
       }
     }
     for (String s : igs) {
-      new IGReleaseUpdater(s, url, folder, reg, serverType, igs, sft, filter == null || filter.equals(s)).check(indexes, true);
+      new IGReleaseUpdater(s, url, folder, reg, serverType, igs, sft, filter == null || filter.equalsIgnoreCase(s)).check(indexes, true);
     }
     for (IndexMaintainer index : indexes.values()) {
       index.execute();
