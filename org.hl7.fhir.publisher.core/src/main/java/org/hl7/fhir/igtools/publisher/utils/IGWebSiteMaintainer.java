@@ -49,6 +49,7 @@ public class IGWebSiteMaintainer {
   }
   
   public static void execute(String folder, IGRegistryMaintainer reg, boolean doCore, String filter, boolean skipPrompt) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
+    System.out.println("Update publication at '"+folder+"' with filter '"+filter+"'");
     File f = new File(folder);
     if (!f.exists())
       throw new IOException("Folder "+folder+" not found");
@@ -82,6 +83,7 @@ public class IGWebSiteMaintainer {
     else
       System.out.println("Update the public registry at "+reg.getPath());
     System.out.println("The server type is "+serverType);
+    System.out.println("The filter is '"+filter+"'");
     System.out.println("looking for IGs in "+folder);
     List<String> igs = scanForIgs(folder, doCore);
     System.out.println("found "+igs.size()+" IGs to update:");
@@ -103,7 +105,7 @@ public class IGWebSiteMaintainer {
       }
     }
     for (String s : igs) {
-      new IGReleaseUpdater(s, url, folder, reg, serverType, igs, sft, filter == null || filter.equals(s)).check(indexes, true);
+      new IGReleaseUpdater(s, url, folder, reg, serverType, igs, sft, filter == null || filter.equalsIgnoreCase(s)).check(indexes, true);
     }
     for (IndexMaintainer index : indexes.values()) {
       index.execute();
