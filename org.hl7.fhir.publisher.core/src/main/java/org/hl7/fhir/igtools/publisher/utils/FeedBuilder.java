@@ -17,6 +17,7 @@ import java.util.Set;
 
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.JSONUtil;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 
@@ -136,7 +137,7 @@ public class FeedBuilder {
       return kind;
     }    
     public boolean isSemVer() {
-      return version.matches("[0-9]+[.][0-9]+[a-z]?[.][0-9]+[a-z]?");
+      return VersionUtilities.isSemVer(version);
     }
     
     @Override
