@@ -1,28 +1,44 @@
 package org.hl7.fhir.igtools.renderers;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.igtools.renderers.DependencyRenderer.VersionState;
 import org.hl7.fhir.igtools.templates.TemplateManager;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.json.JSONUtil;
+import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.hl7.fhir.utilities.npm.BasePackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageHacker;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
 import org.hl7.fhir.utilities.xhtml.NodeType;
+import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Cell;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Row;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.TableModel;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
+import com.google.gson.JsonObject;
+
 public class DependencyRenderer {
+
+  public enum VersionState {
+    VERSION_LATEST_INTERIM,
+    VERSION_LATEST_MILESTONE,
+    VERSION_OUTDATED,
+    VERSION_NO_LIST,
+    VERSION_UNKNOWN,
+  }
 
   private BasePackageCacheManager pcm;
   private String dstFolder;
@@ -30,6 +46,7 @@ public class DependencyRenderer {
   private String fver;
   private String npmName;
   private TemplateManager templateManager;
+  private Map<String, JsonObject> packageListCache = new HashMap<>();
   
   public DependencyRenderer(BasePackageCacheManager pcm, String dstFolder, String npmName, TemplateManager templateManager) {
     super();
@@ -118,7 +135,7 @@ public class DependencyRenderer {
           }
         }
       }
-      Row row = addRow(gen, rows, npm.name(), npm.version(), "current".equals(npm.version()), npm.fhirVersion(), !VersionUtilities.versionsCompatible(fver, npm.fhirVersion()), npm.canonical(), PackageHacker.fixPackageUrl(npm.getWebLocation()), comment);
+      Row row = addRow(gen, rows, npm.name(), npm.version(), getVersionState(npm.name(), npm.version(), npm.canonical()), "current".equals(npm.version()), npm.fhirVersion(), !VersionUtilities.versionsCompatible(fver, npm.fhirVersion()), npm.canonical(), PackageHacker.fixPackageUrl(npm.getWebLocation()), comment);
       if (isNew) {
         for (String d : npm.dependencies()) {
           String id = d.substring(0, d.indexOf("#"));
@@ -132,6 +149,45 @@ public class DependencyRenderer {
         }
       }
     }
+  }
+
+  private VersionState getVersionState(String name, String version, String canonical) {
+    JsonObject pl = fetchPackageList(name, canonical);
+    if (pl == null) {
+      return VersionState.VERSION_NO_LIST;
+    }
+    boolean latestInterim = true;
+    for (JsonObject v : JSONUtil.objects(pl, "list")) {
+      if (!"current".equals(JSONUtil.str(v, "version"))) {
+        if (version.equals(JSONUtil.str(v, "version"))) {
+          if (JSONUtil.bool(v, "current")) {// this is the current official release
+            return VersionState.VERSION_LATEST_MILESTONE;
+          } if (latestInterim) {
+            return VersionState.VERSION_LATEST_INTERIM;
+          } else {
+            return VersionState.VERSION_OUTDATED;
+          }
+        } else {
+          latestInterim = false;
+        }
+      }      
+    }
+    return VersionState.VERSION_UNKNOWN;
+  }
+
+  private JsonObject fetchPackageList(String name, String canonical) {
+    if (packageListCache .containsKey(name)) {
+      return packageListCache.get(name);
+    }
+    JsonObject pl;
+    try {
+      pl = JsonTrackingParser.fetchJson(Utilities.pathURL(canonical, "package-list.json")); 
+          
+    } catch (Exception e) {
+      pl = null;
+    }
+    packageListCache.put(name, pl);
+    return pl;
   }
 
   private NpmPackage resolve(ImplementationGuideDependsOnComponent d) throws FHIRException, IOException {
@@ -170,19 +226,40 @@ public class DependencyRenderer {
     } else if (id.startsWith("hl7") && !id.startsWith("hl7.fhir.")) {
       comment = "HL7 Packages must have an id that starts with hl7.fhir.";
     }
-    Row row = addRow(gen, model.getRows(), id, ver, false, fver, false, canonical, web, comment);
+    Row row = addRow(gen, model.getRows(), id, ver, null, false, fver, false, canonical, web, comment);
     if (comment != null) {
       row.getCells().get(5).addStyle("background-color: #ffcccc");
     }
     return row;
   }
 
-  private Row addRow(HierarchicalTableGenerator gen, List<Row> rows, String id, String ver, boolean verError, String fver, boolean fverError, String canonical, String web, String problems) {
+  private Row addRow(HierarchicalTableGenerator gen, List<Row> rows, String id, String ver, VersionState verState, boolean verError, String fver, boolean fverError, String canonical, String web, String problems) {
     Row row = gen.new Row();
     rows.add(row);
     row.setIcon("icon-fhir-16.png", "NPM Package");
     row.getCells().add(gen.new Cell(null, null, id, null, null));
-    row.getCells().add(gen.new Cell(null, null, ver, null, null));
+    Cell c = gen.new Cell(null, null, ver, null, null);
+    row.getCells().add(c);
+    if (verState != null) {
+      c.addText(" ");
+      switch (verState) {
+      case VERSION_LATEST_INTERIM:
+        c.addStyledText("Latest Interim Release", "I", "white", "green", null, false);
+        break;
+      case VERSION_LATEST_MILESTONE:
+        c.addStyledText("Latest Milestone Release", "M", "white", "green", null, false);
+        break;
+      case VERSION_OUTDATED:
+        c.addStyledText("Outdated Release", "O", "white", "red", null, false);
+        break;
+      case VERSION_NO_LIST:
+        c.addStyledText("Not yet released", "U", "white", "red", null, false);
+        break;    
+      case VERSION_UNKNOWN:
+        c.addStyledText("Illegal Version", "V", "white", "red", null, false);
+        break;    
+      }      
+    }
     row.getCells().add(gen.new Cell(null, null, fver, null, null));
     row.getCells().add(gen.new Cell(null, null, canonical, null, null));
     row.getCells().add(gen.new Cell(null, null, web, null, null));
