@@ -4629,6 +4629,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     res.add("CapabilityStatement2");
     res.add("StructureMap");
     res.add("ActivityDefinition");
+    res.add("Citation");
     res.add("ChargeItemDefinition");
     res.add("CompartmentDefinition");
     res.add("ConceptMap");
@@ -9680,6 +9681,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       runGUI();
       // Returning here ends the main thread but leaves the GUI running
       return; 
+    } else if (hasNamedParam(args, "-v")){
+      System.out.println(IGVersionUtil.getVersion());
     } else if (hasNamedParam(args, "-package")) {
       System.out.println("FHIR IG Publisher "+IGVersionUtil.getVersionString());
       System.out.println("Detected Java version: " + System.getProperty("java.version")+" from "+System.getProperty("java.home")+" on "+System.getProperty("os.arch")+" ("+System.getProperty("sun.arch.data.model")+"bit). "+toMB(Runtime.getRuntime().maxMemory())+"MB available");
