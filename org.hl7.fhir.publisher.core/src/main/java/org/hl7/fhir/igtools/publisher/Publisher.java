@@ -7154,12 +7154,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       shortCountryCode = new HashMap<String,String>();
       stateNameForCode = new HashMap<String,String>();
       ignoreFlags = new ArrayList<String>();
-      ValueSet char3 = context.fetchResource(ValueSet.class, "http://hl7.org/fhir/ValueSet/iso3166-1-3");
-      ValueSet char2 = context.fetchResource(ValueSet.class, "http://hl7.org/fhir/ValueSet/iso3166-1-2");
-      ValueSet num = context.fetchResource(ValueSet.class, "http://hl7.org/fhir/ValueSet/iso3166-1-N");
-      ValueSet state = context.fetchResource(ValueSet.class, "http://hl7.org/fhir/ValueSet/jurisdiction");
-      if (char3==null || char2==null || num == null || state == null)
-        throw new Exception("Error retrieving ISO country-code & state value sets");
+      JsonParser p = new org.hl7.fhir.r5.formats.JsonParser(false);
+      ValueSet char3 = (ValueSet)p.parse("{\"resourceType\":\"ValueSet\",\"url\":\"http://hl7.org/fhir/ValueSet/iso3166-1-3\",\"version\":\"4.0.1\",\"name\":\"Iso3166-1-3\",\"status\":\"active\",\"compose\":{\"include\":[{\"system\":\"urn:iso:std:iso:3166\",\"filter\":[{\"property\":\"code\",\"op\":\"regex\",\"value\":\"[A-Z]{3}\"}]}]}}");
+      ValueSet char2 = (ValueSet)p.parse("{\"resourceType\":\"ValueSet\",\"url\":\"http://hl7.org/fhir/ValueSet/iso3166-1-2\",\"version\":\"4.0.1\",\"name\":\"Iso3166-1-2\",\"status\":\"active\",\"compose\":{\"include\":[{\"system\":\"urn:iso:std:iso:3166\",\"filter\":[{\"property\":\"code\",\"op\":\"regex\",\"value\":\"[A-Z]{2}\"}]}]}}");
+      ValueSet num = (ValueSet)p.parse("{\"resourceType\":\"ValueSet\",\"url\":\"http://hl7.org/fhir/ValueSet/iso3166-1-N\",\"version\":\"4.0.1\",\"name\":\"Iso3166-1-N\",\"status\":\"active\",\"compose\":{\"include\":[{\"system\":\"urn:iso:std:iso:3166\",\"filter\":[{\"property\":\"code\",\"op\":\"regex\",\"value\":\"[0-9]{3}\"}]}]}}");
+      ValueSet state = (ValueSet)p.parse("{\"resourceType\":\"ValueSet\",\"url\":\"http://hl7.org/fhir/ValueSet/jurisdiction\",\"version\":\"4.0.1\",\"name\":\"JurisdictionValueSet\",\"status\":\"active\",\"compose\":{\"include\":[{\"system\":\"urn:iso:std:iso:3166:-2\"}]}}");
       ValueSetExpansionOutcome char3Expand = context.expandVS(char3,true,false);
       ValueSetExpansionOutcome char2Expand = context.expandVS(char2,true,false);
       ValueSetExpansionOutcome numExpand = context.expandVS(num,true,false);
