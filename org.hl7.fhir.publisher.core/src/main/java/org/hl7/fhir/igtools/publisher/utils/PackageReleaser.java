@@ -287,7 +287,7 @@ public class PackageReleaser {
     i = source.indexOf("</ul>");
     source = source.substring(i);
     source = pfx + b.toString()+source;
-    TextFile.stringToFile(source, file);
+    TextFile.stringToFile(source, file, false);
   }
   
   
@@ -313,10 +313,17 @@ public class PackageReleaser {
         build(source, v, versions);
       }
     }
-    makePackage(Utilities.path(source, vd.getId()), vd.getId());
+    makePackage(Utilities.path(source, vd.getId()), vd.getId(), vd.getNewVersion());
   }
 
-  private void makePackage(String path, String id) throws IOException {
+  private void makePackage(String path, String id, String version) throws IOException {
+    if (id.contains("dicom")) {
+      String src = Utilities.path(path, version, "package.tgz");
+      String dst = Utilities.path(path, "output", "package.tgz");
+      Utilities.createDirectory(Utilities.path(path, "output"));
+      Utilities.copyFile(src,  dst);
+      return;
+    }
     try {
       if (config.hasSection(id)) {
         String v = config.getStringProperty(id, "version");
