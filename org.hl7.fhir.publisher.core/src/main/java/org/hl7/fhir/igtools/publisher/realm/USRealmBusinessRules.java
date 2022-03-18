@@ -109,7 +109,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
             usCoreProfiles.add((StructureDefinition) usd);
           }
           if (!context.hasResource(Resource.class, usd.getUrl())) {
-            context.cacheResourceFromPackage(usd, new PackageVersion(uscore.id(), uscore.version()));
+            context.cacheResourceFromPackage(usd, new PackageVersion(uscore.id(), uscore.version(), uscore.dateAsDate()));
           }
         }
       }

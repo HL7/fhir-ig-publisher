@@ -3469,7 +3469,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private SimpleWorkerContext loadCorePackage() throws Exception {
     NpmPackage pi = null;
     
-    String v = version.equals(Constants.VERSION) ? "current" : version;
+    String v = version;
 
     if (Utilities.noString(igPack)) {
       System.out.println("Core Package "+VersionUtilities.packageForVersion(v)+"#"+v);
@@ -3817,6 +3817,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         throw new Error("Error generating build: the file "+path+" is being generated more than once (may differ by case)");
       allOutputs.add(s);
     }
+
     outputTracker.add(path);
     File f = new CSFile(path);
     byte[] existing = null;
@@ -5300,7 +5301,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             }
             igpkp.checkForPath(f, r, bc, false);
             try {
-              context.cacheResourceFromPackage(bc, new PackageVersion(publishedIg.getPackageId(), publishedIg.getVersion()));
+              context.cacheResourceFromPackage(bc, new PackageVersion(publishedIg.getPackageId(), publishedIg.getVersion(), new Date()));
             } catch (Exception e) {
               throw new Exception("Exception loading "+bc.getUrl()+": "+e.getMessage(), e);
             }
@@ -5323,7 +5324,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                   if (!mr.hasUserData("path")) {
                     igpkp.checkForPath(f,  r,  mr, true);
                   }
-                  context.cacheResourceFromPackage(mr, new PackageVersion(publishedIg.getPackageId(), publishedIg.getVersion()));
+                  context.cacheResourceFromPackage(mr, new PackageVersion(publishedIg.getPackageId(), publishedIg.getVersion(), new Date()));
                 } else
                   logDebugMessage(LogCategory.PROGRESS, "Ignoring resource "+type+"/"+mr.getId()+" in Bundle "+f.getName()+" because it has no canonical URL");
 
@@ -5471,7 +5472,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     r.setSnapshotted(true);
     logDebugMessage(LogCategory.CONTEXT, "Context.See "+sd.getUrl());
-    context.cacheResourceFromPackage(sd, new PackageVersion(publishedIg.getPackageId(), publishedIg.getVersion()));
+    context.cacheResourceFromPackage(sd, new PackageVersion(publishedIg.getPackageId(), publishedIg.getVersion(), new Date()));
   }
 
   private void validateExpressions() {
@@ -5911,6 +5912,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       createToc(childPublisher.getPublishedIg().getDefinition().getPage(), igArtifactsPage, nestedIgOutput);
     }
+    checkMakeFile(new DependencyRenderer(pcm, tempDir, npmName, templateManager).render(publishedIg).getBytes(), Utilities.path(tempDir, "_includes", "dependency-table.xhtml"), new HashSet<>());
+
     fixSearchForm();
     if (!noGenerate) {
       templateBeforeJekyll();

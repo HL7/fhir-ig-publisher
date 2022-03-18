@@ -577,6 +577,9 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
           br.url = vs.getUserString("path");
           br.display = vs.getName(); 
         } else {
+          if (ref.contains("|")) {
+            ref = ref.substring(0, ref.indexOf("|"));
+          }
           String vsr = VersionConvertorConstants.vsToRef(ref);
           if (vsr != null) {
             br.display = ref.substring(29);
