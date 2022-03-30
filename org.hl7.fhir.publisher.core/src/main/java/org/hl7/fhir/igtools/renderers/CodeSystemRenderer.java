@@ -50,8 +50,8 @@ public class CodeSystemRenderer extends CanonicalRenderer {
 
   private CodeSystem cs;
 
-  public CodeSystemRenderer(IWorkerContext context, String corePath, CodeSystem cs, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
-    super(context, corePath, cs, null, igp, maps, markdownEngine, packge, gen);
+  public CodeSystemRenderer(IWorkerContext context, String corePath, CodeSystem cs, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
+    super(context, corePath, cs, null, igp, maps, allTargets, markdownEngine, packge, gen);
     this.cs = cs;
   }
 

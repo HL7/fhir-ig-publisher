@@ -81,8 +81,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     private List<FetchedFile> files;
     private boolean allInvariants;
 
-    public StructureDefinitionRenderer(IWorkerContext context, String corePath, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants) {
-        super(context, corePath, sd, destDir, igp, maps, markdownEngine, packge, gen);
+    public StructureDefinitionRenderer(IWorkerContext context, String corePath, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants) {
+        super(context, corePath, sd, destDir, igp, maps, allTargets, markdownEngine, packge, gen);
         this.sd = sd;
         this.destDir = destDir;
         utils = new ProfileUtilities(context, null, igp);

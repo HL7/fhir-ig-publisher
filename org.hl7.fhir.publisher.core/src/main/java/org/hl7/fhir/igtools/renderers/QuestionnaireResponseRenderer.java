@@ -23,6 +23,7 @@ package org.hl7.fhir.igtools.renderers;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 import org.hl7.fhir.exceptions.DefinitionException;
 import org.hl7.fhir.exceptions.FHIRException;
@@ -45,8 +46,8 @@ public class QuestionnaireResponseRenderer extends BaseRenderer {
   private Element qr;
   private String destDir;
 
-  public QuestionnaireResponseRenderer(IWorkerContext context, String corePath, Element qr, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
-    super(context, corePath, igp, maps, markdownEngine, packge, gen);
+  public QuestionnaireResponseRenderer(IWorkerContext context, String corePath, Element qr, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
+    super(context, corePath, igp, maps, allTargets, markdownEngine, packge, gen);
     this.qr = qr;
     this.destDir = destDir;
   }
