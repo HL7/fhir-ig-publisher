@@ -23,6 +23,7 @@ package org.hl7.fhir.igtools.renderers;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
@@ -48,12 +49,13 @@ public class BaseRenderer extends TranslatingUtilities {
   protected String prefix = ""; // path to relative root of IG, if not the same directory (currenly always is)
   protected IGKnowledgeProvider igp;
   protected List<SpecMapManager> specmaps;
+  protected Set<String> allTargets;
   protected NpmPackage packge;
   private MarkDownProcessor markdownEngine;
   protected RenderingContext gen;
 
 
-  public BaseRenderer(IWorkerContext context, String corePath, IGKnowledgeProvider igp, List<SpecMapManager> specmaps, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
+  public BaseRenderer(IWorkerContext context, String corePath, IGKnowledgeProvider igp, List<SpecMapManager> specmaps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
     super();
     this.context = context;
     this.corePath = corePath;
@@ -62,6 +64,7 @@ public class BaseRenderer extends TranslatingUtilities {
     this.markdownEngine = markdownEngine;
     this.packge = packge; 
     this.gen = gen;
+    this.allTargets = allTargets;
   }
 
   @SuppressWarnings("rawtypes")
@@ -120,7 +123,7 @@ public class BaseRenderer extends TranslatingUtilities {
 	        i--;
 	      }
 	    }
-	    text = ProfileUtilities.processRelativeUrls(text, "", corePath, context.getResourceNames(), specmaps.get(0).listTargets(), false);
+	    text = ProfileUtilities.processRelativeUrls(text, "", corePath, context.getResourceNames(), specmaps.get(0).listTargets(), allTargets, false);
 	    // 3. markdown
 	    String s = markdownEngine.process(checkEscape(text), location);
 	    return s;

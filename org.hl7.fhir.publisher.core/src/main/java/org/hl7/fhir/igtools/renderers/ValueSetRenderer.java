@@ -60,8 +60,8 @@ public class ValueSetRenderer extends CanonicalRenderer {
 
   private ValueSet vs;
 
-  public ValueSetRenderer(IWorkerContext context, String corePath, ValueSet vs, IGKnowledgeProvider igp, List<SpecMapManager> maps, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
-    super(context, corePath, vs, null, igp, maps, markdownEngine, packge, gen);
+  public ValueSetRenderer(IWorkerContext context, String corePath, ValueSet vs, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
+    super(context, corePath, vs, null, igp, maps, allTargets, markdownEngine, packge, gen);
     this.vs = vs; 
   }
 

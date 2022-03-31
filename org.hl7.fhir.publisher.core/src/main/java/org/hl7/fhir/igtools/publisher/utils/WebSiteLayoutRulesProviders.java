@@ -20,6 +20,7 @@ public class WebSiteLayoutRulesProviders {
   public static class DefaultNamingRulesProvider implements WebSiteLayoutRulesProvider {
     protected String id;
     protected String[] parts;
+    protected String tail;
 
     protected boolean check(List<ValidationMessage> res, boolean b, String message) {
       if (!b)  {
@@ -142,11 +143,25 @@ public class WebSiteLayoutRulesProviders {
 
     @Override
     public boolean checkCanonicalAndUrl(List<ValidationMessage> res, String canonical, String url) {
-      return check(res, canonical != null && (canonical.equals("http://fhir.org/guides/"+org()+"/"+code())), 
+      if (org().equals("acme")) {
+        boolean ok = check(res, canonical != null && canonical.startsWith("http://fhir.org/guides/"+org()+"/") && (canonical.equalsIgnoreCase("http://fhir.org/guides/"+org()+"/"+code())), 
+            "canonical URL of "+canonical+" does not match the required canonical of http://fhir.org/guides/"+org()+"/"+code()) &&
+            check(res, canonical.startsWith(url), "Proposed canonical '"+canonical+"' does not match the web site URL '"+url+"'");
+        if (ok) {
+          parts[parts.length - 1] = tail(canonical);
+        }
+        return ok;
+      } else {
+        return check(res, canonical != null && (canonical.equals("http://fhir.org/guides/"+org()+"/"+code())), 
           "canonical URL of "+canonical+" does not match the required canonical of http://fhir.org/guides/"+org()+"/"+code()) &&
           check(res, canonical.startsWith(url), "Proposed canonical '"+canonical+"' does not match the web site URL '"+url+"'");
+      }
     }
     
+    private String tail(String canonical) {
+      return canonical.substring(canonical.lastIndexOf("/")+1);
+    }
+
     public String org() {
       return parts[1];
     }
