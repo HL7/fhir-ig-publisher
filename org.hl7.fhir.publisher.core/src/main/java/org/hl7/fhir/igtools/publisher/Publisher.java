@@ -640,7 +640,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private String qaDir;
   private String version;
   private FhirPublication pubVersion;
-  private long toolTimeout = JEKYLL_TIMEOUT;
+  private long jekyllTimeout = JEKYLL_TIMEOUT;
   private long fshTimeout = FSH_TIMEOUT;
   private SuppressedMessageInformation suppressedMessages = new SuppressedMessageInformation();
 
@@ -2525,8 +2525,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       count++;
     }
     
-    if (ini.hasProperty("IG", "tool-timeout")) {
-      toolTimeout = ini.getLongProperty("IG", "tool-timeout") * 1000;
+    if (ini.hasProperty("IG", "jekyll-timeout")) {
+      jekyllTimeout = ini.getLongProperty("IG", "jekyll-timeout") * 1000;
     }
     
     // ok process the paths
@@ -2867,6 +2867,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (configuration.has("tool") && !"jekyll".equals(str(configuration, "tool")))
       throw new Exception("Error: At present, configuration file must include a \"tool\" property with a value of 'jekyll'");
     tool = GenerationTool.Jekyll;
+
+    if (configuration.has("jekyllTimeout")) {
+      jekyllTimeout = configuration.get("jekyllTimeout").getAsLong() * 1000;
+    }
+
     version = ostr(configuration, "version");
     if (Utilities.noString(version))
       version = Constants.VERSION;
@@ -6652,7 +6657,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     PumpStreamHandler pump = new PumpStreamHandler(pumpHandler, pumpHandler);
     exec.setStreamHandler(pump);
     exec.setWorkingDirectory(new File(tempDir));
-    ExecuteWatchdog watchdog = new ExecuteWatchdog(toolTimeout);
+    ExecuteWatchdog watchdog = new ExecuteWatchdog(jekyllTimeout);
     exec.setWatchdog(watchdog);
 
     try {
@@ -6676,13 +6681,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       tts.end();
       if (pumpHandler.observedToSucceed) {
         if (watchdog.killedProcess()) {
-          log("Jekyll timeout exceeded: " + Long.toString(toolTimeout/1000) + " seconds");
+          log("Jekyll timeout exceeded: " + Long.toString(jekyllTimeout/1000) + " seconds");
         }
         log("Jekyll claimed to succeed, but returned an error. Proceeding anyway");
       } else {
         log("Jekyll has failed. Complete output from running Jekyll: " + pumpHandler.getBufferString());
         if (watchdog.killedProcess()) {
-          log("Jekyll timeout exceeded: " + Long.toString(toolTimeout/1000) + " seconds");
+          log("Jekyll timeout exceeded: " + Long.toString(jekyllTimeout/1000) + " seconds");
         } else {
           log("Note: Check that Jekyll is installed correctly");
         }
