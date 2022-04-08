@@ -595,7 +595,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private static final String REDIRECT_SOURCE = "<html>\r\n<head>\r\n<meta http-equiv=\"Refresh\" content=\"0; url=site/index.html\"/>\r\n</head>\r\n"+
        "<body>\r\n<p>See here: <a href=\"site/index.html\">this link</a>.</p>\r\n</body>\r\n</html>\r\n";
 
-  private static final long JEKYLL_TIMEOUT = 60000 * 5; // 5 minutes.... 
+  private static final long TOOL_TIMEOUT = 60000 * 5; // 5 minutes.... 
   private static final long FSH_TIMEOUT = 60000 * 5; // 5 minutes.... 
   public static String txServerProd = "http://tx.fhir.org";
   public static String txServerDev = "http://local.fhir.org:8080";
@@ -640,6 +640,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private String qaDir;
   private String version;
   private FhirPublication pubVersion;
+  private long toolTimeout = TOOL_TIMEOUT;
   private long fshTimeout = FSH_TIMEOUT;
   private SuppressedMessageInformation suppressedMessages = new SuppressedMessageInformation();
 
@@ -2277,7 +2278,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     } catch (IOException ioex) {
       log("Sushi couldn't be run. Complete output from running Sushi : " + pumpHandler.getBufferString());
-      log("Note: Check that Sushi is installed correctly (\"npm install -g fsh-sushi\". On windows, get npm from https://www.npmjs.com/get-npm)");
+      if (watchdog.killedProcess()) {
+        log("Sushi timeout exceeded: " + Long.toString(fshTimeout/1000) + " seconds");
+      } else {
+        log("Note: Check that Sushi is installed correctly (\"npm install -g fsh-sushi\". On windows, get npm from https://www.npmjs.com/get-npm)");
+      }
       log("Exception: "+ioex.getMessage());
       throw ioex;
     }    
@@ -2518,6 +2523,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           showReferenceMessages = true;
       }
       count++;
+    }
+    
+    if (ini.hasProperty("IG", "tool-timeout")) {
+      toolTimeout = ini.getLongProperty("IG", "tool-timeout") * 1000;
     }
     
     // ok process the paths
@@ -6643,7 +6652,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     PumpStreamHandler pump = new PumpStreamHandler(pumpHandler, pumpHandler);
     exec.setStreamHandler(pump);
     exec.setWorkingDirectory(new File(tempDir));
-    ExecuteWatchdog watchdog = new ExecuteWatchdog(JEKYLL_TIMEOUT);
+    ExecuteWatchdog watchdog = new ExecuteWatchdog(toolTimeout);
     exec.setWatchdog(watchdog);
 
     try {
@@ -6666,10 +6675,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } catch (IOException ioex) {
       tts.end();
       if (pumpHandler.observedToSucceed) {
+        if (watchdog.killedProcess()) {
+          log("Jekyll timeout exceeded: " + Long.toString(toolTimeout/1000) + " seconds");
+        }
         log("Jekyll claimed to succeed, but returned an error. Proceeding anyway");
       } else {
         log("Jekyll has failed. Complete output from running Jekyll: " + pumpHandler.getBufferString());
-        log("Note: Check that Jekyll is installed correctly");
+        if (watchdog.killedProcess()) {
+          log("Jekyll timeout exceeded: " + Long.toString(toolTimeout/1000) + " seconds");
+        } else {
+          log("Note: Check that Jekyll is installed correctly");
+        }
       	throw ioex;
       }
     }
