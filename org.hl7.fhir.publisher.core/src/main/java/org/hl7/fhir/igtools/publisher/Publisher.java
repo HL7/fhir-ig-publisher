@@ -2277,7 +2277,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     } catch (IOException ioex) {
       log("Sushi couldn't be run. Complete output from running Sushi : " + pumpHandler.getBufferString());
-      log("Note: Check that Sushi is installed correctly (\"npm install -g fsh-sushi\". On windows, get npm from https://www.npmjs.com/get-npm)");
+      if (watchdog.killedProcess()) {
+        log("Sushi timeout exceeded: " + Long.toString(fshTimeout/1000) + " seconds");
+      } else {
+        log("Note: Check that Sushi is installed correctly (\"npm install -g fsh-sushi\". On windows, get npm from https://www.npmjs.com/get-npm)");
+      }
       log("Exception: "+ioex.getMessage());
       throw ioex;
     }    
@@ -6666,10 +6670,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } catch (IOException ioex) {
       tts.end();
       if (pumpHandler.observedToSucceed) {
+        if (watchdog.killedProcess()) {
+          log("Jekyll timeout exceeded: " + Long.toString(JEKYLL_TIMEOUT/1000) + " seconds");
+        }
         log("Jekyll claimed to succeed, but returned an error. Proceeding anyway");
       } else {
         log("Jekyll has failed. Complete output from running Jekyll: " + pumpHandler.getBufferString());
-        log("Note: Check that Jekyll is installed correctly");
+        if (watchdog.killedProcess()) {
+          log("Jekyll timeout exceeded: " + Long.toString(JEKYLL_TIMEOUT/1000) + " seconds");
+        } else {
+          log("Note: Check that Jekyll is installed correctly");
+        }
       	throw ioex;
       }
     }
