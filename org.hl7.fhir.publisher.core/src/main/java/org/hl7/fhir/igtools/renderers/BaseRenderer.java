@@ -35,6 +35,7 @@ import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
 import org.hl7.fhir.r5.model.PrimitiveType;
 import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.r5.renderers.IMarkdownProcessor;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
@@ -43,7 +44,7 @@ import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 
-public class BaseRenderer extends TranslatingUtilities {
+public class BaseRenderer extends TranslatingUtilities implements IMarkdownProcessor {
   protected IWorkerContext context;
   protected String corePath;
   protected String prefix = ""; // path to relative root of IG, if not the same directory (currenly always is)

@@ -28,7 +28,9 @@ import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
+import org.hl7.fhir.r5.conformance.AdditionalBindingsRenderer;
 import org.hl7.fhir.r5.conformance.ProfileUtilities;
+import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider;
 import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider.BindingResolution;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
@@ -50,7 +52,9 @@ import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
+import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Cell;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Piece;
 
 import java.io.ByteArrayOutputStream;
@@ -348,14 +352,14 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         if (sd.getDifferential().getElement().isEmpty())
             return "";
         else
-            return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateTable(defnFile, sd, true, destDir, false, sd.getId(), false, corePath, "", false, false, outputTracker, true, false));
+            return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateTable(defnFile, sd, true, destDir, false, sd.getId(), false, corePath, "", false, false, outputTracker, true, false, gen));
     }
 
     public String snapshot(String defnFile, Set<String> outputTracker) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
         if (sd.getSnapshot().getElement().isEmpty())
             return "";
         else
-            return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateTable(defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", false, false, outputTracker, true, false));
+            return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateTable(defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", false, false, outputTracker, true, false, gen));
     }
 
     public String byMustSupport(String defnFile, Set<String> outputTracker) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
@@ -390,7 +394,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             }
 
             sdCopy.getSnapshot().setElement(mustSupportElements);
-            org.hl7.fhir.utilities.xhtml.XhtmlNode table = utils.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", false, false, outputTracker, true, true);
+            org.hl7.fhir.utilities.xhtml.XhtmlNode table = utils.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", false, false, outputTracker, true, true, gen);
 
             return composer.compose(table);
         }
@@ -1151,26 +1155,13 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         if (!d.hasBinding())
             return null;
         else {
-            // return TerminologyNotesGenerator.describeBinding(prefix, d.getBinding(), page);
-            ElementDefinitionBindingComponent def = d.getBinding();
-            if (!def.hasValueSet())
-                return processMarkdown("Binding.description", PublicationHacker.fixBindingDescriptions(context, def.getDescriptionElement()));
-            BindingResolution br = igp.resolveBinding(sd, def, path);
-            String s = conf(def) + "<a href=\"" + Utilities.escapeXml(br.url) + "\">" + Utilities.escapeXml(br.display) + "</a>" + confTail(def);
-            if (def.hasExtension(ToolingExtensions.EXT_MAX_VALUESET)) {
-                br = igp.resolveBinding(sd, ToolingExtensions.readStringExtension(def, ToolingExtensions.EXT_MAX_VALUESET), path);
-                s = s + "<br/>";
-                s = s + "<a style=\"font-weight:bold\" title=\"Max Value Set Extension\" href=\"" + corePath + "extension-elementdefinition-maxvalueset.html\">Max Binding</a>: ";
-                s = s + (br.url == null ? processMarkdown("binding", br.display) : "<a href=\"" + (Utilities.isAbsoluteUrlLinkable(br.url) || !igp.prependLinks() ? Utilities.escapeXml(br.url) : corePath + br.url) + "\">" + Utilities.escapeXml(br.display) + "</a>");
-            }
-            if (def.hasExtension(ToolingExtensions.EXT_MIN_VALUESET)) {
-                br = igp.resolveBinding(sd, ToolingExtensions.readStringExtension(def, ToolingExtensions.EXT_MIN_VALUESET), path);
-                s = s + "<br/>";
-                s = s + "<a style=\"font-weight:bold\" title=\"Min Value Set Extension\" href=\"" + corePath + "extension-elementdefinition-minvalueset.html\">Min Binding</a>: ";
-                s = s + (br.url == null ? processMarkdown("binding", br.display) : "<a href=\"" + (Utilities.isAbsoluteUrlLinkable(br.url) || !igp.prependLinks() ? Utilities.escapeXml(br.url) : corePath + br.url) + "\">" + Utilities.escapeXml(br.display) + "</a>");
-            }
-            if (def.hasDescription()) {
-                String desc = processMarkdown("Binding.description", PublicationHacker.fixBindingDescriptions(context, def.getDescriptionElement()));
+            ElementDefinitionBindingComponent binding = d.getBinding();
+            if (!binding.hasValueSet())
+                return processMarkdown("Binding.description", PublicationHacker.fixBindingDescriptions(context, binding.getDescriptionElement()));
+            BindingResolution br = igp.resolveBinding(sd, binding, path);
+            String s = conf(binding) + "<a href=\"" + Utilities.escapeXml(br.url) + "\">" + Utilities.escapeXml(br.display) + "</a>" + confTail(binding);
+            if (binding.hasDescription()) {
+                String desc = processMarkdown("Binding.description", PublicationHacker.fixBindingDescriptions(context, binding.getDescriptionElement()));
                 if (desc != null) {
                     if (desc.length() > 4 && desc.substring(4).contains("<p>")) {
                         s = s + "<br/>" + desc;
@@ -1179,6 +1170,20 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
                     }
                 }
             }
+            
+            AdditionalBindingsRenderer abr = new AdditionalBindingsRenderer(igp, corePath, sd, d.getPath(), gen, this);
+            if (binding.hasExtension(ToolingExtensions.EXT_MAX_VALUESET)) {
+              abr.seeMaxBinding(ToolingExtensions.getExtension(binding, ToolingExtensions.EXT_MAX_VALUESET));
+            }
+            if (binding.hasExtension(ToolingExtensions.EXT_MIN_VALUESET)) {
+              abr.seeMinBinding(ToolingExtensions.getExtension(binding, ToolingExtensions.EXT_MIN_VALUESET));
+            }
+            if (binding.hasExtension(ToolingExtensions.EXT_BINDING_ADDITIONAL)) {
+              abr.seeAdditionalBindings(binding.getExtensionsByUrl(ToolingExtensions.EXT_BINDING_ADDITIONAL));
+            }
+            
+            s = s + abr.render();
+            
             return s;
         }
     }
