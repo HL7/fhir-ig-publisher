@@ -595,7 +595,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private static final String REDIRECT_SOURCE = "<html>\r\n<head>\r\n<meta http-equiv=\"Refresh\" content=\"0; url=site/index.html\"/>\r\n</head>\r\n"+
        "<body>\r\n<p>See here: <a href=\"site/index.html\">this link</a>.</p>\r\n</body>\r\n</html>\r\n";
 
-  private static final long TOOL_TIMEOUT = 60000 * 5; // 5 minutes.... 
+  private static final long JEKYLL_TIMEOUT = 60000 * 5; // 5 minutes.... 
   private static final long FSH_TIMEOUT = 60000 * 5; // 5 minutes.... 
   public static String txServerProd = "http://tx.fhir.org";
   public static String txServerDev = "http://local.fhir.org:8080";
@@ -640,7 +640,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private String qaDir;
   private String version;
   private FhirPublication pubVersion;
-  private long toolTimeout = TOOL_TIMEOUT;
+  private long toolTimeout = JEKYLL_TIMEOUT;
   private long fshTimeout = FSH_TIMEOUT;
   private SuppressedMessageInformation suppressedMessages = new SuppressedMessageInformation();
 
