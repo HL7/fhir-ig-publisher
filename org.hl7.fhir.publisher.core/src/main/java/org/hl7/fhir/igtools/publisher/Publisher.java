@@ -6687,7 +6687,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     log("-----------------------");
   }
 
-
   private void generateSummaryOutputs() throws Exception {
     log("Generating Summary Outputs");
     generateResourceReferences();
