@@ -261,9 +261,9 @@ public class TemplateManager {
           return NpmPackage.fromPackage(new FileInputStream(template));
         }
       }
-      if (template.startsWith("https://github.com") || template.startsWith("http://github.com")) {
-        if (template.startsWith("http://github.com")) {
-          template = template.replace("http://github.com", "https://github.com");
+      if (template.startsWith("https://github.") || template.startsWith("http://github.")) {
+        if (template.startsWith("http://")) {
+          template = template.replace("http://", "https://");
         }
 
         URL url = new URL(zipUrl(template));
