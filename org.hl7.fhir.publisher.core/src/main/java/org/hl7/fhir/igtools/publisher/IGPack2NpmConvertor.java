@@ -81,7 +81,7 @@ public class IGPack2NpmConvertor {
   public static void main(String[] args) throws FileNotFoundException, IOException, FHIRException {
     IGPack2NpmConvertor self = new IGPack2NpmConvertor();
     self.init();
-    self.tini = new IniFile("c:\\temp\\v.ini");
+    self.tini = new IniFile(Utilities.path("[tmp]", "v.ini"));
 //    self.execute(new File("C:\\work\\org.hl7.fhir.us"));
 //    self.execute(new File("C:\\work\\org.hl7.fhir.au"));
 //    self.execute(new File("C:\\work\\org.hl7.fhir.intl"));
