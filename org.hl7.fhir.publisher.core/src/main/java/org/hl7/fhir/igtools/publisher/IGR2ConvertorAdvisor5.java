@@ -24,8 +24,8 @@ package org.hl7.fhir.igtools.publisher;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
 import org.hl7.fhir.r5.model.Bundle;
 import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.FhirPublication;
 import org.hl7.fhir.r5.model.ValueSet;
+import org.hl7.fhir.utilities.FhirPublication;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
