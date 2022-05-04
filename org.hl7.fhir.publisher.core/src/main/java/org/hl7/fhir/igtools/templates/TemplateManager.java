@@ -280,13 +280,13 @@ public class TemplateManager {
   }
 
   private String zipUrl(String template) {
-    if (!template.startsWith("https://github.com")) {
+    if (!template.startsWith("https://github.")) {
       throw new FHIRException("Cannot refer to a template by URL unless referring to a github repository: "+template);
     } else if (Utilities.charCount(template, '/') == 4) {
       return Utilities.pathURL(template, "archive", "master.zip");      
     } else if (Utilities.charCount(template, '/') == 6) {
       String[] p = template.split("\\/");
-      return Utilities.pathURL("https://github.com", p[3], p[4], "archive", p[6]+".zip");      
+      return Utilities.pathURL("https://"+p[2], p[3], p[4], "archive", p[6]+".zip");      
     } else {
       throw new FHIRException("Template syntax in URL referring to a github repository was not understood: "+template);
     }

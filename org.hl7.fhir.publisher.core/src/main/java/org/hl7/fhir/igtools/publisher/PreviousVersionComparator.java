@@ -105,10 +105,10 @@ public class PreviousVersionComparator {
   private void processVersions(String canonical, List<String> versions, String rootDir) throws IOException {
     JsonArray publishedVersions = null;
     for (String v : versions) {
+      if (publishedVersions == null) {
+        publishedVersions = fetchVersionHistory(canonical);
+      }
       if (Utilities.existsInList(v, "{last}", "{current}")) {
-        if (publishedVersions == null) {
-          publishedVersions = fetchVersionHistory(canonical);
-        }
         String last = null;
         String major = null;
         for (JsonElement e : publishedVersions) {

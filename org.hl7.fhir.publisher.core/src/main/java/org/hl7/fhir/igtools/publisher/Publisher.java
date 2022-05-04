@@ -2506,7 +2506,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (comparisonVersions == null) {
           comparisonVersions = new ArrayList<>();
         }
-        if ("n/a".equals(p.getValue())) {
+        if (!"n/a".equals(p.getValue())) {
           comparisonVersions.add(p.getValue());
         }        
       } else if (p.getCode().equals("validation")) {
