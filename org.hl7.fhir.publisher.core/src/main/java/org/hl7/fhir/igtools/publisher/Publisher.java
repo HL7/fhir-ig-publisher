@@ -124,6 +124,7 @@ import org.hl7.fhir.igtools.renderers.VersionCheckRenderer;
 import org.hl7.fhir.igtools.renderers.XmlXHtmlRenderer;
 import org.hl7.fhir.igtools.spreadsheets.IgSpreadsheetParser;
 import org.hl7.fhir.igtools.spreadsheets.MappingSpace;
+import org.hl7.fhir.igtools.spreadsheets.ObservationSummarySpreadsheetGenerator;
 import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.igtools.templates.TemplateManager;
 import org.hl7.fhir.igtools.ui.GraphicalPublisher;
@@ -6710,7 +6711,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     generateDataFile();
     generateCanonicalSummary();
     
-    CrossViewRenderer cvr = new CrossViewRenderer(igpkp.getCanonical(), context);
+    CrossViewRenderer cvr = new CrossViewRenderer(igpkp.getCanonical(), context, igpkp.specPath());
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
@@ -6719,6 +6720,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
     fragment("summary-observations", cvr.getObservationSummary(), otherFilesRun);
+    String path = Utilities.path(tempDir, "observations-summary.xlsx");
+    ObservationSummarySpreadsheetGenerator vsg = new ObservationSummarySpreadsheetGenerator(context);
+    otherFilesRun.add(path);
+    vsg.generate(cvr.getObservations());
+    vsg.finish(new FileOutputStream(path));
+    
     fragment("summary-extensions", cvr.getExtensionSummary(), otherFilesRun);
     fragment("ip-statements",  genIpStatements(fileList), otherFilesRun);
 
@@ -6834,7 +6841,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         item.addProperty("history", r.hasHistory());
         item.addProperty("index", i);
         item.addProperty("source", f.getStatedPath());
-        String path = null;
+        path = null;
         if (r.getPath() != null) {
           path = r.getPath();
         } else if (r.getResource() != null) {
