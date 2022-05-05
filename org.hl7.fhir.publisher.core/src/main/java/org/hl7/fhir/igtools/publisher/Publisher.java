@@ -640,6 +640,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private String qaDir;
   private String version;
   private FhirPublication pubVersion;
+  private long jekyllTimeout = JEKYLL_TIMEOUT;
   private long fshTimeout = FSH_TIMEOUT;
   private SuppressedMessageInformation suppressedMessages = new SuppressedMessageInformation();
 
@@ -2522,6 +2523,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           showReferenceMessages = true;
       }
       count++;
+    }
+    
+    if (ini.hasProperty("IG", "jekyll-timeout")) { //todo: consider adding this to ImplementationGuideDefinitionParameterComponent
+      jekyllTimeout = ini.getLongProperty("IG", "jekyll-timeout") * 1000;
     }
     
     // ok process the paths
@@ -6647,7 +6652,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     PumpStreamHandler pump = new PumpStreamHandler(pumpHandler, pumpHandler);
     exec.setStreamHandler(pump);
     exec.setWorkingDirectory(new File(tempDir));
-    ExecuteWatchdog watchdog = new ExecuteWatchdog(JEKYLL_TIMEOUT);
+    ExecuteWatchdog watchdog = new ExecuteWatchdog(jekyllTimeout);
     exec.setWatchdog(watchdog);
 
     try {
@@ -6671,13 +6676,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       tts.end();
       if (pumpHandler.observedToSucceed) {
         if (watchdog.killedProcess()) {
-          log("Jekyll timeout exceeded: " + Long.toString(JEKYLL_TIMEOUT/1000) + " seconds");
+          log("Jekyll timeout exceeded: " + Long.toString(jekyllTimeout/1000) + " seconds");
         }
         log("Jekyll claimed to succeed, but returned an error. Proceeding anyway");
       } else {
         log("Jekyll has failed. Complete output from running Jekyll: " + pumpHandler.getBufferString());
         if (watchdog.killedProcess()) {
-          log("Jekyll timeout exceeded: " + Long.toString(JEKYLL_TIMEOUT/1000) + " seconds");
+          log("Jekyll timeout exceeded: " + Long.toString(jekyllTimeout/1000) + " seconds");
         } else {
           log("Note: Check that Jekyll is installed correctly");
         }
