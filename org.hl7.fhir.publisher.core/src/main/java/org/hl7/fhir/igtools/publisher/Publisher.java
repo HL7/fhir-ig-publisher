@@ -4625,6 +4625,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return url.substring(url.lastIndexOf("/")+1);
   }
 
+  private String tailPI(String url) {
+    int i = url.contains("\\") ? url.lastIndexOf("\\") : url.lastIndexOf("/");
+    return url.substring(i+1);
+  }
+
   private List<String> metadataResourceNames() {
     List<String> res = new ArrayList<>();
     // order matters here
@@ -6841,6 +6846,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         item.addProperty("history", r.hasHistory());
         item.addProperty("index", i);
         item.addProperty("source", f.getStatedPath());
+        item.addProperty("sourceTail", tailPI(f.getStatedPath()));
         path = null;
         if (r.getPath() != null) {
           path = r.getPath();
