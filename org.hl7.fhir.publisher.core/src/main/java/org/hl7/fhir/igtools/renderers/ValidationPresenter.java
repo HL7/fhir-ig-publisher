@@ -389,7 +389,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
 
     genQAText(title, files, path, filteredMessages, linkErrors);
     
-    String summary = "Errors: " + err + ", Warnings: " + warn + ", Info: " + info+", Broken Links = "+link;
+    String summary = "Errors: " + err + ", Warnings: " + warn + ", Info: " + info+", Broken Links: "+link;
     return path + "\r\n" + summary;
   }
 
@@ -584,7 +584,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private final String headerTemplate = 
       "<!DOCTYPE HTML>\r\n"+
       "<html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\">\r\n"+
-      "<!-- broken links = $links$, errors = $err$, warn = $warn$, info = $info$ -->\r\n"+
+      "<!-- broken links = errors = $err$, warn = $warn$, info = $info$, $links$ -->\r\n"+
       "<head>\r\n"+
       "  <title>$title$ : Validation Results</title>\r\n"+
       "  <link href=\"fhir.css\" rel=\"stylesheet\"/>\r\n"+
@@ -636,7 +636,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       " <tr><td>Previous Version Comparison:</td><td> $previousVersion$</td></tr>\r\n"+
       "$noNarrative$"+
       "$noValidation$"+
-      " <tr><td>Summary:</td><td> broken links = $links$, errors = $err$, warn = $warn$, info = $info$</td></tr>\r\n"+
+      " <tr><td>Summary:</td><td> errors = $err$, warn = $warn$, info = $info$, broken links = $links$</td></tr>\r\n"+
       "</table>\r\n"+
       " <table class=\"grid\">\r\n"+
       "   <tr>\r\n"+
