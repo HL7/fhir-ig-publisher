@@ -822,6 +822,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private String fmtDateTime = "yyyy-MM-dd hh:mm:ssZZZ";
   private String fmtDate = "yyyy-MM-dd";
+  private DependentIGFinder dependentIgFinder;
   
   private class PreProcessInfo {
     private String xsltName;
@@ -885,7 +886,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                 bc.check(igpkp.getCanonical(), npmName, workingVersion(), historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator,
                 new DependencyRenderer(pcm, outputDir, npmName, templateManager).render(publishedIg), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
                 new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate(), copyrightYear, context, scanForR5Extensions(),
-                    noNarrativeResources, noValidateResources, noValidation, noGenerate);
+                    noNarrativeResources, noValidateResources, noValidation, noGenerate, dependentIgFinder.getOutcome(mode != IGBuildMode.MANUAL));
             log("Built. "+Utilities.presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
             recordOutcome(null, val);
             log("Finished");
@@ -1025,7 +1026,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           bc.check(igpkp.getCanonical(), npmName, workingVersion(), historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator,
           new DependencyRenderer(pcm, outputDir, npmName, templateManager).render(publishedIg), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
           new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate(), copyrightYear, context, scanForR5Extensions(),
-          noNarrativeResources, noValidateResources, noValidation, noGenerate);
+          noNarrativeResources, noValidateResources, noValidation, noGenerate, dependentIgFinder.getOutcome(mode != IGBuildMode.MANUAL));
       tts.end();
       if (isChild()) {
         log("Built. "+tt.report());      
@@ -3905,7 +3906,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       publishedIg = sourceIg.copy();
       altMap.get(IG_NAME).getResources().get(0).setResource(publishedIg);
     }
-    
+    dependentIgFinder = new DependentIGFinder(sourceIg.getPackageId());
+
+
     loadMappingSpaces(context.getBinaries().get("mappingSpaces.details"));
     validationFetcher.getMappingUrls().addAll(mappingSpaces.keySet());
     validationFetcher.getOtherUrls().add(publishedIg.getUrl());
@@ -4155,6 +4158,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         logDebugMessage(LogCategory.INIT, "    "+r.fhirType()+"/"+r.getId());      
     }
     extensionTracker.scan(publishedIg);
+    
     return needToBuild;
   }
 
