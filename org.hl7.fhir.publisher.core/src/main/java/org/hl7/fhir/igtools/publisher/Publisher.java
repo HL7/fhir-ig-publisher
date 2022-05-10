@@ -2639,8 +2639,21 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     fetcher.setPkp(igpkp);
     template.loadSummaryRows(igpkp.summaryRows());
+//    if (!dependsOnToolsIg(sourceIg.getDependsOn())) {
+//      ImplementationGuideDependsOnComponent dep = new ImplementationGuideDependsOnComponent();
+//      dep.setId("hl7tx");
+//      dep.setPackageId(getUTGPackageName());
+//      dep.setUri("http://hl7.org/fhir/tools");
+//      dep.setVersion(pcm.getLatestVersion(dep.getPackageId()));
+//      sourceIg.getDependsOn().add(0, dep);
+//    }
     if (!dependsOnUTG(sourceIg.getDependsOn()) && !sourceIg.getPackageId().contains("hl7.terminology")) {
-      loadUTG();
+      ImplementationGuideDependsOnComponent dep = new ImplementationGuideDependsOnComponent();
+      dep.setId("hl7tx");
+      dep.setPackageId(getUTGPackageName());
+      dep.setUri("http://terminology.hl7.org");
+      dep.setVersion(pcm.getLatestVersion(dep.getPackageId()));
+      sourceIg.getDependsOn().add(0, dep);
     }
     
     inspector = new HTLMLInspector(outputDir, specMaps, this, igpkp.getCanonical(), sourceIg.getPackageId());
@@ -3211,14 +3224,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void loadUTG() throws FHIRException, IOException {
-    String vs = null;
-    if (VersionUtilities.isR3Ver(version)) {
-      vs = "hl7.terminology.r3";
-    } else if (VersionUtilities.isR4Ver(version)) {
-      vs = "hl7.terminology.r4";
-    } else if (VersionUtilities.isR5Ver(version)) {
-      vs = "hl7.terminology.r5";
-    }
+    String vs = getUTGPackageName();
     if (vs != null) {
       NpmPackage npm = pcm.loadPackage(vs, null);
       SpecMapManager spm = new SpecMapManager(TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.fhirVersion());
@@ -3226,6 +3232,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       context.loadFromPackage(npm, loader);
     }
   }
+
+  private String getUTGPackageName() throws FHIRException, IOException {
+    String vs = null;
+    if (VersionUtilities.isR3Ver(version)) {
+      vs = "hl7.terminology.r3";
+    } else if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {
+      vs = "hl7.terminology.r4";
+    } else if (VersionUtilities.isR5Ver(version)) {
+      vs = "hl7.terminology.r5";
+    }
+    return vs;
+  }
+
 
 
   private void processExtraTemplates(JsonArray templates) throws Exception {
@@ -6880,6 +6899,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           citem.addProperty("history", r.hasHistory());
           citem.addProperty("index", i);
           citem.addProperty("source", f.getStatedPath()+"#"+crd.getId());
+          citem.addProperty("sourceTail", tailPI(f.getStatedPath())+"#"+crd.getId());
           citem.addProperty("path", crd.getType()+"-"+r.getId()+"_"+crd.getId()+".html");// todo: is this always correct?
           JsonObject container = new JsonObject();; 
           citem.add("container", container);
