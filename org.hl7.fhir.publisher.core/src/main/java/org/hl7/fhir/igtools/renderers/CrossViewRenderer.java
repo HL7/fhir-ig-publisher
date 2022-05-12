@@ -554,8 +554,8 @@ public class CrossViewRenderer {
             b.append(" <span style=\"color:white; background-color: red; font-weight:bold\">S</span>");
           }
         }
-        b.append("</td>");
       }
+      b.append("</td>");
     }    
   }
 
@@ -596,7 +596,6 @@ public class CrossViewRenderer {
           b.append(Utilities.escapeXml(vs.present()));
         }
       } else {
-
         for (Coding t : list) {
           if (first) first = false; else b.append(", ");
           String sys = TerminologyRenderer.describeSystem(t.getSystem());
@@ -625,8 +624,8 @@ public class CrossViewRenderer {
           }
         }
       }
+      b.append("</td>");
     }
-    b.append("</td>");
   }
 
   public List<ObservationProfile> getObservations() {
