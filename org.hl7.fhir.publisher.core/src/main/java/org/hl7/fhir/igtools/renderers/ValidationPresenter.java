@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import org.hl7.fhir.igtools.publisher.DependentIGFinder;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
@@ -260,11 +261,13 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private boolean noValidate;
   private boolean noGenerate;
   private Set<String> r5Extensions;
-
+  private String dependencies;
+  private DependentIGFinder dependentIgs;
+  
   public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, String ballotCheck, 
       String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, String dependencies, String csAnalysis, String versionRulesCheck, String copyrightYear, IWorkerContext context,
       Set<String> r5Extensions,
-      List<FetchedResource> noNarratives, List<FetchedResource> noValidation, boolean noValidate, boolean noGenerate, String dependentIgs) {
+      List<FetchedResource> noNarratives, List<FetchedResource> noValidation, boolean noValidate, boolean noGenerate, DependentIGFinder dependentIgs) {
     super();
     this.statedVersion = statedVersion;
     this.igVersion = igVersion;
@@ -606,17 +609,6 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       "        span.innerHTML = 'Show Reasoning';\r\n"+
       "      }\r\n"+
       "    }\r\n"+
-      "    function flipg(id) {\r\n"+
-      "      var span = document.getElementById('s'+id);\r\n"+
-      "      var div = document.getElementById(id);\r\n"+
-      "      if (document.getElementById('s'+id).innerHTML == 'Show the list') {\r\n"+
-      "        div.style.display = 'block';\r\n"+
-      "        span.innerHTML = 'Hide the list';\r\n"+
-      "      } else {\r\n"+
-      "        div.style.display = 'none';\r\n"+
-      "        span.innerHTML = 'Show the list';\r\n"+
-      "      }\r\n"+
-      "    }\r\n"+
       "    function toggle(id) {\r\n"+
       "      var span = document.getElementById('s'+id);\r\n"+
       "      var div = document.getElementById(id);\r\n"+
@@ -642,7 +634,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       " <tr><td>Version Check:</td><td>$versionRulesCheck$</td></tr>\r\n"+
       " <tr><td>Supressed Messages:</td><td>$suppressedmsgssummary$</td></tr>\r\n"+
       " <tr><td>Dependency Checks:</td><td>$dependencyCheck$</td></tr>\r\n"+
-      " <tr><td>Dependent IGs:</td><td>$dependentIgs$</td></tr>\r\n"+
+      " <tr><td>Dependent IGs:</td><td><a href=\"qa-dep.html\">$dependentIgs$</a></td></tr>\r\n"+
       " <tr><td>Publication Rules:</td><td>Code = $igcode$. $ballotCheck$ $copyrightYearCheck$</td></tr>\r\n"+
       " <tr><td>HTA Analysis:</td><td>$csAnalysis$</td></tr>\r\n"+
       " <tr><td>R5 Dependencies:</td><td>$r5usage$</td></tr>\r\n"+
@@ -719,7 +711,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private final String footerTemplate = 
       "</body>\r\n"+
       "</html>\r\n";
-
+  
   // Text templates
   private final String headerTemplateText = 
       "$title$ : Validation Results\r\n"+
@@ -742,9 +734,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   
   private final String footerTemplateText = 
       "\r\n";
-  private String dependencies;
-  private String dependentIgs;
-  
+
   private ST template(String t) {
     return new ST(t, '$', '$');
   }
@@ -772,7 +762,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("versionRulesCheck", versionRulesCheck);
     t.add("realm", igrealm == null ? "n/a" : igrealm.toUpperCase());
     t.add("dependencyCheck", dependencies);
-    t.add("dependentIgs", dependentIgs);
+    t.add("dependentIgs", dependentIgs.getCountDesc());
     t.add("csAnalysis", csAnalysis);
     t.add("r5usage", genR5());
     t.add("otherFileName", allIssues ? "Errors Only" : "Full QA Report");
@@ -850,7 +840,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("igrealmerror", igRealmError);
     t.add("realm", igrealm == null ? "n/a" : igrealm.toUpperCase());
     t.add("dependencyCheck", dependencies);
-    t.add("dependentIgs", dependentIgs);
+    t.add("dependentIgs", dependentIgs.getCountDesc());
     t.add("versionRulesCheck", versionRulesCheck);
     t.add("csAnalysis", csAnalysis);
     t.add("previousVersion", previousVersionComparator.checkHtml());
