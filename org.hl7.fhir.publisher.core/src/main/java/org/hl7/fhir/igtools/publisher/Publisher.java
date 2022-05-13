@@ -2644,7 +2644,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     template.loadSummaryRows(igpkp.summaryRows());
 //    if (!dependsOnToolsIg(sourceIg.getDependsOn())) {
 //      ImplementationGuideDependsOnComponent dep = new ImplementationGuideDependsOnComponent();
-//      dep.setId("hl7tx");
+//      dep.setId("hl7tools");
 //      dep.setPackageId(getUTGPackageName());
 //      dep.setUri("http://hl7.org/fhir/tools");
 //      dep.setVersion(pcm.getLatestVersion(dep.getPackageId()));
@@ -2654,7 +2654,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       ImplementationGuideDependsOnComponent dep = new ImplementationGuideDependsOnComponent();
       dep.setId("hl7tx");
       dep.setPackageId(getUTGPackageName());
-      dep.setUri("http://terminology.hl7.org");
+      dep.setUri("http://terminology.hl7.org/ImplementationGuide/hl7.terminology");
       dep.setVersion(pcm.getLatestVersion(dep.getPackageId()));
       sourceIg.getDependsOn().add(0, dep);
     }
