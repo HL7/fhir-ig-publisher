@@ -766,7 +766,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("csAnalysis", csAnalysis);
     t.add("r5usage", genR5());
     t.add("otherFileName", allIssues ? "Errors Only" : "Full QA Report");
-    t.add("otherFilePath", allIssues ? Utilities.getFileNameForName(Utilities.changeFileExt(path, ".min.html")) : Utilities.getFileNameForName(path));
+    t.add("otherFilePath", allIssues ? "qa.min.html" : "qa.html");
     t.add("previousVersion", previousVersionComparator.checkHtml());
     t.add("noNarrative", genResourceList(noNarratives, "Narratives Suppressed"));
     t.add("noValidation", genResourceList(noValidation, "Validation Suppressed"));
