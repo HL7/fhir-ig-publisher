@@ -614,7 +614,7 @@ public class CrossViewRenderer {
             //          else {
             CodeSystem cs = context.fetchCodeSystem(t.getSystem());
             if (cs != null && cs.hasUserData("path")) {
-              b.append("<a href=\""+cs.getUserString("path")+"#"+t.getCode()+"\" title=\""+t.getSystem()+(sys == null ? "" : " ("+sys+")")+": "+ vr.getDisplay()+"\">"+t.getCode()+"</a>");                  
+              b.append("<a href=\""+cs.getUserString("path")+"#"+cs.getId()+"-"+t.getCode()+"\" title=\""+t.getSystem()+(sys == null ? "" : " ("+sys+")")+": "+ vr.getDisplay()+"\">"+t.getCode()+"</a>");                  
             } else {
               b.append("<span title=\""+t.getSystem()+(sys == null ? "" : " ("+sys+")")+": "+ vr.getDisplay()+"\">"+t.getCode()+"</span>");
             }
