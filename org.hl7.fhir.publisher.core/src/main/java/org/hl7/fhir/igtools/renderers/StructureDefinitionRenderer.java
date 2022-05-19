@@ -681,16 +681,18 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       StringBuilder b = new StringBuilder();
       b.append("<table class=\"dict\">\r\n");
       
-      Map<String, ElementDefinition> allAnchors = new HashMap<>(); 
+      Map<String, ElementDefinition> allAnchors = new HashMap<>();
+      List<ElementDefinition> excluded = new ArrayList<>();
 
       List<ElementDefinition> stack = new ArrayList<>(); // keeps track of parents, for anchor generation
       for (ElementDefinition ec : sd.getSnapshot().getElement()) {
         addToStack(stack, ec);
-        generateAnchors(stack, allAnchors);  
+        generateAnchors(stack, allAnchors); 
+        checkInScope(stack, excluded);
       }
       
       for (ElementDefinition ec : sd.getSnapshot().getElement()) {
-        if (incProfiledOut || !"0".equals(ec.getMax())) {
+        if ((incProfiledOut || !"0".equals(ec.getMax())) && !excluded.contains(ec)) {
           String anchors = makeAnchors(ec);
           if (isProfiledExtension(ec)) {
             StructureDefinition extDefn = context.fetchResource(StructureDefinition.class, ec.getType().get(0).getProfile().get(0).getValue());
@@ -721,6 +723,18 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return b.toString();
     }
     
+    private void checkInScope(List<ElementDefinition> stack, List<ElementDefinition> excluded) {
+      if (stack.size() > 2) {
+        ElementDefinition parent = stack.get(stack.size()-2);
+        ElementDefinition focus = stack.get(stack.size()-1);
+        
+        if (excluded.contains(parent) || "0".equals(parent.getMax())) {
+          excluded.add(focus);
+        }
+      }
+      
+    }
+
     private void generateAnchors(List<ElementDefinition> stack, Map<String, ElementDefinition> allAnchors) {
       List<String> list = new ArrayList<>();
       list.add(stack.get(0).getId()); // initialise
