@@ -13,10 +13,12 @@ import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_30_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.r5.comparison.ComparisonRenderer;
 import org.hl7.fhir.r5.comparison.ComparisonSession;
 import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
+import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.ImplementationGuide;
@@ -30,6 +32,7 @@ import org.hl7.fhir.utilities.npm.BasePackageCacheManager;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
+import org.hl7.fhir.utilities.validation.ValidationMessage;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -66,6 +69,7 @@ public class PreviousVersionComparator {
     private List<CanonicalResource> resources = new ArrayList<>();
     private String errMsg;
     private IniFile ini;
+    private ProfileKnowledgeProvider pkp;
     
     public VersionInstance(String version, IniFile ini) {
       super();
@@ -78,7 +82,7 @@ public class PreviousVersionComparator {
   private String version;
   private String dstDir;
   private List<ProfilePair> comparisons = new ArrayList<>();
-  private ProfileKnowledgeProvider pkp;
+  private ProfileKnowledgeProvider newpkp;
   private String errMsg;
   private String pid;
   private List<VersionInstance> versionList = new ArrayList<>();
@@ -93,7 +97,7 @@ public class PreviousVersionComparator {
     this.context = context;
     this.version = version;
     this.dstDir = dstDir;
-    this.pkp = pkp;
+    this.newpkp = pkp;
     this.logger = logger;
     try {
       processVersions(canonical, versions, rootDir);
@@ -208,6 +212,7 @@ public class PreviousVersionComparator {
           vi.context.setLocale(context.getLocale());
           vi.context.setLogger(context.getLogger());
           vi.context.loadFromPackageAndDependencies(current, new PublisherLoader(current, SpecMapManager.fromPackage(current), current.getWebLocation(), null).makeLoader(), pcm);
+          vi.pkp = new IGKnowledgeProvider(vi.context, current.getWebLocation(), current.canonical(), null, null, false, null, null);
         } catch (Exception e) {
           vi.errMsg = "Unable to find load package "+pid+"#"+vi.version+" ("+e.getMessage()+" on file "+filename+")";
           e.printStackTrace();
@@ -245,7 +250,7 @@ public class PreviousVersionComparator {
         }
 
         try {
-          ComparisonSession session = new ComparisonSession(vi.context, context, "Comparison of v"+vi.version+" with this version", pkp);
+          ComparisonSession session = new ComparisonSession(vi.context, context, "Comparison of v"+vi.version+" with this version", vi.pkp, newpkp);
           //    session.setDebug(true);
           for (ProfilePair c : comparisons) {
 //            System.out.println("Version Comparison: compare "+vi.version+" to current for "+c.getUrl());

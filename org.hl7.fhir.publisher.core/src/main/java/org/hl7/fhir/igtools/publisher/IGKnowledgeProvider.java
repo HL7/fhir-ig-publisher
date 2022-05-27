@@ -84,7 +84,9 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     this.canonical = canonical;
     this.template = template;
     this.listedURLExemptions = listedURLExemptions;
-    loadPaths(igs);
+    if (igs != null) {
+      loadPaths(igs);
+    }
   }
   
   private void loadPaths(JsonObject igs) throws Exception {
@@ -474,7 +476,9 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     String s = "The reference "+ref+" could not be resolved";
     if (!msgs.contains(s)) {
       msgs.add(s);
-      errors.add(new ValidationMessage(Source.Publisher, IssueType.INVARIANT, pathToFhirPath(location), s, IssueSeverity.ERROR));
+      if (errors != null) {
+        errors.add(new ValidationMessage(Source.Publisher, IssueType.INVARIANT, pathToFhirPath(location), s, IssueSeverity.ERROR));
+      }
     }
   }
 
@@ -577,10 +581,11 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
           br.url = vs.getUserString("path");
           br.display = vs.getName(); 
         } else {
-          if (ref.contains("|")) {
-            ref = ref.substring(0, ref.indexOf("|"));
+          String nvref = ref;
+          if (nvref.contains("|")) {
+            nvref = nvref.substring(0, nvref.indexOf("|"));
           }
-          String vsr = VersionConvertorConstants.vsToRef(ref);
+          String vsr = VersionConvertorConstants.vsToRef(nvref);
           if (vsr != null) {
             br.display = ref.substring(29);
             br.url = vsr;

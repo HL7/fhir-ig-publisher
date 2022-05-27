@@ -213,7 +213,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
   @Override
   public void finishChecks() throws DefinitionException, FHIRFormatError, IOException {
     try {
-      ComparisonSession session = new ComparisonSession(context, context, "Comparison of "+name+" with US-Core", pkp);
+      ComparisonSession session = new ComparisonSession(context, context, "Comparison of "+name+" with US-Core", pkp, pkp);
       //    session.setDebug(true);
       for (ProfilePair c : comparisons) {
         System.out.println("US Core Comparison: compare "+c.local+" to "+c.uscore);

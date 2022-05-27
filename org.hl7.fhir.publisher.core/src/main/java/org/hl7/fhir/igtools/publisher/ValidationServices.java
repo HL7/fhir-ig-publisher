@@ -101,7 +101,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
       return new ObjectConverter(context).convert(vs);
     
     for (NpmPackage npm : packages) {
-      if (npm.canonical() != null && url.startsWith(npm.canonical())) {
+      if (Utilities.isAbsoluteUrl(url) && npm.canonical() != null && url.startsWith(npm.canonical())) {
         String u = url.substring(npm.canonical().length());
         if (u.startsWith("/"))
           u = u.substring(1);
@@ -157,6 +157,16 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
               }
             }
           }
+        }
+      }
+    }
+
+    if (parts.length >= 2 && Utilities.existsInList(parts[parts.length - 2], context.getResourceNames())) {
+      for (int i = packages.size() - 1; i >= 0; i--) {
+        NpmPackage npm = packages.get(i);
+        InputStream s = npm.loadExampleResource(parts[parts.length - 2], parts[parts.length - 1]);
+        if (s != null) {
+            return Manager.makeParser(context, FhirFormat.JSON).parseSingle(s);
         }
       }
     }
