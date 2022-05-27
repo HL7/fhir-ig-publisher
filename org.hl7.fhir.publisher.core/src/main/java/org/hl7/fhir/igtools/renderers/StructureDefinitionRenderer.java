@@ -1221,6 +1221,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
 
     private String conf(ElementDefinitionBindingComponent def) {
+        if (def.getStrength() == null) {
+          return "" + translate("sd.dict", "For codes, see ");
+        }
         switch (def.getStrength()) {
             case EXAMPLE:
                 return "" + translate("sd.dict", "For example codes, see ");
