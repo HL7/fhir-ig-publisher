@@ -1825,7 +1825,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               }
             } else {
               RenderingContext lrc = rc.copy().setParser(getTypeLoader(f,r));
-              if ("http://hl7.org/fhir/StructureDefinition/DomainResource".equals(r.getElement().getProperty().getStructure().getBaseDefinition()) && !hasNarrative(r.getElement())) {
+              if (isDomainResource(r) && !hasNarrative(r.getElement())) {
                 ResourceWrapper rw = new ElementWrappers.ResourceWrapperMetaElement(lrc, r.getElement());
                 RendererFactory.factory(rw, lrc).render(rw);
               } else if (r.fhirType().equals("Bundle")) {
@@ -1836,7 +1836,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                     RendererFactory.factory(rw, lrc, new ResourceContext(ResourceContextType.BUNDLE, r.getElement(), res)).render(rw);
                   }
                 }
-              } else if ("http://hl7.org/fhir/StructureDefinition/DomainResource".equals(r.getElement().getProperty().getStructure().getBaseDefinition()) && hasNarrative(r.getElement())) {
+              } else if (isDomainResource(r) && hasNarrative(r.getElement())) {
                 checkExistingNarrative(f, r, r.getElement().getNamedChild("text").getNamedChild("div").getXhtml());
               }
             }
@@ -1847,6 +1847,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
     tts.end();
+  }
+
+  private boolean isDomainResource(FetchedResource r) {
+    StructureDefinition sd = r.getElement().getProperty().getStructure();
+    while (sd != null) {
+      if ("DomainResource".equals(sd.getType())) {
+        return true;
+      }
+      sd = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition());
+    }
+    return false;
   }
 
   private boolean passesNarrativeFilter(FetchedResource r) {
@@ -2944,7 +2955,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
    qaDir = Utilities.path(rootDir, str(paths, "qa", "qa"));
    vsCache = ostr(paths, "txCache");
    templateProvider.clear();
-   if (paths.has("liquid")) {
+   if (paths != null && paths.has("liquid")) {
      templateProvider.load(Utilities.path(rootDir, str(paths, "liquid", "liquid")));
    } 
     
