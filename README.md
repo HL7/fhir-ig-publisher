@@ -28,6 +28,13 @@ To skip unit tests:
 mvn -Dmaven.test.skip install
 ```
 
+## Running this Project
+
+Once built, there are two common tasks that can be accomplished using the fhir-ig-publisher, which are described in detail in the documentation below:
+
+* [Publishing Packages](https://hl7.github.io/docs/publishing_packages)
+* [Publishing Templates](https://hl7.github.io/docs/publishing_templates)
+
 ## Publishing Binaries
 
 An brief overview of our publishing process is [here][Link-Publishing].
