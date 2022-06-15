@@ -8,10 +8,6 @@ This is the code for the HL7 IG publisher: a tool to take a set of inputs
 and create a standard FHIR IG. The HL7 FHIR IG publisher does not provide 
 an authoring environment - that's left to other parties.
 
-## CI/CD
-
-All intergration and delivery done on Azure pipelines. Azure project can be viewed [here][Link-AzurePipelines].
-
 ## Building this Project
 
 This project uses [Apache Maven][Link-Maven] to build. To build:
@@ -40,6 +36,10 @@ Once built, there are two common tasks that can be accomplished using the fhir-i
 An brief overview of our publishing process is [here][Link-Publishing].
 
 For more detailed instructions on cutting a release, please read [the wiki][Link-PublishingRelease]
+
+## CI/CD
+
+All intergration and delivery done on Azure pipelines. Azure project can be viewed [here][Link-AzurePipelines].
 
 ## Maintenance
 
