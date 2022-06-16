@@ -44,7 +44,7 @@ All intergration and delivery done on Azure pipelines. Azure project can be view
 * **Release Branch Pipeline** is run manually whenever a release is ready to be made. It builds the [release binaries](#releases) and distributes them to artifact repositories. [[Azure Pipeline]][Link-AzureReleasePipeline][[source]](release-branch-pipeline.yml)
 
 
-An brief overview of our publishing process is [here][Link-Publishing].
+A brief overview of our publishing process is [here][Link-Publishing].
 
 For more detailed instructions on cutting a release, please read [the wiki][Link-PublishingRelease]
 
