@@ -29,7 +29,7 @@ import java.util.List;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.json.JSONUtil;
+import org.hl7.fhir.utilities.json.JsonUtilities;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 
 import com.google.gson.JsonObject;
@@ -83,9 +83,9 @@ public class IGReleaseVersionDeleter {
       throw new FHIRException("Folder '"+folder+"' is not a valid IG directory");
     JsonObject json = JsonTrackingParser.parseJsonFile(pl);
     List<String> igs = new ArrayList<>();
-    String canonical = JSONUtil.str(json, "canonical");
-    for (JsonObject obj : JSONUtil.objects(json, "list")) {
-      String path = JSONUtil.str(obj, "path");
+    String canonical = JsonUtilities.str(json, "canonical");
+    for (JsonObject obj : JsonUtilities.objects(json, "list")) {
+      String path = JsonUtilities.str(obj, "path");
       if (path.startsWith(canonical)) {
         igs.add(path.substring(canonical.length()+1));
       }

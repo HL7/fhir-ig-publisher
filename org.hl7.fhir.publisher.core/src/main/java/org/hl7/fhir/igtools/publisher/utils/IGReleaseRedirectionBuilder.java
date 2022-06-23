@@ -32,7 +32,7 @@ import java.util.Set;
 
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.json.JSONUtil;
+import org.hl7.fhir.utilities.json.JsonUtilities;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 
@@ -408,7 +408,7 @@ public class IGReleaseRedirectionBuilder {
       if (f.getName().endsWith(".json") && !f.getName().endsWith(".canonical.json") && new File(Utilities.changeFileExt(f.getAbsolutePath(), ".xml")).exists() && new File(Utilities.changeFileExt(f.getAbsolutePath(), ".html")).exists()) {
         JsonObject obj = JsonTrackingParser.parseJson(f);
         if (obj.has("resourceType") && obj.has("id")) {
-          res.put(JSONUtil.str(obj, "resourceType")+"/"+JSONUtil.str(obj, "id"), Utilities.pathURL(vpath, Utilities.changeFileExt(f.getName(), ".html")));
+          res.put(JsonUtilities.str(obj, "resourceType")+"/"+JsonUtilities.str(obj, "id"), Utilities.pathURL(vpath, Utilities.changeFileExt(f.getName(), ".html")));
         }
       }
     }

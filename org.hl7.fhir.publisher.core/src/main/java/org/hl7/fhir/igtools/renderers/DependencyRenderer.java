@@ -15,7 +15,7 @@ import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnCom
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.json.JSONUtil;
+import org.hl7.fhir.utilities.json.JsonUtilities;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.hl7.fhir.utilities.npm.BasePackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -157,10 +157,10 @@ public class DependencyRenderer {
       return VersionState.VERSION_NO_LIST;
     }
     boolean latestInterim = true;
-    for (JsonObject v : JSONUtil.objects(pl, "list")) {
-      if (!"current".equals(JSONUtil.str(v, "version"))) {
-        if (version.equals(JSONUtil.str(v, "version"))) {
-          if (JSONUtil.bool(v, "current")) {// this is the current official release
+    for (JsonObject v : JsonUtilities.objects(pl, "list")) {
+      if (!"current".equals(JsonUtilities.str(v, "version"))) {
+        if (version.equals(JsonUtilities.str(v, "version"))) {
+          if (JsonUtilities.bool(v, "current")) {// this is the current official release
             return VersionState.VERSION_LATEST_MILESTONE;
           } if (latestInterim) {
             return VersionState.VERSION_LATEST_INTERIM;

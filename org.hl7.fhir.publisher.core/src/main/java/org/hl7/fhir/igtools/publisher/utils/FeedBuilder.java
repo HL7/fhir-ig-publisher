@@ -18,7 +18,7 @@ import java.util.Set;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.json.JSONUtil;
+import org.hl7.fhir.utilities.json.JsonUtilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 
 import com.google.gson.JsonElement;
@@ -292,28 +292,28 @@ public class FeedBuilder {
     System.out.println("Load from "+f.getAbsolutePath());
     String folder = Utilities.getDirectoryForFile(f.getAbsolutePath());    
     JsonObject json = (JsonObject) new JsonParser().parse(TextFile.fileToString(f)); // use gson parser to preseve property order
-    String packageId = JSONUtil.str(json, "package-id");
-    String title = JSONUtil.str(json, "title");
-    String canonical = JSONUtil.str(json, "canonical");
-    String kind = JSONUtil.str(json, "kind");
+    String packageId = JsonUtilities.str(json, "package-id");
+    String title = JsonUtilities.str(json, "title");
+    String canonical = JsonUtilities.str(json, "canonical");
+    String kind = JsonUtilities.str(json, "kind");
     if (Utilities.noString(kind))
       kind = "IG";
-    for (JsonElement e : JSONUtil.forceArray(json, "list")) {
+    for (JsonElement e : JsonUtilities.forceArray(json, "list")) {
       JsonObject v = (JsonObject) e;
-      String version = JSONUtil.str(v, "version");
-      String vpackageId = v.has("package-id") ? JSONUtil.str(v, "package-id") : packageId;
+      String version = JsonUtilities.str(v, "version");
+      String vpackageId = v.has("package-id") ? JsonUtilities.str(v, "package-id") : packageId;
       if (!"current".equals(version)) {
-        String desc = JSONUtil.str(v, "desc");
+        String desc = JsonUtilities.str(v, "desc");
         if (Utilities.noString(desc))
-          desc = JSONUtil.str(v, "descmd");
+          desc = JsonUtilities.str(v, "descmd");
         if (!v.has("date")) {
           System.out.println("no date - "+version+" in "+f.getAbsolutePath());
         }
-        String date = JSONUtil.str(v, "date");
-        String path = JSONUtil.str(v, "path");
-        String status = JSONUtil.str(v, "status");
-        String sequence = JSONUtil.str(v, "sequence");
-        String fhirversion = JSONUtil.str(v, "fhirversion");
+        String date = JsonUtilities.str(v, "date");
+        String path = JsonUtilities.str(v, "path");
+        String status = JsonUtilities.str(v, "status");
+        String sequence = JsonUtilities.str(v, "sequence");
+        String fhirversion = JsonUtilities.str(v, "fhirversion");
         if (Utilities.noString(fhirversion)) {
           if ("fhir.core".equals(kind))
             fhirversion = version;
