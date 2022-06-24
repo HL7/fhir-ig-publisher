@@ -1,4 +1,4 @@
-package org.hl7.fhir.igtools.publisher;
+package org.hl7.fhir.igtools.publisher.comparators;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -13,6 +13,10 @@ import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_30_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
+import org.hl7.fhir.igtools.publisher.PastProcessHackerUtilities;
+import org.hl7.fhir.igtools.publisher.PublisherLoader;
+import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.r5.comparison.ComparisonRenderer;
 import org.hl7.fhir.r5.comparison.ComparisonSession;
@@ -26,7 +30,7 @@ import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.json.JSONUtil;
+import org.hl7.fhir.utilities.json.JsonUtilities;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.hl7.fhir.utilities.npm.BasePackageCacheManager;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
@@ -118,16 +122,16 @@ public class PreviousVersionComparator {
         for (JsonElement e : publishedVersions) {
           if (e instanceof JsonObject) {
             JsonObject o = e.getAsJsonObject();
-            if (!"ci-build".equals(JSONUtil.str(o, "status"))) {
+            if (!"ci-build".equals(JsonUtilities.str(o, "status"))) {
               if (last == null) {
-                last = JSONUtil.str(o, "version");
-                lastUrl = JSONUtil.str(o, "path");
-                lastName = JSONUtil.str(o, "version");
+                last = JsonUtilities.str(o, "version");
+                lastUrl = JsonUtilities.str(o, "path");
+                lastName = JsonUtilities.str(o, "version");
               }
               if (o.has("current") && o.get("current").getAsBoolean()) {
-                major = JSONUtil.str(o, "version");
-                lastUrl = JSONUtil.str(o, "path");
-                lastName = JSONUtil.str(o, "sequence");                
+                major = JsonUtilities.str(o, "version");
+                lastUrl = JsonUtilities.str(o, "path");
+                lastName = JsonUtilities.str(o, "sequence");                
               }
             }
           }
@@ -167,12 +171,12 @@ public class PreviousVersionComparator {
       String ppl = Utilities.pathURL(canonical, "package-list.json");
       logger.logMessage("Fetch "+ppl+" for version check");
       JsonObject pl = JsonTrackingParser.fetchJson(ppl);
-      if (!canonical.equals(JSONUtil.str(pl, "canonical"))) {
+      if (!canonical.equals(JsonUtilities.str(pl, "canonical"))) {
         throw new FHIRException("Mismatch canonical URL");
       } else if (!pl.has("package-id")) {
         throw new FHIRException("Package ID not specified in package-list.json");        
       } else {
-        pid = JSONUtil.str(pl, "package-id");
+        pid = JsonUtilities.str(pl, "package-id");
         JsonArray arr = pl.getAsJsonArray("list");
         if (arr == null) {
           throw new FHIRException("Package-list has no history");
@@ -262,6 +266,7 @@ public class PreviousVersionComparator {
           cr.getTemplates().put("ValueSet", new String(context.getBinaries().get("template-comparison-ValueSet.html")));
           cr.getTemplates().put("Profile", new String(context.getBinaries().get("template-comparison-Profile.html")));
           cr.getTemplates().put("Index", new String(context.getBinaries().get("template-comparison-index.html")));
+          cr.getTemplates().put("CapabilityStatement", new String(context.getBinaries().get("template-comparison-CapabilityStatement.html")));
           cr.render("Version "+vi.version, "Current Build");
         } catch (Throwable e) {
           errMsg = "Current Version Comparison failed: "+e.getMessage();
