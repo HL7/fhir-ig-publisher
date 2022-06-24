@@ -8,7 +8,7 @@ import org.hl7.fhir.igtools.publisher.PastProcessHackerUtilities;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.json.JSONUtil;
+import org.hl7.fhir.utilities.json.JsonUtilities;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 
 import com.google.gson.JsonArray;
@@ -49,7 +49,7 @@ public class VersionCheckRenderer {
         return packageVersion+": "+error("package-list.json has no path for this version");
       } else {
         CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder(". ");
-        b.append(packageVersion+" = ok. Step <code>"+JSONUtil.str(ver, "status")+"</code> in sequence <code>"+JSONUtil.str(ver, "sequence")+"</code>, to be published at "+JSONUtil.str(ver, "path")+" (subdir = "+subdir(PastProcessHackerUtilities.actualUrl(canonical), JSONUtil.str(ver, "path"))+")");  
+        b.append(packageVersion+" = ok. Step <code>"+JsonUtilities.str(ver, "status")+"</code> in sequence <code>"+JsonUtilities.str(ver, "sequence")+"</code>, to be published at "+JsonUtilities.str(ver, "path")+" (subdir = "+subdir(PastProcessHackerUtilities.actualUrl(canonical), JsonUtilities.str(ver, "path"))+")");  
         JsonObject pubPl = getPublishedPackageList();
         if (pubPl == null) {
           if (packageVersion.startsWith("0.")) {
@@ -61,18 +61,18 @@ public class VersionCheckRenderer {
           if (isPublished(pubPl, ver.get("path").getAsString())) {
             b.append(error("The version "+packageVersion+" has already been published"));        
           } 
-          if (!JSONUtil.str(packageList, "package-id").equals(JSONUtil.str(pubPl, "package-id"))) {
-            b.append(error("Package-id mismatch between provided and published package-list.json files: "+JSONUtil.str(packageList, "package-id")+" vs "+JSONUtil.str(pubPl, "package-id")));        
+          if (!JsonUtilities.str(packageList, "package-id").equals(JsonUtilities.str(pubPl, "package-id"))) {
+            b.append(error("Package-id mismatch between provided and published package-list.json files: "+JsonUtilities.str(packageList, "package-id")+" vs "+JsonUtilities.str(pubPl, "package-id")));        
           }
-          if (!JSONUtil.str(packageList, "canonical").equals(JSONUtil.str(pubPl, "canonical"))) {
-            b.append(error("canonical mismatch between provided and published package-list.json files: "+JSONUtil.str(packageList, "canonical")+" vs "+JSONUtil.str(pubPl, "canonical")));        
+          if (!JsonUtilities.str(packageList, "canonical").equals(JsonUtilities.str(pubPl, "canonical"))) {
+            b.append(error("canonical mismatch between provided and published package-list.json files: "+JsonUtilities.str(packageList, "canonical")+" vs "+JsonUtilities.str(pubPl, "canonical")));        
           }
         }
         if (!ver.get("path").getAsString().startsWith(canonical) && !ver.get("path").getAsString().startsWith(PastProcessHackerUtilities.actualUrl(canonical))) {
           b.append(error("package-list.json path for this version does not start with the canonical URL ("+ver.get("path").getAsString()+" vs "+canonical+")"));
         } 
         String mostRecent = packageVersion;
-        for (JsonObject o : JSONUtil.objects(packageList, "list")) {
+        for (JsonObject o : JsonUtilities.objects(packageList, "list")) {
           if (o.has("version") && !"current".equals(o.get("version").getAsString()) && VersionUtilities.isThisOrLater(mostRecent, o.get("version").getAsString())) {
             mostRecent = o.get("version").getAsString();
           }
@@ -86,12 +86,12 @@ public class VersionCheckRenderer {
         if (!ver.has("sequence")) {
           b.append(error("package-list.json has no sequence for this version"));
         }
-        for (JsonObject o : JSONUtil.objects(packageList, "list")) {
+        for (JsonObject o : JsonUtilities.objects(packageList, "list")) {
           if (!o.has("desc") && !o.has("descmd")) {
-            b.append(error("package-list.json has no description version "+JSONUtil.str(o, "ver")));            
+            b.append(error("package-list.json has no description version "+JsonUtilities.str(o, "ver")));            
           }
-          if (o.has("descmd") && JSONUtil.str(o, "descmd").contains("'")) {
-            b.append(error("package-list.json has a descmd that contains ' for version "+JSONUtil.str(o, "ver")));            
+          if (o.has("descmd") && JsonUtilities.str(o, "descmd").contains("'")) {
+            b.append(error("package-list.json has a descmd that contains ' for version "+JsonUtilities.str(o, "ver")));            
           }
         }
         return b.toString();
