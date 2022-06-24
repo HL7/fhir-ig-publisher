@@ -42,9 +42,10 @@ import org.hl7.fhir.igtools.publisher.DependentIGFinder;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
-import org.hl7.fhir.igtools.publisher.PreviousVersionComparator;
 import org.hl7.fhir.igtools.publisher.SuppressedMessageInformation;
 import org.hl7.fhir.igtools.publisher.SuppressedMessageInformation.SuppressedMessage;
+import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
+import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
 import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.PackageDetails;
@@ -263,9 +264,11 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private Set<String> r5Extensions;
   private String dependencies;
   private DependentIGFinder dependentIgs;
+  private IpaComparator ipaComparator;
   
   public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, String ballotCheck, 
-      String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, String dependencies, String csAnalysis, String versionRulesCheck, String copyrightYear, IWorkerContext context,
+      String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, IpaComparator ipaComparator,
+      String dependencies, String csAnalysis, String versionRulesCheck, String copyrightYear, IWorkerContext context,
       Set<String> r5Extensions,
       List<FetchedResource> noNarratives, List<FetchedResource> noValidation, boolean noValidate, boolean noGenerate, DependentIGFinder dependentIgs) {
     super();
@@ -281,6 +284,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     this.toolsVersion = toolsVersion;
     this.currentToolsVersion = currentToolsVersion;
     this.previousVersionComparator = previousVersionComparator;
+    this.ipaComparator = ipaComparator;
     this.dependencies = dependencies;
     this.dependentIgs = dependentIgs;
     this.csAnalysis = csAnalysis;
@@ -639,6 +643,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       " <tr><td>HTA Analysis:</td><td>$csAnalysis$</td></tr>\r\n"+
       " <tr><td>R5 Dependencies:</td><td>$r5usage$</td></tr>\r\n"+
       " <tr><td>Previous Version Comparison:</td><td> $previousVersion$</td></tr>\r\n"+
+      " <tr><td>IPA Comparison:</td><td> $ipaComparison$</td></tr>\r\n"+
       "$noNarrative$"+
       "$noValidation$"+
       " <tr><td>Summary:</td><td> errors = $err$, warn = $warn$, info = $info$, broken links = $links$</td></tr>\r\n"+
@@ -768,6 +773,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("otherFileName", allIssues ? "Errors Only" : "Full QA Report");
     t.add("otherFilePath", allIssues ? "qa.min.html" : "qa.html");
     t.add("previousVersion", previousVersionComparator.checkHtml());
+    t.add("ipaComparison", ipaComparator == null ? "n/a" : ipaComparator.checkHtml());
     t.add("noNarrative", genResourceList(noNarratives, "Narratives Suppressed"));
     t.add("noValidation", genResourceList(noValidation, "Validation Suppressed"));
     if (noGenerate || noValidate) {
@@ -844,6 +850,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("versionRulesCheck", versionRulesCheck);
     t.add("csAnalysis", csAnalysis);
     t.add("previousVersion", previousVersionComparator.checkHtml());
+    t.add("ipaComparison", ipaComparator == null ? "n/a" : ipaComparator.checkHtml());
     if (noGenerate || noValidate) {
       if (noGenerate && noValidate) {
         t.add("warning", "Warning: This IG was generated with both validation and HTML generation off. Many kinds of errors will not be reported.\r\n");        
