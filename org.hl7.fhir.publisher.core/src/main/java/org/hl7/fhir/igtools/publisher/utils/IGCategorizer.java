@@ -17,7 +17,7 @@ import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.json.JSONUtil;
+import org.hl7.fhir.utilities.json.JsonUtilities;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -227,21 +227,21 @@ public class IGCategorizer {
   
   private void process(String path) throws IOException {
     JsonObject iglist = JsonTrackingParser.parseJson(new File(path));
-    for (JsonObject ig : JSONUtil.objects(iglist, "guides")) {
+    for (JsonObject ig : JsonUtilities.objects(iglist, "guides")) {
         processIG(ig);
     }  
     JsonTrackingParser.write(iglist, new File(path));
   }
 
   private void processIG(JsonObject ig) {
-    String name = JSONUtil.str(ig, "npm-name");
-    JsonObject analysis = JSONUtil.forceObject(ig, "analysis");
+    String name = JsonUtilities.str(ig, "npm-name");
+    JsonObject analysis = JsonUtilities.forceObject(ig, "analysis");
     analysis.entrySet().clear();
-    for (JsonObject edition : JSONUtil.objects(ig, "editions")) {
+    for (JsonObject edition : JsonUtilities.objects(ig, "editions")) {
       if (edition.has("analysis")) {
         edition.remove("analysis");
       }
-      String version = JSONUtil.str(edition, "ig-version");
+      String version = JsonUtilities.str(edition, "ig-version");
       try {
         IGInfo info = processIGEdition(ig, edition, analysis);
 
@@ -258,7 +258,7 @@ public class IGCategorizer {
 
   private IGInfo processIGEdition(JsonObject ig, JsonObject edition, JsonObject analysis) throws FHIRException, IOException {
     IGInfo info = new IGInfo();
-    NpmPackage npm = pcm.loadPackage(JSONUtil.str(edition, "package"));
+    NpmPackage npm = pcm.loadPackage(JsonUtilities.str(edition, "package"));
 
     for (String t : npm.listResources("CodeSystem", "ValueSet", "StructureDefinition", "OperationDefinition", 
         "SearchParameter", "ImplementationGuide", "TestScript", "Conformance", "CapabilityStatement", "MessageDefinition")) {

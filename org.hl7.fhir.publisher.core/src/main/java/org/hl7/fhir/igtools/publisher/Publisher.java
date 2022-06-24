@@ -97,6 +97,8 @@ import org.hl7.fhir.exceptions.PathEngineException;
 import org.hl7.fhir.igtools.publisher.FetchedFile.FetchedBundleType;
 import org.hl7.fhir.igtools.publisher.IFetchFile.FetchState;
 import org.hl7.fhir.igtools.publisher.Publisher.ContainedResourceDetails;
+import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
+import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
 import org.hl7.fhir.igtools.publisher.realm.NullRealmBusinessRules;
 import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
 import org.hl7.fhir.igtools.publisher.realm.USRealmBusinessRules;
@@ -296,7 +298,7 @@ import org.hl7.fhir.utilities.ToolGlobalSettings;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.ZipGenerator;
-import org.hl7.fhir.utilities.json.JSONUtil;
+import org.hl7.fhir.utilities.json.JsonUtilities;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.hl7.fhir.utilities.npm.CommonPackages;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
@@ -776,6 +778,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private List<String> generateVersions = new ArrayList<>();
   private RealmBusinessRules realmRules;
   private PreviousVersionComparator previousVersionComparator;
+  private IpaComparator ipaComparator;
 
   private IGPublisherLiquidTemplateServices templateProvider;
 
@@ -808,6 +811,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private boolean duplicateInputResourcesDetected;
 
   private List<String> comparisonVersions;
+  private List<String> ipaComparisons;
 
   private TimeTracker tt;
 
@@ -884,7 +888,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             BallotChecker bc = new BallotChecker(repoRoot);
             dependentIgFinder.finish(outputDir, sourceIg.present());
             ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
-                bc.check(igpkp.getCanonical(), npmName, workingVersion(), historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator,
+                bc.check(igpkp.getCanonical(), npmName, workingVersion(), historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator,
                 new DependencyRenderer(pcm, outputDir, npmName, templateManager).render(publishedIg), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
                 new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate(), copyrightYear, context, scanForR5Extensions(),
                     noNarrativeResources, noValidateResources, noValidation, noGenerate, dependentIgFinder);
@@ -1025,7 +1029,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       BallotChecker bc = new BallotChecker(repoRoot);
       dependentIgFinder.finish(outputDir, sourceIg.present());
       ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), rootDir, npmName, childPublisher == null? null : childPublisher.npmName, 
-          bc.check(igpkp.getCanonical(), npmName, workingVersion(), historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator,
+          bc.check(igpkp.getCanonical(), npmName, workingVersion(), historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator,
           new DependencyRenderer(pcm, outputDir, npmName, templateManager).render(publishedIg), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
           new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate(), copyrightYear, context, scanForR5Extensions(),
           noNarrativeResources, noValidateResources, noValidation, noGenerate, dependentIgFinder);
@@ -2180,6 +2184,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     expectedJurisdiction = checkForJurisdiction();
     realmRules = makeRealmBusinessRules();
     previousVersionComparator = makePreviousVersionComparator();
+    ipaComparator = makeIpaComparator();
   }
   
   private Coding checkForJurisdiction() {
@@ -2349,7 +2354,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return null;
   }
 
-
   private void initializeFromIg(IniFile ini) throws Exception {
     configFile = ini.getFileName();
     igMode = true;
@@ -2412,6 +2416,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     tempDir = Utilities.path(rootDir, "temp");
     outputDir = Utilities.path(rootDir, "output");
     Map<String, String> expParamMap = new HashMap<>();
+    boolean allowExtensibleWarnings = false;
     
     int count = 0;
     for (ImplementationGuideDefinitionParameterComponent p : sourceIg.getDefinition().getParameter()) {
@@ -2518,12 +2523,21 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         defaultBusinessVersion = sourceIg.getVersion();
       } else if (p.getCode().equals("generate-version")) {     
         generateVersions.add(p.getValue());
+      } else if (p.getCode().equals("allow-extensible-warnings")) {     
+        allowExtensibleWarnings = p.getValue().equals("true");
       } else if (p.getCode().equals("version-comparison")) {     
         if (comparisonVersions == null) {
           comparisonVersions = new ArrayList<>();
         }
         if (!"n/a".equals(p.getValue())) {
           comparisonVersions.add(p.getValue());
+        }        
+      } else if (p.getCode().equals("ipa-comparison")) {     
+        if (ipaComparisons == null) {
+          ipaComparisons = new ArrayList<>();
+        }
+        if (!"n/a".equals(p.getValue())) {
+          ipaComparisons.add(p.getValue());
         }        
       } else if (p.getCode().equals("validation")) {
         if (p.getValue().equals("check-must-support"))
@@ -2669,7 +2683,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       dep.setVersion(pcm.getLatestVersion(dep.getPackageId()));
       sourceIg.getDependsOn().add(0, dep);
     }
-    
     inspector = new HTLMLInspector(outputDir, specMaps, this, igpkp.getCanonical(), sourceIg.getPackageId());
     inspector.getManual().add("full-ig.zip");
     if (historyPage != null) {
@@ -2686,13 +2699,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       loadIg(dep, i);
       i++;
     }
+    System.out.print("Load R5 Extensions");
+    System.out.println(" - " + ProfileUtilities.loadR5Extensions(pcm, context) + " resources (" + tt.milestone() + ")");
     generateLoadedSnapshots();
     
     // set up validator;
     validator = new InstanceValidator(context, new IGPublisherHostServices(), context.getXVer()); // todo: host services for reference resolution....
     validator.setAllowXsiLocation(true);
     validator.setNoBindingMsgSuppressed(true);
-    validator.setNoExtensibleWarnings(true);
+    validator.setNoExtensibleWarnings(!allowExtensibleWarnings);
     validator.setHintAboutNonMustSupport(hintAboutNonMustSupport);
     validator.setAnyExtensionsAllowed(anyExtensionsAllowed);
     validator.setAllowExamples(true);
@@ -2922,7 +2937,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (!configuration.has("defaults"))
         configuration.add("defaults", template.config().get("defaults"));
       else
-        JSONUtil.merge(template.config().getAsJsonObject("defaults"), configuration.getAsJsonObject("defaults"));
+        JsonUtilities.merge(template.config().getAsJsonObject("defaults"), configuration.getAsJsonObject("defaults"));
     }
     
     if (Utilities.existsInList(version.substring(0,  3), "1.0", "1.4", "1.6", "3.0"))
@@ -4821,14 +4836,24 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     logDebugMessage(LogCategory.PROGRESS, "check profiles & code systems");
     tts = tt.start("previous-version");
     previousVersionComparator.startChecks(publishedIg);
+    if (ipaComparator != null) {
+      ipaComparator.startChecks(publishedIg);      
+    }
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
           previousVersionComparator.check((CanonicalResource) r.getResource());
+          if (ipaComparator != null) {
+            ipaComparator.check((CanonicalResource) r.getResource());      
+          }
         }
+        
       }
     }
     previousVersionComparator.finishChecks();
+    if (ipaComparator != null) {
+      ipaComparator.finishChecks();      
+    }
     tts.end();
   }
   
@@ -4849,6 +4874,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       comparisonVersions.add("{last}");
     }
     return new PreviousVersionComparator(context, version, rootDir, tempDir, igpkp.getCanonical(), igpkp, logger, comparisonVersions);
+  }
+
+
+  private IpaComparator makeIpaComparator() throws IOException {
+    if (isTemplate()) {
+      return null;
+    }
+    if (ipaComparisons == null) {
+      return null;
+    }
+    return new IpaComparator(context, rootDir, tempDir, igpkp, logger, ipaComparisons);
   }
 
   private void checkJurisdiction(FetchedFile f, CanonicalResource resource, IssueSeverity error, String verb) {
@@ -5977,6 +6013,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     
     realmRules.addOtherFiles(otherFilesRun, outputDir);
     previousVersionComparator.addOtherFiles(otherFilesRun, outputDir);
+    if (ipaComparator != null) {
+      ipaComparator.addOtherFiles(otherFilesRun, outputDir);
+    }
     otherFilesRun.add(Utilities.path(tempDir, "usage-stats.json"));
     
     printMemUsage();
@@ -7783,6 +7822,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       diff.addProperty("name", Utilities.encodeUri(previousVersionComparator.getLastName()));
       diff.addProperty("current", Utilities.encodeUri(targetUrl()));
       diff.addProperty("previous", Utilities.encodeUri(previousVersionComparator.getLastUrl()));
+    }    
+    if (ipaComparator != null && ipaComparator.hasLast() && !targetUrl().startsWith("file:")) {
+      JsonObject diff = new JsonObject();
+      data.add("iga-diff", diff);
+      diff.addProperty("name", Utilities.encodeUri(ipaComparator.getLastName()));
+      diff.addProperty("current", Utilities.encodeUri(targetUrl()));
+      diff.addProperty("previous", Utilities.encodeUri(ipaComparator.getLastUrl()));
     }
     
     if (publishedIg.hasContact()) {
@@ -10129,6 +10175,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         System.setProperty("http.proxyPort", p[1]);
         System.setProperty("https.proxyHost", p[0]);
         System.setProperty("https.proxyPort", p[1]);
+        System.out.println("Web Proxy = "+p[0]+":"+p[1]);
       }
       self.setTxServer(getNamedParam(args, "-tx"));
       self.setPackagesFolder(getNamedParam(args, "-packages"));

@@ -16,7 +16,7 @@ import org.hl7.fhir.igtools.publisher.utils.IndexMaintainer.IGIndexInformation;
 import org.hl7.fhir.igtools.publisher.utils.IndexMaintainer.IdOrderSorter;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.json.JSONUtil;
+import org.hl7.fhir.utilities.json.JsonUtilities;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
@@ -190,13 +190,13 @@ public class IndexMaintainer {
   }
 
   public void seeEntry(String id, JsonObject ig, JsonObject ver) throws ParseException {
-    String name = JSONUtil.str(ig, "title"); 
-    String descMD = JSONUtil.str(ig, "introduction");
-    String version = JSONUtil.str(ver, "version");
-    String fhirVersion = JSONUtil.str(ver, "fhirversion");
+    String name = JsonUtilities.str(ig, "title"); 
+    String descMD = JsonUtilities.str(ig, "introduction");
+    String version = JsonUtilities.str(ver, "version");
+    String fhirVersion = JsonUtilities.str(ver, "fhirversion");
     SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
-    Date d = df.parse(JSONUtil.str(ver, "date"));
-    boolean current = "true".equals(JSONUtil.str(ver, "current"));
+    Date d = df.parse(JsonUtilities.str(ver, "date"));
+    boolean current = "true".equals(JsonUtilities.str(ver, "current"));
     
     IGIndexInformation entry = igs.get(id);
     if (entry == null) {
@@ -207,13 +207,13 @@ public class IndexMaintainer {
     }
     if (current) {
       entry.dateMilestone = d;
-      entry.refMilestone = JSONUtil.str(ig, "canonical");
+      entry.refMilestone = JsonUtilities.str(ig, "canonical");
       entry.fvMilestone = fhirVersion;
       entry.verMilestone = version;      
     }  
     if (entry.dateLatest == null || entry.dateLatest.before(d)) {
       entry.dateLatest = d;
-      entry.refLatest = JSONUtil.str(ver, "path");
+      entry.refLatest = JsonUtilities.str(ver, "path");
       entry.fvLatest = fhirVersion;
       entry.verLatest = version;
     }

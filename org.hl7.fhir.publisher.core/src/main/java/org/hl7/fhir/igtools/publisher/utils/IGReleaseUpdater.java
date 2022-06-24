@@ -51,7 +51,7 @@ import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.json.JSONUtil;
+import org.hl7.fhir.utilities.json.JsonUtilities;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 
 import com.google.gson.GsonBuilder;
@@ -118,7 +118,7 @@ public class IGReleaseUpdater {
         errs.add("unable to find package-list.json");
       else {
         JsonObject json = JsonTrackingParser.parseJsonFile(f);
-        String canonical = JSONUtil.str(json, "canonical");
+        String canonical = JsonUtilities.str(json, "canonical");
         String packageId = json.get("package-id").getAsString();
         String realm = Utilities.charCount(packageId, '.') > 1 ? packageId.split("\\.")[2] : null;
 
@@ -129,14 +129,14 @@ public class IGReleaseUpdater {
           JsonObject o = (JsonObject) n;
           if (!o.has("version"))
            throw new Error(folder+" has Version without version");
-          if (!JSONUtil.str(o, "version").equals("current")) {
+          if (!JsonUtilities.str(o, "version").equals("current")) {
             if (o.has("current") && o.get("current").getAsBoolean() && o.has("path") && o.get("path").getAsString().startsWith(canonical+"/")) {
               root = o;
             }
           }
         }
         boolean save = false;
-        ImplementationGuideEntry rc = reg == null ? null : reg.seeIg(JSONUtil.str(json, "package-id"), canonical, JSONUtil.str(json, "title"), JSONUtil.str(json, "category"));
+        ImplementationGuideEntry rc = reg == null ? null : reg.seeIg(JsonUtilities.str(json, "package-id"), canonical, JsonUtilities.str(json, "title"), JsonUtilities.str(json, "category"));
         if (!json.has("category")) {
           if (Utilities.noString(rc.getCategory())) {
             errs.add(f+" has no category value");            
@@ -149,18 +149,18 @@ public class IGReleaseUpdater {
         List<String> folders = new ArrayList<>();
         for (JsonElement n : list) {
           JsonObject o = (JsonObject) n;
-          if (JSONUtil.str(o, "version").equals("current")) {
+          if (JsonUtilities.str(o, "version").equals("current")) {
             if (reg != null) {
-              reg.seeCiBuild(rc, JSONUtil.str(o, "path"), f);
+              reg.seeCiBuild(rc, JsonUtilities.str(o, "path"), f);
             }
             System.out.println("-- ignoring current build entry");
           } else {
-            String v = JSONUtil.str(o, "version");
+            String v = JsonUtilities.str(o, "version");
             if (!o.has("path")) {
               System.out.println("-- ignoring version "+v+" as it has no path");
               errs.add("version "+v+" has no path'"); 
             } else {
-              String path = JSONUtil.str(o, "path");
+              String path = JsonUtilities.str(o, "path");
               String vf = Utilities.path(path.replace(url, rootFolder));
               if (indexes.containsKey(realm)) {
                 indexes.get(realm).seeEntry(packageId, json, o);
@@ -189,11 +189,11 @@ public class IGReleaseUpdater {
                 root = o;
               }
               if (reg != null) {
-                if (JSONUtil.str(o, "status").equals("release") || JSONUtil.str(o, "status").equals("trial-use") || JSONUtil.str(o, "status").equals("update")) {
-                  reg.seeRelease(rc, JSONUtil.str(o, "status").equals("update") ? "STU Update" : JSONUtil.str(o, "sequence"), JSONUtil.str(o, "version"), JSONUtil.str(o, "fhirversion", "fhir-version"), JSONUtil.str(o, "path"));
+                if (JsonUtilities.str(o, "status").equals("release") || JsonUtilities.str(o, "status").equals("trial-use") || JsonUtilities.str(o, "status").equals("update")) {
+                  reg.seeRelease(rc, JsonUtilities.str(o, "status").equals("update") ? "STU Update" : JsonUtilities.str(o, "sequence"), JsonUtilities.str(o, "version"), JsonUtilities.str(o, "fhirversion", "fhir-version"), JsonUtilities.str(o, "path"));
                   hasRelease = true;
-                } else if (!hasRelease && VersionUtilities.packageForVersion(JSONUtil.str(o, "fhirversion", "fhir-version")) != null)
-                  reg.seeCandidate(rc, JSONUtil.str(o, "sequence")+" "+Utilities.titleize(JSONUtil.str(o, "status")), JSONUtil.str(o, "version"), JSONUtil.str(o, "fhirversion", "fhir-version"), JSONUtil.str(o, "path"));
+                } else if (!hasRelease && VersionUtilities.packageForVersion(JsonUtilities.str(o, "fhirversion", "fhir-version")) != null)
+                  reg.seeCandidate(rc, JsonUtilities.str(o, "sequence")+" "+Utilities.titleize(JsonUtilities.str(o, "status")), JsonUtilities.str(o, "version"), JsonUtilities.str(o, "fhirversion", "fhir-version"), JsonUtilities.str(o, "path"));
               }
             }
           }
@@ -353,12 +353,12 @@ public class IGReleaseUpdater {
     igvu.checkXmlJsonClones(vf);
     System.out.println("  .. "+igvu.getClonedTotal()+" clones checked, "+igvu.getClonedCount()+" updated");
     if (!isCore) {
-      IGPackageChecker pc = new IGPackageChecker(vf, canonical, JSONUtil.str(version, "path"), JSONUtil.str(ig, "package-id"));
-      String fv = JSONUtil.str(version, "fhirversion", "fhirversion");
-      pc.check(JSONUtil.str(version, "version"), JSONUtil.str(ig, "package-id"), fv, 
-          JSONUtil.str(ig, "title"), new SimpleDateFormat("yyyy-MM-dd", new Locale("en", "US")).parse(JSONUtil.str(version, "date")), JSONUtil.str(version, "path"), canonical, getJurisdiction(vf, fv, ig, version));
+      IGPackageChecker pc = new IGPackageChecker(vf, canonical, JsonUtilities.str(version, "path"), JsonUtilities.str(ig, "package-id"));
+      String fv = JsonUtilities.str(version, "fhirversion", "fhirversion");
+      pc.check(JsonUtilities.str(version, "version"), JsonUtilities.str(ig, "package-id"), fv, 
+          JsonUtilities.str(ig, "title"), new SimpleDateFormat("yyyy-MM-dd", new Locale("en", "US")).parse(JsonUtilities.str(version, "date")), JsonUtilities.str(version, "path"), canonical, getJurisdiction(vf, fv, ig, version));
     }
-    IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(vf, canonical, JSONUtil.str(version, "path"), rootFolder);
+    IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(vf, canonical, JsonUtilities.str(version, "path"), rootFolder);
     if (serverType == ServerType.APACHE) {
       rb.buildApacheRedirections();
     } else if (serverType == ServerType.ASP2) {
@@ -373,11 +373,11 @@ public class IGReleaseUpdater {
       rb.buildOldAspRedirections();
     }
     System.out.println("  .. "+rb.getCountTotal()+" redirections ("+rb.getCountUpdated()+" created/updated)");
-    new DownloadBuilder(vf, canonical, isCurrent ?  canonical: JSONUtil.str(version, "path")).execute();
+    new DownloadBuilder(vf, canonical, isCurrent ?  canonical: JsonUtilities.str(version, "path")).execute();
     if (!isCurrent && serverType == ServerType.ASP2) {
-      new VersionRedirectorGenerator(canonicalPath).execute(JSONUtil.str(version, "version"), JSONUtil.str(version, "path"));
+      new VersionRedirectorGenerator(canonicalPath).execute(JsonUtilities.str(version, "version"), JsonUtilities.str(version, "path"));
     }
-    if (!JSONUtil.has(version, "fhirversion", "fhirversion")) {
+    if (!JsonUtilities.has(version, "fhirversion", "fhirversion")) {
       if (rb.getFhirVersion() == null) {
         System.out.println("Unable to determine FHIR version for "+vf);
       } else {
@@ -392,14 +392,14 @@ public class IGReleaseUpdater {
     
     if (sft != null) {
       String html = TextFile.fileToString(sft);
-      html = fixParameter(html, "title", JSONUtil.str(ig, "title"));
-      html = fixParameter(html, "id", JSONUtil.str(ig, "package-id"));
-      html = fixParameter(html, "version", isCurrent ? "All Versions" : JSONUtil.str(version, "version"));
-      html = fixParameter(html, "path", isCurrent ? canonicalPath : JSONUtil.str(version, "path"));
+      html = fixParameter(html, "title", JsonUtilities.str(ig, "title"));
+      html = fixParameter(html, "id", JsonUtilities.str(ig, "package-id"));
+      html = fixParameter(html, "version", isCurrent ? "All Versions" : JsonUtilities.str(version, "version"));
+      html = fixParameter(html, "path", isCurrent ? canonicalPath : JsonUtilities.str(version, "path"));
       html = fixParameter(html, "history", isCurrent ? "history.html" : "../history.html");
       html = fixParameter(html, "search-list", searchLinks(isCurrent, version, canonicalPath, list));
-      html = fixParameter(html, "note", isCurrent ? "this search searches all versions of the "+JSONUtil.str(ig, "title")+", including balloted versions. You can also search specific versions" :
-        "this search searches version "+JSONUtil.str(version, "version")+" of the "+JSONUtil.str(ig, "title")+". You can also search other versions, or all versions at once");
+      html = fixParameter(html, "note", isCurrent ? "this search searches all versions of the "+JsonUtilities.str(ig, "title")+", including balloted versions. You can also search specific versions" :
+        "this search searches version "+JsonUtilities.str(version, "version")+" of the "+JsonUtilities.str(ig, "title")+". You can also search other versions, or all versions at once");
       html = fixParameter(html, "prefix", "");            
       TextFile.stringToFile(html, Utilities.path(vf, "searchform.html"), false);          
     }
@@ -503,14 +503,14 @@ public class IGReleaseUpdater {
     }
     for (JsonElement n : list) {
       JsonObject o = (JsonObject) n;
-      if (!JSONUtil.str(o, "version").equals("current")) {
-        String v = JSONUtil.str(o, "version");
-        String path = JSONUtil.str(o, "path");
-        String date = JSONUtil.str(o, "date");
+      if (!JsonUtilities.str(o, "version").equals("current")) {
+        String v = JsonUtilities.str(o, "version");
+        String path = JsonUtilities.str(o, "path");
+        String date = JsonUtilities.str(o, "date");
         if (o == focus && !root) {
-          b.append(" <li>"+JSONUtil.str(o, "sequence")+" "+Utilities.titleize(JSONUtil.str(o, "status"))+" (v"+v+", "+summariseDate(date)+") (this version)</li>\r\n");
+          b.append(" <li>"+JsonUtilities.str(o, "sequence")+" "+Utilities.titleize(JsonUtilities.str(o, "status"))+" (v"+v+", "+summariseDate(date)+") (this version)</li>\r\n");
         } else {
-          b.append(" <li><a href=\""+path+"/searchform.html\">"+JSONUtil.str(o, "sequence")+" "+Utilities.titleize(JSONUtil.str(o, "status"))+" (v"+v+", "+summariseDate(date)+")</a></li>\r\n");
+          b.append(" <li><a href=\""+path+"/searchform.html\">"+JsonUtilities.str(o, "sequence")+" "+Utilities.titleize(JsonUtilities.str(o, "status"))+" (v"+v+", "+summariseDate(date)+")</a></li>\r\n");
         }
       }
     }
@@ -537,13 +537,13 @@ public class IGReleaseUpdater {
    * @return
    */
   private String genFragment(JsonObject ig, JsonObject version, JsonObject root, String canonical, boolean currentPublication, boolean isCore) {
-    String p1 = JSONUtil.str(ig, "title")+" (v"+JSONUtil.str(version, "version")+": "+state(ig, version)+")";
+    String p1 = JsonUtilities.str(ig, "title")+" (v"+JsonUtilities.str(version, "version")+": "+state(ig, version)+")";
     if (!isCore) {
-      p1 = p1 + (version.has("fhirversion") ? " based on <a href=\"http://hl7.org/fhir/"+getPath(JSONUtil.str(version, "fhirversion", "fhir-version"))+"\">FHIR "+fhirRef(JSONUtil.str(version, "fhirversion"))+"</a>" : "")+". ";
+      p1 = p1 + (version.has("fhirversion") ? " based on <a href=\"http://hl7.org/fhir/"+getPath(JsonUtilities.str(version, "fhirversion", "fhir-version"))+"\">FHIR "+fhirRef(JsonUtilities.str(version, "fhirversion"))+"</a>" : "")+". ";
     } else {
       p1 = p1 + ". ";      
     }
-    String p2 = root == null ? "" : version == root ? "This is the current published version"+(currentPublication ? "" : " in its permanent home (it will always be available at this URL)") : "The current version which supercedes this version is <a href=\""+(JSONUtil.str(root, "path").startsWith(canonical) ? canonical : JSONUtil.str(root, "path"))+"{{fn}}\">"+JSONUtil.str(root, "version")+"</a>";
+    String p2 = root == null ? "" : version == root ? "This is the current published version"+(currentPublication ? "" : " in its permanent home (it will always be available at this URL)") : "The current version which supercedes this version is <a href=\""+(JsonUtilities.str(root, "path").startsWith(canonical) ? canonical : JsonUtilities.str(root, "path"))+"{{fn}}\">"+JsonUtilities.str(root, "version")+"</a>";
     String p3;
     if (canonical.equals("http://hl7.org/fhir"))
       p3 = " For a full list of available versions, see the <a href=\""+canonical+"/directory.html\">Directory of published versions <img src=\"external.png\" style=\"text-align: baseline\"></a>";
@@ -613,8 +613,8 @@ public class IGReleaseUpdater {
   }
 
   private String state(JsonObject ig, JsonObject version) {
-    String status = JSONUtil.str(version, "status");
-    String sequence = JSONUtil.str(version, "sequence");
+    String status = JsonUtilities.str(version, "status");
+    String sequence = JsonUtilities.str(version, "sequence");
     if ("trial-use".equals(status))
       return decorate(sequence);
     else if ("release".equals(status))
@@ -650,7 +650,7 @@ public class IGReleaseUpdater {
       JsonObject o = (JsonObject) list.get(i);
       if (o == version)
         return Integer.toString(c);
-      if (sequence.equals(JSONUtil.str(o, "sequence")) && "ballot".equals(JSONUtil.str(version, "status")))
+      if (sequence.equals(JsonUtilities.str(o, "sequence")) && "ballot".equals(JsonUtilities.str(version, "status")))
         c++;
     }
     return "1";

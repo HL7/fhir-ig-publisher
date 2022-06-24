@@ -36,7 +36,7 @@ import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.json.JSONUtil;
+import org.hl7.fhir.utilities.json.JsonUtilities;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -53,7 +53,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
-import ca.uhn.fhir.util.JsonUtil;
 
 public class PackageReleaser {
   
@@ -183,13 +182,34 @@ public class PackageReleaser {
   // 2 parameters: source of package, package dest folder
   public static void main(String[] args) throws Exception {
     try {
-      new PackageReleaser().release(args[0], args[1]);
+      if (args.length == 4) {        
+        new PackageReleaser().pack(args[2], args[3]);
+        new PackageReleaser().release(args[0], args[1]);
+      } else {
+        new PackageReleaser().release(args[0], args[1]);
+      }
     } catch (Throwable e) {
       System.out.println("Error releasing packages from "+args[0]+" to "+args[1]+":");
       System.out.println(e.getMessage());
       System.out.println("");
       e.printStackTrace();
     }
+  }
+
+  private void pack(String src, String dst) throws IOException {
+    JsonObject j = JsonTrackingParser.parseJson(new File(Utilities.path(src, "packages.json")));
+    for (String s : JsonUtilities.strings(j.getAsJsonArray("packages"))) {
+      packPackage(Utilities.path(src, s), dst);
+    }
+    System.out.println("Finished Building Packages");    
+  }
+
+  private void packPackage(String path, String dst) throws IOException {
+    String name = new File(path).getName();
+    System.out.println("Build "+name);
+    NpmPackage npm = NpmPackage.fromFolder(path);
+    npm.loadAllFiles();
+    npm.save(new FileOutputStream(Utilities.path(dst, name+".tgz")));
   }
 
   private void release(String source, String dest) throws Exception {
@@ -272,9 +292,9 @@ public class PackageReleaser {
     
     for (JsonElement n : pl.getAsJsonArray("list")) { 
       JsonObject v = (JsonObject) n;
-      String ver = JSONUtil.str(v, "version");
-      String desc = JSONUtil.str(v, "desc");
-      String date = JSONUtil.str(v, "date");
+      String ver = JsonUtilities.str(v, "version");
+      String desc = JsonUtilities.str(v, "desc");
+      String date = JsonUtilities.str(v, "date");
       b.append("<li><a href=\""+ver+"/package.tgz\">"+ver+"</a>: "+Utilities.escapeJson(desc)+" ("+date+")</li>\r\n");
     }    
     String source = TextFile.fileToString(file);
@@ -530,12 +550,12 @@ public class PackageReleaser {
   private void updateDate(String source, VersionDecision vd, String dateFmt) throws FileNotFoundException, IOException {
     JsonObject pl = JsonTrackingParser.parseJson(new FileInputStream(Utilities.path(source, vd.getId(), "package-list.json")));
     boolean ok = false;
-    for (JsonObject v : JSONUtil.objects(pl, "list")) {
-      if (JSONUtil.str(v, "version").equals(vd.getNewVersion())) {
+    for (JsonObject v : JsonUtilities.objects(pl, "list")) {
+      if (JsonUtilities.str(v, "version").equals(vd.getNewVersion())) {
         v.remove("date");
         v.addProperty("date", dateFmt);
         ok = true;
-        vd.releaseNote = JSONUtil.str(v, "desc");
+        vd.releaseNote = JsonUtilities.str(v, "desc");
       }
     }
     if (!ok) {
@@ -716,9 +736,9 @@ public class PackageReleaser {
         scanForCurrentVersions(res, f);
       } else if (f.getName().equals("package-list.json")) {
         JsonObject pl = JsonTrackingParser.parseJson(f);
-        for (JsonObject v : JSONUtil.objects(pl, "list")) {
-          if ("release".equals(JSONUtil.str(v, "status")) && JSONUtil.bool(v, "current")) {
-            res.put(JSONUtil.str(pl, "package-id"), JSONUtil.str(v, "version"));
+        for (JsonObject v : JsonUtilities.objects(pl, "list")) {
+          if ("release".equals(JsonUtilities.str(v, "status")) && JsonUtilities.bool(v, "current")) {
+            res.put(JsonUtilities.str(pl, "package-id"), JsonUtilities.str(v, "version"));
           }
         }
       }

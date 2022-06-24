@@ -29,7 +29,7 @@ import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.json.JSONUtil;
+import org.hl7.fhir.utilities.json.JsonUtilities;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.xml.XMLUtil;
@@ -247,12 +247,12 @@ public class TemplateReleaser {
   private void updateDate(String source, VersionDecision vd, String dateFmt) throws FileNotFoundException, IOException {
     JsonObject pl = JsonTrackingParser.parseJson(new FileInputStream(Utilities.path(source, vd.getId(), "package-list.json")));
     boolean ok = false;
-    for (JsonObject v : JSONUtil.objects(pl, "list")) {
-      if (JSONUtil.str(v, "version").equals(vd.getNewVersion())) {
+    for (JsonObject v : JsonUtilities.objects(pl, "list")) {
+      if (JsonUtilities.str(v, "version").equals(vd.getNewVersion())) {
         v.remove("date");
         v.addProperty("date", dateFmt);
         ok = true;
-        vd.releaseNote = JSONUtil.str(v, "desc");
+        vd.releaseNote = JsonUtilities.str(v, "desc");
       }
     }
     if (!ok) {
@@ -422,9 +422,9 @@ public class TemplateReleaser {
         scanForCurrentVersions(res, f);
       } else if (f.getName().equals("package-list.json")) {
         JsonObject pl = JsonTrackingParser.parseJson(f);
-        for (JsonObject v : JSONUtil.objects(pl, "list")) {
-          if ("release".equals(JSONUtil.str(v, "status")) && JSONUtil.bool(v, "current")) {
-            res.put(JSONUtil.str(pl, "package-id"), JSONUtil.str(v, "version"));
+        for (JsonObject v : JsonUtilities.objects(pl, "list")) {
+          if ("release".equals(JsonUtilities.str(v, "status")) && JsonUtilities.bool(v, "current")) {
+            res.put(JsonUtilities.str(pl, "package-id"), JsonUtilities.str(v, "version"));
           }
         }
       }

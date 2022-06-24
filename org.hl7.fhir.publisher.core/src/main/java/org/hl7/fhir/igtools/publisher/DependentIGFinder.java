@@ -22,7 +22,7 @@ import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.json.JSONUtil;
+import org.hl7.fhir.utilities.json.JsonUtilities;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -155,8 +155,10 @@ public class DependentIGFinder {
       render();
       working = false;
     } catch (Exception e) {
+      System.out.println("Error processing dependencies: "+e.getMessage());
       errors.add("Unable to process: " +e.getMessage());
       outcome = "<span style=\"color: maroon\">Error analysing dependencies: "+Utilities.escapeXml(e.getMessage())+"</span>";
+      working = false;
     }
   }
 
@@ -177,8 +179,8 @@ public class DependentIGFinder {
   }
 
   private JsonObject getGuide(JsonObject json, String pid) {
-    for (JsonObject o : JSONUtil.objects(json, "guides")) {
-      if (pid.equals(JSONUtil.str(o,  "npm-name"))) {
+    for (JsonObject o : JsonUtilities.objects(json, "guides")) {
+      if (pid.equals(JsonUtilities.str(o,  "npm-name"))) {
         return o;
       }
     }
@@ -345,35 +347,35 @@ public class DependentIGFinder {
   }
 
   private void checkIGDependencies(JsonObject guide) { 
-    String pid = JSONUtil.str(guide, "npm-name");
+    String pid = JsonUtilities.str(guide, "npm-name");
 //    System.out.println("check "+pid+" " +abc);
     
     // we only check the latest published version, and the CI build
     try {
       JsonObject pl = JsonTrackingParser.fetchJson(Utilities.pathURL(guide.get("canonical").getAsString(), "package-list.json"));
-      String canonical = JSONUtil.str(guide, "canonical");
+      String canonical = JsonUtilities.str(guide, "canonical");
       DepInfo dep = new DepInfo(pid, Utilities.path(canonical, "history.html"));
       deplist.add(dep);
-      for (JsonObject list : JSONUtil.objects(pl, "list")) {
+      for (JsonObject list : JsonUtilities.objects(pl, "list")) {
         boolean ballot = false;
-        String version = JSONUtil.str(list, "version");
+        String version = JsonUtilities.str(list, "version");
         if (!"current".equals(version)) {
-          String status = JSONUtil.str(list, "status");
+          String status = JsonUtilities.str(list, "status");
           if ("ballot".equals(status)) {
             if (!ballot) {
               ballot = true;
-              dep.ballot = checkForDependency(pid, version, JSONUtil.str(list, "path"));          
+              dep.ballot = checkForDependency(pid, version, JsonUtilities.str(list, "path"));          
             }
           } else {
-            dep.published = checkForDependency(pid, version, JSONUtil.str(list, "path"));                    
+            dep.published = checkForDependency(pid, version, JsonUtilities.str(list, "path"));                    
             break;
           }
         }
       }
-      dep.cibuild = checkForDependency(pid, "current", JSONUtil.str(guide, "ci-build"));
+      dep.cibuild = checkForDependency(pid, "current", JsonUtilities.str(guide, "ci-build"));
     } catch (Exception e) {
-      errors.add("Unable to process "+JSONUtil.str(guide, "name")+": " +e.getMessage());
-      if (debug) System.out.println("Dependency Analysis - Unable to process "+JSONUtil.str(guide, "name")+": " +e.getMessage());
+      errors.add("Unable to process "+JsonUtilities.str(guide, "name")+": " +e.getMessage());
+      if (debug) System.out.println("Dependency Analysis - Unable to process "+JsonUtilities.str(guide, "name")+": " +e.getMessage());
     }    
   }
 

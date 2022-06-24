@@ -28,7 +28,7 @@ import java.util.List;
 
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.json.JSONUtil;
+import org.hl7.fhir.utilities.json.JsonUtilities;
 
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
@@ -113,7 +113,7 @@ public class IGRegistryMaintainer {
     }
 
     public String getCategory() {
-      return JSONUtil.str(entry, "category");
+      return JsonUtilities.str(entry, "category");
     }
   }
 
@@ -135,7 +135,7 @@ public class IGRegistryMaintainer {
   public ImplementationGuideEntry seeIg(String packageId, String canonical, String title, String category) {
     ImplementationGuideEntry ig = new ImplementationGuideEntry(packageId, canonical, title);
     igs.add(ig);
-    ig.entry = JSONUtil.findByStringProp(json.getAsJsonArray("guides"), "npm-name", ig.packageId);
+    ig.entry = JsonUtilities.findByStringProp(json.getAsJsonArray("guides"), "npm-name", ig.packageId);
     if (ig.entry == null) {
       ig.entry = new JsonObject();
       json.getAsJsonArray("guides").add(ig.entry);

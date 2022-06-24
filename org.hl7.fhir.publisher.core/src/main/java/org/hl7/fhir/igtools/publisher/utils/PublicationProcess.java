@@ -18,7 +18,7 @@ import org.hl7.fhir.igtools.publisher.utils.WebSiteLayoutRulesProviders.WebSiteL
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.ZipGenerator;
-import org.hl7.fhir.utilities.json.JSONUtil;
+import org.hl7.fhir.utilities.json.JsonUtilities;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
@@ -131,16 +131,16 @@ public class PublicationProcess {
     JsonObject plSrc = JsonTrackingParser.parseJson(loadFile("Source Package List", Utilities.path(source, "package-list.json")));
     JsonObject plPub = JsonTrackingParser.parseJson(loadFile("Published Package List", Utilities.path(destination, "package-list.json")));
 
-    check(res, id.equals(JSONUtil.str(plSrc, "package-id")), "Source Package List has the wrong package id: "+JSONUtil.str(plSrc, "package-id")+" (should be "+id+")");
-    check(res, id.equals(JSONUtil.str(plPub, "package-id")), "Published Package List has the wrong package id: "+JSONUtil.str(plPub, "package-id")+" (should be "+id+")");
-    check(res, canonical.equals(JSONUtil.str(plSrc, "canonical")), "Source Package List has the wrong canonical: "+JSONUtil.str(plSrc, "canonical")+" (should be "+canonical+")");
-    check(res, canonical.equals(JSONUtil.str(plPub, "canonical")), "Source Package List has the wrong canonical: "+JSONUtil.str(plPub, "canonical")+" (should be "+canonical+")");
+    check(res, id.equals(JsonUtilities.str(plSrc, "package-id")), "Source Package List has the wrong package id: "+JsonUtilities.str(plSrc, "package-id")+" (should be "+id+")");
+    check(res, id.equals(JsonUtilities.str(plPub, "package-id")), "Published Package List has the wrong package id: "+JsonUtilities.str(plPub, "package-id")+" (should be "+id+")");
+    check(res, canonical.equals(JsonUtilities.str(plSrc, "canonical")), "Source Package List has the wrong canonical: "+JsonUtilities.str(plSrc, "canonical")+" (should be "+canonical+")");
+    check(res, canonical.equals(JsonUtilities.str(plPub, "canonical")), "Source Package List has the wrong canonical: "+JsonUtilities.str(plPub, "canonical")+" (should be "+canonical+")");
     check(res, plSrc.has("category"), "No Entry found in source package-list for 'category'");
     check(res, plPub.has("category"), "No Entry found in dest package-list 'category'");
-    check(res, JSONUtil.str(plSrc, "category").equals(JSONUtil.str(plPub, "category")), "Category values differ between source and publication package-list: "+JSONUtil.str(plSrc, "category")+" vs " +JSONUtil.str(plPub, "category"));
+    check(res, JsonUtilities.str(plSrc, "category").equals(JsonUtilities.str(plPub, "category")), "Category values differ between source and publication package-list: "+JsonUtilities.str(plSrc, "category")+" vs " +JsonUtilities.str(plPub, "category"));
 
-    JsonObject vSrc = JSONUtil.findByStringProp(plSrc.getAsJsonArray("list"), "version", version);
-    JsonObject vPub = JSONUtil.findByStringProp(plPub.getAsJsonArray("list"), "version", version);
+    JsonObject vSrc = JsonUtilities.findByStringProp(plSrc.getAsJsonArray("list"), "version", version);
+    JsonObject vPub = JsonUtilities.findByStringProp(plPub.getAsJsonArray("list"), "version", version);
     
     check(res, plPub.getAsJsonArray("list").size() > 0, "Dest package-list has no existent version (should have ci-build entry)");
     check(res, vSrc != null, "No Entry found in source package-list for v"+version);
@@ -149,18 +149,18 @@ public class PublicationProcess {
       return res;
     }
     check(res, vSrc.has("desc") || vSrc.has("descmd"), "Source Package list has no description for v"+version);
-    String pathVer = JSONUtil.str(vSrc, "path");
+    String pathVer = JsonUtilities.str(vSrc, "path");
     String vCode = pathVer.substring(pathVer.lastIndexOf("/")+1);
     
-    check(res, pathVer.equals(Utilities.pathURL(canonical, vCode)), "Source Package list path v"+version+" is wrong - is '"+JSONUtil.str(vSrc, "path")+"', doesn't match canonical)");
-    check(res, npm.fhirVersion().equals(JSONUtil.str(vSrc, "fhirversion")), "Source Package list fhir version for v"+version+" is wrong - is '"+JSONUtil.str(vSrc, "fhirversion")+"', should be '"+npm.fhirVersion()+"')");
+    check(res, pathVer.equals(Utilities.pathURL(canonical, vCode)), "Source Package list path v"+version+" is wrong - is '"+JsonUtilities.str(vSrc, "path")+"', doesn't match canonical)");
+    check(res, npm.fhirVersion().equals(JsonUtilities.str(vSrc, "fhirversion")), "Source Package list fhir version for v"+version+" is wrong - is '"+JsonUtilities.str(vSrc, "fhirversion")+"', should be '"+npm.fhirVersion()+"')");
     // ok, the ids and canonicals are all lined up, and w're ready to publish     
 
-    check(res, id.equals(JSONUtil.str(qa, "package-id")), "Generated IG has wrong package "+JSONUtil.str(qa, "package-id"));
-    check(res, version.equals(JSONUtil.str(qa, "ig-ver")), "Generated IG has wrong version "+JSONUtil.str(qa, "ig-ver"));
+    check(res, id.equals(JsonUtilities.str(qa, "package-id")), "Generated IG has wrong package "+JsonUtilities.str(qa, "package-id"));
+    check(res, version.equals(JsonUtilities.str(qa, "ig-ver")), "Generated IG has wrong version "+JsonUtilities.str(qa, "ig-ver"));
     check(res, qa.has("errs"), "Generated IG has no error count");
-    check(res, npm.fhirVersion().equals(JSONUtil.str(qa, "version")), "Generated IG has wrong FHIR version "+JSONUtil.str(qa, "version"));
-    check(res, JSONUtil.str(qa, "url").startsWith(canonical) || JSONUtil.str(qa, "url").startsWith(npm.canonical()), "Generated IG has wrong Canonical "+JSONUtil.str(qa, "url"));
+    check(res, npm.fhirVersion().equals(JsonUtilities.str(qa, "version")), "Generated IG has wrong FHIR version "+JsonUtilities.str(qa, "version"));
+    check(res, JsonUtilities.str(qa, "url").startsWith(canonical) || JsonUtilities.str(qa, "url").startsWith(npm.canonical()), "Generated IG has wrong Canonical "+JsonUtilities.str(qa, "url"));
     
     String destVer = Utilities.path(destination, vCode);
     if (!check(res, new File(destination).exists(), "Destination '"+destVer+"' not found - must be set up manually for first publication")) {
