@@ -224,6 +224,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
       cr.getTemplates().put("CodeSystem", new String(context.getBinaries().get("template-comparison-CodeSystem.html")));
       cr.getTemplates().put("ValueSet", new String(context.getBinaries().get("template-comparison-ValueSet.html")));
       cr.getTemplates().put("Profile", new String(context.getBinaries().get("template-comparison-Profile.html")));
+      cr.getTemplates().put("CapabilityStatement", new String(context.getBinaries().get("template-comparison-CapabilityStatement.html")));
       cr.getTemplates().put("Index", new String(context.getBinaries().get("template-comparison-index.html")));
       cr.render("US Realm", "Current Build");
       System.out.println("US Core Comparisons Finished");

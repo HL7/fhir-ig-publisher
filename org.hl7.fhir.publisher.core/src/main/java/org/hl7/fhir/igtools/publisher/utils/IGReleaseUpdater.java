@@ -355,7 +355,7 @@ public class IGReleaseUpdater {
     if (!isCore) {
       IGPackageChecker pc = new IGPackageChecker(vf, canonical, JsonUtilities.str(version, "path"), JsonUtilities.str(ig, "package-id"));
       String fv = JsonUtilities.str(version, "fhirversion", "fhirversion");
-      pc.check(JsonUtilities.str(version, "version"), JsonUtilities.str(ig, "package-id"), fv,
+      pc.check(JsonUtilities.str(version, "version"), JsonUtilities.str(ig, "package-id"), fv, 
           JsonUtilities.str(ig, "title"), new SimpleDateFormat("yyyy-MM-dd", new Locale("en", "US")).parse(JsonUtilities.str(version, "date")), JsonUtilities.str(version, "path"), canonical, getJurisdiction(vf, fv, ig, version));
     }
     IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(vf, canonical, JsonUtilities.str(version, "path"), rootFolder);

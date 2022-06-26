@@ -155,8 +155,10 @@ public class DependentIGFinder {
       render();
       working = false;
     } catch (Exception e) {
+      System.out.println("Error processing dependencies: "+e.getMessage());
       errors.add("Unable to process: " +e.getMessage());
       outcome = "<span style=\"color: maroon\">Error analysing dependencies: "+Utilities.escapeXml(e.getMessage())+"</span>";
+      working = false;
     }
   }
 

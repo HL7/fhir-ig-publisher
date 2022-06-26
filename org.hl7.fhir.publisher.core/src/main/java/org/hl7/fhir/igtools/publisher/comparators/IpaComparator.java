@@ -1,4 +1,4 @@
-package org.hl7.fhir.igtools.publisher;
+package org.hl7.fhir.igtools.publisher.comparators;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -13,6 +13,10 @@ import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_30_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
+import org.hl7.fhir.igtools.publisher.PastProcessHackerUtilities;
+import org.hl7.fhir.igtools.publisher.PublisherLoader;
+import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.r5.comparison.ComparisonRenderer;
 import org.hl7.fhir.r5.comparison.ComparisonSession;
@@ -21,8 +25,10 @@ import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.r5.model.CapabilityStatement;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
@@ -38,13 +44,13 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
-public class PreviousVersionComparator {
+public class IpaComparator {
 
-  public class ProfilePair {
+  public class ComparisonPair {
     CanonicalResource left;
     CanonicalResource right;
     
-    public ProfilePair(CanonicalResource left, CanonicalResource right) {
+    public ComparisonPair(CanonicalResource left, CanonicalResource right) {
       super();
       this.left = left;
       this.right = right;
@@ -68,20 +74,17 @@ public class PreviousVersionComparator {
     private SimpleWorkerContext context;    
     private List<CanonicalResource> resources = new ArrayList<>();
     private String errMsg;
-    private IniFile ini;
     private ProfileKnowledgeProvider pkp;
     
-    public VersionInstance(String version, IniFile ini) {
+    public VersionInstance(String version) {
       super();
       this.version = version;
-      this.ini = ini;
     }
   }
 
   private SimpleWorkerContext context;
-  private String version;
   private String dstDir;
-  private List<ProfilePair> comparisons = new ArrayList<>();
+  private List<ComparisonPair> comparisons = new ArrayList<>();
   private ProfileKnowledgeProvider newpkp;
   private String errMsg;
   private String pid;
@@ -91,22 +94,22 @@ public class PreviousVersionComparator {
   private String lastName;
   private String lastUrl;
   
-  public PreviousVersionComparator(SimpleWorkerContext context, String version, String rootDir, String dstDir, String canonical, ProfileKnowledgeProvider pkp, ILoggingService logger, List<String> versions) {
+  public IpaComparator(SimpleWorkerContext context, String rootDir, String dstDir, ProfileKnowledgeProvider pkp, ILoggingService logger, List<String> versions) {
     super();
         
     this.context = context;
-    this.version = version;
     this.dstDir = dstDir;
     this.newpkp = pkp;
     this.logger = logger;
     try {
-      processVersions(canonical, versions, rootDir);
+      processVersions(versions, rootDir);
     } catch (Exception e) {
-      errMsg = "Unable to find version history at "+canonical+" ("+e.getMessage()+")";
+      errMsg = "Unable to find version history at http://hl7.org/fhir/uv/ipa/ ("+e.getMessage()+")";
     }
   }
 
-  private void processVersions(String canonical, List<String> versions, String rootDir) throws IOException {
+  private void processVersions(List<String> versions, String rootDir) throws IOException {
+    String canonical = "http://hl7.org/fhir/uv/ipa";
     JsonArray publishedVersions = null;
     for (String v : versions) {
       if (publishedVersions == null) {
@@ -127,7 +130,7 @@ public class PreviousVersionComparator {
               if (o.has("current") && o.get("current").getAsBoolean()) {
                 major = JsonUtilities.str(o, "version");
                 lastUrl = JsonUtilities.str(o, "path");
-                lastName = JsonUtilities.str(o, "sequence");
+                lastName = JsonUtilities.str(o, "sequence");                
               }
             }
           }
@@ -136,28 +139,19 @@ public class PreviousVersionComparator {
           if(last == null) {
             throw new FHIRException("no {last} version found in package-list.json");
           } else {
-            versionList.add(new VersionInstance(last, makeIni(rootDir, last)));
+            versionList.add(new VersionInstance(last));
           }
         } 
         if ("{current}".equals(v)) {
           if(last == null) {
             throw new FHIRException("no {current} version found in package-list.json");
           } else {
-            versionList.add(new VersionInstance(major, makeIni(rootDir, major)));
+            versionList.add(new VersionInstance(major));
           }
         } 
       } else {
-        versionList.add(new VersionInstance(v, makeIni(rootDir, v)));
+        versionList.add(new VersionInstance(v));
       }
-    }
-  }
-    
-  private IniFile makeIni(String rootDir, String v) throws IOException {
-    File ini = new File(Utilities.path(rootDir, "url-map-v-"+v+".ini"));
-    if (ini.exists()) {
-      return new IniFile(new FileInputStream(ini));
-    } else {
-      return null;
     }
   }
 
@@ -195,7 +189,7 @@ public class PreviousVersionComparator {
           vi.resources = new ArrayList<>();
           BasePackageCacheManager pcm = new FilesystemPackageCacheManager(true, ToolsVersion.TOOLS_VERSION);
           NpmPackage current = pcm.loadPackage(pid, vi.version);
-          for (String id : current.listResources("StructureDefinition", "ValueSet", "CodeSystem")) {
+          for (String id : current.listResources("StructureDefinition", "ValueSet", "CodeSystem", "CapabilityStatement")) {
             filename = id;
             CanonicalResource curr = (CanonicalResource) loadResourceFromPackage(current, id, current.fhirVersion());
             curr.setUserData("path", Utilities.pathURL(current.getWebLocation(), curr.fhirType()+"-"+curr.getId()+".html")); // to do - actually refactor to use the correct algorithm
@@ -238,29 +232,26 @@ public class PreviousVersionComparator {
     if (errMsg == null && pid != null) {
       for (VersionInstance vi : versionList) {
         Set<String> set = new HashSet<>();
-        for (CanonicalResource rl : vi.resources) {
-          comparisons.add(new ProfilePair(rl, findByUrl(rl.getUrl(), resources, vi.ini)));
-          set.add(rl.getUrl());      
-        }
         for (CanonicalResource rr : resources) {
-          String url = fixForIniMap(rr.getUrl(), vi.ini);
-          if (!set.contains(url)) {
-            comparisons.add(new ProfilePair(findByUrl(url, vi.resources, null), rr));
+          CanonicalResource rl = findByType(rr, vi.resources);
+          if (rl != null) {
+            comparisons.add(new ComparisonPair(rl, rr));
           }
         }
 
         try {
           ComparisonSession session = new ComparisonSession(vi.context, context, "Comparison of v"+vi.version+" with this version", vi.pkp, newpkp);
           //    session.setDebug(true);
-          for (ProfilePair c : comparisons) {
+          for (ComparisonPair c : comparisons) {
 //            System.out.println("Version Comparison: compare "+vi.version+" to current for "+c.getUrl());
             session.compare(c.left, c.right);      
           }
-          Utilities.createDirectory(Utilities.path(dstDir, "comparison-v"+vi.version));
-          ComparisonRenderer cr = new ComparisonRenderer(vi.context, context, Utilities.path(dstDir, "comparison-v"+vi.version), session);
+          Utilities.createDirectory(Utilities.path(dstDir, "ipa-comparison-v"+vi.version));
+          ComparisonRenderer cr = new ComparisonRenderer(vi.context, context, Utilities.path(dstDir, "ipa-comparison-v"+vi.version), session);
           cr.getTemplates().put("CodeSystem", new String(context.getBinaries().get("template-comparison-CodeSystem.html")));
           cr.getTemplates().put("ValueSet", new String(context.getBinaries().get("template-comparison-ValueSet.html")));
           cr.getTemplates().put("Profile", new String(context.getBinaries().get("template-comparison-Profile.html")));
+          cr.getTemplates().put("CapabilityStatement", new String(context.getBinaries().get("template-comparison-CapabilityStatement.html")));
           cr.getTemplates().put("Index", new String(context.getBinaries().get("template-comparison-index.html")));
           cr.render("Version "+vi.version, "Current Build");
         } catch (Throwable e) {
@@ -269,15 +260,6 @@ public class PreviousVersionComparator {
         }
       }
     }
-  }
-private String fixForIniMap(String url, IniFile ini) {
-    if (ini == null) {
-      return url;
-    }
-    if (ini.hasProperty("urls", url)) {
-      return ini.getStringProperty("urls", url);
-    }
-    return url;
   }
 
 //
@@ -327,11 +309,28 @@ private String fixForIniMap(String url, IniFile ini) {
 //  }
 
 
-  private CanonicalResource findByUrl(String url, List<CanonicalResource> list, IniFile ini) {
-    for (CanonicalResource r : list) {
-      if (fixForIniMap(r.getUrl(), ini).equals(url)) {
-        return r;
-      }
+  private CanonicalResource findByType(CanonicalResource rr, List<CanonicalResource> list) {
+    if (rr instanceof StructureDefinition) {
+      String t = ((StructureDefinition) rr).getType();
+      for (CanonicalResource r : list) {
+        if (r instanceof StructureDefinition) {
+          String tr = ((StructureDefinition) r).getType();
+          if (tr.equals(t)) {
+            return r;
+          }
+        }
+      }      
+    }
+    if (rr instanceof CapabilityStatement) {
+      String t = ((CapabilityStatement) rr).getRestFirstRep().getModeElement().asStringValue();
+      for (CanonicalResource r : list) {
+        if (r instanceof CapabilityStatement) {
+          String tr = ((CapabilityStatement) r).getRestFirstRep().getModeElement().asStringValue();
+          if (tr.equals(t)) {
+            return r;
+          }
+        }
+      }      
     }
     return null;
   }
@@ -339,7 +338,7 @@ private String fixForIniMap(String url, IniFile ini) {
 
   public void addOtherFiles(Set<String> otherFilesRun, String outputDir) throws IOException {
     for (VersionInstance vi : versionList) {
-      otherFilesRun.add(Utilities.path(outputDir, "comparison-v"+vi.version));
+      otherFilesRun.add(Utilities.path(outputDir, "ipa-comparison-v"+vi.version));
     }
   }
 
@@ -351,7 +350,7 @@ private String fixForIniMap(String url, IniFile ini) {
       boolean first = true;
       for (VersionInstance vi : versionList) {
         if(first) first = false; else b.append("<br/>");
-        b.append("<a href=\"comparison-v"+vi.version+"/index.html\">Comparison with version "+vi.version+"</a>");
+        b.append("<a href=\"ipa-comparison-v"+vi.version+"/index.html\">Comparison with version "+vi.version+"</a>");
       }
       return b.toString();
     }

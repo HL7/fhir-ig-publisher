@@ -53,7 +53,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
-import ca.uhn.fhir.util.JsonUtil;
 
 public class PackageReleaser {
   
@@ -183,13 +182,34 @@ public class PackageReleaser {
   // 2 parameters: source of package, package dest folder
   public static void main(String[] args) throws Exception {
     try {
-      new PackageReleaser().release(args[0], args[1]);
+      if (args.length == 4) {        
+        new PackageReleaser().pack(args[2], args[3]);
+        new PackageReleaser().release(args[0], args[1]);
+      } else {
+        new PackageReleaser().release(args[0], args[1]);
+      }
     } catch (Throwable e) {
       System.out.println("Error releasing packages from "+args[0]+" to "+args[1]+":");
       System.out.println(e.getMessage());
       System.out.println("");
       e.printStackTrace();
     }
+  }
+
+  private void pack(String src, String dst) throws IOException {
+    JsonObject j = JsonTrackingParser.parseJson(new File(Utilities.path(src, "packages.json")));
+    for (String s : JsonUtilities.strings(j.getAsJsonArray("packages"))) {
+      packPackage(Utilities.path(src, s), dst);
+    }
+    System.out.println("Finished Building Packages");    
+  }
+
+  private void packPackage(String path, String dst) throws IOException {
+    String name = new File(path).getName();
+    System.out.println("Build "+name);
+    NpmPackage npm = NpmPackage.fromFolder(path);
+    npm.loadAllFiles();
+    npm.save(new FileOutputStream(Utilities.path(dst, name+".tgz")));
   }
 
   private void release(String source, String dest) throws Exception {
