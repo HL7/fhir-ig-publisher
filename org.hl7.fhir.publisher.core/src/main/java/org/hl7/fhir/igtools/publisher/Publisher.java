@@ -133,6 +133,7 @@ import org.hl7.fhir.igtools.ui.GraphicalPublisher;
 import org.hl7.fhir.r4.formats.FormatUtilities;
 import org.hl7.fhir.r5.conformance.ConstraintJavaGenerator;
 import org.hl7.fhir.r5.conformance.ProfileUtilities;
+import org.hl7.fhir.r5.conformance.R5ExtensionsLoader;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.IContextResourceLoader;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
@@ -2691,7 +2692,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       i++;
     }
     System.out.print("Load R5 Extensions");
-    System.out.println(" - " + ProfileUtilities.loadR5Extensions(pcm, context) + " resources (" + tt.milestone() + ")");
+    R5ExtensionsLoader r5e = new R5ExtensionsLoader(pcm);
+    r5e.loadR5Extensions(context);
+    SpecMapManager smm = new SpecMapManager(r5e.getMap(), r5e.getPck().fhirVersion());
+    smm.setName(r5e.getPck().name());
+    smm.setBase("http://build.fhir.org");
+    smm.setBase2("http://build.fhir.org/");
+    specMaps.add(smm);
+    System.out.println(" - " + r5e.getCount() + " resources (" + tt.milestone() + ")");
     generateLoadedSnapshots();
     
     // set up validator;
