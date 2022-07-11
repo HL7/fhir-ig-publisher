@@ -21,7 +21,7 @@
 <!--        <version>5.3.14</version>-->
 <!--    </parent>-->
 
-    <version>1.1.124</version> <!-- See the note above -->
+    <version>1.1.124-SNAPSHOT</version> <!-- See the note above -->
 
     <properties>
         <core_version>5.6.50</core_version>
@@ -33,6 +33,38 @@
     <packaging>pom</packaging>
 
     <name>HL7 FHIR IG Publisher</name>
+    <description>A tool to take a set of inputs and create a standard FHIR IG</description>
+    <url>https://github.com/HL7/fhir-ig-publisher/</url>
+
+    <licenses>
+        <license>
+            <name>The Apache License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
+
+    <developers>
+    <developer>
+        <id>jamesagnew</id>
+        <name>James Agnew</name>
+        <organization>Smile CDR</organization>
+    </developer>
+    <developer>
+        <id>grahamegrieve</id>
+        <name>Grahame Grieve</name>
+        <organization>Health Intersections</organization>
+    </developer>
+        <developer>
+            <id>markiantorno</id>
+            <name>Mark Iantorno</name>
+            <organization>Smile CDR</organization>
+        </developer>
+        <developer>
+            <id>davidotasek</id>
+            <name>David Otasek</name>
+            <organization>Smile CDR</organization>
+        </developer>
+    </developers>
 
     <organization>
         <name>Health Level 7</name>
