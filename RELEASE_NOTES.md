@@ -1,1 +1,1 @@
-* Bump apache poi
+* Update apache poi dependency
