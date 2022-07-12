@@ -42,7 +42,9 @@ mvn -Dmaven.test.skip install
 
 ## Running this Project
 
-Once built, there are two common tasks that can be accomplished using the fhir-ig-publisher, which are described in detail in the documentation below:
+Once built, this project produces an executable publisher jar file: `org.hl7.fhir.publisher.cli/target/org.hl7.fhir.publisher.cli-X.Y.Z-SNAPSHOT.jar`. Detailed documentation on its features and common use cases are located in the [Confluence Documentation](https://confluence.hl7.org/display/FHIR/IG+Publisher+Documentation), including instructions on how to run the publisher from your IDE.
+
+In addition, two common publishing tasks that can be accomplished using the fhir-ig-publisher are described in detail in the documentation below:
 
 * [Publishing Packages](https://hl7.github.io/docs/publishing_packages)
 * [Publishing Templates](https://hl7.github.io/docs/publishing_templates)
