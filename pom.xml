@@ -26,6 +26,7 @@
     <properties>
         <core_version>5.6.50</core_version>
         <maven.test.skip>true</maven.test.skip>
+        <apache_poi_version>4.1.1</apache_poi_version>
     </properties>
 
     <groupId>org.hl7.fhir.publisher</groupId>
@@ -204,19 +205,19 @@
 		<dependency>
 			<groupId>org.apache.poi</groupId>
 			<artifactId>poi</artifactId>
-			<version>4.1.1</version>
+			<version>${apache_poi_version}</version>
 			<optional>true</optional>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.poi</groupId>
 			<artifactId>poi-ooxml</artifactId>
-			<version>4.1.1</version>
+			<version>${apache_poi_version}</version>
 			<optional>true</optional>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.poi</groupId>
 			<artifactId>poi-ooxml-schemas</artifactId>
-			<version>4.1.1</version>
+			<version>${apache_poi_version}</version>
 			<optional>true</optional>
 		</dependency>
 		<dependency>
