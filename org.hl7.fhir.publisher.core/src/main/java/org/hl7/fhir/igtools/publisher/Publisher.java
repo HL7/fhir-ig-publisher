@@ -2716,11 +2716,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.setFetcher(validationFetcher);
     validator.setPolicyAdvisor(validationFetcher);
     validator.setTracker(this);
-    for (String s : context.getBinaries().keySet()) {
+    for (String s : context.getBinaryKeysAsSet()) {
       if (needFile(s)) {
         if (makeQA)
-          checkMakeFile(context.getBinaries().get(s), Utilities.path(qaDir, s), otherFilesStartup);
-        checkMakeFile(context.getBinaries().get(s), Utilities.path(tempDir, s), otherFilesStartup);
+          checkMakeFile(context.getBinaryForKey(s), Utilities.path(qaDir, s), otherFilesStartup);
+        checkMakeFile(context.getBinaryForKey(s), Utilities.path(tempDir, s), otherFilesStartup);
       }
     }
     otherFilesStartup.add(Utilities.path(tempDir, "_data"));
@@ -3062,7 +3062,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     
     
-    loadSpecDetails(context.getBinaries().get("spec.internals"));
+    loadSpecDetails(context.getBinaryForKey("spec.internals"));
     JsonElement cb = configuration.get("canonicalBase");
     if (cb == null)
       throw new Exception("You must define a canonicalBase in the json file");
@@ -3166,11 +3166,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.setFetcher(validationFetcher);
     validator.setPolicyAdvisor(validationFetcher);
     validator.setTracker(this);
-    for (String s : context.getBinaries().keySet())
+    for (String s : context.getBinaryKeysAsSet())
       if (needFile(s)) {
         if (makeQA)
-          checkMakeFile(context.getBinaries().get(s), Utilities.path(qaDir, s), otherFilesStartup);
-        checkMakeFile(context.getBinaries().get(s), Utilities.path(tempDir, s), otherFilesStartup);
+          checkMakeFile(context.getBinaryForKey(s), Utilities.path(qaDir, s), otherFilesStartup);
+        checkMakeFile(context.getBinaryForKey(s), Utilities.path(tempDir, s), otherFilesStartup);
       }
     otherFilesStartup.add(Utilities.path(tempDir, "_data"));
     otherFilesStartup.add(Utilities.path(tempDir, "_data", "fhir.json"));
@@ -3928,7 +3928,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     dependentIgFinder = new DependentIGFinder(sourceIg.getPackageId());
 
 
-    loadMappingSpaces(context.getBinaries().get("mappingSpaces.details"));
+    loadMappingSpaces(context.getBinaryForKey("mappingSpaces.details"));
     validationFetcher.getMappingUrls().addAll(mappingSpaces.keySet());
     validationFetcher.getOtherUrls().add(publishedIg.getUrl());
     for (SpecMapManager s :  specMaps) {
