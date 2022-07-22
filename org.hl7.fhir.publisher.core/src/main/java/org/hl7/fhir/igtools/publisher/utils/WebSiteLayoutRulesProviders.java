@@ -103,6 +103,40 @@ public class WebSiteLayoutRulesProviders {
     }
   }
 
+  public static class HL7ChNamingRulesProvider extends DefaultNamingRulesProvider {
+    @Override
+    public boolean checkNpmId(List<ValidationMessage> res) {
+      return check(res, parts.length == 4 && "ch".equals(parts[0]) && "fhir".equals(parts[1]) && "ig".equals(parts[2]), 
+          "Package Id '"+id+"' is not valid:  must have 4 parts (ch.fhir.ig.[code]");
+    }
+
+    @Override
+    public boolean checkCanonicalAndUrl(List<ValidationMessage> res, String canonical, String url) {
+      boolean ok = true;
+      if ("ch".equals(realm())) {
+        ok = check(res, canonical.equals("http://fhir.ch/ig/"+code()), 
+            "canonical URL of "+canonical+" does not match the required canonical of http://fhir.ch/ig/"+code());          
+      } 
+      return check(res, canonical.startsWith(url), "Proposed canonical '"+canonical+"' does not match the web site URL '"+url+"'") && ok;
+    }
+        
+    public String realm() {
+      return parts[0];
+    }
+    
+    public String code() {
+      return parts[3];
+    }  
+    
+    @Override
+    public String getDestination(String rootFolder) throws IOException {
+      if ("ch".equals(realm())) {
+        return Utilities.path(rootFolder, code());
+      } 
+      return super.getDestination(rootFolder);
+    }
+  }
+
   public static class IHENamingRulesProvider extends DefaultNamingRulesProvider {
     public boolean checkNpmId(List<ValidationMessage> res) {
       return check(res, parts.length == 3 && "ihe".equals(parts[0]), 
@@ -224,6 +258,8 @@ public class WebSiteLayoutRulesProviders {
       res = new FHIROrgNamingRulesProvider();
     } else if (id.startsWith("hl7.")) {
       res = new HL7NamingRulesProvider();
+    } else if ((id.startsWith("ch.fhir"))) {
+      res = new HL7ChNamingRulesProvider();
     } else if (id.startsWith("ihe.")) {
       res = new IHENamingRulesProvider();
     } 
