@@ -42,9 +42,71 @@ public class WebSiteLayoutRulesProviders {
         
     @Override
     public String getDestination(String rootFolder) throws IOException {
-      throw new Error("Must be overridden");
+      throw new Error("This website needs configuration or support in the IG publisher. Discuss on https://chat.fhir.org/#narrow/stream/179252-IG-creation");
     }
   }
+  
+  public static class ScriptedNamingRulesProvider extends DefaultNamingRulesProvider {
+    protected String idRule;
+    protected String[] ruleParts;
+    protected String canonicalRule;
+
+    public ScriptedNamingRulesProvider(String idRule, String canonicalRule) {
+      super();
+      this.idRule = idRule;
+      this.canonicalRule = canonicalRule;
+      this.ruleParts = idRule.split("\\.");
+    }
+
+    protected boolean check(List<ValidationMessage> res, boolean b, String message) {
+      if (!b)  {
+        ValidationMessage msg = new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, "parameters", message, IssueSeverity.ERROR);
+        res.add(msg);
+      }
+      return b;      
+    }
+
+    private String getPart(String name) {
+      for (int i = 0; i < ruleParts.length; i++) {
+        String p = ruleParts[i];
+        if (p.equals("["+name+"]")) {
+          return parts[i];
+        }
+      }
+      return null;
+    }
+
+    @Override
+    public boolean checkNpmId(List<ValidationMessage> res) {
+      boolean ok = parts.length == ruleParts.length;
+      for (int i = 0; i < ruleParts.length; i++) {
+        String p = ruleParts[i];
+        ok = ok && (p.startsWith("[") || p.equals(parts[i]));
+      }
+      return check(res, ok, "Package Id '"+id+"' is not valid:  must have the structure '"+idRule+"'");
+    }
+    
+    @Override
+    public boolean checkCanonicalAndUrl(List<ValidationMessage> res, String canonical, String url) {
+      String category = getPart("category");
+      String code = getPart("code");
+      String u = canonicalRule.replace("[category]", category).replace("[code]", code);
+      boolean ok = check(res, canonical.equals(u) , "canonical URL of '"+canonical+"' does not match the required canonical of '"+u+"'");
+      return check(res, canonical.startsWith(url), "Proposed canonical '"+canonical+"' does not match the web site URL '"+url+"'") && ok;
+    }
+        
+    @Override
+    public String getDestination(String rootFolder) throws IOException {
+      String category = getPart("category");
+      String code = getPart("code");
+      if (category == null) {
+        return Utilities.path(rootFolder, code);
+      } else {
+        return Utilities.path(rootFolder, category, code);        
+      }
+    }
+  }
+  
 
   public static class HL7NamingRulesProvider extends DefaultNamingRulesProvider {
     @Override
@@ -248,7 +310,7 @@ public class WebSiteLayoutRulesProviders {
 
   }
 
-  public static WebSiteLayoutRulesProvider recogniseNpmId(String id, String[] p) {
+  public static WebSiteLayoutRulesProvider recogniseNpmId(String id, String[] p, String script) {
     DefaultNamingRulesProvider res = new DefaultNamingRulesProvider();
     if (id.equals("hl7.terminology")) {
       res = new HL7TerminologyNamingRulesProvider();
@@ -262,7 +324,10 @@ public class WebSiteLayoutRulesProviders {
       res = new HL7ChNamingRulesProvider();
     } else if (id.startsWith("ihe.")) {
       res = new IHENamingRulesProvider();
-    } 
+    } else if (script != null && script.contains("|")) {
+      String[] s = script.split("\\|");
+      res = new ScriptedNamingRulesProvider(s[0], s[1]);
+    }
     res.id = id;
     res.parts = p;
     return res;
