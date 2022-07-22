@@ -4232,10 +4232,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           try {
             FetchedFile f = fetcher.fetch(Utilities.path(repoRoot, newFile));
             String dir = Utilities.getDirectoryForFile(f.getPath());
+            if (tempDir.startsWith("/var") && dir.startsWith("/private/var")) {
+              dir = dir.substring(8);
+            }
             String relative = tempDir.length() > dir.length() ? "" : dir.substring(tempDir.length());
             if (relative.length() > 0)
               relative = relative.substring(1);
-            f.setRelativePath(f.getPath().substring(dir.length()+1));
+            f.setRelativePath(f.getPath().substring( Utilities.getDirectoryForFile(f.getPath()).length()+1));
             PreProcessInfo ppinfo = new PreProcessInfo(null, relative);
             loadPrePage(f, ppinfo);
           } catch (Exception e) {
@@ -4361,6 +4364,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (String link : dir.getFiles()) {
       FetchedFile f = fetcher.fetch(link);
 //      System.out.println("find pre-page "+f.getPath()+" at "+link+" from "+basePath);
+      if (basePath.startsWith("/var") && f.getPath().startsWith("/private/var")) {
+        f.setPath(f.getPath().substring(8));
+      }
       f.setRelativePath(f.getPath().substring(basePath.length()+1));
       if (f.isFolder())
         changed = loadPrePages(f, basePath) || changed;
