@@ -631,6 +631,8 @@ public class IGReleaseUpdater {
       return decorate(sequence+" - Mixed Normative and STU");
     else if ("normative".equals(status))
       return decorate(sequence+" - Normative");
+    else if ("informative".equals(status))
+      return decorate(sequence+" - Informative");
     else 
       throw new Error("unknown status "+status);
   }

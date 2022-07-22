@@ -111,7 +111,7 @@ public class PublicationProcess {
     }
 
     // --- Rules for layout depend on publisher ------
-    WebSiteLayoutRulesProvider rp = WebSiteLayoutRulesProviders.recogniseNpmId(id, p);
+    WebSiteLayoutRulesProvider rp = WebSiteLayoutRulesProviders.recogniseNpmId(id, p, ini.getStringProperty("website", "layout"));
     if (!rp.checkNpmId(res)) {
       return res;
     }
