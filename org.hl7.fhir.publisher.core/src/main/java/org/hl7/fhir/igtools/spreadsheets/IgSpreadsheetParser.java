@@ -1430,9 +1430,9 @@ public class IgSpreadsheetParser {
     if ("normal".equals(s))
       return SearchParameter.XPathUsageType.NORMAL;
     if ("nearby".equals(s))
-      return SearchParameter.XPathUsageType.NEARBY;
+      return SearchParameter.XPathUsageType.OTHER;
     if ("distance".equals(s))
-      return SearchParameter.XPathUsageType.DISTANCE;
+      return SearchParameter.XPathUsageType.OTHER;
     if ("phonetic".equals(s))
       return SearchParameter.XPathUsageType.PHONETIC;
     throw new Exception("Unknown Search Path Usage '" + s + "' at " + getLocation(row));
