@@ -221,11 +221,11 @@ public class USRealmBusinessRules extends RealmBusinessRules {
       }
       Utilities.createDirectory(Utilities.path(dstDir, "us-core-comparisons"));
       ComparisonRenderer cr = new ComparisonRenderer(context, context, Utilities.path(dstDir, "us-core-comparisons"), session);
-      cr.getTemplates().put("CodeSystem", new String(context.getBinaries().get("template-comparison-CodeSystem.html")));
-      cr.getTemplates().put("ValueSet", new String(context.getBinaries().get("template-comparison-ValueSet.html")));
-      cr.getTemplates().put("Profile", new String(context.getBinaries().get("template-comparison-Profile.html")));
-      cr.getTemplates().put("CapabilityStatement", new String(context.getBinaries().get("template-comparison-CapabilityStatement.html")));
-      cr.getTemplates().put("Index", new String(context.getBinaries().get("template-comparison-index.html")));
+      cr.getTemplates().put("CodeSystem", new String(context.getBinaryForKey("template-comparison-CodeSystem.html")));
+      cr.getTemplates().put("ValueSet", new String(context.getBinaryForKey("template-comparison-ValueSet.html")));
+      cr.getTemplates().put("Profile", new String(context.getBinaryForKey("template-comparison-Profile.html")));
+      cr.getTemplates().put("CapabilityStatement", new String(context.getBinaryForKey("template-comparison-CapabilityStatement.html")));
+      cr.getTemplates().put("Index", new String(context.getBinaryForKey("template-comparison-index.html")));
       cr.render("US Realm", "Current Build");
       System.out.println("US Core Comparisons Finished");
     } catch (Throwable e) {

@@ -262,11 +262,11 @@ public class PreviousVersionComparator {
           }
           Utilities.createDirectory(Utilities.path(dstDir, "comparison-v"+vi.version));
           ComparisonRenderer cr = new ComparisonRenderer(vi.context, context, Utilities.path(dstDir, "comparison-v"+vi.version), session);
-          cr.getTemplates().put("CodeSystem", new String(context.getBinaries().get("template-comparison-CodeSystem.html")));
-          cr.getTemplates().put("ValueSet", new String(context.getBinaries().get("template-comparison-ValueSet.html")));
-          cr.getTemplates().put("Profile", new String(context.getBinaries().get("template-comparison-Profile.html")));
-          cr.getTemplates().put("Index", new String(context.getBinaries().get("template-comparison-index.html")));
-          cr.getTemplates().put("CapabilityStatement", new String(context.getBinaries().get("template-comparison-CapabilityStatement.html")));
+          cr.getTemplates().put("CodeSystem", new String(context.getBinaryForKey("template-comparison-CodeSystem.html")));
+          cr.getTemplates().put("ValueSet", new String(context.getBinaryForKey("template-comparison-ValueSet.html")));
+          cr.getTemplates().put("Profile", new String(context.getBinaryForKey("template-comparison-Profile.html")));
+          cr.getTemplates().put("Index", new String(context.getBinaryForKey("template-comparison-index.html")));
+          cr.getTemplates().put("CapabilityStatement", new String(context.getBinaryForKey("template-comparison-CapabilityStatement.html")));
           cr.render("Version "+vi.version, "Current Build");
         } catch (Throwable e) {
           errMsg = "Current Version Comparison failed: "+e.getMessage();
