@@ -265,11 +265,12 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private String dependencies;
   private DependentIGFinder dependentIgs;
   private IpaComparator ipaComparator;
+  private List<StructureDefinition> modifierExtensions;
   
   public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, String ballotCheck, 
       String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, IpaComparator ipaComparator,
       String dependencies, String csAnalysis, String versionRulesCheck, String copyrightYear, IWorkerContext context,
-      Set<String> r5Extensions,
+      Set<String> r5Extensions, List<StructureDefinition> modifierExtensions,
       List<FetchedResource> noNarratives, List<FetchedResource> noValidation, boolean noValidate, boolean noGenerate, DependentIGFinder dependentIgs) {
     super();
     this.statedVersion = statedVersion;
@@ -296,6 +297,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     this.noValidate = noValidate;
     this.noGenerate = noGenerate;
     this.r5Extensions = r5Extensions;
+    this.modifierExtensions = modifierExtensions;
     determineCode();
   }
 
@@ -642,6 +644,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       " <tr><td>Publication Rules:</td><td>Code = $igcode$. $ballotCheck$ $copyrightYearCheck$</td></tr>\r\n"+
       " <tr><td>HTA Analysis:</td><td>$csAnalysis$</td></tr>\r\n"+
       " <tr><td>R5 Dependencies:</td><td>$r5usage$</td></tr>\r\n"+
+      " <tr><td>Modifier Extensions:</td><td>$modifiers$</td></tr>\r\n"+
       " <tr><td>Previous Version Comparison:</td><td> $previousVersion$</td></tr>\r\n"+
       " <tr><td>IPA Comparison:</td><td> $ipaComparison$</td></tr>\r\n"+
       "$noNarrative$"+
@@ -770,6 +773,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("dependentIgs", dependentIgs.getCountDesc());
     t.add("csAnalysis", csAnalysis);
     t.add("r5usage", genR5());
+    t.add("modifiers", genModifiers());
     t.add("otherFileName", allIssues ? "Errors Only" : "Full QA Report");
     t.add("otherFilePath", allIssues ? "qa.min.html" : "qa.html");
     t.add("previousVersion", previousVersionComparator.checkHtml());
@@ -795,7 +799,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     return t.render();
   }
 
-  private Object genR5() {
+  private String genR5() {
     if (r5Extensions == null || r5Extensions.isEmpty()) {
       return "<span style=\"color: grey\">(none)</span>";
     } else {
@@ -805,6 +809,20 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
         String s = url.substring(url.lastIndexOf("-")+1);
         s = s.substring(0, s.indexOf("."));
         b.append("<li><a href=\"http://build.fhir.org/"+s.toLowerCase()+".html\">"+Utilities.escapeXml(url)+"</a></li>");
+      }
+      b.append("</ul>");
+      return b.toString();
+    }
+  }
+
+  private String genModifiers() {
+    if (modifierExtensions == null || modifierExtensions.isEmpty()) {
+      return "<span style=\"color: grey\">(none)</span>";
+    } else {
+      StringBuilder b = new StringBuilder();
+      b.append("<ul>");
+      for (StructureDefinition sd : modifierExtensions) {
+        b.append("<li><a href=\""+sd.getUserString("path")+"\">"+Utilities.escapeXml(sd.present())+"</a></li>");
       }
       b.append("</ul>");
       return b.toString();
