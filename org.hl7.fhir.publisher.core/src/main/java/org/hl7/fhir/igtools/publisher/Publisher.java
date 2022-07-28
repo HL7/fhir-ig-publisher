@@ -82,11 +82,13 @@ import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
+import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_43_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_10_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_14_30;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_14_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_43_50;
 import org.hl7.fhir.convertors.misc.DicomPackageBuilder;
 import org.hl7.fhir.convertors.misc.NpmPackageVersionConverter;
 import org.hl7.fhir.convertors.txClient.TerminologyClientFactory;
@@ -557,6 +559,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
+  public class TypeParserR4B implements ITypeParser {
+
+    @Override
+    public Base parseType(String xml, String type) throws IOException, FHIRException {
+      org.hl7.fhir.r4b.model.DataType t = new org.hl7.fhir.r4b.formats.XmlParser().parseType(xml, type); 
+      return VersionConvertorFactory_43_50.convertType(t);
+    }
+  }
+
   public class TypeParserR5 implements ITypeParser {
 
     @Override
@@ -822,6 +833,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private String fmtDate = "yyyy-MM-dd";
   private DependentIGFinder dependentIgFinder;
   private List<StructureDefinition> modifierExtensions = new ArrayList<>();
+  private Object branchName;
   
   private class PreProcessInfo {
     private String xsltName;
@@ -1939,7 +1951,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return new TypeParserR14();
     } else if (VersionUtilities.isR2Ver(ver)) {
       return new TypeParserR2();
-    } else if (ver.equals(Constants.VERSION) || VersionUtilities.isR4BVer(ver)) {
+    } else if (VersionUtilities.isR4BVer(ver)) {
+      return new TypeParserR4B();
+    } else if (VersionUtilities.isR5Ver(ver)) {
       return new TypeParserR5();
     } else
       throw new FHIRException("Unsupported version "+ver);
@@ -2390,6 +2404,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         handlePreProcess((JsonObject)e, rootDir);
       }
     }
+    branchName = ini.getStringProperty("dev", "branch");
     
     Map<String, List<ValidationMessage>> messages = new HashMap<String, List<ValidationMessage>>();
     sourceIg = template.onLoadEvent(sourceIg, messages);
@@ -5767,7 +5782,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
       BaseAdvisor_10_50 advisor = new IGR2ConvertorAdvisor5();
       return VersionConvertorFactory_10_50.convertResource(res, advisor);
-    } else if (parseVersion.equals(Constants.VERSION) || VersionUtilities.isR4BVer(parseVersion)) {
+    } else if (VersionUtilities.isR4BVer(parseVersion)) {
+      org.hl7.fhir.r4b.model.Resource res;
+      if (contentType.contains("json")) {
+        res = new org.hl7.fhir.r4b.formats.JsonParser(true).parse(source);
+      } else if (contentType.contains("xml")) {
+        res = new org.hl7.fhir.r4b.formats.XmlParser(true).parse(source);
+      } else {
+        throw new Exception("Unable to determine file type for "+name);
+      }
+      return VersionConvertorFactory_43_50.convertResource(res);
+    } else if (VersionUtilities.isR5Ver(parseVersion)) {
       if (contentType.contains("json")) {
         return new JsonParser(true, true).parse(source);
       } else if (contentType.contains("xml")) {
@@ -6107,6 +6132,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             pcm.addPackageToCache(publishedIg.getPackageId(), publishedIg.getVersion(), new FileInputStream(npm.filename()), "[output]");
           } else {
             pcm.addPackageToCache(publishedIg.getPackageId(), "dev", new FileInputStream(npm.filename()), "[output]");
+            if (branchName != null) {
+              pcm.addPackageToCache(publishedIg.getPackageId(), "dev$"+branchName, new FileInputStream(npm.filename()), "[output]");
+            }
           }
         } else if (mode == IGBuildMode.PUBLICATION) {
           pcm.addPackageToCache(publishedIg.getPackageId(), publishedIg.getVersion(), new FileInputStream(npm.filename()), "[output]");
@@ -6650,7 +6678,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           } else if (VersionUtilities.isR2Ver(version)) {
             BaseAdvisor_10_50 advisor = new IGR2ConvertorAdvisor5();
             new org.hl7.fhir.dstu2.formats.JsonParser().compose(bs, VersionConvertorFactory_10_50.convertResource(r.getResource(), advisor));
-          } else if (version.equals(Constants.VERSION) || VersionUtilities.isR4BVer(version)) {
+          } else if (VersionUtilities.isR4BVer(version)) {
+            new org.hl7.fhir.r4b.formats.JsonParser().compose(bs, VersionConvertorFactory_43_50.convertResource(r.getResource()));
+          } else if (VersionUtilities.isR5Ver(version)) {
             new JsonParser().compose(bs, r.getResource());
           } else {
             throw new Exception("Unsupported version "+version);

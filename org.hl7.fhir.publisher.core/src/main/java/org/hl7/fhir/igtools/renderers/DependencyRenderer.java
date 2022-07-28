@@ -135,7 +135,7 @@ public class DependencyRenderer {
           }
         }
       }
-      Row row = addRow(gen, rows, npm.name(), npm.version(), getVersionState(npm.name(), npm.version(), npm.canonical()), "current".equals(npm.version()), npm.fhirVersion(), !VersionUtilities.versionsCompatible(fver, npm.fhirVersion()), npm.canonical(), PackageHacker.fixPackageUrl(npm.getWebLocation()), comment);
+      Row row = addRow(gen, rows, npm.name(), npm.version(), getVersionState(npm.name(), npm.version(), npm.canonical()), getLatestVersion(npm.name(), npm.canonical()), "current".equals(npm.version()), npm.fhirVersion(), !VersionUtilities.versionsCompatible(fver, npm.fhirVersion()), npm.canonical(), PackageHacker.fixPackageUrl(npm.getWebLocation()), comment);
       if (isNew) {
         for (String d : npm.dependencies()) {
           String id = d.substring(0, d.indexOf("#"));
@@ -149,6 +149,22 @@ public class DependencyRenderer {
         }
       }
     }
+  }
+
+
+  private String getLatestVersion(String name, String canonical) {
+    JsonObject pl = fetchPackageList(name, canonical);
+    if (pl == null) {
+      return null;
+    }
+    for (JsonObject v : JsonUtilities.objects(pl, "list")) {
+      if (!"current".equals(JsonUtilities.str(v, "version"))) {
+        if (JsonUtilities.bool(v, "current")) {// this is the current official release
+          return JsonUtilities.str(v,  "version");
+        } 
+      }
+    }      
+    return null;
   }
 
   private VersionState getVersionState(String name, String version, String canonical) {
@@ -226,14 +242,14 @@ public class DependencyRenderer {
     } else if (id.startsWith("hl7") && !id.startsWith("hl7.fhir.")) {
       comment = "HL7 Packages must have an id that starts with hl7.fhir.";
     }
-    Row row = addRow(gen, model.getRows(), id, ver, null, false, fver, false, canonical, web, comment);
+    Row row = addRow(gen, model.getRows(), id, ver, null, null, false, fver, false, canonical, web, comment);
     if (comment != null) {
       row.getCells().get(5).addStyle("background-color: #ffcccc");
     }
     return row;
   }
 
-  private Row addRow(HierarchicalTableGenerator gen, List<Row> rows, String id, String ver, VersionState verState, boolean verError, String fver, boolean fverError, String canonical, String web, String problems) {
+  private Row addRow(HierarchicalTableGenerator gen, List<Row> rows, String id, String ver, VersionState verState, String latestVer, boolean verError, String fver, boolean fverError, String canonical, String web, String problems) {
     Row row = gen.new Row();
     rows.add(row);
     row.setIcon("icon-fhir-16.png", "NPM Package");
@@ -263,7 +279,22 @@ public class DependencyRenderer {
     row.getCells().add(gen.new Cell(null, null, fver, null, null));
     row.getCells().add(gen.new Cell(null, null, canonical, null, null));
     row.getCells().add(gen.new Cell(null, null, web, null, null));
-    row.getCells().add(gen.new Cell(null, null, problems, null, null));
+    String s = Utilities.noString(problems) ? "" : problems;
+    String v = verState == VersionState.VERSION_OUTDATED ? "Latest Release is "+latestVer+"" : "";
+    if (Utilities.noString(s)) {
+      if (Utilities.noString(v)) {
+        s = "";
+      } else {
+        s = v;
+      }
+    } else {
+      if (Utilities.noString(v)) {
+        // s = s;
+      } else {
+        s = s +". "+ v;
+      }      
+    }
+    row.getCells().add(gen.new Cell(null, null, s, null, null));
     if (verError) {
       row.getCells().get(1).addStyle("background-color: #ffcccc");
     }
