@@ -332,8 +332,15 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             return summarise(cc.getCoding().get(0));
         } else if (cc.hasText()) {
             return "\"" + cc.getText() + "\"";
-        } else
-            throw new FHIRException("Error describing concept - not done yet (multiple codings, no text)");
+        } else if (cc.getCoding().size() > 0) {
+          CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
+          for (Coding c : cc.getCoding()) {
+            b.append(summarise(c));
+          }
+          return b.toString();
+        } else {
+          throw new FHIRException("Error describing concept - not done yet (no codings, no text)");
+        }
     }
 
     private String summarise(Coding coding) throws FHIRException {
