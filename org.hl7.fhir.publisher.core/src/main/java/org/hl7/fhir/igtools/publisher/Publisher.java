@@ -3065,7 +3065,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     context.setIgnoreProfileErrors(true);
     context.setProgress(true);
     context.setLogger(logger);
-    context.setAllowLoadingDuplicates(true);
+    context.setAllowLoadingDuplicates(false);
     context.setExpandCodesLimit(1000);
     context.setExpansionProfile(makeExpProfile());
     dr = new DataRenderer(context);
@@ -5568,6 +5568,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void generateSnapshots() throws Exception {
+    context.setAllowLoadingDuplicates(true);
     logDebugMessage(LogCategory.PROGRESS, "Generate Snapshots");
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
@@ -6336,28 +6337,41 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
+  
   private List<ContainedResourceDetails> getContained(Element e) {
+    // this list is for the index. Only some kind of resources are pulled out and presented indepedently
     List<ContainedResourceDetails> list = new ArrayList<>();
     for (Element c : e.getChildren("contained")) {
-      String t = c.getChildValue("title");
-      if (Utilities.noString(t)) {
-        t = c.getChildValue("name");
-      }
-      String d = c.getChildValue("description");
-      if (Utilities.noString(d)) {
-        d = c.getChildValue("definition");
-      }
-      CanonicalResource canonical = null;
-      if (Utilities.existsInList(c.fhirType(), VersionUtilities.getCanonicalResourceNames(context.getVersion()))) {
-        try {
-          canonical = (CanonicalResource)convertFromElement(c);
-        } catch (Exception ex) {
-          System.out.println("Error converting contained resource " + t + " - " + ex.getMessage());
+      if (hasSpecificRenderer(c.fhirType())) {
+        String t = c.getChildValue("title");
+        if (Utilities.noString(t)) {
+          t = c.getChildValue("name");
         }
+        String d = c.getChildValue("description");
+        if (Utilities.noString(d)) {
+          d = c.getChildValue("definition");
+        }
+        CanonicalResource canonical = null;
+        if (Utilities.existsInList(c.fhirType(), VersionUtilities.getCanonicalResourceNames(context.getVersion()))) {
+          try {
+            canonical = (CanonicalResource)convertFromElement(c);
+          } catch (Exception ex) {
+            System.out.println("Error converting contained resource " + t + " - " + ex.getMessage());
+          }
+        }
+        list.add(new ContainedResourceDetails(c.fhirType(), c.getIdBase(), t, d, canonical));
       }
-      list.add(new ContainedResourceDetails(c.fhirType(), c.getIdBase(), t, d, canonical));
     }
     return list;
+  }
+
+  private boolean hasSpecificRenderer(String rt) {
+    // the intent of listing a resource type is that it has multiple renderings, so gets a page of it's own
+    // other wise it's rendered inline
+    
+    return Utilities.existsInList(rt, 
+        "CodeSystem", "ValueSet", "ConceptMap", 
+        "CapabilityStatement", "CompartmentDefinition", "ImplementationGuide", "Library", "NamingSystem", "OperationDefinition", "Questionnaire", "SearchParameter", "StructureDefinition");
   }
 
   private String checkPlural(String word, int c) {
@@ -7796,7 +7810,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         s = s + "<img style=\"background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"tbl_vjoin.png\"/>";
     }
     s = s + "<img style=\"background-color:white;background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"icon_page.gif\"/>";
-    s = s + "<a title=\"" + Utilities.escapeXml(page.getTitle()) + "\" href=\"" + (currentOffset!=null ? currentOffset + "/" : "") + (page.hasNameUrlType() ? page.getNameUrlType().getValue() : "?name?") +"\">" + label + " " + Utilities.escapeXml(page.getTitle()) + "</a></td></tr>";
+    if (page.hasNameUrlType()) { 
+      s = s + "<a title=\"" + Utilities.escapeXml(page.getTitle()) + "\" href=\"" + (currentOffset!=null ? currentOffset + "/" : "") + page.getNameUrlType().getValue() +"\">" + label + " " + Utilities.escapeXml(page.getTitle()) + "</a></td></tr>";
+    } else {
+      s = s + "<a title=\"" + Utilities.escapeXml(page.getTitle()) + "\">" + label + " " + Utilities.escapeXml(page.getTitle()) + "</a></td></tr>";      
+    }
 
     int total = page.getPage().size();
     int i = 1;
@@ -8297,31 +8315,33 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             for (int i = 0; i < containedResources.size(); i++ ) {
               Element containedElement = containedElements.get(i);
               Resource containedResource = containedResources.get(i);
-              if (containedElement.fhirType().equals(containedResource.fhirType())) {
-                String prefixForContained = r.getResource().getId()+"_";
-                makeTemplatesContained(f, r, containedResource, vars, prefixForContained);
-                String fn = saveDirectResourceOutputsContained(f, r, containedResource, vars, prefixForContained);
-                if (containedResource instanceof CanonicalResource) {
-                  CanonicalResource cr = ((CanonicalResource) containedResource).copy();
-                  cr.copyUserData(container);
-                  if (!(container instanceof CanonicalResource)) {
-                    if (!cr.hasUrl() || !cr.hasVersion()) {
-//                    throw new FHIRException("Unable to publish: contained canonical resource in a non-canonical resource does not have url+version");
-                    }
-                  } else {
+              if (hasSpecificRenderer(containedElement.fhirType())) {
+                if (containedElement.fhirType().equals(containedResource.fhirType())) {
+                  String prefixForContained = r.getResource().getId()+"_";
+                  makeTemplatesContained(f, r, containedResource, vars, prefixForContained);
+                  String fn = saveDirectResourceOutputsContained(f, r, containedResource, vars, prefixForContained);
+                  if (containedResource instanceof CanonicalResource) {
+                    CanonicalResource cr = ((CanonicalResource) containedResource).copy();
                     cr.copyUserData(container);
-                    if (!cr.hasUrl()) {
-                      cr.setUrl(((CanonicalResource) container).getUrl()+"#"+containedResource.getId());
+                    if (!(container instanceof CanonicalResource)) {
+                      if (!cr.hasUrl() || !cr.hasVersion()) {
+                        //                    throw new FHIRException("Unable to publish: contained canonical resource in a non-canonical resource does not have url+version");
+                      }
+                    } else {
+                      cr.copyUserData(container);
+                      if (!cr.hasUrl()) {
+                        cr.setUrl(((CanonicalResource) container).getUrl()+"#"+containedResource.getId());
+                      }
+                      if (!cr.hasVersion()) {
+                        cr.setVersion(((CanonicalResource) container).getVersion());
+                      }
                     }
-                    if (!cr.hasVersion()) {
-                      cr.setVersion(((CanonicalResource) container).getVersion());
-                    }
+                    generateResourceHtml(f, regen, r, cr, vars, prefixForContained);
+                    clist.add(new StringPair(cr.present(), fn));
+                  } else {
+                    generateResourceHtml(f, regen, r, containedResource, vars, prefixForContained);
+                    clist.add(new StringPair(containedResource.fhirType()+"/"+containedResource.getId(), fn));
                   }
-                  generateResourceHtml(f, regen, r, cr, vars, prefixForContained);
-                  clist.add(new StringPair(cr.present(), fn));
-                } else {
-                  generateResourceHtml(f, regen, r, containedResource, vars, prefixForContained);
-                  clist.add(new StringPair(containedResource.fhirType()+"/"+containedResource.getId(), fn));
                 }
               }
             }
@@ -8329,6 +8349,27 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         } else {
           // element contained
           // TODO: figure this out
+//          for (Element c : r.getElement().getChildren("contained")) {
+//            if (hasSpecificRenderer(c.fhirType())) {
+//              String t = c.getChildValue("title");
+//              if (Utilities.noString(t)) {
+//                t = c.getChildValue("name");
+//              }
+//              String d = c.getChildValue("description");
+//              if (Utilities.noString(d)) {
+//                d = c.getChildValue("definition");
+//              }
+//              CanonicalResource canonical = null;
+//              if (Utilities.existsInList(c.fhirType(), VersionUtilities.getCanonicalResourceNames(context.getVersion()))) {
+//                try {
+//                  canonical = (CanonicalResource)convertFromElement(c);
+//                } catch (Exception ex) {
+//                  System.out.println("Error converting contained resource " + t + " - " + ex.getMessage());
+//                }
+//              }
+//              list.add(new ContainedResourceDetails(c.fhirType(), c.getIdBase(), t, d, canonical));
+//            }
+//          }
           if ("QuestionnaireResponse".equals(r.fhirType())) {
             String prefixForContained = "";
             generateOutputsQuestionnaireResponse(f, r, vars, prefixForContained);
@@ -8855,7 +8896,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       genWrapperContained(f, r, res, igpkp.getPropertyContained(r, "template-base", res), baseName, f.getOutputNames(), vars, null, "", prefixForContained);
     genWrapperContained(null, r, res, igpkp.getPropertyContained(r, "template-defns", res), igpkp.getPropertyContained(r, "defns", res), f.getOutputNames(), vars, null, "definitions", prefixForContained);
     for (String templateName : extraTemplates.keySet()) {
-      if (!templateName.equals("format") && !templateName.equals("defns")) {
+      if (!templateName.equals("format") && !templateName.equals("defns") && !templateName.equals("change-history")) {
         String output = igpkp.getProperty(r, templateName);
          if (output == null)
           output = r.fhirType()+"-"+r.getId()+"_"+res.getId()+"-"+templateName+".html";
@@ -10735,6 +10776,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       throw new Exception("Building IG '"+path+"' caused an error");
     }
     
+  }
+
+  @Override
+  public String urlForContained(RenderingContext context, String containingType, String containingId, String containedType, String containedId) {
+    return null;
   }
 
 
