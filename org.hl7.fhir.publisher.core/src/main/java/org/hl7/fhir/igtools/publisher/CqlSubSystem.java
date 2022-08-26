@@ -133,7 +133,7 @@ public class CqlSubSystem {
   /**
    * The Implementation Guide build supports multiple versions. This code runs as R5 code.
    * The library reader loads the library from the NpmPackage and returns an R5 library,
-   * irrespective of waht version the IG is 
+   * irrespective of what version the IG is 
    */
   public interface ILibraryReader {
     public Library readLibrary(InputStream stream) throws FHIRFormatError, IOException; 

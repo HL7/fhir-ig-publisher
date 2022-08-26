@@ -6413,6 +6413,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else if (VersionUtilities.isR4Ver(version)) {
       org.hl7.fhir.r4.formats.JsonParser jp = new org.hl7.fhir.r4.formats.JsonParser();
       jp.compose(bs, VersionConvertorFactory_40_50.convertResource(res));
+    } else if (VersionUtilities.isR4BVer(version)) {
+      org.hl7.fhir.r4b.formats.JsonParser jp = new org.hl7.fhir.r4b.formats.JsonParser();
+      jp.compose(bs, VersionConvertorFactory_43_50.convertResource(res));
     } else if (VersionUtilities.isR2BVer(version)) {
       org.hl7.fhir.dstu2016may.formats.JsonParser jp = new org.hl7.fhir.dstu2016may.formats.JsonParser();
       jp.compose(bs, VersionConvertorFactory_14_50.convertResource(res));
@@ -6437,6 +6440,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else if (VersionUtilities.isR4Ver(version)) {
       org.hl7.fhir.r4.formats.JsonParser jp = new org.hl7.fhir.r4.formats.JsonParser();
       return  VersionConvertorFactory_40_50.convertResource(jp.parse(bi));
+    } else if (VersionUtilities.isR4BVer(version)) {
+      org.hl7.fhir.r4b.formats.JsonParser jp = new org.hl7.fhir.r4b.formats.JsonParser();
+      return  VersionConvertorFactory_43_50.convertResource(jp.parse(bi));
     } else if (VersionUtilities.isR2BVer(version)) {
       org.hl7.fhir.dstu2016may.formats.JsonParser jp = new org.hl7.fhir.dstu2016may.formats.JsonParser();
       return  VersionConvertorFactory_14_50.convertResource(jp.parse(bi));
@@ -6598,6 +6604,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             new org.hl7.fhir.r4.formats.XmlParser().compose(bs, r4);
           } else if (fmt.equals(FhirFormat.TURTLE)) {
             new org.hl7.fhir.r4.formats.RdfParser().compose(bs, r4);
+          }
+        } else if (VersionUtilities.isR4BVer(version)) {
+          org.hl7.fhir.r4b.model.Resource r4b = VersionConvertorFactory_43_50.convertResource(r.getResource());
+          if (fmt.equals(FhirFormat.JSON)) {
+            new org.hl7.fhir.r4b.formats.JsonParser().compose(bs, r4b);
+          } else if (fmt.equals(FhirFormat.XML)) {
+            new org.hl7.fhir.r4b.formats.XmlParser().compose(bs, r4b);
+          } else if (fmt.equals(FhirFormat.TURTLE)) {
+            new org.hl7.fhir.r4b.formats.RdfParser().compose(bs, r4b);
           }
         } else if (VersionUtilities.isR2BVer(version)) {
           org.hl7.fhir.dstu2016may.model.Resource r14 = VersionConvertorFactory_14_50.convertResource(r.getResource());
@@ -8297,7 +8312,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             Resource container = convertFromElement(r.getElement());
             r.setResource(container);
           } catch (Exception e) {
-            logMessage("Unable to convert resource " + r.getTitle() + " " + e.getMessage());
+            logMessage("Unable to convert resource " + r.getTitle() + ": " + e.getMessage());
           }
         }
         if (r.getResource() != null) {

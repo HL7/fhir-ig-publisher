@@ -107,7 +107,7 @@ public class CanonicalRenderer extends BaseRenderer {
   }
 
   protected void genSummaryRowsSpecific(StringBuilder b, Set<String> rows) {
-    // Nothing    
+    // Nothing - override in descendents   
   }
 
   private void genSummaryCore2(StringBuilder b, FetchedResource r, boolean xml, boolean json, boolean ttl, Set<String> rows) {
