@@ -6342,7 +6342,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     // this list is for the index. Only some kind of resources are pulled out and presented indepedently
     List<ContainedResourceDetails> list = new ArrayList<>();
     for (Element c : e.getChildren("contained")) {
-      if (hasSpecificRenderer(c.fhirType())) {
+      if (RendererFactory.hasSpecificRenderer(c.fhirType())) {
+        // the intent of listing a resource type is that it has multiple renderings, so gets a page of it's own
+        // other wise it's rendered inline
         String t = c.getChildValue("title");
         if (Utilities.noString(t)) {
           t = c.getChildValue("name");
@@ -6365,14 +6367,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return list;
   }
 
-  private boolean hasSpecificRenderer(String rt) {
-    // the intent of listing a resource type is that it has multiple renderings, so gets a page of it's own
-    // other wise it's rendered inline
-    
-    return Utilities.existsInList(rt, 
-        "CodeSystem", "ValueSet", "ConceptMap", 
-        "CapabilityStatement", "CompartmentDefinition", "ImplementationGuide", "Library", "NamingSystem", "OperationDefinition", "Questionnaire", "SearchParameter", "StructureDefinition");
-  }
+
 
   private String checkPlural(String word, int c) {
     return c == 1 ? word : Utilities.pluralizeMe(word);
