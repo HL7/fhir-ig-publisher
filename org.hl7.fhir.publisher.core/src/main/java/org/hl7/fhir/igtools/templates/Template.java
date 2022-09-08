@@ -37,7 +37,9 @@ import org.apache.commons.io.FileUtils;
 import org.apache.tools.ant.DefaultLogger;
 import org.apache.tools.ant.Project;
 import org.apache.tools.ant.ProjectHelper;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.r4.formats.FormatUtilities;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.model.ImplementationGuide;
@@ -64,6 +66,7 @@ public class Template {
   public static final int IG_NONE = 0;
   public static final int IG_ANY = 1;
   public static final int IG_NO_RESOURCE = 2;
+  private static final boolean USE_R5_IG_FORMAT = false;
   
   private NpmPackage pack;
   private JsonObject configuration;
@@ -199,8 +202,14 @@ public class Template {
         jsonIg.delete();
       if (xmlIg.exists())
         xmlIg.delete();
-      new XmlParser().compose(new FileOutputStream(sfn+"xml"), ig);
-      new JsonParser().compose(new FileOutputStream(sfn+"json"), ig);    
+      if (USE_R5_IG_FORMAT) {
+        new XmlParser().compose(new FileOutputStream(sfn+"xml"), ig);
+        new JsonParser().compose(new FileOutputStream(sfn+"json"), ig);
+      } else {
+        org.hl7.fhir.r4.model.ImplementationGuide ig4 = (org.hl7.fhir.r4.model.ImplementationGuide) VersionConvertorFactory_40_50.convertResource(ig);
+        new org.hl7.fhir.r4.formats.XmlParser().compose(new FileOutputStream(sfn+"xml"), ig4);
+        new org.hl7.fhir.r4.formats.JsonParser().compose(new FileOutputStream(sfn+"json"), ig4);
+      }
     }
     antProject.executeTarget(target);
     if (fileNames!=null) {
@@ -222,17 +231,35 @@ public class Template {
       String newJson = fn+"json";
       switch (modifyIg) {
         case IG_ANY:
-          if (new File(newXml).exists())
-            return (ImplementationGuide) new XmlParser().parse(new FileInputStream(newXml));
-          else if (new File(newJson).exists())
-            return (ImplementationGuide) new JsonParser().parse(new FileInputStream(newJson));
-          else
+          if (new File(newXml).exists()) {
+            if (USE_R5_IG_FORMAT) {
+              return (ImplementationGuide) new XmlParser().parse(new FileInputStream(newXml));
+            } else {
+              return (ImplementationGuide) VersionConvertorFactory_40_50.convertResource(new org.hl7.fhir.r4.formats.XmlParser().parse(new FileInputStream(newXml)));                
+            }
+          } else if (new File(newJson).exists()) {
+            if (USE_R5_IG_FORMAT) {
+              return (ImplementationGuide) new JsonParser().parse(new FileInputStream(newJson));              
+            } else {
+              return (ImplementationGuide) VersionConvertorFactory_40_50.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(new FileInputStream(newXml)));                
+            }
+          } else
             throw new FHIRException("onLoad script "+targetOnLoad+" failed - no output file produced");        
         case IG_NO_RESOURCE:
-          if (new File(newXml).exists())
-            loadModifiedIg((ImplementationGuide) new XmlParser().parse(new FileInputStream(newXml)), ig);
-          else if (new File(newJson).exists())
-            loadModifiedIg((ImplementationGuide) new JsonParser().parse(new FileInputStream(newJson)), ig);
+          if (new File(newXml).exists()) {
+            if (USE_R5_IG_FORMAT) {
+              loadModifiedIg((ImplementationGuide) new XmlParser().parse(new FileInputStream(newXml)), ig);
+            } else {
+              loadModifiedIg((ImplementationGuide) VersionConvertorFactory_40_50.convertResource(new org.hl7.fhir.r4.formats.XmlParser().parse(new FileInputStream(newXml))), ig);
+            }
+          }
+          else if (new File(newJson).exists()) {
+            if (USE_R5_IG_FORMAT) {
+              loadModifiedIg((ImplementationGuide) new JsonParser().parse(new FileInputStream(newJson)), ig);
+            } else {
+              loadModifiedIg((ImplementationGuide) VersionConvertorFactory_40_50.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(new FileInputStream(newXml))), ig);
+            }
+          }
           return null;
         case IG_NONE:
           return null;
