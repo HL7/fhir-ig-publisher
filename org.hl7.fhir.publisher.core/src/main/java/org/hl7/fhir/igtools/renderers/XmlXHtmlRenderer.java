@@ -45,7 +45,7 @@ public class XmlXHtmlRenderer implements IXMLWriter {
   private OutputStream stream;
   private boolean started = false;
   private String[] specialAttributeNames = new String[] {"id", "name" };
-  private int attributeLineWrap = 80;
+  private int attributeLineWrap = 76;
   private String href;
   private List<ElementDecoration> decorations1 = new ArrayList<ElementDecoration>();
   private List<ElementDecoration> decorations2 = new ArrayList<ElementDecoration>();
@@ -81,9 +81,9 @@ public class XmlXHtmlRenderer implements IXMLWriter {
     started = true;
     b = new StringBuilder();
     if (prism) {
-      b.append("<pre class=\"xml\"><code class=\"language-xml\">\r\n");
+      b.append("<pre class=\"xml\" style=\"white-space: pre; overflow: hidden\"><code class=\"language-xml\">\r\n");
     } else {
-      b.append("<pre class=\"xml\"><code>\r\n");
+      b.append("<pre class=\"xml\" style=\"white-space: pre; overflow: hidden\"><code>\r\n");
     }
   }
 
