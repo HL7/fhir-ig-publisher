@@ -203,7 +203,7 @@ public class IGPack2NpmConvertor {
         for (ImplementationGuideDefinitionResourceComponent rd : ig.getDefinition().getResource()) {
           ManifestResourceComponent ra = getMatchingResource(rd.getReference().getReference(), ig);
           if (ra != null) {
-            ra.setExample(rd.getExample());
+            ra.setIsExample(rd.getIsExample());
             if (rd.hasExtension("http://hl7.org/fhir/StructureDefinition/implementationguide-page")) {
               ra.setRelativePath(rd.getExtensionString("http://hl7.org/fhir/StructureDefinition/implementationguide-page"));
               rd.removeExtension("http://hl7.org/fhir/StructureDefinition/implementationguide-page");
@@ -218,7 +218,7 @@ public class IGPack2NpmConvertor {
         NPMPackageGenerator npm = new NPMPackageGenerator(destFile, canonical, url, PackageType.IG, ig, new Date(), false);
         ByteArrayOutputStream bs = new ByteArrayOutputStream();
         new JsonParser().setOutputStyle(OutputStyle.NORMAL).compose(bs, ig);
-        npm.addFile(Category.RESOURCE, "ig-r4.json", bs.toByteArray());
+        npm.addFile(Category.OTHER, "ig-r4.json", bs.toByteArray());
 
         npm.addFile(Category.RESOURCE, "ImplementationGuide-"+ig.getId()+".json", compose(ig, version));
 

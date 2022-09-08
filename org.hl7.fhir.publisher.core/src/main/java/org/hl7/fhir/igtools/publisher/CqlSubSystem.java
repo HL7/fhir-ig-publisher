@@ -540,7 +540,7 @@ public class CqlSubSystem {
     org.hl7.cql.model.DataType parameterType = def.getResultType() instanceof ListType ? ((ListType)def.getResultType()).getElementType() : def.getResultType();
 
     AtomicBoolean isList = new AtomicBoolean(false);
-    Enumerations.FHIRAllTypes typeCode = Enumerations.FHIRAllTypes.fromCode(toFHIRParameterTypeCode(parameterType, def.getName(), isList, messages));
+    Enumerations.FHIRTypes typeCode = Enumerations.FHIRTypes.fromCode(toFHIRParameterTypeCode(parameterType, def.getName(), isList, messages));
 
     return new ParameterDefinition()
             .setName(def.getName())
@@ -552,7 +552,7 @@ public class CqlSubSystem {
 
   private ParameterDefinition toOutputParameterDefinition(ExpressionDef def, List<ValidationMessage> messages) {
     AtomicBoolean isList = new AtomicBoolean(false);
-    Enumerations.FHIRAllTypes typeCode = Enumerations.FHIRAllTypes.fromCode(toFHIRResultTypeCode(def.getResultType(), def.getName(), isList, messages));
+    Enumerations.FHIRTypes typeCode = Enumerations.FHIRTypes.fromCode(toFHIRResultTypeCode(def.getResultType(), def.getName(), isList, messages));
 
     return new ParameterDefinition()
             .setName(def.getName())
@@ -637,7 +637,7 @@ public class CqlSubSystem {
   private org.hl7.fhir.r5.model.DataRequirement toDataRequirement(Retrieve retrieve, TranslatedLibrary library, LibraryManager libraryManager) {
     org.hl7.fhir.r5.model.DataRequirement dr = new org.hl7.fhir.r5.model.DataRequirement();
 
-    dr.setType(org.hl7.fhir.r5.model.Enumerations.FHIRAllTypes.fromCode(retrieve.getDataType().getLocalPart()));
+    dr.setType(org.hl7.fhir.r5.model.Enumerations.FHIRTypes.fromCode(retrieve.getDataType().getLocalPart()));
 
     // Set profile if specified
     if (retrieve.getTemplateId() != null) {
