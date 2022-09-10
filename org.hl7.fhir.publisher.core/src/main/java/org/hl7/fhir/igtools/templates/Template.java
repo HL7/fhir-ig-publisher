@@ -37,6 +37,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.tools.ant.DefaultLogger;
 import org.apache.tools.ant.Project;
 import org.apache.tools.ant.ProjectHelper;
+import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_40_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r4.formats.FormatUtilities;
@@ -206,7 +207,7 @@ public class Template {
         new XmlParser().compose(new FileOutputStream(sfn+"xml"), ig);
         new JsonParser().compose(new FileOutputStream(sfn+"json"), ig);
       } else {
-        org.hl7.fhir.r4.model.ImplementationGuide ig4 = (org.hl7.fhir.r4.model.ImplementationGuide) VersionConvertorFactory_40_50.convertResource(ig);
+        org.hl7.fhir.r4.model.ImplementationGuide ig4 = (org.hl7.fhir.r4.model.ImplementationGuide) VersionConvertorFactory_40_50.convertResource(ig, new BaseAdvisor_40_50(true, true));
         new org.hl7.fhir.r4.formats.XmlParser().compose(new FileOutputStream(sfn+"xml"), ig4);
         new org.hl7.fhir.r4.formats.JsonParser().compose(new FileOutputStream(sfn+"json"), ig4);
       }
