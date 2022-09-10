@@ -69,9 +69,9 @@ public class JsonXhtmlRenderer extends TranslatingUtilities implements JsonCreat
     if (b == null) {
       b = new StringBuilder();
       if (prism) {
-        b.append("<pre class=\"json\"><code class=\"language-json\">\r\n");
+        b.append("<pre class=\"json\" style=\"white-space: pre; overflow: hidden\"><code class=\"language-json\">\r\n");
       } else {
-        b.append("<pre class=\"json\"><code>\r\n");
+        b.append("<pre class=\"json\" style=\"white-space: pre; overflow: hidden\"><code>\r\n");
       }
     }
     levels.add(0, new LevelInfo(false));

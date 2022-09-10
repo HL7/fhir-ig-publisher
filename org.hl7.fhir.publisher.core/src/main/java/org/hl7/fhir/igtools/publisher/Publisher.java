@@ -1023,7 +1023,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void processTxLog(String path) throws FileNotFoundException, IOException {
-    if (txLog != null) {
+    if (txLog != null && new File(txLog).exists()) {
       String tx = TextFile.fileToString(txLog);
       PrintStream f = new PrintStream(new FileOutputStream(path));
       String title = "Terminology Server Log";
@@ -2420,6 +2420,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           sourceIg = (ImplementationGuide) VersionConvertorFactory_40_50.convertResource(FormatUtilities.loadFile(igName));
         }
       } catch (Exception e) {
+        log("Unable to load IG as an r5 IG - try R4 ("+e.getMessage()+")");
         sourceIg = (ImplementationGuide) VersionConvertorFactory_40_50.convertResource(FormatUtilities.loadFile(igName));
       }
     } catch (Exception e) {

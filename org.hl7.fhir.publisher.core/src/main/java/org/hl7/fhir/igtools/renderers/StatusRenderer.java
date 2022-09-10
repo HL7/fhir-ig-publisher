@@ -197,7 +197,7 @@ public class StatusRenderer {
     b.append("\"><tr>");
     if (info.getOwnerLink() != null) {
     b.append("<td>Publisher: <a href=\"");
-    b.append(info.getOwnerLink());
+    b.append(checkLink(info.getOwnerLink()));
     b.append("\">");
     b.append(Utilities.escapeXml(info.getOwner()));
     b.append("</a></td><td>");
@@ -224,6 +224,19 @@ public class StatusRenderer {
     }
     b.append("</td></tr></table>\r\n");
     return b.toString();
+  }
+
+  private static Object checkLink(String link) {
+    if (Utilities.isAbsoluteUrlLinkable(link)) {
+      return link;
+    }
+    if (link.startsWith("www.")) {
+      return "http://"+link;
+    }
+    if (link.contains("@") && !link.startsWith("mailto:")) {
+      return "http://"+link;
+    }
+    return link;
   }
 
 }
