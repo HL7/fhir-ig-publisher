@@ -7627,10 +7627,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     String p = page.getName();
     String sourceName = null;
     String template = null;
-    if (htmlTemplate != null && page.getGeneration() == GuidePageGeneration.HTML  && !relativeNames.keySet().contains(p) && p.endsWith(".html")) {
+    if (htmlTemplate != null && page.getGeneration() == GuidePageGeneration.HTML  && !relativeNames.keySet().contains(p) && p != null && p.endsWith(".html")) {
       sourceName = p.substring(0, p.indexOf(".html")) + ".xml";
       template = htmlTemplate;
-    } else if (mdTemplate != null && page.getGeneration() == GuidePageGeneration.MARKDOWN  && !relativeNames.keySet().contains(p) && p.endsWith(".html")) {
+    } else if (mdTemplate != null && page.getGeneration() == GuidePageGeneration.MARKDOWN  && !relativeNames.keySet().contains(p) && p != null && p.endsWith(".html")) {
       sourceName = p.substring(0, p.indexOf(".html")) + ".md";
       template = mdTemplate;
     }
