@@ -359,7 +359,7 @@ public class TemplateReleaser {
       VersionChangeType t = v.type;
       if (vd.isExplicit()) {
         if (vd.type.lessThan(t)) {
-          throw new Exception("invalid operation");
+          throw new Exception("invalid operation for "+vd.id);
         }
       } else {
         if (vd.type.lessThan(t)) {
