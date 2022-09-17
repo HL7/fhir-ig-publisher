@@ -21,7 +21,7 @@
 <!--        <version>5.3.14</version>-->
 <!--    </parent>-->
 
-    <version>1.2.2</version> <!-- See the note above -->
+    <version>1.2.3-SNAPSHOT</version> <!-- See the note above -->
 
     <properties>
         <core_version>5.6.64</core_version>
