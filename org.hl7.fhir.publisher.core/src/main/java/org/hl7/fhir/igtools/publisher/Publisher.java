@@ -2777,6 +2777,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.setAllowExamples(true);
     validator.setCrumbTrails(true);
     validator.setWantCheckSnapshotUnchanged(true);
+    validator.setForPublication(true);
     
     pvalidator = new ProfileValidator(context, context.getXVer());
     csvalidator = new CodeSystemValidator(context, context.getXVer());
@@ -2784,7 +2785,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     pvalidator.setCheckMustSupport(hintAboutNonMustSupport);
     validator.setShowMessagesFromReferences(showReferenceMessages);
     validator.getExtensionDomains().addAll(extensionDomains);
-    validator.getExtensionDomains().add(IGHelper.EXT_PRIVATE_BASE);
+    validator.getExtensionDomains().add(ToolingExtensions.EXT_PRIVATE_BASE);
     validationFetcher = new ValidationServices(context, igpkp, fileList, npmList, bundleReferencesResolve);
     validator.setFetcher(validationFetcher);
     validator.setPolicyAdvisor(validationFetcher);
@@ -2815,15 +2816,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     doTransforms = template.getDoTransforms();
     template.getExtraTemplates(extraTemplates);
     
-    for (Extension e : sourceIg.getExtensionsByUrl(IGHelper.EXT_SPREADSHEET)) {
+    for (Extension e : sourceIg.getExtensionsByUrl(ToolingExtensions.EXT_IGP_SPREADSHEET)) {
       spreadsheets.add(e.getValue().primitiveValue());
     }
-    ToolingExtensions.removeExtension(sourceIg, IGHelper.EXT_SPREADSHEET);
+    ToolingExtensions.removeExtension(sourceIg, ToolingExtensions.EXT_IGP_SPREADSHEET);
 
-    for (Extension e : sourceIg.getExtensionsByUrl(IGHelper.EXT_MAPPING_CSV)) {
+    for (Extension e : sourceIg.getExtensionsByUrl(ToolingExtensions.EXT_IGP_MAPPING_CSV)) {
       mappings.add(e.getValue().primitiveValue());
     }
-    for (Extension e : sourceIg.getExtensionsByUrl(IGHelper.EXT_BUNDLE)) {
+    for (Extension e : sourceIg.getExtensionsByUrl(ToolingExtensions.EXT_IGP_BUNDLE)) {
       bundles.add(e.getValue().primitiveValue());
     }
     if (mode == IGBuildMode.AUTOBUILD)
@@ -3199,7 +3200,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.setAllowExamples(true);
     validator.setCrumbTrails(true);
     validator.setWantCheckSnapshotUnchanged(true);
-    
+    validator.setForPublication(true);
+
     pvalidator = new ProfileValidator(context, context.getXVer());
     csvalidator = new CodeSystemValidator(context, context.getXVer());
     if (configuration.has("check-aggregation") && configuration.get("check-aggregation").getAsBoolean())
@@ -3213,7 +3215,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (JsonElement e : (JsonArray) paths.get("extension-domains"))
         validator.getExtensionDomains().add(((JsonPrimitive) e).getAsString());
     }
-    validator.getExtensionDomains().add(IGHelper.EXT_PRIVATE_BASE);
+    validator.getExtensionDomains().add(ToolingExtensions.EXT_PRIVATE_BASE);
     if (configuration.has("jurisdiction")) {
       jurisdictions = new ArrayList<CodeableConcept>();
       for (String s : configuration.getAsJsonPrimitive("jurisdiction").getAsString().trim().split("\\,")) {
@@ -4333,11 +4335,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void cleanUpExtensions(ImplementationGuide ig) {
-   ToolingExtensions.removeExtension(ig, IGHelper.EXT_SPREADSHEET);
-   ToolingExtensions.removeExtension(ig, IGHelper.EXT_BUNDLE);
-   ToolingExtensions.removeExtension(ig, IGHelper.EXT_CONTAINED_RESOURCE_INFO);
+   ToolingExtensions.removeExtension(ig, ToolingExtensions.EXT_IGP_SPREADSHEET);
+   ToolingExtensions.removeExtension(ig, ToolingExtensions.EXT_IGP_BUNDLE);
+   ToolingExtensions.removeExtension(ig, ToolingExtensions.EXT_IGP_CONTAINED_RESOURCE_INFO);
    for (ImplementationGuideDefinitionResourceComponent r : ig.getDefinition().getResource())
-     ToolingExtensions.removeExtension(r, IGHelper.EXT_RESOURCE_INFO);
+     ToolingExtensions.removeExtension(r, ToolingExtensions.EXT_IGP_RESOURCE_INFO);
   }
 
 
@@ -4846,7 +4848,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getResEntry() != null) {
-          ToolingExtensions.setStringExtension(r.getResEntry(), IGHelper.EXT_RESOURCE_INFO, r.fhirType());
+          ToolingExtensions.setStringExtension(r.getResEntry(), ToolingExtensions.EXT_IGP_RESOURCE_INFO, r.fhirType());
         }
       }
     }
@@ -5608,7 +5610,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() instanceof StructureDefinition) {
           if (r.getResEntry() != null) {
-            ToolingExtensions.setStringExtension(r.getResEntry(), IGHelper.EXT_RESOURCE_INFO, r.fhirType()+":"+IGKnowledgeProvider.getSDType(r));
+            ToolingExtensions.setStringExtension(r.getResEntry(), ToolingExtensions.EXT_IGP_RESOURCE_INFO, r.fhirType()+":"+IGKnowledgeProvider.getSDType(r));
           }
 
           StructureDefinition sd = (StructureDefinition) r.getResource();
@@ -5636,6 +5638,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     StructureDefinition base = sd.hasBaseDefinition() ? fetchSnapshotted(sd.getBaseDefinition()) : null;
     utils.setIds(sd, true);
     utils.setXver(context.getXVer());
+    if (VersionUtilities.isR4Plus(version)) {
+      utils.setNewSlicingProcessing(true);
+    }
     if (base == null) {
       throw new Exception("Cannot find or generate snapshot for base definition ("+sd.getBaseDefinition()+" from "+sd.getUrl()+")");
     }
@@ -6001,7 +6006,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             validator.validate(r.getElement(), errs, ber, ber.getUserString("profile"));
           }
         }
-
       } else if (res.hasUserData("profile")) {
         validator.validate(r.getElement(), errs, res, res.getUserString("profile"));
       }
@@ -6360,7 +6364,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           inspector.addLinkToCheck("Implementation Guide", path, "fake generated link");
         }
         for (ContainedResourceDetails c : getContained(rt.getElement())) {
-          Extension ex = new Extension(IGHelper.EXT_CONTAINED_RESOURCE_INFO);
+          Extension ex = new Extension(ToolingExtensions.EXT_IGP_CONTAINED_RESOURCE_INFO);
           res.getExtension().add(ex);
           ex.addExtension("type", new CodeType(c.getType()));
           ex.addExtension("id", new IdType(c.getId()));
