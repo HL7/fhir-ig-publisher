@@ -240,7 +240,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
       return "";
     } else {
       StringBuilder b = new StringBuilder();
-      b.append("<p>The following Profiles don't derived from US Core:</p>\r\n");
+      b.append("<p>The following Profiles do not derive from US Core, and should be reviewed with the US Realm Committee:</p>\r\n");
       b.append("<ul>\r\n");
       for (StructureDefinition s : problems) {
         b.append("<li><a href=\"../"+s.getUserString("path")+"\">"+s.present()+"</a></li>\r\n");
