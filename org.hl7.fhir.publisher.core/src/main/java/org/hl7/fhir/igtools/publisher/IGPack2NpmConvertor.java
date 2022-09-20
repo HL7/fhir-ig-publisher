@@ -204,10 +204,11 @@ public class IGPack2NpmConvertor {
           ManifestResourceComponent ra = getMatchingResource(rd.getReference().getReference(), ig);
           if (ra != null) {
             ra.setIsExample(rd.getIsExample());
-            if (rd.hasExtension("http://hl7.org/fhir/StructureDefinition/implementationguide-page")) {
-              ra.setRelativePath(rd.getExtensionString("http://hl7.org/fhir/StructureDefinition/implementationguide-page"));
-              rd.removeExtension("http://hl7.org/fhir/StructureDefinition/implementationguide-page");
-            }
+            throw new Error("What is this code doing?");
+//            if (rd.hasExtension(" http://hl7.org/fhir/StructureDefinition/implementationguide-page")) {
+//              ra.setRelativePath(rd.getExtensionString("http://hl7.org/fhir/StructureDefinition/implementationguide-page"));
+//              rd.removeExtension(" http://hl7.org/fhir/StructureDefinition/implementationguide-page");
+//            }
           }
         }
 
