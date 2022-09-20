@@ -510,7 +510,7 @@ public class XIGGenerator implements IPackageVisitorProcessor, ProfileKnowledgeP
           }
         }
         if (!ok) {
-          if (!profiles.containsKey("No Context")) {
+          if (!profiles.containsKey("s")) {
             profiles.put("No Context", new ArrayList<>());
           }
           profiles.get("No Context").add(sd);        
