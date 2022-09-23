@@ -9,6 +9,7 @@ import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CapabilityStatement;
 import org.hl7.fhir.r5.model.CodeSystem;
+import org.hl7.fhir.r5.model.CodeableConcept;
 import org.hl7.fhir.r5.model.ConceptMap;
 import org.hl7.fhir.r5.model.NamingSystem;
 import org.hl7.fhir.r5.model.OperationDefinition;
@@ -28,6 +29,7 @@ public class XIGInformation {
   private Set<String> spr = new HashSet<>();
   private Set<String> nspr = new HashSet<>();
   private JsonObject json = new JsonObject();
+  private Set<String> realms = new HashSet<>();
   private SimpleWorkerContext ctxt;
   
   public Set<String> getPid() {
@@ -75,7 +77,11 @@ public class XIGInformation {
     if (cr.hasExperimental()) { j.addProperty("experimental", cr.getExperimental()); }
     if (cr.hasDescription()) {  j.addProperty("description", cr.getDescription()); }
     if (cr.hasCopyright()) {    j.addProperty("copyright", cr.getCopyright()); }
-    if (cr.hasJurisdiction()) { j.addProperty("jurisdiction", DataRenderer.display(ctxt, cr.getJurisdictionFirstRep())); }
+    for (CodeableConcept cc : cr.getJurisdiction()) {
+      if 
+      if (cr.hasJurisdiction()) { j.addProperty("jurisdiction", DataRenderer.display(ctxt, cr.getJurisdictionFirstRep())); 
+      }
+    }
         
     if (cr instanceof CodeSystem) {
       new XIGCodeSystemHandler(this).fillOutJson((CodeSystem) cr, j);

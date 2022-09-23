@@ -67,7 +67,7 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
           "<h2>$title$</h2>\r\n";
 
   private final static String FOOTER =
-      "<p>Produced $date$</p></body>\r\n</html>\r\n";
+      "<hr/><p>Produced $date$</p></body>\r\n</html>\r\n";
   
   private XIGInformation info;
   private String target;
