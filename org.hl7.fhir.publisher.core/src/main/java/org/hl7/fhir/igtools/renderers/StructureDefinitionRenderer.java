@@ -45,6 +45,9 @@ import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionMappingCompo
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
+import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
+import org.hl7.fhir.r5.terminologies.CodeSystemUtilities.SystemReference;
 import org.hl7.fhir.r5.utils.ElementDefinitionUtilities;
 import org.hl7.fhir.r5.utils.PublicationHacker;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
@@ -65,6 +68,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     public class BindingResolutionDetails {
         private String vss;
         private String vsn;
+        private String suffix;
 
         public BindingResolutionDetails(String vss, String vsn) {
             super();
@@ -555,16 +559,22 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
                 System.out.println("No value set found at " + url + "#" + path + " (url = '" + tx.getValueSet() + "')");
             else if (!tx.hasDescription())
                 System.out.println("No value set specified at " + url + "#" + path + " (no url)");
-        if (tx.hasUserData("tx.value"))
+        if (tx.hasUserData("tx.value")) {
             brd.vss = "Fixed Value: " + summariseValue((DataType) tx.getUserData("tx.value"));
-        else if (tx.hasUserData("tx.pattern"))
+            brd.suffix = null;
+        } else if (tx.hasUserData("tx.pattern")) {
             brd.vss = "Pattern: " + summariseValue((DataType) tx.getUserData("tx.pattern"));
+            brd.suffix = null;
+        }
 
         b.append("<tr><td>").append(path).append("</td><td><a style=\"opacity: " + opacityStr(strengthInh) + "\" href=\"").append(corePath).append("terminologies.html#").append(strength == null ? "" : egt(tx.getStrengthElement()));
         if (tx.hasDescription())
             b.append("\">").append(strength == null ? "" : egt(tx.getStrengthElement())).append("</a></td><td title=\"").append(Utilities.escapeXml(tx.getDescription())).append("\">").append(brd.vss);
         else
             b.append("\">").append(strength == null ? "" : egt(tx.getStrengthElement())).append("</a></td><td>").append(brd.vss);
+        if (brd.suffix != null) {
+          b.append(brd.suffix);
+        }
         if (tx.hasExtension(ToolingExtensions.EXT_MAX_VALUESET)) {
             BindingResolution br = igp.resolveBinding(sd, ToolingExtensions.readStringExtension(tx, ToolingExtensions.EXT_MAX_VALUESET), path);
             b.append("<br/>");
@@ -609,8 +619,22 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
                 else
                     brd.vss = "<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"" + Utilities.escapeXml(p) + "\">" + Utilities.escapeXml(gt(vs.getNameElement())) + "</a>";
                 StringType title = vs.hasTitleElement() ? vs.getTitleElement() : vs.getNameElement();
-                if (title != null)
+                if (title != null) {
                     brd.vsn = gt(title);
+                }
+                String system = ValueSetUtilities.getAllCodesSystem(vs);
+                if (system != null) {
+                  SystemReference sr = CodeSystemUtilities.getSystemReference(system, context);
+                  if (sr == null) {
+                    brd.suffix = " (a valid code from <code>"+system+"</code>)";
+                  } else if (sr.isLocal() || (sr.getText() != null && sr.getText().equals(vs.getName()))) {
+                    brd.suffix = "";
+                  } else if (sr.getLink() == null) {
+                    brd.suffix = " (a valid code from "+sr.getText()+" (<code>"+system+"</code>)";
+                  } else {
+                    brd.suffix = " (a valid code from <a href=\""+sr.getLink()+"\">"+sr.getText()+"</a>)";
+                  }
+                }
             }
         }
     }
