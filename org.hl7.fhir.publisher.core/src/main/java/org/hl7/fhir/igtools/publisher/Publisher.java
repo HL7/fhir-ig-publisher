@@ -109,6 +109,7 @@ import org.hl7.fhir.igtools.publisher.utils.IGReleaseVersionDeleter;
 import org.hl7.fhir.igtools.publisher.utils.IGWebSiteMaintainer;
 import org.hl7.fhir.igtools.publisher.utils.PublicationProcess;
 import org.hl7.fhir.igtools.publisher.utils.PublisherConsoleLogger;
+import org.hl7.fhir.igtools.publisher.utils.xig.XIGGenerator;
 import org.hl7.fhir.igtools.renderers.CanonicalRenderer;
 import org.hl7.fhir.igtools.renderers.CodeSystemRenderer;
 import org.hl7.fhir.igtools.renderers.CrossViewRenderer;
@@ -2475,7 +2476,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (ImplementationGuideDefinitionParameterComponent p : sourceIg.getDefinition().getParameter()) {
       // documentation for this list: https://confluence.hl7.org/display/FHIR/Implementation+Guide+Parameters
       String pc = p.getCode().getCode();
-      if (pc.equals("logging")) { // added
+      if (pc == null) {
+        throw new Error("The IG Parameter has no code");
+      } else if (pc.equals("logging")) { // added
         logOptions.add(p.getValue());        
       } else if (pc.equals("generate")) { // added
         if ("example-narratives".equals(p.getValue()))
@@ -2740,6 +2743,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       dep.setVersion(pcm.getLatestVersion(dep.getPackageId()));
       sourceIg.getDependsOn().add(0, dep);
     }
+    if (!dependsOnToolsIG(sourceIg.getDependsOn()) && !sourceIg.getPackageId().contains("hl7.fhir.uv.tools")) {
+      ImplementationGuideDependsOnComponent dep = new ImplementationGuideDependsOnComponent();
+      dep.setId("higtools");
+      dep.setPackageId(getToolsIGPackageName());
+      dep.setUri("http://hl7.org/fhir/tools/ImplementationGuide/hl7.fhir.uv.tools");
+      dep.setVersion("current");
+      sourceIg.getDependsOn().add(0, dep);
+    }
     inspector = new HTLMLInspector(outputDir, specMaps, this, igpkp.getCanonical(), sourceIg.getPackageId());
     inspector.getManual().add("full-ig.zip");
     if (historyPage != null) {
@@ -2895,6 +2906,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         return true;
       }
       if (d.hasUri() && d.getUri().contains("terminology.hl7")) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean dependsOnToolsIG(List<ImplementationGuideDependsOnComponent> dependsOn) {
+    for (ImplementationGuideDependsOnComponent d : dependsOn) {
+      if (d.hasPackageId() && d.getPackageId().contains("hl7.fhir.uv.tools")) {
         return true;
       }
     }
@@ -3340,7 +3360,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return vs;
   }
 
-
+  private String getToolsIGPackageName() throws FHIRException, IOException {
+    return "hl7.fhir.uv.tools";
+  }
 
   private void processExtraTemplates(JsonArray templates) throws Exception {
     if (templates!=null) {
@@ -10174,6 +10196,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       deleter.clear(f.getAbsolutePath(), fh.getAbsolutePath());
     } else if (hasNamedParam(args, "-go-publish")) {
       new PublicationProcess().publish(getNamedParam(args, "-source"), getNamedParam(args, "-destination"), hasNamedParam(args, "-milestone"), getNamedParam(args, "-registry"), getNamedParam(args, "-history"), getNamedParam(args, "-temp"));
+    } else if (hasNamedParam(args, "-xig")) {
+      new XIGGenerator(getNamedParam(args, "-xig"));
     } else if (hasNamedParam(args, "-publish-update")) {
       if (!args[0].equals("-publish-update")) {
         throw new Error("-publish-update must have the format -publish-update -folder {folder} -registry {registry}/fhir-ig-list.json (first argument is not -publish-update)");
