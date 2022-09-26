@@ -2,7 +2,8 @@
 trigger: none
 
 pr:
-- main
+  - master
+  - release
 
 # Different users have different machine setups, we run the build three times, on ubuntu, osx, and windows.
 # Azure doesn't always have the same Java versions on each system, so they are enumerated for each system independently.
