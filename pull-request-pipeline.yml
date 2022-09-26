@@ -1,47 +1,29 @@
+# We only want to trigger a test build on PRs to the main branch.
 trigger: none
 
 pr:
-- master
-- release
+- main
 
-# Different users have different machine setups, we run the build three times, on ubuntu, osx, and windows
-strategy:
-  matrix:
-    linux:
-      imageName: 'ubuntu-latest'
-    mac:
-      imageName: "macos-10.15"
-    windows:
-      imageName: "windows-2019"
-  maxParallel: 3
-
-pool:
-  vmImage: $(imageName)
-
-variables:
-  currentImage: $(imageName)
-
-steps:
-  # Runs 'mvn clean package'
-  - task: Maven@3
-    inputs:
-      mavenPomFile: 'pom.xml'
-      mavenOptions: '-Xmx3072m'
-      javaHomeOption: 'JDKVersion'
-      jdkVersionOption: '1.11'
-      jdkArchitectureOption: 'x64'
-      publishJUnitResults: true
-      testResultsFiles: '**/surefire-reports/TEST-*.xml'
-      goals: 'package'
-
-  - task: Maven@3
-    inputs:
-      mavenPomFile: 'pom.xml'
-      mavenOptions: '-Xmx3072m'
-      javaHomeOption: 'JDKVersion'
-      jdkVersionOption: '1.8'
-      jdkArchitectureOption: 'x64'
-      options: '-pl org.hl7.fhir.publisher.cli'
-      publishJUnitResults: false
-      testResultsFiles: '**/surefire-reports/TEST-*.xml'
-      goals: 'exec:exec'
+# Different users have different machine setups, we run the build three times, on ubuntu, osx, and windows.
+# Azure doesn't always have the same Java versions on each system, so they are enumerated for each system independently.
+jobs:
+  - template: pull-request-pipeline-parameterized.yml
+    parameters:
+      images:
+        # This image is here so that at least one job specifically sets Cp1252 file encodings, which are normally set by the JDK (which Azure can change on each latest image)
+        - displayName: ubuntu-latest-java-17-cp1252
+          vmImage: ubuntu-latest
+          jdkVersion: 1.11
+          javaToolOptions: -Dfile.encoding=Cp1252
+        - displayName: ubuntu-latest-java-11
+          vmImage: ubuntu-latest
+          jdkVersion: 1.11
+          javaToolOptions:
+        - displayName: macos-latest-java-11
+          vmImage: macos-latest
+          jdkVersion: 1.11
+          javaToolOptions:
+        - displayName: windows-latest-java-11
+          vmImage: windows-latest
+          jdkVersion: 1.11
+          javaToolOptions:
