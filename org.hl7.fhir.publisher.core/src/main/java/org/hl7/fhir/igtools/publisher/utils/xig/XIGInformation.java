@@ -78,7 +78,6 @@ public class XIGInformation {
     if (cr.hasDescription()) {  j.addProperty("description", cr.getDescription()); }
     if (cr.hasCopyright()) {    j.addProperty("copyright", cr.getCopyright()); }
     for (CodeableConcept cc : cr.getJurisdiction()) {
-      if 
       if (cr.hasJurisdiction()) { j.addProperty("jurisdiction", DataRenderer.display(ctxt, cr.getJurisdictionFirstRep())); 
       }
     }
