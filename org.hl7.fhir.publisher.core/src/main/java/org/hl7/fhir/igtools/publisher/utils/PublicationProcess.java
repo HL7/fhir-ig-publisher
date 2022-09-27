@@ -56,6 +56,7 @@ public class PublicationProcess {
    */
   public void publish(String source, String rootFolder, boolean milestone, String registrySource, String history, String temp) throws Exception {
     PublisherConsoleLogger logger = new PublisherConsoleLogger();
+    rootFolder = new File(rootFolder).getAbsolutePath();
     logger.start(Utilities.path("[tmp]", "publication-process.log"));
     try {
       List<ValidationMessage> res = publishInner(source, rootFolder, milestone, registrySource, history, temp, logger);
