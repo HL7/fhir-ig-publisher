@@ -226,6 +226,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
       cr.getTemplates().put("Profile", new String(context.getBinaryForKey("template-comparison-Profile.html")));
       cr.getTemplates().put("CapabilityStatement", new String(context.getBinaryForKey("template-comparison-CapabilityStatement.html")));
       cr.getTemplates().put("Index", new String(context.getBinaryForKey("template-comparison-index.html")));
+      cr.setPreamble(renderProblems());
       cr.render("US Realm", "Current Build");
       System.out.println("US Core Comparisons Finished");
     } catch (Throwable e) {
@@ -233,6 +234,22 @@ public class USRealmBusinessRules extends RealmBusinessRules {
       e.printStackTrace();
     }
   }
+
+  private String renderProblems() {
+    if (problems == null || problems.isEmpty()) {
+      return "";
+    } else {
+      StringBuilder b = new StringBuilder();
+      b.append("<p>The following Profiles do not derive from US Core, and should be reviewed with the US Realm Committee:</p>\r\n");
+      b.append("<ul>\r\n");
+      for (StructureDefinition s : problems) {
+        b.append("<li><a href=\"../"+s.getUserString("path")+"\">"+s.present()+"</a></li>\r\n");
+      }
+      b.append("</ul>\r\n");
+      return b.toString();
+    }
+  }
+
 
   @Override
   public String checkHtml() {

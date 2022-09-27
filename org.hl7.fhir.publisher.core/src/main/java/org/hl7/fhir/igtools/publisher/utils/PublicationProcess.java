@@ -168,6 +168,11 @@ public class PublicationProcess {
     }    
     check(res, !(new File(destVer).exists()), "Nominated path '"+destVer+"' already exists");
 
+    // check to see if there's history template files; if there isn't, copy it in
+    check(res, new File(Utilities.path(rootFolder, "templates", "header.template")).exists(), Utilities.path(rootFolder, "templates", "header.template")+" not found - template not set up properly");
+    check(res, new File(Utilities.path(rootFolder, "templates", "preamble.template")).exists(), Utilities.path(rootFolder, "templates", "preamble.template")+" not found - template not set up properly");
+    check(res, new File(Utilities.path(rootFolder, "templates", "postamble.template")).exists(), Utilities.path(rootFolder, "templates", "postamble.template")+" not found - template not set up properly");
+      
     // todo: check the license, header, footer?... 
     
     // well, we've run out of things to test... time to actually try...
@@ -238,11 +243,9 @@ public class PublicationProcess {
     System.out.println("");        
     System.out.println("ok. All checks passed. Publish v"+npm.version()+" to "+destVer);        
 
-    // check to see if there's a history; if there isn't, copy it in
-    if (!new File(Utilities.path(destination, "history.html")).exists()) {
-      System.out.println("Copy history from "+history.getAbsolutePath()+" to "+destination);    
-      Utilities.copyDirectory(history.getAbsolutePath(), destination, null);
-    }
+    // copy the history template in, along with    
+    System.out.println("Copy history from "+history.getAbsolutePath()+" to "+destination);    
+    Utilities.copyDirectory(history.getAbsolutePath(), destination, null);
 
     // 3. create the folder {root}/{realm}/{code}/{subdir}
     System.out.println("Copy the IG to "+destVer);    

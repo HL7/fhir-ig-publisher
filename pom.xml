@@ -21,10 +21,10 @@
 <!--        <version>5.3.14</version>-->
 <!--    </parent>-->
 
-    <version>1.2.2-SNAPSHOT</version> <!-- See the note above -->
+    <version>1.2.4-SNAPSHOT</version> <!-- See the note above -->
 
     <properties>
-        <core_version>5.6.63</core_version>
+        <core_version>5.6.66</core_version>
         <maven.test.skip>true</maven.test.skip>
         <apache_poi_version>4.1.1</apache_poi_version>
     </properties>
@@ -177,13 +177,13 @@
         <dependency>
             <groupId>com.atlassian.commonmark</groupId>
             <artifactId>commonmark</artifactId>
-            <version>0.12.1</version>
+            <version>0.17.0</version>
             <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>com.atlassian.commonmark</groupId>
             <artifactId>commonmark-ext-gfm-tables</artifactId>
-            <version>0.12.1</version>
+            <version>0.17.0</version>
             <optional>true</optional>
         </dependency>
         <dependency>

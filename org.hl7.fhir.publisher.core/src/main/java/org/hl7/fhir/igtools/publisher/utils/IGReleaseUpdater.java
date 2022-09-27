@@ -204,10 +204,16 @@ public class IGReleaseUpdater {
         if (save)
           TextFile.stringToFile(new GsonBuilder().setPrettyPrinting().create().toJson(json), f, false);
         File ht = new File(Utilities.path(folder, "history.template"));
+        if (!ht.exists()) {
+         ht = new File(Utilities.path(rootFolder, "history.template"));
+        }
         if (ht.exists()) {
           scrubApostrophes(json);
           String jsonv = new GsonBuilder().create().toJson(json);
           String html = TextFile.fileToString(ht);
+          html = html.replace("$header$", loadTemplate(rootFolder, folder, "header.template"));
+          html = html.replace("$preamble$", loadTemplate(rootFolder, folder, "preamble.template"));
+          html = html.replace("$postamble$", loadTemplate(rootFolder, folder, "postamble.template"));
           html = fixParameter(html, "title", json.get("title").getAsString());
           html = fixParameter(html, "json", jsonv);
           // disabled GDG 23-02-2022: get this right in the template instead
@@ -216,6 +222,9 @@ public class IGReleaseUpdater {
           TextFile.stringToFile(html, Utilities.path(folder, "history.html"), false);
         }
         ht = new File(Utilities.path(folder, "directory.template"));
+        if (!ht.exists()) {
+          ht = new File(Utilities.path(rootFolder, "directory.template"));
+         }
         if (ht.exists()) {
           scrubApostrophes(json);
           String jsonv = new GsonBuilder().create().toJson(json);
@@ -245,6 +254,20 @@ public class IGReleaseUpdater {
         throw new IOException("Error Processing "+folder+", cannot continue. ("+String.join("|", errs)+")");
       }
     }
+  }
+
+  private String loadTemplate(String rootFolder, String folder, String filename) throws FileNotFoundException, IOException {
+    while (new File(folder).exists()) {
+      File f = new File(Utilities.path(folder, "templates", "filename"));
+      if (f.exists()) {
+        return TextFile.fileToString(f);
+      }
+      if (folder.equals(rootFolder)) {
+        throw new Error("Not found: "+f.getAbsolutePath());
+      }
+      folder = Utilities.getDirectoryForFile(folder); 
+    }
+    return null;
   }
 
   private String summariseDate(String d) {
