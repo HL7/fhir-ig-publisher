@@ -373,34 +373,34 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             return "<a title=\"" + cs.present() + "\" href=\"" + Utilities.escapeXml(cs.getUserString("path")) + "#" + cs.getId() + "-" + coding.getCode() + "\">" + coding.getCode() + "</a>" + (!coding.hasDisplay() ? "" : "(\"" + gt(coding.getDisplayElement()) + "\")");
     }
 
-    public String diff(String defnFile, Set<String> outputTracker) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
+    public String diff(String defnFile, Set<String> outputTracker, boolean toTabs) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
         if (sd.getDifferential().getElement().isEmpty())
             return "";
         else
-            return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateTable(defnFile, sd, true, destDir, false, sd.getId(), false, corePath, "", false, false, outputTracker, true, false, gen, ANCHOR_PREFIX_DIFF));
+            return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateTable(defnFile, sd, true, destDir, false, sd.getId(), false, corePath, "", false, false, outputTracker, true, false, gen, toTabs ? ANCHOR_PREFIX_DIFF : ANCHOR_PREFIX_SNAP));
     }
 
-    public String snapshot(String defnFile, Set<String> outputTracker) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
+    public String snapshot(String defnFile, Set<String> outputTracker, boolean toTabs) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
         if (sd.getSnapshot().getElement().isEmpty())
             return "";
         else
-            return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateTable(defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", false, false, outputTracker, true, false, gen, ANCHOR_PREFIX_SNAP));
+            return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateTable(defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", false, false, outputTracker, true, false, gen, toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP));
     }
 
-    public String byKey(String defnFile, Set<String> outputTracker) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
+    public String byKey(String defnFile, Set<String> outputTracker, boolean toTabs) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
         if (sd.getSnapshot().getElement().isEmpty())
             return "";
         else {
             XhtmlComposer composer = new XhtmlComposer(XhtmlComposer.HTML);
             StructureDefinition sdCopy = sd.copy();
             sdCopy.getSnapshot().setElement(getKeyElements());
-            org.hl7.fhir.utilities.xhtml.XhtmlNode table = utils.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", false, false, outputTracker, true, true, gen, ANCHOR_PREFIX_KEY);
+            org.hl7.fhir.utilities.xhtml.XhtmlNode table = utils.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", false, false, outputTracker, true, true, gen, toTabs ? ANCHOR_PREFIX_KEY : ANCHOR_PREFIX_SNAP);
 
             return composer.compose(table);
         }
     }
 
-    public String byMustSupport(String defnFile, Set<String> outputTracker) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
+    public String byMustSupport(String defnFile, Set<String> outputTracker, boolean toTabs) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
         if (sd.getSnapshot().getElement().isEmpty())
             return "";
         else {
@@ -408,7 +408,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             StructureDefinition sdCopy = sd.copy();
 
             sdCopy.getSnapshot().setElement(getMustSupportElements());
-            org.hl7.fhir.utilities.xhtml.XhtmlNode table = utils.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", false, false, outputTracker, true, true, gen, ANCHOR_PREFIX_MS);
+            org.hl7.fhir.utilities.xhtml.XhtmlNode table = utils.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", false, false, outputTracker, true, true, gen, toTabs ? ANCHOR_PREFIX_MS : ANCHOR_PREFIX_SNAP);
 
             return composer.compose(table);
         }
@@ -846,6 +846,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         public String getIds() {
             if (constraint.hasSource() && constraint.getSource().equals("http://hl7.org/fhir/StructureDefinition/Element"))
                 return "**ALL** elements";
+            else if (constraint.hasSource() && constraint.getSource().equals("http://hl7.org/fhir/StructureDefinition/Extension"))
+                return "**ALL** extensions";
             else
                 return String.join(", ", elements);
         }
@@ -854,7 +856,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     public List<ElementDefinition> elementsForMode(int genMode) {
         switch (genMode) {
             case GEN_MODE_DIFF:
-                return sd.getDifferential().getElement();
+                return utils.supplementMissingDiffElements(sd);
             case GEN_MODE_KEY:
                 return getKeyElements();
             case GEN_MODE_MS:
@@ -1445,11 +1447,15 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             List<StringType> newProfiles = new ArrayList<StringType>();
             List<StringType> oldProfiles = new ArrayList<StringType>();
             for (CanonicalType pt : t.getTargetProfile()) {
-                newProfiles.add(new StringType(getTypeProfile(pt, mustSupportOnly)));
+                String tgtProfile = getTypeProfile(pt, mustSupportOnly);
+                if (!tgtProfile.isEmpty())
+                    newProfiles.add(new StringType(tgtProfile));
             }
             if (compare!=null) {
                 for (CanonicalType pt : compare.getTargetProfile()) {
-                    oldProfiles.add(new StringType(getTypeProfile(pt, mustSupportOnly)));
+                    String tgtProfile = getTypeProfile(pt, mustSupportOnly);
+                    if (!tgtProfile.isEmpty())
+                        oldProfiles.add(new StringType(tgtProfile));
                 }
             }
             String profiles = compareSimpleTypeLists(newProfiles, oldProfiles, mode, "|");
