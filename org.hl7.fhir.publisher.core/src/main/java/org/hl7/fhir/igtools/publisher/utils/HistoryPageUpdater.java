@@ -57,6 +57,15 @@ public class HistoryPageUpdater {
     } else {
       TextFile.stringToFile(html, Utilities.path(folder, "history.html"), false);
     }
+
+    String index = new File(Utilities.path(folder, "index.html")).exists() ? TextFile.fileToString(Utilities.path(folder, "index.html")) : "XXXXX";
+    if (index.contains("XXXX")) {
+      html = TextFile.fileToString(Utilities.path(sourceRepo, "index.html"));
+      html = fixParameter(html, "title", json.get("title").getAsString());
+      html = fixParameter(html, "id", json.get("package-id").getAsString());
+      html = fixParameter(html, "json", jsonv);
+      TextFile.stringToFile(html, Utilities.path(folder, "index.html"), false);      
+    }
   }
 
   private String fixParameter(String html, String name, String value) {
