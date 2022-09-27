@@ -268,7 +268,7 @@ public class PublicationProcess {
     
     // finally
     System.out.println("Rebuild everything for "+Utilities.path(destination, "package-list.json"));
-    Publisher.main(new String[] { "-publish-update", "-folder", fRoot.getAbsolutePath(), "-registry", fRegistry.getAbsolutePath(), "-filter", destination, "-no-exit"});
+    Publisher.main(new String[] { "-publish-update", "-folder", fRoot.getAbsolutePath(), "-registry", fRegistry.getAbsolutePath(), "-filter", destination, "-history", history.getAbsolutePath(), "-no-exit"});
 
     System.out.println("Finished Publishing");
     logger.stop();

@@ -73,6 +73,7 @@ public class XIGLoader implements IPackageVisitorProcessor {
         String realm = getRealm(pid);
         if (realm != null) {
           cr.setUserData("realm", realm);
+          info.getJurisdictions().add(realm);
         }
         String auth = getAuth(pid);
         if (auth != null) {

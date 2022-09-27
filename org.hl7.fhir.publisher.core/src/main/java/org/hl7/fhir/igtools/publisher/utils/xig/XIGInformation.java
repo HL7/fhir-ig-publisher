@@ -10,6 +10,7 @@ import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CapabilityStatement;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeableConcept;
+import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ConceptMap;
 import org.hl7.fhir.r5.model.NamingSystem;
 import org.hl7.fhir.r5.model.OperationDefinition;
@@ -18,6 +19,7 @@ import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.renderers.DataRenderer;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
 public class XIGInformation {
@@ -29,7 +31,7 @@ public class XIGInformation {
   private Set<String> spr = new HashSet<>();
   private Set<String> nspr = new HashSet<>();
   private JsonObject json = new JsonObject();
-  private Set<String> realms = new HashSet<>();
+  private Set<String> jurisdictions = new HashSet<>();
   private SimpleWorkerContext ctxt;
   
   public Set<String> getPid() {
@@ -78,7 +80,23 @@ public class XIGInformation {
     if (cr.hasDescription()) {  j.addProperty("description", cr.getDescription()); }
     if (cr.hasCopyright()) {    j.addProperty("copyright", cr.getCopyright()); }
     for (CodeableConcept cc : cr.getJurisdiction()) {
-      if (cr.hasJurisdiction()) { j.addProperty("jurisdiction", DataRenderer.display(ctxt, cr.getJurisdictionFirstRep())); 
+      for (Coding c : cc.getCoding()) {
+        if (c.is("http://unstats.un.org/unsd/methods/m49/m49.htm", "001"))  {
+          jurisdictions.add("uv");
+
+          if (!j.has("jurisdictions")) {
+            j.add("jurisdictions", new JsonArray());
+          }
+          j.getAsJsonArray("jurisdictions").add("uv");
+        } else if ("urn:iso:std:iso:3166".equals(c.getSystem())) {
+          if (c.getCode().length() == 2) {
+            jurisdictions.add(c.getCode().toLowerCase());
+            if (!j.has("jurisdictions")) {
+              j.add("jurisdictions", new JsonArray());
+            }
+            j.getAsJsonArray("jurisdictions").add(c.getCode().toLowerCase());
+          }
+        }
       }
     }
         
@@ -106,5 +124,8 @@ public class XIGInformation {
     if (cr instanceof CapabilityStatement) {
       new XIGCapabilityStatementHandler(this).fillOutJson((CapabilityStatement) cr, j);
     }
+  }
+  public Set<String> getJurisdictions() {
+    return jurisdictions;
   }
 }

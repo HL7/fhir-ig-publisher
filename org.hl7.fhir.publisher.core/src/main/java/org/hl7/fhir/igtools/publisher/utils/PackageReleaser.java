@@ -165,7 +165,7 @@ public class PackageReleaser {
     }
   }
 
-  private static final String RSS_DATE = "EEE, dd MMM yyyy hh:mm:ss";
+  private static final String RSS_DATE = "EEE, dd MMM yyyy hh:mm:ss Z";
 
   private Document rss;
   private Element channel;

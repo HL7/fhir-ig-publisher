@@ -8,6 +8,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.json.JsonUtilities;
+
+import com.google.gson.JsonObject;
 
 public class XIGHandler {
 
@@ -126,8 +129,17 @@ public class XIGHandler {
     if (Utilities.existsInList(realm, "hl7", "ihe")) {
       return realm.equals(cr.getUserData("auth"));
     } else {
-      return realm.equals(cr.getUserData("realm"));
+      if (realm.equals(cr.getUserData("realm"))) {
+        return true;
+      }
+      JsonObject j = (JsonObject) cr.getUserData("json");
+      for (String str : JsonUtilities.strings(j.getAsJsonArray("jurisdictions"))) {
+        if (realm.equals(str)) {
+          return true;
+        }
+      }
     }
+    return false;
   }
 
   protected boolean inMode(String mode, Set<String> systems) {
