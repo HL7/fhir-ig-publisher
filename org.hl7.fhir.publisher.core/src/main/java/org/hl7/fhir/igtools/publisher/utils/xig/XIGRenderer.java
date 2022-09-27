@@ -39,6 +39,7 @@ import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.renderers.RendererFactory;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.ResourceRendererMode;
+import org.hl7.fhir.r5.terminologies.JurisdictionUtilities;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
@@ -131,10 +132,13 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
     addPage(b, "all-index.html", genPageSet(target, "all", "Everything"));
     addPage(b, "hl7-index.html", genPageSet(target, "hl7", "HL7"));
     addPage(b, "ihe-index.html", genPageSet(target, "ihe", "IHE"));
+    addPage(b, "uv-index.html", genPageSet(target, "uv", "Intl."));
     addPage(b, "us-index.html", genPageSet(target, "us", "US"));
-    addPage(b, "uv-index.html", genPageSet(target, "uv", "UV"));
-    addPage(b, "be-index.html", genPageSet(target, "be", "BE"));
-    addPage(b, "ch-index.html", genPageSet(target, "ch", "CH"));
+    for (String s : info.getJurisdictions()) {
+      if (!Utilities.existsInList(s, "uv", "us")) {
+        addPage(b, s+"-index.html", genPageSet(target, s, JurisdictionUtilities.displayJurisdiction(s)));
+      }
+    }
 
     genPage("XIG index", b.toString(), Utilities.path(target, "index.html"));
 

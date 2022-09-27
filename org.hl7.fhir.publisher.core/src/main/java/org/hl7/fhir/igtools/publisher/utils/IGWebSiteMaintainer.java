@@ -45,10 +45,10 @@ import com.google.gson.JsonSyntaxException;
 public class IGWebSiteMaintainer {
 
   public static void main(String[] args) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
-    execute(args[0], args.length > 1 ? new IGRegistryMaintainer(args[1]) : null, args.length >= 3 && "true".equals(args[2]), null, false);
+    execute(args[0], args.length > 1 ? new IGRegistryMaintainer(args[1]) : null, args.length >= 3 && "true".equals(args[2]), null, false, args[3]);
   }
   
-  public static void execute(String folder, IGRegistryMaintainer reg, boolean doCore, String filter, boolean skipPrompt) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
+  public static void execute(String folder, IGRegistryMaintainer reg, boolean doCore, String filter, boolean skipPrompt, String historyRepo) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
     System.out.println("Update publication at '"+folder+"' with filter '"+filter+"'");
     File f = new File(folder);
     if (!f.exists())
@@ -105,7 +105,7 @@ public class IGWebSiteMaintainer {
       }
     }
     for (String s : igs) {
-      new IGReleaseUpdater(s, url, folder, reg, serverType, igs, sft, filter == null || filter.equalsIgnoreCase(s)).check(indexes, true);
+      new IGReleaseUpdater(s, url, folder, reg, serverType, igs, sft, filter == null || filter.equalsIgnoreCase(s), historyRepo).check(indexes, true);
     }
     for (IndexMaintainer index : indexes.values()) {
       index.execute();

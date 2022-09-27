@@ -110,7 +110,7 @@ public class TemplateReleaser {
     }
   }
 
-  private static final String RSS_DATE = "EEE, dd MMM yyyy hh:mm:ss";
+  private static final String RSS_DATE = "EEE, dd MMM yyyy hh:mm:ss Z";
 
   private Document rss;
   private Element channel;
@@ -359,7 +359,7 @@ public class TemplateReleaser {
       VersionChangeType t = v.type;
       if (vd.isExplicit()) {
         if (vd.type.lessThan(t)) {
-          throw new Exception("invalid operation for "+vd.id);
+          throw new Exception("invalid operation for "+vd.id+": change type from "+vd.type+" to "+t);
         }
       } else {
         if (vd.type.lessThan(t)) {

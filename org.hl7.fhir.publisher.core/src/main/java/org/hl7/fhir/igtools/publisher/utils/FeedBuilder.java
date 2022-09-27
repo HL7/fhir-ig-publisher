@@ -28,7 +28,7 @@ import com.google.gson.JsonSyntaxException;
 
 public class FeedBuilder {
 
-  private static final String RSS_DATE = "EEE, dd MMM yyyy hh:mm:ss";
+  private static final String RSS_DATE = "EEE, dd MMM yyyy hh:mm:ss Z";
 
   public class PublicationSorter implements Comparator<Publication> {
 
@@ -193,7 +193,7 @@ public class FeedBuilder {
     b.append("    <lastBuildDate>"+df.format(new Date())+" GMT"+"</lastBuildDate>\r\n");
     b.append("    <atom:link href=\""+thisUrl+"\" rel=\"self\" type=\"application/rss+xml\"/>\r\n");
     b.append("    <pubDate>"+df.format(new Date())+"</pubDate>\r\n");
-    b.append("    <language>en></language>\r\n");
+    b.append("    <language>en</language>\r\n");
     b.append("    <ttl>600</ttl>\r\n");
     
     for (Publication pub : pubs) {
