@@ -104,6 +104,7 @@ import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
 import org.hl7.fhir.igtools.publisher.realm.NullRealmBusinessRules;
 import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
 import org.hl7.fhir.igtools.publisher.realm.USRealmBusinessRules;
+import org.hl7.fhir.igtools.publisher.utils.HistoryPageUpdater;
 import org.hl7.fhir.igtools.publisher.utils.IGRegistryMaintainer;
 import org.hl7.fhir.igtools.publisher.utils.IGReleaseVersionDeleter;
 import org.hl7.fhir.igtools.publisher.utils.IGWebSiteMaintainer;
@@ -573,7 +574,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     @Override
     public Base parseType(Element base) throws FHIRFormatError, IOException, FHIRException {
-      throw new NotImplementedException();
+      ByteArrayOutputStream bs = new ByteArrayOutputStream();
+      new org.hl7.fhir.r5.elementmodel.XmlParser(context).compose(base, bs, OutputStyle.NORMAL, null);
+      String xml = new String(bs.toByteArray(), StandardCharsets.UTF_8);
+      return parseType(xml, base.fhirType());
     }
   }
 
@@ -10230,21 +10234,27 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       new PublicationProcess().publish(getNamedParam(args, "-source"), getNamedParam(args, "-destination"), hasNamedParam(args, "-milestone"), getNamedParam(args, "-registry"), getNamedParam(args, "-history"), getNamedParam(args, "-temp"));
     } else if (hasNamedParam(args, "-xig")) {
       new XIGGenerator(getNamedParam(args, "-xig"));
+    } else if (hasNamedParam(args, "-update-history")) {
+      new HistoryPageUpdater().updateHistoryPages(getNamedParam(args, "-history"), getNamedParam(args, "-website"), getNamedParam(args, "-website"));
     } else if (hasNamedParam(args, "-publish-update")) {
       if (!args[0].equals("-publish-update")) {
-        throw new Error("-publish-update must have the format -publish-update -folder {folder} -registry {registry}/fhir-ig-list.json (first argument is not -publish-update)");
+        throw new Error("-publish-update must have the format -publish-update -folder {folder} -registry {registry}/fhir-ig-list.json -history {folder} (first argument is not -publish-update)");
       }
       if (args.length < 3) {
-        throw new Error("-publish-update must have the format -publish-update -folder {folder} -registry {registry}/fhir-ig-list.json (not enough args)");
+        throw new Error("-publish-update must have the format -publish-update -folder {folder} -registry {registry}/fhir-ig-list.json -history {folder} (not enough args)");
       }
       File f = new File(getNamedParam(args, "-folder"));
       if (!f.exists() || !f.isDirectory()) {
-        throw new Error("-publish-update must have the format -publish-update -folder {folder} -registry {registry}/fhir-ig-list.json ({folder} not found)");
+        throw new Error("-publish-update must have the format -publish-update -folder {folder} -registry {registry}/fhir-ig-list.json -history {folder} ({folder} not found)");
       }
       
       String registry = getNamedParam(args, "-registry");
       if (Utilities.noString(registry)) {
-        throw new Error("-publish-update must have the format -publish-update -url {url} -root {root} -registry {registry}/fhir-ig-list.json (-registry parameter not found)");
+        throw new Error("-publish-update must have the format -publish-update -url {url} -root {root} -registry {registry}/fhir-ig-list.json -history {folder} (-registry parameter not found)");
+      }
+      String history = getNamedParam(args, "-history");
+      if (Utilities.noString(history)) {
+        throw new Error("-publish-update must have the format -publish-update -url {url} -root {root} -registry {registry}/fhir-ig-list.json -history {folder} (-history parameter not found)");
       }
       String filter = getNamedParam(args, "-filter");
       boolean skipPrompt = hasNamedParam(args, "-noconfirm");
@@ -10252,13 +10262,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (!"n/a".equals(registry)) {
         File fr = new File(registry);
         if (!fr.exists() || fr.isDirectory()) {
-          throw new Error("-publish-update must have the format -publish-update -url {url} -root {root} -registry {registry}/fhir-ig-list.json ({registry} not found)");
+          throw new Error("-publish-update must have the format -publish-update -url {url} -root {root} -registry {registry}/fhir-ig-list.json -history {folder} ({registry} not found)");
         }
       }
       boolean doCore = "true".equals(getNamedParam(args, "-core"));
       
       IGRegistryMaintainer reg = "n/a".equals(registry) ? null : new IGRegistryMaintainer(registry);
-      IGWebSiteMaintainer.execute(f.getAbsolutePath(), reg, doCore, filter, skipPrompt);
+      IGWebSiteMaintainer.execute(f.getAbsolutePath(), reg, doCore, filter, skipPrompt, history);
       reg.finish();      
     } else if (hasNamedParam(args, "-multi")) {
       int i = 1;

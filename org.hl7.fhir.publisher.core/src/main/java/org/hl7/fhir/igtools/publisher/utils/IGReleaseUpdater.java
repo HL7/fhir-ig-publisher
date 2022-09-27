@@ -88,13 +88,15 @@ public class IGReleaseUpdater {
   private List<String> ignoreList = new ArrayList<>();
   private File sft;
   private boolean fullUpdate;
+  private String historySource;
 
-  public IGReleaseUpdater(String folder, String url, String rootFolder, IGRegistryMaintainer reg, ServerType serverType, List<String> otherSpecs, File sft, boolean full) throws IOException {
+  public IGReleaseUpdater(String folder, String url, String rootFolder, IGRegistryMaintainer reg, ServerType serverType, List<String> otherSpecs, File sft, boolean full, String historySource) throws IOException {
     this.folder = folder;
     this.url = url;
     this.rootFolder = rootFolder;
     this.fullUpdate = full;
     this.sft = sft;
+    this.historySource = historySource;
     if (!"".equals("http://hl7.org/fhir")) { // keep the main spec out of the registry
       this.reg = reg;
     }
@@ -203,40 +205,7 @@ public class IGReleaseUpdater {
         }
         if (save)
           TextFile.stringToFile(new GsonBuilder().setPrettyPrinting().create().toJson(json), f, false);
-        File ht = new File(Utilities.path(folder, "history.template"));
-        if (!ht.exists()) {
-         ht = new File(Utilities.path(rootFolder, "history.template"));
-        }
-        if (ht.exists()) {
-          scrubApostrophes(json);
-          String jsonv = new GsonBuilder().create().toJson(json);
-          String html = TextFile.fileToString(ht);
-          html = html.replace("$header$", loadTemplate(rootFolder, folder, "header.template"));
-          html = html.replace("$preamble$", loadTemplate(rootFolder, folder, "preamble.template"));
-          html = html.replace("$postamble$", loadTemplate(rootFolder, folder, "postamble.template"));
-          html = fixParameter(html, "title", json.get("title").getAsString());
-          html = fixParameter(html, "json", jsonv);
-          // disabled GDG 23-02-2022: get this right in the template instead
-//          html = html.replace("assets/", "assets-hist/");
-//          html = html.replace("dist/", "dist-hist/");
-          TextFile.stringToFile(html, Utilities.path(folder, "history.html"), false);
-        }
-        ht = new File(Utilities.path(folder, "directory.template"));
-        if (!ht.exists()) {
-          ht = new File(Utilities.path(rootFolder, "directory.template"));
-         }
-        if (ht.exists()) {
-          scrubApostrophes(json);
-          String jsonv = new GsonBuilder().create().toJson(json);
-          String html = TextFile.fileToString(ht);
-          html = fixParameter(html, "title", json.get("title").getAsString());
-          html = fixParameter(html, "json", jsonv);
-          TextFile.stringToFile(html, Utilities.path(folder, "directory.html"), false);
-        }
-        if (!folder.equals(rootFolder)) {
-          checkCopyFolderFromRoot(folder, "dist-hist");
-          checkCopyFolderFromRoot(folder, "assets-hist");
-        }
+        new HistoryPageUpdater().updateHistoryPage(historySource, rootFolder, folder);
       }
         
     } catch (Exception e) {
@@ -256,20 +225,7 @@ public class IGReleaseUpdater {
     }
   }
 
-  private String loadTemplate(String rootFolder, String folder, String filename) throws FileNotFoundException, IOException {
-    while (new File(folder).exists()) {
-      File f = new File(Utilities.path(folder, "templates", "filename"));
-      if (f.exists()) {
-        return TextFile.fileToString(f);
-      }
-      if (folder.equals(rootFolder)) {
-        throw new Error("Not found: "+f.getAbsolutePath());
-      }
-      folder = Utilities.getDirectoryForFile(folder); 
-    }
-    return null;
-  }
-
+  
   private String summariseDate(String d) {
     if (d == null || d.length() < 10) {
       return "??";
@@ -277,12 +233,6 @@ public class IGReleaseUpdater {
     return d.substring(0,7);
   }
 
-  private String fixParameter(String html, String name, String value) {
-    while (html.contains("[%"+name+"%]")) {
-      html = html.replace("[%"+name+"%]", value);
-    }
-    return html;
-  }
 
   private void checkCopyFolderFromRoot(String focus, String name) throws IOException {
     File src = new File(Utilities.path(rootFolder, name));
@@ -430,6 +380,16 @@ public class IGReleaseUpdater {
     return vc;
   }
 
+
+  private String fixParameter(String html, String name, String value) {
+    while (html.contains("[%"+name+"%]")) {
+      html = html.replace("[%"+name+"%]", value);
+    }
+    return html;
+  }
+
+
+  
   private String getJurisdiction(String vf, String fv, JsonObject ig, JsonObject version) throws FHIRFormatError, FHIRException, FileNotFoundException, IOException {
     String inferred = readJurisdictionFromPackageIg(version.has("package-id") ? version.get("package-id").getAsString() : ig.get("package-id").getAsString());
         
@@ -682,7 +642,7 @@ public class IGReleaseUpdater {
   }
 
   public static void main(String[] args) throws Exception {
-    new IGReleaseUpdater(args[0], args[1], args[2], null, ServerType.ASP2, null, null, true).check(null, false);
+    new IGReleaseUpdater(args[0], args[1], args[2], null, ServerType.ASP2, null, null, true, args[3]).check(null, false);
   }
   
 }
