@@ -4794,7 +4794,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     res.add("SearchParameter");
     res.add("CapabilityStatement");
     res.add("Conformance");
-    res.add("CapabilityStatement2");
     res.add("StructureMap");
     res.add("ActivityDefinition");
     res.add("Citation");
