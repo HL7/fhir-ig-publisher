@@ -5,9 +5,12 @@ import java.util.Collections;
 import java.util.List;
 
 import org.hl7.fhir.igtools.publisher.utils.xig.XIGHandler.PageContent;
+import org.hl7.fhir.igtools.publisher.utils.xig.XIGInformation.UsageType;
 import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.CodeType;
 import org.hl7.fhir.r5.model.OperationDefinition;
+import org.hl7.fhir.r5.model.OperationDefinition.OperationDefinitionParameterComponent;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -71,6 +74,20 @@ public class XIGOperationDefinitionHandler extends XIGHandler {
     b.append("</table>\r\n");
 
     return new PageContent(title+" ("+list.size()+")", b.toString());
+  }
+
+  public static void buildUsages(XIGInformation info, OperationDefinition od) {
+    info.recordUsage(od, od.getBase(), UsageType.DERIVATION);
+    info.recordUsage(od, od.getInputProfile(), UsageType.OP_PROFILE);
+    info.recordUsage(od, od.getOutputProfile(), UsageType.OP_PROFILE);
+    for (OperationDefinitionParameterComponent t : od.getParameter()) {
+      for (CanonicalType c : t.getTargetProfile()) {
+        info.recordUsage(od, c.getValue(), UsageType.TARGET);
+      }
+      if (t.hasBinding()) {
+        info.recordUsage(od, t.getBinding().getValueSet(), UsageType.BINDING);
+      }
+    }
   }
 
 

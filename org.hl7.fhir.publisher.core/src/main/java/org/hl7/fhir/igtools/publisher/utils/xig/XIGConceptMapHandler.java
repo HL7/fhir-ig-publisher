@@ -6,10 +6,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.eclipse.persistence.platform.database.Informix11Platform;
 import org.hl7.fhir.igtools.publisher.utils.xig.XIGHandler.PageContent;
+import org.hl7.fhir.igtools.publisher.utils.xig.XIGInformation.UsageType;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.ConceptMap;
 import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
+import org.hl7.fhir.r5.model.ConceptMap.OtherElementComponent;
+import org.hl7.fhir.r5.model.ConceptMap.SourceElementComponent;
+import org.hl7.fhir.r5.model.ConceptMap.TargetElementComponent;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -79,5 +84,34 @@ public class XIGConceptMapHandler extends XIGHandler {
     b.append("</table>\r\n");
 
     return new PageContent(title+" ("+list.size()+")", b.toString());
+  }
+
+  public static void buildUsages(XIGInformation info, ConceptMap cm) {
+    if (cm.hasSourceScopeCanonicalType()) {
+      info.recordUsage(cm, cm.getSourceScopeCanonicalType().getValue(), UsageType.CM_SCOPE);
+    }
+    if (cm.hasTargetScopeCanonicalType()) {
+      info.recordUsage(cm, cm.getTargetScopeCanonicalType().getValue(), UsageType.CM_SCOPE);
+    }
+    for (ConceptMapGroupComponent g : cm.getGroup()) {
+      info.recordUsage(cm, g.getSource(), UsageType.CM_SCOPE);
+      info.recordUsage(cm, g.getSource(), UsageType.CM_SCOPE);
+      for (SourceElementComponent e : g.getElement()) {
+        info.recordUsage(cm, e.getValueSet(), UsageType.CM_MAP);
+        for (TargetElementComponent t : e.getTarget()) {
+          info.recordUsage(cm, t.getValueSet(), UsageType.CM_MAP);
+          for (OtherElementComponent p : t.getProduct()) {
+            info.recordUsage(cm, p.getValueSet(), UsageType.CM_MAP);
+          }
+          for (OtherElementComponent d : t.getDependsOn()) {
+            info.recordUsage(cm, d.getValueSet(), UsageType.CM_MAP);
+          }
+        }
+      }
+      if (g.hasUnmapped()) {
+        info.recordUsage(cm, g.getUnmapped().getValueSet(), UsageType.CM_UNMAP);
+        info.recordUsage(cm, g.getUnmapped().getOtherMap(), UsageType.CM_UNMAP);
+      }
+    }
   }
 }

@@ -1,10 +1,14 @@
 package org.hl7.fhir.igtools.publisher.utils.xig;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.hl7.fhir.igtools.publisher.utils.xig.XIGInformation.CanonicalResourceUsage;
+import org.hl7.fhir.igtools.publisher.utils.xig.XIGInformation.UsageType;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CapabilityStatement;
@@ -14,8 +18,10 @@ import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ConceptMap;
 import org.hl7.fhir.r5.model.NamingSystem;
 import org.hl7.fhir.r5.model.OperationDefinition;
+import org.hl7.fhir.r5.model.Questionnaire;
 import org.hl7.fhir.r5.model.SearchParameter;
 import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.r5.model.StructureMap;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.renderers.DataRenderer;
 
@@ -24,6 +30,48 @@ import com.google.gson.JsonObject;
 
 public class XIGInformation {
 
+  public class CanonicalResourceUsage {
+    private CanonicalResource resource;
+    private UsageType usage;
+    public CanonicalResourceUsage(CanonicalResource resource, UsageType usage) {
+      super();
+      this.resource = resource;
+      this.usage = usage;
+    }
+    public CanonicalResource getResource() {
+      return resource;
+    }
+    public UsageType getUsage() {
+      return usage;
+    }
+    
+  }
+  public enum UsageType {
+    CS_IMPORTS, VS_SYSTEM, VS_VALUESET, VS_EXPANSION, DERIVATION, SP_PROFILE, OP_PROFILE, TARGET, BINDING, CM_SCOPE, CM_MAP, CM_UNMAP, CS_VALUESET, CS_SUPPLEMENTS, CS_PROFILE, SD_PROFILE;
+
+    public String getDisplay() {
+      switch (this) {
+      case BINDING: return " (binding)";
+      case CM_MAP: return " (used in map)";
+      case CM_SCOPE: return " (map scope)";
+      case CM_UNMAP: return " (map when unmapped)";
+      case CS_IMPORTS: return " (depends on)";
+      case CS_PROFILE: return " (profile)";
+      case CS_SUPPLEMENTS: return " (supplements)";
+      case CS_VALUESET: return " (all codes valueset)";
+      case DERIVATION: return " (derives from)";
+      case OP_PROFILE: return " (profile)";
+      case SD_PROFILE: return " (profile)";
+      case SP_PROFILE: return " (profile)";
+      case TARGET: return " (target profile)";
+      case VS_EXPANSION: return " (expansion)";
+      case VS_SYSTEM: return " (system)";
+      case VS_VALUESET: return " (valueset)";
+      }
+      return "";
+    }
+
+  }
   Set<String> pid = new HashSet<>();
   Map<String, Map<String, CanonicalResource>> counts = new HashMap<>();
   Map<String, CanonicalResource> resources = new HashMap<>();
@@ -33,6 +81,7 @@ public class XIGInformation {
   private JsonObject json = new JsonObject();
   private Set<String> jurisdictions = new HashSet<>();
   private SimpleWorkerContext ctxt;
+  Map<String, List<CanonicalResourceUsage>> usages = new HashMap<>();
   
   public Set<String> getPid() {
     return pid;
@@ -57,6 +106,9 @@ public class XIGInformation {
     this.json = json;
   }
 
+  public Map<String, List<CanonicalResourceUsage>> getUsages() {
+    return usages;
+  }
   public Set<String> getNspr() {
     return nspr;
   }
@@ -127,5 +179,54 @@ public class XIGInformation {
   }
   public Set<String> getJurisdictions() {
     return jurisdictions;
+  }
+
+  public void buildUsageMap() {
+    for (CanonicalResource cr : resources.values()) {
+      switch (cr.fhirType()) {
+      case "CapabilityStatement" :
+        XIGCapabilityStatementHandler.buildUsages(this, (CapabilityStatement) cr);
+        break;
+      case "SearchParameter" :
+        XIGSearchParameterHandler.buildUsages(this, (SearchParameter) cr);
+        break;
+      case "OperationDefinition" :
+        XIGOperationDefinitionHandler.buildUsages(this, (OperationDefinition) cr);
+        break;
+      case "StructureDefinition" :
+        XIGStructureDefinitionHandler.buildUsages(this, (StructureDefinition) cr);
+        break;
+      case "ValueSet" :
+        XIGValueSetHandler.buildUsages(this, (ValueSet) cr);
+        break;
+      case "CodeSystem" :
+        XIGCodeSystemHandler.buildUsages(this, (CodeSystem) cr);
+        break;
+      case "ConceptMap" :
+        XIGConceptMapHandler.buildUsages(this, (ConceptMap) cr);
+        break;
+//      case "StructureMap" :
+//        XIGStructureMapHandler.buildUsages(this, (StructureMap) cr);
+//        break;
+//      case "Questionnaire" :
+//        XIGQuestionnaireHandler.buildUsages(this, (Questionnaire) cr);
+//        break;
+      } 
+    }
+  }
+  public void recordUsage(CanonicalResource cr, String value, UsageType usage) {
+    if (value != null) {
+      List<CanonicalResourceUsage> list = usages.get(value);
+      if (list == null) {
+        list = new ArrayList<>();
+        usages.put(value, list);
+      }
+      for (CanonicalResourceUsage cu : list) {
+        if (cu.resource == cr && cu.usage == usage) {
+          return;
+        }
+      }
+      list.add(new CanonicalResourceUsage(cr, usage));
+    }
   }
 }
