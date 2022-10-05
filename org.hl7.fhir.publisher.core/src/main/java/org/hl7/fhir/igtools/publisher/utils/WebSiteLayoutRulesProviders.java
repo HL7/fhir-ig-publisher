@@ -3,6 +3,7 @@ package org.hl7.fhir.igtools.publisher.utils;
 import java.io.IOException;
 import java.util.List;
 
+import com.google.common.base.Strings;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
@@ -88,11 +89,18 @@ public class WebSiteLayoutRulesProviders {
     
     @Override
     public boolean checkCanonicalAndUrl(List<ValidationMessage> res, String canonical, String url) {
-      String category = getPart("category");
-      String code = getPart("code");
-      String u = canonicalRule.replace("[category]", category).replace("[code]", code);
-      boolean ok = check(res, canonical.equals(u) , "canonical URL of '"+canonical+"' does not match the required canonical of '"+u+"' [1]");
-      return check(res, canonical.startsWith(url), "Proposed canonical '"+canonical+"' does not match the web site URL '"+url+"'") && ok;
+        String category = getPart("category");
+        String code = getPart("code");
+
+        String u = canonicalRule.replace("[code]", code);
+
+        if(u.contains("[category]")) {
+          assert !Strings.isNullOrEmpty(category);
+          u = u.replace("[category]", category);
+        }
+
+        boolean ok = check(res, canonical.equals(u) , "canonical URL of '"+canonical+"' does not match the required canonical of '"+u+"' [1]");
+        return check(res, canonical.startsWith(url), "Proposed canonical '"+canonical+"' does not match the web site URL '"+url+"'") && ok;
     }
         
     @Override
