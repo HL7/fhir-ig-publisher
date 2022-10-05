@@ -92,10 +92,13 @@ public class WebSiteLayoutRulesProviders {
         String category = getPart("category");
         String code = getPart("code");
 
-        String u = canonicalRule;
-        if(!Strings.isNullOrEmpty(category))
-            u = u.replace("[category]", category);
-        u = u.replace("[code]", code);
+        String u = canonicalRule.replace("[code]", code);
+
+        if(u.contains("[category]")) {
+          assert !Strings.isNullOrEmpty(category);
+          u = u.replace("[category]", category);
+        }
+
         boolean ok = check(res, canonical.equals(u) , "canonical URL of '"+canonical+"' does not match the required canonical of '"+u+"' [1]");
         return check(res, canonical.startsWith(url), "Proposed canonical '"+canonical+"' does not match the web site URL '"+url+"'") && ok;
     }
