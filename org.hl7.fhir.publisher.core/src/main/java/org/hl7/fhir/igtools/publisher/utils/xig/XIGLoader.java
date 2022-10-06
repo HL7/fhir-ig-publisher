@@ -55,7 +55,7 @@ public class XIGLoader implements IPackageVisitorProcessor {
       info.getJson().getAsJsonObject("packages").add(pid, npm.getNpm());
     }
         
-    info.getPid().add(pid);
+    info.getPid().put(pid, npm.getWebLocation());
     Resource r = loadResource(pid, version, type, id, content);
     if (r != null && r instanceof CanonicalResource) {
       CanonicalResource cr = (CanonicalResource) r;

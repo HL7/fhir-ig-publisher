@@ -52,7 +52,7 @@ public class BaseRenderer extends TranslatingUtilities implements IMarkdownProce
   protected List<SpecMapManager> specmaps;
   protected Set<String> allTargets;
   protected NpmPackage packge;
-  private MarkDownProcessor markdownEngine;
+  protected MarkDownProcessor markdownEngine;
   protected RenderingContext gen;
 
 
@@ -111,7 +111,7 @@ public class BaseRenderer extends TranslatingUtilities implements IMarkdownProce
 	      }
 	      text = left+"["+linkText+"]("+url+")"+right;
 	    }
-	    // 1. if prefix <> "", then check whether we need to insert the prefix
+	    // 2. if prefix <> "", then check whether we need to insert the prefix
 	    if (!Utilities.noString(prefix)) {
 	      int i = text.length() - 3;
 	      while (i > 0) {
@@ -126,7 +126,7 @@ public class BaseRenderer extends TranslatingUtilities implements IMarkdownProce
 	    }
 	    text = ProfileUtilities.processRelativeUrls(text, "", corePath, context.getResourceNames(), specmaps.get(0).listTargets(), allTargets, false);
 	    // 3. markdown
-	    String s = markdownEngine.process(checkEscape(text), location);
+	    String s = markdownEngine.process(text, location);
 	    return s;
 	  } catch (Throwable e) {
 		  throw new FHIRException("Error processing string: " + text, e);
@@ -140,13 +140,6 @@ public class BaseRenderer extends TranslatingUtilities implements IMarkdownProce
         return Utilities.pathURL(map.getBase(), url);
     }      
     return null;
-  }
-
-  private String checkEscape(String text) {
-    if (text.startsWith("```"))
-      return text.substring(3);
-    else
-      return Utilities.escapeXml(text);
   }
 
   protected String canonicalise(String uri) {

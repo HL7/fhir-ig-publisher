@@ -56,7 +56,9 @@ import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
+import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
+import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Cell;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Piece;
 
@@ -143,7 +145,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
                     }
 
                     for (TypeRefComponent t : ed.getType()) {
-                        if (t.hasProfile() && !igp.isDatatype(t.getProfile().get(0).getValue().substring(40))) {
+                        if (t.hasProfile() && t.getProfile().get(0).getValue().length() > 40 && !igp.isDatatype(t.getProfile().get(0).getValue().substring(40))) {
                             if (ed.getPath().endsWith(".extension")) {
                                 tryAdd(ext, summariseExtension(t.getProfile(), false));
                             } else if (ed.getPath().endsWith(".modifierExtension")) {
@@ -434,7 +436,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateGrid(defnFile, sd, destDir, false, sd.getId(), corePath, "", outputTracker));
     }
 
-    public String txDiff(boolean withHeadings, boolean mustSupportOnly) throws FHIRException {
+    public String txDiff(boolean withHeadings, boolean mustSupportOnly) throws FHIRException, IOException {
         List<String> txlist = new ArrayList<String>();
         boolean hasFixed = false;
         Map<String, ElementDefinition> txmap = new HashMap<String, ElementDefinition>();
@@ -475,7 +477,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
     }
 
-    public String tx(boolean withHeadings, boolean mustSupportOnly) throws FHIRException {
+    public String tx(boolean withHeadings, boolean mustSupportOnly) throws FHIRException, IOException {
         List<String> txlist = new ArrayList<String>();
         boolean hasFixed = false;
         Map<String, ElementDefinition> txmap = new HashMap<String, ElementDefinition>();
@@ -534,7 +536,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         return null;
     }
 
-    public void txItem(Map<String, ElementDefinition> txmap, StringBuilder b, String path, String url) throws FHIRException {
+    public void txItem(Map<String, ElementDefinition> txmap, StringBuilder b, String path, String url) throws FHIRException, IOException {
         ElementDefinition ed = txmap.get(path);
         ElementDefinitionBindingComponent tx = ed.getBinding();
         BindingResolutionDetails brd = new BindingResolutionDetails("", "?ext");
@@ -575,18 +577,35 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         if (brd.suffix != null) {
           b.append(brd.suffix);
         }
+        AdditionalBindingsRenderer abr = new AdditionalBindingsRenderer(igp, corePath, sd, path, gen, this);
         if (tx.hasExtension(ToolingExtensions.EXT_MAX_VALUESET)) {
-            BindingResolution br = igp.resolveBinding(sd, ToolingExtensions.readStringExtension(tx, ToolingExtensions.EXT_MAX_VALUESET), path);
-            b.append("<br/>");
-            b.append("<a style=\"font-weight:bold\" title=\"Max Value Set Extension\" href=\"" + corePath + "extension-elementdefinition-maxvalueset.html\">Max Binding</a>: ");
-            b.append((br.url == null ? processMarkdown("binding", br.display) : "<a href=\"" + Utilities.escapeXml((Utilities.isAbsoluteUrlLinkable(br.url) || !igp.prependLinks() ? br.url : corePath + br.url)) + "\">" + Utilities.escapeXml(br.display) + "</a>"));
+          abr.seeMaxBinding(ToolingExtensions.getExtension(tx, ToolingExtensions.EXT_MAX_VALUESET));
         }
         if (tx.hasExtension(ToolingExtensions.EXT_MIN_VALUESET)) {
-            BindingResolution br = igp.resolveBinding(sd, ToolingExtensions.readStringExtension(tx, ToolingExtensions.EXT_MIN_VALUESET), path);
-            b.append("<br/>");
-            b.append("<a style=\"font-weight:bold\" title=\"Min Value Set Extension\" href=\"" + corePath + "extension-elementdefinition-minvalueset.html\">Min Binding</a>: ");
-            b.append((br.url == null ? processMarkdown("binding", br.display) : "<a href=\"" + Utilities.escapeXml((Utilities.isAbsoluteUrlLinkable(br.url) || !igp.prependLinks() ? br.url : corePath + br.url)) + "\">" + Utilities.escapeXml(br.display) + "</a>"));
+          abr.seeMinBinding(ToolingExtensions.getExtension(tx, ToolingExtensions.EXT_MIN_VALUESET));
         }
+        if (tx.hasExtension(ToolingExtensions.EXT_BINDING_ADDITIONAL)) {
+          abr.seeAdditionalBindings(tx.getExtensionsByUrl(ToolingExtensions.EXT_BINDING_ADDITIONAL));
+        }
+        if (abr.hasBindings()) {
+          XhtmlNode x = new XhtmlNode(NodeType.Element, "table");
+          x.setAttribute("class", "grid");
+          abr.render(x.getChildNodes(), true);
+          b.append(new XhtmlComposer(true, true).compose(x));
+        }
+//
+//        if (tx.hasExtension(ToolingExtensions.EXT_MAX_VALUESET)) {
+//            BindingResolution br = igp.resolveBinding(sd, ToolingExtensions.readStringExtension(tx, ToolingExtensions.EXT_MAX_VALUESET), path);
+//            b.append("<br/>");
+//            b.append("<a style=\"font-weight:bold\" title=\"Max Value Set Extension\" href=\"" + corePath + "extension-elementdefinition-maxvalueset.html\">Max Binding</a>: ");
+//            b.append((br.url == null ? processMarkdown("binding", br.display) : "<a href=\"" + Utilities.escapeXml((Utilities.isAbsoluteUrlLinkable(br.url) || !igp.prependLinks() ? br.url : corePath + br.url)) + "\">" + Utilities.escapeXml(br.display) + "</a>"));
+//        }
+//        if (tx.hasExtension(ToolingExtensions.EXT_MIN_VALUESET)) {
+//            BindingResolution br = igp.resolveBinding(sd, ToolingExtensions.readStringExtension(tx, ToolingExtensions.EXT_MIN_VALUESET), path);
+//            b.append("<br/>");
+//            b.append("<a style=\"font-weight:bold\" title=\"Min Value Set Extension\" href=\"" + corePath + "extension-elementdefinition-minvalueset.html\">Min Binding</a>: ");
+//            b.append((br.url == null ? processMarkdown("binding", br.display) : "<a href=\"" + Utilities.escapeXml((Utilities.isAbsoluteUrlLinkable(br.url) || !igp.prependLinks() ? br.url : corePath + br.url)) + "\">" + Utilities.escapeXml(br.display) + "</a>"));
+//        }
         b.append("</td></tr>\r\n");
     }
 

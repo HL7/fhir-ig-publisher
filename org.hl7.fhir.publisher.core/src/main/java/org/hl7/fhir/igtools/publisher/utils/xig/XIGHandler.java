@@ -133,9 +133,11 @@ public class XIGHandler {
         return true;
       }
       JsonObject j = (JsonObject) cr.getUserData("json");
-      for (String str : JsonUtilities.strings(j.getAsJsonArray("jurisdictions"))) {
-        if (realm.equals(str)) {
-          return true;
+      if (j.has("jurisdictions")) {
+        for (String str : JsonUtilities.strings(j.getAsJsonArray("jurisdictions"))) {
+          if (realm.equals(str)) {
+            return true;
+          }
         }
       }
     }

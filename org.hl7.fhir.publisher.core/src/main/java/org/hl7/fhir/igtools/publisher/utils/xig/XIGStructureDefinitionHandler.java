@@ -7,14 +7,21 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.print.DocFlavor.URL;
+
 import org.hl7.fhir.igtools.publisher.utils.xig.XIGHandler.PageContent;
+import org.hl7.fhir.igtools.publisher.utils.xig.XIGInformation.CanonicalResourceUsage;
+import org.hl7.fhir.igtools.publisher.utils.xig.XIGInformation.UsageType;
+import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ElementDefinition;
+import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
 import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
+import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.utilities.Utilities;
 
 import com.google.gson.JsonArray;
@@ -142,7 +149,7 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
       return "Unknown";
     }
   }
-  
+
   public String makeProfilesTypePage(List<StructureDefinition> list, String type, String actualType) {
     Collections.sort(list, new CanonicalResourceSorter());
     StringBuilder b = new StringBuilder();
@@ -209,15 +216,15 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
 
   private String legend() {
     return
-      "<span style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: black; background-color: #cafcd3\" title=\"Slicing\">S</span>: There is slicing defined in the element(s)<br/>\r\n"+
-      "<span style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: black; background-color: #b7e8f7\" title=\"Cardinality\">C</span>: There is cardinality erstrictions defined in the element(s)<br/>\r\n"+
-      "<span style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: black; background-color: #fdf4f4\" title=\"invariants\">I</span>: There is invariants defined in the element(s)<br/>\r\n"+
-      "<span style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: black; background-color: #fcfccc\" title=\"Fixed\">F</span>: There is a fixed or pattern value defined in the element(s)<br/>\r\n"+
-      "<span style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: black; background-color: #fcd9f1\" title=\"Documentation\">D</span>: There is document provided in the element(s)<br/>\r\n"+
-      "<span style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: black; background-color: #fce0d9\" title=\"Binding\">B</span>: There is terminology bindings defined in the element(s)<br/>\r\n"+
-      "<span style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: black; background-color: #ccf2ff\" title=\"Must Support\">M</span>: At least one of the element(s) has must-support = true<br/>\r\n"+
-      " (N): The numbner of elements if > 1";
-        
+        "<span style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: black; background-color: #cafcd3\" title=\"Slicing\">S</span>: There is slicing defined in the element(s)<br/>\r\n"+
+        "<span style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: black; background-color: #b7e8f7\" title=\"Cardinality\">C</span>: There is cardinality erstrictions defined in the element(s)<br/>\r\n"+
+        "<span style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: black; background-color: #fdf4f4\" title=\"invariants\">I</span>: There is invariants defined in the element(s)<br/>\r\n"+
+        "<span style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: black; background-color: #fcfccc\" title=\"Fixed\">F</span>: There is a fixed or pattern value defined in the element(s)<br/>\r\n"+
+        "<span style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: black; background-color: #fcd9f1\" title=\"Documentation\">D</span>: There is document provided in the element(s)<br/>\r\n"+
+        "<span style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: black; background-color: #fce0d9\" title=\"Binding\">B</span>: There is terminology bindings defined in the element(s)<br/>\r\n"+
+        "<span style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: black; background-color: #ccf2ff\" title=\"Must Support\">M</span>: At least one of the element(s) has must-support = true<br/>\r\n"+
+        " (N): The numbner of elements if > 1";
+
   }
 
   private void fillOutSparseElements(List<String> tpaths) {
@@ -239,7 +246,7 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
       return path;
     }
   }
-  
+
 
   private String analyse(String p, StructureDefinition sd) {
     List<ElementDefinition> list = new ArrayList<>();
@@ -336,6 +343,146 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
     b.append("</ul>\r\n");
 
     return new PageContent(title+" ("+t+")", b.toString());
+  }
+
+  public static void buildUsages(XIGInformation info, StructureDefinition sd) {
+    info.recordUsage(sd, sd.getBaseDefinition(), UsageType.DERIVATION);
+    for (ElementDefinition ed : sd.getDifferential().getElement()) {
+      for (TypeRefComponent tr : ed.getType()) {
+        for (CanonicalType c : tr.getProfile()) {
+          info.recordUsage(sd, c.getValue(), UsageType.SD_PROFILE);
+        }
+        for (CanonicalType c : tr.getTargetProfile()) {
+          info.recordUsage(sd, c.getValue(), UsageType.TARGET);
+        }
+      }
+      if (ed.hasBinding()) {
+        info.recordUsage(sd, ed.getBinding().getValueSet(), UsageType.BINDING);
+      }
+    }
+  }
+
+  public PageContent makeExtensionUsagePage(XIGRenderer renderer, String title, String realm, boolean core) throws IOException {
+    Map<String, List<CanonicalResourceUsage>> usages = new HashMap<>();
+    for (String url : info.getUsages().keySet()) {
+      boolean isCore = isCore(url);
+      if (isCore == core && isExtension(url, isCore)) {
+        List<CanonicalResourceUsage> ulist = null;
+        for (CanonicalResourceUsage cr : info.getUsages().get(url)) {
+          if (meetsRealm(cr.getResource(), realm)) {
+            if (ulist == null) {
+              ulist = new ArrayList<>();
+              usages.put(url, ulist);
+            }
+            ulist.add(cr);
+          }          
+        }
+      }
+    }
+    StringBuilder b = new StringBuilder();
+    int t = 0;
+    b.append("<table class=\"grid\">\r\n");
+    for (String s : Utilities.sorted(usages.keySet())) {
+      t++;
+      b.append("<tr><td>");
+      String p = getSDPath(s, core);
+      if (p != null) {
+        b.append("<a href=\""+p+"\">"+s+"</a>");
+      } else {
+        b.append(s);
+      }
+      b.append("</td><td><ul>");
+      for (CanonicalResourceUsage cu : usages.get(s)) {
+        b.append("  <li>");
+        b.append(crlink(cu.getResource()));
+        b.append(cu.getUsage().getDisplay());
+        b.append("</li>\r\n");
+      }
+      b.append("</ul></td></tr>\r\n");
+    }
+    b.append("</ul>\r\n");
+
+    return new PageContent(title+" ("+t+")", b.toString());
+  }
+
+  public PageContent makeProfilesUsagePage(XIGRenderer renderer, String title, String realm, boolean core) throws IOException {
+    Map<String, List<CanonicalResourceUsage>> usages = new HashMap<>();
+    for (String url : info.getUsages().keySet()) {
+      boolean isCore = isCore(url);
+      if (isCore == core && isProfile(url, isCore)) {
+        List<CanonicalResourceUsage> ulist = null;
+        for (CanonicalResourceUsage cr : info.getUsages().get(url)) {
+          if (meetsRealm(cr.getResource(), realm)) {
+            if (ulist == null) {
+              ulist = new ArrayList<>();
+              usages.put(url, ulist);
+            }
+            ulist.add(cr);
+          }          
+        }
+      }
+    }
+    StringBuilder b = new StringBuilder();
+    int t = 0;
+    b.append("<table class=\"grid\">\r\n");
+    for (String s : Utilities.sorted(usages.keySet())) {
+      t++;
+      b.append("<tr><td>");
+      String p = getSDPath(s, core);
+      if (p != null) {
+        b.append("<a href=\""+p+"\">"+s+"</a>");
+      } else {
+        b.append(s);
+      }
+      b.append("</td><td><ul>");
+      for (CanonicalResourceUsage cu : usages.get(s)) {
+        b.append("  <li>");
+        b.append(crlink(cu.getResource()));
+        b.append(cu.getUsage().getDisplay());
+        b.append("</li>\r\n");
+      }
+      b.append("</ul></td></tr>\r\n");
+    }
+    b.append("</ul>\r\n");
+
+    return new PageContent(title+" ("+t+")", b.toString());
+  }
+
+  private String getSDPath(String url, boolean core) {
+    if (core) {
+      StructureDefinition sd = info.getCtxt().fetchResource(StructureDefinition.class, url);
+      if (sd != null) {
+        return sd.getUserString("path");
+      }
+    } else {
+      CanonicalResource cr = info.resources.get(url);
+      if (cr != null ) {
+        return cr.getUserString("filebase")+".html";
+      }
+    }
+    return null;
+  }
+
+  private boolean isExtension(String url, boolean isCore) {
+    CanonicalResource cr = isCore ? info.getCtxt().fetchResource(StructureDefinition.class, url) : info.resources.get(url);
+    if (cr != null && cr instanceof StructureDefinition) {
+      StructureDefinition sd = (StructureDefinition) cr;
+      return "Extension".equals(sd.getType()) && !url.equals("http://hl7.org/fhir/StructureDefinition/Extension");
+    }
+    return false;
+  }
+
+  private boolean isProfile(String url, boolean isCore) {
+    CanonicalResource cr = isCore ? info.getCtxt().fetchResource(StructureDefinition.class, url) : info.resources.get(url);
+    if (cr != null && cr instanceof StructureDefinition) {
+      StructureDefinition sd = (StructureDefinition) cr;
+      return !"Extension".equals(sd.getType()) && !url.equals("http://hl7.org/fhir/StructureDefinition/Extension") && sd.getDerivation() == TypeDerivationRule.CONSTRAINT;
+    }
+    return false;
+  }
+
+  private boolean isCore(String url) {
+    return url.startsWith("http://hl7.org/fhir/StructureDefinition/");
   }
 
 
