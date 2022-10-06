@@ -659,6 +659,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private Map<String,String> countryCodeFor2Letter = null;
   private Map<String,String> shortCountryCode = null;
   private Map<String,String> stateNameForCode = null;
+  private Map<String, Map<String, ElementDefinition>> sdMapCache = new HashMap<>();
   private List<String> ignoreFlags = null;
 
   private Publisher childPublisher = null;
@@ -680,6 +681,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private long jekyllTimeout = JEKYLL_TIMEOUT;
   private long fshTimeout = FSH_TIMEOUT;
   private SuppressedMessageInformation suppressedMessages = new SuppressedMessageInformation();
+  private boolean tabbedSnapshots = false;
 
   private String igName;
   private IGBuildMode mode; // for the IG publication infrastructure
@@ -2614,6 +2616,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           brokenLinksError = true;
         else if (p.getValue().equals("show-reference-messages"))
           showReferenceMessages = true;
+      } else if (pc.equals("tabbed-snapshots")) {
+        tabbedSnapshots = p.getValue().equals("true");
       }
       count++;
     }
@@ -2853,7 +2857,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (!sd.hasSnapshot() && sd.hasBaseDefinition()) {
         generateSnapshot(sd);
       }
+      flagKeyElements(sd);
     }
+  }
+
+  private void flagKeyElements(StructureDefinition sd) {
+    ElementDefinition root = sd.getSnapshot().getElement().get(0);
+/*    int startPos = 1;
+    for (int pos = startPos; pos < sd.getSnapshot().getElement().size(); pos++) {
+
+    }*/
   }
 
   private void generateSnapshot(StructureDefinition sd) {
@@ -7889,13 +7902,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   
   private void createToc(ImplementationGuideDefinitionPageComponent insertPage, String insertAfterName, String insertOffset) throws IOException, FHIRException {
     String s = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><div style=\"col-12\"><table style=\"border:0px;font-size:11px;font-family:verdana;vertical-align:top;\" cellpadding=\"0\" border=\"0\" cellspacing=\"0\"><tbody>";
-    s = s + createTocPage(publishedIg.getDefinition().getPage(), insertPage, insertAfterName, insertOffset, null, "", "0", false);
+    s = s + createTocPage(publishedIg.getDefinition().getPage(), insertPage, insertAfterName, insertOffset, null, "", "0", false, "", 0);
     s = s + "</tbody></table></div>";
     TextFile.stringToFile(s, Utilities.path(tempDir, "_includes", "toc.xml"), false);
   }
 
-  private String createTocPage(ImplementationGuideDefinitionPageComponent page, ImplementationGuideDefinitionPageComponent insertPage, String insertAfterName, String insertOffset, String currentOffset, String indents, String label, boolean last) throws FHIRException {
-    String s = "<tr style=\"border:0px;padding:0px;vertical-align:top;background-color:white;\">";
+  private String createTocPage(ImplementationGuideDefinitionPageComponent page, ImplementationGuideDefinitionPageComponent insertPage, String insertAfterName, String insertOffset, String currentOffset, String indents, String label, boolean last, String idPrefix, int position) throws FHIRException {
+    if (position > 222) {
+      position = 222;
+      System.out.println("Table of contents has a section with more than 222 entries.  Collapsing will not work reliably");
+    }
+    String id = idPrefix + (char)(position+33);
+    String s = "<tr style=\"border:0px;padding:0px;vertical-align:top;background-color:white;\" id=\"" + Utilities.escapeXml(id) + "\">";
     s = s + "<td style=\"vertical-align:top;text-align:left;background-color:white;padding:0px 4px 0px 4px;white-space:nowrap;background-image:url(tbl_bck0.png)\" class=\"hierarchy\">";
     s = s + "<img style=\"background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"tbl_spacer.png\"/>";
     s = s + indents;
@@ -7905,6 +7923,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       else
         s = s + "<img style=\"background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"tbl_vjoin.png\"/>";
     }
+    // lloyd check
+    if (page.hasPage())
+      s = s + "<img onClick=\"tableRowAction(this)\" src=\"tbl_vjoin-open.png\" alt=\".\" style=\"background-color: inherit\" class=\"hierarchy\"/>";
     s = s + "<img style=\"background-color:white;background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"icon_page.gif\"/>";
     if (page.hasName()) { 
       s = s + "<a title=\"" + Utilities.escapeXml(page.getTitle()) + "\" href=\"" + (currentOffset!=null ? currentOffset + "/" : "") + page.getName() +"\">" + label + " " + Utilities.escapeXml(page.getTitle()) + "</a></td></tr>";
@@ -7926,10 +7947,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         total++;
       }
       
-      s = s + createTocPage(childPage, insertPage, insertAfterName, insertOffset, currentOffset, newIndents, (label.equals("0") ? "" : label+".") + Integer.toString(i), i==total);
+      s = s + createTocPage(childPage, insertPage, insertAfterName, insertOffset, currentOffset, newIndents, (label.equals("0") ? "" : label+".") + Integer.toString(i), i==total, id, i);
       i++;
       if (insertAfterName!=null && childPage.getName().equals(insertAfterName)) {
-        s = s + createTocPage(insertPage, null, null, "", insertOffset, newIndents, (label.equals("0") ? "" : label+".") + Integer.toString(i), i==total);
+        s = s + createTocPage(insertPage, null, null, "", insertOffset, newIndents, (label.equals("0") ? "" : label+".") + Integer.toString(i), i==total, id, i);
         i++;
       }
     }
@@ -9623,7 +9644,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "json-schema"))
       fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-json-schema", "yet to be done: json schema as html", null, f.getOutputNames());
 
-    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, rc, allInvariants);
+    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, rc, allInvariants, sdMapCache);
     if (igpkp.wantGen(r, "summary")) {
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-summary", sdr.summary(), f.getOutputNames(), r, vars, null);
     }
@@ -9635,11 +9656,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "uses"))
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-uses", sdr.uses(), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "diff"))
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "snapshot"))
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot", sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot", sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "snapshot-by-key"))
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key", sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "snapshot-by-mustsupport"))
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport", sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport", sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "grid"))
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-grid", sdr.grid(igpkp.getDefinitionsName(r), otherFilesRun), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "pseudo-xml"))
@@ -9651,21 +9674,31 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "uml"))
       fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-uml", "yet to be done: UML as SVG", null, f.getOutputNames());
     if (igpkp.wantGen(r, "tx"))
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx", sdr.tx(includeHeadings, false), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx", sdr.tx(includeHeadings, false, false), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "tx-must-support"))
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx-must-support", sdr.tx(includeHeadings, true), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx-must-support", sdr.tx(includeHeadings, true, false), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "tx-key"))
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx-key", sdr.tx(includeHeadings, false, true), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "tx-diff"))
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx-diff", sdr.txDiff(includeHeadings, false), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "tx-diff-must-support"))
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx-diff-must-support", sdr.txDiff(includeHeadings, true), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "inv-diff"))
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-inv-diff", sdr.invOldMode(includeHeadings, true), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-inv-diff", sdr.invOldMode(includeHeadings, StructureDefinitionRenderer.GEN_MODE_DIFF), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "inv-key"))
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-inv-key", sdr.invOldMode(includeHeadings, StructureDefinitionRenderer.GEN_MODE_KEY), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "inv"))
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-inv", sdr.invOldMode(includeHeadings, false), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-inv", sdr.invOldMode(includeHeadings, StructureDefinitionRenderer.GEN_MODE_SNAP), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "dict"))
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-dict", sdr.dict(true), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-dict", sdr.dict(true, StructureDefinitionRenderer.GEN_MODE_SNAP, StructureDefinitionRenderer.ANCHOR_PREFIX_SNAP), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "dict-diff"))
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-dict-diff", sdr.dict(true, StructureDefinitionRenderer.GEN_MODE_DIFF, StructureDefinitionRenderer.ANCHOR_PREFIX_DIFF), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "dict-ms"))
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-dict-ms", sdr.dict(true, StructureDefinitionRenderer.GEN_MODE_MS, StructureDefinitionRenderer.ANCHOR_PREFIX_MS), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "dict-key"))
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-dict-key", sdr.dict(true, StructureDefinitionRenderer.GEN_MODE_KEY, StructureDefinitionRenderer.ANCHOR_PREFIX_KEY), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "dict-active"))
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-dict-active", sdr.dict(false), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-dict-active", sdr.dict(false, StructureDefinitionRenderer.GEN_MODE_SNAP, StructureDefinitionRenderer.ANCHOR_PREFIX_SNAP), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "maps"))
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps", sdr.mappings(false, false), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "maps"))
@@ -10908,6 +10941,5 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   public String urlForContained(RenderingContext context, String containingType, String containingId, String containedType, String containedId) {
     return null;
   }
-
 
 }

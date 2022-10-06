@@ -23,6 +23,7 @@ import org.apache.xmlbeans.impl.config.NameSet;
  */
 
 
+import org.hl7.fhir.ElementDefinitionType;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
@@ -84,14 +85,28 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     public static final String v2_MAPPING = "http://hl7.org/v2";
     public static final String LOINC_MAPPING = "http://loinc.org";
     public static final String SNOMED_MAPPING = "http://snomed.info";
+    public static final int GEN_MODE_SNAP = 1;
+    public static final int GEN_MODE_DIFF = 2;
+    public static final int GEN_MODE_MS = 3;
+    public static final int GEN_MODE_KEY = 4;
+    public static final String ANCHOR_PREFIX_SNAP = "";
+    public static final String ANCHOR_PREFIX_DIFF = "diff_";
+    public static final String ANCHOR_PREFIX_MS = "ms_";
+    public static final String ANCHOR_PREFIX_KEY = "key_";
 
     ProfileUtilities utils;
     private StructureDefinition sd;
     private String destDir;
     private List<FetchedFile> files;
     private boolean allInvariants;
+    HashMap<String, ElementDefinition> differentialHash = null;
+    HashMap<String, ElementDefinition> mustSupportHash = null;
+    Map<String, Map<String, ElementDefinition>> sdMapCache;
+    List<ElementDefinition> diffElements = null;
+    List<ElementDefinition> mustSupportElements = null;
+    List<ElementDefinition> keyElements = null;
 
-    public StructureDefinitionRenderer(IWorkerContext context, String corePath, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants) {
+    public StructureDefinitionRenderer(IWorkerContext context, String corePath, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants,Map<String, Map<String, ElementDefinition>> mapCache) {
         super(context, corePath, sd, destDir, igp, maps, allTargets, markdownEngine, packge, gen);
         this.sd = sd;
         this.destDir = destDir;
@@ -99,6 +114,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         utils.setIgmode(true);
         this.files = files;
         this.allInvariants = allInvariants;
+        this.sdMapCache = mapCache;
     }
 
     @Override
@@ -361,37 +377,58 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             return "<a title=\"" + cs.present() + "\" href=\"" + Utilities.escapeXml(cs.getUserString("path")) + "#" + cs.getId() + "-" + coding.getCode() + "\">" + coding.getCode() + "</a>" + (!coding.hasDisplay() ? "" : "(\"" + gt(coding.getDisplayElement()) + "\")");
     }
 
-    public String diff(String defnFile, Set<String> outputTracker) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
+    public String diff(String defnFile, Set<String> outputTracker, boolean toTabs) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
         if (sd.getDifferential().getElement().isEmpty())
             return "";
         else
-            return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateTable(defnFile, sd, true, destDir, false, sd.getId(), false, corePath, "", false, false, outputTracker, true, false, gen));
+            return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateTable(defnFile, sd, true, destDir, false, sd.getId(), false, corePath, "", false, false, outputTracker, true, false, gen, toTabs ? ANCHOR_PREFIX_DIFF : ANCHOR_PREFIX_SNAP));
     }
 
-    public String snapshot(String defnFile, Set<String> outputTracker) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
+    public String snapshot(String defnFile, Set<String> outputTracker, boolean toTabs) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
         if (sd.getSnapshot().getElement().isEmpty())
             return "";
         else
-            return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateTable(defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", false, false, outputTracker, true, false, gen));
+            return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateTable(defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", false, false, outputTracker, true, false, gen, toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP));
     }
 
-    public String byMustSupport(String defnFile, Set<String> outputTracker) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
+    public String byKey(String defnFile, Set<String> outputTracker, boolean toTabs) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
         if (sd.getSnapshot().getElement().isEmpty())
             return "";
         else {
             XhtmlComposer composer = new XhtmlComposer(XhtmlComposer.HTML);
             StructureDefinition sdCopy = sd.copy();
-            Set<ElementDefinition> mustSupport = new HashSet<>();
+            sdCopy.getSnapshot().setElement(getKeyElements());
+            org.hl7.fhir.utilities.xhtml.XhtmlNode table = utils.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", false, false, outputTracker, true, true, gen, toTabs ? ANCHOR_PREFIX_KEY : ANCHOR_PREFIX_SNAP);
 
-            List<ElementDefinition> mustSupportElements = new ArrayList<ElementDefinition>();
+            return composer.compose(table);
+        }
+    }
 
+    public String byMustSupport(String defnFile, Set<String> outputTracker, boolean toTabs) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
+        if (sd.getSnapshot().getElement().isEmpty())
+            return "";
+        else {
+            XhtmlComposer composer = new XhtmlComposer(XhtmlComposer.HTML);
+            StructureDefinition sdCopy = sd.copy();
+
+            sdCopy.getSnapshot().setElement(getMustSupportElements());
+            org.hl7.fhir.utilities.xhtml.XhtmlNode table = utils.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", false, false, outputTracker, true, true, gen, toTabs ? ANCHOR_PREFIX_MS : ANCHOR_PREFIX_SNAP);
+
+            return composer.compose(table);
+        }
+    }
+
+    protected List<ElementDefinition> getMustSupportElements() {
+        if (mustSupportElements==null) {
+            mustSupportElements = new ArrayList<ElementDefinition>();
+            Map<String, ElementDefinition> mustSupport = getMustSupport();
             // Scan through all the properties checking for must support elements
             // and clear properties in the cloned StructureDefinition that we don't want to
             // show in the custom view
-            scanForMustSupport(mustSupport, sdCopy.getSnapshot().getElement(), sdCopy.getSnapshot().getElementFirstRep(), new ArrayList<>());
-            for (ElementDefinition ed : sdCopy.getSnapshot().getElement()) {
-                if (mustSupport.contains(ed)) {
+            for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+                if (mustSupport.containsKey(ed.getId())) {
                     ElementDefinition edCopy = ed.copy();
+                    edCopy.copyUserData(ed);
                     if (edCopy.hasExample())
                         edCopy.getExample().clear();
                     if (!edCopy.getMustSupport()) {
@@ -405,19 +442,75 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
                     mustSupportElements.add(edCopy);
                 }
             }
+        }
+        return mustSupportElements;
+    }
 
-            sdCopy.getSnapshot().setElement(mustSupportElements);
-            org.hl7.fhir.utilities.xhtml.XhtmlNode table = utils.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", false, false, outputTracker, true, true, gen);
+    public String byKeyElements(String defnFile, Set<String> outputTracker) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
+        if (sd.getSnapshot().getElement().isEmpty())
+            return "";
+        else {
+            XhtmlComposer composer = new XhtmlComposer(XhtmlComposer.HTML);
+            StructureDefinition sdCopy = sd.copy();
+            List<ElementDefinition> keyElements = getKeyElements();
+
+            sdCopy.getSnapshot().setElement(keyElements);
+            org.hl7.fhir.utilities.xhtml.XhtmlNode table = utils.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", false, false, outputTracker, true, true, gen, ANCHOR_PREFIX_KEY);
 
             return composer.compose(table);
         }
     }
 
-    private void scanForMustSupport(Set<ElementDefinition> mustSupport, List<ElementDefinition> elements, ElementDefinition element, List<ElementDefinition> parents) {
+    protected Map<String, ElementDefinition> getMustSupport() {
+        if (mustSupportHash==null) {
+            mustSupportHash = new HashMap<String, ElementDefinition>();
+            scanForMustSupport(mustSupportHash, sd.getSnapshot().getElement(), sd.getSnapshot().getElementFirstRep(), new ArrayList<>());
+        }
+        return mustSupportHash;
+    }
+
+    // Returns a hash of all elements in the differential (including omitted ancestors) by element id
+    // Allows checking if an element is in the differential.
+    protected Map<String, ElementDefinition> getDifferential() {
+        if (differentialHash==null) {
+            differentialHash = new HashMap<String, ElementDefinition>();
+            for (ElementDefinition e : sd.getDifferential().getElement()) {
+                differentialHash.put(e.getId(), e);
+                if (e.getId().contains(".")) {
+                    String id = e.getId();
+                    do {
+                        id = id.substring(0, id.lastIndexOf(".")-1);
+                        if (differentialHash.containsKey(id))
+                            break;
+                        else
+                            differentialHash.put(id, null);
+                    } while(id.contains("."));
+                }
+            }
+        }
+        return differentialHash;
+    }
+
+    protected List<ElementDefinition> getDifferentialElements() {
+        if (diffElements == null) {
+            diffElements = new ArrayList<ElementDefinition>();
+            for (ElementDefinition e : sd.getSnapshot().getElement()) {
+                if (getDifferential().containsKey(e.getId())) {
+                    ElementDefinition ediff = getDifferential().get(e.getId());
+                    if (ediff == null)
+                        ediff = e.copy();
+                    diffElements.add(ediff);
+                }
+            }
+        }
+        return diffElements;
+    }
+
+    private void scanForMustSupport(Map<String, ElementDefinition> mustSupport, List<ElementDefinition> elements, ElementDefinition element, List<ElementDefinition> parents) {
         if (parents.isEmpty() || element.hasMustSupport() && element.getMustSupport()) {
-            mustSupport.add(element);
+            mustSupport.put(element.getId(), element);
             for (ElementDefinition parent : parents) {
-                mustSupport.add(parent);
+                mustSupport.put(parent.getId(), parent);
             }
         }
         List<ElementDefinition> children = getChildren(elements, element);
@@ -426,6 +519,43 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             np.addAll(parents);
             np.add(element);
             scanForMustSupport(mustSupport, elements, child, np);
+        }
+    }
+
+    protected List<ElementDefinition> getKeyElements() {
+        if (keyElements==null) {
+            keyElements = new ArrayList<ElementDefinition>();
+            Map<String, ElementDefinition> mustSupport = getMustSupport();
+            Set<ElementDefinition> keyElementsSet = new HashSet<ElementDefinition>();
+            scanForKeyElements(keyElementsSet, mustSupport, sd.getSnapshot().getElement(), sd.getSnapshot().getElementFirstRep(), null);
+            for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+                if (keyElementsSet.contains(ed)) {
+                    ElementDefinition edCopy = ed.copy();
+                    edCopy.copyUserData(ed);
+                    keyElements.add(edCopy);
+                }
+            }
+        }
+
+        return keyElements;
+    }
+
+    private void scanForKeyElements(Set<ElementDefinition> keyElements, Map<String, ElementDefinition> mustSupport, List<ElementDefinition> elements, ElementDefinition element, String baseModelUrl) {
+        keyElements.add(element);
+        // Lloyd todo: check changes with the underlying 'base' model
+        List<ElementDefinition> children = getChildren(elements, element);
+
+        for (ElementDefinition child : children) {
+            // An element is 'key' if it's within a 'mustSupport'-relevant element (mustSupport or ancestor of mustSupport) and:
+            //  - it's mandatory
+            //  - it's referenced by an invariant (other than the generic ele-1 that everything is referenced by)
+            //  - it's a modifier element
+            //  - it's a slice (which means it's a constraint on the core) or declares slicing not implicit in the core spec (i.e. extension/modifierExtension)
+            //  - it appears in the differential
+            //  - the max cardinality has been constrained from the base max cardinality
+            if (mustSupport.containsKey(child.getId()) || child.getMin()!=0 || (child.hasCondition() && child.getCondition().size()>1) || child.getIsModifier() || (child.hasSlicing() && !child.getPath().endsWith(".extension") && !child.getPath().endsWith(".modifierExtension")) || child.hasSliceName() || getDifferential().containsKey(child.getId()) || !child.getMax().equals(child.getBase().getMax())) {
+                scanForKeyElements(keyElements ,mustSupport, elements, child, baseModelUrl);
+            }
         }
     }
 
@@ -477,11 +607,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
     }
 
-    public String tx(boolean withHeadings, boolean mustSupportOnly) throws FHIRException, IOException {
+    public String tx(boolean withHeadings, boolean mustSupportOnly, boolean keyOnly) throws FHIRException, IOException {
         List<String> txlist = new ArrayList<String>();
         boolean hasFixed = false;
         Map<String, ElementDefinition> txmap = new HashMap<String, ElementDefinition>();
-        for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+        for (ElementDefinition ed : keyOnly? getKeyElements() : sd.getSnapshot().getElement()) {
             if (ed.hasBinding() && !"0".equals(ed.getMax()) && (!mustSupportOnly || ed.getMustSupport())) {
                 String id = ed.getId();
                 if (ed.hasFixed()) {
@@ -668,30 +798,128 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         return null;
     }
 
-    public String invOldMode(boolean withHeadings, boolean diff) {
-        List<String> txlist = new ArrayList<String>();
-        Map<String, List<ElementDefinitionConstraintComponent>> txmap = new HashMap<String, List<ElementDefinitionConstraintComponent>>();
-        List<ElementDefinition> list = diff ? sd.getDifferential().getElement() : sd.getSnapshot().getElement();
-        for (ElementDefinition ed : list) {
-            if (!"0".equals(ed.getMax())) {
-                txlist.add(ed.getId());
-                txmap.put(ed.getId(), ed.getConstraint());
+    // Information about a constraint within the StructureDefinition that allows for the possibility of
+    // variation in a constraint key between elements (because some elements constraint it and others don't)
+    private class ConstraintInfo {
+        private String key;                                   // The key for the constraint
+        private ConstraintVariation primary;                  // The original definition of the constraint
+        private Map<String, ConstraintVariation> variations = new HashMap<String, ConstraintVariation>();  // Constrained definitions of the constraint
+
+        public ConstraintInfo(ElementDefinitionConstraintComponent c, String id) {
+            key = c.getKey();
+            addVariation(c, id);
+        }
+
+        private String constraintHash(ElementDefinitionConstraintComponent c) {
+            return c.getExpression()+c.getHuman();
+        }
+        public void addVariation(ElementDefinitionConstraintComponent c, String id) {
+            // 'primary' indicates if this is the initial definition of the constraint or if it's a subsequently profiled
+            // version of the constraint.  The logic here could probably use some work, but all it does is make sure the
+            // 'official' one comes first, so it's not critical that there are issues.
+            if (!c.hasSource() || c.getSource().equals(sd.getUrl()) || (c.getSource().startsWith("http://hl7.org/fhir/StructureDefinition/") && !c.getSource().substring(41).contains("/"))) {
+                if (primary == null) {
+                    primary = variations.get(constraintHash(c));
+                    if (primary==null)
+                        primary = new ConstraintVariation(c);
+                    else
+                        variations.remove(constraintHash(c));
+
+                    primary.setPrimary(true);
+                }
+                primary.addElement(id);
+            } else {
+                ConstraintVariation v = variations.get(constraintHash(c));
+                if (v==null) {
+                    v = new ConstraintVariation(c);
+                    variations.put(constraintHash(c), v);
+                }
+                v.addElement(id);
             }
         }
 
-        if (txlist.isEmpty())
+        public List<ConstraintVariation> getVariations() {
+            List<ConstraintVariation> l = new ArrayList<ConstraintVariation>();
+            if (primary!=null)
+                l.add(primary);
+            l.addAll(variations.values());
+            return l;
+        }
+    }
+
+    private class ConstraintVariation {
+        private ElementDefinitionConstraintComponent constraint;
+        private List<String> elements = new ArrayList<String>();
+        private boolean primary = false;
+
+        public ConstraintVariation(ElementDefinitionConstraintComponent c) {
+            constraint = c;
+        }
+        public void addElement(String id) {
+            elements.add(id);
+        }
+        public ElementDefinitionConstraintComponent getConstraint() {
+            return constraint;
+        }
+        public void setPrimary(boolean isPrimary) {
+            primary = isPrimary;
+        }
+        public String getIds() {
+            if (constraint.hasSource() && constraint.getSource().equals("http://hl7.org/fhir/StructureDefinition/Element"))
+                return "**ALL** elements";
+            else if (constraint.hasSource() && constraint.getSource().equals("http://hl7.org/fhir/StructureDefinition/Extension"))
+                return "**ALL** extensions";
+            else
+                return String.join(", ", elements);
+        }
+    }
+
+    public List<ElementDefinition> elementsForMode(int genMode) {
+        switch (genMode) {
+            case GEN_MODE_DIFF:
+                return utils.supplementMissingDiffElements(sd);
+            case GEN_MODE_KEY:
+                return getKeyElements();
+            case GEN_MODE_MS:
+                return getMustSupportElements();
+            default:
+                return sd.getSnapshot().getElement();
+        }
+    }
+
+    public String invOldMode(boolean withHeadings, int genMode) {
+        Map<String, ConstraintInfo> constraintMap = new HashMap<String,ConstraintInfo>();
+        List<ElementDefinition> list = elementsForMode(genMode);
+        for (ElementDefinition ed : list) {
+            if (!"0".equals(ed.getMax()) && ed.hasConstraint()) {
+                for (ElementDefinitionConstraintComponent c : ed.getConstraint()) {
+                    ConstraintInfo ci = constraintMap.get(c.getKey());
+                    if (ci == null) {
+                        ci = new ConstraintInfo(c, ed.getId());
+                        constraintMap.put(c.getKey(), ci);
+                    } else
+                        ci.addVariation(c, ed.getId());
+                }
+            }
+        }
+
+        if (constraintMap.isEmpty())
             return "";
         else {
             StringBuilder b = new StringBuilder();
             if (withHeadings)
                 b.append("<h4>" + translate("sd.inv", "Constraints") + "</h4>\r\n");
             b.append("<table class=\"list\">\r\n");
-            b.append("<tr><td width=\"60\"><b>" + translate("sd.inv", "Id") + "</b></td><td><b>" + translate("sd.inv", "Grade") + "</b></td><td><b>" + translate("sd.inv", "Path") + "</b></td><td><b>" + translate("sd.inv", "Details") + "</b></td><td><b>" + translate("sd.inv", "Requirements") + "</b></td></tr>\r\n");
-            for (String id : txlist) {
-                List<ElementDefinitionConstraintComponent> invs = txmap.get(id);
-                for (ElementDefinitionConstraintComponent inv : invs) {
+            b.append("<tr><td width=\"60\"><b>" + translate("sd.inv", "Id") + "</b></td><td><b>" + translate("sd.inv", "Grade") + "</b></td><td><b>" + translate("sd.inv", "Path(s)") + "</b></td><td><b>" + translate("sd.inv", "Details") + "</b></td><td><b>" + translate("sd.inv", "Requirements") + "</b></td></tr>\r\n");
+            List<String> keys = new ArrayList<>(constraintMap.keySet());
+
+            Collections.sort(keys, new ConstraintKeyComparator());
+            for (String key : keys) {
+                ConstraintInfo ci = constraintMap.get(key);
+                for (ConstraintVariation cv : ci.getVariations()) {
+                    ElementDefinitionConstraintComponent inv = cv.getConstraint();
                     if (!inv.hasSource() || inv.getSource().equals(sd.getUrl()) || allInvariants) {
-                        b.append("<tr><td>").append(inv.getKey()).append("</td><td>").append(grade(inv)).append("</td><td>").append(id).append("</td><td>").append(Utilities.escapeXml(gt(inv.getHumanElement())))
+                        b.append("<tr><td>").append(inv.getKey()).append("</td><td>").append(grade(inv)).append("</td><td>").append(cv.getIds()).append("</td><td>").append(Utilities.escapeXml(gt(inv.getHumanElement())))
                                 .append("<br/>: ").append(Utilities.escapeXml(inv.getExpression())).append("</td><td>").append(Utilities.escapeXml(gt(inv.getRequirementsElement()))).append("</td></tr>\r\n");
                     }
                 }
@@ -701,9 +929,26 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
     }
 
+    class ConstraintKeyComparator implements Comparator<String> {
+
+        public int compare(String a, String b) {
+            if (a.matches(".+\\-\\d+") && b.matches(".+\\-\\d+")) {
+                String aStart = a.substring(0, a.lastIndexOf("-")-1);
+                String bStart = b.substring(0, b.lastIndexOf("-")-1);
+                if (aStart.equals(bStart)) {
+                    Integer aEnd = Integer.parseInt(a.substring(a.lastIndexOf("-") + 1));
+                    Integer bEnd = Integer.parseInt(b.substring(b.lastIndexOf("-") + 1));
+                    return aEnd.compareTo(bEnd);
+                } else
+                    return aStart.compareTo(bStart);
+            } else
+                return a.compareTo(b);
+        }
+    }
+
     private String grade(ElementDefinitionConstraintComponent inv) {
       if (inv.hasExtension(ToolingExtensions.EXT_BEST_PRACTICE)) {
-        return "Best Practice";
+        return "best practice";
       } else {
         return gt(inv.getSeverityElement());
       }
@@ -726,120 +971,153 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
     }
 
-    public String dict(boolean incProfiledOut) throws Exception {
-      int i = 1;
-      StringBuilder b = new StringBuilder();
-      b.append("<table class=\"dict\">\r\n");
-      
-      Map<String, ElementDefinition> allAnchors = new HashMap<>();
-      List<ElementDefinition> excluded = new ArrayList<>();
-
-      List<ElementDefinition> stack = new ArrayList<>(); // keeps track of parents, for anchor generation
-      for (ElementDefinition ec : sd.getSnapshot().getElement()) {
-        addToStack(stack, ec);
-        generateAnchors(stack, allAnchors); 
-        checkInScope(stack, excluded);
-      }
-      
-      for (ElementDefinition ec : sd.getSnapshot().getElement()) {
-        if ((incProfiledOut || !"0".equals(ec.getMax())) && !excluded.contains(ec)) {
-          String anchors = makeAnchors(ec);
-          if (isProfiledExtension(ec)) {
-            StructureDefinition extDefn = context.fetchResource(StructureDefinition.class, ec.getType().get(0).getProfile().get(0).getValue());
-            if (extDefn == null) {
-              String title = ec.getId();
-              b.append("  <tr><td colspan=\"2\" class=\"structure\"><span class=\"self-link-parent\">"+anchors+"</a><span style=\"color: grey\">" + Integer.toString(i++) + ".</span> <b>" + title + "</b>" + link(ec.getId()) + "</span></td></tr>\r\n");
-              generateElementInner(b, sd, ec, 1, null);
-            } else {
-              String title = ec.getId();
-              b.append("  <tr><td colspan=\"2\" class=\"structure\"><span class=\"self-link-parent\">"+anchors+"</a>");
-              b.append("<span style=\"color: grey\">" + Integer.toString(i++) + ".</span> <b>" + title + "</b>" + link(ec.getId()) + "</span></td></tr>\r\n");
-              ElementDefinition valueDefn = getExtensionValueDefinition(extDefn);
-              generateElementInner(b, sd, ec, valueDefn == null || valueDefn.prohibited() ? 2 : 3, valueDefn);
-              //            generateElementInner(b, extDefn, extDefn.getSnapshot().getElement().get(0), valueDefn == null ? 2 : 3, valueDefn);
-            }
-          } else {
-            String title = ec.getId();
-            b.append("  <tr><td colspan=\"2\" class=\"structure\"><span class=\"self-link-parent\">"+anchors);
-            b.append("<span style=\"color: grey\">" + Integer.toString(i++) + ".</span> <b>" + title + "</b>" + link(ec.getId()) + "</span></td></tr>\r\n");
-            generateElementInner(b, sd, ec, 1, null);
-            if (ec.hasSlicing())
-              generateSlicing(b, sd, ec, ec.getSlicing());
-          }
+    // Returns the ElementDefinition for the 'parent' of the current element
+    private ElementDefinition getBaseElement(ElementDefinition e, String url) {
+        if (e.hasUserData(ProfileUtilities.DERIVATION_POINTER)) {
+            return getElementById(url, e.getUserString(ProfileUtilities.DERIVATION_POINTER));
         }
-      }
-      b.append("</table>\r\n");
-      i++;
-      return b.toString();
+        return null;
     }
-    
-    private void checkInScope(List<ElementDefinition> stack, List<ElementDefinition> excluded) {
-      if (stack.size() > 2) {
-        ElementDefinition parent = stack.get(stack.size()-2);
-        ElementDefinition focus = stack.get(stack.size()-1);
-        
-        if (excluded.contains(parent) || "0".equals(parent.getMax())) {
-          excluded.add(focus);
+
+    // Returns the ElementDefinition for the 'root' ancestor of the current element
+    private ElementDefinition getRootElement(ElementDefinition e) {
+        if (!e.hasBase())
+            return null;
+        String basePath = e.getBase().getPath();
+        String url = "http://hl7.org/fhir/StructureDefinition/" + (basePath.contains(".") ? basePath.substring(0, basePath.indexOf(".")) : basePath);
+        try {
+            return getElementById(url, basePath);
+        } catch (FHIRException except) {
+            // Likely a logical model, so this is ok
+            return null;
         }
-      }
-      
+    }
+
+    public String dict(boolean incProfiledOut, int mode, String anchorPrefix) throws Exception {
+        int i = 1;
+        StringBuilder b = new StringBuilder();
+        b.append("<table class=\"dict\">\r\n");
+
+        Map<String, ElementDefinition> allAnchors = new HashMap<>();
+        List<ElementDefinition> excluded = new ArrayList<>();
+
+        List<ElementDefinition> stack = new ArrayList<>(); // keeps track of parents, for anchor generation
+        List<ElementDefinition> elements = elementsForMode(mode);
+        for (ElementDefinition ec : elements) {
+            addToStack(stack, ec);
+            generateAnchors(stack, allAnchors);
+            checkInScope(stack, excluded);
+        }
+
+        for (ElementDefinition ec : elements) {
+            if ((incProfiledOut || !"0".equals(ec.getMax())) && !excluded.contains(ec)) {
+                ElementDefinition compareElement = null;
+                if (mode==GEN_MODE_DIFF)
+                    compareElement = getBaseElement(ec, sd.getBaseDefinition());
+                else if (mode==GEN_MODE_KEY)
+                    compareElement = getRootElement(ec);
+
+                String anchors = makeAnchors(ec, anchorPrefix);
+                if (isProfiledExtension(ec)) {
+                    StructureDefinition extDefn = context.fetchResource(StructureDefinition.class, ec.getType().get(0).getProfile().get(0).getValue());
+                    if (extDefn == null) {
+                        String title = ec.getId();
+                        b.append("  <tr><td colspan=\"2\" class=\"structure\"><span class=\"self-link-parent\">"+anchors+"<span style=\"color: grey\">" + Integer.toString(i++) + ".</span> <b>" + title + "</b>" + link(ec.getId()) + "</span></td></tr>\r\n");
+                        generateElementInner(b, sd, ec, 1, null, compareElement, null);
+                    } else {
+                        String title = ec.getId();
+                        b.append("  <tr><td colspan=\"2\" class=\"structure\"><span class=\"self-link-parent\">"+anchors);
+                        b.append("<span style=\"color: grey\">" + Integer.toString(i++) + ".</span> <b>" + title + "</b>" + link(ec.getId()) + "</span></td></tr>\r\n");
+                        ElementDefinition valueDefn = getExtensionValueDefinition(extDefn);
+                        ElementDefinition compareValueDefn = null;
+                        try {
+                            StructureDefinition compareExtDefn = context.fetchResource(StructureDefinition.class, compareElement.getType().get(0).getProfile().get(0).getValue());
+                            compareValueDefn = getExtensionValueDefinition(extDefn);
+                        } catch (Exception except) {}
+                        generateElementInner(b, sd, ec, valueDefn == null || valueDefn.prohibited() ? 2 : 3, valueDefn, compareElement, compareValueDefn);
+                        // generateElementInner(b, extDefn, extDefn.getSnapshot().getElement().get(0), valueDefn == null ? 2 : 3, valueDefn);
+                    }
+                } else {
+                    String title = ec.getId();
+                    b.append("  <tr><td colspan=\"2\" class=\"structure\"><span class=\"self-link-parent\">"+anchors);
+                    b.append("<span style=\"color: grey\">" + Integer.toString(i++) + ".</span> <b>" + title + "</b>" + link(ec.getId()) + "</span></td></tr>\r\n");
+                    generateElementInner(b, sd, ec, mode, null, compareElement, null);
+                    if (ec.hasSlicing())
+                        generateSlicing(b, sd, ec, ec.getSlicing(), compareElement, mode);
+                }
+            }
+        }
+        b.append("</table>\r\n");
+        i++;
+        return b.toString();
+    }
+
+    private void checkInScope(List<ElementDefinition> stack, List<ElementDefinition> excluded) {
+        if (stack.size() > 2) {
+            ElementDefinition parent = stack.get(stack.size()-2);
+            ElementDefinition focus = stack.get(stack.size()-1);
+
+            if (excluded.contains(parent) || "0".equals(parent.getMax())) {
+                excluded.add(focus);
+            }
+        }
     }
 
     private void generateAnchors(List<ElementDefinition> stack, Map<String, ElementDefinition> allAnchors) {
-      List<String> list = new ArrayList<>();
-      list.add(stack.get(0).getId()); // initialise
-      for (int i = 1; i < stack.size(); i++) {
-        ElementDefinition ed = stack.get(i);
-        List<String> aliases = new ArrayList<>();
-        String name = tail(ed.getPath());
-        if (name.endsWith("[x]")) {
-          aliases.add(name); 
-          Set<String> tl = new HashSet<String>(); // guard against duplicate type names - can happn in some versions 
-          for (TypeRefComponent tr : ed.getType()) {
-            String tc = tr.getWorkingCode();
-            if (!tl.contains(tc)) {
-              aliases.add(name.replace("[x]", Utilities.capitalize(tc)));
-              aliases.add(name+":"+name.replace("[x]", Utilities.capitalize(tc)));
-              tl.add(tc);
+        List<String> list = new ArrayList<>();
+        list.add(stack.get(0).getId()); // initialise
+        for (int i = 1; i < stack.size(); i++) {
+            ElementDefinition ed = stack.get(i);
+            List<String> aliases = new ArrayList<>();
+            String name = tail(ed.getPath());
+            if (name.endsWith("[x]")) {
+                aliases.add(name);
+                Set<String> tl = new HashSet<String>(); // guard against duplicate type names - can happn in some versions
+                for (TypeRefComponent tr : ed.getType()) {
+                    String tc = tr.getWorkingCode();
+                    if (!tl.contains(tc)) {
+                        aliases.add(name.replace("[x]", Utilities.capitalize(tc)));
+                        aliases.add(name+":"+name.replace("[x]", Utilities.capitalize(tc)));
+                        tl.add(tc);
+                    }
+                }
+            } else if (ed.hasSliceName()) {
+                aliases.add(name+":"+ed.getSliceName());
+                // names.add(name); no good generating this?
+            } else {
+                aliases.add(name);
             }
-          }          
-        } else if (ed.hasSliceName()) {
-          aliases.add(name+":"+ed.getSliceName());    
-          // names.add(name); no good generating this?  
-        } else { 
-          aliases.add(name);
+            List<String> generated = new ArrayList<>();
+            for (String l : list) {
+                for (String a : aliases) {
+                    generated.add(l+"."+a);
+                }
+            }
+            list.clear();
+            list.addAll(generated);
         }
-        List<String> generated = new ArrayList<>();
-        for (String l : list) {
-          for (String a : aliases) {
-            generated.add(l+"."+a);
-          }
+        ElementDefinition ed = stack.get(stack.size()-1);
+
+        // now we have all the possible names, but some of them might be inappropriate if we've
+        // already generated a type slicer. On the other hand, if we've already done that, we're
+        // going to steal any type specific ones off it.
+        List<String> removed = new ArrayList<>();
+        for (String s : list) {
+            if (!allAnchors.containsKey(s)) {
+                allAnchors.put(s, ed);
+            } else if (s.endsWith("[x]")) {
+                // that belongs on the earlier element
+                removed.add(s);
+            } else {
+                // we delete it from the other
+                @SuppressWarnings("unchecked")
+                List<String> other = (List<String>) allAnchors.get(s).getUserData("dict.generator.anchors");
+                other.remove(s);
+                allAnchors.put(s, ed);
+            }
         }
-        list.clear();
-        list.addAll(generated);
-      }
-      ElementDefinition ed = stack.get(stack.size()-1);
-      
-      // now we have all the possible names, but some of them might be inappropriate if we've 
-      // already generated a type slicer. On the other hand, if we've already done that, we're 
-      // going to steal any type specific ones off it. 
-      List<String> removed = new ArrayList<>();
-      for (String s : list) {
-        if (!allAnchors.containsKey(s)) {
-          allAnchors.put(s, ed);          
-        } else if (s.endsWith("[x]")) {
-          // that belongs on the earlier element
-          removed.add(s);
-        } else {
-          // we delete it from the other 
-          @SuppressWarnings("unchecked")
-          List<String> other = (List<String>) allAnchors.get(s).getUserData("dict.generator.anchors");
-          other.remove(s);
-          allAnchors.put(s, ed);          
-        }
-      }
-      list.removeAll(removed);      
-      ed.setUserData("dict.generator.anchors", list);
+        list.removeAll(removed);
+        ed.setUserData("dict.generator.anchors", list);
     }
 
     private void addToStack(List<ElementDefinition> stack, ElementDefinition ec) {
@@ -853,13 +1131,13 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return ec.getPath().startsWith(ed.getPath()+".");
     }
 
-    private String makeAnchors(ElementDefinition ed) {
+    private String makeAnchors(ElementDefinition ed, String anchorPrefix) {
       List<String> list = (List<String>) ed.getUserData("dict.generator.anchors");
       StringBuilder b = new StringBuilder();
-      b.append("<a name=\"" + ed.getId() + "\"> </a>");
+      b.append("<a name=\"" + anchorPrefix + ed.getId() + "\"> </a>");
       for (String s : list) {
         if (!s.equals(ed.getId())) {
-          b.append("<a name=\"" + s + "\"> </a>");
+          b.append("<a name=\"" + anchorPrefix + s + "\"> </a>");
         }
       }
       return b.toString();
@@ -881,39 +1159,80 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         return null;
     }
 
-    private void generateElementInner(StringBuilder b, StructureDefinition profile, ElementDefinition d, int mode, ElementDefinition value) throws Exception {
+    public String compareMarkdown(String location, PrimitiveType md, PrimitiveType compare, int mode) throws FHIRException {
+        if (compare == null)
+            return processMarkdown(location, md);
+        String newMd = processMarkdown(location, md);
+        String oldMd = processMarkdown(location, compare);
+        return compareString(newMd, oldMd, mode);
+    }
+
+    public String compareString(String newStr, String oldStr, int mode) {
+        if (mode==GEN_MODE_SNAP || mode==GEN_MODE_MS)
+            return newStr;
+        if (oldStr==null || oldStr.isEmpty())
+            if (newStr==null || newStr.isEmpty())
+                return null;
+            else
+                return newStr;
+        if (oldStr!=null && !oldStr.isEmpty() && (newStr==null || newStr.isEmpty())) {
+            if (mode == GEN_MODE_DIFF)
+                return "";
+            else
+                return removed(oldStr);
+        }
+        if (oldStr.equals(newStr))
+            if (mode==GEN_MODE_DIFF)
+                return "";
+            else
+                return unchanged(newStr);
+        if (newStr.startsWith(oldStr))
+            return unchanged(oldStr) + newStr.substring(oldStr.length());
+        // TODO: improve comparision in this fall-through case, by looking for matches in sub-paragraphs?
+        return newStr + removed(oldStr);
+    }
+
+    public String unchanged(String s) {
+        return "<span style='color:DarkGray'>" + s + "</span>";
+    }
+
+    public String removed(String s) {
+        return "<span style='color:DarkGray;text-decoration:line-through'>" + s + "</span>";
+    }
+
+    private void generateElementInner(StringBuilder b, StructureDefinition profile, ElementDefinition d, int mode, ElementDefinition value, ElementDefinition compare, ElementDefinition compareValue) throws Exception {
         tableRow(b, translate("sd.dict", "SliceName"), "profiling.html#slicing", d.getSliceName());
-        tableRowNE(b, translate("sd.dict", "Definition"), null, processMarkdown(profile.getName(), d.getDefinitionElement()));
+        tableRowNE(b, translate("sd.dict", "Definition"), null, compareMarkdown(profile.getName(), d.getDefinitionElement(), compare==null ? null : compare.getDefinitionElement(), mode));
         tableRowNE(b, translate("sd.dict", "Note"), null, businessIdWarning(profile.getName(), tail(d.getPath())));
-        tableRow(b, translate("sd.dict", "Control"), "conformance-rules.html#conformance", describeCardinality(d) + summariseConditions(d.getCondition()));
-        tableRowNE(b, translate("sd.dict", "Binding"), "terminologies.html", describeBinding(profile, d, d.getPath()));
+        tableRowNE(b, translate("sd.dict", "Control"), "conformance-rules.html#conformance", describeCardinality(d, compare, mode) + summariseConditions(d.getCondition(), compare==null?null:compare.getCondition(), mode));
+        tableRowNE(b, translate("sd.dict", "Binding"), "terminologies.html", describeBinding(profile, d, d.getPath(), compare, mode));
         if (d.hasContentReference())
             tableRow(b, translate("sd.dict", "Type"), null, "See " + d.getContentReference().substring(1));
         else
-            tableRowNE(b, translate("sd.dict", "Type"), "datatypes.html", describeTypes(d.getType(), false) + processSecondary(mode, value));
+            tableRowNE(b, translate("sd.dict", "Type"), "datatypes.html", describeTypes(d.getType(), false, compare, mode) + (value==null ? "" : processSecondary(mode, value, compareValue, mode)));
         if (d.getPath().endsWith("[x]"))
             tableRowNE(b, translate("sd.dict", "[x] Note"), null, translate("sd.dict", "See %sChoice of Data Types%s for further information about how to use [x]", "<a href=\"" + corePath + "formats.html#choice\">", "</a>"));
-        tableRow(b, translate("sd.dict", "Is Modifier"), "conformance-rules.html#ismodifier", displayBoolean(d.getIsModifier()));
-        tableRow(b, translate("sd.dict", "Must Support"), "conformance-rules.html#mustSupport", displayBoolean(d.getMustSupport()));
+        tableRowNE(b, translate("sd.dict", "Is Modifier"), "conformance-rules.html#ismodifier", displayBoolean(d.getIsModifier(), null, mode));
+        tableRowNE(b, translate("sd.dict", "Must Support"), "conformance-rules.html#mustSupport", displayBoolean(d.getMustSupport(), compare==null ? null : compare.getMustSupportElement(), mode));
         if (d.getMustSupport()) {
             if (hasMustSupportTypes(d.getType())) {
-                tableRowNE(b, translate("sd.dict", "Must Support Types"), "datatypes.html", describeTypes(d.getType(), true));
+                tableRowNE(b, translate("sd.dict", "Must Support Types"), "datatypes.html", describeTypes(d.getType(), true, compare, mode));
             } else if (hasChoices(d.getType())) {
                 tableRowNE(b, translate("sd.dict", "Must Support Types"), "datatypes.html", "No must-support rules about the choice of types/profiles");
             }
         }
-        tableRowNE(b, translate("sd.dict", "Requirements"), null, processMarkdown(profile.getName(), d.getRequirementsElement()));
-        tableRowHint(b, translate("sd.dict", "Alternate Names"), translate("sd.dict", "Other names by which this resource/element may be known"), null, describeAliases(d.getAlias()));
-        tableRowNE(b, translate("sd.dict", "Comments"), null, processMarkdown(profile.getName(), d.getCommentElement()));
-        tableRow(b, translate("sd.dict", "Max Length"), null, !d.hasMaxLengthElement() ? null : toStr(d.getMaxLength()));
-        tableRowNE(b, translate("sd.dict", "Default Value"), null, encodeValue(d.getDefaultValue()));
+        tableRowNE(b, translate("sd.dict", "Requirements"), null, compareMarkdown(profile.getName(), d.getRequirementsElement(), compare==null ? null : compare.getRequirementsElement(), mode));
+        tableRowHint(b, translate("sd.dict", "Alternate Names"), translate("sd.dict", "Other names by which this resource/element may be known"), null, compareSimpleTypeLists(d.getAlias(), (compare==null ? new ArrayList<StringType>() : compare.getAlias()), mode));
+        tableRowNE(b, translate("sd.dict", "Comments"), null, compareMarkdown(profile.getName(), d.getCommentElement(), compare==null ? null : compare.getCommentElement(), mode));
+        tableRowNE(b, translate("sd.dict", "Max Length"), null, !d.hasMaxLengthElement() ? null : compare!= null && compare.hasMaxLengthElement() ? compareString(toStr(d.getMaxLength()), toStr(compare.getMaxLength()), mode) : toStr(d.getMaxLength()));
+        tableRowNE(b, translate("sd.dict", "Default Value"), null, encodeValue(d.getDefaultValue(), compare==null ? null : compare.getDefaultValue(), mode));
         tableRowNE(b, translate("sd.dict", "Meaning if Missing"), null, d.getMeaningWhenMissing());
-        tableRowNE(b, translate("sd.dict", "Fixed Value"), null, encodeValue(d.getFixed()));
-        tableRowNE(b, translate("sd.dict", "Pattern Value"), null, encodeValue(d.getPattern()));
+        tableRowNE(b, translate("sd.dict", "Fixed Value"), null, encodeValue(d.getFixed(), compare==null ? null : compare.getFixed(), mode));
+        tableRowNE(b, translate("sd.dict", "Pattern Value"), null, encodeValue(d.getPattern(), compare==null ? null : compare.getPattern(), mode));
         tableRowNE(b, translate("sd.dict", "Example"), null, encodeValues(d.getExample()));
-        tableRowNE(b, translate("sd.dict", "Invariants"), null, invariants(d.getConstraint()));
-        tableRow(b, translate("sd.dict", "LOINC Code"), null, getMapping(profile, d, LOINC_MAPPING));
-        tableRow(b, translate("sd.dict", "SNOMED-CT Code"), null, getMapping(profile, d, SNOMED_MAPPING));
+        tableRowNE(b, translate("sd.dict", "Invariants"), null, invariants(d.getConstraint(), compare==null ? null : compare.getConstraint(), mode));
+        tableRowNE(b, translate("sd.dict", "LOINC Code"), null, getMapping(profile, d, LOINC_MAPPING, compare, mode));
+        tableRowNE(b, translate("sd.dict", "SNOMED-CT Code"), null, getMapping(profile, d, SNOMED_MAPPING, compare, mode));
     }
 
     private boolean hasChoices(List<TypeRefComponent> types) {
@@ -925,24 +1244,33 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         return types.size() > 1;
     }
 
-    private void generateSlicing(StringBuilder b, StructureDefinition profile, ElementDefinition ed, ElementDefinitionSlicingComponent slicing) throws IOException {
-        String rs = null;
+    private String sliceOrderString(ElementDefinitionSlicingComponent slicing) {
         if (slicing.getOrdered())
-            rs = translate("sd.dict", "ordered");
+            return translate("sd.dict", "ordered");
         else
-            rs = translate("sd.dict", "unordered");
-        if (slicing.hasRules())
-            rs = rs + " and " + slicing.getRules().getDisplay();
+            return translate("sd.dict", "unordered");
+    }
+    private void generateSlicing(StringBuilder b, StructureDefinition profile, ElementDefinition ed, ElementDefinitionSlicingComponent slicing, ElementDefinition compare, int mode) throws IOException {
+        String newOrdered = sliceOrderString(slicing);
+        String oldOrdered = (compare==null || !compare.hasSlicing()) ? null : sliceOrderString(compare.getSlicing());
+        String slicingRules = compareString(slicing.hasRules() ? slicing.getRules().getDisplay() : null, compare!=null && compare.hasSlicing() && compare.getSlicing().hasRules() ? compare.getSlicing().getRules().getDisplay() : null, mode);
+        String rs = compareString(newOrdered, oldOrdered, mode) + " and " + slicingRules;
 
         StringBuilder bl = new StringBuilder();
-        if (!slicing.getDiscriminator().isEmpty()) {
+        List<ElementDefinition.ElementDefinitionSlicingDiscriminatorComponent> newDiscs = slicing.getDiscriminator();
+        List<ElementDefinition.ElementDefinitionSlicingDiscriminatorComponent> oldDiscs;
+        if (compare!=null && compare.hasSlicing())
+            oldDiscs = compare.getSlicing().getDiscriminator();
+        else
+            oldDiscs = new ArrayList<>();
+        if (!newDiscs.isEmpty() || oldDiscs.isEmpty()) {
             boolean first = true;
-            for (ElementDefinitionSlicingDiscriminatorComponent s : slicing.getDiscriminator()) {
-                if (first)
-                    first = false;
-                else
-                    bl.append(", ");
-                bl.append("<li>" + s.getType().toCode() + " @ " + s.getPath() + "</li>");
+            for (int i=0; i<newDiscs.size()||i<oldDiscs.size(); i++) {
+                ElementDefinitionSlicingDiscriminatorComponent newDisc = i<newDiscs.size() ? slicing.getDiscriminator().get(0) : null;
+                ElementDefinitionSlicingDiscriminatorComponent oldDisc = i<oldDiscs.size() ? slicing.getDiscriminator().get(0) : null;
+                String code = compareString(newDisc==null ? null : newDisc.getType().toCode(), oldDisc==null ? null : oldDisc.getType().toCode(), mode);
+                String path = compareString(newDisc==null ? null : newDisc.getPath(), oldDisc==null ? null : oldDisc.getPath(), mode);
+                bl.append("<li>" + code + " @ " + path + (i!=0 ? ", ": "") + "</li>");
             }
         }
         if (slicing.hasDiscriminator())
@@ -964,9 +1292,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     private void tableRowHint(StringBuilder b, String name, String hint, String defRef, String value) throws IOException {
         if (value != null && !"".equals(value)) {
             if (defRef != null)
-                b.append("  <tr><td><a href=\"" + corePath + defRef + "\" title=\"" + Utilities.escapeXml(hint) + "\">" + name + "</a></td><td>" + Utilities.escapeXml(value) + "</td></tr>\r\n");
+                b.append("  <tr><td><a href=\"" + corePath + defRef + "\" title=\"" + Utilities.escapeXml(hint) + "\">" + name + "</a></td><td>" + value + "</td></tr>\r\n");
             else
-                b.append("  <tr><td title=\"" + Utilities.escapeXml(hint) + "\">" + name + "</td><td>" + Utilities.escapeXml(value) + "</td></tr>\r\n");
+                b.append("  <tr><td title=\"" + Utilities.escapeXml(hint) + "\">" + name + "</td><td>" + value + "</td></tr>\r\n");
         }
     }
 
@@ -1008,23 +1336,36 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         return null;
     }
 
-    private String describeCardinality(ElementDefinition d) {
-        if (!d.hasMax() && d.getMinElement() == null)
-            return "";
-        else if (d.getMax() == null)
-            return toStr(d.getMin()) + "..?";
-        else
-            return toStr(d.getMin()) + ".." + d.getMax();
+    private String describeCardinality(ElementDefinition d, ElementDefinition compare, int mode) {
+        if (compare==null) {
+            if (!d.hasMax() && d.getMinElement() == null)
+                return "";
+            else if (d.getMax() == null)
+                return toStr(d.getMin()) + "..?";
+            else
+                return toStr(d.getMin()) + ".." + d.getMax();
+        } else {
+            String min = compareString(toStr(d.getMin()), toStr(compare.getMin()), mode);
+            if (mode==GEN_MODE_DIFF && (d.getMin()==compare.getMin() || d.getMin()==0))
+                min=null;
+            String max = compareString(d.getMax(), compare.getMax(), mode);
+            if ((min==null || min.isEmpty()) && (max==null || max.isEmpty()))
+                return "";
+            if (mode==GEN_MODE_DIFF)
+                return( (min==null || min.isEmpty() ? unchanged(toStr(compare.getMin())) : min) + ".." + (max==null || max.isEmpty() ? unchanged(compare.getMax()) : max));
+            else
+                return( (min==null || min.isEmpty() ? "?" : min) + ".." + (max==null || max.isEmpty() ? "?" : max));
+        }
     }
 
-    private String summariseConditions(List<IdType> conditions) {
-        if (conditions.isEmpty())
+    private String summariseConditions(List<IdType> conditions, List<IdType> compare, int mode) {
+        if (conditions.isEmpty() && (compare==null || compare.isEmpty()))
             return "";
         else {
-            CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
-            for (IdType t : conditions)
-                b.append(t.getValue());
-            return " " + translate("sd.dict", "This element is affected by the following invariants") + ": " + b.toString();
+            String comparedList = compareSimpleTypeLists(conditions, compare, mode);
+            if (comparedList.equals(""))
+                return "";
+            return " " + translate("sd.dict", "This element is affected by the following invariants") + ": " + comparedList;
         }
     }
 
@@ -1037,27 +1378,41 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         return false;
     }
 
-    private String describeTypes(List<TypeRefComponent> types, boolean mustSupportOnly) throws Exception {
+    private String describeTypes(List<TypeRefComponent> types, boolean mustSupportOnly, ElementDefinition compare, int mode) throws Exception {
         if (types.isEmpty())
             return "";
 
+        List<TypeRefComponent> compareTypes = compare==null ? new ArrayList<>() : compare.getType();
         StringBuilder b = new StringBuilder();
-        if ((!mustSupportOnly && types.size() == 1) || (mustSupportOnly && mustSupportCount(types) == 1)) {
+        if ((!mustSupportOnly && types.size() == 1 && compareTypes.size() <=1) || (mustSupportOnly && mustSupportCount(types) == 1)) {
             if (!mustSupportOnly || ProfileUtilities.isMustSupport(types.get(0))) {
-                describeType(b, types.get(0), mustSupportOnly);
+                describeType(b, types.get(0), mustSupportOnly, compareTypes.size()==0 ? null : compareTypes.get(0), mode);
             }
         } else {
             boolean first = true;
             b.append(translate("sd.dict", "Choice of") + ": ");
+            Map<String,TypeRefComponent> map = new HashMap<String, TypeRefComponent>();
+            for (TypeRefComponent t : compareTypes) {
+                map.put(t.getCode(), t);
+            }
             for (TypeRefComponent t : types) {
+                TypeRefComponent compareType = map.get(t.getCode());
+                if (compareType!=null)
+                    map.remove(t.getCode());
                 if (!mustSupportOnly || ProfileUtilities.isMustSupport(t)) {
                     if (first) {
                         first = false;
                     } else {
                         b.append(", ");
                     }
-                    describeType(b, t, mustSupportOnly);
+                    describeType(b, t, mustSupportOnly, compareType, mode);
                 }
+            }
+            for (TypeRefComponent t : map.values()) {
+                b.append(", ");
+                StringBuilder b2 = new StringBuilder();
+                describeType(b2, t, mustSupportOnly, null, mode);
+                b.append(removed(b2.toString()));
             }
         }
         return b.toString();
@@ -1073,7 +1428,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         return c;
     }
 
-    private void describeType(StringBuilder b, TypeRefComponent t, boolean mustSupportOnly) throws Exception {
+    private void describeType(StringBuilder b, TypeRefComponent t, boolean mustSupportOnly, TypeRefComponent compare, int mode) throws Exception {
         if (t.getWorkingCode() == null) {
             return;
         }
@@ -1082,123 +1437,158 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
 
         if (t.getWorkingCode().startsWith("xs:")) {
-            b.append(t.getWorkingCode());
+            b.append(compareString(t.getWorkingCode(), compare==null ? null : compare.getWorkingCode(), mode));
         } else {
-            String s = igp.getLinkFor(sd.getUserString("path"), t.getWorkingCode());
-            if (s != null) {
-                b.append("<a href=\"");
-                //    GG 13/12/2016 - I think that this is always wrong now.
-                //      if (!s.startsWith("http:") && !s.startsWith("https:") && !s.startsWith(".."))
-                //        b.append(prefix);
-                b.append(s);
-                if (!s.contains(".html")) {
-                    //     b.append(".html#");
-                    //     String type = t.getCode();
-                    //     if (type.equals("*"))
-                    //       b.append("open");
-                    //     else
-                    //       b.append(t.getCode());
-                }
-                b.append("\">");
-                b.append(t.getWorkingCode());
-                b.append("</a>");
-            } else {
-                b.append(t.getWorkingCode());
-            }
+            b.append(compareString(getTypeLink(t), compare==null ? null : getTypeLink(compare), mode));
         }
-        if ((!mustSupportOnly && t.hasProfile()) || ProfileUtilities.isMustSupport(t.getProfile())) {
-            b.append("(");
-            boolean first = true;
+        if ((!mustSupportOnly && (t.hasProfile() || (compare!=null && compare.hasProfile()))) || ProfileUtilities.isMustSupport(t.getProfile())) {
+            List<String> newProfiles = new ArrayList<String>();
+            List<String> oldProfiles = new ArrayList<String>();
             for (CanonicalType pt : t.getProfile()) {
-                if (!mustSupportOnly || ProfileUtilities.isMustSupport(pt)) {
-                    if (first) first = false;
-                    else b.append(", ");
-                    StructureDefinition p = context.fetchResource(StructureDefinition.class, pt.getValue());
-                    if (p == null)
-                        b.append(t.getProfile());
-                    else {
-                        String pth = p.getUserString("path");
-                        b.append("<a href=\"" + Utilities.escapeXml(pth) + "\" title=\"" + t.getProfile() + "\">");
-                        b.append(p.getName());
-                        b.append("</a>");
-                    }
+                newProfiles.add(getTypeProfile(pt, mustSupportOnly));
+            }
+            if (compare!=null) {
+                for (CanonicalType pt : compare.getProfile()) {
+                    oldProfiles.add(getTypeProfile(pt, mustSupportOnly));
                 }
             }
-            b.append(")");
+            String profiles = compareSimpleTypeLists(newProfiles, oldProfiles, mode);
+            if (!profiles.isEmpty()) {
+                if (b.toString().isEmpty())
+                    b.append(unchanged(getTypeLink(t)));
+                b.append("(");
+                b.append(profiles);
+                b.append(")");
+            }
         }
-        if ((!mustSupportOnly && t.hasTargetProfile()) || ProfileUtilities.isMustSupport(t.getTargetProfile())) {
-            b.append("(");
-            boolean first = true;
-            for (CanonicalType tp : t.getTargetProfile()) {
-                if (!mustSupportOnly || ProfileUtilities.isMustSupport(tp)) {
-                    if (first)
-                        first = false;
-                    else
-                        b.append(" | ");
-                    StructureDefinition p = context.fetchResource(StructureDefinition.class, tp.getValue());
-                    if (p == null)
-                        b.append(tp.getValue());
-                    else {
-                        String pth = p.getUserString("path");
-                        b.append("<a href=\"" + Utilities.escapeXml(pth) + "\" title=\"" + tp.getValue() + "\">");
-                        b.append(p.getName());
-                        b.append("</a>");
-                    }
+        if ((!mustSupportOnly && (t.hasTargetProfile() || (compare!=null && compare.hasTargetProfile()))) || ProfileUtilities.isMustSupport(t.getTargetProfile())) {
+            List<StringType> newProfiles = new ArrayList<StringType>();
+            List<StringType> oldProfiles = new ArrayList<StringType>();
+            for (CanonicalType pt : t.getTargetProfile()) {
+                String tgtProfile = getTypeProfile(pt, mustSupportOnly);
+                if (!tgtProfile.isEmpty())
+                    newProfiles.add(new StringType(tgtProfile));
+            }
+            if (compare!=null) {
+                for (CanonicalType pt : compare.getTargetProfile()) {
+                    String tgtProfile = getTypeProfile(pt, mustSupportOnly);
+                    if (!tgtProfile.isEmpty())
+                        oldProfiles.add(new StringType(tgtProfile));
                 }
             }
-            if (!t.getAggregation().isEmpty()) {
-              b.append(" : ");
-              boolean firstMode = true;
-              for (Enumeration<AggregationMode> a :t.getAggregation()) {
-                if (!firstMode)
-                  b.append(", ");
-                b.append(" <a href=\"" + corePath + "codesystem-resource-aggregation-mode.html#content\" title=\""+ProfileUtilities.hintForAggregation(a.getValue())+"\">{" + ProfileUtilities.codeForAggregation(a.getValue()) + "}</a>");
-                firstMode = false;
-              }
+            String profiles = compareSimpleTypeLists(newProfiles, oldProfiles, mode, "|");
+            if (!profiles.isEmpty()) {
+                if (b.toString().isEmpty())
+                    b.append(unchanged(getTypeLink(t)));
+                b.append("(");
+                b.append(profiles);
+                b.append(")");
+            }
+
+            if (!t.getAggregation().isEmpty() || (compare!=null && !compare.getAggregation().isEmpty())) {
+                b.append(" : ");
+                List<String> newAgg = new ArrayList<String>();
+                List<String> oldAgg = new ArrayList<String>();
+                for (Enumeration<AggregationMode> a :t.getAggregation()) {
+                    newAgg.add(" <a href=\"" + corePath + "codesystem-resource-aggregation-mode.html#content\" title=\""+ProfileUtilities.hintForAggregation(a.getValue())+"\">{" + ProfileUtilities.codeForAggregation(a.getValue()) + "}</a>");
+                }
+                if (compare!=null) {
+                    for (Enumeration<AggregationMode> a : compare.getAggregation()) {
+                        newAgg.add(" <a href=\"" + corePath + "codesystem-resource-aggregation-mode.html#content\" title=\"" + ProfileUtilities.hintForAggregation(a.getValue()) + "\">{" + ProfileUtilities.codeForAggregation(a.getValue()) + "}</a>");
+                    }
+                }
+                b.append(compareSimpleTypeLists(newAgg, oldAgg, mode));
             }
             
             b.append(")");
         }
     }
 
-    private String processSecondary(int mode, ElementDefinition value) throws Exception {
+    private String getTypeProfile(CanonicalType pt, boolean mustSupportOnly) {
+        StringBuilder b = new StringBuilder();
+        if (!mustSupportOnly || ProfileUtilities.isMustSupport(pt)) {
+            StructureDefinition p = context.fetchResource(StructureDefinition.class, pt.getValue());
+            if (p == null)
+                b.append(pt.getValue());
+            else {
+                String pth = p.getUserString("path");
+                b.append("<a href=\"" + Utilities.escapeXml(pth) + "\" title=\"" + pt.getValue() + "\">");
+                b.append(p.getName());
+                b.append("</a>");
+            }
+        }
+        return b.toString();
+    }
+
+    private String getTypeLink(TypeRefComponent t) {
+        StringBuilder b = new StringBuilder();
+        String s = igp.getLinkFor(sd.getUserString("path"), t.getWorkingCode());
+        if (s != null) {
+            b.append("<a href=\"");
+            //    GG 13/12/2016 - I think that this is always wrong now.
+            //      if (!s.startsWith("http:") && !s.startsWith("https:") && !s.startsWith(".."))
+            //        b.append(prefix);
+            b.append(s);
+            if (!s.contains(".html")) {
+                //     b.append(".html#");
+                //     String type = t.getCode();
+                //     if (type.equals("*"))
+                //       b.append("open");
+                //     else
+                //       b.append(t.getCode());
+            }
+            b.append("\">");
+            b.append(t.getWorkingCode());
+            b.append("</a>");
+        } else {
+            b.append(t.getWorkingCode());
+        }
+        return b.toString();
+    }
+
+    private String processSecondary(int mode, ElementDefinition value, ElementDefinition compareValue, int compMode) throws Exception {
         switch (mode) {
             case 1:
                 return "";
             case 2:
                 return "  (" + translate("sd.dict", "Complex Extension") + ")";
             case 3:
-                return "  (" + translate("sd.dict", "Extension Type") + ": " + describeTypes(value.getType(), false) + ")";
+                return "  (" + translate("sd.dict", "Extension Type") + ": " + describeTypes(value.getType(), false, compareValue, compMode) + ")";
             default:
                 return "";
         }
     }
 
-    private String displayBoolean(boolean mustUnderstand) {
-        if (mustUnderstand)
-            return "true";
-        else
-            return null;
+    private String displayBoolean(boolean value, BooleanType compare, int mode) {
+        String newValue = value ? "true" : null;
+        String oldValue = compare==null || compare.getValue()==null ? null : (compare.getValue()!=true ? null : "true");
+        return compareString(newValue, oldValue, mode);
     }
 
-    private String invariants(List<ElementDefinitionConstraintComponent> constraints) {
-        if (constraints.isEmpty())
+    private String invariants(List<ElementDefinitionConstraintComponent> constraints, List<ElementDefinitionConstraintComponent> compare, int mode) {
+        // Lloyd todo compare
+        if (constraints.isEmpty() && (compare==null || compare.isEmpty()))
             return null;
+        if (compare == null)
+            compare = new ArrayList<ElementDefinitionConstraintComponent>();
         StringBuilder s = new StringBuilder();
         if (constraints.size() > 0) {
             s.append("<b>" + translate("sd.dict", "Defined on this element") + "</b><br/>\r\n");
             List<String> ids = new ArrayList<String>();
             for (ElementDefinitionConstraintComponent id : constraints)
                 ids.add(id.hasKey() ? id.getKey() : id.toString());
-            Collections.sort(ids);
+            Collections.sort(ids, new ConstraintKeyComparator());
             boolean b = false;
             for (String id : ids) {
                 ElementDefinitionConstraintComponent inv = getConstraint(constraints, id);
+                ElementDefinitionConstraintComponent invCompare = getConstraint(compare, id);
                 if (b)
                     s.append("<br/>");
                 else
                     b = true;
-                s.append("<b title=\"" + translate("sd.dict", "Formal Invariant Identifier") + "\">" + id + "</b>: " + Utilities.escapeXml(gt(inv.getHumanElement())) + " (: " + Utilities.escapeXml(inv.getExpression()) + ")");
+                String human = compareString(Utilities.escapeXml(gt(inv.getHumanElement())), invCompare==null ? null : Utilities.escapeXml(gt(invCompare.getHumanElement())), mode);
+                String expression= compareString(Utilities.escapeXml(inv.getExpression()), invCompare==null ? null : Utilities.escapeXml(invCompare.getExpression()), mode);
+                s.append("<b title=\"" + translate("sd.dict", "Formal Invariant Identifier") + "\">" + id + "</b>: " + human + " (: " + expression + ")");
             }
         }
 
@@ -1215,17 +1605,33 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         return null;
     }
 
-    private String describeBinding(StructureDefinition sd, ElementDefinition d, String path) throws Exception {
+    private String describeBinding(StructureDefinition sd, ElementDefinition d, String path, ElementDefinition compare, int mode) throws Exception {
         if (!d.hasBinding())
             return null;
         else {
             ElementDefinitionBindingComponent binding = d.getBinding();
+            ElementDefinitionBindingComponent compBinding = compare == null ? null : compare.getBinding();
+            String bindingDesc = null;
+            if (binding.hasDescription()) {
+                StringType newBinding = PublicationHacker.fixBindingDescriptions(context, binding.getDescriptionElement());
+                if (mode == GEN_MODE_SNAP || mode == GEN_MODE_MS)
+                    bindingDesc = processMarkdown("Binding.description", newBinding);
+                else {
+                    StringType oldBinding = compBinding != null && compBinding.hasDescription() ? PublicationHacker.fixBindingDescriptions(context, compBinding.getDescriptionElement()) : null;
+                    bindingDesc = compareMarkdown("Binding.description", newBinding, oldBinding, mode);
+                }
+            }
             if (!binding.hasValueSet())
-                return processMarkdown("Binding.description", PublicationHacker.fixBindingDescriptions(context, binding.getDescriptionElement()));
+                return bindingDesc;
             BindingResolution br = igp.resolveBinding(sd, binding, path);
             String s = conf(binding) + "<a href=\"" + Utilities.escapeXml(br.url) + "\">" + Utilities.escapeXml(br.display) + "</a>" + confTail(binding);
+            if (compBinding!=null ) {
+                BindingResolution compBr = igp.resolveBinding(sd, compBinding, path);
+                String compS = conf(compBinding) + "<a href=\"" + Utilities.escapeXml(compBr.url) + "\">" + Utilities.escapeXml(compBr.display) + "</a>" + confTail(compBinding);
+                s = compareString(s, compS, mode);
+            }
             if (binding.hasDescription()) {
-                String desc = processMarkdown("Binding.description", PublicationHacker.fixBindingDescriptions(context, binding.getDescriptionElement()));
+                String desc = bindingDesc;
                 if (desc != null) {
                     if (desc.length() > 4 && desc.substring(4).contains("<p>")) {
                         s = s + "<br/>" + desc;
@@ -1237,15 +1643,15 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             
             AdditionalBindingsRenderer abr = new AdditionalBindingsRenderer(igp, corePath, sd, d.getPath(), gen, this);
             if (binding.hasExtension(ToolingExtensions.EXT_MAX_VALUESET)) {
-              abr.seeMaxBinding(ToolingExtensions.getExtension(binding, ToolingExtensions.EXT_MAX_VALUESET));
+              abr.seeMaxBinding(ToolingExtensions.getExtension(binding, ToolingExtensions.EXT_MAX_VALUESET), compBinding==null ? null : ToolingExtensions.getExtension(compBinding, ToolingExtensions.EXT_MAX_VALUESET), mode!=GEN_MODE_SNAP && mode!=GEN_MODE_MS);
             }
             if (binding.hasExtension(ToolingExtensions.EXT_MIN_VALUESET)) {
-              abr.seeMinBinding(ToolingExtensions.getExtension(binding, ToolingExtensions.EXT_MIN_VALUESET));
+              abr.seeMinBinding(ToolingExtensions.getExtension(binding, ToolingExtensions.EXT_MIN_VALUESET), compBinding==null ? null : ToolingExtensions.getExtension(compBinding, ToolingExtensions.EXT_MIN_VALUESET), mode!=GEN_MODE_SNAP && mode!=GEN_MODE_MS);
             }
             if (binding.hasExtension(ToolingExtensions.EXT_BINDING_ADDITIONAL)) {
-              abr.seeAdditionalBindings(binding.getExtensionsByUrl(ToolingExtensions.EXT_BINDING_ADDITIONAL));
+              abr.seeAdditionalBindings(binding.getExtensionsByUrl(ToolingExtensions.EXT_BINDING_ADDITIONAL), compBinding==null ? null : compBinding.getExtensionsByUrl(ToolingExtensions.EXT_BINDING_ADDITIONAL), mode!=GEN_MODE_SNAP && mode!=GEN_MODE_MS);
             }
-            
+
             s = s + abr.render();
             
             return s;
@@ -1257,8 +1663,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         if (s.startsWith("<p>")) {
             s = s.substring(3);
         }
-        if (s.endsWith("</p>")) {
-            s = s.substring(0, s.length() - 4);
+        if (s.trim().endsWith("</p>")) {
+            s = s.substring(0, s.lastIndexOf("</p>")-1) + s.substring(s.lastIndexOf("</p>") +4);
         }
         return s;
     }
@@ -1302,6 +1708,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
     }
 
+    private String encodeValue(DataType value, DataType compare, int mode) throws Exception {
+        String oldValue = encodeValue(compare);
+        String newValue = encodeValue(value);
+        return compareString(newValue, oldValue, mode);
+    }
+
     private String encodeValue(DataType value) throws Exception {
         if (value == null || value.isEmpty())
             return null;
@@ -1323,7 +1735,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
     }
 
-    private String getMapping(StructureDefinition profile, ElementDefinition d, String uri) {
+    private String getMapping(StructureDefinition profile, ElementDefinition d, String uri, ElementDefinition compare, int mode) {
         String id = null;
         for (StructureDefinitionMappingComponent m : profile.getMapping()) {
             if (m.hasUri() && m.getUri().equals(uri))
@@ -1331,18 +1743,81 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
         if (id == null)
             return null;
+        String newMap = null;
         for (ElementDefinitionMappingComponent m : d.getMapping()) {
-            if (m.getIdentity().equals(id))
-                return m.getMap();
+            if (m.getIdentity().equals(id)) {
+                newMap = m.getMap();
+                break;
+            }
         }
-        return null;
+        if (compare==null)
+            return newMap;
+        String oldMap = null;
+        for (ElementDefinitionMappingComponent m : compare.getMapping()) {
+            if (m.getIdentity().equals(id)) {
+                oldMap = m.getMap();
+                break;
+            }
+        }
+
+        return compareString(Utilities.escapeXml(newMap), Utilities.escapeXml(oldMap), mode);
     }
 
+    private String compareSimpleTypeLists(List original, List compare, int mode) {
+        return compareSimpleTypeLists(original, compare, mode, ", ");
+    }
 
-    private String describeAliases(List<StringType> synonym) {
-        CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
-        for (StringType s : synonym)
-            b.append(gt(s));
+    private List<String> convertPrimitiveTypeList(List<PrimitiveType> original) {
+        List<String> originalList = new ArrayList<String>();
+        for (PrimitiveType pt : original) {
+            String s = gt(pt);
+            if (!s.startsWith("<"))
+                s = Utilities.escapeXml(s);
+            originalList.add(s);
+        }
+        return originalList;
+    }
+    private String compareSimpleTypeLists(List originalList, List compareList, int mode, String separator) {
+        List<String> original;
+        List<String> compare;
+        if (compareList == null)
+            compareList = new ArrayList<>();
+        if (!originalList.isEmpty() && originalList.get(0) instanceof PrimitiveType)
+            original = convertPrimitiveTypeList(originalList);
+        else
+            original = originalList;
+        if (!compareList.isEmpty() && compareList.get(0) instanceof PrimitiveType)
+            compare = convertPrimitiveTypeList(compareList);
+        else
+            compare = compareList;
+        StringBuilder b = new StringBuilder();
+        if (mode==GEN_MODE_SNAP || mode==GEN_MODE_MS) {
+            for (String s : original)
+                b.append(s);
+        } else {
+            boolean first = true;
+            for (String s : original) {
+                if (first)
+                    first = false;
+                else
+                    b.append(separator);
+                if (compare.contains(s))
+                    b.append(unchanged(s));
+                else
+                    b.append(s);
+            }
+            if (original.size()!=0 || mode!=GEN_MODE_DIFF) {
+                for (String s : compare) {
+                    if (!original.contains(s)) {
+                        if (first)
+                            first = false;
+                        else
+                            b.append(separator);
+                        b.append(removed(s));
+                    }
+                }
+            }
+        }
         return b.toString();
     }
 
@@ -2185,6 +2660,22 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
     @Override
     protected void genSummaryRowsSpecific(StringBuilder b, Set<String> rows) {
+    }
+
+    public ElementDefinition getElementById(String structureCanonical, String id) {
+        Map<String, ElementDefinition> sdCache = sdMapCache.get(structureCanonical);
+
+        if (sdCache == null) {
+            StructureDefinition sd = (StructureDefinition) context.fetchResource(StructureDefinition.class, structureCanonical);
+            if (sd==null)
+                throw new FHIRException("Unable to retrieve StructureDefinition with URL " + structureCanonical);
+            sdCache = new HashMap<String, ElementDefinition>();
+            sdMapCache.put(structureCanonical, sdCache);
+            for (ElementDefinition e : sd.getSnapshot().getElement()) {
+                sdCache.put(e.getId(), e);
+            }
+        }
+        return sdCache.get(id);
     }
 
 }
