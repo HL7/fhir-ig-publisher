@@ -10122,6 +10122,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   
   public static void main(String[] args) throws Exception {
     int exitCode = 0;
+
+    org.hl7.fhir.utilities.FileFormat.checkCharsetAndWarnIfNotUTF8(System.out);
+
     if (hasNamedParam(args, "-gui")) {
       runGUI();
       // Returning here ends the main thread but leaves the GUI running
