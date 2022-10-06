@@ -145,7 +145,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
                     }
 
                     for (TypeRefComponent t : ed.getType()) {
-                        if (t.hasProfile() && !igp.isDatatype(t.getProfile().get(0).getValue().substring(40))) {
+                        if (t.hasProfile() && t.getProfile().get(0).getValue().length() > 40 && !igp.isDatatype(t.getProfile().get(0).getValue().substring(40))) {
                             if (ed.getPath().endsWith(".extension")) {
                                 tryAdd(ext, summariseExtension(t.getProfile(), false));
                             } else if (ed.getPath().endsWith(".modifierExtension")) {
