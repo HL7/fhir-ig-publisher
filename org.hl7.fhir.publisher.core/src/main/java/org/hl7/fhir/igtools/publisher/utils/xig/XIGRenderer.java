@@ -16,6 +16,7 @@ import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.utils.xig.XIGHandler.PageContent;
+import org.hl7.fhir.igtools.publisher.utils.xig.XIGInformation.CanonicalResourceUsage;
 import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.JsonParser;
@@ -57,7 +58,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider {
-  
+
   private final static String HEADER=
       "<html>\r\n"+
           "<head>\r\n"+
@@ -69,7 +70,7 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
 
   private final static String FOOTER =
       "<hr/><p>Produced $date$</p></body>\r\n</html>\r\n";
-  
+
   private XIGInformation info;
   private String target;
   private RenderingContext rc;
@@ -92,7 +93,7 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
     StringBuilder b = new StringBuilder();
     b.append("<table class=\"grid\">\r\n");
     b.append("<tr><td><a href=\""+cr.getUserString("path")+"\">Source</a></td><td><a href=\""+cr.getUserString("purl")+"\">"+cr.getUserString("pid")+"</a>:"
-           +cr.getUserString("pname")+" (v"+cr.getUserString("fver")+")</td></tr>\r\n");
+        +cr.getUserString("pname")+" (v"+cr.getUserString("fver")+")</td></tr>\r\n");
     JsonObject j = new JsonObject();
     info.fillOutJson(cr, j);
     for (Entry<String, JsonElement> pp : j.entrySet()) {
@@ -106,13 +107,27 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
         b.append("</td></tr>\r\n");
       }
     }
-     return b.toString();
+    List<CanonicalResourceUsage> list = info.usages.get(cr.getUrl());
+    if (list == null || list.isEmpty()) {
+      b.append("<tr><td>Usages</td><td>(none)</td></tr>\r\n");
+    } else {
+      b.append("<tr><td>Usages</td><td><ul>\r\n");
+      for (CanonicalResourceUsage cu : list) {
+        b.append("  <li>");
+        b.append(crlink(cu.getResource()));
+        b.append(cu.getUsage().getDisplay());
+        b.append("</li>\r\n");
+      }
+      b.append("</ul></td></tr>\r\n");
+    }
+    b.append("</table>\r\n");
+    return b.toString();
   }
-  
+
   public void produce(FilesystemPackageCacheManager pcm) throws IOException, FHIRException, EOperationOutcome {
     JsonTrackingParser.write(info.getJson(), Utilities.path(target, "registry.json"));
     info.setJson(null);
-    
+
     System.out.println("Generate...");
     int i = 0;
     for (CanonicalResource cr : info.getResources().values()) {
@@ -140,6 +155,12 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
       }
     }
 
+    b.append("<p><b>"+info.getPid().size()+" Packages Loaded</b></p>\r\n");
+    b.append("<ul style=\"column-count: 4\">\r\n");
+    for (String s : Utilities.sorted(info.getPid().keySet())) {
+      b.append("<li><a href=\""+info.getPid().get(s)+"\">"+s+"</a></li>\r\n");
+    }
+    b.append("</ul>\r\n");
     genPage("XIG index", b.toString(), Utilities.path(target, "index.html"));
 
     System.out.println("Done");
@@ -158,13 +179,17 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
     StringBuilder b = new StringBuilder();
     b.append("<p><b>Structures</b></p>\r\n");
     b.append("<ul style=\"column-count: 4\">\r\n");
-    
+
     XIGStructureDefinitionHandler sdh = new XIGStructureDefinitionHandler(info);
     addPage(b, realmPrefix(realm)+"profiles-resources.html", sdh.makeProfilesPage(this, StructureDefinitionKind.RESOURCE, "profile-res", "Resource Profiles", realm));   
     addPage(b, realmPrefix(realm)+"profiles-datatypes.html", sdh.makeProfilesPage(this, null, "profile-dt", "DataType Profiles", realm));   
     addPage(b, realmPrefix(realm)+"extensions.html", sdh.makeExtensionsPage(this, "extensions", realm));   
     addPage(b, realmPrefix(realm)+"logicals.html", sdh.makeLogicalsPage(realm));   
-    
+    addPage(b, realmPrefix(realm)+"extension-usages-core.html", sdh.makeExtensionUsagePage(this, "Core Extension Usage", realm, true));   
+    addPage(b, realmPrefix(realm)+"extension-usages-other.html", sdh.makeExtensionUsagePage(this, "Other Extension Usage", realm, false));   
+    addPage(b, realmPrefix(realm)+"profiles-usages-core.html", sdh.makeProfilesUsagePage(this, "Core Profile Usage", realm, true));   
+    addPage(b, realmPrefix(realm)+"profiles-usages-other.html", sdh.makeProfilesUsagePage(this, "Other Profile Usage", realm, false));   
+
     b.append("</ul>\r\n");
     b.append("<p><b>CodeSytems</b></p>\r\n");
     b.append("<ul style=\"column-count: 4\">\r\n");
@@ -174,7 +199,9 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
     addPage(b, realmPrefix(realm)+"codeSystems-fragment.html", csh.makeCodeSystemPage(CodeSystemContentMode.FRAGMENT, "Fragement Code Systems", realm));   
     addPage(b, realmPrefix(realm)+"codeSystems-notpresent.html", csh.makeCodeSystemPage(CodeSystemContentMode.NOTPRESENT, "Not Present Code Systems", realm));   
     addPage(b, realmPrefix(realm)+"codeSystems-supplement.html", csh.makeCodeSystemPage(CodeSystemContentMode.SUPPLEMENT, "Code System Supplements", realm));   
-    
+    addPage(b, realmPrefix(realm)+"codesystem-usages-core.html", csh.makeCoreUsagePage(this, "Core CodeSystems Usage", realm));   
+    addPage(b, realmPrefix(realm)+"codesystem-usages-tho.html", csh.makeTHOUsagePage(this, "THO CodeSystems Usage", realm));   
+
     b.append("</ul>\r\n");
     b.append("<p><b>ValueSets</b></p>\r\n");
     b.append("<ul style=\"column-count: 4\">\r\n");
@@ -204,6 +231,8 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
     addPage(b, realmPrefix(realm)+"valuesets-fhir.html",  vsh.makeValueSetsPage("tho", "FHIR ValueSets", realm));   
     addPage(b, realmPrefix(realm)+"valuesets-ucum.html", vsh.makeValueSetsPage("ucum", "UCUM ValueSets", realm));   
     addPage(b, realmPrefix(realm)+"valuesets-vs.html", vsh.makeValueSetsPage("vs", "Composite ValueSets", realm));   
+    addPage(b, realmPrefix(realm)+"valueset-usages-core.html", vsh.makeCoreUsagePage(this, "Core ValueSets Usage", realm));   
+    addPage(b, realmPrefix(realm)+"valueset-usages-tho.html", vsh.makeTHOUsagePage(this, "THO ValueSets Usage", realm));   
     b.append("</ul>\r\n");
     b.append("<p><b>ConceptMaps</b></p>\r\n");
     b.append("<ul style=\"column-count: 4\">\r\n");
@@ -282,7 +311,7 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
     addPage(b, realmPrefix(realm)+"resources-act.html", oth.makeResourcesPage("ActorDefinition", "ActorDefinitions", realm));         
     addPage(b, realmPrefix(realm)+"resources-req.html", oth.makeResourcesPage("Requirements", "Requirements", realm));         
     b.append("</ul>\r\n");
-    
+
     System.out.println("");
     return new PageContent("XIG index for "+realmT, b.toString());
   }
@@ -305,7 +334,7 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
     RendererFactory.factory(cr, rc).render(cr);
     String s = new XhtmlComposer(false, true).compose(cr.getText().getDiv());
     new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(target, cr.getUserString("filebase")+".json")), cr);
-//    new XmlParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(target, cr.getUserString("filebase")+".xml")), cr);
+    //    new XmlParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(target, cr.getUserString("filebase")+".xml")), cr);
     genPage(cr.fhirType()+"-"+cr.getIdBase(), summaryForResource(cr) + s, Utilities.path(target, cr.getUserString("filebase")+".html"));  
     cr.setText(null);
   }

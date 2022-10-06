@@ -5,9 +5,14 @@ import java.util.Collections;
 import java.util.List;
 
 import org.hl7.fhir.igtools.publisher.utils.xig.XIGHandler.PageContent;
+import org.hl7.fhir.igtools.publisher.utils.xig.XIGInformation.UsageType;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.CapabilityStatement;
+import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestComponent;
+import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceComponent;
+import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceOperationComponent;
+import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceSearchParamComponent;
 import org.hl7.fhir.r5.model.CodeType;
 import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
 import org.hl7.fhir.r5.model.Enumerations.CapabilityStatementKind;
@@ -116,4 +121,35 @@ public class XIGCapabilityStatementHandler extends XIGHandler {
     return new PageContent(title+" ("+list.size()+")", b.toString());
   }
 
+  public static void buildUsages(XIGInformation info, CapabilityStatement cs) {
+    for (CanonicalType ct : cs.getImports()) {
+      info.recordUsage(cs, ct.getValue(), UsageType.CS_IMPORTS);
+    }
+    for (CanonicalType ct : cs.getInstantiates()) {
+      info.recordUsage(cs, ct.getValue(), UsageType.CS_IMPORTS);
+    }
+    for (CanonicalType ct : cs.getImplementationGuide()) {
+      info.recordUsage(cs, ct.getValue(), UsageType.CS_IMPORTS);
+    }
+    for (CapabilityStatementRestComponent tr1 : cs.getRest()) {
+      for (CapabilityStatementRestResourceSearchParamComponent t : tr1.getSearchParam()) {
+        info.recordUsage(cs, t.getDefinition(), UsageType.CS_IMPORTS);
+      }
+      for (CapabilityStatementRestResourceOperationComponent t : tr1.getOperation()) {
+        info.recordUsage(cs, t.getDefinition(), UsageType.CS_IMPORTS);
+      }
+      for (CapabilityStatementRestResourceComponent tr : tr1.getResource()) {
+        info.recordUsage(cs, tr.getProfile(), UsageType.CS_PROFILE);
+        for (CanonicalType t : tr.getSupportedProfile()) {
+          info.recordUsage(cs, t.getValue(), UsageType.CS_PROFILE);
+        }
+        for (CapabilityStatementRestResourceSearchParamComponent t : tr.getSearchParam()) {
+          info.recordUsage(cs, t.getDefinition(), UsageType.CS_IMPORTS);
+        }
+        for (CapabilityStatementRestResourceOperationComponent t : tr.getOperation()) {
+          info.recordUsage(cs, t.getDefinition(), UsageType.CS_IMPORTS);
+        }
+      }
+    }
+  }
 }

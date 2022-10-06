@@ -2751,14 +2751,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       dep.setVersion(pcm.getLatestVersion(dep.getPackageId()));
       sourceIg.getDependsOn().add(0, dep);
     }
-    if (!dependsOnToolsIG(sourceIg.getDependsOn()) && !sourceIg.getPackageId().contains("hl7.fhir.uv.tools")) {
-      ImplementationGuideDependsOnComponent dep = new ImplementationGuideDependsOnComponent();
-      dep.setId("higtools");
-      dep.setPackageId(getToolsIGPackageName());
-      dep.setUri("http://hl7.org/fhir/tools/ImplementationGuide/hl7.fhir.uv.tools");
-      dep.setVersion("current");
-      sourceIg.getDependsOn().add(0, dep);
-    }
     inspector = new HTLMLInspector(outputDir, specMaps, this, igpkp.getCanonical(), sourceIg.getPackageId());
     inspector.getManual().add("full-ig.zip");
     if (historyPage != null) {
@@ -2775,6 +2767,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       loadIg(dep, i);
       i++;
     }
+
+    loadIg("igtools", "hl7.fhir.uv.tools", "current", "http://hl7.org/fhir/tools/ImplementationGuide/hl7.fhir.uv.tools", i);    
     System.out.print("Load R5 Extensions");
     R5ExtensionsLoader r5e = new R5ExtensionsLoader(pcm);
     r5e.loadR5Extensions(context);
@@ -3731,6 +3725,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (Utilities.noString(igver))
       throw new Exception("You must specify a version for the IG "+packageId+" ("+canonical+")");
     
+   
     NpmPackage pi = packageId == null ? null : pcm.loadPackageFromCacheOnly(packageId, igver);
     if (pi == null) {
       pi = resolveDependency(canonical, packageId, igver);
@@ -3741,10 +3736,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           throw new Exception("Unknown Package "+packageId+"#"+igver);
       }
     }
-    if (pi != null)
-      npmList.add(pi);
-    logDebugMessage(LogCategory.INIT, "Load "+name+" ("+canonical+") from "+packageId+"#"+igver);
-
     if (dep.hasUri() && !dep.getUri().contains("/ImplementationGuide/")) {
       String cu = getIgUri(pi);
       if (cu != null) {
@@ -3752,6 +3743,39 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             "The correct canonical URL for this dependency is "+cu, IssueSeverity.INFORMATION));
       }
     }
+    
+    loadIGPackage(name, canonical, packageId, igver, pi);
+    
+  }
+
+  private void loadIg(String name, String packageId, String igver, String uri, int index) throws Exception {
+    String canonical = determineCanonical(uri, "ImplementationGuide.dependency["+index+"].url");
+    if (Utilities.noString(canonical) && !Utilities.noString(packageId))
+      canonical = pcm.getPackageUrl(packageId);
+    if (Utilities.noString(canonical))
+      throw new Exception("You must specify a canonical URL for the IG "+name);
+    
+   
+    NpmPackage pi = packageId == null ? null : pcm.loadPackageFromCacheOnly(packageId, igver);
+    if (pi == null) {
+      pi = resolveDependency(canonical, packageId, igver);
+      if (pi == null) {
+        if (Utilities.noString(packageId))
+          throw new Exception("Package Id for guide at "+canonical+" is unknown (contact FHIR Product Director");
+        else
+          throw new Exception("Unknown Package "+packageId+"#"+igver);
+      }
+    }    
+    loadIGPackage(name, canonical, packageId, igver, pi);    
+  }
+
+  private void loadIGPackage(String name, String canonical, String packageId, String igver, NpmPackage pi)
+      throws IOException {
+    if (pi != null)
+      npmList.add(pi);
+    logDebugMessage(LogCategory.INIT, "Load "+name+" ("+canonical+") from "+packageId+"#"+igver);
+
+
     String webref = pi.getWebLocation();
     webref = PackageHacker.fixPackageUrl(webref);
 
@@ -3765,7 +3789,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     
     loadFromPackage(name, canonical, pi, webref, igm);
-    
   }
 
 
@@ -10132,6 +10155,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   
   public static void main(String[] args) throws Exception {
     int exitCode = 0;
+
+    org.hl7.fhir.utilities.FileFormat.checkCharsetAndWarnIfNotUTF8(System.out);
+
     if (hasNamedParam(args, "-gui")) {
       runGUI();
       // Returning here ends the main thread but leaves the GUI running

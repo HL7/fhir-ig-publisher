@@ -167,6 +167,8 @@ public class XIGGenerator {
     pv.setProcessor(new XIGLoader(info));
     pv.setCurrent(true);
     pv.visitPackages();
+    
+    info.buildUsageMap();
 
     new XIGRenderer(info, target, date).produce(pcm);
     printSummary(); 

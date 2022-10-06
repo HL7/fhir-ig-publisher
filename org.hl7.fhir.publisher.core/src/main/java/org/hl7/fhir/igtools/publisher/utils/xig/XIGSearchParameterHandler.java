@@ -5,9 +5,11 @@ import java.util.Collections;
 import java.util.List;
 
 import org.hl7.fhir.igtools.publisher.utils.xig.XIGHandler.PageContent;
+import org.hl7.fhir.igtools.publisher.utils.xig.XIGInformation.UsageType;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CodeType;
 import org.hl7.fhir.r5.model.SearchParameter;
+import org.hl7.fhir.r5.model.SearchParameter.SearchParameterComponentComponent;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -68,6 +70,14 @@ public class XIGSearchParameterHandler extends XIGHandler {
     b.append("</table>\r\n");
 
     return new PageContent(title+" ("+list.size()+")", b.toString());
+  }
+
+  public static void buildUsages(XIGInformation info, SearchParameter sp) {
+    info.recordUsage(sp, sp.getDerivedFrom(), UsageType.DERIVATION);
+    for (SearchParameterComponentComponent t : sp.getComponent()) {
+      info.recordUsage(sp, t.getDefinition(), UsageType.SP_PROFILE);
+    }
+    
   }
 
 }
