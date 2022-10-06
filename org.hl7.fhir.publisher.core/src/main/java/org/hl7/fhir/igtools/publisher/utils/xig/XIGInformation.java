@@ -72,7 +72,7 @@ public class XIGInformation {
     }
 
   }
-  Set<String> pid = new HashSet<>();
+  Map<String, String> pid = new HashMap<>();
   Map<String, Map<String, CanonicalResource>> counts = new HashMap<>();
   Map<String, CanonicalResource> resources = new HashMap<>();
   private Set<String> opr = new HashSet<>();
@@ -83,7 +83,7 @@ public class XIGInformation {
   private SimpleWorkerContext ctxt;
   Map<String, List<CanonicalResourceUsage>> usages = new HashMap<>();
   
-  public Set<String> getPid() {
+  public Map<String, String> getPid() {
     return pid;
   }
   public Map<String, Map<String, CanonicalResource>> getCounts() {

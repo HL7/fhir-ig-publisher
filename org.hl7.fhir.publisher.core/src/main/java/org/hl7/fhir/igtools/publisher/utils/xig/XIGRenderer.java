@@ -155,6 +155,12 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
       }
     }
 
+    b.append("<p><b>"+info.getPid().size()+" Packages Loaded</b></p>\r\n");
+    b.append("<ul style=\"column-count: 4\">\r\n");
+    for (String s : Utilities.sorted(info.getPid().keySet())) {
+      b.append("<li><a href=\""+info.getPid().get(s)+"\">"+s+"</a></li>\r\n");
+    }
+    b.append("</ul>\r\n");
     genPage("XIG index", b.toString(), Utilities.path(target, "index.html"));
 
     System.out.println("Done");
