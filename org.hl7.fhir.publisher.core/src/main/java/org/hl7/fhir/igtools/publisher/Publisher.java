@@ -659,6 +659,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private Map<String,String> countryCodeFor2Letter = null;
   private Map<String,String> shortCountryCode = null;
   private Map<String,String> stateNameForCode = null;
+  private Map<String, Map<String, ElementDefinition>> sdMapCache = new HashMap<>();
   private List<String> ignoreFlags = null;
 
   private Publisher childPublisher = null;
@@ -9621,7 +9622,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "json-schema"))
       fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-json-schema", "yet to be done: json schema as html", null, f.getOutputNames());
 
-    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, rc, allInvariants);
+    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, rc, allInvariants, sdMapCache);
     if (igpkp.wantGen(r, "summary")) {
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-summary", sdr.summary(), f.getOutputNames(), r, vars, null);
     }
@@ -10915,6 +10916,5 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   public String urlForContained(RenderingContext context, String containingType, String containingId, String containedType, String containedId) {
     return null;
   }
-
 
 }

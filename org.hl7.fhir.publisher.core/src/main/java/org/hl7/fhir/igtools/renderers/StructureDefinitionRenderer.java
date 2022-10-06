@@ -99,11 +99,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     private boolean allInvariants;
     HashMap<String, ElementDefinition> differentialHash = null;
     HashMap<String, ElementDefinition> mustSupportHash = null;
+    Map<String, Map<String, ElementDefinition>> sdMapCache;
     List<ElementDefinition> diffElements = null;
     List<ElementDefinition> mustSupportElements = null;
     List<ElementDefinition> keyElements = null;
 
-    public StructureDefinitionRenderer(IWorkerContext context, String corePath, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants) {
+    public StructureDefinitionRenderer(IWorkerContext context, String corePath, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants,Map<String, Map<String, ElementDefinition>> mapCache) {
         super(context, corePath, sd, destDir, igp, maps, allTargets, markdownEngine, packge, gen);
         this.sd = sd;
         this.destDir = destDir;
@@ -111,6 +112,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         utils.setIgmode(true);
         this.files = files;
         this.allInvariants = allInvariants;
+        this.sdMapCache = mapCache;
     }
 
     @Override
@@ -953,10 +955,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     // Returns the ElementDefinition for the 'parent' of the current element
     private ElementDefinition getBaseElement(ElementDefinition e, String url) {
         if (e.hasUserData(ProfileUtilities.DERIVATION_POINTER)) {
-            e = utils.getElementById(url, e.getUserString(ProfileUtilities.DERIVATION_POINTER));
-        }
-        if (e.hasUserData(ProfileUtilities.BASE_MODEL)) {
-            return utils.getElementById(e.getUserString(ProfileUtilities.BASE_MODEL), e.getUserString(ProfileUtilities.BASE_PATH));
+            return getElementById(url, e.getUserString(ProfileUtilities.DERIVATION_POINTER));
         }
         return null;
     }
@@ -968,7 +967,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         String basePath = e.getBase().getPath();
         String url = "http://hl7.org/fhir/StructureDefinition/" + (basePath.contains(".") ? basePath.substring(0, basePath.indexOf(".")) : basePath);
         try {
-            return utils.getElementById(url, basePath);
+            return getElementById(url, basePath);
         } catch (FHIRException except) {
             // Likely a logical model, so this is ok
             return null;
@@ -995,7 +994,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             if ((incProfiledOut || !"0".equals(ec.getMax())) && !excluded.contains(ec)) {
                 ElementDefinition compareElement = null;
                 if (mode==GEN_MODE_DIFF)
-                    compareElement = getBaseElement(ec, sd.getUrl());
+                    compareElement = getBaseElement(ec, sd.getBaseDefinition());
                 else if (mode==GEN_MODE_KEY)
                     compareElement = getRootElement(ec);
 
@@ -1625,13 +1624,13 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             
             AdditionalBindingsRenderer abr = new AdditionalBindingsRenderer(igp, corePath, sd, d.getPath(), gen, this);
             if (binding.hasExtension(ToolingExtensions.EXT_MAX_VALUESET)) {
-              abr.seeMaxBinding(ToolingExtensions.getExtension(binding, ToolingExtensions.EXT_MAX_VALUESET), compBinding==null ? null : ToolingExtensions.getExtension(compBinding, ToolingExtensions.EXT_MAX_VALUESET), mode==GEN_MODE_SNAP || mode==GEN_MODE_MS);
+              abr.seeMaxBinding(ToolingExtensions.getExtension(binding, ToolingExtensions.EXT_MAX_VALUESET), compBinding==null ? null : ToolingExtensions.getExtension(compBinding, ToolingExtensions.EXT_MAX_VALUESET), mode!=GEN_MODE_SNAP && mode!=GEN_MODE_MS);
             }
             if (binding.hasExtension(ToolingExtensions.EXT_MIN_VALUESET)) {
-              abr.seeMinBinding(ToolingExtensions.getExtension(binding, ToolingExtensions.EXT_MIN_VALUESET), compBinding==null ? null : ToolingExtensions.getExtension(compBinding, ToolingExtensions.EXT_MIN_VALUESET), mode==GEN_MODE_SNAP || mode==GEN_MODE_MS);
+              abr.seeMinBinding(ToolingExtensions.getExtension(binding, ToolingExtensions.EXT_MIN_VALUESET), compBinding==null ? null : ToolingExtensions.getExtension(compBinding, ToolingExtensions.EXT_MIN_VALUESET), mode!=GEN_MODE_SNAP && mode!=GEN_MODE_MS);
             }
             if (binding.hasExtension(ToolingExtensions.EXT_BINDING_ADDITIONAL)) {
-              abr.seeAdditionalBindings(binding.getExtensionsByUrl(ToolingExtensions.EXT_BINDING_ADDITIONAL), compBinding==null ? null : compBinding.getExtensionsByUrl(ToolingExtensions.EXT_BINDING_ADDITIONAL), mode==GEN_MODE_SNAP || mode==GEN_MODE_MS);
+              abr.seeAdditionalBindings(binding.getExtensionsByUrl(ToolingExtensions.EXT_BINDING_ADDITIONAL), compBinding==null ? null : compBinding.getExtensionsByUrl(ToolingExtensions.EXT_BINDING_ADDITIONAL), mode!=GEN_MODE_SNAP && mode!=GEN_MODE_MS);
             }
 
             s = s + abr.render();
@@ -1691,8 +1690,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
 
     private String encodeValue(DataType value, DataType compare, int mode) throws Exception {
-        String oldValue = encodeValue(value);
-        String newValue = encodeValue(compare);
+        String oldValue = encodeValue(compare);
+        String newValue = encodeValue(value);
         return compareString(newValue, oldValue, mode);
     }
 
@@ -2642,6 +2641,22 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
     @Override
     protected void genSummaryRowsSpecific(StringBuilder b, Set<String> rows) {
+    }
+
+    public ElementDefinition getElementById(String structureCanonical, String id) {
+        Map<String, ElementDefinition> sdCache = sdMapCache.get(structureCanonical);
+
+        if (sdCache == null) {
+            StructureDefinition sd = (StructureDefinition) context.fetchResource(StructureDefinition.class, structureCanonical);
+            if (sd==null)
+                throw new FHIRException("Unable to retrieve StructureDefinition with URL " + structureCanonical);
+            sdCache = new HashMap<String, ElementDefinition>();
+            sdMapCache.put(structureCanonical, sdCache);
+            for (ElementDefinition e : sd.getSnapshot().getElement()) {
+                sdCache.put(e.getId(), e);
+            }
+        }
+        return sdCache.get(id);
     }
 
 }
