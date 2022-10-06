@@ -52,7 +52,7 @@ public class BaseRenderer extends TranslatingUtilities implements IMarkdownProce
   protected List<SpecMapManager> specmaps;
   protected Set<String> allTargets;
   protected NpmPackage packge;
-  private MarkDownProcessor markdownEngine;
+  protected MarkDownProcessor markdownEngine;
   protected RenderingContext gen;
 
 
