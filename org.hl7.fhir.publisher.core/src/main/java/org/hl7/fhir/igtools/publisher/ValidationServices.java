@@ -228,12 +228,10 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
     }
     
 
-    for (CanonicalResource cr : context.allConformanceResources()) {
-      if (cr instanceof NamingSystem) {
-        if (hasURL((NamingSystem) cr, u)) {
-          // ignore the version?
-          return true;
-        }
+    for (NamingSystem ns : context.fetchResourcesByType(NamingSystem.class)) {
+      if (hasURL(ns, u)) {
+        // ignore the version?
+        return true;
       }
     }
     
