@@ -135,6 +135,7 @@ import org.hl7.fhir.r4.formats.FormatUtilities;
 import org.hl7.fhir.r5.conformance.ConstraintJavaGenerator;
 import org.hl7.fhir.r5.conformance.ProfileUtilities;
 import org.hl7.fhir.r5.conformance.R5ExtensionsLoader;
+import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.IContextResourceLoader;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
@@ -2681,7 +2682,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     // loading the specifications
     context = loadCorePackage();
     context.setProgress(true);
-    context.setIgnoreProfileErrors(true);
     context.setLogger(logger);
     context.setAllowLoadingDuplicates(true);
     context.setExpandCodesLimit(1000);
@@ -2854,7 +2854,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void generateLoadedSnapshots() {
-    for (StructureDefinition sd : context.allStructures()) {
+    for (StructureDefinition sd : new ContextUtilities(context).allStructures()) {
       if (!sd.hasSnapshot() && sd.hasBaseDefinition()) {
         generateSnapshot(sd);
       }
@@ -3129,7 +3129,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     log("Load Terminology Cache from "+vsCache);
     
     context = loadCorePackage();
-    context.setIgnoreProfileErrors(true);
     context.setProgress(true);
     context.setLogger(logger);
     context.setAllowLoadingDuplicates(false);
@@ -3669,7 +3668,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (!version.equals(Constants.VERSION)) {
       // If it wasn't a 4.0 source, we need to set the ids because they might not have been set in the source
       ProfileUtilities utils = new ProfileUtilities(context, new ArrayList<ValidationMessage>(), igpkp);
-      for (StructureDefinition sd : sp.allStructures()) {
+      for (StructureDefinition sd : new ContextUtilities(sp).allStructures()) {
         utils.setIds(sd, true);
       }
     }
@@ -8074,7 +8073,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private void generateResourceReferences() throws Exception {
     Set<String> resourceTypes = new HashSet<>();
-    for (StructureDefinition sd : context.allStructures()) {
+    for (StructureDefinition sd : new ContextUtilities(context).allStructures()) {
       if (sd.getDerivation() == TypeDerivationRule.SPECIALIZATION && sd.getKind() == StructureDefinitionKind.RESOURCE) {
         resourceTypes.add(sd.getType());
       }

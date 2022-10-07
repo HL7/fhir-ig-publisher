@@ -33,6 +33,7 @@ import org.hl7.fhir.r5.conformance.AdditionalBindingsRenderer;
 import org.hl7.fhir.r5.conformance.ProfileUtilities;
 import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider;
 import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider.BindingResolution;
+import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
@@ -1998,7 +1999,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
     private List<StructureDefinition> findDerived() {
         List<StructureDefinition> res = new ArrayList<>();
-        for (StructureDefinition t : context.allStructures()) {
+        for (StructureDefinition t : new ContextUtilities(context).allStructures()) {
             if (sd.getUrl().equals(t.getBaseDefinition())) {
                 res.add(t);
             }
@@ -2008,7 +2009,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
     private List<StructureDefinition> findUses() {
         List<StructureDefinition> res = new ArrayList<>();
-        for (StructureDefinition t : context.allStructures()) {
+        for (StructureDefinition t : new ContextUtilities(context).allStructures()) {
             boolean uses = false;
             for (ElementDefinition ed : t.getSnapshot().getElement()) {
                 for (TypeRefComponent u : ed.getType()) {
@@ -2578,7 +2579,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         Map<String, String> refs = new HashMap<>();
         Map<String, String> trefs = new HashMap<>();
         Map<String, String> examples = new HashMap<>();
-        for (StructureDefinition sd : context.allStructures()) {
+        for (StructureDefinition sd : new ContextUtilities(context).allStructures()) {
             if (this.sd.getUrl().equals(sd.getBaseDefinition())) {
                 base.put(sd.getUserString("path"), sd.present());
             }

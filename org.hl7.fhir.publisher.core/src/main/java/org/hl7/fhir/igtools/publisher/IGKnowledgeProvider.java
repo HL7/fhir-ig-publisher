@@ -32,6 +32,7 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.r5.conformance.ProfileUtilities;
 import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider;
+import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.ParserBase;
 import org.hl7.fhir.r5.elementmodel.Property;
@@ -345,7 +346,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   // base specification only, only the old json style
   public void loadSpecPaths(SpecMapManager paths) throws Exception {
     this.specPaths = paths;
-    for (CanonicalResource bc : context.allConformanceResources()) {
+    for (CanonicalResource bc : context.fetchResourcesByType(CanonicalResource.class)) {
       String s = getOverride(bc.getUrl());
       if (s == null) {
         s = paths.getPath(bc.getUrl(), bc.getMeta().getSource(), bc.fhirType(), bc.getId());
@@ -747,7 +748,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   }
   @Override
   public String getLinkForUrl(String corePath, String s) {
-    return context.getLinkForUrl(corePath, s);
+    return new ContextUtilities(context).getLinkForUrl(corePath, s);
   }
 
   public Set<String> summaryRows() {

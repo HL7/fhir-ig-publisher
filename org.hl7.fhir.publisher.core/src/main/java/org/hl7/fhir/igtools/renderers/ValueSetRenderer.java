@@ -103,7 +103,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
       Set<String> vsurls = new HashSet<String>();
       Set<String> pdurls = new HashSet<String>();
       Set<String> qurls = new HashSet<String>();
-      for (CanonicalResource sd : context.allConformanceResources()) {
+      for (CanonicalResource sd : context.fetchResourcesByType(CanonicalResource.class)) {
         if (sd instanceof StructureDefinition)
           sdurls.add(sd.getUrl());
         if (sd instanceof ValueSet)

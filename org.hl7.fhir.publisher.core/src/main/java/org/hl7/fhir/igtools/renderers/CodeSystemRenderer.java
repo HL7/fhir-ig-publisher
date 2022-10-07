@@ -118,9 +118,8 @@ public class CodeSystemRenderer extends CanonicalRenderer {
     boolean first = true;
     b.append("\r\n");
     List<String> vsurls = new ArrayList<String>();
-    for (CanonicalResource sd : context.allConformanceResources()) {
-      if (sd instanceof ValueSet)
-        vsurls.add(sd.getUrl());
+    for (ValueSet vs : context.fetchResourcesByType(ValueSet.class)) {
+        vsurls.add(vs.getUrl());
     }
     Collections.sort(vsurls);
 

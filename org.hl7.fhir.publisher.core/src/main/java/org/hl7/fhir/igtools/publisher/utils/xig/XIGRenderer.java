@@ -18,6 +18,7 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.utils.xig.XIGHandler.PageContent;
 import org.hl7.fhir.igtools.publisher.utils.xig.XIGInformation.CanonicalResourceUsage;
 import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider;
+import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.model.CanonicalResource;
@@ -342,12 +343,12 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
 
   @Override
   public boolean isDatatype(String typeSimple) {
-    return info.getCtxt().isDatatype(typeSimple);
+    return new ContextUtilities(info.getCtxt()).isDatatype(typeSimple);
   }
 
   @Override
   public boolean isResource(String typeSimple) {
-    return info.getCtxt().isResource(typeSimple);
+    return new ContextUtilities(info.getCtxt()).isResource(typeSimple);
   }
 
   @Override

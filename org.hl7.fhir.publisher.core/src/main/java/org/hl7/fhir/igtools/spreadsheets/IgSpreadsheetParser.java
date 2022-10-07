@@ -33,6 +33,7 @@ import java.util.Set;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.r5.conformance.ProfileUtilities;
+import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.XmlParser;
@@ -301,7 +302,7 @@ public class IgSpreadsheetParser {
         sd.setBaseDefinition(sd.getDifferential().getElementFirstRep().getType().get(0).getProfile().get(0).getValue());
       else
         sd.setBaseDefinition("http://hl7.org/fhir/StructureDefinition/"+sd.getType());
-      if (!context.getResourceNames().contains(sd.getType()) && !context.getTypeNames().contains(sd.getType()))
+      if (!context.getResourceNames().contains(sd.getType()) && !new ContextUtilities(context).getTypeNames().contains(sd.getType()))
         throw new Exception("Unknown Resource "+sd.getType());
     }
     sd.getDifferential().getElementFirstRep().getType().clear();
