@@ -1222,6 +1222,29 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
                 tableRowNE(b, translate("sd.dict", "Must Support Types"), "datatypes.html", "No must-support rules about the choice of types/profiles");
             }
         }
+        // tooling extensions for formats
+        if (d.hasExtension(ToolingExtensions.EXT_JSON_EMPTY) || d.hasExtension(ToolingExtensions.EXT_JSON_PROP_KEY)) {
+          StringBuilder s = new StringBuilder();
+          String code = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_JSON_EMPTY);
+          if (code != null) {
+            switch (code) {
+            case "present":
+              s.append("The JSON Array for this element is present even when there are no items in the instance (e.g. as an empty array). ");
+              break;
+            case "absent":
+              s.append("The JSON Array for this element is not present when there are no items in the instance (e.g. never as an empty array). ");
+              break;
+            case "either":
+              s.append("The JSON Array for this element may be present even when there are no items in the instance (e.g. may be present as an empty array). ");
+              break;
+            }
+          }
+          code = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_JSON_PROP_KEY);
+          if (code != null) {
+            s.append("This repeating object is represented as a single object with named properties. The name of the property (key) is the vsalue of the <code>"+code+"</code> child.");
+          }
+          tableRowNE(b, translate("sd.dict", "JSON Representation"), null, s.toString());          
+        }
         tableRowNE(b, translate("sd.dict", "Requirements"), null, compareMarkdown(profile.getName(), d.getRequirementsElement(), compare==null ? null : compare.getRequirementsElement(), mode));
         tableRowHint(b, translate("sd.dict", "Alternate Names"), translate("sd.dict", "Other names by which this resource/element may be known"), null, compareSimpleTypeLists(d.getAlias(), (compare==null ? new ArrayList<StringType>() : compare.getAlias()), mode));
         tableRowNE(b, translate("sd.dict", "Comments"), null, compareMarkdown(profile.getName(), d.getCommentElement(), compare==null ? null : compare.getCommentElement(), mode));
@@ -2663,15 +2686,21 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     protected void genSummaryRowsSpecific(StringBuilder b, Set<String> rows) {
     }
 
-    public ElementDefinition getElementById(String structureCanonical, String id) {
-        Map<String, ElementDefinition> sdCache = sdMapCache.get(structureCanonical);
+    public ElementDefinition getElementById(String url, String id) {
+        Map<String, ElementDefinition> sdCache = sdMapCache.get(url);
 
         if (sdCache == null) {
-            StructureDefinition sd = (StructureDefinition) context.fetchResource(StructureDefinition.class, structureCanonical);
-            if (sd==null)
-                throw new FHIRException("Unable to retrieve StructureDefinition with URL " + structureCanonical);
+            StructureDefinition sd = (StructureDefinition) context.fetchResource(StructureDefinition.class, url);
+            if (sd == null) {
+              if (url.equals("http://hl7.org/fhir/StructureDefinition/Base")) {
+                sd = (StructureDefinition) context.fetchResource(StructureDefinition.class, "http://hl7.org/fhir/StructureDefinition/Element");                
+              }
+              if (sd == null) {
+                throw new FHIRException("Unable to retrieve StructureDefinition with URL " + url);
+              }
+            }
             sdCache = new HashMap<String, ElementDefinition>();
-            sdMapCache.put(structureCanonical, sdCache);
+            sdMapCache.put(url, sdCache);
             for (ElementDefinition e : sd.getSnapshot().getElement()) {
                 sdCache.put(e.getId(), e);
             }
