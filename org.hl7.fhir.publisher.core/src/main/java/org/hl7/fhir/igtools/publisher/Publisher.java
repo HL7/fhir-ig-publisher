@@ -234,6 +234,7 @@ import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.StructureMap;
 import org.hl7.fhir.r5.model.StructureMap.StructureMapModelMode;
 import org.hl7.fhir.r5.model.StructureMap.StructureMapStructureComponent;
+import org.hl7.fhir.r5.model.TestScript;
 import org.hl7.fhir.r5.model.TypeDetails;
 import org.hl7.fhir.r5.model.UriType;
 import org.hl7.fhir.r5.model.UsageContext;
@@ -720,6 +721,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private StringBuilder filelog;
   private Set<String> allOutputs = new HashSet<String>();
   private Set<FetchedResource> examples = new HashSet<FetchedResource>();
+  private Set<FetchedResource> testscripts = new HashSet<FetchedResource>();
   private HashMap<String, FetchedResource> resources = new HashMap<String, FetchedResource>();
   private HashMap<String, ImplementationGuideDefinitionPageComponent> igPages = new HashMap<String, ImplementationGuideDefinitionPageComponent>();
   private List<String> logOptions = new ArrayList<String>();
@@ -4153,6 +4155,35 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (f!=null)
           igpkp.findConfiguration(f, r);
       }
+      // TestScript Check
+      if (res.getReference().getReference().contains("TestScript")) {
+        if (f == null) {
+          f = fetcher.fetch(res.getReference(), igf);
+        }
+        if (f != null) {
+          FetchedResource r = res.hasUserData("loaded.resource") ? (FetchedResource) res.getUserData("loaded.resource") : f.getResources().get(0);
+          if (r != null) {
+            testscripts.add(r);
+            try {
+              Element t = r.getElement();
+              if (t != null) {
+                List<Element> profiles = t.getChildrenByName("profile");
+                if (profiles != null) {
+                  for (Element profile : profiles) {
+                    String tp = profile.getChildValue("reference");
+                    if (tp != null && !tp.isEmpty()) {
+                      r.addTestProfile(tp);
+                    }
+                  }
+                }
+              }
+            }
+            catch(Exception e) {
+              errors.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, r.fhirType()+"/"+r.getId(), "Unable to load test resource " + r.getUrlTail(), IssueSeverity.ERROR));
+            }
+          }
+        }
+      }
     }
     if (duplicateInputResourcesDetected) {
       throw new Error("Unable to continue because duplicate input resources were identified");
@@ -7114,6 +7145,22 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
 
+    for (FetchedResource r: testscripts) {
+      if (r.hasTestProfiles()) {
+        FetchedResource baseRes = null;
+        for (String tsProfile : r.getTestProfiles()) {
+          baseRes = getResourceForUri(tsProfile);
+          if (baseRes == null) {
+            // We only yell if the resource doesn't exist, not only if it doesn't exist in the current IG.
+            if (context.fetchResource(StructureDefinition.class, tsProfile) == null)
+              errors.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, r.fhirType()+"/"+r.getId(), "Unable to find profile " + tsProfile + " nominated as the profile for test resource " + r.getUrlTail(), IssueSeverity.ERROR));
+          } else {
+            baseRes.addFoundTestScript(r);
+          }
+        }
+      }
+    }
+
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
     String json = gson.toJson(data);
     TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "structuredefinitions.json"), false);
@@ -7742,11 +7789,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       String fmm = ToolingExtensions.readStringExtension(page, ToolingExtensions.EXT_FMM_LEVEL);
       String status = ToolingExtensions.readStringExtension(page, ToolingExtensions.EXT_STANDARDS_STATUS);
       String normVersion = ToolingExtensions.readStringExtension(page, ToolingExtensions.EXT_NORMATIVE_VERSION);
-      addPageDataRow(pages, source, title, label + (page.hasPage() ? ".0" : ""), fmm, status, normVersion, breadcrumb + breadCrumbForPage(page, false), null);
+      addPageDataRow(pages, source, title, label + (page.hasPage() ? ".0" : ""), fmm, status, normVersion, breadcrumb + breadCrumbForPage(page, false), null, null);
     } else {
       Map<String, String> vars = makeVars(r);
       String outputName = determineOutputName(igpkp.getProperty(r, "base"), r, vars, null, "");
-      addPageDataRow(pages, outputName, title, label, breadcrumb + breadCrumbForPage(page, false), r.getStatedExamples());
+      addPageDataRow(pages, outputName, title, label, breadcrumb + breadCrumbForPage(page, false), r.getStatedExamples(), r.getFoundTestScripts());
 //      addPageDataRow(pages, source, title, label, breadcrumb + breadCrumbForPage(page, false), r.getStatedExamples());
       for (String templateName: extraTemplateList) {
         if (r.getConfig() !=null && r.getConfig().get("template-"+templateName)!=null && !r.getConfig().get("template-"+templateName).getAsString().isEmpty()) {
@@ -7756,7 +7803,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               String formatTemplateDesc = templateDesc.replace("FMT", format.toUpperCase());
               if (igpkp.wantGen(r, format)) {
                 outputName = determineOutputName(igpkp.getProperty(r, "format"), r, vars, format, "");
-                addPageDataRow(pages, outputName, page.getTitle() + " - " + formatTemplateDesc, label, breadcrumb + breadCrumbForPage(page, false), null);
+                addPageDataRow(pages, outputName, page.getTitle() + " - " + formatTemplateDesc, label, breadcrumb + breadCrumbForPage(page, false), null, null);
               }
             }
           } else if (page.hasGeneration() && page.getGeneration().equals(GuidePageGeneration.GENERATED) /*page.getKind().equals(ImplementationGuide.GuidePageKind.RESOURCE) */) {
@@ -7771,7 +7818,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               if (outputName==null)
                 throw new FHIRException("Error in publisher template.  Unable to find file-path property " + templateName + " for resource type " + r.fhirType() + " when property template-" + templateName + " is defined.");
               outputName = igpkp.doReplacements(outputName, r, vars, "");
-              addPageDataRow(pages, outputName, page.getTitle() + " - " + templateDesc, label, breadcrumb + breadCrumbForPage(page, false), null);
+              addPageDataRow(pages, outputName, page.getTitle() + " - " + templateDesc, label, breadcrumb + breadCrumbForPage(page, false), null, null);
             }
           }          
         }
@@ -7786,11 +7833,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
 
-  private void addPageDataRow(JsonObject pages, String url, String title, String label, String breadcrumb, Set<FetchedResource> examples) throws FHIRException {
-    addPageDataRow(pages, url, title, label, null, null, null, breadcrumb, examples);
+  private void addPageDataRow(JsonObject pages, String url, String title, String label, String breadcrumb, Set<FetchedResource> examples, Set<FetchedResource> testscripts) throws FHIRException {
+    addPageDataRow(pages, url, title, label, null, null, null, breadcrumb, examples, testscripts);
   }
 
-  private void addPageDataRow(JsonObject pages, String url, String title, String label, String fmm, String status, String normVersion, String breadcrumb, Set<FetchedResource> examples) throws FHIRException {
+  private void addPageDataRow(JsonObject pages, String url, String title, String label, String fmm, String status, String normVersion, String breadcrumb, Set<FetchedResource> examples, Set<FetchedResource> testscripts) throws FHIRException {
     JsonObject jsonPage = new JsonObject();
     pages.add(url, jsonPage);
     jsonPage.addProperty("title", title);
@@ -7891,6 +7938,24 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         exampleArray.add(exampleItem);
         exampleItem.addProperty("url", examplePage.getName());
         exampleItem.addProperty("title", examplePage.getTitle());
+      }
+    }
+
+    if (testscripts != null) {
+      JsonArray testscriptArray = new JsonArray();
+      jsonPage.add("testscripts", testscriptArray);
+
+      TreeSet<ImplementationGuideDefinitionPageComponent> testscriptPages = new TreeSet<ImplementationGuideDefinitionPageComponent>(new ImplementationGuideDefinitionPageComponentComparator());
+      for (FetchedResource testscriptResource: testscripts) {
+        ImplementationGuideDefinitionPageComponent page = pageForFetchedResource(testscriptResource);
+        if (page!=null)
+          testscriptPages.add(page);
+      }
+      for (ImplementationGuideDefinitionPageComponent testscriptPage : testscriptPages) {
+        JsonObject testscriptItem = new JsonObject();
+        testscriptArray.add(testscriptItem);
+        testscriptItem.addProperty("url", testscriptPage.getName());
+        testscriptItem.addProperty("title", testscriptPage.getTitle());
       }
     }
   }

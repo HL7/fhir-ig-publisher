@@ -44,10 +44,12 @@ public class FetchedResource {
   private boolean validateAsResource;
   private List<String> statedProfiles = new ArrayList<String>();
   private List<String> foundProfiles = new ArrayList<String>();
+  private List<String> testProfiles = new ArrayList<String>();
   private boolean snapshotted;
   private String exampleUri;
   private HashSet<FetchedResource> statedExamples = new HashSet<FetchedResource>();
   private HashSet<FetchedResource> foundExamples = new HashSet<FetchedResource>();
+  private HashSet<FetchedResource> foundTestScripts = new HashSet<FetchedResource>();
   private ImplementationGuideDefinitionResourceComponent resEntry;
   private List<ProvenanceDetails> audits = new ArrayList<>();
   private List<ValidationMessage> errors = new ArrayList<ValidationMessage>();
@@ -218,6 +220,25 @@ public class FetchedResource {
   public void setPath(String path) {
     this.path = path;
   }
-  
-  
+
+  public void addTestProfile(String profile) {
+    testProfiles.add(profile);  
+  }
+	  
+  public List<String> getTestProfiles() {
+    return testProfiles;
+  }
+
+  public boolean hasTestProfiles() {
+    return !testProfiles.isEmpty();
+  }
+
+  public HashSet<FetchedResource> getFoundTestScripts() {
+    return foundTestScripts;
+  }
+
+  public void addFoundTestScript(FetchedResource r) {
+    this.foundTestScripts.add(r);
+  }
+
 }
