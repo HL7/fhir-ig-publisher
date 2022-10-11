@@ -1,5 +1,5 @@
 schedules:
-- cron: "0 * * * *"
+- cron: "*/15 * * * *"
   displayName: "nightly-xig-build-process"
   branches:
     include: 
