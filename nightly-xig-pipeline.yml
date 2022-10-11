@@ -1,5 +1,5 @@
 schedules:
-- cron: "*/15 * * * *"
+- cron: "0 0 * * *"
   displayName: "nightly-xig-build-process"
   branches:
     include: 
@@ -10,10 +10,15 @@ pool:
   vmImage: ubuntu-latest
 
 steps:
-- script: echo Hello, world!
-  displayName: 'Run a one-line script'
+- task: Bash@3
+  displayName: 'Download publisher'
+  inputs:
+    targetType: 'inline'
+    script: 'wget https://github.com/HL7/fhir-ig-publisher/releases/latest/download/publisher.jar'
 
-- script: |
-    echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
-  displayName: 'Run a multi-line script'
+- task: Bash@3
+  displayName: 'Run publisher with xig param'
+  inputs:
+    targetType: 'inline'
+    script: 'java -jar ./publisher.jar -xig testxig'
+
