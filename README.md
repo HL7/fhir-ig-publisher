@@ -11,7 +11,7 @@ Please maintain this README.md as a linkable document, as other documentation ma
 ## Releases
 ## CI/CD
 ## Maintenance
- 
+
 --->
 
 # HL7 FHIR IG Publisher Artifacts
