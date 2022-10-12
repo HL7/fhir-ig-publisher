@@ -382,7 +382,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (sd.getDifferential().getElement().isEmpty())
       return "";
     else
-      return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateTable(defnFile, sd, true, destDir, false, sd.getId(), false, corePath, "", false, false, outputTracker, true, false, gen, toTabs ? ANCHOR_PREFIX_DIFF : ANCHOR_PREFIX_SNAP));
+      return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateTable(defnFile, sd, true, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, true, false, gen, toTabs ? ANCHOR_PREFIX_DIFF : ANCHOR_PREFIX_SNAP));
   }
 
   public String snapshot(String defnFile, Set<String> outputTracker, boolean toTabs) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
@@ -1216,6 +1216,10 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (d.hasExtension(ToolingExtensions.EXT_DEF_TYPE)) {
       tableRowNE(b, translate("sd.dict", "Default Type"), "datatypes.html", ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_DEF_TYPE));          
     }
+    if (d.hasExtension(ToolingExtensions.EXT_TYPE_SPEC)) {
+      tableRowNE(b, translate("sd.dict", Utilities.pluralize("Type Specifier", d.getExtensionsByUrl(ToolingExtensions.EXT_TYPE_SPEC).size())),
+          "datatypes.html", ProfileUtilities.formatTypeSpecifiers(context, d));          
+    }
     if (d.getPath().endsWith("[x]"))
       tableRowNE(b, translate("sd.dict", "[x] Note"), null, translate("sd.dict", "See %sChoice of Data Types%s for further information about how to use [x]", "<a href=\"" + corePath + "formats.html#choice\">", "</a>"));
     tableRowNE(b, translate("sd.dict", "Is Modifier"), "conformance-rules.html#ismodifier", displayBoolean(d.getIsModifier(), null, mode));
@@ -1293,6 +1297,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       tableRowNE(b, translate("sd.dict", "XML Representation"), null, s.toString());          
     }
 
+    if (d.hasExtension(ToolingExtensions.EXT_IMPLIED_PREFIX)) {
+      tableRowNE(b, translate("sd.dict", "Validation Rules"), null, "When this element is read <code>"
+          +ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_IMPLIED_PREFIX)+"</code> is prefixed to the value before validation");                
+    }
+    
     tableRowNE(b, translate("sd.dict", "Requirements"), null, compareMarkdown(profile.getName(), d.getRequirementsElement(), compare==null ? null : compare.getRequirementsElement(), mode));
     tableRowHint(b, translate("sd.dict", "Alternate Names"), translate("sd.dict", "Other names by which this resource/element may be known"), null, compareSimpleTypeLists(d.getAlias(), (compare==null ? new ArrayList<StringType>() : compare.getAlias()), mode));
     tableRowNE(b, translate("sd.dict", "Comments"), null, compareMarkdown(profile.getName(), d.getCommentElement(), compare==null ? null : compare.getCommentElement(), mode));

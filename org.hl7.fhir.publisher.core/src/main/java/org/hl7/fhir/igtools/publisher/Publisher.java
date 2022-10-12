@@ -94,6 +94,7 @@ import org.hl7.fhir.exceptions.DefinitionException;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.exceptions.PathEngineException;
+import org.hl7.fhir.igtools.publisher.DependencyAnalyser.ArtifactDependency;
 import org.hl7.fhir.igtools.publisher.FetchedFile.FetchedBundleType;
 import org.hl7.fhir.igtools.publisher.IFetchFile.FetchState;
 import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
@@ -868,6 +869,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private DependentIGFinder dependentIgFinder;
   private List<StructureDefinition> modifierExtensions = new ArrayList<>();
   private Object branchName;
+  private R4ToR4BAnalyser r4tor4b;
+  private List<DependencyAnalyser.ArtifactDependency> dependencyList;
   
   private class PreProcessInfo {
     private String xsltName;
@@ -930,7 +933,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             dependentIgFinder.finish(outputDir, sourceIg.present());
             ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
                 bc.check(igpkp.getCanonical(), npmName, workingVersion(), historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator,
-                new DependencyRenderer(pcm, outputDir, npmName, templateManager).render(publishedIg), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
+                new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList).render(publishedIg, true), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
                 new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate(), copyrightYear, context, scanForR5Extensions(), modifierExtensions ,
                     noNarrativeResources, noValidateResources, noValidation, noGenerate, dependentIgFinder);
             log("Built. "+ DurationUtil.presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
@@ -1071,7 +1074,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       dependentIgFinder.finish(outputDir, sourceIg.present());
       ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), rootDir, npmName, childPublisher == null? null : childPublisher.npmName, 
           bc.check(igpkp.getCanonical(), npmName, workingVersion(), historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator,
-          new DependencyRenderer(pcm, outputDir, npmName, templateManager).render(publishedIg), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
+          new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList).render(publishedIg, true), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
           new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
           noNarrativeResources, noValidateResources, noValidation, noGenerate, dependentIgFinder);
       tts.end();
@@ -2238,6 +2241,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     realmRules = makeRealmBusinessRules();
     previousVersionComparator = makePreviousVersionComparator();
     ipaComparator = makeIpaComparator();
+    r4tor4b = new R4ToR4BAnalyser(context);
   }
   
   private Coding checkForJurisdiction() {
@@ -5686,6 +5690,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           if ("Extension".equals(sd.getType()) && sd.getSnapshot().getElementFirstRep().getIsModifier()) {
             modifierExtensions.add(sd);
           }
+          r4tor4b.checkProfile(sd);
         }
       }
     }
@@ -5809,10 +5814,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           }
         }
       }
-    }
-    // Special case for logical models:
-    if ("http://hl7.org/fhir/StructureDefinition/Base".equals(url)) {
-      return ProfileUtilities.makeBaseDefinition(FHIRVersion.fromCode(version));
     }
     return context.fetchResource(StructureDefinition.class, url);
   }
@@ -6208,8 +6209,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       createToc(childPublisher.getPublishedIg().getDefinition().getPage(), igArtifactsPage, nestedIgOutput);
     }
-    checkMakeFile(new DependencyRenderer(pcm, tempDir, npmName, templateManager).render(publishedIg).getBytes(), Utilities.path(tempDir, "_includes", "dependency-table.xhtml"), new HashSet<>());
-
     fixSearchForm();
     if (!noGenerate) {
       templateBeforeJekyll();
@@ -6226,6 +6225,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         npm.addFile(Category.OTHER, "validation-summary.json", validationSummaryJson());
         npm.addFile(Category.OTHER, "validation-oo.json", validationSummaryOO());
         npm.finish();
+        if (r4tor4b.canBeR4() && r4tor4b.canBeR4B()) {
+          r4tor4b.clonePackage(npmName, npm.filename());
+        }
         
         if (mode == null || mode == IGBuildMode.MANUAL) {
           if (cacheVersion) {
@@ -7036,6 +7038,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     
     fragment("summary-extensions", cvr.getExtensionSummary(), otherFilesRun);
     fragment("ip-statements",  genIpStatements(fileList), otherFilesRun);
+    fragment("cross-version-analysis", r4tor4b.generate(npmName), otherFilesRun);
+    fragment("dependency-table", new DependencyRenderer(pcm, tempDir, npmName, templateManager, makeDependencies()).render(publishedIg, false), otherFilesRun);
 
     // now, list the profiles - all the profiles
     JsonObject data = new JsonObject();
@@ -7233,6 +7237,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         applyPageTemplate(htmlTemplate, mdTemplate, publishedIg.getDefinition().getPage());
       }
     }
+  }
+
+  private List<DependencyAnalyser.ArtifactDependency> makeDependencies() {
+    DependencyAnalyser analyser = new DependencyAnalyser(context);
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getResource() != null && r.getResource() != null) {
+          analyser.analyse(r.getResource());
+        }
+      }
+    }
+    this.dependencyList = analyser.getList();
+    return analyser.getList();
   }
 
   public void populateResourceEntry(FetchedResource r, JsonObject item, ContainedResourceDetails crd) throws Exception {
