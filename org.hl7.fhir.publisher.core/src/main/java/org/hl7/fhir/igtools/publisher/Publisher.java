@@ -10260,7 +10260,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else if (hasNamedParam(args, "-go-publish")) {
       new PublicationProcess().publish(getNamedParam(args, "-source"), getNamedParam(args, "-destination"), hasNamedParam(args, "-milestone"), getNamedParam(args, "-registry"), getNamedParam(args, "-history"), getNamedParam(args, "-temp"));
     } else if (hasNamedParam(args, "-xig")) {
-      new XIGGenerator(getNamedParam(args, "-xig"));
+      new XIGGenerator(getNamedParam(args, "-xig")).execute();
     } else if (hasNamedParam(args, "-update-history")) {
       new HistoryPageUpdater().updateHistoryPages(getNamedParam(args, "-history"), getNamedParam(args, "-website"), getNamedParam(args, "-website"));
     } else if (hasNamedParam(args, "-publish-update")) {
