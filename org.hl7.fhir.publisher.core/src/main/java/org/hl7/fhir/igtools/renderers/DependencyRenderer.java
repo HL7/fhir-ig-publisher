@@ -1,20 +1,37 @@
 package org.hl7.fhir.igtools.renderers;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.eclipse.persistence.jpa.jpql.parser.FunctionsReturningDatetimeBNF;
+import org.hl7.fhir.convertors.conv14_50.VersionConvertor_14_50;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_14_50;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_43_50;
+import org.hl7.fhir.dstu2016may.formats.JsonParser;
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.DependencyAnalyser;
 import org.hl7.fhir.igtools.publisher.DependencyAnalyser.ArtifactDependency;
+import org.hl7.fhir.igtools.renderers.DependencyRenderer.GlobalProfile;
+import org.hl7.fhir.igtools.renderers.DependencyRenderer.GlobalProfileSorter;
 import org.hl7.fhir.igtools.renderers.DependencyRenderer.VersionState;
 import org.hl7.fhir.igtools.templates.TemplateManager;
+import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
+import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideGlobalComponent;
+import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
@@ -23,7 +40,6 @@ import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.hl7.fhir.utilities.npm.BasePackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageHacker;
-import org.hl7.fhir.utilities.npm.PackageUtilities;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Cell;
@@ -35,6 +51,49 @@ import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import com.google.gson.JsonObject;
 
 public class DependencyRenderer {
+
+  public class GlobalProfile {
+    private ImplementationGuide guide; 
+    private StructureDefinition profile;
+    private String type;
+    private String pUrl;
+    private NpmPackage npm;
+    
+    public GlobalProfile(NpmPackage npm, ImplementationGuide guide, String type, String pUrl, StructureDefinition profile) {
+      super();
+      this.npm = npm;
+      this.guide = guide;
+      this.type = type;
+      this.pUrl = pUrl;
+      this.profile = profile;
+    }
+    public String getpUrl() {
+      return pUrl;
+    }
+    public ImplementationGuide getGuide() {
+      return guide;
+    }
+    public StructureDefinition getProfile() {
+      return profile;
+    }
+    public String getType() {
+      return type;
+    }
+    public NpmPackage getNpm() {
+      return npm;
+    }
+  }
+
+  public class GlobalProfileSorter implements Comparator<GlobalProfile> {
+
+    @Override
+    public int compare(GlobalProfile o1, GlobalProfile o2) {
+      String p1 = o1.npm == null ? "" : o1.npm.name();
+      String p2 = o2.npm == null ? "" : o2.npm.name();
+      return o1.type.equals(o2.type) ? p1.compareTo(p2) : o1.type.compareTo(o2.type);
+    }
+
+  }
 
   public enum VersionState {
     VERSION_LATEST_INTERIM,
@@ -52,14 +111,17 @@ public class DependencyRenderer {
   private TemplateManager templateManager;
   private Map<String, JsonObject> packageListCache = new HashMap<>();
   private List<DependencyAnalyser.ArtifactDependency> dependencies;
+  private List<GlobalProfile> globals = new ArrayList<>();
+  private IWorkerContext context;
   
-  public DependencyRenderer(BasePackageCacheManager pcm, String dstFolder, String npmName, TemplateManager templateManager, List<DependencyAnalyser.ArtifactDependency> dependencies) {
+  public DependencyRenderer(BasePackageCacheManager pcm, String dstFolder, String npmName, TemplateManager templateManager, List<DependencyAnalyser.ArtifactDependency> dependencies, IWorkerContext context) {
     super();
     this.pcm = pcm;
     this.dstFolder = dstFolder;
     this.npmName = npmName;
     this.templateManager = templateManager;
     this.dependencies = dependencies;
+    this.context = context;
   }
 
   public String render(ImplementationGuide ig, boolean QA) throws FHIRException, IOException {
@@ -78,6 +140,9 @@ public class DependencyRenderer {
       } catch (Exception e) {
         addErrorRow(gen, row.getSubRows(), d.getPackageId(), d.getVersion(), d.getUri(), null, e.getMessage(), QA);
       }
+    }
+    if (!QA) {
+      checkGlobals(ig, null);
     }
     // create the table
     // add the rows 
@@ -159,6 +224,9 @@ public class DependencyRenderer {
         }
       }
     }
+    if (!QA) {
+      checkGlobals(npm);
+    }
     if (!npm.isCore() && !npm.isTx()) {
       String n = (npm.name()+"#"+npm.version());
       b.append("<h3>Package ");
@@ -203,6 +271,38 @@ public class DependencyRenderer {
     }
   }
 
+
+  private void checkGlobals(NpmPackage npm) throws IOException {
+    for (String n : npm.listResources("ImplementationGuide")) {
+      ImplementationGuide ig = loadImplementationGuide(npm.loadResource(n), npm.fhirVersion());
+      if (ig != null) {
+        checkGlobals(ig, npm);
+      }
+    }
+  }
+
+  private ImplementationGuide loadImplementationGuide(InputStream content, String v) throws FHIRFormatError, FHIRException, IOException {
+    if (VersionUtilities.isR2BVer(v)) {
+      return (ImplementationGuide) VersionConvertorFactory_14_50.convertResource(new JsonParser().parse(content));
+    } else if (VersionUtilities.isR3Ver(v)) {
+      return (ImplementationGuide) VersionConvertorFactory_30_50.convertResource(new org.hl7.fhir.dstu3.formats.JsonParser().parse(content));
+    } else if (VersionUtilities.isR4Ver(v)) {
+      return (ImplementationGuide) VersionConvertorFactory_40_50.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(content));
+    } else if (VersionUtilities.isR4BVer(v)) {
+      return (ImplementationGuide) VersionConvertorFactory_43_50.convertResource(new org.hl7.fhir.r4b.formats.JsonParser().parse(content));
+    } else if (VersionUtilities.isR4BVer(v)) {
+      return (ImplementationGuide) new org.hl7.fhir.r5.formats.JsonParser().parse(content);
+    } else {
+      return null;
+    }
+  }
+
+  private void checkGlobals(ImplementationGuide ig, NpmPackage npm) {
+    for (ImplementationGuideGlobalComponent g : ig.getGlobal()) {
+      StructureDefinition sd = context.fetchResource(StructureDefinition.class, g.getProfile());
+      globals.add(new GlobalProfile(npm, ig, g.getType(), g.getProfile(), sd));
+    }    
+  }
 
   private String getLatestVersion(String name, String canonical) {
     JsonObject pl = fetchPackageList(name, canonical);
@@ -386,5 +486,54 @@ public class DependencyRenderer {
       model.getTitles().add(gen.new Title(null, null, "Comment", "Comments about this entry", null, 0));
     }
     return model;
+  }
+  
+  public String renderGlobals() {
+    if (globals.isEmpty()) {
+      return "<p><i>No Global profiles found</i></p>\r\n";
+    } else {
+      StringBuilder b = new StringBuilder();
+      b.append("<p>Global Profiles:</p>\r\n<table class=\"none\">\r\n<tr><td><b>Type</b></td><td><b>Source</b></td><td><b>Profile</b></td></tr>\r\n");
+      Collections.sort(globals, new GlobalProfileSorter());
+      for (GlobalProfile gp : globals) {
+        b.append("<tr><td>");
+        StructureDefinition sd = context.fetchTypeDefinition(gp.type);
+        if (sd == null) {
+          b.append("<code>");
+          b.append(gp.type);          
+          b.append("</code>");          
+        } else {
+          b.append("<a href=\"");
+          b.append(sd.getUserString("path"));
+          b.append("\">");
+          b.append(Utilities.escapeXml(sd.present()));
+          b.append("</a>");
+        }
+        b.append("</td><td>");
+        if (gp.npm != null) {
+          b.append("<a href=\"");
+          b.append(gp.npm.getWebLocation());
+          b.append("\">");
+          b.append(Utilities.escapeXml(gp.npm.name()+"#"+gp.npm.version()));
+          b.append("</a>");
+        }
+        b.append("</td><td>");
+        if (gp.profile == null) {
+          b.append("<code>");
+          b.append(gp.pUrl);          
+          b.append("</code>");          
+        } else {
+          b.append("<a href=\"");
+          b.append(gp.profile.getUserString("path"));
+          b.append("\">");
+          b.append(Utilities.escapeXml(gp.profile.present()));
+          b.append("</a>");
+        }
+        b.append("</td></tr>");
+      }
+      b.append("</table>\r\n");
+      b.append("<p>All resources of these types must conform to these profiles.</p>\r\n");
+      return b.toString();
+    }
   }
 }

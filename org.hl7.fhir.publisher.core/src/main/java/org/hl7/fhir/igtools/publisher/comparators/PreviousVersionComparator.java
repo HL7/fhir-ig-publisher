@@ -202,8 +202,8 @@ public class PreviousVersionComparator {
           for (String id : current.listResources("StructureDefinition", "ValueSet", "CodeSystem")) {
             filename = id;
             CanonicalResource curr = (CanonicalResource) loadResourceFromPackage(current, id, current.fhirVersion());
-            curr.setUserData("path", Utilities.pathURL(current.getWebLocation(), curr.fhirType()+"-"+curr.getId()+".html")); // to do - actually refactor to use the correct algorithm
             if (curr != null) {
+              curr.setUserData("path", Utilities.pathURL(current.getWebLocation(), curr.fhirType()+"-"+curr.getId()+".html")); // to do - actually refactor to use the correct algorithm
               vi.resources.add(curr);
             }
           }

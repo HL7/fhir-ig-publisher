@@ -51,6 +51,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -734,7 +735,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private ILoggingService logger = this;
 
-  private HTLMLInspector inspector;
+  private HTMLInspector inspector;
 
   private List<String> prePagesDirs = new ArrayList<String>();
   private HashMap<String, PreProcessInfo> preProcessInfo = new HashMap<String, PreProcessInfo>();
@@ -871,6 +872,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private Object branchName;
   private R4ToR4BAnalyser r4tor4b;
   private List<DependencyAnalyser.ArtifactDependency> dependencyList;
+  private Map<String, String> trackedFragments = new HashMap<>();
   
   private class PreProcessInfo {
     private String xsltName;
@@ -933,7 +935,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             dependentIgFinder.finish(outputDir, sourceIg.present());
             ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
                 bc.check(igpkp.getCanonical(), npmName, workingVersion(), historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator,
-                new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList).render(publishedIg, true), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
+                new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context).render(publishedIg, true), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
                 new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate(), copyrightYear, context, scanForR5Extensions(), modifierExtensions ,
                     noNarrativeResources, noValidateResources, noValidation, noGenerate, dependentIgFinder);
             log("Built. "+ DurationUtil.presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
@@ -1074,7 +1076,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       dependentIgFinder.finish(outputDir, sourceIg.present());
       ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), rootDir, npmName, childPublisher == null? null : childPublisher.npmName, 
           bc.check(igpkp.getCanonical(), npmName, workingVersion(), historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator,
-          new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList).render(publishedIg, true), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
+          new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context).render(publishedIg, true), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
           new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
           noNarrativeResources, noValidateResources, noValidation, noGenerate, dependentIgFinder);
       tts.end();
@@ -2229,6 +2231,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
     }
+    r4tor4b = new R4ToR4BAnalyser();
     IniFile ini = checkNewIg();
     if (ini != null) {
       newIg = true;
@@ -2241,7 +2244,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     realmRules = makeRealmBusinessRules();
     previousVersionComparator = makePreviousVersionComparator();
     ipaComparator = makeIpaComparator();
-    r4tor4b = new R4ToR4BAnalyser(context);
+    r4tor4b.setContext(context);
   }
   
   private Coding checkForJurisdiction() {
@@ -2624,6 +2627,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           showReferenceMessages = true;
       } else if (pc.equals("tabbed-snapshots")) {
         tabbedSnapshots = p.getValue().equals("true");
+      } else if (pc.equals("r4-exclusion")) {
+        r4tor4b.markExempt(p.getValue(), true);
+      } else if (pc.equals("r4b-exclusion")) {
+        r4tor4b.markExempt(p.getValue(), false);
       }
       count++;
     }
@@ -2756,7 +2763,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       dep.setVersion(pcm.getLatestVersion(dep.getPackageId()));
       sourceIg.getDependsOn().add(0, dep);
     }
-    inspector = new HTLMLInspector(outputDir, specMaps, this, igpkp.getCanonical(), sourceIg.getPackageId());
+    inspector = new HTMLInspector(outputDir, specMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), trackedFragments);
     inspector.getManual().add("full-ig.zip");
     if (historyPage != null) {
       inspector.getManual().add(historyPage);
@@ -3190,7 +3197,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       businessVersion = configuration.getAsJsonPrimitive("fixed-business-version").getAsString();
     }
     
-    inspector = new HTLMLInspector(outputDir, specMaps, this, igpkp.getCanonical(), configuration.has("npm-name") ? configuration.get("npm-name").getAsString() : null);
+    inspector = new HTMLInspector(outputDir, specMaps, this, igpkp.getCanonical(), configuration.has("npm-name") ? configuration.get("npm-name").getAsString() : null, trackedFragments);
     inspector.getManual().add("full-ig.zip");
     historyPage = ostr(paths, "history");
     if (historyPage != null) {
@@ -4871,7 +4878,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (String s : metadataResourceNames()) 
       load(s);
     log("Generating Snapshots");
+    loadPaths();
     generateSnapshots();
+    checkR4R4B();
     if (isPropagateStatus) {
       log("Propagating status");
       propagateStatus();
@@ -4894,6 +4903,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validateExpressions();
     errors.addAll(cql.getGeneralErrors());
     scanForUsageStats();
+  }
+
+  private void loadPaths() {
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (!r.getElement().hasUserData("path")) {
+          igpkp.checkForPath(f, r, r.getElement());
+        }
+      }
+    }
   }
 
   private void validate(String type) throws Exception {
@@ -5690,7 +5709,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           if ("Extension".equals(sd.getType()) && sd.getSnapshot().getElementFirstRep().getIsModifier()) {
             modifierExtensions.add(sd);
           }
-          r4tor4b.checkProfile(sd);
+        }
+      }
+    }
+  }
+
+  private void checkR4R4B() throws Exception {
+    logDebugMessage(LogCategory.PROGRESS, "R4/R4B Check");
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getResource() instanceof StructureDefinition) {
+          r4tor4b.checkProfile((StructureDefinition) r.getResource());
+        } else {
+          r4tor4b.checkExample(r.getElement());
         }
       }
     }
@@ -7037,9 +7068,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     vsg.finish(new FileOutputStream(path));
     
     fragment("summary-extensions", cvr.getExtensionSummary(), otherFilesRun);
-    fragment("ip-statements",  genIpStatements(fileList), otherFilesRun);
-    fragment("cross-version-analysis", r4tor4b.generate(npmName), otherFilesRun);
-    fragment("dependency-table", new DependencyRenderer(pcm, tempDir, npmName, templateManager, makeDependencies()).render(publishedIg, false), otherFilesRun);
+    trackedFragment("1", "ip-statements",  genIpStatements(fileList), otherFilesRun);
+    if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {
+      trackedFragment("2", "cross-version-analysis", r4tor4b.generate(npmName), otherFilesRun);
+    } else {
+      fragment("cross-version-analysis", r4tor4b.generate(npmName), otherFilesRun);      
+    }
+    DependencyRenderer depr = new DependencyRenderer(pcm, tempDir, npmName, templateManager, makeDependencies(), context);
+    trackedFragment("3", "dependency-table", depr.render(publishedIg, false), otherFilesRun);
+    trackedFragment("4", "globals-table", depr.renderGlobals(), otherFilesRun);
 
     // now, list the profiles - all the profiles
     JsonObject data = new JsonObject();
@@ -9985,6 +10022,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       fragment(name, content, outputTracker, null, null, null);
   }
   
+  private void trackedFragment(String id, String name, String content, Set<String> outputTracker) throws IOException, FHIRException {
+    trackedFragments.put(id, name+".xhtml");
+    fragment(name, content+HTMLInspector.TRACK_PREFIX+id+HTMLInspector.TRACK_SUFFIX, outputTracker, null, null, null);
+  }
+  
   private void fragment(String name, String content, Set<String> outputTracker) throws IOException, FHIRException {
     fragment(name, content, outputTracker, null, null, null);
   }
@@ -10871,7 +10913,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     this.targetOutputNested = targetOutputNested;
   }
   
-  private void updateInspector(HTLMLInspector parentInspector, String path) {
+  private void updateInspector(HTMLInspector parentInspector, String path) {
     parentInspector.getManual().add(path+"/full-ig.zip");
     parentInspector.getManual().add("../"+historyPage);
     parentInspector.getSpecMaps().addAll(specMaps);

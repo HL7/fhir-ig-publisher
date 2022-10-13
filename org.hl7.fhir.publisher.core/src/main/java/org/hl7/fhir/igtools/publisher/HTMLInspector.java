@@ -66,7 +66,7 @@ import com.google.gson.JsonObject;
 //import org.owasp.html.PolicyFactory;
 //import org.owasp.html.Sanitizers;
 
-public class HTLMLInspector {
+public class HTMLInspector {
 
   
   public enum NodeChangeType {
@@ -172,6 +172,8 @@ public class HTLMLInspector {
   private static final String RELEASE_HTML_MARKER = "<!--ReleaseHeader--><p id=\"publish-box\">Publish Box goes here</p><!--EndReleaseHeader-->";
   private static final String START_HTML_MARKER = "<!--ReleaseHeader--><p id=\"publish-box\">";
   private static final String END_HTML_MARKER = "</p><!--EndReleaseHeader-->";
+  public static final String TRACK_PREFIX = "<!--$$";
+  public static final String TRACK_SUFFIX = "$$-->";
 
   private boolean strict;
   private String rootFolder;
@@ -198,13 +200,16 @@ public class HTLMLInspector {
   private List<String> missingPublishBoxList = new ArrayList<>();
   private Set<String> exceptions = new HashSet<>();
   private boolean referencesValidatorPack;
+  private Map<String, String> trackedFragments;
+  private Set<String> foundFragments = new HashSet<>();
 
-  public HTLMLInspector(String rootFolder, List<SpecMapManager> specs, ILoggingService log, String canonical, String packageId) {
+  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, ILoggingService log, String canonical, String packageId, Map<String, String> trackedFragments) {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
     this.log = log;
     this.canonical = canonical;
     this.forHL7 = canonical.contains("hl7.org/fhir");
+    this.trackedFragments = trackedFragments;
     requirePublishBox = Utilities.startsWithInList(packageId, "hl7."); 
   }
 
@@ -250,6 +255,7 @@ public class HTLMLInspector {
     for (String s : sorted(cache.keySet())) {
       log.logDebugMessage(LogCategory.HTML, "Check "+s);
       LoadedFile lf = cache.get(s);
+
       if (lf.getHl7State() != null && !lf.getHl7State()) {
         boolean check = true;
         for (String pattern : exemptHtmlPatterns ) {
@@ -272,6 +278,8 @@ public class HTLMLInspector {
           first = false;
         }
       }
+      checkFragmentIds(TextFile.fileToString(lf.filename));
+      
       if (lf.isHasXhtml()) {
         XhtmlNode x = new XhtmlParser().setMustBeWellFormed(strict).parse(new FileInputStream(lf.filename), null);
         referencesValidatorPack = false;
@@ -302,9 +310,24 @@ public class HTLMLInspector {
     
     log.logDebugMessage(LogCategory.HTML, "Done checking");
     
+    for (String s : trackedFragments.keySet()) {
+      if (!foundFragments.contains(s)) {
+        messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, s, "The HTML fragment '"+trackedFragments.get(s)+"' is not included anywhere in the produced implementation guide",
+            "The HTML fragment '"+trackedFragments.get(s)+"' is not included anywhere in the produced implementation guide", IssueSeverity.WARNING));            
+      }
+    }
     return messages;
   }
 
+  private void checkFragmentIds(String src) {
+    int s = src.indexOf(TRACK_PREFIX);
+    while (s > -1) {
+      src = src.substring(s+TRACK_PREFIX.length());
+      int e = src.indexOf(TRACK_SUFFIX);
+      foundFragments.add(src.substring(0, e));
+      s = src.indexOf(TRACK_PREFIX);
+    }    
+  }
 
   private List<String> sorted(Set<String> keys) {
     List<String> res = new ArrayList<>();
@@ -780,7 +803,7 @@ public class HTLMLInspector {
   }
 
   public static void main(String[] args) throws Exception {
-    HTLMLInspector inspector = new HTLMLInspector(args[0], null, null, "http://hl7.org/fhir/us/core", "hl7.fhir.us.core");
+    HTMLInspector inspector = new HTMLInspector(args[0], null, null, "http://hl7.org/fhir/us/core", "hl7.fhir.us.core", new HashMap<>());
     inspector.setStrict(false);
     List<ValidationMessage> linkmsgs = inspector.check("test text");
     int bl = 0;
