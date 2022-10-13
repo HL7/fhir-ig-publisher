@@ -44,7 +44,7 @@ public class FetchedResource {
   private boolean validateAsResource;
   private List<String> statedProfiles = new ArrayList<String>();
   private List<String> foundProfiles = new ArrayList<String>();
-  private List<String> testProfiles = new ArrayList<String>();
+  private List<String> testArtifacts = new ArrayList<String>();
   private boolean snapshotted;
   private String exampleUri;
   private HashSet<FetchedResource> statedExamples = new HashSet<FetchedResource>();
@@ -221,16 +221,19 @@ public class FetchedResource {
     this.path = path;
   }
 
-  public void addTestProfile(String profile) {
-    testProfiles.add(profile);  
+  public void addTestArtifact(String profile) {
+    // Check for duplicate
+    if (!testArtifacts.contains(profile)) {
+      testArtifacts.add(profile);
+    }
   }
 	  
-  public List<String> getTestProfiles() {
-    return testProfiles;
+  public List<String> getTestArtifacts() {
+    return testArtifacts;
   }
 
-  public boolean hasTestProfiles() {
-    return !testProfiles.isEmpty();
+  public boolean hasTestArtifacts() {
+    return !testArtifacts.isEmpty();
   }
 
   public HashSet<FetchedResource> getFoundTestScripts() {
@@ -238,7 +241,14 @@ public class FetchedResource {
   }
 
   public void addFoundTestScript(FetchedResource r) {
-    this.foundTestScripts.add(r);
+    // Check for duplicate
+    if (!foundTestScripts.contains(r)) {
+      this.foundTestScripts.add(r);
+    }
+  }
+
+  public boolean hasFoundTestScripts() {
+    return !foundTestScripts.isEmpty();
   }
 
 }

@@ -234,7 +234,6 @@ import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.StructureMap;
 import org.hl7.fhir.r5.model.StructureMap.StructureMapModelMode;
 import org.hl7.fhir.r5.model.StructureMap.StructureMapStructureComponent;
-import org.hl7.fhir.r5.model.TestScript;
 import org.hl7.fhir.r5.model.TypeDetails;
 import org.hl7.fhir.r5.model.UriType;
 import org.hl7.fhir.r5.model.UsageContext;
@@ -1507,7 +1506,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         case EvidenceVariable:
         case ExampleScenario:
         case ObservationDefinition:
-        case TestScript:
           isInformative = true;
         default:
           // We're in a resource we need to process, so continue on
@@ -4167,12 +4165,33 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             try {
               Element t = r.getElement();
               if (t != null) {
+                // Add TestScript.profile references
                 List<Element> profiles = t.getChildrenByName("profile");
                 if (profiles != null) {
                   for (Element profile : profiles) {
                     String tp = profile.getChildValue("reference");
                     if (tp != null && !tp.isEmpty()) {
-                      r.addTestProfile(tp);
+                      r.addTestArtifact(tp);
+                    }
+                  }
+                }
+                // Add TestScript.scope.artifact references
+                List<Element> scopes = t.getChildrenByName("scope");
+                if (scopes != null) {
+                  for (Element scope : scopes) {
+                    String tsa = scope.getChildValue("artifact");
+                    if (tsa != null && !tsa.isEmpty()) {
+                      r.addTestArtifact(tsa);
+                    }
+                  }
+                }
+                // Add TestScript extension for scope references
+                List<Element> extensions = t.getChildrenByName("extension");
+                if (extensions != null) {
+                  for (Element extension : extensions) {
+                    String url = extension.getChildValue("url");
+                    if (url != null && url.equals("http://hl7.org/fhir/StructureDefinition/scope")) {
+                      r.addTestArtifact(extension.getChildValue("valueCanonical"));
                     }
                   }
                 }
@@ -7145,15 +7164,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
 
-    for (FetchedResource r: testscripts) {
-      if (r.hasTestProfiles()) {
+    for (FetchedResource r : testscripts) {
+      if (r.hasTestArtifacts()) {
         FetchedResource baseRes = null;
-        for (String tsProfile : r.getTestProfiles()) {
-          baseRes = getResourceForUri(tsProfile);
+        for (String tsArtifact : r.getTestArtifacts()) {
+          baseRes = getResourceForUri(tsArtifact);
           if (baseRes == null) {
             // We only yell if the resource doesn't exist, not only if it doesn't exist in the current IG.
-            if (context.fetchResource(StructureDefinition.class, tsProfile) == null)
-              errors.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, r.fhirType()+"/"+r.getId(), "Unable to find profile " + tsProfile + " nominated as the profile for test resource " + r.getUrlTail(), IssueSeverity.ERROR));
+            errors.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, r.fhirType()+"/"+r.getId(), "Unable to find artifact " + tsArtifact + " nominated as the artifact for test resource " + r.getUrlTail(), IssueSeverity.WARNING));
           } else {
             baseRes.addFoundTestScript(r);
           }
@@ -7200,6 +7218,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         JsonObject item = new JsonObject();
         data.add(r.fhirType()+"/"+r.getId(), item);
         item.addProperty("history", r.hasHistory());
+        item.addProperty("testscript", r.hasFoundTestScripts());
         item.addProperty("index", i);
         item.addProperty("source", f.getStatedPath());
         item.addProperty("sourceTail", tailPI(f.getStatedPath()));
