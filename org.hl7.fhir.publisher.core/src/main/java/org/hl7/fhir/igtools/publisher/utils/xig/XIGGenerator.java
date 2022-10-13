@@ -137,7 +137,7 @@ public class XIGGenerator {
     return res;
   }
   
-  private void execute() throws IOException, ParserConfigurationException, SAXException, FHIRException, EOperationOutcome {
+  public void execute() throws IOException, ParserConfigurationException, SAXException, FHIRException, EOperationOutcome {
     PackageVisitor pv = new PackageVisitor();
     pv.getResourceTypes().add("CapabilityStatement");
     pv.getResourceTypes().add("SearchParameter");
