@@ -318,9 +318,9 @@ public class SimpleFetcher implements IFetchFile {
                   count++;
                   ok = true;
                 } catch (Exception e) {
-                  if (!f.getName().startsWith("Binary-")) { // we don't notify here because Binary is special. 
+                  if (!f.getName().startsWith("Binary-") && !f.getName().startsWith("binary-") ) { // we don't notify here because Binary is special. 
                     log.logMessage(e.getMessage() +" loading "+f);
-                    e.printStackTrace();
+//                    e.printStackTrace();
                   }
                 }
               if (!ok && !Utilities.existsInList(ext, "xml", "ttl", "html", "txt")) {
@@ -332,7 +332,7 @@ public class SimpleFetcher implements IFetchFile {
                 } catch (Exception e) {
                   if (!f.getName().startsWith("Binary-")) { // we don't notify here because Binary is special. 
                     log.logMessage(e.getMessage() +" loading "+f);
-                    e.printStackTrace();
+//                    e.printStackTrace();
                   }
                 }
               }
@@ -345,7 +345,7 @@ public class SimpleFetcher implements IFetchFile {
                 } catch (Exception e) {
                   if (!f.getName().startsWith("Binary-")) { // we don't notify here because Binary is special. 
                     log.logMessage(e.getMessage() +" loading "+f);
-                    e.printStackTrace();
+//                    e.printStackTrace();
                   }
                 }
               }
