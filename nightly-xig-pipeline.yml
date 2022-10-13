@@ -1,0 +1,27 @@
+trigger: none
+pr: none
+
+schedules:
+- cron: "0 0 * * *"
+  displayName: "nightly-xig-build-process"
+  branches:
+    include: 
+    - master
+  always: true # whether to always run the pipeline or only if there have been source code changes since the last successful scheduled run. The default is false.
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+- task: Bash@3
+  displayName: 'Download publisher'
+  inputs:
+    targetType: 'inline'
+    script: 'wget https://github.com/HL7/fhir-ig-publisher/releases/latest/download/publisher.jar'
+
+- task: Bash@3
+  displayName: 'Run publisher with xig param'
+  inputs:
+    targetType: 'inline'
+    script: 'java -jar ./publisher.jar -xig testxig'
+
