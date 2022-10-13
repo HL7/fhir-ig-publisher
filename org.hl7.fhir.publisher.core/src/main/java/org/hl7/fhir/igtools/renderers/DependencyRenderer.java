@@ -226,47 +226,47 @@ public class DependencyRenderer {
     }
     if (!QA) {
       checkGlobals(npm);
-    }
-    if (!npm.isCore() && !npm.isTx()) {
-      String n = (npm.name()+"#"+npm.version());
-      b.append("<h3>Package ");
-      b.append(n);
-      b.append("</h3>\r\n<p>");
-      b.append(Utilities.escapeXml(npm.description()));
-      b.append("</p>\r\n<p><b>Dependencies</b></p>\r\n");
-      boolean first = true;
-      for (ArtifactDependency ad : dependencies) {
-        String t = ad.getTarget().getUserString("package");
-        if (n.equals(t)) {
-          if (first) {
-            b.append("<ul>\r\n");
-            first = false;
-          }
-          b.append("<li><a href=\"");
-          b.append(ad.getSource().getUserString("path"));
-          b.append("\">");
-          if (ad.getSource() instanceof CanonicalResource) {
-            b.append(Utilities.escapeXml(((CanonicalResource) ad.getSource()).present()));
-          } else {
-            b.append(ad.getSource().fhirType()+"/"+ad.getSource().getId());          
-          }
-          b.append("</a> ");
-          b.append(ad.getKind());
-          b.append(" <a href=\"");
-          b.append(ad.getTarget().getUserString("path"));
-          b.append("\">");
-          if (ad.getTarget() instanceof CanonicalResource) {
-            b.append(Utilities.escapeXml(((CanonicalResource) ad.getTarget()).present()));
-          } else {
-            b.append(ad.getTarget().fhirType()+"/"+ad.getTarget().getId());          
-          }
-          b.append("</a></li>\r\n");
-        } 
-      }
-      if (first) {
-        b.append("<p><i>No dependencies found</i></p>\r\n");
-      } else {
-        b.append("</ul>\r\n");
+      if (!npm.isCore() && !npm.isTx()) {
+        String n = (npm.name()+"#"+npm.version());
+        b.append("<h3>Package ");
+        b.append(n);
+        b.append("</h3>\r\n<p>");
+        b.append(Utilities.escapeXml(npm.description()));
+        b.append("</p>\r\n<p><b>Dependencies</b></p>\r\n");
+        boolean first = true;
+        for (ArtifactDependency ad : dependencies) {
+          String t = ad.getTarget().getUserString("package");
+          if (n.equals(t)) {
+            if (first) {
+              b.append("<ul>\r\n");
+              first = false;
+            }
+            b.append("<li><a href=\"");
+            b.append(ad.getSource().getUserString("path"));
+            b.append("\">");
+            if (ad.getSource() instanceof CanonicalResource) {
+              b.append(Utilities.escapeXml(((CanonicalResource) ad.getSource()).present()));
+            } else {
+              b.append(ad.getSource().fhirType()+"/"+ad.getSource().getId());          
+            }
+            b.append("</a> ");
+            b.append(ad.getKind());
+            b.append(" <a href=\"");
+            b.append(ad.getTarget().getUserString("path"));
+            b.append("\">");
+            if (ad.getTarget() instanceof CanonicalResource) {
+              b.append(Utilities.escapeXml(((CanonicalResource) ad.getTarget()).present()));
+            } else {
+              b.append(ad.getTarget().fhirType()+"/"+ad.getTarget().getId());          
+            }
+            b.append("</a></li>\r\n");
+          } 
+        }
+        if (first) {
+          b.append("<p><i>No dependencies found</i></p>\r\n");
+        } else {
+          b.append("</ul>\r\n");
+        }
       }
     }
   }
