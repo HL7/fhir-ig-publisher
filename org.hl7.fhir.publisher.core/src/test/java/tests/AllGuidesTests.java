@@ -188,9 +188,14 @@ private static final String VER = "1.0.53";
 //    test(Utilities.path(testingPath(), "src", "test", "resources", "test-igs", "new", "ig-package"));
 //  }
 
-  //@Test
+  @Test
   public void testIPS() throws Exception {
-    testIg("hl7.fhir.uv.ips", "ig.json");
+    testIg("hl7.fhir.uv.ips", null);
+  }
+
+  @Test
+  public void testIPA() throws Exception {
+    testIg("hl7.fhir.uv.ipa", null);
   }
 
 }
