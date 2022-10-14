@@ -266,10 +266,11 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private DependentIGFinder dependentIgs;
   private IpaComparator ipaComparator;
   private List<StructureDefinition> modifierExtensions;
+  private String globalCheck;
   
   public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, String ballotCheck, 
       String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, IpaComparator ipaComparator,
-      String dependencies, String csAnalysis, String versionRulesCheck, String copyrightYear, IWorkerContext context,
+      String dependencies, String csAnalysis, String versionRulesCheck, String globalCheck, String copyrightYear, IWorkerContext context,
       Set<String> r5Extensions, List<StructureDefinition> modifierExtensions,
       List<FetchedResource> noNarratives, List<FetchedResource> noValidation, boolean noValidate, boolean noGenerate, DependentIGFinder dependentIgs) {
     super();
@@ -298,6 +299,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     this.noGenerate = noGenerate;
     this.r5Extensions = r5Extensions;
     this.modifierExtensions = modifierExtensions;
+    this.globalCheck = globalCheck;
     determineCode();
   }
 
@@ -641,6 +643,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       " <tr><td>Supressed Messages:</td><td>$suppressedmsgssummary$</td></tr>\r\n"+
       " <tr><td>Dependency Checks:</td><td>$dependencyCheck$</td></tr>\r\n"+
       " <tr><td>Dependent IGs:</td><td><a href=\"qa-dep.html\">$dependentIgs$</a></td></tr>\r\n"+
+      " <tr><td>Global Profiles:</td><td>$globalCheck$</td></tr>\r\n"+
       " <tr><td>Publication Rules:</td><td>Code = $igcode$. $ballotCheck$ $copyrightYearCheck$</td></tr>\r\n"+
       " <tr><td>HTA Analysis:</td><td>$csAnalysis$</td></tr>\r\n"+
       " <tr><td>R5 Dependencies:</td><td>$r5usage$</td></tr>\r\n"+
@@ -769,6 +772,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("igrealmerror", igRealmError);
     t.add("versionRulesCheck", versionRulesCheck);
     t.add("realm", igrealm == null ? "n/a" : igrealm.toUpperCase());
+    t.add("globalCheck", globalCheck);
     t.add("dependencyCheck", dependencies);
     t.add("dependentIgs", dependentIgs.getCountDesc());
     t.add("csAnalysis", csAnalysis);

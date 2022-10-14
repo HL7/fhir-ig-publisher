@@ -92,7 +92,7 @@ public class R4ToR4BAnalyser {
 
   public void setContext(IWorkerContext context) {
     this.context = context;    
-    if (VersionUtilities.isR4Ver(context.getVersion()) || VersionUtilities.isR4BVer(context.getVersion())) {
+    if (context != null && (VersionUtilities.isR4Ver(context.getVersion()) || VersionUtilities.isR4BVer(context.getVersion()))) {
       r4OK = true;
       r4BOK = true;
       checking = true;
