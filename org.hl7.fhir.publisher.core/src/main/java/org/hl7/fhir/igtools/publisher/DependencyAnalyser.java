@@ -323,7 +323,7 @@ public class DependencyAnalyser {
       dep(q, "binds to", context.fetchResource(ValueSet.class, item.getAnswerValueSet()));
     }    
     for (QuestionnaireItemComponent i : item.getItem()) {
-      analyseQItem(q, item);
+      analyseQItem(q, i);
     }
   }
 
