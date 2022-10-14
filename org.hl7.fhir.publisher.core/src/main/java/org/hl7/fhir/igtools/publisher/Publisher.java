@@ -202,6 +202,7 @@ import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionPa
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionParameterComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
+import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideGlobalComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.SPDXLicense;
 import org.hl7.fhir.r5.model.IntegerType;
 import org.hl7.fhir.r5.model.Library;
@@ -936,7 +937,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
                 bc.check(igpkp.getCanonical(), npmName, workingVersion(), historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator,
                 new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context).render(publishedIg, true), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
-                new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate(), copyrightYear, context, scanForR5Extensions(), modifierExtensions ,
+                new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions ,
                     noNarrativeResources, noValidateResources, noValidation, noGenerate, dependentIgFinder);
             log("Built. "+ DurationUtil.presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
             recordOutcome(null, val);
@@ -957,6 +958,27 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       } catch (Throwable e) {
         // nothing
       }
+    }
+  }
+
+  private String renderGlobals() {
+    if (sourceIg.hasGlobal()) {
+      StringBuilder b = new StringBuilder();
+      boolean list = sourceIg.getGlobal().size() > 1;
+      if (list) {
+        b.append("<ul>\r\n");
+      } 
+      for (ImplementationGuideGlobalComponent g : sourceIg.getGlobal()) {
+        b.append(list ? "<li>" : "");
+        b.append(""+g.getType()+": "+g.getProfile());
+        b.append(list ? "</li>" : "");
+      }
+      if (list) {
+        b.append("</ul>\r\n");
+      } 
+      return b.toString();
+    } else {
+      return "(none declared)";
     }
   }
 
@@ -1077,7 +1099,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), rootDir, npmName, childPublisher == null? null : childPublisher.npmName, 
           bc.check(igpkp.getCanonical(), npmName, workingVersion(), historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator,
           new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context).render(publishedIg, true), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
-          new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
+          new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
           noNarrativeResources, noValidateResources, noValidation, noGenerate, dependentIgFinder);
       tts.end();
       if (isChild()) {
@@ -2244,7 +2266,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     realmRules = makeRealmBusinessRules();
     previousVersionComparator = makePreviousVersionComparator();
     ipaComparator = makeIpaComparator();
-    r4tor4b.setContext(context);
+    if (context != null) {
+      r4tor4b.setContext(context);
+    }
   }
   
   private Coding checkForJurisdiction() {
@@ -4140,8 +4164,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         boolean rchanged = noteFile(res, f);        
         needToBuild = rchanged || needToBuild;
         if (rchanged) {
-          if (res.hasExtension(ToolingExtensions.EXT_BINARY_FORMAT)) {
-            loadAsBinaryResource(f, f.addResource(), res, res.getExtensionString(ToolingExtensions.EXT_BINARY_FORMAT));
+          if (res.hasExtension(ToolingExtensions.EXT_BINARY_FORMAT_NEW)) {
+            loadAsBinaryResource(f, f.addResource(), res, res.getExtensionString(ToolingExtensions.EXT_BINARY_FORMAT_NEW));
+          } else if (res.hasExtension(ToolingExtensions.EXT_BINARY_FORMAT_OLD)) {
+             loadAsBinaryResource(f, f.addResource(), res, res.getExtensionString(ToolingExtensions.EXT_BINARY_FORMAT_OLD));
           } else {
             loadAsElementModel(f, f.addResource(), res);
           }
