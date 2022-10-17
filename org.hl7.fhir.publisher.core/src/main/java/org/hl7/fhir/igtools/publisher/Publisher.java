@@ -2806,8 +2806,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     loadIg("igtools", "hl7.fhir.uv.tools", "current", "http://hl7.org/fhir/tools/ImplementationGuide/hl7.fhir.uv.tools", i);    
     System.out.print("Load R5 Extensions");
-    R5ExtensionsLoader r5e = new R5ExtensionsLoader(pcm);
-    r5e.loadR5Extensions(context);
+    R5ExtensionsLoader r5e = new R5ExtensionsLoader(pcm, context);
+    r5e.loadR5Extensions();
     SpecMapManager smm = new SpecMapManager(r5e.getMap(), r5e.getPck().fhirVersion());
     smm.setName(r5e.getPck().name());
     smm.setBase("http://build.fhir.org");
@@ -9384,7 +9384,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (Utilities.noString(p)) {
       return "";
     }
-    p = p.strip();
+    p = p.trim();
     if (p.startsWith("<p>")) {
       p = p.substring(3);
     }
