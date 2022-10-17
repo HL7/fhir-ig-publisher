@@ -33,6 +33,7 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService.LogCategory;
+import org.hl7.fhir.r5.elementmodel.ParserBase.NamedElement;
 import org.hl7.fhir.r5.formats.FormatUtilities;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.DataType;
@@ -190,7 +191,11 @@ public class SimpleFetcher implements IFetchFile {
         throw new Exception("Bad Source Reference '"+s+"' - should have the format [Type]/[id]");
       String type = s.substring(0,  s.indexOf("/"));
       String id = s.substring(s.indexOf("/")+1); 
-      if (!pkp.getContext().hasResource(StructureDefinition.class , "http://hl7.org/fhir/StructureDefinition/"+type) && !(pkp.getContext().hasResource(StructureDefinition.class , "http://hl7.org/fhir/StructureDefinition/Conformance") && type.equals("CapabilityStatement")))
+      if (!pkp.getContext().hasResource(StructureDefinition.class, "http://hl7.org/fhir/StructureDefinition/"+type) &&
+          // first special case: Conformance/Capability
+          (!(pkp.getContext().hasResource(StructureDefinition.class , "http://hl7.org/fhir/StructureDefinition/Conformance") && 
+              type.equals("CapabilityStatement"))) 
+          )
         throw new Exception("Bad Resource Identity - should have the format [Type]/[id] where Type is a valid resource type:" + s);
       if (!id.matches(FormatUtilities.ID_REGEX))
         throw new Exception("Bad Source Reference '"+s+"' - should have the format [Type]/[id] where id is a valid FHIR id type");
@@ -325,10 +330,12 @@ public class SimpleFetcher implements IFetchFile {
                 }
               if (!ok && !Utilities.existsInList(ext, "xml", "ttl", "html", "txt")) {
                 try {
-                  org.hl7.fhir.r5.elementmodel.Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parseSingle(new FileInputStream(fn));
-                  addFile(res, f, e, "application/fhir+json");
-                  count++;
-                  ok = true;
+                  List<NamedElement> el = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parse(new FileInputStream(fn));
+                  if (el.size() == 1) {
+                    addFile(res, f, el.get(0).getElement(), "application/fhir+json");
+                    count++;
+                    ok = true;
+                  }
                 } catch (Exception e) {
                   if (!f.getName().startsWith("Binary-")) { // we don't notify here because Binary is special. 
                     log.logMessage(e.getMessage() +" loading "+f);

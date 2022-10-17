@@ -1903,7 +1903,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                 checkExistingNarrative(f, r, ((DomainResource) r.getResource()).getText().getDiv());
               }
               if (regen) {
-                r.setElement(convertToElement(r.getResource()));
+                Element e = convertToElement(r, r.getResource());
+                e.copyUserData(r.getElement());
+                r.setElement(e);
               }
             } else {
               RenderingContext lrc = rc.copy().setParser(getTypeLoader(f,r));
@@ -1992,7 +1994,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private boolean isConvertableResource(String t) {
     return Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "Conformance", "CapabilityStatement", "Questionnaire", "NamingSystem", 
-        "ConceptMap", "OperationOutcome", "CompartmentDefinition", "OperationDefinition", "ImplementationGuide");
+        "ConceptMap", "OperationOutcome", "CompartmentDefinition", "OperationDefinition", "ImplementationGuide", "ActorDefinition");
   }
 
 
@@ -2806,8 +2808,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     loadIg("igtools", "hl7.fhir.uv.tools", "current", "http://hl7.org/fhir/tools/ImplementationGuide/hl7.fhir.uv.tools", i);    
     System.out.print("Load R5 Extensions");
-    R5ExtensionsLoader r5e = new R5ExtensionsLoader(pcm);
-    r5e.loadR5Extensions(context);
+    R5ExtensionsLoader r5e = new R5ExtensionsLoader(pcm, context);
+    r5e.load();
+    r5e.loadR5Extensions();
+    r5e.loadR5SpecialTypes(SpecialTypeHandler.SPECIAL_TYPES);
     SpecMapManager smm = new SpecMapManager(r5e.getMap(), r5e.getPck().fhirVersion());
     smm.setName(r5e.getPck().name());
     smm.setBase("http://build.fhir.org");
@@ -4090,7 +4094,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       FetchedResource igr = igf.addResource();
 //      loadAsElementModel(igf, igr, null);
       igr.setResource(publishedIg);
-      igr.setElement(convertToElement(publishedIg));
+      igr.setElement(convertToElement(null, publishedIg));
       igr.setId(sourceIg.getId()).setTitle(publishedIg.getName());
     } else {
       // special case; the source is updated during the build, so we track it differently
@@ -4735,7 +4739,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       FetchedResource r = f.addResource();
       r.setResource(cm);
       r.setId(cm.getId());
-      r.setElement(convertToElement(cm));
+      r.setElement(convertToElement(r, cm));
       r.setTitle(r.getElement().getChildValue("name"));
       igpkp.findConfiguration(f, r);
     } else {
@@ -4770,7 +4774,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         FetchedResource r = f.addResource();
         r.setResource(b.getResource());
         r.setId(b.getResource().getId());
-        r.setElement(convertToElement(r.getResource()));
+        r.setElement(convertToElement(r, r.getResource()));
         r.setTitle(r.getElement().getChildValue("name"));
         igpkp.findConfiguration(f, r);
       }
@@ -4893,6 +4897,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     res.add("Statistic");
     res.add("TerminologyCapabilities");
     res.add("TestScript");
+    res.add("ActorDefinition");
+    res.add("Requirements");
     return res;
   }
   
@@ -4948,6 +4954,26 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           logDebugMessage(LogCategory.PROGRESS, "validate res: "+r.fhirType()+"/"+r.getId());
           if (!r.isValidated()) {
             validate(f, r);
+          }
+          if (SpecialTypeHandler.handlesType(r.fhirType()) && !VersionUtilities.isR5Ver(version)) {
+            // we validated the resource as it was supplied, but now we need to 
+            // switch it for the correct representation in the underlying version
+            byte[] cnt = null;
+            if (VersionUtilities.isR3Ver(version)) {
+              org.hl7.fhir.dstu3.model.Resource res = VersionConvertorFactory_30_50.convertResource(r.getResource());
+              cnt = new org.hl7.fhir.dstu3.formats.JsonParser().setOutputStyle(org.hl7.fhir.dstu3.formats.IParser.OutputStyle.PRETTY).composeBytes(res);
+            } else if (VersionUtilities.isR4Ver(version)) {
+              org.hl7.fhir.r4.model.Resource res = VersionConvertorFactory_40_50.convertResource(r.getResource());
+              cnt = new org.hl7.fhir.r4.formats.JsonParser().setOutputStyle(org.hl7.fhir.r4.formats.IParser.OutputStyle.PRETTY).composeBytes(res);
+            } else if (VersionUtilities.isR4BVer(version)) {
+              org.hl7.fhir.r4b.model.Resource res = VersionConvertorFactory_43_50.convertResource(r.getResource());
+              cnt = new org.hl7.fhir.r4b.formats.JsonParser().setOutputStyle(org.hl7.fhir.r4b.formats.IParser.OutputStyle.PRETTY).composeBytes(res);
+            } else {
+              throw new Error("Cannot use resources of type "+r.fhirType()+" in a IG with version "+version);
+            }
+            Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parseSingle(new ByteArrayInputStream(cnt));
+            e.copyUserData(r.getElement());
+            r.setElement(e);
           }
         }
       }
@@ -5113,7 +5139,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           map.setUserData("analysis", analysis);
           for (StructureDefinition sd : analysis.getProfiles()) {
             FetchedResource nr = new FetchedResource();
-            nr.setElement(convertToElement(sd));
+            nr.setElement(convertToElement(nr, sd));
             nr.setId(sd.getId());
             nr.setResource(sd);
             nr.setTitle("Generated Profile (by Transform)");
@@ -5162,7 +5188,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               services.reset();
               utils.transform(target, t.getKey().getElement(), map, target);
               FetchedResource nr = new FetchedResource();
-              nr.setElement(convertToElement(target));
+              nr.setElement(convertToElement(nr, target));
               nr.setId(target.getId());
               nr.setResource(target);
               nr.setTitle("Generated Example (by Transform)");
@@ -5335,7 +5361,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           else if (file.getContentType().contains("xml"))
             res2 = new org.hl7.fhir.dstu2.formats.XmlParser().parse(file.getSource());
           org.hl7.fhir.r5.model.Resource res = VersionConvertorFactory_10_50.convertResource(res2);
-          e = convertToElement(res);
+          e = convertToElement(r, res);
           r.setElement(e).setId(id).setTitle(e.getChildValue("name"));
           r.setResource(res);
         }
@@ -5443,20 +5469,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     logDebugMessage(LogCategory.PROGRESS, "process type: "+type);
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
-        String url = r.getElement().getChildValue("url");
-        if (url != null) {
-          String title = r.getElement().getChildValue("title");
-          if (title == null) {
-            title = r.getElement().getChildValue("name");
-          }
-          String link = igpkp.getLinkFor(r, true);
-          if (r.fhirType().equals(type)) {
+        if (r.fhirType().equals(type) ) {
+          String url = r.getElement().getChildValue("url");
+          if (url != null) {
+            String title = r.getElement().getChildValue("title");
+            if (title == null) {
+              title = r.getElement().getChildValue("name");
+            }
+            String link = igpkp.getLinkFor(r, true);
+            r.getElement().setUserData("path", link);
             validationFetcher.getOtherUrls().add(url);
           }
         }
       }
     }
-
   }
   
   private void loadDepInfo() {
@@ -5623,7 +5649,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               altered = true;
             }
             if (altered) {
-              r.setElement(convertToElement(bc));
+              r.setElement(convertToElement(r, bc));
             }
             igpkp.checkForPath(f, r, bc, false);
             try {
@@ -5814,7 +5840,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
     if (changed || (!r.getElement().hasChild("snapshot") && sd.hasSnapshot())) {
-      r.setElement(convertToElement(sd));
+      r.setElement(convertToElement(r, sd));
     }
     r.setSnapshotted(true);
     logDebugMessage(LogCategory.CONTEXT, "Context.See "+sd.getUrl());
@@ -5890,7 +5916,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (StructureMap map : maps) {
         FetchedResource nr = f.addResource();
         nr.setResource(map);
-        nr.setElement(convertToElement(map));
+        nr.setElement(convertToElement(nr, map));
         nr.setId(map.getId());
         nr.setTitle(map.getName());
         igpkp.findConfiguration(f, nr);
@@ -5977,7 +6003,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private Resource parse(FetchedFile file) throws Exception {
     String parseVersion = version;
     if (!file.getResources().isEmpty()) {
-      parseVersion = str(file.getResources().get(0).getConfig(), "version", version);
+      if (Utilities.existsInList(file.getResources().get(0).fhirType(), SpecialTypeHandler.SPECIAL_TYPES)) {
+        parseVersion = SpecialTypeHandler.VERSION;
+      } else {
+        parseVersion = str(file.getResources().get(0).getConfig(), "version", version);
+      }
     }
     return parseContent(file.getName(), file.getContentType(), parseVersion, file.getSource());
   }
@@ -6461,7 +6491,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       publishedIg.setText(((ImplementationGuide)r.getResource()).getText());
     }
     r.setResource(publishedIg);
-    r.setElement(convertToElement(publishedIg));
+    r.setElement(convertToElement(r, publishedIg));
     
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
     new org.hl7.fhir.r4.formats.JsonParser().compose(bs, VersionConvertorFactory_40_50.convertResource(publishedIg));
@@ -6551,28 +6581,36 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     r.setId(bc.getId());
     r.setTitle(bc.getName());
     r.setValidated(true);
-    r.setElement(convertToElement(bc));
+    r.setElement(convertToElement(r, bc));
     igpkp.findConfiguration(f, r);
     bc.setUserData("config", r.getConfig());
     generateNativeOutputs(f, true);
     generateHtmlOutputs(f, true);
   }
 
-  private Element convertToElement(Resource res) throws IOException, org.hl7.fhir.exceptions.FHIRException, FHIRFormatError, DefinitionException {
+  private Element convertToElement(FetchedResource r, Resource res) throws Exception {
+    String parseVersion = version;
+    if (r != null) {
+      if (Utilities.existsInList(r.fhirType(), SpecialTypeHandler.SPECIAL_TYPES)) {
+        parseVersion = SpecialTypeHandler.VERSION;
+      } else if (r.getConfig() != null) {
+        parseVersion = str(r.getConfig(), "version", version);
+      }
+    }
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
-    if (VersionUtilities.isR3Ver(version)) {
+    if (VersionUtilities.isR3Ver(parseVersion)) {
       org.hl7.fhir.dstu3.formats.JsonParser jp = new org.hl7.fhir.dstu3.formats.JsonParser();
       jp.compose(bs, VersionConvertorFactory_30_50.convertResource(res));
-    } else if (VersionUtilities.isR4Ver(version)) {
+    } else if (VersionUtilities.isR4Ver(parseVersion)) {
       org.hl7.fhir.r4.formats.JsonParser jp = new org.hl7.fhir.r4.formats.JsonParser();
       jp.compose(bs, VersionConvertorFactory_40_50.convertResource(res));
-    } else if (VersionUtilities.isR4BVer(version)) {
+    } else if (VersionUtilities.isR4BVer(parseVersion)) {
       org.hl7.fhir.r4b.formats.JsonParser jp = new org.hl7.fhir.r4b.formats.JsonParser();
       jp.compose(bs, VersionConvertorFactory_43_50.convertResource(res));
-    } else if (VersionUtilities.isR2BVer(version)) {
+    } else if (VersionUtilities.isR2BVer(parseVersion)) {
       org.hl7.fhir.dstu2016may.formats.JsonParser jp = new org.hl7.fhir.dstu2016may.formats.JsonParser();
       jp.compose(bs, VersionConvertorFactory_14_50.convertResource(res));
-    } else if (VersionUtilities.isR2Ver(version)) {
+    } else if (VersionUtilities.isR2Ver(parseVersion)) {
       org.hl7.fhir.dstu2.formats.JsonParser jp = new org.hl7.fhir.dstu2.formats.JsonParser();
       jp.compose(bs, VersionConvertorFactory_10_50.convertResource(res, new IGR2ConvertorAdvisor5()));
     } else {
@@ -9012,7 +9050,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
     org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(context);
     jp.compose(r.getElement(), bs, OutputStyle.NORMAL, igpkp.getCanonical());
-    npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, r.fhirType()+"-"+r.getId()+".json", bs.toByteArray());
+    npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, r.getElement().fhirType()+"-"+r.getId()+".json", bs.toByteArray());
     String path = Utilities.path(tempDir, "_includes", r.fhirType()+"-"+r.getId()+".json");
     String json = new String(bs.toByteArray());
     TextFile.stringToFile(json, path);
