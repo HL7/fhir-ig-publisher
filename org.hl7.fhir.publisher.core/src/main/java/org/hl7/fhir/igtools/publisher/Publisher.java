@@ -9384,7 +9384,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (Utilities.noString(p)) {
       return "";
     }
-    p = p.strip();
+    p = p.trim();
     if (p.startsWith("<p>")) {
       p = p.substring(3);
     }
