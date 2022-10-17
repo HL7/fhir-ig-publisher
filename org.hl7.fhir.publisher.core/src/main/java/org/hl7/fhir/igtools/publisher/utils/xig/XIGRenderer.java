@@ -132,7 +132,12 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
     System.out.println("Generate...");
     int i = 0;
     for (CanonicalResource cr : info.getResources().values()) {
-      renderResource(cr);
+      try {
+        renderResource(cr);
+      } catch (Exception e) {
+        Exception wrappedException = new Exception("Exception rendering canonical resource " + cr.getId() + " " + cr.getUrl(), e);
+        wrappedException.printStackTrace();
+      }
       i++;
       if (i > info.getResources().size() / 100) {
         System.out.print(".");
