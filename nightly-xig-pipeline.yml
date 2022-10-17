@@ -20,8 +20,14 @@ steps:
     script: 'wget https://github.com/HL7/fhir-ig-publisher/releases/latest/download/publisher.jar'
 
 - task: Bash@3
+  displayName: 'Make output dir'
+  inputs:
+    targetType: 'inline'
+    script: 'mkdir xig_output'
+
+- task: Bash@3
   displayName: 'Run publisher with xig param'
   inputs:
     targetType: 'inline'
-    script: 'java -Xmx7168m -jar ./publisher.jar -xig testxig'
+    script: 'java -Xmx7168m -jar ./publisher.jar -xig xig_output'
 
