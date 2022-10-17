@@ -23,5 +23,5 @@ steps:
   displayName: 'Run publisher with xig param'
   inputs:
     targetType: 'inline'
-    script: 'java -jar ./publisher.jar -xig testxig'
+    script: 'java -Xmx7168m -jar ./publisher.jar -xig testxig'
 
