@@ -9402,7 +9402,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   // todo - hook this up to the
   private CopyRightUsageStatement getCopyRightStatement(String system) {
     if ("http://snomed.info/sct".equals(system)) {
-      return new CopyRightUsageStatement("SNOMED Clinical Terms® (SNOMED CT®)", "This content is copyright of SNOMED International. Implementers of these specifications must have the appropriate SNOMED CT Affiliate license - "+
+      return new CopyRightUsageStatement("SNOMED Clinical Terms® (SNOMED CT®)", "This material contains content that is copyright of SNOMED International. Implementers of these specifications must have the appropriate SNOMED CT Affiliate license - "+
        "for more information contact <a href=\"http://www.snomed.org/snomed-ct/get-snomed-ct\">http://www.snomed.org/snomed-ct/get-snomed-ct</a> or <a href=\"mailto:info@snomed.org\">info@snomed.org</a>.");
     }
     if ("http://loinc.org".equals(system)) {
@@ -9422,7 +9422,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (Utilities.noString(p)) {
       return "";
     }
-    p = p.strip();
+    p = p.trim();
     if (p.startsWith("<p>")) {
       p = p.substring(3);
     }
