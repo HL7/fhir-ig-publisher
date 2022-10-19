@@ -15,7 +15,6 @@ pool:
 variables:
 - group: XIG_VARIABLE_GROUP
 
-appendCommitMessageToRunName:
 steps:
 - task: Bash@3
   displayName: 'Download publisher'
