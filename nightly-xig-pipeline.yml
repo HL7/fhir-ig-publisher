@@ -43,4 +43,4 @@ steps:
   inputs:
     targetType: 'inline'
     script: |
-      ssh -i $(Agent.TempDirectory)/xig.private.key $(XIG_TARGET_USER)@$(XIG_TARGET_SERVER) 'rm -rf $(XIG_TARGET_DIRECTORY)/*'
+      ssh -i $(Agent.TempDirectory)/xig.private.key $(XIG_USER)@$(XIG_SERVER) 'rm -rf $(XIG_TARGET_DIRECTORY)/*'
