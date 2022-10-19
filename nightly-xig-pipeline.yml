@@ -39,4 +39,4 @@ steps:
   displayName: 'Clean previous results'
   inputs:
     targetType: 'inline'
-    script: "ssh -i fhir-ig-xig-gce.private.key $(xig_target_user)@www.fhir.org 'rm -rf $(xig_target_directory)/*'"
+    script: "ssh -i $(Agent.TempDirectory)/fhir-ig-xig-gce.private.key $(xig_target_user)@www.fhir.org 'rm -rf $(xig_target_directory)/*'"
