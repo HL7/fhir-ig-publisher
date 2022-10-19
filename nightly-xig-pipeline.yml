@@ -43,4 +43,5 @@ steps:
   inputs:
     targetType: 'inline'
     script: |
+      chmod 400 $(Agent.TempDirectory)/xig.private.key
       ssh -o "StrictHostKeyChecking=no" -i $(Agent.TempDirectory)/xig.private.key $(XIG_USER)@$(XIG_SERVER) 'rm -rf $(XIG_TARGET_DIRECTORY)/*'
