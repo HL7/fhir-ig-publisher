@@ -33,7 +33,7 @@ steps:
 
 - task: DownloadSecureFile@1
   inputs:
-    secureFile: 'fhir-ig-xig-gce.private.key' 
+    secureFile: 'xig.private.key' 
 
 - task: Bash@3
   displayName: 'Clean previous results'
