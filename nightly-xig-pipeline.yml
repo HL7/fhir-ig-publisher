@@ -43,4 +43,5 @@ steps:
   displayName: 'Clean previous results'
   inputs:
     targetType: 'inline'
-    script: "ssh -i $(Agent.TempDirectory)/xig.private.key $(XIG_TARGET_USER)@$(XIG_TARGET_SERVER) 'rm -rf $(XIG_TARGET_DIRECTORY)/*'"
+    script: |
+      ssh -i $(Agent.TempDirectory)/xig.private.key $(XIG_TARGET_USER)@$(XIG_TARGET_SERVER) 'rm -rf $(XIG_TARGET_DIRECTORY)/*'
