@@ -51,4 +51,4 @@ steps:
   inputs:
     targetType: 'inline'
     script: |
-      scp -o "StrictHostKeyChecking=no" -i $(Agent.TempDirectory)/xig.private.key xig_output/* $(XIG_USER)@$(XIG_SERVER):$(XIG_TARGET_DIRECTORY)/
+      scp -o "StrictHostKeyChecking=no" -i $(Agent.TempDirectory)/xig.private.key -r ~/xig_output/. $(XIG_USER)@$(XIG_SERVER):$(XIG_TARGET_DIRECTORY)/
