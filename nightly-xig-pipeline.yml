@@ -31,12 +31,8 @@ steps:
 #    targetType: 'inline'
 #    script: 'java -Xmx7168m -jar ./publisher.jar -xig xig_output'
 
-- task: GoogleCloudSdkTool@1
+- task: DownloadSecureFile@1
+  displayName: 'Download xig private key.'
   inputs:
-    versionSpec: '315.x'
-
-- task: Bash@3
-  displayName: 'Run publisher with xig param'
-  inputs:
-    targetType: 'inline'
-    script: 'gcloud --version'
+    secureFile: fhir-ig-xig-gce.private.key
+    retryCount: 5
