@@ -7590,8 +7590,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       ValueSetExpansionOutcome char2Expand = context.expandVS(char2,true,false);
       ValueSetExpansionOutcome numExpand = context.expandVS(num,true,false);
       ValueSetExpansionOutcome stateExpand = context.expandVS(state,true,false);
-      if (!char3Expand.isOk() || !char2Expand.isOk() || !numExpand.isOk() || !stateExpand.isOk())
+      if (!char3Expand.isOk() || !char2Expand.isOk() || !numExpand.isOk() || !stateExpand.isOk()) {
+        if (!char3Expand.isOk())
+          System.out.println("Error expanding 3-character country codes: " + char3Expand.getError());
+        if (!char2Expand.isOk())
+          System.out.println("Error expanding 2-character country codes: " + char2Expand.getError());
+        if (!numExpand.isOk())
+          System.out.println("Error expanding numeric country codes: " + numExpand.getError());
+        if (!stateExpand.isOk())
+          System.out.println("Error expanding state & province codes: " + stateExpand.getError());
         throw new Exception("Error expanding ISO country-code & state value sets");
+      }
       for (ValueSetExpansionContainsComponent c: char3Expand.getValueset().getExpansion().getContains()) {
         countryCodeForName.put(c.getDisplay(), c.getCode());
         countryNameForCode.put(c.getCode(), c.getDisplay());      
