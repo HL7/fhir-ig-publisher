@@ -34,3 +34,9 @@ steps:
 - task: GoogleCloudSdkTool@1
   inputs:
     versionSpec: '315.x'
+
+- task: Bash@3
+  displayName: 'Run publisher with xig param'
+  inputs:
+    targetType: 'inline'
+    script: 'gcloud --version'
