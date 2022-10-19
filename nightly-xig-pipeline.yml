@@ -12,6 +12,10 @@ schedules:
 pool:
   vmImage: ubuntu-latest
 
+variables:
+- group: XIG_VARIABLE_GROUP
+
+appendCommitMessageToRunName:
 steps:
 - task: Bash@3
   displayName: 'Download publisher'
@@ -39,4 +43,4 @@ steps:
   displayName: 'Clean previous results'
   inputs:
     targetType: 'inline'
-    script: "ssh -i $(Agent.TempDirectory)/xig.private.key $(xig_target_user)@www.fhir.org 'rm -rf $(xig_target_directory)/*'"
+    script: "ssh -i $(Agent.TempDirectory)/xig.private.key $(XIG_TARGET_USER)@$(XIG_TARGET_SERVER) 'rm -rf $(XIG_TARGET_DIRECTORY)/*'"
