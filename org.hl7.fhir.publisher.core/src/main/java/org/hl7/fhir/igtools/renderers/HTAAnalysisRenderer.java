@@ -39,7 +39,7 @@ public class HTAAnalysisRenderer {
 
     public String url;
     public String name;
-    public String copyright;
+    public List<String> copyrights;
     public Boolean okToUse;
 //    public int count;
 //    public int c;
@@ -129,7 +129,21 @@ public class HTAAnalysisRenderer {
         b.append("<h2>"+analysis.url+(analysis.name == null ? "" : " ("+analysis.name+")")+"</h2><a name=\"cs"+i+"\">\r\n");
         b.append("<table class=\"grid\">\r\n");
         b.append(" <tr><td>Uses</td><td>"+analysis.usages.size()+"</td></tr>\r\n");
-        b.append(" <tr><td>Expected Copyright</td><td>"+presentCopyright(analysis.copyright)+"</td></tr>\r\n");
+        b.append(" <tr><td>Expected Copyright</td><td>");
+        if (analysis.copyrights.size() == 0) {
+          b.append(presentCopyright(null));
+        } else if (analysis.copyrights.size() == 1) {          
+          b.append(presentCopyright(analysis.copyrights.get(0)));
+        } else {
+          b.append("<ul>");
+          for (String s : analysis.copyrights) {
+            b.append("<li>");
+            b.append(presentCopyright(s));
+            b.append("</li>");            
+          }
+          b.append("</ul>");
+        }
+        b.append("</td></tr>\r\n");
         b.append(" <tr><td>Approved:</td><td>"+analysis.summary()+"</td></tr>\r\n");
         b.append("</table>\r\n");
         b.append("<p></p>\r\n");
@@ -153,7 +167,7 @@ public class HTAAnalysisRenderer {
             b.append("  <td>"+tail(usage.cr.getUrl())+"</td>\r\n");
           }
           b.append("  <td>"+usage.cr.present()+"</td>\r\n");
-          b.append("  <td>"+presentUsageCopyright(analysis.copyright, usage.cr.getCopyright())+"</td>\r\n");
+          b.append("  <td>"+presentUsageCopyright(analysis.copyrights, usage.cr.getCopyright())+"</td>\r\n");
           b.append("  <td>"+usage.notes+"</td>\r\n");
           b.append(" </tr>\r\n");
         }
@@ -181,9 +195,13 @@ public class HTAAnalysisRenderer {
     return url.contains("/") ? url.substring(url.lastIndexOf("/")+1) : url;
   }
 
-  private String presentUsageCopyright(String copy, String ucopy) {
-    if (ucopy != null && copy != null && ucopy.contains(copy)) {
-      return "&#x2611;";
+  private String presentUsageCopyright(List<String> copyrights, String ucopy) {
+    boolean ok = false;
+    for (String copy : copyrights) {
+      ok = ok || (ucopy != null && copy != null && ucopy.contains(copy));
+    }
+    if (ok) {
+      return "<span style=\"font-size: 14; background-color: #afffad\">&#x2611;</span>";
     } else if (!Utilities.noString(ucopy)) {
       return md.process(ucopy, "resource copyright");
     } else {
@@ -243,17 +261,27 @@ public class HTAAnalysisRenderer {
   // "" - it should be empty 
   // "*" - it should be something
   // else the actual pattern for the copyright
-  private String getApprovedCopyright(String url) {
+  private List<String> getApprovedCopyright(String url) {
+    List<String> res = new ArrayList<>();
     if ("http://snomed.info/sct".equals(url)) {
-      return "This value set includes content from SNOMED CT, which is copyright © 2002+ International Health Terminology Standards Development Organisation (IHTSDO), and distributed by agreement between IHTSDO and HL7. Implementer use of SNOMED CT is not covered by this agreement";
+      res.add("This value set includes content from SNOMED CT, which is copyright © 2002+ International Health Terminology Standards Development Organisation (IHTSDO), and distributed by agreement between IHTSDO and HL7. Implementer use of SNOMED CT is not covered by this agreement");
     }
     if ("http://loinc.org".equals(url)) {
-      return "This material contains content from LOINC (http://loinc.org). LOINC is copyright © 1995-2020, Regenstrief Institute, Inc. and the Logical Observation Identifiers Names and Codes (LOINC) Committee and is available at no cost under the license at http://loinc.org/license. LOINC® is a registered United States trademark of Regenstrief Institute, Inc";
+      res.add("This material contains content from LOINC (http://loinc.org). LOINC is copyright © 1995-2020, Regenstrief Institute, Inc. and the Logical Observation Identifiers Names and Codes (LOINC) Committee and is available at no cost under the license at http://loinc.org/license. LOINC® is a registered United States trademark of Regenstrief Institute, Inc");
     }
     if ("http://www.ama-assn.org/go/cpt".equals(url)) {
-      return "Current Procedural Terminology (CPT) is copyright 2020 American Medical Association. All rights reserved";
+      res.add("Current Procedural Terminology (CPT) is copyright 2020 American Medical Association. All rights reserved");
     }
-    return null;
+    if ("http://www.whocc.no/atc".equals(url)) {
+      res.add("This artifact includes content from Anatomical Therapeutic Chemical (ATC) classification system. ATC codes are copyright World Health Organization (WHO) Collaborating Centre for Drug Statistics Methodology. Terms & Conditions in https://www.whocc.no/use_of_atc_ddd/");
+    }
+    if ("urn:oid:2.16.840.1.113883.2.9.6.2.7".equals(url)) {
+      res.add("This artifact includes content from International Standard Classification of Occupations (ISCO). ISCO is copyright International Labour Organization (ILO). Terms & Conditions in http://www.ilo.org/global/copyright/lang--en/index.htm");
+    }
+    if ("http://standardterms.edqm.eu".equals(url)) {
+      res.add("This artifact includes content from EDQM Standard Terms. EDQM Standard Terms are copyright European Directorate for the Quality of Medicines. Terms & Conditions in https://www.edqm.eu/en/standard-terms-database");
+    }
+    return res;
   }
 
   private List<CopyRightAnalysis> processDependencies(List<FetchedFile> fileList) {
@@ -303,29 +331,35 @@ public class HTAAnalysisRenderer {
         analysis.usages.add(usage);
         usage.cr = vs;
 
-        if (analysis.copyright != null) {
-          if (analysis.copyright.equals("")) {
+        if (!analysis.copyrights.isEmpty()) {
+          if (analysis.copyrights.size() == 1 && analysis.copyrights.get(0).equals("")) {
             if (!vs.hasCopyright()) {
               usage.ok = true;
             } else {
               usage.errs++;
-              usage.notes = usage.notes + "<li>This Value Set should not have a copyright statement</li>\r\n";
+              usage.notes = usage.notes + "<li style=\"background-color: #fbccfc\">This Value Set should not have a copyright statement</li>\r\n";
             }
-          } else if (analysis.copyright.equals("*")) {
+          } else if (analysis.copyrights.size() == 1 && analysis.copyrights.get(0).equals("*")) {
             if (vs.hasCopyright()) {
               usage.ok = true;
             } else {
               usage.errs++;
-              usage.notes = usage.notes + "<li>This Value Set should have a copyright statement</li>\r\n";
+              usage.notes = usage.notes + "<li style=\"background-color: #fcf0cc\">This Value Set should have a copyright statement</li>\r\n";
             }
-          } else if (vs.hasCopyright() && vs.getCopyright().contains(analysis.copyright)) {
-            usage.ok = true;
           } else {
-            usage.errs++;
-            if (!vs.hasCopyright()) {
-              usage.notes = usage.notes + "<li>The copyright statement is missing</li>\r\n";            
+            boolean ok = false;
+            for (String copy : analysis.copyrights) {
+              ok = ok || vs.hasCopyright() && vs.getCopyright().contains(copy);
+            }
+            if (ok) {
+              usage.ok = true;
             } else {
-              usage.notes = usage.notes + "<li>The copyright statement is wrong</li>\r\n";            
+              usage.errs++;
+              if (!vs.hasCopyright()) {
+                usage.notes = usage.notes + "<li style=\"background-color: #fcf0cc\">The copyright statement is missing</li>\r\n";            
+              } else {
+                usage.notes = usage.notes + "<li style=\"background-color: #fccccc\">The copyright statement is wrong</li>\r\n";            
+              }
             }
           }
         } else {
@@ -344,7 +378,7 @@ public class HTAAnalysisRenderer {
     CopyRightAnalysis analysis = new CopyRightAnalysis();
     analysis.url = system;
     analysis.name = name(system);
-    analysis.copyright = getApprovedCopyright(system);
+    analysis.copyrights = getApprovedCopyright(system);
     analysis.okToUse = getIsApproved(system);
     res.add(analysis);
     return analysis;
