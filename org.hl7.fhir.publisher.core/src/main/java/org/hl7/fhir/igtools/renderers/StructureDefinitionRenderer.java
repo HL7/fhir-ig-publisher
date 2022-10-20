@@ -1858,6 +1858,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
     return originalList;
   }
+
   private String compareSimpleTypeLists(List originalList, List compareList, int mode, String separator) {
     List<String> original;
     List<String> compare;
@@ -2758,7 +2759,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
       sdCache = new HashMap<String, ElementDefinition>();
       sdMapCache.put(url, sdCache);
+      String webroot = sd.getUserString("webroot");
       for (ElementDefinition e : sd.getSnapshot().getElement()) {
+        utils.updateURLs(sd.getUrl(), webroot, e);
         sdCache.put(e.getId(), e);
       }
     }
