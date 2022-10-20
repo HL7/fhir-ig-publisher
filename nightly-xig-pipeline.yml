@@ -12,6 +12,9 @@ schedules:
 pool:
   vmImage: ubuntu-latest
 
+variables:
+- group: XIG_VARIABLE_GROUP
+
 steps:
 - task: Bash@3
   displayName: 'Download publisher'
@@ -20,8 +23,32 @@ steps:
     script: 'wget https://github.com/HL7/fhir-ig-publisher/releases/latest/download/publisher.jar'
 
 - task: Bash@3
+  displayName: 'Make output dir'
+  inputs:
+    targetType: 'inline'
+    script: 'mkdir xig_output'
+
+- task: Bash@3
   displayName: 'Run publisher with xig param'
   inputs:
     targetType: 'inline'
-    script: 'java -jar ./publisher.jar -xig testxig'
+    script: 'java -Xmx7168m -jar ./publisher.jar -xig xig_output'
 
+- task: DownloadSecureFile@1
+  inputs:
+    secureFile: 'xig.private.key' 
+
+- task: Bash@3
+  displayName: 'Clean previous results'
+  inputs:
+    targetType: 'inline'
+    script: |
+      chmod 400 $(Agent.TempDirectory)/xig.private.key
+      ssh -o "StrictHostKeyChecking=no" -i $(Agent.TempDirectory)/xig.private.key $(XIG_USER)@$(XIG_SERVER) 'rm -rf $(XIG_TARGET_DIRECTORY)/*'
+
+- task: Bash@3
+  displayName: 'Copy current results'
+  inputs:
+    targetType: 'inline'
+    script: |
+      scp -o "StrictHostKeyChecking=no" -i $(Agent.TempDirectory)/xig.private.key -r xig_output $(XIG_USER)@$(XIG_SERVER):$(XIG_TARGET_DIRECTORY)/
