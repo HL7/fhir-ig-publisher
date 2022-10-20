@@ -1,6 +1,6 @@
 package org.hl7.fhir.igtools.publisher;
 
-public class I18nConstants {
+public class PublisherMessageIds {
 
   public static final String RESOURCE_ID_MISMATCH = "RESOURCE_ID_MISMATCH";
   public static final String RESOURCE_ID_NO_URL = "RESOURCE_ID_NO_URL";

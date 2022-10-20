@@ -17,7 +17,7 @@ import org.hl7.fhir.exceptions.DefinitionException;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
-import org.hl7.fhir.igtools.publisher.I18nConstants;
+import org.hl7.fhir.igtools.publisher.PublisherMessageIds;
 import org.hl7.fhir.r5.comparison.ComparisonRenderer;
 import org.hl7.fhir.r5.comparison.ComparisonSession;
 import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider;
@@ -130,7 +130,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
         StringBuilder b = new StringBuilder();
         ValidationMessage vm = new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"').baseDefinition", "US FHIR Usage rules require that all profiles on "+sd.getType()+
             (matches(usCoreProfiles, sd.getType()) > 1 ? " derive from one of the base US profiles" : " derive from the core US profile"),
-            IssueSeverity.WARNING).setMessageId(I18nConstants.US_CORE_DERIVATION); 
+            IssueSeverity.WARNING).setMessageId(PublisherMessageIds.US_CORE_DERIVATION); 
         b.append(vm.getMessage());
         f.getErrors().add(vm);
         // actually, that should be an error, but US realm doesn't have a proper base, so we're going to report the differences against the base

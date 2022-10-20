@@ -60,6 +60,7 @@ public class FetchedFile {
   private int processMode;
   private Set<String> outputNames = new HashSet<String>();
   private String statedPath;  
+  private String logical;
   
   public FetchedFile(String statedPath) {
     super();
@@ -195,6 +196,12 @@ public class FetchedFile {
   }
   public void trim() {
     source = null;
+  }
+  public String getLogical() {
+    return logical;
+  }
+  public void setLogical(String logical) {
+    this.logical = logical;
   }
   
 }

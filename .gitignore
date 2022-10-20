@@ -221,3 +221,5 @@ local.properties
 /org.hl7.fhir.publisher.core/var/lib
 /org.hl7.fhir.publisher.cli/full-ig.zip
 /org.hl7.fhir.publisher.core/full-ig.zip
+
+FHIR-us-pq-cmc

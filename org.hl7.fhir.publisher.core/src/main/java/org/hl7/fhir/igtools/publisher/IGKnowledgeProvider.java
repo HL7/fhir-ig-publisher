@@ -430,11 +430,11 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   
   public void checkForPath(FetchedFile f, FetchedResource r, CanonicalResource bc, boolean inner) throws FHIRException {
     if (!bc.hasUrl())
-      error(f, bc.fhirType()+".url", "Resource has no url: "+bc.getId(), I18nConstants.RESOURCE_ID_NO_URL);
+      error(f, bc.fhirType()+".url", "Resource has no url: "+bc.getId(), PublisherMessageIds.RESOURCE_ID_NO_URL);
     else if (bc.getUrl().startsWith(canonical) && !bc.getUrl().endsWith("/"+bc.getId()) && !listedURLExemptions.contains(bc.getUrl()))
-      error(f, bc.fhirType()+".url","Resource id/url mismatch: "+bc.getId()+"/"+bc.getUrl(), I18nConstants.RESOURCE_ID_MISMATCH);
+      error(f, bc.fhirType()+".url","Resource id/url mismatch: "+bc.getId()+"/"+bc.getUrl(), PublisherMessageIds.RESOURCE_ID_MISMATCH);
     if (!inner && !r.getId().equals(bc.getId()))
-      error(f, bc.fhirType()+".id", "Resource id/loaded id mismatch: "+r.getId()+"/"+bc.getUrl(), I18nConstants.RESOURCE_ID_LOADED_MISMATCH);
+      error(f, bc.fhirType()+".id", "Resource id/loaded id mismatch: "+r.getId()+"/"+bc.getUrl(), PublisherMessageIds.RESOURCE_ID_LOADED_MISMATCH);
     if (r.getConfig() == null)
       findConfiguration(f, r);
     JsonObject e = r.getConfig();
