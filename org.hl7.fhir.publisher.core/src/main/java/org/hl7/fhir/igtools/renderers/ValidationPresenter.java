@@ -514,7 +514,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
 
   private List<String> messageIdNames() {
     I18nConstants obj = new I18nConstants();
-    org.hl7.fhir.igtools.publisher.I18nConstants obj2 = new org.hl7.fhir.igtools.publisher.I18nConstants(); // not that it really matters?
+    org.hl7.fhir.igtools.publisher.PublisherMessageIds obj2 = new org.hl7.fhir.igtools.publisher.PublisherMessageIds(); // not that it really matters?
     List<String> names = new ArrayList<>();
     Field[] interfaceFields=I18nConstants.class.getFields();
     for(Field f : interfaceFields) {
@@ -526,7 +526,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       } catch (Exception e) {
       }
     }
-    interfaceFields=org.hl7.fhir.igtools.publisher.I18nConstants.class.getFields();
+    interfaceFields=org.hl7.fhir.igtools.publisher.PublisherMessageIds.class.getFields();
     for(Field f : interfaceFields) {
       try {
         if (Modifier.isStatic(f.getModifiers())) {

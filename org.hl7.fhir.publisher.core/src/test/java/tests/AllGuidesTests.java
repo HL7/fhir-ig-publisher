@@ -198,4 +198,11 @@ private static final String VER = "1.0.53";
     testIg("hl7.fhir.uv.ipa", null);
   }
 
+  @Test
+  public void testTools() throws Exception {
+    testIg("hl7.fhir.uv.tools", null);
+  }
+
+  
+  
 }
