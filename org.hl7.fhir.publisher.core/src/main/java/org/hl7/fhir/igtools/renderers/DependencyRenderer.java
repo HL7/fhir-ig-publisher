@@ -228,9 +228,9 @@ public class DependencyRenderer {
       checkGlobals(npm);
       if (!npm.isCore() && !npm.isTx()) {
         String n = (npm.name()+"#"+npm.version());
-        b.append("<h3>Package ");
+        b.append("<p><b>Package ");
         b.append(n);
-        b.append("</h3>\r\n<p>");
+        b.append("</b></p>\r\n<p>");
         b.append(Utilities.escapeXml(npm.description()));
         b.append("</p>\r\n<p><b>Dependencies</b></p>\r\n");
         boolean first = true;
