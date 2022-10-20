@@ -65,7 +65,7 @@ jobs:
         scp -o "StrictHostKeyChecking=no" -i $(Agent.TempDirectory)/xig.private.key xig-www.tar.gz $(XIG_USER)@$(XIG_SERVER):$(XIG_TARGET_DIRECTORY)/
 
   - task: Bash@3
-    displayName: 'Clean previous results'
+    displayName: 'Decompress tar'
     inputs:
       targetType: 'inline'
       script: |
