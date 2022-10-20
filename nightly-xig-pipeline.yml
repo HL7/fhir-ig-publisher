@@ -69,4 +69,4 @@ jobs:
     inputs:
       targetType: 'inline'
       script: |
-        ssh -o "StrictHostKeyChecking=no" -i $(Agent.TempDirectory)/xig.private.key $(XIG_USER)@$(XIG_SERVER) 'tar -zxvf $(XIG_TARGET_DIRECTORY)/xig-www.tar.gz -C $(XIG_TARGET_DIRECTORY)'
+        ssh -o "StrictHostKeyChecking=no" -i $(Agent.TempDirectory)/xig.private.key $(XIG_USER)@$(XIG_SERVER) 'sudo mkdir $(XIG_TARGET_DIRECTORY) && tar -zxvf $(XIG_TARGET_DIRECTORY)/xig-www.tar.gz -C $(XIG_TARGET_DIRECTORY)'
