@@ -539,7 +539,7 @@ public class PackageReleaser {
       }
       for (String s : deps) {
         d.remove(s);
-        d.addProperty(s, "current");
+        d.addProperty(s, VersionUtilities.getCurrentVersion(JsonUtilities.strings(npm.getAsJsonArray("fhirVersions")).get(0)));
       }
       Gson gson = new GsonBuilder().setPrettyPrinting().create();
       String jcnt = gson.toJson(npm);

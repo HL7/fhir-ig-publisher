@@ -58,7 +58,10 @@ public class XIGGenerator {
     info.getCtxt().setAllowLoadingDuplicates(true);
 //    this.ctxt.connectToTSServer(TerminologyClientFactory.makeClient("http://tx.fhir.org", "fhir/publisher", FhirPublication.R5), null);
     info.getCtxt().setExpansionProfile(buildExpansionProfile());
-    date = new SimpleDateFormat("yyyy-MM-dd'T'hh:mm:ssZ", new Locale("en", "US")).format(Calendar.getInstance().getTime());
+    String ds = new SimpleDateFormat("dd MMM yyyy", new Locale("en", "US")).format(Calendar.getInstance().getTime());
+    String dl = new SimpleDateFormat("yyyy-MM-dd'T'hh:mm:ssZ", new Locale("en", "US")).format(Calendar.getInstance().getTime());
+    date = "<span title=\""+dl+"\">"+ds+"</span>";
+    
     info.getJson().addProperty("date", date);
     JsonObject doco = new JsonObject();
     info.getJson().add("_doco", doco);
