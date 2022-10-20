@@ -724,6 +724,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private StringBuilder filelog;
   private Set<String> allOutputs = new HashSet<String>();
   private Set<FetchedResource> examples = new HashSet<FetchedResource>();
+  private Set<FetchedResource> testscripts = new HashSet<FetchedResource>();
   private HashMap<String, FetchedResource> resources = new HashMap<String, FetchedResource>();
   private HashMap<String, ImplementationGuideDefinitionPageComponent> igPages = new HashMap<String, ImplementationGuideDefinitionPageComponent>();
   private List<String> logOptions = new ArrayList<String>();
@@ -1533,7 +1534,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         case EvidenceVariable:
         case ExampleScenario:
         case ObservationDefinition:
-        case TestScript:
           isInformative = true;
         default:
           // We're in a resource we need to process, so continue on
@@ -4193,6 +4193,56 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         // Redo this because we now have example information
         if (f!=null)
           igpkp.findConfiguration(f, r);
+      }
+      // TestScript Check
+      if (res.getReference().getReference().contains("TestScript")) {
+        if (f == null) {
+          f = fetcher.fetch(res.getReference(), igf);
+        }
+        if (f != null) {
+          FetchedResource r = res.hasUserData("loaded.resource") ? (FetchedResource) res.getUserData("loaded.resource") : f.getResources().get(0);
+          if (r != null) {
+            testscripts.add(r);
+            try {
+              Element t = r.getElement();
+              if (t != null) {
+                // Add TestScript.profile references
+                List<Element> profiles = t.getChildrenByName("profile");
+                if (profiles != null) {
+                  for (Element profile : profiles) {
+                    String tp = profile.getChildValue("reference");
+                    if (tp != null && !tp.isEmpty()) {
+                      r.addTestArtifact(tp);
+                    }
+                  }
+                }
+                // Add TestScript.scope.artifact references
+                List<Element> scopes = t.getChildrenByName("scope");
+                if (scopes != null) {
+                  for (Element scope : scopes) {
+                    String tsa = scope.getChildValue("artifact");
+                    if (tsa != null && !tsa.isEmpty()) {
+                      r.addTestArtifact(tsa);
+                    }
+                  }
+                }
+                // Add TestScript extension for scope references
+                List<Element> extensions = t.getChildrenByName("extension");
+                if (extensions != null) {
+                  for (Element extension : extensions) {
+                    String url = extension.getChildValue("url");
+                    if (url != null && url.equals("http://hl7.org/fhir/StructureDefinition/scope")) {
+                      r.addTestArtifact(extension.getChildValue("valueCanonical"));
+                    }
+                  }
+                }
+              }
+            }
+            catch(Exception e) {
+              errors.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, r.fhirType()+"/"+r.getId(), "Unable to load test resource " + r.getUrlTail(), IssueSeverity.ERROR));
+            }
+          }
+        }
       }
     }
     if (duplicateInputResourcesDetected) {
@@ -7231,6 +7281,21 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
 
+    for (FetchedResource r : testscripts) {
+      if (r.hasTestArtifacts()) {
+        FetchedResource baseRes = null;
+        for (String tsArtifact : r.getTestArtifacts()) {
+          baseRes = getResourceForUri(tsArtifact);
+          if (baseRes == null) {
+            // We only yell if the resource doesn't exist, not only if it doesn't exist in the current IG.
+            errors.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, r.fhirType()+"/"+r.getId(), "Unable to find artifact " + tsArtifact + " nominated as the artifact for test resource " + r.getUrlTail(), IssueSeverity.WARNING));
+          } else {
+            baseRes.addFoundTestScript(r);
+          }
+        }
+      }
+    }
+
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
     String json = gson.toJson(data);
     TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "structuredefinitions.json"), false);
@@ -7270,6 +7335,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         JsonObject item = new JsonObject();
         data.add(r.fhirType()+"/"+r.getId(), item);
         item.addProperty("history", r.hasHistory());
+        item.addProperty("testscript", r.hasFoundTestScripts());
         item.addProperty("index", i);
         item.addProperty("source", f.getStatedPath());
         item.addProperty("sourceTail", tailPI(f.getStatedPath()));
@@ -7640,8 +7706,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       ValueSetExpansionOutcome char2Expand = context.expandVS(char2,true,false);
       ValueSetExpansionOutcome numExpand = context.expandVS(num,true,false);
       ValueSetExpansionOutcome stateExpand = context.expandVS(state,true,false);
-      if (!char3Expand.isOk() || !char2Expand.isOk() || !numExpand.isOk() || !stateExpand.isOk())
+      if (!char3Expand.isOk() || !char2Expand.isOk() || !numExpand.isOk() || !stateExpand.isOk()) {
+        if (!char3Expand.isOk())
+          System.out.println("Error expanding 3-character country codes: " + char3Expand.getError());
+        if (!char2Expand.isOk())
+          System.out.println("Error expanding 2-character country codes: " + char2Expand.getError());
+        if (!numExpand.isOk())
+          System.out.println("Error expanding numeric country codes: " + numExpand.getError());
+        if (!stateExpand.isOk())
+          System.out.println("Error expanding state & province codes: " + stateExpand.getError());
         throw new Exception("Error expanding ISO country-code & state value sets");
+      }
       for (ValueSetExpansionContainsComponent c: char3Expand.getValueset().getExpansion().getContains()) {
         countryCodeForName.put(c.getDisplay(), c.getCode());
         countryNameForCode.put(c.getCode(), c.getDisplay());      
@@ -7872,11 +7947,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       String fmm = ToolingExtensions.readStringExtension(page, ToolingExtensions.EXT_FMM_LEVEL);
       String status = ToolingExtensions.readStringExtension(page, ToolingExtensions.EXT_STANDARDS_STATUS);
       String normVersion = ToolingExtensions.readStringExtension(page, ToolingExtensions.EXT_NORMATIVE_VERSION);
-      addPageDataRow(pages, source, title, label + (page.hasPage() ? ".0" : ""), fmm, status, normVersion, breadcrumb + breadCrumbForPage(page, false), null);
+      addPageDataRow(pages, source, title, label + (page.hasPage() ? ".0" : ""), fmm, status, normVersion, breadcrumb + breadCrumbForPage(page, false), null, null);
     } else {
       Map<String, String> vars = makeVars(r);
       String outputName = determineOutputName(igpkp.getProperty(r, "base"), r, vars, null, "");
-      addPageDataRow(pages, outputName, title, label, breadcrumb + breadCrumbForPage(page, false), r.getStatedExamples());
+      addPageDataRow(pages, outputName, title, label, breadcrumb + breadCrumbForPage(page, false), r.getStatedExamples(), r.getFoundTestScripts());
 //      addPageDataRow(pages, source, title, label, breadcrumb + breadCrumbForPage(page, false), r.getStatedExamples());
       for (String templateName: extraTemplateList) {
         if (r.getConfig() !=null && r.getConfig().get("template-"+templateName)!=null && !r.getConfig().get("template-"+templateName).getAsString().isEmpty()) {
@@ -7886,7 +7961,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               String formatTemplateDesc = templateDesc.replace("FMT", format.toUpperCase());
               if (igpkp.wantGen(r, format)) {
                 outputName = determineOutputName(igpkp.getProperty(r, "format"), r, vars, format, "");
-                addPageDataRow(pages, outputName, page.getTitle() + " - " + formatTemplateDesc, label, breadcrumb + breadCrumbForPage(page, false), null);
+                addPageDataRow(pages, outputName, page.getTitle() + " - " + formatTemplateDesc, label, breadcrumb + breadCrumbForPage(page, false), null, null);
               }
             }
           } else if (page.hasGeneration() && page.getGeneration().equals(GuidePageGeneration.GENERATED) /*page.getKind().equals(ImplementationGuide.GuidePageKind.RESOURCE) */) {
@@ -7901,7 +7976,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               if (outputName==null)
                 throw new FHIRException("Error in publisher template.  Unable to find file-path property " + templateName + " for resource type " + r.fhirType() + " when property template-" + templateName + " is defined.");
               outputName = igpkp.doReplacements(outputName, r, vars, "");
-              addPageDataRow(pages, outputName, page.getTitle() + " - " + templateDesc, label, breadcrumb + breadCrumbForPage(page, false), null);
+              addPageDataRow(pages, outputName, page.getTitle() + " - " + templateDesc, label, breadcrumb + breadCrumbForPage(page, false), null, null);
             }
           }          
         }
@@ -7916,11 +7991,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
 
-  private void addPageDataRow(JsonObject pages, String url, String title, String label, String breadcrumb, Set<FetchedResource> examples) throws FHIRException {
-    addPageDataRow(pages, url, title, label, null, null, null, breadcrumb, examples);
+  private void addPageDataRow(JsonObject pages, String url, String title, String label, String breadcrumb, Set<FetchedResource> examples, Set<FetchedResource> testscripts) throws FHIRException {
+    addPageDataRow(pages, url, title, label, null, null, null, breadcrumb, examples, testscripts);
   }
 
-  private void addPageDataRow(JsonObject pages, String url, String title, String label, String fmm, String status, String normVersion, String breadcrumb, Set<FetchedResource> examples) throws FHIRException {
+  private void addPageDataRow(JsonObject pages, String url, String title, String label, String fmm, String status, String normVersion, String breadcrumb, Set<FetchedResource> examples, Set<FetchedResource> testscripts) throws FHIRException {
     JsonObject jsonPage = new JsonObject();
     pages.add(url, jsonPage);
     jsonPage.addProperty("title", title);
@@ -8021,6 +8096,24 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         exampleArray.add(exampleItem);
         exampleItem.addProperty("url", examplePage.getName());
         exampleItem.addProperty("title", examplePage.getTitle());
+      }
+    }
+
+    if (testscripts != null) {
+      JsonArray testscriptArray = new JsonArray();
+      jsonPage.add("testscripts", testscriptArray);
+
+      TreeSet<ImplementationGuideDefinitionPageComponent> testscriptPages = new TreeSet<ImplementationGuideDefinitionPageComponent>(new ImplementationGuideDefinitionPageComponentComparator());
+      for (FetchedResource testscriptResource: testscripts) {
+        ImplementationGuideDefinitionPageComponent page = pageForFetchedResource(testscriptResource);
+        if (page!=null)
+          testscriptPages.add(page);
+      }
+      for (ImplementationGuideDefinitionPageComponent testscriptPage : testscriptPages) {
+        JsonObject testscriptItem = new JsonObject();
+        testscriptArray.add(testscriptItem);
+        testscriptItem.addProperty("url", testscriptPage.getName());
+        testscriptItem.addProperty("title", testscriptPage.getTitle());
       }
     }
   }
