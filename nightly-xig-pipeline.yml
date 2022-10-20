@@ -16,7 +16,7 @@ variables:
 - group: XIG_VARIABLE_GROUP
 
 jobs:
-- job: build-and-copy-xig
+- job: build_and_copy_xig
   timeoutInMinutes: 70
   steps:
   - task: Bash@3
