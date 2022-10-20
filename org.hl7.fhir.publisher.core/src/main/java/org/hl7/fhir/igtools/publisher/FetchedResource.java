@@ -67,7 +67,9 @@ public class FetchedResource {
   
   public FetchedResource setElement(Element element) {
     this.element = element;
-    type = element.fhirType();
+    if (type == null) {
+      type = element.fhirType();
+    }
     return this;
   }
 
@@ -217,6 +219,11 @@ public class FetchedResource {
 
   public void setPath(String path) {
     this.path = path;
+  }
+
+  @Override
+  public String toString() {
+    return title; 
   }
   
   
