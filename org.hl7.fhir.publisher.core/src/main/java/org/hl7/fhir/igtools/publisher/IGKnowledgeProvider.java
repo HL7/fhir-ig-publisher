@@ -34,6 +34,7 @@ import org.hl7.fhir.r5.conformance.ProfileUtilities;
 import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider;
 import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.ParserBase;
 import org.hl7.fhir.r5.elementmodel.Property;
 import org.hl7.fhir.r5.formats.FormatUtilities;
@@ -445,6 +446,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       bc.setUserData("path", pathPattern.replace("[type]", r.fhirType()).replace("[id]", r.getId()));
     else
       bc.setUserData("path", r.fhirType()+"/"+r.getId()+".html");
+    r.getElement().setUserData("path", bc.getUserData("path"));
     for (Resource cont : bc.getContained()) {
       if (base != null) 
         cont.setUserData("path", doReplacements(base, r, cont, null, null, bc.getId()+"_"));
@@ -453,6 +455,20 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       else
         cont.setUserData("path", r.fhirType()+"/"+bc.getId()+"_"+r.getId()+".html");
     }
+  }
+
+  public void checkForPath(FetchedFile f, FetchedResource r, Element res) throws FHIRException {
+    if (r.getConfig() == null)
+      findConfiguration(f, r);
+    JsonObject e = r.getConfig();
+    res.setUserData("config", e);
+    String base = getProperty(r,  "base");
+    if (base != null) 
+      res.setUserData("path", doReplacements(base, r, null, null));
+    else if (pathPattern != null)
+      res.setUserData("path", pathPattern.replace("[type]", r.fhirType()).replace("[id]", r.getId()));
+    else
+      res.setUserData("path", r.fhirType()+"/"+r.getId()+".html");
   }
 
   private void error(FetchedFile f, String path, String msg, String msgId) {
