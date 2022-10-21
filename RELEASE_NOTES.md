@@ -1,0 +1,1 @@
+* Go-Publish: Remove erroneous copy from history repository
