@@ -55,7 +55,7 @@ jobs:
       targetType: 'inline'
       script: |
         chmod 400 $(Agent.TempDirectory)/xig.private.key
-        ssh -o "StrictHostKeyChecking=no" -i $(Agent.TempDirectory)/xig.private.key $(XIG_USER)@$(XIG_SERVER) 'find $(XIG_TARGET_DIRECTORY) -name "*" -delete && mkdir $(XIG_TARGET_DIRECTORY)'
+        ssh -o "StrictHostKeyChecking=no" -i $(Agent.TempDirectory)/xig.private.key $(XIG_USER)@$(XIG_SERVER) 'if [ -d "$(XIG_TARGET_DIRECTORY)" ]; then find $(XIG_TARGET_DIRECTORY) -name "*" -delete; fi && mkdir $(XIG_TARGET_DIRECTORY)'
 
   - task: Bash@3
     displayName: 'Tar results'
