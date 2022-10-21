@@ -92,15 +92,17 @@ public class HistoryPageUpdater {
 
   private void copyFiles(String sourceRepo, String folder) throws IOException {
     IniFile ini = new IniFile(Utilities.path(sourceRepo, "manifest.ini"));
-    for (String s : ini.getPropertyNames("files")) {
-      File src = new File(Utilities.path(sourceRepo, s));
-      File tgt = new File(Utilities.path(folder, s));
-      if ("overwrite".equals(ini.getStringProperty("files", s)) || !tgt.exists()) {
-        if (src.isDirectory()) {
-          Utilities.createDirectory(tgt.getAbsolutePath());
-          Utilities.copyDirectory(src.getAbsolutePath(), tgt.getAbsolutePath(), null);
-        } else {
-          Utilities.copyFile(src, tgt);
+    if (ini.hasSection("files")) {
+      for (String s : ini.getPropertyNames("files")) {
+        File src = new File(Utilities.path(sourceRepo, s));
+        File tgt = new File(Utilities.path(folder, s));
+        if ("overwrite".equals(ini.getStringProperty("files", s)) || !tgt.exists()) {
+          if (src.isDirectory()) {
+            Utilities.createDirectory(tgt.getAbsolutePath());
+            Utilities.copyDirectory(src.getAbsolutePath(), tgt.getAbsolutePath(), null);
+          } else {
+            Utilities.copyFile(src, tgt);
+          }
         }
       }
     }

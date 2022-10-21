@@ -1231,8 +1231,18 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         tableRowNE(b, translate("sd.dict", "Must Support Types"), "datatypes.html", "No must-support rules about the choice of types/profiles");
       }
     }
+    String ide = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_ID_EXPECTATION);
+    if (ide != null) {
+      if (ide.equals("optional")) {
+        tableRowNE(b, translate("sd.dict", "ID Expectation"), null, "Id may or not be present (this is the default for elements but not resources)");
+      } else if (ide.equals("required")) {
+        tableRowNE(b, translate("sd.dict", "ID Expectation"), null, "Id is required to be present (this is the default for resources but not elements)");
+      } else if (ide.equals("required")) {
+        tableRowNE(b, translate("sd.dict", "ID Expectation"), null, "An ID is not allowed in this context");
+      }
+    }
     // tooling extensions for formats
-    if (d.hasExtension(ToolingExtensions.EXT_JSON_EMPTY) || d.hasExtension(ToolingExtensions.EXT_JSON_PROP_KEY)) {
+    if (d.hasExtension(ToolingExtensions.EXT_JSON_EMPTY) || d.hasExtension(ToolingExtensions.EXT_JSON_PROP_KEY) || d.hasExtension(ToolingExtensions.EXT_JSON_NULLABLE)) {
       StringBuilder s = new StringBuilder();
       String code = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_JSON_EMPTY);
       if (code != null) {
@@ -1250,7 +1260,10 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
       code = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_JSON_PROP_KEY);
       if (code != null) {
-        s.append("This repeating object is represented as a single object with named properties. The name of the property (key) is the value of the <code>"+code+"</code> child.");
+        s.append("This repeating object is represented as a single JSON object with named properties. The name of the property (key) is the value of the <code>"+code+"</code> child.");
+      }
+      if (ToolingExtensions.readBoolExtension(d, ToolingExtensions.EXT_JSON_NULLABLE)) {
+        s.append("This object can be represented as null in the JSON structure (which counts as 'present' for cardinality purposes).");
       }
       tableRowNE(b, translate("sd.dict", "JSON Representation"), null, s.toString());          
     }
