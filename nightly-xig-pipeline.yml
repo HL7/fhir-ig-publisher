@@ -51,6 +51,7 @@ jobs:
   # This step includes chmod to the private key to avoid ssh complaining about permissions.
   - task: Bash@3
     displayName: 'Clean previous results'
+    retryCountOnTaskFailure: 5
     inputs:
       targetType: 'inline'
       script: |
@@ -66,6 +67,7 @@ jobs:
 
   - task: Bash@3
     displayName: 'Copy tar'
+    retryCountOnTaskFailure: 5
     inputs:
       targetType: 'inline'
       script: |
@@ -73,6 +75,7 @@ jobs:
 
   - task: Bash@3
     displayName: 'Decompress tar'
+    retryCountOnTaskFailure: 5
     inputs:
       targetType: 'inline'
       script: |
