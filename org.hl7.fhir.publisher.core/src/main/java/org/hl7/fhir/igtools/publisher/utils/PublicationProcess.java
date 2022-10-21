@@ -15,6 +15,7 @@ import org.apache.commons.io.IOUtils;
 import org.hl7.fhir.igtools.publisher.PastProcessHackerUtilities;
 import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.publisher.utils.WebSiteLayoutRulesProviders.WebSiteLayoutRulesProvider;
+import org.hl7.fhir.utilities.FileNotifier;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.ZipGenerator;
@@ -47,7 +48,7 @@ public class PublicationProcess {
    *   - TSC has approved the publication
    *   
    */
-  
+
   /**
    * 
    * @param source - the directory that contains the IG source that will be published. This must be post normal build, and the build must have succeeded, and the output must have gone to \output. it will  be rebuilt
@@ -243,10 +244,6 @@ public class PublicationProcess {
 
     System.out.println("");        
     System.out.println("ok. All checks passed. Publish v"+npm.version()+" to "+destVer);        
-
-    // copy the history template in, along with    
-    System.out.println("Copy history from "+history.getAbsolutePath()+" to "+destination);    
-    Utilities.copyDirectory(history.getAbsolutePath(), destination, null);
 
     // 3. create the folder {root}/{realm}/{code}/{subdir}
     System.out.println("Copy the IG to "+destVer);    
