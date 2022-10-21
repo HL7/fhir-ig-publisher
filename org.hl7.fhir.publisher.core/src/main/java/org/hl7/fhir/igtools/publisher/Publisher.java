@@ -9948,6 +9948,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "example-table-all"))
       fragment("StructureDefinition-example-table-all-"+prefixForContainer+sd.getId(), sdr.exampleTable(fileList, false), f.getOutputNames(), r, vars, null);
 
+    if (igpkp.wantGen(r, "testscript-list"))
+      fragment("StructureDefinition-testscript-list-"+prefixForContainer+sd.getId(), sdr.testscriptList(fileList), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "testscript-table"))
+      fragment("StructureDefinition-testscript-table-"+prefixForContainer+sd.getId(), sdr.testscriptTable(fileList), f.getOutputNames(), r, vars, null);
+
     String sdPrefix = newIg ? "StructureDefinition-" : "";
     if (igpkp.wantGen(r, "csv")) {
       String path = Utilities.path(tempDir, sdPrefix + r.getId()+".csv");
