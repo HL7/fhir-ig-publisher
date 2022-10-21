@@ -31,18 +31,18 @@ jobs:
       targetType: 'inline'
       script: 'mkdir xig_output'
 
-  # - task: Bash@3
-  #  displayName: 'Run publisher with xig param'
-  #  inputs:
-  #    targetType: 'inline'
-  #    script: 'java -Xmx7168m -jar ./publisher.jar -xig xig_output'
-
   - task: Bash@3
-    displayName: 'Make dummy file'
+    displayName: 'Run publisher with xig param'
     inputs:
       targetType: 'inline'
-      script: |
-        echo 'Why hello there' > xig_output/hello.txt
+      script: 'java -Xmx7168m -jar ./publisher.jar -xig xig_output'
+
+#  - task: Bash@3
+#    displayName: 'Make dummy file'
+#    inputs:
+#      targetType: 'inline'
+#      script: |
+#        echo 'Why hello there' > xig_output/hello.txt
 
   - task: DownloadSecureFile@1
     inputs:
