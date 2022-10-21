@@ -238,7 +238,7 @@ public class WebSiteLayoutRulesProviders {
     public String getDestination(String rootFolder) throws IOException {
       // there's a case problem here: if IHI lowercases package names, but not canonicals or folder URLs, then the case of this will be wrong
       // and can't upper case algorithmically. May have to pick up case from canonical?
-      return Utilities.path(rootFolder, domain(), profile());      
+      return Utilities.path(rootFolder, domain().toUpperCase(), profile().toUpperCase());      
     }
 
   }
