@@ -224,7 +224,7 @@ public class PublicationProcess {
   private void doPublish(File fSource, File fOutput, JsonObject qa, String destination, String destVer, String pathVer, File fRoot, IniFile ini, JsonObject plPub, JsonObject vSrc, File fRegistry, NpmPackage npm, boolean milestone, File history, String tempDir, PublisherConsoleLogger logger) throws Exception {
     // ok. all our tests have passed.
     // 1. do the publication build(s)
-    System.out.println("All checks passed. Do the publication builds");        
+    System.out.println("All checks passed. Do the publication build from "+fSource.getAbsolutePath()+" and publish to "+destination);        
 
     // create a temporary copy and build in that:
     File temp = cloneToTemp(tempDir, fSource, npm.name()+"#"+npm.version());

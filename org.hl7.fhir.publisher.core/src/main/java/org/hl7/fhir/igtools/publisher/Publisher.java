@@ -1995,7 +1995,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private boolean isConvertableResource(String t) {
     return Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "Conformance", "CapabilityStatement", "Questionnaire", "NamingSystem", 
-        "ConceptMap", "OperationOutcome", "CompartmentDefinition", "OperationDefinition", "ImplementationGuide", "ActorDefinition");
+        "ConceptMap", "OperationOutcome", "CompartmentDefinition", "OperationDefinition", "ImplementationGuide", "ActorDefinition", "Requirements");
   }
 
 
@@ -2225,8 +2225,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   public void initialize() throws Exception {
     firstExecution = true;
     pcm = new FilesystemPackageCacheManager(mode == null || mode == IGBuildMode.MANUAL || mode == IGBuildMode.PUBLICATION, ToolsVersion.TOOLS_VERSION);
+    log("Build FHIR IG from "+configFile);
     if (mode == IGBuildMode.PUBLICATION)
       log("Build Formal Publication package, intended for "+getTargetOutput());
+      
     
     if (apiKeyFile == null) {
       apiKeyFile = new IniFile(Utilities.path(System.getProperty("user.home"), "fhir-api-keys.ini"));
@@ -4297,7 +4299,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     rc.setDestDir(Utilities.path(tempDir));
     rc.setProfileUtilities(new ProfileUtilities(context, new ArrayList<ValidationMessage>(), igpkp));
     rc.setQuestionnaireMode(QuestionnaireRendererMode.TREE);
-    rc.getCodeSystemPropList().addAll(codeSystemProps );
+    rc.getCodeSystemPropList().addAll(codeSystemProps);
+    rc.setParser(getTypeLoader(version));
     if (publishedIg.hasJurisdiction()) {
       Locale locale = null;
       try {
