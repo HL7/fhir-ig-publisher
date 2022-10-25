@@ -519,6 +519,11 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   // ---- overrides ---------------------------------------------------------------------------
   
   @Override
+  public boolean isPrimitiveType(String name) {
+    StructureDefinition sd = context.fetchTypeDefinition(name);
+    return sd != null && (sd.getKind() == StructureDefinitionKind.PRIMITIVETYPE) && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION;
+  }  
+
   public boolean isDatatype(String name) {
     StructureDefinition sd = context.fetchTypeDefinition(name);
     return sd != null && (sd.getKind() == StructureDefinitionKind.PRIMITIVETYPE || sd.getKind() == StructureDefinitionKind.COMPLEXTYPE) && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION;

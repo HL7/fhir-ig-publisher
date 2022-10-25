@@ -36,12 +36,14 @@ import org.hl7.fhir.r5.model.SearchParameter;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
+import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.renderers.RendererFactory;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.ResourceRendererMode;
 import org.hl7.fhir.r5.terminologies.JurisdictionUtilities;
+import org.hl7.fhir.r5.test.utils.TestingUtilities;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
@@ -350,6 +352,12 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
   public boolean isDatatype(String typeSimple) {
     return new ContextUtilities(info.getCtxt()).isDatatype(typeSimple);
   }
+
+  @Override
+  public boolean isPrimitiveType(String name) {
+    return new ContextUtilities(info.getCtxt()).isPrimitiveDatatype(name);
+  }
+
 
   @Override
   public boolean isResource(String typeSimple) {
