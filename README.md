@@ -60,6 +60,7 @@ All intergration and delivery done on Azure pipelines. Azure project can be view
 * **Pull Request Pipeline** is automatically run for every Pull Request to ensure that the project can be built by maven. [[Azure Pipeline]][Link-AzurePullRequestPipeline] [[source]](pull-request-pipeline.yml)
 * **Master Branch Pipeline** is automatically run whenever code is merged to the master branch and builds the SNAPSHOT binaries distributed to OSSRH [[Azure Pipeline]][Link-AzureMasterPipeline][[source]](master-branch-pipeline.yml)
 * **Release Branch Pipeline** is run manually whenever a release is ready to be made. It builds the [release binaries](#releases) and distributes them to artifact repositories. [[Azure Pipeline]][Link-AzureReleasePipeline][[source]](release-branch-pipeline.yml)
+* **Nightly xig Pipeline** is run automatically once a day to produce an aggregated view of all public IGs, available [here][Link-XigStatsOutput]. [[Azure Pipeline]][Link-AzureXigPipeline][[source]](nightly-xig-pipeline.yml)
 
 
 A brief overview of our publishing process is [here][Link-Publishing].
@@ -76,6 +77,8 @@ This project is maintained by [Grahame Grieve][Link-grahameGithub] and [Lloyd Mc
 [Link-AzureMasterPipeline]: https://dev.azure.com/fhir-pipelines/ig-publisher/_build/latest?definitionId=33&branchName=master
 [Link-AzureReleasePipeline]: https://dev.azure.com/fhir-pipelines/ig-publisher/_build/latest?definitionId=34&branchName=master
 [Link-AzurePullRequestPipeline]: https://dev.azure.com/fhir-pipelines/ig-publisher/_build?definitionId=32
+[Link-AzureXigPipeline]: https://dev.azure.com/fhir-pipelines/ig-publisher/_build?definitionId=48
+[Link-XigStatsOutput]: https://fhir.org/guides/stats/
 [Link-GithubIssues]: https://github.com/HL7/fhir-ig-publisher/issues
 [Link-GithubReleases]: https://github.com/HL7/fhir-ig-publisher/releases
 [Link-GithubZipRelease]: https://github.com/HL7/fhir-ig-publisher/releases/latest/download/publisher.jar "Sonatype Releases"
