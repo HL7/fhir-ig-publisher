@@ -223,7 +223,7 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
         "<span style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: black; background-color: #fcd9f1\" title=\"Documentation\">D</span>: There is document provided in the element(s)<br/>\r\n"+
         "<span style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: black; background-color: #fce0d9\" title=\"Binding\">B</span>: There is terminology bindings defined in the element(s)<br/>\r\n"+
         "<span style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: black; background-color: #ccf2ff\" title=\"Must Support\">M</span>: At least one of the element(s) has must-support = true<br/>\r\n"+
-        " (N): The numbner of elements if > 1";
+        " (N): The number of elements if > 1";
 
   }
 

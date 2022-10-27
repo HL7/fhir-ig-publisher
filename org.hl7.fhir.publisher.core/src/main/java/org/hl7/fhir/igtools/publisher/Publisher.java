@@ -2966,15 +2966,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return false;
   }
 
-  private boolean dependsOnToolsIG(List<ImplementationGuideDependsOnComponent> dependsOn) {
-    for (ImplementationGuideDependsOnComponent d : dependsOn) {
-      if (d.hasPackageId() && d.getPackageId().contains("hl7.fhir.uv.tools")) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   private String determineCanonical(String url, String path) throws FHIRException {
     if (url == null)
       return url;
@@ -2985,7 +2976,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     return url;
   }
-
 
   private String pathForVersion() {
     String v = version;
