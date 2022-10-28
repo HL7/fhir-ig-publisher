@@ -259,6 +259,7 @@ import org.hl7.fhir.r5.renderers.utils.DirectWrappers;
 import org.hl7.fhir.r5.renderers.utils.ElementWrappers;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.ITypeParser;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext.KnownLinkType;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.QuestionnaireRendererMode;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.ResourceRendererMode;
 import org.hl7.fhir.r5.renderers.utils.Resolver.IReferenceResolver;
@@ -4291,6 +4292,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     rc.setQuestionnaireMode(QuestionnaireRendererMode.TREE);
     rc.getCodeSystemPropList().addAll(codeSystemProps);
     rc.setParser(getTypeLoader(version));
+    rc.addLink(KnownLinkType.SELF, targetOutput);
     if (publishedIg.hasJurisdiction()) {
       Locale locale = null;
       try {

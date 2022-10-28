@@ -47,6 +47,7 @@ import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionMappingCompo
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext.KnownLinkType;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities.SystemReference;
@@ -1231,6 +1232,19 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         tableRowNE(b, translate("sd.dict", "Must Support Types"), "datatypes.html", "No must-support rules about the choice of types/profiles");
       }
     }
+    if (d.hasExtension(ToolingExtensions.EXT_EXTENSION_STYLE)) {
+      String es = d.getExtensionString(ToolingExtensions.EXT_EXTENSION_STYLE);
+      if ("named-elements".equals(es)) {
+        if (gen.hasLink(KnownLinkType.JSON_NAMES)) {
+//          c.getPieces().add(gen.new Piece(rc.getLink(KnownLinkType.JSON_NAMES), "This element can be extended by named JSON elements", null));                        
+          tableRowNE(b, translate("sd.dict", "Extension Style"), gen.getLink(KnownLinkType.JSON_NAMES), "This element can be extended by named JSON elements");
+        } else {
+//          c.getPieces().add(gen.new Piece(null, "This element can be extended by named JSON elements", null));                        
+          tableRowNE(b, translate("sd.dict", "Extension Style"), ToolingExtensions.WEB_EXTENSION_STYLE, "This element can be extended by named JSON elements");
+        }
+      }
+    }
+    
     String ide = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_ID_EXPECTATION);
     if (ide != null) {
       if (ide.equals("optional")) {
@@ -1242,30 +1256,47 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
     }
     // tooling extensions for formats
-    if (d.hasExtension(ToolingExtensions.EXT_JSON_EMPTY) || d.hasExtension(ToolingExtensions.EXT_JSON_PROP_KEY) || d.hasExtension(ToolingExtensions.EXT_JSON_NULLABLE)) {
+    if (ToolingExtensions.hasExtensions(d, ToolingExtensions.EXT_JSON_EMPTY, ToolingExtensions.EXT_JSON_PROP_KEY, ToolingExtensions.EXT_JSON_NULLABLE, ToolingExtensions.EXT_JSON_NAME)) {
+      boolean list = ToolingExtensions.countExtensions(d, ToolingExtensions.EXT_JSON_EMPTY, ToolingExtensions.EXT_JSON_PROP_KEY, ToolingExtensions.EXT_JSON_NULLABLE, ToolingExtensions.EXT_JSON_NAME) > 1;
       StringBuilder s = new StringBuilder();
+      String pfx = "";
+      String sfx = "";
+      if (list) {
+        s.append("<ul>\r\n");
+        pfx = "<li>";
+        sfx = "</li>\r\n";
+      }
       String code = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_JSON_EMPTY);
       if (code != null) {
         switch (code) {
         case "present":
-          s.append("The JSON Array for this property is present even when there are no items in the instance (e.g. as an empty array). ");
+          s.append(pfx+"The JSON Array for this property is present even when there are no items in the instance (e.g. as an empty array)"+sfx);
           break;
         case "absent":
-          s.append("The JSON Array for this property is not present when there are no items in the instance (e.g. never as an empty array). ");
+          s.append(pfx+"The JSON Array for this property is not present when there are no items in the instance (e.g. never as an empty array)"+sfx);
           break;
         case "either":
-          s.append("The JSON Array for this property may be present even when there are no items in the instance (e.g. may be present as an empty array). ");
+          s.append(pfx+"The JSON Array for this property may be present even when there are no items in the instance (e.g. may be present as an empty array)</li>\r\n ");
           break;
+        }
+      }
+      String jn = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_JSON_NAME);
+      if (jn != null) {
+        if (d.getPath().contains(".")) {
+          s.append(pfx+"This property appears in JSON with the property name <code>"+Utilities.escapeXml(jn)+"</code>"+sfx);
+        } else {
+          s.append(pfx+"This type can appear in JSON with the property name <code>"+Utilities.escapeXml(jn)+"</code> (in elements using named extensions)"+sfx);          
         }
       }
       code = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_JSON_PROP_KEY);
       if (code != null) {
-        s.append("This repeating object is represented as a single JSON object with named properties. The name of the property (key) is the value of the <code>"+code+"</code> child.");
+        s.append(pfx+"This repeating object is represented as a single JSON object with named properties. The name of the property (key) is the value of the <code>"+Utilities.escapeXml(code)+"</code> child"+sfx);
       }
       if (ToolingExtensions.readBoolExtension(d, ToolingExtensions.EXT_JSON_NULLABLE)) {
-        s.append("This object can be represented as null in the JSON structure (which counts as 'present' for cardinality purposes).");
+        s.append(pfx+"This object can be represented as null in the JSON structure (which counts as 'present' for cardinality purposes)"+sfx);
       }
-      tableRowNE(b, translate("sd.dict", "JSON Representation"), null, s.toString());          
+      if (list) s.append("<ul>");
+      tableRowNE(b, translate("sd.dict", "JSON Representation"), null,  s.toString());          
     }
     if (d.hasExtension(ToolingExtensions.EXT_XML_NAMESPACE) || profile.hasExtension(ToolingExtensions.EXT_XML_NAMESPACE) || d.hasExtension(ToolingExtensions.EXT_XML_NAME) || (root && profile.hasExtension(ToolingExtensions.EXT_XML_NO_ORDER)) ||
         d.hasRepresentation()) {
