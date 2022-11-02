@@ -118,6 +118,7 @@ import org.hl7.fhir.igtools.renderers.HTAAnalysisRenderer;
 import org.hl7.fhir.igtools.renderers.HistoryGenerator;
 import org.hl7.fhir.igtools.renderers.JsonXhtmlRenderer;
 import org.hl7.fhir.igtools.renderers.OperationDefinitionRenderer;
+import org.hl7.fhir.igtools.renderers.PublicationChecker;
 import org.hl7.fhir.igtools.renderers.QuestionnaireRenderer;
 import org.hl7.fhir.igtools.renderers.QuestionnaireResponseRenderer;
 import org.hl7.fhir.igtools.renderers.StatusRenderer;
@@ -125,7 +126,6 @@ import org.hl7.fhir.igtools.renderers.StructureDefinitionRenderer;
 import org.hl7.fhir.igtools.renderers.StructureMapRenderer;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter;
 import org.hl7.fhir.igtools.renderers.ValueSetRenderer;
-import org.hl7.fhir.igtools.renderers.VersionCheckRenderer;
 import org.hl7.fhir.igtools.renderers.XmlXHtmlRenderer;
 import org.hl7.fhir.igtools.spreadsheets.IgSpreadsheetParser;
 import org.hl7.fhir.igtools.spreadsheets.MappingSpace;
@@ -935,12 +935,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             clean();
             long endTime = System.nanoTime();
             processTxLog(Utilities.path(destDir != null ? destDir : outputDir, "qa-tx.html"));
-            BallotChecker bc = new BallotChecker(repoRoot);
             dependentIgFinder.finish(outputDir, sourceIg.present());
             ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
-                bc.check(igpkp.getCanonical(), npmName, workingVersion(), historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator,
+                IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator,
                 new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context).render(publishedIg, true), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
-                new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions ,
+                new PublicationChecker(repoRoot, historyPage).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions ,
                     noNarrativeResources, noValidateResources, noValidation, noGenerate, dependentIgFinder);
             log("Built. "+ DurationUtil.presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
             recordOutcome(null, val);
@@ -1097,12 +1096,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Generating Outputs in "+outputDir);
       generate();
       clean();
-      BallotChecker bc = new BallotChecker(repoRoot);
       dependentIgFinder.finish(outputDir, sourceIg.present());
       ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), rootDir, npmName, childPublisher == null? null : childPublisher.npmName, 
-          bc.check(igpkp.getCanonical(), npmName, workingVersion(), historyPage, version), IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator,
+          IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator,
           new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context).render(publishedIg, true), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
-          new VersionCheckRenderer(npm.version(), publishedIg.getVersion(), bc.getPackageList(), igpkp.getCanonical()).generate(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
+          new PublicationChecker(repoRoot, historyPage).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
           noNarrativeResources, noValidateResources, noValidation, noGenerate, dependentIgFinder);
       tts.end();
       if (isChild()) {
@@ -4055,7 +4053,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return true;
     if (s.startsWith("icon"))
       return true;
-    if (Utilities.existsInList(s, "modifier.png", "mustsupport.png", "summary.png", "lock.png", "external.png", "cc0.png", "target.png", "link.svg"))
+    if (Utilities.existsInList(s, "modifier.png", "mustsupport.png", "information.png", "summary.png", "lock.png", "external.png", "cc0.png", "target.png", "link.svg"))
       return true;
     
     return false;
@@ -10487,7 +10485,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       IGReleaseVersionDeleter deleter = new IGReleaseVersionDeleter();
       deleter.clear(f.getAbsolutePath(), fh.getAbsolutePath());
     } else if (hasNamedParam(args, "-go-publish")) {
-      new PublicationProcess().publish(getNamedParam(args, "-source"), getNamedParam(args, "-destination"), hasNamedParam(args, "-milestone"), getNamedParam(args, "-registry"), getNamedParam(args, "-history"), getNamedParam(args, "-temp"));
+      new PublicationProcess().publish(getNamedParam(args, "-source"), getNamedParam(args, "-destination"), hasNamedParam(args, "-milestone"), hasNamedParam(args, "-first"), getNamedParam(args, "-date"),  getNamedParam(args, "-registry"), getNamedParam(args, "-history"), getNamedParam(args, "-temp"));
     } else if (hasNamedParam(args, "-xig")) {
       new XIGGenerator(getNamedParam(args, "-xig")).execute();
     } else if (hasNamedParam(args, "-update-history")) {
