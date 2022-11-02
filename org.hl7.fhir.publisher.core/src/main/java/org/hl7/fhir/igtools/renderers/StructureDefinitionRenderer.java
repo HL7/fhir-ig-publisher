@@ -1256,7 +1256,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
     }
     // tooling extensions for formats
-    if (ToolingExtensions.hasExtensions(d, ToolingExtensions.EXT_JSON_EMPTY, ToolingExtensions.EXT_JSON_PROP_KEY, ToolingExtensions.EXT_JSON_NULLABLE, ToolingExtensions.EXT_JSON_NAME)) {
+    if (ToolingExtensions.hasExtensions(d, ToolingExtensions.EXT_JSON_EMPTY, ToolingExtensions.EXT_JSON_PROP_KEY, ToolingExtensions.EXT_JSON_NULLABLE, 
+        ToolingExtensions.EXT_JSON_NAME, ToolingExtensions.EXT_JSON_PRIMITIVE_CHOICE)) {
       boolean list = ToolingExtensions.countExtensions(d, ToolingExtensions.EXT_JSON_EMPTY, ToolingExtensions.EXT_JSON_PROP_KEY, ToolingExtensions.EXT_JSON_NULLABLE, ToolingExtensions.EXT_JSON_NAME) > 1;
       StringBuilder s = new StringBuilder();
       String pfx = "";
@@ -1294,6 +1295,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
       if (ToolingExtensions.readBoolExtension(d, ToolingExtensions.EXT_JSON_NULLABLE)) {
         s.append(pfx+"This object can be represented as null in the JSON structure (which counts as 'present' for cardinality purposes)"+sfx);
+      }
+      if (ToolingExtensions.readBoolExtension(d, ToolingExtensions.EXT_JSON_PRIMITIVE_CHOICE)) {
+        s.append(pfx+"The type of this element is inferred from the JSON type in the instance"+sfx);
       }
       if (list) s.append("<ul>");
       tableRowNE(b, translate("sd.dict", "JSON Representation"), null,  s.toString());          
