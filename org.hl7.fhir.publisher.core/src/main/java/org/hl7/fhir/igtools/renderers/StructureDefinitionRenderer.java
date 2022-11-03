@@ -1430,10 +1430,13 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private void tableRowNE(StringBuilder b, String name, String defRef, String value) throws IOException {
     if (value != null && !"".equals(value))
-      if (defRef != null)
-        b.append("  <tr><td><a href=\"" + corePath + defRef + "\">" + name + "</a></td><td>" + value + "</td></tr>\r\n");
-      else
+      if (defRef == null) {
         b.append("  <tr><td>" + name + "</td><td>" + value + "</td></tr>\r\n");
+      } else if (Utilities.isAbsoluteUrl(defRef)) {
+        b.append("  <tr><td><a href=\"" + defRef + "\">" + name + "</a></td><td>" + value + "</td></tr>\r\n");
+      } else {
+        b.append("  <tr><td><a href=\"" + corePath + defRef + "\">" + name + "</a></td><td>" + value + "</td></tr>\r\n");
+      }
   }
 
   private String head(String path) {
