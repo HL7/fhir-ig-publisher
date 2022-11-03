@@ -200,10 +200,10 @@ public class HTMLInspector {
   private List<String> missingPublishBoxList = new ArrayList<>();
   private Set<String> exceptions = new HashSet<>();
   private boolean referencesValidatorPack;
-  private Map<String, String> trackedFragments;
+  private Map<String, List<String>> trackedFragments;
   private Set<String> foundFragments = new HashSet<>();
 
-  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, ILoggingService log, String canonical, String packageId, Map<String, String> trackedFragments) {
+  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, ILoggingService log, String canonical, String packageId, Map<String, List<String>> trackedFragments) {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
     this.log = log;
@@ -312,8 +312,13 @@ public class HTMLInspector {
     
     for (String s : trackedFragments.keySet()) {
       if (!foundFragments.contains(s)) {
-        messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, s, "The HTML fragment '"+trackedFragments.get(s)+"' is not included anywhere in the produced implementation guide",
-            "The HTML fragment '"+trackedFragments.get(s)+"' is not included anywhere in the produced implementation guide", IssueSeverity.WARNING));            
+        if (trackedFragments.get(s).size() > 1) {
+          messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, s, "An HTML fragment from the set "+trackedFragments.get(s)+" is not included anywhere in the produced implementation guide",
+              "An HTML fragment from the set "+trackedFragments.get(s)+" is not included anywhere in the produced implementation guide", IssueSeverity.WARNING));
+        } else {
+          messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, s, "The HTML fragment '"+trackedFragments.get(s).get(0)+"' is not included anywhere in the produced implementation guide",
+            "The HTML fragment '"+trackedFragments.get(s).get(0)+"' is not included anywhere in the produced implementation guide", IssueSeverity.WARNING));
+        }
       }
     }
     return messages;
@@ -615,6 +620,9 @@ public class HTMLInspector {
       resolved = filename.contains("searchform.html") && ref.equals("history.html"); 
     if (!resolved)
       resolved = manual.contains(rref);
+    if (!resolved) {
+      resolved = rref.startsWith("http://build.fhir.org/ig/FHIR/fhir-tools-ig"); // always allowed to refer to tooling IG build location
+    }
     if (!resolved && specs != null){
       for (SpecMapManager spec : specs) {
         if (!resolved && spec.getBase() != null) {
@@ -642,7 +650,7 @@ public class HTMLInspector {
           "http://hl7.org/fhir-issues", "http://hl7.org/registry") || 
           matchesTarget(ref, "http://hl7.org", "http://hl7.org/fhir/DSTU2", "http://hl7.org/fhir/STU3", "http://hl7.org/fhir/R4", "http://hl7.org/fhir/smart-app-launch", "http://hl7.org/fhir/validator");
 
-     // a local file may have bee created by some poorly tracked process, so we'll consider that as a possible
+     // a local file may have been created by some poorly tracked process, so we'll consider that as a possible
      if (!resolved && !Utilities.isAbsoluteUrl(rref) && !rref.contains("..")) { // .. is security check. Maybe there's some ways it could be valid, but we're not interested for now
        String fname = Utilities.path(new File(filename).getParent(), rref);
        if (new File(fname).exists()) {

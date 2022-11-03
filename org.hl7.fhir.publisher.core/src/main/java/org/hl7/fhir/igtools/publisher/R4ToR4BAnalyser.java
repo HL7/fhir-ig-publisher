@@ -257,48 +257,71 @@ public class R4ToR4BAnalyser {
     return r4BOK;
   }
 
-  public String generate(String pid) {
+  public String generate(String pid, boolean inline) {
     if (VersionUtilities.isR4Ver(context.getVersion())) {
-      return gen(pid, "R4", "R4B", r4BOK, r4Problems, r4BProblems, r4Exemptions, r4BExemptions);
+      return gen(pid, "R4", "R4B", r4BOK, r4Problems, r4BProblems, r4Exemptions, r4BExemptions, inline);
     } else if (VersionUtilities.isR4BVer(context.getVersion())) {
-      return gen(pid, "R4B", "R4", r4OK, r4BProblems, r4Problems, r4BExemptions, r4Exemptions);
+      return gen(pid, "R4B", "R4", r4OK, r4BProblems, r4Problems, r4BExemptions, r4Exemptions, inline);
     } else {
       return "";
     }
   }
 
-  private String gen(String pid, String src, String dst, boolean dstOk, List<String> srcProblems, List<String> dstProblems, Map<String, ResPointer> srcExempt, Map<String, ResPointer> dstExempt) {
+  private String gen(String pid, String src, String dst, boolean dstOk, List<String> srcProblems, List<String> dstProblems, Map<String, ResPointer> srcExempt, Map<String, ResPointer> dstExempt, boolean inline) {
     StringBuilder b = new StringBuilder();
     if (dstOk) {
-      b.append("<p>This is an "+src+" IG. None of the features it uses are changed "+(src.equals("r4") ? "in" : "from")+" "+dst+", so it can be used as is with "+dst+" systems. ");
-      b.append("Packages for both <a href=\"package.r4.tgz\">R4 ("+pid+".r4)</a> and <a href=\"package.r4b.tgz\">R4B ("+pid+".r4b)</a> are available.</p>\r\n");
+      if (!inline) {
+        b.append("<p>");
+      }
+      b.append("This is an "+src+" IG. None of the features it uses are changed "+(src.equals("r4") ? "in" : "from")+" "+dst+", so it can be used as is with "+dst+" systems. ");
+      b.append("Packages for both <a href=\"package.r4.tgz\">R4 ("+pid+".r4)</a> and <a href=\"package.r4b.tgz\">R4B ("+pid+".r4b)</a> are available.");
+      if (!inline) {
+        b.append("</p>\r\n");
+      }
+      
     } else {
-      b.append("<p>This is an "+src+" IG that is not compatible with "+dst+" because: </p>\r\n");
-      b.append("<ul>\r\n");
+      if (!inline) {
+        b.append("<p>");
+      }
+      b.append("This is an "+src+" IG that is not compatible with "+dst+" because: \r\n");
+      if (!inline) {
+        b.append("</p>\r\n");
+        b.append("<ul>\r\n");
+      }
+      boolean first = true;
       for (String s : dstProblems) {
-        b.append("<li>");
+        if (!inline) {
+          b.append("<li>");
+        }
+        if (first) first = false; else if (inline) b.append(", ");
         b.append(s);
-        b.append("</li>\r\n");
+        if (!inline) {
+          b.append("</li>\r\n");
+        }
       }
-      b.append("</ul>\r\n");      
-    }
-    if (dstExempt.size() > 0) {
-      b.append("<p>The following resources are not in the "+dst+" version: </p>\r\n");
-      renderExempList(dstExempt, b);            
-    }
-    if (srcExempt.size() > 0) {
-      b.append("<p>The following resources are only in the "+dst+" version: </p>\r\n");
-      renderExempList(srcExempt, b);            
-    }
-    if (srcProblems.size() > 0) {
-      b.append("<p>While checking for "+dst+" compatibility, the following "+src+" problems were found: </p>\r\n");
-      b.append("<ul>\r\n");
-      for (String s : srcProblems) {
-        b.append("<li>");
-        b.append(s);
-        b.append("</li>\r\n");
+      if (!inline) {
+        b.append("</ul>\r\n");
       }
-      b.append("</ul>\r\n");            
+    }
+    if (!inline) {
+      if (dstExempt.size() > 0) {
+        b.append("<p>The following resources are not in the "+dst+" version: </p>\r\n");
+        renderExempList(dstExempt, b);            
+      }
+      if (srcExempt.size() > 0) {
+        b.append("<p>The following resources are only in the "+dst+" version: </p>\r\n");
+        renderExempList(srcExempt, b);            
+      }
+      if (srcProblems.size() > 0) {
+        b.append("<p>While checking for "+dst+" compatibility, the following "+src+" problems were found: </p>\r\n");
+        b.append("<ul>\r\n");
+        for (String s : srcProblems) {
+          b.append("<li>");
+          b.append(s);
+          b.append("</li>\r\n");
+        }
+        b.append("</ul>\r\n");            
+      }
     }
     return b.toString();
   }

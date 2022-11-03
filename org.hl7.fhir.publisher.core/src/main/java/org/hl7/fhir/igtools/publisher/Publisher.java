@@ -876,7 +876,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private Object branchName;
   private R4ToR4BAnalyser r4tor4b;
   private List<DependencyAnalyser.ArtifactDependency> dependencyList;
-  private Map<String, String> trackedFragments = new HashMap<>();
+  private Map<String, List<String>> trackedFragments = new HashMap<>();
   
   private class PreProcessInfo {
     private String xsltName;
@@ -938,7 +938,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             dependentIgFinder.finish(outputDir, sourceIg.present());
             ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
                 IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator,
-                new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context).render(publishedIg, true), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
+                new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context).render(publishedIg, true, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
                 new PublicationChecker(repoRoot, historyPage).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions ,
                     noNarrativeResources, noValidateResources, noValidation, noGenerate, dependentIgFinder);
             log("Built. "+ DurationUtil.presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
@@ -1099,7 +1099,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       dependentIgFinder.finish(outputDir, sourceIg.present());
       ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), rootDir, npmName, childPublisher == null? null : childPublisher.npmName, 
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator,
-          new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context).render(publishedIg, true), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
+          new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context).render(publishedIg, true, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
           new PublicationChecker(repoRoot, historyPage).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
           noNarrativeResources, noValidateResources, noValidation, noGenerate, dependentIgFinder);
       tts.end();
@@ -2789,6 +2789,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       dep.setPackageId(getUTGPackageName());
       dep.setUri("http://terminology.hl7.org/ImplementationGuide/hl7.terminology");
       dep.setVersion(pcm.getLatestVersion(dep.getPackageId()));
+      dep.addExtension(ToolingExtensions.EXT_IGDEP_COMMENT, new StringType("Automatically added as a dependency - all IGs depend on HL7 Terminology"));
       sourceIg.getDependsOn().add(0, dep);
     }
     inspector = new HTMLInspector(outputDir, specMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), trackedFragments);
@@ -7189,12 +7190,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     fragment("summary-extensions", cvr.getExtensionSummary(), otherFilesRun);
     trackedFragment("1", "ip-statements",  genIpStatements(fileList), otherFilesRun);
     if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {
-      trackedFragment("2", "cross-version-analysis", r4tor4b.generate(npmName), otherFilesRun);
+      trackedFragment("2", "cross-version-analysis", r4tor4b.generate(npmName, false), otherFilesRun);
+      trackedFragment("2", "cross-version-analysis-inline", r4tor4b.generate(npmName, true), otherFilesRun);
     } else {
-      fragment("cross-version-analysis", r4tor4b.generate(npmName), otherFilesRun);      
+      fragment("cross-version-analysis", r4tor4b.generate(npmName, false), otherFilesRun);      
+      fragment("cross-version-analysis-inline", r4tor4b.generate(npmName, true), otherFilesRun);      
     }
     DependencyRenderer depr = new DependencyRenderer(pcm, tempDir, npmName, templateManager, makeDependencies(), context);
-    trackedFragment("3", "dependency-table", depr.render(publishedIg, false), otherFilesRun);
+    trackedFragment("3", "dependency-table", depr.render(publishedIg, false, true), otherFilesRun);
+    trackedFragment("3", "dependency-table-short", depr.render(publishedIg, false, false), otherFilesRun);
     trackedFragment("4", "globals-table", depr.renderGlobals(), otherFilesRun);
 
     // now, list the profiles - all the profiles
@@ -10191,7 +10195,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
   
   private void trackedFragment(String id, String name, String content, Set<String> outputTracker) throws IOException, FHIRException {
-    trackedFragments.put(id, name+".xhtml");
+    if (!trackedFragments.containsKey(id)) {
+      trackedFragments.put(id, new ArrayList<>());      
+    }
+    trackedFragments.get(id).add(name+".xhtml");
     fragment(name, content+HTMLInspector.TRACK_PREFIX+id+HTMLInspector.TRACK_SUFFIX, outputTracker, null, null, null);
   }
   
