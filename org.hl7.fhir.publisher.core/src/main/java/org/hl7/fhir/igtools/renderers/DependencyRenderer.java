@@ -32,6 +32,7 @@ import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideGlobalComponent;
 import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
@@ -124,21 +125,26 @@ public class DependencyRenderer {
     this.context = context;
   }
 
-  public String render(ImplementationGuide ig, boolean QA) throws FHIRException, IOException {
+  public String render(ImplementationGuide ig, boolean QA, boolean details) throws FHIRException, IOException {
+    boolean hasDesc = false;
+    for (ImplementationGuideDependsOnComponent d : ig.getDependsOn()) {
+      hasDesc = hasDesc || d.hasExtension(ToolingExtensions.EXT_IGDEP_COMMENT);
+    }
+    
     HierarchicalTableGenerator gen = new HierarchicalTableGenerator(dstFolder, true, true);
-    TableModel model = createTable(gen, QA);
+    TableModel model = createTable(gen, QA, hasDesc);
     
     String realm = determineRealmForIg(ig.getPackageId());
 
     StringBuilder b = new StringBuilder();
     
-    Row row = addBaseRow(gen, model, ig, QA);
+    Row row = addBaseRow(gen, model, ig, QA, hasDesc);
     for (ImplementationGuideDependsOnComponent d : ig.getDependsOn()) {
       try {
         NpmPackage p = resolve(d);
-        addPackageRow(gen, row.getSubRows(), p, d.getVersion(), realm, QA, b);
+        addPackageRow(gen, row.getSubRows(), p, d.getVersion(), realm, QA, b, ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_IGDEP_COMMENT), hasDesc);
       } catch (Exception e) {
-        addErrorRow(gen, row.getSubRows(), d.getPackageId(), d.getVersion(), d.getUri(), null, e.getMessage(), QA);
+        addErrorRow(gen, row.getSubRows(), d.getPackageId(), d.getVersion(), d.getUri(), null, e.getMessage(), QA, hasDesc);
       }
     }
     if (!QA) {
@@ -153,7 +159,7 @@ public class DependencyRenderer {
     if (QA) {
       div.add(makeTemplateTable());
     }
-    return new XhtmlComposer(false).compose(div)+b.toString();
+    return new XhtmlComposer(false).compose(div)+(details ? b.toString() : "");
   }
 
   private XhtmlNode makeTemplateTable() {
@@ -184,7 +190,7 @@ public class DependencyRenderer {
     return null;
   }
 
-  private void addPackageRow(HierarchicalTableGenerator gen, List<Row> rows, NpmPackage npm, String originalVersion, String realm, boolean QA, StringBuilder b) throws FHIRException, IOException {
+  private void addPackageRow(HierarchicalTableGenerator gen, List<Row> rows, NpmPackage npm, String originalVersion, String realm, boolean QA, StringBuilder b, String desc, boolean hasDesc) throws FHIRException, IOException {
     if (!npm.isCore()) {
       String idv = npm.name()+"#"+npm.version();
       boolean isNew = !ids.contains(idv);
@@ -210,16 +216,17 @@ public class DependencyRenderer {
           }
         }
       }
-      Row row = addRow(gen, rows, npm.name(), npm.version(), getVersionState(npm.name(), npm.version(), npm.canonical()), getLatestVersion(npm.name(), npm.canonical()), "current".equals(npm.version()), npm.fhirVersion(), !VersionUtilities.versionsCompatible(fver, npm.fhirVersion()), npm.canonical(), PackageHacker.fixPackageUrl(npm.getWebLocation()), comment, QA);
+      Row row = addRow(gen, rows, npm.name(), npm.version(), getVersionState(npm.name(), npm.version(), npm.canonical()), getLatestVersion(npm.name(), npm.canonical()), "current".equals(npm.version()), npm.fhirVersion(), 
+          !VersionUtilities.versionsCompatible(fver, npm.fhirVersion()), npm.canonical(), PackageHacker.fixPackageUrl(npm.getWebLocation()), comment, desc, QA, hasDesc);
       if (isNew) {
         for (String d : npm.dependencies()) {
           String id = d.substring(0, d.indexOf("#"));
           String version = d.substring(d.indexOf("#")+1);
           try {
             NpmPackage p = resolve(id, version);
-            addPackageRow(gen, row.getSubRows(), p, d.substring(d.indexOf("#")+1), realm, QA, b);
+            addPackageRow(gen, row.getSubRows(), p, d.substring(d.indexOf("#")+1), realm, QA, b, null, hasDesc);
           } catch (Exception e) {
-            addErrorRow(gen, row.getSubRows(), id, version, null, null, e.getMessage(), QA);
+            addErrorRow(gen, row.getSubRows(), id, version, null, null, e.getMessage(), QA, hasDesc);
           }
         }
       }
@@ -275,7 +282,7 @@ public class DependencyRenderer {
   private void checkGlobals(NpmPackage npm) throws IOException {
     for (String n : npm.listResources("ImplementationGuide")) {
       ImplementationGuide ig = loadImplementationGuide(npm.loadResource(n), npm.fhirVersion());
-      if (ig != null) {
+      if (ig != null && !ig.getUrl().equals("http://hl7.org/fhir/us/daf")) {
         checkGlobals(ig, npm);
       }
     }
@@ -378,7 +385,7 @@ public class DependencyRenderer {
     }
   }
 
-  private Row addBaseRow(HierarchicalTableGenerator gen, TableModel model, ImplementationGuide ig, boolean QA) {
+  private Row addBaseRow(HierarchicalTableGenerator gen, TableModel model, ImplementationGuide ig, boolean QA, boolean hasDesc) {
     String id = ig.getPackageId();
     String ver = ig.getVersion();
     String fver = ig.getFhirVersion().get(0).asStringValue();
@@ -394,14 +401,15 @@ public class DependencyRenderer {
     } else if (id.startsWith("hl7") && !id.startsWith("hl7.fhir.")) {
       comment = "HL7 Packages must have an id that starts with hl7.fhir.";
     }
-    Row row = addRow(gen, model.getRows(), id, ver, null, null, false, fver, false, canonical, web, comment, QA);
+    Row row = addRow(gen, model.getRows(), id, ver, null, null, false, fver, false, canonical, web, comment, null, QA, hasDesc);
     if (QA && comment != null) {
       row.getCells().get(5).addStyle("background-color: #ffcccc");
     }
+    
     return row;
   }
 
-  private Row addRow(HierarchicalTableGenerator gen, List<Row> rows, String id, String ver, VersionState verState, String latestVer, boolean verError, String fver, boolean fverError, String canonical, String web, String problems, boolean QA) {
+  private Row addRow(HierarchicalTableGenerator gen, List<Row> rows, String id, String ver, VersionState verState, String latestVer, boolean verError, String fver, boolean fverError, String canonical, String web, String problems, String desc, boolean QA, boolean hasDesc) {
     Row row = gen.new Row();
     rows.add(row);
     row.setIcon("icon-fhir-16.png", "NPM Package");
@@ -454,11 +462,13 @@ public class DependencyRenderer {
       if (fverError) {
         row.getCells().get(2).addStyle("background-color: #ffcccc");
       }
+    } else if (hasDesc) {   
+      row.getCells().add(gen.new Cell(null, null, desc, null, null));
     }
     return row;
   }
 
-  private void addErrorRow(HierarchicalTableGenerator gen, List<Row> rows, String id, String ver, String uri, String web, String message, boolean QA) {
+  private void addErrorRow(HierarchicalTableGenerator gen, List<Row> rows, String id, String ver, String uri, String web, String message, boolean QA, boolean hasDesc) {
     Row row = gen.new Row();
     rows.add(row);
     row.setIcon("icon-fhir-16.png", "NPM Package");
@@ -469,11 +479,13 @@ public class DependencyRenderer {
     row.getCells().add(gen.new Cell(null, null, web, null, null));
     if (QA) {
       row.getCells().add(gen.new Cell(null, null, message, null, null));
+    } else if (hasDesc) {
+      row.getCells().add(gen.new Cell(null, null, message, null, null));
     }
     row.setColor("#ffcccc");
   }
 
-  private TableModel createTable(HierarchicalTableGenerator gen, boolean QA) {
+  private TableModel createTable(HierarchicalTableGenerator gen, boolean QA, boolean hasDesc) {
     TableModel model = gen.new TableModel("dep", false);
     
     model.setAlternating(true);
@@ -484,13 +496,15 @@ public class DependencyRenderer {
     model.getTitles().add(gen.new Title(null, null, "Web Base", "Web Reference Base", null, 0));
     if (QA) {
       model.getTitles().add(gen.new Title(null, null, "Comment", "Comments about this entry", null, 0));
+    } else if (hasDesc) {
+      model.getTitles().add(gen.new Title(null, null, "Comment", "Explains why this dependency exists", null, 0));
     }
     return model;
   }
   
   public String renderGlobals() {
     if (globals.isEmpty()) {
-      return "<p><i>No Global profiles found</i></p>\r\n";
+      return "<p><i>There are no Global profiles defined</i></p>\r\n";
     } else {
       StringBuilder b = new StringBuilder();
       b.append("<p>Global Profiles:</p>\r\n<table class=\"none\">\r\n<tr><td><b>Type</b></td><td><b>Source</b></td><td><b>Profile</b></td></tr>\r\n");
