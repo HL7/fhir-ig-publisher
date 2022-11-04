@@ -123,7 +123,7 @@ public class PublicationProcess {
     String destination = rp.getDestination(rootFolder); 
     // ----------------------------------------------
 
-    if (!check(res, new File(Utilities.path(source, "package-list.json")).exists(), "Source '"+source+"' contains a package-list.json - must not exist")) {
+    if (!check(res, !(new File(Utilities.path(source, "package-list.json")).exists()), "Source '"+source+"' contains a package-list.json - must not exist")) {
       return res;
     }            
     if (!check(res, new File(Utilities.path(source, "publication-request.json")).exists(), "Source '"+source+"' does not contain a publication-request.json - consult documentation to see how to set it up")) {
