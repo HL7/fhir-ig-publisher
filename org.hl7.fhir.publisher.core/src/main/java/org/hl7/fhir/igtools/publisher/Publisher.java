@@ -116,6 +116,7 @@ import org.hl7.fhir.igtools.renderers.CrossViewRenderer;
 import org.hl7.fhir.igtools.renderers.DependencyRenderer;
 import org.hl7.fhir.igtools.renderers.HTAAnalysisRenderer;
 import org.hl7.fhir.igtools.renderers.HistoryGenerator;
+import org.hl7.fhir.igtools.renderers.IPStatementsRenderer;
 import org.hl7.fhir.igtools.renderers.JsonXhtmlRenderer;
 import org.hl7.fhir.igtools.renderers.OperationDefinitionRenderer;
 import org.hl7.fhir.igtools.renderers.PublicationChecker;
@@ -409,26 +410,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   }
 
-  public class CopyRightUsageStatement {
-
-    private String name;
-    private String html;
-
-    public CopyRightUsageStatement(String name, String html) {
-      super();
-      this.name = name;
-      this.html = html;
-    }
-
-    public String getSystemName() {
-      return name;
-    }
-
-    public String getHtml() {
-      return html;
-    }
-
-  }
 
   public class JsonDependency {
     private String name;
@@ -7188,7 +7169,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     vsg.finish(new FileOutputStream(path));
     
     fragment("summary-extensions", cvr.getExtensionSummary(), otherFilesRun);
-    trackedFragment("1", "ip-statements",  genIpStatements(fileList), otherFilesRun);
+    trackedFragment("1", "ip-statements", new IPStatementsRenderer(context, markdownEngine).genIpStatements(fileList), otherFilesRun);
     if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {
       trackedFragment("2", "cross-version-analysis", r4tor4b.generate(npmName, false), otherFilesRun);
       trackedFragment("2", "cross-version-analysis-inline", r4tor4b.generate(npmName, true), otherFilesRun);
@@ -9287,7 +9268,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       fragment(res.fhirType()+"-"+r.getId()+"-maturity",  genFmmBanner(r), f.getOutputNames());
     }
     if (igpkp.wantGen(r, "ip-statements") && res != null) {
-      fragment(res.fhirType()+"-"+r.getId()+"-ip-statements",  genIpStatements(r, example), f.getOutputNames());
+      fragment(res.fhirType()+"-"+r.getId()+"-ip-statements", new IPStatementsRenderer(context, markdownEngine).genIpStatements(r, example), f.getOutputNames());
     }
     if (igpkp.wantGen(r, "validate")) {
       fragment(r.fhirType()+"-"+r.getId()+"-validate",  genValidation(f, r), f.getOutputNames());
@@ -9434,119 +9415,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
     return res.fhirType()+"-"+prefixForContained+res.getId()+".html"; // will be a broken link if wantGen(html) == false
-  }
-
-  private String genIpStatements(List<FetchedFile> files) throws FHIRException {
-    Set<String> systems = new HashSet<String>();
-    for (FetchedFile f : files) {
-      for (FetchedResource r : f.getResources()) {
-        listAllCodeSystems(systems, r.getElement());        
-      }
-    }
-    
-    StringBuilder b = new StringBuilder();
-    boolean first = true;
-    for (String system : systems) {
-      CopyRightUsageStatement stmt = getCopyRightStatement(system);
-      if (stmt != null) {
-        if (first) {
-          b.append("<ul>\r\n");
-        }
-        first = false;
-        b.append("<li>This publication includes IP from "+stmt.getSystemName()+". "+stmt.getHtml()+"</li>\r\n");
-      }
-    }
-    if (!first) {
-      b.append("</ul>\r\n");
-    }
-    return b.toString();     
-  }
-  
-  private String genIpStatements(FetchedResource r, boolean example) throws FHIRException {
-    Set<String> systems = listAllCodeSystems(r.getElement());
-    StringBuilder b = new StringBuilder();
-    boolean first = true;
-    for (String system : systems) {
-      CopyRightUsageStatement stmt = getCopyRightStatement(system);
-      if (stmt != null) {
-        if (first) {
-          b.append("<ul>\r\n");
-        }
-        first = false;
-        b.append("<li>This "+(example ? "example" : describeResource(r.getElement()))+" includes IP from "+stmt.getSystemName()+". "+stmt.getHtml()+"</li>\r\n");
-      }
-    }
-    if (!first) {
-      b.append("</ul>\r\n");
-    }
-    return b.toString(); 
-  }
-
-  private String describeResource(Element element) {
-    String t = element.fhirType();
-    if ("StructureDefinition".equals(t)) {
-      String s = element.getChildValue("type");
-      if ("Extension".equals(s)) {
-        return "extension";
-      } else {
-        s = element.getChildValue("kind");
-        if ("logical".equals(s)) {
-          return "logical model";
-        } else {
-          return "profile";
-        }       
-      }
-    } else {
-      return t;
-    }
-  }
-
-  // todo - hook this up to the
-  private CopyRightUsageStatement getCopyRightStatement(String system) {
-    if ("http://snomed.info/sct".equals(system)) {
-      return new CopyRightUsageStatement("SNOMED Clinical Terms® (SNOMED CT®)", "This material contains content that is copyright of SNOMED International. Implementers of these specifications must have the appropriate SNOMED CT Affiliate license - "+
-       "for more information contact <a href=\"http://www.snomed.org/snomed-ct/get-snomed-ct\">http://www.snomed.org/snomed-ct/get-snomed-ct</a> or <a href=\"mailto:info@snomed.org\">info@snomed.org</a>.");
-    }
-    if ("http://loinc.org".equals(system)) {
-      return new CopyRightUsageStatement("LOINC", "This material contains content from <a href=\"http://loinc.org\">LOINC</a>. LOINC is copyright © 1995-2020, Regenstrief Institute, Inc. and the Logical Observation Identifiers Names and Codes (LOINC) "+
-         "Committee and is available at no cost under the <a href=\"http://loinc.org/license\">license</a>. LOINC® is a registered United States trademark of Regenstrief Institute, Inc.");
-    }
-    if (system != null) {
-      CodeSystem cs = context.fetchCodeSystem(system);
-      if (cs != null && cs.hasCopyright()) {
-        return new CopyRightUsageStatement(cs.present(), stripPara(markdownEngine.process(cs.getCopyright(), "Copyright")));        
-      }
-    }
-    return null;
-  }
-
-  private String stripPara(String p) {
-    if (Utilities.noString(p)) {
-      return "";
-    }
-    p = p.trim();
-    if (p.startsWith("<p>")) {
-      p = p.substring(3);
-    }
-    if (p.endsWith("</p>")) {
-      p = p.substring(0, p.length()-4);
-    }
-    return p;
-  }
-
-  private Set<String> listAllCodeSystems(Element element) {
-    Set<String> set = new HashSet<String>();
-    listAllCodeSystems(set, element);
-    return set;
-  }
-
-  private void listAllCodeSystems(Set<String> set, Element element) {
-    if ("Coding".equals(element.fhirType())) {
-      set.add(element.getChildValue("system"));
-    }
-    for (Element child : element.getChildren()) {
-      listAllCodeSystems(set, child);
-    }    
   }
 
   private String genFmmBanner(FetchedResource r) throws FHIRException {
