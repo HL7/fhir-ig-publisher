@@ -26,6 +26,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,10 +46,10 @@ import com.google.gson.JsonSyntaxException;
 public class IGWebSiteMaintainer {
 
   public static void main(String[] args) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
-    execute(args[0], args.length > 1 ? new IGRegistryMaintainer(args[1]) : null, args.length >= 3 && "true".equals(args[2]), null, false, args[3]);
+    execute(args[0], args.length > 1 ? new IGRegistryMaintainer(args[1]) : null, args.length >= 3 && "true".equals(args[2]), null, false, args[3], true);
   }
   
-  public static void execute(String folder, IGRegistryMaintainer reg, boolean doCore, String filter, boolean skipPrompt, String historyRepo) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
+  public static void execute(String folder, IGRegistryMaintainer reg, boolean doCore, String filter, boolean skipPrompt, String historyRepo, boolean updateStatements) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
     System.out.println("Update publication at '"+folder+"' with filter '"+filter+"'");
     File f = new File(folder);
     if (!f.exists())
@@ -87,6 +88,7 @@ public class IGWebSiteMaintainer {
     System.out.println("looking for IGs in "+folder);
     List<String> igs = scanForIgs(folder, doCore);
     System.out.println("found "+igs.size()+" IGs to update:");
+    Collections.sort(igs);
     for (String s : igs) {
       System.out.println(" - "+s);
     }
@@ -105,7 +107,7 @@ public class IGWebSiteMaintainer {
       }
     }
     for (String s : igs) {
-      new IGReleaseUpdater(s, url, folder, reg, serverType, igs, sft, filter == null || filter.equalsIgnoreCase(s), historyRepo).check(indexes, true);
+      new IGReleaseUpdater(s, url, folder, reg, serverType, igs, sft, filter == null || filter.equalsIgnoreCase(s), historyRepo).check(indexes, true, updateStatements);
     }
     for (IndexMaintainer index : indexes.values()) {
       index.execute();
