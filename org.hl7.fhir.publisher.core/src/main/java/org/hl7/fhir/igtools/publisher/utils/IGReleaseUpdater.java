@@ -112,7 +112,7 @@ public class IGReleaseUpdater {
     this.ignoreList.addAll(otherSpecs);
   }
 
-  public void check(Map<String, IndexMaintainer> indexes, boolean throwError) throws IOException  {
+  public void check(Map<String, IndexMaintainer> indexes, boolean throwError, boolean updateStatements) throws IOException  {
     List<String> errs = new ArrayList<>(); 
     try {
       String f = Utilities.path(folder, "package-list.json");
@@ -182,7 +182,7 @@ public class IGReleaseUpdater {
                 } else {
                   System.out.println("-- updating version "+v+" in '"+vf+"'");
                   folders.add(vf);
-                  save = updateStatement(vf, null, ignoreList, json, o, errs, root, canonical, folder, canonical.equals("http://hl7.org/fhir"), false, list) | save;
+                  save = updateStatement(vf, null, ignoreList, json, o, errs, root, canonical, folder, canonical.equals("http://hl7.org/fhir"), false, list, updateStatements) | save;
                 }
               } else {
                 System.out.println("-- ignoring version "+v+" as it is an invalid path");
@@ -201,7 +201,7 @@ public class IGReleaseUpdater {
           }
         }
         if (root != null) {
-          updateStatement(folder, folders, ignoreList, json, root, errs, root, canonical, folder, canonical.equals("http://hl7.org/fhir"), true, list);
+          updateStatement(folder, folders, ignoreList, json, root, errs, root, canonical, folder, canonical.equals("http://hl7.org/fhir"), true, list, updateStatements);
         }
         if (save)
           TextFile.stringToFile(new GsonBuilder().setPrettyPrinting().create().toJson(json), f, false);
@@ -313,16 +313,18 @@ public class IGReleaseUpdater {
 //  }
 //
   private boolean updateStatement(String vf, List<String> ignoreList, List<String> ignoreListOuter, JsonObject ig, JsonObject version, List<String> errs, JsonObject root, String canonical, String canonicalPath, boolean isCore, 
-      boolean isCurrent, JsonArray list) throws FileNotFoundException, IOException, FHIRException, ParseException {
+      boolean isCurrent, JsonArray list, boolean updateStatements) throws FileNotFoundException, IOException, FHIRException, ParseException {
     if (!fullUpdate) {
       return false;
     }
     boolean vc = false;
-    String fragment = genFragment(ig, version, root, canonical, ignoreList != null, isCore);
-    System.out.println("  "+vf+": "+fragment);
     IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(vf, ignoreList, ignoreListOuter, version, folder);
-    igvu.updateStatement(fragment, ignoreList != null ? 0 : 1);
-    System.out.println("  .. "+igvu.getCountTotal()+" files checked, "+igvu.getCountUpdated()+" updated");
+    if (updateStatements) {
+      String fragment = genFragment(ig, version, root, canonical, ignoreList != null, isCore);
+      System.out.println("  "+vf+": "+fragment);
+      igvu.updateStatement(fragment, ignoreList != null ? 0 : 1);
+      System.out.println("  .. "+igvu.getCountTotal()+" files checked, "+igvu.getCountUpdated()+" updated");
+    }
     igvu.checkXmlJsonClones(vf);
     System.out.println("  .. "+igvu.getClonedTotal()+" clones checked, "+igvu.getClonedCount()+" updated");
     if (!isCore) {
@@ -642,7 +644,7 @@ public class IGReleaseUpdater {
   }
 
   public static void main(String[] args) throws Exception {
-    new IGReleaseUpdater(args[0], args[1], args[2], null, ServerType.ASP2, null, null, true, args[3]).check(null, false);
+    new IGReleaseUpdater(args[0], args[1], args[2], null, ServerType.ASP2, null, null, true, args[3]).check(null, false, true);
   }
   
 }
