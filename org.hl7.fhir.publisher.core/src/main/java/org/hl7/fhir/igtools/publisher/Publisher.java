@@ -2886,7 +2886,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void flagKeyElements(StructureDefinition sd) {
-    ElementDefinition root = sd.getSnapshot().getElement().get(0);
+    // if hasSnapshot then...
+    // ElementDefinition root = sd.getSnapshot().getElement().get(0);
 /*    int startPos = 1;
     for (int pos = startPos; pos < sd.getSnapshot().getElement().size(); pos++) {
 
@@ -10395,9 +10396,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
       boolean doCore = "true".equals(getNamedParam(args, "-core"));
+      boolean updateStatements = !"false".equals(getNamedParam(args, "-statements"));
       
       IGRegistryMaintainer reg = "n/a".equals(registry) ? null : new IGRegistryMaintainer(registry);
-      IGWebSiteMaintainer.execute(f.getAbsolutePath(), reg, doCore, filter, skipPrompt, history);
+      IGWebSiteMaintainer.execute(f.getAbsolutePath(), reg, doCore, filter, skipPrompt, history, updateStatements);
       reg.finish();      
     } else if (hasNamedParam(args, "-multi")) {
       int i = 1;
