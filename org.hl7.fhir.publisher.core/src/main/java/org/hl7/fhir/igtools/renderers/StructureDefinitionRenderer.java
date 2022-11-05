@@ -998,6 +998,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   public String dict(boolean incProfiledOut, int mode, String anchorPrefix) throws Exception {
     int i = 1;
     StringBuilder b = new StringBuilder();
+    b.append("<p>Guidance on how to interpret the contents of this table can be found <a href=\"https://build.fhir.org/ig/FHIR/ig-guidance//readingIgs.html#data-dictionaries\">here</a>.</p>\r\n");
     b.append("<table class=\"dict\">\r\n");
 
     Map<String, ElementDefinition> allAnchors = new HashMap<>();
