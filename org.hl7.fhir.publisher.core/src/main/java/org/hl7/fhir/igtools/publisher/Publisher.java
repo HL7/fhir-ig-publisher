@@ -209,6 +209,7 @@ import org.hl7.fhir.r5.model.IntegerType;
 import org.hl7.fhir.r5.model.Library;
 import org.hl7.fhir.r5.model.ListResource;
 import org.hl7.fhir.r5.model.ListResource.ListResourceEntryComponent;
+import org.hl7.fhir.r5.model.MarkdownType;
 import org.hl7.fhir.r5.model.Measure;
 import org.hl7.fhir.r5.model.MessageDefinition;
 import org.hl7.fhir.r5.model.MessageDefinition.MessageDefinitionAllowedResponseComponent;
@@ -2770,7 +2771,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       dep.setPackageId(getUTGPackageName());
       dep.setUri("http://terminology.hl7.org/ImplementationGuide/hl7.terminology");
       dep.setVersion(pcm.getLatestVersion(dep.getPackageId()));
-      dep.addExtension(ToolingExtensions.EXT_IGDEP_COMMENT, new StringType("Automatically added as a dependency - all IGs depend on HL7 Terminology"));
+      dep.addExtension(ToolingExtensions.EXT_IGDEP_COMMENT, new MarkdownType("Automatically added as a dependency - all IGs depend on HL7 Terminology"));
       sourceIg.getDependsOn().add(0, dep);
     }
     inspector = new HTMLInspector(outputDir, specMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), trackedFragments);
