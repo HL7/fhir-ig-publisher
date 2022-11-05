@@ -2881,17 +2881,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (!sd.hasSnapshot() && sd.hasBaseDefinition()) {
         generateSnapshot(sd);
       }
-      flagKeyElements(sd);
     }
-  }
-
-  private void flagKeyElements(StructureDefinition sd) {
-    // if hasSnapshot then...
-    // ElementDefinition root = sd.getSnapshot().getElement().get(0);
-/*    int startPos = 1;
-    for (int pos = startPos; pos < sd.getSnapshot().getElement().size(); pos++) {
-
-    }*/
   }
 
   private void generateSnapshot(StructureDefinition sd) {
