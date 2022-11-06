@@ -55,12 +55,12 @@ public class PublicationProcess {
    * @param destination - the root folder of the local copy of files for the web site to which the IG is being published. 
    * @throws Exception 
    */
-  public void publish(String source, String rootFolder, boolean milestone, boolean first, String date, String registrySource, String history, String temp) throws Exception {
+  public void publish(String source, String rootFolder, boolean first, String date, String registrySource, String history, String temp) throws Exception {
     PublisherConsoleLogger logger = new PublisherConsoleLogger();
     rootFolder = new File(rootFolder).getAbsolutePath();
     logger.start(Utilities.path("[tmp]", "publication-process.log"));
     try {
-      List<ValidationMessage> res = publishInner(source, rootFolder, milestone, first, date, registrySource, history, temp, logger);
+      List<ValidationMessage> res = publishInner(source, rootFolder, first, date, registrySource, history, temp, logger);
       if (res.size() == 0) {
         System.out.println("Success");
       } else {
@@ -75,7 +75,7 @@ public class PublicationProcess {
     System.out.println("Full log in "+logger.getFilename());
   }
   
-  public List<ValidationMessage> publishInner(String source, String rootFolder, boolean milestone, boolean first, String date, String registrySource, String history, String temp, PublisherConsoleLogger logger) throws Exception {
+  public List<ValidationMessage> publishInner(String source, String rootFolder, boolean first, String date, String registrySource, String history, String temp, PublisherConsoleLogger logger) throws Exception {
     List<ValidationMessage> res = new ArrayList<>();
 
     // check the wider context
@@ -132,6 +132,7 @@ public class PublicationProcess {
     
     JsonObject prSrc = JsonTrackingParser.parseJson(loadFile("Source Package List", Utilities.path(source, "publication-request.json")));
 
+    boolean milestone = JsonUtilities.bool(prSrc, "milestone");
     if (first) {
       if (new File(Utilities.path(destination, "package-list.json")).exists()) {
         check(res, false, "Destination Package List already exists, but the parameter -first was provided");

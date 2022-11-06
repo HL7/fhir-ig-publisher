@@ -129,6 +129,12 @@ public class PublicationChecker {
         check(errors, cv == null || VersionUtilities.isThisOrLater(cv, v), "Proposed version v"+v+" is older than already published version v"+cv+mkError());
       }
     }
+    boolean milestone = JsonUtilities.bool(pr, "milestone");
+    if (milestone) {
+      check(errors, !npm.version().contains("-"), "This release is labelled as a milestone, so should not have a patch version ("+npm.version() +")"+mkWarning());      
+    } else {
+      check(errors, npm.version().contains("-"), "This release is not labelled as a milestone, so should have a patch version ("+npm.version() +")"+mkWarning());
+    }
     if (check(errors, pr.has("path"), "No publication request path found"+mkError())) {
       check(errors, JsonUtilities.str(pr, "path").startsWith(npm.canonical()), "Proposed path for this publication does not start with the canonical URL ("+JsonUtilities.str(pr, "path")+" vs "+npm.canonical() +")"+mkError());
     }
