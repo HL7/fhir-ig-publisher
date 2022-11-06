@@ -267,7 +267,7 @@ public class PublicationProcess {
     zipFolder(temp, Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".zip"));
 
     System.out.println("");        
-    System.out.println("ok. All checks passed. Publish v"+npm.version()+" to "+destVer);        
+    System.out.println("ok. A= ll checks passed. Publish v"+npm.version()+" to "+destVer);        
 
     // 3. create the folder {root}/{realm}/{code}/{subdir}
     System.out.println("Copy the IG to "+destVer);    
@@ -276,13 +276,13 @@ public class PublicationProcess {
 
     // now, update the package list 
     System.out.println("Update "+Utilities.path(destination, "package-list.json"));    
-    updatePackageList(plPub, prSrc, Utilities.path(destination, "package-list.json"), milestone, date, npm.fhirVersion());
+    updatePackageList(plPub, prSrc, pathVer,  Utilities.path(destination, "package-list.json"), milestone, date, npm.fhirVersion());
     
     if (milestone) {
       System.out.println("This is a milestone release - publish v"+npm.version()+" to "+destination);      
       
       System.out.println("Clear out existing content");        
-      Publisher.main(new String[] { "-delete-current", destination, "-history", history.getAbsolutePath(), "-no-exit"});       
+       Publisher.main(new String[] { "-delete-current", destination, "-history", history.getAbsolutePath(), "-no-exit"});       
 
       System.out.println("Copy to directory");        
       FileUtils.copyDirectory(new File(Utilities.path(tempM.getAbsolutePath(), "output")), new File(destination));
@@ -313,7 +313,7 @@ public class PublicationProcess {
     return fDest;
   }
   
-  private void updatePackageList(JsonObject plPub, JsonObject prSrc, String path, boolean milestone, String date, String fhirVersion) throws IOException {
+  private void updatePackageList(JsonObject plPub, JsonObject prSrc, String webpath, String filepath, boolean milestone, String date, String fhirVersion) throws IOException {
     if (date == null) {
       SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
       date = sdf.format(new Date());      
@@ -321,7 +321,7 @@ public class PublicationProcess {
     JsonObject newVer = new JsonObject();
     newVer.addProperty("version", JsonUtilities.str(prSrc,  "version"));
     newVer.addProperty("date", date);
-    newVer.addProperty("path", path);
+    newVer.addProperty("path", webpath);
     newVer.addProperty("status", JsonUtilities.str(prSrc,  "status"));
     newVer.addProperty("sequence", JsonUtilities.str(prSrc,  "sequence"));
     newVer.addProperty("fhirversion", fhirVersion);
@@ -350,7 +350,7 @@ public class PublicationProcess {
     }
     plPub.remove("list");
     plPub.add("list", newArr);
-    JsonTrackingParser.write(plPub, new File(path));
+    JsonTrackingParser.write(plPub, new File(filepath));
   }
 
   private void zipFolder(File fSource, String path) throws IOException {

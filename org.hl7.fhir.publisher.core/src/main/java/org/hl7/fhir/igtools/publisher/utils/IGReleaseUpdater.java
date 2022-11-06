@@ -172,13 +172,17 @@ public class IGReleaseUpdater {
                 throw new Error("No Sequence value for version "+v+" in "+f);
               }
               if (!path.endsWith(".html")) {
-                if (!(new File(vf).exists())) {
+                File file = new File(vf);
+                if (!(file.exists())) {
                   if (Utilities.isAbsoluteUrl(vf)) {
                     System.out.println("-- ignoring version "+v+" as it appears to be a reference to an external target ('"+path+"')");
                   } else {
                     System.out.println("-- ignoring version "+v+" as path not found ('"+path+"')");
                     errs.add("version "+v+" path "+vf+" not found (canonical = "+canonical+", path = "+path+")");
                   }
+                } else if (!file.isDirectory()) {
+                  System.out.println("-- ignoring version "+v+" as path is not a folder ('"+path+"')");
+                  errs.add("version "+v+" path "+vf+" is not a folder (canonical = "+canonical+", path = "+path+")");
                 } else {
                   System.out.println("-- updating version "+v+" in '"+vf+"'");
                   folders.add(vf);
