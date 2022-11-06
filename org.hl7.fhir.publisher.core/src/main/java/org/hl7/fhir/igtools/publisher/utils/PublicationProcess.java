@@ -268,7 +268,7 @@ public class PublicationProcess {
     zipFolder(temp, Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".zip"));
 
     System.out.println("");        
-    System.out.println("ok. A= ll checks passed. Publish v"+npm.version()+" to "+destVer);        
+    System.out.println("ok. All checks passed. Publish v"+npm.version()+" to "+destVer);        
 
     // 3. create the folder {root}/{realm}/{code}/{subdir}
     System.out.println("Copy the IG to "+destVer);    
