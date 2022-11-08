@@ -161,9 +161,9 @@ public class IPStatementsRenderer {
           Map<String, String> links = new HashMap<>();
           for (FetchedResource r : t.uses) {
             String link = r.getPath();
-            if (link == null && r.getResource() != null) {
-              link = r.getResource().getUserString("path");
-            }
+//            if (link == null && r.getResource() != null) {
+//              link = r.getResource().getUserString("path");
+//            }
             links.put(r.getTitle(), link);
           }
           key2++;
