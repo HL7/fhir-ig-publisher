@@ -145,7 +145,9 @@ public class IPStatementsRenderer {
         Collections.sort(v, new SystemUsageSorter());        
         for (SystemUsage t : v) {
           b.append("<li>");
-          if (t.cs != null) {
+          if (t.cs == null) {
+            b.append(Utilities.escapeXml(t.desc));
+          } else if (t.cs.hasUserData("path")) {
             b.append("<a href=\"");
             b.append(t.cs.getUserString("path"));
             b.append("\">");
@@ -158,7 +160,11 @@ public class IPStatementsRenderer {
           
           Map<String, String> links = new HashMap<>();
           for (FetchedResource r : t.uses) {
-            links.put(r.getTitle(), r.getPath());
+            String link = r.getPath();
+            if (link == null && r.getResource() != null) {
+              link = r.getResource().getUserString("path");
+            }
+            links.put(r.getTitle(), link);
           }
           key2++;
           int c = 0;
@@ -175,7 +181,11 @@ public class IPStatementsRenderer {
             } else if (c > 1) {
               b.append(", ");
             }
-            b.append("<a href=\""+links.get(s)+"\">"+Utilities.escapeXml(s)+"</a>");
+            if (links.get(s) == null) {
+              b.append(Utilities.escapeXml(s));
+            } else {
+              b.append("<a href=\""+links.get(s)+"\">"+Utilities.escapeXml(s)+"</a>");
+            }
           }
           if (links.size() > MAX_LIST_DISPLAY + 2) {
             b.append("</span>");
