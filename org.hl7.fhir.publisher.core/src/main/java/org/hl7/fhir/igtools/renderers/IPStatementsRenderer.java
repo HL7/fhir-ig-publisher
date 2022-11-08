@@ -182,7 +182,7 @@ public class IPStatementsRenderer {
           }
           b.append("</li>\r\n");
         }
-        b.append("<ul>\r\n");
+        b.append("</ul>\r\n");
         b.append("</div>");
         b.append("</li>\r\n");
       }
