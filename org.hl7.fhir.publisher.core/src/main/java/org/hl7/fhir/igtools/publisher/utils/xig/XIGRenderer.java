@@ -41,6 +41,7 @@ import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.renderers.RendererFactory;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext.GenerationRules;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.ResourceRendererMode;
 import org.hl7.fhir.r5.terminologies.JurisdictionUtilities;
 import org.hl7.fhir.r5.test.utils.TestingUtilities;
@@ -85,7 +86,7 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
     this.info = info;
     this.target = target;
     this.rc = new RenderingContext(info.getCtxt(), new MarkDownProcessor(Dialect.COMMON_MARK), 
-        new ValidationOptions("en"), "http://hl7.org/fhir", "", "en", ResourceRendererMode.TECHNICAL);
+        new ValidationOptions("en"), "http://hl7.org/fhir", "", "en", ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
     this.rc.setDestDir(target);
     this.rc.setPkp(this);
     this.rc.setNoSlowLookup(true);
