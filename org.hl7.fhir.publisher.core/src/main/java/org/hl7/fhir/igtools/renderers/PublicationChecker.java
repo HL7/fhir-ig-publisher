@@ -8,6 +8,7 @@ import java.util.List;
 
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.StringPair;
+import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
@@ -122,7 +123,7 @@ public class PublicationChecker {
     }  
   }
 
-  private void checkPublicationRequest(List<String> messages, NpmPackage npm, JsonObject pl, List<StringPair> summary) {
+  private void checkPublicationRequest(List<String> messages, NpmPackage npm, JsonObject pl, List<StringPair> summary) throws IOException {
     JsonObject pr = null;
     try {
       pr = JsonTrackingParser.parseJsonFile(Utilities.path(folder, "publication-request.json"));
@@ -186,9 +187,15 @@ public class PublicationChecker {
     }
     if (pr.has("descmd")) {
       String md = JsonUtilities.str(pr, "descmd");
+      if (md.startsWith("@")) {
+        File mdFile = new File(Utilities.path(folder, md.substring(1)));
+        if (check(messages, mdFile.exists(), "descmd references the file "+md.substring(1)+" but it doesn't exist")) {
+          md = TextFile.fileToString(mdFile);
+        }
+      }
       check(messages, !md.contains("'"), "descmd cannot contain a '"+mkError());
       check(messages, !md.contains("\""), "descmd cannot contain a \""+mkError());
-      summary.add(new StringPair("descmd", mdEngine.process(JsonUtilities.str(pr, "descmd"), "descmd")));                        
+      summary.add(new StringPair("descmd", mdEngine.process(md, "descmd")));                        
     }
     if (pr.has("changes")) {
       summary.add(new StringPair("changes", JsonUtilities.str(pr, "changes")));                        

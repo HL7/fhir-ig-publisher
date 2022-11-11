@@ -17,6 +17,7 @@ import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.publisher.utils.WebSiteLayoutRulesProviders.WebSiteLayoutRulesProvider;
 import org.hl7.fhir.utilities.FileNotifier;
 import org.hl7.fhir.utilities.IniFile;
+import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.ZipGenerator;
 import org.hl7.fhir.utilities.json.JsonUtilities;
@@ -277,7 +278,7 @@ public class PublicationProcess {
 
     // now, update the package list 
     System.out.println("Update "+Utilities.path(destination, "package-list.json"));    
-    updatePackageList(plPub, prSrc, pathVer,  Utilities.path(destination, "package-list.json"), milestone, date, npm.fhirVersion());
+    updatePackageList(plPub, fSource.getAbsolutePath(), prSrc, pathVer,  Utilities.path(destination, "package-list.json"), milestone, date, npm.fhirVersion());
     
     if (milestone) {
       System.out.println("This is a milestone release - publish v"+npm.version()+" to "+destination);      
@@ -314,7 +315,7 @@ public class PublicationProcess {
     return fDest;
   }
   
-  private void updatePackageList(JsonObject plPub, JsonObject prSrc, String webpath, String filepath, boolean milestone, String date, String fhirVersion) throws IOException {
+  private void updatePackageList(JsonObject plPub, String folder, JsonObject prSrc, String webpath, String filepath, boolean milestone, String date, String fhirVersion) throws Exception {
     if (date == null) {
       SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
       date = sdf.format(new Date());      
@@ -330,7 +331,15 @@ public class PublicationProcess {
       newVer.addProperty("desc", JsonUtilities.str(prSrc,  "desc"));
     }
     if (prSrc.has("descmd")) {
-      newVer.addProperty("descmd", JsonUtilities.str(prSrc,  "descmd"));
+      String md = JsonUtilities.str(prSrc,  "descmd");
+      if (md.startsWith("@")) {
+        File mdFile = new File(Utilities.path(folder, md.substring(1)));
+        if (!mdFile.exists()) {
+          throw new Exception("descmd references the file "+md.substring(1)+" but it doesn't exist");
+        }
+        md = TextFile.fileToString(mdFile);
+      }
+      newVer.addProperty("descmd", md);
     }
     if (prSrc.has("changes")) {
       newVer.addProperty("changes", JsonUtilities.str(prSrc,  "changes"));
