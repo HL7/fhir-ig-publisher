@@ -1,6 +1,7 @@
 package org.hl7.fhir.igtools.publisher;
 
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -9,9 +10,11 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.Map.Entry;
 
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.igtools.publisher.Publisher.IGBuildMode;
 import org.hl7.fhir.igtools.publisher.R4ToR4BAnalyser.ResPointer;
 import org.hl7.fhir.r4b.model.Bundle;
 import org.hl7.fhir.r4b.model.Bundle.BundleEntryComponent;
@@ -19,22 +22,34 @@ import org.hl7.fhir.r4b.model.Enumerations.FHIRVersion;
 import org.hl7.fhir.r4b.model.OperationDefinition;
 import org.hl7.fhir.r4b.model.OperationDefinition.OperationDefinitionParameterComponent;
 import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.r5.conformance.ProfileUtilities;
+import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.context.SimpleWorkerContext;
+import org.hl7.fhir.r5.context.IWorkerContext.IContextResourceLoader;
+import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService.LogCategory;
+import org.hl7.fhir.r5.context.SimpleWorkerContext.SimpleWorkerContextBuilder;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.model.CanonicalType;
+import org.hl7.fhir.r5.model.Constants;
 import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
+import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.JsonTrackingParser;
 import org.hl7.fhir.utilities.json.JsonUtilities;
+import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.NpmPackage.NpmPackageFolder;
+import org.hl7.fhir.utilities.npm.NpmPackage.PackageResourceInformation;
+import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.npm.PackageHacker;
+import org.hl7.fhir.utilities.npm.ToolsVersion;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -273,7 +288,7 @@ public class R4ToR4BAnalyser {
       if (!inline) {
         b.append("<p>");
       }
-      b.append("This is an "+src+" IG. None of the features it uses are changed "+(src.equals("r4") ? "in" : "from")+" "+dst+", so it can be used as is with "+dst+" systems. ");
+      b.append("This is an "+src+" IG. None of the features it uses are changed in "+dst+", so it can be used as is with "+dst+" systems. ");
       b.append("Packages for both <a href=\"package.r4.tgz\">R4 ("+pid+".r4)</a> and <a href=\"package.r4b.tgz\">R4B ("+pid+".r4b)</a> are available.");
       if (!inline) {
         b.append("</p>\r\n");
@@ -324,6 +339,47 @@ public class R4ToR4BAnalyser {
       }
     }
     return b.toString();
+  }
+  
+  public void log(String pid) {
+    if (VersionUtilities.isR4Ver(context.getVersion())) {
+      log(pid, "R4", "R4B", r4BOK, r4Problems, r4BProblems, r4Exemptions, r4BExemptions);
+    } else if (VersionUtilities.isR4BVer(context.getVersion())) {
+      log(pid, "R4B", "R4", r4OK, r4BProblems, r4Problems, r4BExemptions, r4Exemptions);
+    } else {
+      System.out.println("??");
+    }
+  }
+
+  private void log(String pid, String src, String dst, boolean dstOk, List<String> srcProblems, List<String> dstProblems, Map<String, ResPointer> srcExempt, Map<String, ResPointer> dstExempt) {
+    if (dstOk) {
+      System.out.println("This is an "+src+" IG. None of the features it uses are changed "+(src.equals("r4") ? "in" : "from")+" "+dst+", so it can be used as is with "+dst+" systems.");
+      System.out.println("Packages for both R4 ("+pid+".r4) and R4B ("+pid+".r4b) are available.");
+    } else {
+      System.out.println("This is an "+src+" IG that is not compatible with "+dst+" because:");
+      for (String s : dstProblems) {
+        System.out.println("* "+s);
+      }
+    }
+    if (dstExempt.size() > 0) {
+      System.out.println("The following resources are not in the "+dst+" version:");
+      for (String s : Utilities.sorted(dstExempt.keySet())) {
+        System.out.println("* "+s);
+      }
+    }
+    if (srcExempt.size() > 0) {
+      System.out.println("The following resources are only in the "+dst+" version:");
+      for (String s : Utilities.sorted(srcExempt.keySet())) {
+        System.out.println("* "+s);
+      }
+    }
+    if (srcProblems.size() > 0) {
+      System.out.println("<p>While checking for "+dst+" compatibility, the following "+src+" problems were found:");
+      for (String s : srcProblems) {
+        System.out.println("* "+s);
+      }
+    }
+
   }
 
   private void renderExempList(Map<String, ResPointer> list, StringBuilder b) {
@@ -540,4 +596,45 @@ public class R4ToR4BAnalyser {
     return true;
   }
   
+  public static void main(String[] args) throws Exception {
+    new R4ToR4BAnalyser().processPackage(args[0]);
+  }
+
+  public SpecMapManager loadSpecDetails(byte[] bs, String version, String specPath) throws IOException {
+    SpecMapManager map = new SpecMapManager(bs, version);
+    map.setBase(PackageHacker.fixPackageUrl(specPath));
+    return map;
+  }
+
+  private void processPackage(String filename) throws FileNotFoundException, IOException {
+    System.out.println("Analysing "+filename);
+    NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(filename));
+    String version = npm.fhirVersion();
+    String pid = VersionUtilities.packageForVersion(version);
+    String specPath = VersionUtilities.getSpecUrl(version);
+    System.out.println("Loaded. Version = "+version);
+    FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager(true, ToolsVersion.TOOLS_VERSION);
+    System.out.println("Preparing using "+pid);
+    NpmPackage pi = pcm.loadPackage(pid);
+    
+    SpecMapManager spm = loadSpecDetails(TextFile.streamToBytes(pi.load("other", "spec.internals")), version, specPath);
+    SimpleWorkerContext sp;
+    IContextResourceLoader loader = new PublisherLoader(pi, spm, specPath, null).makeLoader();
+    sp = new SimpleWorkerContext.SimpleWorkerContextBuilder().fromPackage(pi, loader);
+    ProfileUtilities utils = new ProfileUtilities(context, new ArrayList<ValidationMessage>(), null);
+    for (StructureDefinition sd : new ContextUtilities(sp).allStructures()) {
+      utils.setIds(sd, true);
+    }
+    setContext(sp);
+    System.out.println("Processing");
+    for (PackageResourceInformation pri : npm.listIndexedResources("StructureDefinition")) {
+      StructureDefinition sd = (StructureDefinition) loader.loadResource(npm.load(pri), true);
+      checkProfile(sd);
+    }
+    log(npm.name());
+    if (canBeR4() && canBeR4B()) {
+      clonePackage(npm.name(), filename);
+    }
+    System.out.println("== done ==");
+  }
 }
