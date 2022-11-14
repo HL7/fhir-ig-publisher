@@ -216,7 +216,7 @@ public class DependencyRenderer {
           }
         }
       }
-      Row row = addRow(gen, rows, npm.name(), npm.version(), getVersionState(npm.name(), npm.version(), npm.canonical()), getLatestVersion(npm.name(), npm.canonical()), "current".equals(npm.version()), npm.fhirVersion(), 
+      Row row = addRow(gen, rows, npm.name(), npm.title(), npm.version(), getVersionState(npm.name(), npm.version(), npm.canonical()), getLatestVersion(npm.name(), npm.canonical()), "current".equals(npm.version()), npm.fhirVersion(), 
           !VersionUtilities.versionsCompatible(fver, npm.fhirVersion()), npm.canonical(), PackageHacker.fixPackageUrl(npm.getWebLocation()), comment, desc, QA, hasDesc);
       if (isNew) {
         for (String d : npm.dependencies()) {
@@ -401,7 +401,7 @@ public class DependencyRenderer {
     } else if (id.startsWith("hl7") && !id.startsWith("hl7.fhir.")) {
       comment = "HL7 Packages must have an id that starts with hl7.fhir.";
     }
-    Row row = addRow(gen, model.getRows(), id, ver, null, null, false, fver, false, canonical, web, comment, null, QA, hasDesc);
+    Row row = addRow(gen, model.getRows(), id,  ig.present(), ver, null, null, false, fver, false, canonical, web, comment, null, QA, hasDesc);
     if (QA && comment != null) {
       row.getCells().get(5).addStyle("background-color: #ffcccc");
     }
@@ -409,37 +409,43 @@ public class DependencyRenderer {
     return row;
   }
 
-  private Row addRow(HierarchicalTableGenerator gen, List<Row> rows, String id, String ver, VersionState verState, String latestVer, boolean verError, String fver, boolean fverError, String canonical, String web, String problems, String desc, boolean QA, boolean hasDesc) {
+  private Row addRow(HierarchicalTableGenerator gen, List<Row> rows, String id, String title, String ver, VersionState verState, String latestVer, boolean verError, String fver, boolean fverError, String canonical, String web, String problems, String desc, boolean QA, boolean hasDesc) {
     Row row = gen.new Row();
     rows.add(row);
     row.setIcon("icon-fhir-16.png", "NPM Package");
-    row.getCells().add(gen.new Cell(null, null, id, null, null));
-    Cell c = gen.new Cell(null, null, ver, null, null);
-    row.getCells().add(c);
-    if (verState != null) {
-      c.addText(" ");
-      switch (verState) {
-      case VERSION_LATEST_INTERIM:
-        c.addStyledText("Latest Interim Release", "I", "white", "green", null, false);
-        break;
-      case VERSION_LATEST_MILESTONE:
-        c.addStyledText("Latest Milestone Release", "M", "white", "green", null, false);
-        break;
-      case VERSION_OUTDATED:
-        c.addStyledText("Outdated Release", "O", "white", "red", null, false);
-        break;
-      case VERSION_NO_LIST:
-        c.addStyledText("Not yet released", "U", "white", "red", null, false);
-        break;    
-      case VERSION_UNKNOWN:
-        c.addStyledText("Illegal Version", "V", "white", "red", null, false);
-        break;    
-      }      
-    }
-    row.getCells().add(gen.new Cell(null, null, fver, null, null));
-    row.getCells().add(gen.new Cell(null, null, canonical, null, null));
-    row.getCells().add(gen.new Cell(null, null, web, null, null));
     if (QA) {
+      row.getCells().add(gen.new Cell(null, null, id, null, null));
+      Cell c = gen.new Cell(null, null, ver, null, null);
+      row.getCells().add(c);
+      if (verState != null) {
+        c.addText(" ");
+        switch (verState) {
+        case VERSION_LATEST_INTERIM:
+          c.addStyledText("Latest Interim Release", "I", "white", "green", null, false);
+          break;
+        case VERSION_LATEST_MILESTONE:
+          c.addStyledText("Latest Milestone Release", "M", "white", "green", null, false);
+          break;
+        case VERSION_OUTDATED:
+          c.addStyledText("Outdated Release", "O", "white", "red", null, false);
+          break;
+        case VERSION_NO_LIST:
+          c.addStyledText("Not yet released", "U", "white", "red", null, false);
+          break;    
+        case VERSION_UNKNOWN:
+          c.addStyledText("Illegal Version", "V", "white", "red", null, false);
+          break;    
+        }      
+      }
+    } else {
+      row.getCells().add(gen.new Cell(null, web, title, "Canonical: "+canonical, null));
+      row.getCells().add(gen.new Cell(null, "https://simplifier.net/packages/"+id+"/"+ver, id+"#"+ver, null, null));
+    }
+    row.getCells().add(gen.new Cell(null, VersionUtilities.getSpecUrl(fver), VersionUtilities.getNameForVersion(fver), null, null));
+    if (QA) {
+      row.getCells().add(gen.new Cell(null, null, canonical, null, null));
+      row.getCells().add(gen.new Cell(null, null, web, null, null));
+      
       String s = Utilities.noString(problems) ? "" : problems;
       String v = verState == VersionState.VERSION_OUTDATED ? "Latest Release is "+latestVer+"" : "";
       if (Utilities.noString(s)) {
@@ -489,12 +495,17 @@ public class DependencyRenderer {
     TableModel model = gen.new TableModel("dep", false);
     
     model.setAlternating(true);
+    if (!QA) {
+      model.getTitles().add(gen.new Title(null, null, "IG", "Implementation Guide Reference", null, 0));      
+    }
     model.getTitles().add(gen.new Title(null, null, "Package", "The NPM Package Id", null, 0));
-    model.getTitles().add(gen.new Title(null, null, "Version", "The version of the package", null, 0));
-    model.getTitles().add(gen.new Title(null, null, "FHIR Release", "The version of FHIR that the package is based on", null, 0));
-    model.getTitles().add(gen.new Title(null, null, "Canonical", "Canonical URL", null, 0));
-    model.getTitles().add(gen.new Title(null, null, "Web Base", "Web Reference Base", null, 0));
     if (QA) {
+      model.getTitles().add(gen.new Title(null, null, "Version", "The version of the package", null, 0));
+    }
+    model.getTitles().add(gen.new Title(null, null, "FHIR", "The version of FHIR that the package is based on", null, 0));
+    if (QA) {
+      model.getTitles().add(gen.new Title(null, null, "Canonical", "Canonical URL", null, 0));
+      model.getTitles().add(gen.new Title(null, null, "Web Base", "Web Reference Base", null, 0));
       model.getTitles().add(gen.new Title(null, null, "Comment", "Comments about this entry", null, 0));
     } else if (hasDesc) {
       model.getTitles().add(gen.new Title(null, null, "Comment", "Explains why this dependency exists", null, 0));
