@@ -1937,7 +1937,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             ("*".equals(p[1]) || r.getId().equals(p[1]))) {
           return false;
         }
-      }
     }
     return true;
   }
@@ -2514,7 +2513,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if ("examples".equals(p.getValue()))
           genExamples = true;
       } else if (pc.equals("no-narrative")) {
-        noNarratives.add(p.getValue());
+        String s = p.getValue();
+        if (!s.contains("/")) {
+         throw new Exception("Illegal value "+s+" for no-narrative");
+        }
+        noNarratives.add(s);
       } else if (pc.equals("no-validate")) {
         noValidate.add(p.getValue());
       } else if (pc.equals("path-resource")) {

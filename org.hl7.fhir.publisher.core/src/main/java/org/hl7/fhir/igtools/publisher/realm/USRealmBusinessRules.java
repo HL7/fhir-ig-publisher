@@ -194,11 +194,16 @@ public class USRealmBusinessRules extends RealmBusinessRules {
     }
   }
 
-  private JsonObject fetchJson(String source) throws IOException  {
-    SimpleHTTPClient http = new SimpleHTTPClient();
-    HTTPResult res = http.get(source+"?nocache=" + System.currentTimeMillis());
-    res.checkThrowException();
-    return JsonTrackingParser.parseJson(res.getContent());
+  private JsonObject fetchJson(String source) throws IOException {
+    try {
+      SimpleHTTPClient http = new SimpleHTTPClient();
+      HTTPResult res;
+        res = http.get(source+"?nocache=" + System.currentTimeMillis());
+      res.checkThrowException();
+      return JsonTrackingParser.parseJson(res.getContent());
+    } catch (IOException e) {
+      throw new IOException("Error reading "+source+": "+e.getMessage(), e);
+    }
   }
 
   @Override
