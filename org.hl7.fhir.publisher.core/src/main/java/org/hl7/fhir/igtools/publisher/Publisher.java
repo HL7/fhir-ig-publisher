@@ -1937,6 +1937,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             ("*".equals(p[1]) || r.getId().equals(p[1]))) {
           return false;
         }
+      }
     }
     return true;
   }
