@@ -255,7 +255,7 @@ public class FetchedResource {
 
   @Override
   public String toString() {
-    return title; 
+    return fhirType()+"/"+getId(); 
   }
   
 }

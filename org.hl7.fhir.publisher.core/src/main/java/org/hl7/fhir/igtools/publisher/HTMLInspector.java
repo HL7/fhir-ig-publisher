@@ -650,6 +650,11 @@ public class HTMLInspector {
           "http://hl7.org/fhir-issues", "http://hl7.org/registry") || 
           matchesTarget(ref, "http://hl7.org", "http://hl7.org/fhir/DSTU2", "http://hl7.org/fhir/STU3", "http://hl7.org/fhir/R4", "http://hl7.org/fhir/smart-app-launch", "http://hl7.org/fhir/validator");
 
+     if (!resolved) { // updated table documentation
+       if (ref.startsWith("http://build.fhir.org/ig/FHIR/ig-guidance/readingIgs.html")) {
+         resolved = true;
+       }
+     }
      // a local file may have been created by some poorly tracked process, so we'll consider that as a possible
      if (!resolved && !Utilities.isAbsoluteUrl(rref) && !rref.contains("..")) { // .. is security check. Maybe there's some ways it could be valid, but we're not interested for now
        String fname = Utilities.path(new File(filename).getParent(), rref);

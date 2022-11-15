@@ -3840,7 +3840,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         } else {
           NpmPackage dpi = pcm.loadPackage(dep);
           if (dpi == null) {
-            logDebugMessage(LogCategory.CONTEXT, "Unable to find package dependency "+dep+". Will proceed, but likely to be be errors in qz.html etc");
+            logDebugMessage(LogCategory.CONTEXT, "Unable s to find package dependency "+dep+". Will proceed, but likely to be be errors in qz.html etc");
           } else {
             if (!VersionUtilities.versionsCompatible(version, pi.fhirVersion())) {
               log("Version mismatch. This IG is for FHIR version "+version+", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion()+" (will ignore that and try to run anyway)");
@@ -3851,12 +3851,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             smm.setBase(dpi.canonical());
             smm.setBase2(PackageHacker.fixPackageUrl(dpi.url()));
             specMaps.add(smm);
-            loadFromPackage(dpi.title(), dpi.canonical(), dpi, dpi.url(), smm);          
+            loadFromPackage(dpi.title(), dpi.canonical(), dpi, PackageHacker.fixPackageUrl(dpi.getWebLocation()), smm);          
           }
         }
       }
-    }
-    IContextResourceLoader loader = new PublisherLoader(pi, igm, webref, igpkp).makeLoader();
+    }    IContextResourceLoader loader = new PublisherLoader(pi, igm, webref, igpkp).makeLoader();
     context.loadFromPackage(pi, loader);
   }
 
