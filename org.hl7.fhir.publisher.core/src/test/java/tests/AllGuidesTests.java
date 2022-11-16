@@ -115,7 +115,7 @@ private static final String VER = "1.0.53";
 
   @Test
   public void testAUBase() throws Exception {
-    testIg("hl7.fhir.au.base", "ig.json");
+    testIg("hl7.fhir.au.base", null);
   }
 
 

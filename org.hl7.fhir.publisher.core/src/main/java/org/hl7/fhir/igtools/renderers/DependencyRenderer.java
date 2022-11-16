@@ -17,7 +17,6 @@ import org.hl7.fhir.convertors.factory.VersionConvertorFactory_14_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_43_50;
-import org.hl7.fhir.dstu2016may.formats.JsonParser;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.DependencyAnalyser;
@@ -36,8 +35,7 @@ import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.json.JsonUtilities;
-import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.npm.BasePackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageHacker;
@@ -48,8 +46,6 @@ import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Row;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.TableModel;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
-
-import com.google.gson.JsonObject;
 
 public class DependencyRenderer {
 
@@ -290,7 +286,7 @@ public class DependencyRenderer {
 
   private ImplementationGuide loadImplementationGuide(InputStream content, String v) throws FHIRFormatError, FHIRException, IOException {
     if (VersionUtilities.isR2BVer(v)) {
-      return (ImplementationGuide) VersionConvertorFactory_14_50.convertResource(new JsonParser().parse(content));
+      return (ImplementationGuide) VersionConvertorFactory_14_50.convertResource(new org.hl7.fhir.dstu2016may.formats.JsonParser().parse(content));
     } else if (VersionUtilities.isR3Ver(v)) {
       return (ImplementationGuide) VersionConvertorFactory_30_50.convertResource(new org.hl7.fhir.dstu3.formats.JsonParser().parse(content));
     } else if (VersionUtilities.isR4Ver(v)) {
@@ -316,10 +312,10 @@ public class DependencyRenderer {
     if (pl == null) {
       return null;
     }
-    for (JsonObject v : JsonUtilities.objects(pl, "list")) {
-      if (!"current".equals(JsonUtilities.str(v, "version"))) {
-        if (JsonUtilities.bool(v, "current")) {// this is the current official release
-          return JsonUtilities.str(v,  "version");
+    for (JsonObject v : pl.getArr("list").asObjects()) {
+      if (!"current".equals(v.getString("version"))) {
+        if (v.getBoolean("current")) {// this is the current official release
+          return v.getString("version");
         } 
       }
     }      
@@ -332,10 +328,10 @@ public class DependencyRenderer {
       return VersionState.VERSION_NO_LIST;
     }
     boolean latestInterim = true;
-    for (JsonObject v : JsonUtilities.objects(pl, "list")) {
-      if (!"current".equals(JsonUtilities.str(v, "version"))) {
-        if (version.equals(JsonUtilities.str(v, "version"))) {
-          if (JsonUtilities.bool(v, "current")) {// this is the current official release
+    for (JsonObject v : pl.getArr("list").asObjects()) {
+      if (!"current".equals(v.getString("version"))) {
+        if (version.equals(v.getString("version"))) {
+          if (v.getBoolean("current")) {// this is the current official release
             return VersionState.VERSION_LATEST_MILESTONE;
           } if (latestInterim) {
             return VersionState.VERSION_LATEST_INTERIM;
@@ -356,7 +352,7 @@ public class DependencyRenderer {
     }
     JsonObject pl;
     try {
-      pl = JsonTrackingParser.fetchJson(Utilities.pathURL(canonical, "package-list.json")); 
+      pl =  org.hl7.fhir.utilities.json.parser.JsonParser.parseObjectFromUrl(Utilities.pathURL(canonical, "package-list.json")); 
           
     } catch (Exception e) {
       pl = null;
