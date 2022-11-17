@@ -140,6 +140,7 @@ public class DependencyRenderer {
         NpmPackage p = resolve(d);
         addPackageRow(gen, row.getSubRows(), p, d.getVersion(), realm, QA, b, ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_IGDEP_COMMENT), hasDesc);
       } catch (Exception e) {
+        e.printStackTrace();
         addErrorRow(gen, row.getSubRows(), d.getPackageId(), d.getVersion(), d.getUri(), null, e.getMessage(), QA, hasDesc);
       }
     }
@@ -312,10 +313,10 @@ public class DependencyRenderer {
     if (pl == null) {
       return null;
     }
-    for (JsonObject v : pl.getArr("list").asObjects()) {
-      if (!"current".equals(v.getString("version"))) {
-        if (v.getBoolean("current")) {// this is the current official release
-          return v.getString("version");
+    for (JsonObject v : pl.forceArray("list").asObjects()) {
+      if (!"current".equals(v.asString("version"))) {
+        if (v.asBoolean("current")) {// this is the current official release
+          return v.asString("version");
         } 
       }
     }      
@@ -328,10 +329,10 @@ public class DependencyRenderer {
       return VersionState.VERSION_NO_LIST;
     }
     boolean latestInterim = true;
-    for (JsonObject v : pl.getArr("list").asObjects()) {
-      if (!"current".equals(v.getString("version"))) {
-        if (version.equals(v.getString("version"))) {
-          if (v.getBoolean("current")) {// this is the current official release
+    for (JsonObject v : pl.forceArray("list").asObjects()) {
+      if (!"current".equals(v.asString("version"))) {
+        if (version.equals(v.asString("version"))) {
+          if (v.asBoolean("current")) {// this is the current official release
             return VersionState.VERSION_LATEST_MILESTONE;
           } if (latestInterim) {
             return VersionState.VERSION_LATEST_INTERIM;

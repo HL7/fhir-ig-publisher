@@ -113,8 +113,8 @@ public class PublicationChecker {
 
   private void checkExistingPublication(List<String> messages, NpmPackage npm, JsonObject pl) {
     if (pl != null) {
-      check(messages, npm.name().equals(pl.getString("package-id")), "Package ID mismatch. This package is "+npm.name()+" but the website has "+pl.getString("package-id")+mkError());
-      check(messages, npm.canonical().equals(pl.getString("canonical")), "Package canonical mismatch. This package canonical is "+npm.canonical()+" but the website has "+pl.getString("canonical")+mkError());
+      check(messages, npm.name().equals(pl.asString("package-id")), "Package ID mismatch. This package is "+npm.name()+" but the website has "+pl.asString("package-id")+mkError());
+      check(messages, npm.canonical().equals(pl.asString("canonical")), "Package canonical mismatch. This package canonical is "+npm.canonical()+" but the website has "+pl.asString("canonical")+mkError());
       check(messages, !hasVersion(pl, npm.version()), "Version "+npm.version()+" has already been published"+mkWarning());
     } else {
       check(messages, npm.version().startsWith("0.1"), "This IG has never been published, so the version should start with 0."+mkWarning());
@@ -130,14 +130,14 @@ public class PublicationChecker {
       return;
     }    
     if (check(messages, pr.has("package-id"), "No package id found in publication request (required for cross-check)"+mkError())) {
-      if (check(messages, npm.name().equals(pr.getString("package-id")), "Publication Request is for '"+pr.getString("package-id")+"' but package is "+npm.name()+mkError())) {
-        summary.add(new StringPair("package-id", pr.getString("package-id")));
+      if (check(messages, npm.name().equals(pr.asString("package-id")), "Publication Request is for '"+pr.asString("package-id")+"' but package is "+npm.name()+mkError())) {
+        summary.add(new StringPair("package-id", pr.asString("package-id")));
       }
     }
     if (check(messages, pr.has("version"), "No publication request version found"+mkError())) {
-      String v = pr.getString("version");
-      if (check(messages, npm.version().equals(v), "Publication Request is for v'"+pr.getString("version")+"' but package version is v"+npm.version()+mkError())) {
-        summary.add(new StringPair("version", pr.getString("version")));        
+      String v = pr.asString("version");
+      if (check(messages, npm.version().equals(v), "Publication Request is for v'"+pr.asString("version")+"' but package version is v"+npm.version()+mkError())) {
+        summary.add(new StringPair("version", pr.asString("version")));        
       }
       if (pl != null) {
         JsonObject plv = getVersionObject(v, pl);
@@ -150,41 +150,41 @@ public class PublicationChecker {
       }
     }
     if (check(messages, pr.has("path"), "No publication request path found"+mkError())) {
-      if (check(messages, pr.getString("path").startsWith(npm.canonical()), "Proposed path for this publication does not start with the canonical URL ("+pr.getString("path")+" vs "+npm.canonical() +")"+mkError())) {
-        summary.add(new StringPair("path", pr.getString("path")));                        
+      if (check(messages, pr.asString("path").startsWith(npm.canonical()), "Proposed path for this publication does not start with the canonical URL ("+pr.asString("path")+" vs "+npm.canonical() +")"+mkError())) {
+        summary.add(new StringPair("path", pr.asString("path")));                        
       }
     }
-    boolean milestone = pr.getBoolean("milestone");
+    boolean milestone = pr.asBoolean("milestone");
     if (milestone) {
       if (check(messages, !npm.version().contains("-"), "This release is labelled as a milestone, so should not have a patch version ("+npm.version() +")"+mkWarning())) {
-        summary.add(new StringPair("milestone", pr.getString("milestone")));        
+        summary.add(new StringPair("milestone", pr.asString("milestone")));        
       }
     } else {
       if (check(messages, npm.version().contains("-"), "This release is not labelled as a milestone, so should have a patch version ("+npm.version() +")"+mkWarning())) {
-        summary.add(new StringPair("milestone", pr.getString("milestone")));                
+        summary.add(new StringPair("milestone", pr.asString("milestone")));                
       }
     }
     if (check(messages, pr.has("status"), "No publication request status found"+mkError())) {
-      if (check(messages, isValidStatus(pr.getString("status")), "Proposed status for this publication is not valid (valid values: release|trial-use|update|qa-preview|ballot|draft|normative+trial-use|normative|informative)"+mkError())) {
-        summary.add(new StringPair("status", pr.getString("status")));                        
+      if (check(messages, isValidStatus(pr.asString("status")), "Proposed status for this publication is not valid (valid values: release|trial-use|update|qa-preview|ballot|draft|normative+trial-use|normative|informative)"+mkError())) {
+        summary.add(new StringPair("status", pr.asString("status")));                        
       }
     }
     if (check(messages, pr.has("sequence"), "No publication request sequence found (sequence is e.g. R1, and groups all the pre-publications together. if you don't have a lifecycle like that, just use 'Releases' or 'Publications')"+mkError())) {
       if (pl != null) {
         String seq = getCurrentSequence(pl);
-        check(messages, pr.getString("sequence").equals(seq), "This publication will finish the sequence '"+seq+"' and start a new sequence '"+pr.getString("sequence")+"'"+mkInfo());
+        check(messages, pr.asString("sequence").equals(seq), "This publication will finish the sequence '"+seq+"' and start a new sequence '"+pr.asString("sequence")+"'"+mkInfo());
       }
-      summary.add(new StringPair("sequence", pr.getString("sequence")));                        
+      summary.add(new StringPair("sequence", pr.asString("sequence")));                        
     }
 
     if (check(messages, pr.has("desc") || pr.has("descmd") , "No publication request description found"+mkError())) {
       check(messages, pr.has("desc"), "No publication request desc found (it is recommended to provide a shorter desc as well as descmd"+mkWarning());
       if (pr.has("desc")) {
-        summary.add(new StringPair("desc", pr.getString("desc")));                        
+        summary.add(new StringPair("desc", pr.asString("desc")));                        
       }
     }
     if (pr.has("descmd")) {
-      String md = pr.getString("descmd");
+      String md = pr.asString("descmd");
       if (md.startsWith("@")) {
         File mdFile = new File(Utilities.path(folder, md.substring(1)));
         if (check(messages, mdFile.exists(), "descmd references the file "+md.substring(1)+" but it doesn't exist")) {
@@ -196,22 +196,22 @@ public class PublicationChecker {
       summary.add(new StringPair("descmd", mdEngine.process(md, "descmd")));                        
     }
     if (pr.has("changes")) {
-      summary.add(new StringPair("changes", pr.getString("changes")));                        
-      if (check(messages, !Utilities.isAbsoluteUrl(pr.getString("changes")), "Publication request changes must be a relative URL"+mkError())) {
+      summary.add(new StringPair("changes", pr.asString("changes")));                        
+      if (check(messages, !Utilities.isAbsoluteUrl(pr.asString("changes")), "Publication request changes must be a relative URL"+mkError())) {
       }
     }
     if (pl == null) {
       if (check(messages, pr.has("category"), "No publication request category found (needed for first publication - consult FHIR product director for a value"+mkError())) {
-        summary.add(new StringPair("category", pr.getString("category")));                                
+        summary.add(new StringPair("category", pr.asString("category")));                                
       }
       if (check(messages, pr.has("title"), "No publication request title found (needed for first publication)"+mkError())) {
-        summary.add(new StringPair("title", pr.getString("title")));                                
+        summary.add(new StringPair("title", pr.asString("title")));                                
       }
       if (check(messages, pr.has("introduction"), "No publication request introduction found (needed for first publication)"+mkError())) {
-        summary.add(new StringPair("introduction", pr.getString("introduction")));                                
+        summary.add(new StringPair("introduction", pr.asString("introduction")));                                
       }
       if (check(messages, pr.has("ci-build"), "No publication request ci-build found (needed for first publication)"+mkError())) {
-        summary.add(new StringPair("ci-build", pr.getString("ci-build")));                                
+        summary.add(new StringPair("ci-build", pr.asString("ci-build")));                                
       }
     } else {
       check(messages, !pr.has("category"), "No publication request category found (not allowed after first publication"+mkError());
@@ -225,8 +225,8 @@ public class PublicationChecker {
   }
 
   private JsonObject getVersionObject(String v, JsonObject pl) {
-    for (JsonObject j : pl.getArr("list").asObjects()) {
-      String vl = j.getString("version");
+    for (JsonObject j : pl.getArray("list").asObjects()) {
+      String vl = j.asString("version");
       if (v.equals(vl)) {
         return j;
       }
@@ -253,12 +253,12 @@ public class PublicationChecker {
   private String getCurrentSequence(JsonObject pl) {
     String cv = null;
     String res = null;
-    for (JsonObject j : pl.getArr("list").asObjects()) {
-      String v = j.getString("version");
+    for (JsonObject j : pl.getArray("list").asObjects()) {
+      String v = j.asString("version");
       if (!Utilities.noString(v) && !"current".equals(v)) {
         if (cv == null || VersionUtilities.isThisOrLater(cv, v)) {
           cv = v;
-          res = j.getString("sequence");
+          res = j.asString("sequence");
         }
       }
     }
@@ -267,8 +267,8 @@ public class PublicationChecker {
 
   private String getLatestVersion(JsonObject pl) {
     String cv = null;
-    for (JsonObject j : pl.getArr("list").asObjects()) {
-      String v = j.getString("version");
+    for (JsonObject j : pl.getArray("list").asObjects()) {
+      String v = j.asString("version");
       if (!Utilities.noString(v)) {
         if (cv == null || VersionUtilities.isThisOrLater(v, cv)) {
           cv = v;
@@ -279,10 +279,10 @@ public class PublicationChecker {
   }
 
   private boolean hasVersion(JsonObject pl, String version) {
-    JsonArray list = pl.getArr("list");
+    JsonArray list = pl.getArray("list");
     if (list != null) {
       for (JsonObject o : list.asObjects()) {
-        if (o.has("version") && o.getString("version").equals(version)) {
+        if (o.has("version") && o.asString("version").equals(version)) {
           return true;
         }
       }
