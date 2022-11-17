@@ -136,8 +136,8 @@ public class WebSiteLayoutRulesProviders {
         ok = check(res, canonical.equals("http://hl7belgium.org/profiles/fhir/"+code()) || canonical.equals("https://www.ehealth.fgov.be/standards/fhir/"+code()), 
             "canonical URL of "+canonical+" does not match the required canonical of http://hl7belgium.org/profiles/fhir/"+code()+" or https://www.ehealth.fgov.be/standards/fhir/"+code()+" [4]");          
       } else if ("cl".equals(realm())) {
-        ok = check(res, canonical.equals("http://hl7chile.cl/fhir/ig/"+code()), 
-            "canonical URL of "+canonical+" does not match the required canonical of http://hl7chile.cl/fhir/ig/"+code()+" [4a]");          
+        ok = check(res, canonical.equals("https://hl7chile.cl/fhir/ig/"+code()), 
+            "canonical URL of "+canonical+" does not match the required canonical of https://hl7chile.cl/fhir/ig/"+code()+" [4a]");          
       } else {
         // special case weirdity
         if ("uv".equals(realm()) && "smart-app-launch".equals(code())) {
