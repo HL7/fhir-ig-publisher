@@ -89,7 +89,7 @@ public class PublicationChecker {
         try {
           pl = readPackageList(dst);
         } catch (Exception e) {
-          if (e.getMessage().contains("404")) {
+          if (e.getMessage() != null && e.getMessage().contains("404")) {
             messages.add("<span title=\""+Utilities.escapeXml(e.getMessage())+"\">This IG has never been published</span>"+mkInfo());
           } else {            
             check(messages, false, "Error fetching package-list from "+dst+": "+e.getMessage()+mkError());
