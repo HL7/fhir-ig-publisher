@@ -200,7 +200,7 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
     addPage(b, realmPrefix(realm)+"profiles-usages-other.html", sdh.makeProfilesUsagePage(this, "Other Profile Usage", realm, false));   
 
     b.append("</ul>\r\n");
-    b.append("<p><b>CodeSytems</b></p>\r\n");
+    b.append("<p><b>CodeSystems</b></p>\r\n");
     b.append("<ul style=\"column-count: 4\">\r\n");
     XIGCodeSystemHandler csh = new XIGCodeSystemHandler(info);
     addPage(b, realmPrefix(realm)+"codeSystems-complete.html", csh.makeCodeSystemPage(CodeSystemContentMode.COMPLETE, "Complete Code Systems", realm));   
