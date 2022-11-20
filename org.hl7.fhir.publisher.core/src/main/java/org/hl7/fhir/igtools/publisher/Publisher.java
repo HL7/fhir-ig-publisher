@@ -2516,7 +2516,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       } else if (pc.equals("no-narrative")) {
         String s = p.getValue();
         if (!s.contains("/")) {
-         throw new Exception("Illegal value "+s+" for no-narrative");
+         throw new Exception("Illegal value "+s+" for no-narrative: should be resource/id (see documentation at https://build.fhir.org/ig/FHIR/fhir-tools-ig/CodeSystem-ig-parameters.html)");
         }
         noNarratives.add(s);
       } else if (pc.equals("no-validate")) {
@@ -3859,7 +3859,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           }
         }
       }
-    }    IContextResourceLoader loader = new PublisherLoader(pi, igm, webref, igpkp).makeLoader();
+    }    
+    IContextResourceLoader loader = new PublisherLoader(pi, igm, webref, igpkp).makeLoader();
     context.loadFromPackage(pi, loader);
   }
 
@@ -7422,9 +7423,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         List<String> ids = new ArrayList<String>();
         for (Identifier id : cr.getIdentifier()) {
           if (id.hasValue()) {
-            String label = dr.display(id.getType());
-            String idString = label!=null ? label + ":\u00A0" + id.getValue() : id.getValue();
-            ids.add(idString);
+            ids.add(dr.display(id));
           }
         }
         if (!ids.isEmpty())

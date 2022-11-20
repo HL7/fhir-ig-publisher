@@ -242,6 +242,7 @@ public class PreviousVersionComparator {
   public void finishChecks() throws IOException {
     if (errMsg == null && pid != null) {
       for (VersionInstance vi : versionList) {
+        comparisons.clear();
         Set<String> set = new HashSet<>();
         for (CanonicalResource rl : vi.resources) {
           comparisons.add(new ProfilePair(rl, findByUrl(rl.getUrl(), resources, vi.ini)));

@@ -46,6 +46,7 @@ import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.ValueSet;
+import org.hl7.fhir.utilities.LoincLinker;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.PackageHacker;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
@@ -626,10 +627,10 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       } else if (ref.startsWith("http://loinc.org/vs/")) {
         String code = tail(ref);
         if (code.startsWith("LL")) {
-          br.url = "https://r.details.loinc.org/AnswerList/"+code+".html";
+          br.url = LoincLinker.getLinkForCode(code);
           br.display = "LOINC Answer List "+code;
         } else {
-          br.url = "https://r.details.loinc.org/LOINC/"+code+".html";
+          br.url = LoincLinker.getLinkForCode(code);
           br.display = "LOINC "+code;
         }
       } else {
@@ -748,10 +749,10 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       if (uri.startsWith("http://loinc.org/vs/")) {
         String code = tail(uri);
         if (code.startsWith("LL")) {
-          br.url = "https://r.details.loinc.org/AnswerList/"+code+".html";
+          br.url = LoincLinker.getLinkForCode(code);
           br.display = "LOINC Answer List "+code;
         } else {
-          br.url = "https://r.details.loinc.org/LOINC/"+code+".html";
+          br.url = LoincLinker.getLinkForCode(code);
           br.display = "LOINC "+code;
         }
       } else if (uri.startsWith("urn:")) {

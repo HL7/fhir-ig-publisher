@@ -9,6 +9,7 @@ import org.hl7.fhir.convertors.loaders.loaderR5.R3ToR5Loader;
 import org.hl7.fhir.convertors.loaders.loaderR5.R4ToR5Loader;
 import org.hl7.fhir.convertors.loaders.loaderR5.R5ToR5Loader;
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.igtools.publisher.SpecMapManager.SpecialPackageType;
 import org.hl7.fhir.r5.context.IWorkerContext.IContextResourceLoader;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CodeSystem;
@@ -62,7 +63,15 @@ public class PublisherLoader implements ILoaderKnowledgeProviderR5 {
       return getCorePath(resource);
     } else {
       if (pathToSpec == null || igpkp == null) {
-        return null;
+        if (spm != null && spm.getSpecial() == SpecialPackageType.Simplifier) {
+          if (resource instanceof CanonicalResource) {
+            return spm.getPath(((CanonicalResource) resource).getUrl(), resource.getMeta().getSource(), resource.fhirType(), resource.getId());
+          } else {
+            return null;
+          }
+        } else {
+          return null;
+        }
       }
       return getIgPath(resource);
     }
