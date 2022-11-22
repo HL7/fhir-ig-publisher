@@ -214,10 +214,10 @@ public class PublicationChecker {
         summary.add(new StringPair("ci-build", pr.asString("ci-build")));                                
       }
     } else {
-      check(messages, !pr.has("category"), "No publication request category found (not allowed after first publication"+mkError());
-      check(messages, !pr.has("title"), "No publication request title found (not allowed after first publication)"+mkError());
-      check(messages, !pr.has("introduction"), "No publication request introduction found (not allowed after first publication)"+mkError());
-      check(messages, !pr.has("ci-build"), "No publication request ci-build found (not allowed after first publication)"+mkError());
+      check(messages, !pr.has("category"), "Publication request category found (not allowed after first publication"+mkError());
+      check(messages, !pr.has("title"), "Publication request title found (not allowed after first publication)"+mkError());
+      check(messages, !pr.has("introduction"), "Publication request introduction found (not allowed after first publication)"+mkError());
+      check(messages, !pr.has("ci-build"), "Publication request ci-build found (not allowed after first publication)"+mkError());
     }
     check(messages, !pr.has("date"), "Cannot specify a date of publication in the request"+mkError());
     check(messages, !pr.has("canonical"), "Cannot specify a canonical in the request"+mkError());
