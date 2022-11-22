@@ -131,7 +131,7 @@ public class PublicationProcess {
       return res;
     }            
     
-    JsonObject prSrc = JsonTrackingParser.parseJson(loadFile("Source Package List", Utilities.path(source, "publication-request.json")));
+    JsonObject prSrc = JsonTrackingParser.parseJson(loadFile("Source publication request", Utilities.path(source, "publication-request.json")));
 
     boolean milestone = JsonUtilities.bool(prSrc, "milestone");
     if (first) {
@@ -168,16 +168,16 @@ public class PublicationProcess {
     }
     JsonObject plPub = JsonTrackingParser.parseJson(loadFile("Published Package List", Utilities.path(destination, "package-list.json")));
 
-    check(res, id.equals(JsonUtilities.str(prSrc, "package-id")), "Source Package List has the wrong package id: "+JsonUtilities.str(prSrc, "package-id")+" (should be "+id+")");
+    check(res, id.equals(JsonUtilities.str(prSrc, "package-id")), "Source publication request has the wrong package id: "+JsonUtilities.str(prSrc, "package-id")+" (should be "+id+")");
     check(res, id.equals(JsonUtilities.str(plPub, "package-id")), "Published Package List has the wrong package id: "+JsonUtilities.str(plPub, "package-id")+" (should be "+id+")");
-    check(res, canonical.equals(JsonUtilities.str(plPub, "canonical")), "Source Package List has the wrong canonical: "+JsonUtilities.str(plPub, "canonical")+" (should be "+canonical+")");
+    check(res, canonical.equals(JsonUtilities.str(plPub, "canonical")), "Destination Package List has the wrong canonical: "+JsonUtilities.str(plPub, "canonical")+" (should be "+canonical+")");
     check(res, plPub.has("category"), "No Entry found in dest package-list 'category'");
 
     JsonObject vPub = JsonUtilities.findByStringProp(plPub.getAsJsonArray("list"), "version", version);
     
-    check(res, plPub.getAsJsonArray("list").size() > 0, "Dest package-list has no existent version (should have ci-build entry)");
+    check(res, plPub.getAsJsonArray("list").size() > 0, "Destination package-list has no existent version (should have ci-build entry)");
     check(res, vPub == null, "Found an entry in the publication package-list for v"+version+" - it looks like it has already been published");
-    check(res, prSrc.has("desc") || prSrc.has("descmd"), "Source Package list has no description for v"+version);
+    check(res, prSrc.has("desc") || prSrc.has("descmd"), "Source publication request has no description for v"+version);
     String pathVer = JsonUtilities.str(prSrc, "path");
     String vCode = pathVer.substring(pathVer.lastIndexOf("/")+1);
     

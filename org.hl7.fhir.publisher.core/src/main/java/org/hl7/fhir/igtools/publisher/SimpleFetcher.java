@@ -196,7 +196,7 @@ public class SimpleFetcher implements IFetchFile {
           (!(pkp.getContext().hasResource(StructureDefinition.class , "http://hl7.org/fhir/StructureDefinition/Conformance") && 
               type.equals("CapabilityStatement"))) 
           )
-        throw new Exception("Bad Resource Identity - should have the format [Type]/[id] where Type is a valid resource type:" + s);
+        throw new Exception("Bad Resource Identity - should have the format [Type]/[id] where Type is a valid resource type: " + s);
       if (!id.matches(FormatUtilities.ID_REGEX))
         throw new Exception("Bad Source Reference '"+s+"' - should have the format [Type]/[id] where id is a valid FHIR id type");
       String fn = pkp.getSourceFor(type+"/"+id);

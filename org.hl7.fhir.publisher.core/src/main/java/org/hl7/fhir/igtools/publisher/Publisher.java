@@ -2798,7 +2798,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       i++;
     }
 
-    loadIg("igtools", "hl7.fhir.uv.tools", "current", "http://hl7.org/fhir/tools/ImplementationGuide/hl7.fhir.uv.tools", i);    
+    if (!"hl7.fhir.uv.tools".equals(sourceIg.getPackageId())) {
+      loadIg("igtools", "hl7.fhir.uv.tools", "current", "http://hl7.org/fhir/tools/ImplementationGuide/hl7.fhir.uv.tools", i);   
+    }
     System.out.print("Load R5 Extensions");
     R5ExtensionsLoader r5e = new R5ExtensionsLoader(pcm, context);
     r5e.load();
@@ -3844,7 +3846,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         } else {
           NpmPackage dpi = pcm.loadPackage(dep);
           if (dpi == null) {
-            logDebugMessage(LogCategory.CONTEXT, "Unable s to find package dependency "+dep+". Will proceed, but likely to be be errors in qz.html etc");
+            logDebugMessage(LogCategory.CONTEXT, "Unable s to find package dependency "+dep+". Will proceed, but likely to be be errors in qa.html etc");
           } else {
             if (!VersionUtilities.versionsCompatible(version, pi.fhirVersion())) {
               log("Version mismatch. This IG is for FHIR version "+version+", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion()+" (will ignore that and try to run anyway)");
@@ -4034,7 +4036,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return true;
     if (s.startsWith("icon"))
       return true;
-    if (Utilities.existsInList(s, "modifier.png", "mustsupport.png", "information.png", "summary.png", "lock.png", "external.png", "cc0.png", "target.png", "link.svg"))
+    if (Utilities.existsInList(s, "modifier.png", "mustsupport.png", "information.png", "summary.png", "new.png", "lock.png", "external.png", "cc0.png", "target.png", "link.svg"))
       return true;
     
     return false;

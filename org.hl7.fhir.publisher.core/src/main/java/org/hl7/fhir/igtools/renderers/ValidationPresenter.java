@@ -25,6 +25,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
@@ -233,6 +235,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
 
   private static final String INTERNAL_LINK = "internal";
   private static final boolean NO_FILTER = false;
+  private Date RULE_DATE_CUTOFF = null;
   private String statedVersion;
   private IGKnowledgeProvider provider;
   private IGKnowledgeProvider altProvider;
@@ -298,6 +301,11 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     this.r5Extensions = r5Extensions;
     this.modifierExtensions = modifierExtensions;
     this.globalCheck = globalCheck;
+    try {
+      RULE_DATE_CUTOFF = new SimpleDateFormat("yyyy-MM-dd").parse("2022-11-01");
+    } catch (ParseException e) {
+      e.printStackTrace();
+    }
     determineCode();
   }
 
@@ -1114,10 +1122,14 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("halfcolor", halfColorForLevel(vm.getLevel(), vm.isSignpost()));
     t.add("id", "l"+id);
     t.add("mid", vm.getMessageId());
-    t.add("msg", vm.getHtml());
+    t.add("msg", (isNewRule(vm) ? "<img style=\"vertical-align: text-bottom\" src=\"new.png\" height=\"16px\" width=\"36px\" alt=\"New Rule: \"> " : "")+ vm.getHtml());
     t.add("msgdetails", vm.isSlicingHint() ? vm.getSliceHtml() : vm.getHtml());
     t.add("tx", "qa-tx.html#l"+vm.getTxLink());
     return t.render();
+  }
+
+  private boolean isNewRule(ValidationMessage vm) {
+    return vm.getRuleDate() != null && !vm.getRuleDate().before(RULE_DATE_CUTOFF);
   }
 
   private String stripId(String loc) {
