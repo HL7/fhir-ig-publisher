@@ -27,6 +27,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
@@ -73,7 +75,6 @@ import org.stringtemplate.v4.ST;
 import org.stringtemplate.v4.STErrorListener;
 
 public class ValidationPresenter extends TranslatingUtilities implements Comparator<FetchedFile> {
-
 
   private class ProfileSignpostBuilder {
 
@@ -235,7 +236,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
 
   private static final String INTERNAL_LINK = "internal";
   private static final boolean NO_FILTER = false;
-  private Date RULE_DATE_CUTOFF = null;
+  private Date ruleDateCutoff = null;
   private String statedVersion;
   private IGKnowledgeProvider provider;
   private IGKnowledgeProvider altProvider;
@@ -301,11 +302,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     this.r5Extensions = r5Extensions;
     this.modifierExtensions = modifierExtensions;
     this.globalCheck = globalCheck;
-    try {
-      RULE_DATE_CUTOFF = new SimpleDateFormat("yyyy-MM-dd").parse("2022-11-01");
-    } catch (ParseException e) {
-      e.printStackTrace();
-    }
+    ruleDateCutoff = Date.from(LocalDate.now().minusMonths(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
     determineCode();
   }
 
@@ -1129,7 +1126,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   }
 
   private boolean isNewRule(ValidationMessage vm) {
-    return vm.getRuleDate() != null && !vm.getRuleDate().before(RULE_DATE_CUTOFF);
+    return vm.getRuleDate() != null && !vm.getRuleDate().before(ruleDateCutoff);
   }
 
   private String stripId(String loc) {
