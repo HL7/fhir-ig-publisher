@@ -621,7 +621,7 @@ public class HTMLInspector {
     if (!resolved)
       resolved = manual.contains(rref);
     if (!resolved) {
-      resolved = rref.startsWith("http://build.fhir.org/ig/FHIR/fhir-tools-ig"); // always allowed to refer to tooling IG build location
+      resolved = rref.startsWith("http://build.fhir.org/ig/FHIR/fhir-tools-ig") || rref.startsWith("http://build.fhir.org/ig/FHIR/ig-guidance"); // always allowed to refer to tooling or IG Guidance IG build location
     }
     if (!resolved && specs != null){
       for (SpecMapManager spec : specs) {
