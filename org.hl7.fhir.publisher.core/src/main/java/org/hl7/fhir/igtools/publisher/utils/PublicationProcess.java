@@ -3,6 +3,7 @@ package org.hl7.fhir.igtools.publisher.utils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.SimpleDateFormat;
@@ -20,18 +21,14 @@ import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.ZipGenerator;
-import org.hl7.fhir.utilities.json.JsonUtilities;
-import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.json.model.JsonArray;
+import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
-
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
-
-import ca.uhn.fhir.util.JsonUtil;
 
 public class PublicationProcess {
  
@@ -98,7 +95,7 @@ public class PublicationProcess {
     if (res.size() > 0) {
       return res;
     }
-    JsonObject qa = JsonTrackingParser.parseJson(loadFile("Source QA file", fQA.getAbsolutePath()));
+    JsonObject qa = JsonParser.parseObject(loadFile("Source QA file", fQA.getAbsolutePath()));
     
     // now: is the IG itself ready for publication
     NpmPackage npm = NpmPackage.fromPackage(loadFile("Source package", Utilities.path(source, "output", "package.tgz")));
@@ -131,64 +128,65 @@ public class PublicationProcess {
       return res;
     }            
     
-    JsonObject prSrc = JsonTrackingParser.parseJson(loadFile("Source publication request", Utilities.path(source, "publication-request.json")));
+    JsonObject prSrc = JsonParser.parseObject(loadFile("Source publication request", Utilities.path(source, "publication-request.json")));
 
-    boolean milestone = JsonUtilities.bool(prSrc, "milestone");
+    boolean milestone = prSrc.asBoolean("milestone");
     if (first) {
       if (new File(Utilities.path(destination, "package-list.json")).exists()) {
         check(res, false, "Destination Package List already exists, but the parameter -first was provided");
       } else {
         boolean ok = true;
-        ok = check(res, !Utilities.noString(JsonUtilities.str(prSrc, "category")), "No category in the publication request") && ok;
-        ok = check(res, !Utilities.noString(JsonUtilities.str(prSrc, "title")), "No title in the publication request") && ok;
-        ok = check(res, !Utilities.noString(JsonUtilities.str(prSrc, "introduction")), "No introduction in the publication request") && ok;
-        ok = check(res, !Utilities.noString(JsonUtilities.str(prSrc, "ci-build")), "No ci-build in the publication request") && ok;
+        ok = check(res, !Utilities.noString(prSrc.asString("category")), "No category in the publication request") && ok;
+        ok = check(res, !Utilities.noString(prSrc.asString("title")), "No title in the publication request") && ok;
+        ok = check(res, !Utilities.noString(prSrc.asString("introduction")), "No introduction in the publication request") && ok;
+        ok = check(res, !Utilities.noString(prSrc.asString("ci-build")), "No ci-build in the publication request") && ok;
         if (!ok) {
           return res;
         }
         JsonObject tplDst = new JsonObject();
-        tplDst.addProperty("package-id", npm.name());
-        tplDst.addProperty("canonical", npm.canonical());
-        tplDst.addProperty("title", JsonUtilities.str(prSrc, "title"));
-        tplDst.addProperty("category", JsonUtilities.str(prSrc, "category"));
-        tplDst.addProperty("introduction", JsonUtilities.str(prSrc, "introduction"));
+        tplDst.add("package-id", npm.name());
+        tplDst.add("canonical", npm.canonical());
+        tplDst.add("title", prSrc.asString("title"));
+        tplDst.add("category", prSrc.asString("category"));
+        tplDst.add("introduction", prSrc.asString("introduction"));
         JsonArray vl = new JsonArray();
         tplDst.add("list", vl);
         JsonObject ci = new JsonObject();
         vl.add(ci);
-        ci.addProperty("version", "current");
-        ci.addProperty("desc", "Continuous Integration Build (latest in version control) - Content subject to frequent changes");
-        ci.addProperty("path", JsonUtilities.str(prSrc, "ci-build"));
-        ci.addProperty("status", "ci-build");
-        JsonTrackingParser.write(tplDst, Utilities.path(destination, "package-list.json"));
+        ci.add("version", "current");
+        ci.add("desc", "Continuous Integration Build (latest in version control) - Content subject to frequent changes");
+        ci.add("path", prSrc.asString("ci-build"));
+        ci.add("status", "ci-build");
+        JsonParser.compose(tplDst, new FileOutputStream(Utilities.path(destination, "package-list.json")), true);
       }      
     }
     if (!check(res, new File(Utilities.path(destination, "package-list.json")).exists(), "Destination '"+destination+"' does not contain a package-list.json - cannot proceed")) {
       return res;
     }
-    JsonObject plPub = JsonTrackingParser.parseJson(loadFile("Published Package List", Utilities.path(destination, "package-list.json")));
+    JsonObject plPub = JsonParser.parseObject(loadFile("Published Package List", Utilities.path(destination, "package-list.json")));
 
-    check(res, id.equals(JsonUtilities.str(prSrc, "package-id")), "Source publication request has the wrong package id: "+JsonUtilities.str(prSrc, "package-id")+" (should be "+id+")");
-    check(res, id.equals(JsonUtilities.str(plPub, "package-id")), "Published Package List has the wrong package id: "+JsonUtilities.str(plPub, "package-id")+" (should be "+id+")");
-    check(res, canonical.equals(JsonUtilities.str(plPub, "canonical")), "Destination Package List has the wrong canonical: "+JsonUtilities.str(plPub, "canonical")+" (should be "+canonical+")");
+    check(res, id.equals(prSrc.asString("package-id")), "Source publication request has the wrong package id: "+prSrc.asString("package-id")+" (should be "+id+")");
+    check(res, id.equals(plPub.asString("package-id")), "Published Package List has the wrong package id: "+plPub.asString("package-id")+" (should be "+id+")");
+    check(res, canonical.equals(plPub.asString("canonical")), "Destination Package List has the wrong canonical: "+plPub.asString("canonical")+" (should be "+canonical+")");
     check(res, plPub.has("category"), "No Entry found in dest package-list 'category'");
+    check(res, plPub.findByStringProp("list", "version", "current") != null, "Destination Package List does not have an entry for the current version in the list of versions");
 
-    JsonObject vPub = JsonUtilities.findByStringProp(plPub.getAsJsonArray("list"), "version", version);
+    JsonObject vPub = plPub.findByStringProp("list", "version", version);
     
-    check(res, plPub.getAsJsonArray("list").size() > 0, "Destination package-list has no existent version (should have ci-build entry)");
+    check(res, plPub.getJsonArray("list").size() > 0, "Destination package-list has no existent version (should have ci-build entry)");
     check(res, vPub == null, "Found an entry in the publication package-list for v"+version+" - it looks like it has already been published");
     check(res, prSrc.has("desc") || prSrc.has("descmd"), "Source publication request has no description for v"+version);
-    String pathVer = JsonUtilities.str(prSrc, "path");
+    String pathVer = prSrc.asString("path");
     String vCode = pathVer.substring(pathVer.lastIndexOf("/")+1);
     
-    check(res, pathVer.equals(Utilities.pathURL(canonical, vCode)), "Source publication request path is wrong - is '"+JsonUtilities.str(prSrc, "path")+"', doesn't match canonical)");
+    check(res, pathVer.equals(Utilities.pathURL(canonical, vCode)), "Source publication request path is wrong - is '"+prSrc.asString("path")+"', doesn't match canonical)");
     // ok, the ids and canonicals are all lined up, and w're ready to publish     
 
-    check(res, id.equals(JsonUtilities.str(qa, "package-id")), "Generated IG has wrong package "+JsonUtilities.str(qa, "package-id"));
-    check(res, version.equals(JsonUtilities.str(qa, "ig-ver")), "Generated IG has wrong version "+JsonUtilities.str(qa, "ig-ver"));
+    check(res, id.equals(qa.asString("package-id")), "Generated IG has wrong package "+qa.asString("package-id"));
+    check(res, version.equals(qa.asString("ig-ver")), "Generated IG has wrong version "+qa.asString("ig-ver"));
     check(res, qa.has("errs"), "Generated IG has no error count");
-    check(res, npm.fhirVersion().equals(JsonUtilities.str(qa, "version")), "Generated IG has wrong FHIR version "+JsonUtilities.str(qa, "version"));
-    check(res, JsonUtilities.str(qa, "url").startsWith(canonical) || JsonUtilities.str(qa, "url").startsWith(npm.canonical()), "Generated IG has wrong Canonical "+JsonUtilities.str(qa, "url"));
+    check(res, npm.fhirVersion().equals(qa.asString("version")), "Generated IG has wrong FHIR version "+qa.asString("version"));
+    check(res, qa.asString("url").startsWith(canonical) || qa.asString("url").startsWith(npm.canonical()), "Generated IG has wrong Canonical "+qa.asString("url"));
     
     String destVer = Utilities.path(destination, vCode);
     if (!check(res, new File(destination).exists(), "Destination '"+destVer+"' not found - must be set up manually for first publication")) {
@@ -321,17 +319,17 @@ public class PublicationProcess {
       date = sdf.format(new Date());      
     }
     JsonObject newVer = new JsonObject();
-    newVer.addProperty("version", JsonUtilities.str(prSrc,  "version"));
-    newVer.addProperty("date", date);
-    newVer.addProperty("path", webpath);
-    newVer.addProperty("status", JsonUtilities.str(prSrc,  "status"));
-    newVer.addProperty("sequence", JsonUtilities.str(prSrc,  "sequence"));
-    newVer.addProperty("fhirversion", fhirVersion);
+    newVer.add("version", prSrc.asString("version"));
+    newVer.add("date", date);
+    newVer.add("path", webpath);
+    newVer.add("status", prSrc.asString("status"));
+    newVer.add("sequence", prSrc.asString("sequence"));
+    newVer.add("fhirversion", fhirVersion);
     if (prSrc.has("desc")) {
-      newVer.addProperty("desc", JsonUtilities.str(prSrc,  "desc"));
+      newVer.add("desc", prSrc.asString("desc"));
     }
     if (prSrc.has("descmd")) {
-      String md = JsonUtilities.str(prSrc,  "descmd");
+      String md = prSrc.asString("descmd");
       if (md.startsWith("@")) {
         File mdFile = new File(Utilities.path(folder, md.substring(1)));
         if (!mdFile.exists()) {
@@ -339,15 +337,15 @@ public class PublicationProcess {
         }
         md = TextFile.fileToString(mdFile);
       }
-      newVer.addProperty("descmd", md);
+      newVer.add("descmd", md);
     }
     if (prSrc.has("changes")) {
-      newVer.addProperty("changes", JsonUtilities.str(prSrc,  "changes"));
+      newVer.add("changes", prSrc.asString("changes"));
     }
     if (milestone) {
-      newVer.addProperty("current", true);
+      newVer.add("current", true);
     }
-    JsonArray oldArr = plPub.getAsJsonArray("list");
+    JsonArray oldArr = plPub.getJsonArray("list");
     JsonArray newArr = new JsonArray();
     newArr.add(oldArr.get(0)); // the ci-build entry
     newArr.add(newVer);
@@ -360,7 +358,7 @@ public class PublicationProcess {
     }
     plPub.remove("list");
     plPub.add("list", newArr);
-    JsonTrackingParser.write(plPub, new File(filepath));
+    JsonParser.compose(plPub, new FileOutputStream(filepath));
   }
 
   private void zipFolder(File fSource, String path) throws IOException {
@@ -376,7 +374,7 @@ public class PublicationProcess {
     if (!f.exists()) {
       throw new Error("File "+f.getAbsolutePath()+" not found - it appears the build run failed");
     }
-    JsonObject nqa = JsonTrackingParser.parseJson(loadFile("Source QA file", f.getAbsolutePath()));
+    JsonObject nqa = JsonParser.parseObject(loadFile("Source QA file", f.getAbsolutePath()));
     compareJsonProp(qa, nqa, "errs", "Errors");
     compareJsonProp(qa, nqa, "warnings", "Warnings");
     compareJsonProp(qa, nqa, "hints", "Hints");
@@ -386,11 +384,11 @@ public class PublicationProcess {
     if (!qa.has(name)) {
       throw new Exception("Unable to find "+name+" for past run");
     }
-    int oldv = qa.get(name).getAsInt();
+    int oldv = qa.asInteger(name);
     if (!nqa.has(name)) {
       throw new Exception("Unable to find "+name+" for current run");
     }
-    int newv = qa.get(name).getAsInt();
+    int newv = qa.asInteger(name);
     if (newv > oldv) {
       throw new Exception("Increase in "+label+" on run - was "+oldv+", now "+newv);      
     }

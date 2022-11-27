@@ -24,9 +24,8 @@ import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureMap;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.renderers.DataRenderer;
-
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+import org.hl7.fhir.utilities.json.model.JsonArray;
+import org.hl7.fhir.utilities.json.model.JsonObject;
 
 public class XIGInformation {
 
@@ -119,18 +118,18 @@ public class XIGInformation {
     this.ctxt = ctxt;
   }
   public void fillOutJson(CanonicalResource cr, JsonObject j) {
-    j.addProperty("type", cr.fhirType());
-    if (cr.hasId()) {           j.addProperty("id", cr.getId()); }
-    if (cr.hasUrl()) {          j.addProperty("canonical", cr.getUrl()); }
-    if (cr.hasVersion()) {      j.addProperty("version", cr.getVersion()); }
-    if (cr.hasStatus()) {       j.addProperty("status", cr.getStatus().toCode()); }
-    if (cr.hasPublisher()) {    j.addProperty("publisher", cr.getPublisher()); }
-    if (cr.hasName()) {         j.addProperty("name", cr.getName()); }
-    if (cr.hasTitle()) {        j.addProperty("title", cr.getTitle()); }
-    if (cr.hasDate()) {         j.addProperty("date", cr.getDateElement().asStringValue()); }
-    if (cr.hasExperimental()) { j.addProperty("experimental", cr.getExperimental()); }
-    if (cr.hasDescription()) {  j.addProperty("description", cr.getDescription()); }
-    if (cr.hasCopyright()) {    j.addProperty("copyright", cr.getCopyright()); }
+    j.add("type", cr.fhirType());
+    if (cr.hasId()) {           j.add("id", cr.getId()); }
+    if (cr.hasUrl()) {          j.add("canonical", cr.getUrl()); }
+    if (cr.hasVersion()) {      j.add("version", cr.getVersion()); }
+    if (cr.hasStatus()) {       j.add("status", cr.getStatus().toCode()); }
+    if (cr.hasPublisher()) {    j.add("publisher", cr.getPublisher()); }
+    if (cr.hasName()) {         j.add("name", cr.getName()); }
+    if (cr.hasTitle()) {        j.add("title", cr.getTitle()); }
+    if (cr.hasDate()) {         j.add("date", cr.getDateElement().asStringValue()); }
+    if (cr.hasExperimental()) { j.add("experimental", cr.getExperimental()); }
+    if (cr.hasDescription()) {  j.add("description", cr.getDescription()); }
+    if (cr.hasCopyright()) {    j.add("copyright", cr.getCopyright()); }
     for (CodeableConcept cc : cr.getJurisdiction()) {
       for (Coding c : cc.getCoding()) {
         if (c.is("http://unstats.un.org/unsd/methods/m49/m49.htm", "001"))  {
@@ -139,14 +138,14 @@ public class XIGInformation {
           if (!j.has("jurisdictions")) {
             j.add("jurisdictions", new JsonArray());
           }
-          j.getAsJsonArray("jurisdictions").add("uv");
+          j.getJsonArray("jurisdictions").add("uv");
         } else if ("urn:iso:std:iso:3166".equals(c.getSystem())) {
           if (c.getCode().length() == 2) {
             jurisdictions.add(c.getCode().toLowerCase());
             if (!j.has("jurisdictions")) {
               j.add("jurisdictions", new JsonArray());
             }
-            j.getAsJsonArray("jurisdictions").add(c.getCode().toLowerCase());
+            j.getJsonArray("jurisdictions").add(c.getCode().toLowerCase());
           }
         }
       }

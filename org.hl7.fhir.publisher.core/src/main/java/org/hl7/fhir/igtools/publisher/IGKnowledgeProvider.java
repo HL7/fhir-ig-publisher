@@ -48,16 +48,15 @@ import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.utilities.LoincLinker;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.json.model.JsonElement;
+import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.model.JsonPrimitive;
+import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.npm.PackageHacker;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
-
-import com.google.gson.JsonElement;
-import com.google.gson.JsonNull;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonPrimitive;
 
 public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase.ILinkResolver {
 
@@ -95,15 +94,15 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   private void loadPaths(JsonObject igs) throws Exception {
     JsonElement e = igs.get("path-pattern");
     if (e != null)
-      pathPattern = e.getAsString(); 
-    defaultConfig = igs.getAsJsonObject("defaults");
-    resourceConfig = igs.getAsJsonObject("resources");
+      pathPattern = e.asString(); 
+    defaultConfig = igs.getJsonObject("defaults");
+    resourceConfig = igs.getJsonObject("resources");
     if (resourceConfig != null) {
-      for (Entry<String, JsonElement> pp : resourceConfig.entrySet()) {
-        if (pp.getKey().equals("*")) {
+      for (JsonProperty pp : resourceConfig.getProperties()) {
+        if (pp.getName().equals("*")) {
           autoPath = true;
-        } else if (!pp.getKey().startsWith("_")) {
-          String s = pp.getKey();
+        } else if (!pp.getName().startsWith("_")) {
+          String s = pp.getName();
           if (!s.contains("/"))
             throw new Exception("Bad Resource Identity - should have the format [Type]/[id]:" + s);
           String type = s.substring(0,  s.indexOf("/"));
@@ -119,41 +118,18 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
           JsonElement p = o.get("base");
           //        if (p == null)
           //          throw new Exception("You must provide a base on each path in the json file");
-          if (p != null && !(p instanceof JsonPrimitive) && !((JsonPrimitive) p).isString())
+          if (p != null && !(p instanceof JsonPrimitive))
             throw new Exception("Unexpected type in paths - base must be a string");
           p = o.get("defns");
-          if (p != null && !(p instanceof JsonPrimitive) && !((JsonPrimitive) p).isString())
+          if (p != null && !(p instanceof JsonPrimitive))
             throw new Exception("Unexpected type in paths - defns must be a string");
           p = o.get("source");
-          if (p != null && !(p instanceof JsonPrimitive) && !((JsonPrimitive) p).isString())
+          if (p != null && !(p instanceof JsonPrimitive))
             throw new Exception("Unexpected type in paths - source must be a string");
         }
       }
     } else if (template == null)
       throw new Exception("No \"resources\" entry found in json file (see http://wiki.hl7.org/index.php?title=IG_Publisher_Documentation#Control_file)");
-  }
-  
-  private boolean hasBoolean(JsonObject obj, String code) {
-    JsonElement e = obj.get(code);
-    return e != null && e instanceof JsonPrimitive && ((JsonPrimitive) e).isBoolean();
-  }
-
-  private boolean getBoolean(JsonObject obj, String code) {
-    JsonElement e = obj.get(code);
-    return e != null && e instanceof JsonPrimitive && ((JsonPrimitive) e).getAsBoolean();
-  }
-
-  private boolean hasString(JsonObject obj, String code) {
-    JsonElement e = obj.get(code);
-    return e != null && (e instanceof JsonPrimitive && ((JsonPrimitive) e).isString()) || e instanceof JsonNull;
-  }
-
-  private String getString(JsonObject obj, String code) {
-    JsonElement e = obj.get(code);
-    if (e instanceof JsonNull)
-      return null;
-    else 
-      return ((JsonPrimitive) e).getAsString();
   }
 
   public String doReplacements(String s, FetchedResource r, Map<String, String> vars, String format) throws FHIRException {
@@ -224,68 +200,68 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   }
 
   public boolean wantGen(FetchedResource r, String code) {
-    if (r.getConfig() != null && hasBoolean(r.getConfig(), code))
-      return getBoolean(r.getConfig(), code);
+    if (r.getConfig() != null && r.getConfig().hasBoolean(code))
+      return r.getConfig().asBoolean(code);
     JsonObject cfg = null;
     if (defaultConfig != null) {
-      cfg = defaultConfig.getAsJsonObject(r.fhirType());
-      if (cfg != null && hasBoolean(cfg, code)) {
-        return getBoolean(cfg, code);
+      cfg = defaultConfig.getJsonObject(r.fhirType());
+      if (cfg != null && cfg.hasBoolean(code)) {
+        return cfg.asBoolean(code);
       }
-      cfg = defaultConfig.getAsJsonObject("Any");
-      if (cfg != null && hasBoolean(cfg, code)) {
-        return getBoolean(cfg, code);
+      cfg = defaultConfig.getJsonObject("Any");
+      if (cfg != null && cfg.hasBoolean(code)) {
+        return cfg.asBoolean(code);
       }
     }
     return true;
   }
 
   public String getPropertyContained(FetchedResource r, String propertyName, Resource contained) {
-    if (contained == null && r.getConfig() != null && hasString(r.getConfig(), propertyName)) {
-      return getString(r.getConfig(), propertyName);
+    if (contained == null && r.getConfig() != null && r.getConfig().hasString(propertyName)) {
+      return r.getConfig().asString(propertyName);
     }
     if (defaultConfig != null && contained != null) {
       JsonObject cfg = null;
       if (cfg==null && "StructureDefinition".equals(contained.fhirType())) {
-        cfg = defaultConfig.getAsJsonObject(contained.fhirType()+":"+getSDType(contained));
-        if (cfg != null && hasString(cfg, propertyName)) {
-          return getString(cfg, propertyName);        
+        cfg = defaultConfig.getJsonObject(contained.fhirType()+":"+getSDType(contained));
+        if (cfg != null && cfg.hasString(propertyName)) {
+          return cfg.asString(propertyName);        
         }
       }
-      cfg = defaultConfig.getAsJsonObject(contained.fhirType());
-      if (cfg != null && hasString(cfg, propertyName)) {
-        return getString(cfg, propertyName);
+      cfg = defaultConfig.getJsonObject(contained.fhirType());
+      if (cfg != null && cfg.hasString(propertyName)) {
+        return cfg.asString(propertyName);
       }
-      cfg = defaultConfig.getAsJsonObject("Any");
-      if (cfg != null && hasString(cfg, propertyName)) {
-        return getString(cfg, propertyName);
+      cfg = defaultConfig.getJsonObject("Any");
+      if (cfg != null && cfg.hasString(propertyName)) {
+        return cfg.asString(propertyName);
       }
     }
     return null;
   }
 
   public String getProperty(FetchedResource r, String propertyName) {
-    if (r.getConfig() != null && hasString(r.getConfig(), propertyName)) {
-      return getString(r.getConfig(), propertyName);
+    if (r.getConfig() != null && r.getConfig().hasString(propertyName)) {
+      return r.getConfig().asString(propertyName);
     }
     if (defaultConfig != null) {
       JsonObject cfg = null;
       if (r.isExample()) {
-        cfg = defaultConfig.getAsJsonObject("example");
+        cfg = defaultConfig.getJsonObject("example");
       }
       if (cfg==null && "StructureDefinition".equals(r.fhirType())) {
-        cfg = defaultConfig.getAsJsonObject(r.fhirType()+":"+getSDType(r));
-        if (cfg != null && hasString(cfg, propertyName)) {
-          return getString(cfg, propertyName);        
+        cfg = defaultConfig.getJsonObject(r.fhirType()+":"+getSDType(r));
+        if (cfg != null && cfg.hasString(propertyName)) {
+          return cfg.asString(propertyName);        
         }
       }
-      cfg = defaultConfig.getAsJsonObject(r.fhirType());
-  	  if (cfg != null && hasString(cfg, propertyName)) {
-  	    return getString(cfg, propertyName);
+      cfg = defaultConfig.getJsonObject(r.fhirType());
+  	  if (cfg != null && cfg.hasString(propertyName)) {
+  	    return cfg.asString(propertyName);
   	  }
-      cfg = defaultConfig.getAsJsonObject("Any");
-      if (cfg != null && hasString(cfg, propertyName)) {
-        return getString(cfg, propertyName);
+      cfg = defaultConfig.getJsonObject("Any");
+      if (cfg != null && cfg.hasString(propertyName)) {
+        return cfg.asString(propertyName);
       }
     }
     return null;
@@ -309,33 +285,33 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   }
 
   public boolean hasProperty(FetchedResource r, String propertyName, Resource contained) {
-    if (r.getConfig() != null && hasString(r.getConfig(), propertyName))
+    if (r.getConfig() != null && r.getConfig().hasString(propertyName))
       return true;
     if (defaultConfig != null && contained != null) {
-      JsonObject cfg = defaultConfig.getAsJsonObject(contained.fhirType());
-      if (cfg != null && hasString(cfg, propertyName))
+      JsonObject cfg = defaultConfig.getJsonObject(contained.fhirType());
+      if (cfg != null && cfg.hasString(propertyName))
         return true;
     }
     if (defaultConfig != null) {
-      JsonObject cfg = defaultConfig.getAsJsonObject(r.fhirType());
-      if (cfg != null && hasString(cfg, propertyName))
+      JsonObject cfg = defaultConfig.getJsonObject(r.fhirType());
+      if (cfg != null && cfg.hasString(propertyName))
         return true;
-      cfg = defaultConfig.getAsJsonObject("Any");
-      if (cfg != null && hasString(cfg, propertyName))
+      cfg = defaultConfig.getJsonObject("Any");
+      if (cfg != null && cfg.hasString(propertyName))
         return true;
     }
     return false;    
   }
   
   public boolean hasProperty(FetchedResource r, String propertyName) {
-    if (r.getConfig() != null && hasString(r.getConfig(), propertyName))
+    if (r.getConfig() != null && r.getConfig().hasString(propertyName))
       return true;
     if (defaultConfig != null) {
-      JsonObject cfg = defaultConfig.getAsJsonObject(r.fhirType());
-      if (cfg != null && hasString(cfg, propertyName))
+      JsonObject cfg = defaultConfig.getJsonObject(r.fhirType());
+      if (cfg != null && cfg.hasString(propertyName))
         return true;
-      cfg = defaultConfig.getAsJsonObject("Any");
-      if (cfg != null && hasString(cfg, propertyName))
+      cfg = defaultConfig.getJsonObject("Any");
+      if (cfg != null && cfg.hasString(propertyName))
         return true;
     }
     return false;
@@ -400,30 +376,30 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   public String getSourceFor(String ref) {
     if (resourceConfig == null)
       return null;
-    JsonObject o = resourceConfig.getAsJsonObject(ref);
+    JsonObject o = resourceConfig.getJsonObject(ref);
     if (o == null)
       return null;
     JsonElement e = o.get("source");
     if (e == null)
       return null;
-    return e.getAsString();
+    return e.asString();
   }
 
   public void findConfiguration(FetchedFile f, FetchedResource r) {
     if (template != null) {
       JsonObject cfg = null;
       if (r.isExample()) {
-        cfg = defaultConfig.getAsJsonObject("example");
+        cfg = defaultConfig.getJsonObject("example");
       }        
       if (cfg == null && r.fhirType().equals("StructureDefinition")) {
-        cfg = defaultConfig.getAsJsonObject(r.fhirType()+":"+getSDType(r));
+        cfg = defaultConfig.getJsonObject(r.fhirType()+":"+getSDType(r));
       }
       if (cfg == null)
         cfg = template.getConfig(r.fhirType(), r.getId());        
       r.setConfig(cfg);
     }
     if (r.getConfig() == null && resourceConfig != null) {
-      JsonObject e = resourceConfig.getAsJsonObject(r.fhirType()+"/"+r.getId());
+      JsonObject e = resourceConfig.getJsonObject(r.fhirType()+"/"+r.getId());
       if (e != null)
         r.setConfig(e);
     }

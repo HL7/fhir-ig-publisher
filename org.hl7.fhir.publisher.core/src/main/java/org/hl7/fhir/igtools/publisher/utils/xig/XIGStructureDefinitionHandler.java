@@ -23,9 +23,7 @@ import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextCompo
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.utilities.Utilities;
-
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+import org.hl7.fhir.utilities.json.model.JsonObject;
 
 public class XIGStructureDefinitionHandler extends XIGHandler {
 
@@ -37,32 +35,23 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
   }
 
   public void fillOutJson(StructureDefinition sd, JsonObject j) {
-    if (sd.hasFhirVersion()) {      j.addProperty("fhirVersion", sd.getFhirVersion().toCode()); }
-    if (sd.hasKind()) {             j.addProperty("kind", sd.getKind().toCode()); }
-    if (sd.hasAbstract()) {         j.addProperty("abstract", sd.getAbstract()); }
-    if (sd.hasType()) {             j.addProperty("type", sd.getType()); }
-    if (sd.hasDerivation()) {       j.addProperty("derivation", sd.getDerivation().toCode()); }
-    if (sd.hasBaseDefinition()) {   j.addProperty("base", sd.getBaseDefinition()); }
+    if (sd.hasFhirVersion()) {      j.add("fhirVersion", sd.getFhirVersion().toCode()); }
+    if (sd.hasKind()) {             j.add("kind", sd.getKind().toCode()); }
+    if (sd.hasAbstract()) {         j.add("abstract", sd.getAbstract()); }
+    if (sd.hasType()) {             j.add("type", sd.getType()); }
+    if (sd.hasDerivation()) {       j.add("derivation", sd.getDerivation().toCode()); }
+    if (sd.hasBaseDefinition()) {   j.add("base", sd.getBaseDefinition()); }
 
     for (StringType t : sd.getContextInvariant()) {
-      if (!j.has("contextInvs")) {
-        j.add("contextInvs", new JsonArray());
-      }
-      j.getAsJsonArray("contextInvs").add(t.asStringValue()); 
+      j.forceArray("contextInvs").add(t.asStringValue()); 
     }
 
     for (StructureDefinitionContextComponent t : sd.getContext()) {
-      if (!j.has("contexts")) {
-        j.add("contexts", new JsonArray());
-      }
-      j.getAsJsonArray("contexts").add(t.getType().toCode()+":"+t.getExpression()); 
+      j.forceArray("contexts").add(t.getType().toCode()+":"+t.getExpression()); 
     }
 
     for (Coding t : sd.getKeyword()) {
-      if (!j.has("keywords")) {
-        j.add("keywords", new JsonArray());
-      }
-      j.getAsJsonArray("keywords").add(t.toString()); 
+      j.forceArray("keywords").add(t.toString()); 
     }  
   }
 

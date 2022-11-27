@@ -117,7 +117,7 @@ public class PublicationChecker {
       check(messages, npm.canonical().equals(pl.asString("canonical")), "Package canonical mismatch. This package canonical is "+npm.canonical()+" but the website has "+pl.asString("canonical")+mkError());
       check(messages, !hasVersion(pl, npm.version()), "Version "+npm.version()+" has already been published"+mkWarning());
     } else {
-      check(messages, npm.version().startsWith("0.1"), "This IG has never been published, so the version should start with 0."+mkWarning());
+      check(messages, npm.version().startsWith("0.1") || npm.version().contains("-"), "This IG has never been published, so the version should start with '0.' or include a patch version e.g. '-ballot'"+mkWarning());
     }  
   }
 
@@ -225,7 +225,7 @@ public class PublicationChecker {
   }
 
   private JsonObject getVersionObject(String v, JsonObject pl) {
-    for (JsonObject j : pl.getArray("list").asObjects()) {
+    for (JsonObject j : pl.getJsonArray("list").asJsonObjects()) {
       String vl = j.asString("version");
       if (v.equals(vl)) {
         return j;
@@ -253,7 +253,7 @@ public class PublicationChecker {
   private String getCurrentSequence(JsonObject pl) {
     String cv = null;
     String res = null;
-    for (JsonObject j : pl.getArray("list").asObjects()) {
+    for (JsonObject j : pl.getJsonArray("list").asJsonObjects()) {
       String v = j.asString("version");
       if (!Utilities.noString(v) && !"current".equals(v)) {
         if (cv == null || VersionUtilities.isThisOrLater(cv, v)) {
@@ -267,7 +267,7 @@ public class PublicationChecker {
 
   private String getLatestVersion(JsonObject pl) {
     String cv = null;
-    for (JsonObject j : pl.getArray("list").asObjects()) {
+    for (JsonObject j : pl.getJsonArray("list").asJsonObjects()) {
       String v = j.asString("version");
       if (!Utilities.noString(v)) {
         if (cv == null || VersionUtilities.isThisOrLater(v, cv)) {
@@ -279,9 +279,9 @@ public class PublicationChecker {
   }
 
   private boolean hasVersion(JsonObject pl, String version) {
-    JsonArray list = pl.getArray("list");
+    JsonArray list = pl.getJsonArray("list");
     if (list != null) {
-      for (JsonObject o : list.asObjects()) {
+      for (JsonObject o : list.asJsonObjects()) {
         if (o.has("version") && o.asString("version").equals(version)) {
           return true;
         }

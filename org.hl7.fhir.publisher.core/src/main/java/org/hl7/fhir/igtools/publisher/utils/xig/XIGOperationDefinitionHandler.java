@@ -11,9 +11,7 @@ import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.CodeType;
 import org.hl7.fhir.r5.model.OperationDefinition;
 import org.hl7.fhir.r5.model.OperationDefinition.OperationDefinitionParameterComponent;
-
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+import org.hl7.fhir.utilities.json.model.JsonObject;
 
 public class XIGOperationDefinitionHandler extends XIGHandler {
 
@@ -26,17 +24,14 @@ public class XIGOperationDefinitionHandler extends XIGHandler {
   }
 
   public void fillOutJson(OperationDefinition od, JsonObject j) {
-    if (od.hasAffectsState()) {    j.addProperty("affectsState", od.getAffectsState()); }
-    if (od.hasCode()) {            j.addProperty("code", od.getCode()); }
-    if (od.hasBase()) {            j.addProperty("base", od.getBase()); }
-    if (od.hasSystem()) {          j.addProperty("system", od.getSystem()); }
-    if (od.hasType())     {        j.addProperty("type", od.getType()); }
-    if (od.hasInstance()) {        j.addProperty("instance", od.getInstance()); }
+    if (od.hasAffectsState()) {    j.add("affectsState", od.getAffectsState()); }
+    if (od.hasCode()) {            j.add("code", od.getCode()); }
+    if (od.hasBase()) {            j.add("base", od.getBase()); }
+    if (od.hasSystem()) {          j.add("system", od.getSystem()); }
+    if (od.hasType())     {        j.add("type", od.getType()); }
+    if (od.hasInstance()) {        j.add("instance", od.getInstance()); }
     for (CodeType t : od.getResource()) {
-      if (!j.has("resources")) {
-        j.add("resources", new JsonArray());
-      }
-      j.getAsJsonArray("resources").add(t.toString()); 
+      j.forceArray("resources").add(t.toString()); 
       info.getOpr().add(t.toString());
     }
   }

@@ -313,7 +313,7 @@ public class DependencyRenderer {
     if (pl == null) {
       return null;
     }
-    for (JsonObject v : pl.forceArray("list").asObjects()) {
+    for (JsonObject v : pl.forceArray("list").asJsonObjects()) {
       if (!"current".equals(v.asString("version"))) {
         if (v.asBoolean("current")) {// this is the current official release
           return v.asString("version");
@@ -329,7 +329,7 @@ public class DependencyRenderer {
       return VersionState.VERSION_NO_LIST;
     }
     boolean latestInterim = true;
-    for (JsonObject v : pl.forceArray("list").asObjects()) {
+    for (JsonObject v : pl.forceArray("list").asJsonObjects()) {
       if (!"current".equals(v.asString("version"))) {
         if (version.equals(v.asString("version"))) {
           if (v.asBoolean("current")) {// this is the current official release

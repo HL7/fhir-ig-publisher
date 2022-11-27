@@ -30,8 +30,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
-
-import com.google.gson.JsonObject;
+import org.hl7.fhir.utilities.json.model.JsonObject;
 
 public class IGReleaseVersionUpdater {
 

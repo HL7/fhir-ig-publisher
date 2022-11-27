@@ -10,9 +10,9 @@ import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CodeType;
 import org.hl7.fhir.r5.model.SearchParameter;
 import org.hl7.fhir.r5.model.SearchParameter.SearchParameterComponentComponent;
+import org.hl7.fhir.utilities.json.model.JsonArray;
+import org.hl7.fhir.utilities.json.model.JsonObject;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
 
 public class XIGSearchParameterHandler extends XIGHandler {
 
@@ -25,13 +25,13 @@ public class XIGSearchParameterHandler extends XIGHandler {
   }
 
   public void fillOutJson(SearchParameter sp, JsonObject j) {
-    if (sp.hasCode()) {            j.addProperty("code", sp.getCode()); }
-    if (sp.hasType()) {            j.addProperty("type", sp.getType().toCode()); }
+    if (sp.hasCode()) {            j.add("code", sp.getCode()); }
+    if (sp.hasType()) {            j.add("type", sp.getType().toCode()); }
     for (CodeType t : sp.getBase()) {
       if (!j.has("resources")) {
         j.add("resources", new JsonArray());
       }
-      j.getAsJsonArray("resources").add(t.toString()); 
+      j.getJsonArray("resources").add(t.toString()); 
       info.getSpr().add(t.toString());
     }
   }

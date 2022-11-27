@@ -8,13 +8,12 @@ import java.util.Map.Entry;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.json.JsonTrackingParser;
-
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonPrimitive;
+import org.hl7.fhir.utilities.json.model.JsonArray;
+import org.hl7.fhir.utilities.json.model.JsonElement;
+import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.model.JsonProperty;
+import org.hl7.fhir.utilities.json.model.JsonString;
+import org.hl7.fhir.utilities.json.parser.JsonParser;
 
 public class HistoryPageUpdater {
 
@@ -40,16 +39,16 @@ public class HistoryPageUpdater {
     System.out.println("Update history page at "+folder+" from "+sourceRepo);
     copyFiles(sourceRepo, folder);
 
-    JsonObject json = JsonTrackingParser.parseJsonFile(Utilities.path(folder, "package-list.json"));
+    JsonObject json = JsonParser.parseObjectFromFile(Utilities.path(folder, "package-list.json"));
     scrubApostrophes(json);
-    String jsonv = new GsonBuilder().create().toJson(json);
+    String jsonv = JsonParser.compose(json, false);
 
     String html = TextFile.fileToString(Utilities.path(sourceRepo, "history.template"));
     html = html.replace("$header$", loadTemplate(rootFolder, folder, "header.template"));
     html = html.replace("$preamble$", loadTemplate(rootFolder, folder, "preamble.template"));
     html = html.replace("$postamble$", loadTemplate(rootFolder, folder, "postamble.template"));
-    html = fixParameter(html, "title", json.get("title").getAsString());
-    html = fixParameter(html, "id", json.get("package-id").getAsString());
+    html = fixParameter(html, "title", json.asString("title"));
+    html = fixParameter(html, "id", json.asString("package-id"));
     html = fixParameter(html, "json", jsonv);
     File tgt = new File(Utilities.path(folder, "directory.html"));
     if (tgt.exists() && TextFile.fileToString(tgt).contains("<div id=\"history-data\"></div>")) {
@@ -61,8 +60,8 @@ public class HistoryPageUpdater {
     String index = new File(Utilities.path(folder, "index.html")).exists() ? TextFile.fileToString(Utilities.path(folder, "index.html")) : "XXXXX";
     if (index.contains("XXXX")) {
       html = TextFile.fileToString(Utilities.path(sourceRepo, "index.html"));
-      html = fixParameter(html, "title", json.get("title").getAsString());
-      html = fixParameter(html, "id", json.get("package-id").getAsString());
+      html = fixParameter(html, "title", json.asString("title"));
+      html = fixParameter(html, "id", json.asString("package-id"));
       html = fixParameter(html, "json", jsonv);
       TextFile.stringToFile(html, Utilities.path(folder, "index.html"), false);      
     }
@@ -109,7 +108,7 @@ public class HistoryPageUpdater {
   }
 
   private void scrubApostrophes(JsonObject json) {
-    for (Entry<String, JsonElement> p : json.entrySet()) {
+    for (JsonProperty p : json.getProperties()) {
       if (p.getValue().isJsonPrimitive()) {
         scrubApostrophesInProperty(p);
       } else if (p.getValue().isJsonObject()) {
@@ -118,7 +117,7 @@ public class HistoryPageUpdater {
         int i = 0;
         for (JsonElement ai : ((JsonArray) p.getValue())) {
           if (ai.isJsonPrimitive()) {
-            if (ai.getAsString().contains("'"))
+            if (ai.asString().contains("'"))
               throw new Error("Don't know how to handle apostrophes in arrays");
           } else if (ai.isJsonObject()) {
             scrubApostrophes((JsonObject) ai);
@@ -129,11 +128,11 @@ public class HistoryPageUpdater {
     }
   }
 
-  private void scrubApostrophesInProperty(Entry<String, JsonElement> p) {
-    String s = p.getValue().getAsString();
+  private void scrubApostrophesInProperty(JsonProperty p) {
+    String s = p.getValue().asString();
     if (s.contains("'")) {
       s = s.replace("'", "`");
-      p.setValue(new JsonPrimitive(s));
+      p.setValue(new JsonString(s));
     }
   }
 

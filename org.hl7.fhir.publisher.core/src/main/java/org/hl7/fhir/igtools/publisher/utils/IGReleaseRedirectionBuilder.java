@@ -32,12 +32,10 @@ import java.util.Set;
 
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.json.JsonUtilities;
-import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.model.JsonProperty;
+import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.NpmPackage;
-
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 
 public class IGReleaseRedirectionBuilder {
 
@@ -376,7 +374,7 @@ public class IGReleaseRedirectionBuilder {
     if (new File(Utilities.path(folder, "spec.internals")).exists()) {
       JsonObject json = null;
       try {
-        json = JsonTrackingParser.parseJsonFile(Utilities.path(folder, "spec.internals"));
+        json = JsonParser.parseObjectFromFile(Utilities.path(folder, "spec.internals"));
       } catch (Exception e) {
         return null;
       }
@@ -392,7 +390,7 @@ public class IGReleaseRedirectionBuilder {
     pkg = NpmPackage.fromPackage(new FileInputStream(f));
     JsonObject json = null;
     try {
-      json = JsonTrackingParser.parseJson(pkg.load("other", "spec.internals"));
+      json = JsonParser.parseObject(pkg.load("other", "spec.internals"));
     } catch (Exception e) {
       return null;
     }
@@ -406,9 +404,9 @@ public class IGReleaseRedirectionBuilder {
   private void scanAdditionalFiles(Map<String, String> res) throws IOException {
     for (File f : new File(folder).listFiles()) {
       if (f.getName().endsWith(".json") && !f.getName().endsWith(".canonical.json") && new File(Utilities.changeFileExt(f.getAbsolutePath(), ".xml")).exists() && new File(Utilities.changeFileExt(f.getAbsolutePath(), ".html")).exists()) {
-        JsonObject obj = JsonTrackingParser.parseJson(f);
+        JsonObject obj = JsonParser.parseObject(f);
         if (obj.has("resourceType") && obj.has("id")) {
-          res.put(JsonUtilities.str(obj, "resourceType")+"/"+JsonUtilities.str(obj, "id"), Utilities.pathURL(vpath, Utilities.changeFileExt(f.getName(), ".html")));
+          res.put(obj.asString("resourceType")+"/"+obj.asString("id"), Utilities.pathURL(vpath, Utilities.changeFileExt(f.getName(), ".html")));
         }
       }
     }
@@ -417,16 +415,16 @@ public class IGReleaseRedirectionBuilder {
 
   public Map<String, String> parseSpecDetails(JsonObject json) {
     Map<String, String> res = new HashMap<>();
-    for (Entry<String, JsonElement> p : json.getAsJsonObject("paths").entrySet()) {
-      String key = p.getKey();
+    for (JsonProperty p : json.getJsonObject("paths").getProperties()) {
+      String key = p.getName();
       if (key.contains("|")) {
         key = key.substring(0,  key.indexOf("|"));
       }
       if (key.length() >= canonical.length()+1 && key.startsWith(canonical)) {
-        String value = p.getValue().getAsString();
+        String value = p.getValue().asString();
         res.put(key.substring(canonical.length()+1), Utilities.pathURL(vpath, value));
       } else if (key.contains("/")) {
-        res.put(key, Utilities.pathURL(vpath, p.getValue().getAsString()));        
+        res.put(key, Utilities.pathURL(vpath, p.getValue().asString()));        
       }
     }
     return res;

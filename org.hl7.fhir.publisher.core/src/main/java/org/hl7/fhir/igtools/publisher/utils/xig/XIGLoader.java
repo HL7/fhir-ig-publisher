@@ -25,11 +25,9 @@ import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageHacker;
-
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
 
 public class XIGLoader implements IPackageVisitorProcessor {
 
@@ -52,7 +50,7 @@ public class XIGLoader implements IPackageVisitorProcessor {
       smm.setBase(npm.canonical());
       smm.setBase2(PackageHacker.fixPackageUrl(npm.url()));
       smmList.put(pid, smm);
-      info.getJson().getAsJsonObject("packages").add(pid, npm.getNpm());
+      info.getJson().getJsonObject("packages").add(pid, npm.getNpm());
     }
         
     info.getPid().put(pid, npm.getWebLocation());
@@ -63,8 +61,8 @@ public class XIGLoader implements IPackageVisitorProcessor {
         cr.setText(null);
         cr.setUserData("path", Utilities.pathURL(smm.getBase(), smm.getPath(cr.getUrl(), null, cr.fhirType(), cr.getIdBase())));
         JsonObject j = new JsonObject();
-        info.getJson().getAsJsonArray("canonicals").add(j);
-        j.addProperty("pid", pid);
+        info.getJson().getJsonArray("canonicals").add(j);
+        j.add("pid", pid);
         cr.setUserData("pid", pid);
         cr.setUserData("purl", npm.getWebLocation());
         cr.setUserData("pname", npm.title());
@@ -80,10 +78,10 @@ public class XIGLoader implements IPackageVisitorProcessor {
           cr.setUserData("auth", auth);
         }
         cr.setUserData("filebase", (cr.fhirType()+"-"+pid.substring(0, pid.indexOf("#"))+"-"+cr.getId()).toLowerCase());
-        j.addProperty("fver", npm.fhirVersion());
-        j.addProperty("published", pid.contains("#current"));
-        j.addProperty("filebase", cr.getUserString("filebase"));
-        j.addProperty("path", cr.getUserString("path"));
+        j.add("fver", npm.fhirVersion());
+        j.add("published", pid.contains("#current"));
+        j.add("filebase", cr.getUserString("filebase"));
+        j.add("path", cr.getUserString("path"));
         
         info.fillOutJson(cr, j);
         if (info.getResources().containsKey(cr.getUrl())) {

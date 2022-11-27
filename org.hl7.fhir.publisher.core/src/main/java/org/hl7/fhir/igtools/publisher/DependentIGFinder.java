@@ -22,16 +22,14 @@ import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.json.JsonUtilities;
-import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageClient;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
 import org.stringtemplate.v4.ST;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 
 public class DependentIGFinder {
 
@@ -144,7 +142,7 @@ public class DependentIGFinder {
   private void analyse() {
     try {
       Set<String> plist = getDependentPackages();
-      JsonObject json = JsonTrackingParser.fetchJson("https://raw.githubusercontent.com/FHIR/ig-registry/master/fhir-ig-list.json");
+      JsonObject json = JsonParser.parseObjectFromUrl("https://raw.githubusercontent.com/FHIR/ig-registry/master/fhir-ig-list.json");
       
       for (String pid : plist) {
         JsonObject guide = getGuide(json, pid);
@@ -179,8 +177,8 @@ public class DependentIGFinder {
   }
 
   private JsonObject getGuide(JsonObject json, String pid) {
-    for (JsonObject o : JsonUtilities.objects(json, "guides")) {
-      if (pid.equals(JsonUtilities.str(o,  "npm-name"))) {
+    for (JsonObject o : json.getJsonObjects("guides")) {
+      if (pid.equals(o.asString("npm-name"))) {
         return o;
       }
     }
@@ -347,35 +345,35 @@ public class DependentIGFinder {
   }
 
   private void checkIGDependencies(JsonObject guide) { 
-    String pid = JsonUtilities.str(guide, "npm-name");
+    String pid = guide.asString("npm-name");
 //    System.out.println("check "+pid+" " +abc);
     
     // we only check the latest published version, and the CI build
     try {
-      JsonObject pl = JsonTrackingParser.fetchJson(Utilities.pathURL(guide.get("canonical").getAsString(), "package-list.json"));
-      String canonical = JsonUtilities.str(guide, "canonical");
+      JsonObject pl = JsonParser.parseObjectFromUrl(Utilities.pathURL(guide.asString("canonical"), "package-list.json"));
+      String canonical = guide.asString("canonical");
       DepInfo dep = new DepInfo(pid, Utilities.path(canonical, "history.html"));
       deplist.add(dep);
-      for (JsonObject list : JsonUtilities.objects(pl, "list")) {
+      for (JsonObject list : pl.getJsonObjects("list")) {
         boolean ballot = false;
-        String version = JsonUtilities.str(list, "version");
+        String version = list.asString("version");
         if (!"current".equals(version)) {
-          String status = JsonUtilities.str(list, "status");
+          String status = list.asString("status");
           if ("ballot".equals(status)) {
             if (!ballot) {
               ballot = true;
-              dep.ballot = checkForDependency(pid, version, JsonUtilities.str(list, "path"));          
+              dep.ballot = checkForDependency(pid, version, list.asString("path"));          
             }
           } else {
-            dep.published = checkForDependency(pid, version, JsonUtilities.str(list, "path"));                    
+            dep.published = checkForDependency(pid, version, list.asString("path"));                    
             break;
           }
         }
       }
-      dep.cibuild = checkForDependency(pid, "current", JsonUtilities.str(guide, "ci-build"));
+      dep.cibuild = checkForDependency(pid, "current", guide.asString("ci-build"));
     } catch (Exception e) {
-      errors.add("Unable to process "+JsonUtilities.str(guide, "name")+": " +e.getMessage());
-      if (debug) System.out.println("Dependency Analysis - Unable to process "+JsonUtilities.str(guide, "name")+": " +e.getMessage());
+      errors.add("Unable to process "+guide.asString("name")+": " +e.getMessage());
+      if (debug) System.out.println("Dependency Analysis - Unable to process "+guide.asString("name")+": " +e.getMessage());
     }    
   }
 

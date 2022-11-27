@@ -29,19 +29,15 @@ import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.json.JsonUtilities;
-import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.json.model.JsonArray;
+import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.model.JsonProperty;
+import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.xml.XMLUtil;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
-
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 
 public class TemplateReleaser {
   
@@ -207,65 +203,62 @@ public class TemplateReleaser {
   }
 
   private void updateVersions(String source, VersionDecision vd, List<VersionDecision> versionsList) throws FileNotFoundException, IOException {
-    JsonObject npm = JsonTrackingParser.parseJson(new FileInputStream(Utilities.path(source, vd.getId(), "package", "package.json")));
+    JsonObject npm = JsonParser.parseObject(new FileInputStream(Utilities.path(source, vd.getId(), "package", "package.json")));
     npm.remove("version");
-    npm.addProperty("version", vd.getNewVersion());
+    npm.add("version", vd.getNewVersion());
     if (npm.has("dependencies")) {
-      JsonObject d = npm.getAsJsonObject("dependencies");
+      JsonObject d = npm.getJsonObject("dependencies");
       List<String> deps = new ArrayList<>();
-      for (Entry<String, JsonElement> e : d.entrySet()) {
-        deps.add(e.getKey());
+      for (JsonProperty e : d.getProperties()) {
+        deps.add(e.getName());
       }
       for (String s : deps) {
         d.remove(s);
-        d.addProperty(s, findVersion(versionsList, s).newVersion);
+        d.add(s, findVersion(versionsList, s).newVersion);
       }
     }
-    Gson gson = new GsonBuilder().setPrettyPrinting().create();
-    String jcnt = gson.toJson(npm);
+    String jcnt = JsonParser.compose(npm, true);
     TextFile.stringToFile(jcnt, Utilities.path(source, vd.getId(), "package", "package.json"));
   }
 
   private void resetVersions(String source, VersionDecision vd, List<VersionDecision> versionsList) throws FileNotFoundException, IOException {
-    JsonObject npm = JsonTrackingParser.parseJson(new FileInputStream(Utilities.path(source, vd.getId(), "package", "package.json")));
+    JsonObject npm = JsonParser.parseObject(new FileInputStream(Utilities.path(source, vd.getId(), "package", "package.json")));
     if (npm.has("dependencies")) {
-      JsonObject d = npm.getAsJsonObject("dependencies");
+      JsonObject d = npm.getJsonObject("dependencies");
       List<String> deps = new ArrayList<>();
-      for (Entry<String, JsonElement> e : d.entrySet()) {
-        deps.add(e.getKey());
+      for (JsonProperty e : d.getProperties()) {
+        deps.add(e.getName());
       }
       for (String s : deps) {
         d.remove(s);
-        d.addProperty(s, "current");
+        d.add(s, "current");
       }
-      Gson gson = new GsonBuilder().setPrettyPrinting().create();
-      String jcnt = gson.toJson(npm);
+      String jcnt = JsonParser.compose(npm, true);
       TextFile.stringToFile(jcnt, Utilities.path(source, vd.getId(), "package", "package.json"));
     }
   }
 
   private void updateDate(String source, VersionDecision vd, String dateFmt) throws FileNotFoundException, IOException {
-    JsonObject pl = JsonTrackingParser.parseJson(new FileInputStream(Utilities.path(source, vd.getId(), "package-list.json")));
+    JsonObject pl = JsonParser.parseObject(new FileInputStream(Utilities.path(source, vd.getId(), "package-list.json")));
     boolean ok = false;
-    for (JsonObject v : JsonUtilities.objects(pl, "list")) {
-      if (JsonUtilities.str(v, "version").equals(vd.getNewVersion())) {
+    for (JsonObject v : pl.getJsonObjects("list")) {
+      if (v.asString("version").equals(vd.getNewVersion())) {
         v.remove("date");
-        v.addProperty("date", dateFmt);
+        v.add("date", dateFmt);
         ok = true;
-        vd.releaseNote = JsonUtilities.str(v, "desc");
+        vd.releaseNote = v.asString("desc");
       }
     }
     if (!ok) {
       throw new Error("unable to find version "+vd.getNewVersion()+" in pacjage list");
     }
-    Gson gson = new GsonBuilder().setPrettyPrinting().create();
-    String jcnt = gson.toJson(pl);
+    String jcnt = JsonParser.compose(pl, true);
     TextFile.stringToFile(jcnt, Utilities.path(source, vd.getId(), "package-list.json"));
   }
 
   private void updatePackageList(String source, VersionDecision vd) throws FileNotFoundException, IOException {
-    JsonObject pl = JsonTrackingParser.parseJson(new FileInputStream(Utilities.path(source, vd.getId(), "package-list.json")));
-    JsonArray vl = pl.getAsJsonArray("list");
+    JsonObject pl = JsonParser.parseObject(new FileInputStream(Utilities.path(source, vd.getId(), "package-list.json")));
+    JsonArray vl = pl.getJsonArray("list");
     JsonArray nvl = new JsonArray();
     JsonObject v = new JsonObject();
     nvl.add(vl.get(0));
@@ -279,15 +272,14 @@ public class TemplateReleaser {
     }
     pl.remove("list");
     pl.add("list", nvl);
-    v.addProperty("version", vd.newVersion);
-    v.addProperty("date", "XXXX-XX-XX");
-    v.addProperty("desc", "Upgrade for dependency on "+vd.implicitSource);
-    v.addProperty("path", Utilities.pathURL(pl.get("canonical").getAsString(), vd.newVersion));
-    v.addProperty("status", "release");
-    v.addProperty("sequence", "Publications");
-    v.addProperty("current", true);
-    Gson gson = new GsonBuilder().setPrettyPrinting().create();
-    String jcnt = gson.toJson(pl);
+    v.add("version", vd.newVersion);
+    v.add("date", "XXXX-XX-XX");
+    v.add("desc", "Upgrade for dependency on "+vd.implicitSource);
+    v.add("path", Utilities.pathURL(pl.asString("canonical"), vd.newVersion));
+    v.add("status", "release");
+    v.add("sequence", "Publications");
+    v.add("current", true);
+    String jcnt = JsonParser.compose(pl, true);
     TextFile.stringToFile(jcnt, Utilities.path(source, vd.getId(), "package-list.json"));
   }
 
@@ -385,14 +377,14 @@ public class TemplateReleaser {
   }
 
   private List<String> listDependencies(String source, String id) throws Exception {
-    JsonObject npm = JsonTrackingParser.parseJson(TextFile.fileToString(Utilities.path(source, id, "package", "package.json")));
+    JsonObject npm = JsonParser.parseObject(TextFile.fileToString(Utilities.path(source, id, "package", "package.json")));
     List<String> res = new ArrayList<String>();
     if (npm.has("dependencies")) {
-      for (Entry<String, JsonElement> s : npm.getAsJsonObject("dependencies").entrySet()) {
+      for (JsonProperty s : npm.getJsonObject("dependencies").getProperties()) {
 //        if (!"current".equals(s.getValue().getAsString())) {
 //          throw new Exception("Dependency is not 'current'");
 //        }
-        res.add(s.getKey());
+        res.add(s.getName());
       }
     }
     return res;
@@ -421,10 +413,10 @@ public class TemplateReleaser {
       if (f.isDirectory()) {
         scanForCurrentVersions(res, f);
       } else if (f.getName().equals("package-list.json")) {
-        JsonObject pl = JsonTrackingParser.parseJson(f);
-        for (JsonObject v : JsonUtilities.objects(pl, "list")) {
-          if ("release".equals(JsonUtilities.str(v, "status")) && JsonUtilities.bool(v, "current")) {
-            res.put(JsonUtilities.str(pl, "package-id"), JsonUtilities.str(v, "version"));
+        JsonObject pl = JsonParser.parseObject(f);
+        for (JsonObject v : pl.getJsonObjects("list")) {
+          if ("release".equals(v.asString("status")) && v.asBoolean("current")) {
+            res.put(pl.asString("package-id"), v.asString("version"));
           }
         }
       }
