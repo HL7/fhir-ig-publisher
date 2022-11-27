@@ -50,16 +50,15 @@ import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.json.model.JsonElement;
+import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.model.JsonArray;
+import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.npm.CommonPackages;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.validation.ValidationOptions;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
-
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 
 public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider {
 
@@ -100,13 +99,13 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
         +cr.getUserString("pname")+" (v"+cr.getUserString("fver")+")</td></tr>\r\n");
     JsonObject j = new JsonObject();
     info.fillOutJson(cr, j);
-    for (Entry<String, JsonElement> pp : j.entrySet()) {
+    for (JsonProperty pp : j.getProperties()) {
       if (pp.getValue().isJsonPrimitive()) {
-        b.append("<tr><td>"+pp.getKey()+"</td><td>"+Utilities.escapeXml(pp.getValue().getAsString())+"</td></tr>\r\n");
+        b.append("<tr><td>"+pp.getName()+"</td><td>"+Utilities.escapeXml(pp.getValue().asString())+"</td></tr>\r\n");
       } else {
-        b.append("<tr><td>"+pp.getKey()+"</td><td>");
-        for (JsonElement a : pp.getValue().getAsJsonArray()) {
-          b.append(Utilities.escapeXml(a.getAsJsonPrimitive().toString())+" ");
+        b.append("<tr><td>"+pp.getName()+"</td><td>");
+        for (JsonElement a : ((JsonArray) pp.getValue())) {
+          b.append(Utilities.escapeXml(a.asString())+" ");
         }
         b.append("</td></tr>\r\n");
       }
@@ -129,7 +128,7 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
   }
 
   public void produce(FilesystemPackageCacheManager pcm) throws IOException, FHIRException, EOperationOutcome {
-    JsonTrackingParser.write(info.getJson(), Utilities.path(target, "registry.json"));
+    org.hl7.fhir.utilities.json.parser.JsonParser.compose(info.getJson(), new FileOutputStream(Utilities.path(target, "registry.json")));
     info.setJson(null);
 
     System.out.println("Generate...");

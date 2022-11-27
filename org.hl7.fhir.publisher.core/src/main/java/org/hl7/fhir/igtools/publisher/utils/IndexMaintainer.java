@@ -17,11 +17,11 @@ import org.hl7.fhir.igtools.publisher.utils.IndexMaintainer.IdOrderSorter;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.JsonUtilities;
+import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
-import com.google.gson.JsonObject;
 
 public class IndexMaintainer {
 
@@ -190,13 +190,13 @@ public class IndexMaintainer {
   }
 
   public void seeEntry(String id, JsonObject ig, JsonObject ver) throws ParseException {
-    String name = JsonUtilities.str(ig, "title"); 
-    String descMD = JsonUtilities.str(ig, "introduction");
-    String version = JsonUtilities.str(ver, "version");
-    String fhirVersion = JsonUtilities.str(ver, "fhirversion");
+    String name = ig.asString("title"); 
+    String descMD = ig.asString("introduction");
+    String version = ver.asString("version");
+    String fhirVersion = ver.asString("fhirversion");
     SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
-    Date d = df.parse(JsonUtilities.str(ver, "date"));
-    boolean current = "true".equals(JsonUtilities.str(ver, "current"));
+    Date d = df.parse(ver.asString("date"));
+    boolean current = "true".equals(ver.asString("current"));
     
     IGIndexInformation entry = igs.get(id);
     if (entry == null) {
@@ -207,13 +207,13 @@ public class IndexMaintainer {
     }
     if (current) {
       entry.dateMilestone = d;
-      entry.refMilestone = JsonUtilities.str(ig, "canonical");
+      entry.refMilestone = ig.asString("canonical");
       entry.fvMilestone = fhirVersion;
       entry.verMilestone = version;      
     }  
     if (entry.dateLatest == null || entry.dateLatest.before(d)) {
       entry.dateLatest = d;
-      entry.refLatest = JsonUtilities.str(ver, "path");
+      entry.refLatest = ver.asString("path");
       entry.fvLatest = fhirVersion;
       entry.verLatest = version;
     }

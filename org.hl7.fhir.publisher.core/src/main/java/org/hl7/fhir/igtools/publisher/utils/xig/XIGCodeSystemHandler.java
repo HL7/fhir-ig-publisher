@@ -14,8 +14,8 @@ import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.CodeSystem.CodeSystemContentMode;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.json.model.JsonObject;
 
-import com.google.gson.JsonObject;
 
 public class XIGCodeSystemHandler extends XIGHandler {
 
@@ -28,13 +28,13 @@ public class XIGCodeSystemHandler extends XIGHandler {
   }
 
   public void fillOutJson(CodeSystem cs, JsonObject j) {
-    if (cs.hasCaseSensitive()) {    j.addProperty("caseSensitive", cs.getCaseSensitive()); }
-    if (cs.hasValueSet()) {         j.addProperty("valueSet", cs.getValueSet()); }
-    if (cs.hasHierarchyMeaning()) { j.addProperty("hierarchyMeaning", cs.getHierarchyMeaning().toCode());}
-    if (cs.hasCompositional()) {    j.addProperty("compositional", cs.getCompositional()); }
-    if (cs.hasVersionNeeded()) {    j.addProperty("versionNeeded", cs.getVersionNeeded()); }
-    if (cs.hasContent()) {          j.addProperty("content", cs.getContent().toCode()); }
-    if (cs.hasSupplements()) {      j.addProperty("supplements", cs.getSupplements()); }
+    if (cs.hasCaseSensitive()) {    j.add("caseSensitive", cs.getCaseSensitive()); }
+    if (cs.hasValueSet()) {         j.add("valueSet", cs.getValueSet()); }
+    if (cs.hasHierarchyMeaning()) { j.add("hierarchyMeaning", cs.getHierarchyMeaning().toCode());}
+    if (cs.hasCompositional()) {    j.add("compositional", cs.getCompositional()); }
+    if (cs.hasVersionNeeded()) {    j.add("versionNeeded", cs.getVersionNeeded()); }
+    if (cs.hasContent()) {          j.add("content", cs.getContent().toCode()); }
+    if (cs.hasSupplements()) {      j.add("supplements", cs.getSupplements()); }
   }
   
   

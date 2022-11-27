@@ -1632,8 +1632,6 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
         b.append(compareSimpleTypeLists(newAgg, oldAgg, mode));
       }
-
-      b.append(")");
     }
   }
 
@@ -1926,15 +1924,15 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       compare = compareList;
     StringBuilder b = new StringBuilder();
     if (mode==GEN_MODE_SNAP || mode==GEN_MODE_MS) {
-      for (String s : original)
+      boolean first = true;
+      for (String s : original) {
+        if (first) first = false; else b.append(separator);
         b.append(s);
+      }
     } else {
       boolean first = true;
       for (String s : original) {
-        if (first)
-          first = false;
-        else
-          b.append(separator);
+        if (first) first = false; else b.append(separator);
         if (compare.contains(s))
           b.append(unchanged(s));
         else

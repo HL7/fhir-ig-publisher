@@ -35,17 +35,13 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.model.Constants;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.json.model.JsonArray;
+import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.model.JsonPrimitive;
+import org.hl7.fhir.utilities.json.model.JsonProperty;
+import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
-
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonPrimitive;
-import com.google.gson.JsonSyntaxException;
 
 /**
  * TODO: should we call versionless references ok? not sure....
@@ -81,14 +77,14 @@ public class SpecMapManager {
   public SpecMapManager(String npmName, String igVersion, String toolVersion, String buildId, Calendar genDate, String webUrl) {
     spec = new JsonObject();
     if (npmName != null)
-      spec.addProperty("npm-name", npmName);
-    spec.addProperty("ig-version", igVersion);
-    spec.addProperty("tool-version", toolVersion);
-    spec.addProperty("tool-build", buildId);
-    spec.addProperty("webUrl", webUrl);
+      spec.add("npm-name", npmName);
+    spec.add("ig-version", igVersion);
+    spec.add("tool-version", toolVersion);
+    spec.add("tool-build", buildId);
+    spec.add("webUrl", webUrl);
     if (genDate != null) {
-      spec.addProperty("date", new SimpleDateFormat("yyyy-MM-dd", new Locale("en", "US")).format(genDate.getTime()));
-      spec.addProperty("date-time", new SimpleDateFormat("yyyyMMddhhmmssZ", new Locale("en", "US")).format(genDate.getTime()));
+      spec.add("date", new SimpleDateFormat("yyyy-MM-dd", new Locale("en", "US")).format(genDate.getTime()));
+      spec.add("date-time", new SimpleDateFormat("yyyyMMddhhmmssZ", new Locale("en", "US")).format(genDate.getTime()));
     }
     paths = new JsonObject();
     spec.add("paths", paths);
@@ -100,24 +96,24 @@ public class SpecMapManager {
     spec.add("images", images);
   }
 
-  public SpecMapManager(byte[] bytes, String version) throws JsonSyntaxException, IOException {
+  public SpecMapManager(byte[] bytes, String version) throws IOException {
     this.version = version;
-    spec = JsonTrackingParser.parseJson(bytes, true);
-    paths = spec.getAsJsonObject("paths");
-    pages = spec.getAsJsonObject("pages");
-    targets = spec.getAsJsonArray("targets");
-    images = spec.getAsJsonArray("images");
+    spec = JsonParser.parseObject(bytes);
+    paths = spec.getJsonObject("paths");
+    pages = spec.getJsonObject("pages");
+    targets = spec.getJsonArray("targets");
+    images = spec.getJsonArray("images");
     if (targets != null)
-      for (JsonElement e : targets) {
-        targetSet.add(((JsonPrimitive) e).getAsString());
+      for (String e : targets.asStrings()) {
+        targetSet.add(e);
     }
     if (images != null)
-      for (JsonElement e : images) {
-        imageSet.add(((JsonPrimitive) e).getAsString());
+      for (String e : images.asStrings()) {
+        imageSet.add(e);
     }
   }
 
-  public static SpecMapManager fromPackage(NpmPackage pi) throws JsonSyntaxException, IOException {
+  public static SpecMapManager fromPackage(NpmPackage pi) throws IOException {
     if (pi.hasFile("other", "spec.internals")) {
       return new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion());      
     } else {
@@ -127,12 +123,11 @@ public class SpecMapManager {
 
 
   public void path(String url, String path) {
-    paths.addProperty(url, path);
+    paths.set(url, path);
   }
 
   public void save(String filename) throws IOException {
-    Gson gson = new GsonBuilder().setPrettyPrinting().create();
-    String json = gson.toJson(spec);
+    String json = JsonParser.compose(spec, true);
     TextFile.stringToFile(json, filename);    
   }
 
@@ -221,8 +216,8 @@ public class SpecMapManager {
 
   public List<String> getPathUrls() {
     List<String> res = new ArrayList<String>();
-    for (Entry<String, JsonElement> e : paths.entrySet()) 
-      res.add(e.getKey());
+    for (JsonProperty e : paths.getProperties()) 
+      res.add(e.getName());
     return res;
   }
 
@@ -235,10 +230,7 @@ public class SpecMapManager {
       throw new FHIRException("Property "+name+" not found");
     if (!(obj.get(name) instanceof JsonPrimitive))
       throw new FHIRException("Property "+name+" not a primitive");
-    JsonPrimitive p = (JsonPrimitive) obj.get(name);
-    if (!p.isString())
-      throw new FHIRException("Property "+name+" not a string");
-    return p.getAsString();
+    return obj.asString(name);
   }
 
   private String strOpt(JsonObject obj, String name) throws FHIRException {
@@ -246,10 +238,7 @@ public class SpecMapManager {
       return null;
     if (!(obj.get(name) instanceof JsonPrimitive))
       throw new FHIRException("Property "+name+" not a primitive");
-    JsonPrimitive p = (JsonPrimitive) obj.get(name);
-    if (!p.isString())
-      throw new FHIRException("Property "+name+" not a string");
-    return p.getAsString();
+    return obj.asString(name);
   }
 
   private String strOpt(JsonObject obj, String name, String def) throws FHIRException {
@@ -257,14 +246,11 @@ public class SpecMapManager {
       return def;
     if (!(obj.get(name) instanceof JsonPrimitive))
       throw new FHIRException("Property "+name+" not a primitive");
-    JsonPrimitive p = (JsonPrimitive) obj.get(name);
-    if (!p.isString())
-      throw new FHIRException("Property "+name+" not a string");
-    return p.getAsString();
+    return obj.asString(name);
   }
 
   public void page(String title, String url) {
-    pages.addProperty(title, url);    
+    pages.add(title, url);    
   }
 
   public String getBase() {
@@ -286,14 +272,14 @@ public class SpecMapManager {
   public void target(String tgt) {
     if (!targetSet.contains(tgt)) {
       targetSet.add(tgt);
-      targets.add(new JsonPrimitive(tgt));
+      targets.add(tgt);
     }
   }
   
   public void image(String tgt) {
     if (!imageSet.contains(tgt)) {
       imageSet.add(tgt);
-      images.add(new JsonPrimitive(tgt));
+      images.add(tgt);
     }
   }
   
@@ -380,8 +366,8 @@ public class SpecMapManager {
 
   public List<String> getPages() {
     List<String> res = new ArrayList<String>();
-    for (Entry<String, JsonElement> e : pages.entrySet()) 
-      res.add(e.getKey());
+    for (JsonProperty e : pages.getProperties()) 
+      res.add(e.getName());
     return res;
   }
 
@@ -404,8 +390,8 @@ public class SpecMapManager {
 
   public Set<String> listTargets() {
     Set<String> res = new HashSet<String>();
-    for (JsonElement n : targets) {
-      res.add(n.getAsString());
+    for (String n : targets.asStrings()) {
+      res.add(n);
     }
     return res;
   }
@@ -413,6 +399,11 @@ public class SpecMapManager {
 
   public SpecialPackageType getSpecial() {
     return special;
+  }
+
+  @Override
+  public String toString() {
+    return "SpecMapManager [base=" + base + ", name=" + name + ", pi=" + pi + "]";
   }
 
 }

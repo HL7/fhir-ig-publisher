@@ -9,8 +9,8 @@ import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.JsonUtilities;
+import org.hl7.fhir.utilities.json.model.JsonObject;
 
-import com.google.gson.JsonObject;
 
 public class XIGHandler {
 
@@ -134,7 +134,7 @@ public class XIGHandler {
       }
       JsonObject j = (JsonObject) cr.getUserData("json");
       if (j.has("jurisdictions")) {
-        for (String str : JsonUtilities.strings(j.getAsJsonArray("jurisdictions"))) {
+        for (String str : j.getStrings("jurisdictions")) {
           if (realm.equals(str)) {
             return true;
           }

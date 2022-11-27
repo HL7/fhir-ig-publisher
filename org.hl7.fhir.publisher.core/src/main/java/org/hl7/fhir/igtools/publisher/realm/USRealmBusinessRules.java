@@ -35,7 +35,8 @@ import org.hl7.fhir.utilities.SimpleHTTPClient.HTTPResult;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
@@ -43,9 +44,6 @@ import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
-
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 
 public class USRealmBusinessRules extends RealmBusinessRules {
 
@@ -174,10 +172,9 @@ public class USRealmBusinessRules extends RealmBusinessRules {
 
   private NpmPackage fetchLatestUSCore() throws IOException {
     JsonObject pl = fetchJson("https://hl7.org/fhir/us/core/package-list.json");
-    for (JsonElement e : pl.getAsJsonArray("list")) {
-      JsonObject v = (JsonObject) e;
-      if (v.has("fhirversion") && VersionUtilities.versionsCompatible(version, v.get("fhirversion").getAsString())) {
-        return new FilesystemPackageCacheManager(true, ToolsVersion.TOOLS_VERSION).loadPackage("hl7.fhir.us.core", v.get("version").getAsString());
+    for (JsonObject v : pl.getJsonObjects("list")) {
+      if (v.has("fhirversion") && VersionUtilities.versionsCompatible(version, v.asString("fhirversion"))) {
+        return new FilesystemPackageCacheManager(true, ToolsVersion.TOOLS_VERSION).loadPackage("hl7.fhir.us.core", v.asString("version"));
       }
     }
     return null;
@@ -200,7 +197,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
       HTTPResult res;
         res = http.get(source+"?nocache=" + System.currentTimeMillis());
       res.checkThrowException();
-      return JsonTrackingParser.parseJson(res.getContent());
+      return JsonParser.parseObject(res.getContent());
     } catch (IOException e) {
       throw new IOException("Error reading "+source+": "+e.getMessage(), e);
     }

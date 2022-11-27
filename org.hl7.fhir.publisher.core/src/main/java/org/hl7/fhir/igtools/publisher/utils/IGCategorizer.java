@@ -1,6 +1,7 @@
 package org.hl7.fhir.igtools.publisher.utils;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -17,14 +18,12 @@ import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.json.JsonUtilities;
-import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
 
 public class IGCategorizer {
 
@@ -73,77 +72,77 @@ public class IGCategorizer {
 
     public void update(JsonObject a) {
       if (content) {
-        a.addProperty("content", true);
+        a.add("content", true);
       }
       if (rest) {
-        a.addProperty("rest", true);
+        a.add("rest", true);
       }
       if (messaging) {
-        a.addProperty("messaging", messaging);
+        a.add("messaging", messaging);
       }
       if (documents) {
-        a.addProperty("documents", documents);
+        a.add("documents", documents);
       }
       if (clinicalCore) {
-        a.addProperty("clinicalCore", clinicalCore);
+        a.add("clinicalCore", clinicalCore);
       }
       if (patientAdmin) {
-        a.addProperty("patientAdmin", patientAdmin);
+        a.add("patientAdmin", patientAdmin);
       }
       if (carePlanning) {
-        a.addProperty("carePlanning", carePlanning);
+        a.add("carePlanning", carePlanning);
       }
       if (financials) {
-        a.addProperty("financials", financials);
+        a.add("financials", financials);
       }
       if (medsMgmt) {
-        a.addProperty("medsMgmt", medsMgmt);
+        a.add("medsMgmt", medsMgmt);
       }
       if (medsReg) {
-        a.addProperty("medsReg", medsReg);
+        a.add("medsReg", medsReg);
       }
       if (scheduling) {
-        a.addProperty("scheduling", scheduling);
+        a.add("scheduling", scheduling);
       }
       if (diagnostics) {
-        a.addProperty("diagnostics", diagnostics);
+        a.add("diagnostics", diagnostics);
       }
       if (measures) {
-        a.addProperty("measures", measures);
+        a.add("measures", measures);
       }
       if (ebm) {
-        a.addProperty("ebm", ebm);
+        a.add("ebm", ebm);
       }
       if (questionnaire) {
-        a.addProperty("questionnaire", questionnaire);
+        a.add("questionnaire", questionnaire);
       }
       if (trials) {
-        a.addProperty("trials", trials);
+        a.add("trials", trials);
       }
       
       if (profiles > 0) {
-        a.addProperty("profiles", profiles);
+        a.add("profiles", profiles);
       }
       if (extensions> 0) {
-        a.addProperty("extensions", extensions);
+        a.add("extensions", extensions);
       }
       if (logicals> 0) {
-        a.addProperty("logicals", logicals);
+        a.add("logicals", logicals);
       }
       if (operations > 0) {
-        a.addProperty("operations", operations);
+        a.add("operations", operations);
       }
       if (valuesets > 0) {
-        a.addProperty("valuesets", valuesets);
+        a.add("valuesets", valuesets);
       }
       if (codeSystems > 0) {
-        a.addProperty("codeSystems", codeSystems);
+        a.add("codeSystems", codeSystems);
       }
       if (tests > 0) {
-        a.addProperty("tests", tests);
+        a.add("tests", tests);
       }
       if (examples > 0) {
-        a.addProperty("examples", examples);
+        a.add("examples", examples);
       }
     }
 
@@ -226,22 +225,22 @@ public class IGCategorizer {
   }
   
   private void process(String path) throws IOException {
-    JsonObject iglist = JsonTrackingParser.parseJson(new File(path));
-    for (JsonObject ig : JsonUtilities.objects(iglist, "guides")) {
+    JsonObject iglist = JsonParser.parseObject(new File(path));
+    for (JsonObject ig : iglist.getJsonObjects("guides")) {
         processIG(ig);
     }  
-    JsonTrackingParser.write(iglist, new File(path));
+    JsonParser.compose(iglist, new FileOutputStream(path));
   }
 
   private void processIG(JsonObject ig) {
-    String name = JsonUtilities.str(ig, "npm-name");
-    JsonObject analysis = JsonUtilities.forceObject(ig, "analysis");
-    analysis.entrySet().clear();
-    for (JsonObject edition : JsonUtilities.objects(ig, "editions")) {
+    String name = ig.asString("npm-name");
+    JsonObject analysis = ig.forceObject("analysis");
+    analysis.getProperties().clear();
+    for (JsonObject edition : ig.getJsonObjects("editions")) {
       if (edition.has("analysis")) {
         edition.remove("analysis");
       }
-      String version = JsonUtilities.str(edition, "ig-version");
+      String version = edition.asString("ig-version");
       try {
         IGInfo info = processIGEdition(ig, edition, analysis);
 
@@ -251,14 +250,14 @@ public class IGCategorizer {
       } catch (Exception e) {
         System.out.println(name+"#"+version+": Error "+e.getMessage());
         e.printStackTrace();
-        analysis.addProperty("error", e.getMessage());
+        analysis.add("error", e.getMessage());
       }
     }  
   }
 
   private IGInfo processIGEdition(JsonObject ig, JsonObject edition, JsonObject analysis) throws FHIRException, IOException {
     IGInfo info = new IGInfo();
-    NpmPackage npm = pcm.loadPackage(JsonUtilities.str(edition, "package"));
+    NpmPackage npm = pcm.loadPackage(edition.asString("package"));
 
     for (String t : npm.listResources("CodeSystem", "ValueSet", "StructureDefinition", "OperationDefinition", 
         "SearchParameter", "ImplementationGuide", "TestScript", "Conformance", "CapabilityStatement", "MessageDefinition")) {

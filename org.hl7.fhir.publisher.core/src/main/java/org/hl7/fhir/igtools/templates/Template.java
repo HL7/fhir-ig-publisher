@@ -50,16 +50,14 @@ import org.hl7.fhir.r5.model.OperationOutcome.OperationOutcomeIssueComponent;
 import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.json.model.JsonArray;
+import org.hl7.fhir.utilities.json.model.JsonElement;
+import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.model.JsonPrimitive;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
-
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonPrimitive;
 
 
 public class Template {
@@ -105,20 +103,20 @@ public class Template {
     templateDir = Utilities.path(rootDir, "template");
 
     // ok, now templateDir has the content of the template
-    configuration = JsonTrackingParser.parseJsonFile(Utilities.path(templateDir, "config.json"));
+    configuration = org.hl7.fhir.utilities.json.parser.JsonParser.parseObjectFromFile(Utilities.path(templateDir, "config.json"));
     if (configuration.has("script")) {
-      script = configuration.get("script").getAsString();
+      script = configuration.asString("script");
       if (!configuration.has("targets"))
         throw new FHIRException("If a script is provided, then targets must be defined");
-      JsonObject targets = configuration.getAsJsonObject("targets");
+      JsonObject targets = configuration.getJsonObject("targets");
       if (targets.has("onLoad"))
-        targetOnLoad = targets.get("onLoad").getAsString();
+        targetOnLoad = targets.asString("onLoad");
       if (targets.has("onGenerate"))
-        targetOnGenerate = targets.get("onGenerate").getAsString();
+        targetOnGenerate = targets.asString("onGenerate");
       if (targets.has("onJekyll"))
-        targetOnJekyll = targets.get("onJekyll").getAsString();
+        targetOnJekyll = targets.asString("onJekyll");
       if (targets.has("onCheck"))
-        targetOnCheck = targets.get("onCheck").getAsString();
+        targetOnCheck = targets.asString("onCheck");
       File buildFile = new File(Utilities.path(templateDir, script));
       antProject = new Project();
 
@@ -147,7 +145,7 @@ public class Template {
       preProcess = (JsonArray)configuration.get("pre-process");
     }
     if (configuration.has("summaryRows")) {
-      for (String s : configuration.get("summaryRows").getAsString().split("\\ "))
+      for (String s : configuration.asString("summaryRows").split("\\ "))
       summaryRows.add(s);
     }
   }
@@ -172,8 +170,8 @@ public class Template {
   public Collection<String> getFormats() {
     Collection<String> formatList = new ArrayList<String>();
     if (configuration.has("formats")) {
-      for (JsonElement format: configuration.getAsJsonArray("formats"))
-        formatList.add(format.getAsString());
+      for (JsonElement format: configuration.getJsonArray("formats"))
+        formatList.add(format.asString());
     } else {
       formatList.add("xml");
       formatList.add("json");
@@ -317,9 +315,7 @@ public class Template {
     if (!(obj.get(name) instanceof JsonPrimitive))
       return null;
     JsonPrimitive p = (JsonPrimitive) obj.get(name);
-    if (!p.isString())
-      return null;
-    return p.getAsString();
+    return p.asString();
   }
 
 
@@ -328,11 +324,11 @@ public class Template {
   }
 
   public boolean getIncludeHeadings() {
-    return !configuration.has("includeHeadings") || configuration.get("includeHeadings").getAsBoolean();
+    return !configuration.has("includeHeadings") || configuration.asBoolean("includeHeadings");
   }
 
   public String getIGArtifactsPage() {
-    return configuration.has("igArtifactsPage") ? configuration.get("igArtifactsPage").getAsString() : null;
+    return configuration.has("igArtifactsPage") ? configuration.asString("igArtifactsPage") : null;
   }
 
   public boolean getDoTransforms() throws Exception {
@@ -340,15 +336,15 @@ public class Template {
   }
 
   public void getExtraTemplates(Map<String, String> extraTemplates) throws Exception {
-    JsonArray templates = configuration.getAsJsonArray("extraTemplates");
+    JsonArray templates = configuration.getJsonArray("extraTemplates");
     if (templates!=null) {
       for (JsonElement template : templates) {
         if (template.isJsonPrimitive())
-          extraTemplates.put(template.getAsString(), template.getAsString());
+          extraTemplates.put(template.asString(), template.asString());
         else {
           if (!((JsonObject)template).has("name") || !((JsonObject)template).has("description"))
             throw new Exception("extraTemplates must be an array of objects with 'name' and 'description' properties");
-          extraTemplates.put(((JsonObject)template).get("name").getAsString(), ((JsonObject)template).get("description").getAsString());
+          extraTemplates.put(((JsonObject)template).asString("name"), ((JsonObject)template).asString("description"));
         }
       }
     }

@@ -41,8 +41,9 @@ import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.json.JsonTrackingParser;
-import org.hl7.fhir.utilities.json.JsonUtilities;
+import org.hl7.fhir.utilities.json.model.JsonArray;
+import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.NpmPackage.NpmPackageFolder;
@@ -50,9 +51,6 @@ import org.hl7.fhir.utilities.npm.NpmPackage.PackageResourceInformation;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.npm.PackageHacker;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
-
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
 
 public class R4ToR4BAnalyser {
   
@@ -420,7 +418,7 @@ public class R4ToR4BAnalyser {
     NpmPackage src = NpmPackage.fromPackage(new FileInputStream(source));
     JsonObject npm = src.getNpm();
     npm.remove("name");
-    npm.addProperty("name", pid+"."+pver);
+    npm.add("name", pid+"."+pver);
 
     NPMPackageGenerator gen = new NPMPackageGenerator(dest, npm, src.dateAsDate(), src.isNotForPublication());
     
@@ -457,37 +455,37 @@ public class R4ToR4BAnalyser {
 
 
   private byte[] updateIGR4(byte[] content, String ver, String pver) throws IOException {
-    JsonObject json = JsonTrackingParser.parseJson(content);
-    JsonUtilities.setProperty(json, "packageId", JsonUtilities.str(json, "packageId")+"."+pver);
+    JsonObject json = JsonParser.parseObject(content);
+    json.set("packageId", json.asString("packageId")+"."+pver);
     json.remove("fhirVersion");
     JsonArray fvl = new JsonArray(); 
     json.add("fhirVersion", fvl);
     fvl.add(ver);
-    return JsonTrackingParser.writeBytes(json, false);
+    return JsonParser.composeBytes(json, false);
   }
 
   private byte[] updateSpecInternals(byte[] content, String ver, String pver) throws IOException {
-    JsonObject json = JsonTrackingParser.parseJson(content);
-    JsonUtilities.setProperty(json, "npm-name", JsonUtilities.str(json, "npm-name")+"."+pver);
-    if (!ver.equals(JsonUtilities.str(json, "ig-version"))) {
-      JsonUtilities.setProperty(json, "ig-version", ver);      
+    JsonObject json = JsonParser.parseObject(content);
+    json.set("npm-name", json.asString("npm-name")+"."+pver);
+    if (!ver.equals(json.asString("ig-version"))) {
+      json.set("ig-version", ver);      
     }
-    return JsonTrackingParser.writeBytes(json, true);
+    return JsonParser.composeBytes(json, true);
   }
 
   private void genOtherVersionPackage(String pid, String source, String dest, String core, String ver, String pver, String nver) throws FHIRException, IOException {
     NpmPackage src = NpmPackage.fromPackage(new FileInputStream(source));
     JsonObject npm = src.getNpm();
     npm.remove("name");
-    npm.addProperty("name", pid+"."+pver);
+    npm.add("name", pid+"."+pver);
     npm.remove("fhirVersions");
     JsonArray fvl = new JsonArray(); 
     npm.add("fhirVersions", fvl);
     fvl.add(ver);
-    JsonObject dep = npm.getAsJsonObject("dependencies");
+    JsonObject dep = npm.getJsonObject("dependencies");
     dep.remove("hl7.fhir.r4.core");
     dep.remove("hl7.fhir.r4b.core");
-    dep.addProperty(core, ver);
+    dep.add(core, ver);
 
     NPMPackageGenerator gen = new NPMPackageGenerator(dest, npm, src.dateAsDate(), src.isNotForPublication());
     

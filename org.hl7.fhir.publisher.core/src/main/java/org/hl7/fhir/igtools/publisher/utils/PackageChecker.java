@@ -7,12 +7,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.json.model.JsonArray;
+import org.hl7.fhir.utilities.json.model.JsonElement;
+import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.NpmPackage;
-
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 
 public class PackageChecker {
 
@@ -30,8 +29,8 @@ public class PackageChecker {
           System.out.println("Package "+f.getAbsolutePath());
           NpmPackage pck = NpmPackage.fromPackage(new FileInputStream(f));
           boolean save = false;
-          JsonObject json = JsonTrackingParser.parseJson(pck.load("package", "package.json"));
-          JsonArray vl = json.getAsJsonArray("fhir-version-list");
+          JsonObject json = JsonParser.parseObject(pck.load("package", "package.json"));
+          JsonArray vl = json.getJsonArray("fhir-version-list");
           if (vl != null) {
             json.add("fhirVersions", vl);
             json.remove("fhir-version-list");
@@ -50,10 +49,10 @@ public class PackageChecker {
     if (deps.has(id)) {
       deps.remove(id);
       if (v != null && v.startsWith(vc)) {
-        deps.addProperty(id, vf);
+        deps.add(id, vf);
       }
     } else if (v.startsWith(vc)) {
-      deps.addProperty(id, vf);
+      deps.add(id, vf);
     }
   }
 
@@ -81,11 +80,11 @@ public class PackageChecker {
   private String findVersion(File folder) throws IOException {
     File pl = new File(Utilities.path(folder.getAbsolutePath(), "package-list.json"));
     if (pl.exists()) {
-      JsonObject json = JsonTrackingParser.parseJson(pl);
-      for (JsonElement e : json.getAsJsonArray("list")) {
+      JsonObject json = JsonParser.parseObject(pl);
+      for (JsonElement e : json.getJsonArray("list")) {
         JsonObject vo = (JsonObject) e;
-        if ((vo.has("current") && vo.get("current").getAsBoolean()) && !"ci-build".equals(vo.get("status").getAsString())) {
-          return vo.get("fhirversion").getAsString();
+        if ((vo.has("current") && vo.asBoolean("current")) && !"ci-build".equals(vo.asString("status"))) {
+          return vo.asString("fhirversion");
         }
       }
     } else {
@@ -93,12 +92,12 @@ public class PackageChecker {
       String name = folder.getName();
       pl = new File(Utilities.path(parent, "package-list.json"));
       if (pl.exists()) {
-        JsonObject json = JsonTrackingParser.parseJson(pl);
-        String canonical = json.get("canonical").getAsString();
-        for (JsonElement e : json.getAsJsonArray("list")) {
+        JsonObject json = JsonParser.parseObject(pl);
+        String canonical = json.asString("canonical");
+        for (JsonElement e : json.getJsonArray("list")) {
           JsonObject vo = (JsonObject) e;
-          if (vo.get("path").getAsString().equals(Utilities.pathURL(canonical, name))) {
-            return vo.get("fhirversion").getAsString();
+          if (vo.asString("path").equals(Utilities.pathURL(canonical, name))) {
+            return vo.asString("fhirversion");
           }
         }
       }

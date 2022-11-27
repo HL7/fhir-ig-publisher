@@ -42,6 +42,7 @@ import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService.LogCategory;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageHacker;
@@ -54,8 +55,6 @@ import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode.Location;
 import org.hl7.fhir.utilities.xhtml.XhtmlParser;
-
-import com.google.gson.JsonObject;
 
 //import org.owasp.html.Handler;
 //import org.owasp.html.HtmlChangeListener;
@@ -720,13 +719,6 @@ public class HTMLInspector {
     } 
   }
 
-
-  private JsonObject fetchJson(String source) throws IOException {
-    URL url = new URL(source);
-    URLConnection c = url.openConnection();
-    return (JsonObject) new com.google.gson.JsonParser().parse(TextFile.streamToString(c.getInputStream()));
-  }
-
   private boolean matchesTarget(String ref, String... url) {
     for (String s : url) {
       if (ref.equals(s))
@@ -748,7 +740,7 @@ public class HTMLInspector {
       InputStream src = c.getInputStream();
       pi = pcm.addPackageToCache(id, ver, src, url);
     }    
-    SpecMapManager sm = new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.getNpm().getAsJsonObject("dependencies").get("hl7.fhir.core").getAsString());
+    SpecMapManager sm = new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.getNpm().getJsonObject("dependencies").asString("hl7.fhir.core"));
     sm.setBase(PackageHacker.fixPackageUrl(url));
     return sm;
   }

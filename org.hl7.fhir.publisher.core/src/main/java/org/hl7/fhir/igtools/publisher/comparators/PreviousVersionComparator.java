@@ -30,17 +30,15 @@ import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.json.JsonUtilities;
-import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.json.model.JsonArray;
+import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.BasePackageCacheManager;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 
 public class PreviousVersionComparator {
 
@@ -119,20 +117,17 @@ public class PreviousVersionComparator {
       if (Utilities.existsInList(v, "{last}", "{current}")) {
         String last = null;
         String major = null;
-        for (JsonElement e : publishedVersions) {
-          if (e instanceof JsonObject) {
-            JsonObject o = e.getAsJsonObject();
-            if (!"ci-build".equals(JsonUtilities.str(o, "status"))) {
-              if (last == null) {
-                last = JsonUtilities.str(o, "version");
-                lastUrl = JsonUtilities.str(o, "path");
-                lastName = JsonUtilities.str(o, "version");
-              }
-              if (o.has("current") && o.get("current").getAsBoolean()) {
-                major = JsonUtilities.str(o, "version");
-                lastUrl = JsonUtilities.str(o, "path");
-                lastName = JsonUtilities.str(o, "sequence");                
-              }
+        for (JsonObject o : publishedVersions.asJsonObjects()) {
+          if (!"ci-build".equals(o.asString("status"))) {
+            if (last == null) {
+              last = o.asString("version");
+              lastUrl = o.asString("path");
+              lastName = o.asString("version");
+            }
+            if (o.has("current") && o.asBoolean("current")) {
+              major = o.asString("version");
+              lastUrl = o.asString("path");
+              lastName = o.asString("sequence");                
             }
           }
         }
@@ -170,14 +165,14 @@ public class PreviousVersionComparator {
       canonical = PastProcessHackerUtilities.actualUrl(canonical); // hack for old publishing process problems 
       String ppl = Utilities.pathURL(canonical, "package-list.json");
       logger.logMessage("Fetch "+ppl+" for version check");
-      JsonObject pl = JsonTrackingParser.fetchJson(ppl);
-      if (!canonical.equals(JsonUtilities.str(pl, "canonical"))) {
+      JsonObject pl = JsonParser.parseObjectFromUrl(ppl);
+      if (!canonical.equals(pl.asString("canonical"))) {
         throw new FHIRException("Mismatch canonical URL");
       } else if (!pl.has("package-id")) {
         throw new FHIRException("Package ID not specified in package-list.json");        
       } else {
-        pid = JsonUtilities.str(pl, "package-id");
-        JsonArray arr = pl.getAsJsonArray("list");
+        pid = pl.asString("package-id");
+        JsonArray arr = pl.getJsonArray("list");
         if (arr == null) {
           throw new FHIRException("Package-list has no history");
         } else {

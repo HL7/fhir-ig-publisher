@@ -16,9 +16,7 @@ import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResource
 import org.hl7.fhir.r5.model.CodeType;
 import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
 import org.hl7.fhir.r5.model.Enumerations.CapabilityStatementKind;
-
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+import org.hl7.fhir.utilities.json.model.JsonObject;
 
 public class XIGCapabilityStatementHandler extends XIGHandler {
 
@@ -31,59 +29,41 @@ public class XIGCapabilityStatementHandler extends XIGHandler {
 
   public void fillOutJson(CapabilityStatement cs, JsonObject j) {
     if (cs.hasKind()) {    
-      j.addProperty("kind", cs.getKind().toCode()); 
+      j.add("kind", cs.getKind().toCode()); 
     }
     if (cs.hasFhirVersion()) {         
-      j.addProperty("fhirVersion", cs.getFhirVersion().toCode()); 
+      j.add("fhirVersion", cs.getFhirVersion().toCode()); 
     }
     
     for (CanonicalType g : cs.getInstantiates()) {
       if (g.hasValue()) {    
-        if (!j.has("instantiates")) {
-          j.add("instantiates", new JsonArray());
-        }
-        j.getAsJsonArray("instantiates").add(g.primitiveValue()); 
+        j.forceArray("instantiates").add(g.primitiveValue()); 
       }
     }
     for (CanonicalType g : cs.getImports()) {
       if (g.hasValue()) {    
-        if (!j.has("imports")) {
-          j.add("imports", new JsonArray());
-        }
-        j.getAsJsonArray("imports").add(g.primitiveValue()); 
+        j.forceArray("imports").add(g.primitiveValue()); 
       }
     }
     for (CodeType g : cs.getFormat()) {
       if (g.hasValue()) {    
-        if (!j.has("formats")) {
-          j.add("formats", new JsonArray());
-        }
-        j.getAsJsonArray("formats").add(g.primitiveValue()); 
+        j.forceArray("formats").add(g.primitiveValue()); 
       }
     }
     for (CodeType g : cs.getPatchFormat()) {
       if (g.hasValue()) {    
-        if (!j.has("formats")) {
-          j.add("formats", new JsonArray());
-        }
-        j.getAsJsonArray("formats").add(g.primitiveValue()); 
+        j.forceArray("formats").add(g.primitiveValue()); 
       }
     }
     for (CodeType g : cs.getAcceptLanguage()) {
       if (g.hasValue()) {    
-        if (!j.has("languages")) {
-          j.add("languages", new JsonArray());
-        }
-        j.getAsJsonArray("languages").add(g.primitiveValue()); 
+        j.forceArray("languages").add(g.primitiveValue()); 
       }
     }
     
     for (CanonicalType g : cs.getImplementationGuide()) {
       if (g.hasValue()) {    
-        if (!j.has("implementationGuides")) {
-          j.add("implementationGuides", new JsonArray());
-        }
-        j.getAsJsonArray("implementationGuides").add(g.primitiveValue()); 
+        j.forceArray("implementationGuides").add(g.primitiveValue()); 
       }
     }
     

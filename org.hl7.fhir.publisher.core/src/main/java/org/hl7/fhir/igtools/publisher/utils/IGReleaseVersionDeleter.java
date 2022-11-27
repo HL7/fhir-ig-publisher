@@ -29,10 +29,8 @@ import java.util.List;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.json.JsonUtilities;
-import org.hl7.fhir.utilities.json.JsonTrackingParser;
-
-import com.google.gson.JsonObject;
+import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.parser.JsonParser;
 
 /**
  * This deletes all the current files for a directory that contains the root of an IG without deleting the hitory infrastructure or past versions
@@ -81,11 +79,11 @@ public class IGReleaseVersionDeleter {
     String pl = Utilities.path(folder, "package-list.json");
     if (!new File(pl).exists())
       throw new FHIRException("Folder '"+folder+"' is not a valid IG directory");
-    JsonObject json = JsonTrackingParser.parseJsonFile(pl);
+    JsonObject json = JsonParser.parseObjectFromFile(pl);
     List<String> igs = new ArrayList<>();
-    String canonical = JsonUtilities.str(json, "canonical");
-    for (JsonObject obj : JsonUtilities.objects(json, "list")) {
-      String path = JsonUtilities.str(obj, "path");
+    String canonical = json.asString("canonical");
+    for (JsonObject obj : json.getJsonObjects("list")) {
+      String path = obj.asString("path");
       if (path.startsWith(canonical)) {
         igs.add(path.substring(canonical.length()+1));
       }

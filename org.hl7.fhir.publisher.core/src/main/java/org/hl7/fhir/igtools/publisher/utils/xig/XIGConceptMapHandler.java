@@ -15,9 +15,9 @@ import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
 import org.hl7.fhir.r5.model.ConceptMap.OtherElementComponent;
 import org.hl7.fhir.r5.model.ConceptMap.SourceElementComponent;
 import org.hl7.fhir.r5.model.ConceptMap.TargetElementComponent;
+import org.hl7.fhir.utilities.json.model.JsonArray;
+import org.hl7.fhir.utilities.json.model.JsonObject;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
 
 public class XIGConceptMapHandler extends XIGHandler {
 
@@ -30,20 +30,14 @@ public class XIGConceptMapHandler extends XIGHandler {
   }
 
   public void fillOutJson(ConceptMap cm, JsonObject j) {
-    if (cm.hasSourceScope()) {        j.addProperty("sourceScope", cm.getSourceScope().primitiveValue()); }
-    if (cm.hasTargetScope()) {        j.addProperty("targetScope", cm.getTargetScope().primitiveValue()); }
+    if (cm.hasSourceScope()) {        j.add("sourceScope", cm.getSourceScope().primitiveValue()); }
+    if (cm.hasTargetScope()) {        j.add("targetScope", cm.getTargetScope().primitiveValue()); }
     for (ConceptMapGroupComponent g : cm.getGroup()) {
       if (g.hasSource()) {    
-        if (!j.has("sources")) {
-          j.add("sources", new JsonArray());
-        }
-        j.getAsJsonArray("sources").add(g.getSource()); 
+        j.forceArray("sources").add(g.getSource()); 
       }
       if (g.hasTarget()) {        
-        if (!j.has("targets")) {
-          j.add("targets", new JsonArray());
-        }
-        j.getAsJsonArray("targets").add(g.getTarget()); 
+        j.forceArray("targets").add(g.getTarget()); 
       }
     }    
   }

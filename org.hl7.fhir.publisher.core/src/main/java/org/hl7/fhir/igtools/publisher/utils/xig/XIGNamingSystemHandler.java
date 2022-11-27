@@ -1,6 +1,7 @@
 package org.hl7.fhir.igtools.publisher.utils.xig;
 
 import org.hl7.fhir.r5.renderers.DataRenderer;
+import org.hl7.fhir.utilities.json.model.JsonObject;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -15,7 +16,6 @@ import org.hl7.fhir.r5.model.NamingSystem;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.NamingSystem.NamingSystemType;
 
-import com.google.gson.JsonObject;
 
 public class XIGNamingSystemHandler extends XIGHandler {
 
@@ -28,10 +28,10 @@ public class XIGNamingSystemHandler extends XIGHandler {
 
   public void fillOutJson(NamingSystem ns, JsonObject j) {
     if (ns.hasKind()) {    
-      j.addProperty("kind", ns.getKind().toCode()); 
+      j.add("kind", ns.getKind().toCode()); 
     }
     if (ns.hasType()) {    
-      j.addProperty("type", new DataRenderer(info.getCtxt()).display(ns.getType()));
+      j.add("type", new DataRenderer(info.getCtxt()).display(ns.getType()));
       for (Coding t : ns.getType().getCoding()) {
         info.getNspr().add(t.getCode());
       }

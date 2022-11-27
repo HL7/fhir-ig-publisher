@@ -18,8 +18,8 @@ import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.json.model.JsonObject;
 
-import com.google.gson.JsonObject;
 
 public class XIGValueSetHandler extends XIGHandler {
 
@@ -33,7 +33,7 @@ public class XIGValueSetHandler extends XIGHandler {
 
   public void fillOutJson(ValueSet vs, JsonObject j) {
     if (vs.hasImmutable()) {        
-      j.addProperty("immutable", vs.getImmutable());
+      j.add("immutable", vs.getImmutable());
     }
   }
 

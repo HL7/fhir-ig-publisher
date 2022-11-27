@@ -9,11 +9,10 @@ import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.publisher.Publisher.CacheOption;
 import org.hl7.fhir.utilities.ToolGlobalSettings;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.json.JsonTrackingParser;
+import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-
-import com.google.gson.JsonObject;
 
 public class AllGuidesTests {
 
@@ -53,19 +52,19 @@ private static final String VER = "1.0.53";
       IOUtils.copy(new FileInputStream(Utilities.path(ToolGlobalSettings.getTestIgsPath(), id, "output", "qa.txt")), new FileOutputStream(Utilities.path(ToolGlobalSettings.getTestIgsPath(), "records", id+"-qa-gen.txt")));
     }
     
-    JsonObject current = JsonTrackingParser.parseJson(new FileInputStream(Utilities.path(ToolGlobalSettings.getTestIgsPath(), id, "output", "qa.json")));
+    JsonObject current = JsonParser.parseObject(new FileInputStream(Utilities.path(ToolGlobalSettings.getTestIgsPath(), id, "output", "qa.json")));
     JsonObject previous = null;
     if (new File(Utilities.path(ToolGlobalSettings.getTestIgsPath(), "records", id+"-qa.json")).exists()) {
-      previous = JsonTrackingParser.parseJson(new FileInputStream(Utilities.path(ToolGlobalSettings.getTestIgsPath(), "records", id+"-qa.json")));
+      previous = JsonParser.parseObject(new FileInputStream(Utilities.path(ToolGlobalSettings.getTestIgsPath(), "records", id+"-qa.json")));
     } else {
       previous = new JsonObject();      
     }
-    int cErr = current.has("errs") ? current.get("errs").getAsInt() : 0;
-    int pErr = previous.has("errs") ? previous.get("errs").getAsInt() : 0;
-    int cWarn = current.has("warnings") ? current.get("warnings").getAsInt() : 0;
-    int pWarn = previous.has("warnings") ? previous.get("warnings").getAsInt() : 0;
-    int cHint = current.has("hints") ? current.get("hints").getAsInt() : 0;
-    int pHint = previous.has("hints") ? previous.get("hints").getAsInt() : 0;
+    int cErr = current.hasNumber("errs") ? current.asInteger("errs") : 0;
+    int pErr = previous.hasNumber("errs") ? previous.asInteger("errs") : 0;
+    int cWarn = current.hasNumber("warnings") ? current.asInteger("warnings") : 0;
+    int pWarn = previous.hasNumber("warnings") ? previous.asInteger("warnings") : 0;
+    int cHint = current.hasNumber("hints") ? current.asInteger("hints") : 0;
+    int pHint = previous.hasNumber("hints") ? previous.asInteger("hints") : 0;
     Assertions.assertTrue(cErr <= pErr, "Error count has increased from "+pErr+" to "+cErr);
     Assertions.assertTrue(cWarn <= pWarn, "Warning count has increased from "+pWarn+" to "+cWarn);
     Assertions.assertTrue(cHint <= pHint, "Hint count has increased from "+pHint+" to "+cHint);
@@ -174,7 +173,7 @@ private static final String VER = "1.0.53";
 //  }
 //
 //  private void checkIGMods(String path) throws IOException {
-//    JsonObject json = JsonTrackingParser.parseJsonFile(path);
+//    JsonObject json = JsonParser.parseJsonFile(path);
 //    Assert.assertEquals("xxxxx", json.get("publisher").getAsString());  // jjjjj is set in the javascript load script
 //  }
 //
