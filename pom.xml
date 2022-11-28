@@ -27,6 +27,12 @@
         <core_version>5.6.81-SNAPSHOT</core_version>
         <maven.test.skip>true</maven.test.skip>
         <apache_poi_version>4.1.1</apache_poi_version>
+        <maven.compiler.release>11</maven.compiler.release>
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
+        <maven.compiler.testRelease>11</maven.compiler.testRelease>
+        <maven.compiler.testSource>11</maven.compiler.testSource>
+        <maven.compiler.testTarget>11</maven.compiler.testTarget>
     </properties>
 
     <groupId>org.hl7.fhir.publisher</groupId>
@@ -252,10 +258,9 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.8.0</version>
+                <version>3.10.1</version>
                 <configuration>
-                    <source>1.8</source>
-                    <target>1.8</target>
+                    <release>11</release>
                     <forceJavacCompilerUse>false</forceJavacCompilerUse>
                     <encoding>UTF-8</encoding>
                     <fork>false</fork>
