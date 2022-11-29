@@ -853,7 +853,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private boolean noValidation;
   private boolean noGenerate;
 
-  private String fmtDateTime = "yyyy-MM-dd hh:mm:ssZZZ";
+  private String fmtDateTime = "yyyy-MM-dd HH:mm:ssZZZ";
   private String fmtDate = "yyyy-MM-dd";
   private DependentIGFinder dependentIgFinder;
   private List<StructureDefinition> modifierExtensions = new ArrayList<>();
@@ -1374,7 +1374,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     
     for (SpecMapManager sp : specMaps) {
-      String fp = sp.getBase()+"/"+url;
+      String fp = Utilities.isAbsoluteUrl(url) ? url : sp.getBase()+"/"+url;
       String path;
       try {
         path = sp.getPath(fp, null, null, null);
@@ -8290,11 +8290,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     for (SpecMapManager sm : specMaps) {
       if (sm.getName() != null) {
-        data.add(sm.getName(), appendTrailingSlashInDataFile ? sm.getBase() : Utilities.appendForwardSlash(sm.getBase()));
+        data.set(sm.getName(), appendTrailingSlashInDataFile ? sm.getBase() : Utilities.appendForwardSlash(sm.getBase()));
         if (!data.has("ver")) {
           data.add("ver", new JsonObject());
         }
-        data.getJsonObject("ver").add(sm.getName(), appendTrailingSlashInDataFile ? sm.getBase2() : Utilities.appendForwardSlash(sm.getBase2()));
+        data.getJsonObject("ver").set(sm.getName(), appendTrailingSlashInDataFile ? sm.getBase2() : Utilities.appendForwardSlash(sm.getBase2()));
       }
     }
     String json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(data, true);
