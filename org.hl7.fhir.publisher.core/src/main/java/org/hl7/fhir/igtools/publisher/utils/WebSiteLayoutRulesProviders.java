@@ -164,11 +164,7 @@ public class WebSiteLayoutRulesProviders {
     
     @Override
     public String getDestination(String rootFolder) throws IOException {
-      if ("dk".equals(realm())) {
-        return Utilities.path(rootFolder, code());
-      } else if ("ch".equals(realm())) {
-        return Utilities.path(rootFolder, code());
-      } else if ("be".equals(realm())) {
+      if (Utilities.existsInList(realm(), "dk", "ch", "be", "cl")) {
         return Utilities.path(rootFolder, code());
       } else {
         // special case weirdity
