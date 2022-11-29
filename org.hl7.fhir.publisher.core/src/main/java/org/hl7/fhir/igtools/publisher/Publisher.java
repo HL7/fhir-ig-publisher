@@ -7574,7 +7574,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                     Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
                   } catch (Exception e2) {
                     ignoreFlags.add(code);
-                    System.out.println("Unable to access " + url + " or " + url2);
+                    System.out.println("Unable to access " + url + " or " + url2+" ("+e.getMessage()+", "+e2.getMessage()+")");
                   }
                 }
               }
@@ -8018,7 +8018,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private void addPageDataRow(JsonObject pages, String url, String title, String label, String fmm, String status, String normVersion, String breadcrumb, Set<FetchedResource> examples, Set<FetchedResource> testscripts) throws FHIRException {
     JsonObject jsonPage = new JsonObject();
-    pages.add(url, jsonPage);
+    pages.set(url, jsonPage);
     jsonPage.add("title", title);
     jsonPage.add("label", label);
     jsonPage.add("breadcrumb", breadcrumb);
