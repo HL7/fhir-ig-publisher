@@ -56,6 +56,7 @@ import org.hl7.fhir.r5.utils.PublicationHacker;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
+import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
@@ -1351,6 +1352,21 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           +ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_IMPLIED_PREFIX)+"</code> is prefixed to the value before validation");                
     }
     
+    if (d.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
+      StandardsStatus ss = StandardsStatus.fromCode(d.getExtensionString(ToolingExtensions.EXT_STANDARDS_STATUS));
+//      gc.addStyledText("Standards Status = "+ss.toDisplay(), ss.getAbbrev(), "black", ss.getColor(), baseSpecUrl()+, true);
+      StructureDefinition sdb = context.fetchResource(StructureDefinition.class, profile.getBaseDefinition());
+      if (sdb != null) {
+        StandardsStatus base = determineStandardsStatus(sdb, (ElementDefinition) d.getUserData("derived.pointer"));
+        if (base != null) {
+          tableRowNE(b, translate("sd.dict", "Standards Status"), "versions.html#std-process", ss.toDisplay()+" (from "+base.toDisplay()+")");
+        } else {
+          tableRowNE(b, translate("sd.dict", "Standards Status"), "versions.html#std-process", ss.toDisplay());          
+        }
+      } else {
+        tableRowNE(b, translate("sd.dict", "Standards Status"), "versions.html#std-process", ss.toDisplay());
+      }
+    }
     tableRowNE(b, translate("sd.dict", "Requirements"), null, compareMarkdown(profile.getName(), d.getRequirementsElement(), compare==null ? null : compare.getRequirementsElement(), mode));
     tableRowHint(b, translate("sd.dict", "Alternate Names"), translate("sd.dict", "Other names by which this resource/element may be known"), null, compareSimpleTypeLists(d.getAlias(), (compare==null ? new ArrayList<StringType>() : compare.getAlias()), mode));
     tableRowNE(b, translate("sd.dict", "Comments"), null, compareMarkdown(profile.getName(), d.getCommentElement(), compare==null ? null : compare.getCommentElement(), mode));
@@ -1363,6 +1379,19 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     tableRowNE(b, translate("sd.dict", "Invariants"), null, invariants(d.getConstraint(), compare==null ? null : compare.getConstraint(), mode));
     tableRowNE(b, translate("sd.dict", "LOINC Code"), null, getMapping(profile, d, LOINC_MAPPING, compare, mode));
     tableRowNE(b, translate("sd.dict", "SNOMED-CT Code"), null, getMapping(profile, d, SNOMED_MAPPING, compare, mode));
+  }
+
+  private StandardsStatus determineStandardsStatus(StructureDefinition sd, ElementDefinition ed) {
+    if (ed != null && ed.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
+      return StandardsStatus.fromCode(ed.getExtensionString(ToolingExtensions.EXT_STANDARDS_STATUS));
+    }
+    while (sd != null) {
+      if (sd.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
+        return ToolingExtensions.getStandardsStatus(sd);
+      }
+      sd = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition());
+    }
+    return null;
   }
 
   private boolean hasChoices(List<TypeRefComponent> types) {

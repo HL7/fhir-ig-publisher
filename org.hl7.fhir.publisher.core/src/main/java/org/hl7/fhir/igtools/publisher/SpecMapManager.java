@@ -177,7 +177,10 @@ public class SpecMapManager {
     if (special != null) {
       switch (special) {
       case Simplifier: return "https://simplifier.net/resolve?scope="+pi.name()+"@"+pi.version()+"&canonical="+url;
-      case PhinVads:  return "??phinvads??";
+      case PhinVads:  if (url.startsWith(base)) 
+          return "??phinvads??"; 
+        else 
+          break;
       case Vsac: if (url.contains("cts.nlm.nih.gov")) {
         return url.replace("http://cts.nlm.nih.gov/fhir/ValueSet/", "https://vsac.nlm.nih.gov/valueset/")+"/expansion";
       }
