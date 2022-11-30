@@ -2311,7 +2311,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (b == 10) { // eoln
         String s = new String(buffer, 0, length);
         if (passSushiFilter(s)) {
-          log("Sushi: "+s.trim());
+          log("Sushi: "+StringUtils.stripEnd(s, null));
           if (s.trim().startsWith("Errors:")) {
             errorCount = Integer.parseInt(s.substring(10).trim());
           }
