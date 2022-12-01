@@ -22,9 +22,9 @@ import org.hl7.fhir.r5.comparison.ComparisonRenderer;
 import org.hl7.fhir.r5.comparison.ComparisonSession;
 import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider;
 import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.context.IWorkerContext.PackageVersion;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.ImplementationGuide;
+import org.hl7.fhir.r5.model.PackageInformation;
 import org.hl7.fhir.r5.model.Parameters;
 import org.hl7.fhir.r5.model.Parameters.ParametersParameterComponent;
 import org.hl7.fhir.r5.model.Resource;
@@ -99,6 +99,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
     if (usCoreProfiles == null) {
       usCoreProfiles = new ArrayList<>();
       NpmPackage uscore = fetchLatestUSCore();
+      PackageInformation pi = new PackageInformation(uscore);
       if (uscore != null) {
         for (String id : uscore.listResources("StructureDefinition", "ValueSet", "CodeSystem")) {
           CanonicalResource usd = (CanonicalResource) loadResourceFromPackage(uscore, id);
@@ -107,7 +108,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
             usCoreProfiles.add((StructureDefinition) usd);
           }
           if (!context.hasResource(Resource.class, usd.getUrl())) {
-            context.cacheResourceFromPackage(usd, new PackageVersion(uscore.id(), uscore.version(), uscore.dateAsDate()));
+            context.cacheResourceFromPackage(usd, pi);
           }
         }
       }
@@ -298,4 +299,9 @@ public class USRealmBusinessRules extends RealmBusinessRules {
   public String code() {
     return "US";
   }
+  
+  public boolean isExempt(String packageId) {
+    return "hl7.fhir.us.core".equals(packageId);
+  }
+
 }
