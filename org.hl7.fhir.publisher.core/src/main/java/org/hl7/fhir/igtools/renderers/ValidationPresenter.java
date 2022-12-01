@@ -52,14 +52,13 @@ import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
 import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
 import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
 import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.context.IWorkerContext.PackageDetails;
-import org.hl7.fhir.r5.context.IWorkerContext.PackageVersion;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.model.Bundle;
 import org.hl7.fhir.r5.model.Bundle.BundleEntryComponent;
 import org.hl7.fhir.r5.model.Constants;
 import org.hl7.fhir.r5.model.OperationOutcome;
+import org.hl7.fhir.r5.model.PackageInformation;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.utils.FHIRPathEngine;
 import org.hl7.fhir.r5.utils.OperationOutcomeUtilities;
@@ -95,16 +94,15 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       if (url.startsWith("http://hl7.org/fhir/StructureDefinition/")) {
         return "<a href=\"http://hl7.org/fhir\">fhir</a>.";
       }
-      PackageVersion pck = context.getPackageForUrl(url);
+      PackageInformation pck = context.getPackageForUrl(url);
       if (pck != null) {
         if (pck.getId().equals(packageId)) {
           return "<i>this.</i>";
+        } else if (pck.getWeb() != null) {
+          return "<a href=\""+pck.getWeb()+"\">"+pck.getId()+"</a>.";
+        } else {
+          return pck.getId()+".";
         }
-        PackageDetails det = context.getPackage(pck);
-        if (det != null) {
-          return "<a href=\""+det.getWeb()+"\">"+det.getName()+"</a>.";
-        }
-        return pck.getId()+".";
       }
       return "";
     }
