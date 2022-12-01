@@ -25,11 +25,11 @@ import java.io.File;
 import java.io.FileInputStream;
 
 import org.hl7.fhir.r5.context.CanonicalResourceManager;
-import org.hl7.fhir.r5.context.IWorkerContext.PackageVersion;
 import org.hl7.fhir.r5.formats.IParser;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.ContactDetail;
 import org.hl7.fhir.r5.model.ContactPoint;
+import org.hl7.fhir.r5.model.PackageInformation;
 import org.hl7.fhir.r5.model.UsageContext;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
@@ -44,7 +44,7 @@ public class CodeSystemConvertor {
     this.codeSystems = codeSystems;
   }
 
-  public void convert(IParser p, ValueSet vs, String name, PackageVersion packageInfo) throws Exception {
+  public void convert(IParser p, ValueSet vs, String name, PackageInformation packageInfo) throws Exception {
     String nname = name.replace("valueset-", "codesystem-");
     if (nname.equals(name))
       nname = Utilities.changeFileExt(name, "-cs.xml");
