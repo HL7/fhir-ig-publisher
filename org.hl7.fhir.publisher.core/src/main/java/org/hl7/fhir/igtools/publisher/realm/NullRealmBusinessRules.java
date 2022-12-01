@@ -56,4 +56,9 @@ public class NullRealmBusinessRules extends RealmBusinessRules {
     return realm == null ? "n/a" : realm;
   }
 
+  @Override
+  public boolean isExempt(String packageId) {
+    return false;
+  }
+
 }

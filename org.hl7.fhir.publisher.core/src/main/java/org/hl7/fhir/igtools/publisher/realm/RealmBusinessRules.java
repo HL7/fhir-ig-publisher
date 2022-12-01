@@ -21,5 +21,6 @@ public abstract class RealmBusinessRules {
   public abstract String checkHtml();
   public abstract String checkText();
   public abstract String code();
+  public abstract boolean isExempt(String packageId);
 
 }
