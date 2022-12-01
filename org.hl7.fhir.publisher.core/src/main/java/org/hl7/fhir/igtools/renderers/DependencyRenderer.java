@@ -246,14 +246,16 @@ public class DependencyRenderer {
         b.append("<p><b>Package ");
         b.append(n);
         b.append("</b></p>\r\n");
-        if (npm.description().contains("<br") || npm.description().contains("<li") || npm.description().contains("<p") || npm.description().contains("<td") || npm.description().contains("<span")) {
-          if (npm.description().contains("<p ") || npm.description().contains("<p>")) {
-            b.append(npm.description());          
+        if (npm.description() != null) {
+          if (npm.description().contains("<br") || npm.description().contains("<li") || npm.description().contains("<p") || npm.description().contains("<td") || npm.description().contains("<span")) {
+            if (npm.description().contains("<p ") || npm.description().contains("<p>")) {
+              b.append(npm.description());          
+            } else {
+              b.append("<p>"+npm.description()+"</p>");                      
+            }
           } else {
-            b.append("<p>"+npm.description()+"</p>");                      
+            b.append(mdEngine.process(npm.description(), "npm.description"));
           }
-        } else {
-          b.append(mdEngine.process(npm.description(), "npm.description"));
         }
         StringBuilder b2 = new StringBuilder();
         b2.append("\r\n<p><b>Dependencies</b></p>\r\n");
