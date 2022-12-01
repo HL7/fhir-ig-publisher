@@ -1,0 +1,1 @@
+* Fix error message when html missing pub-box
