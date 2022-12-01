@@ -142,7 +142,6 @@ import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.IContextResourceLoader;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
-import org.hl7.fhir.r5.context.IWorkerContext.PackageVersion;
 import org.hl7.fhir.r5.context.IWorkerContext.ValidationResult;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
@@ -217,6 +216,7 @@ import org.hl7.fhir.r5.model.MessageDefinition.MessageDefinitionFocusComponent;
 import org.hl7.fhir.r5.model.OperationDefinition;
 import org.hl7.fhir.r5.model.OperationDefinition.OperationDefinitionParameterComponent;
 import org.hl7.fhir.r5.model.OperationOutcome;
+import org.hl7.fhir.r5.model.PackageInformation;
 import org.hl7.fhir.r5.model.Parameters;
 import org.hl7.fhir.r5.model.PlanDefinition;
 import org.hl7.fhir.r5.model.PlanDefinition.PlanDefinitionActionComponent;
@@ -861,6 +861,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private R4ToR4BAnalyser r4tor4b;
   private List<DependencyAnalyser.ArtifactDependency> dependencyList;
   private Map<String, List<String>> trackedFragments = new HashMap<>();
+  private PackageInformation packageInfo;
   
   private class PreProcessInfo {
     private String xsltName;
@@ -4088,8 +4089,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
 
-    if (npmName == null)
+    if (npmName == null) {
       throw new Exception("A package name (npm-name) is required to publish implementation guides. For further information, see http://wiki.hl7.org/index.php?title=FHIR_NPM_Package_Spec#Package_name");
+    }
     if (!publishedIg.hasLicense())
       publishedIg.setLicense(licenseAsEnum());
     if (!publishedIg.hasPackageId())
@@ -4113,6 +4115,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }        
     } else if (!id.equals(publishedIg.getId()))
       errors.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "ImplementationGuide.id", "The Implementation Guide Resource id should be "+id, IssueSeverity.WARNING));
+
+    packageInfo = new PackageInformation(publishedIg.getPackageId(), publishedIg.getVersion(), new Date(), publishedIg.getName(), igpkp.getCanonical(), targetOutput); 
       
     // Cql Compile
     cql = new CqlSubSystem(npmList, binaryPaths, new LibraryLoader(version), this, context.getUcumService(), publishedIg.getPackageId(), igpkp.getCanonical());
@@ -5052,23 +5056,25 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     logDebugMessage(LogCategory.PROGRESS, "check profiles & code systems");
     Session tts = tt.start("realm-rules");
-    realmRules.startChecks(publishedIg);
-    for (FetchedFile f : fileList) {
-      for (FetchedResource r : f.getResources()) {
-        if (r.fhirType().equals("StructureDefinition")) {
-          StructureDefinition sd = (StructureDefinition) r.getResource();
-          realmRules.checkSD(f, sd);
-        } else if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
-          realmRules.checkCR(f, (CanonicalResource) r.getResource());
-        }
-        if (r.fhirType().equals("CodeSystem")) {
-          logDebugMessage(LogCategory.PROGRESS, "process CodeSystem: "+r.getId());
-          CodeSystem cs = (CodeSystem) r.getResource();
-          f.getErrors().addAll(csvalidator.validate(cs, false));
+    if (!realmRules.isExempt(publishedIg.getPackageId())) {
+      realmRules.startChecks(publishedIg);
+      for (FetchedFile f : fileList) {
+        for (FetchedResource r : f.getResources()) {
+          if (r.fhirType().equals("StructureDefinition")) {
+            StructureDefinition sd = (StructureDefinition) r.getResource();
+            realmRules.checkSD(f, sd);
+          } else if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
+            realmRules.checkCR(f, (CanonicalResource) r.getResource());
+          }
+          if (r.fhirType().equals("CodeSystem")) {
+            logDebugMessage(LogCategory.PROGRESS, "process CodeSystem: "+r.getId());
+            CodeSystem cs = (CodeSystem) r.getResource();
+            f.getErrors().addAll(csvalidator.validate(cs, false));
+          }
         }
       }
+      realmRules.finishChecks();
     }
-    realmRules.finishChecks();
     tts.end();
     logDebugMessage(LogCategory.PROGRESS, "check profiles & code systems");
     tts = tt.start("previous-version");
@@ -5692,7 +5698,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             }
             igpkp.checkForPath(f, r, bc, false);
             try {
-              context.cacheResourceFromPackage(bc, new PackageVersion(publishedIg.getPackageId(), publishedIg.getVersion(), new Date()));
+              context.cacheResourceFromPackage(bc, packageInfo);
             } catch (Exception e) {
               throw new Exception("Exception loading "+bc.getUrl()+": "+e.getMessage(), e);
             }
@@ -5715,7 +5721,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                   if (!mr.hasUserData("path")) {
                     igpkp.checkForPath(f,  r,  mr, true);
                   }
-                  context.cacheResourceFromPackage(mr, new PackageVersion(publishedIg.getPackageId(), publishedIg.getVersion(), new Date()));
+                  context.cacheResourceFromPackage(mr, packageInfo);
                 } else
                   logDebugMessage(LogCategory.PROGRESS, "Ignoring resource "+type+"/"+mr.getId()+" in Bundle "+f.getName()+" because it has no canonical URL");
 
@@ -5883,7 +5889,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     r.setSnapshotted(true);
     logDebugMessage(LogCategory.CONTEXT, "Context.See "+sd.getUrl());
-    context.cacheResourceFromPackage(sd, new PackageVersion(publishedIg.getPackageId(), publishedIg.getVersion(), new Date()));
+    context.cacheResourceFromPackage(sd, packageInfo);
   }
 
   private void validateExpressions() {
@@ -6436,6 +6442,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               
       realmRules.addOtherFiles(inspector.getExceptions(), outputDir);
       previousVersionComparator.addOtherFiles(inspector.getExceptions(), outputDir);
+      ipaComparator.addOtherFiles(inspector.getExceptions(), outputDir);
       List<ValidationMessage> linkmsgs = noGenerate ? new ArrayList<ValidationMessage>() : inspector.check(statusMessage);
       int bl = 0;
       int lf = 0;
@@ -8018,6 +8025,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private void addPageDataRow(JsonObject pages, String url, String title, String label, String fmm, String status, String normVersion, String breadcrumb, Set<FetchedResource> examples, Set<FetchedResource> testscripts) throws FHIRException {
     JsonObject jsonPage = new JsonObject();
+    if (pages.has(url)) {
+      errors.add(new ValidationMessage(Source.Publisher, IssueType.REQUIRED, "ToC", "The ToC contains the page "+url+" more than once", IssueSeverity.ERROR).setRuleDate("2022-12-01"));
+    }
     pages.set(url, jsonPage);
     jsonPage.add("title", title);
     jsonPage.add("label", label);
