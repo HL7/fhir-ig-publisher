@@ -923,7 +923,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             dependentIgFinder.finish(outputDir, sourceIg.present());
             ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
                 IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator,
-                new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context).render(publishedIg, true, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
+                new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine).render(publishedIg, true, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
                 new PublicationChecker(repoRoot, historyPage, markdownEngine).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions ,
                     noNarrativeResources, noValidateResources, noValidation, noGenerate, dependentIgFinder);
             log("Built. "+ DurationUtil.presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
@@ -1083,7 +1083,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       dependentIgFinder.finish(outputDir, sourceIg.present());
       ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), rootDir, npmName, childPublisher == null? null : childPublisher.npmName, 
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator,
-          new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context).render(publishedIg, true, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
+          new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine).render(publishedIg, true, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
           new PublicationChecker(repoRoot, historyPage, markdownEngine).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
           noNarrativeResources, noValidateResources, noValidation, noGenerate, dependentIgFinder);
       tts.end();
@@ -6442,7 +6442,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               
       realmRules.addOtherFiles(inspector.getExceptions(), outputDir);
       previousVersionComparator.addOtherFiles(inspector.getExceptions(), outputDir);
-      ipaComparator.addOtherFiles(inspector.getExceptions(), outputDir);
+      if (ipaComparator != null) {
+        ipaComparator.addOtherFiles(inspector.getExceptions(), outputDir);
+      }
       List<ValidationMessage> linkmsgs = noGenerate ? new ArrayList<ValidationMessage>() : inspector.check(statusMessage);
       int bl = 0;
       int lf = 0;
@@ -7231,7 +7233,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       fragment("cross-version-analysis", r4tor4b.generate(npmName, false), otherFilesRun);      
       fragment("cross-version-analysis-inline", r4tor4b.generate(npmName, true), otherFilesRun);      
     }
-    DependencyRenderer depr = new DependencyRenderer(pcm, tempDir, npmName, templateManager, makeDependencies(), context);
+    DependencyRenderer depr = new DependencyRenderer(pcm, tempDir, npmName, templateManager, makeDependencies(), context, markdownEngine);
     trackedFragment("3", "dependency-table", depr.render(publishedIg, false, true), otherFilesRun);
     trackedFragment("3", "dependency-table-short", depr.render(publishedIg, false, false), otherFilesRun);
     trackedFragment("4", "globals-table", depr.renderGlobals(), otherFilesRun);

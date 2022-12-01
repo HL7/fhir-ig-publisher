@@ -33,6 +33,7 @@ import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideGlobalCompon
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
+import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -110,8 +111,10 @@ public class DependencyRenderer {
   private List<DependencyAnalyser.ArtifactDependency> dependencies;
   private List<GlobalProfile> globals = new ArrayList<>();
   private IWorkerContext context;
+  private MarkDownProcessor mdEngine;
   
-  public DependencyRenderer(BasePackageCacheManager pcm, String dstFolder, String npmName, TemplateManager templateManager, List<DependencyAnalyser.ArtifactDependency> dependencies, IWorkerContext context) {
+  public DependencyRenderer(BasePackageCacheManager pcm, String dstFolder, String npmName, TemplateManager templateManager,
+      List<DependencyAnalyser.ArtifactDependency> dependencies, IWorkerContext context, MarkDownProcessor mdEngine) {
     super();
     this.pcm = pcm;
     this.dstFolder = dstFolder;
@@ -119,6 +122,7 @@ public class DependencyRenderer {
     this.templateManager = templateManager;
     this.dependencies = dependencies;
     this.context = context;
+    this.mdEngine = mdEngine;
   }
 
   public String render(ImplementationGuide ig, boolean QA, boolean details) throws FHIRException, IOException {
@@ -230,47 +234,65 @@ public class DependencyRenderer {
     }
     if (!QA) {
       checkGlobals(npm);
+      boolean firstP = true;
       if (!npm.isCore() && !npm.isTx()) {
+        if (firstP) {
+          firstP = false;
+          b.append("<table class=\"grid\"><tr><td>");      
+        } else {
+          b.append("</td></tr><tr><td>");                
+        }
         String n = (npm.name()+"#"+npm.version());
         b.append("<p><b>Package ");
         b.append(n);
-        b.append("</b></p>\r\n<p>");
-        b.append(Utilities.escapeXml(npm.description()));
-        b.append("</p>\r\n<p><b>Dependencies</b></p>\r\n");
+        b.append("</b></p>\r\n");
+        if (npm.description().contains("<br") || npm.description().contains("<li") || npm.description().contains("<p") || npm.description().contains("<td") || npm.description().contains("<span")) {
+          if (npm.description().contains("<p ") || npm.description().contains("<p>")) {
+            b.append(npm.description());          
+          } else {
+            b.append("<p>"+npm.description()+"</p>");                      
+          }
+        } else {
+          b.append(mdEngine.process(npm.description(), "npm.description"));
+        }
+        StringBuilder b2 = new StringBuilder();
+        b2.append("\r\n<p><b>Dependencies</b></p>\r\n");
         boolean first = true;
         for (ArtifactDependency ad : dependencies) {
           String t = ad.getTarget().getUserString("package");
           if (n.equals(t)) {
             if (first) {
-              b.append("<ul>\r\n");
+              b2.append("<ul>\r\n");
               first = false;
             }
-            b.append("<li><a href=\"");
-            b.append(ad.getSource().getUserString("path"));
-            b.append("\">");
+            b2.append("<li><a href=\"");
+            b2.append(ad.getSource().getUserString("path"));
+            b2.append("\">");
             if (ad.getSource() instanceof CanonicalResource) {
-              b.append(Utilities.escapeXml(((CanonicalResource) ad.getSource()).present()));
+              b2.append(Utilities.escapeXml(((CanonicalResource) ad.getSource()).present()));
             } else {
-              b.append(ad.getSource().fhirType()+"/"+ad.getSource().getId());          
+              b2.append(ad.getSource().fhirType()+"/"+ad.getSource().getId());          
             }
-            b.append("</a> ");
-            b.append(ad.getKind());
-            b.append(" <a href=\"");
-            b.append(ad.getTarget().getUserString("path"));
-            b.append("\">");
+            b2.append("</a> ");
+            b2.append(ad.getKind());
+            b2.append(" <a href=\"");
+            b2.append(ad.getTarget().getUserString("path"));
+            b2.append("\">");
             if (ad.getTarget() instanceof CanonicalResource) {
-              b.append(Utilities.escapeXml(((CanonicalResource) ad.getTarget()).present()));
+              b2.append(Utilities.escapeXml(((CanonicalResource) ad.getTarget()).present()));
             } else {
-              b.append(ad.getTarget().fhirType()+"/"+ad.getTarget().getId());          
+              b2.append(ad.getTarget().fhirType()+"/"+ad.getTarget().getId());          
             }
-            b.append("</a></li>\r\n");
+            b2.append("</a></li>\r\n");
           } 
         }
-        if (first) {
-          b.append("<p><i>No dependencies found</i></p>\r\n");
-        } else {
-          b.append("</ul>\r\n");
+        if (!first) {
+          b2.append("</ul>\r\n");
+          b.append(b2.toString());
         }
+      }
+      if (!firstP) {
+        b.append("</td></tr></table>");      
       }
     }
   }
