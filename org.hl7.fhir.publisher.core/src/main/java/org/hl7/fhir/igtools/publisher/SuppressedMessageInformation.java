@@ -5,8 +5,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
-import org.hl7.fhir.igtools.publisher.SuppressedMessageInformation.SuppressedMessageListSorter;
-
 public class SuppressedMessageInformation {
 
   public class SuppressedMessageListSorter implements Comparator<SuppressedMessage> {

@@ -1,20 +1,15 @@
 package org.hl7.fhir.igtools.publisher.utils.xig;
 
-import org.hl7.fhir.r5.renderers.DataRenderer;
-import org.hl7.fhir.utilities.json.model.JsonObject;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.hl7.fhir.igtools.publisher.utils.xig.XIGHandler.CanonicalResourceSorter;
-import org.hl7.fhir.igtools.publisher.utils.xig.XIGHandler.DuplicateTracker;
-import org.hl7.fhir.igtools.publisher.utils.xig.XIGHandler.PageContent;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.NamingSystem;
-import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.NamingSystem.NamingSystemType;
+import org.hl7.fhir.r5.renderers.DataRenderer;
+import org.hl7.fhir.utilities.json.model.JsonObject;
 
 
 public class XIGNamingSystemHandler extends XIGHandler {

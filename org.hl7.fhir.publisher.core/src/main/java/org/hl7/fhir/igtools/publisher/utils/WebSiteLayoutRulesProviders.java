@@ -3,12 +3,13 @@ package org.hl7.fhir.igtools.publisher.utils;
 import java.io.IOException;
 import java.util.List;
 
-import com.google.common.base.Strings;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
+
+import com.google.common.base.Strings;
 
 public class WebSiteLayoutRulesProviders {
 

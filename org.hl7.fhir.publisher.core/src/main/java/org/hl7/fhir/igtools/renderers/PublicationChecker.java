@@ -247,7 +247,7 @@ public class PublicationChecker {
   }
 
   private boolean isValidStatus(String str) {
-    return Utilities.existsInList(str, "release", "trial-use", "update", "qa-preview", "ballot", "draft", "normative+trial-use", "normative", "informative");
+    return Utilities.existsInList(str, "release", "trial-use", "update", "qa-preview", "ballot", "draft", "normative+trial-use", "normative", "informative", "public-comment");
   }
 
   private String getCurrentSequence(JsonObject pl) {

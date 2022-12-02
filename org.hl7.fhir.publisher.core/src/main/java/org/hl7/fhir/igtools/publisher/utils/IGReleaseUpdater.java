@@ -1,7 +1,5 @@
 package org.hl7.fhir.igtools.publisher.utils;
 
-import java.io.BufferedReader;
-
 /*-
  * #%L
  * org.hl7.fhir.publisher.core
@@ -26,7 +24,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -34,7 +31,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Map.Entry;
 
 import org.apache.commons.io.FileUtils;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_30_50;
@@ -611,6 +607,8 @@ public class IGReleaseUpdater {
       return "QA Preview";
     else if ("ballot".equals(status))
       return decorate(sequence)+" Ballot "+ballotCount(ig, sequence, version);
+    else if ("public-comment".equals(status))
+      return decorate(sequence)+" Public Comment";
     else if ("draft".equals(status))
       return decorate(sequence)+" Draft";
     else if ("update".equals(status))

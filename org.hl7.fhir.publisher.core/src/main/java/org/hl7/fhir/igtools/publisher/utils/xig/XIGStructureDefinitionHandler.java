@@ -7,13 +7,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.print.DocFlavor.URL;
-
-import org.hl7.fhir.igtools.publisher.utils.xig.XIGHandler.PageContent;
 import org.hl7.fhir.igtools.publisher.utils.xig.XIGInformation.CanonicalResourceUsage;
 import org.hl7.fhir.igtools.publisher.utils.xig.XIGInformation.UsageType;
-import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;

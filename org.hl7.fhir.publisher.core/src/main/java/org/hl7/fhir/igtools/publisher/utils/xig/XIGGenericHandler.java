@@ -4,12 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.hl7.fhir.igtools.publisher.utils.xig.XIGHandler.PageContent;
 import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.CodeSystem.CodeSystemContentMode;
-
-import com.google.gson.JsonObject;
 
 public class XIGGenericHandler extends XIGHandler {
 

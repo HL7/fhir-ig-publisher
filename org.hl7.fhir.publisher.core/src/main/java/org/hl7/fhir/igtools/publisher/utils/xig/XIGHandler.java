@@ -8,7 +8,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.json.JsonUtilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 
 

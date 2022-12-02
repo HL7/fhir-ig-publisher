@@ -11,14 +11,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
-import org.hl7.fhir.igtools.publisher.DependentIGFinder.DepInfo;
-import org.hl7.fhir.igtools.publisher.DependentIGFinder.DeplistSorter;
 import org.hl7.fhir.r4.model.CanonicalType;
-import org.hl7.fhir.r4.model.CodeSystem;
 import org.hl7.fhir.r4.model.ValueSet.ConceptSetComponent;
-import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
@@ -359,7 +354,7 @@ public class DependentIGFinder {
         String version = list.asString("version");
         if (!"current".equals(version)) {
           String status = list.asString("status");
-          if ("ballot".equals(status)) {
+          if ("ballot".equals(status) || "public-comment".equals(status) ) {
             if (!ballot) {
               ballot = true;
               dep.ballot = checkForDependency(pid, version, list.asString("path"));          

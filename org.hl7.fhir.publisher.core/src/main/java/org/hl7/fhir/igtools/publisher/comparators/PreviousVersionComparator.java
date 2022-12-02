@@ -17,12 +17,10 @@ import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.PastProcessHackerUtilities;
 import org.hl7.fhir.igtools.publisher.PublisherLoader;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
-import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.r5.comparison.ComparisonRenderer;
 import org.hl7.fhir.r5.comparison.ComparisonSession;
 import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
-import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.ImplementationGuide;
@@ -37,7 +35,6 @@ import org.hl7.fhir.utilities.npm.BasePackageCacheManager;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
-import org.hl7.fhir.utilities.validation.ValidationMessage;
 
 
 public class PreviousVersionComparator {
@@ -92,12 +89,14 @@ public class PreviousVersionComparator {
   private List<CanonicalResource> resources;
   private String lastName;
   private String lastUrl;
+  private String businessVersion;
   
-  public PreviousVersionComparator(SimpleWorkerContext context, String version, String rootDir, String dstDir, String canonical, ProfileKnowledgeProvider pkp, ILoggingService logger, List<String> versions) {
+  public PreviousVersionComparator(SimpleWorkerContext context, String version, String businessVersion, String rootDir, String dstDir, String canonical, ProfileKnowledgeProvider pkp, ILoggingService logger, List<String> versions) {
     super();
         
     this.context = context;
     this.version = version;
+    this.businessVersion = businessVersion;
     this.dstDir = dstDir;
     this.newpkp = pkp;
     this.logger = logger;
@@ -134,14 +133,14 @@ public class PreviousVersionComparator {
         if ("{last}".equals(v)) {
           if(last == null) {
             throw new FHIRException("no {last} version found in package-list.json");
-          } else {
+          } else if (!last.equals(businessVersion)) {
             versionList.add(new VersionInstance(last, makeIni(rootDir, last)));
           }
         } 
         if ("{current}".equals(v)) {
           if(last == null) {
             throw new FHIRException("no {current} version found in package-list.json");
-          } else {
+          } else if (!last.equals(businessVersion)) {
             versionList.add(new VersionInstance(major, makeIni(rootDir, major)));
           }
         } 

@@ -51,7 +51,6 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Hashtable;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -95,7 +94,6 @@ import org.hl7.fhir.exceptions.DefinitionException;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.exceptions.PathEngineException;
-import org.hl7.fhir.igtools.publisher.DependencyAnalyser.ArtifactDependency;
 import org.hl7.fhir.igtools.publisher.FetchedFile.FetchedBundleType;
 import org.hl7.fhir.igtools.publisher.IFetchFile.FetchState;
 import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
@@ -335,8 +333,6 @@ import org.hl7.fhir.validation.instance.InstanceValidator;
 import org.hl7.fhir.validation.instance.utils.ValidatorHostContext;
 import org.hl7.fhir.validation.profile.ProfileValidator;
 import org.w3c.dom.Document;
-
-import net.sf.saxon.trans.SymbolicName.F;
 
 
 /**
@@ -862,6 +858,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private List<DependencyAnalyser.ArtifactDependency> dependencyList;
   private Map<String, List<String>> trackedFragments = new HashMap<>();
   private PackageInformation packageInfo;
+  private boolean tocSizeWarning = false;;
   
   private class PreProcessInfo {
     private String xsltName;
@@ -5116,7 +5113,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       comparisonVersions = new ArrayList<>();
       comparisonVersions.add("{last}");
     }
-    return new PreviousVersionComparator(context, version, rootDir, tempDir, igpkp.getCanonical(), igpkp, logger, comparisonVersions);
+    return new PreviousVersionComparator(context, version, sourceIg.getVersion(), rootDir, tempDir, igpkp.getCanonical(), igpkp, logger, comparisonVersions);
   }
 
 
@@ -8166,7 +8163,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private String createTocPage(ImplementationGuideDefinitionPageComponent page, ImplementationGuideDefinitionPageComponent insertPage, String insertAfterName, String insertOffset, String currentOffset, String indents, String label, boolean last, String idPrefix, int position) throws FHIRException {
     if (position > 222) {
       position = 222;
-      System.out.println("Table of contents has a section with more than 222 entries.  Collapsing will not work reliably");
+      if (!tocSizeWarning) {
+        System.out.println("Table of contents has a section with more than 222 entries.  Collapsing will not work reliably");
+        tocSizeWarning  = true;
+      }        
     }
     String id = idPrefix + (char)(position+33);
     String s = "<tr style=\"border:0px;padding:0px;vertical-align:top;background-color:white;\" id=\"" + Utilities.escapeXml(id) + "\">";

@@ -126,6 +126,9 @@ public class PublisherLoader implements ILoaderKnowledgeProviderR5 {
       CanonicalResource bc = (CanonicalResource) resource;
       String s = getOverride(bc.getUrl());
       if (s == null) {
+        if (spm == null) {
+          return null;
+        }
         s = spm.getPath(bc.getUrl(), resource.getMeta().getSource(), resource.fhirType(), resource.getId());
       }
       if (s == null && bc instanceof CodeSystem) { // work around for an R2 issue) 

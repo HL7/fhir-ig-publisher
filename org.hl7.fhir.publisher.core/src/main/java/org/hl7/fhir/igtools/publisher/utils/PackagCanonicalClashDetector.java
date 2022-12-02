@@ -1,6 +1,5 @@
 package org.hl7.fhir.igtools.publisher.utils;
 
-import java.io.ByteArrayInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -8,26 +7,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.PublisherLoader;
-import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r4.test.utils.TestingUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext.IContextResourceLoader;
-import org.hl7.fhir.r5.context.SimpleWorkerContext.PackageResourceLoader;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.i18n.I18nConstants;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
 
 import com.google.gson.JsonSyntaxException;
-
-import org.hl7.fhir.utilities.npm.NpmPackage.PackageResourceInformation;
 
 public class PackagCanonicalClashDetector {
 
