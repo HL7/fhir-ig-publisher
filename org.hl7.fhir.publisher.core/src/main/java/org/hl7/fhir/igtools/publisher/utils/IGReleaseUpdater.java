@@ -384,7 +384,7 @@ public class IGReleaseUpdater {
 
   private String fixParameter(String html, String name, String value) {
     while (html.contains("[%"+name+"%]")) {
-      html = html.replace("[%"+name+"%]", value);
+      html = html.replace("[%"+name+"%]", value == null ? "" : value);
     }
     return html;
   }
