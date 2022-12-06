@@ -280,6 +280,7 @@ import org.hl7.fhir.r5.utils.ResourceUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.XVerExtensionManager;
 import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
+import org.hl7.fhir.r5.utils.formats.CSVWriter;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.validation.IResourceValidator;
@@ -858,7 +859,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private List<DependencyAnalyser.ArtifactDependency> dependencyList;
   private Map<String, List<String>> trackedFragments = new HashMap<>();
   private PackageInformation packageInfo;
-  private boolean tocSizeWarning = false;;
+  private boolean tocSizeWarning = false;
+  private CSVWriter allProfilesCsv;
+  private StructureDefinitionSpreadsheetGenerator allProfilesXlsx;;
   
   private class PreProcessInfo {
     private String xsltName;
@@ -6322,6 +6325,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (FetchedFile f : changeList) {
       generateHtmlOutputs(f, false);
     }
+    if (allProfilesCsv != null) {
+      allProfilesCsv.dump();
+    }
+    if (allProfilesXlsx != null) {
+      String path = Utilities.path(tempDir, "all-profiles.xlsx");
+      allProfilesXlsx.finish(new FileOutputStream(path));
+      otherFilesRun.add(Utilities.path(tempDir, "all-profiles.xlsx"));
+    }
 
     if (!changeList.isEmpty()) {
       generateSummaryOutputs();
@@ -6547,7 +6558,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void generatePackageVersion(String filename, String ver) throws IOException {
-    NpmPackageVersionConverter self = new NpmPackageVersionConverter(filename, Utilities.path(Utilities.getDirectoryForFile(filename), publishedIg.getPackageId()+"."+ver+".tgz"), ver);
+    NpmPackageVersionConverter self = new NpmPackageVersionConverter(filename, Utilities.path(Utilities.getDirectoryForFile(filename), publishedIg.getPackageId()+"."+ver+".tgz"), ver, publishedIg.getPackageId()+"."+ver);
     self.execute();
     for (String s : self.getErrors()) {
       errors.add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, "ImplementationGuide", "Error creating "+ver+" package: "+s, IssueSeverity.ERROR));
@@ -6822,7 +6833,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     FileUtils.copyFile(new File(Utilities.path(outputDir, "validator.pack")),new File(Utilities.path(outputDir, "validator-" + sourceIg.getId() + ".pack")));
     generateCsvZip();
     generateExcelZip();
-//    generateRegistryUploadZip(df.getCanonicalPath());
+    generateSchematronsZip();
   }
 
   private boolean supportsTurtle() {
@@ -6936,6 +6947,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private void generateCsvZip()  throws Exception {
     generateZipByExtension(Utilities.path(outputDir, "csvs.zip"), ".csv");
+  }
+
+  private void generateSchematronsZip()  throws Exception {
+    generateZipByExtension(Utilities.path(outputDir, "schematrons.zip"), ".sch");
   }
 
   private void generateRegistryUploadZip(String specFile)  throws Exception {
@@ -8620,7 +8635,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (noGenerate) {
       return;
     }
-    
+    System.out.println("gen: "+f.getName());
     if (f.getProcessMode() == FetchedFile.PROCESS_NONE) {
       String dst = tempDir;
       if (f.getRelativePath().startsWith(File.separator))
@@ -9878,7 +9893,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "csv")) {
       String path = Utilities.path(tempDir, sdPrefix + r.getId()+".csv");
       f.getOutputNames().add(path);
-      new ProfileUtilities(context, errors, igpkp).generateCsvs(new FileOutputStream(path), sd, true);
+      ProfileUtilities pu = new ProfileUtilities(context, errors, igpkp);
+      pu.generateCsv(new FileOutputStream(path), sd, true);
+      if (allProfilesCsv == null) {
+        allProfilesCsv = new CSVWriter(new FileOutputStream(Utilities.path(tempDir, "all-profiles.csv")), true);
+        otherFilesRun.add(Utilities.path(tempDir, "all-profiles.csv"));
+
+      }
+      pu.addToCSV(allProfilesCsv, sd);
     }
 
     if (igpkp.wantGen(r, "java")) {
@@ -9894,8 +9916,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       String path = Utilities.path(tempDir, sdPrefix + r.getId()+".xlsx");
       f.getOutputNames().add(path);
       StructureDefinitionSpreadsheetGenerator sdg = new StructureDefinitionSpreadsheetGenerator(context, true, anyMustSupport(sd));
-      sdg.renderStructureDefinition(sd);
+      sdg.renderStructureDefinition(sd, false);
       sdg.finish(new FileOutputStream(path));
+      if (allProfilesXlsx == null) {
+        allProfilesXlsx  = new StructureDefinitionSpreadsheetGenerator(context, true, false);
+      }
+      allProfilesXlsx.renderStructureDefinition(sd, true);
     }
 
     if (!regen && sd.getKind() != StructureDefinitionKind.LOGICAL &&  igpkp.wantGen(r, "sch")) {
