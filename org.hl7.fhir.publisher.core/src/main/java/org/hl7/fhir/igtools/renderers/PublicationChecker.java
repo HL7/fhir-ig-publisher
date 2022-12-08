@@ -141,7 +141,7 @@ public class PublicationChecker {
       }
       if (pl != null) {
         JsonObject plv = getVersionObject(v, pl);
-        if (!check(messages, plv == null, "Publication Requet is for version v"+v+" which is already publisehd"+mkError())) {
+        if (!check(messages, plv == null, "Publication Requet is for version v"+v+" which is already published"+mkError())) {
           summary.clear();
           return;          
         }
