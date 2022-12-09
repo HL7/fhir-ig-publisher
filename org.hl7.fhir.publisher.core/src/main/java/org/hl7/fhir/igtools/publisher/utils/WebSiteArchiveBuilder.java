@@ -19,12 +19,48 @@ public class WebSiteArchiveBuilder {
   private static final String ARCHIVE_FILE_NAME = "_ig-pub-archive.zip";
 
   public static void main(String[] args) throws Exception {
-    new WebSiteArchiveBuilder().scanForAllIGs(args[0]);
+    new WebSiteArchiveBuilder().start(args[0]);
   }
   
   
-  private void scanForAllIGs(String folder) throws IOException {
-    check(new File(Utilities.path(folder, "publish.ini")).exists(), "publish.inin not found at root");
+  public void start(String folder) throws IOException {
+    File f = new File(Utilities.path(folder, "publish.ini"));
+    if (f.exists()) {
+      scanForAllIGs(folder);
+    } else {
+      f = new File(Utilities.path(folder, "package-list.json"));
+      if (f.exists()) {
+        String rootFolder = findRootFolder(folder);
+        IniFile ini = new IniFile(Utilities.path(rootFolder, "publish.ini"));
+        String url = ini.getStringProperty("website", "url");
+        buildArchives(new File(folder), rootFolder, url);
+      } else {
+        f = new File(Utilities.path(folder, "package.tgz"));
+        if (f.exists()) {
+          buildArchive(folder, new ArrayList<>());
+        } else {
+          throw new IOException("Unable to pack "+folder);
+        }
+      }
+    }    
+  }
+
+
+  private String findRootFolder(String folder) throws IOException {
+    String dir = folder;
+    while (!Utilities.noString(dir)) {
+      File f = new File(Utilities.path(dir, "publish.ini"));
+      if (f.exists()) {
+        return dir;
+      }
+      dir = Utilities.getDirectoryForFile(folder);
+    }
+    throw new IOException("Unable to find publish.ini from "+folder);
+  }
+
+
+  public void scanForAllIGs(String folder) throws IOException {
+    check(new File(Utilities.path(folder, "publish.ini")).exists(), "publish.ini not found at root");
     IniFile ini = new IniFile(Utilities.path(folder, "publish.ini"));
     String url = ini.getStringProperty("website", "url");
     scanForIGs(new File(folder), folder, url);
@@ -117,7 +153,7 @@ public class WebSiteArchiveBuilder {
       return;
     }
     ZipGenerator zip = new ZipGenerator(war);
-    System.out.println(" "+folder+": "+addFolderToZip(zip, new File(folder), folder.length()+1, exemptions)+" files");
+    System.out.println("Produce Web Archive for "+folder+": "+addFolderToZip(zip, new File(folder), folder.length()+1, exemptions)+" files");
     zip.close();
   }
 

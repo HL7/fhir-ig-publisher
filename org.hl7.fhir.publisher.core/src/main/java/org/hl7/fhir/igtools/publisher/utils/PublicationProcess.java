@@ -201,7 +201,7 @@ public class PublicationProcess {
     
     // well, we've run out of things to test... time to actually try...
     if (res.size() == 0) {
-      doPublish(fSource, fOutput, qa, destination, destVer, pathVer, fRoot, ini, plPub, prSrc, fRegistry, npm, milestone, date, fHistory, temp, logger);
+      doPublish(fSource, fOutput, qa, destination, destVer, pathVer, fRoot, ini, plPub, prSrc, fRegistry, npm, milestone, date, fHistory, temp, logger, ini.getStringProperty("website", "url"));
     }        
     return res;
     
@@ -243,7 +243,7 @@ public class PublicationProcess {
     return new FileInputStream(f);
   }
 
-  private void doPublish(File fSource, File fOutput, JsonObject qa, String destination, String destVer, String pathVer, File fRoot, IniFile ini, JsonObject plPub, JsonObject prSrc, File fRegistry, NpmPackage npm, boolean milestone, String date, File history, String tempDir, PublisherConsoleLogger logger) throws Exception {
+  private void doPublish(File fSource, File fOutput, JsonObject qa, String destination, String destVer, String pathVer, File fRoot, IniFile ini, JsonObject plPub, JsonObject prSrc, File fRegistry, NpmPackage npm, boolean milestone, String date, File history, String tempDir, PublisherConsoleLogger logger, String url) throws Exception {
     // ok. all our tests have passed.
     // 1. do the publication build(s)
     System.out.println("All checks passed. Do the publication build from "+fSource.getAbsolutePath()+" and publish to "+destination);        
@@ -280,10 +280,14 @@ public class PublicationProcess {
       System.out.println("This is a milestone release - publish v"+npm.version()+" to "+destination);      
       
       System.out.println("Clear out existing content");        
-       Publisher.main(new String[] { "-delete-current", destination, "-history", history.getAbsolutePath(), "-no-exit"});       
+      Publisher.main(new String[] { "-delete-current", destination, "-history", history.getAbsolutePath(), "-no-exit"});       
 
       System.out.println("Copy to directory");        
       FileUtils.copyDirectory(new File(Utilities.path(tempM.getAbsolutePath(), "output")), new File(destination));
+      
+      new WebSiteArchiveBuilder().buildArchives(new File(destination), fRoot.getAbsolutePath(), url);   
+    } else {
+      new WebSiteArchiveBuilder().buildArchive(destVer, new ArrayList<>());      
     }
     
     // finally
