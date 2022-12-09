@@ -280,6 +280,7 @@ import org.hl7.fhir.r5.utils.ResourceUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.XVerExtensionManager;
 import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
+import org.hl7.fhir.r5.utils.formats.CSVWriter;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.validation.IResourceValidator;
@@ -858,7 +859,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private List<DependencyAnalyser.ArtifactDependency> dependencyList;
   private Map<String, List<String>> trackedFragments = new HashMap<>();
   private PackageInformation packageInfo;
-  private boolean tocSizeWarning = false;;
+  private boolean tocSizeWarning = false;
+  private CSVWriter allProfilesCsv;
+  private StructureDefinitionSpreadsheetGenerator allProfilesXlsx;;
   
   private class PreProcessInfo {
     private String xsltName;
@@ -6322,6 +6325,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (FetchedFile f : changeList) {
       generateHtmlOutputs(f, false);
     }
+    if (allProfilesCsv != null) {
+      allProfilesCsv.dump();
+    }
+    if (allProfilesXlsx != null) {
+      String path = Utilities.path(tempDir, "all-profiles.xlsx");
+      allProfilesXlsx.finish(new FileOutputStream(path));
+      otherFilesRun.add(Utilities.path(tempDir, "all-profiles.xlsx"));
+    }
 
     if (!changeList.isEmpty()) {
       generateSummaryOutputs();
@@ -6547,7 +6558,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void generatePackageVersion(String filename, String ver) throws IOException {
-    NpmPackageVersionConverter self = new NpmPackageVersionConverter(filename, Utilities.path(Utilities.getDirectoryForFile(filename), publishedIg.getPackageId()+"."+ver+".tgz"), ver);
+    NpmPackageVersionConverter self = new NpmPackageVersionConverter(filename, Utilities.path(Utilities.getDirectoryForFile(filename), publishedIg.getPackageId()+"."+ver+".tgz"), ver, publishedIg.getPackageId()+"."+ver);
     self.execute();
     for (String s : self.getErrors()) {
       errors.add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, "ImplementationGuide", "Error creating "+ver+" package: "+s, IssueSeverity.ERROR));
@@ -6822,7 +6833,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     FileUtils.copyFile(new File(Utilities.path(outputDir, "validator.pack")),new File(Utilities.path(outputDir, "validator-" + sourceIg.getId() + ".pack")));
     generateCsvZip();
     generateExcelZip();
-//    generateRegistryUploadZip(df.getCanonicalPath());
+    generateSchematronsZip();
   }
 
   private boolean supportsTurtle() {
@@ -6936,6 +6947,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private void generateCsvZip()  throws Exception {
     generateZipByExtension(Utilities.path(outputDir, "csvs.zip"), ".csv");
+  }
+
+  private void generateSchematronsZip()  throws Exception {
+    generateZipByExtension(Utilities.path(outputDir, "schematrons.zip"), ".sch");
   }
 
   private void generateRegistryUploadZip(String specFile)  throws Exception {
@@ -8024,10 +8039,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private void addPageDataRow(JsonObject pages, String url, String title, String label, String fmm, String status, String normVersion, String breadcrumb, Set<FetchedResource> examples, Set<FetchedResource> testscripts) throws FHIRException {
     JsonObject jsonPage = new JsonObject();
-    if (pages.has(url)) {
-      errors.add(new ValidationMessage(Source.Publisher, IssueType.REQUIRED, "ToC", "The ToC contains the page "+url+" more than once", IssueSeverity.ERROR).setRuleDate("2022-12-01"));
-    }
-    pages.set(url, jsonPage);
+    registerPageFile(pages, url, jsonPage);
     jsonPage.add("title", title);
     jsonPage.add("label", label);
     jsonPage.add("breadcrumb", breadcrumb);
@@ -8052,25 +8064,25 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (String pagesDir: pagesDirs) {
       String contentFile = pagesDir + File.separator + "_includes" + File.separator + baseUrl + "-intro.xml";
       if (new File(contentFile).exists()) {
-        jsonPage.add("intro", baseUrl+"-intro.xml");
-        jsonPage.add("intro-type", "xml");
+        registerSubPageFile(jsonPage, url, "intro", baseUrl+"-intro.xml");
+        registerSubPageFile(jsonPage, url, "intro-type", "xml");
       } else {
         contentFile = pagesDir + File.separator + "_includes" + File.separator + baseUrl + "-intro.md";
         if (new File(contentFile).exists()) {
-          jsonPage.add("intro", baseUrl+"-intro.md");
-          jsonPage.add("intro-type", "md");
+          registerSubPageFile(jsonPage, url, "intro", baseUrl+"-intro.md");
+          registerSubPageFile(jsonPage, url, "intro-type", "md");
         }
       }
 
       contentFile = pagesDir + File.separator + "_includes" + File.separator + baseUrl + "-notes.xml";
       if (new File(contentFile).exists()) {
-        jsonPage.add("notes", baseUrl+"-notes.xml");
-        jsonPage.add("notes-type", "xml");
+        registerSubPageFile(jsonPage, url, "notes", baseUrl+"-notes.xml");
+        registerSubPageFile(jsonPage, url, "notes-type", "xml");
       } else {
         contentFile = pagesDir + File.separator + "_includes" + File.separator + baseUrl + "-notes.md";
         if (new File(contentFile).exists()) {
-          jsonPage.add("notes", baseUrl+"-notes.md");
-          jsonPage.add("notes-type", "md");
+          registerSubPageFile(jsonPage, url, "notes", baseUrl+"-notes.md");
+          registerSubPageFile(jsonPage, url, "notes-type", "md");
         }
       }
     }
@@ -8086,25 +8098,25 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       baseFile = baseFile + baseUrl;
       String contentFile = baseFile + "-intro.xml";
       if (new File(contentFile).exists()) {
-        jsonPage.add("intro", baseUrl+"-intro.xml");
-        jsonPage.add("intro-type", "xml");
+        registerSubPageFile(jsonPage, url, "intro", baseUrl+"-intro.xml");
+        registerSubPageFile(jsonPage, url, "intro-type", "xml");
       } else {
         contentFile = baseFile + "-intro.md";
         if (new File(contentFile).exists()) {
-          jsonPage.add("intro", baseUrl+"-intro.md");
-          jsonPage.add("intro-type", "md");
+          registerSubPageFile(jsonPage, url, "intro", baseUrl+"-intro.md");
+          registerSubPageFile(jsonPage, url, "intro-type", "md");
         }
       }
   
       contentFile = baseFile + "-notes.xml";
       if (new File(contentFile).exists()) {
-        jsonPage.add("notes", baseUrl+"-notes.xml");
-        jsonPage.add("notes-type", "xml");
+        registerSubPageFile(jsonPage, url, "notes", baseUrl+"-notes.xml");
+        registerSubPageFile(jsonPage, url, "notes-type", "xml");
       } else {
         contentFile = baseFile + "-notes.md";
         if (new File(contentFile).exists()) {
-          jsonPage.add("notes", baseUrl+"-notes.md");
-          jsonPage.add("notes-type", "md");
+          registerSubPageFile(jsonPage, url, "notes", baseUrl+"-notes.md");
+          registerSubPageFile(jsonPage, url, "notes-type", "md");
         }        
       }
     }
@@ -8146,6 +8158,21 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         testscriptItem.add("title", testscriptPage.getTitle());
       }
     }
+  }
+
+  private void registerSubPageFile(JsonObject jsonPage, String url, String name, String value) {
+    if (jsonPage.has(name) && !value.equals(jsonPage.asString("name"))) {
+      errors.add(new ValidationMessage(Source.Publisher, IssueType.REQUIRED, "ToC", "Attempt to register a page file '"+name+"' more than once for the page "+url+". New Value '"+value+"', existing value '"+jsonPage.asString(name)+"'", 
+          IssueSeverity.ERROR).setRuleDate("2022-12-01"));
+    }
+    jsonPage.set(name, value);    
+  }
+
+  private void registerPageFile(JsonObject pages, String url, JsonObject jsonPage) {
+    if (pages.has(url)) {
+      errors.add(new ValidationMessage(Source.Publisher, IssueType.REQUIRED, "ToC", "The ToC contains the page "+url+" more than once", IssueSeverity.ERROR).setRuleDate("2022-12-01"));
+    }
+    pages.set(url, jsonPage);
   }
 
     
@@ -8620,7 +8647,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (noGenerate) {
       return;
     }
-    
+    System.out.println("gen: "+f.getName());
     if (f.getProcessMode() == FetchedFile.PROCESS_NONE) {
       String dst = tempDir;
       if (f.getRelativePath().startsWith(File.separator))
@@ -9878,7 +9905,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "csv")) {
       String path = Utilities.path(tempDir, sdPrefix + r.getId()+".csv");
       f.getOutputNames().add(path);
-      new ProfileUtilities(context, errors, igpkp).generateCsvs(new FileOutputStream(path), sd, true);
+      ProfileUtilities pu = new ProfileUtilities(context, errors, igpkp);
+      pu.generateCsv(new FileOutputStream(path), sd, true);
+      if (allProfilesCsv == null) {
+        allProfilesCsv = new CSVWriter(new FileOutputStream(Utilities.path(tempDir, "all-profiles.csv")), true);
+        otherFilesRun.add(Utilities.path(tempDir, "all-profiles.csv"));
+
+      }
+      pu.addToCSV(allProfilesCsv, sd);
     }
 
     if (igpkp.wantGen(r, "java")) {
@@ -9894,8 +9928,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       String path = Utilities.path(tempDir, sdPrefix + r.getId()+".xlsx");
       f.getOutputNames().add(path);
       StructureDefinitionSpreadsheetGenerator sdg = new StructureDefinitionSpreadsheetGenerator(context, true, anyMustSupport(sd));
-      sdg.renderStructureDefinition(sd);
+      sdg.renderStructureDefinition(sd, false);
       sdg.finish(new FileOutputStream(path));
+      if (allProfilesXlsx == null) {
+        allProfilesXlsx  = new StructureDefinitionSpreadsheetGenerator(context, true, false);
+      }
+      allProfilesXlsx.renderStructureDefinition(sd, true);
     }
 
     if (!regen && sd.getKind() != StructureDefinitionKind.LOGICAL &&  igpkp.wantGen(r, "sch")) {

@@ -120,8 +120,14 @@ public class WebSiteLayoutRulesProviders {
   public static class HL7NamingRulesProvider extends DefaultNamingRulesProvider {
     @Override
     public boolean checkNpmId(List<ValidationMessage> res) {
-      return check(res, parts.length == 4 && "hl7".equals(parts[0]) && Utilities.existsInList(parts[1], "fhir", "xprod"), 
-          "Package Id '"+id+"' is not valid:  must have 4 parts (hl7.fhir.[realm].[code] or hl7.xprod.[realm].[code])");
+      boolean ok = check(res, parts.length == 4, "Package Id '"+id+"' is not valid: must have 4 parts (hl7.fhir.[realm].[code]");
+      ok = check(res, "hl7".equals(parts[0]), "Package Id '"+id+"' is not valid: must start with hl7.") && ok;
+      if ("eu".equals(parts[1])) {
+        ok = check(res, Utilities.existsInList(parts[2], "fhir", "xprod"), "Package Id '"+id+"' is not valid: must start with hl7.eu.fhir.[code] or hl7.eu.xprod.[code]") && ok;         
+      } else {
+        ok = check(res, Utilities.existsInList(parts[1], "fhir", "xprod"), "Package Id '"+id+"' is not valid: must start with hl7.fhir.[realm].[code] or hl7.xprod.[realm].[code]") && ok; 
+      }
+      return ok;
     }
 
     @Override
