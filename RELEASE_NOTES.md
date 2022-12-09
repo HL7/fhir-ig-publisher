@@ -11,4 +11,4 @@
 * QA: Fix version comparison bug
 * Publish Process: Support hl7.eu naming processes + Fix for NPE
 * Publish Process: Start generating _ig-pub-archive.zip
-
+* XIG: fix json duplicate error
