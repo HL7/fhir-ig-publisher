@@ -8039,10 +8039,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private void addPageDataRow(JsonObject pages, String url, String title, String label, String fmm, String status, String normVersion, String breadcrumb, Set<FetchedResource> examples, Set<FetchedResource> testscripts) throws FHIRException {
     JsonObject jsonPage = new JsonObject();
-    if (pages.has(url)) {
-      errors.add(new ValidationMessage(Source.Publisher, IssueType.REQUIRED, "ToC", "The ToC contains the page "+url+" more than once", IssueSeverity.ERROR).setRuleDate("2022-12-01"));
-    }
-    pages.set(url, jsonPage);
+    registerPageFile(pages, url, jsonPage);
     jsonPage.add("title", title);
     jsonPage.add("label", label);
     jsonPage.add("breadcrumb", breadcrumb);
@@ -8067,25 +8064,25 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (String pagesDir: pagesDirs) {
       String contentFile = pagesDir + File.separator + "_includes" + File.separator + baseUrl + "-intro.xml";
       if (new File(contentFile).exists()) {
-        jsonPage.add("intro", baseUrl+"-intro.xml");
-        jsonPage.add("intro-type", "xml");
+        registerSubPageFile(jsonPage, url, "intro", baseUrl+"-intro.xml");
+        registerSubPageFile(jsonPage, url, "intro-type", "xml");
       } else {
         contentFile = pagesDir + File.separator + "_includes" + File.separator + baseUrl + "-intro.md";
         if (new File(contentFile).exists()) {
-          jsonPage.add("intro", baseUrl+"-intro.md");
-          jsonPage.add("intro-type", "md");
+          registerSubPageFile(jsonPage, url, "intro", baseUrl+"-intro.md");
+          registerSubPageFile(jsonPage, url, "intro-type", "md");
         }
       }
 
       contentFile = pagesDir + File.separator + "_includes" + File.separator + baseUrl + "-notes.xml";
       if (new File(contentFile).exists()) {
-        jsonPage.add("notes", baseUrl+"-notes.xml");
-        jsonPage.add("notes-type", "xml");
+        registerSubPageFile(jsonPage, url, "notes", baseUrl+"-notes.xml");
+        registerSubPageFile(jsonPage, url, "notes-type", "xml");
       } else {
         contentFile = pagesDir + File.separator + "_includes" + File.separator + baseUrl + "-notes.md";
         if (new File(contentFile).exists()) {
-          jsonPage.add("notes", baseUrl+"-notes.md");
-          jsonPage.add("notes-type", "md");
+          registerSubPageFile(jsonPage, url, "notes", baseUrl+"-notes.md");
+          registerSubPageFile(jsonPage, url, "notes-type", "md");
         }
       }
     }
@@ -8101,25 +8098,25 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       baseFile = baseFile + baseUrl;
       String contentFile = baseFile + "-intro.xml";
       if (new File(contentFile).exists()) {
-        jsonPage.add("intro", baseUrl+"-intro.xml");
-        jsonPage.add("intro-type", "xml");
+        registerSubPageFile(jsonPage, url, "intro", baseUrl+"-intro.xml");
+        registerSubPageFile(jsonPage, url, "intro-type", "xml");
       } else {
         contentFile = baseFile + "-intro.md";
         if (new File(contentFile).exists()) {
-          jsonPage.add("intro", baseUrl+"-intro.md");
-          jsonPage.add("intro-type", "md");
+          registerSubPageFile(jsonPage, url, "intro", baseUrl+"-intro.md");
+          registerSubPageFile(jsonPage, url, "intro-type", "md");
         }
       }
   
       contentFile = baseFile + "-notes.xml";
       if (new File(contentFile).exists()) {
-        jsonPage.add("notes", baseUrl+"-notes.xml");
-        jsonPage.add("notes-type", "xml");
+        registerSubPageFile(jsonPage, url, "notes", baseUrl+"-notes.xml");
+        registerSubPageFile(jsonPage, url, "notes-type", "xml");
       } else {
         contentFile = baseFile + "-notes.md";
         if (new File(contentFile).exists()) {
-          jsonPage.add("notes", baseUrl+"-notes.md");
-          jsonPage.add("notes-type", "md");
+          registerSubPageFile(jsonPage, url, "notes", baseUrl+"-notes.md");
+          registerSubPageFile(jsonPage, url, "notes-type", "md");
         }        
       }
     }
@@ -8161,6 +8158,21 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         testscriptItem.add("title", testscriptPage.getTitle());
       }
     }
+  }
+
+  private void registerSubPageFile(JsonObject jsonPage, String url, String name, String value) {
+    if (jsonPage.has(name) && !value.equals(jsonPage.asString("name"))) {
+      errors.add(new ValidationMessage(Source.Publisher, IssueType.REQUIRED, "ToC", "Attempt to register a page file '"+name+"' more than once for the page "+url+". New Value '"+value+"', existing value '"+jsonPage.asString(name)+"'", 
+          IssueSeverity.ERROR).setRuleDate("2022-12-01"));
+    }
+    jsonPage.set(name, value);    
+  }
+
+  private void registerPageFile(JsonObject pages, String url, JsonObject jsonPage) {
+    if (pages.has(url)) {
+      errors.add(new ValidationMessage(Source.Publisher, IssueType.REQUIRED, "ToC", "The ToC contains the page "+url+" more than once", IssueSeverity.ERROR).setRuleDate("2022-12-01"));
+    }
+    pages.set(url, jsonPage);
   }
 
     
