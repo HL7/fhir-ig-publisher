@@ -109,7 +109,7 @@ public class XIGGenerator {
     docoC.add("kind", "kind, if stated (CapabilityStatement, NamingSystem, StructureDefinition)"); 
     docoC.add("languages", "array of languages in the resource (CapabilityStatement)"); 
     docoC.add("resources", "array of base resource, in the resource (OperationDefinition)"); 
-    docoC.add("resources", "array of base resource, in the resource (SearchParameter)"); 
+    docoC.add("resourcesSP", "array of base resource, in the resource (SearchParameter)"); 
     docoC.add("sourceScope", "sourceScope, if stated (ConceptMap"); 
     docoC.add("sources", "array of sources in the resource (ConceptMap"); 
     docoC.add("supplements", "supplements, if stated (CodeSystem)"); 

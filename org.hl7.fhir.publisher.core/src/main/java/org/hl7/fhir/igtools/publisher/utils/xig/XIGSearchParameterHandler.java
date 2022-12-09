@@ -27,10 +27,10 @@ public class XIGSearchParameterHandler extends XIGHandler {
     if (sp.hasCode()) {            j.add("code", sp.getCode()); }
     if (sp.hasType()) {            j.add("type", sp.getType().toCode()); }
     for (CodeType t : sp.getBase()) {
-      if (!j.has("resources")) {
-        j.add("resources", new JsonArray());
+      if (!j.has("resourcesSP")) {
+        j.add("resourcesSP", new JsonArray());
       }
-      j.getJsonArray("resources").add(t.toString()); 
+      j.getJsonArray("resourcesSP").add(t.toString()); 
       info.getSpr().add(t.toString());
     }
   }
