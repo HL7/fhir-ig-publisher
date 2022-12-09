@@ -24,7 +24,7 @@
     <version>1.2.23-SNAPSHOT</version> <!-- See the note above -->
 
     <properties>
-        <core_version>5.6.85-SNAPSHOT</core_version>
+        <core_version>5.6.85</core_version>
         <maven.test.skip>true</maven.test.skip>
         <apache_poi_version>4.1.1</apache_poi_version>
     </properties>
