@@ -33,6 +33,8 @@ import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.BasePackageCacheManager;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.npm.PackageList;
+import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
 
 
@@ -102,7 +104,7 @@ public class IpaComparator {
 
   private void processVersions(List<String> versions, String rootDir) throws IOException {
     String canonical = "http://hl7.org/fhir/uv/ipa";
-    JsonArray publishedVersions = null;
+    List<PackageListEntry> publishedVersions = null;
     for (String v : versions) {
       if (publishedVersions == null) {
         publishedVersions = fetchVersionHistory(canonical);
@@ -110,22 +112,20 @@ public class IpaComparator {
       if (Utilities.existsInList(v, "{last}", "{current}")) {
         String last = null;
         String major = null;
-        for (JsonObject o : publishedVersions.asJsonObjects()) {
-          if (!"ci-build".equals(o.asString("status"))) {
-            if (last == null) {
-              last = o.asString("version");
-              lastUrl = o.asString("path");
-              lastName = o.asString("version");
-            }
-            if (o.has("current") && o.asBoolean("current")) {
-              major = o.asString("version");
-              lastUrl = o.asString("path");
-              lastName = o.asString("sequence");                
-            }
+        for (PackageListEntry o : publishedVersions) {
+          if (last == null) {
+            last = o.version();
+            lastUrl = o.path();
+            lastName = o.version();
+          }
+          if (o.current()) {
+            major = o.version();
+            lastUrl = o.path();
+            lastName = o.sequence();                
           }
         }
         if ("{last}".equals(v)) {
-          if(last == null) {
+          if (last == null) {
             throw new FHIRException("no {last} version found in package-list.json");
           } else {
             versionList.add(new VersionInstance(last));
@@ -144,24 +144,19 @@ public class IpaComparator {
     }
   }
 
-  private JsonArray fetchVersionHistory(String canonical) { 
+  private List<PackageListEntry> fetchVersionHistory(String canonical) { 
     try {
       canonical = PastProcessHackerUtilities.actualUrl(canonical); // hack for old publishing process problems 
       String ppl = Utilities.pathURL(canonical, "package-list.json");
       logger.logMessage("Fetch "+ppl+" for version check");
-      JsonObject pl = JsonParser.parseObjectFromUrl(ppl);
-      if (!canonical.equals(pl.asString("canonical"))) {
+      PackageList pl = PackageList.fromUrl(ppl);
+      if (!canonical.equals(pl.canonical())) {
         throw new FHIRException("Mismatch canonical URL");
-      } else if (!pl.has("package-id")) {
+      } else if (!pl.hasPid()) {
         throw new FHIRException("Package ID not specified in package-list.json");        
       } else {
-        pid = pl.asString("package-id");
-        JsonArray arr = pl.getJsonArray("list");
-        if (arr == null) {
-          throw new FHIRException("Package-list has no history");
-        } else {
-          return arr;
-        }
+        pid = pl.pid();
+        return pl.versions();
       }
     } catch (Exception e) {
       throw new FHIRException("Problem #1 with package-list.json at "+canonical+": "+e.getMessage(), e);

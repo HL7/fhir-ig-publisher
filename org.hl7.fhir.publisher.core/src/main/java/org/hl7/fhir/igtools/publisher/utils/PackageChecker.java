@@ -12,6 +12,8 @@ import org.hl7.fhir.utilities.json.model.JsonElement;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.npm.PackageList;
+import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
 
 public class PackageChecker {
 
@@ -78,26 +80,24 @@ public class PackageChecker {
   }
 
   private String findVersion(File folder) throws IOException {
-    File pl = new File(Utilities.path(folder.getAbsolutePath(), "package-list.json"));
-    if (pl.exists()) {
-      JsonObject json = JsonParser.parseObject(pl);
-      for (JsonElement e : json.getJsonArray("list")) {
-        JsonObject vo = (JsonObject) e;
-        if ((vo.has("current") && vo.asBoolean("current")) && !"ci-build".equals(vo.asString("status"))) {
-          return vo.asString("fhirversion");
+    File plf = new File(Utilities.path(folder.getAbsolutePath(), "package-list.json"));
+    if (plf.exists()) {
+      PackageList pl = PackageList.fromFile(plf);
+      for (PackageListEntry e : pl.versions()) {
+        if (e.current()) {
+          return e.fhirVersion();
         }
       }
     } else {
       String parent = Utilities.getDirectoryForFile(folder.getAbsolutePath());
       String name = folder.getName();
-      pl = new File(Utilities.path(parent, "package-list.json"));
-      if (pl.exists()) {
-        JsonObject json = JsonParser.parseObject(pl);
-        String canonical = json.asString("canonical");
-        for (JsonElement e : json.getJsonArray("list")) {
-          JsonObject vo = (JsonObject) e;
-          if (vo.asString("path").equals(Utilities.pathURL(canonical, name))) {
-            return vo.asString("fhirversion");
+      plf = new File(Utilities.path(parent, "package-list.json"));
+      if (plf.exists()) {
+        PackageList pl = PackageList.fromFile(plf);
+        String canonical = pl.canonical();
+        for (PackageListEntry e : pl.list()) {
+          if (e.path().equals(Utilities.pathURL(canonical, name))) {
+            return e.fhirVersion();
           }
         }
       }
