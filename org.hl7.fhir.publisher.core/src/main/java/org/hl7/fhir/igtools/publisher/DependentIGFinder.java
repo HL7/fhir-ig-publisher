@@ -22,6 +22,8 @@ import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageClient;
+import org.hl7.fhir.utilities.npm.PackageList;
+import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
 import org.stringtemplate.v4.ST;
 
@@ -345,25 +347,23 @@ public class DependentIGFinder {
     
     // we only check the latest published version, and the CI build
     try {
-      JsonObject pl = JsonParser.parseObjectFromUrl(Utilities.pathURL(guide.asString("canonical"), "package-list.json"));
+      PackageList pl = PackageList.fromUrl(Utilities.pathURL(guide.asString("canonical"), "package-list.json"));
       String canonical = guide.asString("canonical");
       DepInfo dep = new DepInfo(pid, Utilities.path(canonical, "history.html"));
       deplist.add(dep);
-      for (JsonObject list : pl.getJsonObjects("list")) {
+      for (PackageListEntry e : pl.versions()) {
         boolean ballot = false;
-        String version = list.asString("version");
-        if (!"current".equals(version)) {
-          String status = list.asString("status");
+        String version = e.version();
+          String status = e.status();
           if ("ballot".equals(status) || "public-comment".equals(status) ) {
             if (!ballot) {
               ballot = true;
-              dep.ballot = checkForDependency(pid, version, list.asString("path"));          
+              dep.ballot = checkForDependency(pid, version, e.path());          
             }
           } else {
-            dep.published = checkForDependency(pid, version, list.asString("path"));                    
+            dep.published = checkForDependency(pid, version, e.path());                    
             break;
           }
-        }
       }
       dep.cibuild = checkForDependency(pid, "current", guide.asString("ci-build"));
     } catch (Exception e) {

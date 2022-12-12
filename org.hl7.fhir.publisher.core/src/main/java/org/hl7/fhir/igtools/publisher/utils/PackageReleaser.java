@@ -33,7 +33,9 @@ import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
 import org.hl7.fhir.dstu2.model.StructureDefinition;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
+import org.hl7.fhir.r5.model.Enumerations.FHIRVersion;
 import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.utilities.FhirPublication;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
@@ -44,6 +46,8 @@ import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.NpmPackage.ITransformingLoader;
+import org.hl7.fhir.utilities.npm.PackageList;
+import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
 import org.hl7.fhir.utilities.xml.XMLUtil;
 import org.w3c.dom.Document;
@@ -283,13 +287,13 @@ public class PackageReleaser {
     }
   }
 
-  private void updateIndex(File file, JsonObject pl) throws FileNotFoundException, IOException {
+  private void updateIndex(File file, PackageList pl) throws FileNotFoundException, IOException {
     StringBuilder b = new StringBuilder();
     
-    for (JsonObject v : pl.getJsonObjects("list")) { 
-      String ver = v.asString("version");
-      String desc = v.asString("desc");
-      String date = v.asString("date");
+    for (PackageListEntry v : pl.list()) { 
+      String ver = v.version();
+      String desc = v.desc();
+      String date = v.date();
       b.append("<li><a href=\""+ver+"/package.tgz\">"+ver+"</a>: "+Utilities.escapeJson(desc)+" ("+date+")</li>\r\n");
     }    
     String source = TextFile.fileToString(file);
@@ -541,48 +545,31 @@ public class PackageReleaser {
   }
 
   private void updateDate(String source, VersionDecision vd, String dateFmt) throws FileNotFoundException, IOException {
-    JsonObject pl = JsonParser.parseObject(new FileInputStream(Utilities.path(source, vd.getId(), "package-list.json")));
+    PackageList pl = PackageList.fromFile(new File(Utilities.path(source, vd.getId(), "package-list.json")));
     boolean ok = false;
-    for (JsonObject v : pl.getJsonObjects("list")) {
-      if (v.asString("version").equals(vd.getNewVersion())) {
-        v.remove("date");
-        v.add("date", dateFmt);
+    for (PackageListEntry v : pl.list()) {
+      if (v.version().equals(vd.getNewVersion())) {
+        v.setDate(dateFmt);
         ok = true;
-        vd.releaseNote = v.asString("desc");
+        vd.releaseNote = v.desc();
       }
     }
     if (!ok) {
       throw new Error("unable to find version "+vd.getNewVersion()+" in pacjage list");
     }
-    String jcnt = JsonParser.compose(pl, true);
-    TextFile.stringToFile(jcnt, Utilities.path(source, vd.getId(), "package-list.json"));
+    TextFile.stringToFile(pl.toJson(), Utilities.path(source, vd.getId(), "package-list.json"));
   }
 
   private void updatePackageList(String source, VersionDecision vd) throws FileNotFoundException, IOException {
-    JsonObject pl = JsonParser.parseObject(new FileInputStream(Utilities.path(source, vd.getId(), "package-list.json")));
-    JsonArray vl = pl.getJsonArray("list");
-    JsonArray nvl = new JsonArray();
-    JsonObject v = new JsonObject();
-    nvl.add(vl.get(0));
-    nvl.add(v);
-    for (int i = 1; i < vl.size(); i++) {
-      JsonObject vo = (JsonObject) vl.get(i);
-      if (vo.has("current")) {
-        vo.remove("current");
-      }
-      nvl.add(vo);
+    PackageList pl =PackageList.fromFile(new File(Utilities.path(source, vd.getId(), "package-list.json")));
+    for (PackageListEntry e : pl.versions()) {
+      e.setCurrent(false);
     }
-    pl.remove("list");
-    pl.add("list", nvl);
-    v.add("version", vd.newVersion);
-    v.add("date", "XXXX-XX-XX");
-    v.add("desc", "Upgrade for dependency on "+vd.implicitSource);
-    v.add("path", Utilities.pathURL(pl.asString("canonical"), vd.newVersion));
-    v.add("status", "release");
-    v.add("sequence", "Publications");
-    v.add("current", true);
-    String jcnt = JsonParser.compose(pl, true);
-    TextFile.stringToFile(jcnt, Utilities.path(source, vd.getId(), "package-list.json"));
+    PackageListEntry e = pl.newVersion(vd.newVersion, Utilities.pathURL(pl.canonical(), vd.newVersion), "release", "Publications", FhirPublication.R4);
+    e.describe("Upgrade for dependency on "+vd.implicitSource, null, null);
+    e.setCurrent(true);
+    e.setDate("XXXX-XX-XX");
+    TextFile.stringToFile(pl.toJson(), Utilities.path(source, vd.getId(), "package-list.json"));
   }
 
   private List<VersionDecision> analyseVersions(String source, Map<String, String> newList, Map<String, String> oldList) throws Exception {
@@ -726,10 +713,10 @@ public class PackageReleaser {
       if (f.isDirectory()) {
         scanForCurrentVersions(res, f);
       } else if (f.getName().equals("package-list.json")) {
-        JsonObject pl = JsonParser.parseObject(f);
-        for (JsonObject v : pl.getJsonObjects("list")) {
-          if ("release".equals(v.asString("status")) && v.asBoolean("current")) {
-            res.put(pl.asString("package-id"), v.asString("version"));
+        PackageList pl = PackageList.fromFile(f);
+        for (PackageListEntry v : pl.list()) {
+          if ("release".equals(v.status()) && v.current()) {
+            res.put(pl.pid(), v.version());
           }
         }
       }
@@ -806,7 +793,7 @@ public class PackageReleaser {
       if (!file.exists()) {
         throw new Error("not found: "+file.getAbsolutePath());
       }
-      updateIndex(file, JsonParser.parseObject(new File(Utilities.path(dest, npm.name(), "package-list.json"))));            
+      updateIndex(file, PackageList.fromFile(new File(Utilities.path(dest, npm.name(), "package-list.json"))));            
 
       // update rss feed      
       Element item = rss.createElement("item");

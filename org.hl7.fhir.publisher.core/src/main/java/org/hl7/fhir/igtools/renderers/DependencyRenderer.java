@@ -35,6 +35,8 @@ import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.npm.BasePackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageHacker;
+import org.hl7.fhir.utilities.npm.PackageList;
+import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Cell;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Row;
@@ -102,7 +104,7 @@ public class DependencyRenderer {
   private String fver;
   private String npmName;
   private TemplateManager templateManager;
-  private Map<String, JsonObject> packageListCache = new HashMap<>();
+  private Map<String, PackageList> packageListCache = new HashMap<>();
   private List<DependencyAnalyser.ArtifactDependency> dependencies;
   private List<GlobalProfile> globals = new ArrayList<>();
   private IWorkerContext context;
@@ -328,51 +330,47 @@ public class DependencyRenderer {
   }
 
   private String getLatestVersion(String name, String canonical) {
-    JsonObject pl = fetchPackageList(name, canonical);
+    PackageList pl = fetchPackageList(name, canonical);
     if (pl == null) {
       return null;
     }
-    for (JsonObject v : pl.forceArray("list").asJsonObjects()) {
-      if (!"current".equals(v.asString("version"))) {
-        if (v.asBoolean("current")) {// this is the current official release
-          return v.asString("version");
-        } 
+    for (PackageListEntry v : pl.versions()) {
+      if (v.current()) {// this is the current official release
+          return v.version();
       }
     }      
     return null;
   }
 
   private VersionState getVersionState(String name, String version, String canonical) {
-    JsonObject pl = fetchPackageList(name, canonical);
+    PackageList pl = fetchPackageList(name, canonical);
     if (pl == null) {
       return VersionState.VERSION_NO_LIST;
     }
     boolean latestInterim = true;
-    for (JsonObject v : pl.forceArray("list").asJsonObjects()) {
-      if (!"current".equals(v.asString("version"))) {
-        if (version.equals(v.asString("version"))) {
-          if (v.asBoolean("current")) {// this is the current official release
-            return VersionState.VERSION_LATEST_MILESTONE;
-          } if (latestInterim) {
-            return VersionState.VERSION_LATEST_INTERIM;
-          } else {
-            return VersionState.VERSION_OUTDATED;
-          }
+    for (PackageListEntry v : pl.versions()) {
+      if (version.equals(v.version())) {
+        if (v.current()) {// this is the current official release
+          return VersionState.VERSION_LATEST_MILESTONE;
+        } if (latestInterim) {
+          return VersionState.VERSION_LATEST_INTERIM;
         } else {
-          latestInterim = false;
+          return VersionState.VERSION_OUTDATED;
         }
-      }      
+      } else {
+        latestInterim = false;
+      }
     }
     return VersionState.VERSION_UNKNOWN;
   }
 
-  private JsonObject fetchPackageList(String name, String canonical) {
+  private PackageList fetchPackageList(String name, String canonical) {
     if (packageListCache .containsKey(name)) {
       return packageListCache.get(name);
     }
-    JsonObject pl;
+    PackageList pl;
     try {
-      pl =  org.hl7.fhir.utilities.json.parser.JsonParser.parseObjectFromUrl(Utilities.pathURL(canonical, "package-list.json")); 
+      pl = PackageList.fromUrl(Utilities.pathURL(canonical, "package-list.json")); 
           
     } catch (Exception e) {
       pl = null;

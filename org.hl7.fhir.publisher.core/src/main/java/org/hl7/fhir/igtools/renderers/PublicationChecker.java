@@ -15,6 +15,8 @@ import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.npm.PackageList;
+import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
 
 
 public class PublicationChecker {
@@ -85,7 +87,7 @@ public class PublicationChecker {
       if (npm != null) {
         checkPackage(messages, npm);  
         String dst = determineDestination(npm);
-        JsonObject pl = null;
+        PackageList pl = null;
         try {
           pl = readPackageList(dst);
         } catch (Exception e) {
@@ -111,17 +113,17 @@ public class PublicationChecker {
        Utilities.escapeXml(Utilities.pathURL(npm.canonical(), "history.html"))+"'"+mkError());
   }
 
-  private void checkExistingPublication(List<String> messages, NpmPackage npm, JsonObject pl) {
+  private void checkExistingPublication(List<String> messages, NpmPackage npm, PackageList pl) {
     if (pl != null) {
-      check(messages, npm.name().equals(pl.asString("package-id")), "Package ID mismatch. This package is "+npm.name()+" but the website has "+pl.asString("package-id")+mkError());
-      check(messages, npm.canonical().equals(pl.asString("canonical")), "Package canonical mismatch. This package canonical is "+npm.canonical()+" but the website has "+pl.asString("canonical")+mkError());
+      check(messages, npm.name().equals(pl.pid()), "Package ID mismatch. This package is "+npm.name()+" but the website has "+pl.pid()+mkError());
+      check(messages, npm.canonical().equals(pl.canonical()), "Package canonical mismatch. This package canonical is "+npm.canonical()+" but the website has "+pl.canonical()+mkError());
       check(messages, !hasVersion(pl, npm.version()), "Version "+npm.version()+" has already been published"+mkWarning());
     } else {
       check(messages, npm.version().startsWith("0.1") || npm.version().contains("-"), "This IG has never been published, so the version should start with '0.' or include a patch version e.g. '-ballot'"+mkWarning());
     }  
   }
 
-  private void checkPublicationRequest(List<String> messages, NpmPackage npm, JsonObject pl, List<StringPair> summary) throws IOException {
+  private void checkPublicationRequest(List<String> messages, NpmPackage npm, PackageList pl, List<StringPair> summary) throws IOException {
     JsonObject pr = null;
     try {
       pr = JsonParser.parseObjectFromFile(Utilities.path(folder, "publication-request.json"));
@@ -140,7 +142,7 @@ public class PublicationChecker {
         summary.add(new StringPair("version", pr.asString("version")));        
       }
       if (pl != null) {
-        JsonObject plv = getVersionObject(v, pl);
+        PackageListEntry plv = getVersionObject(v, pl);
         if (!check(messages, plv == null, "Publication Requet is for version v"+v+" which is already published"+mkError())) {
           summary.clear();
           return;          
@@ -224,9 +226,9 @@ public class PublicationChecker {
     
   }
 
-  private JsonObject getVersionObject(String v, JsonObject pl) {
-    for (JsonObject j : pl.getJsonArray("list").asJsonObjects()) {
-      String vl = j.asString("version");
+  private PackageListEntry getVersionObject(String v, PackageList pl) {
+    for (PackageListEntry j : pl.list()) {
+      String vl = j.version();
       if (v.equals(vl)) {
         return j;
       }
@@ -250,25 +252,25 @@ public class PublicationChecker {
     return Utilities.existsInList(str, "release", "trial-use", "update", "qa-preview", "ballot", "draft", "normative+trial-use", "normative", "informative", "public-comment");
   }
 
-  private String getCurrentSequence(JsonObject pl) {
+  private String getCurrentSequence(PackageList pl) {
     String cv = null;
     String res = null;
-    for (JsonObject j : pl.getJsonArray("list").asJsonObjects()) {
-      String v = j.asString("version");
+    for (PackageListEntry j : pl.list()) {
+      String v = j.version();
       if (!Utilities.noString(v) && !"current".equals(v)) {
         if (cv == null || VersionUtilities.isThisOrLater(cv, v)) {
           cv = v;
-          res = j.asString("sequence");
+          res = j.sequence();
         }
       }
     }
     return res;
   }
 
-  private String getLatestVersion(JsonObject pl) {
+  private String getLatestVersion(PackageList pl) {
     String cv = null;
-    for (JsonObject j : pl.getJsonArray("list").asJsonObjects()) {
-      String v = j.asString("version");
+    for (PackageListEntry j : pl.list()) {
+      String v = j.version();
       if (!Utilities.noString(v)) {
         if (cv == null || VersionUtilities.isThisOrLater(v, cv)) {
           cv = v;
@@ -278,20 +280,18 @@ public class PublicationChecker {
     return cv;
   }
 
-  private boolean hasVersion(JsonObject pl, String version) {
-    JsonArray list = pl.getJsonArray("list");
-    if (list != null) {
-      for (JsonObject o : list.asJsonObjects()) {
-        if (o.has("version") && o.asString("version").equals(version)) {
-          return true;
-        }
+  private boolean hasVersion(PackageList pl, String version) {
+    List<PackageListEntry> list = pl.list();
+    for (PackageListEntry o : list) {
+      if (version.equals(o.version())) {
+        return true;
       }
     }
     return false;
   }
   
-  private JsonObject readPackageList(String dst) throws IOException {
-    return JsonParser.parseObjectFromUrl(Utilities.pathURL(dst, "package-list.json"));
+  private PackageList readPackageList(String dst) throws IOException {
+    return PackageList.fromUrl(Utilities.pathURL(dst, "package-list.json"));
   }
 
   private String determineDestination(NpmPackage npm) {
