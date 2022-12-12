@@ -101,13 +101,7 @@ import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
 import org.hl7.fhir.igtools.publisher.realm.NullRealmBusinessRules;
 import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
 import org.hl7.fhir.igtools.publisher.realm.USRealmBusinessRules;
-import org.hl7.fhir.igtools.publisher.utils.HistoryPageUpdater;
-import org.hl7.fhir.igtools.publisher.utils.IGRegistryMaintainer;
-import org.hl7.fhir.igtools.publisher.utils.IGReleaseVersionDeleter;
-import org.hl7.fhir.igtools.publisher.utils.IGWebSiteMaintainer;
-import org.hl7.fhir.igtools.publisher.utils.PublicationProcess;
-import org.hl7.fhir.igtools.publisher.utils.PublisherConsoleLogger;
-import org.hl7.fhir.igtools.publisher.utils.xig.XIGGenerator;
+import org.hl7.fhir.igtools.publisher.xig.XIGGenerator;
 import org.hl7.fhir.igtools.renderers.CanonicalRenderer;
 import org.hl7.fhir.igtools.renderers.CodeSystemRenderer;
 import org.hl7.fhir.igtools.renderers.CrossViewRenderer;
@@ -132,6 +126,13 @@ import org.hl7.fhir.igtools.spreadsheets.ObservationSummarySpreadsheetGenerator;
 import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.igtools.templates.TemplateManager;
 import org.hl7.fhir.igtools.ui.GraphicalPublisher;
+import org.hl7.fhir.igtools.web.HistoryPageUpdater;
+import org.hl7.fhir.igtools.web.IGRegistryMaintainer;
+import org.hl7.fhir.igtools.web.IGReleaseVersionDeleter;
+import org.hl7.fhir.igtools.web.IGWebSiteMaintainer;
+import org.hl7.fhir.igtools.web.PublicationProcess;
+import org.hl7.fhir.igtools.web.PublisherConsoleLogger;
+import org.hl7.fhir.igtools.web.WebSiteArchiveBuilder;
 import org.hl7.fhir.r4.formats.FormatUtilities;
 import org.hl7.fhir.r5.conformance.ConstraintJavaGenerator;
 import org.hl7.fhir.r5.conformance.ProfileUtilities;
@@ -316,6 +317,8 @@ import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageGenerator.PackageType;
 import org.hl7.fhir.utilities.npm.PackageHacker;
+import org.hl7.fhir.utilities.npm.PackageList;
+import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
 import org.hl7.fhir.utilities.turtle.Turtle;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
@@ -3853,13 +3856,23 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               if (!VersionUtilities.versionsCompatible(version, pi.fhirVersion())) {
                 log("Version mismatch. This IG is for FHIR version "+version+", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion()+" (will ignore that and try to run anyway)");
               }
+              SpecMapManager smm = null;
               logDebugMessage(LogCategory.PROGRESS, "Load package dependency "+dep);
-              SpecMapManager smm = dpi.hasFile("other", "spec.internals") ?  new SpecMapManager(TextFile.streamToBytes(dpi.load("other", "spec.internals")), dpi.fhirVersion()) : SpecMapManager.createSpecialPackage(dpi);
-              smm.setName(dpi.name()+"_"+dpi.version());
-              smm.setBase(dpi.canonical());
-              smm.setBase2(PackageHacker.fixPackageUrl(dpi.url()));
-              specMaps.add(smm);
-              loadFromPackage(dpi.title(), dpi.canonical(), dpi, PackageHacker.fixPackageUrl(dpi.getWebLocation()), smm, true);          
+              try {
+                smm = dpi.hasFile("other", "spec.internals") ?  new SpecMapManager(TextFile.streamToBytes(dpi.load("other", "spec.internals")), dpi.fhirVersion()) : SpecMapManager.createSpecialPackage(dpi);
+                smm.setName(dpi.name()+"_"+dpi.version());
+                smm.setBase(dpi.canonical());
+                smm.setBase2(PackageHacker.fixPackageUrl(dpi.url()));
+                specMaps.add(smm);
+              } catch (Exception e) {
+                throw new IOException("Error reading SMM for "+dpi.name()+"#"+dpi.version()+": "+e.getMessage(), e);
+              }
+              
+              try {
+                loadFromPackage(dpi.title(), dpi.canonical(), dpi, PackageHacker.fixPackageUrl(dpi.getWebLocation()), smm, true);
+              } catch (Exception e) {
+                throw new IOException("Error loading "+dpi.name()+"#"+dpi.version()+": "+e.getMessage(), e);                
+              }
             }
           }
         }
@@ -3933,42 +3946,22 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (packageId != null) 
       return pcm.loadPackage(packageId, igver);
     
-    JsonObject pl;
+    PackageList pl;
     logDebugMessage(LogCategory.INIT, "Fetch Package history from "+Utilities.pathURL(canonical, "package-list.json"));
     try {
-      pl = org.hl7.fhir.utilities.json.parser.JsonParser.parseObjectFromUrl(Utilities.pathURL(canonical, "package-list.json"));
+      pl = PackageList.fromUrl(Utilities.pathURL(canonical, "package-list.json"));
     } catch (Exception e) {
       return null;
     }
-    if (!canonical.equals(pl.asString("canonical")))
-      throw new Exception("Canonical mismatch fetching package list for "+canonical+"#"+igver+", package-list.json says "+pl.get("canonical"));
-    for (JsonElement e : pl.getJsonArray("list")) {
-      JsonObject o = (JsonObject) e;
-      if (igver.equals(o.asString("version"))) {
-        InputStream src = fetchFromSource(pl.asString("package-id")+"-"+igver, Utilities.pathURL(o.asString("path"), "package.tgz"));
-        return pcm.addPackageToCache(pl.asString("package-id"), igver, src, Utilities.pathURL(o.asString("path"), "package.tgz"));
+    if (!canonical.equals(pl.canonical()))
+      throw new Exception("Canonical mismatch fetching package list for "+canonical+"#"+igver+", package-list.json says "+pl.canonical());
+    for (PackageListEntry e : pl.versions()) {
+      if (igver.equals(e.version())) {
+        InputStream src = fetchFromSource(pl.pid()+"-"+igver, Utilities.pathURL(e.path(), "package.tgz"));
+        return pcm.addPackageToCache(pl.pid(), igver, src, Utilities.pathURL(e.path(), "package.tgz"));
       }
     }
     return null;
-  }
-
- 
-  private String fetchFromURL(String source, String name) throws Exception {
-    String filename = Utilities.path(vsCache, name+".cache");
-    if (new File(filename).exists())
-      return filename;
-
-    if (!source.endsWith("validator.pack"))
-      source = Utilities.pathURL(source, "validator.pack");
-    try {
-      URL url = new URL(source+"?nocache=" + System.currentTimeMillis());
-      URLConnection c = url.openConnection();
-      byte[] cnt = IOUtils.toByteArray(c.getInputStream());
-      TextFile.bytesToFile(cnt, filename);
-      return filename;
-    } catch (Exception e) {
-      throw new Exception("Unable to load definitions from URL '"+source+"': "+e.getMessage(), e);
-    }
   }
 
   private static String getCurentDirectory() {
@@ -10454,7 +10447,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       IGReleaseVersionDeleter deleter = new IGReleaseVersionDeleter();
       deleter.clear(f.getAbsolutePath(), fh.getAbsolutePath());
     } else if (hasNamedParam(args, "-go-publish")) {
-      new PublicationProcess().publish(getNamedParam(args, "-source"), getNamedParam(args, "-destination"), hasNamedParam(args, "-first"), getNamedParam(args, "-date"),  getNamedParam(args, "-registry"), getNamedParam(args, "-history"), getNamedParam(args, "-temp"));
+      new PublicationProcess().publish(getNamedParam(args, "-source"), getNamedParam(args, "-destination"), getNamedParam(args, "-date"),  getNamedParam(args, "-registry"), getNamedParam(args, "-history"), getNamedParam(args, "-temp"));
+    } else if (hasNamedParam(args, "-generate-archives")) {
+      new WebSiteArchiveBuilder().start(getNamedParam(args, "-generate-archives"));
     } else if (hasNamedParam(args, "-xig")) {
       new XIGGenerator(getNamedParam(args, "-xig")).execute();
     } else if (hasNamedParam(args, "-update-history")) {
