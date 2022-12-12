@@ -306,6 +306,15 @@ public class PublicationProcess {
       FileUtils.copyDirectory(new File(Utilities.path(tempM.getAbsolutePath(), "output")), new File(destination));      
     }
     
+    // update indexes and collateral 
+    // if it's a milestone
+    //  - generate redirects
+    //  - update publish box
+    // every time
+    //  - uppdate history page
+    //  - update feed(s)
+    //  - update indexes 
+    
     // finally
     System.out.println("Rebuild everything for "+Utilities.path(destination, "package-list.json"));
     Publisher.main(new String[] { "-publish-update", "-folder", fRoot.getAbsolutePath(), "-registry", fRegistry.getAbsolutePath(), "-filter", destination, "-history", history.getAbsolutePath(), "-no-exit"});

@@ -347,7 +347,7 @@ public class IGReleaseUpdater {
       rb.buildOldAspRedirections();
     }
     System.out.println("  .. "+rb.getCountTotal()+" redirections ("+rb.getCountUpdated()+" created/updated)");
-    new DownloadBuilder(vf, canonical, isCurrent ?  canonical: version.asString("path")).execute();
+    new DownloadBuilder(vf, canonical, isCurrent ?  canonical : version.asString("path")).execute();
     if (!isCurrent && serverType == ServerType.ASP2) {
       new VersionRedirectorGenerator(canonicalPath).execute(version.asString("version"), version.asString("path"));
     }
