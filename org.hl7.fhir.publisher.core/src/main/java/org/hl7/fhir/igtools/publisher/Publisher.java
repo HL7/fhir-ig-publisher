@@ -192,7 +192,6 @@ import org.hl7.fhir.r5.model.ExpressionNode;
 import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.GraphDefinition;
 import org.hl7.fhir.r5.model.GraphDefinition.GraphDefinitionLinkComponent;
-import org.hl7.fhir.r5.model.GraphDefinition.GraphDefinitionLinkTargetComponent;
 import org.hl7.fhir.r5.model.IdType;
 import org.hl7.fhir.r5.model.Identifier;
 import org.hl7.fhir.r5.model.ImplementationGuide;
@@ -1668,14 +1667,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             
           case GraphDefinition:
             GraphDefinition gd = (GraphDefinition)res;
-            if (gd.hasProfile())
-              updateResourceStatus(gd.getProfileElement(), fmm, status, statusNormVersion, res.getUrl());
-            for (GraphDefinitionLinkComponent link: gd.getLink()) {
-              for (GraphDefinitionLinkTargetComponent target: link.getTarget()) {
-                if (gd.hasProfile())
-                  updateResourceStatus(target.getProfileElement(), fmm, status, statusNormVersion, res.getUrl());
-              }
-            }
+//            if (gd.hasProfile())
+//              updateResourceStatus(gd.getProfileElement(), fmm, status, statusNormVersion, res.getUrl());
+//            for (GraphDefinitionLinkComponent link: gd.getLink()) {
+//              for (GraphDefinitionLinkTargetComponent target: link.getTarget()) {
+//                if (gd.hasProfile())
+//                  updateResourceStatus(target.getProfileElement(), fmm, status, statusNormVersion, res.getUrl());
+//              }
+//            }
             break;
             
           case ImplementationGuide:
@@ -6145,7 +6144,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private List<String> loadOids(CanonicalResource cr) {
     List<String> res = new ArrayList<>();
     for (Identifier id : cr.getIdentifier()) {
-      if (id.getValue().startsWith("urn:oid:")) {
+      if (id.hasValue() && id.getValue().startsWith("urn:oid:")) {
         res.add(id.getValue().substring(8));
       }
     }
@@ -9212,7 +9211,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         arg0.printStackTrace();
       }      
     }
-    
   }
 
 

@@ -306,6 +306,7 @@ public class PublicationProcess {
       FileUtils.copyDirectory(new File(Utilities.path(tempM.getAbsolutePath(), "output")), new File(destination));      
     }
     
+    
     // update indexes and collateral 
     // if it's a milestone
     //  - generate redirects
@@ -321,9 +322,9 @@ public class PublicationProcess {
 
     if (milestone) {
       new WebSiteArchiveBuilder().buildArchives(new File(destination), fRoot.getAbsolutePath(), url);   
-  } else {
-     new WebSiteArchiveBuilder().buildArchive(destVer, new ArrayList<>());      
-  }
+    } else {
+      new WebSiteArchiveBuilder().buildArchive(destVer, new ArrayList<>());      
+    }
     System.out.println("Finished Publishing");
     logger.stop();
     FileUtils.copyFile(new File(logger.getFilename()), new File(Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".log")));    

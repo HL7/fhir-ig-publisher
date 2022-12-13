@@ -351,14 +351,14 @@ public class IgSpreadsheetParser {
         else {
           ElementDefinition ed = findContext(sd, inv.getUserString("context"), "Profile "+sd.getId()+" Invariant "+inv.getId()+" Context");
           ed.getConstraint().add(inv);
-          if (Utilities.noString(inv.getXpath())) {
-            throw new Exception("Profile "+sd.getId()+" Invariant "+inv.getId()+" ("+inv.getHuman()+") has no XPath statement");
-          }
+//          if (Utilities.noString(inv.getXpath())) {
+//            throw new Exception("Profile "+sd.getId()+" Invariant "+inv.getId()+" ("+inv.getHuman()+") has no XPath statement");
+//          }
           if (Utilities.noString(inv.getExpression())) {
             throw new Exception("Profile "+sd.getId()+" Invariant "+inv.getId()+" ("+inv.getHuman()+") has no Expression statement");
           }
-          else if (inv.getXpath().contains("\""))
-            throw new Exception("Profile "+sd.getId()+" Invariant "+inv.getId()+" ("+inv.getHuman()+") contains a \" character: "+inv.getXpath());
+//          else if (inv.getXpath().contains("\""))
+//            throw new Exception("Profile "+sd.getId()+" Invariant "+inv.getId()+" ("+inv.getHuman()+") contains a \" character: "+inv.getXpath());
         }
       }
     }
@@ -685,7 +685,7 @@ public class IgSpreadsheetParser {
           inv.getSeverityElement().setValueAsString(sev);
         inv.setHuman(sheet.getColumn(row, "English"));
         inv.setExpression(sheet.getColumn(row, "Expression"));
-        inv.setXpath(sheet.getColumn(row, "XPath"));
+//        inv.setXpath(sheet.getColumn(row, "XPath"));
         if (s.equals("") || result.containsKey(s))
           throw new Exception("duplicate or missing invariant id "+ getLocation(row));
         inv.setUserData("context", sheet.getColumn(row, "Context"));

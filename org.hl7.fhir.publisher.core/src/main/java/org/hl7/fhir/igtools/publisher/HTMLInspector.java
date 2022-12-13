@@ -650,7 +650,7 @@ public class HTMLInspector {
           matchesTarget(ref, "http://hl7.org", "http://hl7.org/fhir/DSTU2", "http://hl7.org/fhir/STU3", "http://hl7.org/fhir/R4", "http://hl7.org/fhir/smart-app-launch", "http://hl7.org/fhir/validator");
 
      if (!resolved) { // updated table documentation
-       if (ref.startsWith("http://build.fhir.org/ig/FHIR/ig-guidance/readingIgs.html")) {
+       if (ref.startsWith("https://build.fhir.org/ig/FHIR/ig-guidance/readingIgs.html")) {
          resolved = true;
        }
      }
