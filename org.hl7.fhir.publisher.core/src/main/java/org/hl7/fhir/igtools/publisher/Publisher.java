@@ -65,6 +65,7 @@ import java.util.zip.ZipInputStream;
 import javax.swing.UIManager;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.ErrorListener;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
@@ -6056,6 +6057,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     
     checkURLsUnique();
+    checkOIDsUnique();
     
     for (FetchedFile f : fileList) {
       logDebugMessage(LogCategory.PROGRESS, " .. validate "+f.getName());
@@ -6117,6 +6119,37 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
     }
+  }
+
+  private void checkOIDsUnique() {
+    Map<String, FetchedResource> oidMap = new HashMap<>();
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
+          List<String> oids = loadOids(((CanonicalResource) r.getResource())); 
+          for (String oid : oids) {
+            if (oidMap.containsKey(oid)) {
+              FetchedResource rs = oidMap.get(oid);
+              FetchedFile fs = findFileForResource(rs);
+              f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "The OID '"+oid+"' has already been used by "+rs.getId()+" in "+fs.getName(), IssueSeverity.ERROR));
+              fs.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "The OID '"+oid+"' is also used by "+r.getId()+" in "+f.getName(), IssueSeverity.ERROR));
+            } else {
+              oidMap.put(oid, r);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private List<String> loadOids(CanonicalResource cr) {
+    List<String> res = new ArrayList<>();
+    for (Identifier id : cr.getIdentifier()) {
+      if (id.getValue().startsWith("urn:oid:")) {
+        res.add(id.getValue().substring(8));
+      }
+    }
+    return res;
   }
 
   private FetchedFile findFileForResource(FetchedResource r) {
@@ -9154,10 +9187,41 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return r.fhirType()+"/"+r.getId();
   }
 
+  public class MyErrorListener implements ErrorListener {
+
+    @Override
+    public void error(TransformerException arg0) throws TransformerException {
+      System.out.println("XSLT Error: "+arg0.getMessage());
+      if (debug) {
+        arg0.printStackTrace();
+      }      
+    }
+
+    @Override
+    public void fatalError(TransformerException arg0) throws TransformerException {
+      System.out.println("XSLT Error: "+arg0.getMessage());
+      if (debug) {
+        arg0.printStackTrace();
+      }      
+    }
+
+    @Override
+    public void warning(TransformerException arg0) throws TransformerException {
+      System.out.println("XSLT Warning: "+arg0.getMessage());
+      if (debug) {
+        arg0.printStackTrace();
+      }      
+    }
+    
+  }
+
+
   private byte[] transform(byte[] source, byte[] xslt) throws TransformerException {
     TransformerFactory f = TransformerFactory.newInstance();
+    f.setErrorListener(new MyErrorListener());
     StreamSource xsrc = new StreamSource(new ByteArrayInputStream(xslt));
     Transformer t = f.newTransformer(xsrc);
+    t.setErrorListener(new MyErrorListener());
 
     StreamSource src = new StreamSource(new ByteArrayInputStream(source));
     ByteArrayOutputStream out = new ByteArrayOutputStream();
