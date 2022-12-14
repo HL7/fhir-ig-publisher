@@ -2900,6 +2900,14 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return sdCache.get(id);
   }
 
+
+  public String dense(PackageInformation srcInfo) {
+    if (srcInfo.getId().startsWith("hl7.fhir")) {
+      return srcInfo.getId().substring(9);
+    }
+    return srcInfo.getId();
+  }
+  
   public String crumbTrail() {
     CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder(" -&lt; ");
     b.append(sd.getName());
@@ -2908,7 +2916,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       PackageInformation srcInfo = t.getSourcePackage();
       String s = "";
       if (srcInfo != null) {
-        s = s + "<a href=\""+srcInfo.getWeb()+"\">"+srcInfo.dense()+"</a>:";
+        s = s + "<a href=\""+srcInfo.getWeb()+"\">"+dense(srcInfo)+"</a>:";
       }
       s = s + "<a href=\""+t.getUserString("path")+"\">"+t.getName()+"</a>";
       b.append(s);
