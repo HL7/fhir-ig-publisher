@@ -47,6 +47,7 @@ import org.hl7.fhir.r5.model.Enumeration;
 import org.hl7.fhir.r5.model.Enumerations.BindingStrength;
 import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.IdType;
+import org.hl7.fhir.r5.model.PackageInformation;
 import org.hl7.fhir.r5.model.PrimitiveType;
 import org.hl7.fhir.r5.model.Quantity;
 import org.hl7.fhir.r5.model.StringType;
@@ -1369,6 +1370,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       } else {
         tableRowNE(b, translate("sd.dict", "Standards Status"), "versions.html#std-process", ss.toDisplay());
       }
+    }
+    if (mode != GEN_MODE_DIFF && d.hasIsSummary()) {
+      tableRow(b, "Summary", "search.html#summary", Boolean.toString(d.getIsSummary()));
     }
     tableRowNE(b, translate("sd.dict", "Requirements"), null, compareMarkdown(profile.getName(), d.getRequirementsElement(), compare==null ? null : compare.getRequirementsElement(), mode));
     tableRowHint(b, translate("sd.dict", "Alternate Names"), translate("sd.dict", "Other names by which this resource/element may be known"), null, compareSimpleTypeLists(d.getAlias(), (compare==null ? new ArrayList<StringType>() : compare.getAlias()), mode));
@@ -2896,4 +2900,20 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return sdCache.get(id);
   }
 
+  public String crumbTrail() {
+    CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder(" -&lt; ");
+    b.append(sd.getName());
+    StructureDefinition t = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition());
+    while (t != null) {
+      PackageInformation srcInfo = t.getSourcePackage();
+      String s = "";
+      if (srcInfo != null) {
+        s = s + "<a href=\""+srcInfo.getWeb()+"\">"+srcInfo.dense()+"</a>:";
+      }
+      s = s + "<a href=\""+t.getUserString("path")+"\">"+t.getName()+"</a>";
+      b.append(s);
+      t = t.getDerivation() == TypeDerivationRule.SPECIALIZATION ? null : context.fetchResource(StructureDefinition.class, t.getBaseDefinition());
+    }
+    return b.toString();
+  }
 }

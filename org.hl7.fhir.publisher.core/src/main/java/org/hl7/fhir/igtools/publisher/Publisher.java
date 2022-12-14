@@ -9926,6 +9926,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-dict-key", sdr.dict(true, StructureDefinitionRenderer.GEN_MODE_KEY, StructureDefinitionRenderer.ANCHOR_PREFIX_KEY), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "dict-active"))
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-dict-active", sdr.dict(false, StructureDefinitionRenderer.GEN_MODE_SNAP, StructureDefinitionRenderer.ANCHOR_PREFIX_SNAP), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "crumbs"))
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-crumbs", sdr.crumbTrail(), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "maps"))
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps", sdr.mappings(false, false), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "maps"))
