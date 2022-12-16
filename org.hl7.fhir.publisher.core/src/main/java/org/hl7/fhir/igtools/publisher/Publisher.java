@@ -10511,7 +10511,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       IGReleaseVersionDeleter deleter = new IGReleaseVersionDeleter();
       deleter.clear(f.getAbsolutePath(), fh.getAbsolutePath());
     } else if (hasNamedParam(args, "-go-publish")) {
-      new PublicationProcess().publish(getNamedParam(args, "-source"), getNamedParam(args, "-destination"), getNamedParam(args, "-date"),  getNamedParam(args, "-registry"), getNamedParam(args, "-history"), getNamedParam(args, "-temp"));
+      throw new Exception("-go-publish is not supported in this version (work in progress)");
+      // new PublicationProcess().publish(getNamedParam(args, "-source"), getNamedParam(args, "-destination"), getNamedParam(args, "-date"),  getNamedParam(args, "-registry"), getNamedParam(args, "-history"), getNamedParam(args, "-temp"));
     } else if (hasNamedParam(args, "-generate-archives")) {
       new WebSiteArchiveBuilder().start(getNamedParam(args, "-generate-archives"));
     } else if (hasNamedParam(args, "-xig")) {
