@@ -26,6 +26,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,19 +34,28 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService.LogCategory;
+import org.hl7.fhir.r5.context.SimpleWorkerContext;
+import org.hl7.fhir.r5.context.SimpleWorkerContext.SimpleWorkerContextBuilder;
+import org.hl7.fhir.r5.elementmodel.ObjectConverter;
 import org.hl7.fhir.r5.elementmodel.ParserBase.NamedElement;
 import org.hl7.fhir.r5.formats.FormatUtilities;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.DataType;
+import org.hl7.fhir.r5.model.Narrative;
+import org.hl7.fhir.r5.model.Narrative.NarrativeStatus;
 import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.r5.model.StructureMap;
 import org.hl7.fhir.r5.model.UriType;
+import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.xhtml.NodeType;
+import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
 public class SimpleFetcher implements IFetchFile {
 
-  private static final String[] EXTENSIONS = new String[] {".xml", ".json", ".map", ".phinvads"};
+  private static final String[] EXTENSIONS = new String[] {".xml", ".json", ".map", ".phinvads", ".fml"};
   private IGKnowledgeProvider pkp;
   private List<String> resourceDirs;
   private ILoggingService log;
@@ -97,6 +107,8 @@ public class SimpleFetcher implements IFetchFile {
         ff.setContentType("application/fhir+json");
       } else if (path.endsWith("xml")) {
         ff.setContentType("application/fhir+xml");
+      } else if (path.endsWith("fml")) {
+	ff.setContentType("application/fhir+fml"); //don't know if there is an official type
       }
       InputStream ss = new FileInputStream(f);
       byte[] b = new byte[ss.available()];
@@ -108,7 +120,8 @@ public class SimpleFetcher implements IFetchFile {
   }
 
   private boolean isIgnoredFile(String name) {
-    return name.startsWith(".");
+    return name.startsWith(".")
+      || name.endsWith("~"); // a little emacs love
   }
 
   @Override
@@ -304,9 +317,10 @@ public class SimpleFetcher implements IFetchFile {
       sources.addAll(resourceDirs);
     if (sources.isEmpty())
       throw new FHIRException("No Source directories to scan found"); // though it's not possible to get to this point...
-
+    log.logMessage("Begin scan on: " + sourceDir);
     List<FetchedFile> res = new ArrayList<>();
     for (String s : sources) {
+      log.logMessage("Scanning source: " + s);
       int count = 0;
       File file = new File(s);
       if (file.exists()) {
@@ -314,8 +328,35 @@ public class SimpleFetcher implements IFetchFile {
           if (!f.isDirectory()) {
             String fn = f.getCanonicalPath();
             String ext = Utilities.getFileExtension(fn);
-            if (!Utilities.existsInList(ext, "md", "txt") && !fn.endsWith(".gitignore") && !fn.contains("-spreadsheet") && !isIgnoredFile(f.getName())) {
-              boolean ok = false;
+	    boolean ok = false;
+	    if (isIgnoredFile(f.getName())) {
+	      continue;
+	    }
+	    if (Utilities.existsInList(ext, "fml")  ) {
+              try {
+		InputStream fis = new FileInputStream(f);
+		byte[] source = new byte[fis.available()];
+		fis.read(source, 0, fis.available());
+		fis.close();
+		String contents = new String(source,StandardCharsets.UTF_8);
+
+		SimpleWorkerContext ctx = new SimpleWorkerContextBuilder().fromNothing();
+		StructureMapUtilities smu = new StructureMapUtilities(ctx);
+		StructureMap map = smu.parse(contents, "map");
+		map.getText().setStatus(NarrativeStatus.GENERATED);
+		map.getText().setDiv(new XhtmlNode(NodeType.Element, "div"));
+		map.getText().getDiv().addTag("pre").addText(contents);		  
+		ObjectConverter oc = new ObjectConverter(context);
+		addFile(res, f,oc.convert(map), "application/fhir+fml"); //why do we need the element?
+		ok = true;
+		count++;
+	      } catch (Exception e) {
+                if (!f.getName().startsWith("Binary-")) { // we don't notify here because Binary is special. 
+		  log.logMessage(e.getMessage() +" loading "+f);
+		}
+	      }		
+            } else if (!Utilities.existsInList(ext, "md", "txt") && !fn.endsWith(".gitignore") && !fn.contains("-spreadsheet") && !isIgnoredFile(f.getName())) {
+
               if (!Utilities.existsInList(ext, "json", "ttl", "html", "txt"))
                 try {
                   org.hl7.fhir.r5.elementmodel.Element e = new org.hl7.fhir.r5.elementmodel.XmlParser(context).parseSingle(new FileInputStream(f));
@@ -356,7 +397,7 @@ public class SimpleFetcher implements IFetchFile {
                   }
                 }
               }
-            }
+	    }
           }
         }
       }

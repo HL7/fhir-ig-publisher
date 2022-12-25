@@ -44,6 +44,7 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
@@ -144,6 +145,7 @@ import org.hl7.fhir.r5.context.IWorkerContext.IContextResourceLoader;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.r5.context.IWorkerContext.ValidationResult;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
+import org.hl7.fhir.r5.context.SimpleWorkerContext.SimpleWorkerContextBuilder;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.Manager.FhirFormat;
 import org.hl7.fhir.r5.elementmodel.ObjectConverter;
@@ -212,6 +214,8 @@ import org.hl7.fhir.r5.model.Measure;
 import org.hl7.fhir.r5.model.MessageDefinition;
 import org.hl7.fhir.r5.model.MessageDefinition.MessageDefinitionAllowedResponseComponent;
 import org.hl7.fhir.r5.model.MessageDefinition.MessageDefinitionFocusComponent;
+import org.hl7.fhir.r5.model.Narrative;
+import org.hl7.fhir.r5.model.Narrative.NarrativeStatus;
 import org.hl7.fhir.r5.model.OperationDefinition;
 import org.hl7.fhir.r5.model.OperationDefinition.OperationDefinitionParameterComponent;
 import org.hl7.fhir.r5.model.OperationOutcome;
@@ -661,12 +665,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private List<String> noValidate = new ArrayList<>();
   private List<FetchedResource> noValidateResources = new ArrayList<>();
 
+  private List<String> fmlDirs = new ArrayList<String>();
   private List<String> resourceDirs = new ArrayList<String>();
   private List<String> pagesDirs = new ArrayList<String>();
   private String tempDir;
   private String outputDir;
   private String specPath;
   private String qaDir;
+  private String fmlDir;
   private String version;
   private FhirPublication pubVersion;
   private long jekyllTimeout = JEKYLL_TIMEOUT;
@@ -834,6 +840,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private Coding expectedJurisdiction;
 
   private boolean noFSH;
+  private boolean noFML;
 
   private Set<String> loadedIds;
 
@@ -2009,7 +2016,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else
       throw new FHIRException("Unsupported version "+ver);
   }
-
+    
   private boolean hasNarrative(Element element) {
     return element.hasChild("text") && element.getNamedChild("text").hasChild("div");
   }
@@ -2221,8 +2228,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Also loading Packages from "+packagesFolder);
       pcm.loadFromFolder(packagesFolder);
     }
-    fetcher.setRootDir(rootDir);      
+    fetcher.setRootDir(rootDir);
     fetcher.setResourceDirs(resourceDirs);
+    log("Setting resources dirrs to " + resourceDirs.toString());
     if (configFile != null && focusDir().contains(" ")) {
       throw new Error("There is a space in the folder path: \""+focusDir()+"\". Please fix your directory arrangement to remove the space and try again");
     }
@@ -2246,6 +2254,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       initializeTemplate();
     else
       initializeFromJson();
+
     expectedJurisdiction = checkForJurisdiction();
     realmRules = makeRealmBusinessRules();
     previousVersionComparator = makePreviousVersionComparator();
@@ -2325,6 +2334,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
+  
+
+
+    
   private void runFsh(File file) throws IOException { 
     File inif = new File(Utilities.path(file.getAbsolutePath(), "fsh.ini"));
     if (!inif.exists()) {
@@ -2435,6 +2448,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     igName = Utilities.path(repoRoot, ini.getStringProperty("IG", "ig"));
     try {
       try {
+	  log ("Loading IG from " + igName);
         sourceIg = (ImplementationGuide) org.hl7.fhir.r5.formats.FormatUtilities.loadFileTight(igName);
         boolean isR5 = false;
         for (Enumeration<FHIRVersion> v : sourceIg.getFhirVersion()) {
@@ -2450,6 +2464,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } catch (Exception e) {
       throw new Exception("Error Parsing File "+igName+": "+e.getMessage(), e);
     }
+    log ("Source IG1= \n"  +sourceIg.toString());
     template = templateManager.loadTemplate(templateName, rootDir, sourceIg.getPackageId(), mode == IGBuildMode.AUTOBUILD);
 
     if (template.hasExtraTemplates()) {
@@ -2465,6 +2480,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     
     Map<String, List<ValidationMessage>> messages = new HashMap<String, List<ValidationMessage>>();
     sourceIg = template.onLoadEvent(sourceIg, messages);
+    log ("Source IG2= \n"  +sourceIg.toString());
     checkOutcomes(messages);
     // ok, loaded. Now we start loading settings out of the IG
     tool = GenerationTool.Jekyll;
@@ -2502,6 +2518,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (pc == null) {
         throw new Error("The IG Parameter has no code");
       } else if (pc.equals("logging")) { // added
+	  log ("logging " + p.toString());
         logOptions.add(p.getValue());        
       } else if (pc.equals("generate")) { // added
         if ("example-narratives".equals(p.getValue()))
@@ -2519,6 +2536,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       } else if (pc.equals("path-resource")) {
         String dir = Utilities.path(rootDir, p.getValue());
         if (!resourceDirs.contains(dir)) {
+	    log("Adding to resource dirs" + dir);
           resourceDirs.add(dir);
         }
       } else if (pc.equals("autoload-resources")) {     
@@ -2527,6 +2545,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         codeSystemProps.add(p.getValue());
       } else if (pc.equals("path-pages")) {     
         pagesDirs.add(Utilities.path(rootDir, p.getValue()));
+      } else if (pc.equals("path-fmls")) {     
+        fmlDirs.add(Utilities.path(rootDir, p.getValue()));
       } else if (pc.equals("copyrightyear")) {     
         copyrightYear = p.getValue();
       } else if (pc.equals("path-qa")) {     
@@ -2655,9 +2675,24 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     
     // ok process the paths
+    log("Creating temp directory: "+tempDir);
+    forceDir(tempDir);
     log("Root directory: "+rootDir);
-    if (resourceDirs.isEmpty())
+    if (resourceDirs.isEmpty()) {
       resourceDirs.add(Utilities.path(rootDir, "resources"));
+      log("b/c empty adding " + Utilities.path(rootDir, "resources"));
+    }
+    if (!noFML) {
+	if (fmlDirs.isEmpty()) {
+	  fmlDirs.add(Utilities.path(rootDir,"input","fml")); //should be onLoad XSLT
+	  log("adding default fml source input/fml");
+	}
+	fmlDir = Utilities.path(rootDir, "fml-generated");
+	log("Creating fml output dir" + fmlDir.toString());
+	forceDir(fmlDir); 
+	resourceDirs.add(fmlDir);
+    }
+
     if (pagesDirs.isEmpty())
       pagesDirs.add(Utilities.path(rootDir, "pages"));
     if (mode == IGBuildMode.WEBSERVER) 
@@ -2672,11 +2707,21 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     logDebugMessage(LogCategory.INIT, "Check folders");
     List<String> missingDirs = new ArrayList<String>();
     for (String s : resourceDirs) {
+	log("checking dir " + s);
       logDebugMessage(LogCategory.INIT, "Source: "+s);
       if (!checkDir(s, true))
         missingDirs.add(s);
     }
     resourceDirs.removeAll(missingDirs);
+    
+    missingDirs.clear();
+    for (String s : fmlDirs) {
+      log("checking fml dir " + s);
+      logDebugMessage(LogCategory.INIT, "FML Source: "+s);
+      if (!checkDir(s, true))
+        missingDirs.add(s);
+    }
+    fmlDirs.removeAll(missingDirs);
     
     missingDirs.clear();
     for (String s : pagesDirs) {
@@ -2688,7 +2733,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     logDebugMessage(LogCategory.INIT, "Temp: "+tempDir);
     Utilities.clearDirectory(tempDir);
-    forceDir(tempDir);
     forceDir(Utilities.path(tempDir, "_includes"));
     forceDir(Utilities.path(tempDir, "_data"));
     logDebugMessage(LogCategory.INIT, "Output: "+outputDir);
@@ -2849,6 +2893,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     otherFilesStartup.add(Utilities.path(tempDir, "_data", "questionnaires.json"));
     otherFilesStartup.add(Utilities.path(tempDir, "_data", "pages.json"));
     otherFilesStartup.add(Utilities.path(tempDir, "_includes"));
+    if (!noFML) {
+      otherFilesStartup.add(fmlDir);
+    }
 
     if (sourceIg.hasLicense())
       license = sourceIg.getLicense().toCode();
@@ -3060,11 +3107,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (JsonElement e : (JsonArray) paths.get("resources")) {
         String dir = Utilities.path(rootDir, e.asJsonPrimitive().asString());
         if (!resourceDirs.contains(dir)) {
+	    log("adding from paths " +  dir);
           resourceDirs.add(dir);
         }
       }
     } else {
       String dir = Utilities.path(rootDir, str(paths, "resources", "resources"));
+      log("adding from null paths " + dir);
       if (!resourceDirs.contains(dir)) {
         resourceDirs.add(dir);
       }
@@ -3115,6 +3164,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     logDebugMessage(LogCategory.INIT, "Check folders");
     for (String s : resourceDirs) {
+	log("check again " + s);
       logDebugMessage(LogCategory.INIT, "Source: "+s);
       checkDir(s);
     }
@@ -3127,6 +3177,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     forceDir(tempDir);
     forceDir(Utilities.path(tempDir, "_includes"));
     forceDir(Utilities.path(tempDir, "_data"));
+    forceDir(Utilities.path(tempDir, "_includes"));
+    if (!noFML) {
+      forceDir(fmlDir);
+    }
     logDebugMessage(LogCategory.INIT, "Output: "+outputDir);
     forceDir(outputDir);
     Utilities.clearDirectory(outputDir);
@@ -3305,7 +3359,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     otherFilesStartup.add(Utilities.path(tempDir, "_data", "questionnaires.json"));
     otherFilesStartup.add(Utilities.path(tempDir, "_data", "pages.json"));
     otherFilesStartup.add(Utilities.path(tempDir, "_includes"));
-
+    if (!noFML) {
+      otherFilesStartup.add(fmlDir);
+    }
+    
     JsonArray urls = configuration.getJsonArray("special-urls");
     if (urls != null) {
       for (JsonElement url : urls) {
@@ -4047,6 +4104,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
 
+
+
   private boolean load() throws Exception {
     validationFetcher.initOtherUrls();
     fileList.clear();
@@ -4055,6 +4114,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     boolean needToBuild = false;
     FetchedFile igf = fetcher.fetch(igName);
     needToBuild = noteFile(IG_NAME, igf) || needToBuild;
+
     if (needToBuild) {
       if (sourceIg == null) // old JSON approach
         sourceIg = (ImplementationGuide) parse(igf);
@@ -4067,7 +4127,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else {
       // special case; the source is updated during the build, so we track it differently
       publishedIg = sourceIg.copy();
-      altMap.get(IG_NAME).getResources().get(0).setResource(publishedIg);
+      altMap.get(IG_NAME).getResources().get(0).setResource(publishedIg);      
     }
     dependentIgFinder = new DependentIGFinder(sourceIg.getPackageId());
 
@@ -4120,6 +4180,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     loadedIds = new HashSet<>();
     duplicateInputResourcesDetected = false;
     // load any bundles
+    if (!noFML) {
+      log("Start to build FMLs");
+      needToBuild |= loadFMLs(needToBuild,igf);
+    }
     if (sourceDir != null || igpkp.isAutoPath())
       needToBuild = loadResources(needToBuild, igf);
     needToBuild = loadSpreadsheets(needToBuild, igf);
@@ -4713,6 +4777,130 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return changed || needToBuild;
   }
 
+
+
+  private boolean loadFMLs(boolean needToBuild, FetchedFile igf) throws Exception {
+
+      
+    List<FetchedFile> resources = new ArrayList<>();
+    boolean changed = false;
+
+    for (String s : fmlDirs) {
+      log("Checking fml dir " +  s);
+      File dir = new File(s);
+      if (!dir.isDirectory()) {
+	continue;
+      }      
+      logDebugMessage(LogCategory.INIT, "Scanning FML Dir: "+s);
+
+      List<FetchedFile> fmlfiles = fetcher.scan(dir.getAbsolutePath(), context, false);      
+      for (FetchedFile fmlfile : fmlfiles) {
+	  log("Checking fml file " +  fmlfile.getPath());
+	if (!fmlfile.matches(igf))
+	  needToBuild |= loadFML(needToBuild, fmlfile);
+      }
+    }
+    return needToBuild;
+  }
+
+
+  private boolean loadFML(boolean needToBuild, FetchedFile fmlfile) throws Exception {
+    logDebugMessage(LogCategory.INIT, "Parsing FML: "+fmlfile.getPath());
+    File file = new File(fmlfile.getPath());
+    File outputDir = new File(fmlDir);
+
+	
+    String version = sourceIg.getFhirVersion().get(0).asStringValue();
+    log("parsing file:" + fmlfile.getName());
+    
+    byte[] fmlsource = fmlfile.getSource();
+    
+    org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(context);
+    jp.setupValidation(ValidationPolicy.EVERYTHING, null);    
+    jp.setAllowComments(true);
+    ByteArrayOutputStream bs = new ByteArrayOutputStream();
+    log("begining parse of fml source:" + fmlsource);    
+    StructureMap map = (StructureMap) parseContent(file.getName(), "text/fhir-mapping", version ,fmlsource);
+    String mapName = map.getName();
+    String libraryName = "FML-" + map.getName();
+    
+    //since this was auto-generated, set some metadata and link back to source
+    map.setTitle(mapName);    
+    map.getText().setStatus(NarrativeStatus.GENERATED);
+    map.getText().setDiv(new XhtmlNode(NodeType.Element, "div"));
+    map.getText().getDiv().addTag("pre").addText(new String(fmlsource, StandardCharsets.UTF_8));
+    map.setPublisher(sourceIg.getPublisher()); //these should be conditional (if not set then...), but that assumes structured fml comments.
+    map.setJurisdiction(sourceIg.getJurisdiction());
+    map.setCopyright(sourceIg.getCopyright());
+    //    map.setCopyrightLabel(sourceIg.getCopyrightLabel()); //causes runtime error - see below
+    map.setContact(sourceIg.getContact());
+    map.setDate(sourceIg.getDate() );
+                
+    UriType mapUri = map.getUrlElement();
+    Reference libraryRef = new Reference("Library/" + libraryName);    
+    mapUri.addExtension( "http://hl7.org/fhir/StructureDefinition/derivation-reference",libraryRef);
+    map.setUrlElement(mapUri);
+
+    ObjectConverter oc = new ObjectConverter(context);
+    jp.compose(oc.convert(map), bs, OutputStyle.PRETTY, null);
+    String mapSource = new String(bs.toByteArray(),StandardCharsets.UTF_8);    
+    log("setting output map to: " + mapSource);    
+    
+    String outputFilename = "StructureMap-" + mapName  + ".json"; //neet to sanitize mapName as part of filename
+    log("Trying to create " + outputFilename + " json output");
+    File outputFile = new File(Utilities.path(outputDir.getAbsolutePath(),outputFilename));
+    TextFile.stringToFile(mapSource,outputFile);
+    //    TextFile.stringToFile(mapSource,Utilities.path(tempDir, "StructureMap-" + mapName + ".fml")); //persit to pages directory
+			  
+			  
+    Library library = new Library();
+    library.setName(libraryName);
+    library.setId("FML-" + map.getId());
+    library.setUrl(Utilities.pathURL(igpkp.getCanonical(), "Library/" + libraryName));
+    library.setTitle("FML Source for StructureMap " + mapName); //should be a translated string
+    
+    library.setJurisdiction(sourceIg.getJurisdiction());
+    library.setCopyright(sourceIg.getCopyright());
+    //library.setCopyrightLabel(sourceIg.getCopyrightLabel());
+    // caused run time error
+    // Exception in thread "main" java.lang.Error: The resource type "Library" does not implement the property "copyrightLabel"
+    //  at org.hl7.fhir.r5.model.Library.setCopyrightLabel(Library.java:1886)
+    library.setContact(sourceIg.getContact());
+    library.setDate(sourceIg.getDate() );
+    library.setPublisher(sourceIg.getPublisher());
+    library.setDescription(map.getDescription());
+			  
+    Attachment content = new Attachment();
+    content.setContentType("text/fhir-mapping");
+    content.setData(Base64.getEncoder().encode(fmlsource));
+    content.setTitle("FML Source for StructureMap " + mapName); //should be a translated string
+    library.addContent(content);
+
+    // content = new Attachment();
+    // content.setContentType("text/fhir-mapping");
+    // content.setUrl(Utilities.pathURL(igpkp.getCanonical(),  "StructureMap-" + mapName + ".fml")); 
+    // content.setTitle("FML Source for StructureMap " + mapName); //should be a translated string
+    // library.addContent(content);
+
+    
+			  
+    String libraryFilename =  "Library-" + libraryName + ".json";    
+    File libraryFile = new File(Utilities.path(outputDir.getAbsolutePath(),libraryFilename));
+    log("setting output library file: " + libraryFilename);    
+    //libraryFile.createNewFile();
+    ByteArrayOutputStream lbs = new ByteArrayOutputStream();
+    jp.compose(oc.convert(library), lbs, OutputStyle.PRETTY, null);
+    String librarySource = new String(lbs.toByteArray(),StandardCharsets.UTF_8);    
+    log("setting output library to: " + librarySource);
+
+    TextFile.stringToFile(librarySource,libraryFile);    
+
+    return true;
+  }
+    
+
+
+    
   private boolean loadResources(boolean needToBuild, FetchedFile igf) throws Exception { // igf is not currently used, but it was about relative references? 
     List<FetchedFile> resources = fetcher.scan(sourceDir, context, igpkp.isAutoPath());
     for (FetchedFile ff : resources) {
@@ -4997,7 +5185,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             } else {
               throw new Error("Cannot use resources of type "+r.fhirType()+" in a IG with version "+version);
             }
-            Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parseSingle(new ByteArrayInputStream(cnt));
+
+	    Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parseSingle(new ByteArrayInputStream(cnt));
             e.copyUserData(r.getElement());
             r.setElement(e);
           }
@@ -5979,6 +6168,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         res = new org.hl7.fhir.r4.formats.JsonParser(true, true).parse(source);
       } else if (contentType.contains("xml")) {
         res = new org.hl7.fhir.r4.formats.XmlParser(true).parse(source);
+      } else if (contentType.equals("text/fhir-mapping")) {	  
+	org.hl7.fhir.r4.context.SimpleWorkerContext ctx = new org.hl7.fhir.r4.context.SimpleWorkerContext();
+	org.hl7.fhir.r4.utils.StructureMapUtilities smu = new org.hl7.fhir.r4.utils.StructureMapUtilities(ctx);	
+	String contents = new String(source, StandardCharsets.UTF_8);
+	log("Parsing map (" + name + "):" + contents );	
+	res = smu.parse(contents,"map");	
       } else {
         throw new Exception("Unable to determine file type for "+name);
       }
@@ -6011,8 +6206,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         res = new org.hl7.fhir.r4b.formats.JsonParser(true).parse(source);
       } else if (contentType.contains("xml")) {
         res = new org.hl7.fhir.r4b.formats.XmlParser(true).parse(source);
+      } else if (contentType.equals("text/fhir-mapping")) {	  
+	org.hl7.fhir.r4b.context.SimpleWorkerContext ctx = new org.hl7.fhir.r4b.context.SimpleWorkerContext();
+	org.hl7.fhir.r4b.utils.structuremap.StructureMapUtilities smu = new org.hl7.fhir.r4b.utils.structuremap.StructureMapUtilities(ctx);	
+	String contents = new String(source, StandardCharsets.UTF_8);
+	res =  smu.parse(contents,"map");
       } else {
-        throw new Exception("Unable to determine file type for "+name);
+	throw new Exception("Unable to determine file type for "+name);
       }
       return VersionConvertorFactory_43_50.convertResource(res);
     } else if (VersionUtilities.isR5Ver(parseVersion)) {
@@ -6020,6 +6220,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         return new JsonParser(true, true).parse(source);
       } else if (contentType.contains("xml")) {
         return new XmlParser(true).parse(source);
+      } else if (contentType.equals("text/fhir-mapping")) {	  
+	SimpleWorkerContext ctx = new SimpleWorkerContext.SimpleWorkerContextBuilder().fromNothing();
+	String contents = new String(source, StandardCharsets.UTF_8);
+	return new StructureMapUtilities(ctx).parse(contents,"map");
       } else {
         throw new Exception("Unable to determine file type for "+name);
       }
@@ -6028,6 +6232,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }    
   }
 
+
+    
   private Resource parseInternal(FetchedFile file, FetchedResource res) throws Exception {
     String parseVersion = version;
     if (!file.getResources().isEmpty()) {
@@ -6331,7 +6537,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     forceDir(tempDir);
     forceDir(Utilities.path(tempDir, "_includes"));
     forceDir(Utilities.path(tempDir, "data"));
-
+    if (!noFML) {
+      forceDir(fmlDir);
+    }
     otherFilesRun.clear();
     otherFilesRun.add(Utilities.path(outputDir, "package.tgz"));
     otherFilesRun.add(Utilities.path(outputDir, "package.manifest.json"));
@@ -9276,7 +9484,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     path = Utilities.path(tempDir, "_includes", r.fhirType()+"-"+r.getId()+".escaped.json");
     json = Utilities.escapeXml(json);
     TextFile.stringToFile(json, path);
-    
+
+
     if (igpkp.wantGen(r, "xml") || forHL7orFHIR()) {
       path = Utilities.path(tempDir, r.fhirType()+"-"+r.getId()+".xml");
       f.getOutputNames().add(path);
@@ -10751,6 +10960,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (hasNamedParam(args, "-no-sushi")) {
         self.noFSH = true;
       }
+      if (hasNamedParam(args, "-no-fml")) {
+        self.noFML = true;
+      }
+
       try {
         self.execute();
         if (hasNamedParam(args, "-no-errors")) {
