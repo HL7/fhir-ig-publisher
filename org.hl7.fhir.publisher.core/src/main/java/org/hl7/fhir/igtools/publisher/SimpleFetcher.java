@@ -317,10 +317,8 @@ public class SimpleFetcher implements IFetchFile {
       sources.addAll(resourceDirs);
     if (sources.isEmpty())
       throw new FHIRException("No Source directories to scan found"); // though it's not possible to get to this point...
-    log.logMessage("Begin scan on: " + sourceDir);
     List<FetchedFile> res = new ArrayList<>();
     for (String s : sources) {
-      log.logMessage("Scanning source: " + s);
       int count = 0;
       File file = new File(s);
       if (file.exists()) {

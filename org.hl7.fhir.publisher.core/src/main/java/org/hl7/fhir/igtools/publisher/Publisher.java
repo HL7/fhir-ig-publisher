@@ -2675,9 +2675,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     
     // ok process the paths
-    log("Creating temp directory: "+tempDir);
     forceDir(tempDir);
-    log("Root directory: "+rootDir);
     if (resourceDirs.isEmpty()) {
       resourceDirs.add(Utilities.path(rootDir, "resources"));
       log("b/c empty adding " + Utilities.path(rootDir, "resources"));
@@ -2707,7 +2705,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     logDebugMessage(LogCategory.INIT, "Check folders");
     List<String> missingDirs = new ArrayList<String>();
     for (String s : resourceDirs) {
-	log("checking dir " + s);
       logDebugMessage(LogCategory.INIT, "Source: "+s);
       if (!checkDir(s, true))
         missingDirs.add(s);
@@ -2716,7 +2713,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     
     missingDirs.clear();
     for (String s : fmlDirs) {
-      log("checking fml dir " + s);
       logDebugMessage(LogCategory.INIT, "FML Source: "+s);
       if (!checkDir(s, true))
         missingDirs.add(s);
@@ -3102,7 +3098,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     else
       markdownEngine = new MarkDownProcessor(Dialect.COMMON_MARK);
     
-    log("Root directory: "+rootDir);
     if (paths != null && paths.get("resources") instanceof JsonArray) {
       for (JsonElement e : (JsonArray) paths.get("resources")) {
         String dir = Utilities.path(rootDir, e.asJsonPrimitive().asString());
@@ -3113,7 +3108,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     } else {
       String dir = Utilities.path(rootDir, str(paths, "resources", "resources"));
-      log("adding from null paths " + dir);
       if (!resourceDirs.contains(dir)) {
         resourceDirs.add(dir);
       }
@@ -3164,7 +3158,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     logDebugMessage(LogCategory.INIT, "Check folders");
     for (String s : resourceDirs) {
-	log("check again " + s);
       logDebugMessage(LogCategory.INIT, "Source: "+s);
       checkDir(s);
     }
@@ -4181,7 +4174,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     duplicateInputResourcesDetected = false;
     // load any bundles
     if (!noFML) {
-      log("Start to build FMLs");
       needToBuild |= loadFMLs(needToBuild,igf);
     }
     if (sourceDir != null || igpkp.isAutoPath())
@@ -4786,7 +4778,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     boolean changed = false;
 
     for (String s : fmlDirs) {
-      log("Checking fml dir " +  s);
       File dir = new File(s);
       if (!dir.isDirectory()) {
 	continue;
@@ -4795,7 +4786,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
       List<FetchedFile> fmlfiles = fetcher.scan(dir.getAbsolutePath(), context, false);      
       for (FetchedFile fmlfile : fmlfiles) {
-	  log("Checking fml file " +  fmlfile.getPath());
 	if (!fmlfile.matches(igf))
 	  needToBuild |= loadFML(needToBuild, fmlfile);
       }
@@ -4819,7 +4809,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     jp.setupValidation(ValidationPolicy.EVERYTHING, null);    
     jp.setAllowComments(true);
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
-    log("begining parse of fml source:" + fmlsource);    
     StructureMap map = (StructureMap) parseContent(file.getName(), "text/fhir-mapping", version ,fmlsource);
     String mapName = map.getName();
     String libraryName = "FML-" + map.getName();
@@ -4844,13 +4833,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     ObjectConverter oc = new ObjectConverter(context);
     jp.compose(oc.convert(map), bs, OutputStyle.PRETTY, null);
     String mapSource = new String(bs.toByteArray(),StandardCharsets.UTF_8);    
-    log("setting output map to: " + mapSource);    
     
     String outputFilename = "StructureMap-" + mapName  + ".json"; //neet to sanitize mapName as part of filename
-    log("Trying to create " + outputFilename + " json output");
+    log("Ceating " + outputFilename );
+    
     File outputFile = new File(Utilities.path(outputDir.getAbsolutePath(),outputFilename));
     TextFile.stringToFile(mapSource,outputFile);
-    //    TextFile.stringToFile(mapSource,Utilities.path(tempDir, "StructureMap-" + mapName + ".fml")); //persit to pages directory
+    TextFile.stringToFile(mapSource,Utilities.path(tempDir, "StructureMap-" + mapName + ".fml")); //persit to pages directory
 			  
 			  
     Library library = new Library();
@@ -4876,29 +4865,29 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     content.setTitle("FML Source for StructureMap " + mapName); //should be a translated string
     library.addContent(content);
 
-    // content = new Attachment();
-    // content.setContentType("text/fhir-mapping");
-    // content.setUrl(Utilities.pathURL(igpkp.getCanonical(),  "StructureMap-" + mapName + ".fml")); 
-    // content.setTitle("FML Source for StructureMap " + mapName); //should be a translated string
-    // library.addContent(content);
+    content = new Attachment();
+    content.setContentType("text/fhir-mapping");
+    content.setUrl(Utilities.pathURL(igpkp.getCanonical(),  "StructureMap-" + mapName + ".fml")); 
+    content.setTitle("FML Source for StructureMap " + mapName); //should be a translated string
+    library.addContent(content);
 
     
 			  
     String libraryFilename =  "Library-" + libraryName + ".json";    
     File libraryFile = new File(Utilities.path(outputDir.getAbsolutePath(),libraryFilename));
     log("setting output library file: " + libraryFilename);    
-    //libraryFile.createNewFile();
     ByteArrayOutputStream lbs = new ByteArrayOutputStream();
     jp.compose(oc.convert(library), lbs, OutputStyle.PRETTY, null);
     String librarySource = new String(lbs.toByteArray(),StandardCharsets.UTF_8);    
-    log("setting output library to: " + librarySource);
+    TextFile.stringToFile(librarySource,libraryFile);
 
-    TextFile.stringToFile(librarySource,libraryFile);    
 
     return true;
   }
-    
 
+
+
+	
 
     
   private boolean loadResources(boolean needToBuild, FetchedFile igf) throws Exception { // igf is not currently used, but it was about relative references? 
