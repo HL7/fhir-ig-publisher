@@ -17,25 +17,25 @@ import org.hl7.fhir.utilities.json.parser.JsonParser;
 public class HistoryPageUpdater {
 
   public static void main(String[] args) throws IOException {
-    new HistoryPageUpdater().updateHistoryPages(args[0], args[1], args[1]);
+    new HistoryPageUpdater().updateHistoryPages(args[0], args[1], args[2]);
   }
 
-  public void updateHistoryPages(String source, String website, String folder) throws IOException {
+  public void updateHistoryPages(String source, String folder, String templateSrc) throws IOException {
     File d = new File(folder);
     if (new File(Utilities.path(d.getAbsolutePath(), "history.html")).exists() &&
         new File(Utilities.path(d.getAbsolutePath(), "package-list.json")).exists()) {
-      updateHistoryPage(source, website, d.getAbsolutePath());
+      updateHistoryPage(source, d.getAbsolutePath(), templateSrc, false);
     }
     
     for (File f : d.listFiles()) {
       if (f.isDirectory()) {
-        updateHistoryPages(source, website, f.getAbsolutePath());
+        updateHistoryPages(source, f.getAbsolutePath(), templateSrc);
       }
     }
   }
 
-  public void updateHistoryPage(String sourceRepo, String rootFolder, String folder) throws IOException {
-    System.out.println("Update history page at "+folder+" from "+sourceRepo);
+  public void updateHistoryPage(String sourceRepo, String folder, String templateSrc, boolean delta) throws IOException {
+    System.out.println("Update history page at "+folder+" from "+sourceRepo+" and "+templateSrc);
     copyFiles(sourceRepo, folder);
 
     JsonObject json = JsonParser.parseObjectFromFile(Utilities.path(folder, "package-list.json"));
@@ -43,9 +43,9 @@ public class HistoryPageUpdater {
     String jsonv = JsonParser.compose(json, false);
 
     String html = TextFile.fileToString(Utilities.path(sourceRepo, "history.template"));
-    html = html.replace("$header$", loadTemplate(rootFolder, folder, "header.template"));
-    html = html.replace("$preamble$", loadTemplate(rootFolder, folder, "preamble.template"));
-    html = html.replace("$postamble$", loadTemplate(rootFolder, folder, "postamble.template"));
+    html = html.replace("$header$", loadTemplate(templateSrc, "header.template"));
+    html = html.replace("$preamble$", loadTemplate(templateSrc, "preamble.template"));
+    html = html.replace("$postamble$", loadTemplate(templateSrc, "postamble.template"));
     html = fixParameter(html, "title", json.asString("title"));
     html = fixParameter(html, "id", json.asString("package-id"));
     html = fixParameter(html, "json", jsonv);
@@ -56,13 +56,17 @@ public class HistoryPageUpdater {
       TextFile.stringToFile(html, Utilities.path(folder, "history.html"), false);
     }
 
-    String index = new File(Utilities.path(folder, "index.html")).exists() ? TextFile.fileToString(Utilities.path(folder, "index.html")) : "XXXXX";
-    if (index.contains("XXXX")) {
-      html = TextFile.fileToString(Utilities.path(sourceRepo, "index.html"));
-      html = fixParameter(html, "title", json.asString("title"));
-      html = fixParameter(html, "id", json.asString("package-id"));
-      html = fixParameter(html, "json", jsonv);
-      TextFile.stringToFile(html, Utilities.path(folder, "index.html"), false);      
+    if (delta) {
+// don't want to do this ....      new File(Utilities.path(folder, "index.html")).delete();
+    } else {
+      String index = new File(Utilities.path(folder, "index.html")).exists() ? TextFile.fileToString(Utilities.path(folder, "index.html")) : "XXXXX";
+      if (index.contains("XXXX")) {
+        html = TextFile.fileToString(Utilities.path(sourceRepo, "index.html"));
+        html = fixParameter(html, "title", json.asString("title"));
+        html = fixParameter(html, "id", json.asString("package-id"));
+        html = fixParameter(html, "json", jsonv);
+        TextFile.stringToFile(html, Utilities.path(folder, "index.html"), false);      
+      }
     }
   }
 
@@ -74,18 +78,13 @@ public class HistoryPageUpdater {
   }
 
 
-  private String loadTemplate(String rootFolder, String folder, String filename) throws FileNotFoundException, IOException {
-    while (new File(folder).exists()) {
-      File f = new File(Utilities.path(folder, "templates", filename));
-      if (f.exists()) {
-        return TextFile.fileToString(f);
-      }
-      if (folder.equals(rootFolder)) {
-        throw new Error("Not found: "+f.getAbsolutePath());
-      }
-      folder = Utilities.getDirectoryForFile(folder); 
+  private String loadTemplate(String folder, String filename) throws FileNotFoundException, IOException {
+    File f = new File(Utilities.path(folder, filename));
+    if (f.exists()) {
+      return TextFile.fileToString(f);
+    } else {
+      throw new Error("Not found: "+f.getAbsolutePath());
     }
-    return "";
   }
 
   private void copyFiles(String sourceRepo, String folder) throws IOException {

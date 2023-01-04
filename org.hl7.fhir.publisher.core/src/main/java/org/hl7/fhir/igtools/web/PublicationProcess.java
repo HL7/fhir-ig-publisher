@@ -6,21 +6,29 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Path;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
 import org.hl7.fhir.igtools.publisher.PastProcessHackerUtilities;
 import org.hl7.fhir.igtools.publisher.Publisher;
+import org.hl7.fhir.igtools.web.IGRegistryMaintainer.ImplementationGuideEntry;
+import org.hl7.fhir.igtools.web.IGReleaseUpdater.ServerType;
 import org.hl7.fhir.igtools.web.WebSiteLayoutRulesProviders.WebSiteLayoutRulesProvider;
 import org.hl7.fhir.utilities.FhirPublication;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.ZipGenerator;
 import org.hl7.fhir.utilities.json.model.JsonArray;
+import org.hl7.fhir.utilities.json.model.JsonElement;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -30,6 +38,11 @@ import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
+
+import com.google.gson.JsonSyntaxException;
+
+//throw new Exception("-go-publish is not supported in this version (work in progress)");
+
 
 public class PublicationProcess {
  
@@ -51,15 +64,15 @@ public class PublicationProcess {
   /**
    * 
    * @param source - the directory that contains the IG source that will be published. This must be post normal build, and the build must have succeeded, and the output must have gone to \output. it will  be rebuilt
+   * @param args 
    * @param destination - the root folder of the local copy of files for the web site to which the IG is being published. 
    * @throws Exception 
    */
-  public void publish(String source, String rootFolder, String date, String registrySource, String history, String temp) throws Exception {
+  public void publish(String source, String web, String date, String registrySource, String history, String templatesSrc, String temp, String[] args) throws Exception {
     PublisherConsoleLogger logger = new PublisherConsoleLogger();
-    rootFolder = new File(rootFolder).getAbsolutePath();
     logger.start(Utilities.path("[tmp]", "publication-process.log"));
     try {
-      List<ValidationMessage> res = publishInner(source, rootFolder, date, registrySource, history, temp, logger);
+      List<ValidationMessage> res = publishInner(source, web, date, registrySource, history, templatesSrc, temp, logger, args);
       if (res.size() == 0) {
         System.out.println("Success");
       } else {
@@ -74,28 +87,45 @@ public class PublicationProcess {
     System.out.println("Full log in "+logger.getFilename());
   }
   
-  public List<ValidationMessage> publishInner(String source, String rootFolder, String date, String registrySource, String history, String temp, PublisherConsoleLogger logger) throws Exception {
+  public List<ValidationMessage> publishInner(String source, String web, String date, String registrySource, String history, String templateSrc, String temp, PublisherConsoleLogger logger, String[] args) throws Exception {
     List<ValidationMessage> res = new ArrayList<>();
 
+    if (temp == null) {
+      temp = "[tmp]";
+    }
     // check the wider context
     File fSource = checkDirectory(source, res, "Source");
-    checkDirectory(rootFolder, res, "Destination");
     
-    String workingRoot = Utilities.path(temp, "web-root-"+new SimpleDateFormat("yyyyMMddhhmmss"));
-    Utilities.createDirectory(workingRoot);    
+    String workingRoot = Utilities.path(temp, "web-root", "run-"+new SimpleDateFormat("yyyyMMdd").format(new Date()));
+    if (new File(workingRoot).exists()) {
+      Utilities.clearDirectory(workingRoot);
+    } else {
+      Utilities.createDirectory(workingRoot);
+    }
     File fRoot = checkDirectory(workingRoot, res, "Working Web Folder");
-    WebSourceProvider src = new WebSourceProvider(workingRoot, source);
+    WebSourceProvider src = new WebSourceProvider(workingRoot, web);
+    if (getNamedParam(args, "-upload-server") != null) {
+      src.configureUpload(getNamedParam(args, "-upload-server"), getNamedParam(args, "-upload-path"), getNamedParam(args, "-upload-user"), getNamedParam(args, "-upload-password"));
+    }
     
     checkDirectory(Utilities.path(workingRoot, "ig-build-zips"), res, "Destination Zip Folder", true);
     File fRegistry = checkFile(registrySource, res, "Registry");
     File fHistory = checkDirectory(history, res, "History Template");
-    src.needFile("publish.ini");
-    File fPubIni = checkFile(Utilities.path(workingRoot, "publish.ini"), res, "Publish.ini");
+    src.needFile("publish-setup.json");
+    File fPubIni = checkFile(Utilities.path(workingRoot, "publish-setup.json"), res, "publish-setup.json");
     if (res.size() > 0) {
       return res;
     }
-    IniFile ini = new IniFile(fPubIni.getAbsolutePath());
-    String url = ini.getStringProperty("website", "url");
+    JsonObject pubSetup = JsonParser.parseObject(fPubIni);
+    Integer runNumber = pubSetup.forceObject("counter").asInteger("last-run");
+    if (runNumber == null) {
+      runNumber = 0;
+    }
+    runNumber = runNumber + 1;
+    System.out.println("Run Number: "+runNumber);
+    pubSetup.forceObject("counter").set("last-run", runNumber);
+    JsonParser.compose(pubSetup, new FileOutputStream(fPubIni), true);
+    String url = pubSetup.getJsonObject("website").asString("url");
     
     // check the output
     File fOutput = checkDirectory(Utilities.path(source, "output"), res, "Publication Source");
@@ -119,7 +149,7 @@ public class PublicationProcess {
     }
 
     // --- Rules for layout depend on publisher ------
-    WebSiteLayoutRulesProvider rp = WebSiteLayoutRulesProviders.recogniseNpmId(id, p, ini.getStringProperty("website", "layout"));
+    WebSiteLayoutRulesProvider rp = WebSiteLayoutRulesProviders.recogniseNpmId(id, p, pubSetup.getJsonObject("website").asString("layout"));
     if (!rp.checkNpmId(res)) {
       return res;
     }
@@ -127,6 +157,9 @@ public class PublicationProcess {
       return res;
     }
     String destination = rp.getDestination(workingRoot); 
+    String relDest = Utilities.getRelativePath(workingRoot, destination);
+    Utilities.createDirectory(destination);
+    
     // ----------------------------------------------
 
     if (!check(res, !(new File(Utilities.path(source, "package-list.json")).exists()), "Source '"+source+"' contains a package-list.json - must not exist")) {
@@ -140,7 +173,7 @@ public class PublicationProcess {
 
     boolean milestone = prSrc.asBoolean("milestone");
     boolean first = prSrc.asBoolean("first"); 
-    src.needOptionalFile(Utilities.path(destination,"package-list.json"));
+    src.needOptionalFile(Utilities.path(relDest,"package-list.json"));
     if (first) {
       if (new File(Utilities.path(destination, "package-list.json")).exists()) {
         check(res, false, "Package List already exists, but the publication request says this is the first publication");
@@ -193,20 +226,36 @@ public class PublicationProcess {
     }    
     check(res, !(new File(destVer).exists()), "Nominated path '"+destVer+"' already exists");
 
-    src.needFile(Utilities.path("templates", "header.template"));
-    src.needFile(Utilities.path("templates", "preamble.template"));
-    src.needFile(Utilities.path("templates", "postamble.template"));
-    
-    // check to see if there's history template files; if there isn't, copy it in
-    check(res, new File(Utilities.path(workingRoot, "templates", "header.template")).exists(), Utilities.path(workingRoot, "templates", "header.template")+" not found - template not set up properly");
-    check(res, new File(Utilities.path(workingRoot, "templates", "preamble.template")).exists(), Utilities.path(workingRoot, "templates", "preamble.template")+" not found - template not set up properly");
-    check(res, new File(Utilities.path(workingRoot, "templates", "postamble.template")).exists(), Utilities.path(workingRoot, "templates", "postamble.template")+" not found - template not set up properly");
+    check(res, (new File(Utilities.path(templateSrc, "header.template")).exists()), "Template header.template not found in templates source ("+templateSrc+")");
+    check(res, (new File(Utilities.path(templateSrc, "preamble.template")).exists()), "Template preamble.template not found in templates source ("+templateSrc+")");
+    check(res, (new File(Utilities.path(templateSrc, "postamble.template")).exists()), "Template postamble.template not found in templates source ("+templateSrc+")");
       
+
+    File sft = null;
+    if (pubSetup.getJsonObject("website").has("search-template")) {
+      sft = new File(Utilities.path(templateSrc, pubSetup.getJsonObject("website").asString("search-template")));
+      if (!sft.exists()) {
+        throw new Error("Search form "+sft.getAbsolutePath()+" not found");
+      }
+    }
+    Map<String, IndexMaintainer> indexes = new HashMap<>();
+    if (pubSetup.has("indexes")) {
+      JsonObject ndxs = pubSetup.getJsonObject("indexes");
+      for (String realm : ndxs.getNames()) {
+        JsonObject ndx = ndxs.getJsonObject(realm);
+        indexes.put(realm, new IndexMaintainer(realm, ndx.asString("title"), ndx.asString("source"), Utilities.path(fRoot.getAbsolutePath(), ndx.asString("source")), Utilities.path(templateSrc, pubSetup.getJsonObject("website").asString("index-template"))));        
+      }
+    }
+    // we always need the current folder, if there is one 
+    if (pl.current() != null) {
+      src.needFolder(relDest, false);
+    }
     // todo: check the license, header, footer?... 
     
     // well, we've run out of things to test... time to actually try...
     if (res.size() == 0) {
-      doPublish(fSource, fOutput, qa, destination, destVer, pathVer, fRoot, ini, pl, prSrc, fRegistry, npm, milestone, date, fHistory, temp, logger, ini.getStringProperty("website", "url"), src);
+      doPublish(fSource, fOutput, qa, destination, destVer, pathVer, fRoot, pubSetup, pl, prSrc, fRegistry, npm, milestone, date, fHistory, temp, logger, 
+          pubSetup.getJsonObject("website").asString("url"), src, sft, relDest, templateSrc, first, indexes);
     }        
     return res;
     
@@ -255,7 +304,8 @@ public class PublicationProcess {
     return new FileInputStream(f);
   }
 
-  private void doPublish(File fSource, File fOutput, JsonObject qa, String destination, String destVer, String pathVer, File fRoot, IniFile ini, PackageList pl, JsonObject prSrc, File fRegistry, NpmPackage npm, boolean milestone, String date, File history, String tempDir, PublisherConsoleLogger logger, String url, WebSourceProvider src) throws Exception {
+  private void doPublish(File fSource, File fOutput, JsonObject qa, String destination, String destVer, String pathVer, File fRoot, JsonObject pubSetup, PackageList pl, JsonObject prSrc, File fRegistry, NpmPackage npm, 
+      boolean milestone, String date, File history, String tempDir, PublisherConsoleLogger logger, String url, WebSourceProvider src, File sft, String relDest, String templateSrc, boolean first, Map<String, IndexMaintainer> indexes) throws Exception {
     // ok. all our tests have passed.
     // 1. do the publication build(s)
     System.out.println("All checks passed. Do the publication build from "+fSource.getAbsolutePath()+" and publish to "+destination);        
@@ -286,48 +336,214 @@ public class PublicationProcess {
 
     // now, update the package list 
     System.out.println("Update "+Utilities.path(destination, "package-list.json"));    
-    updatePackageList(pl, fSource.getAbsolutePath(), prSrc, pathVer,  Utilities.path(destination, "package-list.json"), milestone, date, npm.fhirVersion());
+    PackageListEntry plVer = updatePackageList(pl, fSource.getAbsolutePath(), prSrc, pathVer,  Utilities.path(destination, "package-list.json"), milestone, date, npm.fhirVersion());
+    updatePublishBox(pl, plVer, destVer, pathVer, destination, false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null);
     
+    List<String> existingFiles = new ArrayList<>();
     if (milestone) {
       System.out.println("This is a milestone release - publish v"+npm.version()+" to "+destination);
-       
+      String igSrc = Utilities.path(tempM.getAbsolutePath(), "output");
+      
+      List<String> ignoreList = new ArrayList<>();
+      ignoreList.add(destVer);
       // get the current content from the source
       for (PackageListEntry v : pl.versions()) {
-        String path = v.determineLocalPath(url, fRoot.getAbsolutePath());
-        src.needFolder(path);
+        if (v != plVer) {
+          String path = v.determineLocalPath(url, fRoot.getAbsolutePath());
+          String relPath = Utilities.getRelativePath(fRoot.getAbsolutePath(), path);
+          ignoreList.add(path);
+          src.needFolder(relPath, false);
+        }
       }
-      String path = pl.determineLocalPath(url, fRoot.getAbsolutePath());
-      src.needFolder(path);
       
-      System.out.println("Clear out existing content");        
-      Publisher.main(new String[] { "-delete-current", destination, "-history", history.getAbsolutePath(), "-no-exit"});       
+      // we do this first in the output so we can get a proper diff
+      updatePublishBox(pl, plVer, igSrc, pathVer, igSrc, true, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null);
+      
+      System.out.println("Check for Files to delete");        
+      List<String> newFiles = Utilities.listAllFiles(igSrc, null);
+      List<String> historyFiles = Utilities.listAllFiles(history.getAbsolutePath(), null);
+      existingFiles = Utilities.listAllFiles(destination, ignoreList);
+      existingFiles.removeAll(newFiles);
+      existingFiles.removeAll(historyFiles);
+      existingFiles.remove("package-list.json");
+      existingFiles.removeIf(s -> s.endsWith("web.config"));
+      for (String s : existingFiles) {
+        new File(Utilities.path(destination, s)).delete();
+      }
+      System.out.println("  ... "+existingFiles.size()+" files");        
+      System.out.println("Copy to new IG to "+destination);        
+      FileUtils.copyDirectory(new File(Utilities.path(tempM.getAbsolutePath(), "output")), new File(destination));
+      new WebSiteArchiveBuilder().buildArchives(new File(destination), fRoot.getAbsolutePath(), url);         
+    }
+    NpmPackage npmB = NpmPackage.fromPackage(new FileInputStream(Utilities.path(destVer, "package.tgz")));
+    updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("package"), false, src, pubSetup.forceObject("website").asString("org"), npmB);
+    updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("publication"), true, src, pubSetup.forceObject("website").asString("org"), npmB);
 
-      System.out.println("Copy to directory");        
-      FileUtils.copyDirectory(new File(Utilities.path(tempM.getAbsolutePath(), "output")), new File(destination));      
+    new HistoryPageUpdater().updateHistoryPage(history.getAbsolutePath(), destination, templateSrc, !first);
+
+    IndexMaintainer ndx = getIndexForIg(indexes, npmB.id());
+    if (ndx != null) {
+      src.needFile(Utilities.changeFileExt(ndx.path(), ".json"));      
+      ndx.loadJson();
+      ndx.updateForPublication(pl, plVer, milestone);
+      ndx.buildJson();
+      ndx.execute();
     }
     
-    
-    // update indexes and collateral 
-    // if it's a milestone
-    //  - generate redirects
-    //  - update publish box
-    // every time
-    //  - uppdate history page
-    //  - update feed(s)
-    //  - update indexes 
-    
-    // finally
-    System.out.println("Rebuild everything for "+Utilities.path(destination, "package-list.json"));
-    Publisher.main(new String[] { "-publish-update", "-folder", fRoot.getAbsolutePath(), "-registry", fRegistry.getAbsolutePath(), "-filter", destination, "-history", history.getAbsolutePath(), "-no-exit"});
+    updateRegistry(fRegistry, pl, plVer, npmB);
 
-    if (milestone) {
-      new WebSiteArchiveBuilder().buildArchives(new File(destination), fRoot.getAbsolutePath(), url);   
-    } else {
-      new WebSiteArchiveBuilder().buildArchive(destVer, new ArrayList<>());      
-    }
-    System.out.println("Finished Publishing");
+    src.finish(relDest, existingFiles);
+    System.out.println("Finished Publishing. "+src.instructions(existingFiles.size()));
     logger.stop();
     FileUtils.copyFile(new File(logger.getFilename()), new File(Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".log")));    
+  }
+
+  private String tail(String path) {
+    return path.substring(path.lastIndexOf("/")+1);
+  }
+
+  private void updateRegistry(File fRegistry, PackageList pl, PackageListEntry plVer, NpmPackage npmB) throws JsonSyntaxException, FileNotFoundException, IOException {
+    IGRegistryMaintainer reg = new IGRegistryMaintainer(fRegistry.getAbsolutePath());
+    ImplementationGuideEntry rc = reg.seeIg(pl.pid(), pl.canonical(), pl.title(), pl.category());
+    
+    if (reg != null) {
+      reg.seeCiBuild(rc, pl.current().path(), "package-list.json");
+    }
+    
+    boolean hasRelease = false;
+    if (reg != null) {
+      if (plVer.status().equals("release") || plVer.status().equals("trial-use") || plVer.status().equals("update")) {
+        reg.seeRelease(rc, plVer.status().equals("update") ? "STU Update" : plVer.sequence(), plVer.version(), plVer.fhirVersion(), plVer.path());
+        hasRelease = true;
+      } else if (!hasRelease && VersionUtilities.packageForVersion(plVer.fhirVersion()) != null) {
+        reg.seeCandidate(rc, plVer.sequence()+" "+Utilities.titleize(plVer.status()), plVer.version(), plVer.fhirVersion(), plVer.path());
+      }
+    }
+    reg.finish();
+  }
+
+  private IndexMaintainer getIndexForIg(Map<String, IndexMaintainer> indexes, String packageId) {
+    String realm = Utilities.charCount(packageId, '.') > 1 ? packageId.split("\\.")[2] : null;
+    return realm == null ? null : indexes.get(realm);
+  }
+
+  private void updateFeed(File fRoot, String destVer, PackageList pl, PackageListEntry plVer, String file, boolean isPublication, WebSourceProvider src, String orgName, NpmPackage npm) throws IOException {
+    if (!Utilities.noString(file)) {
+      src.needFile(file);
+      String newContent = makeEntry(pl, plVer, isPublication, orgName, npm);
+      String rss = TextFile.fileToString(Utilities.path(fRoot.getAbsolutePath(), file));
+      int i = rss.indexOf("<item");
+      while (rss.charAt(i-1) == ' ') {
+        i--;
+      }
+      rss = rss.substring(0, i) + newContent+rss.substring(i);
+      TextFile.stringToFile(rss, Utilities.path(fRoot.getAbsolutePath(), file));
+    }
+  }
+
+  private String makeEntry(PackageList pl, PackageListEntry plVer, boolean isPublication, String orgName, NpmPackage npm) {
+    String link = Utilities.pathURL(plVer.path(), isPublication ? "index.html" : "package.tgz");
+
+    StringBuilder b = new StringBuilder();
+    b.append("    <item>\r\n");
+    b.append("      <title>"+Utilities.escapeXml(isPublication ? pl.title()+" version "+plVer.version() : pl.pid()+"#"+plVer.version())+"</title>\r\n");
+    b.append("      <description>"+Utilities.escapeXml(plVer.desc())+"</description>\r\n");
+    b.append("      <link>"+Utilities.escapeXml(link)+"</link>\r\n");
+    b.append("      <guid isPermaLink=\"true\">"+Utilities.escapeXml(link)+"</guid>\r\n");
+    b.append("      <dc:creator>"+Utilities.escapeXml(orgName)+"</dc:creator>\r\n");
+    b.append("      <fhir:version>"+plVer.fhirVersion()+"</fhir:version>\r\n");
+    b.append("      <fhir:kind>"+npm.getNpm().asString("type")+"</fhir:kind>\r\n");
+    b.append("      <pubDate>"+presentDate(npm.dateAsDate())+"</pubDate>\r\n");
+    b.append("    </item>\r\n");
+    
+    return b.toString();
+  }
+  
+  private static final String RSS_DATE = "EEE, dd MMM yyyy hh:mm:ss Z";
+  public String presentDate(Date date) {
+    SimpleDateFormat sdf = new SimpleDateFormat(RSS_DATE, new Locale("en", "US"));// Wed, 04 Sep 2019 08:58:14 GMT      
+    return sdf.format(date);
+  }
+
+  private void updatePublishBox(PackageList pl, PackageListEntry plVer, String destVer, String pathVer, String rootFolder, boolean current, ServerType serverType, File sft, List<String> ignoreList) throws FileNotFoundException, IOException {
+    IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(destVer, ignoreList, null, plVer.json(), rootFolder);
+    String fragment = PublishBoxStatementGenerator.genFragment(pl, plVer, pl.current(), pl.canonical(), current, false);
+    System.out.println("Publish Box Statement: "+fragment);
+    igvu.updateStatement(fragment, current ? 0 : 1);
+    System.out.println("  .. "+igvu.getCountTotal()+" files checked, "+igvu.getCountUpdated()+" updated");
+    
+    igvu.checkXmlJsonClones(destVer);
+    System.out.println("  .. "+igvu.getClonedTotal()+" clones checked, "+igvu.getClonedCount()+" updated");
+    IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(destVer, pl.canonical(), plVer.path(), rootFolder);
+    if (serverType == ServerType.APACHE) {
+      rb.buildApacheRedirections();
+    } else if (serverType == ServerType.ASP2) {
+      rb.buildNewAspRedirections(false, false);
+    } else if (serverType == ServerType.ASP1) {
+      rb.buildOldAspRedirections();
+    } else if (serverType == ServerType.LITESPEED) {
+      rb.buildLitespeedRedirections();
+    } else if (!pl.canonical().contains("hl7.org/fhir")) {
+      rb.buildApacheRedirections();
+    } else {
+      rb.buildOldAspRedirections();
+    }
+    System.out.println("  .. "+rb.getCountTotal()+" redirections ("+rb.getCountUpdated()+" created/updated)");
+    new DownloadBuilder(destVer, pl.canonical(), current ?  pl.canonical() : plVer.path(), ignoreList).execute();
+    if (!current && serverType == ServerType.ASP2) {
+      new VersionRedirectorGenerator(rootFolder).execute(plVer.version(), plVer.path());
+    }
+
+    
+    if (sft != null) {
+      String html = TextFile.fileToString(sft);
+      html = fixParameter(html, "title", pl.title());
+      html = fixParameter(html, "id", pl.pid());
+      html = fixParameter(html, "version", current ? "All Versions" : plVer.version());
+      html = fixParameter(html, "path", current ? pl.canonical() : plVer.path());
+      html = fixParameter(html, "history", current ? "history.html" : "../history.html");
+      html = fixParameter(html, "search-list", searchLinks(current, plVer, pl.canonical(), pl.list()));
+      html = fixParameter(html, "note", current ? "this search searches all versions of the "+pl.title()+", including balloted versions. You can also search specific versions" :
+        "this search searches version "+plVer.version()+" of the "+pl.title()+". You can also search other versions, or all versions at once");
+      html = fixParameter(html, "prefix", "");            
+      TextFile.stringToFile(html, Utilities.path(destVer, "searchform.html"), false);          
+    }
+  }
+
+
+  private String searchLinks(boolean root, PackageListEntry focus, String canonical, List<PackageListEntry> list) {
+    StringBuilder b = new StringBuilder();
+    if (!root) {
+      b.append(" <li><a href=\""+canonical+"/searchform.html\">All Versions</a></li>\r\n");
+    }
+    for (PackageListEntry n : list) {
+      if (!n.cibuild()) {
+        String v = n.version();
+        String path = n.path();
+        String date = n.date();
+        if (n == focus && !root) {
+          b.append(" <li>"+n.sequence()+" "+Utilities.titleize(n.status())+" (v"+v+", "+summariseDate(date)+") (this version)</li>\r\n");
+        } else {
+          b.append(" <li><a href=\""+path+"/searchform.html\">"+n.sequence()+" "+Utilities.titleize(n.status())+" (v"+v+", "+summariseDate(date)+")</a></li>\r\n");
+        }
+      }
+    }
+    return b.toString();
+  }
+
+
+  private String summariseDate(String d) {
+    if (d == null || d.length() < 10) {
+      return "??";
+    }
+    return d.substring(0,7);
+  }
+
+  private String fixParameter(String html, String name, String value) {
+    while (html.contains("[%"+name+"%]")) {
+      html = html.replace("[%"+name+"%]", value == null ? "" : value);
+    }
+    return html;
   }
 
   private File cloneToTemp(String tempDir, File fSource, String name) throws IOException {
@@ -346,7 +562,7 @@ public class PublicationProcess {
     return fDest;
   }
   
-  private void updatePackageList(PackageList pl, String folder, JsonObject prSrc, String webpath, String filepath, boolean milestone, String date, String fhirVersion) throws Exception {
+  private PackageListEntry updatePackageList(PackageList pl, String folder, JsonObject prSrc, String webpath, String filepath, boolean milestone, String date, String fhirVersion) throws Exception {
     if (date == null) {
       SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
       date = sdf.format(new Date());      
@@ -376,6 +592,7 @@ public class PublicationProcess {
     nv.describe(prSrc.asString("desc"), md, prSrc.asString("changes"));
 
     pl.save(filepath);
+    return nv;
   }
 
   private void zipFolder(File fSource, String path) throws IOException {
@@ -409,6 +626,18 @@ public class PublicationProcess {
     if (newv > oldv) {
       throw new Exception("Increase in "+label+" on run - was "+oldv+", now "+newv);      
     }
+  }
+
+  private static String getNamedParam(String[] args, String param) {
+    boolean found = false;
+    for (String a : args) {
+      if (found)
+        return a;
+      if (a.equals(param)) {
+        found = true;
+      }
+    }
+    return null;
   }
 
 

@@ -107,7 +107,7 @@ public class IGReleaseUpdater {
     this.ignoreList.addAll(otherSpecs);
   }
 
-  public void check(Map<String, IndexMaintainer> indexes, boolean throwError, boolean updateStatements) throws IOException  {
+  public void check(Map<String, IndexMaintainer> indexes, boolean throwError, boolean updateStatements, String templateSrc) throws IOException  {
     List<String> errs = new ArrayList<>(); 
     try {
       String f = Utilities.path(folder, "package-list.json");
@@ -204,7 +204,7 @@ public class IGReleaseUpdater {
         }
         if (save)
           TextFile.stringToFile(JsonParser.compose(json, true), f, false);
-        new HistoryPageUpdater().updateHistoryPage(historySource, rootFolder, folder);
+        new HistoryPageUpdater().updateHistoryPage(historySource, folder, templateSrc, false);
       }
         
     } catch (Exception e) {
@@ -347,7 +347,7 @@ public class IGReleaseUpdater {
       rb.buildOldAspRedirections();
     }
     System.out.println("  .. "+rb.getCountTotal()+" redirections ("+rb.getCountUpdated()+" created/updated)");
-    new DownloadBuilder(vf, canonical, isCurrent ?  canonical : version.asString("path")).execute();
+    new DownloadBuilder(vf, canonical, isCurrent ?  canonical : version.asString("path"), ignoreList).execute();
     if (!isCurrent && serverType == ServerType.ASP2) {
       new VersionRedirectorGenerator(canonicalPath).execute(version.asString("version"), version.asString("path"));
     }
@@ -645,7 +645,7 @@ public class IGReleaseUpdater {
   }
 
   public static void main(String[] args) throws Exception {
-    new IGReleaseUpdater(args[0], args[1], args[2], null, ServerType.ASP2, null, null, true, args[3]).check(null, false, true);
+    new IGReleaseUpdater(args[0], args[1], args[2], null, ServerType.ASP2, null, null, true, args[3]).check(null, false, true, args[4]);
   }
   
 }

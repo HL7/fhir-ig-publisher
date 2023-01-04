@@ -10532,8 +10532,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       IGReleaseVersionDeleter deleter = new IGReleaseVersionDeleter();
       deleter.clear(f.getAbsolutePath(), fh.getAbsolutePath());
     } else if (hasNamedParam(args, "-go-publish")) {
-      throw new Exception("-go-publish is not supported in this version (work in progress)");
-      // new PublicationProcess().publish(getNamedParam(args, "-source"), getNamedParam(args, "-destination"), getNamedParam(args, "-date"),  getNamedParam(args, "-registry"), getNamedParam(args, "-history"), getNamedParam(args, "-temp"));
+      new PublicationProcess().publish(getNamedParam(args, "-source"), getNamedParam(args, "-web"), getNamedParam(args, "-date"),  getNamedParam(args, "-registry"), getNamedParam(args, "-history"), getNamedParam(args, "-templates"), getNamedParam(args, "-temp"), args);
     } else if (hasNamedParam(args, "-generate-archives")) {
       new WebSiteArchiveBuilder().start(getNamedParam(args, "-generate-archives"));
     } else if (hasNamedParam(args, "-xig")) {
@@ -10573,7 +10572,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       boolean updateStatements = !"false".equals(getNamedParam(args, "-statements"));
       
       IGRegistryMaintainer reg = "n/a".equals(registry) ? null : new IGRegistryMaintainer(registry);
-      IGWebSiteMaintainer.execute(f.getAbsolutePath(), reg, doCore, filter, skipPrompt, history, updateStatements);
+      IGWebSiteMaintainer.execute(f.getAbsolutePath(), reg, doCore, filter, skipPrompt, history, updateStatements, getNamedParam(args, "-templates"));
       reg.finish();      
     } else if (hasNamedParam(args, "-multi")) {
       int i = 1;
