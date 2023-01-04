@@ -123,7 +123,7 @@ public class WebSourceProvider {
       SimpleHTTPClient fetcher = new SimpleHTTPClient();
       String url = Utilities.pathURL(source, path)+"?nocache=" + System.currentTimeMillis();
       HTTPResult res = fetcher.get(url);
-      if (res.getContent().length > 0) {
+      if (res.getCode() < 300 && res.getContent().length > 0) {
         TextFile.bytesToFile(res.getContent(), df);
       }
     } else {
@@ -198,5 +198,9 @@ public class WebSourceProvider {
     } else {
       return "The web site source in "+source+" has been updated";
     }
+  }
+
+  public boolean isWeb() {
+    return web;
   }
 }

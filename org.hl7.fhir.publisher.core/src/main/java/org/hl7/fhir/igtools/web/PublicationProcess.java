@@ -117,15 +117,15 @@ public class PublicationProcess {
       return res;
     }
     JsonObject pubSetup = JsonParser.parseObject(fPubIni);
-    Integer runNumber = pubSetup.forceObject("counter").asInteger("last-run");
-    if (runNumber == null) {
-      runNumber = 0;
-    }
-    runNumber = runNumber + 1;
-    System.out.println("Run Number: "+runNumber);
-    pubSetup.forceObject("counter").set("last-run", runNumber);
-    JsonParser.compose(pubSetup, new FileOutputStream(fPubIni), true);
     String url = pubSetup.getJsonObject("website").asString("url");
+
+    src.needOptionalFile("publish-counter.json");
+    File fPubCounter = new File(Utilities.path(workingRoot, "publish-counter.json"));
+    JsonObject countJson = fPubCounter.exists() ? JsonParser.parseObject(fPubCounter) : new JsonObject();
+    int runNumber = (countJson.has("run-number") ? countJson.asInteger("run-number") : 0) + 1; 
+    System.out.println("Run Number: "+runNumber);
+    countJson.set("run-number", runNumber);
+    JsonParser.compose(countJson, new FileOutputStream(fPubCounter), true);
     
     // check the output
     File fOutput = checkDirectory(Utilities.path(source, "output"), res, "Publication Source");
@@ -373,7 +373,14 @@ public class PublicationProcess {
       System.out.println("  ... "+existingFiles.size()+" files");        
       System.out.println("Copy to new IG to "+destination);        
       FileUtils.copyDirectory(new File(Utilities.path(tempM.getAbsolutePath(), "output")), new File(destination));
-      new WebSiteArchiveBuilder().buildArchives(new File(destination), fRoot.getAbsolutePath(), url);         
+      if (src.isWeb()) {
+        new WebSiteArchiveBuilder().buildArchives(new File(destination), fRoot.getAbsolutePath(), url);
+      }
+    } else {
+      if (src.isWeb()) {
+        new WebSiteArchiveBuilder().buildArchive(destVer, new ArrayList<>());
+      }
+      src.cleanFolder(relDest);
     }
     NpmPackage npmB = NpmPackage.fromPackage(new FileInputStream(Utilities.path(destVer, "package.tgz")));
     updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("package"), false, src, pubSetup.forceObject("website").asString("org"), npmB);
@@ -390,12 +397,20 @@ public class PublicationProcess {
       ndx.execute();
     }
     
-    updateRegistry(fRegistry, pl, plVer, npmB);
-
-    src.finish(relDest, existingFiles);
-    System.out.println("Finished Publishing. "+src.instructions(existingFiles.size()));
-    logger.stop();
-    FileUtils.copyFile(new File(logger.getFilename()), new File(Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".log")));    
+    System.out.println("The build is complete, and ready to be applied. Check the output at "+fRoot.getAbsolutePath());
+    System.out.println("Do you wish to continue? (Y/N)");
+    int r = System.in.read();
+    if (r == 'y' || r == 'Y') {
+      System.out.println("Go!");
+      updateRegistry(fRegistry, pl, plVer, npmB);
+      logger.stop();
+      FileUtils.copyFile(new File(logger.getFilename()), new File(Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".log")));
+      src.finish(relDest, existingFiles);
+      System.out.println("Finished Publishing. "+src.instructions(existingFiles.size()));
+    } else {
+      System.out.println("No!");
+      System.out.print("Changes not applied. Finished");
+    }
   }
 
   private String tail(String path) {
