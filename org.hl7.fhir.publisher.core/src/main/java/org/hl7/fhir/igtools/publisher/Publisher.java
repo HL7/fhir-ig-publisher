@@ -136,8 +136,8 @@ import org.hl7.fhir.igtools.web.PublisherConsoleLogger;
 import org.hl7.fhir.igtools.web.WebSiteArchiveBuilder;
 import org.hl7.fhir.r4.formats.FormatUtilities;
 import org.hl7.fhir.r5.conformance.ConstraintJavaGenerator;
-import org.hl7.fhir.r5.conformance.ProfileUtilities;
 import org.hl7.fhir.r5.conformance.R5ExtensionsLoader;
+import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.IContextResourceLoader;
@@ -264,6 +264,7 @@ import org.hl7.fhir.r5.renderers.utils.RenderingContext.ITypeParser;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.KnownLinkType;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.QuestionnaireRendererMode;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.ResourceRendererMode;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext.StructureDefinitionRendererMode;
 import org.hl7.fhir.r5.renderers.utils.Resolver.IReferenceResolver;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceContext;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceWithReference;
@@ -5109,7 +5110,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       comparisonVersions = new ArrayList<>();
       comparisonVersions.add("{last}");
     }
-    return new PreviousVersionComparator(context, version, sourceIg.getVersion(), rootDir, tempDir, igpkp.getCanonical(), igpkp, logger, comparisonVersions);
+    return new PreviousVersionComparator(context, version, businessVersion != null ? businessVersion : sourceIg.getVersion(), rootDir, tempDir, igpkp.getCanonical(), igpkp, logger, comparisonVersions);
   }
 
 
@@ -9882,14 +9883,34 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-header", sdr.header(), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "uses"))
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-uses", sdr.uses(), f.getOutputNames(), r, vars, null);
+
     if (igpkp.wantGen(r, "diff"))
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "snapshot"))
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot", sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot", sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "snapshot-by-key"))
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key", sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key", sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "snapshot-by-mustsupport"))
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport", sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots), f.getOutputNames(), r, vars, null);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport", sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "diff-bindings"))
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff-bindings", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "snapshot-bindings"))
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-bindings", sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "snapshot-by-key-bindings"))
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key-bindings", sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "snapshot-by-mustsupport-bindings"))
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport-bindings", sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "diff-obligations"))
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff-obligations", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "snapshot-obligations"))
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-obligations", sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "snapshot-by-key-obligations"))
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key-obligations", sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "snapshot-by-mustsupport-obligations"))
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport-obligations", sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "expansion"))
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-expansion", sdr.expansion(igpkp.getDefinitionsName(r), otherFilesRun), f.getOutputNames(), r, vars, null);
+
     if (igpkp.wantGen(r, "grid"))
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-grid", sdr.grid(igpkp.getDefinitionsName(r), otherFilesRun), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "pseudo-xml"))

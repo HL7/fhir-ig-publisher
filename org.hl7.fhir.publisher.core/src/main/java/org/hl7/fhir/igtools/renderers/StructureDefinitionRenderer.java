@@ -17,8 +17,9 @@ import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.conformance.AdditionalBindingsRenderer;
-import org.hl7.fhir.r5.conformance.ProfileUtilities;
-import org.hl7.fhir.r5.conformance.ProfileUtilities.ProfileKnowledgeProvider.BindingResolution;
+import org.hl7.fhir.r5.conformance.profile.BindingResolution;
+import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
+import org.hl7.fhir.r5.conformance.profile.ProfileUtilities.ElementChoiceGroup;
 import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
@@ -56,9 +57,17 @@ import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionMappingComponent;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.ValueSet;
+import org.hl7.fhir.r5.profilemodel.PEBuilder;
+import org.hl7.fhir.r5.profilemodel.PEBuilder.PEElementPropertiesPolicy;
+import org.hl7.fhir.r5.profilemodel.PEDefinition;
+import org.hl7.fhir.r5.profilemodel.PEType;
+import org.hl7.fhir.r5.renderers.CodeResolver;
 import org.hl7.fhir.r5.renderers.DataRenderer;
+import org.hl7.fhir.r5.renderers.StructureDefinitionRenderer.UnusedTracker;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext.GenerationRules;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.KnownLinkType;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext.StructureDefinitionRendererMode;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities.SystemReference;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
@@ -69,10 +78,18 @@ import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.i18n.I18nConstants;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
+import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Cell;
+import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Piece;
+import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Row;
+import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.TableModel;
+import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Title;
 
 public class StructureDefinitionRenderer extends CanonicalRenderer {
   public class BindingResolutionDetails {
@@ -85,7 +102,6 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       this.vss = vss;
       this.vsn = vsn;
     }
-
   }
 
   public static final String RIM_MAPPING = "http://hl7.org/v3";
@@ -112,16 +128,17 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   List<ElementDefinition> diffElements = null;
   List<ElementDefinition> mustSupportElements = null;
   List<ElementDefinition> keyElements = null;
+  private org.hl7.fhir.r5.renderers.StructureDefinitionRenderer sdr;
 
   public StructureDefinitionRenderer(IWorkerContext context, String corePath, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants,Map<String, Map<String, ElementDefinition>> mapCache) {
     super(context, corePath, sd, destDir, igp, maps, allTargets, markdownEngine, packge, gen);
     this.sd = sd;
     this.destDir = destDir;
     utils = new ProfileUtilities(context, null, igp);
-    utils.setIgmode(true);
     this.files = files;
     this.allInvariants = allInvariants;
     this.sdMapCache = mapCache;
+    sdr = new org.hl7.fhir.r5.renderers.StructureDefinitionRenderer(gen);
   }
 
   @Override
@@ -255,7 +272,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (!ed.getPath().contains("."))
       return false;
 
-    ElementDefinition match = (ElementDefinition) ed.getUserData(ProfileUtilities.DERIVATION_POINTER);
+    ElementDefinition match = (ElementDefinition) ed.getUserData(ProfileUtilities.UD_DERIVATION_POINTER);
     if (match == null)
       return true; // really, we shouldn't get here, but this appears to be common in the existing profiles?
     // throw new Error("no matches for "+ed.getPath()+"/"+ed.getName()+" in "+profile.getUrl());
@@ -384,42 +401,48 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return "<a title=\"" + cs.present() + "\" href=\"" + Utilities.escapeXml(cs.getUserString("path")) + "#" + cs.getId() + "-" + coding.getCode() + "\">" + coding.getCode() + "</a>" + (!coding.hasDisplay() ? "" : "(\"" + gt(coding.getDisplayElement()) + "\")");
   }
 
-  public String diff(String defnFile, Set<String> outputTracker, boolean toTabs) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
+  public String diff(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
     if (sd.getDifferential().getElement().isEmpty())
       return "";
-    else
-      return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateTable(defnFile, sd, true, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen, toTabs ? ANCHOR_PREFIX_DIFF : ANCHOR_PREFIX_SNAP));
+    else {
+      sdr.getContext().setStructureMode(mode);
+      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(defnFile, sd, true, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen, toTabs ? ANCHOR_PREFIX_DIFF : ANCHOR_PREFIX_SNAP));
+    }
   }
 
-  public String snapshot(String defnFile, Set<String> outputTracker, boolean toTabs) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
+  public String snapshot(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
     if (sd.getSnapshot().getElement().isEmpty())
       return "";
-    else
-      return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateTable(defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", false, false, outputTracker, false, gen, toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP));
+    else {
+      sdr.getContext().setStructureMode(mode);
+      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", false, false, outputTracker, false, gen, toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP));
+    }
   }
 
-  public String byKey(String defnFile, Set<String> outputTracker, boolean toTabs) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
+  public String byKey(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
     if (sd.getSnapshot().getElement().isEmpty())
       return "";
     else {
       XhtmlComposer composer = new XhtmlComposer(XhtmlComposer.HTML);
       StructureDefinition sdCopy = sd.copy();
       sdCopy.getSnapshot().setElement(getKeyElements());
-      org.hl7.fhir.utilities.xhtml.XhtmlNode table = utils.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", false, false, outputTracker, true, gen, toTabs ? ANCHOR_PREFIX_KEY : ANCHOR_PREFIX_SNAP);
+      sdr.getContext().setStructureMode(mode);
+      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", false, false, outputTracker, true, gen, toTabs ? ANCHOR_PREFIX_KEY : ANCHOR_PREFIX_SNAP);
 
       return composer.compose(table);
     }
   }
 
-  public String byMustSupport(String defnFile, Set<String> outputTracker, boolean toTabs) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
+  public String byMustSupport(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
     if (sd.getSnapshot().getElement().isEmpty())
       return "";
     else {
       XhtmlComposer composer = new XhtmlComposer(XhtmlComposer.HTML);
       StructureDefinition sdCopy = sd.copy();
+      sdr.getContext().setStructureMode(mode);
 
       sdCopy.getSnapshot().setElement(getMustSupportElements());
-      org.hl7.fhir.utilities.xhtml.XhtmlNode table = utils.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", false, false, outputTracker, true, gen, toTabs ? ANCHOR_PREFIX_MS : ANCHOR_PREFIX_SNAP);
+      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", false, false, outputTracker, true, gen, toTabs ? ANCHOR_PREFIX_MS : ANCHOR_PREFIX_SNAP);
 
       return composer.compose(table);
     }
@@ -462,7 +485,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       List<ElementDefinition> keyElements = getKeyElements();
 
       sdCopy.getSnapshot().setElement(keyElements);
-      org.hl7.fhir.utilities.xhtml.XhtmlNode table = utils.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", false, false, outputTracker, true, gen, ANCHOR_PREFIX_KEY);
+      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", false, false, outputTracker, true, gen, ANCHOR_PREFIX_KEY);
 
       return composer.compose(table);
     }
@@ -570,7 +593,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (sd.getSnapshot().getElement().isEmpty())
       return "";
     else
-      return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateGrid(defnFile, sd, destDir, false, sd.getId(), corePath, "", outputTracker));
+      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateGrid(defnFile, sd, destDir, false, sd.getId(), corePath, "", outputTracker));
   }
 
   public String txDiff(boolean withHeadings, boolean mustSupportOnly) throws FHIRException, IOException {
@@ -679,16 +702,16 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     BindingResolutionDetails brd = new BindingResolutionDetails("", "?ext");
     if (tx.hasValueSet()) {
       txDetails(tx, brd, false);
-    } else if (ed.hasUserData(ProfileUtilities.DERIVATION_POINTER)) {
-      ElementDefinitionBindingComponent txi = ((ElementDefinition) ed.getUserData(ProfileUtilities.DERIVATION_POINTER)).getBinding();
+    } else if (ed.hasUserData(ProfileUtilities.UD_DERIVATION_POINTER)) {
+      ElementDefinitionBindingComponent txi = ((ElementDefinition) ed.getUserData(ProfileUtilities.UD_DERIVATION_POINTER)).getBinding();
       txDetails(txi, brd, true);
     }
     boolean strengthInh = false;
     BindingStrength strength = null;
     if (tx.hasStrength()) {
       strength = tx.getStrength();
-    } else if (ed.hasUserData(ProfileUtilities.DERIVATION_POINTER)) {
-      ElementDefinitionBindingComponent txi = ((ElementDefinition) ed.getUserData(ProfileUtilities.DERIVATION_POINTER)).getBinding();
+    } else if (ed.hasUserData(ProfileUtilities.UD_DERIVATION_POINTER)) {
+      ElementDefinitionBindingComponent txi = ((ElementDefinition) ed.getUserData(ProfileUtilities.UD_DERIVATION_POINTER)).getBinding();
       strength = txi.getStrength();
       strengthInh = true;
     }
@@ -714,7 +737,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (brd.suffix != null) {
       b.append(brd.suffix);
     }
-    AdditionalBindingsRenderer abr = new AdditionalBindingsRenderer(igp, corePath, sd, path, gen, this);
+    AdditionalBindingsRenderer abr = new AdditionalBindingsRenderer(igp, corePath, sd, path, gen, this, sdr);
     if (tx.hasExtension(ToolingExtensions.EXT_MAX_VALUESET)) {
       abr.seeMaxBinding(ToolingExtensions.getExtension(tx, ToolingExtensions.EXT_MAX_VALUESET));
     }
@@ -884,7 +907,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   public List<ElementDefinition> elementsForMode(int genMode) {
     switch (genMode) {
     case GEN_MODE_DIFF:
-      return utils.supplementMissingDiffElements(sd);
+      return sdr.supplementMissingDiffElements(sd);
     case GEN_MODE_KEY:
       return getKeyElements();
     case GEN_MODE_MS:
@@ -980,8 +1003,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   // Returns the ElementDefinition for the 'parent' of the current element
   private ElementDefinition getBaseElement(ElementDefinition e, String url) {
-    if (e.hasUserData(ProfileUtilities.DERIVATION_POINTER)) {
-      return getElementById(url, e.getUserString(ProfileUtilities.DERIVATION_POINTER));
+    if (e.hasUserData(ProfileUtilities.UD_DERIVATION_POINTER)) {
+      return getElementById(url, e.getUserString(ProfileUtilities.UD_DERIVATION_POINTER));
     }
     return null;
   }
@@ -1225,7 +1248,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
     if (d.hasExtension(ToolingExtensions.EXT_TYPE_SPEC)) {
       tableRowNE(b, translate("sd.dict", Utilities.pluralize("Type Specifier", d.getExtensionsByUrl(ToolingExtensions.EXT_TYPE_SPEC).size())),
-          "datatypes.html", ProfileUtilities.formatTypeSpecifiers(context, d));          
+          "datatypes.html", sdr.formatTypeSpecifiers(context, d));          
     }
     if (d.getPath().endsWith("[x]"))
       tableRowNE(b, translate("sd.dict", "[x] Note"), null, translate("sd.dict", "See %sChoice of Data Types%s for further information about how to use [x]", "<a href=\"" + corePath + "formats.html#choice\">", "</a>"));
@@ -1540,7 +1563,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private boolean hasMustSupportTypes(List<TypeRefComponent> types) {
     for (TypeRefComponent tr : types) {
-      if (ProfileUtilities.isMustSupport(tr)) {
+      if (sdr.isMustSupport(tr)) {
         return true;
       }
     }
@@ -1554,7 +1577,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     List<TypeRefComponent> compareTypes = compare==null ? new ArrayList<>() : compare.getType();
     StringBuilder b = new StringBuilder();
     if ((!mustSupportOnly && types.size() == 1 && compareTypes.size() <=1) || (mustSupportOnly && mustSupportCount(types) == 1)) {
-      if (!mustSupportOnly || ProfileUtilities.isMustSupport(types.get(0))) {
+      if (!mustSupportOnly || sdr.isMustSupport(types.get(0))) {
         describeType(b, types.get(0), mustSupportOnly, compareTypes.size()==0 ? null : compareTypes.get(0), mode);
       }
     } else {
@@ -1568,7 +1591,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         TypeRefComponent compareType = map.get(t.getCode());
         if (compareType!=null)
           map.remove(t.getCode());
-        if (!mustSupportOnly || ProfileUtilities.isMustSupport(t)) {
+        if (!mustSupportOnly || sdr.isMustSupport(t)) {
           if (first) {
             first = false;
           } else {
@@ -1590,7 +1613,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   private int mustSupportCount(List<TypeRefComponent> types) {
     int c = 0;
     for (TypeRefComponent tr : types) {
-      if (ProfileUtilities.isMustSupport(tr)) {
+      if (sdr.isMustSupport(tr)) {
         c++;
       }
     }
@@ -1610,7 +1633,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     } else {
       b.append(compareString(getTypeLink(t), compare==null ? null : getTypeLink(compare), mode));
     }
-    if ((!mustSupportOnly && (t.hasProfile() || (compare!=null && compare.hasProfile()))) || ProfileUtilities.isMustSupport(t.getProfile())) {
+    if ((!mustSupportOnly && (t.hasProfile() || (compare!=null && compare.hasProfile()))) || sdr.isMustSupport(t.getProfile())) {
       List<String> newProfiles = new ArrayList<String>();
       List<String> oldProfiles = new ArrayList<String>();
       for (CanonicalType pt : t.getProfile()) {
@@ -1630,7 +1653,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         b.append(")");
       }
     }
-    if ((!mustSupportOnly && (t.hasTargetProfile() || (compare!=null && compare.hasTargetProfile()))) || ProfileUtilities.isMustSupport(t.getTargetProfile())) {
+    if ((!mustSupportOnly && (t.hasTargetProfile() || (compare!=null && compare.hasTargetProfile()))) || sdr.isMustSupport(t.getTargetProfile())) {
       List<StringType> newProfiles = new ArrayList<StringType>();
       List<StringType> oldProfiles = new ArrayList<StringType>();
       for (CanonicalType pt : t.getTargetProfile()) {
@@ -1659,11 +1682,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         List<String> newAgg = new ArrayList<String>();
         List<String> oldAgg = new ArrayList<String>();
         for (Enumeration<AggregationMode> a :t.getAggregation()) {
-          newAgg.add(" <a href=\"" + corePath + "codesystem-resource-aggregation-mode.html#content\" title=\""+ProfileUtilities.hintForAggregation(a.getValue())+"\">{" + ProfileUtilities.codeForAggregation(a.getValue()) + "}</a>");
+          newAgg.add(" <a href=\"" + corePath + "codesystem-resource-aggregation-mode.html#content\" title=\""+sdr.hintForAggregation(a.getValue())+"\">{" + sdr.codeForAggregation(a.getValue()) + "}</a>");
         }
         if (compare!=null) {
           for (Enumeration<AggregationMode> a : compare.getAggregation()) {
-            newAgg.add(" <a href=\"" + corePath + "codesystem-resource-aggregation-mode.html#content\" title=\"" + ProfileUtilities.hintForAggregation(a.getValue()) + "\">{" + ProfileUtilities.codeForAggregation(a.getValue()) + "}</a>");
+            newAgg.add(" <a href=\"" + corePath + "codesystem-resource-aggregation-mode.html#content\" title=\"" + sdr.hintForAggregation(a.getValue()) + "\">{" + sdr.codeForAggregation(a.getValue()) + "}</a>");
           }
         }
         b.append(compareSimpleTypeLists(newAgg, oldAgg, mode));
@@ -1673,7 +1696,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private String getTypeProfile(CanonicalType pt, boolean mustSupportOnly) {
     StringBuilder b = new StringBuilder();
-    if (!mustSupportOnly || ProfileUtilities.isMustSupport(pt)) {
+    if (!mustSupportOnly || sdr.isMustSupport(pt)) {
       StructureDefinition p = context.fetchResource(StructureDefinition.class, pt.getValue());
       if (p == null)
         b.append(pt.getValue());
@@ -1808,7 +1831,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
       }
 
-      AdditionalBindingsRenderer abr = new AdditionalBindingsRenderer(igp, corePath, sd, d.getPath(), gen, this);
+      AdditionalBindingsRenderer abr = new AdditionalBindingsRenderer(igp, corePath, sd, d.getPath(), gen, this, sdr);
       if (binding.hasExtension(ToolingExtensions.EXT_MAX_VALUESET)) {
         abr.seeMaxBinding(ToolingExtensions.getExtension(binding, ToolingExtensions.EXT_MAX_VALUESET), compBinding==null ? null : ToolingExtensions.getExtension(compBinding, ToolingExtensions.EXT_MAX_VALUESET), mode!=GEN_MODE_SNAP && mode!=GEN_MODE_MS);
       }
@@ -2282,7 +2305,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   public String span(boolean onlyConstraints, String canonical, Set<String> outputTracker) throws IOException, FHIRException {
-    return new XhtmlComposer(XhtmlComposer.HTML).compose(utils.generateSpanningTable(sd, destDir, onlyConstraints, canonical, outputTracker));
+    return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateSpanningTable(sd, destDir, onlyConstraints, canonical, outputTracker));
   }
 
   public String pseudoJson() throws Exception {
@@ -2923,5 +2946,150 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       t = t.getDerivation() == TypeDerivationRule.SPECIALIZATION ? null : context.fetchResource(StructureDefinition.class, t.getBaseDefinition());
     }
     return b.toString();
+  }
+
+  public String expansion(String definitionsName, Set<String> otherFilesRun) throws IOException {
+    PEBuilder pe = context.getProfiledElementBuilder(PEElementPropertiesPolicy.NONE, true);
+    HierarchicalTableGenerator gen = new HierarchicalTableGenerator(destDir, true, true);
+    gen.setTranslator(getTranslator());
+    
+    TableModel model = gen.initNormalTable(corePath, false, true, sd.getId()+"x", true);
+    XhtmlNode x = null;
+    try {
+      genElement(gen, model.getRows(), pe.buildPEDefinition(sd));
+      x = gen.generate(model, destDir, 0, otherFilesRun);
+    } catch (Exception e) {
+      x = new XhtmlNode(NodeType.Element, "div").tx("Error: "+e.getMessage());
+    }
+    return new XhtmlComposer(false, false).compose(x);
+  }
+
+  private void genElement(HierarchicalTableGenerator gen, List<Row> rows, PEDefinition element) throws FHIRException, IOException {
+    Row row = gen.new Row();
+    rows.add(row);
+    row.setAnchor(element.path());
+    row.setColor(element.fixedValue() ? "#eeeeee" : "#ffffff");
+    row.setLineColor(0);
+    if (element.fixedValue()) {
+      row.setIcon("icon_fixed.gif", "Fixed Value" /*HierarchicalTableGenerator.TEXT_ICON_FIXED*/);
+    } else {
+      switch (element.mode()) {
+      case Resource:
+        row.setIcon("icon_resource.png", HierarchicalTableGenerator.TEXT_ICON_RESOURCE);
+        break;
+      case Element:
+        row.setIcon("icon_element.gif", HierarchicalTableGenerator.TEXT_ICON_ELEMENT);
+        break;
+      case DataType:
+        row.setIcon("icon_datatype.gif", HierarchicalTableGenerator.TEXT_ICON_DATATYPE);
+        break;
+      case Extension:
+        row.setIcon("icon_extension_simple.png", HierarchicalTableGenerator.TEXT_ICON_EXTENSION_SIMPLE);
+        break;
+      }
+    }
+    // name
+    Cell gc = gen.new Cell();
+    row.getCells().add(gc);
+    gc.addText(element.name());
+    
+    // flags
+    gc = gen.new Cell();
+    row.getCells().add(gc);
+    if (element.definition().getIsModifier()) {
+      gc.addStyledText(translate("sd.table", "This element is a modifier element"), "?!", null, null, null, false);
+    }
+    if (element.definition().getMustSupport() || element.definition().hasObligation()) {
+      gc.addStyledText(translate("sd.table", "This element must be supported"), "S", "white", "red", null, false);
+    }
+    if (element.definition().getIsSummary()) {
+      gc.addStyledText(translate("sd.table", "This element is included in summaries"), "\u03A3", null, null, null, false);
+    }
+    if (sdr.hasNonBaseConstraints(element.definition().getConstraint()) || sdr.hasNonBaseConditions(element.definition().getCondition())) {
+      Piece p = gc.addText(org.hl7.fhir.r5.renderers.StructureDefinitionRenderer.CONSTRAINT_CHAR);
+      p.setHint(translate("sd.table", "This element has or is affected by constraints ("+sdr.listConstraintsAndConditions(element.definition())+")"));
+      p.addStyle(org.hl7.fhir.r5.renderers.StructureDefinitionRenderer.CONSTRAINT_STYLE);
+      p.setReference(Utilities.pathURL(VersionUtilities.getSpecUrl(context.getVersion()), "conformance-rules.html#constraints"));
+    }
+    if (element != null && element.definition().hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
+      StandardsStatus ss = StandardsStatus.fromCode(element.definition().getExtensionString(ToolingExtensions.EXT_STANDARDS_STATUS));
+      gc.addStyledText("Standards Status = "+ss.toDisplay(), ss.getAbbrev(), "black", ss.getColor(), context.getSpecUrl()+"versions.html#std-process", true);
+    }
+
+
+    // cardinality
+    gc = gen.new Cell();
+    row.getCells().add(gc);
+    gc.addText(""+element.min()+".."+(element.max() == Integer.MAX_VALUE ? "*" : element.max()));
+    
+    // type
+    gc = gen.new Cell();
+    row.getCells().add(gc);
+    if (element.types().size() == 1) {
+      PEType t = element.types().get(0);
+      StructureDefinition sd = context.fetchResource(StructureDefinition.class, t.getUrl());
+      if (sd != null) {
+        gc.addPiece(gen.new Piece(sd.getUserString("path"), t.getName(), t.getType()));        
+      } else {
+        gc.addPiece(gen.new Piece(null, t.getName(), t.getType()));
+      }
+    } else if (element.types().size() == 0) {
+      // unprofiled primitive type value
+      TypeRefComponent tr = element.definition().getTypeFirstRep();
+      StructureDefinition sd = context.fetchTypeDefinition(tr.getWorkingCode());
+      if (sd != null) {
+        gc.addPiece(gen.new Piece(sd.getUserString("path"), "("+tr.getWorkingCode()+" value)", "Primitive value "+tr.getWorkingCode()));        
+      } else {
+        gc.addPiece(gen.new Piece(null, "("+tr.getWorkingCode()+" value)", "Primitive value "+tr.getWorkingCode()));
+      }
+    } else {
+      gc.addText("(multiple)");
+      
+    }
+    
+    // description
+    sdr.generateDescription(gen, row, element.definition(), null, true, context.getSpecUrl(), null, sd, context.getSpecUrl(), destDir, false, false, allInvariants, true, false, false, sdr.getContext());
+    
+    if (element.types().size() == 1) {
+      PEType t = element.types().get(0);
+      for (PEDefinition child : element.children(t.getUrl())) {
+        if (child.isProfiled()) {
+          genElement(gen, row.getSubRows(), child);
+        }
+      }
+    } else {
+      for (PEType t : element.types()) {
+        Row trow = gen.new Row();
+        row.getSubRows().add(trow);
+        trow.setAnchor(element.path()+"-t-"+t.getName());
+        trow.setColor(element.fixedValue() ? "#eeeeee" : "#ffffff");
+        trow.setLineColor(0);
+        trow.setIcon("icon_slice.png", HierarchicalTableGenerator.TEXT_ICON_SLICE);
+        gc = gen.new Cell();
+        trow.getCells().add(gc);
+        gc.addText(t.getName());
+        gc = gen.new Cell();
+        trow.getCells().add(gc);
+        gc = gen.new Cell();
+        trow.getCells().add(gc);
+        
+        // type
+        gc = gen.new Cell();
+        trow.getCells().add(gc);
+        StructureDefinition sd = context.fetchResource(StructureDefinition.class, t.getUrl());
+        if (sd != null) {
+          gc.addPiece(gen.new Piece(sd.getUserString("path"), t.getName(), t.getType()));        
+        } else {
+          gc.addPiece(gen.new Piece(null, t.getName(), t.getType()));
+        }
+        gc = gen.new Cell();
+        trow.getCells().add(gc);
+        for (PEDefinition child : element.children(t.getUrl())) {
+          if (child.isProfiled()) {
+            genElement(gen, row.getSubRows(), child);
+          }
+        }
+      }
+    }
   }
 }
