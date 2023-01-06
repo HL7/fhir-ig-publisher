@@ -9,10 +9,10 @@ import javax.xml.transform.stream.StreamSource;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 
-public class XSLTTransformer {
+public class XSLTransformer {
     private final boolean debug;
 
-    public XSLTTransformer(boolean debug) {
+    public XSLTransformer(boolean debug) {
         this.debug = debug;
     }
 
