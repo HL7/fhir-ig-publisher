@@ -3866,7 +3866,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                 smm.setBase2(PackageHacker.fixPackageUrl(dpi.url()));
                 specMaps.add(smm);
               } catch (Exception e) {
-                throw new IOException("Error reading SMM for "+dpi.name()+"#"+dpi.version()+": "+e.getMessage(), e);
+                if (!"hl7.fhir.core".equals(dpi.name())) {
+                  System.out.println("Error reading SMM for "+dpi.name()+"#"+dpi.version()+": "+e.getMessage());
+                }
               }
               
               try {
