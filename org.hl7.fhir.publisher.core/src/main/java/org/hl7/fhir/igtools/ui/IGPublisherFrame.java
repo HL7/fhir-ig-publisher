@@ -303,6 +303,11 @@ public class IGPublisherFrame extends javax.swing.JFrame {
       btnExecute.setLabel("Execute");
     }
 
+    @Override
+    public boolean isDebugLogging() {
+      return false;
+    }
+
 
   }
 
