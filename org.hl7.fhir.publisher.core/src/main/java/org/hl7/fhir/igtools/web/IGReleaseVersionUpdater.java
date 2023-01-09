@@ -76,7 +76,7 @@ public class IGReleaseVersionUpdater {
       if (ignoreListOuter != null && ignoreListOuter.contains(f.getAbsolutePath())) {
         continue;
       }
-      if (Utilities.existsInList(f.getName(), "modeldoc", "quick", "qa.html", "qa-hta.html", "qa.min.html", "history.html", "directory.html", "qa-tx.html", "us-core-comparisons", "searchform.html")) {
+      if (Utilities.existsInList(f.getName(), "modeldoc", "quick", "qa.html", "qa-hta.html", "qa-dep.html", "qa.min.html", "history.html", "directory.html", "qa-tx.html", "us-core-comparisons", "searchform.html")) {
         continue;
       }
       if (f.getName().startsWith("comparison-v")) {
@@ -173,6 +173,9 @@ public class IGReleaseVersionUpdater {
   }
 
   private void checkXmlJsonClones(File dir) throws IOException {
+    if (ignoreList != null && ignoreList.contains(dir.getAbsolutePath())) {
+      return;
+    }
     for (File f : dir.listFiles()) {
       if (f.isDirectory()) {
         checkXmlJsonClones(f);

@@ -34,6 +34,8 @@ import java.util.Map;
 import org.hl7.fhir.igtools.web.IGReleaseUpdater.ServerType;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.parser.JsonParser;
 
 import com.google.gson.JsonSyntaxException;
 
@@ -46,10 +48,10 @@ import com.google.gson.JsonSyntaxException;
 public class IGWebSiteMaintainer {
 
   public static void main(String[] args) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
-    execute(args[0], args.length > 1 ? new IGRegistryMaintainer(args[1]) : null, args.length >= 3 && "true".equals(args[2]), null, false, args[3], true);
+    execute(args[0], args.length > 1 ? new IGRegistryMaintainer(args[1]) : null, args.length >= 3 && "true".equals(args[2]), null, false, args[3], true, args[4]);
   }
   
-  public static void execute(String folder, IGRegistryMaintainer reg, boolean doCore, String filter, boolean skipPrompt, String historyRepo, boolean updateStatements) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
+  public static void execute(String folder, IGRegistryMaintainer reg, boolean doCore, String filter, boolean skipPrompt, String historyRepo, boolean updateStatements, String templateSrc) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
     System.out.println("Update publication at '"+folder+"' with filter '"+filter+"'");
     File f = new File(folder);
     if (!f.exists())
@@ -57,22 +59,22 @@ public class IGWebSiteMaintainer {
     if (!f.isDirectory())
       throw new IOException("The path "+folder+" is not a folder");
     
-    f = new File(Utilities.path(folder, "publish.ini"));
+    f = new File(Utilities.path(folder, "publish-setup.json"));
     if (!f.exists())
-      throw new IOException("publish.ini not found in "+folder);
+      throw new IOException("publish-setup.json not found in "+folder);
     
-    IniFile ini = new IniFile(f.getAbsolutePath());
-    if (!"fhir.layout".equals(ini.getStringProperty("website", "style")))
+    JsonObject pubSetup = JsonParser.parseObject(f);
+    if (!"fhir.layout".equals(pubSetup.forceObject("website").asString("style")))
       throw new IOException("publish.ini in "+f.getAbsolutePath()+" not in the correct format (missing style=fhir.layout in [website])");
       
-    String url = ini.getStringProperty("website",  "url");
-    if (reg == null && !ini.getBooleanProperty("website", "no-registry"))
+    String url = pubSetup.forceObject("website").asString("url");
+    if (reg == null && !pubSetup.forceObject("website").asBoolean("no-registry"))
       throw new Error("This web site contains IGs that are registered in the implementation guide registry, and you must pass in a reference to the registry");
-    ServerType serverType = ServerType.fromCode(ini.getStringProperty("website", "server"));
+    ServerType serverType = ServerType.fromCode(pubSetup.forceObject("website").asString("server"));
     
     File sft = null;
-    if (ini.hasProperty("website", "search-template")) {
-      sft = new File(Utilities.path(folder, ini.getStringProperty("website", "search-template")));
+    if (pubSetup.forceObject("website").has("search-template")) {
+      sft = new File(Utilities.path(templateSrc, pubSetup.forceObject("website").asString("search-template")));
       if (!sft.exists()) {
         throw new Error("Search form "+sft.getAbsolutePath()+" not found");
       }
@@ -100,22 +102,24 @@ public class IGWebSiteMaintainer {
     }
     
     Map<String, IndexMaintainer> indexes = new HashMap<>();
-    if (ini.hasSection("indexes")) {
-      for (String realm : ini.getPropertyNames("indexes")) {
-        String[] p = ini.getStringProperty("indexes", realm).split("\\;");
-        indexes.put(realm, new IndexMaintainer(realm, p[0], Utilities.path(folder, p[1]), Utilities.path(folder, ini.getStringProperty("website", "index-template"))));        
+    if (pubSetup.has("indexes")) {
+      JsonObject ndxs = pubSetup.getJsonObject("indexes");
+      for (String realm : ndxs.getNames()) {
+        JsonObject ndx = ndxs.getJsonObject(realm);
+        indexes.put(realm, new IndexMaintainer(realm, ndx.asString("title"), ndx.asString("source"), Utilities.path(folder, ndx.asString("source")), Utilities.path(templateSrc, pubSetup.getJsonObject("website").asString("index-template"))));        
       }
     }
     for (String s : igs) {
-      new IGReleaseUpdater(s, url, folder, reg, serverType, igs, sft, filter == null || filter.equalsIgnoreCase(s), historyRepo).check(indexes, true, updateStatements);
+      new IGReleaseUpdater(s, url, folder, reg, serverType, igs, sft, filter == null || filter.equalsIgnoreCase(s), historyRepo).check(indexes, true, updateStatements, templateSrc);
     }
     for (IndexMaintainer index : indexes.values()) {
+      index.buildJson();
       index.execute();
     }
     System.out.println("==================== ");
     System.out.println("Processing Feeds for "+folder);
-    if (!Utilities.noString(ini.getStringProperty("feeds",  "package")) || !Utilities.noString(ini.getStringProperty("feeds",  "publication"))) {
-      new FeedBuilder().execute(folder, Utilities.path(folder, ini.getStringProperty("feeds", "package")), Utilities.path(folder, ini.getStringProperty("feeds", "publication")), ini.getStringProperty("website", "org"), Utilities.pathURL(url, ini.getStringProperty("feeds", "package")), url);
+    if (!Utilities.noString(pubSetup.forceObject("feeds").asString("package")) || !Utilities.noString(pubSetup.forceObject("feeds").asString("publication"))) {
+      new FeedBuilder().execute(folder, Utilities.path(folder, pubSetup.forceObject("feeds").asString("package")), Utilities.path(folder, pubSetup.forceObject("feeds").asString("publication")), pubSetup.forceObject("website").asString("org"), Utilities.pathURL(url, pubSetup.forceObject("feeds").asString("package")), url);
     }
     System.out.println("Finished Processing Feeds");
     System.out.println("==================== ");

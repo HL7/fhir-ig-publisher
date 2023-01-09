@@ -29,6 +29,7 @@ import org.hl7.fhir.utilities.FhirPublication;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.json.JsonException;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
@@ -36,6 +37,9 @@ import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageList;
 import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
+import org.hl7.fhir.utilities.xhtml.NodeType;
+import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
+import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.utilities.xml.XMLUtil;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -110,6 +114,9 @@ public class TemplateReleaser {
 
   private static final String RSS_DATE = "EEE, dd MMM yyyy hh:mm:ss Z";
 
+  private static final String INDEX_TEMPLATE = "---\nlayout: page\ntitle: FHIR IG Templates (HL7 FHIR Foundation)\n---\n<p>A list of currently maintained FHIR IG templates</p>\n{{index}}"+
+    "<p>Note that not all templates must be released through this page, but most are in order to benefit from a comment version/lifecycle management system. Contact fhir-director at hl7.org to get listed.</p>\n";
+
   private Document rss;
   private Element channel;
   private String linkRoot;
@@ -137,7 +144,8 @@ public class TemplateReleaser {
     for (String s : currentPublishedVersions.keySet()) {
       System.out.println(" * "+s+"#"+currentPublishedVersions.get(s));
     }
-    List<VersionDecision> versionsList = analyseVersions(source, scanForCurrentVersions(source), currentPublishedVersions);
+    Map<String, String> currentVersions = scanForCurrentVersions(source);
+    List<VersionDecision> versionsList = analyseVersions(source, currentVersions, currentPublishedVersions);
     System.out.println("Actions to take");
     for (VersionDecision vd : versionsList) {
       System.out.println(" * "+vd.summary());
@@ -188,9 +196,32 @@ public class TemplateReleaser {
       if (bak.exists())
         bak.delete();
       xml.renameTo(bak);
-      saveXml(new FileOutputStream(xml));  
+      saveXml(new FileOutputStream(xml)); 
+      
+      buildIndexPage(currentVersions, dest);
       System.out.println("Published");
     }
+  }
+
+  
+  private void buildIndexPage(Map<String, String> currentVersions, String path) throws JsonException, IOException {
+    XhtmlNode tbl = new XhtmlNode(NodeType.Element, "table");
+    tbl.attribute("class", "grid");
+    XhtmlNode tr = tbl.tr();
+    tr.td().b().tx("ID");
+    tr.td().b().tx("Title");
+    tr.td().b().tx("Version");
+    tr.td().b().tx("Release Date");
+    for (String id : Utilities.sorted(currentVersions.keySet())) {
+      tr = tbl.tr();
+      PackageList pl = new PackageList(JsonParser.parseObject(new File(Utilities.path(path, id, "package-list.json"))));
+      tr.td().ah("http://fhir.org/templates/"+id).tx(pl.pid());
+      tr.td().tx(pl.title());
+      tr.td().ah("http://fhir.org/templates/"+id+"/"+pl.current().version()+"/package.tgz").tx(pl.current().version());
+      tr.td().tx(pl.current().date());
+    }
+    String s = INDEX_TEMPLATE.replace("{{index}}", new XhtmlComposer(false, false).compose(tbl));
+    TextFile.stringToFile(s, Utilities.path(path, "index.html"), false);
   }
 
   private void build(String source, VersionDecision vd, List<VersionDecision> versions) throws Exception {
@@ -376,7 +407,9 @@ public class TemplateReleaser {
   }
 
   private VersionChangeType checkVersionChangeType(String v, String nv) {
-    if (v.equals(nv)) { 
+    if (v == null) {
+      return VersionChangeType.MAJOR;      
+    } else if (v.equals(nv)) { 
       return VersionChangeType.NONE;
     } else if (VersionUtilities.versionsCompatible(v, nv)) {
       return VersionChangeType.PATCH;
@@ -399,10 +432,15 @@ public class TemplateReleaser {
         scanForCurrentVersions(res, f);
       } else if (f.getName().equals("package-list.json")) {
         PackageList pl = PackageList.fromFile(f);
+        boolean ok = false;
         for (PackageListEntry v : pl.list()) {
           if ("release".equals(v.status()) && v.current()) {
             res.put(pl.pid(), v.version());
+            ok = true;
           }
+        }
+        if (!ok) {
+          res.put(pl.pid(), null);            
         }
       }
     }

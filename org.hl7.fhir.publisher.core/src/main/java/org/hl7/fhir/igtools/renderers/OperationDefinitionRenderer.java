@@ -6,7 +6,7 @@ import java.util.Set;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
-import org.hl7.fhir.r5.conformance.ProfileUtilities;
+import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.OperationDefinition;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
@@ -29,7 +29,6 @@ public class OperationDefinitionRenderer extends CanonicalRenderer {
     this.od = od;
     this.destDir = destDir;
     utils = new ProfileUtilities(context, null, igp);
-    utils.setIgmode(true);
     this.files = files;
   }
 

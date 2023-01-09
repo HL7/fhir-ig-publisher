@@ -3,6 +3,7 @@ package org.hl7.fhir.igtools.web;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.List;
 
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
@@ -28,28 +29,28 @@ public class DownloadBuilder {
   private static final String CURRENT_VERSION = "1";
 
   public static void main(String[] args) throws IOException {
-    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2011Aug", "http://hl7.org/fhir", "http://hl7.org/fhir/2011Aug").execute();
-    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2012May", "http://hl7.org/fhir", "http://hl7.org/fhir/2012May").execute();
-    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2012Sep", "http://hl7.org/fhir", "http://hl7.org/fhir/2012Sep").execute();
-    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2013Jan", "http://hl7.org/fhir", "http://hl7.org/fhir/2013Jan").execute();
-    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2013Sep", "http://hl7.org/fhir", "http://hl7.org/fhir/2013Sep").execute();
-    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2015Dec", "http://hl7.org/fhir", "http://hl7.org/fhir/2015Dec").execute();
-    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2015Jan", "http://hl7.org/fhir", "http://hl7.org/fhir/2015Jan").execute();
-    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2015May", "http://hl7.org/fhir", "http://hl7.org/fhir/2015May").execute();
-    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2015Sep", "http://hl7.org/fhir", "http://hl7.org/fhir/2015Sep").execute();
-    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2016Jan", "http://hl7.org/fhir", "http://hl7.org/fhir/2016Jan").execute();
-    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2016May", "http://hl7.org/fhir", "http://hl7.org/fhir/2016May").execute();
-    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2016Sep", "http://hl7.org/fhir", "http://hl7.org/fhir/2016Sep").execute();
-    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2017Jan", "http://hl7.org/fhir", "http://hl7.org/fhir/2017Jan").execute();
-    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2018Dec", "http://hl7.org/fhir", "http://hl7.org/fhir/2018Dec").execute();
-    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2018Jan", "http://hl7.org/fhir", "http://hl7.org/fhir/2018Jan").execute();
-    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2018May", "http://hl7.org/fhir", "http://hl7.org/fhir/2018May").execute();
-    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2018Sep", "http://hl7.org/fhir", "http://hl7.org/fhir/2018Sep").execute();
-    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\DSTU1", "http://hl7.org/fhir", "http://hl7.org/fhir/DSTU1").execute();
-    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\DSTU2", "http://hl7.org/fhir", "http://hl7.org/fhir/DSTU2").execute();
-    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\STU3", "http://hl7.org/fhir", "http://hl7.org/fhir/STU3").execute();
-    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\R4", "http://hl7.org/fhir", "http://hl7.org/fhir/R4").execute();
-    new DownloadBuilder("C:\\web\\hl7.org\\fhir", "http://hl7.org/fhir", "http://hl7.org/fhir").execute();
+    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2011Aug", "http://hl7.org/fhir", "http://hl7.org/fhir/2011Aug", null).execute();
+    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2012May", "http://hl7.org/fhir", "http://hl7.org/fhir/2012May", null).execute();
+    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2012Sep", "http://hl7.org/fhir", "http://hl7.org/fhir/2012Sep", null).execute();
+    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2013Jan", "http://hl7.org/fhir", "http://hl7.org/fhir/2013Jan", null).execute();
+    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2013Sep", "http://hl7.org/fhir", "http://hl7.org/fhir/2013Sep", null).execute();
+    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2015Dec", "http://hl7.org/fhir", "http://hl7.org/fhir/2015Dec", null).execute();
+    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2015Jan", "http://hl7.org/fhir", "http://hl7.org/fhir/2015Jan", null).execute();
+    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2015May", "http://hl7.org/fhir", "http://hl7.org/fhir/2015May", null).execute();
+    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2015Sep", "http://hl7.org/fhir", "http://hl7.org/fhir/2015Sep", null).execute();
+    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2016Jan", "http://hl7.org/fhir", "http://hl7.org/fhir/2016Jan", null).execute();
+    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2016May", "http://hl7.org/fhir", "http://hl7.org/fhir/2016May", null).execute();
+    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2016Sep", "http://hl7.org/fhir", "http://hl7.org/fhir/2016Sep", null).execute();
+    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2017Jan", "http://hl7.org/fhir", "http://hl7.org/fhir/2017Jan", null).execute();
+    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2018Dec", "http://hl7.org/fhir", "http://hl7.org/fhir/2018Dec", null).execute();
+    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2018Jan", "http://hl7.org/fhir", "http://hl7.org/fhir/2018Jan", null).execute();
+    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2018May", "http://hl7.org/fhir", "http://hl7.org/fhir/2018May", null).execute();
+    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\2018Sep", "http://hl7.org/fhir", "http://hl7.org/fhir/2018Sep", null).execute();
+    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\DSTU1", "http://hl7.org/fhir", "http://hl7.org/fhir/DSTU1", null).execute();
+    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\DSTU2", "http://hl7.org/fhir", "http://hl7.org/fhir/DSTU2", null).execute();
+    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\STU3", "http://hl7.org/fhir", "http://hl7.org/fhir/STU3", null).execute();
+    new DownloadBuilder("C:\\web\\hl7.org\\fhir\\R4", "http://hl7.org/fhir", "http://hl7.org/fhir/R4", null).execute();
+    new DownloadBuilder("C:\\web\\hl7.org\\fhir", "http://hl7.org/fhir", "http://hl7.org/fhir", null).execute();
   }
 
   private String srcFolder;
@@ -59,12 +60,14 @@ public class DownloadBuilder {
   private ZipGenerator zip;
   private int counter;
   private String zipfilename;
+  private List<String> ignoreList;
   
-  public DownloadBuilder(String srcFolder, String canonical, String url) {
+  public DownloadBuilder(String srcFolder, String canonical, String url, List<String> ignoreList) {
     super();
     this.srcFolder = srcFolder;
     this.canonical = canonical;
     this.url = url;
+    this.ignoreList = ignoreList;
   }
 
   private boolean isCore() {
@@ -133,7 +136,7 @@ public class DownloadBuilder {
     for (File f : folder.listFiles()) {
       if (!Utilities.existsInList(f.getName(), EXEMPT_FILES)) {
         if (f.isDirectory()) {
-          boolean ok = true;
+          boolean ok = ignoreList == null || !ignoreList.contains(f.getAbsolutePath());
           File pck = new File(Utilities.path(f.getAbsolutePath(), "full-ig.zip"));
           if (pck.exists())
             ok = false;
