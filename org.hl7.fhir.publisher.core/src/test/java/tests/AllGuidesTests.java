@@ -12,10 +12,11 @@ import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
 
-@Disabled("This requires a specific directory setup and should only be run manually, not as part of the test suite.")
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
+
+@EnabledIf("igsPathExists")
 public class AllGuidesTests {
 
 private static final String VER = "1.0.53";
@@ -33,7 +34,7 @@ private static final String VER = "1.0.53";
 //  }
 
   private void testIg(String id, String path) throws Exception {
-    if (!new File(ToolGlobalSettings.getTestIgsPath()).exists()) {
+    if (!igsPathExists()) {
       Assertions.assertTrue(true);
       return;
     }
@@ -72,6 +73,10 @@ private static final String VER = "1.0.53";
     Assertions.assertTrue(cHint <= pHint, "Hint count has increased from "+pHint+" to "+cHint);
     System.out.println("=======================================================================================");
     System.out.println("");
+  }
+
+  private static boolean igsPathExists() {
+    return ToolGlobalSettings.getTestIgsPath() != null && new File(ToolGlobalSettings.getTestIgsPath()).exists();
   }
 
 //  private String testingPath() {
