@@ -2,6 +2,7 @@ package tests;
 
 import org.apache.commons.io.IOUtils;
 import org.hl7.fhir.igtools.publisher.XSLTransformer;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import javax.xml.transform.TransformerException;
@@ -20,6 +21,7 @@ public class XSLTransformerTest {
         byte[] expected = getLineSeparatorNormalizedBytes("/xslt/unicom-expected.xml");
 
         assertArrayEquals(actual, expected);
+        Assertions.fail();
     }
 
     private byte[] getLineSeparatorNormalizedBytes(String fileName) throws IOException {
