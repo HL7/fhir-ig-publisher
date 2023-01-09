@@ -10336,6 +10336,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
   }
 
+  @Override
+  public boolean isDebugLogging() {
+    return false;
+  }
+
   public static void prop(StringBuilder b, String name, String value) {
     b.append(name+": ");
     b.append(value);

@@ -12,8 +12,10 @@ import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
+@Disabled("This requires a specific directory setup and should only be run manually, not as part of the test suite.")
 public class AllGuidesTests {
 
 private static final String VER = "1.0.53";
