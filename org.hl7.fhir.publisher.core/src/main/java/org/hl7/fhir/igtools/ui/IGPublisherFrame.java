@@ -278,7 +278,8 @@ public class IGPublisherFrame extends javax.swing.JFrame {
     public void logDebugMessage(LogCategory category, String msg) {
       publish(LOG_PREFIX+msg);
       
-    }    
+    }
+
     @Override
     protected void process(List<String> msgs) {
       for (String msg : msgs) {
