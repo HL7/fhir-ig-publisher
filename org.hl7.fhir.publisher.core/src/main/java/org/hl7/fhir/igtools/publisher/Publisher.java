@@ -78,7 +78,6 @@ import org.apache.commons.exec.DefaultExecutor;
 import org.apache.commons.exec.ExecuteWatchdog;
 import org.apache.commons.exec.PumpStreamHandler;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
@@ -2233,7 +2232,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     fetcher.setRootDir(rootDir);
     fetcher.setResourceDirs(resourceDirs);
-    log("Setting resources dirrs to " + resourceDirs.toString());
     if (configFile != null && focusDir().contains(" ")) {
       throw new Error("There is a space in the folder path: \""+focusDir()+"\". Please fix your directory arrangement to remove the space and try again");
     }
@@ -2467,7 +2465,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } catch (Exception e) {
       throw new Exception("Error Parsing File "+igName+": "+e.getMessage(), e);
     }
-    log ("Source IG1= \n"  +sourceIg.toString());
     template = templateManager.loadTemplate(templateName, rootDir, sourceIg.getPackageId(), mode == IGBuildMode.AUTOBUILD);
 
     if (template.hasExtraTemplates()) {
@@ -2483,7 +2480,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     
     Map<String, List<ValidationMessage>> messages = new HashMap<String, List<ValidationMessage>>();
     sourceIg = template.onLoadEvent(sourceIg, messages);
-    log ("Source IG2= \n"  +sourceIg.toString());
     checkOutcomes(messages);
     // ok, loaded. Now we start loading settings out of the IG
     tool = GenerationTool.Jekyll;
@@ -2521,7 +2517,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (pc == null) {
         throw new Error("The IG Parameter has no code");
       } else if (pc.equals("logging")) { // added
-	  log ("logging " + p.toString());
         logOptions.add(p.getValue());        
       } else if (pc.equals("generate")) { // added
         if ("example-narratives".equals(p.getValue()))
@@ -2539,7 +2534,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       } else if (pc.equals("path-resource")) {
         String dir = Utilities.path(rootDir, p.getValue());
         if (!resourceDirs.contains(dir)) {
-	    log("Adding to resource dirs" + dir);
           resourceDirs.add(dir);
         }
       } else if (pc.equals("autoload-resources")) {     
@@ -3103,7 +3097,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (JsonElement e : (JsonArray) paths.get("resources")) {
         String dir = Utilities.path(rootDir, e.asJsonPrimitive().asString());
         if (!resourceDirs.contains(dir)) {
-	    log("adding from paths " +  dir);
           resourceDirs.add(dir);
         }
       }
@@ -4440,6 +4433,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
       if (failed) {
+	log("Resources: "+b.toString());
         throw new Exception("Invalid - see reasons"); // if this ever happens, it's a programming issue....
       }
     }
@@ -5125,13 +5119,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (String s : metadataResourceNames()) 
       load(s);
     loadPaths();
+    log("Generating Snapshots");
     generateSnapshots();
     checkR4R4B();
     if (isPropagateStatus) {
+      log("Propagating status");      
       propagateStatus();
     }
+    log("Generating Narratives");
     generateNarratives();
     if (!noValidation) {
+      log("Validating Conformance Resources");
       for (String s : metadataResourceNames()) {
         validate(s);
       }
@@ -9099,6 +9097,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     } catch (Exception e) {
       log("Exception generating resource "+f.getName()+"::"+r.fhirType()+"/"+r.getId()+(!Utilities.noString(prefixForContainer) ? "#"+res.getId() : "")+": "+e.getMessage());
+      e.printStackTrace();
+      for (StackTraceElement m : e.getStackTrace()) {
+          log("   "+m.toString());
+      }
     }
     return result;
   }
