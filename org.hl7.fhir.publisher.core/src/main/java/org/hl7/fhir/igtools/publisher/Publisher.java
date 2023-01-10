@@ -66,12 +66,19 @@ import java.util.zip.ZipInputStream;
 import javax.swing.UIManager;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.ErrorListener;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.stream.StreamResult;
+import javax.xml.transform.stream.StreamSource;
 
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
 import org.apache.commons.exec.ExecuteWatchdog;
 import org.apache.commons.exec.PumpStreamHandler;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
@@ -89,6 +96,7 @@ import org.hl7.fhir.exceptions.DefinitionException;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.exceptions.PathEngineException;
+import org.hl7.fhir.igtools.publisher.LogStructureMapUtilities;
 import org.hl7.fhir.igtools.publisher.FetchedFile.FetchedBundleType;
 import org.hl7.fhir.igtools.publisher.IFetchFile.FetchState;
 import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
@@ -132,6 +140,7 @@ import org.hl7.fhir.r4.formats.FormatUtilities;
 import org.hl7.fhir.r5.conformance.ConstraintJavaGenerator;
 import org.hl7.fhir.r5.conformance.R5ExtensionsLoader;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
+import org.hl7.fhir.r5.conformance.R5ExtensionsLoader;
 import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.IContextResourceLoader;
@@ -186,6 +195,7 @@ import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
 import org.hl7.fhir.r5.model.ExpressionNode;
 import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.GraphDefinition;
+import org.hl7.fhir.r5.model.GraphDefinition.GraphDefinitionLinkComponent;
 import org.hl7.fhir.r5.model.IdType;
 import org.hl7.fhir.r5.model.Identifier;
 import org.hl7.fhir.r5.model.ImplementationGuide;
@@ -890,6 +900,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return relativePath;
     }
   }
+
+
+  public boolean isDebugLogging() {return true;}
 
   public void execute() throws Exception {
     tt = new TimeTracker();
@@ -4170,9 +4183,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     // load any bundles
     if (!noFML) {
       needToBuild |= loadFMLs(needToBuild,igf);
+      // String sds = "post fml Structure Definitions loaded: ";
+      // for (StructureDefinition sd : context.listStructures()) {
+      // 	  sds += "  " + sd.getName() + " " + sd.getUrl() + "\n";
+      // }
+      // log(sds);
     }
     if (sourceDir != null || igpkp.isAutoPath())
       needToBuild = loadResources(needToBuild, igf);
+    // String sds = "post load resources Structure Definitions loaded: ";
+    // for (StructureDefinition sd : context.listStructures()) {
+    // 	sds += "  " + sd.getName() + " " + sd.getUrl() + "\n";
+    // }
+    // log(sds);
+
     needToBuild = loadSpreadsheets(needToBuild, igf);
     needToBuild = loadMappings(needToBuild, igf);
     needToBuild = loadBundles(needToBuild, igf);
@@ -4830,12 +4854,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     String mapSource = new String(bs.toByteArray(),StandardCharsets.UTF_8);    
     
     String outputFilename = "StructureMap-" + mapName  + ".json"; //neet to sanitize mapName as part of filename
-    log("Ceating " + outputFilename );
+    log("Creating " + outputFilename );
     
     File outputFile = new File(Utilities.path(outputDir.getAbsolutePath(),outputFilename));
     TextFile.stringToFile(mapSource,outputFile);
-    TextFile.stringToFile(mapSource,Utilities.path(tempDir, "StructureMap-" + mapName + ".fml")); //persit to pages directory
-			  
+//    TextFile.stringToFile(mapSource,Utilities.path(tempDir, "StructureMap-" + mapName + ".fml")); //persit to pages directory
+//    FetchedFile ff = fetcher.fetch(outputFile.getPath());
+//    noteFile(outputFilename, ff);
 			  
     Library library = new Library();
     library.setName(libraryName);
@@ -4875,7 +4900,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     jp.compose(oc.convert(library), lbs, OutputStyle.PRETTY, null);
     String librarySource = new String(lbs.toByteArray(),StandardCharsets.UTF_8);    
     TextFile.stringToFile(librarySource,libraryFile);
-
+//    noteFile(libraryFilename, fetcher.fetch(libraryFile.getPath()));
 
     return true;
   }
@@ -5101,12 +5126,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
   
   private void loadConformance() throws Exception {
-    for (String s : metadataResourceNames()) 
+    log("Begin load conformace");
+    for (String s : metadataResourceNames()) {
+      log("load conformonce - scanning metadata: " + s);
       scan(s);
+    }
+
+    String sds = "post load conformance Structure Definitions loaded: ";
+    for (StructureDefinition sd : context.listStructures()) {
+	sds += "  " + sd.getName() + " " + sd.getUrl() + "\n";
+    }
+    log(sds);
+
     loadDepInfo();
     loadInfo();
-    for (String s : metadataResourceNames()) 
-      load(s);
     log("Generating Snapshots");
     loadPaths();
     generateSnapshots();
@@ -5120,15 +5153,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (!noValidation) {
       log("Validating Conformance Resources");
       for (String s : metadataResourceNames()) {
+	log("Validating Conformance Resources - " + s);
         validate(s);
       }
     }
-    
+    log("loading lists");
     loadLists();
+    log("checking conformance resource");
     checkConformanceResources();
+    log("generating logical maps");
     generateLogicalMaps();
 //    load("StructureMap"); // todo: this is a problem...
     generateAdditionalExamples();
+    log("executing transforms");
     executeTransforms();
     validateExpressions();
     errors.addAll(cql.getGeneralErrors());
@@ -5149,8 +5186,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.fhirType().equals(type)) {
+	  log("validate res: "+r.fhirType()+"/"+r.getId());
           logDebugMessage(LogCategory.PROGRESS, "validate res: "+r.fhirType()+"/"+r.getId());
           if (!r.isValidated()) {
+	    log("  was not validated");
             validate(f, r);
           }
           if (SpecialTypeHandler.handlesType(r.fhirType()) && !VersionUtilities.isR5Ver(version)) {
@@ -5323,22 +5362,25 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void executeTransforms() throws FHIRException, Exception {
     if (doTransforms) {
       MappingServices services = new MappingServices(context, igpkp.getCanonical());
-      StructureMapUtilities utils = new StructureMapUtilities(context, services, igpkp);
-
+      StructureMapUtilities utils = new LogStructureMapUtilities(context, services, igpkp);
+      log("Executing transforms");
       // ok, our first task is to generate the profiles
       for (FetchedFile f : changeList) {
         List<StructureMap> worklist = new ArrayList<StructureMap>();
         for (FetchedResource r : f.getResources()) {
           if (r.getResource() != null && r.getResource() instanceof StructureDefinition) {
+	      log("Got strctured deintion " + ((StructureDefinition) r.getResource()).getName());
             List<StructureMap> transforms = context.findTransformsforSource(((StructureDefinition) r.getResource()).getUrl());
             worklist.addAll(transforms);
           }
         }
 
         for (StructureMap map : worklist) {
+	  log("beginning structure map analysis on: " + map.getName());
           StructureMapAnalysis analysis = utils.analyse(null, map);
           map.setUserData("analysis", analysis);
           for (StructureDefinition sd : analysis.getProfiles()) {
+	    log("  analysis found SD:" + sd.getName() + " " + sd.getUrl() );
             FetchedResource nr = new FetchedResource();
             nr.setElement(convertToElement(nr, sd));
             nr.setId(sd.getId());
@@ -5404,6 +5446,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private boolean noteFile(ImplementationGuideDefinitionResourceComponent key, FetchedFile file) {
+    log("Noting "  + file.getName());
     FetchedFile existing = fileMap.get(key);
     if (existing == null || existing.getTime() != file.getTime() || existing.getHash() != file.getHash()) {
       fileList.add(file);
@@ -5422,6 +5465,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private boolean noteFile(String key, FetchedFile file) {
+    log("Noting "  + file.getName());
     FetchedFile existing = altMap.get(key);
     if (existing == null || existing.getTime() != file.getTime() || existing.getHash() != file.getHash()) {
       fileList.add(file);
@@ -5596,6 +5640,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   public void checkResourceUnique(String tid) throws Error {
     if (loadedIds.contains(tid)) {
+	log("Duplicate resource " + tid);
       System.out.println("Duplicate Resource in IG: "+tid);
       duplicateInputResourcesDetected = true;
     }
@@ -5681,6 +5726,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.fhirType().equals(type) ) {
+	    log("    matched " + f.getName() + " to have resource type " + r.fhirType());
           String url = r.getElement().getChildValue("url");
           if (url != null) {
             String title = r.getElement().getChildValue("title");
@@ -5743,6 +5789,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (FetchedResource r : f.getResources()) {
         if (r.fhirType().equals("List")) {
           ListResource l = (ListResource) convertFromElement(r.getElement());
+	  log("setting list resource: " + l.getId());
           r.setResource(l);          
         }
       }
@@ -6113,7 +6160,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void generateLogicalMaps() throws Exception {
-    StructureMapUtilities mu = new StructureMapUtilities(context, null, null);
+    LogStructureMapUtilities mu = new LogStructureMapUtilities(context, null, null);
     for (FetchedFile f : fileList) {
       List<StructureMap> maps = new ArrayList<StructureMap>();
       for (FetchedResource r : f.getResources()) {
@@ -6207,7 +6254,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       } else if (contentType.equals("text/fhir-mapping")) {	  
 	SimpleWorkerContext ctx = new SimpleWorkerContext.SimpleWorkerContextBuilder().fromNothing();
 	String contents = new String(source, StandardCharsets.UTF_8);
-	return new StructureMapUtilities(ctx).parse(contents,"map");
+	return new LogStructureMapUtilities(ctx).parse(contents,"map");
       } else {
         throw new Exception("Unable to determine file type for "+name);
       }
@@ -9376,6 +9423,48 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (r instanceof CanonicalResource)
       return ((CanonicalResource) r).getName();
     return r.fhirType()+"/"+r.getId();
+  }
+
+  public class MyErrorListener implements ErrorListener {
+
+    @Override
+    public void error(TransformerException arg0) throws TransformerException {
+      System.out.println("XSLT Error: "+arg0.getMessage());
+      if (debug) {
+        arg0.printStackTrace();
+      }      
+    }
+
+    @Override
+    public void fatalError(TransformerException arg0) throws TransformerException {
+      System.out.println("XSLT Error: "+arg0.getMessage());
+      if (debug) {
+        arg0.printStackTrace();
+      }      
+    }
+
+    @Override
+    public void warning(TransformerException arg0) throws TransformerException {
+      System.out.println("XSLT Warning: "+arg0.getMessage());
+      if (debug) {
+        arg0.printStackTrace();
+      }      
+    }
+  }
+
+
+  private byte[] transform(byte[] source, byte[] xslt) throws TransformerException {
+    TransformerFactory f = TransformerFactory.newInstance();
+    f.setErrorListener(new MyErrorListener());
+    StreamSource xsrc = new StreamSource(new ByteArrayInputStream(xslt));
+    Transformer t = f.newTransformer(xsrc);
+    t.setErrorListener(new MyErrorListener());
+
+    StreamSource src = new StreamSource(new ByteArrayInputStream(source));
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    StreamResult res = new StreamResult(out);
+    t.transform(src, res);
+    return out.toByteArray();
   }
 
   private Map<String, String> makeVars(FetchedResource r) {
