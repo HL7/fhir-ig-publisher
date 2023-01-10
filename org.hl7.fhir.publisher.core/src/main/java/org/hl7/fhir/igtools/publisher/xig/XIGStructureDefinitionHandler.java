@@ -35,7 +35,7 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
     if (sd.hasFhirVersion()) {      j.add("fhirVersion", sd.getFhirVersion().toCode()); }
     if (sd.hasKind()) {             j.add("kind", sd.getKind().toCode()); }
     if (sd.hasAbstract()) {         j.add("abstract", sd.getAbstract()); }
-    if (sd.hasType()) {             j.add("type", sd.getType()); }
+    if (sd.hasType()) {             j.add("sdTtype", sd.getType()); }
     if (sd.hasDerivation()) {       j.add("derivation", sd.getDerivation().toCode()); }
     if (sd.hasBaseDefinition()) {   j.add("base", sd.getBaseDefinition()); }
 

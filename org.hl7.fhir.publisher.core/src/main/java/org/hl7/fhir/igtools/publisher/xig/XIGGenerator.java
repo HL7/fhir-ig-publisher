@@ -72,7 +72,7 @@ public class XIGGenerator {
     docoC.add("published", "true if this is from a published package (as oppoosed to the ci-build");
     docoC.add("filebase", "the name of the file (same directory as this json file). Both .json and .html exist");
     docoC.add("path", "Where to find the HTML publication of this resource");
-    docoC.add("type", "the type of this resource");
+    docoC.add("resourceType", "the type of this resource");
     docoC.add("id", "id of the resource in the source package"); 
     docoC.add("canonical", "canonical URL, if there is one"); 
     docoC.add("version", "business version, if there is one"); 

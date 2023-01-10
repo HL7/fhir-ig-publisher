@@ -10333,14 +10333,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   public void logDebugMessage(LogCategory category, String msg) {
     if (logOptions.contains(category.toString().toLowerCase())) {
       logMessage(msg);
+    }
   }
-  }
+
 
   @Override
   public boolean isDebugLogging() {
-    return false;
+    return debug;
   }
-
+  
   public static void prop(StringBuilder b, String name, String value) {
     b.append(name+": ");
     b.append(value);
@@ -11175,5 +11176,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   public String urlForContained(RenderingContext context, String containingType, String containingId, String containedType, String containedId) {
     return null;
   }
+
 
 }

@@ -281,11 +281,6 @@ public class IGPublisherFrame extends javax.swing.JFrame {
     }
 
     @Override
-    public boolean isDebugLogging() {
-      return false;
-    }
-
-    @Override
     protected void process(List<String> msgs) {
       for (String msg : msgs) {
         if (msg.startsWith(LOG_PREFIX)) {
@@ -307,6 +302,11 @@ public class IGPublisherFrame extends javax.swing.JFrame {
       btnQA.setEnabled(true);      
       btnIG.setEnabled(true);      
       btnExecute.setLabel("Execute");
+    }
+
+    @Override
+    public boolean isDebugLogging() {
+      return false;
     }
 
 
