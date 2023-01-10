@@ -113,7 +113,7 @@ public class XIGInformation {
     this.ctxt = ctxt;
   }
   public void fillOutJson(CanonicalResource cr, JsonObject j) {
-    j.add("type", cr.fhirType());
+    j.add("resourceType", cr.fhirType());
     if (cr.hasId()) {           j.add("id", cr.getId()); }
     if (cr.hasUrl()) {          j.add("canonical", cr.getUrl()); }
     if (cr.hasVersion()) {      j.add("version", cr.getVersion()); }

@@ -278,7 +278,8 @@ public class IGPublisherFrame extends javax.swing.JFrame {
     public void logDebugMessage(LogCategory category, String msg) {
       publish(LOG_PREFIX+msg);
       
-    }    
+    }
+
     @Override
     protected void process(List<String> msgs) {
       for (String msg : msgs) {
@@ -301,6 +302,11 @@ public class IGPublisherFrame extends javax.swing.JFrame {
       btnQA.setEnabled(true);      
       btnIG.setEnabled(true);      
       btnExecute.setLabel("Execute");
+    }
+
+    @Override
+    public boolean isDebugLogging() {
+      return false;
     }
 
 
