@@ -108,7 +108,7 @@ public class SimpleFetcher implements IFetchFile {
       } else if (path.endsWith("xml")) {
         ff.setContentType("application/fhir+xml");
       } else if (path.endsWith("fml")) {
-	ff.setContentType("application/fhir+fml"); //don't know if there is an official type
+	ff.setContentType("text/fhir-mapping"); //don't know if there is an official type
       }
       InputStream ss = new FileInputStream(f);
       byte[] b = new byte[ss.available()];
