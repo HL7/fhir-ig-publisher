@@ -8923,7 +8923,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private Set<String> pageTargets() {
     Set<String> set = new HashSet<>();
-    set.add(sourceIg.getDefinition().getPage().getName());
+    if (sourceIg.getDefinition().getPage().hasName()) {
+      set.add(sourceIg.getDefinition().getPage().getName());
+    }
     listPageTargets(set, sourceIg.getDefinition().getPage().getPage());
     return set;
   }
