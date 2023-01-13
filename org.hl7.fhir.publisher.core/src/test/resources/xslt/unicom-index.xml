@@ -1,0 +1,12 @@
+<div xmlns="http://www.w3.org/1999/xhtml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://hl7.org/fhir" lang="en">
+
+    <a name="scope">  </a>
+    <p>
+        This is FHIR Implementation Guide for UNICOM project, created to assist work with pilot product list product data in FHIR.
+    </p>
+
+    <p>
+        The specification herewith documented is a demo working specification, and may not be used for any implementation purposes.
+        No liability can be inferred from the use or misuse of this specification, or its consequences.
+    </p>
+</div>

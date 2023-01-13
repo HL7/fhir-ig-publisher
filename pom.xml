@@ -21,11 +21,11 @@
 <!--        <version>5.3.14</version>-->
 <!--    </parent>-->
 
-    <version>1.2.26-SNAPSHOT</version> <!-- See the note above -->
+    <version>1.2.27-SNAPSHOT</version> <!-- See the note above -->
 
     <properties>
         <core_version>5.6.90-SNAPSHOT</core_version>
-        <maven.test.skip>true</maven.test.skip>
+        <maven_surefire_version>3.0.0-M5</maven_surefire_version>
         <apache_poi_version>4.1.1</apache_poi_version>
         <maven.compiler.release>11</maven.compiler.release>
         <maven.compiler.source>11</maven.compiler.source>
@@ -339,18 +339,13 @@
             </plugin>
            <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
+               <version>${maven_surefire_version}</version>
                 <configuration>
                     <trimStackTrace>false</trimStackTrace>
                     <testFailureIgnore>false</testFailureIgnore>
                     <argLine>-Xmx4096m</argLine>
                     <redirectTestOutputToFile>false</redirectTestOutputToFile>
-                    <includes>
-                        <include>**/All*</include>
-                    </includes>
-                    <excludes>
-                        <exclude>**/*dstu*/**</exclude>
-                        <exclude>**/*r4*/**</exclude>
-                    </excludes>
+
                 </configuration>
             </plugin>
         </plugins>

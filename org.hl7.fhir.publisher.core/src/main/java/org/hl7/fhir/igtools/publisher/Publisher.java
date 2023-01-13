@@ -65,19 +65,12 @@ import java.util.zip.ZipInputStream;
 import javax.swing.UIManager;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.transform.ErrorListener;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.stream.StreamResult;
-import javax.xml.transform.stream.StreamSource;
 
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
 import org.apache.commons.exec.ExecuteWatchdog;
 import org.apache.commons.exec.PumpStreamHandler;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
@@ -191,7 +184,6 @@ import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
 import org.hl7.fhir.r5.model.ExpressionNode;
 import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.GraphDefinition;
-import org.hl7.fhir.r5.model.GraphDefinition.GraphDefinitionLinkComponent;
 import org.hl7.fhir.r5.model.IdType;
 import org.hl7.fhir.r5.model.Identifier;
 import org.hl7.fhir.r5.model.ImplementationGuide;
@@ -8723,7 +8715,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           f.getOutputNames().add(dst);
           Utilities.createDirectory(dst);
         } else
-          checkMakeFile(transform(f.getSource(), f.getXslt()), dst, f.getOutputNames());
+          checkMakeFile(new XSLTransformer(debug).transform(f.getSource(), f.getXslt()), dst, f.getOutputNames());
       } catch (Exception e) {
         log("Exception generating xslt page "+dst+" for "+f.getRelativePath()+" in "+tempDir+": "+e.getMessage());
       }
@@ -9205,48 +9197,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (r instanceof CanonicalResource)
       return ((CanonicalResource) r).getName();
     return r.fhirType()+"/"+r.getId();
-  }
-
-  public class MyErrorListener implements ErrorListener {
-
-    @Override
-    public void error(TransformerException arg0) throws TransformerException {
-      System.out.println("XSLT Error: "+arg0.getMessage());
-      if (debug) {
-        arg0.printStackTrace();
-      }      
-    }
-
-    @Override
-    public void fatalError(TransformerException arg0) throws TransformerException {
-      System.out.println("XSLT Error: "+arg0.getMessage());
-      if (debug) {
-        arg0.printStackTrace();
-      }      
-    }
-
-    @Override
-    public void warning(TransformerException arg0) throws TransformerException {
-      System.out.println("XSLT Warning: "+arg0.getMessage());
-      if (debug) {
-        arg0.printStackTrace();
-      }      
-    }
-  }
-
-
-  private byte[] transform(byte[] source, byte[] xslt) throws TransformerException {
-    TransformerFactory f = TransformerFactory.newInstance();
-    f.setErrorListener(new MyErrorListener());
-    StreamSource xsrc = new StreamSource(new ByteArrayInputStream(xslt));
-    Transformer t = f.newTransformer(xsrc);
-    t.setErrorListener(new MyErrorListener());
-
-    StreamSource src = new StreamSource(new ByteArrayInputStream(source));
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
-    StreamResult res = new StreamResult(out);
-    t.transform(src, res);
-    return out.toByteArray();
   }
 
   private Map<String, String> makeVars(FetchedResource r) {
