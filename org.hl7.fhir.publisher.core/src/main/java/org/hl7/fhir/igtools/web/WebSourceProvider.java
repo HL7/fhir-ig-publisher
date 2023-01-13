@@ -158,6 +158,7 @@ public class WebSourceProvider {
           c++;
           p = progress(c, t, p);      
         }
+        System.out.print("|");
         for (String s : filesToUpload) {
           ftp.upload(Utilities.path(destination, s), s);
           c++;
@@ -165,6 +166,7 @@ public class WebSourceProvider {
         }
         System.out.print(".");
       }
+      System.out.println("!");
     } else {
       System.out.println("Applying changes to website source at "+source);
       for (String s : existingFiles) {
@@ -189,11 +191,16 @@ public class WebSourceProvider {
 
   public String instructions(int fc) throws IOException {
     if (web) {
-      if (fc > 0) {
-        return "Upload all the files in "+destination+" to "+source+" using your preferred file copy method. Note that there is "+fc+" files to be deleted on the website (see "+deleteFileName()+")"; 
-      
+      if (upload) {
+        return "The web site source at ftp://"+uploadServer+"/"+uploadPath+" has been updated";
+
       } else {
-        return "Upload all the files in "+destination+" to "+source+" using your preferred file copy method"; 
+        if (fc > 0) {
+          return "Upload all the files in "+destination+" to "+source+" using your preferred file copy method. Note that there is "+fc+" files to be deleted on the website (see "+deleteFileName()+")"; 
+
+        } else {
+          return "Upload all the files in "+destination+" to "+source+" using your preferred file copy method"; 
+        }
       }
     } else {
       return "The web site source in "+source+" has been updated";

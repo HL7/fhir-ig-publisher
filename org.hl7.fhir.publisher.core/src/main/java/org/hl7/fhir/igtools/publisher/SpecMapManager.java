@@ -393,7 +393,9 @@ public class SpecMapManager {
   public Set<String> listTargets() {
     Set<String> res = new HashSet<String>();
     for (String n : targets.asStrings()) {
-      res.add(n);
+      if (n != null) { // shouldn't be null, but apparently this has happemed in the past
+        res.add(n);
+      }
     }
     return res;
   }

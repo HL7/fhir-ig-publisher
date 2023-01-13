@@ -9,6 +9,7 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -16,6 +17,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
+import org.hl7.fhir.igtools.publisher.IGVersionUtil;
 import org.hl7.fhir.igtools.publisher.PastProcessHackerUtilities;
 import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.web.IGRegistryMaintainer.ImplementationGuideEntry;
@@ -255,10 +257,32 @@ public class PublicationProcess {
     // well, we've run out of things to test... time to actually try...
     if (res.size() == 0) {
       doPublish(fSource, fOutput, qa, destination, destVer, pathVer, fRoot, pubSetup, pl, prSrc, fRegistry, npm, milestone, date, fHistory, temp, logger, 
-          pubSetup.getJsonObject("website").asString("url"), src, sft, relDest, templateSrc, first, indexes);
+          pubSetup.getJsonObject("website").asString("url"), src, sft, relDest, templateSrc, first, indexes, Calendar.getInstance(), getComputerName(), IGVersionUtil.getVersionString(), gitSrcId(source), Integer.toString(runNumber));
     }        
     return res;
     
+  }
+
+  private String gitSrcId(String source) {
+    return "Unknown (todo)";
+  }
+
+  private String getComputerName() {
+    Map<String, String> env = System.getenv();
+    if (env.containsKey("COMPUTERNAME"))
+        return env.get("COMPUTERNAME");
+    else if (env.containsKey("HOSTNAME"))
+      return env.get("HOSTNAME");
+    else if (env.containsKey("USERNAME"))
+      return env.get("USERNAME");
+    else {
+      String res = System.getProperty("user.name");
+      if (res == null) {
+        return "Unknown Computer";
+      } else {
+        return res;
+      }
+    }
   }
 
   private File checkDirectory(String filename, List<ValidationMessage> res, String name) throws Exception {
@@ -305,7 +329,8 @@ public class PublicationProcess {
   }
 
   private void doPublish(File fSource, File fOutput, JsonObject qa, String destination, String destVer, String pathVer, File fRoot, JsonObject pubSetup, PackageList pl, JsonObject prSrc, File fRegistry, NpmPackage npm, 
-      boolean milestone, String date, File history, String tempDir, PublisherConsoleLogger logger, String url, WebSourceProvider src, File sft, String relDest, String templateSrc, boolean first, Map<String, IndexMaintainer> indexes) throws Exception {
+      boolean milestone, String date, File history, String tempDir, PublisherConsoleLogger logger, String url, WebSourceProvider src, File sft, String relDest, String templateSrc, boolean first, Map<String, IndexMaintainer> indexes,
+      Calendar genDate, String username, String version, String gitSrcId, String runNumber) throws Exception {
     // ok. all our tests have passed.
     // 1. do the publication build(s)
     System.out.println("All checks passed. Do the publication build from "+fSource.getAbsolutePath()+" and publish to "+destination);        
@@ -337,7 +362,7 @@ public class PublicationProcess {
     // now, update the package list 
     System.out.println("Update "+Utilities.path(destination, "package-list.json"));    
     PackageListEntry plVer = updatePackageList(pl, fSource.getAbsolutePath(), prSrc, pathVer,  Utilities.path(destination, "package-list.json"), milestone, date, npm.fhirVersion());
-    updatePublishBox(pl, plVer, destVer, pathVer, destination, false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null);
+    updatePublishBox(pl, plVer, destVer, pathVer, destination, fRoot.getAbsolutePath(), false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null);
     
     List<String> existingFiles = new ArrayList<>();
     if (milestone) {
@@ -357,7 +382,7 @@ public class PublicationProcess {
       }
       
       // we do this first in the output so we can get a proper diff
-      updatePublishBox(pl, plVer, igSrc, pathVer, igSrc, true, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null);
+      updatePublishBox(pl, plVer, igSrc, pathVer, igSrc, fRoot.getAbsolutePath(), true, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null);
       
       System.out.println("Check for Files to delete");        
       List<String> newFiles = Utilities.listAllFiles(igSrc, null);
@@ -383,8 +408,8 @@ public class PublicationProcess {
       src.cleanFolder(relDest);
     }
     NpmPackage npmB = NpmPackage.fromPackage(new FileInputStream(Utilities.path(destVer, "package.tgz")));
-    updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("package"), false, src, pubSetup.forceObject("website").asString("org"), npmB);
-    updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("publication"), true, src, pubSetup.forceObject("website").asString("org"), npmB);
+    updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("package"), false, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(genDate), username, version, gitSrcId, runNumber);
+    updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("publication"), true, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(genDate), username, version, gitSrcId, runNumber);
 
     new HistoryPageUpdater().updateHistoryPage(history.getAbsolutePath(), destination, templateSrc, !first);
 
@@ -411,6 +436,10 @@ public class PublicationProcess {
       System.out.println("No!");
       System.out.print("Changes not applied. Finished");
     }
+  }
+
+  private String genDateS(Calendar genDate) {
+    return new SimpleDateFormat("dd/MM/yyyy", new Locale("en", "US")).format(genDate.getTime());
   }
 
   private String tail(String path) {
@@ -442,10 +471,10 @@ public class PublicationProcess {
     return realm == null ? null : indexes.get(realm);
   }
 
-  private void updateFeed(File fRoot, String destVer, PackageList pl, PackageListEntry plVer, String file, boolean isPublication, WebSourceProvider src, String orgName, NpmPackage npm) throws IOException {
+  private void updateFeed(File fRoot, String destVer, PackageList pl, PackageListEntry plVer, String file, boolean isPublication, WebSourceProvider src, String orgName, NpmPackage npm, String genDate, String username, String version, String gitSrcId, String runNumber) throws IOException {
     if (!Utilities.noString(file)) {
       src.needFile(file);
-      String newContent = makeEntry(pl, plVer, isPublication, orgName, npm);
+      String newContent = makeEntry(pl, plVer, isPublication, orgName, npm, genDate, username, version, gitSrcId, runNumber);
       String rss = TextFile.fileToString(Utilities.path(fRoot.getAbsolutePath(), file));
       int i = rss.indexOf("<item");
       while (rss.charAt(i-1) == ' ') {
@@ -456,7 +485,7 @@ public class PublicationProcess {
     }
   }
 
-  private String makeEntry(PackageList pl, PackageListEntry plVer, boolean isPublication, String orgName, NpmPackage npm) {
+  private String makeEntry(PackageList pl, PackageListEntry plVer, boolean isPublication, String orgName, NpmPackage npm, String genDate, String username, String version, String gitSrcId, String runNumber) {
     String link = Utilities.pathURL(plVer.path(), isPublication ? "index.html" : "package.tgz");
 
     StringBuilder b = new StringBuilder();
@@ -469,6 +498,7 @@ public class PublicationProcess {
     b.append("      <fhir:version>"+plVer.fhirVersion()+"</fhir:version>\r\n");
     b.append("      <fhir:kind>"+npm.getNpm().asString("type")+"</fhir:kind>\r\n");
     b.append("      <pubDate>"+presentDate(npm.dateAsDate())+"</pubDate>\r\n");
+    b.append("      <fhir:details>Publication run at "+genDate+" by "+username+" using v"+version+" source id "+gitSrcId+" Run #"+runNumber+"</fhir:details>\r\n");
     b.append("    </item>\r\n");
     
     return b.toString();
@@ -480,8 +510,8 @@ public class PublicationProcess {
     return sdf.format(date);
   }
 
-  private void updatePublishBox(PackageList pl, PackageListEntry plVer, String destVer, String pathVer, String rootFolder, boolean current, ServerType serverType, File sft, List<String> ignoreList) throws FileNotFoundException, IOException {
-    IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(destVer, ignoreList, null, plVer.json(), rootFolder);
+  private void updatePublishBox(PackageList pl, PackageListEntry plVer, String destVer, String pathVer, String destination, String rootFolder, boolean current, ServerType serverType, File sft, List<String> ignoreList) throws FileNotFoundException, IOException {
+    IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(destVer, ignoreList, null, plVer.json(), destination);
     String fragment = PublishBoxStatementGenerator.genFragment(pl, plVer, pl.current(), pl.canonical(), current, false);
     System.out.println("Publish Box Statement: "+fragment);
     igvu.updateStatement(fragment, current ? 0 : 1);
