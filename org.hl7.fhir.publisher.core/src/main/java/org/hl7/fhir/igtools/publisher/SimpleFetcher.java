@@ -45,7 +45,7 @@ import org.hl7.fhir.utilities.Utilities;
 
 public class SimpleFetcher implements IFetchFile {
 
-  private static final String[] EXTENSIONS = new String[] {".xml", ".json", ".map", ".phinvads"};
+  private static final String[] EXTENSIONS = new String[] {".xml", ".json", ".map", ".fml", ".phinvads"};
   private IGKnowledgeProvider pkp;
   private List<String> resourceDirs;
   private ILoggingService log;

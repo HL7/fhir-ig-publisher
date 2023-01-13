@@ -5320,8 +5320,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         e = loadFromJson(file);
       } else if (file.getContentType().contains("xml")) {
         e = loadFromXml(file);
-      } else
+      } else if (file.getContentType().contains("fml")) {
+        e = loadFromMap(file); 
+      } else {
         throw new Exception("Unable to determine file type for "+file.getName());
+      }
     } catch (Exception ex) {
       throw new Exception("Unable to parse "+file.getName()+": " +ex.getMessage(), ex);
     }
@@ -5439,6 +5442,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
     return null;
+  }
+
+  private Element loadFromMap(FetchedFile file) throws Exception {
+    if (VersionUtilities.isR4Ver(context.getVersion()) || VersionUtilities.isR4BVer(context.getVersion())) {
+      StructureMapUtilities mr = new StructureMapUtilities(context);
+      Element res = mr.parseForValidation(new ByteArrayInputStream(file.getSource()), context.getVersion(), file.getErrors());
+      if (res == null) {
+        throw new Exception("Unable to parse Map File for "+file.getName());
+      }
+      return res;      
+    } else {
+      throw new Error("Loading Map Files is not supported for version "+VersionUtilities.getNameForVersion(context.getVersion()));
+    }
   }
 
   private Element loadFromXml(FetchedFile file) throws Exception {
@@ -9428,7 +9444,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (tool == GenerationTool.Jekyll)
         genWrapper(null, r, template, igpkp.getProperty(r, "format"), f.getOutputNames(), vars, "json", "", false);
     } 
-
+    if (igpkp.wantGen(r, "jekyll-data")) {
+      org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(context);
+      FileOutputStream bs = new FileOutputStream(Utilities.path(tempDir, "_data", r.fhirType()+"-"+r.getId()+".json"));
+      jp.compose(r.getElement(), bs, OutputStyle.NORMAL, null);
+      bs.close();      
+    }
     if (igpkp.wantGen(r, "ttl")) {
       if (tool == GenerationTool.Jekyll)
         genWrapper(null, r, template, igpkp.getProperty(r, "format"), f.getOutputNames(), vars, "ttl", "", false);

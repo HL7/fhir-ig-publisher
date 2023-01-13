@@ -193,7 +193,6 @@ public class WebSourceProvider {
     if (web) {
       if (upload) {
         return "The web site source at ftp://"+uploadServer+"/"+uploadPath+" has been updated";
-
       } else {
         if (fc > 0) {
           return "Upload all the files in "+destination+" to "+source+" using your preferred file copy method. Note that there is "+fc+" files to be deleted on the website (see "+deleteFileName()+")"; 
