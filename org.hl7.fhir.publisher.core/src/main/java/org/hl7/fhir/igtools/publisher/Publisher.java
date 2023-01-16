@@ -5876,7 +5876,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             utils.generateSnapshot(base, sd, sd.getUrl(), null, sd.getName());
           }
         } catch (Exception e) { 
-          throw new FHIRException("Unable to generate snapshot for "+sd.getUrl()+" in "+f.getName(), e);
+          if (debug) {
+            e.printStackTrace();
+          }
+          throw new FHIRException("Unable to generate snapshot for "+sd.getUrl()+" in "+f.getName()+" because "+e.getMessage(), e);
         }
         changed = true;
       }
@@ -6365,6 +6368,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       allProfilesCsv.dump();
     }
     if (allProfilesXlsx != null) {
+      allProfilesXlsx.configure();
       String path = Utilities.path(tempDir, "all-profiles.xlsx");
       allProfilesXlsx.finish(new FileOutputStream(path));
       otherFilesRun.add(Utilities.path(tempDir, "all-profiles.xlsx"));
@@ -9978,15 +9982,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
 
     if (igpkp.wantGen(r, "xlsx")) {
+      lapsed(null);
       String path = Utilities.path(tempDir, sdPrefix + r.getId()+".xlsx");
       f.getOutputNames().add(path);
       StructureDefinitionSpreadsheetGenerator sdg = new StructureDefinitionSpreadsheetGenerator(context, true, anyMustSupport(sd));
       sdg.renderStructureDefinition(sd, false);
       sdg.finish(new FileOutputStream(path));
+      lapsed("xslx");
       if (allProfilesXlsx == null) {
         allProfilesXlsx  = new StructureDefinitionSpreadsheetGenerator(context, true, false);
       }
-      allProfilesXlsx.renderStructureDefinition(sd, true);
+      if (allProfilesXlsx != null) {
+        allProfilesXlsx.renderStructureDefinition(sd, true);
+      }
+      lapsed("all-xslx");
     }
 
     if (!regen && sd.getKind() != StructureDefinitionKind.LOGICAL &&  igpkp.wantGen(r, "sch")) {
@@ -9997,6 +10006,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     if (igpkp.wantGen(r, "sch"))
       fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-sch", "yet to be done: schematron as html", null, f.getOutputNames());
+  }
+
+  long last = System.currentTimeMillis();
+  
+  private void lapsed(String msg) {
+    long now = System.currentTimeMillis();
+    long d = now - last;
+    last = now;
+    if (msg != null) {
+      System.out.println("  "+msg+": "+Long.toString(d));
+    }
   }
 
   private boolean anyMustSupport(StructureDefinition sd) {
