@@ -99,16 +99,19 @@ public class WebSourceProvider {
 
     if (web) {      
       Path target = Path.of(df.getAbsolutePath());
-      try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(folderSources.get(path)))) {
-        ZipEntry zipEntry = zis.getNextEntry();
-        while (zipEntry != null) {
-          Path newPath = Utilities.zipSlipProtect(zipEntry, target);
-          Files.delete(newPath);
-          zipEntry = zis.getNextEntry();
+      byte[] buf = folderSources.get(path);
+      if (buf != null) {
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(buf))) {
+          ZipEntry zipEntry = zis.getNextEntry();
+          while (zipEntry != null) {
+            Path newPath = Utilities.zipSlipProtect(zipEntry, target);
+            Files.delete(newPath);
+            zipEntry = zis.getNextEntry();
+          }
+          zis.closeEntry();
         }
-        zis.closeEntry();
+        Utilities.deleteEmptyFolders(df);
       }
-      Utilities.deleteEmptyFolders(df);
     } else {
       // do nothing?
     }
