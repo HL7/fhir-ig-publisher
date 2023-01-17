@@ -858,6 +858,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private boolean tocSizeWarning = false;
   private CSVWriter allProfilesCsv;
   private StructureDefinitionSpreadsheetGenerator allProfilesXlsx;
+  private boolean produceJekyllData;
   
   private class PreProcessInfo {
     private String xsltName;
@@ -2639,6 +2640,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         r4tor4b.markExempt(p.getValue(), true);
       } else if (pc.equals("r4b-exclusion")) {
         r4tor4b.markExempt(p.getValue(), false);
+      } else if (pc.equals("produce-jekyll-data")) {        
+        produceJekyllData = "true".equals(p.getValue());
       }
       count++;
     }
@@ -9398,7 +9401,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (tool == GenerationTool.Jekyll)
         genWrapper(null, r, template, igpkp.getProperty(r, "format"), f.getOutputNames(), vars, "json", "", false);
     } 
-    if (igpkp.wantGen(r, "jekyll-data")) {
+    if (igpkp.wantGen(r, "jekyll-data") && produceJekyllData) {
       org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(context);
       FileOutputStream bs = new FileOutputStream(Utilities.path(tempDir, "_data", r.fhirType()+"-"+r.getId()+".json"));
       jp.compose(r.getElement(), bs, OutputStyle.NORMAL, null);
