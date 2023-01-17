@@ -62,6 +62,11 @@ public class HistoryPageUpdater {
       String index = new File(Utilities.path(folder, "index.html")).exists() ? TextFile.fileToString(Utilities.path(folder, "index.html")) : "XXXXX";
       if (index.contains("XXXX")) {
         html = TextFile.fileToString(Utilities.path(sourceRepo, "index.html"));
+        html = html.replace("XXXX", "");
+        html = html.replace("$header$", loadTemplate(templateSrc, "header.template"));
+        html = html.replace("$preamble$", loadTemplate(templateSrc, "preamble.template"));
+        html = html.replace("$postamble$", loadTemplate(templateSrc, "postamble.template"));
+
         html = fixParameter(html, "title", json.asString("title"));
         html = fixParameter(html, "id", json.asString("package-id"));
         html = fixParameter(html, "json", jsonv);

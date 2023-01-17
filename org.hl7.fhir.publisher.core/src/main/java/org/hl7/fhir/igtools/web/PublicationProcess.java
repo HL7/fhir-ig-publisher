@@ -74,6 +74,16 @@ public class PublicationProcess {
     PublisherConsoleLogger logger = new PublisherConsoleLogger();
     logger.start(Utilities.path("[tmp]", "publication-process.log"));
     try {
+      System.out.println("FHIR IG Publisher "+IGVersionUtil.getVersionString());
+      System.out.println("Detected Java version: " + System.getProperty("java.version")+" from "+System.getProperty("java.home")+" on "+System.getProperty("os.arch")+" ("+System.getProperty("sun.arch.data.model")+"bit). "+toMB(Runtime.getRuntime().maxMemory())+"MB available");
+      System.out.println("dir = "+System.getProperty("user.dir")+", path = "+System.getenv("PATH"));
+      String s = "Parameters:";
+      for (int i = 0; i < args.length; i++) {
+          s = s + " "+args[i];
+      }      
+      System.out.println(s);
+      System.out.println("---------------");
+      System.out.println("Publication Run: publish "+source+" to "+web);
       List<ValidationMessage> res = publishInner(source, web, date, registrySource, history, templatesSrc, temp, logger, args);
       if (res.size() == 0) {
         System.out.println("Success");
@@ -89,6 +99,11 @@ public class PublicationProcess {
     System.out.println("Full log in "+logger.getFilename());
   }
   
+
+  private static String toMB(long maxMemory) {
+    return Long.toString(maxMemory / (1024*1024));
+  }
+
   public List<ValidationMessage> publishInner(String source, String web, String date, String registrySource, String history, String templateSrc, String temp, PublisherConsoleLogger logger, String[] args) throws Exception {
     List<ValidationMessage> res = new ArrayList<>();
 
@@ -451,7 +466,7 @@ public class PublicationProcess {
     ImplementationGuideEntry rc = reg.seeIg(pl.pid(), pl.canonical(), pl.title(), pl.category());
     
     if (reg != null) {
-      reg.seeCiBuild(rc, pl.current().path(), "package-list.json");
+      reg.seeCiBuild(rc, pl.ciBuild().path(), "package-list.json");
     }
     
     boolean hasRelease = false;
@@ -536,7 +551,7 @@ public class PublicationProcess {
     System.out.println("  .. "+rb.getCountTotal()+" redirections ("+rb.getCountUpdated()+" created/updated)");
     new DownloadBuilder(destVer, pl.canonical(), current ?  pl.canonical() : plVer.path(), ignoreList).execute();
     if (!current && serverType == ServerType.ASP2) {
-      new VersionRedirectorGenerator(rootFolder).execute(plVer.version(), plVer.path());
+      new VersionRedirectorGenerator(destination).execute(plVer.version(), plVer.path());
     }
 
     

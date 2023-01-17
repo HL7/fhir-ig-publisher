@@ -123,9 +123,9 @@ public class WebSiteLayoutRulesProviders {
       boolean ok = check(res, parts.length == 4, "Package Id '"+id+"' is not valid: must have 4 parts (hl7.fhir.[realm].[code]");
       ok = check(res, "hl7".equals(parts[0]), "Package Id '"+id+"' is not valid: must start with hl7.") && ok;
       if ("eu".equals(parts[1])) {
-        ok = check(res, Utilities.existsInList(parts[2], "fhir", "xprod"), "Package Id '"+id+"' is not valid: must start with hl7.eu.fhir.[code] or hl7.eu.xprod.[code]") && ok;         
+        ok = check(res, Utilities.existsInList(parts[2], "fhir"), "Package Id '"+id+"' is not valid: must start with hl7.eu.fhir.[code]") && ok;         
       } else {
-        ok = check(res, Utilities.existsInList(parts[1], "fhir", "xprod"), "Package Id '"+id+"' is not valid: must start with hl7.fhir.[realm].[code] or hl7.xprod.[realm].[code]") && ok; 
+        ok = check(res, Utilities.existsInList(parts[1], "fhir", "xprod", "cda"), "Package Id '"+id+"' is not valid: must start with hl7.fhir.[realm].[code], hl7.cda.[realm].[code] or hl7.xprod.[realm].[code]") && ok; 
       }
       return ok;
     }
@@ -154,10 +154,12 @@ public class WebSiteLayoutRulesProviders {
           ok = check(res, canonical.equals("http://hl7.org/fhir/smart-app-launch"), "canonical URL of "+canonical+" does not match the required canonical of http://hl7.org/fhir/smart-app-launch"+" [5]");
         } else if ("xprod".equals(family())) {
           ok = check(res, canonical.equals("http://hl7.org/xprod/ig/"+realm()+"/"+code()), "canonical URL of "+canonical+" does not match the required canonical of http://hl7.org/fhir/"+realm()+"/"+code()+" [5a]");
+        } else if ("cda".equals(family())) {
+          ok = check(res, canonical.equals("http://hl7.org/cda/stds/"+code()), "canonical URL of "+canonical+" does not match the required canonical of http://hl7.org/cda/"+code()+" [5b]");
         } else if ("eu".equals(family())) {
-          ok = check(res, canonical.equals("http://hl7.eu/fhir/ig/"+code()), "canonical URL of "+canonical+" does not match the required canonical of http://hl7.eu/fhir/ig/"+code()+" [5a]");
+          ok = check(res, canonical.equals("http://hl7.eu/fhir/ig/"+code()), "canonical URL of "+canonical+" does not match the required canonical of http://hl7.eu/fhir/ig/"+code()+" [5c]");
         } else {
-          ok = check(res, canonical.equals("http://hl7.org/fhir/"+realm()+"/"+code()) || canonical.equals("http://hl7.org/fhir/smart-app-launch"), "canonical URL of "+canonical+" does not match the required canonical of http://hl7.org/fhir/"+realm()+"/"+code());
+          ok = check(res, canonical.equals("http://hl7.org/fhir/"+realm()+"/"+code()) || canonical.equals("http://hl7.org/fhir/smart-app-launch"), "canonical URL of "+canonical+" does not match the required canonical of http://hl7.org/fhir/"+realm()+"/"+code()+" (5d)");
         }
       }
       return check(res, canonical.startsWith(url), "Proposed canonical '"+canonical+"' does not match the web site URL '"+url+"'") && ok;
@@ -181,6 +183,8 @@ public class WebSiteLayoutRulesProviders {
       } else {
         // special case weirdity
         if ("uv".equals(realm()) && "smart-app-launch".equals(code())) {
+          return Utilities.path(rootFolder, code());
+        } else  if ("cda".equals(family())) {
           return Utilities.path(rootFolder, code());
         } else {
           return Utilities.path(rootFolder, realm(), code());
