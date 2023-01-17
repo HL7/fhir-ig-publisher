@@ -857,7 +857,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private PackageInformation packageInfo;
   private boolean tocSizeWarning = false;
   private CSVWriter allProfilesCsv;
-  private StructureDefinitionSpreadsheetGenerator allProfilesXlsx;;
+  private StructureDefinitionSpreadsheetGenerator allProfilesXlsx;
   
   private class PreProcessInfo {
     private String xsltName;
@@ -9992,9 +9992,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (allProfilesXlsx == null) {
         allProfilesXlsx  = new StructureDefinitionSpreadsheetGenerator(context, true, false);
       }
-      if (allProfilesXlsx != null) {
-        allProfilesXlsx.renderStructureDefinition(sd, true);
-      }
+      allProfilesXlsx.renderStructureDefinition(sd, true);
       lapsed("all-xslx");
     }
 
