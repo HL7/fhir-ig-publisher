@@ -767,6 +767,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private String packagesFolder;
   private String targetOutput;
+  private String repoSource;
   private String targetOutputNested;
 
   private String folderToDelete;
@@ -2207,7 +2208,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       apiKeyFile = new IniFile(Utilities.path(System.getProperty("user.home"), "fhir-api-keys.ini"));
     }
     log("API keys loaded from "+apiKeyFile.getFileName());
-    templateManager = new TemplateManager(pcm, logger, gh());
+    templateManager = new TemplateManager(pcm, logger);
     templateProvider = new IGPublisherLiquidTemplateServices();
     extensionTracker = new ExtensionTracker();
     log("Package Cache: "+pcm.getFolder());
@@ -5442,9 +5443,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private Element loadFromMap(FetchedFile file) throws Exception {
     if (VersionUtilities.isR4Ver(context.getVersion()) || VersionUtilities.isR4BVer(context.getVersion())) {
       StructureMapUtilities mr = new StructureMapUtilities(context);
-      Element res = mr.parseForValidation(new ByteArrayInputStream(file.getSource()), context.getVersion(), file.getErrors());
+      Element res = mr.parseEM(TextFile.bytesToString(file.getSource()), context.getVersion(), file.getErrors());
       if (res == null) {
-        throw new Exception("Unable to parse Map File for "+file.getName());
+        throw new Exception("Unable to parse Map Source for "+file.getName());
       }
       return res;      
     } else {
@@ -6609,7 +6610,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private String gh() {
-    return targetOutput == null ? null : targetOutput.replace("https://build.fhir.org/ig", "https://github.com");
+    return repoSource != null ? repoSource : targetOutput != null ? targetOutput.replace("https://build.fhir.org/ig", "https://github.com") : null;
   }
 
 
@@ -10640,6 +10641,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (hasNamedParam(args, "-auto-ig-build")) {
         self.setMode(IGBuildMode.AUTOBUILD);
         self.targetOutput = getNamedParam(args, "-target");
+        self.repoSource = getNamedParam(args, "-repo");
       }
       if (hasNamedParam(args, "-api-key-file")) {
         self.apiKeyFile = new IniFile(new File(getNamedParam(args, "-api-key-file")).getAbsolutePath());
