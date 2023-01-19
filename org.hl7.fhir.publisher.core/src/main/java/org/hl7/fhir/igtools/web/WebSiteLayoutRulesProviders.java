@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.List;
 
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
@@ -45,6 +46,10 @@ public class WebSiteLayoutRulesProviders {
     @Override
     public String getDestination(String rootFolder) throws IOException {
       throw new Error("This website needs configuration or support in the IG publisher. Discuss on https://chat.fhir.org/#narrow/stream/179252-IG-creation");
+    }
+
+    public String desc() {
+      return "No defined web Layout";
     }
   }
   
@@ -114,6 +119,11 @@ public class WebSiteLayoutRulesProviders {
         return Utilities.path(rootFolder, category, code);        
       }
     }
+
+    public String desc() {
+      return "Web Layout using the script "+idRule+" & "+canonicalRule;
+    }
+
   }
   
 
@@ -180,6 +190,8 @@ public class WebSiteLayoutRulesProviders {
     public String getDestination(String rootFolder) throws IOException {
       if (Utilities.existsInList(realm(), "dk", "ch", "be", "cl")) {
         return Utilities.path(rootFolder, code());
+      } else if ("eu".equals(parts[1])) {
+        return Utilities.path(rootFolder, code());
       } else {
         // special case weirdity
         if ("uv".equals(realm()) && "smart-app-launch".equals(code())) {
@@ -191,6 +203,11 @@ public class WebSiteLayoutRulesProviders {
         }
       }
     }
+    
+    public String desc() {
+      return "Web Layout using the HL7 defined rules";
+    }
+
   }
 
   public static class HL7ChNamingRulesProvider extends DefaultNamingRulesProvider {
@@ -225,6 +242,10 @@ public class WebSiteLayoutRulesProviders {
       } 
       return super.getDestination(rootFolder);
     }
+    public String desc() {
+      return "Web Layout using the HL7-CH defined rules";
+    }
+    
   }
 
   public static class IHENamingRulesProvider extends DefaultNamingRulesProvider {
@@ -254,6 +275,9 @@ public class WebSiteLayoutRulesProviders {
       // there's a case problem here: if IHI lowercases package names, but not canonicals or folder URLs, then the case of this will be wrong
       // and can't upper case algorithmically. May have to pick up case from canonical?
       return Utilities.path(rootFolder, domain().toUpperCase(), profile().toUpperCase());      
+    }
+    public String desc() {
+      return "Web Layout using the IHE defined rules";
     }
 
   }
@@ -297,6 +321,11 @@ public class WebSiteLayoutRulesProviders {
     public String getDestination(String rootFolder) throws IOException {
       return Utilities.path(rootFolder, org(), code());      
     }
+    
+    public String desc() {
+      return "Web Layout using the fhir.org defined rules";
+    }
+
 
   }
 
@@ -316,7 +345,10 @@ public class WebSiteLayoutRulesProviders {
     public String getDestination(String rootFolder) throws IOException {
       return rootFolder;
     }
-    
+    public String desc() {
+      return "Web Layout using the CQL defined rules";
+    }
+
   }
 
   public static class HL7TerminologyNamingRulesProvider extends DefaultNamingRulesProvider {
@@ -335,10 +367,13 @@ public class WebSiteLayoutRulesProviders {
       return rootFolder;
     }
 
+    public String desc() {
+      return "Web Layout using the THO defined rules";
+    }
 
   }
 
-  public static WebSiteLayoutRulesProvider recogniseNpmId(String id, String[] p, String script) {
+  public static WebSiteLayoutRulesProvider recogniseNpmId(String id, String[] p, JsonObject setup) {
     DefaultNamingRulesProvider res = new DefaultNamingRulesProvider();
     if (id.equals("hl7.terminology")) {
       res = new HL7TerminologyNamingRulesProvider();
@@ -352,10 +387,14 @@ public class WebSiteLayoutRulesProviders {
       res = new HL7ChNamingRulesProvider();
     } else if (id.startsWith("ihe.")) {
       res = new IHENamingRulesProvider();
-    } else if (script != null && script.contains("|")) {
-      String[] s = script.split("\\|");
-      res = new ScriptedNamingRulesProvider(s[0], s[1]);
+    } else if (setup != null) {
+      if (setup.has("id") && setup.has("canonical")) {
+        res = new ScriptedNamingRulesProvider(setup.asString("id"), setup.asString("canonical"));
+      } else {
+        System.out.println("Found layout in publish-setup.json, but it doesn't contain both id & canonical rules");
+      }
     }
+    System.out.println(res.desc());
     res.id = id;
     res.parts = p;
     return res;

@@ -166,7 +166,7 @@ public class PublicationProcess {
     }
 
     // --- Rules for layout depend on publisher ------
-    WebSiteLayoutRulesProvider rp = WebSiteLayoutRulesProviders.recogniseNpmId(id, p, pubSetup.getJsonObject("website").asString("layout"));
+    WebSiteLayoutRulesProvider rp = WebSiteLayoutRulesProviders.recogniseNpmId(id, p, pubSetup.getJsonObject("website").getJsonObject("layout"));
     if (!rp.checkNpmId(res)) {
       return res;
     }
@@ -174,6 +174,7 @@ public class PublicationProcess {
       return res;
     }
     String destination = rp.getDestination(workingRoot); 
+    System.out.println("Relative directory for IG is "+destination.substring(workingRoot.length()));
     String relDest = Utilities.getRelativePath(workingRoot, destination);
     Utilities.createDirectory(destination);
     

@@ -24,7 +24,7 @@
     <version>1.2.29-SNAPSHOT</version> <!-- See the note above -->
 
     <properties>
-        <core_version>5.6.91</core_version>
+        <core_version>5.6.92-SNAPSHOT</core_version>
         <maven_surefire_version>3.0.0-M5</maven_surefire_version>
         <apache_poi_version>4.1.1</apache_poi_version>
         <maven.compiler.release>11</maven.compiler.release>
@@ -88,7 +88,7 @@
             <dependency>
                 <groupId>org.apache.ant</groupId>
                 <artifactId>ant</artifactId>
-                <version>1.10.11</version>
+                <version>1.10.12</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
