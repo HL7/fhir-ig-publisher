@@ -24,7 +24,7 @@
     <version>1.2.29-SNAPSHOT</version> <!-- See the note above -->
 
     <properties>
-        <core_version>5.6.92-SNAPSHOT</core_version>
+        <core_version>5.6.92</core_version>
         <maven_surefire_version>3.0.0-M5</maven_surefire_version>
         <apache_poi_version>4.1.1</apache_poi_version>
         <maven.compiler.release>11</maven.compiler.release>
