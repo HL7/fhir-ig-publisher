@@ -590,7 +590,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private final String headerTemplate = 
       "<!DOCTYPE HTML>\r\n"+
       "<html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\">\r\n"+
-      "<!-- broken links = errors = $err$, warn = $warn$, info = $info$, $links$ -->\r\n"+
+      "<!-- broken links = $links$, errors = $err$, warn = $warn$, info = $info$-->\r\n"+
       "<head>\r\n"+
       "  <title>$title$ : Validation Results</title>\r\n"+
       "  <link href=\"fhir.css\" rel=\"stylesheet\"/>\r\n"+
