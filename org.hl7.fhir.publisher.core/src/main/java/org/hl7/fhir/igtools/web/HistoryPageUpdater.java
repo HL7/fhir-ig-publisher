@@ -137,6 +137,10 @@ public class HistoryPageUpdater {
       s = s.replace("'", "`");
       p.setValue(new JsonString(s));
     }
+    if (s.contains("\"")) {
+      s = s.replace("\"", "`");
+      p.setValue(new JsonString(s));
+    }
   }
 
 }

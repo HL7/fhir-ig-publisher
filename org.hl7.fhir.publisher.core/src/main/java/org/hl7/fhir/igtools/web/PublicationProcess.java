@@ -22,6 +22,7 @@ import org.hl7.fhir.igtools.publisher.PastProcessHackerUtilities;
 import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.web.IGRegistryMaintainer.ImplementationGuideEntry;
 import org.hl7.fhir.igtools.web.IGReleaseUpdater.ServerType;
+import org.hl7.fhir.igtools.web.PublicationProcess.PublicationProcessMode;
 import org.hl7.fhir.igtools.web.WebSiteLayoutRulesProviders.WebSiteLayoutRulesProvider;
 import org.hl7.fhir.utilities.FhirPublication;
 import org.hl7.fhir.utilities.IniFile;
@@ -62,6 +63,29 @@ public class PublicationProcess {
    *   - TSC has approved the publication
    *   
    */
+
+  public enum PublicationProcessMode {
+    WORKING,
+    MILESTONE,
+    TECHNICAL_CORRECTION;
+
+    public static PublicationProcessMode fromCode(String s) {
+      if (Utilities.noString(s)) {
+        return WORKING;
+      }
+      s = s.toLowerCase();
+      if ("working".equals(s)) {
+        return WORKING;
+      }
+      if ("milestone".equals(s)) {
+        return MILESTONE;
+      }
+      if ("technical-correction".equals(s)) {
+        return TECHNICAL_CORRECTION;
+      }
+      throw new Error("Unknown publication process mode '"+s+"'");
+    }
+  }
 
   /**
    * 
@@ -174,7 +198,7 @@ public class PublicationProcess {
       return res;
     }
     String destination = rp.getDestination(workingRoot); 
-    System.out.println("Relative directory for IG is "+destination.substring(workingRoot.length()));
+    System.out.println("Relative directory for IG is '"+destination.substring(workingRoot.length())+"'");
     String relDest = Utilities.getRelativePath(workingRoot, destination);
     Utilities.createDirectory(destination);
     
@@ -189,7 +213,7 @@ public class PublicationProcess {
     
     JsonObject prSrc = JsonParser.parseObject(loadFile("Source publication request", Utilities.path(source, "publication-request.json")));
 
-    boolean milestone = prSrc.asBoolean("milestone");
+    PublicationProcessMode mode = PublicationProcessMode.fromCode(prSrc.asString("mode"));
     boolean first = prSrc.asBoolean("first"); 
     src.needOptionalFile(Utilities.path(relDest,"package-list.json"));
     if (first) {
@@ -264,6 +288,17 @@ public class PublicationProcess {
         indexes.put(realm, new IndexMaintainer(realm, ndx.asString("title"), ndx.asString("source"), Utilities.path(fRoot.getAbsolutePath(), ndx.asString("source")), Utilities.path(templateSrc, pubSetup.getJsonObject("website").asString("index-template"))));        
       }
     }
+    String tcName = null;
+    if (mode == PublicationProcessMode.TECHNICAL_CORRECTION) {
+      if (pl.current() == null) {
+        throw new Error("Cannot perform a technical correction when the spec hasn't yet been published");        
+      }
+      if (pl.current().version().equals(prSrc.asString("version"))) {
+        throw new Error("Technical correction must have a different version to the currently published version ("+pl.current().version()+")");        
+      }
+      tcName = pl.pid()+"#"+pl.current().version()+".zip";
+    }
+    
     // we always need the current folder, if there is one 
     if (pl.current() != null) {
       src.needFolder(relDest, false);
@@ -272,8 +307,8 @@ public class PublicationProcess {
     
     // well, we've run out of things to test... time to actually try...
     if (res.size() == 0) {
-      doPublish(fSource, fOutput, qa, destination, destVer, pathVer, fRoot, pubSetup, pl, prSrc, fRegistry, npm, milestone, date, fHistory, temp, logger, 
-          pubSetup.getJsonObject("website").asString("url"), src, sft, relDest, templateSrc, first, indexes, Calendar.getInstance(), getComputerName(), IGVersionUtil.getVersionString(), gitSrcId(source), Integer.toString(runNumber));
+      doPublish(fSource, fOutput, qa, destination, destVer, pathVer, fRoot, pubSetup, pl, prSrc, fRegistry, npm, mode, date, fHistory, temp, logger, 
+          pubSetup.getJsonObject("website").asString("url"), src, sft, relDest, templateSrc, first, indexes, Calendar.getInstance(), getComputerName(), IGVersionUtil.getVersionString(), gitSrcId(source), Integer.toString(runNumber), tcName);
     }        
     return res;
     
@@ -345,8 +380,8 @@ public class PublicationProcess {
   }
 
   private void doPublish(File fSource, File fOutput, JsonObject qa, String destination, String destVer, String pathVer, File fRoot, JsonObject pubSetup, PackageList pl, JsonObject prSrc, File fRegistry, NpmPackage npm, 
-      boolean milestone, String date, File history, String tempDir, PublisherConsoleLogger logger, String url, WebSourceProvider src, File sft, String relDest, String templateSrc, boolean first, Map<String, IndexMaintainer> indexes,
-      Calendar genDate, String username, String version, String gitSrcId, String runNumber) throws Exception {
+      PublicationProcessMode mode, String date, File history, String tempDir, PublisherConsoleLogger logger, String url, WebSourceProvider src, File sft, String relDest, String templateSrc, boolean first, Map<String, IndexMaintainer> indexes,
+      Calendar genDate, String username, String version, String gitSrcId, String runNumber, String tcName) throws Exception {
     // ok. all our tests have passed.
     // 1. do the publication build(s)
     System.out.println("All checks passed. Do the publication build from "+fSource.getAbsolutePath()+" and publish to "+destination);        
@@ -357,7 +392,7 @@ public class PublicationProcess {
     System.out.println("Build IG at "+fSource.getAbsolutePath()+": final copy suitable for publication (in "+temp.getAbsolutePath()+")");        
     runBuild(qa, temp.getAbsolutePath(), new String[] {"-ig", temp.getAbsolutePath(), "-resetTx", "-publish", pathVer, "-no-exit"});
 
-    if (milestone) {
+    if (mode != PublicationProcessMode.WORKING) {
       tempM = cloneToTemp(tempDir, temp, npm.name()+"#"+npm.version()+"-milestone");
       System.out.println("Build IG at "+fSource.getAbsolutePath()+": final copy suitable for publication (in "+tempM.getAbsolutePath()+") (milestone build)");        
       runBuild(qa, tempM.getAbsolutePath(), new String[] {"-ig", tempM.getAbsolutePath(), "-publish", pathVer, "-milestone", "-no-exit"});      
@@ -377,13 +412,18 @@ public class PublicationProcess {
 
     // now, update the package list 
     System.out.println("Update "+Utilities.path(destination, "package-list.json"));    
-    PackageListEntry plVer = updatePackageList(pl, fSource.getAbsolutePath(), prSrc, pathVer,  Utilities.path(destination, "package-list.json"), milestone, date, npm.fhirVersion());
+    PackageListEntry plVer = updatePackageList(pl, fSource.getAbsolutePath(), prSrc, pathVer,  Utilities.path(destination, "package-list.json"), mode, date, npm.fhirVersion(), Utilities.pathURL(pubSetup.asString("url"), tcName));
     updatePublishBox(pl, plVer, destVer, pathVer, destination, fRoot.getAbsolutePath(), false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null);
     
     List<String> existingFiles = new ArrayList<>();
-    if (milestone) {
-      System.out.println("This is a milestone release - publish v"+npm.version()+" to "+destination);
+    if (mode != PublicationProcessMode.WORKING) {
       String igSrc = Utilities.path(tempM.getAbsolutePath(), "output");
+      if (mode == PublicationProcessMode.TECHNICAL_CORRECTION) {
+        System.out.println("This is a technical correction - publish v"+npm.version()+" to "+destination+" but archive first");
+        produceArchive(destVer, Utilities.path(igSrc,tcName));
+      } else {
+        System.out.println("This is a milestone release - publish v"+npm.version()+" to "+destination);
+      }
       
       List<String> ignoreList = new ArrayList<>();
       ignoreList.add(destVer);
@@ -391,9 +431,11 @@ public class PublicationProcess {
       for (PackageListEntry v : pl.versions()) {
         if (v != plVer) {
           String path = v.determineLocalPath(url, fRoot.getAbsolutePath());
-          String relPath = Utilities.getRelativePath(fRoot.getAbsolutePath(), path);
-          ignoreList.add(path);
-          src.needFolder(relPath, false);
+          if (path != null) {
+            String relPath = Utilities.getRelativePath(fRoot.getAbsolutePath(), path);
+            ignoreList.add(path);
+            src.needFolder(relPath, false);
+          }
         }
       }
       
@@ -433,7 +475,7 @@ public class PublicationProcess {
     if (ndx != null) {
       src.needFile(Utilities.changeFileExt(ndx.path(), ".json"));      
       ndx.loadJson();
-      ndx.updateForPublication(pl, plVer, milestone);
+      ndx.updateForPublication(pl, plVer, mode != PublicationProcessMode.WORKING);
       ndx.buildJson();
       ndx.execute();
     }
@@ -452,6 +494,30 @@ public class PublicationProcess {
       System.out.println("No!");
       System.out.print("Changes not applied. Finished");
     }
+  }
+
+  private void produceArchive(String source, String dest) throws IOException {
+    System.out.println("Zipping "+source+" to "+dest);
+    if (new File(dest).exists()) {
+      System.out.println(" "+dest+": already exists");
+      return;
+    }
+    ZipGenerator zip = new ZipGenerator(dest);
+    addFolderToZip(zip, new File(source), source.length()+1);
+    zip.close();    
+  }
+
+  private int addFolderToZip(ZipGenerator zip, File folder, int offset) throws FileNotFoundException, IOException {
+    int c = 0;
+    for (File f : folder.listFiles()) {
+      if (f.isDirectory()) {
+        c = c + addFolderToZip(zip, f, offset);
+      } else {
+        zip.addBytes(f.getAbsolutePath().substring(offset), TextFile.fileToBytes(f), false);
+        c++;
+      }
+    }
+    return c;
   }
 
   private String genDateS(Calendar genDate) {
@@ -623,21 +689,28 @@ public class PublicationProcess {
     return fDest;
   }
   
-  private PackageListEntry updatePackageList(PackageList pl, String folder, JsonObject prSrc, String webpath, String filepath, boolean milestone, String date, String fhirVersion) throws Exception {
+  private PackageListEntry updatePackageList(PackageList pl, String folder, JsonObject prSrc, String webpath, String filepath, PublicationProcessMode mode, String date, String fhirVersion, String tcPath) throws Exception {
     if (date == null) {
       SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
       date = sdf.format(new Date());      
     }
-    if (milestone) {
-      for (PackageListEntry e : pl.versions()) {
-        e.setCurrent(false);
-      }
-    }
-    PackageListEntry nv = pl.newVersion(prSrc.asString("version"), webpath,  prSrc.asString("status"), prSrc.asString("sequence"), FhirPublication.fromCode(fhirVersion));
+    PackageListEntry nv = null;
     
-    nv.setDate(date);
-    if (milestone) {
-      nv.setCurrent(true);
+    if (mode == PublicationProcessMode.TECHNICAL_CORRECTION) {
+      nv = pl.current();
+      nv.update(prSrc.asString("version"), webpath,  prSrc.asString("status"), prSrc.asString("sequence"), FhirPublication.fromCode(fhirVersion), tcPath, date);
+    } else {
+      if (mode != PublicationProcessMode.WORKING) {
+        for (PackageListEntry e : pl.versions()) {
+          e.setCurrent(false);
+        }
+      }
+      nv = pl.newVersion(prSrc.asString("version"), webpath,  prSrc.asString("status"), prSrc.asString("sequence"), FhirPublication.fromCode(fhirVersion));
+
+      nv.setDate(date);
+      if (mode != PublicationProcessMode.WORKING) {
+        nv.setCurrent(true);
+      }
     }
     String md = null;
     if (prSrc.has("descmd")) {
