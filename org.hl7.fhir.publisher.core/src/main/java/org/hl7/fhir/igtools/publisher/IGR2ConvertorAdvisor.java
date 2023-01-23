@@ -26,12 +26,12 @@ import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.CodeSystem;
 import org.hl7.fhir.r4.model.ValueSet;
 import org.hl7.fhir.utilities.FhirPublication;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 public class IGR2ConvertorAdvisor extends BaseAdvisor_10_40 {
     @Override
-    public boolean ignoreEntry(@Nullable Bundle.BundleEntryComponent bundleEntryComponent, @NotNull FhirPublication fhirPublication) {
+    public boolean ignoreEntry(@Nullable Bundle.BundleEntryComponent bundleEntryComponent, @Nonnull FhirPublication fhirPublication) {
         return false;
     }
 
