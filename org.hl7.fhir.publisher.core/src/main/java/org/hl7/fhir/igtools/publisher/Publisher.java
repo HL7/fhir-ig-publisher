@@ -39,6 +39,7 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -3029,15 +3030,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (configuration.has("paths") && !(configuration.get("paths") instanceof JsonObject))
       throw new Exception("Error: if configuration file has a \"paths\", it must be an object");
     JsonObject paths = configuration.getJsonObject("paths");
-    if (fetcher instanceof ZipFetcher) {
-      rootDir = configFileRootPath;
-    } else {
-      rootDir = Utilities.getDirectoryForFile(configFile);
-      if (Utilities.noString(rootDir))
-        rootDir = getCurentDirectory();
-      // We need the root to be expressed as a full path.  getDirectoryForFile will do that in general, but not in Eclipse
-      rootDir = new File(rootDir).getCanonicalPath();
+
+    rootDir = Utilities.getDirectoryForFile(configFile);
+    if (Utilities.noString(rootDir)) {
+      rootDir = getCurentDirectory();
     }
+    // We need the root to be expressed as a full path.  getDirectoryForFile will do that in general, but not in Eclipse
+    rootDir = new File(rootDir).getCanonicalPath();
+
 
     if (configuration.has("template")) {
       template = templateManager.loadTemplate(str(configuration, "template"), rootDir, configuration.has("npm-name") ? configuration.asString("npm-name") : null, mode == IGBuildMode.AUTOBUILD);
@@ -3594,14 +3594,27 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       String pid = VersionUtilities.packageForVersion(vid);
       npm = pcm.loadPackage(pid, vid);
     }
-    
-    ZipInputStream zip = new ZipInputStream(npm.load("other", "ig-template.zip"));
+
+    InputStream igTemplateInputStream = npm.load("other", "ig-template.zip");
+    String zipTargetDirectory = adHocTmpDir;
+    unzipToDirectory(igTemplateInputStream, zipTargetDirectory);
+  }
+
+  protected static void unzipToDirectory(InputStream inputStream, String zipTargetDirectory) throws IOException {
+    ZipInputStream zip = new ZipInputStream(inputStream);
     byte[] buffer = new byte[2048];
     ZipEntry entry;
     while((entry = zip.getNextEntry())!=null) {
-      String filename = Utilities.path(adHocTmpDir, entry.getName());
+
+      if (entry.isDirectory()) {
+        continue;
+      }
+      String filename = Utilities.path(zipTargetDirectory, entry.getName());
       String dir = Utilities.getDirectoryForFile(filename);
+
+      Utilities.zipSlipProtect(entry, Path.of(dir));
       Utilities.createDirectory(dir);
+
       FileOutputStream output = new FileOutputStream(filename);
       int len = 0;
       while ((len = zip.read(buffer)) > 0)
@@ -11044,7 +11057,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
 
-  public void setFetcher(ZipFetcher theFetcher) {
+  public void setFetcher(IFetchFile theFetcher) {
     fetcher = theFetcher;
   }
 

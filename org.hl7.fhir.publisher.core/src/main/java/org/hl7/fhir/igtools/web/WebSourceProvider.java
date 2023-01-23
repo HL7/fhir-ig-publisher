@@ -3,9 +3,9 @@ package org.hl7.fhir.igtools.web;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -101,19 +101,26 @@ public class WebSourceProvider {
       Path target = Path.of(df.getAbsolutePath());
       byte[] buf = folderSources.get(path);
       if (buf != null) {
-        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(buf))) {
-          ZipEntry zipEntry = zis.getNextEntry();
-          while (zipEntry != null) {
-            Path newPath = Utilities.zipSlipProtect(zipEntry, target);
-            Files.delete(newPath);
-            zipEntry = zis.getNextEntry();
-          }
-          zis.closeEntry();
-        }
+        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buf);
+        cleanZipTargets(target, byteArrayInputStream);
         Utilities.deleteEmptyFolders(df);
       }
     } else {
       // do nothing?
+    }
+  }
+
+  protected static void cleanZipTargets(Path target, InputStream inputStream) throws IOException {
+    try (ZipInputStream zis = new ZipInputStream(inputStream)) {
+      ZipEntry zipEntry = zis.getNextEntry();
+      while (zipEntry != null) {
+        Path newPath = Utilities.zipSlipProtect(zipEntry, target);
+        if (Files.exists(newPath)) {
+          Files.delete(newPath);
+        }
+        zipEntry = zis.getNextEntry();
+      }
+      zis.closeEntry();
     }
   }
 
