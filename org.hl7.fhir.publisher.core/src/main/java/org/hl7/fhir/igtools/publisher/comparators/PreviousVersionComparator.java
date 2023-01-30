@@ -103,7 +103,11 @@ public class PreviousVersionComparator {
     this.newpkp = pkp;
     this.logger = logger;
     try {
-      processVersions(canonical, versions, rootDir);
+      if (businessVersion == null) {
+         errMsg = "No Version Information Provided";
+      } else {
+        processVersions(canonical, versions, rootDir);
+      }
     } catch (Exception e) {
       errMsg = "Unable to find version history at "+canonical+" ("+e.getMessage()+")";
     }
@@ -180,7 +184,7 @@ public class PreviousVersionComparator {
 
 
   public void startChecks(ImplementationGuide ig) {
-    if (errMsg == null && pid != null) {
+    if (errMsg == null && pid != null && businessVersion != null) {
       resources = new ArrayList<>();
       for (VersionInstance vi : versionList) {
         String filename = "";
@@ -229,7 +233,7 @@ public class PreviousVersionComparator {
   }
 
   public void finishChecks() throws IOException {
-    if (errMsg == null && pid != null) {
+    if (errMsg == null && pid != null && businessVersion != null) {
       for (VersionInstance vi : versionList) {
         comparisons.clear();
         Set<String> set = new HashSet<>();
