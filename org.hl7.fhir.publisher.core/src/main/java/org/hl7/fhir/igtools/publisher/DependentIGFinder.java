@@ -19,12 +19,8 @@ import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
-import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
-import org.hl7.fhir.utilities.npm.NpmPackage;
-import org.hl7.fhir.utilities.npm.PackageClient;
-import org.hl7.fhir.utilities.npm.PackageList;
+import org.hl7.fhir.utilities.npm.*;
 import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
-import org.hl7.fhir.utilities.npm.ToolsVersion;
 import org.stringtemplate.v4.ST;
 
 
@@ -160,12 +156,12 @@ public class DependentIGFinder {
   private Set<String> getDependentPackages() {
     Set<String> list = new HashSet<>();
 //    getDependentPackages(list, PackageClient.PRIMARY_SERVER);
-    getDependentPackages(list, PackageClient.SECONDARY_SERVER);
+    getDependentPackages(list, PackageServer.SECONDARY_SERVER);
     return list;
   }
 
   private void getDependentPackages(Set<String> list, String url) {
-    PackageClient client = new PackageClient(url);
+    PackageClient client = new PackageClient(new PackageServer(url));
     try {
       client.findDependents(list, id);
     } catch (Exception e) {
