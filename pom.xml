@@ -21,12 +21,13 @@
 <!--        <version>5.3.14</version>-->
 <!--    </parent>-->
 
-    <version>1.2.27-SNAPSHOT</version> <!-- See the note above -->
+    <version>1.2.31-SNAPSHOT</version> <!-- See the note above -->
 
     <properties>
-        <core_version>5.6.90-SNAPSHOT</core_version>
+        <core_version>5.6.93-SNAPSHOT</core_version>
         <maven_surefire_version>3.0.0-M5</maven_surefire_version>
         <apache_poi_version>4.1.1</apache_poi_version>
+        <junit_jupiter_version>5.7.1</junit_jupiter_version>
         <maven.compiler.release>11</maven.compiler.release>
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
@@ -242,13 +243,19 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
-            <version>5.7.1</version>
+            <version>${junit_jupiter_version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
-            <version>5.7.1</version>
+            <version>${junit_jupiter_version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-params</artifactId>
+            <version>${junit_jupiter_version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

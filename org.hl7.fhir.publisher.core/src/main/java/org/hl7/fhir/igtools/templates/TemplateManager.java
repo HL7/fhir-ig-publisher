@@ -54,13 +54,11 @@ public class TemplateManager {
   boolean canExecute;
   String templateThatCantExecute;
   String templateReason;
-  String ghUrl;
   List<String> templateList = new ArrayList<>();
 
-  public TemplateManager(FilesystemPackageCacheManager pcm, ILoggingService logger, String ghUrl) {
+  public TemplateManager(FilesystemPackageCacheManager pcm, ILoggingService logger) {
     this.pcm = pcm;
     this.logger = logger;
-    this.ghUrl = ghUrl;
   }
 
   public Template loadTemplate(String template, String rootFolder, String packageId, boolean autoMode) throws FHIRException, IOException {
@@ -126,7 +124,7 @@ public class TemplateManager {
       for (NpmPackageFolder f : npm.getFolders().values()) {
         for (String n : f.listFiles()) {
           String s = extension(n);
-          if (!Utilities.existsInList(s, ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini", ".eot", ".otf", ".svg", ".ttf", ".woff", ".txt", ".yml", ".gitignore")) {
+          if (!Utilities.existsInList(s, ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini", ".eot", ".otf", ".svg", ".ttf", ".woff", ".txt", ".yml", ".liquid", ".gitignore")) {
             noScripts = false;
             ext.add(s);
             break;

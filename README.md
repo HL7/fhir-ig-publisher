@@ -26,6 +26,8 @@ an authoring environment - that's left to other parties.
 
 ## Building this Project
 
+You can find detailed instructions on setting up this project in your IDE [here](https://hl7.github.io/docs/ig_publisher/getting-started).
+
 This project uses [Apache Maven][Link-Maven] to build. To build:
 
 ```
@@ -46,8 +48,8 @@ Once built, this project produces an executable publisher jar file: `org.hl7.fhi
 
 In addition, two common publishing tasks that can be accomplished using the fhir-ig-publisher are described in detail in the documentation below:
 
-* [Publishing Packages](https://hl7.github.io/docs/publishing_packages)
-* [Publishing Templates](https://hl7.github.io/docs/publishing_templates)
+* [Publishing Packages](https://hl7.github.io/docs/ig_publisher/publishing-packages)
+* [Publishing Templates](https://hl7.github.io/docs/ig_publisher/publishing-templates)
 
 ## Releases
 

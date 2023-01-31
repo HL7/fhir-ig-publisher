@@ -3,9 +3,9 @@ package org.hl7.fhir.igtools.web;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -99,18 +99,28 @@ public class WebSourceProvider {
 
     if (web) {      
       Path target = Path.of(df.getAbsolutePath());
-      try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(folderSources.get(path)))) {
-        ZipEntry zipEntry = zis.getNextEntry();
-        while (zipEntry != null) {
-          Path newPath = Utilities.zipSlipProtect(zipEntry, target);
-          Files.delete(newPath);
-          zipEntry = zis.getNextEntry();
-        }
-        zis.closeEntry();
+      byte[] buf = folderSources.get(path);
+      if (buf != null) {
+        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buf);
+        cleanZipTargets(target, byteArrayInputStream);
+        Utilities.deleteEmptyFolders(df);
       }
-      Utilities.deleteEmptyFolders(df);
     } else {
       // do nothing?
+    }
+  }
+
+  protected static void cleanZipTargets(Path target, InputStream inputStream) throws IOException {
+    try (ZipInputStream zis = new ZipInputStream(inputStream)) {
+      ZipEntry zipEntry = zis.getNextEntry();
+      while (zipEntry != null) {
+        Path newPath = Utilities.zipSlipProtect(zipEntry, target);
+        if (Files.exists(newPath)) {
+          Files.delete(newPath);
+        }
+        zipEntry = zis.getNextEntry();
+      }
+      zis.closeEntry();
     }
   }
 
@@ -158,6 +168,7 @@ public class WebSourceProvider {
           c++;
           p = progress(c, t, p);      
         }
+        System.out.print("|");
         for (String s : filesToUpload) {
           ftp.upload(Utilities.path(destination, s), s);
           c++;
@@ -165,6 +176,7 @@ public class WebSourceProvider {
         }
         System.out.print(".");
       }
+      System.out.println("!");
     } else {
       System.out.println("Applying changes to website source at "+source);
       for (String s : existingFiles) {
@@ -189,11 +201,15 @@ public class WebSourceProvider {
 
   public String instructions(int fc) throws IOException {
     if (web) {
-      if (fc > 0) {
-        return "Upload all the files in "+destination+" to "+source+" using your preferred file copy method. Note that there is "+fc+" files to be deleted on the website (see "+deleteFileName()+")"; 
-      
+      if (upload) {
+        return "The web site source at ftp://"+uploadServer+"/"+uploadPath+" has been updated";
       } else {
-        return "Upload all the files in "+destination+" to "+source+" using your preferred file copy method"; 
+        if (fc > 0) {
+          return "Upload all the files in "+destination+" to "+source+" using your preferred file copy method. Note that there is "+fc+" files to be deleted on the website (see "+deleteFileName()+")"; 
+
+        } else {
+          return "Upload all the files in "+destination+" to "+source+" using your preferred file copy method"; 
+        }
       }
     } else {
       return "The web site source in "+source+" has been updated";

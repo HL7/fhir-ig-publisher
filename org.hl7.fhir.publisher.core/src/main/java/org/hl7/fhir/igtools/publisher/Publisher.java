@@ -39,6 +39,7 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -767,6 +768,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private String packagesFolder;
   private String targetOutput;
+  private String repoSource;
   private String targetOutputNested;
 
   private String folderToDelete;
@@ -857,7 +859,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private PackageInformation packageInfo;
   private boolean tocSizeWarning = false;
   private CSVWriter allProfilesCsv;
-  private StructureDefinitionSpreadsheetGenerator allProfilesXlsx;;
+  private StructureDefinitionSpreadsheetGenerator allProfilesXlsx;
+  private boolean produceJekyllData;
   
   private class PreProcessInfo {
     private String xsltName;
@@ -2206,7 +2209,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       apiKeyFile = new IniFile(Utilities.path(System.getProperty("user.home"), "fhir-api-keys.ini"));
     }
     log("API keys loaded from "+apiKeyFile.getFileName());
-    templateManager = new TemplateManager(pcm, logger, gh());
+    templateManager = new TemplateManager(pcm, logger);
     templateProvider = new IGPublisherLiquidTemplateServices();
     extensionTracker = new ExtensionTracker();
     log("Package Cache: "+pcm.getFolder());
@@ -2639,6 +2642,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         r4tor4b.markExempt(p.getValue(), true);
       } else if (pc.equals("r4b-exclusion")) {
         r4tor4b.markExempt(p.getValue(), false);
+      } else if (pc.equals("produce-jekyll-data")) {        
+        produceJekyllData = "true".equals(p.getValue());
       }
       count++;
     }
@@ -3025,15 +3030,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (configuration.has("paths") && !(configuration.get("paths") instanceof JsonObject))
       throw new Exception("Error: if configuration file has a \"paths\", it must be an object");
     JsonObject paths = configuration.getJsonObject("paths");
-    if (fetcher instanceof ZipFetcher) {
-      rootDir = configFileRootPath;
-    } else {
-      rootDir = Utilities.getDirectoryForFile(configFile);
-      if (Utilities.noString(rootDir))
-        rootDir = getCurentDirectory();
-      // We need the root to be expressed as a full path.  getDirectoryForFile will do that in general, but not in Eclipse
-      rootDir = new File(rootDir).getCanonicalPath();
+
+    rootDir = Utilities.getDirectoryForFile(configFile);
+    if (Utilities.noString(rootDir)) {
+      rootDir = getCurentDirectory();
     }
+    // We need the root to be expressed as a full path.  getDirectoryForFile will do that in general, but not in Eclipse
+    rootDir = new File(rootDir).getCanonicalPath();
+
 
     if (configuration.has("template")) {
       template = templateManager.loadTemplate(str(configuration, "template"), rootDir, configuration.has("npm-name") ? configuration.asString("npm-name") : null, mode == IGBuildMode.AUTOBUILD);
@@ -3590,14 +3594,27 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       String pid = VersionUtilities.packageForVersion(vid);
       npm = pcm.loadPackage(pid, vid);
     }
-    
-    ZipInputStream zip = new ZipInputStream(npm.load("other", "ig-template.zip"));
+
+    InputStream igTemplateInputStream = npm.load("other", "ig-template.zip");
+    String zipTargetDirectory = adHocTmpDir;
+    unzipToDirectory(igTemplateInputStream, zipTargetDirectory);
+  }
+
+  protected static void unzipToDirectory(InputStream inputStream, String zipTargetDirectory) throws IOException {
+    ZipInputStream zip = new ZipInputStream(inputStream);
     byte[] buffer = new byte[2048];
     ZipEntry entry;
     while((entry = zip.getNextEntry())!=null) {
-      String filename = Utilities.path(adHocTmpDir, entry.getName());
+
+      if (entry.isDirectory()) {
+        continue;
+      }
+      String filename = Utilities.path(zipTargetDirectory, entry.getName());
       String dir = Utilities.getDirectoryForFile(filename);
+
+      Utilities.zipSlipProtect(entry, Path.of(dir));
       Utilities.createDirectory(dir);
+
       FileOutputStream output = new FileOutputStream(filename);
       int len = 0;
       while ((len = zip.read(buffer)) > 0)
@@ -5104,7 +5121,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       comparisonVersions = new ArrayList<>();
       comparisonVersions.add("{last}");
     }
-    return new PreviousVersionComparator(context, version, businessVersion != null ? businessVersion : sourceIg.getVersion(), rootDir, tempDir, igpkp.getCanonical(), igpkp, logger, comparisonVersions);
+    return new PreviousVersionComparator(context, version, businessVersion != null ? businessVersion : sourceIg == null ? null : sourceIg.getVersion(), rootDir, tempDir, igpkp.getCanonical(), igpkp, logger, comparisonVersions);
   }
 
 
@@ -5312,8 +5329,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         e = loadFromJson(file);
       } else if (file.getContentType().contains("xml")) {
         e = loadFromXml(file);
-      } else
+      } else if (file.getContentType().contains("fml")) {
+        e = loadFromMap(file); 
+      } else {
         throw new Exception("Unable to determine file type for "+file.getName());
+      }
     } catch (Exception ex) {
       throw new Exception("Unable to parse "+file.getName()+": " +ex.getMessage(), ex);
     }
@@ -5431,6 +5451,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
     return null;
+  }
+
+  private Element loadFromMap(FetchedFile file) throws Exception {
+    if (VersionUtilities.isR4Ver(context.getVersion()) || VersionUtilities.isR4BVer(context.getVersion())) {
+      StructureMapUtilities mr = new StructureMapUtilities(context);
+      Element res = mr.parseEM(TextFile.bytesToString(file.getSource()), context.getVersion(), file.getErrors());
+      if (res == null) {
+        throw new Exception("Unable to parse Map Source for "+file.getName());
+      }
+      return res;      
+    } else {
+      throw new Error("Loading Map Files is not supported for version "+VersionUtilities.getNameForVersion(context.getVersion()));
+    }
   }
 
   private Element loadFromXml(FetchedFile file) throws Exception {
@@ -5860,7 +5893,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             utils.generateSnapshot(base, sd, sd.getUrl(), null, sd.getName());
           }
         } catch (Exception e) { 
-          throw new FHIRException("Unable to generate snapshot for "+sd.getUrl()+" in "+f.getName(), e);
+          if (debug) {
+            e.printStackTrace();
+          }
+          throw new FHIRException("Unable to generate snapshot for "+sd.getUrl()+" in "+f.getName()+" because "+e.getMessage(), e);
         }
         changed = true;
       }
@@ -6349,6 +6385,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       allProfilesCsv.dump();
     }
     if (allProfilesXlsx != null) {
+      allProfilesXlsx.configure();
       String path = Utilities.path(tempDir, "all-profiles.xlsx");
       allProfilesXlsx.finish(new FileOutputStream(path));
       otherFilesRun.add(Utilities.path(tempDir, "all-profiles.xlsx"));
@@ -6586,7 +6623,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private String gh() {
-    return targetOutput == null ? null : targetOutput.replace("https://build.fhir.org/ig", "https://github.com");
+    return repoSource != null ? repoSource : targetOutput != null ? targetOutput.replace("https://build.fhir.org/ig", "https://github.com") : null;
   }
 
 
@@ -8667,7 +8704,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (noGenerate) {
       return;
     }
-    System.out.println("gen: "+f.getName());
+//    System.out.println("gen: "+f.getName());
     if (f.getProcessMode() == FetchedFile.PROCESS_NONE) {
       String dst = tempDir;
       if (f.getRelativePath().startsWith(File.separator))
@@ -8915,7 +8952,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private Set<String> pageTargets() {
     Set<String> set = new HashSet<>();
-    set.add(sourceIg.getDefinition().getPage().getName());
+    if (sourceIg.getDefinition().getPage().hasName()) {
+      set.add(sourceIg.getDefinition().getPage().getName());
+    }
     listPageTargets(set, sourceIg.getDefinition().getPage().getPage());
     return set;
   }
@@ -9376,7 +9415,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (tool == GenerationTool.Jekyll)
         genWrapper(null, r, template, igpkp.getProperty(r, "format"), f.getOutputNames(), vars, "json", "", false);
     } 
-
+    if (igpkp.wantGen(r, "jekyll-data") && produceJekyllData) {
+      org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(context);
+      FileOutputStream bs = new FileOutputStream(Utilities.path(tempDir, "_data", r.fhirType()+"-"+r.getId()+".json"));
+      jp.compose(r.getElement(), bs, OutputStyle.NORMAL, null);
+      bs.close();      
+    }
     if (igpkp.wantGen(r, "ttl")) {
       if (tool == GenerationTool.Jekyll)
         genWrapper(null, r, template, igpkp.getProperty(r, "format"), f.getOutputNames(), vars, "ttl", "", false);
@@ -9955,15 +9999,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
 
     if (igpkp.wantGen(r, "xlsx")) {
+      lapsed(null);
       String path = Utilities.path(tempDir, sdPrefix + r.getId()+".xlsx");
       f.getOutputNames().add(path);
       StructureDefinitionSpreadsheetGenerator sdg = new StructureDefinitionSpreadsheetGenerator(context, true, anyMustSupport(sd));
       sdg.renderStructureDefinition(sd, false);
       sdg.finish(new FileOutputStream(path));
+      lapsed("xslx");
       if (allProfilesXlsx == null) {
         allProfilesXlsx  = new StructureDefinitionSpreadsheetGenerator(context, true, false);
       }
       allProfilesXlsx.renderStructureDefinition(sd, true);
+      lapsed("all-xslx");
     }
 
     if (!regen && sd.getKind() != StructureDefinitionKind.LOGICAL &&  igpkp.wantGen(r, "sch")) {
@@ -9974,6 +10021,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     if (igpkp.wantGen(r, "sch"))
       fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-sch", "yet to be done: schematron as html", null, f.getOutputNames());
+  }
+
+  long last = System.currentTimeMillis();
+  
+  private void lapsed(String msg) {
+    long now = System.currentTimeMillis();
+    long d = now - last;
+    last = now;
+    if (msg != null) {
+      System.out.println("  "+msg+": "+Long.toString(d));
+    }
   }
 
   private boolean anyMustSupport(StructureDefinition sd) {
@@ -10596,6 +10654,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (hasNamedParam(args, "-auto-ig-build")) {
         self.setMode(IGBuildMode.AUTOBUILD);
         self.targetOutput = getNamedParam(args, "-target");
+        self.repoSource = getNamedParam(args, "-repo");
       }
       if (hasNamedParam(args, "-api-key-file")) {
         self.apiKeyFile = new IniFile(new File(getNamedParam(args, "-api-key-file")).getAbsolutePath());
@@ -10998,7 +11057,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
 
-  public void setFetcher(ZipFetcher theFetcher) {
+  public void setFetcher(IFetchFile theFetcher) {
     fetcher = theFetcher;
   }
 

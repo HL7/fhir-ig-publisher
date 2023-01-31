@@ -439,11 +439,18 @@ public class IGPack2NpmConvertor {
     return v;
   }
 
-  private Map<String, byte[]> loadZip(InputStream stream) throws IOException {
+  protected Map<String, byte[]> loadZip(InputStream stream) throws IOException {
     Map<String, byte[]> res = new HashMap<String, byte[]>();
     ZipInputStream zip = new ZipInputStream(stream);
     ZipEntry ze;
     while ((ze = zip.getNextEntry()) != null) {
+      final String entryName = ze.getName();
+
+      if (entryName.contains("..")) {
+        throw new IOException("Entry with an illegal name: " + entryName);
+      }
+
+
       int size;
       byte[] buffer = new byte[2048];
 
@@ -455,7 +462,7 @@ public class IGPack2NpmConvertor {
       }
       bos.flush();
       bos.close();
-      res.put(ze.getName(), bytes.toByteArray());
+      res.put(entryName, bytes.toByteArray());
 
       zip.closeEntry();
     }
