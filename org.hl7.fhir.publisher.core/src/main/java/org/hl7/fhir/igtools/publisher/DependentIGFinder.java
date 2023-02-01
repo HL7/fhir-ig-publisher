@@ -24,6 +24,7 @@ import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageClient;
 import org.hl7.fhir.utilities.npm.PackageList;
 import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
+import org.hl7.fhir.utilities.npm.PackageServer;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
 import org.stringtemplate.v4.ST;
 
@@ -160,12 +161,12 @@ public class DependentIGFinder {
   private Set<String> getDependentPackages() {
     Set<String> list = new HashSet<>();
 //    getDependentPackages(list, PackageClient.PRIMARY_SERVER);
-    getDependentPackages(list, PackageClient.SECONDARY_SERVER);
+    getDependentPackages(list, PackageServer.secondaryServer());
     return list;
   }
 
-  private void getDependentPackages(Set<String> list, String url) {
-    PackageClient client = new PackageClient(url);
+  private void getDependentPackages(Set<String> list, PackageServer server) {
+    PackageClient client = new PackageClient(server);
     try {
       client.findDependents(list, id);
     } catch (Exception e) {
