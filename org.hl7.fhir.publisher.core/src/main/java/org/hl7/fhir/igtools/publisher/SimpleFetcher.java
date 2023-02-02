@@ -419,5 +419,19 @@ public class SimpleFetcher implements IFetchFile {
     return TextFile.fileToString(filename);
   }
 
+  @Override
+  public void scanFolders(String dir, List<String> dirs) {
+    scanFolders(new File(dir), dirs);
+  }
+  
+  public void scanFolders(File dir, List<String> dirs) {
+    dirs.add(dir.getAbsolutePath());
+    for (File f : dir.listFiles()) {
+      if (f.isDirectory()) {
+        scanFolders(f, dirs);
+      }
+    }    
+  }
+
   
 }

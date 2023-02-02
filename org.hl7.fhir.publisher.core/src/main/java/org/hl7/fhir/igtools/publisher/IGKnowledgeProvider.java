@@ -74,8 +74,9 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   private Template template;
   private List<String> listedURLExemptions;
   private Set<String> summaryRows = new HashSet<>();
+  private String altCanonical;
   
-  public IGKnowledgeProvider(IWorkerContext context, String pathToSpec, String canonical, JsonObject igs, List<ValidationMessage> errors, boolean noXhtml, Template template, List<String> listedURLExemptions) throws Exception {
+  public IGKnowledgeProvider(IWorkerContext context, String pathToSpec, String canonical, JsonObject igs, List<ValidationMessage> errors, boolean noXhtml, Template template, List<String> listedURLExemptions, String altCanonical) throws Exception {
     super();
     this.context = context;
     this.pathToSpec = pathToSpec;
@@ -86,6 +87,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     this.canonical = canonical;
     this.template = template;
     this.listedURLExemptions = listedURLExemptions;
+    this.altCanonical = altCanonical;
     if (igs != null) {
       loadPaths(igs);
     }
@@ -408,7 +410,8 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   public void checkForPath(FetchedFile f, FetchedResource r, CanonicalResource bc, boolean inner) throws FHIRException {
     if (!bc.hasUrl())
       error(f, bc.fhirType()+".url", "Resource has no url: "+bc.getId(), PublisherMessageIds.RESOURCE_ID_NO_URL);
-    else if (bc.getUrl().startsWith(canonical) && !bc.getUrl().endsWith("/"+bc.getId()) && !listedURLExemptions.contains(bc.getUrl()))
+    else if ((bc.getUrl().startsWith(canonical) || (altCanonical != null && bc.getUrl().startsWith(altCanonical)))
+        && !bc.getUrl().endsWith("/"+bc.getId()) && !listedURLExemptions.contains(bc.getUrl()))
       error(f, bc.fhirType()+".url","Resource id/url mismatch: "+bc.getId()+"/"+bc.getUrl(), PublisherMessageIds.RESOURCE_ID_MISMATCH);
     if (!inner && !r.getId().equals(bc.getId()))
       error(f, bc.fhirType()+".id", "Resource id/loaded id mismatch: "+r.getId()+"/"+bc.getUrl(), PublisherMessageIds.RESOURCE_ID_LOADED_MISMATCH);
