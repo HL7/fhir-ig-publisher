@@ -8394,6 +8394,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     data.add("processedFiles", changeList.size());
     data.add("genDate", genTime());
     data.add("genDay", genDate());
+    JsonArray rt = data.forceArray("resourceTypes");
+    List<String> rtl = context.getResourceNames();
+    for (String s : rtl) {
+      rt.add(s);
+    }
+    rt = data.forceArray("dataTypes");
+    ContextUtilities cu = new ContextUtilities(context);
+    for (String s : cu.getTypeNames()) {
+      if (!rtl.contains(s)) {
+        rt.add(s);
+      }
+    }
+    
     JsonObject ig = new JsonObject();
     data.add("ig", ig);
     ig.add("id", publishedIg.getId());
