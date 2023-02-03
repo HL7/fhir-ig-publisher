@@ -123,11 +123,13 @@ public class TemplateManager {
     if (noScripts) {
       for (NpmPackageFolder f : npm.getFolders().values()) {
         for (String n : f.listFiles()) {
-          String s = extension(n);
-          if (!Utilities.existsInList(s, ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini", ".eot", ".otf", ".svg", ".ttf", ".woff", ".txt", ".yml", ".liquid", ".gitignore")) {
-            noScripts = false;
-            ext.add(s);
-            break;
+          if (!Utilities.existsInList(n.toLowerCase(), "license", "readme")) {
+            String s = extension(n);
+            if (!Utilities.existsInList(s, ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini", ".eot", ".otf", ".svg", ".ttf", ".woff", ".txt", ".yml", ".liquid", ".gitignore")) {
+              noScripts = false;
+              ext.add(s);
+              break;
+            }
           }
         }
       }
