@@ -14,6 +14,7 @@ import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.ValidationResult;
 import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeableConcept;
 import org.hl7.fhir.r5.model.Coding;
@@ -708,17 +709,17 @@ public class CrossViewRenderer {
   }
 
   public String buildExtensionTable() throws Exception {
-    return buildExtensionTable(extList);
+    return buildExtensionTable(null, extList);
   }
 
   public String buildExtensionTable(String s) throws Exception {
     if (extMap.containsKey(s)) {
-      return buildExtensionTable(extMap.get(s));
+      return buildExtensionTable(s, extMap.get(s));
     }
     return null;
   }
 
-  private String buildExtensionTable(List<ExtensionDefinition> definitions) throws Exception {
+  private String buildExtensionTable(String type, List<ExtensionDefinition> definitions) throws Exception {
     StringBuilder b = new StringBuilder();
 
     b.append("<table class=\"list\">\r\n");
@@ -729,17 +730,123 @@ public class CrossViewRenderer {
     b.append("<td><b><a href=\""+Utilities.pathURL(context.getSpecUrl(), "defining-extensions.html")+"#context\">Context</a></b></td>");
     b.append("<td><b><a href=\""+Utilities.pathURL(context.getSpecUrl(), "versions.html")+"#maturity\">FMM</a></b></td>");
     b.append("</tr>");
-
+    if (type != null) {
+      b.append("<tr><td colspan=\"5\"><b>Extensions defined for this resource</b></td></tr>\r\n");
+    }
     Map<String, StructureDefinition> map = new HashMap<>();
     for (ExtensionDefinition sd : definitions)
       map.put(sd.source.getUrl(), sd.source);
-    for (String s : Utilities.sorted(map.keySet())) {
-      genExtensionRow(b, map.get(s));
+    if (map.size() == 0) {
+      b.append("<tr><td colspan=\"5\">(None found)</td></tr>\r\n");      
+    } else {
+      for (String s : Utilities.sorted(map.keySet())) {
+        genExtensionRow(b, map.get(s));
+      }
     }
+
+    if (type != null) {
+      List<String> ancestors = new ArrayList<>();
+      StructureDefinition t = context.fetchTypeDefinition(type);
+      if (t != null) {
+        t = context.fetchResource(StructureDefinition.class, t.getBaseDefinition());
+        while (t != null) {
+          ancestors.add(t.getType());
+          t = context.fetchResource(StructureDefinition.class, t.getBaseDefinition());
+        }
+      }
+      
+      b.append("<tr><td colspan=\"5\"><b>Extensions defined for many resources including this resource</b></td></tr>\r\n");
+      map = new HashMap<>();
+      for (ExtensionDefinition sd : this.extList) {
+        if (forAncestor(ancestors, sd)) {
+          map.put(sd.source.getUrl(), sd.source);
+        }
+      }
+      if (map.size() == 0) {
+        b.append("<tr><td colspan=\"5\">(None found)</td></tr>\r\n");      
+      } else {
+        for (String s : Utilities.sorted(map.keySet())) {
+          genExtensionRow(b, map.get(s));
+        }
+      }
+      
+      b.append("<tr><td colspan=\"5\"><b>Extensions that refer to this resource</b></td></tr>\r\n");
+      map = new HashMap<>();
+      for (ExtensionDefinition sd : this.extList) {
+        if (refersToThisType(type, sd)) {
+          map.put(sd.source.getUrl(), sd.source);
+        }
+      }
+      if (map.size() == 0) {
+        b.append("<tr><td colspan=\"5\">(None found)</td></tr>\r\n");      
+      } else {
+        for (String s : Utilities.sorted(map.keySet())) {
+          genExtensionRow(b, map.get(s));
+        }
+      }
+      b.append("<tr><td colspan=\"5\"><b>Extensions that refer to many resources including this resource</b></td></tr>\r\n");
+      map = new HashMap<>();
+      for (ExtensionDefinition sd : this.extList) {
+        if (refersToThisTypesAncestors(ancestors, sd)) {
+          map.put(sd.source.getUrl(), sd.source);
+        }
+      }
+      if (map.size() == 0) {
+        b.append("<tr><td colspan=\"5\">(None found)</td></tr>\r\n");      
+      } else {
+        for (String s : Utilities.sorted(map.keySet())) {
+          genExtensionRow(b, map.get(s));
+        }
+      }
+    }
+
     b.append("</table>\r\n");
     return b.toString();
   }
   
+  private boolean refersToThisType(String type, ExtensionDefinition sd) {
+    String url = "http://hl7.org/fhir/StructureDefinition/"+type;
+    for (ElementDefinition ed : sd.source.getSnapshot().getElement()) {
+      for (TypeRefComponent t : ed.getType()) {
+        for (CanonicalType u : t.getTargetProfile()) {
+          if (url.equals(u.getValue())) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+
+  private boolean refersToThisTypesAncestors(List<String> ancestors, ExtensionDefinition sd) {
+    List<String> urls = new ArrayList<>();
+    for (String t : ancestors) {
+      urls.add("http://hl7.org/fhir/StructureDefinition/"+t);
+    }
+    
+    for (ElementDefinition ed : sd.source.getSnapshot().getElement()) {
+      for (TypeRefComponent t : ed.getType()) {
+        for (CanonicalType u : t.getTargetProfile()) {
+          if (urls.contains(u.getValue())) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  private boolean forAncestor(List<String> ancestors, ExtensionDefinition sd) {
+    List<String> types = getExtensionContext(sd.source);
+    for (String type : types) {
+      if (ancestors.contains(type)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private void genExtensionRow(StringBuilder s, StructureDefinition ed) throws Exception {
     StandardsStatus status = ToolingExtensions.getStandardsStatus(ed);
     if (status  == StandardsStatus.DEPRECATED) {
