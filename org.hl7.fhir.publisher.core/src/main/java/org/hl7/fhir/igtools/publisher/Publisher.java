@@ -716,6 +716,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private CqlSubSystem cql;
   private IniFile apiKeyFile;
   private File killFile;    
+  private List<PageFactory> pageFactories = new ArrayList<>();
 
   private ILoggingService logger = this;
 
@@ -2651,6 +2652,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         r4tor4b.markExempt(p.getValue(), false);
       } else if (pc.equals("produce-jekyll-data")) {        
         produceJekyllData = "true".equals(p.getValue());
+      } else if (pc.equals("page-factory")) {
+        String dir = Utilities.path(rootDir, "temp", "factory-pages", "factory"+pageFactories.size());
+        Utilities.createDirectory(dir);
+        pageFactories.add(new PageFactory(Utilities.path(rootDir, p.getValue()), dir));
+        pagesDirs.add(dir);
       }
       count++;
     }
@@ -2731,6 +2737,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     context.setAllowLoadingDuplicates(true);
     context.setExpandCodesLimit(1000);
     context.setExpansionProfile(makeExpProfile());
+    for (PageFactory pf : pageFactories) {
+      pf.setContext(context);
+    }
     dr = new DataRenderer(context);
 
 
@@ -4259,6 +4268,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     if (duplicateInputResourcesDetected) {
       throw new Error("Unable to continue because duplicate input resources were identified");
+    }
+    
+    for (PageFactory pf : pageFactories) {
+      pf.execute(rootDir, publishedIg);
     }
 
     // load static pages
