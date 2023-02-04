@@ -7340,14 +7340,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     
     JsonObject data = new JsonObject();
     JsonArray ecl = new JsonArray();
-    data.add("extension-contexts", ecl);
+//    data.add("extension-contexts-populated", ecl); causes a bug in jekyll see https://github.com/jekyll/jekyll/issues/9289
     
     fragment("summary-extensions", cvr.getExtensionSummary(), otherFilesRun);
-    fragment("extension-list", cvr.buildExtensionTable(), otherFilesRun);
+    fragment("extension-list", cvr.buildExtensionTable(), otherFilesRun);    
+    Set<String> econtexts = new ContextUtilities(context).getTypeNameSet();
     for (String s : cvr.getExtensionContexts()) {
       ecl.add(s);
+      econtexts.add(s);
+    }
+    for (String s : econtexts) {
       fragment("extension-list-"+s, cvr.buildExtensionTable(s), otherFilesRun);      
     }
+
     trackedFragment("1", "ip-statements", new IPStatementsRenderer(context, markdownEngine).genIpStatements(fileList), otherFilesRun);
     if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {
       trackedFragment("2", "cross-version-analysis", r4tor4b.generate(npmName, false), otherFilesRun);
@@ -7418,13 +7423,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               citem.add("expression", ec.getExpression());
             }
           }
-          List<String> ec = cvr.getExtensionContext(sd);
-          JsonArray contexts = new JsonArray();
-          item.add("extension-contexts", contexts);
-          for (String s : ec) {
-            contexts.add(s);
+          if (ProfileUtilities.isExtensionDefinition(sd)) {
+            List<String> ec = cvr.getExtensionContext(sd);
+            JsonArray contexts = new JsonArray();
+             item.add("extension-contexts", contexts);
+            for (String s : ec) {
+              contexts.add(s);
+            }
           }
-
           i++;
         }
       }
@@ -8394,6 +8400,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     data.add("processedFiles", changeList.size());
     data.add("genDate", genTime());
     data.add("genDay", genDate());
+    JsonArray rt = data.forceArray("resourceTypes");
+    List<String> rtl = context.getResourceNames();
+    for (String s : rtl) {
+      rt.add(s);
+    }
+    rt = data.forceArray("dataTypes");
+    ContextUtilities cu = new ContextUtilities(context);
+    for (String s : cu.getTypeNames()) {
+      if (!rtl.contains(s)) {
+        rt.add(s);
+      }
+    }
+    
     JsonObject ig = new JsonObject();
     data.add("ig", ig);
     ig.add("id", publishedIg.getId());
@@ -8545,7 +8564,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (FetchedResource r : f.getResources()) {
         if (r.fhirType().equals("StructureDefinition")) {
           StructureDefinition sd = (StructureDefinition) r.getResource();
-          if (sd.getDerivation() == TypeDerivationRule.CONSTRAINT && sd.getType().equals("Extension")) {
+          if (ProfileUtilities.isExtensionDefinition(sd)) {
             items.add(new Item(f, r, sd.hasTitle() ? sd.getTitle() : sd.hasName() ? sd.getName() : r.getTitle()));
           }
         }
