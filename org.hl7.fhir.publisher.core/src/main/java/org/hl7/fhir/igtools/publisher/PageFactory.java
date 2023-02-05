@@ -26,12 +26,14 @@ import org.hl7.fhir.utilities.json.parser.JsonParser;
 
 public class PageFactory {
 
+  private String source;
   private JsonObject json;
   private IWorkerContext context;
   private ContextUtilities utils;
   private String dir;
   
   public PageFactory(String filename, String dir) throws JsonException, IOException {
+    source = filename;
     json = JsonParser.parseObjectFromFile(filename);
     this.dir = dir;
   }
@@ -53,10 +55,27 @@ public class PageFactory {
     return json.asString("source-file");
   }
   
-  private String sourceVar() {
-    return json.asString("source-var");
+  private List<String> variables() {
+    List<String> vars = new ArrayList<>();
+    for (JsonObject obj : json.forceArray("variables").asJsonObjects()) {
+      vars.add(obj.asString("name"));
+    }
+    return vars;
   }
-  
+
+  private String variableValue(String name, String item) {
+    for (JsonObject obj : json.forceArray("variables").asJsonObjects()) {
+      if (name.equals(obj.asString("name"))) {
+        switch (obj.asString("transform")) {
+        case "n/a": return item;
+        case "lowercase" : return item.toLowerCase();
+        case "uppercase" : return item.toUpperCase();
+        }
+      }
+    }
+    return null;
+  }
+
   private String generatedFileName() {
     return json.asString("generated-file-name");
   }
@@ -77,11 +96,16 @@ public class PageFactory {
     return json.asString("page-title");
   }
   
+  boolean debug() {
+    return json.asBoolean("debug");
+  }
+  
   private List<String> items() {
     switch (itemFactory()) {
     case "types" : return itemsForTypes();
     case "resources" : return itemsForResources();
     case "datatypes" : return itemsForDataTypes();
+    case "canonicals" : return itemsForCanonicalResources();
     }
     throw new Error("Unknown page factory 'item-factory' value "+itemFactory()+"'");
   }
@@ -96,17 +120,29 @@ public class PageFactory {
     return context.getResourceNames();
   }
 
+  private List<String> itemsForCanonicalResources() {
+    return utils.getCanonicalResourceNames();
+  }
+  
   private List<String> itemsForTypes() {
     return utils.getTypeNames();
   }
   
   public void execute(String repoSource, ImplementationGuide ig) throws FileNotFoundException, IOException {
+    doDebug("pf: "+source);
     checks(repoSource, ig);
     for (String item : sorted(items())) {
+      doDebug("  "+item);
       execute(item, repoSource, ig);
     }
   }
   
+  private void doDebug(String msg) {
+    if (debug()) {
+      System.out.println(msg);
+    }
+  }
+
   public static List<String> sorted(Collection<String> set) {
     List<String> list = new ArrayList<>();
     list.addAll(set);
@@ -116,16 +152,21 @@ public class PageFactory {
   
   private void execute(String item, String repoSource, ImplementationGuide ig) throws FileNotFoundException, IOException {
     String source = TextFile.fileToString(Utilities.path(repoSource, sourceFile()));
-    if (sourceVar() != null) {
-      source = source.replace(sourceVar(), item);
+    for (String n : variables()) {
+      String v = variableValue(n, item);
+      doDebug("   "+n+" --> "+v);
+      source = source.replace(n, v);
     }
-    TextFile.stringToFile(source, Utilities.path(dir, "_includes", generatedFileName(item)));
+    String fn = generatedFileName(item);
+    doDebug("  save to "+fn);
+    TextFile.stringToFile(source, Utilities.path(dir, "_includes", fn));
     ImplementationGuideDefinitionPageComponent page = getParentPage(ig.getDefinition().getPage());
     ImplementationGuideDefinitionPageComponent subPage = page.addPage();
     subPage.setSource(new UrlType(statedFileName(item)));
     subPage.setName(statedFileName(item));
     subPage.setGeneration(GuidePageGeneration.fromCode(generation()));
     subPage.setTitle(title(item)); 
+    doDebug("  page "+subPage.getName()+":"+subPage.getGenerationElement().toString()+" = "+subPage.getTitle());
   }
 
   private ImplementationGuideDefinitionPageComponent getParentPage(ImplementationGuideDefinitionPageComponent page) {
