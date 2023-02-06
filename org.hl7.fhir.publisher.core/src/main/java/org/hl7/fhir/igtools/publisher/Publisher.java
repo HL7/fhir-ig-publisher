@@ -2683,7 +2683,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     logDebugMessage(LogCategory.INIT, "Check folders");
     List<String> extraDirs = new ArrayList<String>();
     for (String s : resourceDirs) {
-      if (s.endsWith("/*")) {
+      if (s.endsWith(File.separator+"*")) {
         logDebugMessage(LogCategory.INIT, "Scan Source: "+s);
         scanDirectories(Utilities.getDirectoryForFile(s), extraDirs);
         
@@ -2694,7 +2694,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     List<String> missingDirs = new ArrayList<String>();
     for (String s : resourceDirs) {
       logDebugMessage(LogCategory.INIT, "Source: "+s);
-      if (s.endsWith("/*")) {
+      if (s.endsWith(File.separator+"*")) {
         missingDirs.add(s);
         
       }
