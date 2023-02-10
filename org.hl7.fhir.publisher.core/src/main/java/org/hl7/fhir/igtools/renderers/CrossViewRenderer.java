@@ -683,6 +683,10 @@ public class CrossViewRenderer {
 
   private Set<String> getExtensionContext(StructureDefinitionContextComponent ctxt) {
     Set<String> set = new HashSet<>();
+    if (ctxt.getType() == null) {
+      set.add("Unknown");
+      return set;
+    }
     switch (ctxt.getType()) {
     case ELEMENT:
       String s = ctxt.getExpression();
@@ -874,7 +878,7 @@ public class CrossViewRenderer {
         s.append(", ");
         l++;        
       }
-      l = l + ec.getExpression().length();
+      l = l + (ec.hasExpression() ? ec.getExpression().length() : 0);
       if (ec.getType() == ExtensionContextType.ELEMENT) {
         String ref = Utilities.oidRoot(ec.getExpression());
         if (ref.startsWith("@"))
@@ -889,7 +893,7 @@ public class CrossViewRenderer {
           s.append(ec.getExpression());
         }
       } else if (ec.getType() == ExtensionContextType.FHIRPATH) {
-          s.append(Utilities.escapeXml(ec.getExpression()));
+        s.append(Utilities.escapeXml(ec.getExpression()));
       } else if (ec.getType() == ExtensionContextType.EXTENSION) {
         StructureDefinition extension = context.fetchResource(StructureDefinition.class, ec.getExpression());
         if (extension==null)
@@ -897,16 +901,19 @@ public class CrossViewRenderer {
         else {
           s.append("<a href=\""+extension.getUserData("path")+"\">"+ec.getExpression()+"</a>");
         }
-      } else
+      } else if (ec.getType() == null) {
+        s.append("??error??: "+Utilities.escapeXml(ec.getExpression()));
+      } else {
         throw new Error("Not done yet");
+      }
     }
     s.append("</td>");
     if (status == StandardsStatus.NORMATIVE) {
-      s.append("<td><a href=\"versions.html#std-process\" title=\"Normative Content\" class=\"normative-flag\">N</a></td>");
+      s.append("<td><a href=\""+Utilities.pathURL(corePath, "versions.html")+"#std-process\" title=\"Normative Content\" class=\"normative-flag\">N</a></td>");
     } else if (status == StandardsStatus.DEPRECATED) {
-      s.append("<td><a href=\"versions.html#std-process\" title=\"Deprecated Content\" class=\"deprecated-flag\">D</a></td>");      
+      s.append("<td><a href=\""+Utilities.pathURL(corePath, "versions.html")+"#std-process\" title=\"Deprecated Content\" class=\"deprecated-flag\">D</a></td>");      
     } else if (status == StandardsStatus.INFORMATIVE) {
-      s.append("<td><a href=\"versions.html#std-process\" title=\"Informative Content\" class=\"deprecated-flag\">I</a></td>");      
+      s.append("<td><a href=\""+Utilities.pathURL(corePath, "versions.html")+"#std-process\" title=\"Informative Content\" class=\"deprecated-flag\">I</a></td>");      
     } else { 
       String fmm = ToolingExtensions.readStringExtension(ed, ToolingExtensions.EXT_FMM_LEVEL);
       s.append("<td>"+(Utilities.noString(fmm) ? "0" : fmm)+"</td>");
