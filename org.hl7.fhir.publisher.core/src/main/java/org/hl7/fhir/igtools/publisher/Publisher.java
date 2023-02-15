@@ -7381,6 +7381,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (String s : context.getResourceNames()) {
       fragment("extension-search-list-"+s, cvr.buildExtensionSearchTable(s), otherFilesRun);      
     }
+    for (String s : cvr.getExtensionIds()) {
+      fragment("extension-search-"+s, cvr.buildSearchTableForExtension(s), otherFilesRun);      
+    }
     
     trackedFragment("1", "ip-statements", new IPStatementsRenderer(context, markdownEngine, sourceIg.getPackageId()).genIpStatements(fileList), otherFilesRun);
     if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {

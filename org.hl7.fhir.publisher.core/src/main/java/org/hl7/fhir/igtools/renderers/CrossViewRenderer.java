@@ -23,6 +23,7 @@ import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
 import org.hl7.fhir.r5.model.ExpressionNode;
+import org.hl7.fhir.r5.model.ExpressionNode.Kind;
 import org.hl7.fhir.r5.model.SearchParameter;
 import org.hl7.fhir.r5.model.StructureDefinition.ExtensionContextType;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
@@ -98,6 +99,8 @@ public class CrossViewRenderer {
   private List<ObservationProfile> obsList = new ArrayList<>();
   private List<ExtensionDefinition> extList = new ArrayList<>();
   private Map<String, List<ExtensionDefinition>> extMap = new HashMap<>();
+  public List<StructureDefinition> allExtensions = new ArrayList<>();
+
   public List<String> baseEffectiveTypes = new ArrayList<>();
   public List<String> baseTypes = new ArrayList<>();
   public List<String> baseExtTypes = new ArrayList<>();
@@ -359,6 +362,7 @@ public class CrossViewRenderer {
   }
 
   private void seeExtensionDefinition(StructureDefinition sd) {
+    allExtensions.add(sd);
     String code = null;
     if (sd.getUrl().startsWith(canonical)) {
       code = sd.getUrl().substring(canonical.length()+21);
@@ -991,6 +995,10 @@ public class CrossViewRenderer {
         list.add(sp);
       }
     }
+    return genSearchList(list);
+  }
+
+  public String genSearchList(List<SearchParameter> list) {
     if (list.size() == 0) {
       return "<p>(none found)</p>;";
     } else {
@@ -1009,4 +1017,51 @@ public class CrossViewRenderer {
     }
   }
 
+  public List<String> getExtensionIds() {
+    List<String> ret = new ArrayList<>();
+    for (StructureDefinition ext : allExtensions) {
+      ret.add(ext.getId());
+    }
+    return ret;
+  }
+
+  public String buildSearchTableForExtension(String id) {
+    StructureDefinition ext = null;
+    for (StructureDefinition t : allExtensions) {
+      if (t.getId().equals(id)) {
+        ext = t;
+        break;
+      }
+    }
+    if (ext == null) {
+      return "<p>Unknown Extension "+id+"</p>";
+    } else {
+      List<SearchParameter> list = new ArrayList<>();
+      for (SearchParameter sp : searchParams) {
+        ExpressionNode n = (ExpressionNode) sp.getExpressionElement() .getUserData("expression");
+        if (n != null && refersToExtension(n, ext.getUrl())) {
+          list.add(sp);
+        }
+      }
+      return genSearchList(list);
+    }
+  }
+
+  private boolean refersToExtension(ExpressionNode n, String url) {
+    if (n.getKind() == Kind.Function && n.getName().equals("extension") && n.getParameters().size() == 1) {
+      ExpressionNode p = n.getParameters().get(0);
+      return p.getKind() == Kind.Constant && p.getConstant().primitiveValue().equals(url);
+    }
+    if (n.getInner() != null) {
+      if (refersToExtension(n.getInner(), url)) {
+        return true;
+      }
+    }
+    if (n.getGroup() != null) {
+      if (refersToExtension(n.getGroup(), url)) {
+        return true;
+      }
+    }
+    return false;
+  }
 }
