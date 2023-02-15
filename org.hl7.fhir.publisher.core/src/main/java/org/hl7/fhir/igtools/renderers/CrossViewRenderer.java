@@ -10,22 +10,28 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.hl7.fhir.r5.context.CanonicalResourceManager.CanonicalListSorter;
 import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.ValidationResult;
 import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeableConcept;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
+import org.hl7.fhir.r5.model.ExpressionNode;
+import org.hl7.fhir.r5.model.ExpressionNode.Kind;
+import org.hl7.fhir.r5.model.SearchParameter;
 import org.hl7.fhir.r5.model.StructureDefinition.ExtensionContextType;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.TerminologyRenderer;
+import org.hl7.fhir.r5.utils.FHIRPathEngine;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.Utilities;
@@ -93,11 +99,15 @@ public class CrossViewRenderer {
   private List<ObservationProfile> obsList = new ArrayList<>();
   private List<ExtensionDefinition> extList = new ArrayList<>();
   private Map<String, List<ExtensionDefinition>> extMap = new HashMap<>();
+  public List<StructureDefinition> allExtensions = new ArrayList<>();
+
   public List<String> baseEffectiveTypes = new ArrayList<>();
   public List<String> baseTypes = new ArrayList<>();
   public List<String> baseExtTypes = new ArrayList<>();
   public String corePath;
   private ContextUtilities cu;
+  private FHIRPathEngine fpe;
+  private List<SearchParameter> searchParams = new ArrayList<>();
 
   public CrossViewRenderer(String canonical, String canonical2, IWorkerContext context, String corePath) {
     super();
@@ -107,6 +117,7 @@ public class CrossViewRenderer {
     this.corePath = corePath;
     getBaseTypes();
     cu = new ContextUtilities(context);
+    fpe = new FHIRPathEngine(context);
   }
 
   private void getBaseTypes() {
@@ -137,7 +148,21 @@ public class CrossViewRenderer {
     if (res instanceof StructureDefinition) {
       seeStructureDefinition((StructureDefinition) res);
     }
+    if (res instanceof SearchParameter) {
+      seeSearchParameter((SearchParameter) res);
+    }
   }
+  
+  private void seeSearchParameter(SearchParameter sp) {
+    try {
+      ExpressionNode n = fpe.parse(sp.getExpression());
+      sp.getExpressionElement().setUserData("expression", n);
+    } catch (Exception e) {
+      // do nothing in this case
+    }
+    searchParams.add(sp);    
+  }
+
   public void seeStructureDefinition(StructureDefinition sd) {
     if ("Extension".equals(sd.getType())) {
       seeExtensionDefinition(sd);
@@ -337,6 +362,7 @@ public class CrossViewRenderer {
   }
 
   private void seeExtensionDefinition(StructureDefinition sd) {
+    allExtensions.add(sd);
     String code = null;
     if (sd.getUrl().startsWith(canonical)) {
       code = sd.getUrl().substring(canonical.length()+21);
@@ -682,6 +708,10 @@ public class CrossViewRenderer {
 
   private Set<String> getExtensionContext(StructureDefinitionContextComponent ctxt) {
     Set<String> set = new HashSet<>();
+    if (ctxt.getType() == null) {
+      set.add("Unknown");
+      return set;
+    }
     switch (ctxt.getType()) {
     case ELEMENT:
       String s = ctxt.getExpression();
@@ -708,17 +738,17 @@ public class CrossViewRenderer {
   }
 
   public String buildExtensionTable() throws Exception {
-    return buildExtensionTable(extList);
+    return buildExtensionTable(null, extList);
   }
 
   public String buildExtensionTable(String s) throws Exception {
     if (extMap.containsKey(s)) {
-      return buildExtensionTable(extMap.get(s));
+      return buildExtensionTable(s, extMap.get(s));
     }
     return null;
   }
 
-  private String buildExtensionTable(List<ExtensionDefinition> definitions) throws Exception {
+  private String buildExtensionTable(String type, List<ExtensionDefinition> definitions) throws Exception {
     StringBuilder b = new StringBuilder();
 
     b.append("<table class=\"list\">\r\n");
@@ -729,17 +759,123 @@ public class CrossViewRenderer {
     b.append("<td><b><a href=\""+Utilities.pathURL(context.getSpecUrl(), "defining-extensions.html")+"#context\">Context</a></b></td>");
     b.append("<td><b><a href=\""+Utilities.pathURL(context.getSpecUrl(), "versions.html")+"#maturity\">FMM</a></b></td>");
     b.append("</tr>");
-
+    if (type != null) {
+      b.append("<tr><td colspan=\"5\"><b>Extensions defined for this resource</b></td></tr>\r\n");
+    }
     Map<String, StructureDefinition> map = new HashMap<>();
     for (ExtensionDefinition sd : definitions)
       map.put(sd.source.getUrl(), sd.source);
-    for (String s : Utilities.sorted(map.keySet())) {
-      genExtensionRow(b, map.get(s));
+    if (map.size() == 0) {
+      b.append("<tr><td colspan=\"5\">(None found)</td></tr>\r\n");      
+    } else {
+      for (String s : Utilities.sorted(map.keySet())) {
+        genExtensionRow(b, map.get(s));
+      }
     }
+
+    if (type != null) {
+      List<String> ancestors = new ArrayList<>();
+      StructureDefinition t = context.fetchTypeDefinition(type);
+      if (t != null) {
+        t = context.fetchResource(StructureDefinition.class, t.getBaseDefinition());
+        while (t != null) {
+          ancestors.add(t.getType());
+          t = context.fetchResource(StructureDefinition.class, t.getBaseDefinition());
+        }
+      }
+      
+      b.append("<tr><td colspan=\"5\"><b>Extensions defined for many resources including this resource</b></td></tr>\r\n");
+      map = new HashMap<>();
+      for (ExtensionDefinition sd : this.extList) {
+        if (forAncestor(ancestors, sd)) {
+          map.put(sd.source.getUrl(), sd.source);
+        }
+      }
+      if (map.size() == 0) {
+        b.append("<tr><td colspan=\"5\">(None found)</td></tr>\r\n");      
+      } else {
+        for (String s : Utilities.sorted(map.keySet())) {
+          genExtensionRow(b, map.get(s));
+        }
+      }
+      
+      b.append("<tr><td colspan=\"5\"><b>Extensions that refer to this resource</b></td></tr>\r\n");
+      map = new HashMap<>();
+      for (ExtensionDefinition sd : this.extList) {
+        if (refersToThisType(type, sd)) {
+          map.put(sd.source.getUrl(), sd.source);
+        }
+      }
+      if (map.size() == 0) {
+        b.append("<tr><td colspan=\"5\">(None found)</td></tr>\r\n");      
+      } else {
+        for (String s : Utilities.sorted(map.keySet())) {
+          genExtensionRow(b, map.get(s));
+        }
+      }
+      b.append("<tr><td colspan=\"5\"><b>Extensions that refer to many resources including this resource</b></td></tr>\r\n");
+      map = new HashMap<>();
+      for (ExtensionDefinition sd : this.extList) {
+        if (refersToThisTypesAncestors(ancestors, sd)) {
+          map.put(sd.source.getUrl(), sd.source);
+        }
+      }
+      if (map.size() == 0) {
+        b.append("<tr><td colspan=\"5\">(None found)</td></tr>\r\n");      
+      } else {
+        for (String s : Utilities.sorted(map.keySet())) {
+          genExtensionRow(b, map.get(s));
+        }
+      }
+    }
+
     b.append("</table>\r\n");
     return b.toString();
   }
   
+  private boolean refersToThisType(String type, ExtensionDefinition sd) {
+    String url = "http://hl7.org/fhir/StructureDefinition/"+type;
+    for (ElementDefinition ed : sd.source.getSnapshot().getElement()) {
+      for (TypeRefComponent t : ed.getType()) {
+        for (CanonicalType u : t.getTargetProfile()) {
+          if (url.equals(u.getValue())) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+
+  private boolean refersToThisTypesAncestors(List<String> ancestors, ExtensionDefinition sd) {
+    List<String> urls = new ArrayList<>();
+    for (String t : ancestors) {
+      urls.add("http://hl7.org/fhir/StructureDefinition/"+t);
+    }
+    
+    for (ElementDefinition ed : sd.source.getSnapshot().getElement()) {
+      for (TypeRefComponent t : ed.getType()) {
+        for (CanonicalType u : t.getTargetProfile()) {
+          if (urls.contains(u.getValue())) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  private boolean forAncestor(List<String> ancestors, ExtensionDefinition sd) {
+    List<String> types = getExtensionContext(sd.source);
+    for (String type : types) {
+      if (ancestors.contains(type)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private void genExtensionRow(StringBuilder s, StructureDefinition ed) throws Exception {
     StandardsStatus status = ToolingExtensions.getStandardsStatus(ed);
     if (status  == StandardsStatus.DEPRECATED) {
@@ -767,7 +903,7 @@ public class CrossViewRenderer {
         s.append(", ");
         l++;        
       }
-      l = l + ec.getExpression().length();
+      l = l + (ec.hasExpression() ? ec.getExpression().length() : 0);
       if (ec.getType() == ExtensionContextType.ELEMENT) {
         String ref = Utilities.oidRoot(ec.getExpression());
         if (ref.startsWith("@"))
@@ -782,7 +918,7 @@ public class CrossViewRenderer {
           s.append(ec.getExpression());
         }
       } else if (ec.getType() == ExtensionContextType.FHIRPATH) {
-          s.append(Utilities.escapeXml(ec.getExpression()));
+        s.append(Utilities.escapeXml(ec.getExpression()));
       } else if (ec.getType() == ExtensionContextType.EXTENSION) {
         StructureDefinition extension = context.fetchResource(StructureDefinition.class, ec.getExpression());
         if (extension==null)
@@ -790,16 +926,19 @@ public class CrossViewRenderer {
         else {
           s.append("<a href=\""+extension.getUserData("path")+"\">"+ec.getExpression()+"</a>");
         }
-      } else
+      } else if (ec.getType() == null) {
+        s.append("??error??: "+Utilities.escapeXml(ec.getExpression()));
+      } else {
         throw new Error("Not done yet");
+      }
     }
     s.append("</td>");
     if (status == StandardsStatus.NORMATIVE) {
-      s.append("<td><a href=\"versions.html#std-process\" title=\"Normative Content\" class=\"normative-flag\">N</a></td>");
+      s.append("<td><a href=\""+Utilities.pathURL(corePath, "versions.html")+"#std-process\" title=\"Normative Content\" class=\"normative-flag\">N</a></td>");
     } else if (status == StandardsStatus.DEPRECATED) {
-      s.append("<td><a href=\"versions.html#std-process\" title=\"Deprecated Content\" class=\"deprecated-flag\">D</a></td>");      
+      s.append("<td><a href=\""+Utilities.pathURL(corePath, "versions.html")+"#std-process\" title=\"Deprecated Content\" class=\"deprecated-flag\">D</a></td>");      
     } else if (status == StandardsStatus.INFORMATIVE) {
-      s.append("<td><a href=\"versions.html#std-process\" title=\"Informative Content\" class=\"deprecated-flag\">I</a></td>");      
+      s.append("<td><a href=\""+Utilities.pathURL(corePath, "versions.html")+"#std-process\" title=\"Informative Content\" class=\"deprecated-flag\">I</a></td>");      
     } else { 
       String fmm = ToolingExtensions.readStringExtension(ed, ToolingExtensions.EXT_FMM_LEVEL);
       s.append("<td>"+(Utilities.noString(fmm) ? "0" : fmm)+"</td>");
@@ -834,10 +973,95 @@ public class CrossViewRenderer {
           return "(Choice)";
         }
       }
-
-
     }
     return "(complex)";
   }
 
+
+  public class SearchParameterListSorter implements Comparator<SearchParameter> {
+
+    @Override
+    public int compare(SearchParameter arg0, SearchParameter arg1) {
+      String u0 = arg0.getUrl();
+      String u1 = arg1.getUrl();
+      return u0.compareTo(u1);
+    }
+  }
+
+  public String buildExtensionSearchTable(String s) {
+    List<SearchParameter> list = new ArrayList<>();
+    for (SearchParameter sp : searchParams) {
+      if (sp.hasBase(s)) {
+        list.add(sp);
+      }
+    }
+    return genSearchList(list);
+  }
+
+  public String genSearchList(List<SearchParameter> list) {
+    if (list.size() == 0) {
+      return "<p>(none found)</p>;";
+    } else {
+      Collections.sort(list, new SearchParameterListSorter());
+      StringBuilder b = new StringBuilder();
+      b.append("<ul>\r\n");
+      for (SearchParameter sp : list) {
+        if (sp.hasDescription()) {
+          b.append(" <li><a href=\""+sp.getUserString("path")+"\">"+Utilities.escapeXml(sp.present())+"</a>: "+Utilities.escapeXml(sp.getDescription())+"</li>\r\n");
+        } else {
+          b.append(" <li><a href=\""+sp.getUserString("path")+"\">"+Utilities.escapeXml(sp.present())+"</a></li>\r\n");
+        }
+      }
+      b.append("</ul>\r\n");
+      return b.toString();
+    }
+  }
+
+  public List<String> getExtensionIds() {
+    List<String> ret = new ArrayList<>();
+    for (StructureDefinition ext : allExtensions) {
+      ret.add(ext.getId());
+    }
+    return ret;
+  }
+
+  public String buildSearchTableForExtension(String id) {
+    StructureDefinition ext = null;
+    for (StructureDefinition t : allExtensions) {
+      if (t.getId().equals(id)) {
+        ext = t;
+        break;
+      }
+    }
+    if (ext == null) {
+      return "<p>Unknown Extension "+id+"</p>";
+    } else {
+      List<SearchParameter> list = new ArrayList<>();
+      for (SearchParameter sp : searchParams) {
+        ExpressionNode n = (ExpressionNode) sp.getExpressionElement() .getUserData("expression");
+        if (n != null && refersToExtension(n, ext.getUrl())) {
+          list.add(sp);
+        }
+      }
+      return genSearchList(list);
+    }
+  }
+
+  private boolean refersToExtension(ExpressionNode n, String url) {
+    if (n.getKind() == Kind.Function && n.getName().equals("extension") && n.getParameters().size() == 1) {
+      ExpressionNode p = n.getParameters().get(0);
+      return p.getKind() == Kind.Constant && p.getConstant().primitiveValue().equals(url);
+    }
+    if (n.getInner() != null) {
+      if (refersToExtension(n.getInner(), url)) {
+        return true;
+      }
+    }
+    if (n.getGroup() != null) {
+      if (refersToExtension(n.getGroup(), url)) {
+        return true;
+      }
+    }
+    return false;
+  }
 }

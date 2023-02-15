@@ -716,6 +716,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private CqlSubSystem cql;
   private IniFile apiKeyFile;
   private File killFile;    
+  private List<PageFactory> pageFactories = new ArrayList<>();
 
   private ILoggingService logger = this;
 
@@ -1980,7 +1981,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private boolean isConvertableResource(String t) {
-    return Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "Conformance", "CapabilityStatement", "Questionnaire", "NamingSystem", 
+    return Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "Conformance", "CapabilityStatement", "Questionnaire", "NamingSystem", "SearchParameter",
         "ConceptMap", "OperationOutcome", "CompartmentDefinition", "OperationDefinition", "ImplementationGuide", "ActorDefinition", "Requirements");
   }
 
@@ -2651,6 +2652,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         r4tor4b.markExempt(p.getValue(), false);
       } else if (pc.equals("produce-jekyll-data")) {        
         produceJekyllData = "true".equals(p.getValue());
+      } else if (pc.equals("page-factory")) {
+        String dir = Utilities.path(rootDir, "temp", "factory-pages", "factory"+pageFactories.size());
+        Utilities.createDirectory(dir);
+        pageFactories.add(new PageFactory(Utilities.path(rootDir, p.getValue()), dir));
+        pagesDirs.add(dir);
       }
       count++;
     }
@@ -2677,7 +2683,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     logDebugMessage(LogCategory.INIT, "Check folders");
     List<String> extraDirs = new ArrayList<String>();
     for (String s : resourceDirs) {
-      if (s.endsWith("/*")) {
+      if (s.endsWith(File.separator+"*")) {
         logDebugMessage(LogCategory.INIT, "Scan Source: "+s);
         scanDirectories(Utilities.getDirectoryForFile(s), extraDirs);
         
@@ -2688,7 +2694,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     List<String> missingDirs = new ArrayList<String>();
     for (String s : resourceDirs) {
       logDebugMessage(LogCategory.INIT, "Source: "+s);
-      if (s.endsWith("/*")) {
+      if (s.endsWith(File.separator+"*")) {
         missingDirs.add(s);
         
       }
@@ -2731,6 +2737,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     context.setAllowLoadingDuplicates(true);
     context.setExpandCodesLimit(1000);
     context.setExpansionProfile(makeExpProfile());
+    for (PageFactory pf : pageFactories) {
+      pf.setContext(context);
+    }
     dr = new DataRenderer(context);
 
 
@@ -2824,10 +2833,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     r5e.load();
     r5e.loadR5Extensions();
     r5e.loadR5SpecialTypes(SpecialTypeHandler.SPECIAL_TYPES);
-    SpecMapManager smm = new SpecMapManager(r5e.getMap(), r5e.getPck().fhirVersion());
-    smm.setName(r5e.getPck().name());
+    SpecMapManager smm = new SpecMapManager(r5e.getMap(), r5e.getPckCore().fhirVersion());
+    smm.setName(r5e.getPckCore().name());
     smm.setBase("http://build.fhir.org");
     smm.setBase2("http://build.fhir.org/");
+    specMaps.add(smm);
+    smm = new SpecMapManager(r5e.getMap(), r5e.getPckExt().fhirVersion());
+    smm.setName(r5e.getPckExt().name());
+    smm.setBase("http://build.fhir.org/ig/HL7/fhir-extensions");
+    smm.setBase2("http://build.fhir.org/ig/HL7/fhir-extensions");
     specMaps.add(smm);
     System.out.println(" - " + r5e.getCount() + " resources (" + tt.milestone() + ")");
     generateLoadedSnapshots();
@@ -4260,6 +4274,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (duplicateInputResourcesDetected) {
       throw new Error("Unable to continue because duplicate input resources were identified");
     }
+    
+    for (PageFactory pf : pageFactories) {
+      pf.execute(rootDir, publishedIg);
+    }
 
     // load static pages
     needToBuild = loadPrePages() || needToBuild;
@@ -4367,6 +4385,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                     }
                   }
                 }
+              }
+            }
+            if (rg.hasDescription()) {
+              String desc = rg.getDescription();
+              String descNew = ProfileUtilities.processRelativeUrls(desc, "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).getTargets(), pageTargets(), false);
+              if (!desc.equals(descNew)) {
+                rg.setDescription(descNew);
+//                System.out.println("change\r\n"+desc+"\r\nto\r\n"+descNew);
               }
             }
             if (!rg.getIsExample()) {
@@ -7340,15 +7366,26 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     
     JsonObject data = new JsonObject();
     JsonArray ecl = new JsonArray();
-    data.add("extension-contexts", ecl);
+//    data.add("extension-contexts-populated", ecl); causes a bug in jekyll see https://github.com/jekyll/jekyll/issues/9289
     
     fragment("summary-extensions", cvr.getExtensionSummary(), otherFilesRun);
-    fragment("extension-list", cvr.buildExtensionTable(), otherFilesRun);
+    fragment("extension-list", cvr.buildExtensionTable(), otherFilesRun);    
+    Set<String> econtexts = new ContextUtilities(context).getTypeNameSet();
     for (String s : cvr.getExtensionContexts()) {
       ecl.add(s);
+      econtexts.add(s);
+    }
+    for (String s : econtexts) {
       fragment("extension-list-"+s, cvr.buildExtensionTable(s), otherFilesRun);      
     }
-    trackedFragment("1", "ip-statements", new IPStatementsRenderer(context, markdownEngine).genIpStatements(fileList), otherFilesRun);
+    for (String s : context.getResourceNames()) {
+      fragment("extension-search-list-"+s, cvr.buildExtensionSearchTable(s), otherFilesRun);      
+    }
+    for (String s : cvr.getExtensionIds()) {
+      fragment("extension-search-"+s, cvr.buildSearchTableForExtension(s), otherFilesRun);      
+    }
+    
+    trackedFragment("1", "ip-statements", new IPStatementsRenderer(context, markdownEngine, sourceIg.getPackageId()).genIpStatements(fileList), otherFilesRun);
     if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {
       trackedFragment("2", "cross-version-analysis", r4tor4b.generate(npmName, false), otherFilesRun);
       trackedFragment("2", "cross-version-analysis-inline", r4tor4b.generate(npmName, true), otherFilesRun);
@@ -7407,7 +7444,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           }
           item.add("publisher", sd.getPublisher());
           item.add("copyright", sd.getCopyright());
-          item.add("description", sd.getDescription());
+          item.add("description", ProfileUtilities.processRelativeUrls(sd.getDescription(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
+
           if (sd.hasContext()) {
             JsonArray contexts = new JsonArray();
             item.add("contexts", contexts);
@@ -7418,13 +7456,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               citem.add("expression", ec.getExpression());
             }
           }
-          List<String> ec = cvr.getExtensionContext(sd);
-          JsonArray contexts = new JsonArray();
-          item.add("extension-contexts", contexts);
-          for (String s : ec) {
-            contexts.add(s);
+          if (ProfileUtilities.isExtensionDefinition(sd)) {
+            List<String> ec = cvr.getExtensionContext(sd);
+            JsonArray contexts = new JsonArray();
+             item.add("extension-contexts", contexts);
+            for (String s : ec) {
+              contexts.add(s);
+            }
           }
-
           i++;
         }
       }
@@ -7479,7 +7518,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           item.add("date", q.getDate().toString());
           item.add("publisher", q.getPublisher());
           item.add("copyright", q.getCopyright());
-          item.add("description", q.getDescription());
+          item.add("description", ProfileUtilities.processRelativeUrls(q.getDescription(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
+
           i++;
         }
       }
@@ -7529,7 +7569,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           jo.add("type", crd.getType());
           jo.add("id", crd.getId());
           jo.add("title", crd.getType());
-          jo.add("description", crd.getDescription());
+          jo.add("description", ProfileUtilities.processRelativeUrls(crd.getDescription(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
           
           JsonObject citem = new JsonObject();
           data.add(crd.getType()+"/"+r.getId()+"_"+crd.getId(), citem); 
@@ -7632,7 +7672,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       // status gets overridden later, and it appears in there
       // publisher & description are exposed in domain resource as  'owner' & 'link'
       if (cr.hasDescription()) {
-        item.add("description", cr.getDescription());
+        item.add("description", ProfileUtilities.processRelativeUrls(cr.getDescription(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
+
       }
       if (cr.hasUseContext() && !containedCr) {
         List<String> contexts = new ArrayList<String>();
@@ -7746,7 +7787,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (pcr != null && pcr.hasStatus())
         item.add("status", pcr.getStatus().toCode());
       if (cr.hasPurpose())
-        item.add("purpose", cr.getPurpose());              
+        item.add("purpose", ProfileUtilities.processRelativeUrls(cr.getPurpose(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
+
       if (cr.hasCopyright())
         item.add("copyright", cr.getCopyright());              
       if (pcr!=null && pcr.hasExtension(ToolingExtensions.EXT_FMM_LEVEL)) {
@@ -8394,6 +8436,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     data.add("processedFiles", changeList.size());
     data.add("genDate", genTime());
     data.add("genDay", genDate());
+    JsonArray rt = data.forceArray("resourceTypes");
+    List<String> rtl = context.getResourceNames();
+    for (String s : rtl) {
+      rt.add(s);
+    }
+    rt = data.forceArray("dataTypes");
+    ContextUtilities cu = new ContextUtilities(context);
+    for (String s : cu.getTypeNames()) {
+      if (!rtl.contains(s)) {
+        rt.add(s);
+      }
+    }
+    
     JsonObject ig = new JsonObject();
     data.add("ig", ig);
     ig.add("id", publishedIg.getId());
@@ -8437,7 +8492,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
     ig.add("date", publishedIg.getDateElement().asStringValue());
-    ig.add("description", publishedIg.getDescription());
+    ig.add("description", ProfileUtilities.processRelativeUrls(publishedIg.getDescription(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
+
     ig.add("copyright", publishedIg.getCopyright());
     for (Enumeration<FHIRVersion> v : publishedIg.getFhirVersion()) {
       ig.add("fhirVersion", v.asStringValue());
@@ -8545,7 +8601,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (FetchedResource r : f.getResources()) {
         if (r.fhirType().equals("StructureDefinition")) {
           StructureDefinition sd = (StructureDefinition) r.getResource();
-          if (sd.getDerivation() == TypeDerivationRule.CONSTRAINT && sd.getType().equals("Extension")) {
+          if (ProfileUtilities.isExtensionDefinition(sd)) {
             items.add(new Item(f, r, sd.hasTitle() ? sd.getTitle() : sd.hasName() ? sd.getName() : r.getTitle()));
           }
         }
@@ -9456,7 +9512,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       fragment(res.fhirType()+"-"+r.getId()+"-maturity",  genFmmBanner(r), f.getOutputNames());
     }
     if (igpkp.wantGen(r, "ip-statements") && res != null) {
-      fragment(res.fhirType()+"-"+r.getId()+"-ip-statements", new IPStatementsRenderer(context, markdownEngine).genIpStatements(r, example), f.getOutputNames());
+      fragment(res.fhirType()+"-"+r.getId()+"-ip-statements", new IPStatementsRenderer(context, markdownEngine, sourceIg.getPackageId()).genIpStatements(r, example), f.getOutputNames());
     }
     if (igpkp.wantGen(r, "validate")) {
       fragment(r.fhirType()+"-"+r.getId()+"-validate",  genValidation(f, r), f.getOutputNames());
