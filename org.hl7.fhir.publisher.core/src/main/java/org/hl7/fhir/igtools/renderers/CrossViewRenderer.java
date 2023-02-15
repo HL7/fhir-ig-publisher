@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.hl7.fhir.r5.context.CanonicalResourceManager.CanonicalListSorter;
 import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.ValidationResult;
@@ -21,12 +22,15 @@ import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
+import org.hl7.fhir.r5.model.ExpressionNode;
+import org.hl7.fhir.r5.model.SearchParameter;
 import org.hl7.fhir.r5.model.StructureDefinition.ExtensionContextType;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.TerminologyRenderer;
+import org.hl7.fhir.r5.utils.FHIRPathEngine;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.Utilities;
@@ -99,6 +103,8 @@ public class CrossViewRenderer {
   public List<String> baseExtTypes = new ArrayList<>();
   public String corePath;
   private ContextUtilities cu;
+  private FHIRPathEngine fpe;
+  private List<SearchParameter> searchParams = new ArrayList<>();
 
   public CrossViewRenderer(String canonical, String canonical2, IWorkerContext context, String corePath) {
     super();
@@ -108,6 +114,7 @@ public class CrossViewRenderer {
     this.corePath = corePath;
     getBaseTypes();
     cu = new ContextUtilities(context);
+    fpe = new FHIRPathEngine(context);
   }
 
   private void getBaseTypes() {
@@ -138,7 +145,21 @@ public class CrossViewRenderer {
     if (res instanceof StructureDefinition) {
       seeStructureDefinition((StructureDefinition) res);
     }
+    if (res instanceof SearchParameter) {
+      seeSearchParameter((SearchParameter) res);
+    }
   }
+  
+  private void seeSearchParameter(SearchParameter sp) {
+    try {
+      ExpressionNode n = fpe.parse(sp.getExpression());
+      sp.getExpressionElement().setUserData("expression", n);
+    } catch (Exception e) {
+      // do nothing in this case
+    }
+    searchParams.add(sp);    
+  }
+
   public void seeStructureDefinition(StructureDefinition sd) {
     if ("Extension".equals(sd.getType())) {
       seeExtensionDefinition(sd);
@@ -948,10 +969,44 @@ public class CrossViewRenderer {
           return "(Choice)";
         }
       }
-
-
     }
     return "(complex)";
+  }
+
+
+  public class SearchParameterListSorter implements Comparator<SearchParameter> {
+
+    @Override
+    public int compare(SearchParameter arg0, SearchParameter arg1) {
+      String u0 = arg0.getUrl();
+      String u1 = arg1.getUrl();
+      return u0.compareTo(u1);
+    }
+  }
+
+  public String buildExtensionSearchTable(String s) {
+    List<SearchParameter> list = new ArrayList<>();
+    for (SearchParameter sp : searchParams) {
+      if (sp.hasBase(s)) {
+        list.add(sp);
+      }
+    }
+    if (list.size() == 0) {
+      return "<p>(none found)</p>;";
+    } else {
+      Collections.sort(list, new SearchParameterListSorter());
+      StringBuilder b = new StringBuilder();
+      b.append("<ul>\r\n");
+      for (SearchParameter sp : list) {
+        if (sp.hasDescription()) {
+          b.append(" <li><a href=\""+sp.getUserString("path")+"\">"+Utilities.escapeXml(sp.present())+"</a>: "+Utilities.escapeXml(sp.getDescription())+"</li>\r\n");
+        } else {
+          b.append(" <li><a href=\""+sp.getUserString("path")+"\">"+Utilities.escapeXml(sp.present())+"</a></li>\r\n");
+        }
+      }
+      b.append("</ul>\r\n");
+      return b.toString();
+    }
   }
 
 }

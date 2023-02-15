@@ -1981,7 +1981,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private boolean isConvertableResource(String t) {
-    return Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "Conformance", "CapabilityStatement", "Questionnaire", "NamingSystem", 
+    return Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "Conformance", "CapabilityStatement", "Questionnaire", "NamingSystem", "SearchParameter",
         "ConceptMap", "OperationOutcome", "CompartmentDefinition", "OperationDefinition", "ImplementationGuide", "ActorDefinition", "Requirements");
   }
 
@@ -7378,7 +7378,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (String s : econtexts) {
       fragment("extension-list-"+s, cvr.buildExtensionTable(s), otherFilesRun);      
     }
-
+    for (String s : context.getResourceNames()) {
+      fragment("extension-search-list-"+s, cvr.buildExtensionSearchTable(s), otherFilesRun);      
+    }
+    
     trackedFragment("1", "ip-statements", new IPStatementsRenderer(context, markdownEngine, sourceIg.getPackageId()).genIpStatements(fileList), otherFilesRun);
     if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {
       trackedFragment("2", "cross-version-analysis", r4tor4b.generate(npmName, false), otherFilesRun);
