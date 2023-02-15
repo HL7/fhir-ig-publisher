@@ -1981,7 +1981,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private boolean isConvertableResource(String t) {
-    return Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "Conformance", "CapabilityStatement", "Questionnaire", "NamingSystem", 
+    return Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "Conformance", "CapabilityStatement", "Questionnaire", "NamingSystem", "SearchParameter",
         "ConceptMap", "OperationOutcome", "CompartmentDefinition", "OperationDefinition", "ImplementationGuide", "ActorDefinition", "Requirements");
   }
 
@@ -4385,6 +4385,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                     }
                   }
                 }
+              }
+            }
+            if (rg.hasDescription()) {
+              String desc = rg.getDescription();
+              String descNew = ProfileUtilities.processRelativeUrls(desc, "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).getTargets(), pageTargets(), false);
+              if (!desc.equals(descNew)) {
+                rg.setDescription(descNew);
+//                System.out.println("change\r\n"+desc+"\r\nto\r\n"+descNew);
               }
             }
             if (!rg.getIsExample()) {
@@ -7370,8 +7378,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (String s : econtexts) {
       fragment("extension-list-"+s, cvr.buildExtensionTable(s), otherFilesRun);      
     }
-
-    trackedFragment("1", "ip-statements", new IPStatementsRenderer(context, markdownEngine).genIpStatements(fileList), otherFilesRun);
+    for (String s : context.getResourceNames()) {
+      fragment("extension-search-list-"+s, cvr.buildExtensionSearchTable(s), otherFilesRun);      
+    }
+    for (String s : cvr.getExtensionIds()) {
+      fragment("extension-search-"+s, cvr.buildSearchTableForExtension(s), otherFilesRun);      
+    }
+    
+    trackedFragment("1", "ip-statements", new IPStatementsRenderer(context, markdownEngine, sourceIg.getPackageId()).genIpStatements(fileList), otherFilesRun);
     if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {
       trackedFragment("2", "cross-version-analysis", r4tor4b.generate(npmName, false), otherFilesRun);
       trackedFragment("2", "cross-version-analysis-inline", r4tor4b.generate(npmName, true), otherFilesRun);
@@ -7430,7 +7444,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           }
           item.add("publisher", sd.getPublisher());
           item.add("copyright", sd.getCopyright());
-          item.add("description", sd.getDescription());
+          item.add("description", ProfileUtilities.processRelativeUrls(sd.getDescription(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
+
           if (sd.hasContext()) {
             JsonArray contexts = new JsonArray();
             item.add("contexts", contexts);
@@ -7503,7 +7518,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           item.add("date", q.getDate().toString());
           item.add("publisher", q.getPublisher());
           item.add("copyright", q.getCopyright());
-          item.add("description", q.getDescription());
+          item.add("description", ProfileUtilities.processRelativeUrls(q.getDescription(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
+
           i++;
         }
       }
@@ -7553,7 +7569,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           jo.add("type", crd.getType());
           jo.add("id", crd.getId());
           jo.add("title", crd.getType());
-          jo.add("description", crd.getDescription());
+          jo.add("description", ProfileUtilities.processRelativeUrls(crd.getDescription(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
           
           JsonObject citem = new JsonObject();
           data.add(crd.getType()+"/"+r.getId()+"_"+crd.getId(), citem); 
@@ -7656,7 +7672,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       // status gets overridden later, and it appears in there
       // publisher & description are exposed in domain resource as  'owner' & 'link'
       if (cr.hasDescription()) {
-        item.add("description", cr.getDescription());
+        item.add("description", ProfileUtilities.processRelativeUrls(cr.getDescription(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
+
       }
       if (cr.hasUseContext() && !containedCr) {
         List<String> contexts = new ArrayList<String>();
@@ -7770,7 +7787,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (pcr != null && pcr.hasStatus())
         item.add("status", pcr.getStatus().toCode());
       if (cr.hasPurpose())
-        item.add("purpose", cr.getPurpose());              
+        item.add("purpose", ProfileUtilities.processRelativeUrls(cr.getPurpose(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
+
       if (cr.hasCopyright())
         item.add("copyright", cr.getCopyright());              
       if (pcr!=null && pcr.hasExtension(ToolingExtensions.EXT_FMM_LEVEL)) {
@@ -8474,7 +8492,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
     ig.add("date", publishedIg.getDateElement().asStringValue());
-    ig.add("description", publishedIg.getDescription());
+    ig.add("description", ProfileUtilities.processRelativeUrls(publishedIg.getDescription(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
+
     ig.add("copyright", publishedIg.getCopyright());
     for (Enumeration<FHIRVersion> v : publishedIg.getFhirVersion()) {
       ig.add("fhirVersion", v.asStringValue());
@@ -9493,7 +9512,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       fragment(res.fhirType()+"-"+r.getId()+"-maturity",  genFmmBanner(r), f.getOutputNames());
     }
     if (igpkp.wantGen(r, "ip-statements") && res != null) {
-      fragment(res.fhirType()+"-"+r.getId()+"-ip-statements", new IPStatementsRenderer(context, markdownEngine).genIpStatements(r, example), f.getOutputNames());
+      fragment(res.fhirType()+"-"+r.getId()+"-ip-statements", new IPStatementsRenderer(context, markdownEngine, sourceIg.getPackageId()).genIpStatements(r, example), f.getOutputNames());
     }
     if (igpkp.wantGen(r, "validate")) {
       fragment(r.fhirType()+"-"+r.getId()+"-validate",  genValidation(f, r), f.getOutputNames());

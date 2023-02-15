@@ -47,13 +47,17 @@ public class IPStatementsRenderer {
   private MarkDownProcessor markdownEngine;
   private Map<String, SystemUsage> systems = new HashMap<>();
   private Map<String, List<SystemUsage>> usages = new HashMap<>();
+
+  private String packageId;
   
   
-  public IPStatementsRenderer(IWorkerContext ctxt, MarkDownProcessor markdownEngine) {
+  public IPStatementsRenderer(IWorkerContext ctxt, MarkDownProcessor markdownEngine, String packageId) {
     super();
     this.ctxt = ctxt;
     this.markdownEngine = markdownEngine;
+    this.packageId = packageId;
   }
+  
   private void seeSystem(String url, FetchedResource source) {
     if (url != null) {
       SystemUsage su = systems.get(url);
@@ -122,7 +126,7 @@ public class IPStatementsRenderer {
     }
     
     if (usages.size() == 0) {
-      return "No use of external IP";
+      return isHL7Ig() ? "No use of external IP" : "No use of external IP (other than from the FHIR specification)";
     } else {
       StringBuilder b = new StringBuilder();
       b.append("<p>This "+title+" includes IP covered under the following statements.</p>\r\n<ul>\r\n");
@@ -196,6 +200,10 @@ public class IPStatementsRenderer {
     }
   } 
 
+  private boolean isHL7Ig() {
+    return packageId.startsWith("hl7.");
+  }
+  
   private String getCopyRightStatement(SystemUsage system) {
     if ("http://snomed.info/sct".equals(system.system)) {
       system.desc = "SNOMED Clinical Terms® (SNOMED CT®)";
