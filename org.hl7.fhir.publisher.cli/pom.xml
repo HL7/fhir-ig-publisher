@@ -66,7 +66,13 @@
                             <goal>unpack-dependencies</goal>
                         </goals>
                         <configuration>
-                            <excludes>META-INF/*.SF,META-INF/*.DSA,META-INF/*.RSA</excludes>
+                            <!-- exclude the following:
+                                 Signature files that will be flagged as inconsistent:
+                                   META-INF/*.SF,META-INF/*.DSA,META-INF/*.RSA
+                                 A module-info from org.graalvm.truffle (imported by org.graalvm.js) that is compiled for Java 17
+                                   META-INF/versions/17/module-info.class
+                            -->
+                            <excludes>META-INF/*.SF,META-INF/*.DSA,META-INF/*.RSA,META-INF/versions/17/module-info.class</excludes>
                             <outputDirectory>${project.build.directory}/classes</outputDirectory>
                             <overWriteReleases>false</overWriteReleases>
                             <overWriteSnapshots>true</overWriteSnapshots>
