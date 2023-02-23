@@ -1048,7 +1048,7 @@ public class CrossViewRenderer {
   }
 
   private boolean refersToExtension(ExpressionNode n, String url) {
-    if (n.getKind() == Kind.Function && n.getName().equals("extension") && n.getParameters().size() == 1) {
+    if (n != null && n.getKind() == Kind.Function && n.getName().equals("extension") && n.getParameters().size() == 1) {
       ExpressionNode p = n.getParameters().get(0);
       return p.getKind() == Kind.Constant && p.getConstant().primitiveValue().equals(url);
     }

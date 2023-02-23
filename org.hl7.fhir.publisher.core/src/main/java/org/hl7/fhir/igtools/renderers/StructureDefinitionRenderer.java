@@ -88,6 +88,7 @@ import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Cell;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Piece;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Row;
+import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.TableGenerationMode;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.TableModel;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.Title;
 
@@ -2823,12 +2824,20 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         for (TypeRefComponent tr : ed.getType()) {
           for (CanonicalType u : tr.getProfile()) {
             if (this.sd.getUrl().equals(u.getValue())) {
-              refs.put(sd.getUserString("path"), sd.present());
+              if (sd.hasUserData("path")) {
+                refs.put(sd.getUserString("path"), sd.present());
+              } else {
+                System.out.println("SD "+sd.getVersionedUrl()+" has no path");
+              }
             }
           }
           for (CanonicalType u : tr.getTargetProfile()) {
             if (this.sd.getUrl().equals(u.getValue())) {
-              trefs.put(sd.getUserString("path"), sd.present());
+              if (sd.hasUserData("path")) {
+                trefs.put(sd.getUserString("path"), sd.present());
+              } else {
+                System.out.println("SD "+sd.getVersionedUrl()+" has no path");
+              }
             }
           }
         }
@@ -2838,7 +2847,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       for (FetchedResource r : f.getResources()) {
         if (usesSD(r.getElement())) {
           String p = igp.getLinkFor(r, true);
-          examples.put(p, r.getTitle());
+          if (p != null) {
+            examples.put(p, r.getTitle());
+          } else {
+            System.out.println("Res "+f.getName()+" has no path");
+          }
         }
       }
     }
@@ -2953,7 +2966,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     HierarchicalTableGenerator gen = new HierarchicalTableGenerator(destDir, true, true);
     gen.setTranslator(getTranslator());
     
-    TableModel model = gen.initNormalTable(corePath, false, true, sd.getId()+"x", true);
+    TableModel model = gen.initNormalTable(corePath, false, true, sd.getId()+"x", true, TableGenerationMode.XHTML);
     XhtmlNode x = null;
     try {
       genElement(gen, model.getRows(), pe.buildPEDefinition(sd));
