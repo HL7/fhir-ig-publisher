@@ -139,6 +139,7 @@ import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.r5.context.IWorkerContext.ValidationResult;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
+import org.hl7.fhir.r5.elementmodel.FmlParser;
 import org.hl7.fhir.r5.elementmodel.Manager.FhirFormat;
 import org.hl7.fhir.r5.elementmodel.ObjectConverter;
 import org.hl7.fhir.r5.elementmodel.ParserBase.IdRenderingPolicy;
@@ -5508,7 +5509,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private Element loadFromMap(FetchedFile file) throws Exception {
     if (VersionUtilities.isR4Ver(context.getVersion()) || VersionUtilities.isR4BVer(context.getVersion())) {
       StructureMapUtilities mr = new StructureMapUtilities(context);
-      Element res = mr.parseEM(TextFile.bytesToString(file.getSource()), context.getVersion(), file.getErrors());
+      FmlParser fp = new FmlParser(context);
+      fp.setupValidation(ValidationPolicy.EVERYTHING, file.getErrors());     
+      Element res = fp.parse(TextFile.bytesToString(file.getSource()));
       if (res == null) {
         throw new Exception("Unable to parse Map Source for "+file.getName());
       }

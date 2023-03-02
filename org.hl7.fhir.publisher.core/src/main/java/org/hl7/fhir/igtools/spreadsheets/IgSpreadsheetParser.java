@@ -68,6 +68,7 @@ import org.hl7.fhir.r5.model.Enumerations.BindingStrength;
 import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
 import org.hl7.fhir.r5.model.Enumerations.QuantityComparator;
 import org.hl7.fhir.r5.model.Enumerations.SearchParamType;
+import org.hl7.fhir.r5.model.Enumerations.VersionIndependentResourceTypesAll;
 import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.Factory;
 import org.hl7.fhir.r5.model.IdType;
@@ -1479,7 +1480,7 @@ public class IgSpreadsheetParser {
             op.setVersion(Constants.VERSION);
             String s = sheet.getColumn(row, "Type");
             if (!Utilities.noString(s)) {
-              op.addResource(s);
+              op.addResource(VersionIndependentResourceTypesAll.fromCode(s));
               op.setType(true);
             }
             s = sheet.getColumn(row, "Title");
