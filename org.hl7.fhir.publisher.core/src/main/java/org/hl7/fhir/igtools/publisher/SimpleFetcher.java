@@ -33,13 +33,16 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService.LogCategory;
+import org.hl7.fhir.r5.elementmodel.FmlParser;
 import org.hl7.fhir.r5.elementmodel.ParserBase.NamedElement;
+import org.hl7.fhir.r5.elementmodel.ParserBase.ValidationPolicy;
 import org.hl7.fhir.r5.formats.FormatUtilities;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.DataType;
 import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.UriType;
+import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 
@@ -50,6 +53,8 @@ public class SimpleFetcher implements IFetchFile {
   private List<String> resourceDirs;
   private ILoggingService log;
   private String rootDir;
+  private FmlParser fp;
+
   
   public SimpleFetcher(ILoggingService log) {
     this.log = log;
@@ -316,7 +321,7 @@ public class SimpleFetcher implements IFetchFile {
             String ext = Utilities.getFileExtension(fn);
             if (!Utilities.existsInList(ext, "md", "txt") && !fn.endsWith(".gitignore") && !fn.contains("-spreadsheet") && !isIgnoredFile(f.getName())) {
               boolean ok = false;
-              if (!Utilities.existsInList(ext, "json", "ttl", "html", "txt"))
+              if (!Utilities.existsInList(ext, "json", "ttl", "html", "txt", "fml"))
                 try {
                   org.hl7.fhir.r5.elementmodel.Element e = new org.hl7.fhir.r5.elementmodel.XmlParser(context).parseSingle(new FileInputStream(f));
                   addFile(res, f, e, "application/fhir+xml");
@@ -328,7 +333,7 @@ public class SimpleFetcher implements IFetchFile {
 //                    e.printStackTrace();
                   }
                 }
-              if (!ok && !Utilities.existsInList(ext, "xml", "ttl", "html", "txt")) {
+              if (!ok && !Utilities.existsInList(ext, "xml", "ttl", "html", "txt", "fml")) {
                 try {
                   List<NamedElement> el = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parse(new FileInputStream(fn));
                   if (el.size() == 1) {
@@ -343,10 +348,26 @@ public class SimpleFetcher implements IFetchFile {
                   }
                 }
               }
-              if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt")) {
+              if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt", "fml")) {
                 try {
                   org.hl7.fhir.r5.elementmodel.Element e = new org.hl7.fhir.r5.elementmodel.TurtleParser(context).parseSingle(new FileInputStream(fn));
                   addFile(res, f, e, "application/fhir+turtle");
+                  count++;
+                  ok = true;
+                } catch (Exception e) {
+                  if (!f.getName().startsWith("Binary-")) { // we don't notify here because Binary is special. 
+                    log.logMessage(e.getMessage() +" loading "+f);
+//                    e.printStackTrace();
+                  }
+                }
+              }              
+              if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt")) {
+                try {
+                  if (fp==null) {
+                    fp = new FmlParser(context);
+                  }
+                  org.hl7.fhir.r5.elementmodel.Element e  = fp.parse(new FileInputStream(f)).get(0).getElement();
+                  addFile(res, f, e, "fml");
                   count++;
                   ok = true;
                 } catch (Exception e) {
