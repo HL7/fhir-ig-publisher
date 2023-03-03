@@ -8,6 +8,8 @@ import org.hl7.fhir.igtools.publisher.xig.XIGInformation.UsageType;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.CodeType;
+import org.hl7.fhir.r5.model.Enumeration;
+import org.hl7.fhir.r5.model.Enumerations.VersionIndependentResourceTypesAll;
 import org.hl7.fhir.r5.model.OperationDefinition;
 import org.hl7.fhir.r5.model.OperationDefinition.OperationDefinitionParameterComponent;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -29,8 +31,8 @@ public class XIGOperationDefinitionHandler extends XIGHandler {
     if (od.hasSystem()) {          j.add("system", od.getSystem()); }
     if (od.hasType())     {        j.add("type", od.getType()); }
     if (od.hasInstance()) {        j.add("instance", od.getInstance()); }
-    for (CodeType t : od.getResource()) {
-      j.forceArray("resources").add(t.toString()); 
+    for (Enumeration<VersionIndependentResourceTypesAll> t : od.getResource()) {
+      j.forceArray("resources").add(t.getCode()); 
       info.getOpr().add(t.toString());
     }
   }
@@ -42,8 +44,8 @@ public class XIGOperationDefinitionHandler extends XIGHandler {
         if (cr instanceof OperationDefinition) {
           OperationDefinition od = (OperationDefinition) cr;
           boolean ok = false;
-          for (CodeType c : od.getResource()) {
-            if (r.equals(c.asStringValue())) {
+          for (Enumeration<VersionIndependentResourceTypesAll> c : od.getResource()) {
+            if (r.equals(c.getCode())) {
               ok = true;
             }
           }

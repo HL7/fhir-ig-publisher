@@ -3012,7 +3012,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (element.definition().getIsModifier()) {
       gc.addStyledText(translate("sd.table", "This element is a modifier element"), "?!", null, null, null, false);
     }
-    if (element.definition().getMustSupport() || element.definition().hasObligation()) {
+    if (element.definition().getMustSupport() || element.definition().hasExtension(ToolingExtensions.EXT_OBLIGATION)) {
       gc.addStyledText(translate("sd.table", "This element must be supported"), "S", "white", "red", null, false);
     }
     if (element.definition().getIsSummary()) {

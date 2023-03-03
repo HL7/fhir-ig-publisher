@@ -8,7 +8,7 @@ import org.hl7.fhir.igtools.publisher.xig.XIGInformation.UsageType;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CodeType;
 import org.hl7.fhir.r5.model.Enumeration;
-import org.hl7.fhir.r5.model.Enumerations.AllResourceTypes;
+import org.hl7.fhir.r5.model.Enumerations.VersionIndependentResourceTypesAll;
 import org.hl7.fhir.r5.model.SearchParameter;
 import org.hl7.fhir.r5.model.SearchParameter.SearchParameterComponentComponent;
 import org.hl7.fhir.utilities.json.model.JsonArray;
@@ -28,11 +28,11 @@ public class XIGSearchParameterHandler extends XIGHandler {
   public void fillOutJson(SearchParameter sp, JsonObject j) {
     if (sp.hasCode()) {            j.add("code", sp.getCode()); }
     if (sp.hasType()) {            j.add("type", sp.getType().toCode()); }
-    for (CodeType t : sp.getBase()) {
+    for (Enumeration<VersionIndependentResourceTypesAll> t : sp.getBase()) {
       if (!j.has("resourcesSP")) {
         j.add("resourcesSP", new JsonArray());
       }
-      j.getJsonArray("resourcesSP").add(t.toString()); 
+      j.getJsonArray("resourcesSP").add(t.getCode()); 
       info.getSpr().add(t.toString());
     }
   }
@@ -44,8 +44,8 @@ public class XIGSearchParameterHandler extends XIGHandler {
         if (cr instanceof SearchParameter) {
           SearchParameter sp = (SearchParameter) cr;
           boolean ok = false;
-          for (CodeType c : sp.getBase()) {
-            if (r.equals(c.asStringValue())) {
+          for (Enumeration<VersionIndependentResourceTypesAll> c : sp.getBase()) {
+            if (r.equals(c.getCode())) {
               ok = true;
             }
           }
