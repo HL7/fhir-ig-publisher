@@ -108,7 +108,8 @@ public class PublicationProcess {
       System.out.println(s);
       System.out.println("---------------");
       System.out.println("Publication Run: publish "+source+" to "+web);
-      List<ValidationMessage> res = publishInner(source, web, date, registrySource, history, templatesSrc, temp, logger, args);
+      boolean manualCheck = "true".equals(getNamedParam(args, "-manual-check"));
+      List<ValidationMessage> res = publishInner(source, web, date, registrySource, history, templatesSrc, temp, logger, args, manualCheck);
       if (res.size() == 0) {
         System.out.println("Success");
       } else {
@@ -128,7 +129,7 @@ public class PublicationProcess {
     return Long.toString(maxMemory / (1024*1024));
   }
 
-  public List<ValidationMessage> publishInner(String source, String web, String date, String registrySource, String history, String templateSrc, String temp, PublisherConsoleLogger logger, String[] args) throws Exception {
+  public List<ValidationMessage> publishInner(String source, String web, String date, String registrySource, String history, String templateSrc, String temp, PublisherConsoleLogger logger, String[] args, boolean manualCheck) throws Exception {
     List<ValidationMessage> res = new ArrayList<>();
 
     if (temp == null) {
@@ -308,7 +309,7 @@ public class PublicationProcess {
     // well, we've run out of things to test... time to actually try...
     if (res.size() == 0) {
       doPublish(fSource, fOutput, qa, destination, destVer, pathVer, fRoot, pubSetup, pl, prSrc, fRegistry, npm, mode, date, fHistory, temp, logger, 
-          pubSetup.getJsonObject("website").asString("url"), src, sft, relDest, templateSrc, first, indexes, Calendar.getInstance(), getComputerName(), IGVersionUtil.getVersionString(), gitSrcId(source), Integer.toString(runNumber), tcName);
+          pubSetup.getJsonObject("website").asString("url"), src, sft, relDest, templateSrc, first, indexes, Calendar.getInstance(), getComputerName(), IGVersionUtil.getVersionString(), gitSrcId(source), Integer.toString(runNumber), tcName, manualCheck);
     }        
     return res;
     
@@ -381,7 +382,7 @@ public class PublicationProcess {
 
   private void doPublish(File fSource, File fOutput, JsonObject qa, String destination, String destVer, String pathVer, File fRoot, JsonObject pubSetup, PackageList pl, JsonObject prSrc, File fRegistry, NpmPackage npm, 
       PublicationProcessMode mode, String date, File history, String tempDir, PublisherConsoleLogger logger, String url, WebSourceProvider src, File sft, String relDest, String templateSrc, boolean first, Map<String, IndexMaintainer> indexes,
-      Calendar genDate, String username, String version, String gitSrcId, String runNumber, String tcName) throws Exception {
+      Calendar genDate, String username, String version, String gitSrcId, String runNumber, String tcName, boolean manualCheck) throws Exception {
     // ok. all our tests have passed.
     // 1. do the publication build(s)
     System.out.println("All checks passed. Do the publication build from "+fSource.getAbsolutePath()+" and publish to "+destination);        
@@ -480,10 +481,17 @@ public class PublicationProcess {
       ndx.execute();
     }
     
-    System.out.println("The build is complete, and ready to be applied. Check the output at "+fRoot.getAbsolutePath());
-    System.out.println("Do you wish to continue? (Y/N)");
-    int r = System.in.read();
-    if (r == 'y' || r == 'Y') {
+    boolean go;
+    if (manualCheck) {
+      System.out.println("The build is complete, and ready to be applied. Check the output at "+fRoot.getAbsolutePath());
+      System.out.println("Do you wish to continue? (Y/N)");
+      int r = System.in.read();
+      go = r == 'y' || r == 'Y';
+    } else {
+      System.out.println("Build is complete. "+src.verb()+" from "+ fRoot.getAbsolutePath());
+      go = true;
+    }
+    if (go) {
       System.out.println("Go!");
       updateRegistry(fRegistry, pl, plVer, npmB);
       logger.stop();
@@ -550,7 +558,8 @@ public class PublicationProcess {
 
   private IndexMaintainer getIndexForIg(Map<String, IndexMaintainer> indexes, String packageId) {
     String realm = Utilities.charCount(packageId, '.') > 1 ? packageId.split("\\.")[2] : null;
-    return realm == null ? null : indexes.get(realm);
+    String code = Utilities.charCount(packageId, '.') > 2 ? packageId.split("\\.")[3] : null;
+    return realm == null || ("uv".equals(realm) && Utilities.existsInList(code, "smart-app-launch", "extensions")) ? null : indexes.get(realm);
   }
 
   private void updateFeed(File fRoot, String destVer, PackageList pl, PackageListEntry plVer, String file, boolean isPublication, WebSourceProvider src, String orgName, NpmPackage npm, String genDate, String username, String version, String gitSrcId, String runNumber) throws IOException {

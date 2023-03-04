@@ -169,8 +169,35 @@ public class WebSourceProvider {
           p = progress(c, t, p);      
         }
         System.out.print("|");
+        int failCount = 0;
+        int count = 0;
+        int step = 0;
+        int ten = filesToUpload.size() / 10;
         for (String s : filesToUpload) {
-          ftp.upload(Utilities.path(destination, s), s);
+          count++;
+          if (count % ten == 0) {
+            step++;
+            System.out.print(""+step*10);
+          }
+          try {
+            ftp.upload(Utilities.path(destination, s), s);
+            failCount = 0;
+          } catch (Exception e) {
+            System.out.println("");
+            System.out.println("Error uploading file '"+s+"': "+e.getMessage()+". Trying again");
+            try {
+              ftp.upload(Utilities.path(destination, s), s);
+              failCount = 0;
+            } catch (Exception e2) {
+              failCount++;
+              System.out.println("");
+              System.out.println("Error uploading file '"+s+"': "+e2.getMessage());
+              System.out.println("Need to manually copy '"+Utilities.path(destination, s)+"' to '"+s);
+              if (failCount >= 10) {
+                throw new Error("Too many sequential errors copying files (10). Stopping.");
+              }
+            }
+          }
           c++;
           p = progress(c, t, p);      
         }
@@ -218,5 +245,9 @@ public class WebSourceProvider {
 
   public boolean isWeb() {
     return web;
+  }
+
+  public String verb() {
+    return web ? "Upload" : "Copy";
   }
 }

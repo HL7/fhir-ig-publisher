@@ -160,8 +160,8 @@ public class WebSiteLayoutRulesProviders {
             "canonical URL of "+canonical+" does not match the required canonical of https://hl7chile.cl/fhir/ig/"+code()+" [4a]");          
       } else {
         // special case weirdity
-        if ("uv".equals(realm()) && "smart-app-launch".equals(code())) {
-          ok = check(res, canonical.equals("http://hl7.org/fhir/smart-app-launch"), "canonical URL of "+canonical+" does not match the required canonical of http://hl7.org/fhir/smart-app-launch"+" [5]");
+        if ("uv".equals(realm()) && Utilities.existsInList(code(), "smart-app-launch", "extensions")) {
+          ok = check(res, canonical.equals("http://hl7.org/fhir/"+code()), "canonical URL of "+canonical+" does not match the required canonical of http://hl7.org/fhir/smart-app-launch"+" [5]");
         } else if ("xprod".equals(family())) {
           ok = check(res, canonical.equals("http://hl7.org/xprod/ig/"+realm()+"/"+code()), "canonical URL of "+canonical+" does not match the required canonical of http://hl7.org/fhir/"+realm()+"/"+code()+" [5a]");
         } else if ("cda".equals(family())) {
@@ -194,7 +194,7 @@ public class WebSiteLayoutRulesProviders {
         return Utilities.path(rootFolder, code());
       } else {
         // special case weirdity
-        if ("uv".equals(realm()) && "smart-app-launch".equals(code())) {
+        if ("uv".equals(realm()) && Utilities.existsInList(code(), "smart-app-launch", "extensions")) {
           return Utilities.path(rootFolder, code());
         } else  if ("cda".equals(family())) {
           return Utilities.path(rootFolder, code());
