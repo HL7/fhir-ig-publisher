@@ -2350,7 +2350,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     exec.setWorkingDirectory(file);
     ExecuteWatchdog watchdog = new ExecuteWatchdog(fshTimeout);
     exec.setWatchdog(watchdog);
-    String cmd = fshVersion == null ? "sushi" : "npx fsh-sushi@"+fshVersion+(mode == IGBuildMode.PUBLICATION || mode == IGBuildMode.AUTOBUILD ? "--require-latest" : "");
+    String cmd = fshVersion == null ? "sushi" : "npx fsh-sushi@"+fshVersion;
+    if (mode == IGBuildMode.PUBLICATION || mode == IGBuildMode.AUTOBUILD) {
+      cmd += " --require-latest";
+    }
     try {
       if (SystemUtils.IS_OS_WINDOWS) {
         exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C "+cmd+" . -o ."));
