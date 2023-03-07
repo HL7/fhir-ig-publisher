@@ -219,7 +219,7 @@ public class IGPack2NpmConvertor {
         NPMPackageGenerator npm = new NPMPackageGenerator(destFile, canonical, url, PackageType.IG, ig, new Date(), false);
         ByteArrayOutputStream bs = new ByteArrayOutputStream();
         new JsonParser().setOutputStyle(OutputStyle.NORMAL).compose(bs, ig);
-        npm.addFile(Category.OTHER, "ig-r4.json", bs.toByteArray());
+        npm.addFile(Category.OTHER, "ig-r4.jsonX", bs.toByteArray());
 
         npm.addFile(Category.RESOURCE, "ImplementationGuide-"+ig.getId()+".json", compose(ig, version));
 

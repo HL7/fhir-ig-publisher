@@ -6728,7 +6728,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
     new org.hl7.fhir.r4.formats.JsonParser().compose(bs, VersionConvertorFactory_40_50.convertResource(publishedIg));
-    npm.addFile(Category.OTHER, "ig-r4.json", bs.toByteArray());
+    npm.addFile(Category.OTHER, "ig-r4.jsonX", bs.toByteArray());
     
     for (ImplementationGuideDefinitionResourceComponent res : publishedIg.getDefinition().getResource()) {
       FetchedResource rt = null;

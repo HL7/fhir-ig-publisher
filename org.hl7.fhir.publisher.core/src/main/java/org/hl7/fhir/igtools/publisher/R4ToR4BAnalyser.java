@@ -437,7 +437,7 @@ public class R4ToR4BAnalyser {
 //          System.out.println("** Exclude "+res.fhirType()+"/"+res.getId()+" from same version");
         }
       }
-    } else if (filename.equals("ig-r4.json")) {
+    } else if (filename.equals("ig-r4.json") || filename.equals("ig-r4.jsonX")) {
       gen.addFile(folder, filename, updateIGR4(content, ver, pver));
     } else if (filename.equals("spec.internals")) {
       gen.addFile(folder, filename, updateSpecInternals(content, ver, pver));
