@@ -4225,7 +4225,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           igpkp.findConfiguration(f, r);
       }
       // TestScript Check
-      if (res.getReference().getReference().contains("TestScript")) {
+      if (res.getReference().getReference().contains("TestScript") && !res.getReference().getReference().startsWith("StructureMap")) {
         if (f == null) {
           f = fetcher.fetch(res.getReference(), igf);
         }
@@ -5510,18 +5510,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private Element loadFromMap(FetchedFile file) throws Exception {
-    if (VersionUtilities.isR4Ver(context.getVersion()) || VersionUtilities.isR4BVer(context.getVersion())) {
-      StructureMapUtilities mr = new StructureMapUtilities(context);
-      FmlParser fp = new FmlParser(context);
-      fp.setupValidation(ValidationPolicy.EVERYTHING, file.getErrors());     
-      Element res = fp.parse(TextFile.bytesToString(file.getSource()));
-      if (res == null) {
-        throw new Exception("Unable to parse Map Source for "+file.getName());
-      }
-      return res;      
-    } else {
-      throw new Error("Loading Map Files is not supported for version "+VersionUtilities.getNameForVersion(context.getVersion()));
+    FmlParser fp = new FmlParser(context);
+    fp.setupValidation(ValidationPolicy.EVERYTHING, file.getErrors());     
+    Element res = fp.parse(TextFile.bytesToString(file.getSource()));
+    if (res == null) {
+      throw new Exception("Unable to parse Map Source for "+file.getName());
     }
+    return res;      
   }
 
   private Element loadFromXml(FetchedFile file) throws Exception {
@@ -6073,6 +6068,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         res = new org.hl7.fhir.dstu3.formats.JsonParser(true).parse(source);
       } else if (contentType.contains("xml")) {
         res = new org.hl7.fhir.dstu3.formats.XmlParser(true).parse(source);
+      } else if (contentType.contains("fml")) {
+        StructureMapUtilities mu = new StructureMapUtilities(context, null, null);
+        return mu.parse(new String(source), "");
       } else {
         throw new Exception("Unable to determine file type for "+name);
       }
@@ -6083,6 +6081,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         res = new org.hl7.fhir.r4.formats.JsonParser(true, true).parse(source);
       } else if (contentType.contains("xml")) {
         res = new org.hl7.fhir.r4.formats.XmlParser(true).parse(source);
+      } else if (contentType.contains("fml")) {
+        StructureMapUtilities mu = new StructureMapUtilities(context, null, null);
+        return mu.parse(new String(source), "");
       } else {
         throw new Exception("Unable to determine file type for "+name);
       }
@@ -6093,6 +6094,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         res = new org.hl7.fhir.dstu2016may.formats.JsonParser(true).parse(source);
       } else if (contentType.contains("xml")) {
         res = new org.hl7.fhir.dstu2016may.formats.XmlParser(true).parse(source);
+      } else if (contentType.contains("fml")) {
+        StructureMapUtilities mu = new StructureMapUtilities(context, null, null);
+        return mu.parse(new String(source), "");
       } else {
         throw new Exception("Unable to determine file type for "+name);
       }
@@ -6103,6 +6107,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         res = new org.hl7.fhir.dstu2.formats.JsonParser(true).parse(source);
       } else if (contentType.contains("xml")) {
         res = new org.hl7.fhir.dstu2.formats.XmlParser(true).parse(source);
+      } else if (contentType.contains("fml")) {
+        StructureMapUtilities mu = new StructureMapUtilities(context, null, null);
+        return mu.parse(new String(source), "");
       } else {
         throw new Exception("Unable to determine file type for "+name);
       }
@@ -6115,6 +6122,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         res = new org.hl7.fhir.r4b.formats.JsonParser(true).parse(source);
       } else if (contentType.contains("xml")) {
         res = new org.hl7.fhir.r4b.formats.XmlParser(true).parse(source);
+      } else if (contentType.contains("fml")) {
+        StructureMapUtilities mu = new StructureMapUtilities(context, null, null);
+        return mu.parse(new String(source), "");
       } else {
         throw new Exception("Unable to determine file type for "+name);
       }
@@ -6124,6 +6134,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         return new JsonParser(true, true).parse(source);
       } else if (contentType.contains("xml")) {
         return new XmlParser(true).parse(source);
+      } else if (contentType.contains("fml")) {
+        StructureMapUtilities mu = new StructureMapUtilities(context, null, null);
+        return mu.parse(new String(source), "");
       } else {
         throw new Exception("Unable to determine file type for "+name);
       }
