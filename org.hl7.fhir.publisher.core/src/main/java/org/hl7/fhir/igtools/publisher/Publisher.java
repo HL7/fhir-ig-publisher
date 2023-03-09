@@ -1983,7 +1983,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private boolean isConvertableResource(String t) {
     return Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "Conformance", "CapabilityStatement", "Questionnaire", "NamingSystem", "SearchParameter",
-        "ConceptMap", "OperationOutcome", "CompartmentDefinition", "OperationDefinition", "ImplementationGuide", "ActorDefinition", "Requirements");
+        "ConceptMap", "OperationOutcome", "CompartmentDefinition", "OperationDefinition", "ImplementationGuide", "ActorDefinition", "Requirements", "StructureMap");
   }
 
 
@@ -4225,7 +4225,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           igpkp.findConfiguration(f, r);
       }
       // TestScript Check
-      if (res.getReference().getReference().contains("TestScript") && !res.getReference().getReference().startsWith("StructureMap")) {
+      if (res.getReference().getReference().contains("TestScript/")) {
         if (f == null) {
           f = fetcher.fetch(res.getReference(), igf);
         }
@@ -5413,7 +5413,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               e.setChildValue("id", id);
               altered = true;
             } 
-            if (Utilities.noString(id)) {
+            prefix = Utilities.pathURL(altCanonical, e.fhirType())+"/";
+            if (url.startsWith(prefix)) {
+              id = e.getChildValue("url").substring(prefix.length());
+              e.setChildValue("id", id);
+              altered = true;
+            } 
+             if (Utilities.noString(id)) {
               throw new Exception("Resource has no id in "+file.getPath()+" and canonical URL ("+url+") does not start with the IG canonical URL ("+prefix+")");
             }
           }
@@ -5510,6 +5516,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private Element loadFromMap(FetchedFile file) throws Exception {
+    if (!VersionUtilities.isR4Plus(context.getVersion())) {
+      throw new Error("Loading Map Files is not supported for version "+VersionUtilities.getNameForVersion(context.getVersion()));
+    }
     FmlParser fp = new FmlParser(context);
     fp.setupValidation(ValidationPolicy.EVERYTHING, file.getErrors());     
     Element res = fp.parse(TextFile.bytesToString(file.getSource()));
@@ -6136,6 +6145,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         return new XmlParser(true).parse(source);
       } else if (contentType.contains("fml")) {
         StructureMapUtilities mu = new StructureMapUtilities(context, null, null);
+        mu.setExceptionsForChecks(false);
         return mu.parse(new String(source), "");
       } else {
         throw new Exception("Unable to determine file type for "+name);
