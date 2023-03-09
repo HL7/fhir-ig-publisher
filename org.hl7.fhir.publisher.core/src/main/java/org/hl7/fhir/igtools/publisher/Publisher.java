@@ -4115,7 +4115,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (sourceIg == null) // old JSON approach
         sourceIg = (ImplementationGuide) parse(igf);
       publishedIg = sourceIg.copy();
-      FetchedResource igr = igf.addResource();
+      FetchedResource igr = igf.addResource("$IG");
 //      loadAsElementModel(igf, igr, null);
       igr.setResource(publishedIg);
       igr.setElement(convertToElement(null, publishedIg));
@@ -4196,11 +4196,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         needToBuild = rchanged || needToBuild;
         if (rchanged) {
           if (res.hasExtension(ToolingExtensions.EXT_BINARY_FORMAT_NEW)) {
-            loadAsBinaryResource(f, f.addResource(), res, res.getExtensionString(ToolingExtensions.EXT_BINARY_FORMAT_NEW));
+            loadAsBinaryResource(f, f.addResource(f.getName()), res, res.getExtensionString(ToolingExtensions.EXT_BINARY_FORMAT_NEW));
           } else if (res.hasExtension(ToolingExtensions.EXT_BINARY_FORMAT_OLD)) {
-            loadAsBinaryResource(f, f.addResource(), res, res.getExtensionString(ToolingExtensions.EXT_BINARY_FORMAT_OLD));
+            loadAsBinaryResource(f, f.addResource(f.getName()), res, res.getExtensionString(ToolingExtensions.EXT_BINARY_FORMAT_OLD));
           } else {
-            loadAsElementModel(f, f.addResource(), res);
+            loadAsElementModel(f, f.addResource(f.getContentType()), res);
           }
           if (res.hasExtension(ToolingExtensions.EXT_BINARY_LOGICAL)) {
             f.setLogical(res.getExtensionString(ToolingExtensions.EXT_BINARY_LOGICAL));
@@ -4718,7 +4718,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     FetchedFile f = fetcher.fetch(new Reference().setReference("Bundle/"+name), igf);
     boolean changed = noteFile("Bundle/"+name, f);
     if (changed) {
-      f.setBundle(new FetchedResource());
+      f.setBundle(new FetchedResource(f.getName()+" (bundle)"));
       f.setBundleType(FetchedBundleType.NATIVE);
       loadAsElementModel(f, f.getBundle(), null);
       List<Element> entries = new ArrayList<Element>();
@@ -4731,7 +4731,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, "Bundle.element["+i+"]", "All entries must have resources when loading a bundle", IssueSeverity.ERROR));
         } else {
           checkResourceUnique(res.fhirType()+"/"+res.getIdBase());
-          FetchedResource r = f.addResource();
+          FetchedResource r = f.addResource(f.getName()+"["+i+"]");
           r.setElement(res);
           r.setId(res.getIdBase());
           List<Element> profiles = new ArrayList<Element>();
@@ -4794,7 +4794,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     logDebugMessage(LogCategory.INIT, "load "+f.getPath());
     boolean changed = noteFile(f.getPath(), f);
     if (changed) {
-      loadAsElementModel(f, f.addResource(), null);
+      loadAsElementModel(f, f.addResource(f.getName()), null);
     }
     for (FetchedResource r : f.getResources()) {
       ImplementationGuideDefinitionResourceComponent res = findIGReference(r.fhirType(), r.getId());
@@ -4830,7 +4830,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       MappingSheetParser p = new MappingSheetParser();
       p.parse(new ByteArrayInputStream(f.getSource()), f.getRelativePath());
       ConceptMap cm = p.getConceptMap();
-      FetchedResource r = f.addResource();
+      FetchedResource r = f.addResource(f.getName()+" (mapping)");
       r.setResource(cm);
       r.setId(cm.getId());
       r.setElement(convertToElement(r, cm));
@@ -4860,12 +4860,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       f.getValuesetsToLoad().clear();
       logDebugMessage(LogCategory.INIT, "load "+f.getPath());
       Bundle bnd = new IgSpreadsheetParser(context, execTime, igpkp.getCanonical(), f.getValuesetsToLoad(), firstExecution, mappingSpaces, knownValueSetIds).parse(f);
-      f.setBundle(new FetchedResource());
+      f.setBundle(new FetchedResource(f.getName()+" (ex spreadsheet)"));
       f.setBundleType(FetchedBundleType.SPREADSHEET);
       f.getBundle().setResource(bnd);
       for (BundleEntryComponent b : bnd.getEntry()) {
         checkResourceUnique(b.getResource().fhirType()+"/"+b.getResource().getIdBase());
-        FetchedResource r = f.addResource();
+        FetchedResource r = f.addResource(f.getName());
         r.setResource(b.getResource());
         r.setId(b.getResource().getId());
         r.setElement(convertToElement(r, r.getResource()));
@@ -4884,7 +4884,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         FetchedFile fv = fetcher.fetchFlexible(vr);
         boolean vrchanged = noteFile("sp-ValueSet/"+vr, fv);
         if (vrchanged) {
-          loadAsElementModel(fv, fv.addResource(), null);
+          loadAsElementModel(fv, fv.addResource(f.getName()+" (VS)"), null);
           checkImplicitResourceIdentity(id, fv);
         }
         knownValueSetIds.add(id);
@@ -4896,7 +4896,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             fv = fetcher.fetchFlexible(cr);
             crchanged = noteFile("sp-CodeSystem/"+vr, fv);
             if (crchanged) {
-              loadAsElementModel(fv, fv.addResource(), null);
+              loadAsElementModel(fv, fv.addResource(f.getName()+" (CS)"), null);
               checkImplicitResourceIdentity(id, fv);
             }
           }
@@ -5234,7 +5234,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           StructureMapAnalysis analysis = utils.analyse(null, map);
           map.setUserData("analysis", analysis);
           for (StructureDefinition sd : analysis.getProfiles()) {
-            FetchedResource nr = new FetchedResource();
+            FetchedResource nr = new FetchedResource(f.getName()+" (ex transform)");
             nr.setElement(convertToElement(nr, sd));
             nr.setId(sd.getId());
             nr.setResource(sd);
@@ -5283,7 +5283,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               i++;
               services.reset();
               utils.transform(target, t.getKey().getElement(), map, target);
-              FetchedResource nr = new FetchedResource();
+              FetchedResource nr = new FetchedResource(f.getName()+" (ex transform 2)");
               nr.setElement(convertToElement(nr, target));
               nr.setId(target.getId());
               nr.setResource(target);
@@ -5869,7 +5869,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
         for (StructureDefinition sd : list) {
           for (Element e : utils.generateExamples(sd, false)) {
-            FetchedResource nr = new FetchedResource();
+            FetchedResource nr = new FetchedResource(f.getName()+" (additional example)");
             nr.setElement(e);
             nr.setId(e.getChildValue("id"));
             nr.setTitle("Generated Example");
@@ -6060,7 +6060,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
       for (StructureMap map : maps) {
-        FetchedResource nr = f.addResource();
+        FetchedResource nr = f.addResource(f.getName()+" (LM)");
         nr.setResource(map);
         nr.setElement(convertToElement(nr, map));
         nr.setId(map.getId());
@@ -6832,7 +6832,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     CanonicalResource bc = (CanonicalResource) res;
 
     FetchedFile f = new FetchedFile(bc.getUserString("path"));
-    FetchedResource r = f.addResource();
+    FetchedResource r = f.addResource(f.getName()+" (regen)");
     r.setResource(res);
     r.setId(bc.getId());
     r.setTitle(bc.getName());

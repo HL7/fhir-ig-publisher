@@ -130,8 +130,8 @@ public class FetchedFile {
   public List<FetchedResource> getResources() {
     return resources;
   }
-  public FetchedResource addResource() {
-    FetchedResource r = new FetchedResource();
+  public FetchedResource addResource(String nameForErrors) {
+    FetchedResource r = new FetchedResource(nameForErrors);
     r.setTitle(getTitle());
     resources.add(r);
     return r;

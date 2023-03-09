@@ -54,6 +54,12 @@ public class FetchedResource {
   private List<ProvenanceDetails> audits = new ArrayList<>();
   private List<ValidationMessage> errors = new ArrayList<ValidationMessage>();
   private boolean isProvenance = false;
+  private String nameForErrors;
+
+  public FetchedResource(String nameForErrors) {
+    super();
+    this.nameForErrors = nameForErrors;
+  }
 
   public Resource getResource() {
     return resource;
@@ -256,6 +262,14 @@ public class FetchedResource {
   @Override
   public String toString() {
     return fhirType()+"/"+getId(); 
+  }
+
+  public String getNameForErrors() {
+    return nameForErrors;
+  }
+
+  public void setNameForErrors(String nameForErrors) {
+    this.nameForErrors = nameForErrors;
   }
   
 }
