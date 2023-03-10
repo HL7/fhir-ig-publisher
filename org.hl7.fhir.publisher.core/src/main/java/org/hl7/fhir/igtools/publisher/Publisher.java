@@ -2767,7 +2767,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
     if (expParams != null) {
-      context.setExpansionProfile((Parameters) VersionConvertorFactory_40_50.convertResource(FormatUtilities.loadFile(Utilities.path(Utilities.getDirectoryForFile(igName), expParams))));
+      context.setExpansionProfile((Parameters) VersionConvertorFactory_40_50.convertResource(FormatUtilities.loadFile(Utilities.uncheckedPath(Utilities.getDirectoryForFile(igName), expParams))));
     } else if (!expParamMap.isEmpty()) {
       context.setExpansionProfile(new Parameters());      
     }

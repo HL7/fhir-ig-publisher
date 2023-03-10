@@ -14,8 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class PublisherTests {
@@ -53,25 +52,25 @@ public class PublisherTests {
         return Stream.of(
                 Arguments.of(
                         getResourceAsInputStream(PublisherTests.class,  "zip", ZIP_SLIP_ZIP),
-                        "Bad zip entry: ../evil.txt"),
+                        "../evil.txt"),
                 Arguments.of(
                         getResourceAsInputStream(PublisherTests.class,  "zip", ZIP_SLIP_2_ZIP),
-                        "Bad zip entry: child/../../evil.txt"),
+                        "child/../../evil.txt"),
                 Arguments.of(
                         getResourceAsInputStream(PublisherTests.class,  "zip", ZIP_SLIP_WIN_ZIP),
-                        "Bad zip entry: ../evil.txt")
+                        "../evil.txt")
         );
     }
 
     @ParameterizedTest
     @MethodSource("getParams")
     public void test(InputStream inputStream, String expectedError){
-        IOException thrown = Assertions.assertThrows(IOException.class, () -> {
+        RuntimeException thrown = Assertions.assertThrows(RuntimeException.class, () -> {
 
             Publisher.unzipToDirectory( inputStream, tempDir.toFile().getAbsolutePath());
             //Code under test
         });
         assertNotNull(thrown);
-        assertEquals(expectedError, thrown.getMessage());
+        assertTrue(thrown.getMessage().endsWith(expectedError));
     }
 }
