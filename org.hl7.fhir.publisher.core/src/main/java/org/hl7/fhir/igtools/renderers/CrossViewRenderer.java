@@ -744,8 +744,9 @@ public class CrossViewRenderer {
   public String buildExtensionTable(String s) throws Exception {
     if (extMap.containsKey(s)) {
       return buildExtensionTable(s, extMap.get(s));
+    } else {
+      return buildExtensionTable(s, extMap.get(s));
     }
-    return null;
   }
 
   private String buildExtensionTable(String type, List<ExtensionDefinition> definitions) throws Exception {
@@ -763,8 +764,10 @@ public class CrossViewRenderer {
       b.append("<tr><td colspan=\"5\"><b>Extensions defined for this resource</b></td></tr>\r\n");
     }
     Map<String, StructureDefinition> map = new HashMap<>();
-    for (ExtensionDefinition sd : definitions)
-      map.put(sd.source.getUrl(), sd.source);
+    if (definitions != null) {
+      for (ExtensionDefinition sd : definitions)
+        map.put(sd.source.getUrl(), sd.source);
+    }
     if (map.size() == 0) {
       b.append("<tr><td colspan=\"5\">(None found)</td></tr>\r\n");      
     } else {
@@ -1000,7 +1003,7 @@ public class CrossViewRenderer {
 
   public String genSearchList(List<SearchParameter> list) {
     if (list.size() == 0) {
-      return "<p>(none found)</p>;";
+      return "<p>(none found)</p>";
     } else {
       Collections.sort(list, new SearchParameterListSorter());
       StringBuilder b = new StringBuilder();
