@@ -138,7 +138,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     if (Utilities.noString(s))
       return s;
     if (r.getId()== null) {
-      throw new FHIRException("Error doing replacements - no id defined in resource: " + (r.getTitle()== null ? "NO TITLE EITHER" : r.getTitle()));
+      throw new FHIRException("Error doing replacements - no id defined in resource: " + (r.getTitle()== null ? "NO TITLE EITHER" : r.getTitle())+" from "+r.getNameForErrors());
     }
     s = s.replace("{{[title]}}", r.getTitle() == null ? "?title?" : r.getTitle());
     s = s.replace("{{[name]}}", r.getId()+(format==null? "": "-"+format)+"-html");
