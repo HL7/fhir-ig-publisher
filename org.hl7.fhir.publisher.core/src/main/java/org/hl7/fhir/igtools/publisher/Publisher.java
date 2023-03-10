@@ -6767,7 +6767,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           // Don't expose a page for a resource that is just provenance information
           String path = igpkp.doReplacements(igpkp.getLinkFor(rt, false), rt, null, null);
           res.addExtension().setUrl("http://hl7.org/fhir/StructureDefinition/implementationguide-page").setValue(new UriType(path));
-          inspector.addLinkToCheck("Implementation Guide", path, "fake generated link");
+          inspector.addLinkToCheck(Utilities.path(outputDir, path), path, "fake generated link for Implementation Guide");
         }
         for (ContainedResourceDetails c : getContained(rt.getElement())) {
           Extension ex = new Extension(ToolingExtensions.EXT_IGP_CONTAINED_RESOURCE_INFO);
