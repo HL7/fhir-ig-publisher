@@ -105,6 +105,7 @@ import org.hl7.fhir.igtools.renderers.HTAAnalysisRenderer;
 import org.hl7.fhir.igtools.renderers.HistoryGenerator;
 import org.hl7.fhir.igtools.renderers.IPStatementsRenderer;
 import org.hl7.fhir.igtools.renderers.JsonXhtmlRenderer;
+import org.hl7.fhir.igtools.renderers.MappingSummaryRenderer;
 import org.hl7.fhir.igtools.renderers.OperationDefinitionRenderer;
 import org.hl7.fhir.igtools.renderers.PublicationChecker;
 import org.hl7.fhir.igtools.renderers.QuestionnaireRenderer;
@@ -7373,6 +7374,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private void generateSummaryOutputs() throws Exception {
     log("Generating Summary Outputs");
+    ContextUtilities cu = new ContextUtilities(context);
     generateResourceReferences();
 
     generateDataFile();
@@ -7384,6 +7386,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
           cvr.seeResource((CanonicalResource) r.getResource());
         }
+      }
+    }
+    MappingSummaryRenderer msr = new MappingSummaryRenderer(context, rc);
+    msr.addCanonical(igpkp.getCanonical());
+    if (altCanonical != null) {
+      msr.addCanonical(altCanonical);
+    }
+    msr.analyse();
+    Set<String> types = new HashSet<>();
+    for (StructureDefinition sd : cu.allStructures()) {
+      if (sd.getDerivation() == TypeDerivationRule.SPECIALIZATION && sd.getKind() != StructureDefinitionKind.LOGICAL && !types.contains(sd.getType())) {
+        types.add(sd.getType());
+        String src = msr.render(sd);
+        fragment("maps-"+sd.getType(), src, otherFilesRun);
       }
     }
     fragment("summary-observations", cvr.getObservationSummary(), otherFilesRun);
@@ -7399,7 +7415,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     
     fragment("summary-extensions", cvr.getExtensionSummary(), otherFilesRun);
     fragment("extension-list", cvr.buildExtensionTable(), otherFilesRun);    
-    Set<String> econtexts = new ContextUtilities(context).getTypeNameSet();
+    Set<String> econtexts = cu.getTypeNameSet();
     for (String s : cvr.getExtensionContexts()) {
       ecl.add(s);
       econtexts.add(s);
@@ -8898,8 +8914,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             Resource container = convertFromElement(r.getElement());
             r.setResource(container);
           } catch (Exception e) {
-            logMessage("Unable to convert resource " + r.getTitle() + ": " + e.getMessage());
-          }
+            if (Utilities.existsInList(r.fhirType(), "CodeSystem", "ValueSet", "ConceptMap", "List", "CapabilityStatement", "StructureDefinition", "OperationDefinition", "StructureMap", "Questionnaire", "Library")) {
+              logMessage("Unable to convert resource " + r.getTitle() + " for rendering: " + e.getMessage());
+              logMessage("This resource should already have been converted, so it is likely invalid. It won't be rendered correctly, and Jekyll is quite likely to fail (depends on the template)");                            
+            } else if (Utilities.existsInList(r.fhirType(), new ContextUtilities(context).getCanonicalResourceNames())) {
+              logMessage("Unable to convert resource " + r.getTitle() + " for rendering: " + e.getMessage());
+              logMessage("This resource is a canonical resource and won't be rendered correctly, and Jekyll is likely to fail (depends on the template)");              
+            } else if (r.getElement().hasChildren("contained")) {
+              logMessage("Unable to convert resource " + r.getTitle() + " for rendering: " + e.getMessage());
+              logMessage("This resource contains other resources that won't be rendered correctly, and Jekyll may fail");
+            } else {
+              // we don't care
+            }
+          }        
+            
         }
         if (r.getResource() != null) {
           generateResourceHtml(f, regen, r, r.getResource(), vars, "");
@@ -10013,7 +10041,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "json-schema"))
       fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-json-schema", "yet to be done: json schema as html", null, f.getOutputNames());
 
-    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, rc, allInvariants, sdMapCache);
+    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, rc, allInvariants, sdMapCache, specPath);
     if (igpkp.wantGen(r, "summary")) {
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-summary", sdr.summary(), f.getOutputNames(), r, vars, null);
     }
@@ -10203,7 +10231,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "profiles"))
       fragment("StructureMap-"+prefixForContainer+map.getId()+"-profiles", smr.profiles(), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "script"))
-      fragment("StructureMap-"+prefixForContainer+map.getId()+"-script", smr.script(), f.getOutputNames(), r, vars, null);
+      fragment("StructureMap-"+prefixForContainer+map.getId()+"-script", smr.script(false), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "script-plain"))
+      fragment("StructureMap-"+prefixForContainer+map.getId()+"-script-plain", smr.script(true), f.getOutputNames(), r, vars, null);
 // to generate:
     // map file
     // summary table
@@ -11074,7 +11104,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (!f.exists()) {
       throw new Exception("Unable to find the nominated IG at "+f.getAbsolutePath());
     }
-    if (f.isDirectory() && new File(Utilities.path(ig, "ig.json")).exists()) {
+    if (f.isDirectory() && new File(Utilities.uncheckedPath(ig, "ig.json")).exists()) {
       return Utilities.path(ig, "ig.json");
     } else {
       return f.getAbsolutePath();
