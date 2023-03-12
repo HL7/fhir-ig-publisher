@@ -761,7 +761,7 @@ public class CrossViewRenderer {
     b.append("<td><b><a href=\""+Utilities.pathURL(context.getSpecUrl(), "versions.html")+"#maturity\">FMM</a></b></td>");
     b.append("</tr>");
     if (type != null) {
-      b.append("<tr><td colspan=\"5\"><b>Extensions defined for this resource</b></td></tr>\r\n");
+      b.append("<tr><td colspan=\"5\"><b>Extensions defined for this type</b></td></tr>\r\n");
     }
     Map<String, StructureDefinition> map = new HashMap<>();
     if (definitions != null) {
