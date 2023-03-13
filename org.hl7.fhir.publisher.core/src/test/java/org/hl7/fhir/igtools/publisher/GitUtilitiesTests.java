@@ -4,7 +4,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 
 import java.nio.file.Files;
@@ -33,9 +35,13 @@ public class GitUtilitiesTests {
 
 		File dummyFile = Path.of(normalBranchDirectory.getAbsolutePath().toString(), "dummy.txt").toFile();
 		dummyFile.createNewFile();
-		//System.out.println(execAndReturnString(new String[]{"touch", "dummy.txt"}, null, normalBranchDirectory));
 
-		System.out.println(execAndReturnString(new String[]{"git", "add", "./dummy.txt"},null, normalBranchDirectory));
+		BufferedWriter writer = new BufferedWriter(new FileWriter(dummyFile));
+		writer.write("dummy content");
+
+		writer.close();
+
+		System.out.println(execAndReturnString(new String[]{"git", "add", "dummy.txt"},null, normalBranchDirectory));
 		System.out.println(execAndReturnString(new String[]{"git", "commit", "-m", "test"},null, normalBranchDirectory));
 		System.out.println(execAndReturnString(new String[]{"git", "branch", "branch-a"}, null, normalBranchDirectory));
 
