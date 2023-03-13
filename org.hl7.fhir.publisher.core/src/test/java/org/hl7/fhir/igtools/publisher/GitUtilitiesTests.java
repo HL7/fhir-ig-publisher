@@ -35,6 +35,9 @@ public class GitUtilitiesTests {
 		System.out.println(execAndReturnString(new String[]{"git", "add", "./dummy.txt"},null, normalBranchDirectory));
 		System.out.println(execAndReturnString(new String[]{"git", "commit", "-m", "test"},null, normalBranchDirectory));
 		System.out.println(execAndReturnString(new String[]{"git", "branch", "branch-a"}, null, normalBranchDirectory));
+
+		System.out.println(execAndReturnString(new String[]{"git", "checkout", "-b", "branch-b"}, null, normalBranchDirectory));
+
 		System.out.println(execAndReturnString(new String[]{"git", "worktree", "add", worktreeBranchPath.toString(), "branch-a"}, null, normalBranchDirectory));
 
 		worktreeBranchDirectory = worktreeBranchPath.toFile();
@@ -42,7 +45,7 @@ public class GitUtilitiesTests {
 	@Test
 	public void testGetGitStatus() {
 		String output = GitUtilities.getGitStatus(normalBranchDirectory);
-		assertEquals("main", output.trim());
+		assertEquals("branch-b", output.trim());
 	}
 
 	@Test
