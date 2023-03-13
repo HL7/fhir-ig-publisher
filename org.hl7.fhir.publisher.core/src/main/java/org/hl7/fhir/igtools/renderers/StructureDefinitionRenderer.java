@@ -2909,7 +2909,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (VersionUtilities.isR5Plus(context.getVersion())) {
       if (usages == null) {
         FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager(true);
-        NpmPackage npm = pcm.loadPackage("hl7.fhir.r5.core#5.0.0");
+        NpmPackage npm = pcm.loadPackage("hl7.fhir.r5.core#current");
         usages = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(npm.load("other", "sdmap.details"));
       }
       if (usages.has(sd.getUrl())) {
