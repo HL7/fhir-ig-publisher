@@ -112,8 +112,8 @@ public class MappingSummaryRenderer {
 
   private String render(String typeName, String mode, List<StructureMap> list) throws IOException, FHIRException, EOperationOutcome {
     XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
-    x.an(mode, " ");
-    x.h3().tx("Maps to "+typeName);
+    x.an("conv-"+typeName+"-"+mode, " ");
+    x.h3().tx("Maps"+(mode.equals("Source") ? " to " : " from ")+typeName);
     if (list.isEmpty()) {
       x.para().tx("No maps found");
     } else {
