@@ -14,13 +14,13 @@ public class GitUtilitiesTests {
 	@Test
 	public void testGetGitStatus() {
 		String output = GitUtilities.getGitStatus(Path.of(new File(System.getProperty("user.dir")).getAbsolutePath(), "src/test/resources/git/regular-branch/").toFile());
-		assertEquals("HEAD", output.trim());
+		assertEquals("main", output.trim());
 	}
 
 	@Test
 	public void testGetGitWorktreeStatus() {
 		String output = GitUtilities.getGitStatus(Path.of(new File(System.getProperty("user.dir")).getAbsolutePath(), "src/test/resources/git/worktree-branch/").toFile());
-		assertEquals("HEAD", output.trim());
+		assertEquals("branch-a", output.trim());
 	}
 	@Test
 	public void testGitStatusWhenNotGitDirectory() throws IOException {

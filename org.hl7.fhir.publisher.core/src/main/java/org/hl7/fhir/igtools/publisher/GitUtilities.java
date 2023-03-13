@@ -24,7 +24,7 @@ public class GitUtilities {
 		return "";
 	  }
 	  try {
-		String[] cmd = { "git", "rev-parse", "--abbrev-ref"," HEAD" };
+		String[] cmd = { "git", "branch", "--show-current" };
 		return execAndReturnString(cmd, new String[]{}, gitDir);
 	  } catch (Exception e) {
 		System.out.println("Warning @ Unable to read the git branch: " + e.getMessage() );
