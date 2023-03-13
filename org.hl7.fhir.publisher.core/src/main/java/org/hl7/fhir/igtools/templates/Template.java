@@ -191,8 +191,8 @@ public class Template {
       xmlOutcomes.delete();
     String sfn = Utilities.path(templateDir, target + "-ig-working.");
     String fn = Utilities.path(templateDir, target + "-ig-updated.");
-    File jsonIg = new File(Utilities.path(templateDir, sfn +"json"));
-    File xmlIg = new File(Utilities.path(templateDir, sfn + "xml"));
+    File jsonIg = new File(sfn +"json");
+    File xmlIg = new File(sfn + "xml");
     if (ig != null) {
       antProject.setProperty(target + ".ig.source", sfn);
       antProject.setProperty(target + ".ig.dest", fn);
