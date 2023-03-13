@@ -106,8 +106,13 @@ public class PageFactory {
     case "resources" : return itemsForResources();
     case "datatypes" : return itemsForDataTypes();
     case "canonicals" : return itemsForCanonicalResources();
+    case "manual" : return manualItemList();
     }
     throw new Error("Unknown page factory 'item-factory' value "+itemFactory()+"'");
+  }
+
+  private List<String> manualItemList() {
+    return json.forceArray("items").asStrings();
   }
 
   private List<String> itemsForDataTypes() {
