@@ -13,13 +13,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class GitUtilitiesTests {
 	@Test
 	public void testGetGitStatus() {
-		String output = GitUtilities.getGitStatus(Path.of(new File(System.getProperty("user.dir")).getAbsolutePath(), "src/test/resources/git/regular-branch/").toFile());
+		String output = GitUtilities.getGitStatus(new File("src/test/resources/git/regular-branch/"));
 		assertEquals("main", output.trim());
 	}
 
 	@Test
 	public void testGetGitWorktreeStatus() {
-		String output = GitUtilities.getGitStatus(Path.of(new File(System.getProperty("user.dir")).getAbsolutePath(), "src/test/resources/git/worktree-branch/").toFile());
+		String output = GitUtilities.getGitStatus(new File("src/test/resources/git/worktree-branch/"));
 		assertEquals("branch-a", output.trim());
 	}
 	@Test
