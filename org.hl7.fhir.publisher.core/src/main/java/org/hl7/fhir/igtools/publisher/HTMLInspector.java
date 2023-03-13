@@ -637,7 +637,7 @@ public class HTMLInspector {
       }
     }
     
-    if (!resolved) {
+    if (!resolved && !Utilities.isAbsoluteUrl(ref)) {
       String fref = Utilities.path(Utilities.getDirectoryForFile(filename), ref);
       if (fref.equals(Utilities.path(rootFolder, "qa.html"))) {
         resolved = true;
