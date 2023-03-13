@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.renderers;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -11,7 +12,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
@@ -20,19 +23,27 @@ import org.hl7.fhir.r5.conformance.AdditionalBindingsRenderer;
 import org.hl7.fhir.r5.conformance.profile.BindingResolution;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities.ElementChoiceGroup;
+import org.hl7.fhir.r5.context.CanonicalResourceManager;
 import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
+import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.XmlParser;
+import org.hl7.fhir.r5.model.ActorDefinition;
+import org.hl7.fhir.r5.model.Base;
 import org.hl7.fhir.r5.model.BooleanType;
+import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CanonicalType;
+import org.hl7.fhir.r5.model.CapabilityStatement;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeableConcept;
 import org.hl7.fhir.r5.model.Coding;
+import org.hl7.fhir.r5.model.ConceptMap;
 import org.hl7.fhir.r5.model.ContactPoint;
 import org.hl7.fhir.r5.model.DataType;
 import org.hl7.fhir.r5.model.DateTimeType;
+import org.hl7.fhir.r5.model.DomainResource;
 import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.ElementDefinition.AggregationMode;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
@@ -48,14 +59,26 @@ import org.hl7.fhir.r5.model.Enumeration;
 import org.hl7.fhir.r5.model.Enumerations.BindingStrength;
 import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.IdType;
+import org.hl7.fhir.r5.model.ImplementationGuide;
+import org.hl7.fhir.r5.model.Library;
+import org.hl7.fhir.r5.model.Measure;
+import org.hl7.fhir.r5.model.NamingSystem;
+import org.hl7.fhir.r5.model.OperationDefinition;
 import org.hl7.fhir.r5.model.PackageInformation;
+import org.hl7.fhir.r5.model.PlanDefinition;
 import org.hl7.fhir.r5.model.PrimitiveType;
+import org.hl7.fhir.r5.model.Property;
 import org.hl7.fhir.r5.model.Quantity;
+import org.hl7.fhir.r5.model.Questionnaire;
+import org.hl7.fhir.r5.model.Requirements;
+import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.r5.model.SearchParameter;
 import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionMappingComponent;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
+import org.hl7.fhir.r5.model.StructureMap;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.profilemodel.PEBuilder;
 import org.hl7.fhir.r5.profilemodel.PEBuilder.PEElementPropertiesPolicy;
@@ -63,6 +86,7 @@ import org.hl7.fhir.r5.profilemodel.PEDefinition;
 import org.hl7.fhir.r5.profilemodel.PEType;
 import org.hl7.fhir.r5.renderers.CodeResolver;
 import org.hl7.fhir.r5.renderers.DataRenderer;
+import org.hl7.fhir.r5.renderers.RendererFactory;
 import org.hl7.fhir.r5.renderers.StructureDefinitionRenderer.UnusedTracker;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.GenerationRules;
@@ -77,9 +101,13 @@ import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.StandardsStatus;
+import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.i18n.I18nConstants;
+import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.model.JsonProperty;
+import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
 import org.hl7.fhir.utilities.xhtml.NodeType;
@@ -129,9 +157,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   List<ElementDefinition> diffElements = null;
   List<ElementDefinition> mustSupportElements = null;
   List<ElementDefinition> keyElements = null;
+  private static JsonObject usages;
+  private String specPath;
+  
   private org.hl7.fhir.r5.renderers.StructureDefinitionRenderer sdr;
 
-  public StructureDefinitionRenderer(IWorkerContext context, String corePath, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants,Map<String, Map<String, ElementDefinition>> mapCache) {
+  public StructureDefinitionRenderer(IWorkerContext context, String corePath, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants,Map<String, Map<String, ElementDefinition>> mapCache, String specPath) {
     super(context, corePath, sd, destDir, igp, maps, allTargets, markdownEngine, packge, gen);
     this.sd = sd;
     this.destDir = destDir;
@@ -140,6 +171,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     this.allInvariants = allInvariants;
     this.sdMapCache = mapCache;
     sdr = new org.hl7.fhir.r5.renderers.StructureDefinitionRenderer(gen);
+    this.specPath = specPath;
   }
 
   @Override
@@ -210,53 +242,57 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         Extension v = ToolingExtensions.getExtension(sd, "http://hl7.org/fhir/StructureDefinition/structuredefinition-summary");
         res.append(processMarkdown("Profile.summary", (PrimitiveType) v.getValue()));
       }
-      if (supports + requiredOutrights + requiredNesteds + fixeds + prohibits > 0) {
-        boolean started = false;
-        res.append("<p>");
-        if (requiredOutrights > 0 || requiredNesteds > 0) {
-          started = true;
-          res.append(translate("sd.summary", "Mandatory: %s %s", toStr(requiredOutrights), (requiredOutrights > 1 ? translate("sd.summary", Utilities.pluralizeMe("element")) : translate("sd.summary", "element"))));
-          if (requiredNesteds > 0)
-            res.append(translate("sd.summary", " (%s nested mandatory %s)", toStr(requiredNesteds), requiredNesteds > 1 ? translate("sd.summary", Utilities.pluralizeMe("element")) : translate("sd.summary", "element")));
+      if (sd.getType().equals("Extension")) {
+        res.append(extensionSummary());
+      }else {
+        if (supports + requiredOutrights + requiredNesteds + fixeds + prohibits > 0) {
+          boolean started = false;
+          res.append("<p>");
+          if (requiredOutrights > 0 || requiredNesteds > 0) {
+            started = true;
+            res.append(translate("sd.summary", "Mandatory: %s %s", toStr(requiredOutrights), (requiredOutrights > 1 ? translate("sd.summary", Utilities.pluralizeMe("element")) : translate("sd.summary", "element"))));
+            if (requiredNesteds > 0)
+              res.append(translate("sd.summary", " (%s nested mandatory %s)", toStr(requiredNesteds), requiredNesteds > 1 ? translate("sd.summary", Utilities.pluralizeMe("element")) : translate("sd.summary", "element")));
+          }
+          if (supports > 0) {
+            if (started)
+              res.append("<br/> ");
+            started = true;
+            res.append(translate("sd.summary", "Must-Support: %s %s", toStr(supports), supports > 1 ? translate("sd.summary", Utilities.pluralizeMe("element")) : translate("sd.summary", "element")));
+          }
+          if (fixeds > 0) {
+            if (started)
+              res.append("<br/> ");
+            started = true;
+            res.append(translate("sd.summary", "Fixed Value: %s %s", toStr(fixeds), fixeds > 1 ? translate("sd.summary", Utilities.pluralizeMe("element")) : translate("sd.summary", "element")));
+          }
+          if (prohibits > 0) {
+            if (started)
+              res.append("<br/> ");
+            started = true;
+            res.append(translate("sd.summary", "Prohibited: %s %s", toStr(prohibits), prohibits > 1 ? translate("sd.summary", Utilities.pluralizeMe("element")) : translate("sd.summary", "element")));
+          }
+          res.append("</p>");
         }
-        if (supports > 0) {
-          if (started)
-            res.append("<br/> ");
-          started = true;
-          res.append(translate("sd.summary", "Must-Support: %s %s", toStr(supports), supports > 1 ? translate("sd.summary", Utilities.pluralizeMe("element")) : translate("sd.summary", "element")));
-        }
-        if (fixeds > 0) {
-          if (started)
-            res.append("<br/> ");
-          started = true;
-          res.append(translate("sd.summary", "Fixed Value: %s %s", toStr(fixeds), fixeds > 1 ? translate("sd.summary", Utilities.pluralizeMe("element")) : translate("sd.summary", "element")));
-        }
-        if (prohibits > 0) {
-          if (started)
-            res.append("<br/> ");
-          started = true;
-          res.append(translate("sd.summary", "Prohibited: %s %s", toStr(prohibits), prohibits > 1 ? translate("sd.summary", Utilities.pluralizeMe("element")) : translate("sd.summary", "element")));
-        }
-        res.append("</p>");
-      }
 
-      if (!refs.isEmpty()) {
-        res.append("<p><b>" + translate("sd.summary", "Structures") + "</b></p>\r\n<p>" + translate("sd.summary", "This structure refers to these other structures") + ":</p>\r\n<ul>\r\n");
-        for (String s : refs)
-          res.append(s);
-        res.append("\r\n</ul>\r\n\r\n");
-      }
-      if (!ext.isEmpty()) {
-        res.append("<p><b>" + translate("sd.summary", "Extensions") + "</b></p>\r\n<p>" + translate("sd.summary", "This structure refers to these extensions") + ":</p>\r\n<ul>\r\n");
-        for (String s : ext)
-          res.append(s);
-        res.append("\r\n</ul>\r\n\r\n");
-      }
-      if (!slices.isEmpty()) {
-        res.append("<p><b>" + translate("sd.summary", "Slices") + "</b></p>\r\n<p>" + translate("sd.summary", "This structure defines the following %sSlices%s", "<a href=\"" + corePath + "profiling.html#slices\">", "</a>") + ":</p>\r\n<ul>\r\n");
-        for (String s : slices)
-          res.append(s);
-        res.append("\r\n</ul>\r\n\r\n");
+        if (!refs.isEmpty()) {
+          res.append("<p><b>" + translate("sd.summary", "Structures") + "</b></p>\r\n<p>" + translate("sd.summary", "This structure refers to these other structures") + ":</p>\r\n<ul>\r\n");
+          for (String s : refs)
+            res.append(s);
+          res.append("\r\n</ul>\r\n\r\n");
+        }
+        if (!ext.isEmpty()) {
+          res.append("<p><b>" + translate("sd.summary", "Extensions") + "</b></p>\r\n<p>" + translate("sd.summary", "This structure refers to these extensions") + ":</p>\r\n<ul>\r\n");
+          for (String s : ext)
+            res.append(s);
+          res.append("\r\n</ul>\r\n\r\n");
+        }
+        if (!slices.isEmpty()) {
+          res.append("<p><b>" + translate("sd.summary", "Slices") + "</b></p>\r\n<p>" + translate("sd.summary", "This structure defines the following %sSlices%s", "<a href=\"" + corePath + "profiling.html#slices\">", "</a>") + ":</p>\r\n<ul>\r\n");
+          for (String s : slices)
+            res.append(s);
+          res.append("\r\n</ul>\r\n\r\n");
+        }
       }
       if (ToolingExtensions.hasExtension(sd, ToolingExtensions.EXT_FMM_LEVEL)) {
         // Use hard-coded spec link to point to current spec because DSTU2 had maturity listed on a different page
@@ -266,6 +302,33 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return res.toString();
     } catch (Exception e) {
       return "<p><i>" + Utilities.escapeXml(e.getMessage()) + "</i></p>";
+    }
+  }
+
+  private String extensionSummary() {
+    if (ProfileUtilities.isSimpleExtension(sd)) {
+      ElementDefinition value = sd.getSnapshot().getElementByPath("Extension.value");      
+      return "<p>Simple Extension of type "+value.typeSummary()+": "+Utilities.escapeXml(sd.getDescription())+"</p>";
+    } else {
+      List<ElementDefinition> subs = new ArrayList<>();
+      ElementDefinition slice = null;
+      for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+        if (ed.getPath().endsWith(".extension") && ed.hasSliceName()) {
+          slice = ed;
+        } else if (ed.getPath().endsWith(".extension.value[x]")) {
+          ed.setUserData("slice", slice);
+          subs.add(ed);
+          slice = null;
+        }
+      }
+      StringBuilder b = new StringBuilder();
+      b.append("<p>Complex Extension: "+Utilities.escapeXml(sd.getDescription())+"</p><ul>");
+      for (ElementDefinition ed : subs) {
+        ElementDefinition defn = (ElementDefinition) ed.getUserData("slice");
+        b.append("<li>"+(defn.getSliceName())+": "+ed.typeSummary()+": "+Utilities.escapeXml(defn.getDefinition())+"</li>\r\n");
+      }
+      b.append("</ul>");
+      return b.toString();
     }
   }
 
@@ -2811,7 +2874,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return "// sliced by " + csv.toString() + " " + s;
   }
 
-  public String references() {
+  public String references() throws FHIRFormatError, IOException {
     Map<String, String> base = new HashMap<>();
     Map<String, String> refs = new HashMap<>();
     Map<String, String> trefs = new HashMap<>();
@@ -2843,6 +2906,20 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
       }
     }
+    if (VersionUtilities.isR5Plus(context.getVersion())) {
+      if (usages == null) {
+        FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager(true);
+        NpmPackage npm = pcm.loadPackage("hl7.fhir.r5.core#5.0.0");
+        usages = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(npm.load("other", "sdmap.details"));
+      }
+      if (usages.has(sd.getUrl())) {
+        for (JsonProperty p : usages.getJsonObject(sd.getUrl()).getProperties()) {
+          examples.put(Utilities.pathURL(specPath, p.getName()), p.getValue().asString());
+        }
+      } 
+
+    }
+
     for (FetchedFile f : files) {
       for (FetchedResource r : f.getResources()) {
         if (usesSD(r.getElement())) {
@@ -2859,18 +2936,22 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     StringBuilder b = new StringBuilder();
     b.append("<p><b>Usage:</b></p>\r\n<ul>\r\n");
     if (!base.isEmpty())
-      b.append(" <li>Derived from this " + sd.describeType() + ": " + refList(base) + "</li>\r\n");
+      b.append(" <li>Derived from this " + sd.describeType() + ": " + refList(base, "base") + "</li>\r\n");
     if (!refs.isEmpty())
-      b.append(" <li>Use this " + sd.describeType() + ": " + refList(refs) + "</li>\r\n");
+      b.append(" <li>Use this " + sd.describeType() + ": " + refList(refs, "ref") + "</li>\r\n");
     if (!trefs.isEmpty())
-      b.append(" <li>Refer to this " + sd.describeType() + ": " + refList(refs) + "</li>\r\n");
+      b.append(" <li>Refer to this " + sd.describeType() + ": " + refList(trefs, "tref") + "</li>\r\n");
     if (!examples.isEmpty())
-      b.append(" <li>Examples for this " + sd.describeType() + ": " + refList(examples) + "</li>\r\n");
-    if (base.isEmpty() && refs.isEmpty() && trefs.isEmpty() && examples.isEmpty())
+      b.append(" <li>Examples for this " + sd.describeType() + ": " + refList(examples, "ex") + "</li>\r\n");
+    if (base.isEmpty() && refs.isEmpty() && trefs.isEmpty() && examples.isEmpty()) {
       b.append(" <li>This " + sd.describeType() + " is not used by any profiles in this Implementation Guide</li>\r\n");
+    }
     b.append("</ul>\r\n");
     return b.toString();
   }
+
+
+
 
   private boolean usesSD(Element resource) {
     if (resource.hasChild("meta")) {
@@ -2893,10 +2974,29 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return false;
   }
 
-  private String refList(Map<String, String> base) {
-    CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
+
+  private static final int MAX_DEF_SHOW = 5;
+  private String refList(Map<String, String> base, String key) {
+    StringBuilder b = new StringBuilder();
+    int c = 0;
     for (String s : sorted(base.keySet())) {
+      c++;
+      if (c == MAX_DEF_SHOW && base.size() > MAX_DEF_SHOW) {
+        b.append("<span id=\"rr_"+key+"\" onClick=\"document.getElementById('rr_"+key+"').innerHTML = document.getElementById('rr2_"+key+"').innerHTML\">..."+
+            " <span style=\"cursor: pointer; border: 1px grey solid; background-color: #fcdcb3; padding-left: 3px; padding-right: 3px; color: black\">"+
+            "Show "+(base.size()-MAX_DEF_SHOW+1)+" more</span></span><span id=\"rr2_"+key+"\" style=\"display: none\">");
+      }
+      if (c == base.size() && c != 1) {
+        b.append(" and ");
+      } else if (c > 1) {
+        b.append(", ");
+      }
+
       b.append("<a href=\"" + s + "\">" + base.get(s) + "</a>");
+    }
+
+    if (c >= MAX_DEF_SHOW && base.size() > MAX_DEF_SHOW) {
+      b.append("</span>");
     }
     return b.toString();
   }

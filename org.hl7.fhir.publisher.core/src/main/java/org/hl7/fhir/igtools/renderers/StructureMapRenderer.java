@@ -31,13 +31,17 @@ import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureMap;
+import org.hl7.fhir.r5.renderers.RendererFactory;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
+import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
 public class StructureMapRenderer extends CanonicalRenderer {
 
@@ -73,8 +77,14 @@ public class StructureMapRenderer extends CanonicalRenderer {
     return b.toString();
   }
 
-  public String script() throws FHIRException {
-    return StructureMapUtilities.render(map);
+  public String script(boolean plainText) throws FHIRException, IOException, EOperationOutcome {
+    if (plainText) {
+      return StructureMapUtilities.render(map);
+    } else {
+      XhtmlNode node = new XhtmlNode(NodeType.Element, "div");
+      RendererFactory.factory(map, gen).render(node, map);
+      return new XhtmlComposer(false, false).compose(node);
+    }
   }
 
   public String content() throws IOException {

@@ -369,7 +369,7 @@ public class CrossViewRenderer {
     } else if (canonical2 != null && sd.getUrl().startsWith(canonical2)) {
       code = sd.getUrl().substring(canonical2.length()+21);
     } else {
-      System.out.println("extension url doesn't follow canonical pattern: "+sd.getUrl()+", so omitted from extension summary");
+     //  System.out.println("extension url doesn't follow canonical pattern: "+sd.getUrl()+", so omitted from extension summary");
       return;
     }
     ExtensionDefinition exd = new ExtensionDefinition();
@@ -718,14 +718,20 @@ public class CrossViewRenderer {
       if (s.contains(".")) {
         s = s.substring(0, s.indexOf("."));
       }
+      if (cu.isPrimitiveDatatype(s)) {
+        set.add("primitives");
+      }
       if (cu.isDatatype(s)) {
         set.add("datatypes");
       } 
       set.add(s);
+      break;
     case EXTENSION:
       set.add("Extension");
+      break;
     case FHIRPATH:
       set.add("Path");
+      break;
     case NULL:
     default:
       set.add("none");
@@ -744,27 +750,42 @@ public class CrossViewRenderer {
   public String buildExtensionTable(String s) throws Exception {
     if (extMap.containsKey(s)) {
       return buildExtensionTable(s, extMap.get(s));
+    } else {
+      return buildExtensionTable(s, extMap.get(s));
     }
-    return null;
   }
 
   private String buildExtensionTable(String type, List<ExtensionDefinition> definitions) throws Exception {
     StringBuilder b = new StringBuilder();
 
+    String kind;
+    if (Utilities.existsInList(type, context.getResourceNames())) {
+      kind = "resource";
+    } else {
+      kind = "data type";
+    }
     b.append("<table class=\"list\">\r\n");
     b.append("<tr>");
-    b.append("<td><b>Identity</b></td>");
+    b.append("<td><b>Identity</b><a name=\"ext-"+type+"\"> </a></td>");
     b.append("<td><b><a href=\""+Utilities.pathURL(context.getSpecUrl(), "defining-extensions.html")+"#cardinality\">Conf.</a></b></td>");
     b.append("<td><b>Type</b></td>");
     b.append("<td><b><a href=\""+Utilities.pathURL(context.getSpecUrl(), "defining-extensions.html")+"#context\">Context</a></b></td>");
     b.append("<td><b><a href=\""+Utilities.pathURL(context.getSpecUrl(), "versions.html")+"#maturity\">FMM</a></b></td>");
     b.append("</tr>");
     if (type != null) {
-      b.append("<tr><td colspan=\"5\"><b>Extensions defined for this resource</b></td></tr>\r\n");
+      if ("Path".equals(type)) {
+        b.append("<tr><td colspan=\"5\"><b>Extensions defined by a FHIRPath expression</b></td></tr>\r\n");
+      } else if ("primitives".equals(type)) {
+        b.append("<tr><td colspan=\"5\"><b>Extensions defined on primitive types</b></td></tr>\r\n");
+      } else {
+        b.append("<tr><td colspan=\"5\"><b>Extensions defined for the "+type+" "+kind+"</b></td></tr>\r\n");
+      }
     }
     Map<String, StructureDefinition> map = new HashMap<>();
-    for (ExtensionDefinition sd : definitions)
-      map.put(sd.source.getUrl(), sd.source);
+    if (definitions != null) {
+      for (ExtensionDefinition sd : definitions)
+        map.put(sd.source.getUrl(), sd.source);
+    }
     if (map.size() == 0) {
       b.append("<tr><td colspan=\"5\">(None found)</td></tr>\r\n");      
     } else {
@@ -773,7 +794,7 @@ public class CrossViewRenderer {
       }
     }
 
-    if (type != null) {
+    if (type != null && !Utilities.existsInList(type, "Path", "primitives", "datatypes")) {
       List<String> ancestors = new ArrayList<>();
       StructureDefinition t = context.fetchTypeDefinition(type);
       if (t != null) {
@@ -784,47 +805,55 @@ public class CrossViewRenderer {
         }
       }
       
-      b.append("<tr><td colspan=\"5\"><b>Extensions defined for many resources including this resource</b></td></tr>\r\n");
-      map = new HashMap<>();
-      for (ExtensionDefinition sd : this.extList) {
-        if (forAncestor(ancestors, sd)) {
-          map.put(sd.source.getUrl(), sd.source);
+      if (Utilities.existsInList(type, context.getResourceNames())) {
+        b.append("<tr><td colspan=\"5\"><b>Extensions defined for many resources including the "+type+" resource</b></td></tr>\r\n");
+        map = new HashMap<>();
+        for (ExtensionDefinition sd : this.extList) {
+          if (forAncestor(ancestors, sd)) {
+            map.put(sd.source.getUrl(), sd.source);
+          }
         }
-      }
-      if (map.size() == 0) {
-        b.append("<tr><td colspan=\"5\">(None found)</td></tr>\r\n");      
+        if (map.size() == 0) {
+          b.append("<tr><td colspan=\"5\">(None found)</td></tr>\r\n");      
+        } else {
+          for (String s : Utilities.sorted(map.keySet())) {
+            genExtensionRow(b, map.get(s));
+          }
+        }
+
+        b.append("<tr><td colspan=\"5\"><b>Extensions that refer to the "+type+" resource</b></td></tr>\r\n");
+        map = new HashMap<>();
+        for (ExtensionDefinition sd : this.extList) {
+          if (refersToThisType(type, sd)) {
+            map.put(sd.source.getUrl(), sd.source);
+          }
+        }
+        if (map.size() == 0) {
+          b.append("<tr><td colspan=\"5\">(None found)</td></tr>\r\n");      
+        } else {
+          for (String s : Utilities.sorted(map.keySet())) {
+            genExtensionRow(b, map.get(s));
+          }
+        }
+        b.append("<tr><td colspan=\"5\"><b>Extensions that refer to many resources including the "+type+" resource</b></td></tr>\r\n");
+        map = new HashMap<>();
+        for (ExtensionDefinition sd : this.extList) {
+          if (refersToThisTypesAncestors(ancestors, sd)) {
+            map.put(sd.source.getUrl(), sd.source);
+          }
+        }
+        if (map.size() == 0) {
+          b.append("<tr><td colspan=\"5\">(None found)</td></tr>\r\n");      
+        } else {
+          for (String s : Utilities.sorted(map.keySet())) {
+            genExtensionRow(b, map.get(s));
+          }
+        }
       } else {
-        for (String s : Utilities.sorted(map.keySet())) {
-          genExtensionRow(b, map.get(s));
-        }
-      }
-      
-      b.append("<tr><td colspan=\"5\"><b>Extensions that refer to this resource</b></td></tr>\r\n");
-      map = new HashMap<>();
-      for (ExtensionDefinition sd : this.extList) {
-        if (refersToThisType(type, sd)) {
-          map.put(sd.source.getUrl(), sd.source);
-        }
-      }
-      if (map.size() == 0) {
-        b.append("<tr><td colspan=\"5\">(None found)</td></tr>\r\n");      
-      } else {
-        for (String s : Utilities.sorted(map.keySet())) {
-          genExtensionRow(b, map.get(s));
-        }
-      }
-      b.append("<tr><td colspan=\"5\"><b>Extensions that refer to many resources including this resource</b></td></tr>\r\n");
-      map = new HashMap<>();
-      for (ExtensionDefinition sd : this.extList) {
-        if (refersToThisTypesAncestors(ancestors, sd)) {
-          map.put(sd.source.getUrl(), sd.source);
-        }
-      }
-      if (map.size() == 0) {
-        b.append("<tr><td colspan=\"5\">(None found)</td></tr>\r\n");      
-      } else {
-        for (String s : Utilities.sorted(map.keySet())) {
-          genExtensionRow(b, map.get(s));
+        StructureDefinition sd = context.fetchTypeDefinition(type);
+        if (sd != null && sd.hasBaseDefinition()) {
+          String bt = Utilities.tail(sd.getBaseDefinition());
+          b.append("<tr><td colspan=\"5\"><br/>(See also Extensions defined on <a href=\"extensions-types.html#ext-"+bt+"\">"+bt+"</a>)</td></tr>\r\n");      
         }
       }
     }
@@ -1000,7 +1029,7 @@ public class CrossViewRenderer {
 
   public String genSearchList(List<SearchParameter> list) {
     if (list.size() == 0) {
-      return "<p>(none found)</p>;";
+      return "<p>(none found)</p>";
     } else {
       Collections.sort(list, new SearchParameterListSorter());
       StringBuilder b = new StringBuilder();
