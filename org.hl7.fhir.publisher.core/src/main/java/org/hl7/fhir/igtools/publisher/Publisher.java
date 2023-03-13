@@ -660,6 +660,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private List<String> resourceDirs = new ArrayList<String>();
   private List<String> pagesDirs = new ArrayList<String>();
+  private List<String> dataDirs = new ArrayList<String>();
   private String tempDir;
   private String outputDir;
   private String specPath;
@@ -2532,6 +2533,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         codeSystemProps.add(p.getValue());
       } else if (pc.equals("path-pages")) {     
         pagesDirs.add(Utilities.path(rootDir, p.getValue()));
+      } else if (pc.equals("path-data")) {     
+        dataDirs.add(Utilities.path(rootDir, p.getValue()));
       } else if (pc.equals("copyrightyear")) {     
         copyrightYear = p.getValue();
       } else if (pc.equals("path-qa")) {     
@@ -6460,11 +6463,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void generate() throws Exception {
     forceDir(tempDir);
     forceDir(Utilities.path(tempDir, "_includes"));
-    forceDir(Utilities.path(tempDir, "data"));
-
+    forceDir(Utilities.path(tempDir, "_data"));
+    
     otherFilesRun.clear();
     otherFilesRun.add(Utilities.path(outputDir, "package.tgz"));
     otherFilesRun.add(Utilities.path(outputDir, "package.manifest.json"));
+    copyData();
     for (String rg : regenList) {
       regenerate(rg);
     }
@@ -6640,6 +6644,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       zip.close();
       Utilities.copyFile(Utilities.path(tempDir, "full-ig.zip"), Utilities.path(outputDir, "full-ig.zip"));
       log("Final .zip built");
+    }
+  }
+
+  private void copyData() throws IOException {
+    for (String d : dataDirs) {
+      for (File f : new File(d).listFiles()) {
+        String df = Utilities.path(tempDir, "_data", f.getName());
+        otherFilesRun.add(df);
+        Utilities.copyFile(f, new File(df));
+      }
     }
   }
 
@@ -7396,7 +7410,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     msr.analyse();
     Set<String> types = new HashSet<>();
     for (StructureDefinition sd : cu.allStructures()) {
-      if (sd.getDerivation() == TypeDerivationRule.SPECIALIZATION && sd.getKind() != StructureDefinitionKind.LOGICAL && !types.contains(sd.getType())) {
+      if (sd.getUrl().equals("http://hl7.org/fhir/StructureDefinition/Base") || (sd.getDerivation() == TypeDerivationRule.SPECIALIZATION && sd.getKind() != StructureDefinitionKind.LOGICAL && !types.contains(sd.getType()))) {
         types.add(sd.getType());
         String src = msr.render(sd);
         fragment("maps-"+sd.getType(), src, otherFilesRun);
