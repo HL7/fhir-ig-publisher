@@ -30,7 +30,10 @@ public class GitUtilitiesTests {
 		Path worktreeBranchPath = Path.of(gitRoot.getAbsolutePath(), "branch-a");
 
 		System.out.println(execAndReturnString(new String[]{"git", "init"}, null, normalBranchDirectory));
-		System.out.println(execAndReturnString(new String[]{"touch", "dummy.txt"}, null, normalBranchDirectory));
+
+		File dummyFile = Path.of(normalBranchDirectory.getAbsolutePath().toString(), "dummy.txt").toFile();
+		dummyFile.createNewFile();
+		//System.out.println(execAndReturnString(new String[]{"touch", "dummy.txt"}, null, normalBranchDirectory));
 
 		System.out.println(execAndReturnString(new String[]{"git", "add", "./dummy.txt"},null, normalBranchDirectory));
 		System.out.println(execAndReturnString(new String[]{"git", "commit", "-m", "test"},null, normalBranchDirectory));
