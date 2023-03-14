@@ -33,6 +33,9 @@ public class GitUtilitiesTests {
 
 		System.out.println(execAndReturnString(new String[]{"git", "init"}, null, normalBranchDirectory));
 
+		//git config --global user.email "you@example.com"
+		System.out.println(execAndReturnString(new String[]{"git", "config", "user.email", "\"dummy@dummy.org\""}, null, normalBranchDirectory));
+
 		File dummyFile = Path.of(normalBranchDirectory.getAbsolutePath().toString(), "dummy.txt").toFile();
 		dummyFile.createNewFile();
 
