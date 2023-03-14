@@ -55,6 +55,7 @@ import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode.Location;
 import org.hl7.fhir.utilities.xhtml.XhtmlParser;
+import org.jetbrains.annotations.NotNull;
 
 //import org.owasp.html.Handler;
 //import org.owasp.html.HtmlChangeListener;
@@ -638,8 +639,7 @@ public class HTMLInspector {
     }
     
     if (!resolved && !Utilities.isAbsoluteUrl(ref)) {
-      //FIXME This logic should be in Utilities.path
-      String fref = Utilities.path(Utilities.getDirectoryForFile(filename)) + File.separator + ref;
+      String fref = buildRef(filename, ref);
       if (fref.equals(Utilities.path(rootFolder, "qa.html"))) {
         resolved = true;
       }
@@ -657,7 +657,7 @@ public class HTMLInspector {
      }
      // a local file may have been created by some poorly tracked process, so we'll consider that as a possible
      if (!resolved && !Utilities.isAbsoluteUrl(rref) && !rref.contains("..")) { // .. is security check. Maybe there's some ways it could be valid, but we're not interested for now
-       String fname = Utilities.path(new File(filename).getParent(), rref);
+       String fname = buildRef(new File(filename).getParent(), rref);
        if (new File(fname).exists()) {
          resolved = true;
        }
@@ -718,6 +718,12 @@ public class HTMLInspector {
       messages.add(new ValidationMessage(Source.LinkChecker, IssueType.NOTFOUND, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The link '"+ref+"' for \""+text.replaceAll("[\\s\\n]+", " ").trim()+"\" cannot be resolved"+tgtList, IssueSeverity.ERROR).setLocationLink(uuid == null ? null : makeLocal(filename)+"#"+uuid));
       return true;
     } 
+  }
+
+  @NotNull
+  private String buildRef(String filename, String ref) throws IOException {
+    //FIXME This logic should be in Utilities.path
+    return Utilities.path(Utilities.getDirectoryForFile(filename)) + File.separator + ref;
   }
 
   private boolean matchesTarget(String ref, String... url) {
