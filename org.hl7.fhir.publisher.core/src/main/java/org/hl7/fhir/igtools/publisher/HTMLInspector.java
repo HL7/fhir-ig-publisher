@@ -639,7 +639,7 @@ public class HTMLInspector {
     }
     
     if (!resolved && !Utilities.isAbsoluteUrl(ref) && !rref.startsWith("#")) {
-      String fref = buildRef(filename, ref);
+      String fref = buildRef(Utilities.getDirectoryForFile(filename), ref);
       if (fref.equals(Utilities.path(rootFolder, "qa.html"))) {
         resolved = true;
       }
@@ -721,10 +721,10 @@ public class HTMLInspector {
   }
 
   @NotNull
-  private String buildRef(String filename, String ref) throws IOException {
+  private String buildRef(String refParentPath, String ref) throws IOException {
     //FIXME This logic should be in Utilities.path
     // Utilities path does checks for
-    return Utilities.path(Utilities.getDirectoryForFile(filename)) + File.separator + ref;
+    return Utilities.path(refParentPath) + File.separator + ref;
   }
 
   private boolean matchesTarget(String ref, String... url) {
