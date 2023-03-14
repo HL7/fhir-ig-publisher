@@ -8578,13 +8578,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return businessVersion == null ? publishedIg.getVersion() : businessVersion;
   }
 
+
+
   private String getGitStatus() throws IOException {
-    File gitDir = new File(Utilities.path(Utilities.getDirectoryForFile(configFile), ".git"));
-    if (!gitDir.exists()) {
-      return "";      
-    }
-    String head = TextFile.fileToString(Utilities.path(gitDir.getAbsolutePath(), "HEAD")).trim();
-    return head.substring(head.lastIndexOf("/")+1);
+    File gitDir = new File(Utilities.getDirectoryForFile(configFile));
+    return GitUtilities.getGitStatus(gitDir);
   }
 
   private void generateResourceReferences() throws Exception {
