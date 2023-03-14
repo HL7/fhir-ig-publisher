@@ -2840,7 +2840,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     R5ExtensionsLoader r5e = new R5ExtensionsLoader(pcm, context);
     r5e.load();
     r5e.loadR5Extensions();
-    r5e.loadR5SpecialTypes(SpecialTypeHandler.SPECIAL_TYPES);
+    if (!VersionUtilities.isR5Plus(context.getVersion())) {
+      r5e.loadR5SpecialTypes(SpecialTypeHandler.SPECIAL_TYPES);
+    }
     SpecMapManager smm = new SpecMapManager(r5e.getMap(), r5e.getPckCore().fhirVersion());
     smm.setName(r5e.getPckCore().name());
     smm.setBase("http://build.fhir.org");
