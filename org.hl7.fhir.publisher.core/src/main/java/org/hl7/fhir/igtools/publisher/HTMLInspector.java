@@ -723,6 +723,7 @@ public class HTMLInspector {
   @NotNull
   private String buildRef(String filename, String ref) throws IOException {
     //FIXME This logic should be in Utilities.path
+    // Utilities path does checks for
     return Utilities.path(Utilities.getDirectoryForFile(filename)) + File.separator + ref;
   }
 
