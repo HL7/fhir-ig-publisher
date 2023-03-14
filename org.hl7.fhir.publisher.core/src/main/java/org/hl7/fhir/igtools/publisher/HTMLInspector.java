@@ -640,10 +640,15 @@ public class HTMLInspector {
       }
     }
     
-    if (!resolved && !Utilities.isAbsoluteUrl(ref) && !rref.startsWith("#")) {
-      String fref = buildRef(Utilities.getDirectoryForFile(filename), ref);
-      if (fref.equals(Utilities.path(rootFolder, "qa.html"))) {
-        resolved = true;
+    if (!resolved) {
+      if (Utilities.isAbsoluteFileName(ref)) {
+        if (new File(ref).exists()) {
+          resolved = true;
+        }
+      } else if (!resolved && !Utilities.isAbsoluteUrl(ref) && !rref.startsWith("#")) {
+        String fref = Utilities.path(Utilities.getDirectoryForFile(filename), ref);
+        if (fref.equals(Utilities.path(rootFolder, "qa.html"))) {
+          resolved = true;
       }
     }
     // special case end-points that are always valid:
@@ -680,7 +685,7 @@ public class HTMLInspector {
             }
           }
         }
-      } else { 
+      } else if (!Utiliies.isabsoluteFileName(rref)) { 
         String page = rref;
         String name = null;
         if (page.startsWith("#")) {
