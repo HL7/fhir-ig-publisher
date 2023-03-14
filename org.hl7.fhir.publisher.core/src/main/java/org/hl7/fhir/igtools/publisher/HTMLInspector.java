@@ -638,7 +638,8 @@ public class HTMLInspector {
     }
     
     if (!resolved && !Utilities.isAbsoluteUrl(ref)) {
-      String fref = Utilities.path(Utilities.getDirectoryForFile(filename), ref);
+      //FIXME This logic should be in Utilities.path
+      String fref = Utilities.path(Utilities.getDirectoryForFile(filename)) + File.separator + ref;
       if (fref.equals(Utilities.path(rootFolder, "qa.html"))) {
         resolved = true;
       }
