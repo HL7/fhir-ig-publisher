@@ -55,7 +55,9 @@ import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode.Location;
 import org.hl7.fhir.utilities.xhtml.XhtmlParser;
-import org.jetbrains.annotations.NotNull;
+
+import javax.annotation.Nonnull;
+
 
 //import org.owasp.html.Handler;
 //import org.owasp.html.HtmlChangeListener;
@@ -720,7 +722,7 @@ public class HTMLInspector {
     } 
   }
 
-  @NotNull
+  @Nonnull
   private String buildRef(String refParentPath, String ref) throws IOException {
     //FIXME This logic should be in Utilities.path
     // Utilities path will try to assemble a filesystem path,
