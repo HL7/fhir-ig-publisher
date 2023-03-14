@@ -723,7 +723,8 @@ public class HTMLInspector {
   @NotNull
   private String buildRef(String refParentPath, String ref) throws IOException {
     //FIXME This logic should be in Utilities.path
-    // Utilities path does checks for
+    // Utilities path will try to assemble a filesystem path,
+    // and this will fail in Windows if it contains ':' characters.
     return Utilities.path(refParentPath) + File.separator + ref;
   }
 
