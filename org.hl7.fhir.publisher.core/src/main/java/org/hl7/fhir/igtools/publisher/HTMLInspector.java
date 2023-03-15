@@ -649,6 +649,7 @@ public class HTMLInspector {
         String fref = Utilities.path(Utilities.getDirectoryForFile(filename), ref);
         if (fref.equals(Utilities.path(rootFolder, "qa.html"))) {
           resolved = true;
+        }
       }
     }
     // special case end-points that are always valid:
@@ -685,7 +686,7 @@ public class HTMLInspector {
             }
           }
         }
-      } else if (!Utiliies.isabsoluteFileName(rref)) { 
+      } else if (!Utilities.isAbsoluteFileName(rref)) { 
         String page = rref;
         String name = null;
         if (page.startsWith("#")) {
