@@ -75,6 +75,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
+import org.checkerframework.checker.nullness.qual.NonNull;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_10_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_14_30;
@@ -2523,7 +2524,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       } else if (pc.equals("no-validate")) {
         noValidate.add(p.getValue());
       } else if (pc.equals("path-resource")) {
-        String dir = Utilities.path(rootDir, p.getValue());
+        String dir = getPathResourceDirectory(p);
         if (!resourceDirs.contains(dir)) {
           resourceDirs.add(dir);
         }
@@ -2926,6 +2927,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       extensionTracker.setoptIn(!ini.getBooleanProperty("IG", "usage-stats-opt-out"));
     
     log("Initialization complete");
+  }
+
+  @NonNull
+  private String getPathResourceDirectory(ImplementationGuideDefinitionParameterComponent p) throws IOException {
+    if ( p.getValue().endsWith("*")) {
+      return Utilities.path(rootDir, p.getValue().substring(0, p.getValue().length() - 1)) + "*";
+    }
+    return Utilities.path(rootDir, p.getValue());
   }
 
   private void scanDirectories(String dir, List<String> extraDirs) {
