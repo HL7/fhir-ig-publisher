@@ -1,6 +1,7 @@
 package org.hl7.fhir.igtools.publisher;
 
 import java.io.IOException;
+import java.util.List;
 
 import org.hl7.fhir.convertors.loaders.loaderR5.ILoaderKnowledgeProviderR5;
 import org.hl7.fhir.convertors.loaders.loaderR5.R2016MayToR5Loader;
@@ -37,11 +38,11 @@ public class PublisherLoader implements ILoaderKnowledgeProviderR5 {
 
   public IContextResourceLoader makeLoader() {
     // there's no penalty for listing resources that don't exist, so we just all the relevant possibilities for all versions 
-    String[] types = new String[] {"CodeSystem", "ValueSet", "ConceptMap", "NamingSystem",
+    List<String> types = Utilities.strings("CodeSystem", "ValueSet", "ConceptMap", "NamingSystem",
                                    "StructureDefinition", "StructureMap", 
                                    "SearchParameter", "OperationDefinition", "CapabilityStatement", "Conformance",
                                    "Questionnaire", "ImplementationGuide",
-                                   "Measure"};
+                                   "Measure");
     if (VersionUtilities.isR2Ver(npm.fhirVersion())) {
       return new R2ToR5Loader(types, this);
     } else if (VersionUtilities.isR2BVer(npm.fhirVersion())) {
