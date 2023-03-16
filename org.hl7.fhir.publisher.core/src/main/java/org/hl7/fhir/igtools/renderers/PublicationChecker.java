@@ -156,7 +156,7 @@ public class PublicationChecker {
         summary.add(new StringPair("path", pr.asString("path")));                        
       }
     }
-    boolean milestone = pr.asBoolean("milestone");
+    boolean milestone = "milestone".equals(pr.asString("milestone"));
     if (milestone) {
       if (check(messages, !npm.version().contains("-"), "This release is labelled as a milestone, so should not have a patch version ("+npm.version() +")"+mkWarning())) {
         summary.add(new StringPair("milestone", pr.asString("milestone")));        
