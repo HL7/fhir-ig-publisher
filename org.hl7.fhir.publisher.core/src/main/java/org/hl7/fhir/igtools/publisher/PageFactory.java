@@ -102,13 +102,22 @@ public class PageFactory {
   
   private List<String> items() {
     switch (itemFactory()) {
-    case "types" : return itemsForTypes();
-    case "resources" : return itemsForResources();
-    case "datatypes" : return itemsForDataTypes();
-    case "canonicals" : return itemsForCanonicalResources();
-    case "manual" : return manualItemList();
+    case "types" : return removeExceptions(itemsForTypes());
+    case "resources" : return removeExceptions(itemsForResources());
+    case "datatypes" : return removeExceptions(itemsForDataTypes());
+    case "canonicals" : return removeExceptions(itemsForCanonicalResources());
+    case "manual" : return removeExceptions(manualItemList());
     }
     throw new Error("Unknown page factory 'item-factory' value "+itemFactory()+"'");
+  }
+
+  private List<String> removeExceptions(List<String> list) {
+    List<String> ret = new ArrayList<>();
+    ret.addAll(list);
+    if (json.has("except-items")) {
+      ret.removeAll(json.getStrings("except-items"));
+    }
+    return ret;
   }
 
   private List<String> manualItemList() {
