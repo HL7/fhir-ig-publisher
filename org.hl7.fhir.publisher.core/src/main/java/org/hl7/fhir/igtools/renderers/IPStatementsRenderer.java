@@ -218,26 +218,12 @@ public class IPStatementsRenderer {
     if (system.cs != null) {
       system.desc = system.cs.present();
       if (system.cs.hasCopyright()) {
-        return stripPara(markdownEngine.process(system.cs.getCopyright(), "Copyright"));        
+        return Utilities.stripPara(markdownEngine.process(system.cs.getCopyright(), "Copyright"));        
       }
     }
     return null;
   }
   
-  private String stripPara(String p) {
-    if (Utilities.noString(p)) {
-      return "";
-    }
-    p = p.trim();
-    if (p.startsWith("<p>")) {
-      p = p.substring(3);
-    }
-    if (p.endsWith("</p>")) {
-      p = p.substring(0, p.length()-4);
-    }
-    return p;
-  }
-
   private void listAllCodeSystems(FetchedResource source, Resource resource) {
     if (resource instanceof StructureDefinition) {
       listAllCodeSystemsSD(source, (StructureDefinition) resource);
