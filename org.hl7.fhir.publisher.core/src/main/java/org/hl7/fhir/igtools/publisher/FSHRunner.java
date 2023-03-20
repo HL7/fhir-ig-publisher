@@ -35,6 +35,8 @@ public class FSHRunner {
 
     protected void runFsh(File file, Publisher.IGBuildMode mode) throws IOException {
         File fshIni = new File(Utilities.path(file.getAbsolutePath(), "fsh.ini"));
+        /* Changed 2023-03-20 by dotasek. If the fshIni file resolution below is still commented out
+        // by 2023-06-20, delete the code below.
         if (!fshIni.exists()) {
             try {
                 fshIni = new File(Utilities.path(Utilities.getDirectoryForFile(file.getAbsolutePath()), "fsh.ini"));
@@ -42,6 +44,7 @@ public class FSHRunner {
                 logger.logDebugMessage(IWorkerContext.ILoggingService.LogCategory.INIT,  "Could not check parent directory of file " + file.getAbsolutePath() + " " + e.getMessage());
             }
         }
+        */
         String fshVersion = null;
         if (fshIni.exists()) {
             IniFile ini = new IniFile(new FileInputStream(fshIni));
