@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -187,7 +188,7 @@ public class WebSourceProvider {
         System.out.println("Connect to "+uploadServer);
         FTPClient ftp = new FTPClient(uploadServer, uploadPath, uploadUser, uploadPword);
         ftp.connect();
-        System.out.print("Uploading.");
+        System.out.print("Uploading:");
         int c = 0;
         int p = 0;
         if (!existingFiles.isEmpty()) {
@@ -201,19 +202,14 @@ public class WebSourceProvider {
         String dir = null;
         int failCount = 0;
         int count = 0;
-        int step = 0;
-        int ten = filesToUpload.size() / 10;
+        long start = System.currentTimeMillis();
         for (String s : filesToUpload) {
           count++;
-          if (count % ten == 0) {
-            step++;
-            System.out.print(""+step*10);
-          }
           try {
             String d = Utilities.getDirectoryForFile(s);
             if (d != null && !d.equals(dir)) {
               System.out.println("");
-              System.out.print(d);
+              System.out.print(d+" "+((count * 100) / filesToUpload.size())+"% "+forecast(start, count, filesToUpload.size()));
               dir = d;
             }
             ftp.upload(Utilities.path(destination, s), s);
@@ -225,12 +221,18 @@ public class WebSourceProvider {
               ftp.upload(Utilities.path(destination, s), s);
               failCount = 0;
             } catch (Exception e2) {
-              failCount++;
-              System.out.println("");
-              System.out.println("Error uploading file '"+s+"': "+e2.getMessage());
-              System.out.println("Need to manually copy '"+Utilities.path(destination, s)+"' to '"+s);
-              if (failCount >= 10) {
-                throw new Error("Too many sequential errors copying files (10). Stopping.");
+              try {
+                ftp = new FTPClient(uploadServer, uploadPath, uploadUser, uploadPword);
+                ftp.connect();
+                ftp.upload(Utilities.path(destination, s), s);
+              } catch (Exception e3) {
+                failCount++;
+                System.out.println("");
+                System.out.println("Error uploading file '"+s+"': "+e2.getMessage());
+                System.out.println("Need to manually copy '"+Utilities.path(destination, s)+"' to '"+s);
+                if (failCount >= 10) {
+                  throw new Error("Too many sequential errors copying files (10). Stopping.");
+                }
               }
             }
           }
@@ -248,6 +250,14 @@ public class WebSourceProvider {
       Utilities.copyDirectory(destination, source, null);
       System.out.println("  ... done");
     }
+  }
+
+  private String forecast(long start, int count, int size) {
+    long millisecondsDone = System.currentTimeMillis() - start;
+    long millisecondsToGo = ((millisecondsDone * size) / count) - millisecondsDone;
+    Duration d = Duration.ofMillis(millisecondsToGo);
+    long rate = count * 1000 / millisecondsDone;
+    return ""+rate+" files/sec, "+Utilities.describeDuration(d)+" left";
   }
 
   private int progress(int c, int t, int p) {
