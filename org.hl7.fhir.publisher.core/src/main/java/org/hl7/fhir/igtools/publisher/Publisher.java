@@ -2235,11 +2235,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (configFile != null) {
       File fsh = new File(Utilities.path(focusDir(), "fsh"));
       if (fsh.exists() && fsh.isDirectory() && !noFSH) {
-        runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())));
+        new FSHRunner(this).runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())), mode);
       } else {
         File fsh2 = new File(Utilities.path(focusDir(), "input", "fsh"));
         if (fsh2.exists() && fsh2.isDirectory() && !noFSH) {
-          runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())));   
+          new FSHRunner(this).runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())), mode);
         }
       }
     }
@@ -2294,99 +2294,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return Utilities.noString(dir) ? getCurentDirectory() : dir;
   }
 
-  public class MySushiHandler extends OutputStream {
 
-    private byte[] buffer;
-    private int length;
-    private int errorCount = -1;
 
-    public MySushiHandler() {
-      buffer = new byte[256];
-    }
-
-    public String getBufferString() {
-      return new String(this.buffer, 0, length);
-    }
-
-    private boolean passSushiFilter(String s) {
-      if (Utilities.noString(s))
-        return false;
-      return true;
-    }
-
-    @Override
-    public void write(int b) throws IOException {
-      buffer[length] = (byte) b;
-      length++;
-      if (b == 10) { // eoln
-        String s = new String(buffer, 0, length);
-        if (passSushiFilter(s)) {
-          log("Sushi: "+StringUtils.stripEnd(s, null));
-          if (s.trim().startsWith("Errors:")) {
-            errorCount = Integer.parseInt(s.substring(10).trim());
-          }
-        }
-        length = 0;
-      }
-    }
-  }
-
-  private void runFsh(File file) throws IOException { 
-    File inif = new File(Utilities.path(file.getAbsolutePath(), "fsh.ini"));
-    if (!inif.exists()) {
-      inif = new File(Utilities.path(Utilities.getDirectoryForFile(file.getAbsolutePath()), "fsh.ini"));
-    }
-    String fshVersion = null;
-    if (inif.exists()) {
-      IniFile ini = new IniFile(new FileInputStream(inif));
-      if (ini.hasProperty("FSH", "timeout")) {
-        fshTimeout = ini.getLongProperty("FSH", "timeout") * 1000;
-      }
-      if (ini.hasProperty("FSH", "sushi-version")) {
-        fshVersion = ini.getStringProperty("FSH", "sushi-version");
-      }
-    }
-    log("Run Sushi on "+file.getAbsolutePath());
-    DefaultExecutor exec = new DefaultExecutor();
-    exec.setExitValue(0);
-    MySushiHandler pumpHandler = new MySushiHandler();
-    PumpStreamHandler pump = new PumpStreamHandler(pumpHandler);
-    exec.setStreamHandler(pump);
-    exec.setWorkingDirectory(file);
-    ExecuteWatchdog watchdog = new ExecuteWatchdog(fshTimeout);
-    exec.setWatchdog(watchdog);
-    String cmd = fshVersion == null ? "sushi" : "npx fsh-sushi@"+fshVersion;
-    if (mode == IGBuildMode.PUBLICATION || mode == IGBuildMode.AUTOBUILD) {
-      cmd += " --require-latest";
-    }
-    try {
-      if (SystemUtils.IS_OS_WINDOWS) {
-        exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C "+cmd+" . -o ."));
-      } else if (ToolGlobalSettings.hasNpmPath()) {
-        ProcessBuilder processBuilder = new ProcessBuilder(new String("bash -c "+cmd));
-        Map<String, String> env = processBuilder.environment();
-        Map<String, String> vars = new HashMap<>();
-        vars.putAll(env);
-        String path = ToolGlobalSettings.getNpmPath()+":"+env.get("PATH");
-        vars.put("PATH", path);
-        exec.execute(org.apache.commons.exec.CommandLine.parse("bash -c "+cmd+" . -o ."), vars);
-      } else {
-        exec.execute(org.apache.commons.exec.CommandLine.parse(cmd+" . -o ."));
-      }
-    } catch (IOException ioex) {
-      log("Sushi couldn't be run. Complete output from running Sushi : " + pumpHandler.getBufferString());
-      if (watchdog.killedProcess()) {
-        log("Sushi timeout exceeded: " + Long.toString(fshTimeout/1000) + " seconds");
-      } else {
-        log("Note: Check that Sushi is installed correctly (\"npm install -g fsh-sushi\". On windows, get npm from https://www.npmjs.com/get-npm)");
-      }
-      log("Exception: "+ioex.getMessage());
-      throw ioex;
-    }    
-    if (pumpHandler.errorCount > 0) {
-      throw new IOException("Sushi failed with errors. Complete output from running Sushi : " + pumpHandler.getBufferString());
-    }
-  }
 
 
   private void initializeTemplate() throws IOException {
