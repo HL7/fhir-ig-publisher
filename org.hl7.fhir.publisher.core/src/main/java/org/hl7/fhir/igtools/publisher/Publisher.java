@@ -2330,13 +2330,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void runFsh(File file) throws IOException { 
-    File inif = new File(Utilities.path(file.getAbsolutePath(), "fsh.ini"));
-    if (!inif.exists()) {
-      inif = new File(Utilities.path(Utilities.getDirectoryForFile(file.getAbsolutePath()), "fsh.ini"));
+    File fshIni = new File(Utilities.path(file.getAbsolutePath(), "fsh.ini"));
+    if (!fshIni.exists()) {
+      try {
+        fshIni = new File(Utilities.path(Utilities.getDirectoryForFile(file.getAbsolutePath()), "fsh.ini"));
+      } catch (RuntimeException e) {
+        logDebugMessage(LogCategory.INIT,  "Could not check parent directory of file " + file.getAbsolutePath() + " " + e.getMessage());
+      }
     }
     String fshVersion = null;
-    if (inif.exists()) {
-      IniFile ini = new IniFile(new FileInputStream(inif));
+    if (fshIni.exists()) {
+      IniFile ini = new IniFile(new FileInputStream(fshIni));
       if (ini.hasProperty("FSH", "timeout")) {
         fshTimeout = ini.getLongProperty("FSH", "timeout") * 1000;
       }
@@ -2385,7 +2389,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       throw new IOException("Sushi failed with errors. Complete output from running Sushi : " + pumpHandler.getBufferString());
     }
   }
-
 
   private void initializeTemplate() throws IOException {
     rootDir = configFile;
