@@ -330,6 +330,7 @@ import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.utilities.xhtml.XhtmlParser;
 import org.hl7.fhir.utilities.xml.XMLUtil;
+import org.hl7.fhir.validation.ValidatorUtils;
 import org.hl7.fhir.validation.codesystem.CodeSystemValidator;
 import org.hl7.fhir.validation.instance.InstanceValidator;
 import org.hl7.fhir.validation.instance.utils.ValidatorHostContext;
@@ -807,6 +808,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private List<String> bundles = new ArrayList<>();
   private List<String> mappings = new ArrayList<>();
   private List<String> generateVersions = new ArrayList<>();
+  
   private RealmBusinessRules realmRules;
   private PreviousVersionComparator previousVersionComparator;
   private IpaComparator ipaComparator;
@@ -2410,7 +2412,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     outputDir = Utilities.path(rootDir, "output");
     Map<String, String> expParamMap = new HashMap<>();
     boolean allowExtensibleWarnings = false;
-    
+    List<String> conversionVersions = new ArrayList<>();
+
     int count = 0;
     for (ImplementationGuideDefinitionParameterComponent p : sourceIg.getDefinition().getParameter()) {
       // documentation for this list: https://confluence.hl7.org/display/FHIR/Implementation+Guide+Parameters
@@ -2532,6 +2535,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         defaultBusinessVersion = sourceIg.getVersion();
       } else if (pc.equals("generate-version")) {     
         generateVersions.add(p.getValue());
+      } else if (pc.equals("conversion-version")) {     
+        conversionVersions.add(p.getValue());
       } else if (pc.equals("suppressed-ids")) {
         for (String s : p.getValue().split("\\,"))
           suppressedIds.add(s);
@@ -2659,7 +2664,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       pf.setContext(context);
     }
     dr = new DataRenderer(context);
-
+    for (String s : conversionVersions) {
+      loadConversionVersion(s);
+    }
 
     // initializing the tx sub-system
     Utilities.createDirectory(vsCache);
@@ -2836,6 +2843,23 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       extensionTracker.setoptIn(!ini.getBooleanProperty("IG", "usage-stats-opt-out"));
     
     log("Initialization complete");
+  }
+
+  private void loadConversionVersion(String version) throws FHIRException, IOException {
+   String v = VersionUtilities.getMajMin(version);
+   if (VersionUtilities.versionsMatch(v, context.getVersion())) {
+     throw new FHIRException("Unable to load conversion version "+version+" when base version is already "+context.getVersion());
+   }
+   String pid = VersionUtilities.packageForVersion(v);
+   log("Load "+pid);
+   NpmPackage npm = pcm.loadPackage(pid);
+   IContextResourceLoader loader = ValidatorUtils.loaderForVersion(npm.fhirVersion());
+   if (loader.getTypes().contains("StructureMap")) {
+     loader.getTypes().remove("StructureMap");
+   }
+   loader.setPatchUrls(true);
+   loader.setLoadProfiles(false);
+   context.loadFromPackage(npm, loader);
   }
 
   @NonNull
@@ -3577,10 +3601,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (entry.isDirectory()) {
         continue;
       }
-      String filename = Utilities.path(zipTargetDirectory, entry.getName());
+      String n = Utilities.makeOSSafe(entry.getName());
+      String filename = Utilities.path(zipTargetDirectory, n);
       String dir = Utilities.getDirectoryForFile(filename);
 
-      Utilities.zipSlipProtect(entry, Path.of(dir));
+      Utilities.zipSlipProtect(n, Path.of(dir));
       Utilities.createDirectory(dir);
 
       FileOutputStream output = new FileOutputStream(filename);
@@ -10567,7 +10592,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       System.out.println("dir = "+System.getProperty("user.dir")+", path = "+System.getenv("PATH"));
       String s = "Parameters:";
       for (int i = 0; i < args.length; i++) {
-          s = s + " "+args[i];
+          s = s + " "+removePassword(args, i);
       }      
       System.out.println(s);
       FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager(!hasNamedParam(args, "system"), ToolsVersion.TOOLS_VERSION);
@@ -10749,7 +10774,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       self.logMessage("dir = "+System.getProperty("user.dir")+", path = "+System.getenv("PATH"));
       String s = "Parameters:";
       for (int i = 0; i < args.length; i++) {
-          s = s + " "+args[i];
+          s = s + " "+removePassword(args, i);
       }      
       self.logMessage(s);
 //      self.logMessage("=== Environment variables =====");
@@ -10928,6 +10953,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (!hasNamedParam(args, "-no-exit")) {
       System.exit(exitCode);
     }
+  }
+
+  private static String removePassword(String[] args, int i) {
+    if (i == 0 || !args[i-1].toLowerCase().contains("password")) {
+      return args[i];
+    } else {
+      return "XXXXXX";
+    }
+  }
+
+  private static String removePassword(String string) {
+    // TODO Auto-generated method stub
+    return null;
   }
 
   public static void setTxServerValue(String[] args, Publisher self) {

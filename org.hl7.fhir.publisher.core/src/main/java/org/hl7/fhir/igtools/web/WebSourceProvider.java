@@ -6,12 +6,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import org.hl7.fhir.igtools.web.WebSourceProvider.UploadSorter;
 import org.hl7.fhir.utilities.FTPClient;
 import org.hl7.fhir.utilities.SimpleHTTPClient;
 import org.hl7.fhir.utilities.Utilities;
@@ -19,6 +23,29 @@ import org.hl7.fhir.utilities.SimpleHTTPClient.HTTPResult;
 import org.hl7.fhir.utilities.TextFile;
 
 public class WebSourceProvider {
+
+  public class UploadSorter implements Comparator<String> {
+
+    @Override
+    public int compare(String o1, String o2) {
+      String f1 = Utilities.getDirectoryForFile(o1);
+      String f2 = Utilities.getDirectoryForFile(o2);
+      if (f1 == null && f2 == null) {
+        return o1.compareToIgnoreCase(o2);
+      }
+      if (f1 == null) {
+        return 1;
+      }
+      if (f2 == null) {
+        return -1;
+      }
+      if (f1.equals(f2)) {
+        return o1.compareToIgnoreCase(o2);
+      }
+      return f2.compareToIgnoreCase(f1); // reversal is deliberate
+    }
+
+  }
 
   private String destination;
   private String source;
@@ -114,7 +141,7 @@ public class WebSourceProvider {
     try (ZipInputStream zis = new ZipInputStream(inputStream)) {
       ZipEntry zipEntry = zis.getNextEntry();
       while (zipEntry != null) {
-        Path newPath = Utilities.zipSlipProtect(zipEntry, target);
+        Path newPath = Utilities.zipSlipProtect(Utilities.makeOSSafe(zipEntry.getName()), target);
         if (Files.exists(newPath)) {
           Files.delete(newPath);
         }
@@ -155,31 +182,36 @@ public class WebSourceProvider {
       // for now, it must be done manually
       if (upload) {
         List<String> filesToUpload = Utilities.listAllFiles(destination, null);
+        Collections.sort(filesToUpload, new UploadSorter()); // more specific files first
         System.out.println("Ready to upload changes. "+filesToUpload.size()+" files to upload, "+existingFiles.size()+" files to delete");
         int t = filesToUpload.size()+existingFiles.size();
         System.out.println("Connect to "+uploadServer);
-        System.out.print("Uploading.");
         FTPClient ftp = new FTPClient(uploadServer, uploadPath, uploadUser, uploadPword);
         ftp.connect();
+        System.out.print("Uploading:");
         int c = 0;
         int p = 0;
-        for (String s : existingFiles) {
-          ftp.delete(Utilities.path(existingFilesBase, s));
-          c++;
-          p = progress(c, t, p);      
+        if (!existingFiles.isEmpty()) {
+          for (String s : existingFiles) {
+            ftp.delete(Utilities.path(existingFilesBase, s));
+            c++;
+            p = progress(c, t, p);      
+          }
+          System.out.print("|");
         }
-        System.out.print("|");
+        String dir = null;
         int failCount = 0;
         int count = 0;
-        int step = 0;
-        int ten = filesToUpload.size() / 10;
+        long start = System.currentTimeMillis();
         for (String s : filesToUpload) {
           count++;
-          if (count % ten == 0) {
-            step++;
-            System.out.print(""+step*10);
-          }
           try {
+            String d = Utilities.getDirectoryForFile(s);
+            if (d != null && !d.equals(dir)) {
+              System.out.println("");
+              System.out.print(d+" "+((count * 100) / filesToUpload.size())+"% "+forecast(start, count, filesToUpload.size()));
+              dir = d;
+            }
             ftp.upload(Utilities.path(destination, s), s);
             failCount = 0;
           } catch (Exception e) {
@@ -189,12 +221,18 @@ public class WebSourceProvider {
               ftp.upload(Utilities.path(destination, s), s);
               failCount = 0;
             } catch (Exception e2) {
-              failCount++;
-              System.out.println("");
-              System.out.println("Error uploading file '"+s+"': "+e2.getMessage());
-              System.out.println("Need to manually copy '"+Utilities.path(destination, s)+"' to '"+s);
-              if (failCount >= 10) {
-                throw new Error("Too many sequential errors copying files (10). Stopping.");
+              try {
+                ftp = new FTPClient(uploadServer, uploadPath, uploadUser, uploadPword);
+                ftp.connect();
+                ftp.upload(Utilities.path(destination, s), s);
+              } catch (Exception e3) {
+                failCount++;
+                System.out.println("");
+                System.out.println("Error uploading file '"+s+"': "+e2.getMessage());
+                System.out.println("Need to manually copy '"+Utilities.path(destination, s)+"' to '"+s);
+                if (failCount >= 10) {
+                  throw new Error("Too many sequential errors copying files (10). Stopping.");
+                }
               }
             }
           }
@@ -212,6 +250,14 @@ public class WebSourceProvider {
       Utilities.copyDirectory(destination, source, null);
       System.out.println("  ... done");
     }
+  }
+
+  private String forecast(long start, int count, int size) {
+    long millisecondsDone = System.currentTimeMillis() - start;
+    long millisecondsToGo = ((millisecondsDone * size) / count) - millisecondsDone;
+    Duration d = Duration.ofMillis(millisecondsToGo);
+    long rate = count * 1000 / millisecondsDone;
+    return ""+rate+" files/sec, "+Utilities.describeDuration(d)+" left";
   }
 
   private int progress(int c, int t, int p) {

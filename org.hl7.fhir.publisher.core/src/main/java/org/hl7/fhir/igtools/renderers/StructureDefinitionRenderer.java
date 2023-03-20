@@ -308,7 +308,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   private String extensionSummary() {
     if (ProfileUtilities.isSimpleExtension(sd)) {
       ElementDefinition value = sd.getSnapshot().getElementByPath("Extension.value");      
-      return "<p>Simple Extension of type "+value.typeSummary()+": "+Utilities.escapeXml(sd.getDescription())+"</p>";
+      return "<p>Simple Extension of type "+value.typeSummary()+": "+Utilities.stripPara(processMarkdown("ext-desc", sd.getDescriptionElement()))+"</p>";
     } else {
       List<ElementDefinition> subs = new ArrayList<>();
       ElementDefinition slice = null;
@@ -325,7 +325,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       b.append("<p>Complex Extension: "+Utilities.escapeXml(sd.getDescription())+"</p><ul>");
       for (ElementDefinition ed : subs) {
         ElementDefinition defn = (ElementDefinition) ed.getUserData("slice");
-        b.append("<li>"+(defn.getSliceName())+": "+ed.typeSummary()+": "+Utilities.escapeXml(defn.getDefinition())+"</li>\r\n");
+        b.append("<li>"+(defn.getSliceName())+": "+ed.typeSummary()+": "+Utilities.stripPara(processMarkdown("ext-desc", defn.getDefinition()))+"</li>\r\n");
       }
       b.append("</ul>");
       return b.toString();

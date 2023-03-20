@@ -103,7 +103,7 @@ public class PublicationProcess {
       System.out.println("dir = "+System.getProperty("user.dir")+", path = "+System.getenv("PATH"));
       String s = "Parameters:";
       for (int i = 0; i < args.length; i++) {
-          s = s + " "+args[i];
+          s = s + " "+removePassword(args, i);
       }      
       System.out.println(s);
       System.out.println("---------------");
@@ -124,6 +124,14 @@ public class PublicationProcess {
     System.out.println("Full log in "+logger.getFilename());
   }
   
+  private static String removePassword(String[] args, int i) {
+    if (i == 0 || !args[i-1].toLowerCase().contains("password")) {
+      return args[i];
+    } else {
+      return "XXXXXX";
+    }
+  }
+
 
   private static String toMB(long maxMemory) {
     return Long.toString(maxMemory / (1024*1024));
