@@ -9,6 +9,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -78,6 +79,6 @@ public class WebSourceProviderTest {
             //Code under test
         });
         assertNotNull(thrown);
-        assertEquals(expectedError, thrown.getMessage());
+        assertEquals(expectedError.replace('/', File.separatorChar), thrown.getMessage());
     }
 }
