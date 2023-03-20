@@ -46,6 +46,7 @@ import org.hl7.fhir.r5.model.OperationDefinition;
 import org.hl7.fhir.r5.model.Questionnaire;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.r5.model.StructureMap;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.terminologies.ImplicitValueSets;
 import org.hl7.fhir.r5.utils.validation.IResourceValidator;
@@ -227,6 +228,14 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
       return true;
     }
     
+    if (url.contains("*")) {
+      // for now, this is only done for StructureMap
+      for (StructureMap map : context.fetchResourcesByType(StructureMap.class)) {
+        if (urlMatches(url, map.getUrl())) {
+          return true;
+        }
+      }
+    }
 
     for (NamingSystem ns : context.fetchResourcesByType(NamingSystem.class)) {
       if (hasURL(ns, u)) {
@@ -248,6 +257,12 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
     }
     return true;
   }
+  
+
+  private boolean urlMatches(String mask, String url) {
+    return url.length() > mask.length() && url.startsWith(mask.substring(0, mask.indexOf("*"))) && url.endsWith(mask.substring(mask.indexOf("*") + 1));
+  }
+
   
   private boolean hasURL(NamingSystem ns, String url) {
     for (NamingSystemUniqueIdComponent uid : ns.getUniqueId()) {
