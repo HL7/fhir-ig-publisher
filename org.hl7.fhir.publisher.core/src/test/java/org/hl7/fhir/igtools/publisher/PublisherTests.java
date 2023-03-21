@@ -8,6 +8,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -71,6 +72,6 @@ public class PublisherTests {
             //Code under test
         });
         assertNotNull(thrown);
-        assertTrue(thrown.getMessage().endsWith(expectedError));
+        assertTrue(thrown.getMessage().endsWith(expectedError.replace('/', File.separatorChar)));
     }
 }
