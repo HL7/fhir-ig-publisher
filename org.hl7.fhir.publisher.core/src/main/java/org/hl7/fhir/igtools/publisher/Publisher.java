@@ -2688,6 +2688,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
     if (expParams != null) {
+      /* This call to uncheckedPath is allowed here because the path is used to
+         load an existing resource, and is not persisted in the loadFile method.
+      */
       context.setExpansionProfile((Parameters) VersionConvertorFactory_40_50.convertResource(FormatUtilities.loadFile(Utilities.uncheckedPath(Utilities.getDirectoryForFile(igName), expParams))));
     } else if (!expParamMap.isEmpty()) {
       context.setExpansionProfile(new Parameters());      
@@ -11074,6 +11077,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (!f.exists()) {
       throw new Exception("Unable to find the nominated IG at "+f.getAbsolutePath());
     }
+    /* This call to uncheckedPath is allowed here because the results of this
+       method are used to read a configuration file, NOT to write potentially
+       malicious data to disk. */
     if (f.isDirectory() && new File(Utilities.uncheckedPath(ig, "ig.json")).exists()) {
       return Utilities.path(ig, "ig.json");
     } else {
