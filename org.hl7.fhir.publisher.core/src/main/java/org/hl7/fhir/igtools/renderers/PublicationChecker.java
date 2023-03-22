@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.hl7.fhir.igtools.web.PublicationProcess.PublicationProcessMode;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.StringPair;
 import org.hl7.fhir.utilities.TextFile;
@@ -58,7 +59,7 @@ public class PublicationChecker {
       bs.append("</table>\r\n");
     }
     if (messages.size() == 0) {
-      return bs.toString()+"No Information found";
+      return bs.toString()+"No Messages found - all good";
     } else if (messages.size() == 1) {
       return bs.toString()+messages.get(0);
     } else {
@@ -156,13 +157,13 @@ public class PublicationChecker {
         summary.add(new StringPair("path", pr.asString("path")));                        
       }
     }
-    boolean milestone = "milestone".equals(pr.asString("milestone"));
-    if (milestone) {
-      if (check(messages, !npm.version().contains("-"), "This release is labelled as a milestone, so should not have a patch version ("+npm.version() +")"+mkWarning())) {
+    PublicationProcessMode mode = PublicationProcessMode.fromCode(pr.asString("mode"));
+    if (mode != PublicationProcessMode.WORKING) {
+      if (check(messages, !npm.version().contains("-"), "This release is labelled as a "+mode.toCode()+", so should not have a patch version ("+npm.version() +")"+mkWarning())) {
         summary.add(new StringPair("milestone", pr.asString("milestone")));        
       }
     } else {
-      if (check(messages, npm.version().contains("-"), "This release is not labelled as a milestone, so should have a patch version ("+npm.version() +")"+mkWarning())) {
+      if (check(messages, npm.version().contains("-"), "This release is labelled as a milestone or technical correction, so should have a patch version ("+npm.version() +")"+mkWarning())) {
         summary.add(new StringPair("milestone", pr.asString("milestone")));                
       }
     }
