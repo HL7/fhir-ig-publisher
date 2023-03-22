@@ -2284,13 +2284,15 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     StringBuilder b = new StringBuilder();
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
-        for (String p : r.getProfiles(statedOnly)) {
-          if (sd.getUrl().equals(p)) {
-            String name = r.getTitle();
-            if (Utilities.noString(name))
-              name = "example";
-            String ref = igp.getLinkFor(r, true);
-            b.append(" <li><a href=\"" + Utilities.escapeXml(ref) + "\">" + Utilities.escapeXml(name) + "</a></li>\r\n");
+        if (!r.fhirType().equals("ImplementationGuide")) {
+          for (String p : r.getProfiles(statedOnly)) {
+            if (sd.getUrl().equals(p)) {
+              String name = r.getTitle();
+              if (Utilities.noString(name))
+                name = "example";
+              String ref = igp.getLinkFor(r, true);
+              b.append(" <li><a href=\"" + Utilities.escapeXml(ref) + "\">" + Utilities.escapeXml(name) + "</a></li>\r\n");
+            }
           }
         }
       }
@@ -2302,19 +2304,21 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     StringBuilder b = new StringBuilder();
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
-        for (String p : r.getProfiles(statedOnly)) {
-          if (sd.getUrl().equals(p)) {
-            String name = r.fhirType() + "/" + r.getId();
-            String title = r.getTitle();
-            if (Utilities.noString(title))
-              name = "example";
-            if (f.getTitle() != null && f.getTitle() != f.getName())
-              title = f.getTitle();
-            String ref = igp.getLinkFor(r, true);
-            b.append(" <tr>\r\n");
-            b.append("   <td><a href=\"" + Utilities.escapeXml(ref) + "\">" + Utilities.escapeXml(name) + "</a></td>\r\n");
-            b.append("   <td>" + Utilities.escapeXml(title) + "</td>\r\n");
-            b.append(" </tr>\r\n");
+        if (!r.fhirType().equals("ImplementationGuide")) {
+          for (String p : r.getProfiles(statedOnly)) {
+            if (sd.getUrl().equals(p)) {
+              String name = r.fhirType() + "/" + r.getId();
+              String title = r.getTitle();
+              if (Utilities.noString(title))
+                name = "example";
+              if (f.getTitle() != null && f.getTitle() != f.getName())
+                title = f.getTitle();
+              String ref = igp.getLinkFor(r, true);
+              b.append(" <tr>\r\n");
+              b.append("   <td><a href=\"" + Utilities.escapeXml(ref) + "\">" + Utilities.escapeXml(name) + "</a></td>\r\n");
+              b.append("   <td>" + Utilities.escapeXml(title) + "</td>\r\n");
+              b.append(" </tr>\r\n");
+            }
           }
         }
       }
@@ -2922,12 +2926,14 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
     for (FetchedFile f : files) {
       for (FetchedResource r : f.getResources()) {
-        if (usesSD(r.getElement())) {
-          String p = igp.getLinkFor(r, true);
-          if (p != null) {
-            examples.put(p, r.getTitle());
-          } else {
-            System.out.println("Res "+f.getName()+" has no path");
+        if (!r.fhirType().equals("ImplementationGuide")) {
+          if (usesSD(r.getElement())) {
+            String p = igp.getLinkFor(r, true);
+            if (p != null) {
+              examples.put(p, r.getTitle());
+            } else {
+              System.out.println("Res "+f.getName()+" has no path");
+            }
           }
         }
       }

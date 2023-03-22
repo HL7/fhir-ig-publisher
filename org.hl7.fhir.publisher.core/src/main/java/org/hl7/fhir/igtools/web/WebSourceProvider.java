@@ -80,9 +80,12 @@ public class WebSourceProvider {
     if (web) {
       SimpleHTTPClient fetcher = new SimpleHTTPClient();
       String url = Utilities.pathURL(source, path)+"?nocache=" + System.currentTimeMillis();
+      System.out.println("Fetch "+ url);
+      long t = System.currentTimeMillis();
       HTTPResult res = fetcher.get(url);
       res.checkThrowException();
       TextFile.bytesToFile(res.getContent(), df);
+      System.out.println("  ... done ("+stats(res.getContent().length, t)+")");
     } else {
       File sf = new File(Utilities.path(source, path));
       if (!sf.exists()) {
@@ -105,10 +108,13 @@ public class WebSourceProvider {
     if (web) {
       SimpleHTTPClient fetcher = new SimpleHTTPClient();
       String url = Utilities.pathURL(source, path, "_ig-pub-archive.zip")+"?nocache=" + System.currentTimeMillis();
+      System.out.println("Fetch "+ url);
+      long t = System.currentTimeMillis();
       HTTPResult res = fetcher.get(url);
       res.checkThrowException();
-      folderSources.put(path,  res.getContent());
+      folderSources.put(path, res.getContent());
       Utilities.unzip(new ByteArrayInputStream(res.getContent()), df.getAbsolutePath());
+      System.out.println("  ... done ("+stats(res.getContent().length, t)+")");
     } else {
       File sf = new File(Utilities.path(source, path));
       if (!sf.exists()) {
@@ -119,6 +125,11 @@ public class WebSourceProvider {
       }
       Utilities.copyDirectory(sf.getAbsolutePath(), df.getAbsolutePath(), null);
     }
+  }
+
+  private String stats(long length, long t) {
+    long millis = System.currentTimeMillis()-t;
+    return Utilities.describeSize(length)+", "+Utilities.describeDuration(Duration.ofMillis(millis))+", "+length/millis+"kb/sec";
   }
 
   public void cleanFolder(String path) throws IOException {
@@ -159,10 +170,13 @@ public class WebSourceProvider {
     if (web) {
       SimpleHTTPClient fetcher = new SimpleHTTPClient();
       String url = Utilities.pathURL(source, path)+"?nocache=" + System.currentTimeMillis();
+      System.out.println("Fetch "+ url);
+      long t = System.currentTimeMillis();
       HTTPResult res = fetcher.get(url);
       if (res.getCode() < 300 && res.getContent().length > 0) {
         TextFile.bytesToFile(res.getContent(), df);
       }
+      System.out.println("  ... done ("+stats(res.getContent().length, t)+")");
     } else {
       File sf = new File(Utilities.path(source, path));
       if (sf.exists()) {
@@ -188,60 +202,61 @@ public class WebSourceProvider {
         System.out.println("Connect to "+uploadServer);
         FTPClient ftp = new FTPClient(uploadServer, uploadPath, uploadUser, uploadPword);
         ftp.connect();
-        System.out.print("Uploading:");
-        int c = 0;
-        int p = 0;
         if (!existingFiles.isEmpty()) {
           for (String s : existingFiles) {
+            System.out.print("Deleting");
             ftp.delete(Utilities.path(existingFilesBase, s));
-            c++;
-            p = progress(c, t, p);      
+            System.out.print(".");
+            System.out.flush();
           }
-          System.out.print("|");
         }
-        String dir = null;
+        System.out.println("Uploading");
         int failCount = 0;
-        int count = 0;
+        int count = 1; // no / 0
+        long bytes = 1; // no / 0
         long start = System.currentTimeMillis();
+        int linelength = 0;
         for (String s : filesToUpload) {
           count++;
-          try {
-            String d = Utilities.getDirectoryForFile(s);
-            if (d != null && !d.equals(dir)) {
-              System.out.println("");
-              System.out.print(d+" "+((count * 100) / filesToUpload.size())+"% "+forecast(start, count, filesToUpload.size()));
-              dir = d;
-            }
-            ftp.upload(Utilities.path(destination, s), s);
-            failCount = 0;
-          } catch (Exception e) {
-            System.out.println("");
-            System.out.println("Error uploading file '"+s+"': "+e.getMessage()+". Trying again");
+          String note = genProgressNote(count, bytes, start, filesToUpload.size());
+          System.out.print(Utilities.padLeft("", '\b', linelength));
+          System.out.print(note);
+          System.out.flush();
+          linelength = note.length();
+          if (!s.contains(":")) { // hack around a bug that should be fixed elsewhere
             try {
-              ftp.upload(Utilities.path(destination, s), s);
+              String fn = Utilities.path(destination, s);
+              bytes = bytes + new File(fn).length();
+              ftp.upload(fn, s);
               failCount = 0;
-            } catch (Exception e2) {
+            } catch (Exception e) {
+              System.out.println("");
+              System.out.println("Error uploading file '"+s+"': "+e.getMessage()+". Trying again");
               try {
-                ftp = new FTPClient(uploadServer, uploadPath, uploadUser, uploadPword);
-                ftp.connect();
                 ftp.upload(Utilities.path(destination, s), s);
-              } catch (Exception e3) {
-                failCount++;
-                System.out.println("");
-                System.out.println("Error uploading file '"+s+"': "+e2.getMessage());
-                System.out.println("Need to manually copy '"+Utilities.path(destination, s)+"' to '"+s);
-                if (failCount >= 10) {
-                  throw new Error("Too many sequential errors copying files (10). Stopping.");
+                failCount = 0;
+              } catch (Exception e2) {
+                try {
+                  System.out.println("Reconnecting after second error: "+e.getMessage());
+                  ftp = new FTPClient(uploadServer, uploadPath, uploadUser, uploadPword);
+                  ftp.connect();
+                  ftp.upload(Utilities.path(destination, s), s);
+                } catch (Exception e3) {
+                  failCount++;
+                  System.out.println("");
+                  System.out.println("Error uploading file '"+s+"': "+e2.getMessage());
+                  System.out.println("Need to manually copy '"+Utilities.path(destination, s)+"' to '"+s);
+                  if (failCount >= 10) {
+                    throw new Error("Too many sequential errors copying files (10). Stopping.");
+                  }
                 }
               }
             }
-          }
-          c++;
-          p = progress(c, t, p);      
+          }   
         }
-        System.out.print(".");
       }
-      System.out.println("!");
+      System.out.println("");
+      System.out.println("Upload finished");
     } else {
       System.out.println("Applying changes to website source at "+source);
       for (String s : existingFiles) {
@@ -252,20 +267,20 @@ public class WebSourceProvider {
     }
   }
 
-  private String forecast(long start, int count, int size) {
-    long millisecondsDone = System.currentTimeMillis() - start;
-    long millisecondsToGo = ((millisecondsDone * size) / count) - millisecondsDone;
-    Duration d = Duration.ofMillis(millisecondsToGo);
-    long rate = count * 1000 / millisecondsDone;
-    return ""+rate+" files/sec, "+Utilities.describeDuration(d)+" left";
-  }
-
-  private int progress(int c, int t, int p) {
-    int pc = (c * 100) / t;
-    if (pc > p) {
-      System.out.print(".");
+  private String genProgressNote(int count, long bytes, long start, int size) {
+    long secondsDone = (System.currentTimeMillis() - start) / 1000;
+    if (count == 0 || secondsDone == 0) {
+      return "Starting...";
     }
-    return pc;    
+    float rate = (count * 60) / secondsDone;
+    long secondsToGo = ((secondsDone * size) / count) - secondsDone;
+    Duration d = Duration.ofSeconds(secondsToGo);
+      return ""+
+        count+" files, "+
+        rate+" files/min, "+
+        ((bytes*1000) / (System.currentTimeMillis() - start))+" bytes/sec, about "+
+        ((count * 100) / size)+"% "+
+        Utilities.describeDuration(d)+" left         ";
   }
 
   private String deleteFileName() throws IOException {
