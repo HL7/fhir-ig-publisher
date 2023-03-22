@@ -129,7 +129,7 @@ public class WebSourceProvider {
 
   private String stats(long length, long t) {
     long millis = System.currentTimeMillis()-t;
-    if (mills == 0) {
+    if (millis == 0) {
       return Utilities.describeSize(length)+", "+Utilities.describeDuration(Duration.ofMillis(millis));
     } else {
       return Utilities.describeSize(length)+", "+Utilities.describeDuration(Duration.ofMillis(millis))+", "+length/millis+"kb/sec";
