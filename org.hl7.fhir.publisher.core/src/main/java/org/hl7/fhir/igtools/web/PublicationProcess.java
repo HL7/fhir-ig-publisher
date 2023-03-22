@@ -85,6 +85,16 @@ public class PublicationProcess {
       }
       throw new Error("Unknown publication process mode '"+s+"'");
     }
+    
+    public String toCode() {
+      switch (this) {
+      case MILESTONE: return "milestone";
+      case TECHNICAL_CORRECTION:return "technical-correction";
+      case WORKING:return "working release";
+      default:return "??";
+      }
+    }
+    
   }
 
   /**
