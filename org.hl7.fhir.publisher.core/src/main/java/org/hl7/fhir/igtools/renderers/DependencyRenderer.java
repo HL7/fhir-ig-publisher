@@ -265,7 +265,7 @@ public class DependencyRenderer {
               first = false;
             }
             b2.append("<li><a href=\"");
-            b2.append(ad.getSource().getUserString("path"));
+            b2.append(ad.getSource().getWebPath());
             b2.append("\">");
             if (ad.getSource() instanceof CanonicalResource) {
               b2.append(Utilities.escapeXml(((CanonicalResource) ad.getSource()).present()));
@@ -275,7 +275,7 @@ public class DependencyRenderer {
             b2.append("</a> ");
             b2.append(ad.getKind());
             b2.append(" <a href=\"");
-            b2.append(ad.getTarget().getUserString("path"));
+            b2.append(ad.getTarget().getWebPath());
             b2.append("\">");
             if (ad.getTarget() instanceof CanonicalResource) {
               b2.append(Utilities.escapeXml(((CanonicalResource) ad.getTarget()).present()));
@@ -543,7 +543,7 @@ public class DependencyRenderer {
           b.append("</code>");          
         } else {
           b.append("<a href=\"");
-          b.append(sd.getUserString("path"));
+          b.append(sd.getWebPath());
           b.append("\">");
           b.append(Utilities.escapeXml(sd.present()));
           b.append("</a>");
@@ -563,7 +563,7 @@ public class DependencyRenderer {
           b.append("</code>");          
         } else {
           b.append("<a href=\"");
-          b.append(gp.profile.getUserString("path"));
+          b.append(gp.profile.getWebPath());
           b.append("\">");
           b.append(Utilities.escapeXml(gp.profile.present()));
           b.append("</a>");

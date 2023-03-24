@@ -393,10 +393,10 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     StructureDefinition ed = context.fetchResource(StructureDefinition.class, url);
     if (ed == null)
       return "<li>" + translate("sd.summary", "Unable to summarise extension %s (no extension found)", url) + "</li>";
-    if (ed.getUserData("path") == null)
+    if (ed.getWebPath() == null)
       return "<li><a href=\"" + "extension-" + ed.getId().toLowerCase() + ".html\">" + url + "</a>" + (modifier ? " (<b>" + translate("sd.summary", "Modifier") + "</b>) " : "") + "</li>\r\n";
     else
-      return "<li><a href=\"" + Utilities.escapeXml(ed.getUserString("path")) + "\">" + url + "</a>" + (modifier ? " (<b>" + translate("sd.summary", "Modifier") + "</b>) " : "") + "</li>\r\n";
+      return "<li><a href=\"" + Utilities.escapeXml(ed.getWebPath()) + "\">" + url + "</a>" + (modifier ? " (<b>" + translate("sd.summary", "Modifier") + "</b>) " : "") + "</li>\r\n";
   }
 
   private String describeProfile(String url) throws Exception {
@@ -406,7 +406,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     StructureDefinition ed = context.fetchResource(StructureDefinition.class, url);
     if (ed == null)
       return "<li>" + translate("sd.summary", "unable to summarise profile %s (no profile found)", url) + "</li>";
-    return "<li><a href=\"" + Utilities.escapeXml(ed.getUserString("path")) + "\">" + ed.present() + " <span style=\"font-size: 8px\">(" + url + ")</span></a></li>\r\n";
+    return "<li><a href=\"" + Utilities.escapeXml(ed.getWebPath()) + "\">" + ed.present() + " <span style=\"font-size: 8px\">(" + url + ")</span></a></li>\r\n";
   }
 
   private String summariseValue(DataType fixed) throws FHIRException {
@@ -462,7 +462,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (cs == null)
       return "<span title=\"" + coding.getSystem() + "\">" + coding.getCode() + "</a>" + (!coding.hasDisplay() ? "" : "(\"" + gt(coding.getDisplayElement()) + "\")");
     else
-      return "<a title=\"" + cs.present() + "\" href=\"" + Utilities.escapeXml(cs.getUserString("path")) + "#" + cs.getId() + "-" + coding.getCode() + "\">" + coding.getCode() + "</a>" + (!coding.hasDisplay() ? "" : "(\"" + gt(coding.getDisplayElement()) + "\")");
+      return "<a title=\"" + cs.present() + "\" href=\"" + Utilities.escapeXml(cs.getWebPath()) + "#" + cs.getId() + "-" + coding.getCode() + "\">" + coding.getCode() + "</a>" + (!coding.hasDisplay() ? "" : "(\"" + gt(coding.getDisplayElement()) + "\")");
   }
 
   public String diff(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
@@ -854,7 +854,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           brd.vss = "<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"" + Utilities.escapeXml(prefix + br.url) + "\">" + Utilities.escapeXml(br.display) + "</a>";
         }
       } else {
-        String p = vs.getUserString("path");
+        String p = vs.getWebPath();
         if (p == null)
           brd.vss = "<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"??\">" + Utilities.escapeXml(gt(vs.getNameElement())) + " (" + translate("sd.tx", "missing link") + ")</a>";
         else if (p.startsWith("http:"))
@@ -1765,7 +1765,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       if (p == null)
         b.append(pt.getValue());
       else {
-        String pth = p.getUserString("path");
+        String pth = p.getWebPath();
         b.append("<a href=\"" + Utilities.escapeXml(pth) + "\" title=\"" + pt.getValue() + "\">");
         b.append(p.getName());
         b.append("</a>");
@@ -1776,7 +1776,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private String getTypeLink(TypeRefComponent t) {
     StringBuilder b = new StringBuilder();
-    String s = igp.getLinkFor(sd.getUserString("path"), t.getWorkingCode());
+    String s = igp.getLinkFor(sd.getWebPath(), t.getWorkingCode());
     if (s != null) {
       b.append("<a href=\"");
       //    GG 13/12/2016 - I think that this is always wrong now.
@@ -2216,7 +2216,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       b.append("<p>\r\n");
       StructureDefinition sdb = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition());
       if (sdb != null)
-        b.append(translate("sd.header", "This profile builds on") + " <a href=\"" + Utilities.escapeXml(sdb.getUserString("path")) + "\">" + gt(sdb.getNameElement()) + "</a>.");
+        b.append(translate("sd.header", "This profile builds on") + " <a href=\"" + Utilities.escapeXml(sdb.getWebPath()) + "\">" + gt(sdb.getNameElement()) + "</a>.");
       else
         b.append(translate("sd.header", "This profile builds on") + " " + sd.getBaseDefinition() + ".");
       b.append("</p>\r\n");
@@ -2532,7 +2532,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       if (type.hasProfile()) {
         StructureDefinition tsd = context.fetchResource(StructureDefinition.class, type.getProfile().get(0).getValue());
         if (tsd != null)
-          b.append(" (as <span style=\"color: darkgreen\"><a href=\"" + Utilities.escapeXml(tsd.getUserString("path")) + "#" + tsd.getType() + "\">" + tsd.getName() + "</a></span>)");
+          b.append(" (as <span style=\"color: darkgreen\"><a href=\"" + Utilities.escapeXml(tsd.getWebPath()) + "#" + tsd.getType() + "\">" + tsd.getName() + "</a></span>)");
         else
           b.append(" (as <span style=\"color: darkgreen\">" + type.getProfile() + "</span>)");
       }
@@ -2729,7 +2729,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       if (sdExt == null)
         b.append("\"url\": \"" + url + "\",\r\n");
       else
-        b.append("\"url\": \"<a href=\"" + sdExt.getUserString("path") + "\">" + url + "</a>\",\r\n");
+        b.append("\"url\": \"<a href=\"" + sdExt.getWebPath() + "\">" + url + "</a>\",\r\n");
 
       List<ElementDefinition> extchildren = getChildren(elements, slice);
       if (extchildren.isEmpty()) {
@@ -2885,14 +2885,14 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     Map<String, String> examples = new HashMap<>();
     for (StructureDefinition sd : new ContextUtilities(context).allStructures()) {
       if (this.sd.getUrl().equals(sd.getBaseDefinition())) {
-        base.put(sd.getUserString("path"), sd.present());
+        base.put(sd.getWebPath(), sd.present());
       }
       for (ElementDefinition ed : sd.getSnapshot().getElement()) {
         for (TypeRefComponent tr : ed.getType()) {
           for (CanonicalType u : tr.getProfile()) {
             if (this.sd.getUrl().equals(u.getValue())) {
-              if (sd.hasUserData("path")) {
-                refs.put(sd.getUserString("path"), sd.present());
+              if (sd.hasWebPath()) {
+                refs.put(sd.getWebPath(), sd.present());
               } else {
                 System.out.println("SD "+sd.getVersionedUrl()+" has no path");
               }
@@ -2900,8 +2900,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           }
           for (CanonicalType u : tr.getTargetProfile()) {
             if (this.sd.getUrl().equals(u.getValue())) {
-              if (sd.hasUserData("path")) {
-                trefs.put(sd.getUserString("path"), sd.present());
+              if (sd.hasWebPath()) {
+                trefs.put(sd.getWebPath(), sd.present());
               } else {
                 System.out.println("SD "+sd.getVersionedUrl()+" has no path");
               }
@@ -3060,7 +3060,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       if (srcInfo != null) {
         s = s + "<a href=\""+srcInfo.getWeb()+"\">"+dense(srcInfo)+"</a>:";
       }
-      s = s + "<a href=\""+t.getUserString("path")+"\">"+t.getName()+"</a>";
+      s = s + "<a href=\""+t.getWebPath()+"\">"+t.getName()+"</a>";
       b.append(s);
       t = t.getDerivation() == TypeDerivationRule.SPECIALIZATION ? null : context.fetchResource(StructureDefinition.class, t.getBaseDefinition());
     }
@@ -3148,7 +3148,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       PEType t = element.types().get(0);
       StructureDefinition sd = context.fetchResource(StructureDefinition.class, t.getUrl());
       if (sd != null) {
-        gc.addPiece(gen.new Piece(sd.getUserString("path"), t.getName(), t.getType()));        
+        gc.addPiece(gen.new Piece(sd.getWebPath(), t.getName(), t.getType()));        
       } else {
         gc.addPiece(gen.new Piece(null, t.getName(), t.getType()));
       }
@@ -3157,7 +3157,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       TypeRefComponent tr = element.definition().getTypeFirstRep();
       StructureDefinition sd = context.fetchTypeDefinition(tr.getWorkingCode());
       if (sd != null) {
-        gc.addPiece(gen.new Piece(sd.getUserString("path"), "("+tr.getWorkingCode()+" value)", "Primitive value "+tr.getWorkingCode()));        
+        gc.addPiece(gen.new Piece(sd.getWebPath(), "("+tr.getWorkingCode()+" value)", "Primitive value "+tr.getWorkingCode()));        
       } else {
         gc.addPiece(gen.new Piece(null, "("+tr.getWorkingCode()+" value)", "Primitive value "+tr.getWorkingCode()));
       }
@@ -3197,7 +3197,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         trow.getCells().add(gc);
         StructureDefinition sd = context.fetchResource(StructureDefinition.class, t.getUrl());
         if (sd != null) {
-          gc.addPiece(gen.new Piece(sd.getUserString("path"), t.getName(), t.getType()));        
+          gc.addPiece(gen.new Piece(sd.getWebPath(), t.getName(), t.getType()));        
         } else {
           gc.addPiece(gen.new Piece(null, t.getName(), t.getType()));
         }

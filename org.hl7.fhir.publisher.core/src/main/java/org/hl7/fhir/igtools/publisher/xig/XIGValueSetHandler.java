@@ -178,7 +178,7 @@ public class XIGValueSetHandler extends XIGHandler {
     if (core) {
       ValueSet vs = info.getCtxt().fetchResource(ValueSet.class, url);
       if (vs != null) {
-        return vs.getUserString("path");
+        return vs.getWebPath();
       }
     } else {
       CanonicalResource cr = info.resources.get(url);

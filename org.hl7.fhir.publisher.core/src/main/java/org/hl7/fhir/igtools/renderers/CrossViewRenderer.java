@@ -451,7 +451,7 @@ public class CrossViewRenderer {
 
       for (ExtensionDefinition op : extList) {
         b.append(" <tr>");
-        b.append("<td><a href=\""+op.source.getUserString("path")+"\">"+op.code+"</a></td>");
+        b.append("<td><a href=\""+op.source.getWebPath()+"\">"+op.code+"</a></td>");
         renderTypeCell(b, true, op.types, baseExtTypes);        
         b.append("<td>"+Utilities.escapeXml(op.definition)+"</td>");
         b.append("</tr>\r\n");
@@ -532,7 +532,7 @@ public class CrossViewRenderer {
       for (ObservationProfile op : obsList) {
         b.append(" <tr>");
 
-        b.append("<td><a href=\""+op.source.getUserString("path")+"\" title=\""+op.source.present()+"\">"+op.source.getId()+"</a></td>");
+        b.append("<td><a href=\""+op.source.getWebPath()+"\" title=\""+op.source.present()+"\">"+op.source.getId()+"</a></td>");
         renderCodingCell(b, hasCat, op.category, op.catVS);
         renderCodingCell(b, hasCode, op.code, op.codeVS);
         renderTypeCell(b, hasEffective, op.effectiveTypes, baseEffectiveTypes);
@@ -606,7 +606,7 @@ public class CrossViewRenderer {
           if (first) first = false; else b.append(" | ");
           StructureDefinition sd = context.fetchTypeDefinition(t.name);
           if (sd != null) {
-            b.append("<a href=\""+sd.getUserString("path")+"\" title=\""+t.name+"\">"+t.name+"</a>");
+            b.append("<a href=\""+sd.getWebPath()+"\" title=\""+t.name+"\">"+t.name+"</a>");
           } else {
             b.append(t.name);
           }
@@ -650,8 +650,8 @@ public class CrossViewRenderer {
         ValueSet vs = context.fetchResource(ValueSet.class, binding.getValueSet());
         if (vs == null) {
           b.append(Utilities.escapeXml(binding.getValueSet()));                     
-        } else if (vs.hasUserData("path")) {
-          b.append("<a href=\""+vs.getUserString("path")+"\">"+Utilities.escapeXml(vs.present())+"</a>");
+        } else if (vs.hasWebPath()) {
+          b.append("<a href=\""+vs.getWebPath()+"\">"+Utilities.escapeXml(vs.present())+"</a>");
         } else { 
           b.append(Utilities.escapeXml(vs.present()));
         }
@@ -673,8 +673,8 @@ public class CrossViewRenderer {
             //            b.append("<span title=\""+t.getSystem()+(sys == null ? "" : " ("+sys+")")+": "+ vr.getDisplay()+"\">"+t.getCode()+" "+vr.getDisplay()+"</span>");           
             //          else {
             CodeSystem cs = context.fetchCodeSystem(t.getSystem());
-            if (cs != null && cs.hasUserData("path")) {
-              b.append("<a href=\""+cs.getUserString("path")+"#"+cs.getId()+"-"+t.getCode()+"\" title=\""+t.getSystem()+(sys == null ? "" : " ("+sys+")")+": "+ vr.getDisplay()+"\">"+t.getCode()+"</a>");                  
+            if (cs != null && cs.hasWebPath()) {
+              b.append("<a href=\""+cs.getWebPath()+"#"+cs.getId()+"-"+t.getCode()+"\" title=\""+t.getSystem()+(sys == null ? "" : " ("+sys+")")+": "+ vr.getDisplay()+"\">"+t.getCode()+"</a>");                  
             } else {
               b.append("<span title=\""+t.getSystem()+(sys == null ? "" : " ("+sys+")")+": "+ vr.getDisplay()+"\">"+t.getCode()+"</span>");
             }
@@ -916,7 +916,7 @@ public class CrossViewRenderer {
     } else {
       s.append("<tr>");
     }
-    s.append("<td><a href=\""+ed.getUserString("path")+"\" title=\""+Utilities.escapeXml(ed.getDescription())+"\">"+ed.getId()+"</a></td>");
+    s.append("<td><a href=\""+ed.getWebPath()+"\" title=\""+Utilities.escapeXml(ed.getDescription())+"\">"+ed.getId()+"</a></td>");
     s.append("<td>"+displayExtensionCardinality(ed)+"</td>");
     s.append("<td>"+determineExtensionType(ed)+"</td>");
     s.append("<td>");
@@ -941,8 +941,8 @@ public class CrossViewRenderer {
           ref = ref.substring(0, ref.indexOf("."));
         }
         StructureDefinition sd = context.fetchTypeDefinition(ref);
-        if (sd != null && sd.hasUserData("path")) {
-          s.append("<a href=\""+sd.getUserString("path")+"\">"+ec.getExpression()+"</a>");          
+        if (sd != null && sd.hasWebPath()) {
+          s.append("<a href=\""+sd.getWebPath()+"\">"+ec.getExpression()+"</a>");          
         } else {
           s.append(ec.getExpression());
         }
@@ -953,7 +953,7 @@ public class CrossViewRenderer {
         if (extension==null)
           s.append(Utilities.escapeXml(ec.getExpression()));
         else {
-          s.append("<a href=\""+extension.getUserData("path")+"\">"+ec.getExpression()+"</a>");
+          s.append("<a href=\""+extension.getWebPath()+"\">"+ec.getExpression()+"</a>");
         }
       } else if (ec.getType() == null) {
         s.append("??error??: "+Utilities.escapeXml(ec.getExpression()));
@@ -992,7 +992,7 @@ public class CrossViewRenderer {
         if (e.getType().size() == 1) {
           StructureDefinition sd = context.fetchTypeDefinition(e.getType().get(0).getWorkingCode());
           if (sd != null) {
-            return "<a href=\""+sd.getUserString("path")+"\">"+e.getType().get(0).getWorkingCode()+"</a>";            
+            return "<a href=\""+sd.getWebPath()+"\">"+e.getType().get(0).getWorkingCode()+"</a>";            
           } else {
             return e.getType().get(0).getWorkingCode();
           }
@@ -1036,9 +1036,9 @@ public class CrossViewRenderer {
       b.append("<ul>\r\n");
       for (SearchParameter sp : list) {
         if (sp.hasDescription()) {
-          b.append(" <li><a href=\""+sp.getUserString("path")+"\">"+Utilities.escapeXml(sp.present())+"</a>: "+Utilities.escapeXml(sp.getDescription())+"</li>\r\n");
+          b.append(" <li><a href=\""+sp.getWebPath()+"\">"+Utilities.escapeXml(sp.present())+"</a>: "+Utilities.escapeXml(sp.getDescription())+"</li>\r\n");
         } else {
-          b.append(" <li><a href=\""+sp.getUserString("path")+"\">"+Utilities.escapeXml(sp.present())+"</a></li>\r\n");
+          b.append(" <li><a href=\""+sp.getWebPath()+"\">"+Utilities.escapeXml(sp.present())+"</a></li>\r\n");
         }
       }
       b.append("</ul>\r\n");

@@ -98,7 +98,7 @@ public class PublisherLoader implements ILoaderKnowledgeProviderR5 {
         } else {
           path = pathToSpec+"/"+ igpkp.doReplacements(p, r, null, null);
         }
-        r.setUserData("path", path);
+        r.setWebPath(path);
         r.setUserData("webroot", pathToSpec);
         String v = ((CanonicalResource) r).getVersion();
         if (v != null) {

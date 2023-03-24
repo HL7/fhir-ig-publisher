@@ -160,7 +160,7 @@ public class PublicationChecker {
     PublicationProcessMode mode = PublicationProcessMode.fromCode(pr.asString("mode"));
     if (mode != PublicationProcessMode.WORKING) {
       if (check(messages, !npm.version().contains("-"), "This release is labelled as a "+mode.toCode()+", so should not have a patch version ("+npm.version() +")"+mkWarning())) {
-        summary.add(new StringPair("milestone", pr.asString("milestone")));        
+        summary.add(new StringPair("mode", mode.toCode()));        
       }
     } else {
       if (check(messages, npm.version().contains("-"), "This release is labelled as a milestone or technical correction, so should have a patch version ("+npm.version() +")"+mkWarning())) {

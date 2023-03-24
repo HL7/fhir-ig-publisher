@@ -70,7 +70,7 @@ public class StructureMapRenderer extends CanonicalRenderer {
     } else { 
       b.append("<ul>\r\n");
       for (StructureDefinition sd : analysis.getProfiles()) {
-        b.append("  <li><a href=\""+sd.getUserString("path")+"\">"+Utilities.escapeXml(gt(sd.getNameElement()))+"</a></li>\r\n");
+        b.append("  <li><a href=\""+sd.getWebPath()+"\">"+Utilities.escapeXml(gt(sd.getNameElement()))+"</a></li>\r\n");
       }
       b.append("</ul>\r\n");
     } 

@@ -72,9 +72,9 @@ public class HistoryGenerator {
       for (Coding c : actorTypes) {
         CodeSystem cs = context.getWorker().fetchCodeSystem(c.getSystem());
         XhtmlNode td = tr.td().b(); 
-        if (cs != null && cs.hasUserData("path")) {
+        if (cs != null && cs.hasWebPath()) {
           ConceptDefinitionComponent cd = CodeSystemUtilities.getCode(cs, c.getCode());
-          td.ah(cs.getUserString("path")+"#"+cs.getId()+"-"+c.getCode()).tx(cd != null && cd.hasDisplay() ? cd.getDisplay() : c.hasDisplay() ? c.getDisplay() : c.getCode());
+          td.ah(cs.getWebPath()+"#"+cs.getId()+"-"+c.getCode()).tx(cd != null && cd.hasDisplay() ? cd.getDisplay() : c.hasDisplay() ? c.getDisplay() : c.getCode());
         } else {
           td.tx(c.getCode());
         }
@@ -101,9 +101,9 @@ public class HistoryGenerator {
 
         XhtmlNode td = tr.td(); 
         CodeSystem cs = context.getWorker().fetchCodeSystem(pd.getAction().getSystem());
-        if (cs != null && cs.hasUserData("path")) {
+        if (cs != null && cs.hasWebPath()) {
           ConceptDefinitionComponent cd = CodeSystemUtilities.getCode(cs, pd.getAction().getCode());
-          td.ah(cs.getUserString("path")+"#"+cs.getId()+"-"+pd.getAction().getCode()).tx(cd != null ? cd.getDisplay() : pd.getAction().getCode());
+          td.ah(cs.getWebPath()+"#"+cs.getId()+"-"+pd.getAction().getCode()).tx(cd != null ? cd.getDisplay() : pd.getAction().getCode());
         } else {
           td.tx(pd.getAction().getCode());
         }

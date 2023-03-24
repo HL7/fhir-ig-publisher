@@ -33,7 +33,7 @@ import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.CodeSystem.CodeSystemContentMode;
+import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.renderers.RendererFactory;
@@ -72,7 +72,7 @@ public class CodeSystemRenderer extends CanonicalRenderer {
         if (vs == null) {
           b.append(" <tr><td>"+translate("cs.summary", "Value Set")+":</td><td>"+ cs.getValueSet()+" ("+translate("cs.summary", " is the value set for all codes in this code system")+")</td></tr>\r\n");
         } else {
-          b.append(" <tr><td>"+translate("cs.summary", "Value Set")+":</td><td><a href=\""+vs.getUserString("path")+"\">"+ cs.getValueSet()+"</a> ("+translate("cs.summary", " is the value set for all codes in this code system")+")</td></tr>\r\n");        
+          b.append(" <tr><td>"+translate("cs.summary", "Value Set")+":</td><td><a href=\""+vs.getWebPath()+"\">"+ cs.getValueSet()+"</a> ("+translate("cs.summary", " is the value set for all codes in this code system")+")</td></tr>\r\n");        
         }
       }
     }
@@ -93,7 +93,7 @@ public class CodeSystemRenderer extends CanonicalRenderer {
   private String refCS(String supplements) {
     CodeSystem tgt = context.fetchCodeSystem(supplements);
     if (tgt != null) {
-      return "<a href=\""+tgt.getUserString("path")+"\"><code>"+supplements+"</code></a>";
+      return "<a href=\""+tgt.getWebPath()+"\"><code>"+supplements+"</code></a>";
     } else {
       return "<code>"+supplements+"</code>";
     }
@@ -139,7 +139,7 @@ public class CodeSystemRenderer extends CanonicalRenderer {
 
   private boolean addLink(StringBuilder b, boolean first, ValueSet vc, ConceptSetComponent ed, Set<String> processed) {
     if (ed.hasSystem() && ed.getSystem().equals(cs.getUrl())) {
-      String path = vc.getUserString("path");
+      String path = vc.getWebPath();
       if (!processed.contains(path)) {
         if (first) {
           first = false;

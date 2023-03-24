@@ -10,7 +10,7 @@ import org.hl7.fhir.igtools.publisher.xig.XIGInformation.CanonicalResourceUsage;
 import org.hl7.fhir.igtools.publisher.xig.XIGInformation.UsageType;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.CodeSystem.CodeSystemContentMode;
+import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 
@@ -163,7 +163,7 @@ public class XIGCodeSystemHandler extends XIGHandler {
     if (core) {
       CodeSystem cs = info.getCtxt().fetchCodeSystem(url);
       if (cs != null) {
-        return cs.getUserString("path");
+        return cs.getWebPath();
       }
     } else {
       CanonicalResource cr = info.resources.get(url);

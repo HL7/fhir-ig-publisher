@@ -13,7 +13,7 @@ import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CodeSystem.CodeSystemContentMode;
+import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
 import org.hl7.fhir.r5.model.Enumerations.CapabilityStatementKind;
 import org.hl7.fhir.r5.model.NamingSystem.NamingSystemType;
@@ -75,7 +75,7 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
   private String summaryForResource(CanonicalResource cr) {
     StringBuilder b = new StringBuilder();
     b.append("<table class=\"grid\">\r\n");
-    b.append("<tr><td><a href=\""+cr.getUserString("path")+"\">Source</a></td><td><a href=\""+cr.getUserString("purl")+"\">"+cr.getUserString("pid")+"</a>:"
+    b.append("<tr><td><a href=\""+cr.getWebPath()+"\">Source</a></td><td><a href=\""+cr.getUserString("purl")+"\">"+cr.getUserString("pid")+"</a>:"
         +cr.getUserString("pname")+" (v"+cr.getUserString("fver")+")</td></tr>\r\n");
     JsonObject j = new JsonObject();
     info.fillOutJson(cr, j);

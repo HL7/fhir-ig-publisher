@@ -146,9 +146,9 @@ public class IPStatementsRenderer {
           b.append("<li>");
           if (t.cs == null) {
             b.append(Utilities.escapeXml(t.desc));
-          } else if (t.cs.hasUserData("path")) {
+          } else if (t.cs.hasWebPath()) {
             b.append("<a href=\"");
-            b.append(t.cs.getUserString("path"));
+            b.append(t.cs.getWebPath());
             b.append("\">");
             b.append(Utilities.escapeXml(t.desc));
             b.append("</a>");
@@ -161,7 +161,7 @@ public class IPStatementsRenderer {
           for (FetchedResource r : t.uses) {
             String link = r.getPath();
 //            if (link == null && r.getResource() != null) {
-//              link = r.getResource().getUserString("path");
+//              link = r.getResource().getWebPath();
 //            }
             links.put(r.getTitle(), link);
           }

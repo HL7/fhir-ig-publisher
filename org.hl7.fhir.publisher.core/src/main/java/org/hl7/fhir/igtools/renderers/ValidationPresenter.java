@@ -140,7 +140,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
           StructureDefinition sd = context.fetchResource(StructureDefinition.class, url);
           String l = null;
           if (sd != null) {
-            l = specName+"<a href=\""+sd.getUserString("path")+"\">"+sd.present()+"</a>"+s;
+            l = specName+"<a href=\""+sd.getWebPath()+"\">"+sd.present()+"</a>"+s;
           } else {
             l = "<a href=\""+url+"\">"+url+"</a>"+s;          
           } 
@@ -818,7 +818,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       StringBuilder b = new StringBuilder();
       b.append("<ul>");
       for (StructureDefinition sd : modifierExtensions) {
-        b.append("<li><a href=\""+sd.getUserString("path")+"\">"+Utilities.escapeXml(sd.present())+"</a></li>");
+        b.append("<li><a href=\""+sd.getWebPath()+"\">"+Utilities.escapeXml(sd.present())+"</a></li>");
       }
       b.append("</ul>");
       return b.toString();

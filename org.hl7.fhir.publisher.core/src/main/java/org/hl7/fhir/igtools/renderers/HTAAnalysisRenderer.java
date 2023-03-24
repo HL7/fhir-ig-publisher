@@ -161,8 +161,8 @@ public class HTAAnalysisRenderer {
           warnings = warnings + usage.warnings;
           suggestions = suggestions + usage.suggestions;
           b.append(" <tr>\r\n");
-          if (usage.cr.hasUserData("path")) {
-            b.append("  <td><a href=\""+usage.cr.getUserString("path")+"\">"+tail(usage.cr.getUrl())+"</a></td>\r\n");
+          if (usage.cr.hasWebPath()) {
+            b.append("  <td><a href=\""+usage.cr.getWebPath()+"\">"+tail(usage.cr.getUrl())+"</a></td>\r\n");
           } else {
             b.append("  <td>"+tail(usage.cr.getUrl())+"</td>\r\n");
           }

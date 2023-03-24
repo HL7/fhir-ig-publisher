@@ -177,7 +177,7 @@ public class CanonicalRenderer extends BaseRenderer {
     boolean first = true;
     for (CanonicalResource r : list) {
       if (first) first = false; else b.append(", ");
-      String path = r.getUserString("path");
+      String path = r.getWebPath();
       if (path != null) {
         b.append("<a href=\""+Utilities.escapeXml(path)+"\">"+Utilities.escapeXml(r.present())+"</a>");
       } else {

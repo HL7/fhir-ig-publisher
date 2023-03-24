@@ -76,10 +76,10 @@ public class BaseRenderer extends TranslatingUtilities implements IMarkdownProce
 	        String[] paths = parts[0].split("\\.");
 	        StructureDefinition p = new ProfileUtilities(context, null, null).getProfile(null, paths[0]);
 	        if (p != null) {
-	          if (p.getUserData("path") == null)
+	          if (p.getWebPath() == null)
 	            url = paths[0].toLowerCase();
 	          else
-	            url = p.getUserString("path");
+	            url = p.getWebPath();
 	          if (paths.length > 1) {
 	            url = url.replace(".html", "-definitions.html#"+parts[0]);
 	          }
@@ -133,14 +133,14 @@ public class BaseRenderer extends TranslatingUtilities implements IMarkdownProce
   protected String renderCommitteeLink(CanonicalResource cr) {
     String code = ToolingExtensions.readStringExtension(cr, ToolingExtensions.EXT_WORKGROUP);
     CodeSystem cs = context.fetchCodeSystem("http://terminology.hl7.org/CodeSystem/hl7-work-group");
-    if (cs == null || !cs.hasUserData("path"))
+    if (cs == null || !cs.hasWebPath())
       return code;
     else {
       ConceptDefinitionComponent cd = CodeSystemUtilities.findCode(cs.getConcept(), code);
       if (cd == null) {
         return code;        
       } else {
-        return "<a href=\""+cs.getUserString("path")+"#"+cs.getId()+"-"+cd.getCode()+"\">"+cd.getDisplay()+"</a>";
+        return "<a href=\""+cs.getWebPath()+"#"+cs.getId()+"-"+cd.getCode()+"\">"+cd.getDisplay()+"</a>";
       }
     }
   }

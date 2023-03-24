@@ -123,7 +123,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
                 first = false;
                 b.append("<ul>\r\n");
               }
-              b.append(" <li>"+translate("vs.usage", "Included into ")+"<a href=\""+vc.getUserString("path")+"\">"+Utilities.escapeXml(gt(vc.getNameElement()))+"</a></li>\r\n");
+              b.append(" <li>"+translate("vs.usage", "Included into ")+"<a href=\""+vc.getWebPath()+"\">"+Utilities.escapeXml(gt(vc.getNameElement()))+"</a></li>\r\n");
               break;
             }
           }
@@ -135,7 +135,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
                 first = false;
                 b.append("<ul>\r\n");
               }
-              b.append(" <li>"+translate("vs.usage", "Excluded from ")+"<a href=\""+vc.getUserString("path")+"\">"+Utilities.escapeXml(gt(vc.getNameElement()))+"</a></li>\r\n");
+              b.append(" <li>"+translate("vs.usage", "Excluded from ")+"<a href=\""+vc.getWebPath()+"\">"+Utilities.escapeXml(gt(vc.getNameElement()))+"</a></li>\r\n");
               break;
             }
           }
@@ -151,7 +151,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
                   first = false;
                   b.append("<ul>\r\n");
                 }
-                String path = sd.getUserString("path");
+                String path = sd.getWebPath();
                 if (path == null) {
                   System.out.println("No path for "+sd.getUrl());
                 } else {
@@ -172,7 +172,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
               first = false;
               b.append("<ul>\r\n");
             }
-            String path = q.getUserString("path");
+            String path = q.getWebPath();
             if (path == null) {
               System.out.println("No path for "+q.getUrl());
             } else {
@@ -190,7 +190,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
             first = false;
             b.append("<ul>\r\n");
           }
-          b.append(" <li>Used as a trigger criteria in <a href=\""+pd.getUserString("path")+"\">"+Utilities.escapeXml(pd.present())+"</a></li>\r\n");
+          b.append(" <li>Used as a trigger criteria in <a href=\""+pd.getWebPath()+"\">"+Utilities.escapeXml(pd.present())+"</a></li>\r\n");
         }
       }
     }

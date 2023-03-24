@@ -73,8 +73,8 @@ public class CodeSystemConvertor {
     vs.setUserData("cs", cs);
     if (vs.hasUserData("filename"))
       cs.setUserData("filename", vs.getUserString("filename").replace("valueset-", "codesystem-"));
-    if (vs.hasUserData("path"))
-      cs.setUserData("path", vs.getUserString("path").replace("valueset-", "codesystem-"));
+    if (vs.hasWebPath())
+      cs.setWebPath(vs.getWebPath().replace("valueset-", "codesystem-"));
     if (vs.hasUserData("committee"))
       cs.setUserData("committee", vs.getUserData("committee"));
     cs.setId(vs.getId());

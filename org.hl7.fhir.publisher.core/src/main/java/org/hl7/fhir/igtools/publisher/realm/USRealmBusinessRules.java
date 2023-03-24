@@ -100,7 +100,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
       if (uscore != null) {
         for (String id : uscore.listResources("StructureDefinition", "ValueSet", "CodeSystem")) {
           CanonicalResource usd = (CanonicalResource) loadResourceFromPackage(uscore, id);
-          usd.setUserData("path", Utilities.pathURL(uscore.getWebLocation(), usd.fhirType()+"-"+usd.getId()+".html"));
+          usd.setWebPath(Utilities.pathURL(uscore.getWebLocation(), usd.fhirType()+"-"+usd.getId()+".html"));
           if (usd instanceof StructureDefinition) {
             usCoreProfiles.add((StructureDefinition) usd);
           }
@@ -249,7 +249,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
       b.append("<p>The following Profiles do not derive from US Core, and should be reviewed with the US Realm Committee:</p>\r\n");
       b.append("<ul>\r\n");
       for (StructureDefinition s : problems) {
-        b.append("<li><a href=\"../"+s.getUserString("path")+"\">"+s.present()+"</a></li>\r\n");
+        b.append("<li><a href=\"../"+s.getWebPath()+"\">"+s.present()+"</a></li>\r\n");
       }
       b.append("</ul>\r\n");
       return b.toString();

@@ -2898,7 +2898,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       utils.setIds(sd, true);
       try {
-        utils.generateSnapshot(base, sd, sd.getUrl(), Utilities.extractBaseUrl(base.getUserString("path")), sd.getName());
+        utils.generateSnapshot(base, sd, sd.getUrl(), Utilities.extractBaseUrl(base.getWebPath()), sd.getName());
         if (!sd.hasSnapshot()) {
           System.out.println("Unable to generate snapshot for "+sd.getUrl()+": "+messages.toString());        
         }
@@ -4986,7 +4986,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void loadPaths() {
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
-        if (!r.getElement().hasUserData("path")) {
+        if (!r.getElement().hasWebPath()) {
           igpkp.checkForPath(f, r, r.getElement());
         }
       }
@@ -5193,7 +5193,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             nr.setTitle("Generated Profile (by Transform)");
             f.getResources().add(nr);
             igpkp.findConfiguration(f, nr);
-            sd.setUserData("path", igpkp.getLinkFor(nr, true));
+            sd.setWebPath(igpkp.getLinkFor(nr, true));
             generateSnapshot(f, nr, sd, true);
           }
         }
@@ -5557,7 +5557,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               title = r.getElement().getChildValue("name");
             }
             String link = igpkp.getLinkFor(r, true);
-            r.getElement().setUserData("path", link);
+            r.getElement().setWebPath(link);
             validationFetcher.getOtherUrls().add(url);
           }
         }
@@ -5753,7 +5753,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               if (be.hasResource() && be.getResource().fhirType().equals(type)) {
                 CanonicalResource mr = (CanonicalResource) be.getResource();
                 if (mr.hasUrl()) {
-                  if (!mr.hasUserData("path")) {
+                  if (!mr.hasWebPath()) {
                     igpkp.checkForPath(f,  r,  mr, true);
                   }
                   context.cacheResourceFromPackage(mr, packageInfo);
@@ -5933,7 +5933,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       logDebugMessage(LogCategory.PROGRESS, "Generate Snapshot for Logical Model or specialization"+sd.getUrl());
       if (!sd.hasSnapshot()) {
         utils.setDefWebRoot(igpkp.getCanonical());
-        utils.generateSnapshot(base, sd, sd.getUrl(), Utilities.extractBaseUrl(base.getUserString("path")), sd.getName());
+        utils.generateSnapshot(base, sd, sd.getUrl(), Utilities.extractBaseUrl(base.getWebPath()), sd.getName());
         changed = true;
       }
     }
@@ -6794,7 +6794,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     CanonicalResource bc = (CanonicalResource) res;
 
-    FetchedFile f = new FetchedFile(bc.getUserString("path"));
+    FetchedFile f = new FetchedFile(bc.getWebPath());
     FetchedResource r = f.addResource(f.getName()+" (regen)");
     r.setResource(res);
     r.setId(bc.getId());
@@ -7425,7 +7425,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           item.add("url", sd.getUrl());
           item.add("name", sd.getName());
           item.add("title", sd.present());
-          item.add("path", sd.getUserString("path"));
+          item.add("path", sd.getWebPath());
           if (sd.hasKind()) {
             item.add("kind", sd.getKind().toCode());
           }
@@ -7434,7 +7434,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           StructureDefinition base = sd.hasBaseDefinition() ? context.fetchResource(StructureDefinition.class, sd.getBaseDefinition()) : null;
           if (base != null) {
             item.add("basename", base.getName());
-            item.add("basepath", Utilities.escapeXml(base.getUserString("path")));
+            item.add("basepath", Utilities.escapeXml(base.getWebPath()));
           } else if ("http://hl7.org/fhir/StructureDefinition/Base".equals(sd.getBaseDefinition())) {
             item.add("basename", "Base");
             item.add("basepath", "http://hl7.org/fhir/StructureDefinition/Element");            
@@ -7520,7 +7520,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           item.add("index", i);
           item.add("url", q.getUrl());
           item.add("name", q.getName());
-          item.add("path", q.getUserString("path"));
+          item.add("path", q.getWebPath());
           item.add("status", q.getStatus().toCode());
           item.add("date", q.getDate().toString());
           item.add("publisher", q.getPublisher());
@@ -7554,9 +7554,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (r.getPath() != null) {
           path = r.getPath();
         } else if (r.getResource() != null) {
-          path = r.getResource().getUserString("path");
+          path = r.getResource().getWebPath();
         } else {
-          path = r.getElement().getUserString("path");
+          path = r.getElement().getWebPath();
         }
         if (path != null) {
           item.add("path", path);
@@ -8061,7 +8061,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         h.tx(type);
       }
       tr = tbl.tr();
-      tr.td().ah(cr.getUserString("path")).tx(cr.getUrl());
+      tr.td().ah(cr.getWebPath()).tx(cr.getUrl());
       tr.td().tx(cr.getId());
       tr.td().tx(cr.getVersion());
       tr.td().tx(bo.toString());
@@ -9292,8 +9292,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private String getListLink(FetchedResource lr) {
     String res;
-    if (lr.getResource() != null && lr.getResource().hasUserData("path"))
-      res = lr.getResource().getUserString("path");
+    if (lr.getResource() != null && lr.getResource().hasWebPath())
+      res = lr.getResource().getWebPath();
     else
       res = igpkp.getLinkFor(lr, true);
     return res;
@@ -9338,7 +9338,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private String getListLink(Resource r) {
-    return r.getUserString("path");
+    return r.getWebPath();
   }
 
   private String getListName(Resource r) {
@@ -9363,7 +9363,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         StructureDefinition base = context.fetchResource(StructureDefinition.class, url);
         if (base != null) {
           map.put("parent-name", base.getName());
-          map.put("parent-link", base.getUserString("path"));
+          map.put("parent-link", base.getWebPath());
         } else {
           map.put("parent-name", "?? Unknown reference");
           map.put("parent-link", "??");
@@ -9612,7 +9612,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (r.getExampleUri() != null) {
           StructureDefinition sd = context.fetchResource(StructureDefinition.class, r.getExampleUri());
           if (sd != null && sd.getKind() == StructureDefinitionKind.LOGICAL) {
-            pfx = "<p>This content is an example of the <a href=\""+Utilities.escapeXml(sd.getUserString("path"))+"\">"+Utilities.escapeXml(sd.present())+"</a> Logical Model and is not a FHIR Resource</p>\r\n";
+            pfx = "<p>This content is an example of the <a href=\""+Utilities.escapeXml(sd.getWebPath())+"\">"+Utilities.escapeXml(sd.present())+"</a> Logical Model and is not a FHIR Resource</p>\r\n";
           }          
         }
         BinaryRenderer br = new BinaryRenderer(tempDir);
@@ -10268,8 +10268,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     String qu = getQuestionnaireURL(r);
     if (qu != null) {
       Questionnaire q = context.fetchResource(Questionnaire.class, qu);
-      if (q != null && q.hasUserData("path")) {
-        lrc.setDefinitionsTarget(q.getUserString("path"));
+      if (q != null && q.hasWebPath()) {
+        lrc.setDefinitionsTarget(q.getWebPath());
       }
     }
     

@@ -59,7 +59,7 @@ public class XIGLoader implements IPackageVisitorProcessor {
       CanonicalResource cr = (CanonicalResource) r;
       if (cr.getUrl() != null && !isCoreDefinition(cr, pid)) {
         cr.setText(null);
-        cr.setUserData("path", Utilities.pathURL(smm.getBase(), smm.getPath(cr.getUrl(), null, cr.fhirType(), cr.getIdBase())));
+        cr.setWebPath(Utilities.pathURL(smm.getBase(), smm.getPath(cr.getUrl(), null, cr.fhirType(), cr.getIdBase())));
         JsonObject j = new JsonObject();
         info.getJson().getJsonArray("canonicals").add(j);
         j.add("pid", pid);
@@ -81,7 +81,7 @@ public class XIGLoader implements IPackageVisitorProcessor {
         j.add("fver", npm.fhirVersion());
         j.add("published", pid.contains("#current"));
         j.add("filebase", cr.getUserString("filebase"));
-        j.add("path", cr.getUserString("path"));
+        j.add("path", cr.getWebPath());
         
         info.fillOutJson(cr, j);
         if (info.getResources().containsKey(cr.getUrl())) {

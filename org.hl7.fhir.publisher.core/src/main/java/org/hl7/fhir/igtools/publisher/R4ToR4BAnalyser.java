@@ -66,7 +66,7 @@ public class R4ToR4BAnalyser {
       return element;
     }
     public String getPath() {
-      return resource != null ? resource.getUserString("path") : element.getUserString("path");
+      return resource != null ? resource.getWebPath() : element.getWebPath();
     }
     public String present() {
       return resource != null ? resource.present() : element.fhirType()+"/"+element.getIdBase();
@@ -198,7 +198,7 @@ public class R4ToR4BAnalyser {
     if (Utilities.existsInList(ed.getPath(), "ActivityDefinition.subject[x]", "PlanDefinitionsubject[x]")) {
       for (TypeRefComponent tr : ed.getType()) {
         if ("canonical".equals(tr.getCode())) {
-          String msg = "<a href=\""+src.getUserString("path")+"\">"+Utilities.escapeXml(src.present())+"</a> refers to the canonical type at "+ed.getPath();
+          String msg = "<a href=\""+src.getWebPath()+"\">"+Utilities.escapeXml(src.present())+"</a> refers to the canonical type at "+ed.getPath();
           r4OK = false;
           addToList(r4Problems, msg);
         }
@@ -226,7 +226,7 @@ public class R4ToR4BAnalyser {
 
 
   private void checkTypeReference(StructureDefinition src, String use, String type) {
-    String msg = "<a href=\""+src.getUserString("path")+"\">"+Utilities.escapeXml(src.present())+"</a> "+use+" "+type;
+    String msg = "<a href=\""+src.getWebPath()+"\">"+Utilities.escapeXml(src.present())+"</a> "+use+" "+type;
     if (Utilities.existsInList(type, R4BOnlyTypes) || (VersionUtilities.isR4BVer(context.getVersion()) && Utilities.existsInList(type, R4BChangedTypes))) {
       r4OK = false;
       addToList(r4Problems, msg);
@@ -238,7 +238,7 @@ public class R4ToR4BAnalyser {
   }
 
   private void checkTypeReference(Element src, String use, String type) {
-    String msg = "<a href=\""+src.getUserString("path")+"\">"+Utilities.escapeXml(src.fhirType()+"/"+src.getIdBase())+"</a> "+use+" "+type;
+    String msg = "<a href=\""+src.getWebPath()+"\">"+Utilities.escapeXml(src.fhirType()+"/"+src.getIdBase())+"</a> "+use+" "+type;
     if (Utilities.existsInList(type, R4BOnlyTypes) || (VersionUtilities.isR4BVer(context.getVersion()) && Utilities.existsInList(type, R4BChangedTypes))) {
       r4OK = false;
       addToList(r4Problems, msg);

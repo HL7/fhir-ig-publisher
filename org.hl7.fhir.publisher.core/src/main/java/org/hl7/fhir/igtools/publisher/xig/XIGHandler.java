@@ -106,7 +106,7 @@ public class XIGHandler {
 
   protected void crTr(StringBuilder b, DuplicateTracker dt, CanonicalResource cr, int count) {
     b.append("<tr"+rowColor(dt.hasDuplicate(cr))+">"+(count > 0 ? "<td>"+count+"<td>" : "")+
-        "<td title=\""+cr.getUrl()+"#"+cr.getVersion()+"\">"+crlink(cr)+"</td><td><a href=\""+cr.getUserString("path")+"\">"+cr.getUserString("pid")+"</a></td>"+
+        "<td title=\""+cr.getUrl()+"#"+cr.getVersion()+"\">"+crlink(cr)+"</td><td><a href=\""+cr.getWebPath()+"\">"+cr.getUserString("pid")+"</a></td>"+
         "<td>"+ver(cr.getUserString("fver"))+"</td>"+
         "<td>"+Utilities.escapeXml(cr.getDescription())+"</td>\r\n");
   }

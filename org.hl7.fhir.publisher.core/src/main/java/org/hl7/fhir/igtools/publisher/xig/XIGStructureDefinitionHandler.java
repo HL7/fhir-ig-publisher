@@ -438,7 +438,7 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
     if (core) {
       StructureDefinition sd = info.getCtxt().fetchResource(StructureDefinition.class, url);
       if (sd != null) {
-        return sd.getUserString("path");
+        return sd.getWebPath();
       }
     } else {
       CanonicalResource cr = info.resources.get(url);

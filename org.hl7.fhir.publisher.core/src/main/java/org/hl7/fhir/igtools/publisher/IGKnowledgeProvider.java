@@ -336,16 +336,16 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
         s = paths.getPath(cs.getValueSet(), null, cs.fhirType(), cs.getId());
       }
       if (s != null) {
-        bc.setUserData("path", specPath(s));
+        bc.setWebPath(specPath(s));
       // special cases
       } else if (bc.hasUrl() && bc.getUrl().equals("http://hl7.org/fhir/ValueSet/security-role-type")) {
-        bc.setUserData("path", specPath("valueset-security-role-type.html"));
+        bc.setWebPath(specPath("valueset-security-role-type.html"));
       } else if (bc.hasUrl() && bc.getUrl().equals("http://hl7.org/fhir/ValueSet/object-lifecycle-events")) {
-        bc.setUserData("path", specPath("valueset-object-lifecycle-events.html"));
+        bc.setWebPath(specPath("valueset-object-lifecycle-events.html"));
       } else if (bc.hasUrl() && bc.getUrl().equals("http://hl7.org/fhir/ValueSet/performer-function")) {
-        bc.setUserData("path", specPath("valueset-performer-function.html"));
+        bc.setWebPath(specPath("valueset-performer-function.html"));
       } else if (bc.hasUrl() && bc.getUrl().equals("http://hl7.org/fhir/ValueSet/written-language")) {
-        bc.setUserData("path", specPath("valueset-written-language.html"));
+        bc.setWebPath(specPath("valueset-written-language.html"));
         
 //      else
 //        System.out.println("No path for "+bc.getUrl());
@@ -421,19 +421,19 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     bc.setUserData("config", e);
     String base = getProperty(r,  "base");
     if (base != null) 
-      bc.setUserData("path", doReplacements(base, r, null, null));
+      bc.setWebPath(doReplacements(base, r, null, null));
     else if (pathPattern != null)
-      bc.setUserData("path", pathPattern.replace("[type]", r.fhirType()).replace("[id]", r.getId()));
+      bc.setWebPath(pathPattern.replace("[type]", r.fhirType()).replace("[id]", r.getId()));
     else
-      bc.setUserData("path", r.fhirType()+"/"+r.getId()+".html");
-    r.getElement().setUserData("path", bc.getUserData("path"));
+      bc.setWebPath(r.fhirType()+"/"+r.getId()+".html");
+    r.getElement().setWebPath(bc.getWebPath());
     for (Resource cont : bc.getContained()) {
       if (base != null) 
-        cont.setUserData("path", doReplacements(base, r, cont, null, null, bc.getId()+"_"));
+        cont.setWebPath(doReplacements(base, r, cont, null, null, bc.getId()+"_"));
       else if (pathPattern != null)
-        cont.setUserData("path", pathPattern.replace("[type]", r.fhirType()).replace("[id]", bc.getId()+"_"+cont.getId()));
+        cont.setWebPath(pathPattern.replace("[type]", r.fhirType()).replace("[id]", bc.getId()+"_"+cont.getId()));
       else
-        cont.setUserData("path", r.fhirType()+"/"+bc.getId()+"_"+r.getId()+".html");
+        cont.setWebPath(r.fhirType()+"/"+bc.getId()+"_"+r.getId()+".html");
     }
   }
 
@@ -444,11 +444,11 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     res.setUserData("config", e);
     String base = getProperty(r,  "base");
     if (base != null) 
-      res.setUserData("path", doReplacements(base, r, null, null));
+      res.setWebPath(doReplacements(base, r, null, null));
     else if (pathPattern != null)
-      res.setUserData("path", pathPattern.replace("[type]", r.fhirType()).replace("[id]", r.getId()));
+      res.setWebPath(pathPattern.replace("[type]", r.fhirType()).replace("[id]", r.getId()));
     else
-      res.setUserData("path", r.fhirType()+"/"+r.getId()+".html");
+      res.setWebPath(r.fhirType()+"/"+r.getId()+".html");
   }
 
   private void error(FetchedFile f, String path, String msg, String msgId) {
@@ -530,8 +530,8 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     if (noXhtml && name.equals("xhtml"))
       return null;
     StructureDefinition sd = context.fetchResource(StructureDefinition.class, ProfileUtilities.sdNs(name, null));
-    if (sd != null && sd.hasUserData("path"))
-        return sd.getUserString("path");
+    if (sd != null && sd.hasWebPath())
+        return sd.getWebPath();
     brokenLinkWarning(corepath, name);
     return name+".html";
   }
@@ -573,14 +573,14 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
           brokenLinkWarning(path, ref);
         }
       } else {
-        br.url = vs.getUserString("path");
+        br.url = vs.getWebPath();
         br.display = vs.getName(); 
       }
     } else { 
       if (ref.startsWith("http://hl7.org/fhir/ValueSet/")) {
         ValueSet vs = context.fetchResource(ValueSet.class, ref);
         if (vs != null) { 
-          br.url = vs.getUserString("path");
+          br.url = vs.getWebPath();
           br.display = vs.getName(); 
         } else {
           String nvref = ref;
@@ -618,14 +618,14 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
           if (ref.contains("|")) {
             br.url = vs.getUserString("versionpath");
             if (br.url == null) {
-              br.url = vs.getUserString("path");
+              br.url = vs.getWebPath();
             }
             br.display = vs.getName() + " (" + vs.getVersion() + ")"; 
-          } else if (vs != null && vs.hasUserData("path")) {
-            br.url = vs.getUserString("path");  
+          } else if (vs != null && vs.hasWebPath()) {
+            br.url = vs.getWebPath();  
             br.display = vs.present();
           } else {
-            br.url = vs.getUserString("path");
+            br.url = vs.getWebPath();
             br.display = vs.getName(); 
           }
         } else if (ref.startsWith("http://cts.nlm.nih.gov/fhir/ValueSet/")) {          
@@ -657,8 +657,8 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     StructureDefinition sd = context.fetchResource(StructureDefinition.class, url);
     if (noXhtml && sd != null && sd.getType().equals("xhtml"))
       return null;
-    if (sd != null && sd.hasUserData("path"))
-      return sd.getUserString("path")+"|"+sd.getName();
+    if (sd != null && sd.hasWebPath())
+      return sd.getWebPath()+"|"+sd.getName();
     brokenLinkWarning("?pkp-1?", url);
     return "unknown.html|?pkp-2?";
   }
@@ -672,7 +672,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   @Override
   public String resolveProperty(Property property) {
     String path = property.getDefinition().getPath();
-    return property.getStructure().getUserString("path")+"#"+path;
+    return property.getStructure().getWebPath()+"#"+path;
   }
 
   @Override
