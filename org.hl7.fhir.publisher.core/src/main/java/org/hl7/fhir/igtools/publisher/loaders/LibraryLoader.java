@@ -1,4 +1,4 @@
-package org.hl7.fhir.igtools.publisher;
+package org.hl7.fhir.igtools.publisher.loaders;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -8,6 +8,7 @@ import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
+import org.hl7.fhir.igtools.publisher.CqlSubSystem;
 import org.hl7.fhir.igtools.publisher.CqlSubSystem.ILibraryReader;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.model.Library;
