@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.hl7.fhir.igtools.publisher.PublisherLoader;
+import org.hl7.fhir.igtools.publisher.loaders.PublisherLoader;
 import org.hl7.fhir.r5.context.IWorkerContext.IContextResourceLoader;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.JsonParser;

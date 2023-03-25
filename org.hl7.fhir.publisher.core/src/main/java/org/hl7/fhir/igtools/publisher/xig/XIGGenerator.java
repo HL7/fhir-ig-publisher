@@ -11,8 +11,8 @@ import javax.xml.parsers.ParserConfigurationException;
 
 import org.hl7.fhir.convertors.analytics.PackageVisitor;
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.igtools.publisher.PublisherLoader;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
+import org.hl7.fhir.igtools.publisher.loaders.PublisherLoader;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.model.Parameters;
 import org.hl7.fhir.r5.utils.EOperationOutcome;

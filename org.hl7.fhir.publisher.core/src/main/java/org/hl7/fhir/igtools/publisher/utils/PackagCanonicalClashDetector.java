@@ -7,7 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.hl7.fhir.igtools.publisher.PublisherLoader;
+import org.hl7.fhir.igtools.publisher.loaders.PublisherLoader;
 import org.hl7.fhir.r4.test.utils.TestingUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext.IContextResourceLoader;
 import org.hl7.fhir.r5.formats.JsonParser;
