@@ -94,6 +94,10 @@ import org.hl7.fhir.igtools.publisher.FetchedFile.FetchedBundleType;
 import org.hl7.fhir.igtools.publisher.IFetchFile.FetchState;
 import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
 import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
+import org.hl7.fhir.igtools.publisher.loaders.AdjunctFileLoader;
+import org.hl7.fhir.igtools.publisher.loaders.LibraryLoader;
+import org.hl7.fhir.igtools.publisher.loaders.PatchLoaderKnowledgeProvider;
+import org.hl7.fhir.igtools.publisher.loaders.PublisherLoader;
 import org.hl7.fhir.igtools.publisher.realm.NullRealmBusinessRules;
 import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
 import org.hl7.fhir.igtools.publisher.realm.USRealmBusinessRules;
@@ -2856,7 +2860,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
    String pid = VersionUtilities.packageForVersion(v);
    log("Load "+pid);
    NpmPackage npm = pcm.loadPackage(pid);
-   IContextResourceLoader loader = ValidatorUtils.loaderForVersion(npm.fhirVersion());
+   SpecMapManager spm = loadSpecDetails(TextFile.streamToBytes(npm.load("other", "spec.internals")));
+   IContextResourceLoader loader = ValidatorUtils.loaderForVersion(npm.fhirVersion(), new PatchLoaderKnowledgeProvider(npm, spm));
    if (loader.getTypes().contains("StructureMap")) {
      loader.getTypes().remove("StructureMap");
    }
