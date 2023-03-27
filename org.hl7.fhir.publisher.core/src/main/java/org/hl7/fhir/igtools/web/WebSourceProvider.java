@@ -206,31 +206,29 @@ public class WebSourceProvider {
         System.out.println("Connect to "+uploadServer);
         FTPClient ftp = new FTPClient(uploadServer, uploadPath, uploadUser, uploadPword);
         ftp.connect();
+        int lineLength = 0;
+        int count = 0;
+        long start = System.currentTimeMillis();
         if (!existingFiles.isEmpty()) {
+          System.out.print("Deleting");
           for (String s : existingFiles) {
-            System.out.print("Deleting");
+            count++;
+            lineLength = doProgressNote(s, count, start, existingFiles.size(), lineLength);
             ftp.delete(Utilities.path(existingFilesBase, s));
-            System.out.print(".");
-            System.out.flush();
           }
         }
         System.out.println("Uploading");
         int failCount = 0;
-        int count = 1; // no / 0
-        long bytes = 1; // no / 0
-        long start = System.currentTimeMillis();
-        int linelength = 0;
+        count = 0;
+        start = System.currentTimeMillis();
+        lineLength = 0;
         for (String s : filesToUpload) {
           count++;
-          String note = genProgressNote(count, bytes, start, filesToUpload.size());
-          System.out.print(Utilities.padLeft("", '\b', linelength));
-          System.out.print(note);
-          System.out.flush();
-          linelength = note.length();
+          lineLength = doProgressNote(s, count, start, filesToUpload.size(), lineLength);
+                    
           if (!s.contains(":")) { // hack around a bug that should be fixed elsewhere
             try {
               String fn = Utilities.path(destination, s);
-              bytes = bytes + new File(fn).length();
               ftp.upload(fn, s);
               failCount = 0;
             } catch (Exception e) {
@@ -271,20 +269,24 @@ public class WebSourceProvider {
     }
   }
 
-  private String genProgressNote(int count, long bytes, long start, int size) {
+  private int doProgressNote(String file, int count, long start, int size, int length) {
+    System.out.print(Utilities.padLeft("", '\b', length));
+    String note;
+    
+    int pct = ((count * 20) / size);
+    String pc = "["+Utilities.padRight(Utilities.padLeft("",  '#', pct), ' ', 20)+"]";
     long secondsDone = (System.currentTimeMillis() - start) / 1000;
     if (count == 0 || secondsDone == 0) {
-      return "Starting...";
+      note = pc;
+    } else {
+      float rate = (count * 60) / secondsDone;    
+      long secondsToGo = ((secondsDone * size) / count) - secondsDone;
+      Duration d = Duration.ofSeconds(secondsToGo);
+      note = pc+ "("+rate+" files/min, ~"+Utilities.describeDuration(d)+" to go) "+Utilities.getDirectoryForFile(file)+"         ";
     }
-    float rate = (count * 60) / secondsDone;
-    long secondsToGo = ((secondsDone * size) / count) - secondsDone;
-    Duration d = Duration.ofSeconds(secondsToGo);
-      return ""+
-        count+" files, "+
-        rate+" files/min, "+
-        ((bytes*1000) / (System.currentTimeMillis() - start))+" bytes/sec, about "+
-        ((count * 100) / size)+"% "+
-        Utilities.describeDuration(d)+" left         ";
+    System.out.print(note);
+    System.out.flush();
+    return note.length();
   }
 
   private String deleteFileName() throws IOException {
