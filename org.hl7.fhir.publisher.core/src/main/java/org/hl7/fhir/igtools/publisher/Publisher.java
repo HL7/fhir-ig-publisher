@@ -1015,6 +1015,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     String json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(qaJson, true);
     TextFile.stringToFile(json, Utilities.path(outputDir, "qa.json"), false);
 
+    Utilities.createDirectory(tempDir);
     ZipGenerator zip = new ZipGenerator(Utilities.path(tempDir, "full-ig.zip"));
     zip.addFolder(outputDir, "site/", false);
     zip.addFileSource("index.html", REDIRECT_SOURCE, false);
@@ -1273,6 +1274,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     res.setDate(pv.hasOccurredPeriod() ? pv.getOccurredPeriod().getEndElement() : pv.hasOccurredDateTimeType() ? pv.getOccurredDateTimeType() : pv.getRecordedElement());
     if (pv.getAuthorizationFirstRep().getConcept().hasText()) {
       res.setComment(pv.getAuthorizationFirstRep().getConcept().getText());
+    } else if (pv.getActivity().hasText()) {
+      res.setComment(pv.getActivity().getText());
     }
     for (ProvenanceAgentComponent agent : pv.getAgent()) {
       for (Coding c : agent.getType().getCoding()) {
@@ -2305,6 +2308,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void initializeTemplate() throws IOException {
     rootDir = configFile;
     outputDir = Utilities.path(rootDir, "output");
+    tempDir = Utilities.path(rootDir, "temp");
   }
 
 
@@ -2391,6 +2395,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     // ok, loaded. Now we start loading settings out of the IG
     tool = GenerationTool.Jekyll;
     version = processVersion(sourceIg.getFhirVersion().get(0).asStringValue()); // todo: support multiple versions
+    if (!Utilities.existsInList(version, "5.0.0", "4.3.0", "4.0.1", "3.0.2", "1.0.2", "1.4.0")) {
+      throw new Error("Unable to support version '"+version+"' - must be one of 5.0.0, 4.3.0, 4.0.1, 3.0.2, 1.0.2, or 1.4.0");
+    }
 
     if (!VersionUtilities.isSupportedVersion(version)) {
       throw new Exception("Error: the IG declares that is based on version "+version+" but this IG publisher only supports publishing the following versions: "+VersionUtilities.listSupportedVersions());
@@ -2730,6 +2737,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 //      dep.setVersion(pcm.getLatestVersion(dep.getPackageId()));
 //      sourceIg.getDependsOn().add(0, dep);
 //    }
+    if (VersionUtilities.isR5Plus(version) && !dependsOnExtensions(sourceIg.getDependsOn()) && !sourceIg.getPackageId().contains("hl7.fhir.uv.extensions")) {
+      ImplementationGuideDependsOnComponent dep = new ImplementationGuideDependsOnComponent();
+      dep.setUserData("no-load-deps", "true");
+      dep.setId("hl7ext");
+      dep.setPackageId(getExtensionsPackageName());
+      dep.setUri("http://hl7.org/fhir/extensions/ImplementationGuide/hl7.fhir.uv.extensions");
+      dep.setVersion(pcm.getLatestVersion(dep.getPackageId()));
+      dep.addExtension(ToolingExtensions.EXT_IGDEP_COMMENT, new MarkdownType("Automatically added as a dependency - all IGs depend on the HL7 Extension Pack"));
+      sourceIg.getDependsOn().add(0, dep);
+    }
     if (!dependsOnUTG(sourceIg.getDependsOn()) && !sourceIg.getPackageId().contains("hl7.terminology")) {
       ImplementationGuideDependsOnComponent dep = new ImplementationGuideDependsOnComponent();
       dep.setUserData("no-load-deps", "true");
@@ -2760,24 +2777,24 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (!"hl7.fhir.uv.tools".equals(sourceIg.getPackageId())) {
       loadIg("igtools", "hl7.fhir.uv.tools", "current", "http://hl7.org/fhir/tools/ImplementationGuide/hl7.fhir.uv.tools", i, false);   
     }
-    System.out.print("Load R5 Extensions");
-    R5ExtensionsLoader r5e = new R5ExtensionsLoader(pcm, context);
-    r5e.load();
-    r5e.loadR5Extensions();
-    if (!VersionUtilities.isR5Plus(context.getVersion())) {
-      r5e.loadR5SpecialTypes(SpecialTypeHandler.SPECIAL_TYPES);
-    }
-    SpecMapManager smm = new SpecMapManager(r5e.getMap(), r5e.getPckCore().fhirVersion());
-    smm.setName(r5e.getPckCore().name());
-    smm.setBase("http://build.fhir.org");
-    smm.setBase2("http://build.fhir.org/");
-    specMaps.add(smm);
-    smm = new SpecMapManager(r5e.getMap(), r5e.getPckExt().fhirVersion());
-    smm.setName(r5e.getPckExt().name());
-    smm.setBase("http://build.fhir.org/ig/HL7/fhir-extensions");
-    smm.setBase2("http://build.fhir.org/ig/HL7/fhir-extensions");
-    specMaps.add(smm);
-    System.out.println(" - " + r5e.getCount() + " resources (" + tt.milestone() + ")");
+//    System.out.print("Load R5 Extensions");
+//    R5ExtensionsLoader r5e = new R5ExtensionsLoader(pcm, context);
+//    r5e.load();
+//    r5e.loadR5Extensions();
+//    if (!VersionUtilities.isR5Plus(context.getVersion())) {
+//      r5e.loadR5SpecialTypes(SpecialTypeHandler.SPECIAL_TYPES);
+//    }
+//    SpecMapManager smm = new SpecMapManager(r5e.getMap(), r5e.getPckCore().fhirVersion());
+//    smm.setName(r5e.getPckCore().name());
+//    smm.setBase("http://build.fhir.org");
+//    smm.setBase2("http://build.fhir.org/");
+//    specMaps.add(smm);
+//    smm = new SpecMapManager(r5e.getMap(), r5e.getPckExt().fhirVersion());
+//    smm.setName(r5e.getPckExt().name());
+//    smm.setBase("http://build.fhir.org/ig/HL7/fhir-extensions");
+//    smm.setBase2("http://build.fhir.org/ig/HL7/fhir-extensions");
+//    specMaps.add(smm);
+//    System.out.println(" - " + r5e.getCount() + " resources (" + tt.milestone() + ")");
     generateLoadedSnapshots();
     
     // set up validator;
@@ -2860,7 +2877,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
    String pid = VersionUtilities.packageForVersion(v);
    log("Load "+pid);
    NpmPackage npm = pcm.loadPackage(pid);
-   SpecMapManager spm = loadSpecDetails(TextFile.streamToBytes(npm.load("other", "spec.internals")));
+   SpecMapManager spm = loadSpecDetails(TextFile.streamToBytes(npm.load("other", "spec.internals")), "convSpec"+v, npm.getWebLocation());
    IContextResourceLoader loader = ValidatorUtils.loaderForVersion(npm.fhirVersion(), new PatchLoaderKnowledgeProvider(npm, spm));
    if (loader.getTypes().contains("StructureMap")) {
      loader.getTypes().remove("StructureMap");
@@ -2945,6 +2962,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return false;
   }
 
+
+  private boolean dependsOnExtensions(List<ImplementationGuideDependsOnComponent> dependsOn) {
+    for (ImplementationGuideDependsOnComponent d : dependsOn) {
+      if (d.hasPackageId() && d.getPackageId().contains("hl7.fhir.uv.extensions")) {
+        return true;
+      }
+      if (d.hasUri() && d.getUri().contains("hl7.org/fhir/extensions")) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private String determineCanonical(String url, String path) throws FHIRException {
     if (url == null)
       return url;
@@ -2971,7 +3001,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return PackageHacker.fixPackageUrl("http://hl7.org/fhir/R4");
     if (v.equals("4.1"))
       return PackageHacker.fixPackageUrl("http://hl7.org/fhir/2021Mar");
-    return PackageHacker.fixPackageUrl("http://build.fhir.org");
+    return PackageHacker.fixPackageUrl("http://hl7.org/fhir/R5");
   }
 
 
@@ -3185,7 +3215,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     
     
-    loadSpecDetails(context.getBinaryForKey("spec.internals"));
+    loadSpecDetails(context.getBinaryForKey("spec.internals"), "basespecJson", specPath);
     JsonElement cb = configuration.get("canonicalBase");
     if (cb == null)
       throw new Exception("You must define a canonicalBase in the json file");
@@ -3389,6 +3419,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return vs;
   }
 
+  private String getExtensionsPackageName() throws FHIRException, IOException {
+    String vs = null;
+    if (VersionUtilities.isR3Ver(version)) {
+      vs = "hl7.fhir.uv.extensions.r3";
+    } else if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {
+      vs = "hl7.fhir.uv.extensions.r4";
+    } else if (VersionUtilities.isR5Ver(version)) {
+      vs = "hl7.fhir.uv.extensions.r5";
+    }
+    return vs;
+  }
 
   private void processExtraTemplates(JsonArray templates) throws Exception {
     if (templates!=null) {
@@ -3684,7 +3725,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     logDebugMessage(LogCategory.INIT, "Load hl7.fhir.core-"+v+" package from "+pi.summary());
     npmList.add(pi);
     
-    SpecMapManager spm = loadSpecDetails(TextFile.streamToBytes(pi.load("other", "spec.internals")));
+    SpecMapManager spm = loadSpecDetails(TextFile.streamToBytes(pi.load("other", "spec.internals")), "basespec", specPath);
     SimpleWorkerContext sp;
     IContextResourceLoader loader = new PublisherLoader(pi, spm, specPath, igpkp).makeLoader();
     sp = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(vsCache).fromPackage(pi, loader);
@@ -3711,8 +3752,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (VersionUtilities.isR2Ver(version)) return "http://hl7.org/fhir/DSTU2/hl7.fhir.r2.core.tgz";
     if (VersionUtilities.isR2BVer(version)) return "http://hl7.org/fhir/2016May/hl7.fhir.r2b.core.tgz";
     if (VersionUtilities.isR3Ver(version)) return "http://hl7.org/fhir/STU3/hl7.fhir.r3.core.tgz";
-    if (VersionUtilities.isR4Ver(version)) return "http://hl7.org/fhir/STU3/hl7.fhir.r4.core.tgz";
-    if (Constants.VERSION.equals(version)) return "http://build.fhir.org/package.tgz";
+    if (VersionUtilities.isR4Ver(version)) return "http://hl7.org/fhir/R4/hl7.fhir.r4.core.tgz";
+    if (Constants.VERSION.equals(version)) return "http://hl7.org/fhir/R5/hl7.fhir.r5.core.tgz";
     throw new Error("unknown version "+version);
   }
 
@@ -4051,10 +4092,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return false;
   }
 
-  public SpecMapManager loadSpecDetails(byte[] bs) throws IOException {
+  public SpecMapManager loadSpecDetails(byte[] bs, String name, String path) throws IOException {
     SpecMapManager map = new SpecMapManager(bs, version);
-    map.setBase(PackageHacker.fixPackageUrl(specPath));
-    map.setName("basespec");
+    map.setBase(PackageHacker.fixPackageUrl(path));
+    map.setName(name);
     specMaps.add(map);
     return map;
   }
