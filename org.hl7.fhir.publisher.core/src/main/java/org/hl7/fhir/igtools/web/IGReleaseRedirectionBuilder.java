@@ -171,7 +171,7 @@ public class IGReleaseRedirectionBuilder {
         }
         if (isCoreRoot) {
           for (String s : map.keySet()) {
-            if (!s.contains("/")) {
+            if (!s.contains("/") && !s.contains(":")) {
               String path = Utilities.path(folder, s, "index.asp");
               String p = s.replace("/", "-");
               String litPath = Utilities.path(folder, p)+".html";
@@ -189,58 +189,59 @@ public class IGReleaseRedirectionBuilder {
   }
 
   private void generateRedirect(String rt, Map<String, String> map) throws IOException {
-    StringBuilder b = new StringBuilder();
-    countTotal++;
+    if (!rt.contains(":")) {      
+      StringBuilder b = new StringBuilder();
+      countTotal++;
 
-    String root = Utilities.pathURL(canonical, rt);
-    b.append("<%@ language=\"javascript\"%>\r\n" + 
-        "\r\n" + 
-        "<%\r\n" + 
-        "  var s = String(Request.ServerVariables(\"HTTP_ACCEPT\"));\r\n" +
-        "  var id = Request.QueryString(\"id\");\r\n"+
-        "  if (s.indexOf(\"application/json+fhir\") > -1) \r\n" + 
-        "    Response.Redirect(\""+root+"-\"+id+\".json2\");\r\n" + 
-        "  else if (s.indexOf(\"application/fhir+json\") > -1) \r\n" + 
-        "    Response.Redirect(\""+root+"-\"+id+\".json1\");\r\n" + 
-        "  else if (s.indexOf(\"application/xml+fhir\") > -1) \r\n" + 
-        "    Response.Redirect(\""+root+"-\"+id+\".xml2\");\r\n" + 
-        "  else if (s.indexOf(\"application/fhir+xml\") > -1) \r\n" + 
-        "    Response.Redirect(\""+root+"-\"+id+\".xml1\");\r\n" + 
-        "  else if (s.indexOf(\"json\") > -1) \r\n" + 
-        "    Response.Redirect(\""+root+"-\"+id+\".json\");\r\n" + 
-        "  else if (s.indexOf(\"html\") == -1) \r\n" + 
-        "    Response.Redirect(\""+root+"-\"+id+\".xml\");\r\n" );
-    for (String s : map.keySet()) {
-      if (s.startsWith(rt+"/")) {
-        String id = s.substring(rt.length()+1);
-        String link = map.get(s);
-        b.append("  else if (id == \""+id+"\")\r\n" + 
-            "    Response.Redirect(\""+link+"\");\r\n");
+      String root = Utilities.pathURL(canonical, rt);
+      b.append("<%@ language=\"javascript\"%>\r\n" + 
+          "\r\n" + 
+          "<%\r\n" + 
+          "  var s = String(Request.ServerVariables(\"HTTP_ACCEPT\"));\r\n" +
+          "  var id = Request.QueryString(\"id\");\r\n"+
+          "  if (s.indexOf(\"application/json+fhir\") > -1) \r\n" + 
+          "    Response.Redirect(\""+root+"-\"+id+\".json2\");\r\n" + 
+          "  else if (s.indexOf(\"application/fhir+json\") > -1) \r\n" + 
+          "    Response.Redirect(\""+root+"-\"+id+\".json1\");\r\n" + 
+          "  else if (s.indexOf(\"application/xml+fhir\") > -1) \r\n" + 
+          "    Response.Redirect(\""+root+"-\"+id+\".xml2\");\r\n" + 
+          "  else if (s.indexOf(\"application/fhir+xml\") > -1) \r\n" + 
+          "    Response.Redirect(\""+root+"-\"+id+\".xml1\");\r\n" + 
+          "  else if (s.indexOf(\"json\") > -1) \r\n" + 
+          "    Response.Redirect(\""+root+"-\"+id+\".json\");\r\n" + 
+          "  else if (s.indexOf(\"html\") == -1) \r\n" + 
+          "    Response.Redirect(\""+root+"-\"+id+\".xml\");\r\n" );
+      for (String s : map.keySet()) {
+        if (s.startsWith(rt+"/")) {
+          String id = s.substring(rt.length()+1);
+          String link = map.get(s);
+          b.append("  else if (id == \""+id+"\")\r\n" + 
+              "    Response.Redirect(\""+link+"\");\r\n");
+        }
       }
-    }
-    b.append("  else if (id == \"index\")\r\n" + 
-        "    Response.Redirect(\""+root+".html\");\r\n");
-    b.append(     
-        "\r\n" + 
-        "%>\r\n" + 
-        "\r\n" + 
-        "<!DOCTYPE html>\r\n" + 
-        "<html>\r\n" + 
-        "<body>\r\n" + 
-        "Internal Error - unknown id <%= Request.QueryString(\"id\") %> (from "+Utilities.path(localFolder, "cr"+rt.toLowerCase()+".asp")+") .\r\n" + 
-        "</body>\r\n" + 
-        "</html>\r\n");
+      b.append("  else if (id == \"index\")\r\n" + 
+          "    Response.Redirect(\""+root+".html\");\r\n");
+      b.append(     
+          "\r\n" + 
+              "%>\r\n" + 
+              "\r\n" + 
+              "<!DOCTYPE html>\r\n" + 
+              "<html>\r\n" + 
+              "<body>\r\n" + 
+              "Internal Error - unknown id <%= Request.QueryString(\"id\") %> (from "+Utilities.path(localFolder, "cr"+rt.toLowerCase()+".asp")+") .\r\n" + 
+              "</body>\r\n" + 
+          "</html>\r\n");
 
-    String asp = b.toString();
-    File f = new File(Utilities.path(folder, "cr"+rt.toLowerCase()+".asp"));
-    if (f.exists()) {
-      String aspc = TextFile.fileToString(f);
-      if (aspc.equals(asp))
-        return;
-    }
-    countUpdated++;
-    TextFile.stringToFile(b.toString(), f);    
-    
+      String asp = b.toString();
+      File f = new File(Utilities.path(folder, "cr"+rt.toLowerCase()+".asp"));
+      if (f.exists()) {
+        String aspc = TextFile.fileToString(f);
+        if (aspc.equals(asp))
+          return;
+      }
+      countUpdated++;
+      TextFile.stringToFile(b.toString(), f);    
+    }    
   }
 
   private void generateWebConfig(Set<String> rtl, boolean root) throws IOException {
@@ -248,7 +249,7 @@ public class IGReleaseRedirectionBuilder {
     b.append(root ?  WC_START_ROOT : WC_START_OTHER);
     countTotal++;
     for (String rt : rtl) { 
-      if (!Utilities.existsInList(rt, "v2", "v3")) {
+      if (!Utilities.existsInList(rt, "v2", "v3") && !rt.contains(":")) {
         b.append("        <rule name=\""+rulePrefix()+rt+"\">\n" + 
             "          <match url=\"^("+rt+")/([A-Za-z0-9\\-\\.]{1,64})\" />\n" + 
             "          <action type=\"Rewrite\" url=\"cr"+rt.toLowerCase()+".asp?type={R:1}&amp;id={R:2}\" />\n" + 
@@ -291,14 +292,16 @@ public class IGReleaseRedirectionBuilder {
     Map<String, String> map = createMap(false);
     if (map != null) {
       for (String s : map.keySet()) {
-        String path = Utilities.path(folder, s, "index.asp");
-        String p = s.replace("/", "-");
-        String litPath = Utilities.path(folder, p)+".html";
-        if (!new File(litPath+".xml").exists() && !new File(litPath+".json").exists()) 
-          litPath = Utilities.path(folder, tail(map.get(s)));
-        File file = new File(Utilities.changeFileExt(litPath, ".xml"));
-        if (file.exists() && new File(Utilities.changeFileExt(litPath, ".json")).exists()) {
-          createAspRedirect(path, map.get(s), Utilities.pathURL(vpath, head(file.getName())));
+        if (!s.contains(":")) {
+          String path = Utilities.path(folder, s, "index.asp");
+          String p = s.replace("/", "-");
+          String litPath = Utilities.path(folder, p)+".html";
+          if (!new File(litPath+".xml").exists() && !new File(litPath+".json").exists()) 
+            litPath = Utilities.path(folder, tail(map.get(s)));
+          File file = new File(Utilities.changeFileExt(litPath, ".xml"));
+          if (file.exists() && new File(Utilities.changeFileExt(litPath, ".json")).exists()) {
+            createAspRedirect(path, map.get(s), Utilities.pathURL(vpath, head(file.getName())));
+          }
         }
       }
     }
