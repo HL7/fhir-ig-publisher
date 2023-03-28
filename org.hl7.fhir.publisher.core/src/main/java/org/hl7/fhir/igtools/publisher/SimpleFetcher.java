@@ -321,7 +321,7 @@ public class SimpleFetcher implements IFetchFile {
             String ext = Utilities.getFileExtension(fn);
             if (!Utilities.existsInList(ext, "md", "txt") && !fn.endsWith(".gitignore") && !fn.contains("-spreadsheet") && !isIgnoredFile(f.getName())) {
               boolean ok = false;
-              if (!Utilities.existsInList(ext, "json", "ttl", "html", "txt", "fml"))
+              if (!Utilities.existsInList(ext, fixedFileTypes()))
                 try {
                   org.hl7.fhir.r5.elementmodel.Element e = new org.hl7.fhir.r5.elementmodel.XmlParser(context).parseSingle(new FileInputStream(f));
                   addFile(res, f, e, "application/fhir+xml");
@@ -384,6 +384,15 @@ public class SimpleFetcher implements IFetchFile {
       log.logDebugMessage(LogCategory.PROGRESS, "Loaded "+Integer.toString(count)+" files from "+s);
     }
     return res;
+  }
+
+  private List<String> fixedFileTypes() {
+    return Utilities.strings(
+        // known file types we have parsers for
+        "json", "ttl", "html", "txt", "fml", 
+        
+        // known files types to not even try parsing
+        "jpg", "png", "gif", "mp3", "mp4", "pfd", "doc", "docx", "ppt", "pptx", "svg");
   }
 
   private void addFile(List<FetchedFile> res, File f, org.hl7.fhir.r5.elementmodel.Element e, String cnt) throws IOException {

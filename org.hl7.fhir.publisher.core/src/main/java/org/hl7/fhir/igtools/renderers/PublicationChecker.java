@@ -172,10 +172,22 @@ public class PublicationChecker {
         summary.add(new StringPair("status", pr.asString("status")));                        
       }
     }
+    if (mode == PublicationProcessMode.TECHNICAL_CORRECTION) {
+      if (check(messages, pl != null, "Can't publish a technical correction when nothing is published yet."+mkWarning())) {
+        PackageListEntry cv = getCurrentPublication(pl);
+        check(messages, cv != null, "TCan't publish a technical correction when there's no current publication."+mkWarning());
+      }
+    }
     if (check(messages, pr.has("sequence"), "No publication request sequence found (sequence is e.g. R1, and groups all the pre-publications together. if you don't have a lifecycle like that, just use 'Releases' or 'Publications')"+mkError())) {
       if (pl != null) {
         String seq = getCurrentSequence(pl);
-        check(messages, pr.asString("sequence").equals(seq), "This publication will finish the sequence '"+seq+"' and start a new sequence '"+pr.asString("sequence")+"'"+mkInfo());
+        if (pr.asString("sequence").equals(seq)) {
+          PackageListEntry lv = getLastVersionForSequence(pl, seq); 
+          check(messages, mode != PublicationProcessMode.WORKING || lv.current(), "This release is labelled as a working release in the sequence '"+seq+"'. This is an unexpected workflow - check that the sequence really is correct."+mkWarning());
+        } else if (check(messages, mode != PublicationProcessMode.TECHNICAL_CORRECTION, "Technical Corrections must happen in the scope of the current sequence ('"+seq+"', not '"+pr.asString("sequence")+"'."+mkWarning())) {
+          PackageListEntry ls = getLastVersionForSequence(pl, pr.asString("sequence"));
+          check(messages, ls == null || !ls.current(), "The sequence '"+seq+"' has already been closed with a current publication, and a new sequence '"+seq+"' started - is going back to '"+pr.asString("sequence")+"' really what's intended?"+mkWarning());
+        }        
       }
       summary.add(new StringPair("sequence", pr.asString("sequence")));                        
     }
@@ -204,6 +216,10 @@ public class PublicationChecker {
       }
     }
     if (pl == null) {
+      if (check(messages, "true".equals(pr.asString("first")), "This IG is not yet published at all, so there must be \"first\" : true in the publication request"+mkError())) {
+        summary.add(new StringPair("first", pr.asString("first")));                                
+      }
+
       if (check(messages, pr.has("category"), "No publication request category found (needed for first publication - consult FHIR product director for a value"+mkError())) {
         summary.add(new StringPair("category", pr.asString("category")));                                
       }
@@ -225,6 +241,24 @@ public class PublicationChecker {
     check(messages, !pr.has("date"), "Cannot specify a date of publication in the request"+mkError());
     check(messages, !pr.has("canonical"), "Cannot specify a canonical in the request"+mkError());
     
+  }
+
+  private PackageListEntry getLastVersionForSequence(PackageList pl, String seq) {
+    for (PackageListEntry v : pl.versions()) {
+      if (seq.equals(v.sequence())) {
+        return v;
+      }
+    }
+    return null;
+  }
+
+  private PackageListEntry getCurrentPublication(PackageList pl) {
+    for (PackageListEntry v : pl.versions()) {
+      if (v.current()) {
+        return v;
+      }
+    }
+    return null;
   }
 
   private PackageListEntry getVersionObject(String v, PackageList pl) {
