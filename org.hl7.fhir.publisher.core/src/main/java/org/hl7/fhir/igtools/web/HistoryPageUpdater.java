@@ -36,7 +36,11 @@ public class HistoryPageUpdater {
 
   public void updateHistoryPage(String sourceRepo, String folder, String templateSrc, boolean delta) throws IOException {
     System.out.println("Update history page at "+folder+" from "+sourceRepo+" and "+templateSrc);
-    copyFiles(sourceRepo, folder);
+    if (!delta) {
+      copyFiles(sourceRepo, folder);
+    } else {
+      // throw new Error("not done yet");
+    }
 
     JsonObject json = JsonParser.parseObjectFromFile(Utilities.path(folder, "package-list.json"));
     scrubApostrophes(json);
