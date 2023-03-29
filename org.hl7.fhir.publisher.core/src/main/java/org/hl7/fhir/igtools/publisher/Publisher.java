@@ -9643,7 +9643,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       ttl.setStyle(OutputStyle.PRETTY);
       ttl.compose(r.getElement(), rdf, "");
-      fragment(r.fhirType()+"-"+r.getId()+"-ttl-html", rdf.asHtml(), f.getOutputNames(), r, vars, "ttl");
+      fragment(r.fhirType()+"-"+r.getId()+"-ttl-html", rdf.asHtml(size < PRISM_SIZE_LIMIT), f.getOutputNames(), r, vars, "ttl");
     }
 
     if (igpkp.wantGen(r, "html")) {
