@@ -668,6 +668,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private List<String> pagesDirs = new ArrayList<String>();
   private List<String> dataDirs = new ArrayList<String>();
   private String tempDir;
+  private String tempLangDir;
   private String outputDir;
   private String specPath;
   private String qaDir;
@@ -875,6 +876,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private StructureDefinitionSpreadsheetGenerator allProfilesXlsx;
   private boolean produceJekyllData;
   private boolean noUsageCheck;
+  private boolean hasTranslations;
+  private String defaultTranslationLang;
+  private List<String> translationLangs = new ArrayList<>();
   
   private class PreProcessInfo {
     private String xsltName;
@@ -1091,6 +1095,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       log("Processing Provenance Records");
       processProvenanceDetails();
+      if (hasTranslations) {
+        log("Generating Translation artifacts");
+        processTranslationOutputs();
+      }
       log("Generating Outputs in "+outputDir);
       generate();
       clean();
@@ -1118,6 +1126,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       throw e;
     }
+  }
+
+  private void processTranslationOutputs() throws IOException {
+
+    PublisherTranslator pt = new PublisherTranslator(context, defaultTranslationLang, translationLangs);
+    pt.start(tempLangDir);
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        pt.translate(f, r);
+      }
+    }
+    pt.finish();    
   }
 
   private Set<String> scanForR5Extensions() {
@@ -2420,6 +2440,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     Boolean useStatsOptOut = null;
     List<String> extensionDomains = new ArrayList<>();
     tempDir = Utilities.path(rootDir, "temp");
+    tempLangDir = Utilities.path(rootDir, "temp", "lang");
     outputDir = Utilities.path(rootDir, "output");
     Map<String, String> expParamMap = new HashMap<>();
     boolean allowExtensibleWarnings = false;
@@ -2591,6 +2612,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         Utilities.createDirectory(dir);
         pageFactories.add(new PageFactory(Utilities.path(rootDir, p.getValue()), dir));
         pagesDirs.add(dir);
+      } else if (pc.equals("i18n-default-lang")) {
+        hasTranslations = true;
+        defaultTranslationLang = p.getValue();
+      } else if (pc.equals("i18n-lang")) {
+        hasTranslations = true;
+        translationLangs .add(p.getValue());
       }
       count++;
     }
@@ -2756,6 +2783,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       dep.setVersion(pcm.getLatestVersion(dep.getPackageId()));
       dep.addExtension(ToolingExtensions.EXT_IGDEP_COMMENT, new MarkdownType("Automatically added as a dependency - all IGs depend on HL7 Terminology"));
       sourceIg.getDependsOn().add(0, dep);
+    }
+    if (sourceIg.hasExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency")) {
+      sourceIg.getExtensionByUrl("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency").setValue(new CodeType("hl7.fhir.uv.tools#current"));      
+    } else {
+      sourceIg.addExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency", new CodeType("hl7.fhir.uv.tools#current"));
     }
     inspector = new HTMLInspector(outputDir, specMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), trackedFragments);
     inspector.getManual().add("full-ig.zip");
