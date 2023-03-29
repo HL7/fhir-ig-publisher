@@ -36,7 +36,7 @@ public class GitUtilities {
 		String[] cmd = { "git", "branch", "--show-current" };
 		return execAndReturnString(cmd, new String[]{}, gitDir);
 	  } catch (Exception e) {
-		System.out.println("Warning @ Unable to read the git branch: " + e.getMessage() );
+		System.out.println("Warning @ Unable to read the git branch: " + e.getMessage().replace("fatal: ", "") );
 		return "";
 	  }
 	}
