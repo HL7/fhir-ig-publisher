@@ -273,8 +273,8 @@ public class WebSourceProvider {
     System.out.print(Utilities.padLeft("", '\b', length));
     String note;
     
-    int pct = ((count * 20) / size);
-    String pc = "["+Utilities.padRight(Utilities.padLeft("",  '#', pct), ' ', 20)+"]";
+    int pct = ((count * 50) / size);
+    String pc = "["+Utilities.padRight(Utilities.padLeft("",  '#', pct), ' ', 50)+"]";
     long secondsDone = (System.currentTimeMillis() - start) / 1000;
     if (count == 0 || secondsDone == 0) {
       note = pc;

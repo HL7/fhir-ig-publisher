@@ -43,7 +43,7 @@ public class XIGGenerator {
     super();
     this.target = target;
     pcm = new FilesystemPackageCacheManager(true, ToolsVersion.TOOLS_VERSION);
-    NpmPackage npm = pcm.loadPackage("hl7.fhir.r5.core#5.0.0-ballot");
+    NpmPackage npm = pcm.loadPackage("hl7.fhir.r5.core#5.0.0");
     info.setCtxt(new SimpleWorkerContext.SimpleWorkerContextBuilder().fromPackage(npm, new PublisherLoader(npm, SpecMapManager.fromPackage(npm), npm.getWebLocation(), null).makeLoader()));
     info.getCtxt().setAllowLazyLoading(false);
     info.getCtxt().setAllowLoadingDuplicates(true);
