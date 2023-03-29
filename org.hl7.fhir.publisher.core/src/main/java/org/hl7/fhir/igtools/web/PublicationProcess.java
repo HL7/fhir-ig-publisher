@@ -41,6 +41,9 @@ import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
+import org.hl7.fhir.utilities.xml.XMLUtil;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 
 import com.google.gson.JsonSyntaxException;
 
@@ -318,10 +321,11 @@ public class PublicationProcess {
       tcName = pl.pid()+"#"+pl.current().version()+".zip";
     }
     
-    // we always need the current folder, if there is one 
-    if (pl.current() != null) {
-      src.needFolder(relDest, false);
-    }
+    // we always need the current folder, if there is one
+    // nah, that just wastes time uploading it 
+//    if (pl.current() != null) {
+//      src.needFolder(relDest, false);
+//    }
     // todo: check the license, header, footer?... 
     
     // well, we've run out of things to test... time to actually try...
@@ -488,7 +492,7 @@ public class PublicationProcess {
     updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("package"), false, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(genDate), username, version, gitSrcId, runNumber);
     updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("publication"), true, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(genDate), username, version, gitSrcId, runNumber);
 
-    new HistoryPageUpdater().updateHistoryPage(history.getAbsolutePath(), destination, templateSrc, !first);
+    new HistoryPageUpdater().updateHistoryPage(history.getAbsolutePath(), destination, templateSrc, !first); 
 
     IndexMaintainer ndx = getIndexForIg(indexes, npmB.id());
     if (ndx != null) {
@@ -510,7 +514,6 @@ public class PublicationProcess {
       go = true;
     }
     if (go) {
-      System.out.println("Go!");
       updateRegistry(fRegistry, pl, plVer, npmB);
       logger.stop();
       FileUtils.copyFile(new File(logger.getFilename()), new File(Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".log")));
@@ -583,14 +586,56 @@ public class PublicationProcess {
   private void updateFeed(File fRoot, String destVer, PackageList pl, PackageListEntry plVer, String file, boolean isPublication, WebSourceProvider src, String orgName, NpmPackage npm, String genDate, String username, String version, String gitSrcId, String runNumber) throws IOException {
     if (!Utilities.noString(file)) {
       src.needFile(file);
-      String newContent = makeEntry(pl, plVer, isPublication, orgName, npm, genDate, username, version, gitSrcId, runNumber);
-      String rss = TextFile.fileToString(Utilities.path(fRoot.getAbsolutePath(), file));
-      int i = rss.indexOf("<item");
-      while (rss.charAt(i-1) == ' ') {
-        i--;
+      if (!updateFeedAsXml(Utilities.path(fRoot.getAbsolutePath(), file), pl, plVer, isPublication, orgName, npm, genDate, username, version, gitSrcId, runNumber)) {
+        String newContent = makeEntry(pl, plVer, isPublication, orgName, npm, genDate, username, version, gitSrcId, runNumber);
+        String rss = TextFile.fileToString(Utilities.path(fRoot.getAbsolutePath(), file));
+        int i = rss.indexOf("<item");
+        while (rss.charAt(i-1) == ' ') {
+          i--;
+        }
+        rss = rss.substring(0, i) + newContent+rss.substring(i);
+        TextFile.stringToFile(rss, Utilities.path(fRoot.getAbsolutePath(), file));
       }
-      rss = rss.substring(0, i) + newContent+rss.substring(i);
-      TextFile.stringToFile(rss, Utilities.path(fRoot.getAbsolutePath(), file));
+    }
+  }
+
+  private boolean updateFeedAsXml(String file, PackageList pl, PackageListEntry plVer, boolean isPublication, String orgName, NpmPackage npm, String genDate, String username, String version, String gitSrcId, String runNumber) {
+    String link = Utilities.pathURL(plVer.path(), isPublication ? "index.html" : "package.tgz");
+    try {
+      Document xml = XMLUtil.parseFileToDom(file);
+      Element rss = xml.getDocumentElement();
+      Element channel = XMLUtil.getNamedChild(rss, "channel");
+      Element item = XMLUtil.getNamedChild(channel, "item");
+      Element nitem = null;
+      if (item == null) {
+        channel.appendChild(xml.createTextNode("\n    "));
+        nitem = xml.createElement("item");
+        channel.appendChild(nitem);        
+      } else {
+        nitem = xml.createElement("item");
+        channel.insertBefore(nitem, item);        
+        channel.insertBefore(xml.createTextNode("\n    "), item);        
+      }
+      XMLUtil.addTextTag(xml, nitem, "title", isPublication ? pl.title()+" version "+plVer.version() : pl.pid()+"#"+plVer.version(), 6);
+      XMLUtil.addTextTag(xml, nitem, "description", plVer.desc(), 6);
+      XMLUtil.addTextTag(xml, nitem, "link", link, 6);
+      XMLUtil.addTextTag(xml, nitem, "guid", link, 6).setAttribute("isPermaLink", "true");
+      XMLUtil.addTextTag(xml, nitem, "dc:creator", orgName, 6);
+      XMLUtil.addTextTag(xml, nitem, "fhir:version", plVer.fhirVersion(), 6);
+      XMLUtil.addTextTag(xml, nitem, "fhir:kind", npm.getNpm().asString("type"), 6);
+      XMLUtil.addTextTag(xml, nitem, "pubDate", presentDate(npm.dateAsDate()), 6);
+      XMLUtil.addTextTag(xml, nitem, "fhir:details", "Publication run at "+genDate+" by "+username+" using v"+version+" source id "+gitSrcId+" Run #"+runNumber, 6);
+      nitem.appendChild(xml.createTextNode("\n    "));
+      
+      Element dt = XMLUtil.getNamedChild(channel, "lastBuildDate");
+      dt.getChildNodes().item(0).setTextContent(presentDate(npm.dateAsDate()));
+      dt = XMLUtil.getNamedChild(channel, "pubDate");
+      dt.getChildNodes().item(0).setTextContent(presentDate(npm.dateAsDate()));
+      XMLUtil.writeDomToFile(xml, file);
+      return true;
+    } catch (Exception e) {
+      System.out.println("Unable to process RSS feed "+file+" as XML - processing as text instead ("+e.getMessage()+")");
+      return false;
     }
   }
 
@@ -763,9 +808,14 @@ public class PublicationProcess {
   }
 
   private void runBuild(JsonObject qa, String path, String[] args) throws Exception {
-    Publisher.main(args); // any exceptions, we just let them propagate
-    // check it built ok:
     File f = new File(Utilities.path(path, "output", "qa.json"));
+    if (!f.exists()) {
+      f.delete();
+    }
+    
+    Publisher.main(args); // any exceptions, we just let them propagate
+
+    // check it built ok:
     if (!f.exists()) {
       throw new Error("File "+f.getAbsolutePath()+" not found - it appears the build run failed");
     }
