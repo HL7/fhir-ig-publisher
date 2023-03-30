@@ -2886,7 +2886,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (Extension e : sourceIg.getExtensionsByUrl(ToolingExtensions.EXT_IGP_MAPPING_CSV)) {
       mappings.add(e.getValue().primitiveValue());
     }
-    for (Extension e : sourceIg.getExtensionsByUrl(ToolingExtensions.EXT_IGP_BUNDLE)) {
+    for (Extension e : sourceIg.getDefinition().getExtensionsByUrl(ToolingExtensions.EXT_IGP_BUNDLE)) {
       bundles.add(e.getValue().primitiveValue());
     }
     if (mode == IGBuildMode.AUTOBUILD)
@@ -4230,7 +4230,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           } else if (res.hasExtension(ToolingExtensions.EXT_BINARY_FORMAT_OLD)) {
             loadAsBinaryResource(f, f.addResource(f.getName()), res, res.getExtensionString(ToolingExtensions.EXT_BINARY_FORMAT_OLD));
           } else {
-            loadAsElementModel(f, f.addResource(f.getContentType()), res);
+            loadAsElementModel(f, f.addResource(f.getContentType()), res, false);
           }
           if (res.hasExtension(ToolingExtensions.EXT_BINARY_LOGICAL)) {
             f.setLogical(res.getExtensionString(ToolingExtensions.EXT_BINARY_LOGICAL));
@@ -4750,7 +4750,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (changed) {
       f.setBundle(new FetchedResource(f.getName()+" (bundle)"));
       f.setBundleType(FetchedBundleType.NATIVE);
-      loadAsElementModel(f, f.getBundle(), null);
+      loadAsElementModel(f, f.getBundle(), null, true);
       List<Element> entries = new ArrayList<Element>();
       f.getBundle().getElement().getNamedChildren("entry", entries);
       int i = -1;
@@ -4776,17 +4776,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     } else
       f = altMap.get("Bundle/"+name);
-    ImplementationGuideDefinitionGroupingComponent pck = null;
     for (FetchedResource r : f.getResources()) {
       bndIds.add(r.fhirType()+"/"+r.getId());
       ImplementationGuideDefinitionResourceComponent res = findIGReference(r.fhirType(), r.getId());
       if (res == null) {
-        if (pck == null) {
-          pck = publishedIg.getDefinition().addGrouping().setName(f.getTitle());
-          pck.setId(name);
-        }
         res = publishedIg.getDefinition().addResource();
-        res.setGroupingId(pck.getId());
         if (!res.hasName())
           if (r.hasTitle())
             res.setName(r.getTitle());
@@ -4814,17 +4808,32 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private boolean loadResources(boolean needToBuild, FetchedFile igf) throws Exception { // igf is not currently used, but it was about relative references? 
     List<FetchedFile> resources = fetcher.scan(sourceDir, context, igpkp.isAutoPath());
     for (FetchedFile ff : resources) {
-      if (!ff.matches(igf))
+       if (!ff.matches(igf) && !isBundle(ff)) {
         needToBuild = loadResource(needToBuild, ff);
+      }
     }
     return needToBuild;
+  }
+
+  private boolean isBundle(FetchedFile ff) {
+    File f = new File(ff.getName());
+    String n = f.getName();
+    if (n.contains(".")) {
+      n = n.substring(0, n.indexOf("."));
+    }
+    for (String s : bundles) {
+      if (n.equals("bundle-"+s)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private boolean loadResource(boolean needToBuild, FetchedFile f) throws Exception {
     logDebugMessage(LogCategory.INIT, "load "+f.getPath());
     boolean changed = noteFile(f.getPath(), f);
     if (changed) {
-      loadAsElementModel(f, f.addResource(f.getName()), null);
+      loadAsElementModel(f, f.addResource(f.getName()), null, false);
     }
     for (FetchedResource r : f.getResources()) {
       ImplementationGuideDefinitionResourceComponent res = findIGReference(r.fhirType(), r.getId());
@@ -4914,7 +4923,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         FetchedFile fv = fetcher.fetchFlexible(vr);
         boolean vrchanged = noteFile("sp-ValueSet/"+vr, fv);
         if (vrchanged) {
-          loadAsElementModel(fv, fv.addResource(f.getName()+" (VS)"), null);
+          loadAsElementModel(fv, fv.addResource(f.getName()+" (VS)"), null, false);
           checkImplicitResourceIdentity(id, fv);
         }
         knownValueSetIds.add(id);
@@ -4926,7 +4935,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             fv = fetcher.fetchFlexible(cr);
             crchanged = noteFile("sp-CodeSystem/"+vr, fv);
             if (crchanged) {
-              loadAsElementModel(fv, fv.addResource(f.getName()+" (CS)"), null);
+              loadAsElementModel(fv, fv.addResource(f.getName()+" (CS)"), null, false);
               checkImplicitResourceIdentity(id, fv);
             }
           }
@@ -5406,7 +5415,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     srcForLoad.setUserData("loaded.resource", r);
   }
   
-  private void loadAsElementModel(FetchedFile file, FetchedResource r, ImplementationGuideDefinitionResourceComponent srcForLoad) throws Exception {
+  private void loadAsElementModel(FetchedFile file, FetchedResource r, ImplementationGuideDefinitionResourceComponent srcForLoad, boolean suppressLoading) throws Exception {
     file.getErrors().clear();
     Element e = null;
 
@@ -5456,11 +5465,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
         r.setElement(e).setId(id);
         igpkp.findConfiguration(file, r);
-        if (srcForLoad == null)
-          srcForLoad = findIGReference(r.fhirType(), r.getId());
-        if (srcForLoad == null && !"ImplementationGuide".equals(r.fhirType())) {
-          srcForLoad = publishedIg.getDefinition().addResource();
-          srcForLoad.getReference().setReference(r.fhirType()+"/"+r.getId());
+        if (!suppressLoading) {
+          if (srcForLoad == null)
+            srcForLoad = findIGReference(r.fhirType(), r.getId());
+          if (srcForLoad == null && !"ImplementationGuide".equals(r.fhirType())) {
+            srcForLoad = publishedIg.getDefinition().addResource();
+            srcForLoad.getReference().setReference(r.fhirType()+"/"+r.getId());
+          }
         }
 
         String ver = ToolingExtensions.readStringExtension(srcForLoad, ToolingExtensions.EXT_IGP_LOADVERSION); 
