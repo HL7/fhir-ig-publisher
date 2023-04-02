@@ -644,7 +644,7 @@ public class R4ToR4BAnalyser {
     String pid = VersionUtilities.packageForVersion(version);
     String specPath = VersionUtilities.getSpecUrl(version);
     System.out.println("Loaded. Version = "+version);
-    FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager(true, ToolsVersion.TOOLS_VERSION);
+    FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager(org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager.FilesystemPackageCacheMode.USER);
     System.out.println("Preparing using "+pid);
     NpmPackage pi = pcm.loadPackage(pid);
     
