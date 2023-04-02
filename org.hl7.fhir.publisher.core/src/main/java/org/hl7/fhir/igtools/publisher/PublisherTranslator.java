@@ -5,10 +5,12 @@ import java.util.List;
 
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
+import org.hl7.fhir.r5.elementmodel.LangaugeUtils;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.i18n.LanguageFileProducer;
 import org.hl7.fhir.utilities.i18n.LanguageFileProducer.LanguageProducerLanguageSession;
 import org.hl7.fhir.utilities.i18n.LanguageFileProducer.LanguageProducerSession;
+import org.hl7.fhir.utilities.i18n.LanguageFileProducer.TextUnit;
 import org.hl7.fhir.utilities.i18n.PoGetTextProducer;
 import org.hl7.fhir.utilities.i18n.XLIFFProducer;
 
@@ -49,28 +51,14 @@ public class PublisherTranslator {
     LanguageProducerSession session = lp.startSession(r.fhirType()+"-"+r.getId(), defaultTranslationLang);
     for (String lang : translationLangs) {
       LanguageProducerLanguageSession langSession = session.forLang(lang);
-      translate(r.getElement(), langSession);
+      LangaugeUtils utils = new LangaugeUtils(context);
+      utils.generateTranslations(r.getElement(), langSession);
       langSession.finish();
     }
     session.finish();    
   }
 
-  private void translate(Element element, LanguageProducerLanguageSession langSession) {
-    if (element.isPrimitive() && isTranslatable(element)) {
-      String base = element.primitiveValue();
-      if (base != null) {
-        String translation = element.getTranslation(langSession.getTargetLang());
-        langSession.entry(element.getPath(), base, translation);
-      }
-    }
-    for (Element c: element.getChildren()) {
-      translate(c, langSession);
-    }
-  }
   
-  private boolean isTranslatable(Element element) {
-    return element.getProperty().isTranslatable();
-  }
 
   public void finish() throws IOException {
     po.finish();
