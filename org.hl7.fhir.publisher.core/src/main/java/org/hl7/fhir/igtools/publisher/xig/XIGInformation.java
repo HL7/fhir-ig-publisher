@@ -76,6 +76,7 @@ public class XIGInformation {
   private Set<String> jurisdictions = new HashSet<>();
   private SimpleWorkerContext ctxt;
   Map<String, List<CanonicalResourceUsage>> usages = new HashMap<>();
+  private XIGExtensionHandler extensionHandler = new XIGExtensionHandler();
   
   public Map<String, String> getPid() {
     return pid;
@@ -223,4 +224,9 @@ public class XIGInformation {
       list.add(new CanonicalResourceUsage(cr, usage));
     }
   }
+  public XIGExtensionHandler getExtensionHandler() {
+    return extensionHandler;
+  }
+  
+  
 }
