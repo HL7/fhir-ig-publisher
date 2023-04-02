@@ -2037,7 +2037,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return new TypeParserR2();
     } else if (VersionUtilities.isR4BVer(ver)) {
       return new TypeParserR4B();
-    } else if (VersionUtilities.isR5Ver(ver)) {
+    } else if (VersionUtilities.isR5Plus(ver)) {
       return new TypeParserR5();
     } else
       throw new FHIRException("Unsupported version "+ver);
@@ -2236,7 +2236,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   public void initialize() throws Exception {
     firstExecution = true;
-    pcm = new FilesystemPackageCacheManager(mode == null || mode == IGBuildMode.MANUAL || mode == IGBuildMode.PUBLICATION, ToolsVersion.TOOLS_VERSION);
+    pcm = new FilesystemPackageCacheManager(mode == null || mode == IGBuildMode.MANUAL || mode == IGBuildMode.PUBLICATION);
     log("Build FHIR IG from "+configFile);
     if (mode == IGBuildMode.PUBLICATION)
       log("Build Formal Publication package, intended for "+getTargetOutput());
@@ -3447,6 +3447,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       vs = "hl7.terminology.r4";
     } else if (VersionUtilities.isR5Ver(version)) {
       vs = "hl7.terminology.r5";
+    } else if (VersionUtilities.isR5Ver(version)) {
+      vs = "hl7.terminology.r6";
     }
     return vs;
   }
@@ -3459,6 +3461,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       vs = "hl7.fhir.uv.extensions.r4";
     } else if (VersionUtilities.isR5Ver(version)) {
       vs = "hl7.fhir.uv.extensions.r5";
+    } else if (VersionUtilities.isR6Ver(version)) {
+      vs = "hl7.fhir.uv.extensions.r6";
     }
     return vs;
   }
@@ -3657,7 +3661,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       Utilities.createDirectory(adHocTmpDir);
     Utilities.clearDirectory(adHocTmpDir);
 
-    FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager(true, ToolsVersion.TOOLS_VERSION);
+    FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager(org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager.FilesystemPackageCacheMode.USER);
     
     NpmPackage npm = null; 
     if (specifiedVersion == null) {
@@ -5088,7 +5092,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           if (!r.isValidated()) {
             validate(f, r);
           }
-          if (SpecialTypeHandler.handlesType(r.fhirType()) && !VersionUtilities.isR5Ver(version)) {
+          if (SpecialTypeHandler.handlesType(r.fhirType()) && !VersionUtilities.isR5Plus(version)) {
             // we validated the resource as it was supplied, but now we need to 
             // switch it for the correct representation in the underlying version
             byte[] cnt = null;
@@ -6179,7 +6183,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         throw new Exception("Unable to determine file type for "+name);
       }
       return VersionConvertorFactory_43_50.convertResource(res);
-    } else if (VersionUtilities.isR5Ver(parseVersion)) {
+    } else if (VersionUtilities.isR5Plus(parseVersion)) {
       if (contentType.contains("json")) {
         return new JsonParser(true, true).parse(source);
       } else if (contentType.contains("xml")) {
@@ -7214,7 +7218,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             new org.hl7.fhir.dstu2.formats.JsonParser().compose(bs, VersionConvertorFactory_10_50.convertResource(r.getResource(), advisor));
           } else if (VersionUtilities.isR4BVer(version)) {
             new org.hl7.fhir.r4b.formats.JsonParser().compose(bs, VersionConvertorFactory_43_50.convertResource(r.getResource()));
-          } else if (VersionUtilities.isR5Ver(version)) {
+          } else if (VersionUtilities.isR5Plus(version)) {
             new JsonParser().compose(bs, r.getResource());
           } else {
             throw new Exception("Unsupported version "+version);
@@ -9150,6 +9154,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     } catch (Exception e) {
       log("Exception generating resource "+f.getName()+"::"+r.fhirType()+"/"+r.getId()+(!Utilities.noString(prefixForContainer) ? "#"+res.getId() : "")+": "+e.getMessage());
+      f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, r.fhirType(), "Error Rendering Resource: "+e.getMessage(), IssueSeverity.ERROR));
       e.printStackTrace();
       for (StackTraceElement m : e.getStackTrace()) {
           log("   "+m.toString());
@@ -10687,7 +10692,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           s = s + " "+removePassword(args, i);
       }      
       System.out.println(s);
-      FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager(!hasNamedParam(args, "system"), ToolsVersion.TOOLS_VERSION);
+      FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager(!hasNamedParam(args, "system"));
       System.out.println("Cache = "+pcm.getFolder());
       for (String p : getNamedParam(args, "-package").split("\\;")) {
         NpmPackage npm = pcm.loadPackage(p);
