@@ -101,6 +101,9 @@ public class XIGHandler {
     if (VersionUtilities.isR5Ver(ver)) {
       return "R5";
     }
+    if (VersionUtilities.isR6Ver(ver)) {
+      return "R6";
+    }
     return "R?";
   }
 

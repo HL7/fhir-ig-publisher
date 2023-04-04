@@ -14,10 +14,14 @@ import java.util.Map.Entry;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.loaders.PublisherLoader;
 import org.hl7.fhir.r4b.model.Bundle;
+import org.hl7.fhir.r4b.model.MarkdownType;
 import org.hl7.fhir.r4b.model.Bundle.BundleEntryComponent;
 import org.hl7.fhir.r4b.model.Enumerations.FHIRVersion;
 import org.hl7.fhir.r4b.model.OperationDefinition;
 import org.hl7.fhir.r4b.model.OperationDefinition.OperationDefinitionParameterComponent;
+import org.hl7.fhir.r4b.model.Resource;
+import org.hl7.fhir.r4b.utils.DataTypeVisitor;
+import org.hl7.fhir.r4b.utils.DataTypeVisitor.IDatatypeVisitor;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
@@ -398,10 +402,10 @@ public class R4ToR4BAnalyser {
   public void clonePackage(String pid, String filename) throws IOException {
     if (VersionUtilities.isR4Ver(context.getVersion())) {
       genSameVersionPackage(pid, filename, Utilities.changeFileExt(filename, ".r4.tgz"), true, "4.0.0", "r4");
-      genOtherVersionPackage(pid, filename, Utilities.changeFileExt(filename, ".r4b.tgz"), "hl7.fhir.r4b.core", "4.3.0", "r4b", "4.0.0");
+      genOtherVersionPackage(pid, filename, Utilities.changeFileExt(filename, ".r4b.tgz"), "hl7.fhir.r4b.core", "4.3.0", "r4b", "4.0.0", VersionUtilities.getSpecUrl("4.0"), VersionUtilities.getSpecUrl("4.3"));
     } else if (VersionUtilities.isR4BVer(context.getVersion())) {
       genSameVersionPackage(pid, filename, Utilities.changeFileExt(filename, ".r4b.tgz"), false, "4.3.0", "r4b");
-      genOtherVersionPackage(pid, filename, Utilities.changeFileExt(filename, ".r4.tgz"), "hl7.fhir.r4.core", "4.0.0", "r4", "4.3.0");
+      genOtherVersionPackage(pid, filename, Utilities.changeFileExt(filename, ".r4.tgz"), "hl7.fhir.r4.core", "4.0.0", "r4", "4.3.0", VersionUtilities.getSpecUrl("4.3"), VersionUtilities.getSpecUrl("4.0"));
     } else {
       throw new Error("Should not happen");
     }
@@ -467,7 +471,7 @@ public class R4ToR4BAnalyser {
     return JsonParser.composeBytes(json, true);
   }
 
-  private void genOtherVersionPackage(String pid, String source, String dest, String core, String ver, String pver, String nver) throws FHIRException, IOException {
+  private void genOtherVersionPackage(String pid, String source, String dest, String core, String ver, String pver, String nver, String pathS, String pathT) throws FHIRException, IOException {
     NpmPackage src = NpmPackage.fromPackage(new FileInputStream(source));
     JsonObject npm = src.getNpm();
     npm.remove("name");
@@ -485,14 +489,14 @@ public class R4ToR4BAnalyser {
     
     for (Entry<String, NpmPackageFolder> f : src.getFolders().entrySet()) {
       for (String s : f.getValue().listFiles()) {
-       processFileOther(gen, f.getKey(), s, f.getValue().fetchFile(s), ver, pver, nver, VersionUtilities.isR4Ver(ver) ? r4BExemptions : r4Exemptions);          
+       processFileOther(gen, f.getKey(), s, f.getValue().fetchFile(s), ver, pver, nver, VersionUtilities.isR4Ver(ver) ? r4BExemptions : r4Exemptions, pathS, pathT);          
       }
     }
     gen.finish();
   }
 
   // we use R4B here, whether it's r4 or r4b - if the content is in the differences, we won't get to the this point
-  private void processFileOther(NPMPackageGenerator gen, String folder, String filename, byte[] content, String ver, String pver, String nver, Map<String, ResPointer> exemptions) throws IOException {
+  private void processFileOther(NPMPackageGenerator gen, String folder, String filename, byte[] content, String ver, String pver, String nver, Map<String, ResPointer> exemptions, String pathS, String pathT) throws IOException {
     if (Utilities.existsInList(folder, "package", "example")) {
       if (!Utilities.existsInList(filename, "package.json", ".index.json")) {
         org.hl7.fhir.r4b.model.Resource res = new org.hl7.fhir.r4b.formats.JsonParser().parse(content);
@@ -500,7 +504,7 @@ public class R4ToR4BAnalyser {
             ((res instanceof org.hl7.fhir.r4b.model.CanonicalResource) && exemptions.containsKey(((org.hl7.fhir.r4b.model.CanonicalResource) res).getUrl())));
         if (!exempt) {
 //          System.out.println("** Add "+res.fhirType()+"/"+res.getId()+" to other version");
-          if (reVersion(res, ver, pver, nver)) {
+          if (reVersion(res, ver, pver, nver, pathS, pathT)) {
             gen.addFile(folder, filename, new org.hl7.fhir.r4b.formats.JsonParser().composeBytes(res));            
           } else {
             gen.addFile(folder, filename, content);
@@ -518,23 +522,58 @@ public class R4ToR4BAnalyser {
     }
   }
 
-  private boolean reVersion(org.hl7.fhir.r4b.model.Resource res, String ver, String pver, String nver) {
+  private boolean reVersion(org.hl7.fhir.r4b.model.Resource res, String ver, String pver, String nver, String pathS, String pathT) {
     if (res instanceof org.hl7.fhir.r4b.model.StructureDefinition) {
-      return reVersionSD((org.hl7.fhir.r4b.model.StructureDefinition) res, ver, nver);
+      return reVersionSD((org.hl7.fhir.r4b.model.StructureDefinition) res, ver, nver, pathS, pathT);
     } else if (res instanceof org.hl7.fhir.r4b.model.CapabilityStatement) {
-      return reVersionCS((org.hl7.fhir.r4b.model.CapabilityStatement) res, ver);
+      return reVersionCS((org.hl7.fhir.r4b.model.CapabilityStatement) res, ver, pathS, pathT);
     } else if (res instanceof org.hl7.fhir.r4b.model.OperationDefinition) {
-      return reVersionOD((org.hl7.fhir.r4b.model.OperationDefinition) res, ver, nver);
+      return reVersionOD((org.hl7.fhir.r4b.model.OperationDefinition) res, ver, nver, pathS, pathT);
     } else if (res instanceof org.hl7.fhir.r4b.model.ImplementationGuide) {
-      return reVersionIG((org.hl7.fhir.r4b.model.ImplementationGuide) res, ver, pver);
+      return reVersionIG((org.hl7.fhir.r4b.model.ImplementationGuide) res, ver, pver, pathS, pathT);
     } else if (res instanceof org.hl7.fhir.r4b.model.Bundle) {
-      return reVersionBundle((org.hl7.fhir.r4b.model.Bundle) res, ver, pver, nver);
+      return reVersionBundle((org.hl7.fhir.r4b.model.Bundle) res, ver, pver, nver, pathS, pathT);
     } else {
-      return false;
+      return processMarkdown(res, pathS, pathT);
     }
   }
 
-  private boolean reVersionOD(OperationDefinition od, String ver, String nver) {
+  private class MarkdownProcessor implements IDatatypeVisitor<MarkdownType> {
+    
+    private String path1;
+    private String path2;
+
+    
+    protected MarkdownProcessor(String path1, String path2) {
+      super();
+      this.path1 = path1;
+      this.path2 = path2;
+    }
+
+    @Override
+    public Class<MarkdownType> classT() {
+      return MarkdownType.class;
+    }
+
+    @Override
+    public boolean visit(String path, MarkdownType node) {
+      String src = node.asStringValue();
+      if (src.contains(path1)) {
+        node.setValueAsString(src.replace(path1, path2));
+        return true;
+      } else {
+        return false;
+      }
+    }
+    
+  }
+  private boolean processMarkdown(Resource res, String pathS, String pathT) {
+    DataTypeVisitor visitor = new DataTypeVisitor();
+    visitor.visit(res, new MarkdownProcessor(pathS, pathT));
+    return visitor.isAnyTrue();
+  }
+
+  private boolean reVersionOD(OperationDefinition od, String ver, String nver, String pathS, String pathT) {
     boolean res = false;    
     for (OperationDefinitionParameterComponent p : od.getParameter()) {
       if (p.hasBinding() && p.getBinding().hasValueSet() && p.getBinding().getValueSet().endsWith("|"+nver) && p.getBinding().getValueSet().startsWith("http://hl7.org/fhir/ValueSet")) {
@@ -542,20 +581,20 @@ public class R4ToR4BAnalyser {
         res = true;
       }
     }
-    return res;
+    return processMarkdown(od, pathS, pathT) || res;
   }
 
-  private boolean reVersionBundle(Bundle bnd, String ver, String pver, String nver) {
+  private boolean reVersionBundle(Bundle bnd, String ver, String pver, String nver, String pathS, String pathT) {
     boolean res = false;
     for (BundleEntryComponent be : bnd.getEntry()) {
       if (be.hasResource()) {
-        res = reVersion(be.getResource(), ver, pver, nver) || res;
+        res = reVersion(be.getResource(), ver, pver, nver, pathS, pathT) || res;
       }
     }
-    return res;
+    return processMarkdown(bnd, pathS, pathT) || res;
   }
 
-  private boolean reVersionSD(org.hl7.fhir.r4b.model.StructureDefinition sd, String ver, String nver) {
+  private boolean reVersionSD(org.hl7.fhir.r4b.model.StructureDefinition sd, String ver, String nver, String pathS, String pathT) {
     sd.setFhirVersion(org.hl7.fhir.r4b.model.Enumerations.FHIRVersion.fromCode(ver));
     for (org.hl7.fhir.r4b.model.ElementDefinition ed : sd.getDifferential().getElement()) {
       reVersionED(ed, ver, nver);
@@ -563,7 +602,7 @@ public class R4ToR4BAnalyser {
     for (org.hl7.fhir.r4b.model.ElementDefinition ed : sd.getSnapshot().getElement()) {
       reVersionED(ed, ver, nver);
     }
-    return true;
+    return processMarkdown(sd, pathS, pathT) || true;
   }
 
   private boolean reVersionED(org.hl7.fhir.r4b.model.ElementDefinition ed, String ver, String nver) {
@@ -575,17 +614,17 @@ public class R4ToR4BAnalyser {
     }
   }
 
-  private boolean reVersionCS(org.hl7.fhir.r4b.model.CapabilityStatement cs, String ver) {
+  private boolean reVersionCS(org.hl7.fhir.r4b.model.CapabilityStatement cs, String ver, String pathS, String pathT) {
     cs.setFhirVersion(org.hl7.fhir.r4b.model.Enumerations.FHIRVersion.fromCode(ver));
-    return true;
+    return processMarkdown(cs, pathS, pathT) || true;
   }
 
-  private boolean reVersionIG(org.hl7.fhir.r4b.model.ImplementationGuide ig, String ver, String pver) {
+  private boolean reVersionIG(org.hl7.fhir.r4b.model.ImplementationGuide ig, String ver, String pver, String pathS, String pathT) {
     ig.setId(ig.getId()+"."+pver);
     ig.setPackageId(ig.getPackageId()+"."+pver);
     ig.getFhirVersion().clear();
     ig.addFhirVersion(FHIRVersion.fromCode(ver));
-    return true;
+    return processMarkdown(ig, pathS, pathT) ||  true;
   }
   
   public static void main(String[] args) throws Exception {
@@ -605,7 +644,7 @@ public class R4ToR4BAnalyser {
     String pid = VersionUtilities.packageForVersion(version);
     String specPath = VersionUtilities.getSpecUrl(version);
     System.out.println("Loaded. Version = "+version);
-    FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager(true, ToolsVersion.TOOLS_VERSION);
+    FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager(org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager.FilesystemPackageCacheMode.USER);
     System.out.println("Preparing using "+pid);
     NpmPackage pi = pcm.loadPackage(pid);
     

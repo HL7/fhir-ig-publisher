@@ -172,12 +172,12 @@ public class USRealmBusinessRules extends RealmBusinessRules {
     PackageList pl = PackageList.fromUrl("https://hl7.org/fhir/us/core/package-list.json");
     for (PackageListEntry v : pl.versions()) {
       if (VersionUtilities.versionsCompatible(version, v.fhirVersion())) {
-        return new FilesystemPackageCacheManager(true, ToolsVersion.TOOLS_VERSION).loadPackage("hl7.fhir.us.core", v.version());
+        return new FilesystemPackageCacheManager(org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager.FilesystemPackageCacheMode.USER).loadPackage("hl7.fhir.us.core", v.version());
       }
     }
     // we didn't find a compatible version, we'll just take the last version
     for (PackageListEntry v : pl.versions()) {
-      return new FilesystemPackageCacheManager(true, ToolsVersion.TOOLS_VERSION).loadPackage("hl7.fhir.us.core", v.version());
+      return new FilesystemPackageCacheManager(org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager.FilesystemPackageCacheMode.USER).loadPackage("hl7.fhir.us.core", v.version());
     }
     return null;
   }
@@ -188,7 +188,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
       return VersionConvertorFactory_30_50.convertResource(new org.hl7.fhir.dstu3.formats.JsonParser().parse(s), new BaseAdvisor_30_50(false));
     } else if (VersionUtilities.isR4Ver(uscore.fhirVersion())) {
       return VersionConvertorFactory_40_50.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(s));
-    } else if (VersionUtilities.isR5Ver(uscore.fhirVersion())) {
+    } else if (VersionUtilities.isR5Plus(uscore.fhirVersion())) {
       return new org.hl7.fhir.r5.formats.JsonParser().parse(s);
     } else {
       return null;

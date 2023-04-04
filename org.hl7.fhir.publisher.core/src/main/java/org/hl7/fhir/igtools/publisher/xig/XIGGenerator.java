@@ -1,5 +1,6 @@
 package org.hl7.fhir.igtools.publisher.xig;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.text.SimpleDateFormat;
@@ -42,7 +43,7 @@ public class XIGGenerator {
   public XIGGenerator(String target) throws FHIRException, IOException, URISyntaxException {
     super();
     this.target = target;
-    pcm = new FilesystemPackageCacheManager(true, ToolsVersion.TOOLS_VERSION);
+    pcm = new FilesystemPackageCacheManager(org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager.FilesystemPackageCacheMode.USER);
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r5.core#5.0.0");
     info.setCtxt(new SimpleWorkerContext.SimpleWorkerContextBuilder().fromPackage(npm, new PublisherLoader(npm, SpecMapManager.fromPackage(npm), npm.getWebLocation(), null).makeLoader()));
     info.getCtxt().setAllowLazyLoading(false);
@@ -167,7 +168,8 @@ public class XIGGenerator {
     printSummary(); 
   }
 
-  private void printSummary() {
+  private void printSummary() throws FileNotFoundException, IOException {
+    info.getExtensionHandler().finish(target);
     System.out.println("");
     System.out.println("IGs: "+info.getPid().size());
     int i = 0;

@@ -190,7 +190,7 @@ public class PreviousVersionComparator {
         String filename = "";
         try {
           vi.resources = new ArrayList<>();
-          BasePackageCacheManager pcm = new FilesystemPackageCacheManager(true, ToolsVersion.TOOLS_VERSION);
+          BasePackageCacheManager pcm = new FilesystemPackageCacheManager(org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager.FilesystemPackageCacheMode.USER);
           NpmPackage current = pcm.loadPackage(pid, vi.version);
           for (String id : current.listResources("StructureDefinition", "ValueSet", "CodeSystem")) {
             filename = id;
@@ -225,7 +225,7 @@ public class PreviousVersionComparator {
       return VersionConvertorFactory_30_50.convertResource(new org.hl7.fhir.dstu3.formats.JsonParser().parse(s), new BaseAdvisor_30_50(false));
     } else if (VersionUtilities.isR4Ver(version)) {
       return VersionConvertorFactory_40_50.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(s));
-    } else if (VersionUtilities.isR5Ver(version)) {
+    } else if (VersionUtilities.isR5Plus(version)) {
       return new org.hl7.fhir.r5.formats.JsonParser().parse(s);
     } else {
       return null;

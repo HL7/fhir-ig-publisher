@@ -19,6 +19,7 @@ import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
+import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager.FilesystemPackageCacheMode;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
 
@@ -36,7 +37,7 @@ public class IGCategorizer {
   private FilesystemPackageCacheManager pcm;
   
   public IGCategorizer() throws IOException {
-    pcm = new FilesystemPackageCacheManager(false, ToolsVersion.TOOLS_VERSION);
+    pcm = new FilesystemPackageCacheManager(FilesystemPackageCacheMode.USER);
     pcm.setSuppressErrors(true);
   }
   
@@ -500,7 +501,7 @@ public class IGCategorizer {
       return VersionConvertorFactory_40_50.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(s));
     } else if (VersionUtilities.isR2Ver(version)) {
       return VersionConvertorFactory_10_50.convertResource(new org.hl7.fhir.dstu2.formats.JsonParser().parse(s));
-    } else if (VersionUtilities.isR5Ver(version)) {
+    } else if (VersionUtilities.isR5Plus(version)) {
       return new org.hl7.fhir.r5.formats.JsonParser().parse(s);
     } else {
       throw new FHIRException("Unsupported version: "+version);

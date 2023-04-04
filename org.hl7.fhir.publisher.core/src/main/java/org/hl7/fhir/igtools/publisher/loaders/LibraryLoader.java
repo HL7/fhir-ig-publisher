@@ -35,7 +35,7 @@ public class LibraryLoader implements ILibraryReader {
     } else if (VersionUtilities.isR4Ver(version)) {
       org.hl7.fhir.r4.model.Resource res = new org.hl7.fhir.r4.formats.JsonParser().parse(stream);
       return (Library) VersionConvertorFactory_40_50.convertResource(res);
-    } else if (VersionUtilities.isR5Ver(version)) {
+    } else if (VersionUtilities.isR5Plus(version)) {
       return (Library) new JsonParser().parse(stream);  
     } else {
       throw new FHIRException("Unknown Version '"+version+"'");      

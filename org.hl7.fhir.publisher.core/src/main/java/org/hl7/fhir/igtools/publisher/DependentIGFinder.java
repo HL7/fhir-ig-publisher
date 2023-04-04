@@ -20,6 +20,7 @@ import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.*;
+import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager.FilesystemPackageCacheMode;
 import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
 import org.hl7.fhir.utilities.npm.PackageServer;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
@@ -110,7 +111,7 @@ public class DependentIGFinder {
   public DependentIGFinder(String id) throws IOException {
     super();
     this.id = id;
-    pcm = new  FilesystemPackageCacheManager(true, ToolsVersion.TOOLS_VERSION);
+    pcm = new  FilesystemPackageCacheManager(FilesystemPackageCacheMode.USER);
     pcm.setSilent(true);
     outcome = "Finding Dependent IGs not done yet";
   }
@@ -392,7 +393,7 @@ public class DependentIGFinder {
     DepInfoDetails res = new DepInfoDetails(version, path);
     if (VersionUtilities.isR4Ver(npm.fhirVersion()) || VersionUtilities.isR4BVer(npm.fhirVersion())) {
       scanR4IG(npm, res);
-    } else if (VersionUtilities.isR5Ver(npm.fhirVersion())) {
+    } else if (VersionUtilities.isR5Plus(npm.fhirVersion())) {
 //      scanR5IG(npm, res);
     } else if (VersionUtilities.isR3Ver(npm.fhirVersion())) {
 //      scanR3IG(npm, res);

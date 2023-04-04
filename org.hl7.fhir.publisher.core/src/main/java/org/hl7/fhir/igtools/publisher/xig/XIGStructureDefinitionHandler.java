@@ -9,6 +9,7 @@ import java.util.Map;
 
 import org.hl7.fhir.igtools.publisher.xig.XIGInformation.CanonicalResourceUsage;
 import org.hl7.fhir.igtools.publisher.xig.XIGInformation.UsageType;
+import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.Coding;
@@ -32,6 +33,9 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
   }
 
   public void fillOutJson(StructureDefinition sd, JsonObject j) {
+    if (ProfileUtilities.isExtensionDefinition(sd)) {
+      info.getExtensionHandler().seeExtension(sd);
+    }
     if (sd.hasFhirVersion()) {      j.add("fhirVersion", sd.getFhirVersion().toCode()); }
     if (sd.hasKind()) {             j.add("kind", sd.getKind().toCode()); }
     if (sd.hasAbstract()) {         j.add("abstract", sd.getAbstract()); }

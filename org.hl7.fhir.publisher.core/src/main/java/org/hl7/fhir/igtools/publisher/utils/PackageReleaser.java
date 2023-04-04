@@ -87,7 +87,7 @@ public class PackageReleaser {
             new org.hl7.fhir.dstu3.formats.JsonParser().parse(cnt);
           } else if (VersionUtilities.isR4Ver(ver)) {
             new org.hl7.fhir.r4.formats.JsonParser().parse(cnt);
-          } else if (VersionUtilities.isR5Ver(ver)) {
+          } else if (VersionUtilities.isR5Plus(ver)) {
             new org.hl7.fhir.r5.formats.JsonParser().parse(cnt);
           } 
         }
@@ -213,7 +213,7 @@ public class PackageReleaser {
   }
 
   private void release(String source, String dest) throws Exception {
-    pcm = new FilesystemPackageCacheManager(true, ToolsVersion.TOOLS_VERSION);
+    pcm = new FilesystemPackageCacheManager(org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager.FilesystemPackageCacheMode.USER);
     System.out.println("Load hl7.fhir.r4.core");
     r4 = org.hl7.fhir.r4.context.SimpleWorkerContext.fromPackage(pcm.loadPackage("hl7.fhir.r4.core", "4.0.1"));
     System.out.println("Load hl7.fhir.r3.core");
