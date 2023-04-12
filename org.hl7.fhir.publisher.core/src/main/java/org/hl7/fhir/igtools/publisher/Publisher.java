@@ -136,7 +136,6 @@ import org.hl7.fhir.igtools.web.PublisherConsoleLogger;
 import org.hl7.fhir.igtools.web.WebSiteArchiveBuilder;
 import org.hl7.fhir.r4.formats.FormatUtilities;
 import org.hl7.fhir.r5.conformance.ConstraintJavaGenerator;
-import org.hl7.fhir.r5.conformance.R5ExtensionsLoader;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
@@ -288,24 +287,10 @@ import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.validation.IResourceValidator;
 import org.hl7.fhir.r5.utils.validation.IValidationProfileUsageTracker;
-import org.hl7.fhir.utilities.CSFile;
-import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
-import org.hl7.fhir.utilities.DurationUtil;
-import org.hl7.fhir.utilities.FhirPublication;
-import org.hl7.fhir.utilities.IniFile;
-import org.hl7.fhir.utilities.MarkDownProcessor;
+import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
-import org.hl7.fhir.utilities.MimeType;
-import org.hl7.fhir.utilities.SimpleHTTPClient;
 import org.hl7.fhir.utilities.SimpleHTTPClient.HTTPResult;
-import org.hl7.fhir.utilities.StandardsStatus;
-import org.hl7.fhir.utilities.TextFile;
-import org.hl7.fhir.utilities.TimeTracker;
 import org.hl7.fhir.utilities.TimeTracker.Session;
-import org.hl7.fhir.utilities.ToolGlobalSettings;
-import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.ZipGenerator;
 import org.hl7.fhir.utilities.i18n.I18nConstants;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonBoolean;
@@ -322,6 +307,7 @@ import org.hl7.fhir.utilities.npm.PackageHacker;
 import org.hl7.fhir.utilities.npm.PackageList;
 import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
+import org.hl7.fhir.utilities.settings.FhirSettings;
 import org.hl7.fhir.utilities.turtle.Turtle;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
@@ -377,6 +363,8 @@ import org.w3c.dom.Document;
  */
 
 public class Publisher implements IWorkerContext.ILoggingService, IReferenceResolver, IValidationProfileUsageTracker {
+
+  public static final String FHIR_SETTINGS_PARAM = "-fhir-settings";
 
   public class ContainedResourceDetails {
 
@@ -724,7 +712,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private boolean makeQA = true;
   private boolean bundleReferencesResolve = true;
   private CqlSubSystem cql;
-  private IniFile apiKeyFile;
   private File killFile;    
   private List<PageFactory> pageFactories = new ArrayList<>();
 
@@ -2240,12 +2227,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     log("Build FHIR IG from "+configFile);
     if (mode == IGBuildMode.PUBLICATION)
       log("Build Formal Publication package, intended for "+getTargetOutput());
-      
-    
-    if (apiKeyFile == null) {
-      apiKeyFile = new IniFile(Utilities.path(System.getProperty("user.home"), "fhir-api-keys.ini"));
-    }
-    log("API keys loaded from "+apiKeyFile.getFileName());
+
+    log("API keys loaded from "+ FhirSettings.getInstance().getFilePath());
     templateManager = new TemplateManager(pcm, logger);
     templateProvider = new IGPublisherLiquidTemplateServices();
     extensionTracker = new ExtensionTracker();
@@ -2262,11 +2245,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (configFile != null) {
       File fsh = new File(Utilities.path(focusDir(), "fsh"));
       if (fsh.exists() && fsh.isDirectory() && !noFSH) {
-        new FSHRunner(this).runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())), mode);
+        new FSHRunner(this, FhirSettings.getInstance().getNpmPath()).runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())), mode);
       } else {
         File fsh2 = new File(Utilities.path(focusDir(), "input", "fsh"));
         if (fsh2.exists() && fsh2.isDirectory() && !noFSH) {
-          new FSHRunner(this).runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())), mode);
+          new FSHRunner(this, FhirSettings.getInstance().getNpmPath()).runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())), mode);
         }
       }
     }
@@ -6574,6 +6557,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("**************************");
       log("Processing nested IG: " + nestedIgConfig);
       childPublisher = new Publisher();
+
       childPublisher.setConfigFile(Utilities.path(Utilities.getDirectoryForFile(this.getConfigFile()), nestedIgConfig));
       childPublisher.setJekyllCommand(this.getJekyllCommand());
       childPublisher.setTxServer(this.getTxServer());
@@ -7383,12 +7367,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Run jekyll: "+jekyllCommand+" build --destination \""+outputDir+"\" (in folder "+tempDir+")");
 	    if (SystemUtils.IS_OS_WINDOWS) {
 	      exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C "+jekyllCommand+" build --destination \""+outputDir+"\""));
-	    } else if (ToolGlobalSettings.hasRubyPath()) {
+	    } else if (FhirSettings.getInstance().hasRubyPath()) {
         ProcessBuilder processBuilder = new ProcessBuilder(new String("bash -c "+jekyllCommand));
         Map<String, String> env = processBuilder.environment();
         Map<String, String> vars = new HashMap<>();
         vars.putAll(env);
-        String path = ToolGlobalSettings.getRubyPath()+":"+env.get("PATH");
+        String path = FhirSettings.getInstance().getRubyPath()+":"+env.get("PATH");
         vars.put("PATH", path);
         CommandLine shellCommand = new CommandLine("bash").addArgument("-c").addArgument(jekyllCommand+" build --destination "+outputDir, false);        
         exec.execute(shellCommand, vars);     
@@ -10677,6 +10661,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     org.hl7.fhir.utilities.FileFormat.checkCharsetAndWarnIfNotUTF8(System.out);
 
+
+    if (hasNamedParam(args, FHIR_SETTINGS_PARAM)) {
+      FhirSettings.setExplicitFilePath(getNamedParam(args, FHIR_SETTINGS_PARAM));
+    }
+
     if (hasNamedParam(args, "-gui")) {
       runGUI();
       // Returning here ends the main thread but leaves the GUI running
@@ -10885,9 +10874,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         self.targetOutput = getNamedParam(args, "-target");
         self.repoSource = getNamedParam(args, "-repo");
       }
-      if (hasNamedParam(args, "-api-key-file")) {
-        self.apiKeyFile = new IniFile(new File(getNamedParam(args, "-api-key-file")).getAbsolutePath());
-      }
+
 
       if (hasNamedParam(args, "-no-narrative")) {
         for (String p : getNamedParam(args, "-non-narrative").split("\\,")) {
@@ -11473,7 +11460,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (self.countErrs(self.errors) > 0) {
       throw new Exception("Building IG '"+path+"' caused an error");
     }
-    
   }
 
   @Override

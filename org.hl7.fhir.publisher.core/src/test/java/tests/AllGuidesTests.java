@@ -7,7 +7,7 @@ import java.io.FileOutputStream;
 import org.apache.commons.io.IOUtils;
 import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.publisher.Publisher.CacheOption;
-import org.hl7.fhir.utilities.ToolGlobalSettings;
+import org.hl7.fhir.utilities.settings.FhirSettings;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
@@ -38,10 +38,12 @@ private static final String VER = "1.0.53";
       Assertions.assertTrue(true);
       return;
     }
+
     System.out.println("=======================================================================================");
-    String p = (path == null ? Utilities.path(ToolGlobalSettings.getTestIgsPath(), id) : Utilities.path(ToolGlobalSettings.getTestIgsPath(), id, path));
+    String p = (path == null ? Utilities.path(FhirSettings.getInstance().getTestIgsPath(), id) : Utilities.path(FhirSettings.getInstance().getTestIgsPath(), id, path));
     System.out.println("Publish IG "+ p);
     Publisher pub = new Publisher();
+
     pub.setConfigFile(p);
     pub.setTxServer("http://tx.fhir.org");
     pub.setCacheOption(CacheOption.LEAVE);
@@ -49,16 +51,16 @@ private static final String VER = "1.0.53";
     
     System.out.println("===== Analysis ======================================================================");
     // to make diff programs easy to run
-    IOUtils.copy(new FileInputStream(Utilities.path(ToolGlobalSettings.getTestIgsPath(), id, "output", "qa.json")), new FileOutputStream(Utilities.path(ToolGlobalSettings.getTestIgsPath(), "records", id+"-qa-gen.json")));
-    IOUtils.copy(new FileInputStream(Utilities.path(ToolGlobalSettings.getTestIgsPath(), id, "output", "qa.html")), new FileOutputStream(Utilities.path(ToolGlobalSettings.getTestIgsPath(), "records", id+"-qa-gen.html")));
-    if (new File(Utilities.path(ToolGlobalSettings.getTestIgsPath(), id, "output", "qa.txt")).exists()) {
-      IOUtils.copy(new FileInputStream(Utilities.path(ToolGlobalSettings.getTestIgsPath(), id, "output", "qa.txt")), new FileOutputStream(Utilities.path(ToolGlobalSettings.getTestIgsPath(), "records", id+"-qa-gen.txt")));
+    IOUtils.copy(new FileInputStream(Utilities.path(FhirSettings.getInstance().getTestIgsPath(), id, "output", "qa.json")), new FileOutputStream(Utilities.path(FhirSettings.getInstance().getTestIgsPath(), "records", id+"-qa-gen.json")));
+    IOUtils.copy(new FileInputStream(Utilities.path(FhirSettings.getInstance().getTestIgsPath(), id, "output", "qa.html")), new FileOutputStream(Utilities.path(FhirSettings.getInstance().getTestIgsPath(), "records", id+"-qa-gen.html")));
+    if (new File(Utilities.path(FhirSettings.getInstance().getTestIgsPath(), id, "output", "qa.txt")).exists()) {
+      IOUtils.copy(new FileInputStream(Utilities.path(FhirSettings.getInstance().getTestIgsPath(), id, "output", "qa.txt")), new FileOutputStream(Utilities.path(FhirSettings.getInstance().getTestIgsPath(), "records", id+"-qa-gen.txt")));
     }
     
-    JsonObject current = JsonParser.parseObject(new FileInputStream(Utilities.path(ToolGlobalSettings.getTestIgsPath(), id, "output", "qa.json")));
+    JsonObject current = JsonParser.parseObject(new FileInputStream(Utilities.path(FhirSettings.getInstance().getTestIgsPath(), id, "output", "qa.json")));
     JsonObject previous = null;
-    if (new File(Utilities.path(ToolGlobalSettings.getTestIgsPath(), "records", id+"-qa.json")).exists()) {
-      previous = JsonParser.parseObject(new FileInputStream(Utilities.path(ToolGlobalSettings.getTestIgsPath(), "records", id+"-qa.json")));
+    if (new File(Utilities.path(FhirSettings.getInstance().getTestIgsPath(), "records", id+"-qa.json")).exists()) {
+      previous = JsonParser.parseObject(new FileInputStream(Utilities.path(FhirSettings.getInstance().getTestIgsPath(), "records", id+"-qa.json")));
     } else {
       previous = new JsonObject();      
     }
@@ -76,7 +78,7 @@ private static final String VER = "1.0.53";
   }
 
   private static boolean igsPathExists() {
-    return ToolGlobalSettings.getTestIgsPath() != null && new File(ToolGlobalSettings.getTestIgsPath()).exists();
+    return FhirSettings.getInstance().hasTestIGsPath() && new File(FhirSettings.getInstance().getTestIgsPath()).exists();
   }
 
 //  private String testingPath() {

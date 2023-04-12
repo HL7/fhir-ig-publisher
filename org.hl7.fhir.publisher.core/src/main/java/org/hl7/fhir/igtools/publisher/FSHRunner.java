@@ -7,7 +7,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.utilities.IniFile;
-import org.hl7.fhir.utilities.ToolGlobalSettings;
 import org.hl7.fhir.utilities.Utilities;
 
 import java.io.File;
@@ -21,12 +20,15 @@ public class FSHRunner {
 
     private final IWorkerContext.ILoggingService logger;
 
+    private final String npmPath;
+
     private static final long FSH_TIMEOUT = 60000 * 5; // 5 minutes....
 
     private long fshTimeout = FSH_TIMEOUT;
 
-    public FSHRunner(IWorkerContext.ILoggingService logger) {
+    public FSHRunner(IWorkerContext.ILoggingService logger, String npmPath) {
         this.logger = logger;
+        this.npmPath = npmPath;
     }
 
     public void log(String string) {
@@ -71,12 +73,12 @@ public class FSHRunner {
         try {
             if (SystemUtils.IS_OS_WINDOWS) {
                 exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C "+cmd+" . -o ."));
-            } else if (ToolGlobalSettings.hasNpmPath()) {
+            } else if (npmPath != null) {
                 ProcessBuilder processBuilder = new ProcessBuilder(new String("bash -c "+cmd));
                 Map<String, String> env = processBuilder.environment();
                 Map<String, String> vars = new HashMap<>();
                 vars.putAll(env);
-                String path = ToolGlobalSettings.getNpmPath()+":"+env.get("PATH");
+                String path = npmPath+":"+env.get("PATH");
                 vars.put("PATH", path);
                 exec.execute(org.apache.commons.exec.CommandLine.parse("bash -c "+cmd+" . -o ."), vars);
             } else {
