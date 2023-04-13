@@ -250,7 +250,7 @@ public class TemplateManager {
         return pcm.loadPackage(p[0], p[1]);
       }
       File f = new File(template);
-      if (!f.exists()) {
+      if (!f.exists() && !Utilities.isURL(template)) {
         f = new File(Utilities.path(rootFolder, template));
       }
       if (f.exists()) {
