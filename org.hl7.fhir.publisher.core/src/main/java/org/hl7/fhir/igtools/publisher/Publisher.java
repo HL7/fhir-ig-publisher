@@ -2228,7 +2228,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (mode == IGBuildMode.PUBLICATION)
       log("Build Formal Publication package, intended for "+getTargetOutput());
 
-    log("API keys loaded from "+ FhirSettings.getInstance().getFilePath());
+    log("API keys loaded from "+ FhirSettings.getFilePath());
     templateManager = new TemplateManager(pcm, logger);
     templateProvider = new IGPublisherLiquidTemplateServices();
     extensionTracker = new ExtensionTracker();
@@ -2245,11 +2245,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (configFile != null) {
       File fsh = new File(Utilities.path(focusDir(), "fsh"));
       if (fsh.exists() && fsh.isDirectory() && !noFSH) {
-        new FSHRunner(this, FhirSettings.getInstance().getNpmPath()).runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())), mode);
+        new FSHRunner(this, FhirSettings.getNpmPath()).runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())), mode);
       } else {
         File fsh2 = new File(Utilities.path(focusDir(), "input", "fsh"));
         if (fsh2.exists() && fsh2.isDirectory() && !noFSH) {
-          new FSHRunner(this, FhirSettings.getInstance().getNpmPath()).runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())), mode);
+          new FSHRunner(this, FhirSettings.getNpmPath()).runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())), mode);
         }
       }
     }
@@ -7367,12 +7367,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Run jekyll: "+jekyllCommand+" build --destination \""+outputDir+"\" (in folder "+tempDir+")");
 	    if (SystemUtils.IS_OS_WINDOWS) {
 	      exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C "+jekyllCommand+" build --destination \""+outputDir+"\""));
-	    } else if (FhirSettings.getInstance().hasRubyPath()) {
+	    } else if (FhirSettings.hasRubyPath()) {
         ProcessBuilder processBuilder = new ProcessBuilder(new String("bash -c "+jekyllCommand));
         Map<String, String> env = processBuilder.environment();
         Map<String, String> vars = new HashMap<>();
         vars.putAll(env);
-        String path = FhirSettings.getInstance().getRubyPath()+":"+env.get("PATH");
+        String path = FhirSettings.getRubyPath()+":"+env.get("PATH");
         vars.put("PATH", path);
         CommandLine shellCommand = new CommandLine("bash").addArgument("-c").addArgument(jekyllCommand+" build --destination "+outputDir, false);        
         exec.execute(shellCommand, vars);     
