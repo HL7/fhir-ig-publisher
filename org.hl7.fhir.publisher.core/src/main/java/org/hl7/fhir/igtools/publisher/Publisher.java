@@ -296,13 +296,13 @@ import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.MimeType;
+import org.hl7.fhir.utilities.Servers;
 import org.hl7.fhir.utilities.SimpleHTTPClient;
 import org.hl7.fhir.utilities.SimpleHTTPClient.HTTPResult;
 import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.TimeTracker;
 import org.hl7.fhir.utilities.TimeTracker.Session;
-import org.hl7.fhir.utilities.ToolGlobalSettings;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.ZipGenerator;
@@ -322,6 +322,7 @@ import org.hl7.fhir.utilities.npm.PackageHacker;
 import org.hl7.fhir.utilities.npm.PackageList;
 import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
+import org.hl7.fhir.utilities.settings.FhirSettings;
 import org.hl7.fhir.utilities.turtle.Turtle;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
@@ -628,8 +629,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private static final long JEKYLL_TIMEOUT = 60000 * 5; // 5 minutes.... 
   private static final long FSH_TIMEOUT = 60000 * 5; // 5 minutes.... 
-  public static String txServerProd = "http://tx.fhir.org";
-  public static String txServerDev = "http://local.fhir.org:8080";
   private static final int PRISM_SIZE_LIMIT = 16384;
 
   private static final String FIXED_CACHE_VERSION = "2"; // invalidating validation cache becaise it was incomplete
@@ -2744,10 +2743,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         txLog = null;
       } else {
         log("Connect to Terminology Server at "+txServer);
-        checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient(txServer, "fhir/publisher", FhirPublication.fromCode(version)), txLog));
+        checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient("Tx-Server", txServer, "fhir/publisher", FhirPublication.fromCode(version)), txLog));
       }
     } else 
-      checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient(webTxServer.getAddress(), "fhir/publisher", FhirPublication.fromCode(version)), txLog));
+      checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient("Tx-Server", webTxServer.getAddress(), "fhir/publisher", FhirPublication.fromCode(version)), txLog));
     
     loadPubPack();
     igpkp = new IGKnowledgeProvider(context, checkAppendSlash(specPath), determineCanonical(sourceIg.getUrl(), "ImplementationGuide.url"), template.config(), errors, VersionUtilities.isR2Ver(version), template, listedURLExemptions, altCanonical);
@@ -3234,14 +3233,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       } else {
         log("Connect to Terminology Server at "+txServer);
         try {
-          checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient(txServer, "fhir/publisher", FhirPublication.fromCode(version)), txLog));
+          checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient("Tx-Server", txServer, "fhir/publisher", FhirPublication.fromCode(version)), txLog));
         } catch (Exception e) {
           log("WARNING: Could not connect to terminology server - terminology content will likely not publish correctly ("+e.getMessage()+")");          
         }
       }
     } else 
       try {
-        checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient(webTxServer.getAddress(), "fhir/publisher", FhirPublication.fromCode(version)), txLog));
+        checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient("Tx-Server", webTxServer.getAddress(), "fhir/publisher", FhirPublication.fromCode(version)), txLog));
       } catch (Exception e) {
         log("WARNING: Could not connect to terminology server - terminology content will likely not publish correctly ("+e.getMessage()+")");          
       }
@@ -7383,12 +7382,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Run jekyll: "+jekyllCommand+" build --destination \""+outputDir+"\" (in folder "+tempDir+")");
 	    if (SystemUtils.IS_OS_WINDOWS) {
 	      exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C "+jekyllCommand+" build --destination \""+outputDir+"\""));
-	    } else if (ToolGlobalSettings.hasRubyPath()) {
+	    } else if (FhirSettings.hasRubyPath()) {
         ProcessBuilder processBuilder = new ProcessBuilder(new String("bash -c "+jekyllCommand));
         Map<String, String> env = processBuilder.environment();
         Map<String, String> vars = new HashMap<>();
         vars.putAll(env);
-        String path = ToolGlobalSettings.getRubyPath()+":"+env.get("PATH");
+        String path = FhirSettings.getRubyPath()+":"+env.get("PATH");
         vars.put("PATH", path);
         CommandLine shellCommand = new CommandLine("bash").addArgument("-c").addArgument(jekyllCommand+" build --destination "+outputDir, false);        
         exec.execute(shellCommand, vars);     
@@ -10716,14 +10715,21 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       System.out.println("-spec: a path or a url where the igpack for the version of the core FHIR");
       System.out.println("  specification used by the ig being published is located.  If not specified");
       System.out.println("  the tool will retrieve the file from the web based on the specified FHIR version");
+      System.out.println("");
       System.out.println("-ig: a path or a url where the implementation guide control file is found");
       System.out.println("  see Wiki for Documentation");
+      System.out.println("");
       System.out.println("-tx: (optional) Address to use for terminology server ");
       System.out.println("  (default is http://tx.fhir.org)");
       System.out.println("  use 'n/a' to run without a terminology server");
-      System.out.println("-watch (optional): if this is present, the publisher will not terminate;");
-      System.out.println("  instead, it will stay running, an watch for changes to the IG or its ");
-      System.out.println("  contents and re-run when it sees changes ");
+      System.out.println("");
+      System.out.println("-no-network: (optional) Stop the IG publisher accessing the network");
+      System.out.println("  Beware: the ig -pubisher will not function properly if the network is prohibited");
+      System.out.println("  unless the package and terminology cache are correctly populated (not documented here)");
+      System.out.println("");
+//      System.out.println("-watch (optional): if this is present, the publisher will not terminate;");
+//      System.out.println("  instead, it will stay running, an watch for changes to the IG or its ");
+//      System.out.println("  contents and re-run when it sees changes ");
       System.out.println("");
       System.out.println("-packages: a directory to load packages (*.tgz) from before resolving dependencies");
       System.out.println("           this parameter can be present multiple times");
@@ -10862,7 +10868,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (!hasNamedParam(args, "-auto-ig-build") && !hasNamedParam(args, "-publish-process")) {
         logger.start(consoleLog);
       }
-        
       self.logMessage("FHIR IG Publisher "+IGVersionUtil.getVersionString());
       self.logMessage("Detected Java version: " + System.getProperty("java.version")+" from "+System.getProperty("java.home")+" on "+System.getProperty("os.name")+"/"+System.getProperty("os.arch")+" ("+System.getProperty("sun.arch.data.model")+"bit). "+toMB(Runtime.getRuntime().maxMemory())+"MB available");
       if (!"64".equals(System.getProperty("sun.arch.data.model"))) {
@@ -10898,6 +10903,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         for (String p : getNamedParam(args, "-non-validate").split("\\,")) {
           self.noValidate.add(p);
         }
+      }
+      if (hasNamedParam(args, "-no-network")) {
+        FhirSettings.setProhibitNetworkAccess(true);
+      }
+      if (FhirSettings.isProhibitNetworkAccess()) {
+        System.out.println("Running without network access - output may not be correct unless cache contents are correct");        
       }
 
       if (hasNamedParam(args, "-validation-off")) {
@@ -11069,9 +11080,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (hasNamedParam(args, "-tx")) {
       self.setTxServer(getNamedParam(args, "-tx"));
     } else if (hasNamedParam(args, "-devtx")) {
-      self.setTxServer(txServerDev);
+      self.setTxServer(Servers.TX_SERVER_DEV);
     } else {
-      self.setTxServer(txServerProd);
+      self.setTxServer(Servers.TX_SERVER_PROD);
     }
   }
 
@@ -11408,6 +11419,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         currVer = json.asString("name").toString();
       } catch (IOException e) {
         currVer = "?pub-ver-1?";
+      } catch (FHIRException e) {
+        currVer = "$unknown-version$";
       }
     }
     return currVer;
@@ -11469,7 +11482,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     Publisher self = new Publisher();
     self.setConfigFile(Publisher.determineActualIG(path, IGBuildMode.PUBLICATION));
     self.execute();
-    self.setTxServer(txServerProd);
+    self.setTxServer(Servers.TX_SERVER_PROD);
     if (self.countErrs(self.errors) > 0) {
       throw new Exception("Building IG '"+path+"' caused an error");
     }

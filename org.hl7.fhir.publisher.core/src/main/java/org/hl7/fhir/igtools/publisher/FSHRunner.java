@@ -7,8 +7,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.utilities.IniFile;
-import org.hl7.fhir.utilities.ToolGlobalSettings;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.settings.FhirSettings;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -71,12 +71,12 @@ public class FSHRunner {
         try {
             if (SystemUtils.IS_OS_WINDOWS) {
                 exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C "+cmd+" . -o ."));
-            } else if (ToolGlobalSettings.hasNpmPath()) {
+            } else if (FhirSettings.hasNpmPath()) {
                 ProcessBuilder processBuilder = new ProcessBuilder(new String("bash -c "+cmd));
                 Map<String, String> env = processBuilder.environment();
                 Map<String, String> vars = new HashMap<>();
                 vars.putAll(env);
-                String path = ToolGlobalSettings.getNpmPath()+":"+env.get("PATH");
+                String path = FhirSettings.getNpmPath()+":"+env.get("PATH");
                 vars.put("PATH", path);
                 exec.execute(org.apache.commons.exec.CommandLine.parse("bash -c "+cmd+" . -o ."), vars);
             } else {

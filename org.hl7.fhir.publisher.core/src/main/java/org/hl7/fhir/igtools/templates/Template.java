@@ -54,6 +54,7 @@ import org.hl7.fhir.utilities.json.model.JsonElement;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonPrimitive;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.settings.FhirSettings;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
@@ -129,6 +130,7 @@ public class Template {
       antProject.setProperty("ig.root", root);
       antProject.setProperty("ig.template", templateDir);
       antProject.setProperty("ig.scripts", Utilities.path(templateDir, "scripts"));
+      antProject.setProperty("ig.networkprohibited", Boolean.toString(FhirSettings.isProhibitNetworkAccess()));
       antProject.init();
     }
 
@@ -149,7 +151,6 @@ public class Template {
     }
   }
 
-  
   public boolean hasPreProcess() {
     return preProcess != null;
   }
