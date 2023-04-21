@@ -169,17 +169,23 @@ public class USRealmBusinessRules extends RealmBusinessRules {
   }
 
   private NpmPackage fetchLatestUSCore() throws IOException {
-    PackageList pl = PackageList.fromUrl("https://hl7.org/fhir/us/core/package-list.json");
-    for (PackageListEntry v : pl.versions()) {
-      if (VersionUtilities.versionsCompatible(version, v.fhirVersion())) {
+    try {
+      PackageList pl = PackageList.fromUrl("https://hl7.org/fhir/us/core/package-list.json");
+      for (PackageListEntry v : pl.versions()) {
+        if (VersionUtilities.versionsCompatible(version, v.fhirVersion())) {
+          return new FilesystemPackageCacheManager(org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager.FilesystemPackageCacheMode.USER).loadPackage("hl7.fhir.us.core", v.version());
+        }
+      }
+      // we didn't find a compatible version, we'll just take the last version
+      for (PackageListEntry v : pl.versions()) {
         return new FilesystemPackageCacheManager(org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager.FilesystemPackageCacheMode.USER).loadPackage("hl7.fhir.us.core", v.version());
       }
+      return null;
+    } catch (Exception e) {
+      System.out.println("Error checking US Core: "+e.getMessage());
     }
-    // we didn't find a compatible version, we'll just take the last version
-    for (PackageListEntry v : pl.versions()) {
-      return new FilesystemPackageCacheManager(org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager.FilesystemPackageCacheMode.USER).loadPackage("hl7.fhir.us.core", v.version());
-    }
-    return null;
+    FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager(true);
+    return pcm.loadPackage("hl7.fhir.us.core");
   }
 
   private Resource loadResourceFromPackage(NpmPackage uscore, String filename) throws FHIRException, IOException {
