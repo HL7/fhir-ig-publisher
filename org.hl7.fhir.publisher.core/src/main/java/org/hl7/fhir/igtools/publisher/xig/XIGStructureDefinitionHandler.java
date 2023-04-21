@@ -35,6 +35,18 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
   public void fillOutJson(StructureDefinition sd, JsonObject j) {
     if (ProfileUtilities.isExtensionDefinition(sd)) {
       info.getExtensionHandler().seeExtension(sd);
+    } else {
+      for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+        for (TypeRefComponent tr : ed.getType()) {
+          if ("Extension".equals(tr.getCode())) {
+            for (CanonicalType u : tr.getProfile()) {
+              ElementDefinition focus = getParent(sd.getSnapshot().getElement(), ed);
+              info.getExtensionHandler().seeUse(u.getValue(), focus.getBase().getPath(), focus.getPath());
+            }
+            
+          }
+        }
+      }
     }
     if (sd.hasFhirVersion()) {      j.add("fhirVersion", sd.getFhirVersion().toCode()); }
     if (sd.hasKind()) {             j.add("kind", sd.getKind().toCode()); }
@@ -54,6 +66,19 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
     for (Coding t : sd.getKeyword()) {
       j.forceArray("keywords").add(t.toString()); 
     }  
+  }
+
+  private ElementDefinition getParent(List<ElementDefinition> list, ElementDefinition ed) {
+    int i = list.indexOf(ed);
+    while (i >= 0 && !ed.getPath().startsWith(list.get(i).getPath()+".")) {
+      i--;
+    }
+    if (i < 0) {
+      return ed;
+    } else {
+      ElementDefinition t = list.get(i);
+      return t.getPath().endsWith(".extension") ? getParent(list, t) : t;
+    }
   }
 
   public PageContent makeLogicalsPage(String realm) {

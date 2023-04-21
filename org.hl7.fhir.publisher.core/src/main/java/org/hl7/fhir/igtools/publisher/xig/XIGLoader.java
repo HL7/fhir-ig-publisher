@@ -59,7 +59,7 @@ public class XIGLoader implements IPackageVisitorProcessor {
     if (r != null && r instanceof CanonicalResource) {
       CanonicalResource cr = (CanonicalResource) r;
       if (cr.getUrl() != null) {
-        boolean core = isCoreDefinition(cr, pid) && !isExtension(cr);
+        boolean core = isCoreDefinition(cr, pid);
         if (!core) {
           cr.setText(null);
           cr.setWebPath(Utilities.pathURL(smm.getBase(), smm.getPath(cr.getUrl(), null, cr.fhirType(), cr.getIdBase())));
@@ -187,18 +187,13 @@ public class XIGLoader implements IPackageVisitorProcessor {
     }
   }
 
-  private boolean isExtension(CanonicalResource cr) {
-    return cr instanceof StructureDefinition && ProfileUtilities.isExtensionDefinition((StructureDefinition) cr);
+  private boolean isExtension(CanonicalResource cr, String pid) {
+    return pid.equals("hl7.fhir.uv.extensions");
+//    return  cr instanceof StructureDefinition && ProfileUtilities.isExtensionDefinition((StructureDefinition) cr);
   }
 
   private boolean isCoreDefinition(CanonicalResource cr, String pid) {
-    return cr.getUrl().startsWith("http://hl7.org/fhir/"+cr.fhirType()) ||
-        cr.getUrl().startsWith("http://hl7.org/fhir/1.0/"+cr.fhirType()) ||
-        cr.getUrl().startsWith("http://hl7.org/fhir/3.0/"+cr.fhirType()) ||
-        cr.getUrl().startsWith("http://hl7.org/fhir/4.0/"+cr.fhirType()) ||
-        cr.getUrl().startsWith("http://hl7.org/fhir/5.0/"+cr.fhirType()) ||
-        cr.getUrl().startsWith("http://hl7.org/fhir/4.3/"+cr.fhirType()) ||
-        pid.startsWith("hl7.fhir.xver");
+    return Utilities.startsWithInList(pid, "hl7.fhir.r2", "hl7.fhir.r2b", "hl7.fhir.r3", "hl7.fhir.r4", "hl7.fhir.r4b", "hl7.fhir.r5", "hl7.fhir.r6", "hl7.fhir.xver");
   }
 
   private Resource loadResource(String pid, String parseVersion, String type, String id, byte[] source) {

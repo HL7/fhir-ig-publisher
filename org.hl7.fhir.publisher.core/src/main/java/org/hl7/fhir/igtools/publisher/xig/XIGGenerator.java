@@ -48,7 +48,7 @@ public class XIGGenerator {
     info.setCtxt(new SimpleWorkerContext.SimpleWorkerContextBuilder().fromPackage(npm, new PublisherLoader(npm, SpecMapManager.fromPackage(npm), npm.getWebLocation(), null).makeLoader()));
     info.getCtxt().setAllowLazyLoading(false);
     info.getCtxt().setAllowLoadingDuplicates(true);
-//    this.ctxt.connectToTSServer(TerminologyClientFactory.makeClient("http://tx.fhir.org", "fhir/publisher", FhirPublication.R5), null);
+//    this.ctxt.connectToTSServer(TerminologyClientFactory.makeClient(Servers., "fhir/publisher", FhirPublication.R5), null);
     info.getCtxt().setExpansionProfile(buildExpansionProfile());
     String ds = new SimpleDateFormat("dd MMM yyyy", new Locale("en", "US")).format(Calendar.getInstance().getTime());
     String dl = new SimpleDateFormat("yyyy-MM-dd'T'hh:mm:ssZ", new Locale("en", "US")).format(Calendar.getInstance().getTime());

@@ -137,11 +137,13 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
     addPage(b, "ihe-index.html", genPageSet(target, "ihe", "IHE"));
     addPage(b, "uv-index.html", genPageSet(target, "uv", "Intl."));
     addPage(b, "us-index.html", genPageSet(target, "us", "US"));
-    for (String s : info.getJurisdictions()) {
-      if (!Utilities.existsInList(s, "uv", "us")) {
+    for (String s : Utilities.sorted(info.getJurisdictions())) {
+      if (!Utilities.existsInList(s, "uv", "us", "xver") && !s.startsWith("cda")) {
         addPage(b, s+"-index.html", genPageSet(target, s, JurisdictionUtilities.displayJurisdiction(s)));
       }
     }
+    b.append("</ul>\r\n");
+    b.append("<p>See also the <a href=\"extension-summary-analysis.html\">Extension Analysis</a></p>\r\n");
 
     b.append("<p><b>"+info.getPid().size()+" Packages Loaded</b></p>\r\n");
     b.append("<ul style=\"column-count: 4\">\r\n");

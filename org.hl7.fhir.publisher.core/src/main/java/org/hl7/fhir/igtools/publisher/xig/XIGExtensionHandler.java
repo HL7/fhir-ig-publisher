@@ -24,6 +24,7 @@ import org.hl7.fhir.utilities.VersionUtilities;
 public class XIGExtensionHandler {
 
   private Map<String, StructureDefinition> extensions = new HashMap<>();
+  private Map<String, Set<String>> extensionUsage = new HashMap<>();
   
   public void seeExtension(StructureDefinition sd) {
 //    System.out.println("extension: "+sd.getVersionedUrl());
@@ -35,12 +36,12 @@ public class XIGExtensionHandler {
 
   public void finish(String target) throws FileNotFoundException, IOException {
     PrintStream p = new PrintStream(new FileOutputStream(Utilities.path(target, "extensions.txt")));
-    StringBuilder b = header("Extension Analysis");
-    b.append("<ul>\r\n");
 
+    List<String> entries = new ArrayList<>();
     Set<String> contexts = new HashSet<>();
     Set<String> contextGroups = new HashSet<>();
     for (StructureDefinition sd : extensions.values()) {
+//      if (!Utilities.startsWithInList(sd.getUrl(), "", ""))
       for (StructureDefinitionContextComponent ctxt : sd.getContext()) {
         contexts.add(genExtensionContextName(ctxt));
       }
@@ -49,11 +50,13 @@ public class XIGExtensionHandler {
       String g = s.contains(".") ? s.substring(0, s.indexOf(".")) : s;
       contextGroups.add(g);
     }
-    for (String g : contextGroups) {
+    for (String g : Utilities.sorted(contextGroups)) {
       StringBuilder b1 = header("Extension Analysis for context "+g);
       b1.append("<table class=\"grid\">\r\n");
-      b1.append("<tr><th>Context</th><th>URL</th><th>Version</th><th>Realm</th><th>Type</th><th>Description</th></tr>\r\n");
+      b1.append("<tr><th>Source</th><th>URL</th><th>Version</th><th>Realm</th><th>Type</th><th>Description</th></tr>\r\n");
       p.println("Context: "+g);
+      Set<String> urls = new HashSet<>();
+      String lastContext = null;
       for (String s : Utilities.sorted(contexts)) {
         if (s.equals(g) || s.startsWith(g+".")) {
           List<StructureDefinition> exts = new ArrayList<>();
@@ -64,19 +67,39 @@ public class XIGExtensionHandler {
           }
           Collections.sort(exts, new CanonicalResourceSortByUrl());
           for (StructureDefinition sd : exts) {
-            b1.append("<tr><td>"+s.substring(s.indexOf("-")+1)+"</td><td><a href=\""+sd.getWebPath()+"\">"+sd.getVersionedUrl()+"</a></td><td>"+sd.getFhirVersion().toCode()+"</td><td>"+authority(sd)+"</td><td>"+typeSummary(sd)+"</td><td>"+Utilities.escapeXml(sd.getDescription())+"</td></tr>\r\n");
+            String c = s.substring(s.indexOf("-")+1);
+            if (!c.equals(lastContext)) {
+              b1.append("<tr><td colspan=\"6\" style=\"background-color: #eeeeee\"><b>"+c+"</b></td></tr>\r\n");
+              lastContext = c;
+            }
+            b1.append("<tr><td>"+sd.getUserString("pid")+"</td><td><a href=\""+sd.getWebPath()+"\">"+sd.getVersionedUrl()+"</a></td><td>"+sd.getFhirVersion().toCode()+"</td><td>"+authority(sd)+"</td><td>"+typeSummary(sd)+"</td><td>"+Utilities.escapeXml(sd.getDescription())+uses(sd.getUrl())+"</td></tr>\r\n");
             p.println(s.substring(s.indexOf("-")+1)+"\t"+sd.getVersionedUrl()+"\t"+sd.getWebPath()+"\t"+authority(sd)+"\t"+sd.getFhirVersion().toCode()+"\t"+typeSummary(sd)+"\t"+sd.getDescription());
+            urls.add(sd.getVersionedUrl());
           }
         }
       }
       b1.append("</table>\r\n"+footer());
       TextFile.stringToFile(b1.toString(), Utilities.path(target, "extension-summary-"+g.toLowerCase()+".html"));
-      b.append("<li><a href=\"extension-summary-"+g.toLowerCase()+".html\">"+g+"</a></li>\r\n");
+      entries.add("<li><a href=\"extension-summary-"+g.toLowerCase()+".html\">"+g+"</a>: "+urls.size()+" extensions</li>\r\n");
       p.println("");
+    }
+    StringBuilder b = header("Extension Analysis");
+    b.append("<ul>\r\n");
+    for (String s : Utilities.sorted(entries)) {
+      b.append(s);
     }
     b.append("</ul>\r\n");
     b.append("</table>\r\n"+footer());
     TextFile.stringToFile(b.toString(), Utilities.path(target, "extension-summary-analysis.html"));
+  }
+
+  private String uses(String url) {
+    Set<String> paths = extensionUsage.get(url);
+    if (paths == null) {
+      return "";
+    } else {
+      return "<br/><br/><b>Profile Paths</b>: "+String.join(", ", Utilities.sorted(paths));
+    }
   }
 
   private String genExtensionContextName(StructureDefinitionContextComponent ctxt) {
@@ -109,7 +132,16 @@ public class XIGExtensionHandler {
   }
 
   private String authority(StructureDefinition sd) {
-    return sd.hasJurisdiction() ? JurisdictionUtilities.displayJurisdiction(sd.getJurisdictionFirstRep().getCodingFirstRep()) : "?";
+    if (sd.hasUserData("realm")) {
+      return sd.getUserString("realm");
+    } else {
+      String s = sd.hasJurisdiction() ? JurisdictionUtilities.displayJurisdictionShort(sd.getJurisdictionFirstRep().getCodingFirstRep()) : "?";
+      if (s.contains("Unknown Jurisdiction")) {
+        return "??";
+      } else {
+        return s;
+      }
+    }
   }
 
   private String typeSummary(StructureDefinition sd) {
@@ -128,6 +160,18 @@ public class XIGExtensionHandler {
       }
     }
     return false;
+  }
+
+  public void seeUse(String url, String path, String path2) {
+    if (path == null || Utilities.charCount(path, '.') == Utilities.charCount(path2, '.')) {
+      path = path2;
+    }
+    if (path != null) {
+      if (!extensionUsage.containsKey(url)) {
+        extensionUsage.put(url, new HashSet<>());
+      }
+      extensionUsage.get(url).add(path);
+    }
   }
 
 }
