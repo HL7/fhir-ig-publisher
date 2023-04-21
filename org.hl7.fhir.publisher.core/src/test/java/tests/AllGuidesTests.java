@@ -7,7 +7,7 @@ import java.io.FileOutputStream;
 import org.apache.commons.io.IOUtils;
 import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.publisher.Publisher.CacheOption;
-import org.hl7.fhir.utilities.Servers;
+
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
@@ -43,7 +43,7 @@ private static final String VER = "1.0.53";
     System.out.println("Publish IG "+ p);
     Publisher pub = new Publisher();
     pub.setConfigFile(p);
-    pub.setTxServer(Servers.TX_SERVER_DEV);
+    pub.setTxServer(FhirSettings.getTxFhirDevelopment());
     pub.setCacheOption(CacheOption.LEAVE);
     pub.execute();
     

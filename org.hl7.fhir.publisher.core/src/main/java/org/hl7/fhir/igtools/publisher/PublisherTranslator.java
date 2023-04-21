@@ -5,7 +5,7 @@ import java.util.List;
 
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.elementmodel.LangaugeUtils;
+import org.hl7.fhir.r5.elementmodel.LanguageUtils;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.i18n.LanguageFileProducer;
 import org.hl7.fhir.utilities.i18n.LanguageFileProducer.LanguageProducerLanguageSession;
@@ -51,7 +51,7 @@ public class PublisherTranslator {
     LanguageProducerSession session = lp.startSession(r.fhirType()+"-"+r.getId(), defaultTranslationLang);
     for (String lang : translationLangs) {
       LanguageProducerLanguageSession langSession = session.forLang(lang);
-      LangaugeUtils utils = new LangaugeUtils(context);
+      LanguageUtils utils = new LanguageUtils(context);
       utils.generateTranslations(r.getElement(), langSession);
       langSession.finish();
     }

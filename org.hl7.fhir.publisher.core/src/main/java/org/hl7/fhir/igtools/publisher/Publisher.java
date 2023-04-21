@@ -296,7 +296,7 @@ import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.MimeType;
-import org.hl7.fhir.utilities.Servers;
+
 import org.hl7.fhir.utilities.SimpleHTTPClient;
 import org.hl7.fhir.utilities.SimpleHTTPClient.HTTPResult;
 import org.hl7.fhir.utilities.StandardsStatus;
@@ -11080,9 +11080,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (hasNamedParam(args, "-tx")) {
       self.setTxServer(getNamedParam(args, "-tx"));
     } else if (hasNamedParam(args, "-devtx")) {
-      self.setTxServer(Servers.TX_SERVER_DEV);
+      self.setTxServer(FhirSettings.getTxFhirDevelopment());
     } else {
-      self.setTxServer(Servers.TX_SERVER_PROD);
+      self.setTxServer(FhirSettings.getTxFhirProduction());
     }
   }
 
@@ -11482,7 +11482,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     Publisher self = new Publisher();
     self.setConfigFile(Publisher.determineActualIG(path, IGBuildMode.PUBLICATION));
     self.execute();
-    self.setTxServer(Servers.TX_SERVER_PROD);
+    self.setTxServer(FhirSettings.getTxFhirProduction());
     if (self.countErrs(self.errors) > 0) {
       throw new Exception("Building IG '"+path+"' caused an error");
     }
