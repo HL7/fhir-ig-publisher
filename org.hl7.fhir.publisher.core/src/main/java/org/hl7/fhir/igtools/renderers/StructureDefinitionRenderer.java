@@ -2326,6 +2326,52 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return b.toString();
   }
 
+  public String testplanList(List<FetchedFile> fileList) {
+    StringBuilder b = new StringBuilder();
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.fhirType().equals("TestPlan")) {
+  	      for (String p : r.getTestArtifacts()) {
+            if (sd.getUrl().equals(p)) {
+              String name = r.getTitle();
+              if (Utilities.noString(name))
+                name = "TestPlan";
+              String ref = igp.getLinkFor(r, true);
+              b.append(" <li><a href=\"" + Utilities.escapeXml(ref) + "\">" + Utilities.escapeXml(name) + "</a></li>\r\n");
+            }
+          }
+        }
+      }
+    }
+    return b.toString();
+  }
+
+  public String testplanTable(List<FetchedFile> fileList) {
+    StringBuilder b = new StringBuilder();
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.fhirType().equals("TestPlan")) {
+          for (String p : r.getTestArtifacts()) {
+            if (sd.getUrl().equals(p)) {
+              String name = r.fhirType() + "/" + r.getId();
+              String title = r.getTitle();
+              if (Utilities.noString(title))
+                name = "TestPlan";
+              if (f.getTitle() != null && f.getTitle() != f.getName())
+                title = f.getTitle();
+              String ref = igp.getLinkFor(r, true);
+              b.append(" <tr>\r\n");
+              b.append("   <td><a href=\"" + Utilities.escapeXml(ref) + "\">" + Utilities.escapeXml(name) + "</a></td>\r\n");
+              b.append("   <td>" + Utilities.escapeXml(title) + "</td>\r\n");
+              b.append(" </tr>\r\n");
+            }
+          }
+        }
+      }
+    }
+    return b.toString();
+  }
+
   public String testscriptList(List<FetchedFile> fileList) {
     StringBuilder b = new StringBuilder();
     for (FetchedFile f : fileList) {

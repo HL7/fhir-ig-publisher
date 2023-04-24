@@ -49,6 +49,7 @@ public class FetchedResource {
   private String exampleUri;
   private HashSet<FetchedResource> statedExamples = new HashSet<FetchedResource>();
   private HashSet<FetchedResource> foundExamples = new HashSet<FetchedResource>();
+  private HashSet<FetchedResource> foundTestPlans = new HashSet<FetchedResource>();
   private HashSet<FetchedResource> foundTestScripts = new HashSet<FetchedResource>();
   private ImplementationGuideDefinitionResourceComponent resEntry;
   private List<ProvenanceDetails> audits = new ArrayList<>();
@@ -242,6 +243,21 @@ public class FetchedResource {
 
   public boolean hasTestArtifacts() {
     return !testArtifacts.isEmpty();
+  }
+
+  public HashSet<FetchedResource> getFoundTestPlans() {
+    return foundTestPlans;
+  }
+
+  public void addFoundTestPlan(FetchedResource r) {
+    // Check for duplicate
+    if (!foundTestPlans.contains(r)) {
+      this.foundTestPlans.add(r);
+    }
+  }
+
+  public boolean hasFoundTestPlans() {
+    return !foundTestPlans.isEmpty();
   }
 
   public HashSet<FetchedResource> getFoundTestScripts() {
