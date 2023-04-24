@@ -2444,7 +2444,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     Map<String, String> expParamMap = new HashMap<>();
     boolean allowExtensibleWarnings = false;
     List<String> conversionVersions = new ArrayList<>();
-
     int count = 0;
     for (ImplementationGuideDefinitionParameterComponent p : sourceIg.getDefinition().getParameter()) {
       // documentation for this list: https://confluence.hl7.org/display/FHIR/Implementation+Guide+Parameters
@@ -2617,6 +2616,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       } else if (pc.equals("i18n-lang")) {
         hasTranslations = true;
         translationLangs .add(p.getValue());
+      } else {
+        unknownParams.add(pc);
       }
       count++;
     }
@@ -5110,7 +5111,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parseSingle(new ByteArrayInputStream(cnt));
             e.copyUserData(r.getElement());
             r.setElement(e);
-          }
+          } 
         }
       }
     }
@@ -6433,6 +6434,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       noValidateResources.add(r);
       return;
     }
+    if ("ImplementationGuide".equals(r.fhirType())) {
+      file.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.INVALID, file.getName(), "Unknown Parameters: "+unknownParams.toString(), IssueSeverity.WARNING));
+    }
+
     Session tts = tt.start("validation");
     List<ValidationMessage> errs = new ArrayList<ValidationMessage>();
     r.getElement().setUserData("igpub.context.file", file);
@@ -10250,6 +10255,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   long last = System.currentTimeMillis();
+  private List<String> unknownParams = new ArrayList<>();
   
   private void lapsed(String msg) {
     long now = System.currentTimeMillis();
