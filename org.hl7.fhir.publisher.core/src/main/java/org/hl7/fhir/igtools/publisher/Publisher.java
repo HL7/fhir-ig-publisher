@@ -4259,7 +4259,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           igpkp.findConfiguration(f, r);
       }
       // TestPlan Check
-      if (res.getReference().getReference().contains("TestPlan/")) {
+      if (res.hasReference() && res.getReference().hasReference() && res.getReference().getReference().contains("TestPlan/")) {
         if (f == null) {
           f = fetcher.fetch(res.getReference(), igf);
         }
@@ -4294,7 +4294,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
       // TestScript Check
-      if (res.getReference().getReference().contains("TestScript/")) {
+      if (res.hasReference() && res.getReference().hasReference() && res.getReference().getReference().contains("TestScript/")) {
         if (f == null) {
           f = fetcher.fetch(res.getReference(), igf);
         }
