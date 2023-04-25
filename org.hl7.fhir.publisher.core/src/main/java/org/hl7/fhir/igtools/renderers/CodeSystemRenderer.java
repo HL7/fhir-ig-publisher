@@ -131,7 +131,7 @@ public class CodeSystemRenderer extends CanonicalRenderer {
         first = addLink(b, first, vc, ed, processed);
     }
     if (first)
-      b.append("<p>"+translate("cs.xref", "This CodeSystem is not used here; it may be used elsewhere (e.g. specifications and/or implementations that use this content)")+"</p>\r\n");
+      b.append("<ul><li>"+translate("cs.xref", "This CodeSystem is not used here; it may be used elsewhere (e.g. specifications and/or implementations that use this content)")+"</li></ul>\r\n");
     else
       b.append("</ul>\r\n");
     return b.toString();
