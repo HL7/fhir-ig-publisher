@@ -615,7 +615,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     LEAVE, CLEAR_ERRORS, CLEAR_ALL;
   }
 
-  public static final boolean USE_COMMONS_EXEC = true;
+  public static final String FHIR_SETTINGS_PARAM = "-fhir-settings";
+  
   public static final int FMM_DERIVATION_MAX = 5;
 
   public enum GenerationTool {
@@ -723,7 +724,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private boolean makeQA = true;
   private boolean bundleReferencesResolve = true;
   private CqlSubSystem cql;
-  private IniFile apiKeyFile;
   private File killFile;    
   private List<PageFactory> pageFactories = new ArrayList<>();
 
@@ -2239,12 +2239,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     log("Build FHIR IG from "+configFile);
     if (mode == IGBuildMode.PUBLICATION)
       log("Build Formal Publication package, intended for "+getTargetOutput());
-      
-    
-    if (apiKeyFile == null) {
-      apiKeyFile = new IniFile(Utilities.path(System.getProperty("user.home"), "fhir-api-keys.ini"));
-    }
-    log("API keys loaded from "+apiKeyFile.getFileName());
+
+    log("API keys loaded from "+ FhirSettings.getFilePath());
+
     templateManager = new TemplateManager(pcm, logger);
     templateProvider = new IGPublisherLiquidTemplateServices();
     extensionTracker = new ExtensionTracker();
@@ -10682,6 +10679,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     org.hl7.fhir.utilities.FileFormat.checkCharsetAndWarnIfNotUTF8(System.out);
 
+    if (hasNamedParam(args, FHIR_SETTINGS_PARAM)) {
+      FhirSettings.setExplicitFilePath(getNamedParam(args, FHIR_SETTINGS_PARAM));
+    }
+
     if (hasNamedParam(args, "-gui")) {
       runGUI();
       // Returning here ends the main thread but leaves the GUI running
@@ -10895,9 +10896,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         self.setMode(IGBuildMode.AUTOBUILD);
         self.targetOutput = getNamedParam(args, "-target");
         self.repoSource = getNamedParam(args, "-repo");
-      }
-      if (hasNamedParam(args, "-api-key-file")) {
-        self.apiKeyFile = new IniFile(new File(getNamedParam(args, "-api-key-file")).getAbsolutePath());
       }
 
       if (hasNamedParam(args, "-no-narrative")) {
