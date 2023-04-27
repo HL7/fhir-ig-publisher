@@ -3445,7 +3445,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       vs = "hl7.terminology.r4";
     } else if (VersionUtilities.isR5Ver(version)) {
       vs = "hl7.terminology.r5";
-    } else if (VersionUtilities.isR5Ver(version)) {
+    } else if (VersionUtilities.isR6Ver(version)) {
       vs = "hl7.terminology.r6";
     }
     return vs;
