@@ -144,11 +144,13 @@ public class IGReleaseRedirectionBuilder {
     Map<String, String> map = createMap(false);
     if (map != null) {
       for (String s : map.keySet()) {
-        String path = Utilities.path(folder, s, "index.php");
-        String p = s.replace("/", "-");
-        String litPath = Utilities.path(folder, p);
-        if (new File(litPath+".xml").exists() && new File(litPath+".json").exists()) 
-          createPhpRedirect(path, map.get(s), Utilities.pathURL(vpath, p));
+        if (!s.contains(":")) {
+          String path = Utilities.path(folder, s, "index.php");
+          String p = s.replace("/", "-");
+          String litPath = Utilities.path(folder, p);
+          if (new File(litPath+".xml").exists() && new File(litPath+".json").exists()) 
+            createPhpRedirect(path, map.get(s), Utilities.pathURL(vpath, p));
+        }
       }
     }
   }
