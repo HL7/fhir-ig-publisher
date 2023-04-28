@@ -2093,9 +2093,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         //        else if (specmaps != null && preambles.has(map.getUri()))   
         //          s.append(preambles.get(map.getUri()).getAsString());
 
-        s.append("<table class=\"grid\">\r\n");
 
-        s.append(" <tr><td colspan=\"3\"><b>" + Utilities.escapeXml(gt(sd.getNameElement())) + "</b></td></tr>\r\n");
+        boolean hasComments = false;
         String path = null;
         for (ElementDefinition e : diff ? sd.getDifferential().getElement() : sd.getSnapshot().getElement()) {
           if (path == null || !e.getPath().startsWith(path)) {
@@ -2103,7 +2102,20 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             if (e.hasMax() && e.getMax().equals("0") || !(complete || hasMappings(e, map))) {
               path = e.getPath() + ".";
             } else
-              genElement(s, e, map.getIdentity());
+              hasComments = checkGenElementComments(e, map.getIdentity()) || hasComments;
+          }  
+        }
+        
+        s.append("<table class=\"grid\">\r\n");
+        s.append(" <tr><td colspan=\"3\"><b>" + Utilities.escapeXml(gt(sd.getNameElement())) + "</b></td></tr>\r\n");
+        path = null;
+        for (ElementDefinition e : diff ? sd.getDifferential().getElement() : sd.getSnapshot().getElement()) {
+          if (path == null || !e.getPath().startsWith(path)) {
+            path = null;
+            if (e.hasMax() && e.getMax().equals("0") || !(complete || hasMappings(e, map))) {
+              path = e.getPath() + ".";
+            } else
+              genElement(s, e, map.getIdentity(), hasComments);
           }
         }
         s.append("</table>\r\n");
@@ -2157,7 +2169,16 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return false;
   }
 
-  private void genElement(StringBuilder s, ElementDefinition e, String id) {
+  private boolean checkGenElementComments(ElementDefinition e, String id) {
+    List<ElementDefinitionMappingComponent> ml = getMap(e, id);
+    for (ElementDefinitionMappingComponent m : ml) {
+      if (m.hasComment()) {
+        return true;
+      }
+    }
+    return false;
+  }
+  private void genElement(StringBuilder s, ElementDefinition e, String id, boolean comments) {
     s.append(" <tr><td>");
     boolean root = true;
     for (char c : e.getPath().toCharArray())
@@ -2190,6 +2211,21 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
       s.append("</td>");
     }
+    if (comments) {
+      if (ml.isEmpty())
+        s.append("<td></td>");
+      else {
+        s.append("<td>");
+        boolean first = true;
+        for (ElementDefinitionMappingComponent m : ml) {
+          if (first) first = false;
+          else s.append(", ");
+          s.append(Utilities.escapeXml(m.getComment()));
+        }
+        s.append("</td>");
+      }
+    }
+
     s.append(" </tr>\r\n");
   }
 
