@@ -558,7 +558,7 @@ public class R4ToR4BAnalyser {
     @Override
     public boolean visit(String path, MarkdownType node) {
       String src = node.asStringValue();
-      if (src.contains(path1)) {
+      if (src != null && src.contains(path1)) {
         node.setValueAsString(src.replace(path1, path2));
         return true;
       } else {
