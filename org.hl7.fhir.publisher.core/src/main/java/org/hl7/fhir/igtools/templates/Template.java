@@ -49,10 +49,12 @@ import org.hl7.fhir.r5.model.OperationOutcome.OperationOutcomeIssueComponent;
 import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.json.JsonUtilities;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonElement;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonPrimitive;
+import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.settings.FhirSettings;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
@@ -85,6 +87,7 @@ public class Template {
   private JsonArray preProcess;
   private String templateReason;
   private Set<String> summaryRows = new HashSet<>();
+  private Set<String> templateParams = new HashSet<>();
   
   /** unpack the template into /template 
    * 
@@ -133,7 +136,13 @@ public class Template {
       antProject.setProperty("ig.networkprohibited", Boolean.toString(FhirSettings.isProhibitNetworkAccess()));
       antProject.init();
     }
-
+    for (JsonProperty p : configuration.getProperties()) {
+      if (p.getName().startsWith("template-parameters")) {
+        for (JsonElement j : p.getValue().asJsonArray()) {
+          templateParams.add(j.asString());                  
+        }
+      }
+    }
     if (configuration.has("defaults")) {
       defaults = (JsonObject)configuration.get("defaults");
     }
@@ -410,6 +419,10 @@ public class Template {
 
   public void loadSummaryRows(Set<String> rows) {
     rows.addAll(summaryRows);   
+  }
+
+  public boolean isParameter(String pc) {
+    return templateParams.contains(pc) || (templateParams.isEmpty() && Utilities.existsInList(pc, "releaselabel", "shownav", "excludettl", "jira-code", "fmm-definition", "excludelogbinaryformat"));
   }
 
   

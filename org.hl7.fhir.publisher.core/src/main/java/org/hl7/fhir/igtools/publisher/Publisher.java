@@ -2614,7 +2614,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       } else if (pc.equals("i18n-lang")) {
         hasTranslations = true;
         translationLangs .add(p.getValue());
-      } else {
+      } else if (!template.isParameter(pc)) {
         unknownParams.add(pc);
       }
       count++;
@@ -2782,10 +2782,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       dep.addExtension(ToolingExtensions.EXT_IGDEP_COMMENT, new MarkdownType("Automatically added as a dependency - all IGs depend on HL7 Terminology"));
       sourceIg.getDependsOn().add(0, dep);
     }
-    if (sourceIg.hasExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency")) {
-      sourceIg.getExtensionByUrl("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency").setValue(new CodeType("hl7.fhir.uv.tools#current"));      
+    if (sourceIg.getDefinition().hasExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency")) {
+      sourceIg.getDefinition().getExtensionByUrl("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency").setValue(new CodeType("hl7.fhir.uv.tools#current"));      
     } else {
-      sourceIg.addExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency", new CodeType("hl7.fhir.uv.tools#current"));
+      sourceIg.getDefinition().addExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency", new CodeType("hl7.fhir.uv.tools#current"));
     }
     inspector = new HTMLInspector(outputDir, specMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), trackedFragments);
     inspector.getManual().add("full-ig.zip");
@@ -7603,7 +7603,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             for (StructureDefinitionContextComponent ec : sd.getContext()) {
               JsonObject citem = new JsonObject();
               contexts.add(citem);
-              citem.add("type", ec.getType().getDisplay());
+              citem.add("type", ec.hasType() ? ec.getType().getDisplay() : "??");
               citem.add("expression", ec.getExpression());
             }
           }
