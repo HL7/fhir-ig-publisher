@@ -164,7 +164,7 @@ public class SimpleFetcher implements IFetchFile {
     throw new Exception("Unable to find resource file "+name);
   }
   
-  static String fileTitle(String path) {
+  static public String fileTitle(String path) {
     if (path.contains(".")) {
       String ext = path.substring(path.lastIndexOf(".")+1);
       if (Utilities.isInteger(ext)) {

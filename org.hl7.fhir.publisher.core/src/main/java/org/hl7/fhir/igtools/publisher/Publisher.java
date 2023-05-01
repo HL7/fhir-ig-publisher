@@ -66,6 +66,7 @@ import java.util.zip.ZipInputStream;
 import javax.swing.UIManager;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
@@ -146,6 +147,7 @@ import org.hl7.fhir.r5.context.IWorkerContext.ValidationResult;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.FmlParser;
+import org.hl7.fhir.r5.elementmodel.LanguageUtils;
 import org.hl7.fhir.r5.elementmodel.Manager.FhirFormat;
 import org.hl7.fhir.r5.elementmodel.ObjectConverter;
 import org.hl7.fhir.r5.elementmodel.ParserBase.IdRenderingPolicy;
@@ -172,6 +174,7 @@ import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResource
 import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceOperationComponent;
 import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceSearchParamComponent;
 import org.hl7.fhir.r5.model.CodeSystem;
+import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
 import org.hl7.fhir.r5.model.CodeType;
 import org.hl7.fhir.r5.model.CodeableConcept;
 import org.hl7.fhir.r5.model.Coding;
@@ -187,6 +190,7 @@ import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionConstraintComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
 import org.hl7.fhir.r5.model.Enumeration;
+import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
 import org.hl7.fhir.r5.model.Enumerations.FHIRVersion;
 import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
 import org.hl7.fhir.r5.model.ExpressionNode;
@@ -307,6 +311,13 @@ import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.ZipGenerator;
 import org.hl7.fhir.utilities.i18n.I18nConstants;
+import org.hl7.fhir.utilities.i18n.JsonLangFileProducer;
+import org.hl7.fhir.utilities.i18n.JsonLangFileProducer.JsonLangProducerSession;
+import org.hl7.fhir.utilities.i18n.LanguageFileProducer.LanguageProducerLanguageSession;
+import org.hl7.fhir.utilities.i18n.LanguageFileProducer.LanguageProducerSession;
+import org.hl7.fhir.utilities.i18n.LanguageFileProducer.TranslationUnit;
+import org.hl7.fhir.utilities.i18n.PoGetTextProducer;
+import org.hl7.fhir.utilities.i18n.XLIFFProducer;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonBoolean;
 import org.hl7.fhir.utilities.json.model.JsonElement;
@@ -341,6 +352,7 @@ import org.hl7.fhir.validation.instance.InstanceValidator;
 import org.hl7.fhir.validation.instance.utils.ValidatorHostContext;
 import org.hl7.fhir.validation.profile.ProfileValidator;
 import org.w3c.dom.Document;
+import org.xml.sax.SAXException;
 
 
 /**
@@ -879,6 +891,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private boolean hasTranslations;
   private String defaultTranslationLang;
   private List<String> translationLangs = new ArrayList<>();
+  private List<String> translationSupplements = new ArrayList<>();
   
   private class PreProcessInfo {
     private String xsltName;
@@ -1130,7 +1143,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private void processTranslationOutputs() throws IOException {
 
-    PublisherTranslator pt = new PublisherTranslator(context, defaultTranslationLang, translationLangs);
+    PublisherTranslator pt = new PublisherTranslator(context, sourceIg.hasLanguage() ? sourceIg.getLanguage() : "en", defaultTranslationLang, translationLangs);
     pt.start(tempLangDir);
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
@@ -2613,7 +2626,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         defaultTranslationLang = p.getValue();
       } else if (pc.equals("i18n-lang")) {
         hasTranslations = true;
-        translationLangs .add(p.getValue());
+        translationLangs.add(p.getValue());
+      } else if (pc.equals("translation-supplements")) {
+        hasTranslations = true;
+        translationSupplements.add(p.getValue());
       } else if (!template.isParameter(pc)) {
         unknownParams.add(pc);
       }
@@ -4213,6 +4229,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     needToBuild = loadSpreadsheets(needToBuild, igf);
     needToBuild = loadMappings(needToBuild, igf);
     needToBuild = loadBundles(needToBuild, igf);
+    needToBuild = loadTranslationSupplements(needToBuild, igf);
     int i = 0;
     for (ImplementationGuideDefinitionResourceComponent res : publishedIg.getDefinition().getResource()) {
       if (!res.hasReference())
@@ -4531,6 +4548,145 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     extensionTracker.scan(publishedIg);
     
     return needToBuild;
+  }
+
+  private boolean loadTranslationSupplements(boolean needToBuild, FetchedFile igf) throws Exception {
+    for (String p : translationSupplements) {
+      for (File f : new File(Utilities.path(rootDir, p)).listFiles()) {
+        needToBuild = loadTranslationSupplement(f, needToBuild);
+      }
+    }
+    return needToBuild;
+  }
+
+  private boolean loadTranslationSupplement(File f, boolean needToBuild) throws Exception {
+    String name = f.getName();
+    if (!name.contains("-")) {
+      System.out.println("Ignoring file "+f.getAbsolutePath()+" - name is not {type}-{id}.xxx");
+    } else {
+      String rtype = name.substring(0, name.indexOf("-"));
+      String id = name.substring(name.indexOf("-")+1);
+      String ext = name.substring(name.lastIndexOf(".")+1).toLowerCase();
+      id = id.substring(0, id.lastIndexOf("."));
+      if (!Utilities.isValidId(id)) {
+        System.out.println("Ignoring file "+f.getAbsolutePath()+" - name is not {type}-{id}.xxx");
+      } else if (!Utilities.existsInList(rtype, LanguageUtils.TRANSLATION_SUPPLEMENT_RESOURCE_TYPES)) {
+        System.out.println("Ignoring file "+f.getAbsolutePath()+" - resource type '"+rtype+"' is not supported for translation supplements");
+      } else if (Utilities.existsInList(rtype, "po", "xliff", "json")) {
+        System.out.println("Ignoring file "+f.getAbsolutePath()+" - unknown format '"+ext+"'. Allowed = po, xliff, json");
+      } else {
+        CanonicalResource cr = (CanonicalResource) context.fetchResourceById(rtype, id);
+        if (cr == null) {
+          System.out.println("Ignoring file "+f.getAbsolutePath()+" - the resource "+rtype+"/"+id+" is not known");
+        } else {
+          FetchedFile ff = new FetchedFile(f.getAbsolutePath().substring(rootDir.length()+1));
+          ff.setPath(f.getCanonicalPath());
+          ff.setName(SimpleFetcher.fileTitle(f.getCanonicalPath()));
+          ff.setTime(f.lastModified());
+          ff.setFolder(false);   
+          ff.setContentType(ext);
+//          InputStream ss = new FileInputStream(f);
+//          byte[] b = new byte[ss.available()];
+//          ss.read(b, 0, ss.available());
+//          ff.setSource(b);
+//          ss.close();    
+          
+          boolean changed = noteFile(f.getPath(), ff);
+          // ok good to go
+          CodeSystem cs = makeSupplement(cr);
+          cs.setUserData("source.filename", f.getName().substring(0, f.getName().indexOf(".")));
+          List<TranslationUnit> list = loadTranslations(f, ext);
+          LanguageUtils.fillSupplement(cs, list);
+          FetchedResource rr = ff.addResource("CodeSystemSupplement");
+          rr.setElement(convertToElement(rr, cs));
+          rr.setResource(cs);          
+          rr.setId(cs.getId());
+          rr.setTitle(cs.getName());
+          igpkp.findConfiguration(ff, rr);
+          for (FetchedResource r : ff.getResources()) {
+            ImplementationGuideDefinitionResourceComponent res = findIGReference(r.fhirType(), r.getId());
+            if (res == null) {
+              res = publishedIg.getDefinition().addResource();
+              if (!res.hasName())
+                res.setName(r.getTitle());
+              if (!res.hasDescription())
+                res.setDescription(((CanonicalResource)r.getResource()).getDescription().trim());
+              res.setReference(new Reference().setReference(r.fhirType()+"/"+r.getId()));
+            }
+            res.setUserData("loaded.resource", r);
+            r.setResEntry(res);
+          }
+          return changed;
+        }
+      }
+    }
+    return false;
+  }
+
+  private CodeSystem makeSupplement(CanonicalResource res) {
+    String id = "cs-"+defaultTranslationLang+"-"+res.getId();
+    CodeSystem supplement = new CodeSystem();
+    supplement.setLanguage("en"); // base is EN? 
+    supplement.setId(id);
+    supplement.setUrl(Utilities.pathURL(igpkp.getCanonical(), "CodeSystem", id));
+    supplement.setVersion(res.getVersion());
+    supplement.setStatus(res.getStatus());
+    supplement.setName(res.getTitle()+LanguageUtils.nameForLang(defaultTranslationLang));
+    supplement.setName(res.getTitle()+" ("+LanguageUtils.titleForLang(defaultTranslationLang)+" translation)");
+    supplement.setContent(CodeSystemContentMode.SUPPLEMENT);
+    supplement.setSupplements(res.getUrl());
+    supplement.setCaseSensitive(false);
+    supplement.setPublisher(sourceIg.getPublisher());
+    supplement.setContact(sourceIg.getContact());
+    supplement.setDescription("Language Pack:"+LanguageUtils.titleForLang(defaultTranslationLang)+"\r\n"+res.getDescription());
+    supplement.setCopyright(sourceIg.getCopyright());
+
+    addConcept(supplement, res.getId(), res.getName());
+    addConcept(supplement, res.getId()+"/title", res.getTitle());
+    addConcept(supplement, res.getId()+"/purpose", res.getPurpose());
+    addConcept(supplement, res.getId()+"/copyright", res.getCopyright());
+    
+    if (res instanceof CodeSystem) {
+      CodeSystem cs = (CodeSystem) res;
+      for (ConceptDefinitionComponent cd : cs.getConcept()) {
+        ConceptDefinitionComponent clone = supplement.addConcept().setCode(cd.getCode()).setDisplay(cd.getDisplay());
+        copyConcepts(clone, cd);
+      }
+    } else if (res instanceof StructureDefinition) {
+      StructureDefinition sd = (StructureDefinition) res;
+      for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+        addConcept(supplement, ed.getId(), ed.getDefinition());
+        addConcept(supplement, ed.getId()+"/requirements", ed.getRequirements());
+        addConcept(supplement, ed.getId()+"/comment", ed.getComment());
+        addConcept(supplement, ed.getId()+"/meaningWhenMissing", ed.getMeaningWhenMissing());
+        addConcept(supplement, ed.getId()+"/orderMeaning", ed.getOrderMeaning());
+        addConcept(supplement, ed.getId()+"/isModifierMeaning", ed.getIsModifierReason());
+        addConcept(supplement, ed.getId()+"/binding", ed.getBinding().getDescription());
+      }
+    }
+    return supplement;
+  }
+
+  private void copyConcepts(ConceptDefinitionComponent tgt, ConceptDefinitionComponent src) {
+    for (ConceptDefinitionComponent cd : src.getConcept()) {
+      ConceptDefinitionComponent clone = tgt.addConcept().setCode(cd.getCode()).setDisplay(cd.getDisplay());
+      copyConcepts(clone, cd);
+    }
+  }
+
+  private void addConcept(CodeSystem supplement, String code, String display) {
+    if (display != null) {
+      supplement.addConcept().setCode(code).setDisplay(display.replace("\r", "\\r").replace("\n", "\\n"));
+    }    
+  }
+
+  private List<TranslationUnit> loadTranslations(File f, String ext) throws FileNotFoundException, IOException, ParserConfigurationException, SAXException {
+    switch (ext) {
+    case "po": return new PoGetTextProducer().loadSource(new FileInputStream(f));
+    case "xliff": return new XLIFFProducer().loadSource(new FileInputStream(f));
+    case "json": return new JsonLangFileProducer().loadSource(new FileInputStream(f));
+    }
+    throw new IOException("Unknown extension "+ext); // though we won't get to here
   }
 
   private FetchedResource fetchByResource(String type, String id) {
@@ -6556,6 +6712,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     forceDir(tempDir);
     forceDir(Utilities.path(tempDir, "_includes"));
     forceDir(Utilities.path(tempDir, "_data"));
+    if (hasTranslations) {
+      forceDir(tempLangDir);
+    }
     
     otherFilesRun.clear();
     otherFilesRun.add(Utilities.path(outputDir, "package.tgz"));
