@@ -6637,7 +6637,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       noValidateResources.add(r);
       return;
     }
-    if ("ImplementationGuide".equals(r.fhirType())) {
+    if ("ImplementationGuide".equals(r.fhirType()) && !unknownParams.isEmpty()) {
       file.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.INVALID, file.getName(), "Unknown Parameters: "+unknownParams.toString(), IssueSeverity.WARNING));
     }
 
@@ -8380,7 +8380,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         h.tx(type);
       }
       tr = tbl.tr();
-      tr.td().ah(cr.getWebPath()).tx(cr.getUrl());
+      if (cr.getWebPath() != null) {
+        tr.td().ah(cr.getWebPath()).tx(cr.getUrl());
+      } else {
+        tr.td().code().tx(cr.getUrl());
+      }
       tr.td().tx(cr.getId());
       tr.td().tx(cr.getVersion());
       tr.td().tx(bo.toString());
