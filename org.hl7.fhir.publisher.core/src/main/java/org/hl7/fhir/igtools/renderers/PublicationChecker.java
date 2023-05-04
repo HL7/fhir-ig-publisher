@@ -306,7 +306,7 @@ public class PublicationChecker {
     String cv = null;
     for (PackageListEntry j : pl.list()) {
       String v = j.version();
-      if (!Utilities.noString(v)) {
+      if (!Utilities.noString(v) && !"current".equals(v)) {
         if (cv == null || VersionUtilities.isThisOrLater(v, cv)) {
           cv = v;
         }

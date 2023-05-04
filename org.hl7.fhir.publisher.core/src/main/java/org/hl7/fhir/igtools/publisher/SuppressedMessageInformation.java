@@ -5,6 +5,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import org.hl7.fhir.utilities.validation.ValidationMessage;
+
 public class SuppressedMessageInformation {
 
   public class SuppressedMessageListSorter implements Comparator<SuppressedMessage> {
@@ -48,6 +50,9 @@ public class SuppressedMessageInformation {
     }
     
     public void use() {
+      if (messageRaw.contains("C57134")) {
+        System.out.println("!"); // #FIXME
+      }
       useCount++;
     }
 
@@ -73,7 +78,7 @@ public class SuppressedMessageInformation {
   
   private List<Category> categories = new ArrayList<>();
 
-  public boolean contains(String message) {
+  public boolean contains(String message, ValidationMessage vMsg) {
     if (message == null) {
       return false;
     }
@@ -82,7 +87,10 @@ public class SuppressedMessageInformation {
       for (SuppressedMessage sm : c.messages) {
         boolean match = sm.matches(msg);
         if (match) {
-          sm.use();
+          if (!vMsg.isMatched()) {
+            sm.use();
+            vMsg.setMatched(true);
+          }
           return true;
         }
       }
