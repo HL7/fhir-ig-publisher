@@ -223,3 +223,4 @@ local.properties
 /org.hl7.fhir.publisher.core/full-ig.zip
 
 FHIR-us-pq-cmc
+.vscode/
