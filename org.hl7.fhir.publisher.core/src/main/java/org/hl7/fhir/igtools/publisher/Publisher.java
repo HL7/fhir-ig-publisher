@@ -273,7 +273,7 @@ import org.hl7.fhir.r5.renderers.utils.RenderingContext.StructureDefinitionRende
 import org.hl7.fhir.r5.renderers.utils.Resolver.IReferenceResolver;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceContext;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceWithReference;
-import org.hl7.fhir.r5.terminologies.ValueSetExpander.ValueSetExpansionOutcome;
+import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.r5.utils.FHIRPathEngine;
 import org.hl7.fhir.r5.utils.FHIRPathEngine.IEvaluationContext;
