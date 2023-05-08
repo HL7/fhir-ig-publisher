@@ -7064,7 +7064,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           d = c.getChildValue("definition");
         }
         CanonicalResource canonical = null;
-        if (Utilities.existsInList(c.fhirType(), VersionUtilities.getCanonicalResourceNames(context.getVersion()))) {
+        if (VersionUtilities.getCanonicalResourceNames(context.getVersion()).contains(c.fhirType())) {
           try {
             canonical = (CanonicalResource)convertFromElement(c);
           } catch (Exception ex) {
