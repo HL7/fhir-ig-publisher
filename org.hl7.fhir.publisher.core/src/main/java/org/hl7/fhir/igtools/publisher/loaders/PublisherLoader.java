@@ -84,6 +84,12 @@ public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProv
         }
         String p = spm.getPath(u, r.getMeta().getSource(), r.fhirType(), r.getId());
         if (p == null) {
+          if ("NamingSystem".equals(r.fhirType())) {
+            // work around for an issue cuased by loading the NamingSystem url extension correctly while converting to R5 internally,
+            // but not generating the correct metadata for the NamingSystem when the package was generated before the URL was being
+            // processed correctly
+            return null;
+          }
           throw new FHIRException("Internal error in IG "+npm.name()+"#"+npm.version()+" map: No identity found for "+u);
         }
         if (!r.hasId()) {

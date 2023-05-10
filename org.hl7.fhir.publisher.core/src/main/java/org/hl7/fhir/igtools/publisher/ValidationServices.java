@@ -245,7 +245,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
     }
     
     if (u.startsWith("http://hl7.org/fhir")) {
-      if (Utilities.existsInList(u, org.hl7.fhir.r5.utils.BuildExtensions.allConsts())) {
+      if (org.hl7.fhir.r5.utils.BuildExtensions.allConsts().contains(u)) {
         return true;
       }
       try {
