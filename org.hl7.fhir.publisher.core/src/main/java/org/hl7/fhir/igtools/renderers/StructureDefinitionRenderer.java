@@ -2080,21 +2080,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (sd.getMapping().isEmpty())
       return "<p>" + translate("sd.maps", "No Mappings") + "</p>";
     else {
+      boolean allEmpty = true;  // assume all the mappings are empty; 
       StringBuilder s = new StringBuilder();
       for (StructureDefinitionMappingComponent map : sd.getMapping()) {
 
-        String url = getUrlForUri(map.getUri());
-        if (url == null)
-          s.append("<a name=\"" + map.getIdentity() + "\"> </a><h3>" + translate("sd.maps", "Mappings for %s (%s)", Utilities.escapeXml(gt(map.getNameElement())), Utilities.escapeXml(map.getUri())) + "</h3>");
-        else
-          s.append("<a name=\"" + map.getIdentity() + "\"> </a><h3>" + translate("sd.maps", "Mappings for %s (<a href=\"" + Utilities.escapeXml(url) + "\">%s</a>)", Utilities.escapeXml(gt(map.getNameElement())), Utilities.escapeXml(map.getUri())) + "</h3>");
-        if (map.hasComment())
-          s.append("<p>" + Utilities.escapeXml(gt(map.getCommentElement())) + "</p>");
-        //        else if (specmaps != null && preambles.has(map.getUri()))   
-        //          s.append(preambles.get(map.getUri()).getAsString());
-
-
-        boolean hasComments = false;
+        // Go check all the mappings have at least one Map or Comment defined (we want to suppress completely empty mappings)
+        boolean hasComments = false; boolean hasMaps = false;
         String path = null;
         for (ElementDefinition e : diff ? sd.getDifferential().getElement() : sd.getSnapshot().getElement()) {
           if (path == null || !e.getPath().startsWith(path)) {
@@ -2103,23 +2094,44 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
               path = e.getPath() + ".";
             } else
               hasComments = checkGenElementComments(e, map.getIdentity()) || hasComments;
+              hasMaps = checkGenElementMaps(e, map.getIdentity()) || hasMaps;
           }  
         }
         
-        s.append("<table class=\"grid\">\r\n");
-        s.append(" <tr><td colspan=\"3\"><b>" + Utilities.escapeXml(gt(sd.getNameElement())) + "</b></td></tr>\r\n");
-        path = null;
-        for (ElementDefinition e : diff ? sd.getDifferential().getElement() : sd.getSnapshot().getElement()) {
-          if (path == null || !e.getPath().startsWith(path)) {
-            path = null;
-            if (e.hasMax() && e.getMax().equals("0") || !(complete || hasMappings(e, map))) {
-              path = e.getPath() + ".";
-            } else
-              genElement(s, e, map.getIdentity(), hasComments);
+        // Don't include empty mappings...
+        if(hasMaps || hasComments) {
+          allEmpty = false; // that assumption is wrong
+          String url = getUrlForUri(map.getUri());
+          if (url == null)
+            s.append("<a name=\"" + map.getIdentity() + "\"> </a><h3>" + translate("sd.maps", "Mappings for %s (%s)", Utilities.escapeXml(gt(map.getNameElement())), Utilities.escapeXml(map.getUri())) + "</h3>");
+          else
+            s.append("<a name=\"" + map.getIdentity() + "\"> </a><h3>" + translate("sd.maps", "Mappings for %s (<a href=\"" + Utilities.escapeXml(url) + "\">%s</a>)", Utilities.escapeXml(gt(map.getNameElement())), Utilities.escapeXml(map.getUri())) + "</h3>");
+          if (map.hasComment())
+            s.append("<p>" + Utilities.escapeXml(gt(map.getCommentElement())) + "</p>");
+          //        else if (specmaps != null && preambles.has(map.getUri()))   
+          //          s.append(preambles.get(map.getUri()).getAsString()); 
+
+          s.append("<table class=\"grid\">\r\n");
+          s.append(" <tr><td colspan=\"3\"><b>" + Utilities.escapeXml(gt(sd.getNameElement())) + "</b></td></tr>\r\n");
+          path = null;
+          for (ElementDefinition e : diff ? sd.getDifferential().getElement() : sd.getSnapshot().getElement()) {
+            if (path == null || !e.getPath().startsWith(path)) {
+              path = null;
+              if (e.hasMax() && e.getMax().equals("0") || !(complete || hasMappings(e, map))) {
+                path = e.getPath() + ".";
+              } else
+                genElement(s, e, map.getIdentity(), hasComments);
+            }
           }
+          s.append("</table>\r\n");
         }
-        s.append("</table>\r\n");
       }
+
+      // Well all the mappings are empty
+      if(allEmpty) {
+        s.append("<p>" + translate("sd.maps", "All Mappings are Empty" + "</p>"));
+      }
+
       return s.toString();
     }
   }
@@ -2169,6 +2181,15 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return false;
   }
 
+  private boolean checkGenElementMaps(ElementDefinition e, String id) {
+    List<ElementDefinitionMappingComponent> ml = getMap(e, id);
+    for (ElementDefinitionMappingComponent m : ml) {
+      if (m.hasMap()) {
+        return true;
+      }
+    }
+    return false;
+  }
   private boolean checkGenElementComments(ElementDefinition e, String id) {
     List<ElementDefinitionMappingComponent> ml = getMap(e, id);
     for (ElementDefinitionMappingComponent m : ml) {
@@ -2220,7 +2241,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         for (ElementDefinitionMappingComponent m : ml) {
           if (first) first = false;
           else s.append(", ");
-          s.append(Utilities.escapeXml(m.getComment()));
+//          s.append(Utilities.escapeXml(m.getComment()));
+            s.append(processMarkdown("map.comment", m.getComment()));
         }
         s.append("</td>");
       }
