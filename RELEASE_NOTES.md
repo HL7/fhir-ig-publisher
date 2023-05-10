@@ -7,4 +7,5 @@
 * Validator: Fix FHIRPath split function (parameter is not regex)
 * Validator: Stop warning that Markdown autolinks need to be escaped
 * Renderer: fix handling of naming system title
+* Renderer: Suppress mappings that are totally empty when rendering profiles
 * QA: Fix language around release checking
