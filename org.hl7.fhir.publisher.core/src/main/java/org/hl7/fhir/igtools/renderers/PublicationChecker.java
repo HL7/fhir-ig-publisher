@@ -163,7 +163,7 @@ public class PublicationChecker {
         summary.add(new StringPair("mode", mode.toCode()));        
       }
     } else {
-      if (check(messages, npm.version().contains("-"), "This release is labelled as a milestone or technical correction, so should have a patch version ("+npm.version() +")"+mkWarning())) {
+      if (check(messages, npm.version().contains("-"), "This release is not labelled as a milestone or technical correction, so should have a patch version ("+npm.version() +")"+(isHL7(npm) ? mkError() : mkWarning()))) {
         summary.add(new StringPair("milestone", pr.asString("milestone")));                
       }
     }
@@ -241,6 +241,10 @@ public class PublicationChecker {
     check(messages, !pr.has("date"), "Cannot specify a date of publication in the request"+mkError());
     check(messages, !pr.has("canonical"), "Cannot specify a canonical in the request"+mkError());
     
+  }
+
+  private boolean isHL7(NpmPackage npm) {
+    return npm.id().startsWith("hl7.");
   }
 
   private PackageListEntry getLastVersionForSequence(PackageList pl, String seq) {
