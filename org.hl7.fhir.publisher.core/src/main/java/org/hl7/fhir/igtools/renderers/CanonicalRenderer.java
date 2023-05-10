@@ -60,9 +60,6 @@ public class CanonicalRenderer extends BaseRenderer {
 
     String name = cr.hasName() ? gt(cr.getNameElement()) : null;
     String title = cr.hasTitle() ? gt(cr.getTitleElement()) : null;
-    if (title == null) {
-      title = ToolingExtensions.readStringExtension(cr, "http://hl7.org/fhir/tools/StructureDefinition/extension-title");
-    }
     if (hasSummaryRow(rows, "name")) {
 
       b.append(" <tr><td>"+translate("cr.summary", "Name")+":</td><td>"+Utilities.escapeXml(name)+"</td></tr>\r\n");
