@@ -4550,12 +4550,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private boolean loadTranslationSupplements(boolean needToBuild, FetchedFile igf) throws Exception {
     for (String p : translationSupplements) {
-      for (File f : new File(Utilities.path(rootDir, p)).listFiles()) {
-        needToBuild = loadTranslationSupplement(f, needToBuild);
-      }
+        File dir = new File(Utilities.path(rootDir, p));
+        if (dir.exists()) {
+            if (dir.isFile()) {
+                throw new Exception("A file exists with the name of the expected directory: " + dir.getAbsolutePath());
+            }
+        } else {
+            dir.mkdirs();
+        }
+        for (File f : dir.listFiles()) {
+            needToBuild = loadTranslationSupplement(f, needToBuild);
+        }
     }
     return needToBuild;
-  }
+}
 
   private boolean loadTranslationSupplement(File f, boolean needToBuild) throws Exception {
     String name = f.getName();
