@@ -2446,6 +2446,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     boolean checkAggregation = false;
     boolean autoLoad = false;
     boolean showReferenceMessages = false;
+    boolean displayWarnings = false;
+    
     copyrightYear = null;
     Boolean useStatsOptOut = null;
     List<String> extensionDomains = new ArrayList<>();
@@ -2461,143 +2463,229 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       String pc = p.getCode().getCode();
       if (pc == null) {
         throw new Error("The IG Parameter has no code");
-      } else if (pc.equals("logging")) { // added
-        logOptions.add(p.getValue());        
-      } else if (pc.equals("generate")) { // added
+      } else switch (pc) {
+      case "logging":
+        logOptions.add(p.getValue());
+        break;
+      case "generate":
         if ("example-narratives".equals(p.getValue()))
           genExampleNarratives = true;
         if ("examples".equals(p.getValue()))
           genExamples = true;
-      } else if (pc.equals("no-narrative")) {
+        break;
+      case "no-narrative":
         String s = p.getValue();
         if (!s.contains("/")) {
          throw new Exception("Illegal value "+s+" for no-narrative: should be resource/id (see documentation at https://build.fhir.org/ig/FHIR/fhir-tools-ig/CodeSystem-ig-parameters.html)");
         }
         noNarratives.add(s);
-      } else if (pc.equals("no-validate")) {
+        break;
+      case "no-validate":
         noValidate.add(p.getValue());
-      } else if (pc.equals("path-resource")) {
+        break;
+      case "path-resource":
         String dir = getPathResourceDirectory(p);
         if (!resourceDirs.contains(dir)) {
           resourceDirs.add(dir);
         }
-      } else if (pc.equals("autoload-resources")) {     
+        break;
+      case "autoload-resources":     
         autoLoad = "true".equals(p.getValue());
-      } else if (pc.equals("codesystem-property")) {     
+        break;
+      case "codesystem-property":     
         codeSystemProps.add(p.getValue());
-      } else if (pc.equals("path-pages")) {     
+        break;
+      case "path-pages":     
         pagesDirs.add(Utilities.path(rootDir, p.getValue()));
-      } else if (pc.equals("path-data")) {     
+        break;
+      case "path-data":     
         dataDirs.add(Utilities.path(rootDir, p.getValue()));
-      } else if (pc.equals("copyrightyear")) {     
+        break;
+      case "copyrightyear":     
         copyrightYear = p.getValue();
-      } else if (pc.equals("path-qa")) {     
+        break;
+      case "path-qa":     
         qaDir = Utilities.path(rootDir, p.getValue());
-      } else if (pc.equals("path-tx-cache")) {     
+        break;
+      case "path-tx-cache":     
         vsCache =  Paths.get(p.getValue()).isAbsolute() ? p.getValue() : Utilities.path(rootDir, p.getValue());
-      } else if (pc.equals("path-liquid")) {
+        break;
+      case "path-liquid":
         templateProvider.load(Utilities.path(rootDir, p.getValue()));
-      } else if (pc.equals("path-temp")) {
+        break;
+      case "path-temp":
         tempDir = Utilities.path(rootDir, p.getValue());
         if (!tempDir.startsWith(rootDir))
           throw new Exception("Temp directory must be a sub-folder of the base directory");
-      } else if (pc.equals("path-output") && mode != IGBuildMode.WEBSERVER) {
+        break;
+      case "path-output":
+        if (mode != IGBuildMode.WEBSERVER) {
         // Can't override outputDir if building using webserver
         outputDir = Utilities.path(rootDir, p.getValue());
         if (!outputDir.startsWith(rootDir))
           throw new Exception("Output directory must be a sub-folder of the base directory");
-      } else if (pc.equals("path-history")) {     
+        }
+        break;
+      case "path-history":     
         historyPage = p.getValue();
-      } else if (pc.equals("path-expansion-params")) {     
+        break;
+      case "path-expansion-params":   
         expParams = p.getValue();
-      } else if (pc.equals("path-suppressed-warnings")) {     
+        break;
+      case "path-suppressed-warnings":  
         loadSuppressedMessages(Utilities.path(rootDir, p.getValue()), "ImplementationGuide.definition.parameter["+count+"].value");
-      } else if (pc.equals("html-exempt")) {     
+        break;
+      case "html-exempt": 
         exemptHtmlPatterns.add(p.getValue());
-      } else if (pc.equals("usage-stats-opt-out")) {     
+        break;
+      case "usage-stats-opt-out":     
         useStatsOptOut = "true".equals(p.getValue());
-      } else if (pc.equals("extension-domain")) {
+        break;
+      case "extension-domain":
         extensionDomains.add(p.getValue());
-      } else if (pc.equals("bundle-references-resolve")) {
+        break;
+      case "bundle-references-resolve":
         bundleReferencesResolve = "true".equals(p.getValue());        
-      } else if (pc.equals("active-tables")) {
+        break;
+      case "active-tables":
         HierarchicalTableGenerator.ACTIVE_TABLES = "true".equals(p.getValue());
-      } else if (pc.equals("propagate-status")) {     
+        break;
+      case "propagate-status":     
         isPropagateStatus = p.getValue().equals("true");
-      } else if (pc.equals("ig-expansion-parameters")) {     
+        break;
+      case "ig-expansion-parameters":     
         expParamMap.put(pc, p.getValue());
-      } else if (pc.equals("special-url")) {     
+        break;
+      case "special-url":    
         listedURLExemptions.add(p.getValue());
-      } else if (pc.equals("special-url-base")) {
+        break;
+      case "special-url-base":
         altCanonical = p.getValue();
-      } else if (pc.equals("no-usage-check")) {
+        break;
+      case "no-usage-check":
         noUsageCheck = "true".equals(p.getValue());
-      } else if (pc.equals("template-openapi")) {     
+        break;
+      case "template-openapi": 
         openApiTemplate = p.getValue();
-      } else if (pc.equals("template-html")) {     
+        break;
+      case "template-html":
         htmlTemplate = p.getValue();
-      } else if (pc.equals("format-date")) {     
+        break;
+      case "format-date": 
         fmtDate = p.getValue();
-      } else if (pc.equals("format-datetime")) {     
+        break;
+      case "format-datetime": 
         fmtDateTime = p.getValue();
-      } else if (pc.equals("template-md")) {     
+        break;
+      case "template-md":
         mdTemplate = p.getValue();
-      } else if (pc.equals("path-binary")) {     
+        break;
+      case "path-binary":     
         binaryPaths.add(Utilities.path(rootDir, p.getValue()));
-      } else if (pc.equals("show-inherited-invariants")) {     
+        break;
+      case "show-inherited-invariants":
         allInvariants = "true".equals(p.getValue());
-      } else if (pc.equals("apply-contact") && p.getValue().equals("true")) {
-        contacts = sourceIg.getContact();
-      } else if (pc.equals("apply-context") && p.getValue().equals("true")) {
-        contexts = sourceIg.getUseContext();
-      } else if (pc.equals("apply-copyright") && p.getValue().equals("true")) {
-        copyright = sourceIg.getCopyright();
-      } else if (pc.equals("apply-jurisdiction") && p.getValue().equals("true")) {
-        jurisdictions = sourceIg.getJurisdiction();
-      } else if (pc.equals("apply-license") && p.getValue().equals("true")) {
-        licenseInfo = sourceIg.getLicense();
-      } else if (pc.equals("apply-publisher") && p.getValue().equals("true")) {
-        publisher = sourceIg.getPublisher();
-      } else if (pc.equals("apply-version") && p.getValue().equals("true")) {
-        businessVersion = sourceIg.getVersion();
-      } else if (pc.equals("default-contact") && p.getValue().equals("true")) {
-        defaultContacts = sourceIg.getContact();
-      } else if (pc.equals("default-context") && p.getValue().equals("true")) {
-        defaultContexts = sourceIg.getUseContext();
-      } else if (pc.equals("default-copyright") && p.getValue().equals("true")) {
-        defaultCopyright = sourceIg.getCopyright();
-      } else if (pc.equals("default-jurisdiction") && p.getValue().equals("true")) {
-        defaultJurisdictions = sourceIg.getJurisdiction();
-      } else if (pc.equals("default-license") && p.getValue().equals("true")) {
-        defaultLicenseInfo = sourceIg.getLicense();
-      } else if (pc.equals("default-publisher") && p.getValue().equals("true")) {
-        defaultPublisher = sourceIg.getPublisher();
-      } else if (pc.equals("default-version") && p.getValue().equals("true")) {
-        defaultBusinessVersion = sourceIg.getVersion();
-      } else if (pc.equals("generate-version")) {     
+        break;
+      case "apply-contact":
+        if (p.getValue().equals("true")) {
+          contacts = sourceIg.getContact();
+        }
+        break;
+      case "apply-context":
+        if (p.getValue().equals("true")) {
+          contexts = sourceIg.getUseContext();
+        }
+        break;
+      case "apply-copyright":
+        if (p.getValue().equals("true")) {
+          copyright = sourceIg.getCopyright();
+        }
+        break;
+      case "apply-jurisdiction":
+        if (p.getValue().equals("true")) {
+          jurisdictions = sourceIg.getJurisdiction();
+        }
+        break;
+      case "apply-license":
+        if (p.getValue().equals("true")) {
+          licenseInfo = sourceIg.getLicense();
+        }
+        break;
+      case "apply-publisher":
+        if (p.getValue().equals("true")) {
+          publisher = sourceIg.getPublisher();
+        }
+        break;
+      case "apply-version":
+        if (p.getValue().equals("true")) {
+          businessVersion = sourceIg.getVersion();
+        }
+        break;
+      case "default-contact":
+        if (p.getValue().equals("true")) {
+          defaultContacts = sourceIg.getContact();
+        }
+        break;
+      case "default-context":
+        if (p.getValue().equals("true")) {
+          defaultContexts = sourceIg.getUseContext();
+        }
+        break;
+      case "default-copyright":
+        if (p.getValue().equals("true")) {
+          defaultCopyright = sourceIg.getCopyright();
+        }
+        break;
+      case "default-jurisdiction":
+        if (p.getValue().equals("true")) {
+          defaultJurisdictions = sourceIg.getJurisdiction();
+        }
+        break;
+      case "default-license":
+        if (p.getValue().equals("true")) {
+          defaultLicenseInfo = sourceIg.getLicense();
+        }
+        break;
+      case "default-publisher":
+        if (p.getValue().equals("true")) {
+          defaultPublisher = sourceIg.getPublisher();
+        }
+        break;
+      case "default-version":
+        if (p.getValue().equals("true")) {
+          defaultBusinessVersion = sourceIg.getVersion();
+        }
+        break;
+      case "generate-version":   
         generateVersions.add(p.getValue());
-      } else if (pc.equals("conversion-version")) {     
+        break;
+      case "conversion-version": 
         conversionVersions.add(p.getValue());
-      } else if (pc.equals("suppressed-ids")) {
-        for (String s : p.getValue().split("\\,"))
-          suppressedIds.add(s);
-      } else if (pc.equals("allow-extensible-warnings")) {     
+        break;
+      case "suppressed-ids":
+        for (String s1 : p.getValue().split("\\,"))
+          suppressedIds.add(s1);
+        break;
+      case "allow-extensible-warnings":
         allowExtensibleWarnings = p.getValue().equals("true");
-      } else if (pc.equals("version-comparison")) {     
+        break;
+      case "version-comparison":    
         if (comparisonVersions == null) {
           comparisonVersions = new ArrayList<>();
         }
         if (!"n/a".equals(p.getValue())) {
           comparisonVersions.add(p.getValue());
         }        
-      } else if (pc.equals("ipa-comparison")) {     
+        break;
+      case "ipa-comparison":   
         if (ipaComparisons == null) {
           ipaComparisons = new ArrayList<>();
         }
         if (!"n/a".equals(p.getValue())) {
           ipaComparisons.add(p.getValue());
         }        
-      } else if (pc.equals("validation")) {
+        break;
+      case "validation":
         if (p.getValue().equals("check-must-support"))
           hintAboutNonMustSupport = true;
         else if (p.getValue().equals("allow-any-extensions"))
@@ -2608,30 +2696,44 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           brokenLinksError = true;
         else if (p.getValue().equals("show-reference-messages"))
           showReferenceMessages = true;
-      } else if (pc.equals("tabbed-snapshots")) {
+        break;
+      case "tabbed-snapshots":
         tabbedSnapshots = p.getValue().equals("true");
-      } else if (pc.equals("r4-exclusion")) {
+        break;
+      case "r4-exclusion":
         r4tor4b.markExempt(p.getValue(), true);
-      } else if (pc.equals("r4b-exclusion")) {
+        break;
+      case "r4b-exclusion":
         r4tor4b.markExempt(p.getValue(), false);
-      } else if (pc.equals("produce-jekyll-data")) {        
+        break;
+      case "display-warnings":
+        displayWarnings = "true".equals(p.getValue());
+        break;
+      case "produce-jekyll-data":    
         produceJekyllData = "true".equals(p.getValue());
-      } else if (pc.equals("page-factory")) {
-        String dir = Utilities.path(rootDir, "temp", "factory-pages", "factory"+pageFactories.size());
+        break;
+      case "page-factory":
+        dir = Utilities.path(rootDir, "temp", "factory-pages", "factory"+pageFactories.size());
         Utilities.createDirectory(dir);
         pageFactories.add(new PageFactory(Utilities.path(rootDir, p.getValue()), dir));
         pagesDirs.add(dir);
-      } else if (pc.equals("i18n-default-lang")) {
+        break;
+      case "i18n-default-lang":
         hasTranslations = true;
         defaultTranslationLang = p.getValue();
-      } else if (pc.equals("i18n-lang")) {
+        break;
+      case "i18n-lang":
         hasTranslations = true;
         translationLangs.add(p.getValue());
-      } else if (pc.equals("translation-supplements")) {
+        break;
+      case "translation-supplements":
         hasTranslations = true;
         translationSupplements.add(p.getValue());
-      } else if (!template.isParameter(pc)) {
-        unknownParams.add(pc);
+        break;
+      default: 
+        if (!template.isParameter(pc)) {
+          unknownParams.add(pc+"="+p.getValue());
+        }
       }
       count++;
     }
@@ -2854,6 +2956,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.setCrumbTrails(true);
     validator.setWantCheckSnapshotUnchanged(true);
     validator.setForPublication(true);
+    validator.setDisplayWarnings(displayWarnings);
     
     pvalidator = new ProfileValidator(context, context.getXVer());
     csvalidator = new CodeSystemValidator(context, context.getXVer());
@@ -4550,7 +4653,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private boolean loadTranslationSupplements(boolean needToBuild, FetchedFile igf) throws Exception {
     for (String p : translationSupplements) {
-      for (File f : new File(Utilities.path(rootDir, p)).listFiles()) {
+      File dir = new File(Utilities.path(rootDir, p));
+      Utilities.createDirectory(dir.getAbsolutePath());
+      for (File f : dir.listFiles()) {
         needToBuild = loadTranslationSupplement(f, needToBuild);
       }
     }
