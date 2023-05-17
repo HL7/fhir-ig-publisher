@@ -2880,7 +2880,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 //      dep.setVersion(pcm.getLatestVersion(dep.getPackageId()));
 //      sourceIg.getDependsOn().add(0, dep);
 //    }
-    if (VersionUtilities.isR5Plus(version) && !dependsOnExtensions(sourceIg.getDependsOn()) && !sourceIg.getPackageId().contains("hl7.fhir.uv.extensions")) {
+    if (VersionUtilities.isR4Plus(version) && !dependsOnExtensions(sourceIg.getDependsOn()) && !sourceIg.getPackageId().contains("hl7.fhir.uv.extensions")) {
       ImplementationGuideDependsOnComponent dep = new ImplementationGuideDependsOnComponent();
       dep.setUserData("no-load-deps", "true");
       dep.setId("hl7ext");
@@ -2889,7 +2889,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       dep.setVersion(pcm.getLatestVersion(dep.getPackageId()));
       dep.addExtension(ToolingExtensions.EXT_IGDEP_COMMENT, new MarkdownType("Automatically added as a dependency - all IGs depend on the HL7 Extension Pack"));
       sourceIg.getDependsOn().add(0, dep);
-    }
+    } 
     if (!dependsOnUTG(sourceIg.getDependsOn()) && !sourceIg.getPackageId().contains("hl7.terminology")) {
       ImplementationGuideDependsOnComponent dep = new ImplementationGuideDependsOnComponent();
       dep.setUserData("no-load-deps", "true");
@@ -3114,7 +3114,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private boolean dependsOnExtensions(List<ImplementationGuideDependsOnComponent> dependsOn) {
     for (ImplementationGuideDependsOnComponent d : dependsOn) {
-      if (d.hasPackageId() && d.getPackageId().contains("hl7.fhir.uv.extensions")) {
+      if (d.hasPackageId() && d.getPackageId().equals("hl7.fhir.uv.extensions")) {
         return true;
       }
       if (d.hasUri() && d.getUri().contains("hl7.org/fhir/extensions")) {
@@ -4871,9 +4871,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void cleanUpExtensions(ImplementationGuide ig) {
-   ToolingExtensions.removeExtension(ig, ToolingExtensions.EXT_IGP_SPREADSHEET);
-   ToolingExtensions.removeExtension(ig, ToolingExtensions.EXT_IGP_BUNDLE);
-   ToolingExtensions.removeExtension(ig, ToolingExtensions.EXT_IGP_CONTAINED_RESOURCE_INFO);
+   ToolingExtensions.removeExtension(ig.getDefinition(), ToolingExtensions.EXT_IGP_SPREADSHEET);
+   ToolingExtensions.removeExtension(ig.getDefinition(), ToolingExtensions.EXT_IGP_BUNDLE);
+    ToolingExtensions.removeExtension(ig, ToolingExtensions.EXT_IGP_CONTAINED_RESOURCE_INFO); // - this is in contained resources somewhere, not the root of IG?  
    for (ImplementationGuideDefinitionResourceComponent r : ig.getDefinition().getResource())
      ToolingExtensions.removeExtension(r, ToolingExtensions.EXT_IGP_RESOURCE_INFO);
   }
@@ -5712,12 +5712,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     r.setResEntry(srcForLoad);
     srcForLoad.setUserData("loaded.resource", r);
     r.setResEntry(srcForLoad);
-    if (srcForLoad.hasProfile()) {
-      StructureDefinition sd = context.fetchResource(StructureDefinition.class, srcForLoad.getProfile().get(0).getValue());
-      if (sd == null) {
-        file.getErrors().add(new ValidationMessage(Source.ExampleValidator, IssueType.NOTFOUND, "Binary", "Example Logical Model "+srcForLoad.getProfile().get(0).getValue()+" not found", IssueSeverity.ERROR));
-
-      }
+    if (srcForLoad.hasProfile()) {      
       r.getElement().setUserData("logical", srcForLoad.getProfile().get(0).getValue());
       r.setExampleUri(srcForLoad.getProfile().get(0).getValue());
     }
@@ -7889,8 +7884,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       FetchedResource baseRes = getResourceForUri(r.getExampleUri());
       if (baseRes == null) {
         // We only yell if the resource doesn't exist, not only if it doesn't exist in the current IG.
-        if (context.fetchResource(StructureDefinition.class, r.getExampleUri())==null)
-          errors.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, r.fhirType()+"/"+r.getId(), "Unable to find profile " + r.getExampleUri() + " nominated as the profile for which resource " + r.getUrlTail()+" is an example", IssueSeverity.ERROR));
+        if (context.fetchResource(StructureDefinition.class, r.getExampleUri())==null) {
+          FetchedFile f = findFileForResource(r);
+          (f != null ? f.getErrors() : errors).add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, r.fhirType()+"/"+r.getId(), "Unable to find profile " + r.getExampleUri() + " nominated as the profile for which resource " + r.getUrlTail()+" is an example", IssueSeverity.ERROR));
+        }
       } else {
         baseRes.addStatedExample(r);
       }

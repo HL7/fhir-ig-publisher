@@ -144,7 +144,7 @@ public class PublicationChecker {
       }
       if (pl != null) {
         PackageListEntry plv = getVersionObject(v, pl);
-        if (!check(messages, plv == null, "Publication Requet is for version v"+v+" which is already published"+mkError())) {
+        if (!check(messages, plv == null, "Publication Request is for version v"+v+" which is already published"+mkError())) {
           summary.clear();
           return;          
         }
