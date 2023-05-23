@@ -3884,6 +3884,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     sp = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(vsCache).fromPackage(pi, loader);
     sp.loadBinariesFromFolder(pi);
     sp.setCacheId(UUID.randomUUID().toString());
+    sp.setForPublication(true);
     if (!version.equals(Constants.VERSION)) {
       // If it wasn't a 4.0 source, we need to set the ids because they might not have been set in the source
       ProfileUtilities utils = new ProfileUtilities(context, new ArrayList<ValidationMessage>(), igpkp);
@@ -6276,6 +6277,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     StructureDefinition base = sd.hasBaseDefinition() ? fetchSnapshotted(sd.getBaseDefinition()) : null;
     utils.setIds(sd, true);
     utils.setXver(context.getXVer());
+    utils.setForPublication(true);
     if (VersionUtilities.isR4Plus(version)) {
       utils.setNewSlicingProcessing(true);
     }

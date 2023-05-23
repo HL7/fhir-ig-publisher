@@ -6,6 +6,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
 
 import org.hl7.fhir.igtools.publisher.xig.XIGInformation.CanonicalResourceUsage;
 import org.hl7.fhir.igtools.publisher.xig.XIGInformation.UsageType;
@@ -14,6 +16,7 @@ import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ElementDefinition;
+import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionSlicingComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
 import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.r5.model.StructureDefinition;
@@ -22,17 +25,20 @@ import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.validation.ValidationMessage;
+import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
 
 public class XIGStructureDefinitionHandler extends XIGHandler {
 
   private XIGInformation info;
+  private static Set<String> pidlist = new HashSet<>();
 
   public XIGStructureDefinitionHandler(XIGInformation info) {
     super();
     this.info = info;
   }
 
-  public void fillOutJson(StructureDefinition sd, JsonObject j) {
+  public void fillOutJson(String pid, StructureDefinition sd, JsonObject j) {
     if (ProfileUtilities.isExtensionDefinition(sd)) {
       info.getExtensionHandler().seeExtension(sd);
     } else {
@@ -43,7 +49,6 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
               ElementDefinition focus = getParent(sd.getSnapshot().getElement(), ed);
               info.getExtensionHandler().seeUse(u.getValue(), focus.getBase().getPath(), focus.getPath());
             }
-            
           }
         }
       }
@@ -66,6 +71,19 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
     for (Coding t : sd.getKeyword()) {
       j.forceArray("keywords").add(t.toString()); 
     }  
+
+    for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+      if (!ed.getPath().equals("Bundle.entry.resource")) {
+        for (TypeRefComponent tr : ed.getType()) {
+          if (!"Extension".equals(tr.getCode()) && tr.getProfile().size() == 1&& !tr.getProfile().get(0).asStringValue().startsWith("http://hl7.org/fhir/StructureDefinition/")) {
+            if (!pidlist.contains(pid)) {
+              System.out.println(pid+"\t"+sd.getUrl()+"\t"+ed.getPath()+":"+tr.getCode()+"\t"+tr.getProfile().get(0).asStringValue());
+              pidlist.add(pid);
+            }
+          }
+        }
+      }
+    }
   }
 
   private ElementDefinition getParent(List<ElementDefinition> list, ElementDefinition ed) {
