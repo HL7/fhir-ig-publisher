@@ -1,4 +1,6 @@
+* Maven: Add dependency on plantuml-mit for future use
 * Loader: Add support for R4B to loader
+* Loader: Add support for TestPlan, SubscriptionTopic in R4
 * Snapshot Generator:
 ** Check for slicenames without any slicing 
 ** Check that slice names are unique
@@ -10,4 +12,3 @@
 * Validator: Handle unknown code systems consistently when validating coded elements
 * Validator: Handle sub-slicing case where slice matches both the slice definition and the sub-slice definition
 * Renderer: process markdown for extension summaries
-
