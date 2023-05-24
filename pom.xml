@@ -259,6 +259,13 @@
             <version>${junit_jupiter_version}</version>
             <scope>test</scope>
         </dependency>
+
+        <!-- plantuml -->
+        <dependency>
+          <groupId>net.sourceforge.plantuml</groupId>
+          <artifactId>plantuml-mit</artifactId>
+          <version>1.2023.8</version>
+        </dependency>
     </dependencies>
 
     <build>
