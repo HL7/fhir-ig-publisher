@@ -2028,7 +2028,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private boolean isConvertableResource(String t) {
     return Utilities.existsInList(t, "StructureDefinition", "ValueSet", "CodeSystem", "Conformance", "CapabilityStatement", "Questionnaire", "NamingSystem", "SearchParameter",
-        "ConceptMap", "OperationOutcome", "CompartmentDefinition", "OperationDefinition", "ImplementationGuide", "ActorDefinition", "Requirements", "StructureMap");
+        "ConceptMap", "OperationOutcome", "CompartmentDefinition", "OperationDefinition", "ImplementationGuide", "ActorDefinition", "Requirements", "StructureMap", "SubscriptionTopic");
   }
 
 
@@ -2872,14 +2872,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     fetcher.setPkp(igpkp);
     template.loadSummaryRows(igpkp.summaryRows());
-//    if (!dependsOnToolsIg(sourceIg.getDependsOn())) {
-//      ImplementationGuideDependsOnComponent dep = new ImplementationGuideDependsOnComponent();
-//      dep.setId("hl7tools");
-//      dep.setPackageId(getUTGPackageName());
-//      dep.setUri("http://hl7.org/fhir/tools");
-//      dep.setVersion(pcm.getLatestVersion(dep.getPackageId()));
-//      sourceIg.getDependsOn().add(0, dep);
-//    }
+
     if (VersionUtilities.isR4Plus(version) && !dependsOnExtensions(sourceIg.getDependsOn()) && !sourceIg.getPackageId().contains("hl7.fhir.uv.extensions")) {
       ImplementationGuideDependsOnComponent dep = new ImplementationGuideDependsOnComponent();
       dep.setUserData("no-load-deps", "true");
@@ -2925,13 +2918,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (!"hl7.fhir.uv.tools".equals(sourceIg.getPackageId())) {
       loadIg("igtools", "hl7.fhir.uv.tools", "current", "http://hl7.org/fhir/tools/ImplementationGuide/hl7.fhir.uv.tools", i, false);   
     }
-//    System.out.print("Load R5 Extensions");
-//    R5ExtensionsLoader r5e = new R5ExtensionsLoader(pcm, context);
-//    r5e.load();
-//    r5e.loadR5Extensions();
-//    if (!VersionUtilities.isR5Plus(context.getVersion())) {
-//      r5e.loadR5SpecialTypes(SpecialTypeHandler.SPECIAL_TYPES);
-//    }
+    
+    if (!VersionUtilities.isR5Plus(context.getVersion())) {
+      System.out.print("Load R5 Specials");
+      R5ExtensionsLoader r5e = new R5ExtensionsLoader(pcm, context);
+      r5e.load();
+      r5e.loadR5SpecialTypes(SpecialTypeHandler.SPECIAL_TYPES);
+    }
 //    SpecMapManager smm = new SpecMapManager(r5e.getMap(), r5e.getPckCore().fhirVersion());
 //    smm.setName(r5e.getPckCore().name());
 //    smm.setBase("http://build.fhir.org");
@@ -5342,6 +5335,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     res.add("TestPlan");
     res.add("TestScript");
     res.add("ActorDefinition");
+    res.add("SubscriptionTopic");
     res.add("Requirements");
     return res;
   }

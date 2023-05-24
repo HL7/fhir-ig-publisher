@@ -8,7 +8,7 @@ import org.hl7.fhir.utilities.Utilities;
 
 public class SpecialTypeHandler {
 
-  public static final List<String> SPECIAL_TYPES = Collections.unmodifiableList(Arrays.asList("ActorDefinition", "Requirements"));
+  public static final List<String> SPECIAL_TYPES = Collections.unmodifiableList(Arrays.asList("ActorDefinition", "Requirements", "SubscriptionTopic"));
   public static final String VERSION = "5.0.0";
 
   public static boolean handlesType(String type) {
