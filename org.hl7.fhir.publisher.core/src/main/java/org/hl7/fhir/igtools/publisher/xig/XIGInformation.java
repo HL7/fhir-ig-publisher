@@ -77,6 +77,7 @@ public class XIGInformation {
   private SimpleWorkerContext ctxt;
   Map<String, List<CanonicalResourceUsage>> usages = new HashMap<>();
   private XIGExtensionHandler extensionHandler = new XIGExtensionHandler();
+  private List<String> sdErrors = new ArrayList<>();
   
   public Map<String, String> getPid() {
     return pid;
@@ -113,7 +114,7 @@ public class XIGInformation {
   public void setCtxt(SimpleWorkerContext ctxt) {
     this.ctxt = ctxt;
   }
-  public void fillOutJson(CanonicalResource cr, JsonObject j) {
+  public void fillOutJson(String pid, CanonicalResource cr, JsonObject j) {
     j.add("resourceType", cr.fhirType());
     if (cr.hasId()) {           j.add("id", cr.getId()); }
     if (cr.hasUrl()) {          j.add("canonical", cr.getUrl()); }
@@ -160,7 +161,7 @@ public class XIGInformation {
       new XIGNamingSystemHandler(this).fillOutJson((NamingSystem) cr, j);
     }
     if (cr instanceof StructureDefinition) {
-      new XIGStructureDefinitionHandler(this).fillOutJson((StructureDefinition) cr, j);
+      new XIGStructureDefinitionHandler(this).fillOutJson(pid, (StructureDefinition) cr, j);
     }
     if (cr instanceof OperationDefinition) {
       new XIGOperationDefinitionHandler(this).fillOutJson((OperationDefinition) cr, j);
@@ -226,6 +227,13 @@ public class XIGInformation {
   }
   public XIGExtensionHandler getExtensionHandler() {
     return extensionHandler;
+  }
+  public void addSDError(String msg) {
+    sdErrors.add(msg);
+  
+  }
+  public List<String> getSDErrors() {
+    return sdErrors;
   }
   
   

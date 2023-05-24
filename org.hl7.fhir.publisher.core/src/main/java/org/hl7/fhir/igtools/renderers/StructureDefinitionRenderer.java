@@ -322,7 +322,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
       }
       StringBuilder b = new StringBuilder();
-      b.append("<p>Complex Extension: "+Utilities.escapeXml(sd.getDescription())+"</p><ul>");
+      String html = Utilities.stripAllPara(processMarkdown("description", sd.getDescriptionElement()));
+      b.append("<p>Complex Extension: "+html+"</p><ul>");
       for (ElementDefinition ed : subs) {
         ElementDefinition defn = (ElementDefinition) ed.getUserData("slice");
         b.append("<li>"+(defn.getSliceName())+": "+ed.typeSummary()+": "+Utilities.stripPara(processMarkdown("ext-desc", defn.getDefinition()))+"</li>\r\n");
@@ -780,11 +781,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       strengthInh = true;
     }
 
-    if (brd.vsn.equals("?ext"))
+    if (brd.vsn.equals("?ext")) {
       if (tx.getValueSet() != null)
-        System.out.println("No value set found at " + url + "#" + path + " (url = '" + tx.getValueSet() + "')");
+        System.out.println("Value set '"+tx.getValueSet()+"' at " + url + "#" + path + " not found");
       else if (!tx.hasDescription())
         System.out.println("No value set specified at " + url + "#" + path + " (no url)");
+    }
     if (tx.hasUserData("tx.value")) {
       brd.vss = "Fixed Value: " + summariseValue((DataType) tx.getUserData("tx.value"));
       brd.suffix = null;

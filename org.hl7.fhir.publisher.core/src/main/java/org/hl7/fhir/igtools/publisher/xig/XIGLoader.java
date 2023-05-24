@@ -17,6 +17,7 @@ import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.r5.model.PackageInformation;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
@@ -57,6 +58,7 @@ public class XIGLoader implements IPackageVisitorProcessor {
     info.getPid().put(pid, npm.getWebLocation());
     Resource r = loadResource(pid, version, type, id, content);
     if (r != null && r instanceof CanonicalResource) {
+      r.setSourcePackage(new PackageInformation(npm));
       CanonicalResource cr = (CanonicalResource) r;
       if (cr.getUrl() != null) {
         boolean core = isCoreDefinition(cr, pid);
@@ -86,7 +88,7 @@ public class XIGLoader implements IPackageVisitorProcessor {
           j.add("filebase", cr.getUserString("filebase"));
           j.add("path", cr.getWebPath());
 
-          info.fillOutJson(cr, j);
+          info.fillOutJson(pid, cr, j);
           if (info.getResources().containsKey(cr.getUrl())) {
             CanonicalResource crt = info.getResources().get(cr.getUrl());
             if (VersionUtilities.isThisOrLater(crt.getVersion(), cr.getVersion())) {
