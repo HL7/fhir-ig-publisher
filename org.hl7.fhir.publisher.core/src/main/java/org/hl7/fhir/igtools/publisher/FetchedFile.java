@@ -29,9 +29,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.hl7.fhir.igtools.publisher.FetchedFile.ProcessingReport;
+import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 
 public class FetchedFile {
+  private static long timeZero = System.currentTimeMillis();
+  private static String root;
+  private static List<String> columns = new ArrayList<>();
+  
+  public class ProcessingReport {
+    private String activity;
+    private long start;
+    private long finish;
+  }
+  
   public enum FetchedBundleType {
     NATIVE, SPREADSHEET
   }
@@ -61,6 +73,7 @@ public class FetchedFile {
   private Set<String> outputNames = new HashSet<String>();
   private String statedPath;  
   private String logical;
+  private List<ProcessingReport> processes = new ArrayList<>();
   
   public FetchedFile(String statedPath) {
     super();
@@ -204,4 +217,68 @@ public class FetchedFile {
     this.logical = logical;
   }
   
+  public void start(String activityName) {
+    if (!columns.contains(activityName)) {
+      columns.add(activityName);
+    }
+    ProcessingReport pr = new ProcessingReport();
+    pr.activity = activityName;
+    pr.start = System.currentTimeMillis();
+    processes.add(pr);
+  }
+  
+  public void finish(String activityName) {
+    for (int i = processes.size() -1; i >= 0; i++) {
+      ProcessingReport pr = processes.get(i);
+      if (pr.activity.equals(activityName) && pr.finish == 0) {
+        pr.finish = System.currentTimeMillis();
+        return;
+      }
+    }
+    throw new Error("No tracked activity for "+activityName);
+  }
+  
+  public void processReport(FetchedFile f, JsonObject fj) {
+    fj.add("name", statedPath.startsWith(root) ? statedPath.substring(root.length()) : statedPath);
+    for (ProcessingReport pr : processes) {
+      long duration = (pr.finish - pr.start);
+      if (duration > 0) {
+        JsonObject jp = new JsonObject();
+        fj.forceArray("processes").add(jp);
+        jp.add("activity", pr.activity);
+        jp.add("start", (pr.start - timeZero) / 1000);
+        jp.add("length", duration);
+      }
+    }
+    
+  }
+  public static String getRoot() {
+    return root;
+  }
+  public static void setRoot(String root) {
+    FetchedFile.root = root;
+  }
+  public static List<String> getColumns() {
+    return columns;
+  }
+  
+  public void appendReport(StringBuilder b) {
+    b.append(statedPath.startsWith(root) ? statedPath.substring(root.length()) : statedPath);
+    for (String s : columns) {
+      b.append("\t");
+      ProcessingReport pr = null;
+      for (ProcessingReport t : processes) {
+         if (t.activity.equals(s)) {
+           pr = t;
+           break;
+         }
+      }
+      if (pr == null) {
+        b.append("-");
+      } else {
+        b.append(pr.finish - pr.start);
+      }
+    }
+  }
+
 }
