@@ -116,7 +116,7 @@ public class PublicationProcess {
       System.out.println("dir = "+System.getProperty("user.dir")+", path = "+System.getenv("PATH"));
       String s = "Parameters:";
       for (int i = 0; i < args.length; i++) {
-          s = s + " "+removePassword(args, i);
+        s = s + " "+removePassword(args, i);
       }      
       System.out.println(s);
       System.out.println("---------------");
@@ -136,7 +136,7 @@ public class PublicationProcess {
     }
     System.out.println("Full log in "+logger.getFilename());
   }
-  
+
   private static String removePassword(String[] args, int i) {
     if (i == 0 || !args[i-1].toLowerCase().contains("password")) {
       return args[i];
@@ -158,7 +158,7 @@ public class PublicationProcess {
     }
     // check the wider context
     File fSource = checkDirectory(source, res, "Source");
-    
+
     String workingRoot = Utilities.path(temp, "web-root", "run-"+new SimpleDateFormat("yyyyMMdd").format(new Date()));
     if (new File(workingRoot).exists()) {
       Utilities.clearDirectory(workingRoot);
@@ -170,7 +170,7 @@ public class PublicationProcess {
     if (getNamedParam(args, "-upload-server") != null) {
       src.configureUpload(getNamedParam(args, "-upload-server"), getNamedParam(args, "-upload-path"), getNamedParam(args, "-upload-user"), getNamedParam(args, "-upload-password"));
     }
-    
+
     checkDirectory(Utilities.path(workingRoot, "ig-build-zips"), res, "Destination Zip Folder", true);
     File fRegistry = checkFile(registrySource, res, "Registry");
     File fHistory = checkDirectory(history, res, "History Template");
@@ -182,6 +182,11 @@ public class PublicationProcess {
     JsonObject pubSetup = JsonParser.parseObject(fPubIni);
     String url = pubSetup.getJsonObject("website").asString("url");
 
+    src.needOptionalFile("package-registry.json");
+    if (!check(res, new File(Utilities.path(workingRoot, "package-registry.json")).exists(), "There is no package-registry.json file. Create one by running the publisher -generate-package-registry {folder} (where folder contains the entire website)")) {
+      return res;
+    }
+
     src.needOptionalFile("publish-counter.json");
     File fPubCounter = new File(Utilities.path(workingRoot, "publish-counter.json"));
     JsonObject countJson = fPubCounter.exists() ? JsonParser.parseObject(fPubCounter) : new JsonObject();
@@ -189,7 +194,7 @@ public class PublicationProcess {
     System.out.println("Run Number: "+runNumber);
     countJson.set("run-number", runNumber);
     JsonParser.compose(countJson, new FileOutputStream(fPubCounter), true);
-    
+
     // check the output
     File fOutput = checkDirectory(Utilities.path(source, "output"), res, "Publication Source");
     File fQA = checkFile(Utilities.path(source, "output", "qa.json"), res, "Publication QA info");
@@ -197,7 +202,7 @@ public class PublicationProcess {
       return res;
     }
     JsonObject qa = JsonParser.parseObject(loadFile("Source QA file", fQA.getAbsolutePath()));
-    
+
     // now: is the IG itself ready for publication
     NpmPackage npm = NpmPackage.fromPackage(loadFile("Source package", Utilities.path(source, "output", "package.tgz")));
     String id = npm.name();
@@ -212,14 +217,67 @@ public class PublicationProcess {
     }
 
     // --- Rules for layout depend on publisher ------
-    WebSiteLayoutRulesProvider rp = WebSiteLayoutRulesProviders.recogniseNpmId(id, p, pubSetup.getJsonObject("website").getJsonObject("layout"));
-    if (!rp.checkNpmId(res)) {
-      return res;
+    boolean help = true;
+    JsonObject rules = getPublishingRules(pubSetup, id, p);
+    if (check(res, rules != null, "This website is not set up to publish the IG with Package Id '"+id+"'")) {
+      String cURL = calcByRule(rules.str("url"), p);
+      if (cURL == null) {
+        cURL = url;
+      }
+      if (check(res, canonical.startsWith(cURL), "Publication URL of '"+canonical+"' is not consistent with the required base URL of '"+cURL+"'")) {
+        String cCanonical = calcByRule(rules.str("canonical"), p);
+        if (check(res, cCanonical.equals(canonical), "Publication URL of '"+canonical+"' does not match the required web site URL of '"+cCanonical+"'")) {
+          String destination = Utilities.path(workingRoot, calcByRule(rules.str("destination"), p));
+          help = false;
+          publishInner2(source, web, date, registrySource, history, templateSrc, temp, logger, args,
+              manualCheck, destination, workingRoot, res, src, id, canonical, version, npm, pubSetup, qa,
+              fSource, fOutput, fRoot, fRegistry, fHistory, runNumber);
+        }        
+      }
     }
-    if (!rp.checkCanonicalAndUrl(res, canonical, url)) {
-      return res;
+    check(res, !help, "For help, consult https://chat.fhir.org/#narrow/stream/179252-IG-creation");
+    return res;
+  }
+      
+
+  private JsonObject getPublishingRules(JsonObject pubSetup, String id, String[] p) {
+    for (JsonObject lr : pubSetup.getJsonObjects("layout-rules")) {
+      String[] pr = lr.asString("npm").split("\\.");
+      if (partsMatch(p, pr)) {
+        return lr;
+      }
     }
-    String destination = rp.getDestination(workingRoot); 
+    return null;
+  }
+
+  private boolean partsMatch(String[] p, String[] pr) {
+    if (p.length != pr.length) {
+      return false;
+    }
+    for (int i = 0; i < p.length; i++) {
+      if (!"*".equals(pr[i]) && !pr[i].equals(p[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private String calcByRule(String str, String[] p) {
+    if (str == null) {
+      return null;
+    }
+    String ret = str;
+    for (int i = 0; i < p.length; i++) {
+      ret = ret.replace("{"+(i+1)+"}", p[i]);
+    }  
+    return ret;
+  }
+
+
+  public List<ValidationMessage> publishInner2(String source, String web, String date, String registrySource, String history, String templateSrc, String temp, 
+      PublisherConsoleLogger logger, String[] args, boolean manualCheck, String destination, String workingRoot, List<ValidationMessage> res, WebSourceProvider src,
+      String id, String canonical, String version, NpmPackage npm, JsonObject pubSetup, JsonObject qa, 
+      File fSource, File fOutput, File fRoot, File fRegistry, File fHistory, int runNumber) throws Exception {
     System.out.println("Relative directory for IG is '"+destination.substring(workingRoot.length())+"'");
     String relDest = Utilities.getRelativePath(workingRoot, destination);
     Utilities.createDirectory(destination);
@@ -275,7 +333,7 @@ public class PublicationProcess {
     String pathVer = prSrc.asString("path");
     String vCode = pathVer.substring(pathVer.lastIndexOf("/")+1);
     
-    check(res, pathVer.equals(Utilities.pathURL(canonical, vCode)), "Source publication request path is wrong - is '"+prSrc.asString("path")+"', doesn't match canonical)");
+    check(res, pathVer.equals(Utilities.pathURL(canonical, vCode)), "Source publication request path is wrong - is '"+prSrc.asString("path")+"', doesn't match canonical '"+canonical+"')");
     // ok, the ids and canonicals are all lined up, and w're ready to publish     
 
     check(res, id.equals(qa.asString("package-id")), "Generated IG has wrong package "+qa.asString("package-id"));
@@ -331,10 +389,10 @@ public class PublicationProcess {
     // well, we've run out of things to test... time to actually try...
     if (res.size() == 0) {
       doPublish(fSource, fOutput, qa, destination, destVer, pathVer, fRoot, pubSetup, pl, prSrc, fRegistry, npm, mode, date, fHistory, temp, logger, 
-          pubSetup.getJsonObject("website").asString("url"), src, sft, relDest, templateSrc, first, indexes, Calendar.getInstance(), getComputerName(), IGVersionUtil.getVersionString(), gitSrcId(source), Integer.toString(runNumber), tcName, manualCheck);
+          pubSetup.getJsonObject("website").asString("url"), src, sft, relDest, templateSrc, first, indexes, Calendar.getInstance(), getComputerName(), IGVersionUtil.getVersionString(), gitSrcId(source), Integer.toString(runNumber), tcName, manualCheck,
+          workingRoot);
     }        
-    return res;
-    
+    return res;    
   }
 
   private String gitSrcId(String source) {
@@ -404,7 +462,7 @@ public class PublicationProcess {
 
   private void doPublish(File fSource, File fOutput, JsonObject qa, String destination, String destVer, String pathVer, File fRoot, JsonObject pubSetup, PackageList pl, JsonObject prSrc, File fRegistry, NpmPackage npm, 
       PublicationProcessMode mode, String date, File history, String tempDir, PublisherConsoleLogger logger, String url, WebSourceProvider src, File sft, String relDest, String templateSrc, boolean first, Map<String, IndexMaintainer> indexes,
-      Calendar genDate, String username, String version, String gitSrcId, String runNumber, String tcName, boolean manualCheck) throws Exception {
+      Calendar genDate, String username, String version, String gitSrcId, String runNumber, String tcName, boolean manualCheck, String workingRoot) throws Exception {
     // ok. all our tests have passed.
     // 1. do the publication build(s)
     System.out.println("All checks passed. Do the publication build from "+fSource.getAbsolutePath()+" and publish to "+destination);        
@@ -461,7 +519,6 @@ public class PublicationProcess {
           }
         }
       }
-      
       // we do this first in the output so we can get a proper diff
       updatePublishBox(pl, plVer, igSrc, pathVer, igSrc, fRoot.getAbsolutePath(), true, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null);
       
@@ -491,6 +548,7 @@ public class PublicationProcess {
     NpmPackage npmB = NpmPackage.fromPackage(new FileInputStream(Utilities.path(destVer, "package.tgz")));
     updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("package"), false, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(genDate), username, version, gitSrcId, runNumber);
     updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("publication"), true, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(genDate), username, version, gitSrcId, runNumber);
+    new PackageRegistryBuilder(workingRoot).update(destination.substring(workingRoot.length()+1), pl);
 
     new HistoryPageUpdater().updateHistoryPage(history.getAbsolutePath(), destination, templateSrc, !first); 
 

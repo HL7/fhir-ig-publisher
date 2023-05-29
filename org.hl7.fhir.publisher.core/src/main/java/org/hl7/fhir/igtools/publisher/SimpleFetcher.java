@@ -77,6 +77,7 @@ public class SimpleFetcher implements IFetchFile {
   @Override
   public void setRootDir(String rootDir) {
     this.rootDir = rootDir;
+    FetchedFile.setRoot(rootDir);
   }
 
   @Override
@@ -318,6 +319,7 @@ public class SimpleFetcher implements IFetchFile {
       if (file.exists()) {
         for (File f : file.listFiles()) {
           if (!f.isDirectory()) {
+//            System.out.println("scanning: "+f.getAbsolutePath());
             String fn = f.getCanonicalPath();
             String ext = Utilities.getFileExtension(fn);
             if (!Utilities.existsInList(ext, "md", "txt") && !fn.endsWith(".gitignore") && !fn.contains("-spreadsheet") && !isIgnoredFile(f.getName())) {
