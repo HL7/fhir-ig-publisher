@@ -58,6 +58,7 @@ public class FetchedFile {
   private byte[] xslt;
   
   private byte[] source;
+  private long size;
   private long hash;
   private long time;
   private String contentType;
@@ -136,7 +137,8 @@ public class FetchedFile {
   }
   public void setSource(byte[] source) {
     this.source = source;
-    this.hash =Arrays.hashCode(source);
+    this.size = source.length;
+    this.hash = Arrays.hashCode(source);
   }
   
 
@@ -228,7 +230,7 @@ public class FetchedFile {
   }
   
   public void finish(String activityName) {
-    for (int i = processes.size() -1; i >= 0; i++) {
+    for (int i = processes.size() -1; i >= 0; i--) {
       ProcessingReport pr = processes.get(i);
       if (pr.activity.equals(activityName) && pr.finish == 0) {
         pr.finish = System.currentTimeMillis();
@@ -240,6 +242,7 @@ public class FetchedFile {
   
   public void processReport(FetchedFile f, JsonObject fj) {
     fj.add("name", statedPath.startsWith(root) ? statedPath.substring(root.length()) : statedPath);
+    fj.add("size", size);
     for (ProcessingReport pr : processes) {
       long duration = (pr.finish - pr.start);
       if (duration > 0) {
@@ -264,6 +267,8 @@ public class FetchedFile {
   
   public void appendReport(StringBuilder b) {
     b.append(statedPath.startsWith(root) ? statedPath.substring(root.length()) : statedPath);
+    b.append("\t");
+    b.append(""+size);
     for (String s : columns) {
       b.append("\t");
       ProcessingReport pr = null;

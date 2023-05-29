@@ -575,7 +575,7 @@ public class PublicationProcess {
       updateRegistry(fRegistry, pl, plVer, npmB);
       logger.stop();
       FileUtils.copyFile(new File(logger.getFilename()), new File(Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".log")));
-      src.finish(relDest, Utilities.path("ig-build-zips", npm.name()+"#"+npm.version()), existingFiles);
+      src.finish(relDest, existingFiles);
       System.out.println("Finished Publishing. "+src.instructions(existingFiles.size()));
     } else {
       System.out.println("No!");
