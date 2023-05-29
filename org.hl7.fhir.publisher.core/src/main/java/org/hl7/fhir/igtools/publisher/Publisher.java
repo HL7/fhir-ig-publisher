@@ -133,6 +133,7 @@ import org.hl7.fhir.igtools.web.HistoryPageUpdater;
 import org.hl7.fhir.igtools.web.IGRegistryMaintainer;
 import org.hl7.fhir.igtools.web.IGReleaseVersionDeleter;
 import org.hl7.fhir.igtools.web.IGWebSiteMaintainer;
+import org.hl7.fhir.igtools.web.PackageRegistryBuilder;
 import org.hl7.fhir.igtools.web.PublicationProcess;
 import org.hl7.fhir.igtools.web.PublisherConsoleLogger;
 import org.hl7.fhir.igtools.web.WebSiteArchiveBuilder;
@@ -1394,6 +1395,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       
       StringBuilder b = new StringBuilder();
       b.append("Source File");
+      b.append("\t");
+      b.append("Size");
       for (String s : FetchedFile.getColumns()) {
         b.append("\t");
         b.append(s);
@@ -9464,7 +9467,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (noGenerate) {
       return;
     }
-    System.out.println("gen2: "+f.getName());
+    // System.out.println("gen2: "+f.getName());
     if (f.getProcessMode() == FetchedFile.PROCESS_NONE) {
       String dst = tempDir;
       if (f.getRelativePath().startsWith(File.separator))
@@ -11352,6 +11355,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       new PublicationProcess().publish(getNamedParam(args, "-source"), getNamedParam(args, "-web"), getNamedParam(args, "-date"),  getNamedParam(args, "-registry"), getNamedParam(args, "-history"), getNamedParam(args, "-templates"), getNamedParam(args, "-temp"), args);
     } else if (hasNamedParam(args, "-generate-archives")) {
       new WebSiteArchiveBuilder().start(getNamedParam(args, "-generate-archives"));
+    } else if (hasNamedParam(args, "-generate-package-registry")) {
+      new PackageRegistryBuilder(getNamedParam(args, "-generate-package-registry")).build();
     } else if (hasNamedParam(args, "-xig")) {
       new XIGGenerator(getNamedParam(args, "-xig")).execute();
     } else if (hasNamedParam(args, "-update-history")) {
