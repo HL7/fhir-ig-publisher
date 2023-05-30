@@ -153,18 +153,27 @@ public class PublicationChecker {
       }
     }
     if (check(messages, pr.has("path"), "No publication request path found"+mkError())) {
-      if (check(messages, pr.asString("path").startsWith(npm.canonical()), "Proposed path for this publication does not start with the canonical URL ("+pr.asString("path")+" vs "+npm.canonical() +")"+mkError())) {
+      if (check(messages, pr.asString("path").startsWith(npm.canonical()) && !pr.asString("path").equals(npm.canonical()), "Proposed path for this publication does not start with the canonical URL ("+pr.asString("path")+" vs "+npm.canonical() +")"+mkError())) {
         summary.add(new StringPair("path", pr.asString("path")));                        
       }
-    }
-    PublicationProcessMode mode = PublicationProcessMode.fromCode(pr.asString("mode"));
-    if (mode != PublicationProcessMode.WORKING) {
-      if (check(messages, !npm.version().contains("-"), "This release is labelled as a "+mode.toCode()+", so should not have a patch version ("+npm.version() +")"+mkWarning())) {
-        summary.add(new StringPair("mode", mode.toCode()));        
+      if ("milestone".equals(pr.asString("mode"))) {
+        check(messages,  pr.asString("path").equals(Utilities.pathURL(npm.canonical(), pr.asString("sequence"))) || pr.asString("path").equals(Utilities.pathURL(npm.canonical(), pr.asString("version"))), 
+            "Proposed path for this milestone publication should usually be canonical with either sequence or version appended"+mkWarning());        
+      } else if (pr.has("version")) {
+        check(messages,  
+            pr.asString("path").startsWith(Utilities.pathURL(npm.canonical(), pr.asString("version"))+"-") ||
+            pr.asString("path").startsWith(Utilities.pathURL(npm.canonical(), pr.asString("sequence"))+"-"),
+            "Proposed path for this publication should usually be the canonical with the version or sequence appended and then some kind of label (typically '-snapshot')"+mkWarning());
       }
-    } else {
-      if (check(messages, npm.version().contains("-"), "This release is not labelled as a milestone or technical correction, so should have a patch version ("+npm.version() +")"+(isHL7(npm) ? mkError() : mkWarning()))) {
-        summary.add(new StringPair("milestone", pr.asString("milestone")));                
+    }
+    PublicationProcessMode mode = null;
+    if (check(messages, Utilities.existsInList(pr.asString("mode"), "working", "milestone", "technical-correction"), "The release must have a mode of working, milestone or technical-correction"+mkError())) {
+      mode = PublicationProcessMode.fromCode(pr.asString("mode"));
+      summary.add(new StringPair("Pub-Mode", mode.toCode()));        
+      if (mode != PublicationProcessMode.WORKING) {
+        check(messages, !npm.version().contains("-"), "This release is labelled as a "+mode.toCode()+", so should not have a patch version ("+npm.version() +")"+mkWarning()); 
+      } else {
+        check(messages, npm.version().contains("-"), "This release is not labelled as a milestone or technical correction, so should have a patch version ("+npm.version() +")"+(isHL7(npm) ? mkError() : mkWarning()));
       }
     }
     if (check(messages, pr.has("status"), "No publication request status found"+mkError())) {

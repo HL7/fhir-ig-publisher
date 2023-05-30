@@ -77,6 +77,7 @@ public class SimpleFetcher implements IFetchFile {
   @Override
   public void setRootDir(String rootDir) {
     this.rootDir = rootDir;
+    FetchedFile.setRoot(rootDir);
   }
 
   @Override
@@ -196,6 +197,7 @@ public class SimpleFetcher implements IFetchFile {
         throw new Exception("Bad Source Reference '"+s+"' - should have the format [Type]/[id]");
       String type = s.substring(0,  s.indexOf("/"));
       String id = s.substring(s.indexOf("/")+1); 
+      
       if (!pkp.getContext().hasResource(StructureDefinition.class, "http://hl7.org/fhir/StructureDefinition/"+type) &&
           // first special case: Conformance/Capability
           (!(pkp.getContext().hasResource(StructureDefinition.class , "http://hl7.org/fhir/StructureDefinition/Conformance") && 
@@ -317,6 +319,7 @@ public class SimpleFetcher implements IFetchFile {
       if (file.exists()) {
         for (File f : file.listFiles()) {
           if (!f.isDirectory()) {
+//            System.out.println("scanning: "+f.getAbsolutePath());
             String fn = f.getCanonicalPath();
             String ext = Utilities.getFileExtension(fn);
             if (!Utilities.existsInList(ext, "md", "txt") && !fn.endsWith(".gitignore") && !fn.contains("-spreadsheet") && !isIgnoredFile(f.getName())) {

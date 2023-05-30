@@ -72,13 +72,13 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
     this.date = date;
   }
 
-  private String summaryForResource(CanonicalResource cr) {
+  private String summaryForResource(String pid, CanonicalResource cr) {
     StringBuilder b = new StringBuilder();
     b.append("<table class=\"grid\">\r\n");
     b.append("<tr><td><a href=\""+cr.getWebPath()+"\">Source</a></td><td><a href=\""+cr.getUserString("purl")+"\">"+cr.getUserString("pid")+"</a>:"
         +cr.getUserString("pname")+" (v"+cr.getUserString("fver")+")</td></tr>\r\n");
     JsonObject j = new JsonObject();
-    info.fillOutJson(cr, j);
+    info.fillOutJson(pid, cr, j);
     for (JsonProperty pp : j.getProperties()) {
       if (pp.getValue().isJsonPrimitive()) {
         b.append("<tr><td>"+pp.getName()+"</td><td>"+Utilities.escapeXml(pp.getValue().asString())+"</td></tr>\r\n");
@@ -115,7 +115,7 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
     int i = 0;
     for (CanonicalResource cr : info.getResources().values()) {
       try {
-        renderResource(cr);
+        renderResource(cr.getSourcePackage().getVID(), cr);
       } catch (Exception e) {
         Exception wrappedException = new Exception("Exception rendering canonical resource " + cr.getId() + " " + cr.getUrl(), e);
         wrappedException.printStackTrace();
@@ -320,12 +320,12 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
     }
   }
 
-  private void renderResource(CanonicalResource cr) throws FHIRException, IOException, EOperationOutcome {
+  private void renderResource(String pid, CanonicalResource cr) throws FHIRException, IOException, EOperationOutcome {
     RendererFactory.factory(cr, rc).render(cr);
     String s = new XhtmlComposer(false, true).compose(cr.getText().getDiv());
     new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(target, cr.getUserString("filebase")+".json")), cr);
     //    new XmlParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(target, cr.getUserString("filebase")+".xml")), cr);
-    genPage(cr.fhirType()+"-"+cr.getIdBase(), summaryForResource(cr) + s, Utilities.path(target, cr.getUserString("filebase")+".html"));  
+    genPage(cr.fhirType()+"-"+cr.getIdBase(), summaryForResource(pid, cr) + s, Utilities.path(target, cr.getUserString("filebase")+".html"));  
     cr.setText(null);
   }
 

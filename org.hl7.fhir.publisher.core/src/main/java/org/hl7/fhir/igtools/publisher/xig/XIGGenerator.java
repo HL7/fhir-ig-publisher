@@ -178,6 +178,10 @@ public class XIGGenerator {
       System.out.println(s+": "+info.getCounts().get(s).size());
     }
     System.out.println("Total: "+i);
+    System.out.println("SD Error List:");
+    for (String s : info.getSDErrors()) {
+      System.out.println("  "+s);
+    }
   }
 
 }
