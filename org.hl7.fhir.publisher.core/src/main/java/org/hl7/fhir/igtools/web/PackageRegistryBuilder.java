@@ -44,8 +44,9 @@ public class PackageRegistryBuilder {
       e = new JsonObject();
       json.forceArray("packages").add(e);
       e.add("path", path);
+    } else {
+      e.getProperties().clear();
     }
-    e.getProperties().clear();
     e.add("package-id", pl.pid());
     e.add("title", pl.title());
     e.add("canonical", pl.canonical());
