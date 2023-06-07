@@ -186,6 +186,7 @@ import org.hl7.fhir.r5.model.Constants;
 import org.hl7.fhir.r5.model.ContactDetail;
 import org.hl7.fhir.r5.model.ContactPoint;
 import org.hl7.fhir.r5.model.ContactPoint.ContactPointSystem;
+import org.hl7.fhir.r5.model.DataType;
 import org.hl7.fhir.r5.model.DateTimeType;
 import org.hl7.fhir.r5.model.DomainResource;
 import org.hl7.fhir.r5.model.ElementDefinition;
@@ -230,7 +231,9 @@ import org.hl7.fhir.r5.model.Property;
 import org.hl7.fhir.r5.model.Provenance;
 import org.hl7.fhir.r5.model.Provenance.ProvenanceAgentComponent;
 import org.hl7.fhir.r5.model.Questionnaire;
+import org.hl7.fhir.r5.model.Questionnaire.QuestionnaireItemAnswerOptionComponent;
 import org.hl7.fhir.r5.model.Questionnaire.QuestionnaireItemComponent;
+import org.hl7.fhir.r5.model.Questionnaire.QuestionnaireItemInitialComponent;
 import org.hl7.fhir.r5.model.QuestionnaireResponse;
 import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.model.Resource;
@@ -275,6 +278,7 @@ import org.hl7.fhir.r5.renderers.utils.RenderingContext.StructureDefinitionRende
 import org.hl7.fhir.r5.renderers.utils.Resolver.IReferenceResolver;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceContext;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceWithReference;
+import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.r5.utils.FHIRPathEngine;
@@ -4806,38 +4810,101 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     addConcept(supplement, res.getId()+"/title", res.getTitle());
     addConcept(supplement, res.getId()+"/purpose", res.getPurpose());
     addConcept(supplement, res.getId()+"/copyright", res.getCopyright());
+    addConcept(supplement, res.getId()+"/description", res.getDescription());
 
     if (res instanceof CodeSystem) {
       CodeSystem cs = (CodeSystem) res;
       for (ConceptDefinitionComponent cd : cs.getConcept()) {
         ConceptDefinitionComponent clone = supplement.addConcept().setCode(cd.getCode()).setDisplay(cd.getDisplay());
-        copyConcepts(clone, cd);
+        CodeSystemUtilities.setProperty(supplement, clone, "translation-context", cd.getDefinitionElement());
+        copyConcepts(clone, cd, supplement);
       }
     } else if (res instanceof StructureDefinition) {
       StructureDefinition sd = (StructureDefinition) res;
       for (ElementDefinition ed : sd.getSnapshot().getElement()) {
         addConcept(supplement, ed.getId(), ed.getDefinition());
-        addConcept(supplement, ed.getId()+"/requirements", ed.getRequirements());
-        addConcept(supplement, ed.getId()+"/comment", ed.getComment());
-        addConcept(supplement, ed.getId()+"/meaningWhenMissing", ed.getMeaningWhenMissing());
-        addConcept(supplement, ed.getId()+"/orderMeaning", ed.getOrderMeaning());
-        addConcept(supplement, ed.getId()+"/isModifierMeaning", ed.getIsModifierReason());
-        addConcept(supplement, ed.getId()+"/binding", ed.getBinding().getDescription());
+        addConcept(supplement, ed.getId()+"/requirements", ed.getRequirements(), ed.getDefinitionElement());
+        addConcept(supplement, ed.getId()+"/comment", ed.getComment(), ed.getDefinitionElement());
+        addConcept(supplement, ed.getId()+"/meaningWhenMissing", ed.getMeaningWhenMissing(), ed.getDefinitionElement());
+        addConcept(supplement, ed.getId()+"/orderMeaning", ed.getOrderMeaning(), ed.getDefinitionElement());
+        addConcept(supplement, ed.getId()+"/isModifierMeaning", ed.getIsModifierReason(), ed.getDefinitionElement());
+        addConcept(supplement, ed.getId()+"/binding", ed.getBinding().getDescription(), ed.getDefinitionElement());
+      }
+    } else if (res instanceof Questionnaire) {
+      Questionnaire q = (Questionnaire) res;
+      for (QuestionnaireItemComponent item : q.getItem()) {
+        addItem(supplement, item, null);
       }
     }
     return supplement;
   }
 
-  private void copyConcepts(ConceptDefinitionComponent tgt, ConceptDefinitionComponent src) {
+  private void addItem(CodeSystem supplement, QuestionnaireItemComponent item, QuestionnaireItemComponent parent) {
+    addConcept(supplement, item.getLinkId(), item.getText(), parent == null ? null : parent.getTextElement());   
+    addConcept(supplement, item.getLinkId()+"/prefix", item.getPrefix(), item.getTextElement());   
+    for (QuestionnaireItemAnswerOptionComponent ao : item.getAnswerOption()) {
+      if (ao.hasValueCoding()) {
+        if (ao.getValueCoding().hasDisplay()) {
+          addConcept(supplement, item.getLinkId()+"/option="+ao.getValueCoding().getCode(), ao.getValueCoding().getDisplay(), item.getTextElement());
+        }
+      } else if (ao.hasValueStringType()) {
+        addConcept(supplement, item.getLinkId()+"/option", ao.getValueStringType().primitiveValue(), item.getTextElement());
+      } else if (ao.hasValueReference()) {
+        if (ao.getValueReference().hasDisplay()) {
+          addConcept(supplement, item.getLinkId()+"/option="+ao.getValueReference().getReference(), ao.getValueReference().getDisplay(), item.getText()+": "+ao.getValueReference().getReference());
+        }
+      }
+    }
+    for (QuestionnaireItemInitialComponent ao : item.getInitial()) {
+      if (ao.hasValueCoding()) {
+        if (ao.getValueCoding().hasDisplay()) {
+          addConcept(supplement, item.getLinkId()+"/initial="+ao.getValueCoding().getCode(), ao.getValueCoding().getDisplay(), item.getTextElement());
+        }
+      } else if (ao.hasValueStringType()) {
+        addConcept(supplement, item.getLinkId()+"/initial", ao.getValueStringType().primitiveValue(), item.getText());
+      } else if (ao.hasValueQuantity()) {
+        addConcept(supplement, item.getLinkId()+"/initial", ao.getValueQuantity().getDisplay(), item.getText()+": "+ao.getValueQuantity().toString());
+      } else if (ao.hasValueReference()) {
+        if (ao.getValueReference().hasDisplay()) {
+          addConcept(supplement, item.getLinkId()+"/initial="+ao.getValueReference().getReference(), ao.getValueReference().getDisplay(), item.getText()+": "+ao.getValueReference().getReference());
+        }
+      }
+    }
+    for (QuestionnaireItemComponent child : item.getItem()) {
+      addItem(supplement, child, item);
+    }
+
+  }
+
+  private void copyConcepts(ConceptDefinitionComponent tgt, ConceptDefinitionComponent src, CodeSystem supplement) {
     for (ConceptDefinitionComponent cd : src.getConcept()) {
       ConceptDefinitionComponent clone = tgt.addConcept().setCode(cd.getCode()).setDisplay(cd.getDisplay());
-      copyConcepts(clone, cd);
+      CodeSystemUtilities.setProperty(supplement, clone, "translation-context", cd.getDefinitionElement());
+      copyConcepts(clone, cd, supplement);
     }
+  }
+
+  private void addConcept(CodeSystem supplement, String code, String display, DataType context) {
+    if (display != null) {
+      ConceptDefinitionComponent cs = supplement.addConcept().setCode(code).setDisplay(display.replace("\r", "\\r").replace("\n", "\\n"));
+      if (context != null) {
+        CodeSystemUtilities.setProperty(supplement, cs, "translation-context", context);
+      }
+    }    
   }
 
   private void addConcept(CodeSystem supplement, String code, String display) {
     if (display != null) {
-      supplement.addConcept().setCode(code).setDisplay(display.replace("\r", "\\r").replace("\n", "\\n"));
+      ConceptDefinitionComponent cs = supplement.addConcept().setCode(code).setDisplay(display.replace("\r", "\\r").replace("\n", "\\n"));
+    }    
+  }
+
+  private void addConcept(CodeSystem supplement, String code, String display, String context) {
+    if (display != null) {
+      ConceptDefinitionComponent cs = supplement.addConcept().setCode(code).setDisplay(display.replace("\r", "\\r").replace("\n", "\\n"));
+      if (context != null) {
+        CodeSystemUtilities.setProperty(supplement, cs, "translation-context", new StringType(context));
+      }
     }    
   }
 
@@ -4892,7 +4959,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (debug) {
         waitForInput("before OnGenerate");
       }
-      logMessage("Run Template");
+      logMessage("Run Template ");
       Session tts = tt.start("template");
       List<String> newFileList = new ArrayList<String>();
       checkOutcomes(template.beforeGenerateEvent(publishedIg, tempDir, otherFilesRun, newFileList));
@@ -6985,7 +7052,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     updateImplementationGuide();
 
-    logMessage("Generate 1");
+    logMessage("Generate Native Outputs");
 
     for (FetchedFile f : changeList) {
       f.start("generate1");
@@ -6998,7 +7065,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     templateBeforeGenerate();
 
-    logMessage("Generate 2");
+    logMessage("Generate HTML Outputs");
     for (FetchedFile f : changeList) {
       f.start("generate2");
       try {
@@ -9457,9 +9524,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void generateNativeOutputs(FetchedFile f, boolean regen) throws IOException, FHIRException {
     for (FetchedResource r : f.getResources()) {
       logDebugMessage(LogCategory.PROGRESS, "Produce resources for "+r.fhirType()+"/"+r.getId());
-      if ("for CodeSystem/asp-liste".equals(r.fhirType()+"/"+r.getId())) {
-        System.out.println("?");
-      }
       saveNativeResourceOutputs(f, r);
     }    
   }
