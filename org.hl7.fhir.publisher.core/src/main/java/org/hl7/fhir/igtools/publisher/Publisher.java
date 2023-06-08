@@ -2986,7 +2986,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       System.out.print("Load R5 Specials");
       R5ExtensionsLoader r5e = new R5ExtensionsLoader(pcm, context);
       r5e.load();
-      r5e.loadR5SpecialTypes(SpecialTypeHandler.SPECIAL_TYPES);
+      r5e.loadR5SpecialTypes(SpecialTypeHandler.specialTypes(context.getVersion()));
     }
     //    SpecMapManager smm = new SpecMapManager(r5e.getMap(), r5e.getPckCore().fhirVersion());
     //    smm.setName(r5e.getPckCore().name());
@@ -5532,7 +5532,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             if (!r.isValidated()) {
               validate(f, r);
             }
-            if (SpecialTypeHandler.handlesType(r.fhirType()) && !VersionUtilities.isR5Plus(version)) {
+            if (SpecialTypeHandler.handlesType(r.fhirType(), context.getVersion()) && !VersionUtilities.isR5Plus(version)) {
               // we validated the resource as it was supplied, but now we need to 
               // switch it for the correct representation in the underlying version
               byte[] cnt = null;
@@ -6732,7 +6732,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private Resource parse(FetchedFile file) throws Exception {
     String parseVersion = version;
     if (!file.getResources().isEmpty()) {
-      if (Utilities.existsInList(file.getResources().get(0).fhirType(), SpecialTypeHandler.SPECIAL_TYPES)) {
+      if (Utilities.existsInList(file.getResources().get(0).fhirType(), SpecialTypeHandler.specialTypes(context.getVersion()))) {
         parseVersion = SpecialTypeHandler.VERSION;
       } else {
         parseVersion = str(file.getResources().get(0).getConfig(), "version", version);
@@ -7453,7 +7453,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private Element convertToElement(FetchedResource r, Resource res) throws Exception {
     String parseVersion = version;
     if (r != null) {
-      if (Utilities.existsInList(r.fhirType(), SpecialTypeHandler.SPECIAL_TYPES)) {
+      if (Utilities.existsInList(r.fhirType(), SpecialTypeHandler.specialTypes(context.getVersion()))) {
         parseVersion = SpecialTypeHandler.VERSION;
       } else if (r.getConfig() != null) {
         parseVersion = str(r.getConfig(), "version", version);
@@ -10270,7 +10270,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     int size = bs.size();
 
     Element e = r.getElement();    
-    if (SpecialTypeHandler.handlesType(r.fhirType())) {
+    if (SpecialTypeHandler.handlesType(r.fhirType(), context.getVersion())) {
       e = new ObjectConverter(context).convert(r.getResource());
     } 
 
