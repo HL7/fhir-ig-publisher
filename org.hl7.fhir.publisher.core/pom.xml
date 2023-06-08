@@ -15,6 +15,7 @@
     <properties>
         <graalvm.version>22.2.0</graalvm.version>
         <jackson_version>2.14.0</jackson_version>
+        <info_cqframework_version>1.5.12</info_cqframework_version>
     </properties>
 
     <dependencies>
@@ -28,32 +29,44 @@
         <dependency>
             <groupId>info.cqframework</groupId>
             <artifactId>cql</artifactId>
-            <version>1.5.0</version>
+            <version>${info_cqframework_version}</version>
         </dependency>
         <dependency>
             <groupId>info.cqframework</groupId>
             <artifactId>model</artifactId>
-            <version>1.5.0</version>
+            <version>${info_cqframework_version}</version>
+            <exclusions>
+                <!-- exclude this in favor of 1.9.4 for security reasons -->
+                <exclusion>
+                    <groupId>commons-beanutils</groupId>
+                    <artifactId>commons-beanutils</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>info.cqframework</groupId>
             <artifactId>elm</artifactId>
-            <version>1.5.0</version>
+            <version>${info_cqframework_version}</version>
         </dependency>
         <dependency>
             <groupId>info.cqframework</groupId>
             <artifactId>cql-to-elm</artifactId>
-            <version>1.5.0</version>
+            <version>${info_cqframework_version}</version>
         </dependency>
         <dependency>
             <groupId>info.cqframework</groupId>
             <artifactId>quick</artifactId>
-            <version>1.5.0</version>
+            <version>${info_cqframework_version}</version>
         </dependency>
         <dependency>
             <groupId>info.cqframework</groupId>
             <artifactId>qdm</artifactId>
-            <version>1.5.0</version>
+            <version>${info_cqframework_version}</version>
+        </dependency>
+        <dependency>
+            <groupId>commons-beanutils</groupId>
+            <artifactId>commons-beanutils</artifactId>
+            <version>1.9.4</version>
         </dependency>
         <!-- JAXB-API, used by CQL-to-ELM translator, but no longer loaded by default -->
         <dependency>
