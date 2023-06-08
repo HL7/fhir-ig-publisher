@@ -1,1 +1,0 @@
-* Increment apache.poi, okhttp3, logback, and cqframework
