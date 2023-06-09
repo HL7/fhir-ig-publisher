@@ -24,7 +24,7 @@
     <version>1.3.17-SNAPSHOT</version> <!-- See the note above -->
 
     <properties>
-        <core_version>6.0.15</core_version>
+        <core_version>6.0.16-SNAPSHOT</core_version>
         <maven_surefire_version>3.0.0-M5</maven_surefire_version>
         <apache_poi_version>5.2.1</apache_poi_version>
         <okhttp.version>4.10.0</okhttp.version>
@@ -241,7 +241,7 @@
             <artifactId>okhttp</artifactId>
             <version>${okhttp.version}</version>
             <exclusions>
-                <!-- Exclude this because older jetbrains maven contains an insecure pom definition-->
+                <!-- Exclude this because older jetbrains pom contains an insecure pom definition-->
                 <exclusion>
                     <groupId>org.jetbrains</groupId>
                     <artifactId>annotations</artifactId>
@@ -249,6 +249,7 @@
             </exclusions>
         </dependency>
 
+        <!-- Included because okttp3 used a vulnerable version -->
         <dependency>
             <groupId>org.jetbrains</groupId>
             <artifactId>annotations</artifactId>
