@@ -7959,7 +7959,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         CommandLine shellCommand = new CommandLine("bash").addArgument("-c").addArgument(jekyllCommand+" build --destination "+outputDir, false);        
         exec.execute(shellCommand, vars);     
       } else {
-        exec.execute(org.apache.commons.exec.CommandLine.parse(jekyllCommand+" build --destination \""+outputDir+"\""));
+        //CommandLine commandLine = CommandLine.parse(jekyllCommand + " build --destination \"" + outputDir + "\"");
+        final String enclosedOutputDir = "\"" + outputDir + "\"";
+        final CommandLine commandLine = new CommandLine(jekyllCommand)
+                .addArgument("build")
+                .addArgument("--destination")
+                .addArgument(enclosedOutputDir);
+        exec.execute(commandLine);
       }
       tts.end();
     } catch (IOException ioex) {
