@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import javax.persistence.criteria.Root;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
@@ -19,7 +20,6 @@ import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
-import org.hl7.fhir.r5.conformance.AdditionalBindingsRenderer;
 import org.hl7.fhir.r5.conformance.profile.BindingResolution;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities.ElementChoiceGroup;
@@ -84,8 +84,11 @@ import org.hl7.fhir.r5.profilemodel.PEBuilder;
 import org.hl7.fhir.r5.profilemodel.PEBuilder.PEElementPropertiesPolicy;
 import org.hl7.fhir.r5.profilemodel.PEDefinition;
 import org.hl7.fhir.r5.profilemodel.PEType;
+import org.hl7.fhir.r5.renderers.AdditionalBindingsRenderer;
 import org.hl7.fhir.r5.renderers.CodeResolver;
 import org.hl7.fhir.r5.renderers.DataRenderer;
+import org.hl7.fhir.r5.renderers.IMarkdownProcessor;
+import org.hl7.fhir.r5.renderers.ObligationsRenderer;
 import org.hl7.fhir.r5.renderers.RendererFactory;
 import org.hl7.fhir.r5.renderers.StructureDefinitionRenderer.UnusedTracker;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
@@ -182,6 +185,10 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   public String summary() {
     try {
+      if (sd.hasExtension(ToolingExtensions.EXT_SUMMARY)) {
+        return processMarkdown("Profile Summary", (PrimitiveType) sd.getExtensionByUrl(ToolingExtensions.EXT_SUMMARY).getValue());
+      }
+      
       if (sd.getDifferential() == null)
         return "<p>" + translate("sd.summary", "No Summary, as this profile has no differential") + "</p>";
 
@@ -1327,6 +1334,46 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         tableRowNE(b, translate("sd.dict", "Must Support Types"), "datatypes.html", "No must-support rules about the choice of types/profiles");
       }
     }
+    if (root && sd.getKind() == StructureDefinitionKind.LOGICAL) {
+      tableRowNE(b, translate("sd.dict", "Logical Model"), null, ToolingExtensions.readBoolExtension(sd, ToolingExtensions.EXT_LOGICAL_TARGET) ?
+          "This logical model can be the target of a reference" : "This logical model cannot be the target of a reference");
+    }
+    ObligationsRenderer obr = new ObligationsRenderer(corePath, sd, d.getPath(), gen, this, sdr);
+    obr.seeObligations(d.getExtension());
+    if (obr.hasObligations() || (root && (sd.hasExtension(ToolingExtensions.EXT_OBLIGATION_PROFILE_FLAG) || sd.hasExtension(ToolingExtensions.EXT_OBLIGATION_INHERITS)))) {
+      StringBuilder s = new StringBuilder();
+      XhtmlNode ul = new XhtmlNode(NodeType.Element, "ul");
+      if (root) {
+        if (sd.hasExtension(ToolingExtensions.EXT_OBLIGATION_PROFILE_FLAG)) {
+          ul.li().tx("This is an obligation profile that only contains obligations and additional bindings");           
+        } 
+        for (Extension ext : sd.getExtensionsByUrl(ToolingExtensions.EXT_OBLIGATION_INHERITS)) {
+          String iu = ext.getValue().primitiveValue();
+          XhtmlNode bb = ul.li();
+          bb.tx("This profile picks up obligations and additional bindings from ");           
+          StructureDefinition sd = context.fetchResource(StructureDefinition.class, iu); 
+          if (sd == null) { 
+            bb.code().tx(iu);                     
+          } else if (sd.hasWebPath()) { 
+            bb.ah(sd.getWebPath()).tx(sd.present());
+          } else { 
+            bb.ah(iu).tx(sd.present());
+          } 
+        }  
+        if (ul.hasChildren()) {
+          s.append(new XhtmlComposer(true).compose(ul));
+        }
+      }
+      if (obr.hasObligations()) {
+        XhtmlNode tbl = new XhtmlNode(NodeType.Element, "table").attribute("class", "grid");
+        obr.renderTable(tbl.getChildNodes(), true);
+        if (tbl.hasChildren()) {
+          s.append(new XhtmlComposer(true).compose(tbl));
+        }
+      }
+      tableRowNE(b, translate("sd.dict", "Obligations"), null, s.toString());   
+    }
+    
     if (d.hasExtension(ToolingExtensions.EXT_EXTENSION_STYLE)) {
       String es = d.getExtensionString(ToolingExtensions.EXT_EXTENSION_STYLE);
       if ("named-elements".equals(es)) {
@@ -1339,7 +1386,18 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
       }
     }
+
+    if (!d.getPath().contains(".") && ToolingExtensions.hasExtension(profile, ToolingExtensions.EXT_BINDING_STYLE)) {
+      tableRowNE(b, translate("sd.dict", "Binding Style"), ToolingExtensions.WEB_BINDING_STYLE, 
+          "This type can be bound to a value set using the " + ToolingExtensions.readStringExtension(profile, ToolingExtensions.EXT_BINDING_STYLE)+" binding style");            
+    }
     
+    if (d.hasExtension(ToolingExtensions.EXT_DATE_FORMAT)) {
+      String df = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_DATE_FORMAT);
+      if (df != null) {
+        tableRowNE(b, translate("sd.dict", "Date Format"), null, df);
+      }
+    }
     String ide = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_ID_EXPECTATION);
     if (ide != null) {
       if (ide.equals("optional")) {
@@ -2313,7 +2371,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private List<StructureDefinition> findDerived() {
     List<StructureDefinition> res = new ArrayList<>();
-    for (StructureDefinition t : new ContextUtilities(context).allStructures()) {
+    for (StructureDefinition t : context.fetchResourcesByType(StructureDefinition.class)) {
       if (sd.getUrl().equals(t.getBaseDefinition())) {
         res.add(t);
       }
@@ -2323,9 +2381,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private List<StructureDefinition> findUses() {
     List<StructureDefinition> res = new ArrayList<>();
-    for (StructureDefinition t : new ContextUtilities(context).allStructures()) {
+    for (StructureDefinition t : context.fetchResourcesByType(StructureDefinition.class)) {
       boolean uses = false;
-      for (ElementDefinition ed : t.getSnapshot().getElement()) {
+      for (ElementDefinition ed : t.getDifferential().getElement()) {
         for (TypeRefComponent u : ed.getType()) {
           if (u.hasProfile(sd.getUrl())) {
             uses = true;
@@ -2986,14 +3044,21 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   public String references() throws FHIRFormatError, IOException {
     Map<String, String> base = new HashMap<>();
+    Map<String, String> invoked = new HashMap<>();
     Map<String, String> refs = new HashMap<>();
     Map<String, String> trefs = new HashMap<>();
     Map<String, String> examples = new HashMap<>();
-    for (StructureDefinition sd : new ContextUtilities(context).allStructures()) {
+    for (StructureDefinition sd : context.fetchResourcesByType(StructureDefinition.class)) {
       if (this.sd.getUrl().equals(sd.getBaseDefinition())) {
         base.put(sd.getWebPath(), sd.present());
       }
-      for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+      for (Extension ext : sd.getExtensionsByUrl(ToolingExtensions.EXT_OBLIGATION_INHERITS)) {
+        String v = ext.getValue().primitiveValue();
+        if (this.sd.getUrl().equals(v)) {
+          invoked.put(sd.getWebPath(), sd.present());
+        }
+      }
+       for (ElementDefinition ed : sd.getDifferential().getElement()) {
         for (TypeRefComponent tr : ed.getType()) {
           for (CanonicalType u : tr.getProfile()) {
             if (this.sd.getUrl().equals(u.getValue())) {
@@ -3046,24 +3111,36 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
 
     StringBuilder b = new StringBuilder();
+    String type = sd.describeType();
+    if (ToolingExtensions.readBoolExtension(sd, ToolingExtensions.EXT_OBLIGATION_PROFILE_FLAG)) {
+      type = "Obligation Profile";
+    }
     b.append("<p><b>Usage:</b></p>\r\n<ul>\r\n");
     if (!base.isEmpty())
-      b.append(" <li>Derived from this " + sd.describeType() + ": " + refList(base, "base") + "</li>\r\n");
+      b.append(" <li>Derived from this " + type + ": " + refList(base, "base") + "</li>\r\n");
+    if (!invoked.isEmpty()) {
+      b.append(" <li>Draw in Obligations &amp; Additional Bindings from this " + type + ": " + refList(invoked, "invoked") + "</li>\r\n");
+    }
     if (!refs.isEmpty())
-      b.append(" <li>Use this " + sd.describeType() + ": " + refList(refs, "ref") + "</li>\r\n");
+      b.append(" <li>Use this " + type + ": " + refList(refs, "ref") + "</li>\r\n");
     if (!trefs.isEmpty())
-      b.append(" <li>Refer to this " + sd.describeType() + ": " + refList(trefs, "tref") + "</li>\r\n");
+      b.append(" <li>Refer to this " + type + ": " + refList(trefs, "tref") + "</li>\r\n");
     if (!examples.isEmpty())
-      b.append(" <li>Examples for this " + sd.describeType() + ": " + refList(examples, "ex") + "</li>\r\n");
-    if (base.isEmpty() && refs.isEmpty() && trefs.isEmpty() && examples.isEmpty()) {
-      b.append(" <li>This " + sd.describeType() + " is not used by any profiles in this Implementation Guide</li>\r\n");
+      b.append(" <li>Examples for this " + type + ": " + refList(examples, "ex") + "</li>\r\n");
+    if (base.isEmpty() && refs.isEmpty() && trefs.isEmpty() && examples.isEmpty() & invoked.isEmpty()) {
+      b.append(" <li>This " + type + " is not used by any profiles in this Implementation Guide</li>\r\n");
     }
     b.append("</ul>\r\n");
     return b.toString();
   }
-
-
-
+  
+  public String typeName() {
+    String type = sd.describeType();
+    if (ToolingExtensions.readBoolExtension(sd, ToolingExtensions.EXT_OBLIGATION_PROFILE_FLAG)) {
+      type = "Obligation Profile";
+    }
+    return type;
+  }
 
   private boolean usesSD(Element resource) {
     if (resource.hasChild("meta")) {
