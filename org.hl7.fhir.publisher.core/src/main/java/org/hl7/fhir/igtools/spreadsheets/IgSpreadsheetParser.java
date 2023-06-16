@@ -127,13 +127,11 @@ public class IgSpreadsheetParser {
   private Bundle bundle;
   private Map<String, String> valuesetsToLoad;
   private Set<String> knownValueSetIds;
-  private boolean first;
 
-  public IgSpreadsheetParser(SimpleWorkerContext context, Calendar genDate, String base, Map<String, String> valuesetsToLoad, boolean first, Map<String, MappingSpace> mappings, Set<String> knownValueSetIds) throws Exception {
+  public IgSpreadsheetParser(SimpleWorkerContext context, Calendar genDate, String base, Map<String, String> valuesetsToLoad, Map<String, MappingSpace> mappings, Set<String> knownValueSetIds) throws Exception {
     this.context = context;
     this.genDate = genDate;
     this.base = base;
-    this.first = first;
     this.valuesetsToLoad = valuesetsToLoad;
     this.knownValueSetIds = knownValueSetIds;
     valuesetsToLoad.clear();
