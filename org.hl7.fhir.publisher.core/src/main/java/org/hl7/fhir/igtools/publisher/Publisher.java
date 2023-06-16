@@ -660,7 +660,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private FHIRToolingClient webTxServer;
   private String txServer;
   private String igPack = "";
-  private boolean watch;
   private boolean debug;
   private boolean isChild;
   private boolean cacheVersion;
@@ -710,7 +709,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private XVerExtensionManager xverManager;
   private IGKnowledgeProvider igpkp;
   private List<SpecMapManager> specMaps = new ArrayList<SpecMapManager>();
-  private boolean firstExecution;
   private List<String> suppressedIds = new ArrayList<>();
 
   private Map<String, MappingSpace> mappingSpaces = new HashMap<String, MappingSpace>();
@@ -937,39 +935,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       } catch (Exception e) {
         recordOutcome(e, null);
         throw e;
-      }
-
-      if (watch) {
-        firstExecution = false;
-        log("Watching for changes on a 5sec cycle");
-        while (watch) { // terminated externally
-          Thread.sleep(5000);
-          if (load()) {
-            log("Processing changes to "+Integer.toString(changeList.size())+(changeList.size() == 1 ? " file" : " files")+" @ "+genTime());
-            long startTime = System.nanoTime();
-            loadConformance();
-            generateNarratives();
-            checkDependencies();
-            if (!noValidation) {
-              validate();
-            }
-            generate();
-            clean();
-            long endTime = System.nanoTime();
-            processTxLog(Utilities.path(destDir != null ? destDir : outputDir, "qa-tx.html"));
-            dependentIgFinder.finish(outputDir, sourceIg.present());
-            ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), outputDir, npmName, childPublisher == null? null : childPublisher.npmName, 
-                IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator,
-                new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine).render(publishedIg, true, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
-                new PublicationChecker(repoRoot, historyPage, markdownEngine).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions ,
-                noNarrativeResources, noValidateResources, noValidation, noGenerate, dependentIgFinder);
-            log("Built. "+ DurationUtil.presentDuration(endTime - startTime)+". Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
-            recordOutcome(null, val);
-            log("Finished");
-          }
-        }
-      } else {
-        log("Done"+(!publishing && mode != IGBuildMode.AUTOBUILD ? ". This IG has been built using the 'normal' process for local use. If building to host on an an external website, use the process documented here: https://confluence.hl7.org/display/FHIR/Maintaining+a+FHIR+IG+Publication)" : ""));
       }
     }
     if (templateLoaded && new File(rootDir).exists()) {
@@ -1384,7 +1349,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       j.add("tool", Constants.VERSION+" ("+ToolsVersion.TOOLS_VERSION+")");
       String json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(j, true);
       TextFile.stringToFile(json, Utilities.path(destDir != null ? destDir : outputDir, "qa.json"), false);
-      
+
       j = new JsonObject();
       j.add("date", new SimpleDateFormat("EEE, dd MMM, yyyy HH:mm:ss Z", new Locale("en", "US")).format(execTime.getTime()));
       j.add("doco", "For each file: start is seconds after start activity occurred. Length = milliseconds activity took");
@@ -1396,7 +1361,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(j, true);
       TextFile.stringToFile(json, Utilities.path(destDir != null ? destDir : outputDir, "qa-time-report.json"), false);
-      
+
       StringBuilder b = new StringBuilder();
       b.append("Source File");
       b.append("\t");
@@ -1411,8 +1376,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         b.append("\r\n");
       }
       TextFile.stringToFile(b.toString(), Utilities.path(destDir != null ? destDir : outputDir, "qa-time-report.tsv"), false);
-      
-    
+
+
     } catch (Exception e) {
       // nothing at all
     }
@@ -2311,7 +2276,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   public void initialize() throws Exception {
-    firstExecution = true;
     pcm = new FilesystemPackageCacheManager(mode == null || mode == IGBuildMode.MANUAL || mode == IGBuildMode.PUBLICATION);
     log("Build FHIR IG from "+configFile);
     if (mode == IGBuildMode.PUBLICATION)
@@ -2413,7 +2377,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         isBuildingTemplate = true;
         templateInfo = json;
         npmName = json.asString("name");
-//        System.out.println("targetOutput: "+targetOutput);
+        //        System.out.println("targetOutput: "+targetOutput);
         return true;
       }
     }
@@ -3937,7 +3901,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     SpecMapManager spm = loadSpecDetails(TextFile.streamToBytes(pi.load("other", "spec.internals")), "basespec", specPath);
     SimpleWorkerContext sp;
     IContextResourceLoader loader = new PublisherLoader(pi, spm, specPath, igpkp).makeLoader();
-    sp = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(vsCache).fromPackage(pi, loader);
+    sp = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(vsCache).fromPackage(pi, loader, false);
     sp.loadBinariesFromFolder(pi);
     sp.setCacheId(UUID.randomUUID().toString());
     sp.setForPublication(true);
@@ -4268,12 +4232,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private boolean checkMakeFile(byte[] bs, String path, Set<String> outputTracker) throws IOException {
     logDebugMessage(LogCategory.GENERATE, "Check Generate "+path);
-    if (firstExecution) {
-      String s = path.toLowerCase();
-      if (allOutputs.contains(s))
-        throw new Error("Error generating build: the file "+path+" is being generated more than once (may differ by case)");
-      allOutputs.add(s);
-    }
+    String s = path.toLowerCase();
+    if (allOutputs.contains(s))
+      throw new Error("Error generating build: the file "+path+" is being generated more than once (may differ by case)");
+    allOutputs.add(s);
 
     outputTracker.add(path);
     File f = new CSFile(path);
@@ -4396,7 +4358,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         throw new Exception("Missing source reference on a resource in the IG with the name '"+res.getName()+"' (index = "+i+")");
       i++;
       FetchedFile f = null;
-      if (!bndIds.contains(res.getReference().getReference()) && !res.hasUserData("loaded.resource")) { // todo: this doesn't work for differential builds
+      if (!bndIds.contains(res.getReference().getReference()) && !res.hasUserData("loaded.resource")) { 
         logDebugMessage(LogCategory.INIT, "Load "+res.getReference());
         f = fetcher.fetch(res.getReference(), igf);
         if (!f.hasTitle() && res.getName() != null)
@@ -5338,7 +5300,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (changed) {
       f.getValuesetsToLoad().clear();
       logDebugMessage(LogCategory.INIT, "load "+f.getPath());
-      Bundle bnd = new IgSpreadsheetParser(context, execTime, igpkp.getCanonical(), f.getValuesetsToLoad(), firstExecution, mappingSpaces, knownValueSetIds).parse(f);
+      Bundle bnd = new IgSpreadsheetParser(context, execTime, igpkp.getCanonical(), f.getValuesetsToLoad(), mappingSpaces, knownValueSetIds).parse(f);
       f.setBundle(new FetchedResource(f.getName()+" (ex spreadsheet)"));
       f.setBundleType(FetchedBundleType.SPREADSHEET);
       f.getBundle().setResource(bnd);
@@ -6753,9 +6715,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       f.start("validate");
       try {
         logDebugMessage(LogCategory.PROGRESS, " .. validate "+f.getName());
-        if (firstExecution) {
-          logDebugMessage(LogCategory.PROGRESS, " .. "+f.getName());
-        }
+        logDebugMessage(LogCategory.PROGRESS, " .. "+f.getName());
         for (FetchedResource r : f.getResources()) {
           if (!r.isValidated()) {
             logDebugMessage(LogCategory.PROGRESS, "     validating "+r.getTitle());
@@ -7113,9 +7073,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     printMemUsage();
 
     if (nestedIgConfig != null) {
-      if (watch) {
-        throw new Exception("Cannot run in watch mode when IG has a nested IG.");
-      }
       if (nestedIgOutput == null || igArtifactsPage == null) {
         throw new Exception("If nestedIgConfig is specified, then nestedIgOutput and igArtifactsPage must also be specified.");
       }
@@ -8016,7 +7973,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     msr.analyse();
     Set<String> types = new HashSet<>();
-    for (StructureDefinition sd : cu.allStructures()) {
+    for (StructureDefinition sd : context.fetchResourcesByType(StructureDefinition.class)) {
       if (sd.getUrl().equals("http://hl7.org/fhir/StructureDefinition/Base") || (sd.getDerivation() == TypeDerivationRule.SPECIALIZATION && sd.getKind() != StructureDefinitionKind.LOGICAL && !types.contains(sd.getType()))) {
         types.add(sd.getType());
         String src = msr.render(sd);
@@ -9234,7 +9191,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private void generateResourceReferences() throws Exception {
     Set<String> resourceTypes = new HashSet<>();
-    for (StructureDefinition sd : new ContextUtilities(context).allStructures()) {
+    for (StructureDefinition sd : context.fetchResourcesByType(StructureDefinition.class)) {
       if (sd.getDerivation() == TypeDerivationRule.SPECIALIZATION && sd.getKind() == StructureDefinitionKind.RESOURCE) {
         resourceTypes.add(sd.getType());
       }
@@ -10544,12 +10501,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-xref", csr.xref(), f.getOutputNames(), fr, vars, null);
     }
 
-    CodeSystemSpreadsheetGenerator vsg = new CodeSystemSpreadsheetGenerator(context);
-    if (igpkp.wantGen(fr, "xlsx") && vsg.canGenerate(cs)) {
-      String path = Utilities.path(tempDir, "CodeSystem-"+prefixForContainer + cs.getId()+".xlsx");
-      f.getOutputNames().add(path);
-      vsg.renderCodeSystem(cs);
-      vsg.finish(new FileOutputStream(path));
+    if (igpkp.wantGen(fr, "xlsx")) {
+      CodeSystemSpreadsheetGenerator vsg = new CodeSystemSpreadsheetGenerator(context);
+      if (vsg.canGenerate(cs)) {
+        String path = Utilities.path(tempDir, "CodeSystem-"+prefixForContainer + cs.getId()+".xlsx");
+        f.getOutputNames().add(path);
+        vsg.renderCodeSystem(cs);
+        vsg.finish(new FileOutputStream(path));
+      }
     }
   }
 
@@ -10624,12 +10583,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
     }
-    ValueSetSpreadsheetGenerator vsg = new ValueSetSpreadsheetGenerator(context);
-    if (igpkp.wantGen(r, "xlsx") && vsg.canGenerate(vs)) {
-      String path = Utilities.path(tempDir, "ValueSet-"+prefixForContainer + r.getId()+".xlsx");
-      f.getOutputNames().add(path);
-      vsg.renderValueSet(vs);
-      vsg.finish(new FileOutputStream(path));
+    if (igpkp.wantGen(r, "xlsx")) {
+      ValueSetSpreadsheetGenerator vsg = new ValueSetSpreadsheetGenerator(context);
+      if (vsg.canGenerate(vs)) {
+        String path = Utilities.path(tempDir, "ValueSet-"+prefixForContainer + r.getId()+".xlsx");
+        f.getOutputNames().add(path);
+        vsg.renderValueSet(vs);
+        vsg.finish(new FileOutputStream(path));
+      }
     }
 
   }
@@ -10798,6 +10759,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps-diff-all", sdr.mappings(true, true), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "xref"))
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-sd-xref", sdr.references(), f.getOutputNames(), r, vars, null);
+    fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-typename", sdr.typeName(), f.getOutputNames(), r, vars, null);
     if (sd.getDerivation() == TypeDerivationRule.CONSTRAINT && igpkp.wantGen(r, "span"))
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-span", sdr.span(true, igpkp.getCanonical(), otherFilesRun), f.getOutputNames(), r, vars, null);
     if (sd.getDerivation() == TypeDerivationRule.CONSTRAINT && igpkp.wantGen(r, "spanall"))
@@ -11233,10 +11195,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   @Override
   public void logMessage(String msg) {
-    if (firstExecution)
+    if (tt != null) {
       System.out.println(Utilities.padRight(msg, ' ', 80)+" ("+tt.clock()+")");
-    else
-      System.out.println(msg);    
+    } else {
+      System.out.println(Utilities.padRight(msg, ' ', 80));      
+    }
     if (killFile != null && killFile.exists()) {
       killFile.delete();
       System.out.println("Terminating Process now");    
@@ -11641,7 +11604,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       self.setTxServer(getNamedParam(args, "-tx"));
       self.setPackagesFolder(getNamedParam(args, "-packages"));
-      self.watch = hasNamedParam(args, "-watch");
+      if (hasNamedParam(args, "-watch")) {
+        throw new Error("Watch mode (-watch) is no longer supported");
+      }
       self.debug = hasNamedParam(args, "-debug");
       self.cacheVersion = hasNamedParam(args, "-cacheVersion");
       if (hasNamedParam(args, "-publish")) {
