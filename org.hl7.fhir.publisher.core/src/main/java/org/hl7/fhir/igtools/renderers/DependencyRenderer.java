@@ -22,6 +22,7 @@ import org.hl7.fhir.igtools.publisher.DependencyAnalyser.ArtifactDependency;
 import org.hl7.fhir.igtools.templates.TemplateManager;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.r5.model.CodeType;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideGlobalComponent;
@@ -145,7 +146,9 @@ public class DependencyRenderer {
         addErrorRow(gen, row.getSubRows(), d.getPackageId(), d.getVersion(), d.getUri(), null, e.getMessage(), QA, hasDesc);
       }
     }
-    if (!QA) {
+    if (QA) {
+      
+    } else {
       checkGlobals(ig, null);
     }
     // create the table
@@ -155,12 +158,12 @@ public class DependencyRenderer {
     XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
     div.add(x);
     if (QA) {
-      div.add(makeTemplateTable());
+      div.add(makeTemplateTable(ig));
     }
     return new XhtmlComposer(false).compose(div)+(details ? b.toString() : "");
   }
 
-  private XhtmlNode makeTemplateTable() {
+  private XhtmlNode makeTemplateTable(ImplementationGuide ig) {
     XhtmlNode p = new XhtmlNode(NodeType.Element, "para");
     CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder(" -> ");
     if (templateManager != null) {
@@ -170,6 +173,13 @@ public class DependencyRenderer {
       p.tx("Templates: "+b.toString());
     } else {
       p.tx("No templates used");
+    }
+
+    if (ig.getDefinition().hasExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency")) {
+      String s = ig.getDefinition().getExtensionByUrl("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency").getValue().primitiveValue();
+      p.tx(". Tools: "+(s == null ? "N/A" : s.substring(s.indexOf("#")+1)));      
+    } else {
+      p.tx(". Tools: N/A");      
     }
     
     return p;
