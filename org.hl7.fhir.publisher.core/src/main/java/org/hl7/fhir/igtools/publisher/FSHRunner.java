@@ -1,5 +1,6 @@
 package org.hl7.fhir.igtools.publisher;
 
+import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
 import org.apache.commons.exec.ExecuteWatchdog;
 import org.apache.commons.exec.PumpStreamHandler;
@@ -70,7 +71,14 @@ public class FSHRunner {
         }
         try {
             if (SystemUtils.IS_OS_WINDOWS) {
-                exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C "+cmd+" . -o ."));
+                final CommandLine commandLine = new CommandLine("cmd")
+                        .addArgument("/C")
+                        .addArgument(cmd)
+                        .addArgument(".")
+                        .addArgument("-o")
+                        .addArgument(".");
+
+                exec.execute(commandLine);
             } else if (FhirSettings.hasNpmPath()) {
                 ProcessBuilder processBuilder = new ProcessBuilder(new String("bash -c "+cmd));
                 Map<String, String> env = processBuilder.environment();
@@ -78,9 +86,19 @@ public class FSHRunner {
                 vars.putAll(env);
                 String path = FhirSettings.getNpmPath()+":"+env.get("PATH");
                 vars.put("PATH", path);
-                exec.execute(org.apache.commons.exec.CommandLine.parse("bash -c "+cmd+" . -o ."), vars);
+                final CommandLine commandLine = new CommandLine("bash")
+                        .addArgument("-c")
+                        .addArgument(cmd)
+                        .addArgument(".")
+                        .addArgument("-o")
+                        .addArgument(".");
+                exec.execute(commandLine, vars);
             } else {
-                exec.execute(org.apache.commons.exec.CommandLine.parse(cmd+" . -o ."));
+                final CommandLine commandLine = new CommandLine(cmd)
+                        .addArgument(".")
+                        .addArgument("-o")
+                        .addArgument(".");
+                exec.execute(commandLine);
             }
         } catch (IOException ioex) {
             log("Sushi couldn't be run. Complete output from running Sushi : " + pumpHandler.getBufferString());
