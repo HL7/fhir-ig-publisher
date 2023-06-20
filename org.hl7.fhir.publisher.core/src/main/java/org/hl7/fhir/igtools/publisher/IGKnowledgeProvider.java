@@ -469,12 +469,12 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     return Utilities.pathURL(canonical, ref);
   }
 
-  private void brokenLinkWarning(String location, String ref) {
+  private void brokenLinkMessage(String location, String ref, boolean warning) {
     String s = "The reference "+ref+" could not be resolved";
     if (!msgs.contains(s)) {
       msgs.add(s);
       if (errors != null) {
-        errors.add(new ValidationMessage(Source.Publisher, IssueType.INVARIANT, pathToFhirPath(location), s, IssueSeverity.ERROR));
+        errors.add(new ValidationMessage(Source.Publisher, IssueType.INVARIANT, pathToFhirPath(location), s, warning ? IssueSeverity.WARNING : IssueSeverity.ERROR));
       }
     }
   }
@@ -532,7 +532,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     StructureDefinition sd = context.fetchResource(StructureDefinition.class, ProfileUtilities.sdNs(name, null));
     if (sd != null && sd.hasWebPath())
         return sd.getWebPath();
-    brokenLinkWarning(corepath, name);
+    brokenLinkMessage(corepath, name, false);
     return name+".html";
   }
 
@@ -570,7 +570,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
         else {
           br.url = ref.substring(9)+".html"; // broken link, 
           br.display = ref.substring(9);
-          brokenLinkWarning(path, ref);
+          brokenLinkMessage(path, ref, false);
         }
       } else {
         br.url = vs.getWebPath();
@@ -594,7 +594,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
           } else {
             br.display = ref.substring(29);
             br.url = ref.substring(29)+".html";
-            brokenLinkWarning(path, ref);
+            brokenLinkMessage(path, ref, false);
           }
         }
       } else if (ref.startsWith("http://hl7.org/fhir/ValueSet/v3-")) {
@@ -632,13 +632,13 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
           String oid = ref.substring("http://cts.nlm.nih.gov/fhir/ValueSet/".length());
           br.url = "https://vsac.nlm.nih.gov/valueset/"+oid+"/expansion";  
           br.display = "VSAC "+oid;
-        } else if (Utilities.isAbsoluteUrl(ref) && (!ref.startsWith("http://hl7.org") || !ref.startsWith("http://terminology.hl7.org"))) {
+        } else if (Utilities.isAbsoluteUrlLinkable(ref) && (!ref.startsWith("http://hl7.org") || !ref.startsWith("http://terminology.hl7.org"))) {
           br.url = Utilities.encodeUri(ref);  
           br.display = ref;
         } else if (vs == null) {
-          br.url = ref+".html"; // broken link, 
+          br.url = null;
           br.display = ref;
-          brokenLinkWarning(path, ref);
+          brokenLinkMessage(path, ref, true);
         }
       }
     }
@@ -659,7 +659,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       return null;
     if (sd != null && sd.hasWebPath())
       return sd.getWebPath()+"|"+sd.getName();
-    brokenLinkWarning("?pkp-1?", url);
+    brokenLinkMessage("?pkp-1?", url, false);
     return "unknown.html|?pkp-2?";
   }
 
