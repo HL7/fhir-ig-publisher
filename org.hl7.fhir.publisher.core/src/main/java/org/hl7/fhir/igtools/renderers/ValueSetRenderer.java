@@ -142,9 +142,9 @@ public class ValueSetRenderer extends CanonicalRenderer {
         }
       }
       for (String url : sorted(sdurls)) {
-        StructureDefinition sd = context.fetchResource(StructureDefinition.class, url);
+        StructureDefinition sd = context.fetchResourceRaw(StructureDefinition.class, url);
         if (sd != null) {
-          for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+          for (ElementDefinition ed : sd.getDifferential().getElement()) {
             if (ed.hasBinding() && ed.getBinding().hasValueSet()) {
               if ((ed.getBinding().hasValueSet() && ed.getBinding().getValueSet().equals(vs.getUrl()))) {
                 if (first) {

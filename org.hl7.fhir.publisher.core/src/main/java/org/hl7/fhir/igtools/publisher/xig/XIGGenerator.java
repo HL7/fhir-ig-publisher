@@ -45,7 +45,7 @@ public class XIGGenerator {
     this.target = target;
     pcm = new FilesystemPackageCacheManager(org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager.FilesystemPackageCacheMode.USER);
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r5.core#5.0.0");
-    info.setCtxt(new SimpleWorkerContext.SimpleWorkerContextBuilder().fromPackage(npm, new PublisherLoader(npm, SpecMapManager.fromPackage(npm), npm.getWebLocation(), null).makeLoader()));
+    info.setCtxt(new SimpleWorkerContext.SimpleWorkerContextBuilder().fromPackage(npm, new PublisherLoader(npm, SpecMapManager.fromPackage(npm), npm.getWebLocation(), null).makeLoader(), false));
     info.getCtxt().setAllowLazyLoading(false);
     info.getCtxt().setAllowLoadingDuplicates(true);
 //    this.ctxt.connectToTSServer(TerminologyClientFactory.makeClient(Servers., "fhir/publisher", FhirPublication.R5), null);
