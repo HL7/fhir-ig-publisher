@@ -427,27 +427,31 @@ public class R4ToR4BAnalyser {
     }
     gen.finish();
   }
-  
+
   // we use R4B here, whether it's r4 or r4b - if the content is in the differences, we won't get to the this point
-  private void processFileSame(NPMPackageGenerator gen, String folder, String filename, byte[] content, Map<String, ResPointer> exemptions, String ver, String pver) throws IOException {
-    if (Utilities.existsInList(folder, "package", "example")) {
-      if (!Utilities.existsInList(filename, "package.json", ".index.json")) {
-        org.hl7.fhir.r4b.model.Resource res = new org.hl7.fhir.r4b.formats.JsonParser().parse(content);
-        boolean exempt = (exemptions.containsKey(res.fhirType()+"/"+res.getIdBase()) ||
-            ((res instanceof org.hl7.fhir.r4b.model.CanonicalResource) && exemptions.containsKey(((org.hl7.fhir.r4b.model.CanonicalResource) res).getUrl())));
-        if (!exempt) {
-//          System.out.println("** Add "+res.fhirType()+"/"+res.getId()+" to same version");
-          gen.addFile(folder, filename, content);          
-        } else {
-//          System.out.println("** Exclude "+res.fhirType()+"/"+res.getId()+" from same version");
+  private void processFileSame(NPMPackageGenerator gen, String folder, String filename, byte[] content, Map<String, ResPointer> exemptions, String ver, String pver) {
+    try {
+      if (Utilities.existsInList(folder, "package", "example")) {
+        if (!Utilities.existsInList(filename, "package.json", ".index.json")) {
+          org.hl7.fhir.r4b.model.Resource res = new org.hl7.fhir.r4b.formats.JsonParser().parse(content);
+          boolean exempt = (exemptions.containsKey(res.fhirType()+"/"+res.getIdBase()) ||
+              ((res instanceof org.hl7.fhir.r4b.model.CanonicalResource) && exemptions.containsKey(((org.hl7.fhir.r4b.model.CanonicalResource) res).getUrl())));
+          if (!exempt) {
+            //          System.out.println("** Add "+res.fhirType()+"/"+res.getId()+" to same version");
+            gen.addFile(folder, filename, content);          
+          } else {
+            //          System.out.println("** Exclude "+res.fhirType()+"/"+res.getId()+" from same version");
+          }
         }
+      } else if (filename.equals("ig-r4.json") || filename.equals("ig-r4.jsonX")) {
+        gen.addFile(folder, filename, updateIGR4(content, ver, pver));
+      } else if (filename.equals("spec.internals")) {
+        gen.addFile(folder, filename, updateSpecInternals(content, ver, pver));
+      } else {
+        gen.addFile(folder, filename, content);
       }
-    } else if (filename.equals("ig-r4.json") || filename.equals("ig-r4.jsonX")) {
-      gen.addFile(folder, filename, updateIGR4(content, ver, pver));
-    } else if (filename.equals("spec.internals")) {
-      gen.addFile(folder, filename, updateSpecInternals(content, ver, pver));
-    } else {
-      gen.addFile(folder, filename, content);
+    } catch (Exception e) {
+      throw new FHIRException("Error processing "+folder+"/"+filename+": "+e.getMessage(), e);
     }
   }
 
