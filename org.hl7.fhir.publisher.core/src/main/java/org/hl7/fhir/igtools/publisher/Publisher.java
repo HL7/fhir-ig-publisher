@@ -1052,9 +1052,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       String tx = TextFile.fileToString(txLog);
       PrintStream f = new PrintStream(new FileOutputStream(path));
       String title = "Terminology Server Log";
-      f.println("<html><head><title>"+title+"</title></head><body><h2>"+title+"</h2>");
+      f.println("<html><head><title>"+title+"</title></head><body><h2>"+title+"</h2><pre>");
       f.print(tx);
-      f.println("</head></html>");
+      f.println("</pre></head></html>");
       f.close();
     } 
   }
@@ -7118,7 +7118,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         npm.addFile(Category.OTHER, "validation-oo.json", validationSummaryOO());
         npm.finish();
         if (r4tor4b.canBeR4() && r4tor4b.canBeR4B()) {
-          r4tor4b.clonePackage(npmName, npm.filename());
+          try {
+            r4tor4b.clonePackage(npmName, npm.filename());
+          } catch (Exception e) {
+            errors.add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, "package.tgz", "Error converting pacakge to R4B: "+e.getMessage(), IssueSeverity.ERROR));        
+          }
         }
 
         if (mode == null || mode == IGBuildMode.MANUAL) {
