@@ -82,7 +82,7 @@ public class PackageRegistryBuilder {
     System.out.println("Found "+packages.size()+" packages");
     
     File p = prFile();
-    JsonObject j = p.exists() ? new JsonObject() : JsonParser.parseObject(prFile());
+    JsonObject j = p.exists() ? JsonParser.parseObject(prFile()) : new JsonObject();
     
     if (j.has("doco") ) {
       j.add("doco", "This json object lists all the package-list.json files found on this site, "+
