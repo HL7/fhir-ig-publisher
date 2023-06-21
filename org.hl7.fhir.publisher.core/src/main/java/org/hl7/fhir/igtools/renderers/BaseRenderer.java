@@ -9,6 +9,7 @@ import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
 import org.hl7.fhir.r5.model.PrimitiveType;
@@ -117,6 +118,10 @@ public class BaseRenderer extends TranslatingUtilities implements IMarkdownProce
       if (url != null)
         return Utilities.pathURL(map.getBase(), url);
     }      
+    CanonicalResource cr = (CanonicalResource) context.fetchResource(Resource.class, linkText);
+    if (cr != null && cr.hasWebPath()) {
+      return cr.getWebPath();
+    }
     return null;
   }
 

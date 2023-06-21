@@ -71,15 +71,17 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   private List<String> otherUrls = new ArrayList<>();
   private List<String> mappingUrls = new ArrayList<>();
   private boolean bundleReferencesResolve;
+  private List<SpecMapManager> specMaps;
   
   
-  public ValidationServices(IWorkerContext context, IGKnowledgeProvider ipg, List<FetchedFile> files, List<NpmPackage> packages, boolean bundleReferencesResolve) {
+  public ValidationServices(IWorkerContext context, IGKnowledgeProvider ipg, List<FetchedFile> files, List<NpmPackage> packages, boolean bundleReferencesResolve, List<SpecMapManager> specMaps) {
     super();
     this.context = context;
     this.ipg = ipg;
     this.files = files;
     this.packages = packages;
     this.bundleReferencesResolve = bundleReferencesResolve;
+    this.specMaps = specMaps;
     initOtherUrls();
   }
 
@@ -244,6 +246,12 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
       }
     }
     
+    for (SpecMapManager sp : specMaps) {
+      String base = url.contains("#") ? url.substring(0, url.indexOf("#")) : url;
+      if (sp.hasTarget(base)) {
+        return true;
+      }
+    }
     if (u.startsWith("http://hl7.org/fhir")) {
       if (org.hl7.fhir.r5.utils.BuildExtensions.allConsts().contains(u)) {
         return true;

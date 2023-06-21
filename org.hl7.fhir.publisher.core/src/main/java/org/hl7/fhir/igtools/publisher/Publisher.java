@@ -2985,7 +2985,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     validator.setShowMessagesFromReferences(showReferenceMessages);
     validator.getExtensionDomains().addAll(extensionDomains);
     validator.getExtensionDomains().add(ToolingExtensions.EXT_PRIVATE_BASE);
-    validationFetcher = new ValidationServices(context, igpkp, fileList, npmList, bundleReferencesResolve);
+    validationFetcher = new ValidationServices(context, igpkp, fileList, npmList, bundleReferencesResolve, specMaps);
     validator.setFetcher(validationFetcher);
     validator.setPolicyAdvisor(validationFetcher);
     validator.setTracker(this);
@@ -3485,7 +3485,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (!suppressPath.isEmpty())
         loadSuppressedMessages(Utilities.path(rootDir, suppressPath), "ConfigFile.suppressedWarningFile");
     }
-    validationFetcher = new ValidationServices(context, igpkp, fileList, npmList, bool(configuration, "bundleReferencesResolve"));
+    validationFetcher = new ValidationServices(context, igpkp, fileList, npmList, bool(configuration, "bundleReferencesResolve"), specMaps);
     validator.setFetcher(validationFetcher);
     validator.setPolicyAdvisor(validationFetcher);
     validator.setTracker(this);
@@ -6446,6 +6446,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     utils.setIds(sd, true);
     utils.setXver(context.getXVer());
     utils.setForPublication(true);
+    utils.setMasterSourceFileNames(specMaps.get(0).getTargets());
+    utils.setLocalFileNames(pageTargets());
     if (VersionUtilities.isR4Plus(version)) {
       utils.setNewSlicingProcessing(true);
     }
