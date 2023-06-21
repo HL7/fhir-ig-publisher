@@ -394,9 +394,42 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     s.close();
 
     genQAText(title, files, path, filteredMessages, linkErrors);
+    genQAESLintCompactText(title, files, path, filteredMessages, linkErrors);
     
     String summary = "Errors: " + err + ", Warnings: " + warn + ", Info: " + info+", Broken Links: "+link;
     return path + "\r\n" + summary;
+  }
+
+  public void genQAESLintCompactText(String title, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, List<ValidationMessage> linkErrors)
+      throws IOException {
+    StringBuilder b = new StringBuilder();
+    files = sorted(files);
+
+    for (FetchedFile f : files) {
+      for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages)) {
+        String eslintSeverity = vm.getLevel().getDisplay();
+        if (eslintSeverity.equals("Information"))
+          eslintSeverity = "Info";
+
+        if (eslintSeverity.equals("Fatal"))
+          eslintSeverity = "Error";
+
+        int eslintLine = vm.getLine();
+        if (eslintLine < 0)
+          eslintLine = 0;
+
+        int eslintColumn = vm.getCol();
+        if (eslintColumn < 0)
+          eslintColumn = 0;
+
+        b.append(f.getPath() + ": line " + eslintLine + ", col " + eslintColumn + ", " + eslintSeverity + " - " + vm.getMessage() + " (" + vm.getType() + ")" + "\n");
+      }
+    }
+
+    b.append("\n");
+    b.append(genHeaderTxt(title, err, warn, info));
+    
+    TextFile.stringToFile(b.toString(), Utilities.changeFileExt(path, "-eslintcompact.txt"));
   }
 
   public void genQAText(String title, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, List<ValidationMessage> linkErrors)

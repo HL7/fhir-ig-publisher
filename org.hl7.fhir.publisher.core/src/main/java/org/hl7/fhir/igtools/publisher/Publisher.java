@@ -7911,7 +7911,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     try {
       log("Run jekyll: "+jekyllCommand+" build --destination \""+outputDir+"\" (in folder "+tempDir+")");
       if (SystemUtils.IS_OS_WINDOWS) {
-        exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C "+jekyllCommand+" build --destination \""+outputDir+"\""));
+        final String enclosedOutputDir = "\"" + outputDir + "\"";
+        final CommandLine commandLine = new CommandLine("cmd")
+                .addArgument( "/C")
+                .addArgument(jekyllCommand)
+                .addArgument("build")
+                .addArgument("--destination")
+                .addArgument(enclosedOutputDir);
+        exec.execute(commandLine);
       } else if (FhirSettings.hasRubyPath()) {
         ProcessBuilder processBuilder = new ProcessBuilder(new String("bash -c "+jekyllCommand));
         Map<String, String> env = processBuilder.environment();
@@ -7919,10 +7926,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         vars.putAll(env);
         String path = FhirSettings.getRubyPath()+":"+env.get("PATH");
         vars.put("PATH", path);
-        CommandLine shellCommand = new CommandLine("bash").addArgument("-c").addArgument(jekyllCommand+" build --destination "+outputDir, false);        
-        exec.execute(shellCommand, vars);     
+        CommandLine commandLine = new CommandLine("bash").addArgument("-c").addArgument(jekyllCommand+" build --destination "+outputDir, false);
+        exec.execute(commandLine, vars);
       } else {
-        exec.execute(org.apache.commons.exec.CommandLine.parse(jekyllCommand+" build --destination \""+outputDir+"\""));
+        final String enclosedOutputDir = "\"" + outputDir + "\"";
+        final CommandLine commandLine = new CommandLine(jekyllCommand)
+                .addArgument("build")
+                .addArgument("--destination")
+                .addArgument(enclosedOutputDir);
+        exec.execute(commandLine);
       }
       tts.end();
     } catch (IOException ioex) {
