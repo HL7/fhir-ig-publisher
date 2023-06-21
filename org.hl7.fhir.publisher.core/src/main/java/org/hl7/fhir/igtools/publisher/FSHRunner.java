@@ -101,37 +101,35 @@ public class FSHRunner {
 
     public class MySushiHandler extends OutputStream {
 
-        private byte[] buffer;
-        private int length;
+        private final StringBuilder buffer;
         private int errorCount = -1;
 
         public MySushiHandler() {
-            buffer = new byte[256];
+            buffer = new StringBuilder(256);
         }
 
         public String getBufferString() {
-            return new String(this.buffer, 0, length);
+            return this.buffer.toString();
         }
 
         private boolean passSushiFilter(String s) {
-            if (Utilities.noString(s))
+            if (Utilities.noString(s) || s.isBlank())
                 return false;
             return true;
         }
 
         @Override
         public void write(int b) throws IOException {
-            buffer[length] = (byte) b;
-            length++;
+            this.buffer.appendCodePoint(b);
             if (b == 10) { // eoln
-                String s = new String(buffer, 0, length);
+                final String s = this.getBufferString();
                 if (passSushiFilter(s)) {
                     log("Sushi: "+ StringUtils.stripEnd(s, null));
                     if (s.trim().startsWith("Errors:")) {
                         errorCount = Integer.parseInt(s.substring(10).trim());
                     }
                 }
-                length = 0;
+                this.buffer.setLength(0);
             }
         }
     }
