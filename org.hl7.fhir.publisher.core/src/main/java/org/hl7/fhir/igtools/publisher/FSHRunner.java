@@ -64,6 +64,8 @@ public class FSHRunner {
         exec.setWorkingDirectory(file);
         ExecuteWatchdog watchdog = new ExecuteWatchdog(fshTimeout);
         exec.setWatchdog(watchdog);
+
+        //FIXME This construction is a mess, and should use CommandLine(...).addArgument(...) construction. -Dotasek
         String cmd = fshVersion == null ? "sushi" : "npx fsh-sushi@"+fshVersion;
         if (mode == Publisher.IGBuildMode.PUBLICATION || mode == Publisher.IGBuildMode.AUTOBUILD) {
             cmd += " --require-latest";
