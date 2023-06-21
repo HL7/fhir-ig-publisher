@@ -135,6 +135,10 @@ private static final String VER = "1.0.53";
     testIg("hl7.fhir.uv.howto", null);
   }
 
+  @Test
+  public void testExtensions() throws Exception {
+    testIg("hl7.fhir.uv.extensions", null);
+  }
 
 //
 //  @Test
