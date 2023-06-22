@@ -16,6 +16,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Consumer;
 
 public class FSHRunner {
 
@@ -58,7 +60,7 @@ public class FSHRunner {
         log("Run Sushi on "+file.getAbsolutePath());
         DefaultExecutor exec = new DefaultExecutor();
         exec.setExitValue(0);
-        MySushiHandler pumpHandler = new MySushiHandler();
+        MySushiHandler pumpHandler = new MySushiHandler(this::log);
         PumpStreamHandler pump = new PumpStreamHandler(pumpHandler);
         exec.setStreamHandler(pump);
         exec.setWorkingDirectory(file);
@@ -103,9 +105,11 @@ public class FSHRunner {
 
         private final StringBuilder buffer;
         private int errorCount = -1;
+        private final Consumer<String> outputConsumer;
 
-        public MySushiHandler() {
+        public MySushiHandler(final Consumer<String> outputConsumer) {
             buffer = new StringBuilder(256);
+            this.outputConsumer = Objects.requireNonNull(outputConsumer);
         }
 
         public String getBufferString() {
@@ -124,7 +128,7 @@ public class FSHRunner {
             if (b == 10) { // eoln
                 final String s = this.getBufferString();
                 if (passSushiFilter(s)) {
-                    log("Sushi: "+ StringUtils.stripEnd(s, null));
+                    this.outputConsumer.accept("Sushi: "+ StringUtils.stripEnd(s, null));
                     if (s.trim().startsWith("Errors:")) {
                         errorCount = Integer.parseInt(s.substring(10).trim());
                     }
