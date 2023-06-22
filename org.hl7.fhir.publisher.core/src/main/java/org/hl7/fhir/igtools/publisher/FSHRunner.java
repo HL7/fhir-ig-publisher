@@ -99,7 +99,7 @@ public class FSHRunner {
         }
     }
 
-    public class MySushiHandler extends OutputStream {
+    public static class MySushiHandler extends OutputStream {
 
         private final StringBuilder buffer;
         private int errorCount = -1;
