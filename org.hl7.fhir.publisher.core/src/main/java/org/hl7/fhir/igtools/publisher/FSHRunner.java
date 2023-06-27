@@ -1,6 +1,5 @@
 package org.hl7.fhir.igtools.publisher;
 
-import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
 import org.apache.commons.exec.ExecuteWatchdog;
 import org.apache.commons.exec.PumpStreamHandler;
@@ -65,20 +64,15 @@ public class FSHRunner {
         exec.setWorkingDirectory(file);
         ExecuteWatchdog watchdog = new ExecuteWatchdog(fshTimeout);
         exec.setWatchdog(watchdog);
+
+        //FIXME This construction is a mess, and should use CommandLine(...).addArgument(...) construction. -Dotasek
         String cmd = fshVersion == null ? "sushi" : "npx fsh-sushi@"+fshVersion;
         if (mode == Publisher.IGBuildMode.PUBLICATION || mode == Publisher.IGBuildMode.AUTOBUILD) {
             cmd += " --require-latest";
         }
         try {
             if (SystemUtils.IS_OS_WINDOWS) {
-                final CommandLine commandLine = new CommandLine("cmd")
-                        .addArgument("/C")
-                        .addArgument(cmd)
-                        .addArgument(".")
-                        .addArgument("-o")
-                        .addArgument(".");
-
-                exec.execute(commandLine);
+                exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C "+cmd+" . -o ."));
             } else if (FhirSettings.hasNpmPath()) {
                 ProcessBuilder processBuilder = new ProcessBuilder(new String("bash -c "+cmd));
                 Map<String, String> env = processBuilder.environment();
@@ -86,19 +80,9 @@ public class FSHRunner {
                 vars.putAll(env);
                 String path = FhirSettings.getNpmPath()+":"+env.get("PATH");
                 vars.put("PATH", path);
-                final CommandLine commandLine = new CommandLine("bash")
-                        .addArgument("-c")
-                        .addArgument(cmd)
-                        .addArgument(".")
-                        .addArgument("-o")
-                        .addArgument(".");
-                exec.execute(commandLine, vars);
+                exec.execute(org.apache.commons.exec.CommandLine.parse("bash -c "+cmd+" . -o ."), vars);
             } else {
-                final CommandLine commandLine = new CommandLine(cmd)
-                        .addArgument(".")
-                        .addArgument("-o")
-                        .addArgument(".");
-                exec.execute(commandLine);
+                exec.execute(org.apache.commons.exec.CommandLine.parse(cmd+" . -o ."));
             }
         } catch (IOException ioex) {
             log("Sushi couldn't be run. Complete output from running Sushi : " + pumpHandler.getBufferString());
