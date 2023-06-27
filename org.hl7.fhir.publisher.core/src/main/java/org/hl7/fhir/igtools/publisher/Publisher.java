@@ -1032,10 +1032,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private String makeTemplateJekyllIndexPage() {
-    String page = "---"+
-        "layout: page"+
-        "title: {{npm}}"+
-        "---"+
+    String page = "---\r\n"+
+        "layout: page\r\n"+
+        "title: {{npm}}\r\n"+
+        "---\r\n"+
         "  <p><b>Template {{npm}}</b></p>\r\n"+
         "  <p>You can <a href=\"package.tgz\">download the template</a>, though you should not need to; just refer to the template as {{npm}} in your IG configuration.</p>\r\n"+
         "  <p>A <a href=\"{{canonical}}/history.html\">full version history is published</a></p>\r\n";
