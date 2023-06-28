@@ -220,7 +220,7 @@ public class TemplateReleaser {
       PackageList pl = new PackageList(JsonParser.parseObject(new File(Utilities.path(path, id, "package-list.json"))));
       tr.td().ah(pl.canonical()).tx(pl.pid());
       tr.td().tx(pl.title());
-      tr.td().ah(pl.current().path() + "/package.tgz").tx(pl.current().version());
+      tr.td().ah(pl.canonical() + "/" + pl.current().version() + "/package.tgz").tx(pl.current().version());
       tr.td().tx(pl.current().date());
     }
 
