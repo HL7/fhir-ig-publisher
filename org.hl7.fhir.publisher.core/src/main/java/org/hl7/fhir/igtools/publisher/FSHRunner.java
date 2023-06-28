@@ -96,7 +96,7 @@ public class FSHRunner {
             log("Exception: "+ioex.getMessage());
             throw ioex;
         }
-        if (pumpHandler.errorCount > 0) {
+        if (pumpHandler.getErrorCount() > 0) {
             throw new IOException("Sushi failed with errors. Complete output from running Sushi : " + pumpHandler.getBufferString());
         }
     }
@@ -135,6 +135,10 @@ public class FSHRunner {
                 }
                 this.buffer.setLength(0);
             }
+        }
+
+        protected int getErrorCount() {
+            return errorCount;
         }
     }
 }
