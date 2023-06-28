@@ -713,16 +713,24 @@ public class CrossViewRenderer {
     switch (ctxt.getType()) {
     case ELEMENT:
       String s = ctxt.getExpression();
-      if (s.contains(".")) {
-        s = s.substring(0, s.indexOf("."));
-      }
-      if (cu.isPrimitiveDatatype(s)) {
-        set.add("primitives");
-      }
-      if (cu.isDatatype(s)) {
-        set.add("datatypes");
+      if (s.contains(":")) {
+        if (s.contains("#")) {
+          s = s.substring(s.indexOf("#")+1);
+        } else {
+          s = null;
+        }                  
       } 
-      set.add(s);
+      if (s != null) {
+        if (s.contains(".")) {
+          s = s.substring(0, s.indexOf("."));
+        }
+        if (cu.isPrimitiveDatatype(s)) {
+          set.add("primitives");
+        }
+        if (cu.isDatatype(s)) {
+          set.add("datatypes");
+        } 
+      }
       break;
     case EXTENSION:
       set.add("Extension");
