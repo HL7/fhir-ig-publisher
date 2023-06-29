@@ -35,3 +35,7 @@ jobs:
           vmImage: ubuntu-latest
           jdkVersion: 1.11
           gitRepo: https://github.com/FHIR/fhir-tools-ig.git
+        - displayName: ACME-FSH-IG-Example
+          vmImage: ubuntu-latest
+          jdkVersion: 1.11
+          gitRepo: https://github.com/FirelyTeam/ACME-FSH-IG-Example.git
