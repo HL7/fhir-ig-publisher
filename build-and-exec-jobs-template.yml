@@ -15,7 +15,7 @@ jobs:
 
         steps:
           - checkout: self
-          - checkout: git://FHIR/fhir-tools-ig
+          - checkout: IgRepo
           # Runs 'mvn clean package'
           - task: Maven@3
             inputs:
