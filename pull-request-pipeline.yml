@@ -8,7 +8,7 @@ pr:
 # Different users have different machine setups, we run the build three times, on ubuntu, osx, and windows.
 # Azure doesn't always have the same Java versions on each system, so they are enumerated for each system independently.
 jobs:
-  - template: pull-request-pipeline-parameterized.yml
+  - template: build-and-test-jobs-template.yml
     parameters:
       images:
         # This image is here so that at least one job specifically sets Cp1252 file encodings, which are normally set by the JDK (which Azure can change on each latest image)
@@ -28,3 +28,11 @@ jobs:
           vmImage: windows-latest
           jdkVersion: 1.11
           javaToolOptions:
+  - template: build-and-exec-jobs-template.yml
+    parameters:
+      execTest:
+        - displayName: fhir-tools-ig-exec
+          vmImage: ubuntu-latest
+          jdkVersion: 1.11
+          gitRepo: https://github.com/FHIR/fhir-tools-ig/
+          igDirectory: fhir-tools-ig
