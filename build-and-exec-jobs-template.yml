@@ -20,7 +20,9 @@ jobs:
               versionSpec: '>= 3.0'
 
           - script: |
-              gem install jekyll bundler
+              gem install bundler
+              bundle init
+              bundle update --bundler
               bundle install --retry=3 --jobs=4
             displayName: 'bundle install'
 
