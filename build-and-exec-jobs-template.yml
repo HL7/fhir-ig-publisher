@@ -15,6 +15,15 @@ jobs:
 
         steps:
 
+          - task: UseRubyVersion@0
+            inputs:
+              versionSpec: '>= 3.0'
+
+          - script: |
+              gem install jekyll bundler
+              bundle install --retry=3 --jobs=4
+            displayName: 'bundle install'
+
           # Runs 'mvn clean package'
           - task: Maven@3
             inputs:
@@ -27,11 +36,6 @@ jobs:
               publishJUnitResults: true
               testResultsFiles: '**/surefire-reports/TEST-*.xml'
               goals: 'package'
-
-          - task: Bash@3
-            inputs:
-              targetType: 'inline'
-              script: gem install jekyll bundler
 
           - task: Bash@3
             inputs:
