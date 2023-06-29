@@ -20,6 +20,8 @@ import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.StringJoiner;
 
 public class FSHRunner {
@@ -63,7 +65,7 @@ public class FSHRunner {
         log("Run Sushi on "+file.getAbsolutePath());
         DefaultExecutor exec = new DefaultExecutor();
         exec.setExitValue(0);
-        MySushiHandler pumpHandler = new MySushiHandler();
+        MySushiHandler pumpHandler = new MySushiHandler(this::log);
         PumpStreamHandler pump = new PumpStreamHandler(pumpHandler);
         exec.setStreamHandler(pump);
         exec.setWorkingDirectory(file);
@@ -96,10 +98,11 @@ public class FSHRunner {
             log("Exception: "+ioex.getMessage());
             throw ioex;
         }
-        if (pumpHandler.errorCount > 0) {
+        if (pumpHandler.getErrorCount() > 0) {
             throw new IOException("Sushi failed with errors. Complete output from running Sushi : " + pumpHandler.getBufferString());
         }
     }
+
 
     @Nonnull
     protected CommandLine getDefaultCommandLine(String fshVersion, Publisher.IGBuildMode mode) {
@@ -147,40 +150,45 @@ public class FSHRunner {
         }
         return stringJoiner.toString();
     }
-    public class MySushiHandler extends OutputStream {
+  
+    public static class MySushiHandler extends OutputStream {
 
-        private byte[] buffer;
-        private int length;
+        private final StringBuilder buffer;
         private int errorCount = -1;
+        private final Consumer<String> outputConsumer;
 
-        public MySushiHandler() {
-            buffer = new byte[256];
+        public MySushiHandler(final Consumer<String> outputConsumer) {
+            buffer = new StringBuilder(256);
+            this.outputConsumer = Objects.requireNonNull(outputConsumer);
         }
 
         public String getBufferString() {
-            return new String(this.buffer, 0, length);
+            return this.buffer.toString();
         }
 
         private boolean passSushiFilter(String s) {
-            if (Utilities.noString(s))
+            if (Utilities.noString(s) || s.isBlank())
                 return false;
             return true;
         }
 
         @Override
         public void write(int b) throws IOException {
-            buffer[length] = (byte) b;
-            length++;
+            this.buffer.appendCodePoint(b);
             if (b == 10) { // eoln
-                String s = new String(buffer, 0, length);
+                final String s = this.getBufferString();
                 if (passSushiFilter(s)) {
-                    log("Sushi: "+ StringUtils.stripEnd(s, null));
+                    this.outputConsumer.accept("Sushi: "+ StringUtils.stripEnd(s, null));
                     if (s.trim().startsWith("Errors:")) {
                         errorCount = Integer.parseInt(s.substring(10).trim());
                     }
                 }
-                length = 0;
+                this.buffer.setLength(0);
             }
+        }
+
+        protected int getErrorCount() {
+            return errorCount;
         }
     }
 }
