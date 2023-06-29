@@ -1,10 +1,3 @@
-resources:
-  repositories:
-    - repository: IgRepo # The name used to reference this repository in the checkout step
-      type: github
-      endpoint: MyGitHubServiceConnection
-      name: FHIR/fhir-tools-ig
-      
 jobs:
   - ${{ each execTest in parameters.execTests }}:
       - job:
@@ -22,7 +15,7 @@ jobs:
 
         steps:
           - checkout: self
-          - checkout:
+          - checkout: git://FHIR/fhir-tools-ig
           # Runs 'mvn clean package'
           - task: Maven@3
             inputs:
