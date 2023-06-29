@@ -20,12 +20,18 @@ jobs:
             inputs:
               mavenPomFile: 'pom.xml'
               mavenOptions: '-Xmx3072m'
+              options: '-DskipTests'
               javaHomeOption: 'JDKVersion'
               jdkVersionOption: '${{execTest.jdkVersion}}'
               jdkArchitectureOption: 'x64'
               publishJUnitResults: true
               testResultsFiles: '**/surefire-reports/TEST-*.xml'
               goals: 'package'
+
+          - task: Bash@3
+            inputs:
+              targetType: 'inline'
+              script: gem install jekyll bundler
 
           - task: Bash@3
             inputs:
