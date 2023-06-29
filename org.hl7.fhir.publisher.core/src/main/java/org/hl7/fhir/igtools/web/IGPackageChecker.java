@@ -137,7 +137,7 @@ public class IGPackageChecker {
     ig.setVersion(ver);
     ig.getDateElement().setValue(date);
     ig.setPackageId(packageId);
-    ig.setLicense(SPDXLicense.CC01_0);
+    ig.setLicense(SPDXLicense.CC0_1_0);
     ig.getManifest().setRendering(vpath);
     if (FHIRVersion.isValidCode(fhirversion))
       ig.addFhirVersion(FHIRVersion.fromCode(fhirversion));

@@ -273,7 +273,7 @@ public class IGPack2NpmConvertor {
         ig.setLicense(SPDXLicense.fromCode(license));
       }
     } else
-      ig.setLicense(SPDXLicense.CC01_0);
+      ig.setLicense(SPDXLicense.CC0_1_0);
     
   }
 

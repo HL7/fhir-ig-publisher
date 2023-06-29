@@ -227,6 +227,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
 
   private static final String INTERNAL_LINK = "internal";
   private static final boolean NO_FILTER = false;
+  private static final int MAX_PATH_LENGTH_NO_BREAK = 40;
   private Date ruleDateCutoff = null;
   private String statedVersion;
   private IGKnowledgeProvider provider;
@@ -1132,7 +1133,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private String genDetails(ValidationMessage vm, int id) {
     ST t = template(vm.isSlicingHint() ? detailsTemplateWithExtraDetails : vm.getLocationLink() != null ? detailsTemplateWithLink : vm.getTxLink() != null ? detailsTemplateTx : detailsTemplate);
     if (vm.getLocation()!=null) {
-      t.add("path", stripId(makeLocal(vm.getLocation())+lineCol(vm)));
+      t.add("path", makeBreakable(stripId(makeLocal(vm.getLocation())+lineCol(vm))));
       t.add("pathlink", vm.getLocationLink());
     } else {
       t.add("path", "");
@@ -1147,6 +1148,14 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("msgdetails", vm.isSlicingHint() ? vm.getSliceHtml() : vm.getHtml());
     t.add("tx", "qa-tx.html#l"+vm.getTxLink());
     return t.render();
+  }
+
+  private Object makeBreakable(String path) {
+    if (path == null || path.length() < MAX_PATH_LENGTH_NO_BREAK) {
+      return path;
+    } else {
+      return path.replace("#", "&#8203;#").replace(".", "&#8203;.").replace("/", "&#8203;/");
+    }
   }
 
   private boolean isNewRule(ValidationMessage vm) {
