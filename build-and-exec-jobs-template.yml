@@ -1,3 +1,10 @@
+resources:
+  repositories:
+    - repository: IgRepo # The name used to reference this repository in the checkout step
+      type: github
+      endpoint: MyGitHubServiceConnection
+      name: FHIR/fhir-tools-ig
+      
 jobs:
   - ${{ each execTest in parameters.execTests }}:
       - job:
@@ -7,12 +14,6 @@ jobs:
         pool:
           vmImage: ${{execTest.vmImage}}
 
-        resources:
-          repositories:
-            - repository: IgRepo # The name used to reference this repository in the checkout step
-              type: github
-              endpoint: MyGitHubServiceConnection
-              name: FHIR/fhir-tools-ig
 
         variables:
           currentImage: ${{execTest.vmImage}}
