@@ -14,8 +14,7 @@ jobs:
           JAVA_TOOL_OPTIONS: ${{execTest.javaToolOptions}}
 
         steps:
-          - checkout: self
-          - checkout: IgRepo
+
           # Runs 'mvn clean package'
           - task: Maven@3
             inputs:
@@ -27,6 +26,11 @@ jobs:
               publishJUnitResults: true
               testResultsFiles: '**/surefire-reports/TEST-*.xml'
               goals: 'package'
+
+          - task: Bash@3
+            inputs:
+            targetType: 'inline'
+            script: mkdir -p $(Pipeline.Workspace)/target-ig; git clone https://github.com/FHIR/fhir-tools-ig.git $(Pipeline.Workspace)/target-ig
 
           - task: Maven@3
             inputs:
