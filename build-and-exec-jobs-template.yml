@@ -20,11 +20,11 @@ jobs:
               versionSpec: '>= 3.0'
 
           - script: |
-              gem install bundler
+              gem install jekyll bundler
               bundle init
               bundle update --bundler
               bundle install --retry=3 --jobs=4
-            displayName: 'bundle install'
+            displayName: 'jekyll install'
 
           # Runs 'mvn clean package'
           - task: Maven@3
