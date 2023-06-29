@@ -30,7 +30,7 @@ jobs:
           javaToolOptions:
   - template: build-and-exec-jobs-template.yml
     parameters:
-      execTest:
+      execTests:
         - displayName: fhir-tools-ig-exec
           vmImage: ubuntu-latest
           jdkVersion: 1.11

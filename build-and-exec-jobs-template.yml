@@ -1,11 +1,11 @@
 jobs:
-  - ${{ each image in parameters.images }}:
+  - ${{ each execTest in parameters.execTests }}:
       - job:
 
-        displayName: ${{image.displayName}}
+        displayName: ${{execTest.displayName}}
         
         pool:
-          vmImage: ${{image.vmImage}}
+          vmImage: ${{execTest.vmImage}}
 
         resources:
           repositories:
@@ -15,9 +15,9 @@ jobs:
               name: FHIR/fhir-tools-ig
 
         variables:
-          currentImage: ${{image.vmImage}}
+          currentImage: ${{execTest.vmImage}}
           VERSION:
-          JAVA_TOOL_OPTIONS: ${{image.javaToolOptions}}
+          JAVA_TOOL_OPTIONS: ${{execTest.javaToolOptions}}
 
         steps:
           - checkout: self
@@ -28,7 +28,7 @@ jobs:
               mavenPomFile: 'pom.xml'
               mavenOptions: '-Xmx3072m'
               javaHomeOption: 'JDKVersion'
-              jdkVersionOption: '${{image.jdkVersion}}'
+              jdkVersionOption: '${{execTest.jdkVersion}}'
               jdkArchitectureOption: 'x64'
               publishJUnitResults: true
               testResultsFiles: '**/surefire-reports/TEST-*.xml'
@@ -39,7 +39,7 @@ jobs:
               mavenPomFile: 'pom.xml'
               mavenOptions: '-Xmx3072m'
               javaHomeOption: 'JDKVersion'
-              jdkVersionOption: '${{image.jdkVersion}}'
+              jdkVersionOption: '${{execTest.jdkVersion}}'
               jdkArchitectureOption: 'x64'
               options: '-pl org.hl7.fhir.publisher.cli'
               publishJUnitResults: false
