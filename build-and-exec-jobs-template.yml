@@ -39,7 +39,7 @@ jobs:
               javaHomeOption: 'JDKVersion'
               jdkVersionOption: '${{execTest.jdkVersion}}'
               jdkArchitectureOption: 'x64'
-              options: '-pl org.hl7.fhir.publisher.cli'
+              options: '-pl org.hl7.fhir.publisher.cli -Dpublisher.cli.exec.target-ig="$(Pipeline.Workspace)/target-ig"'
               publishJUnitResults: false
               testResultsFiles: '**/surefire-reports/TEST-*.xml'
-              goals: 'exec:exec'
+              goals: 'org.codehaus.mojo:exec-maven-plugin:exec@target-ig-cli'
