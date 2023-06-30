@@ -50,9 +50,6 @@ public class SuppressedMessageInformation {
     }
     
     public void use() {
-      if (messageRaw.contains("C57134")) {
-        System.out.println("!"); // #FIXME
-      }
       useCount++;
     }
 
