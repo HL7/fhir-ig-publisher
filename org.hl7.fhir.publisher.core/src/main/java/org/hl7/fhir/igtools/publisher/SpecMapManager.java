@@ -293,9 +293,9 @@ public class SpecMapManager {
   }
   
   public boolean hasTarget1(String tgt) {
-    if (tgt.startsWith(base+"/"))
+    if (base != null && tgt.startsWith(base+"/"))
       tgt = tgt.substring(base.length()+1);
-    else if (tgt.startsWith(base))
+    else if (base != null && tgt.startsWith(base))
       tgt = tgt.substring(base.length());
     else
       return false;
@@ -307,7 +307,7 @@ public class SpecMapManager {
       return true;
     if (targetSet.contains(tgt))
       return true;
-    if (paths.has(base+"/"+tgt))
+    if (base != null && paths.has(base+"/"+tgt))
       return true;
     return false;  
   }

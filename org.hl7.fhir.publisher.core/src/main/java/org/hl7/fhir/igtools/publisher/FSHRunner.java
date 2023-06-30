@@ -1,5 +1,7 @@
 package org.hl7.fhir.igtools.publisher;
 
+import com.google.common.collect.ImmutableList;
+import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
 import org.apache.commons.exec.ExecuteWatchdog;
 import org.apache.commons.exec.PumpStreamHandler;
@@ -10,12 +12,17 @@ import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.settings.FhirSettings;
 
+import javax.annotation.Nonnull;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Consumer;
+import java.util.StringJoiner;
 
 public class FSHRunner {
 
@@ -58,31 +65,28 @@ public class FSHRunner {
         log("Run Sushi on "+file.getAbsolutePath());
         DefaultExecutor exec = new DefaultExecutor();
         exec.setExitValue(0);
-        MySushiHandler pumpHandler = new MySushiHandler();
+        MySushiHandler pumpHandler = new MySushiHandler(this::log);
         PumpStreamHandler pump = new PumpStreamHandler(pumpHandler);
         exec.setStreamHandler(pump);
         exec.setWorkingDirectory(file);
         ExecuteWatchdog watchdog = new ExecuteWatchdog(fshTimeout);
         exec.setWatchdog(watchdog);
-
-        //FIXME This construction is a mess, and should use CommandLine(...).addArgument(...) construction. -Dotasek
-        String cmd = fshVersion == null ? "sushi" : "npx fsh-sushi@"+fshVersion;
-        if (mode == Publisher.IGBuildMode.PUBLICATION || mode == Publisher.IGBuildMode.AUTOBUILD) {
-            cmd += " --require-latest";
-        }
+        
         try {
+            final String execString;
             if (SystemUtils.IS_OS_WINDOWS) {
-                exec.execute(org.apache.commons.exec.CommandLine.parse("cmd /C "+cmd+" . -o ."));
+                exec.execute(getWindowsCommandLine(fshVersion, mode));
             } else if (FhirSettings.hasNpmPath()) {
-                ProcessBuilder processBuilder = new ProcessBuilder(new String("bash -c "+cmd));
+                ProcessBuilder processBuilder = new ProcessBuilder(new String("bash -c "+ getSushiCommandString(fshVersion,mode)));
                 Map<String, String> env = processBuilder.environment();
                 Map<String, String> vars = new HashMap<>();
                 vars.putAll(env);
                 String path = FhirSettings.getNpmPath()+":"+env.get("PATH");
                 vars.put("PATH", path);
-                exec.execute(org.apache.commons.exec.CommandLine.parse("bash -c "+cmd+" . -o ."), vars);
+
+                exec.execute(getNpmPathCommandLine(fshVersion, mode), vars);
             } else {
-                exec.execute(org.apache.commons.exec.CommandLine.parse(cmd+" . -o ."));
+                exec.execute(getDefaultCommandLine(fshVersion, mode));
             }
         } catch (IOException ioex) {
             log("Sushi couldn't be run. Complete output from running Sushi : " + pumpHandler.getBufferString());
@@ -94,45 +98,97 @@ public class FSHRunner {
             log("Exception: "+ioex.getMessage());
             throw ioex;
         }
-        if (pumpHandler.errorCount > 0) {
+        if (pumpHandler.getErrorCount() > 0) {
             throw new IOException("Sushi failed with errors. Complete output from running Sushi : " + pumpHandler.getBufferString());
         }
     }
 
-    public class MySushiHandler extends OutputStream {
 
-        private byte[] buffer;
-        private int length;
+    @Nonnull
+    protected CommandLine getDefaultCommandLine(String fshVersion, Publisher.IGBuildMode mode) {
+        final List<String> sushiCommandList = getSushiCommandList(fshVersion, mode);
+        CommandLine commandLine = new CommandLine(sushiCommandList.get(0));
+        for (int i = 1; i < sushiCommandList.size(); i++) {
+            commandLine.addArgument(sushiCommandList.get(i));
+        }
+        commandLine.addArgument(".").addArgument("-o").addArgument(".");
+        return commandLine;
+    }
+
+    @Nonnull
+    protected CommandLine getNpmPathCommandLine(String fshVersion, Publisher.IGBuildMode mode) {
+        CommandLine commandLine = new CommandLine("bash").addArgument("-c");
+        for (String argument : getSushiCommandList(fshVersion,mode)) {
+            commandLine.addArgument(argument);
+        }
+        commandLine.addArgument(".").addArgument("-o").addArgument(".");
+        return commandLine;
+    }
+
+    @Nonnull
+    protected CommandLine getWindowsCommandLine(String fshVersion, Publisher.IGBuildMode mode) {
+        CommandLine commandLine = new CommandLine("cmd").addArgument("/C");
+        for (String argument : getSushiCommandList(fshVersion,mode)) {
+            commandLine.addArgument(argument);
+        }
+        commandLine.addArgument(".").addArgument("-o").addArgument(".");
+        return commandLine;
+    }
+
+    protected List<String> getSushiCommandList(String fshVersion, Publisher.IGBuildMode mode) {
+        final List<String> cmd = fshVersion == null ? List.of("sushi"): List.of("npx", "fsh-sushi@"+fshVersion);
+        if (mode == Publisher.IGBuildMode.PUBLICATION || mode == Publisher.IGBuildMode.AUTOBUILD) {
+            return new ImmutableList.Builder<String>().addAll(cmd).add("--require-latest").build();
+        }
+        return cmd;
+    }
+    protected String getSushiCommandString(String fshVersion, Publisher.IGBuildMode mode) {
+
+        StringJoiner stringJoiner = new StringJoiner(" ");
+        for (String argument : getSushiCommandList(fshVersion,mode)) {
+            stringJoiner.add(argument);
+        }
+        return stringJoiner.toString();
+    }
+  
+    public static class MySushiHandler extends OutputStream {
+
+        private final StringBuilder buffer;
         private int errorCount = -1;
+        private final Consumer<String> outputConsumer;
 
-        public MySushiHandler() {
-            buffer = new byte[256];
+        public MySushiHandler(final Consumer<String> outputConsumer) {
+            buffer = new StringBuilder(256);
+            this.outputConsumer = Objects.requireNonNull(outputConsumer);
         }
 
         public String getBufferString() {
-            return new String(this.buffer, 0, length);
+            return this.buffer.toString();
         }
 
         private boolean passSushiFilter(String s) {
-            if (Utilities.noString(s))
+            if (Utilities.noString(s) || s.isBlank())
                 return false;
             return true;
         }
 
         @Override
         public void write(int b) throws IOException {
-            buffer[length] = (byte) b;
-            length++;
+            this.buffer.appendCodePoint(b);
             if (b == 10) { // eoln
-                String s = new String(buffer, 0, length);
+                final String s = this.getBufferString();
                 if (passSushiFilter(s)) {
-                    log("Sushi: "+ StringUtils.stripEnd(s, null));
+                    this.outputConsumer.accept("Sushi: "+ StringUtils.stripEnd(s, null));
                     if (s.trim().startsWith("Errors:")) {
                         errorCount = Integer.parseInt(s.substring(10).trim());
                     }
                 }
-                length = 0;
+                this.buffer.setLength(0);
             }
+        }
+
+        protected int getErrorCount() {
+            return errorCount;
         }
     }
 }

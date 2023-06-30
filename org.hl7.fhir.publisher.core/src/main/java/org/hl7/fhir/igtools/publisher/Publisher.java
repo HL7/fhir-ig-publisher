@@ -2341,6 +2341,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (parts[2].equals("uv")) {
         igrealm = "uv";
         return new Coding("http://unstats.un.org/unsd/methods/m49/m49.htm", "001", "World");
+      } else if (parts[2].equals("eu")) {
+        igrealm = "eu";
+        return new Coding("http://unstats.un.org/unsd/methods/m49/m49.htm", "150", "Europe");
       } else {
         igrealm = parts[2];
         return new Coding("urn:iso:std:iso:3166", parts[2].toUpperCase(), null);
@@ -2357,9 +2360,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     return Utilities.noString(dir) ? getCurentDirectory() : dir;
   }
-
-
-
 
 
   private void initializeTemplate() throws IOException {
@@ -4237,6 +4237,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       throw new Error("Error generating build: the file "+path+" is being generated more than once (may differ by case)");
     allOutputs.add(s);
 
+    if (path.contains(":")) {
+      System.out.println("!");
+    }
     outputTracker.add(path);
     File f = new CSFile(path);
     byte[] existing = null;
@@ -5667,11 +5670,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void checkJurisdiction(FetchedFile f, CanonicalResource resource, IssueSeverity error, String verb) {
     if (expectedJurisdiction != null) {
       boolean ok = false;
+      CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
       for (CodeableConcept cc : resource.getJurisdiction()) {
         ok = ok || cc.hasCoding(expectedJurisdiction);
+        b.append(cc.toString());
       }
       if (!ok) {
-        f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, resource.fhirType()+".jurisdiction", "The resource "+verb+" declare its jurisdiction to match the package id ("+npmName+", jurisdiction = "+expectedJurisdiction.toString()+") (for sushi-config.yaml: 'jurisdiction: "+toFSH(expectedJurisdiction)+"')",
+        f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, resource.fhirType()+".jurisdiction", 
+            "The resource "+verb+" declare its jurisdiction to match the package id ("+npmName+", jurisdiction = "+expectedJurisdiction.toString()+
+            (Utilities.noString(b.toString()) ? "" : " instead of or as well as "+b.toString())+
+            ") (for Sushi users: in sushi-config.yaml, 'jurisdiction: "+toFSH(expectedJurisdiction)+"')",
             error).setMessageId(PublisherMessageIds.RESOURCE_JURISDICTION_MISMATCH));
       }
     }
