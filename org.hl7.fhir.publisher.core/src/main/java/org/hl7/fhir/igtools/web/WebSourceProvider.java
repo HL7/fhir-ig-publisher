@@ -137,7 +137,7 @@ public class WebSourceProvider {
   }
 
   public void cleanFolder(String path) throws IOException {
-    File df = new File(Utilities.path(destination, path));
+    File df = new File(path == null ? destination : Utilities.path(destination, path));
 
     if (web) {      
       Path target = Path.of(df.getAbsolutePath());
@@ -193,7 +193,7 @@ public class WebSourceProvider {
     if (web) {
       StringBuilder b = new StringBuilder();
       for (String s : existingFiles) {
-        b.append(Utilities.path(existingFilesBase, s)); 
+        b.append(existingFilesBase == null ? s : Utilities.path(existingFilesBase, s)); 
         b.append("\r\n");
       }
       TextFile.stringToFile(b.toString(), deleteFileName());
@@ -214,7 +214,7 @@ public class WebSourceProvider {
           for (String s : existingFiles) {
             count++;
             lineLength = doProgressNote(s, count, start, existingFiles.size(), lineLength);
-            ftp.delete(Utilities.path(existingFilesBase, s));
+            ftp.delete(existingFilesBase == null ? s : Utilities.path(existingFilesBase, s));
           }
         }
         System.out.println("Uploading");
