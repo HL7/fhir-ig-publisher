@@ -295,7 +295,7 @@ public class PublicationProcess {
 
     PublicationProcessMode mode = PublicationProcessMode.fromCode(prSrc.asString("mode"));
     boolean first = prSrc.asBoolean("first"); 
-    src.needOptionalFile(Utilities.path(relDest,"package-list.json"));
+    src.needOptionalFile(relDest == null ? "package-list.json" : Utilities.path(relDest,"package-list.json"));
     if (first) {
       if (new File(Utilities.path(destination, "package-list.json")).exists()) {
         check(res, false, "Package List already exists, but the publication request says this is the first publication");
