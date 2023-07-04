@@ -11365,7 +11365,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       System.out.println("the publisher also supports the param -proxy=[address]:[port] for if you use a proxy (stupid java won't pick up the system settings)");
       System.out.println("or you can configure the proxy using -Dhttp.proxyHost=<ip> -Dhttp.proxyPort=<port> -Dhttps.proxyHost=<ip> -Dhttps.proxyPort=<port>");
       System.out.println("");
-      System.out.println("For additional information, see http://wiki.hl7.org/index.php?title=Proposed_new_FHIR_IG_build_Process");
+      System.out.println("For additional information, see https://confluence.hl7.org/display/FHIR/IG+Publisher+Documentation");
     } else if (hasNamedParam(args, "-convert")) {
       // convert a igpack.zip to a package.tgz
       IGPack2NpmConvertor conv = new IGPack2NpmConvertor();
