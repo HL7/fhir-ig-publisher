@@ -4236,10 +4236,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (allOutputs.contains(s))
       throw new Error("Error generating build: the file "+path+" is being generated more than once (may differ by case)");
     allOutputs.add(s);
-
-    if (path.contains(":")) {
-      System.out.println("!");
-    }
     outputTracker.add(path);
     File f = new CSFile(path);
     byte[] existing = null;
