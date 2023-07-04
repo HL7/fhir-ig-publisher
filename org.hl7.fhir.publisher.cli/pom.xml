@@ -12,6 +12,8 @@
 
     <artifactId>org.hl7.fhir.publisher.cli</artifactId>
 
+
+
     <dependencies>
         <dependency>
             <groupId>org.hl7.fhir.publisher</groupId>
@@ -122,20 +124,40 @@
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.0.0</version>
                 <executions>
+                    <!-- This is the default execution (only prints out help) -->
+                    <!-- Usage: mvn exec:exec -pl org.hl7.fhir.publisher.cli -->
                     <execution>
                         <id>default-cli</id>
                         <goals>
                             <goal>exec</goal>
                         </goals>
                         <configuration>
-                            <executable>java</executable>
-                            <async>true</async>
-                            <asyncDestroyOnShutdown>true</asyncDestroyOnShutdown>
+                            <executable>${env.JAVA_HOME}/bin/java</executable>
+
+                            <workingDirectory>/tmp</workingDirectory>
+                            <arguments>
+                                <argument>-jar</argument>
+                                <argument>${basedir}/target/org.hl7.fhir.publisher.cli-${project.version}.jar</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <!-- This executes the publisher for a specified IG -->
+                    <!-- Usage: mvn org.codehaus.mojo:exec-maven-plugin:exec@target-ig-cli -pl org.hl7.fhir.publisher.cli -Dpublisher.cli.exec.target-ig="/path/to/my/ig/" -->
+                    <execution>
+                        <id>target-ig-cli</id>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>${env.JAVA_HOME}/bin/java</executable>
+
                             <!-- optional -->
                             <workingDirectory>/tmp</workingDirectory>
                             <arguments>
                                 <argument>-jar</argument>
                                 <argument>${basedir}/target/org.hl7.fhir.publisher.cli-${project.version}.jar</argument>
+                                <argument>-ig</argument>
+                                <argument>${publisher.cli.exec.target-ig}</argument>
                             </arguments>
                         </configuration>
                     </execution>
