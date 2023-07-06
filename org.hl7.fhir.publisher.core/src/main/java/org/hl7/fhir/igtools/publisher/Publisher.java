@@ -7282,7 +7282,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     System.out.print("Use = " + (runtime.totalMemory() - runtime.freeMemory()) / mb);
     System.out.print(", Free = " + runtime.freeMemory() / mb);
     System.out.print(", Total = " + runtime.totalMemory() / mb);
-    System.out.println(", Max =" + runtime.maxMemory() / mb);
+    System.out.println(", Max = " + runtime.maxMemory() / mb);
   }
 
   private void generatePackageVersion(String filename, String ver) throws IOException {
