@@ -19,6 +19,10 @@ jobs:
             inputs:
               versionSpec: '>= 3.0'
 
+          - script : |
+              ridk install 3
+            displayName: 'ridk for ruby install'
+
           - script: |
               gem install jekyll bundler
               bundle init
