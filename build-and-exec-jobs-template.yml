@@ -2,7 +2,7 @@ jobs:
   - ${{ each execTest in parameters.execTests }}:
       - job:
 
-        displayName: ${{execTest.displayName}}
+        displayName: Test publisher.jar exec on ${{execTest.igName}} ${{execTest.vmImage}}
         
         pool:
           vmImage: ${{execTest.vmImage}}
