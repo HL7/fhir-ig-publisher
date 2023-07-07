@@ -302,7 +302,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       b.append("<p>Complex Extension: "+html+"</p><ul>");
       for (ElementDefinition ed : subs) {
         ElementDefinition defn = (ElementDefinition) ed.getUserData("slice");
-        b.append("<li>"+(defn.getSliceName())+": "+ed.typeSummary()+": "+Utilities.stripPara(processMarkdown("ext-desc", defn.getDefinition()))+"</li>\r\n");
+        if (defn != null) {
+          b.append("<li>"+(defn.getSliceName())+": "+ed.typeSummary()+": "+Utilities.stripPara(processMarkdown("ext-desc", defn.getDefinition()))+"</li>\r\n");
+        }
       }
       b.append("</ul>");
       return b.toString();
