@@ -39,3 +39,7 @@ jobs:
           vmImage: ubuntu-latest
           jdkVersion: 1.11
           gitRepo: https://github.com/FirelyTeam/ACME-FSH-IG-Example.git
+        - displayName: ACME-FSH-IG-Example-win
+          vmImage: windows-latest
+          jdkVersion: 1.11
+          gitRepo: https://github.com/FirelyTeam/ACME-FSH-IG-Example.git
