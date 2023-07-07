@@ -31,11 +31,27 @@ jobs:
   - template: build-and-exec-jobs-template.yml
     parameters:
       execTests:
-        - displayName: fhir-tools-ig-exec
+        - igName: fhir-tools-ig-exec
           vmImage: ubuntu-latest
           jdkVersion: 1.11
           gitRepo: https://github.com/FHIR/fhir-tools-ig.git
-        - displayName: ACME-FSH-IG-Example
+        - igName: fhir-tools-ig-exec
+          vmImage: windows-latest
+          jdkVersion: 1.11
+          gitRepo: https://github.com/FHIR/fhir-tools-ig.git
+        - igName: fhir-tools-ig-exec
+          vmImage: macos-latest
+          jdkVersion: 1.11
+          gitRepo: https://github.com/FHIR/fhir-tools-ig.git
+        - igName: ACME-FSH-IG-Example
           vmImage: ubuntu-latest
+          jdkVersion: 1.11
+          gitRepo: https://github.com/FirelyTeam/ACME-FSH-IG-Example.git
+        - igName: ACME-FSH-IG-Example
+          vmImage: windows-latest
+          jdkVersion: 1.11
+          gitRepo: https://github.com/FirelyTeam/ACME-FSH-IG-Example.git
+        - igName: ACME-FSH-IG-Example
+          vmImage: macos-latest
           jdkVersion: 1.11
           gitRepo: https://github.com/FirelyTeam/ACME-FSH-IG-Example.git

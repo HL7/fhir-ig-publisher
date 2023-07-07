@@ -2,7 +2,7 @@ jobs:
   - ${{ each execTest in parameters.execTests }}:
       - job:
 
-        displayName: ${{execTest.displayName}}
+        displayName: Test publisher.jar exec on ${{execTest.igName}} ${{execTest.vmImage}}
         
         pool:
           vmImage: ${{execTest.vmImage}}
@@ -18,6 +18,11 @@ jobs:
           - task: UseRubyVersion@0
             inputs:
               versionSpec: '>= 3.0'
+
+          - script : |
+              ridk install 3
+            condition: eq( variables['Agent.OS'], 'Windows_NT' )
+            displayName: 'ridk for ruby install'
 
           - script: |
               gem install jekyll bundler
@@ -48,7 +53,7 @@ jobs:
             displayName: 'Clone target IG'
             inputs:
               targetType: 'inline'
-              script: mkdir -p $(Pipeline.Workspace)/target-ig; git clone ${{execTest.gitRepo}} $(Pipeline.Workspace)/target-ig
+              script: mkdir -p $(Pipeline.Workspace)/target-ig; git clone ${{execTest.gitRepo}} "$(Pipeline.Workspace)/target-ig"
 
           - task: Maven@3
             displayName: 'Run IG Publisher with IG'
