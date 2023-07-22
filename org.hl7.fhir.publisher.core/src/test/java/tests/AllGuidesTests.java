@@ -49,16 +49,13 @@ private static final String VER = "1.0.53";
     
     System.out.println("===== Analysis ======================================================================");
     // to make diff programs easy to run
-    IOUtils.copy(new FileInputStream(Utilities.path(FhirSettings.getTestIgsPath(), id, "output", "qa.json")), new FileOutputStream(Utilities.path(FhirSettings.getTestIgsPath(), "records", id+"-qa-gen.json")));
-    IOUtils.copy(new FileInputStream(Utilities.path(FhirSettings.getTestIgsPath(), id, "output", "qa.html")), new FileOutputStream(Utilities.path(FhirSettings.getTestIgsPath(), "records", id+"-qa-gen.html")));
-    if (new File(Utilities.path(FhirSettings.getTestIgsPath(), id, "output", "qa.txt")).exists()) {
-      IOUtils.copy(new FileInputStream(Utilities.path(FhirSettings.getTestIgsPath(), id, "output", "qa.txt")), new FileOutputStream(Utilities.path(FhirSettings.getTestIgsPath(), "records", id+"-qa-gen.txt")));
-    }
+    IOUtils.copy(new FileInputStream(Utilities.path(FhirSettings.getTestIgsPath(), id, "output", "qa.json")), new FileOutputStream(Utilities.path(FhirSettings.getTestIgsPath(), "records", "json", id+"-new.json")));
+    IOUtils.copy(new FileInputStream(Utilities.path(FhirSettings.getTestIgsPath(), id, "output", "qa.txt")), new FileOutputStream(Utilities.path(FhirSettings.getTestIgsPath(), "records", id+"-new.txt")));
     
     JsonObject current = JsonParser.parseObject(new FileInputStream(Utilities.path(FhirSettings.getTestIgsPath(), id, "output", "qa.json")));
     JsonObject previous = null;
-    if (new File(Utilities.path(FhirSettings.getTestIgsPath(), "records", id+"-qa.json")).exists()) {
-      previous = JsonParser.parseObject(new FileInputStream(Utilities.path(FhirSettings.getTestIgsPath(), "records", id+"-qa.json")));
+    if (new File(Utilities.path(FhirSettings.getTestIgsPath(), "records", "json", id+"-old.json")).exists()) {
+      previous = JsonParser.parseObject(new FileInputStream(Utilities.path(FhirSettings.getTestIgsPath(), "records", "json", id+"-old.json")));
     } else {
       previous = new JsonObject();      
     }
