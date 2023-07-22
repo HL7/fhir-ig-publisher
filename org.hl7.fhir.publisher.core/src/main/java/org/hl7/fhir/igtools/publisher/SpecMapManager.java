@@ -185,7 +185,16 @@ public class SpecMapManager {
       }
       case Examples:
         return str(spec, "webUrl")+"/"+rt.toLowerCase()+"-"+id.toLowerCase()+".html";
-      case DICOM: return url;
+      case DICOM:
+        try {
+          if (pi.hasFile("package", Utilities.urlTail(url)+"json") || pi.hasCanonical(url)) {
+            return url;
+          } else {
+            return null;
+          }
+        } catch (IOException e) {
+          return null;
+        }
       }
     }
     if (url.matches(Constants.URI_REGEX)) {
