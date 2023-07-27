@@ -354,7 +354,6 @@ import org.hl7.fhir.utilities.xhtml.XhtmlParser;
 import org.hl7.fhir.utilities.xml.XMLUtil;
 import org.hl7.fhir.utilities.xml.XmlEscaper;
 import org.hl7.fhir.validation.ValidatorUtils;
-import org.hl7.fhir.validation.codesystem.CodeSystemValidator;
 import org.hl7.fhir.validation.instance.InstanceValidator;
 import org.hl7.fhir.validation.instance.utils.ValidatorHostContext;
 import org.hl7.fhir.validation.profile.ProfileValidator;
@@ -1059,6 +1058,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       PrintStream f = new PrintStream(new FileOutputStream(path));
       String title = "Terminology Server Log";
       f.println("<html><head><title>"+title+"</title></head><body><h2>"+title+"</h2><pre>");
+      for (String s : tx.split("\\r?\\n|\\r")) {
+        if (s.startsWith("---") && s.endsWith("---")) {
+          f.println("</pre><hr/>");
+          String id = s.replace("-", "").trim();
+          f.println("<a name=\"l"+id+"\"> </a><h3>"+id+"</h3>");
+          f.println("<pre>");
+        } else {
+          f.println(s);
+        }
+      }
       f.print(tx);
       f.println("</pre></head></html>");
       f.close();
@@ -11321,14 +11330,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         NpmPackage npm = pcm.loadPackage(p);
         System.out.println("OK: "+npm.name()+"#"+npm.version()+" for FHIR version(s) "+npm.fhirVersionList()+" with canonical "+npm.canonical());
       }
-    } else if (hasNamedParam(args, "-dicom-gen")) {
-      DicomPackageBuilder pgen = new DicomPackageBuilder();
-      pgen.setSource(getNamedParam(args, "src"));
-      pgen.setDest(getNamedParam(args, "dst"));
-      if (hasNamedParam(args, "-pattern")) {
-        pgen.setPattern(getNamedParam(args, "-pattern"));
-      }
-      pgen.execute();
+//    } else if (hasNamedParam(args, "-dicom-gen")) {
+//      DicomPackageBuilder pgen = new DicomPackageBuilder();
+//      pgen.setSource(getNamedParam(args, "src"));
+//      pgen.setDest(getNamedParam(args, "dst"));
+//      if (hasNamedParam(args, "-pattern")) {
+//        pgen.setPattern(getNamedParam(args, "-pattern"));
+//      }
+//      pgen.execute();
     } else if (hasNamedParam(args, "-help") || hasNamedParam(args, "-?") || hasNamedParam(args, "/?") || hasNamedParam(args, "?") || args.length == 0) {
       System.out.println("");
       System.out.println("To use this publisher to publish a FHIR Implementation Guide, run ");
@@ -11372,16 +11381,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       System.out.println("or you can configure the proxy using -Dhttp.proxyHost=<ip> -Dhttp.proxyPort=<port> -Dhttps.proxyHost=<ip> -Dhttps.proxyPort=<port>");
       System.out.println("");
       System.out.println("For additional information, see https://confluence.hl7.org/display/FHIR/IG+Publisher+Documentation");
-    } else if (hasNamedParam(args, "-convert")) {
-      // convert a igpack.zip to a package.tgz
-      IGPack2NpmConvertor conv = new IGPack2NpmConvertor();
-      conv.setSource(getNamedParam(args, "-source"));
-      conv.setDest(getNamedParam(args, "-dest"));
-      conv.setPackageId(getNamedParam(args, "-npm-name"));
-      conv.setVersionIg(getNamedParam(args, "-version"));
-      conv.setLicense(getNamedParam(args, "-license"));
-      conv.setWebsite(getNamedParam(args, "-website"));
-      conv.execute();
+//    } else if (hasNamedParam(args, "-convert")) {
+//      // convert a igpack.zip to a package.tgz
+//      IGPack2NpmConvertor conv = new IGPack2NpmConvertor();
+//      conv.setSource(getNamedParam(args, "-source"));
+//      conv.setDest(getNamedParam(args, "-dest"));
+//      conv.setPackageId(getNamedParam(args, "-npm-name"));
+//      conv.setVersionIg(getNamedParam(args, "-version"));
+//      conv.setLicense(getNamedParam(args, "-license"));
+//      conv.setWebsite(getNamedParam(args, "-website"));
+//      conv.execute();
     } else if (hasNamedParam(args, "-delete-current")) {
       if (!args[0].equals("-delete-current")) {
         throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history} (first argument is not -delete-current)");
@@ -11549,7 +11558,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         self.setSourceDir(getNamedParam(args, "-source"));
         self.setDestDir(getNamedParam(args, "-destination"));
         self.specifiedVersion = getNamedParam(args, "-version");
-      } else if(!hasNamedParam(args, "-ig") && args.length == 1 && new File(args[0]).exists()) {
+      } else if (!hasNamedParam(args, "-ig") && args.length == 1 && new File(args[0]).exists()) {
         self.setConfigFile(determineActualIG(args[0], IGBuildMode.MANUAL));
       } else if (hasNamedParam(args, "-prompt")) {
         IniFile ini = new IniFile("publisher.ini");
