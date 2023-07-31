@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Locale;
 
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
+import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.Manager;
@@ -205,7 +207,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   }
 
   @Override
-  public boolean resolveURL(IResourceValidator validator, Object appContext, String path, String url, String type) throws IOException {
+  public boolean resolveURL(IResourceValidator validator, Object appContext, String path, String url, String type, boolean canonical) throws IOException {
     String u = url;
     String v = null;
     if (url.contains("|")) {
@@ -239,6 +241,15 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
       }
     }
 
+    if (url.startsWith(ipg.getCanonical())) {
+      for (FetchedFile f : files) {
+        for (FetchedResource r: f.getResources()) {
+          if (Utilities.pathURL(ipg.getCanonical(), r.fhirType(), r.getId()).equals(url) && (!canonical || VersionUtilities.getCanonicalResourceNames(context.getVersion()).contains(r.fhirType()))) {
+            return true;
+          }
+        }
+      }
+    }
     for (NamingSystem ns : context.fetchResourcesByType(NamingSystem.class)) {
       if (hasURL(ns, u)) {
         // ignore the version?
