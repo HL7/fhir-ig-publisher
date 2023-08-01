@@ -677,7 +677,7 @@ public class HTMLInspector {
      }
     
     if (!resolved) {
-      if (rref.startsWith("http://") || rref.startsWith("https://") || rref.startsWith("ftp://") || rref.startsWith("tel:")) {
+      if (rref.startsWith("http://") || rref.startsWith("https://") || rref.startsWith("ftp://") || rref.startsWith("tel:") || rref.startsWith("urn:")) {
         resolved = true;
         if (specs != null) {
           for (SpecMapManager spec : specs) {

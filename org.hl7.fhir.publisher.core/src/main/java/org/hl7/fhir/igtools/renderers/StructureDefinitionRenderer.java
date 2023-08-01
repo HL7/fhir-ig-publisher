@@ -1501,7 +1501,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private String describeObligations(ElementDefinition d, boolean root) throws IOException {
     ObligationsRenderer obr = new ObligationsRenderer(corePath, sd, d.getPath(), gen, this, sdr);
-    obr.seeObligations(d.getExtension());
+    obr.seeObligations(d.getExtensionsByUrl(ToolingExtensions.EXT_OBLIGATION));
+    obr.seeRootObligations(d.getId(), sd.getExtensionsByUrl(ToolingExtensions.EXT_OBLIGATION));
     if (obr.hasObligations() || (root && (sd.hasExtension(ToolingExtensions.EXT_OBLIGATION_PROFILE_FLAG) || sd.hasExtension(ToolingExtensions.EXT_OBLIGATION_INHERITS)))) {
       StringBuilder s = new StringBuilder();
       XhtmlNode ul = new XhtmlNode(NodeType.Element, "ul");

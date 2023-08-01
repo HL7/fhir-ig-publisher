@@ -22,6 +22,8 @@ package org.hl7.fhir.igtools.publisher;
 
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -185,7 +187,19 @@ public class SpecMapManager {
       }
       case Examples:
         return str(spec, "webUrl")+"/"+rt.toLowerCase()+"-"+id.toLowerCase()+".html";
-      case DICOM: return url;
+      case DICOM:
+        try {
+          final String fileName = Utilities.urlTail(url) + "json";
+
+          if ((isValidFilename(fileName) && pi.hasFile("package", fileName))
+                  || pi.hasCanonical(url)) {
+            return url;
+          } else {
+            return null;
+          }
+        } catch (IOException e) {
+          return null;
+        }
       }
     }
     if (url.matches(Constants.URI_REGEX)) {
@@ -203,6 +217,15 @@ public class SpecMapManager {
     }
     
     return null;
+  }
+
+  public boolean isValidFilename(String filename) {
+    try {
+      Paths.get(filename);
+    } catch (InvalidPathException e) {
+      return false;
+    }
+    return true;
   }
 
   // hack around things missing in spec.internals 

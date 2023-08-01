@@ -21,6 +21,7 @@ package org.hl7.fhir.igtools.ui;
  */
 
 
+import javax.swing.*;
 import java.awt.EventQueue;
 import java.io.IOException;
 
@@ -32,9 +33,14 @@ public class GraphicalPublisher {
    * Launch the application.
    */
   public static void main(String[] args) {
+    launchUI();
+  }
+
+  public static void launchUI() {
     EventQueue.invokeLater(new Runnable() {
       public void run() {
         try {
+          UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
           GraphicalPublisher window = new GraphicalPublisher();
           window.frame.setVisible(true);
         } catch (Exception e) {

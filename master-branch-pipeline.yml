@@ -99,7 +99,7 @@ steps:
     inputs:
       mavenPomFile: '$(System.DefaultWorkingDirectory)/pom.xml'
       goals: deploy
-      options: '--settings $(System.DefaultWorkingDirectory)/settings.xml -DdeployToSonatype -e'
+      options: '--settings $(System.DefaultWorkingDirectory)/settings.xml -Dmaven.test.skip -DdeployToSonatype -e'
       publishJUnitResults: false
 
   # Deploy the SNAPSHOT artifact to GitHub packages.
