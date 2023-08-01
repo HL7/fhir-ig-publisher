@@ -20,7 +20,6 @@ package org.hl7.fhir.igtools.publisher;
  * #L%
  */
 
-import java.awt.EventQueue;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -63,7 +62,6 @@ import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-import javax.swing.UIManager;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -76,7 +74,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
-import org.apache.xmlbeans.XmlOptionCharEscapeMap;
+
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_10_50;
@@ -85,7 +83,7 @@ import org.hl7.fhir.convertors.factory.VersionConvertorFactory_14_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_43_50;
-import org.hl7.fhir.convertors.misc.DicomPackageBuilder;
+
 import org.hl7.fhir.convertors.misc.NpmPackageVersionConverter;
 import org.hl7.fhir.convertors.txClient.TerminologyClientFactory;
 import org.hl7.fhir.exceptions.DefinitionException;
@@ -318,9 +316,7 @@ import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.ZipGenerator;
 import org.hl7.fhir.utilities.i18n.I18nConstants;
 import org.hl7.fhir.utilities.i18n.JsonLangFileProducer;
-import org.hl7.fhir.utilities.i18n.JsonLangFileProducer.JsonLangProducerSession;
-import org.hl7.fhir.utilities.i18n.LanguageFileProducer.LanguageProducerLanguageSession;
-import org.hl7.fhir.utilities.i18n.LanguageFileProducer.LanguageProducerSession;
+
 import org.hl7.fhir.utilities.i18n.LanguageFileProducer.TranslationUnit;
 import org.hl7.fhir.utilities.i18n.PoGetTextProducer;
 import org.hl7.fhir.utilities.i18n.XLIFFProducer;
@@ -11173,17 +11169,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private static void runGUI() throws InterruptedException, InvocationTargetException {
-    EventQueue.invokeLater(new Runnable() {
-      public void run() {
-        try {
-          UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-          GraphicalPublisher window = new GraphicalPublisher();
-          window.frame.setVisible(true);
-        } catch (Exception e) {
-          e.printStackTrace();
-        }
-      }
-    });
+    GraphicalPublisher.launchUI();
   }
 
   public void setTxServer(String s) {
