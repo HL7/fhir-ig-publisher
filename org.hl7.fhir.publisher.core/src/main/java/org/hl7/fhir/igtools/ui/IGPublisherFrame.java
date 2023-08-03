@@ -21,8 +21,7 @@ package org.hl7.fhir.igtools.ui;
  */
 
 
-import java.awt.Desktop;
-import java.awt.Toolkit;
+import java.awt.*;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.ActionEvent;
@@ -46,13 +45,24 @@ import org.hl7.fhir.utilities.settings.FhirSettings;
 public class IGPublisherFrame extends javax.swing.JFrame {
 
   private static final String LOG_PREFIX = "--$%^^---";
-  
+
+  JCheckBox noValidateCheckbox;
+  JCheckBox noNarrativeCheckbox;
+
+  JCheckBox noSushiCheckbox;
+
+  JCheckBox debugCheckbox;
+
   private javax.swing.JButton executeButton;
   private javax.swing.JButton chooseIGButton;
   private javax.swing.JButton debugSummaryButton;
   private javax.swing.JButton viewQAButton;
   private javax.swing.JButton viewIgButton;
-  private javax.swing.JPanel mainPanel;
+
+  private javax.swing.JPanel optionsPanel;
+  private javax.swing.JPanel resultPanel;
+
+
   private javax.swing.JTextArea txtLogTextArea;
   private javax.swing.JComboBox<String> igNameComboBox;
   private javax.swing.JToolBar mainToolBar;
@@ -86,7 +96,32 @@ public class IGPublisherFrame extends javax.swing.JFrame {
       }
     });
 
-    mainPanel = new javax.swing.JPanel();
+    optionsPanel = new javax.swing.JPanel();
+
+    javax.swing.GroupLayout optionsPanelLayout = new javax.swing.GroupLayout(optionsPanel );
+    optionsPanel.setLayout(optionsPanelLayout);
+
+    optionsPanelLayout.setHorizontalGroup(
+            optionsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(optionsPanelLayout.createSequentialGroup()
+                            .addContainerGap()
+                            .addComponent(noValidateCheckbox)
+                            .addComponent(noNarrativeCheckbox)
+                            .addComponent(noSushiCheckbox)
+                            .addComponent(debugCheckbox)
+                            .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+    );
+    optionsPanelLayout.setVerticalGroup(
+            optionsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(optionsPanelLayout.createParallelGroup()
+                            .addComponent(noValidateCheckbox)
+                            .addComponent(noNarrativeCheckbox)
+                            .addComponent(noSushiCheckbox)
+                            .addComponent(debugCheckbox)
+                            .addGap(0, 13, Short.MAX_VALUE))
+    );
+
+
 
     setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
@@ -98,20 +133,22 @@ public class IGPublisherFrame extends javax.swing.JFrame {
     mainToolBar.add(chooseIGButton);
     mainToolBar.add(igNameComboBox);
 
-    javax.swing.GroupLayout mainPanelLayout = new javax.swing.GroupLayout(mainPanel);
-    mainPanel.setLayout(mainPanelLayout);
-    mainPanelLayout.setHorizontalGroup(
-        mainPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-        .addGroup(mainPanelLayout.createSequentialGroup()
+
+    resultPanel = new javax.swing.JPanel();
+    javax.swing.GroupLayout resultPanelLayout = new javax.swing.GroupLayout(resultPanel);
+    resultPanel.setLayout(resultPanelLayout);
+    resultPanelLayout.setHorizontalGroup(
+        resultPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+        .addGroup(resultPanelLayout.createSequentialGroup()
             .addContainerGap()
             .addComponent(debugSummaryButton)
             .addComponent(viewQAButton)
             .addComponent(viewIgButton)
             .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
-    mainPanelLayout.setVerticalGroup(
-        mainPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-        .addGroup(mainPanelLayout.createParallelGroup()
+    resultPanelLayout.setVerticalGroup(
+        resultPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+        .addGroup(resultPanelLayout.createParallelGroup()
             .addComponent(debugSummaryButton)
             .addComponent(viewQAButton)
             .addComponent(viewIgButton)
@@ -123,20 +160,22 @@ public class IGPublisherFrame extends javax.swing.JFrame {
 
     javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
     getContentPane().setLayout(layout);
+
     layout.setHorizontalGroup(
         layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-        .addComponent(mainToolBar, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-        .addComponent(mainPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+        .addComponent(mainToolBar, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE).addComponent(optionsPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+        .addComponent(resultPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
         .addComponent(logScrollPane, javax.swing.GroupLayout.DEFAULT_SIZE, 627, Short.MAX_VALUE)
         );
     layout.setVerticalGroup(
         layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
         .addGroup(layout.createSequentialGroup()
             .addComponent(mainToolBar, javax.swing.GroupLayout.PREFERRED_SIZE, 25, javax.swing.GroupLayout.PREFERRED_SIZE)
-            .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+            .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED).addComponent(optionsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, 50, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
             .addComponent(logScrollPane, javax.swing.GroupLayout.DEFAULT_SIZE, 175, Short.MAX_VALUE)
             .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-            .addComponent(mainPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+            .addComponent(resultPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
         );
 
     pack();
@@ -149,6 +188,11 @@ public class IGPublisherFrame extends javax.swing.JFrame {
 
   private void createComponents() {
     txtLogTextArea = createTxLogTextArea();
+
+    noNarrativeCheckbox = new JCheckBox("no-narrative");
+    noValidateCheckbox = new JCheckBox("no-validate");
+    noSushiCheckbox = new JCheckBox("no-sushi");
+    debugCheckbox = new JCheckBox("debug");
 
     executeButton = createExecuteButton();
     chooseIGButton = createChooseIGButton();
