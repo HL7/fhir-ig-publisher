@@ -36,8 +36,16 @@ jobs:
           jdkVersion: 1.11
           gitRepo: https://github.com/FHIR/fhir-tools-ig.git
         - igName: fhir-tools-ig-exec
+          vmImage: ubuntu-latest
+          jdkVersion: 1.17
+          gitRepo: https://github.com/FHIR/fhir-tools-ig.git
+        - igName: fhir-tools-ig-exec
           vmImage: windows-latest
           jdkVersion: 1.11
+          gitRepo: https://github.com/FHIR/fhir-tools-ig.git
+        - igName: fhir-tools-ig-exec
+          vmImage: windows-latest
+          jdkVersion: 1.17
           gitRepo: https://github.com/FHIR/fhir-tools-ig.git
         - igName: fhir-tools-ig-exec
           vmImage: macos-latest
