@@ -1501,7 +1501,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private String describeObligations(ElementDefinition d, boolean root) throws IOException {
     ObligationsRenderer obr = new ObligationsRenderer(corePath, sd, d.getPath(), gen, this, sdr);
-    obr.seeObligations(d.getExtension());
+    obr.seeObligations(d.getExtensionsByUrl(ToolingExtensions.EXT_OBLIGATION_CORE, ToolingExtensions.EXT_OBLIGATION_TOOLS));
+    obr.seeRootObligations(d.getId(), sd.getExtensionsByUrl(ToolingExtensions.EXT_OBLIGATION_CORE, ToolingExtensions.EXT_OBLIGATION_TOOLS));
     if (obr.hasObligations() || (root && (sd.hasExtension(ToolingExtensions.EXT_OBLIGATION_PROFILE_FLAG) || sd.hasExtension(ToolingExtensions.EXT_OBLIGATION_INHERITS)))) {
       StringBuilder s = new StringBuilder();
       XhtmlNode ul = new XhtmlNode(NodeType.Element, "ul");
@@ -3384,7 +3385,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (element.definition().getIsModifier()) {
       gc.addStyledText(translate("sd.table", "This element is a modifier element"), "?!", null, null, null, false);
     }
-    if (element.definition().getMustSupport() || element.definition().hasExtension(ToolingExtensions.EXT_OBLIGATION)) {
+    if (element.definition().getMustSupport() || element.definition().hasExtension(ToolingExtensions.EXT_OBLIGATION_CORE, ToolingExtensions.EXT_OBLIGATION_TOOLS)) {
       gc.addStyledText(translate("sd.table", "This element must be supported"), "S", "white", "red", null, false);
     }
     if (element.definition().getIsSummary()) {

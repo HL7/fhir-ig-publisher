@@ -32,10 +32,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
-import javax.swing.JFileChooser;
-import javax.swing.JFrame;
-import javax.swing.JOptionPane;
-import javax.swing.SwingWorker;
+import javax.swing.*;
+import javax.swing.filechooser.FileNameExtensionFilter;
 
 import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.publisher.Publisher.CacheOption;
@@ -49,16 +47,15 @@ public class IGPublisherFrame extends javax.swing.JFrame {
 
   private static final String LOG_PREFIX = "--$%^^---";
   
-  private javax.swing.JButton btnExecute;
-  private javax.swing.JButton btnChoose;
-  private javax.swing.JButton btnGetHelp;
-  private javax.swing.JButton btnQA;
-  private javax.swing.JButton btnIG;
-  private javax.swing.JPanel jPanel1;
-  private javax.swing.JTextArea txtLog;
-  private javax.swing.JTextArea txtValidation;
-  private javax.swing.JComboBox<String> cbxIGName;
-  private javax.swing.JToolBar jToolBar1;
+  private javax.swing.JButton executeButton;
+  private javax.swing.JButton chooseIGButton;
+  private javax.swing.JButton debugSummaryButton;
+  private javax.swing.JButton viewQAButton;
+  private javax.swing.JButton viewIgButton;
+  private javax.swing.JPanel mainPanel;
+  private javax.swing.JTextArea txtLogTextArea;
+  private javax.swing.JComboBox<String> igNameComboBox;
+  private javax.swing.JToolBar mainToolBar;
   private IniFile ini;
 
   private BackgroundPublisherTask task;
@@ -71,14 +68,16 @@ public class IGPublisherFrame extends javax.swing.JFrame {
    */
   public IGPublisherFrame() throws IOException {
     ini = new IniFile(Utilities.path(System.getProperty("user.home"), "fhir-ig.ini"));
-    initComponents();
+
+    createComponents();
+    createLayout();
   }
 
   @SuppressWarnings("unchecked")
-  private void initComponents() {
+  private void createLayout() {
 
     setTitle("FHIR Implementation Guide Publisher");
-    setIconImage(Toolkit.getDefaultToolkit().getImage("C:\\work\\org.hl7.fhir\\build\\tools\\html\\assets\\ico\\favicon.png"));
+    setIconImage(Toolkit.getDefaultToolkit().getImage(getClass().getResource("/favicon.ico")));
     setBounds(100, 100, 785, 449);
     setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     addWindowListener(new WindowAdapter() {
@@ -87,120 +86,57 @@ public class IGPublisherFrame extends javax.swing.JFrame {
       }
     });
 
-    jToolBar1 = new javax.swing.JToolBar();
-    btnExecute = new javax.swing.JButton();
-    btnChoose = new javax.swing.JButton();
-    cbxIGName = new javax.swing.JComboBox<String>();
-    jPanel1 = new javax.swing.JPanel();
-    btnGetHelp = new javax.swing.JButton();
-    btnQA = new javax.swing.JButton();
-    btnIG = new javax.swing.JButton();
-    txtLog = new javax.swing.JTextArea();
-    txtValidation = new javax.swing.JTextArea();
+    mainPanel = new javax.swing.JPanel();
 
     setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
-    jToolBar1.setRollover(true);
-    jToolBar1.setFocusable(false);
+    mainToolBar = new javax.swing.JToolBar();
+    mainToolBar.setRollover(true);
+    mainToolBar.setFocusable(false);
 
-    btnExecute.setFocusable(false);
-    btnExecute.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
-    btnExecute.setLabel("Execute");
-    btnExecute.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
-    btnExecute.addActionListener(new java.awt.event.ActionListener() {
-      public void actionPerformed(java.awt.event.ActionEvent evt) {
-        btnExecuteClick(evt);
-      }
-    });
-    jToolBar1.add(btnExecute);
+    mainToolBar.add(executeButton);
+    mainToolBar.add(chooseIGButton);
+    mainToolBar.add(igNameComboBox);
 
-    btnChoose.setFocusable(false);
-    btnChoose.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
-    btnChoose.setLabel("Choose");
-    btnChoose.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
-    btnChoose.addActionListener(new java.awt.event.ActionListener() {
-      public void actionPerformed(java.awt.event.ActionEvent evt) {
-        btnChooseClick(evt);
-      }
-    });
-    jToolBar1.add(btnChoose);
-
-    if (ini.getProperties("igs") != null && ini.getProperties("igs").containsKey("selected")) {
-      for (int i = 0; i < ini.getIntegerProperty("igs", "count"); i++) 
-        cbxIGName.addItem(ini.getStringProperty("igs", "file"+Integer.toString(i)));
-      cbxIGName.setSelectedIndex(ini.getIntegerProperty("igs", "selected"));
-    }
-    cbxIGName.addActionListener(new java.awt.event.ActionListener() {
-      public void actionPerformed(java.awt.event.ActionEvent evt) {
-        cbxIGNameChange(evt);
-      }
-    });
-    jToolBar1.add(cbxIGName);
-
-    btnGetHelp.setText("Debug Summary");
-    btnGetHelp.setEnabled(false);
-    btnGetHelp.addActionListener(new java.awt.event.ActionListener() {
-      public void actionPerformed(java.awt.event.ActionEvent evt) {
-        btnGetHelpClick(evt);
-      }
-    });
-    btnQA.setText("View QA");
-    btnQA.setEnabled(false);
-    btnQA.addActionListener(new java.awt.event.ActionListener() {
-      public void actionPerformed(java.awt.event.ActionEvent evt) {
-        btnQAClick(evt);
-      }
-    });
-    btnIG.setText("View IG");
-    btnIG.setEnabled(false);
-    btnIG.addActionListener(new java.awt.event.ActionListener() {
-      public void actionPerformed(java.awt.event.ActionEvent evt) {
-        btnIGClick(evt);
-      }
-    });
-
-    
-    javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
-    jPanel1.setLayout(jPanel1Layout);
-    jPanel1Layout.setHorizontalGroup(
-        jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-        .addGroup(jPanel1Layout.createSequentialGroup()
+    javax.swing.GroupLayout mainPanelLayout = new javax.swing.GroupLayout(mainPanel);
+    mainPanel.setLayout(mainPanelLayout);
+    mainPanelLayout.setHorizontalGroup(
+        mainPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+        .addGroup(mainPanelLayout.createSequentialGroup()
             .addContainerGap()
-            .addComponent(btnGetHelp)
-            .addComponent(btnQA)
-            .addComponent(btnIG)
+            .addComponent(debugSummaryButton)
+            .addComponent(viewQAButton)
+            .addComponent(viewIgButton)
             .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
-    jPanel1Layout.setVerticalGroup(
-        jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-        .addGroup(jPanel1Layout.createSequentialGroup()
-            .addComponent(btnGetHelp)
-            .addComponent(btnQA)
-            .addComponent(btnIG)
+    mainPanelLayout.setVerticalGroup(
+        mainPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+        .addGroup(mainPanelLayout.createParallelGroup()
+            .addComponent(debugSummaryButton)
+            .addComponent(viewQAButton)
+            .addComponent(viewIgButton)
             .addGap(0, 13, Short.MAX_VALUE))
         );
 
-    txtLog.setColumns(20);
-    txtLog.setRows(5);
-    txtLog.setEditable(false);
-    txtLog.getCaret().setVisible(false);
+
+    JScrollPane logScrollPane = new JScrollPane(txtLogTextArea);
 
     javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
     getContentPane().setLayout(layout);
     layout.setHorizontalGroup(
         layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-        .addComponent(jToolBar1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-        .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-        .addComponent(txtLog, javax.swing.GroupLayout.DEFAULT_SIZE, 627, Short.MAX_VALUE)
+        .addComponent(mainToolBar, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+        .addComponent(mainPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+        .addComponent(logScrollPane, javax.swing.GroupLayout.DEFAULT_SIZE, 627, Short.MAX_VALUE)
         );
     layout.setVerticalGroup(
         layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
         .addGroup(layout.createSequentialGroup()
-            .addComponent(jToolBar1, javax.swing.GroupLayout.PREFERRED_SIZE, 25, javax.swing.GroupLayout.PREFERRED_SIZE)
+            .addComponent(mainToolBar, javax.swing.GroupLayout.PREFERRED_SIZE, 25, javax.swing.GroupLayout.PREFERRED_SIZE)
             .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-            .addComponent(txtLog, javax.swing.GroupLayout.DEFAULT_SIZE, 175, Short.MAX_VALUE)
+            .addComponent(logScrollPane, javax.swing.GroupLayout.DEFAULT_SIZE, 175, Short.MAX_VALUE)
             .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-            .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+            .addComponent(mainPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
         );
 
     pack();
@@ -209,34 +145,139 @@ public class IGPublisherFrame extends javax.swing.JFrame {
       setSize(ini.getIntegerProperty("layout", "W"), ini.getIntegerProperty("layout", "H")); 
     }
 
-  }                        
+  }
+
+  private void createComponents() {
+    txtLogTextArea = createTxLogTextArea();
+
+    executeButton = createExecuteButton();
+    chooseIGButton = createChooseIGButton();
+    igNameComboBox = createIgNameComboBox();
+
+    debugSummaryButton = createDebugSumaryButton();
+    viewQAButton = createViewQAButton();
+    viewIgButton = createViewIGButton();
+  }
+
+  private JComboBox<String> createIgNameComboBox() {
+    JComboBox igNameComboBox = new javax.swing.JComboBox<String>();
+    if (ini.getProperties("igs") != null && ini.getProperties("igs").containsKey("selected")) {
+      for (int i = 0; i < ini.getIntegerProperty("igs", "count"); i++)
+        igNameComboBox.addItem(ini.getStringProperty("igs", "file"+Integer.toString(i)));
+      igNameComboBox.setSelectedIndex(ini.getIntegerProperty("igs", "selected"));
+    }
+    igNameComboBox.addActionListener(new java.awt.event.ActionListener() {
+      public void actionPerformed(java.awt.event.ActionEvent evt) {
+        changeIGName(evt);
+      }
+    });
+    return igNameComboBox;
+  }
+
+  private JButton createChooseIGButton() {
+    JButton chooseIGButton = new javax.swing.JButton();
+    chooseIGButton.setFocusable(false);
+    chooseIGButton.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
+    chooseIGButton.setLabel("Choose");
+    chooseIGButton.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
+    chooseIGButton.addActionListener(new java.awt.event.ActionListener() {
+      public void actionPerformed(java.awt.event.ActionEvent evt) {
+        btnChooseClick(evt);
+      }
+    });
+    return chooseIGButton;
+  }
+
+  private JButton createViewQAButton() {
+    JButton viewQAButton = new javax.swing.JButton();
+    viewQAButton.setText("View QA");
+    viewQAButton.setEnabled(false);
+    viewQAButton.addActionListener(new java.awt.event.ActionListener() {
+      public void actionPerformed(java.awt.event.ActionEvent evt) {
+        btnQAClick(evt);
+      }
+    });
+    return viewQAButton;
+  }
+
+  private JButton createViewIGButton() {
+    JButton viewIgButton =new javax.swing.JButton();
+    viewIgButton.setText("View IG");
+    viewIgButton.setEnabled(false);
+    viewIgButton.addActionListener(new java.awt.event.ActionListener() {
+      public void actionPerformed(java.awt.event.ActionEvent evt) {
+        btnIGClick(evt);
+      }
+    });
+    return viewIgButton;
+  }
+
+  private JTextArea createTxLogTextArea() {
+    JTextArea txtLogTextArea = new javax.swing.JTextArea();
+    txtLogTextArea.setColumns(20);
+    txtLogTextArea.setRows(5);
+    txtLogTextArea.setEditable(false);
+    txtLogTextArea.getCaret().setVisible(false);
+    return txtLogTextArea;
+  }
+
+  private JButton createDebugSumaryButton() {
+    JButton button = new javax.swing.JButton();
+    button.setText("Debug Summary");
+    button.setEnabled(false);
+    button.addActionListener(new java.awt.event.ActionListener() {
+      public void actionPerformed(java.awt.event.ActionEvent evt) {
+        btnGetHelpClick(evt);
+      }
+    });
+    return button;
+  }
+
+  private JButton createExecuteButton() {
+    JButton executeButton = new javax.swing.JButton();
+    executeButton.setFocusable(false);
+    executeButton.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
+    executeButton.setLabel("Execute");
+    executeButton.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
+    executeButton.addActionListener(new java.awt.event.ActionListener() {
+      public void actionPerformed(java.awt.event.ActionEvent evt) {
+        btnExecuteClick(evt);
+      }
+    });
+    return executeButton;
+  }
 
 
-  
   private void btnChooseClick(java.awt.event.ActionEvent evt) {                                         
-    JFileChooser jfc = new JFileChooser();
-    if (cbxIGName.getSelectedItem() != null)
-      jfc.setCurrentDirectory(new File(Utilities.getDirectoryForFile((String) cbxIGName.getSelectedItem())));
-    if (jfc.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+    JFileChooser igFileChooser = new JFileChooser();
+    igFileChooser.setFileFilter(new FileNameExtensionFilter("IG ini file or IG Directory", "ini"));
+    igFileChooser.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
+    if (igNameComboBox.getSelectedItem() != null)
+      igFileChooser.setCurrentDirectory(new File(Utilities.getDirectoryForFile((String) igNameComboBox.getSelectedItem())));
+    if (igFileChooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
       int index = -1;
-      String s = jfc.getSelectedFile().getAbsolutePath();
-      for (int i = 0; i < cbxIGName.getItemCount(); i++) {
-        if (s.equals(cbxIGName.getItemAt(i)))
+
+      String selectedFile = igFileChooser.getSelectedFile().isDirectory()
+              ? igFileChooser.getSelectedFile().getAbsolutePath() + File.separatorChar + "ig.ini"
+              : igFileChooser.getSelectedFile().getAbsolutePath();
+
+      for (int i = 0; i < igNameComboBox.getItemCount(); i++) {
+        if (selectedFile.equals(igNameComboBox.getItemAt(i)))
           index = i;;
       }
       if (index == -1) {
         index = ini.getProperties("igs") == null ? 0 : ini.getIntegerProperty("igs", "count");
-        ini.setStringProperty("igs", "file"+Integer.toString(index), s, null);
+        ini.setStringProperty("igs", "file"+Integer.toString(index), selectedFile, null);
         ini.setIntegerProperty("igs", "count", index+1, null);
-        cbxIGName.addItem(ini.getStringProperty("igs", "file"+Integer.toString(index)));
+        igNameComboBox.addItem(ini.getStringProperty("igs", "file"+Integer.toString(index)));
       }
       ini.setIntegerProperty("igs", "selected", index, null);
-      cbxIGName.setSelectedIndex(ini.getIntegerProperty("igs", "selected"));
+      igNameComboBox.setSelectedIndex(ini.getIntegerProperty("igs", "selected"));
     }
   } 
 
-  private void cbxIGNameChange(java.awt.event.ActionEvent evt) {         
-    int index = cbxIGName.getSelectedIndex();
+  private void changeIGName(java.awt.event.ActionEvent evt) {
+    int index = igNameComboBox.getSelectedIndex();
     ini.setIntegerProperty("igs", "selected", index, null);
   }                                          
 
@@ -257,7 +298,7 @@ public class IGPublisherFrame extends javax.swing.JFrame {
     public String doInBackground() {
       qa = null;
       Publisher pu = new Publisher();
-      pu.setConfigFile((String) cbxIGName.getSelectedItem());
+      pu.setConfigFile((String) igNameComboBox.getSelectedItem());
       pu.setLogger(this);
       pu.setCacheOption(CacheOption.LEAVE);
       try {
@@ -288,22 +329,22 @@ public class IGPublisherFrame extends javax.swing.JFrame {
         if (msg.startsWith(LOG_PREFIX)) {
           fullLog.append(msg.substring(LOG_PREFIX.length())+"\r\n");
         } else {
-          txtLog.append(msg+"\r\n");
+          txtLogTextArea.append(msg+"\r\n");
           fullLog.append(msg+"\r\n");
         }
       }
-      txtLog.setCaretPosition(txtLog.getText().length() - 1);
+      txtLogTextArea.setCaretPosition(txtLogTextArea.getText().length() - 1);
     }
 
     @Override
     protected void done() {
-      btnExecute.setEnabled(true);
-      btnChoose.setEnabled(true);
-      cbxIGName.setEnabled(true);
-      btnGetHelp.setEnabled(true);      
-      btnQA.setEnabled(true);      
-      btnIG.setEnabled(true);      
-      btnExecute.setLabel("Execute");
+      executeButton.setEnabled(true);
+      chooseIGButton.setEnabled(true);
+      igNameComboBox.setEnabled(true);
+      debugSummaryButton.setEnabled(true);
+      viewQAButton.setEnabled(true);
+      viewIgButton.setEnabled(true);
+      executeButton.setLabel("Execute");
     }
 
     @Override
@@ -315,21 +356,21 @@ public class IGPublisherFrame extends javax.swing.JFrame {
   }
 
   private void btnExecuteClick(java.awt.event.ActionEvent evt) {
-    btnExecute.setEnabled(false);
-    btnChoose.setEnabled(false);
-    cbxIGName.setEnabled(false);
-    btnGetHelp.setEnabled(false);
-    btnQA.setEnabled(false);
-    btnIG.setEnabled(false);
-    btnExecute.setLabel("Running");
-    txtLog.setText("");
+    executeButton.setEnabled(false);
+    chooseIGButton.setEnabled(false);
+    igNameComboBox.setEnabled(false);
+    debugSummaryButton.setEnabled(false);
+    viewQAButton.setEnabled(false);
+    viewIgButton.setEnabled(false);
+    executeButton.setLabel("Running");
+    txtLogTextArea.setText("");
     fullLog.setLength(0);
     task = new BackgroundPublisherTask();
     task.execute();
   }
 
   private String folder() {
-    return Utilities.getDirectoryForFile((String) cbxIGName.getSelectedItem());
+    return Utilities.getDirectoryForFile((String) igNameComboBox.getSelectedItem());
   }
   
   protected void btnQAClick(ActionEvent evt) {
@@ -357,7 +398,7 @@ public class IGPublisherFrame extends javax.swing.JFrame {
   
   protected void btnGetHelpClick(ActionEvent evt) {
     try {
-      String text = Publisher.buildReport((String) cbxIGName.getSelectedItem(), null, fullLog.toString(), qa == null ? null : Utilities.changeFileExt(qa, ".txt"), FhirSettings.getTxFhirProduction());
+      String text = Publisher.buildReport((String) igNameComboBox.getSelectedItem(), null, fullLog.toString(), qa == null ? null : Utilities.changeFileExt(qa, ".txt"), FhirSettings.getTxFhirProduction());
       StringSelection stringSelection = new StringSelection(text);
       Clipboard clpbrd = Toolkit.getDefaultToolkit().getSystemClipboard();
       clpbrd.setContents(stringSelection, null);
