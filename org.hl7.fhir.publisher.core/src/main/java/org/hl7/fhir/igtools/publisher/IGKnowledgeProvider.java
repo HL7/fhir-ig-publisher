@@ -46,6 +46,7 @@ import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.ValueSet;
+import org.hl7.fhir.r5.utils.XVerExtensionManager;
 import org.hl7.fhir.utilities.LoincLinker;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonElement;
@@ -75,6 +76,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   private List<String> listedURLExemptions;
   private Set<String> summaryRows = new HashSet<>();
   private String altCanonical;
+  private XVerExtensionManager xver;
   
   public IGKnowledgeProvider(IWorkerContext context, String pathToSpec, String canonical, JsonObject igs, List<ValidationMessage> errors, boolean noXhtml, Template template, List<String> listedURLExemptions, String altCanonical) throws Exception {
     super();
@@ -91,6 +93,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     if (igs != null) {
       loadPaths(igs);
     }
+    this.xver = new XVerExtensionManager(context);
   }
   
   private void loadPaths(JsonObject igs) throws Exception {
@@ -657,6 +660,9 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     StructureDefinition sd = context.fetchResource(StructureDefinition.class, url);
     if (noXhtml && sd != null && sd.getType().equals("xhtml"))
       return null;
+    if (xver.matchingUrl(url)) {
+      return xver.getReference(url); 
+    }
     if (sd != null && sd.hasWebPath())
       return sd.getWebPath()+"|"+sd.getName();
     brokenLinkMessage("?pkp-1?", url, false);

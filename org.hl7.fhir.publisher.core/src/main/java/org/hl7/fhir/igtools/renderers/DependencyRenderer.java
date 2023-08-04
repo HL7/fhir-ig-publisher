@@ -209,7 +209,7 @@ public class DependencyRenderer {
       } else if ("current".equals(npm.version())) {
         comment = "Cannot be published with a dependency on a current build version";
       } else if (!npm.version().equals(originalVersion)) {
-        comment = "Matched to latest patch release";
+        comment = "Matched to latest patch release ("+originalVersion+"->"+npm.version()+")";
       } else if (realm != null) {
         String drealm = determineRealmForIg(npm.name());
         if (drealm != null) {
