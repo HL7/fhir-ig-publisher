@@ -4034,7 +4034,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     igm.setBase2(PackageHacker.fixPackageUrl(pi.url()));
     specMaps.add(igm);
     if (!VersionUtilities.versionsCompatible(version, igm.getVersion())) {
-      log("Version mismatch. This IG is version "+version+", while the IG '"+name+"' is from version "+igm.getVersion()+" (will try to run anyway)");
+      if (!pi.isWarned()) {
+        log("Version mismatch. This IG is version "+version+", while the IG '"+pi.name()+"' is from version "+igm.getVersion()+" (will try to run anyway)");
+        pi.setWarned(true);   
+      }
     }
 
     loadFromPackage(name, canonical, pi, webref, igm, loadDeps);
@@ -4082,14 +4085,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (!context.hasPackage(dep)) {        
           String coreVersion = VersionUtilities.getVersionForPackage(dep);
           if (coreVersion != null) {
-            log("Ignore Core Dependency on FHIR version "+coreVersion+", from package '"+pi.name()+"#"+pi.version()+"'");
+            log("Ignore Dependency on Core FHIR "+dep+", from package '"+pi.name()+"#"+pi.version()+"'");
           } else {
             NpmPackage dpi = pcm.loadPackage(dep);
             if (dpi == null) {
               logDebugMessage(LogCategory.CONTEXT, "Unable s to find package dependency "+dep+". Will proceed, but likely to be be errors in qa.html etc");
             } else {
               if (!VersionUtilities.versionsCompatible(version, pi.fhirVersion())) {
-                log("Version mismatch. This IG is for FHIR version "+version+", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion()+" (will ignore that and try to run anyway)");
+                if (!pi.isWarned()) {
+                  log("Version mismatch. This IG is for FHIR version "+version+", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion()+" (will ignore that and try to run anyway)");
+                  pi.setWarned(true);
+                }
               }
               SpecMapManager smm = null;
               logDebugMessage(LogCategory.PROGRESS, "Load package dependency "+dep);
@@ -4171,7 +4177,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     igm.setBase(canonical);
     specMaps.add(igm);
     if (!VersionUtilities.versionsCompatible(version, igm.getVersion())) {
-      log("Version mismatch. This IG is for FHIR version "+version+", while the IG '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+igm.getVersion()+" (will try to run anyway)");
+      if (pi.isWarned()) {
+        log("Version mismatch. This IG is for FHIR version "+version+", while the IG '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+igm.getVersion()+" (will try to run anyway)");
+        pi.setWarned(true);
+      }
     }
 
     loadFromPackage(name, canonical, pi, webref, igm, loadDeps);
@@ -7012,9 +7021,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (!vm.getLocation().startsWith(loc)) {
         vm.setLocation(loc+": "+vm.getLocation());
       }
-      file.getErrors().add(vm);
+      if (!alreadyExists(file.getErrors(), vm)) {
+        file.getErrors().add(vm);
+      }
       r.getErrors().add(vm);
     }
+  }
+
+  private boolean alreadyExists(List<ValidationMessage> list, ValidationMessage vm) {
+    for (ValidationMessage t : list) {
+      if (t.matches(vm)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private void addProfile(List<StructureDefinition> profiles, String ref, String rt) {
@@ -8660,8 +8680,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     for (ValueSetExpansionContainsComponent c: numExpand.getValueset().getExpansion().getContains()) {
       String code = countryCodeForName.get(c.getDisplay());
-      if (code==null)
-        throw new Exception("Unable to find 3-character code having same country code as ISO numeric code " + c.getCode() + " - " + c.getDisplay());
+//      if (code==null)
+//        throw new Exception("Unable to find 3-character code having same country code as ISO numeric code " + c.getCode() + " - " + c.getDisplay());
       countryCodeForNumeric.put(c.getCode(), code);
     }
     for (ValueSetExpansionContainsComponent c: stateExpand.getValueset().getExpansion().getContains()) {
