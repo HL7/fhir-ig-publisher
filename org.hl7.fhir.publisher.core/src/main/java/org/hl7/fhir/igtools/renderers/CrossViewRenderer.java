@@ -776,8 +776,9 @@ public class CrossViewRenderer {
     b.append("<td><b><a href=\""+Utilities.pathURL(context.getSpecUrl(), "defining-extensions.html")+"#cardinality\">Conf.</a></b></td>");
     b.append("<td><b>Type</b></td>");
     b.append("<td><b><a href=\""+Utilities.pathURL(context.getSpecUrl(), "defining-extensions.html")+"#context\">Context</a></b></td>");
-    b.append("<td><b><a href=\""+Utilities.pathURL(context.getSpecUrl(), "versions.html")+"#maturity\">Status</a></b></td>");
-    b.append("</tr>");
+    b.append("<td><b><a href=\""+Utilities.pathURL(context.getSpecUrl(), "versions.html")+"#std-process\">Status</a></b></td>");
+    b.append("<td><b><a href=\""+Utilities.pathURL(context.getSpecUrl(), "versions.html")+"#maturity\">Maturity</a></b></td>");
+    b.append("</tr>");  
     if (type != null) {
       if ("Path".equals(type)) {
         b.append("<tr><td colspan=\"5\"><b>Extensions defined by a FHIRPath expression</b></td></tr>\r\n");
@@ -969,16 +970,16 @@ public class CrossViewRenderer {
     }
     s.append("</td>");
     if (status == StandardsStatus.NORMATIVE) {
-      s.append("<td><a href=\""+Utilities.pathURL(corePath, "versions.html")+"#std-process\" title=\"Normative\" class=\"normative-flag\">Normative</a></td>");
+      s.append("<td><a href=\""+Utilities.pathURL(corePath, "versions.html")+"#std-process\" title=\"Normative\" class=\"normative-flag\">Normative</a></td><td></td>");
     } else if (status == StandardsStatus.DEPRECATED) {
-      s.append("<td><a href=\""+Utilities.pathURL(corePath, "versions.html")+"#std-process\" title=\"Deprecated\" class=\"deprecated-flag\">Deprecated</a></td>");      
+      s.append("<td><a href=\""+Utilities.pathURL(corePath, "versions.html")+"#std-process\" title=\"Deprecated\" class=\"deprecated-flag\">Deprecated</a></td><td></td>");      
     } else if (status == StandardsStatus.INFORMATIVE) {
-      s.append("<td><a href=\""+Utilities.pathURL(corePath, "versions.html")+"#std-process\" title=\"Informative\" class=\"deprecated-flag\">Informative</a></td>");      
+      s.append("<td><a href=\""+Utilities.pathURL(corePath, "versions.html")+"#std-process\" title=\"Informative\" class=\"deprecated-flag\">Informative</a></td><td></td>");      
     } else if (status == StandardsStatus.DRAFT) {
-      s.append("<td><a href=\""+Utilities.pathURL(corePath, "versions.html")+"#std-process\" title=\"Draft\" class=\"draft-flag\">Draft</a></td>");      
+      s.append("<td><a href=\""+Utilities.pathURL(corePath, "versions.html")+"#std-process\" title=\"Draft\" class=\"draft-flag\">Draft</a></td><td></td>");      
     } else { 
       String fmm = ToolingExtensions.readStringExtension(ed, ToolingExtensions.EXT_FMM_LEVEL);
-      s.append("<td><a href=\""+Utilities.pathURL(corePath, "versions.html")+"#std-process\" title=\"Trial-Use\" class=\"trial-use-flag\">Trial&nbsp;Use</a>"+(Utilities.noString(fmm) ? "0" : "&nbsp;(FMM"+fmm+")")+"</td>");      
+      s.append("<td><a href=\""+Utilities.pathURL(corePath, "versions.html")+"#std-process\" title=\"Trial-Use\" class=\"trial-use-flag\">Trial&nbsp;Use</a></td><td>"+(Utilities.noString(fmm) ? "0" : "&nbsp;(FMM"+fmm+")")+"</td>");      
     }
 //    s.append("<td><a href=\"extension-"+ed.getId().toLowerCase()+ ".xml.html\">XML</a></td>");
 //    s.append("<td><a href=\"extension-"+ed.getId().toLowerCase()+ ".json.html\">JSON</a></td>");

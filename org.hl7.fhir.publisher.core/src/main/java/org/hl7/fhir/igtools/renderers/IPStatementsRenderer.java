@@ -208,7 +208,7 @@ public class IPStatementsRenderer {
     if ("http://snomed.info/sct".equals(system.system)) {
       system.desc = "SNOMED Clinical Terms® (SNOMED CT®)";
       return "This material contains content that is copyright of SNOMED International. Implementers of these specifications must have the appropriate SNOMED CT Affiliate license - "+
-       "for more information contact <a href=\"http://www.snomed.org/snomed-ct/get-snomed-ct\">http://www.snomed.org/snomed-ct/get-snomed-ct</a> or <a href=\"mailto:info@snomed.org\">info@snomed.org</a>.";
+       "for more information contact <a href=\"https://www.snomed.org/get-snomed\">https://www.snomed.org/get-snomed</a> or <a href=\"mailto:info@snomed.org\">info@snomed.org</a>.";
     }
     if ("http://loinc.org".equals(system.system)) {
       system.desc = "LOINC";

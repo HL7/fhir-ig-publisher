@@ -272,8 +272,10 @@ public class USRealmBusinessRules extends RealmBusinessRules {
       String sctVer = getSnomedVersion(context.getExpansionParameters());
       if (US_SNOMED.equals(sctVer)) {
         sct = "<p>Snomed: The IG specifies the US edition of SNOMED CT <b>&#10003;</b> </p>";
-      } else {
+      } else if (Utilities.noString(sctVer) ){
         sct = "<p>Snomed: <span style=\"background-color: #ffcccc\">The IG does not specify the US edition of SNOMED CT version in the parameters (<code>"+US_SNOMED+"</code>)</span></p>";
+      } else {
+        sct = "<p>Snomed: <span style=\"background-color: #ffcccc\">The IG specifies a different version ("+sctVer+") to the US edition of SNOMED CT version in the parameters (<code>"+US_SNOMED+"</code>)</span></p>";
       }
     }
     if (problems == null || problems.isEmpty()) {
