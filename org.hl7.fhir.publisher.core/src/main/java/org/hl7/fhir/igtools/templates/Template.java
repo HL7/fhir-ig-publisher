@@ -282,7 +282,7 @@ public class Template {
     int oc = ig.getDefinition().getResource().size();
     int nc = modIg.getDefinition().getResource().size();
     if (oc != nc)
-      throw new FHIRException("Ths template is not allowed to modify the resources ("+oc+"/"+nc+")");
+      throw new FHIRException("This template is not allowed to modify the resources ("+oc+"/"+nc+")");
     for (ImplementationGuideDefinitionResourceComponent or : ig.getDefinition().getResource()) {
       ImplementationGuideDefinitionResourceComponent nr = getMatchingResource(modIg, or.getReference()); 
       if (nr == null)
