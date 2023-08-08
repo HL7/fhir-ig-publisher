@@ -2906,7 +2906,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
 
     if (!VersionUtilities.isR5Plus(context.getVersion())) {
-      System.out.print("Load R5 Specials");
+      System.out.println("Load R5 Specials");
       R5ExtensionsLoader r5e = new R5ExtensionsLoader(pcm, context);
       r5e.load();
       r5e.loadR5SpecialTypes(SpecialTypeHandler.specialTypes(context.getVersion()));
@@ -3993,7 +3993,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     loadFromPackage(name, canonical, pi, webref, igm, loadDeps);
   }
 
-
   private boolean isValidIGToken(String tail) {
     if (tail == null || tail.length() == 0)
       return false;
@@ -4002,7 +4001,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       result = result && (Utilities.isAlphabetic(tail.charAt(i)) || Utilities.isDigit(tail.charAt(i)) || (tail.charAt(i) == '_'));
     }
     return result;
-
   }
 
   private String idForDep(ImplementationGuideDependsOnComponent dep) {
@@ -7428,6 +7426,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         parseVersion = str(r.getConfig(), "version", version);
       }
     }
+    XhtmlNode xhtml = null;
+    if (res instanceof DomainResource) {
+      xhtml = ((DomainResource) res).getText().getDiv();
+      if (xhtml != null) {
+        if (xhtml.isEmpty()) {
+          xhtml = null;
+        } else {
+          ((DomainResource) res).getText().setDiv(new XhtmlParser().parseFragment("<div xmlns=\"http://www.w3.org/1999/xhtml\">Placeholder</div>"));
+        }
+      }
+    }
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
     if (VersionUtilities.isR3Ver(parseVersion)) {
       org.hl7.fhir.dstu3.formats.JsonParser jp = new org.hl7.fhir.dstu3.formats.JsonParser();
@@ -7449,7 +7458,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       jp.compose(bs, res);
     }
     ByteArrayInputStream bi = new ByteArrayInputStream(bs.toByteArray());
-    return new org.hl7.fhir.r5.elementmodel.JsonParser(context).parseSingle(bi);
+    Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parseSingle(bi);
+    if (xhtml != null) {
+      e.getNamedChild("text").getNamedChild("div").setXhtml(xhtml);
+    }
+    return e;
   }
 
   private Resource convertFromElement(Element res) throws IOException, org.hl7.fhir.exceptions.FHIRException, FHIRFormatError, DefinitionException {
