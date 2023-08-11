@@ -113,6 +113,7 @@ import org.hl7.fhir.igtools.renderers.JsonXhtmlRenderer;
 import org.hl7.fhir.igtools.renderers.MappingSummaryRenderer;
 import org.hl7.fhir.igtools.renderers.OperationDefinitionRenderer;
 import org.hl7.fhir.igtools.renderers.PublicationChecker;
+import org.hl7.fhir.igtools.renderers.ExampleScenarioRenderer;
 import org.hl7.fhir.igtools.renderers.QuestionnaireRenderer;
 import org.hl7.fhir.igtools.renderers.QuestionnaireResponseRenderer;
 import org.hl7.fhir.igtools.renderers.StatusRenderer;
@@ -156,16 +157,9 @@ import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.RdfParser;
 import org.hl7.fhir.r5.formats.XmlParser;
-import org.hl7.fhir.r5.model.ActivityDefinition;
-import org.hl7.fhir.r5.model.Attachment;
-import org.hl7.fhir.r5.model.Base;
-import org.hl7.fhir.r5.model.Binary;
-import org.hl7.fhir.r5.model.Bundle;
+import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.model.Bundle.BundleEntryComponent;
 import org.hl7.fhir.r5.model.Bundle.BundleType;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CanonicalType;
-import org.hl7.fhir.r5.model.CapabilityStatement;
 import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementDocumentComponent;
 import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementMessagingComponent;
 import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementMessagingSupportedMessageComponent;
@@ -173,34 +167,15 @@ import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestComponen
 import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceComponent;
 import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceOperationComponent;
 import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceSearchParamComponent;
-import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
-import org.hl7.fhir.r5.model.CodeType;
-import org.hl7.fhir.r5.model.CodeableConcept;
-import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.ConceptMap;
 import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
-import org.hl7.fhir.r5.model.Constants;
-import org.hl7.fhir.r5.model.ContactDetail;
-import org.hl7.fhir.r5.model.ContactPoint;
 import org.hl7.fhir.r5.model.ContactPoint.ContactPointSystem;
-import org.hl7.fhir.r5.model.DataType;
-import org.hl7.fhir.r5.model.DateTimeType;
-import org.hl7.fhir.r5.model.DomainResource;
-import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionConstraintComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
-import org.hl7.fhir.r5.model.Enumeration;
 import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
 import org.hl7.fhir.r5.model.Enumerations.FHIRVersion;
 import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
-import org.hl7.fhir.r5.model.ExpressionNode;
-import org.hl7.fhir.r5.model.Extension;
-import org.hl7.fhir.r5.model.GraphDefinition;
-import org.hl7.fhir.r5.model.IdType;
-import org.hl7.fhir.r5.model.Identifier;
 import org.hl7.fhir.r5.model.Identifier.IdentifierUse;
-import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.ImplementationGuide.GuidePageGeneration;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionGroupingComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionPageComponent;
@@ -209,47 +184,21 @@ import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionRe
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideGlobalComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.SPDXLicense;
-import org.hl7.fhir.r5.model.IntegerType;
-import org.hl7.fhir.r5.model.Library;
-import org.hl7.fhir.r5.model.ListResource;
 import org.hl7.fhir.r5.model.ListResource.ListResourceEntryComponent;
-import org.hl7.fhir.r5.model.MarkdownType;
-import org.hl7.fhir.r5.model.Measure;
-import org.hl7.fhir.r5.model.MessageDefinition;
 import org.hl7.fhir.r5.model.MessageDefinition.MessageDefinitionAllowedResponseComponent;
 import org.hl7.fhir.r5.model.MessageDefinition.MessageDefinitionFocusComponent;
-import org.hl7.fhir.r5.model.OperationDefinition;
 import org.hl7.fhir.r5.model.OperationDefinition.OperationDefinitionParameterComponent;
-import org.hl7.fhir.r5.model.OperationOutcome;
-import org.hl7.fhir.r5.model.PackageInformation;
-import org.hl7.fhir.r5.model.Parameters;
-import org.hl7.fhir.r5.model.PlanDefinition;
 import org.hl7.fhir.r5.model.PlanDefinition.PlanDefinitionActionComponent;
-import org.hl7.fhir.r5.model.Property;
-import org.hl7.fhir.r5.model.Provenance;
 import org.hl7.fhir.r5.model.Provenance.ProvenanceAgentComponent;
-import org.hl7.fhir.r5.model.Questionnaire;
 import org.hl7.fhir.r5.model.Questionnaire.QuestionnaireItemAnswerOptionComponent;
 import org.hl7.fhir.r5.model.Questionnaire.QuestionnaireItemComponent;
 import org.hl7.fhir.r5.model.Questionnaire.QuestionnaireItemInitialComponent;
-import org.hl7.fhir.r5.model.QuestionnaireResponse;
-import org.hl7.fhir.r5.model.Reference;
-import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.model.ResourceFactory;
-import org.hl7.fhir.r5.model.SearchParameter;
 import org.hl7.fhir.r5.model.SearchParameter.SearchParameterComponentComponent;
-import org.hl7.fhir.r5.model.StringType;
-import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
-import org.hl7.fhir.r5.model.StructureMap;
 import org.hl7.fhir.r5.model.StructureMap.StructureMapModelMode;
 import org.hl7.fhir.r5.model.StructureMap.StructureMapStructureComponent;
-import org.hl7.fhir.r5.model.TypeDetails;
-import org.hl7.fhir.r5.model.UriType;
-import org.hl7.fhir.r5.model.UsageContext;
-import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
 import org.hl7.fhir.r5.openapi.OpenApiGenerator;
@@ -270,6 +219,7 @@ import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.GenerationRules;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.ITypeParser;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.KnownLinkType;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext.ExampleScenarioRendererMode;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.QuestionnaireRendererMode;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.ResourceRendererMode;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.StructureDefinitionRendererMode;
@@ -431,7 +381,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   }
 
-
   public class JsonDependency {
     private String name;
     private String canonical;
@@ -456,7 +405,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     public String getVersion() {
       return version;
     }
-
 
   }
 
@@ -4036,7 +3984,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     igm.setBase2(PackageHacker.fixPackageUrl(pi.url()));
     specMaps.add(igm);
     if (!VersionUtilities.versionsCompatible(version, igm.getVersion())) {
-      log("Version mismatch. This IG is version "+version+", while the IG '"+name+"' is from version "+igm.getVersion()+" (will try to run anyway)");
+      if (!pi.isWarned()) {
+        log("Version mismatch. This IG is version "+version+", while the IG '"+pi.name()+"' is from version "+igm.getVersion()+" (will try to run anyway)");
+        pi.setWarned(true);   
+      }
     }
 
     loadFromPackage(name, canonical, pi, webref, igm, loadDeps);
@@ -4084,14 +4035,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (!context.hasPackage(dep)) {        
           String coreVersion = VersionUtilities.getVersionForPackage(dep);
           if (coreVersion != null) {
-            log("Ignore Core Dependency on FHIR version "+coreVersion+", from package '"+pi.name()+"#"+pi.version()+"'");
+            log("Ignore Dependency on Core FHIR "+dep+", from package '"+pi.name()+"#"+pi.version()+"'");
           } else {
             NpmPackage dpi = pcm.loadPackage(dep);
             if (dpi == null) {
               logDebugMessage(LogCategory.CONTEXT, "Unable s to find package dependency "+dep+". Will proceed, but likely to be be errors in qa.html etc");
             } else {
               if (!VersionUtilities.versionsCompatible(version, pi.fhirVersion())) {
-                log("Version mismatch. This IG is for FHIR version "+version+", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion()+" (will ignore that and try to run anyway)");
+                if (!pi.isWarned()) {
+                  log("Version mismatch. This IG is for FHIR version "+version+", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion()+" (will ignore that and try to run anyway)");
+                  pi.setWarned(true);
+                }
               }
               SpecMapManager smm = null;
               logDebugMessage(LogCategory.PROGRESS, "Load package dependency "+dep);
@@ -4173,7 +4127,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     igm.setBase(canonical);
     specMaps.add(igm);
     if (!VersionUtilities.versionsCompatible(version, igm.getVersion())) {
-      log("Version mismatch. This IG is for FHIR version "+version+", while the IG '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+igm.getVersion()+" (will try to run anyway)");
+      if (pi.isWarned()) {
+        log("Version mismatch. This IG is for FHIR version "+version+", while the IG '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+igm.getVersion()+" (will try to run anyway)");
+        pi.setWarned(true);
+      }
     }
 
     loadFromPackage(name, canonical, pi, webref, igm, loadDeps);
@@ -6220,76 +6177,99 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               if (bc.fhirType().equals("CodeSystem")) {
                 context.clearTSCache(bc.getUrl());
               }
+              CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
               if (businessVersion != null) {
                 if (!bc.hasVersion()) {
                   altered = true;
+                  b.append("version="+businessVersion);
                   bc.setVersion(businessVersion);
                 } else if (!bc.getVersion().equals(businessVersion)) {
                   altered = true;
+                  b.append("version="+businessVersion);
                   bc.setVersion(businessVersion);
                 }
               } else if (defaultBusinessVersion != null && bc.getVersion().isEmpty()) {
                 altered = true;
+                b.append("version="+defaultBusinessVersion);
                 bc.setVersion(defaultBusinessVersion);
               }
               if (contacts != null && !contacts.isEmpty()) {
                 altered = true;
+                b.append("contact");
                 bc.getContact().clear();
                 bc.getContact().addAll(contacts);
               } else if (!bc.hasContact() && defaultContacts != null && !defaultContacts.isEmpty()) {
                 altered = true;
+                b.append("contact");
                 bc.getContact().addAll(defaultContacts);
               }
               if (contexts != null && !contexts.isEmpty()) {
                 altered = true;
+                b.append("useContext");
                 bc.getUseContext().clear();
                 bc.getUseContext().addAll(contexts);
               } else if (!bc.hasUseContext() && defaultContexts != null && !defaultContexts.isEmpty()) {
                 altered = true;
+                b.append("useContext");
                 bc.getUseContext().addAll(defaultContexts);
               }
               // Todo: Enable these
               if (copyright != null && !bc.hasCopyright() && bc.supportsCopyright()) {
                 altered = true;
+                b.append("copyright="+copyright);
                 bc.setCopyright(copyright);
               } else if (!bc.hasCopyright() && defaultCopyright != null) {
                 altered = true;
+                b.append("copyright="+defaultCopyright);
                 bc.setCopyright(defaultCopyright);
               }
               if (bc.hasCopyright() && bc.getCopyright().contains("{{{year}}}")) {
                 bc.setCopyright(bc.getCopyright().replace("{{{year}}}", Integer.toString(Calendar.getInstance().get(Calendar.YEAR))));
                 altered = true;
+                b.append("copyright="+bc.getCopyright());
               }
               if (jurisdictions != null && !jurisdictions.isEmpty()) {
                 altered = true;
+                b.append("jurisdiction");
                 bc.getJurisdiction().clear();
                 bc.getJurisdiction().addAll(jurisdictions);
               } else if (!bc.hasJurisdiction() && defaultJurisdictions != null && !defaultJurisdictions.isEmpty()) {
                 altered = true;
+                b.append("jurisdiction");
                 bc.getJurisdiction().addAll(defaultJurisdictions);
               }
               if (publisher != null) {
                 altered = true;
+                b.append("publisher="+publisher);
                 bc.setPublisher(publisher);
               } else if (!bc.hasPublisher() && defaultPublisher != null) {
                 altered = true;
+                b.append("publisher="+defaultPublisher);
                 bc.setPublisher(defaultPublisher);
               }
 
 
               if (!bc.hasDate()) {
                 altered = true;
+                b.append("date");
                 bc.setDateElement(new DateTimeType(execTime));
               }
               if (!bc.hasStatus()) {
                 altered = true;
+                b.append("status=draft");
                 bc.setStatus(PublicationStatus.DRAFT);
               }
               if (new AdjunctFileLoader(binaryPaths, cql).replaceAttachments2(f, r)) {
                 altered = true;
               }
               if (altered) {
-                r.setElement(convertToElement(r, bc));
+                if (Utilities.existsInList(r.fhirType(), "GraphDefinition")) {
+                  f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.PROCESSING, bc.fhirType()+".where(url = '"+bc.getUrl()+"')", 
+                      "The resource needed to modified during loading to apply common headers "+b.toString()+" but this isn't possible for the type "+r.fhirType()+" because version conversion isn't working completely",
+                      IssueSeverity.WARNING).setMessageId(PublisherMessageIds.RESOURCE_CONVERSION_NOT_POSSIBLE));
+                } else {
+                  r.setElement(convertToElement(r, bc));
+                }
               }
               igpkp.checkForPath(f, r, bc, false);
               try {
@@ -6991,9 +6971,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (!vm.getLocation().startsWith(loc)) {
         vm.setLocation(loc+": "+vm.getLocation());
       }
-      file.getErrors().add(vm);
+      if (!alreadyExists(file.getErrors(), vm)) {
+        file.getErrors().add(vm);
+      }
       r.getErrors().add(vm);
     }
+  }
+
+  private boolean alreadyExists(List<ValidationMessage> list, ValidationMessage vm) {
+    for (ValidationMessage t : list) {
+      if (t.matches(vm)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private void addProfile(List<StructureDefinition> profiles, String ref, String rt) {
@@ -8639,8 +8630,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     for (ValueSetExpansionContainsComponent c: numExpand.getValueset().getExpansion().getContains()) {
       String code = countryCodeForName.get(c.getDisplay());
-      if (code==null)
-        throw new Exception("Unable to find 3-character code having same country code as ISO numeric code " + c.getCode() + " - " + c.getDisplay());
+//      if (code==null)
+//        throw new Exception("Unable to find 3-character code having same country code as ISO numeric code " + c.getCode() + " - " + c.getDisplay());
       countryCodeForNumeric.put(c.getCode(), code);
     }
     for (ValueSetExpansionContainsComponent c: stateExpand.getValueset().getExpansion().getContains()) {
@@ -9747,6 +9738,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         break;
       case Library:
         generateOutputsLibrary(f, r, (Library) res, vars, prefixForContainer);
+        break;
+      case ExampleScenario:
+        generateOutputsExampleScenario(f, r, (ExampleScenario) res, vars, prefixForContainer);
         break;
       default:
         if (res instanceof CanonicalResource) {
@@ -10931,6 +10925,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       counter++;
     }
+  }
+
+  private void generateOutputsExampleScenario(FetchedFile f, FetchedResource r, ExampleScenario scen, Map<String,String> vars, String prefixForContainer) throws Exception {
+    ExampleScenarioRenderer er = new ExampleScenarioRenderer(context, checkAppendSlash(specPath), scen, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, rc.copy().setDefinitionsTarget(igpkp.getDefinitionsName(r)));
+    if (igpkp.wantGen(r, "actor-table"))
+      fragment("ExampleScenario-"+prefixForContainer+scen.getId()+"-actor-table", er.render(ExampleScenarioRendererMode.ACTORS), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "instance-table"))
+      fragment("ExampleScenario-"+prefixForContainer+scen.getId()+"-instance-table", er.render(ExampleScenarioRendererMode.INSTANCES), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "processes"))
+      fragment("ExampleScenario-"+prefixForContainer+scen.getId()+"-processes", er.render(ExampleScenarioRendererMode.PROCESSES), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "process-diagram"))
+      fragment("ExampleScenario-"+prefixForContainer+scen.getId()+"-process-diagram", er.renderDiagram(), f.getOutputNames(), r, vars, null);
   }
 
   private void generateOutputsQuestionnaire(FetchedFile f, FetchedResource r, Questionnaire q, Map<String,String> vars, String prefixForContainer) throws Exception {
