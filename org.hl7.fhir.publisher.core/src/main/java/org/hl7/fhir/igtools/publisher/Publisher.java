@@ -9048,20 +9048,26 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     s = s + "<td style=\"vertical-align:top;text-align:left;background-color:white;padding:0px 4px 0px 4px;white-space:nowrap;background-image:url(tbl_bck0.png)\" class=\"hierarchy\">";
     s = s + "<img style=\"background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"tbl_spacer.png\"/>";
     s = s + indents;
-    if (!label.equals("0")) {
+    if (!label.equals("0") && !page.hasPage()) {
       if (last)
         s = s + "<img style=\"background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"tbl_vjoin_end.png\"/>";
       else
         s = s + "<img style=\"background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"tbl_vjoin.png\"/>";
     }
     // lloyd check
+    if (page.hasPage() && !label.equals("0"))
+      if (last)
+        s = s + "<img onClick=\"tableRowAction(this)\" src=\"tbl_vjoin_end-open.png\" alt=\".\" style=\"background-color: inherit\" class=\"hierarchy\"/>";
+      else
+        s = s + "<img onClick=\"tableRowAction(this)\" src=\"tbl_vjoin-open.png\" alt=\".\" style=\"background-color: inherit\" class=\"hierarchy\"/>";
     if (page.hasPage())
-      s = s + "<img onClick=\"tableRowAction(this)\" src=\"tbl_vjoin-open.png\" alt=\".\" style=\"background-color: inherit\" class=\"hierarchy\"/>";
-    s = s + "<img style=\"background-color:white;background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"icon_page.gif\"/>";
+      s = s + "<img style=\"background-color:white;background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"icon_page-child.gif\"/>";
+    else
+      s = s + "<img style=\"background-color:white;background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"icon_page.gif\"/>";
     if (page.hasName()) { 
-      s = s + "<a title=\"" + Utilities.escapeXml(page.getTitle()) + "\" href=\"" + (currentOffset!=null ? currentOffset + "/" : "") + page.getName() +"\">" + label + " " + Utilities.escapeXml(page.getTitle()) + "</a></td></tr>";
+      s = s + "<a title=\"" + Utilities.escapeXml(page.getTitle()) + "\" href=\"" + (currentOffset!=null ? currentOffset + "/" : "") + page.getName() +"\"> " + label + " " + Utilities.escapeXml(page.getTitle()) + "</a></td></tr>";
     } else {
-      s = s + "<a title=\"" + Utilities.escapeXml(page.getTitle()) + "\">" + label + " " + Utilities.escapeXml(page.getTitle()) + "</a></td></tr>";      
+      s = s + "<a title=\"" + Utilities.escapeXml(page.getTitle()) + "\"> " + label + " " + Utilities.escapeXml(page.getTitle()) + "</a></td></tr>";
     }
 
     int total = page.getPage().size();
