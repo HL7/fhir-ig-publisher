@@ -46,8 +46,8 @@ public class IGPublisherFrame extends javax.swing.JFrame {
 
   private static final String LOG_PREFIX = "--$%^^---";
 
-  JCheckBox noValidateCheckbox;
-  JCheckBox noNarrativeCheckbox;
+  JTextField noValidateTextField;
+  JTextField noNarrativeTextField;
 
   JCheckBox noSushiCheckbox;
 
@@ -71,7 +71,13 @@ public class IGPublisherFrame extends javax.swing.JFrame {
   private BackgroundPublisherTask task;
   private StringBuilder fullLog = new StringBuilder();
   private String qa;
-  
+  private JLabel noValidateLabel;
+  private JLabel noNarrativeLabel;
+
+  private List<JComponent> igOptionsComponents;
+
+  private List<JComponent> publishedIgComponents;
+
   /**
    * Creates new form IGPublisherFrame
    * @throws IOException 
@@ -98,30 +104,7 @@ public class IGPublisherFrame extends javax.swing.JFrame {
 
     optionsPanel = new javax.swing.JPanel();
 
-    javax.swing.GroupLayout optionsPanelLayout = new javax.swing.GroupLayout(optionsPanel );
-    optionsPanel.setLayout(optionsPanelLayout);
-
-    optionsPanelLayout.setHorizontalGroup(
-            optionsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(optionsPanelLayout.createSequentialGroup()
-                            .addContainerGap()
-                            .addComponent(noValidateCheckbox)
-                            .addComponent(noNarrativeCheckbox)
-                            .addComponent(noSushiCheckbox)
-                            .addComponent(debugCheckbox)
-                            .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-    );
-    optionsPanelLayout.setVerticalGroup(
-            optionsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(optionsPanelLayout.createParallelGroup()
-                            .addComponent(noValidateCheckbox)
-                            .addComponent(noNarrativeCheckbox)
-                            .addComponent(noSushiCheckbox)
-                            .addComponent(debugCheckbox)
-                            .addGap(0, 13, Short.MAX_VALUE))
-    );
-
-
+    createOptionsLayout();
 
     setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
@@ -171,7 +154,7 @@ public class IGPublisherFrame extends javax.swing.JFrame {
         layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
         .addGroup(layout.createSequentialGroup()
             .addComponent(mainToolBar, javax.swing.GroupLayout.PREFERRED_SIZE, 25, javax.swing.GroupLayout.PREFERRED_SIZE)
-            .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED).addComponent(optionsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, 50, javax.swing.GroupLayout.PREFERRED_SIZE)
+            .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED).addComponent(optionsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, 125, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
             .addComponent(logScrollPane, javax.swing.GroupLayout.DEFAULT_SIZE, 175, Short.MAX_VALUE)
             .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -186,11 +169,57 @@ public class IGPublisherFrame extends javax.swing.JFrame {
 
   }
 
+  private void createOptionsLayout() {
+    GroupLayout groupLayout = new GroupLayout(optionsPanel);
+    groupLayout.setAutoCreateGaps(true);
+    groupLayout.setAutoCreateContainerGaps(true);
+    optionsPanel.setLayout(groupLayout);
+    GroupLayout.SequentialGroup columnGroups = groupLayout.createSequentialGroup();
+
+    // add each column horizontally.
+
+    // first column
+    columnGroups.addGroup(groupLayout.createParallelGroup()
+            .addComponent(noSushiCheckbox)
+            .addComponent(debugCheckbox)
+            .addComponent(noValidateLabel)
+            .addComponent(noNarrativeLabel)
+    );
+
+    // second column
+    columnGroups.addGroup(groupLayout.createParallelGroup()
+                    .addComponent(noValidateTextField)
+                    .addComponent(noNarrativeTextField)
+            );
+
+    groupLayout.setHorizontalGroup(columnGroups);
+
+    // create a sequence of row groups.
+    GroupLayout.SequentialGroup rowGroups = groupLayout.createSequentialGroup();
+
+    // add each row vertically.
+
+    rowGroups.addGroup(groupLayout.createSequentialGroup().addComponent(noSushiCheckbox));
+
+    rowGroups.addGroup(groupLayout.createSequentialGroup().addComponent(debugCheckbox));
+
+    // first row
+    rowGroups.addGroup(groupLayout.createParallelGroup(GroupLayout.Alignment.BASELINE).addComponent(noValidateLabel).addComponent(noValidateTextField));
+
+    // second row
+    rowGroups.addGroup(groupLayout.createParallelGroup(GroupLayout.Alignment.BASELINE).addComponent(noNarrativeLabel).addComponent(noNarrativeTextField));
+
+    // set vertical groups
+    groupLayout.setVerticalGroup(rowGroups);
+  }
+
   private void createComponents() {
     txtLogTextArea = createTxLogTextArea();
 
-    noNarrativeCheckbox = new JCheckBox("no-narrative");
-    noValidateCheckbox = new JCheckBox("no-validate");
+    noNarrativeLabel = new JLabel("no-narrative");
+    noNarrativeTextField = new JTextField();
+    noValidateLabel = new JLabel("no-validate");
+    noValidateTextField = new JTextField();
     noSushiCheckbox = new JCheckBox("no-sushi");
     debugCheckbox = new JCheckBox("debug");
 
@@ -198,9 +227,23 @@ public class IGPublisherFrame extends javax.swing.JFrame {
     chooseIGButton = createChooseIGButton();
     igNameComboBox = createIgNameComboBox();
 
+    igOptionsComponents = List.of(chooseIGButton,
+    igNameComboBox,
+    noSushiCheckbox,
+    debugCheckbox,
+    noNarrativeTextField,
+    noValidateTextField
+    );
+
     debugSummaryButton = createDebugSumaryButton();
     viewQAButton = createViewQAButton();
     viewIgButton = createViewIGButton();
+
+    publishedIgComponents = List.of(
+            debugSummaryButton,
+            viewQAButton,
+            viewIgButton
+    );
   }
 
   private JComboBox<String> createIgNameComboBox() {
@@ -333,7 +376,7 @@ public class IGPublisherFrame extends javax.swing.JFrame {
     ini.save();    
   }
 
-  // ------ Execcution ------------------------------------------------------------------------------------------
+  // ------ Execution ------------------------------------------------------------------------------------------
 
   public class BackgroundPublisherTask extends SwingWorker<String, String> implements ILoggingService  {
 
@@ -341,13 +384,17 @@ public class IGPublisherFrame extends javax.swing.JFrame {
     @Override
     public String doInBackground() {
       qa = null;
-      Publisher pu = new Publisher();
-      pu.setConfigFile((String) igNameComboBox.getSelectedItem());
-      pu.setLogger(this);
-      pu.setCacheOption(CacheOption.LEAVE);
+      Publisher publisher = new Publisher();
+      publisher.setConfigFile((String) igNameComboBox.getSelectedItem());
+      publisher.setDebug(debugCheckbox.isSelected());
+      publisher.setNoSushi(noSushiCheckbox.isSelected());
+      Publisher.parseAndAddNoNarrativeParam(publisher, noNarrativeTextField.getText());
+      Publisher.parseAndAddNoValidateParam(publisher, noNarrativeTextField.getText());
+      publisher.setLogger(this);
+      publisher.setCacheOption(CacheOption.LEAVE);
       try {
-        pu.execute();
-        qa = pu.getQAFile();
+        publisher.execute();
+        qa = publisher.getQAFile();
       } catch (Exception e) {
         logMessage("Error : "+e.getMessage());
         for (StackTraceElement m : e.getStackTrace()) 
@@ -383,29 +430,40 @@ public class IGPublisherFrame extends javax.swing.JFrame {
     @Override
     protected void done() {
       executeButton.setEnabled(true);
-      chooseIGButton.setEnabled(true);
-      igNameComboBox.setEnabled(true);
-      debugSummaryButton.setEnabled(true);
-      viewQAButton.setEnabled(true);
-      viewIgButton.setEnabled(true);
+
+      setIgOptionsEnabled(true);
+
+      setPublishedIgComponentsEnabled(true);
+
       executeButton.setLabel("Execute");
     }
 
     @Override
     public boolean isDebugLogging() {
-      return false;
+      return debugCheckbox.isSelected();
     }
 
 
   }
 
+  private void setIgOptionsEnabled(boolean enabled) {
+    for (JComponent component : igOptionsComponents) {
+      component.setEnabled(enabled);
+    }
+  }
+
+  private void setPublishedIgComponentsEnabled(boolean enabled) {
+    for (JComponent component : publishedIgComponents) {
+      component.setEnabled(enabled);
+    }
+  }
   private void btnExecuteClick(java.awt.event.ActionEvent evt) {
     executeButton.setEnabled(false);
-    chooseIGButton.setEnabled(false);
-    igNameComboBox.setEnabled(false);
-    debugSummaryButton.setEnabled(false);
-    viewQAButton.setEnabled(false);
-    viewIgButton.setEnabled(false);
+
+    setIgOptionsEnabled(false);
+
+    setPublishedIgComponentsEnabled(false);
+
     executeButton.setLabel("Running");
     txtLogTextArea.setText("");
     fullLog.setLength(0);

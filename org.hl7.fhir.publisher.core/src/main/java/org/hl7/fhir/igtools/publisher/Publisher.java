@@ -620,9 +620,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private Publisher childPublisher = null;
   private GenerationTool tool;
   private boolean genExampleNarratives = true;
-  private List<String> noNarratives = new ArrayList<>();
+  private final List<String> noNarratives = new ArrayList<>();
   private List<FetchedResource> noNarrativeResources = new ArrayList<>();
-  private List<String> noValidate = new ArrayList<>();
+  private final List<String> noValidate = new ArrayList<>();
   private List<FetchedResource> noValidateResources = new ArrayList<>();
 
   private List<String> resourceDirs = new ArrayList<String>();
@@ -802,7 +802,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private Coding expectedJurisdiction;
 
-  private boolean noFSH;
+  public boolean isNoSushi() {
+    return noSushi;
+  }
+
+  public void setNoSushi(boolean noSushi) {
+    this.noSushi = noSushi;
+  }
+
+  private boolean noSushi;
 
   private Set<String> loadedIds;
 
@@ -2257,11 +2265,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     if (configFile != null) {
       File fsh = new File(Utilities.path(focusDir(), "fsh"));
-      if (fsh.exists() && fsh.isDirectory() && !noFSH) {
+      if (fsh.exists() && fsh.isDirectory() && !noSushi) {
         new FSHRunner(this).runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())), mode);
       } else {
         File fsh2 = new File(Utilities.path(focusDir(), "input", "fsh"));
-        if (fsh2.exists() && fsh2.isDirectory() && !noFSH) {
+        if (fsh2.exists() && fsh2.isDirectory() && !noSushi) {
           new FSHRunner(this).runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())), mode);
         }
       }
@@ -11519,14 +11527,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
 
       if (hasNamedParam(args, "-no-narrative")) {
-        for (String p : getNamedParam(args, "-non-narrative").split("\\,")) {
-          self.noNarratives.add(p);
-        }
+        String param = getNamedParam(args, "-no-narrative");
+        parseAndAddNoNarrativeParam(self, param);
       }
       if (hasNamedParam(args, "-no-validate")) {
-        for (String p : getNamedParam(args, "-non-validate").split("\\,")) {
-          self.noValidate.add(p);
-        }
+        String param = getNamedParam(args, "-no-validate");
+        parseAndAddNoValidateParam(self, param);
       }
       if (hasNamedParam(args, "-no-network")) {
         FhirSettings.setProhibitNetworkAccess(true);
@@ -11652,7 +11658,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         self.setCacheOption(CacheOption.LEAVE);
       }
       if (hasNamedParam(args, "-no-sushi")) {
-        self.noFSH = true;
+        self.noSushi = true;
       }
       try {
         self.execute();
@@ -11686,6 +11692,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     if (!hasNamedParam(args, "-no-exit")) {
       System.exit(exitCode);
+    }
+  }
+
+  public static void parseAndAddNoNarrativeParam(Publisher self, String param) {
+    for (String p : param.split("\\,")) {
+      self.noNarratives.add(p);
+    }
+  }
+
+  public static void parseAndAddNoValidateParam(Publisher publisher, String param) {
+    for (String p : param.split("\\,")) {
+      publisher.noValidate.add(p);
     }
   }
 
