@@ -17,12 +17,16 @@ import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
+import org.hl7.fhir.r5.comparison.VersionComparisonAnnotation;
+import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.CanonicalResourceComparison;
+import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.ChangeAnalysisState;
 import org.hl7.fhir.r5.conformance.profile.BindingResolution;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.XmlParser;
+import org.hl7.fhir.r5.model.Base;
 import org.hl7.fhir.r5.model.BooleanType;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CanonicalType;
@@ -91,6 +95,7 @@ import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator.TableModel;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
+import org.hl7.fhir.utilities.xhtml.XhtmlParser;
 
 public class StructureDefinitionRenderer extends CanonicalRenderer {
   public class BindingResolutionDetails {
@@ -105,6 +110,135 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
   }
 
+  private enum ListItemStatus { New, Unchanged, Removed};
+
+  private abstract class ItemWithStatus {
+    ListItemStatus status = ListItemStatus.New; // new, unchanged, removed    
+
+    protected abstract void renderDetails(XhtmlNode f);
+    protected abstract boolean matches(ItemWithStatus other);
+
+    public void render(XhtmlNode x) {
+      XhtmlNode f = x;
+      if (status == ListItemStatus.Unchanged) {
+        f = unchanged(f);
+      } else if (status == ListItemStatus.Removed) {
+        f = removed(f);
+      }
+      renderDetails(f);
+    }
+  }
+
+  protected class StatusList<T extends ItemWithStatus> extends ArrayList<T> implements List<T> {
+
+    public boolean merge(T item) {
+      if (item == null) {
+        return false;
+      }
+      boolean found = false;
+      for (T t : this) {
+        if (t.matches(item)) {
+          found = true;
+          t.status = ListItemStatus.Unchanged;
+        }
+      }
+      if (!found) {
+        item.status = ListItemStatus.Removed;
+        return add(item);        
+      } else {
+        return false;
+      }
+    }
+    
+    public boolean add(T item) {
+      if (item != null) {
+        return super.add(item);
+      } else {
+        return false;
+      }
+    }
+  }
+
+  private class ResolvedCanonical extends ItemWithStatus {
+    String url; // what we used to resolve
+    CanonicalResource cr; // what we resolved
+
+    public ResolvedCanonical(String url, CanonicalResource cr) {
+      this.url = url;
+      this.cr = cr;
+    }
+    public void renderDetails(XhtmlNode f) {
+      if (cr != null && cr.hasWebPath()) {
+        f.ah(cr.getWebPath()).tx(cr.present());
+      } else {
+        f.code().tx(url);            
+      }
+    }
+    protected boolean matches(ItemWithStatus other) {
+      return ((ResolvedCanonical) other).url.equals(url);
+    }
+  }
+
+  private class InvariantWithStatus extends ItemWithStatus {
+    ElementDefinitionConstraintComponent value;
+    protected InvariantWithStatus(ElementDefinitionConstraintComponent value) {
+      this.value = value;
+    }
+
+    protected boolean matches(ItemWithStatus other) {
+      return ((InvariantWithStatus) other).value.equalsDeep(value);
+    }
+    
+    public void renderDetails(XhtmlNode f) {
+      f.b().attribute("title", "Formal Invariant Identifier").tx(value.getKey());
+      f.tx(": ");
+      f.tx(value.getHuman());
+      f.tx(" (");
+      if (status == ListItemStatus.New) {
+        f.code().tx(value.getExpression());
+      } else {
+        f.tx(value.getExpression());
+      }
+      f.tx(")");      
+    }
+  }
+  
+  private class DiscriminatorWithStatus extends ItemWithStatus {
+    ElementDefinitionSlicingDiscriminatorComponent value;
+    protected DiscriminatorWithStatus(ElementDefinitionSlicingDiscriminatorComponent value) {
+      this.value = value;
+    }
+
+    protected boolean matches(ItemWithStatus other) {
+      return ((DiscriminatorWithStatus) other).value.equalsDeep(value);
+    }
+    
+    public void renderDetails(XhtmlNode f) {
+      f.tx(value.getType().toCode());
+      f.tx(" @ ");
+      f.tx(value.getPath());
+    }
+  }
+  
+  private class ValueWithStatus extends ItemWithStatus {
+    PrimitiveType value;
+    protected ValueWithStatus(PrimitiveType value) {
+      this.value = value;
+    }
+
+    protected boolean matches(ItemWithStatus other) {
+      return ((ValueWithStatus) other).value.equalsDeep(value);
+    }
+    
+    public void renderDetails(XhtmlNode f) {
+      if (value.hasUserData("render.link")) {
+        f = f.ah(value.getUserString("render.link"));
+      }
+      f.tx(value.asStringValue());
+    }
+  }
+  
+  
   public static final String RIM_MAPPING = "http://hl7.org/v3";
   public static final String v2_MAPPING = "http://hl7.org/v2";
   public static final String LOINC_MAPPING = "http://loinc.org";
@@ -134,8 +268,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private org.hl7.fhir.r5.renderers.StructureDefinitionRenderer sdr;
 
-  public StructureDefinitionRenderer(IWorkerContext context, String corePath, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants,Map<String, Map<String, ElementDefinition>> mapCache, String specPath) {
-    super(context, corePath, sd, destDir, igp, maps, allTargets, markdownEngine, packge, gen);
+  public StructureDefinitionRenderer(IWorkerContext context, String corePath, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants,Map<String, Map<String, ElementDefinition>> mapCache, String specPath, String versionToAnnotate) {
+    super(context, corePath, sd, destDir, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate);
     this.sd = sd;
     this.destDir = destDir;
     utils = new ProfileUtilities(context, null, igp);
@@ -470,6 +604,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     else {
       XhtmlComposer composer = new XhtmlComposer(XhtmlComposer.HTML);
       StructureDefinition sdCopy = sd.copy();
+      
       sdCopy.getSnapshot().setElement(getKeyElements());
       sdr.getContext().setStructureMode(mode);
       org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", false, false, outputTracker, true, gen, toTabs ? ANCHOR_PREFIX_KEY : ANCHOR_PREFIX_SNAP);
@@ -511,7 +646,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
               edCopy.setUserData("render.opaque", true);
             }
             edCopy.setBinding(null);
-            ed.getConstraint().clear();
+            edCopy.getConstraint().clear();
           }
           edCopy.setMustSupport(false);
           mustSupportElements.add(edCopy);
@@ -1071,9 +1206,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   public String dict(boolean incProfiledOut, int mode, String anchorPrefix) throws Exception {
     int i = 1;
-    StringBuilder b = new StringBuilder();
-    b.append("<p>Guidance on how to interpret the contents of this table can be found <a href=\"https://build.fhir.org/ig/FHIR/ig-guidance//readingIgs.html#data-dictionaries\">here</a>.</p>\r\n");
-    b.append("<table class=\"dict\">\r\n");
+    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+    var p = x.para();
+    p.tx("Guidance on how to interpret the contents of this table can be found ");
+    p.ah("https://build.fhir.org/ig/FHIR/ig-guidance//readingIgs.html#data-dictionaries").tx("here");
+    XhtmlNode t = x.table("dict");
 
     Map<String, ElementDefinition> allAnchors = new HashMap<>();
     List<ElementDefinition> excluded = new ArrayList<>();
@@ -1094,39 +1231,41 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         else if (mode==GEN_MODE_KEY)
           compareElement = getRootElement(ec);
 
-        String anchors = makeAnchors(ec, anchorPrefix);
+        List<String> anchors = makeAnchors(ec, anchorPrefix);
+        String title = ec.getId();
+        XhtmlNode tr = t.tr();
+        XhtmlNode sp = tr.td("structure").colspan(2).spanClss("self-link-parent");
+        for (String s : anchors) {
+          sp.an(s).tx(" ");
+        }
+        sp.span("color: grey", null).tx(Integer.toString(i++));
+        sp.b().tx(". "+title);
+        link(sp, ec.getId(), anchorPrefix);
         if (isProfiledExtension(ec)) {
           StructureDefinition extDefn = context.fetchResource(StructureDefinition.class, ec.getType().get(0).getProfile().get(0).getValue());
           if (extDefn == null) {
-            String title = ec.getId();
-            b.append("  <tr><td colspan=\"2\" class=\"structure\"><span class=\"self-link-parent\">"+anchors+"<span style=\"color: grey\">" + Integer.toString(i++) + ".</span> <b>" + title + "</b>" + link(ec.getId(), anchorPrefix) + "</span></td></tr>\r\n");
-            generateElementInner(b, sd, ec, 1, null, compareElement, null);
+            generateElementInner(t, sd, ec, 1, null, compareElement, null);
           } else {
-            String title = ec.getId();
-            b.append("  <tr><td colspan=\"2\" class=\"structure\"><span class=\"self-link-parent\">"+anchors);
-            b.append("<span style=\"color: grey\">" + Integer.toString(i++) + ".</span> <b>" + title + "</b>" + link(ec.getId(), anchorPrefix) + "</span></td></tr>\r\n");
             ElementDefinition valueDefn = getExtensionValueDefinition(extDefn);
             ElementDefinition compareValueDefn = null;
             try {
               StructureDefinition compareExtDefn = context.fetchResource(StructureDefinition.class, compareElement.getType().get(0).getProfile().get(0).getValue());
               compareValueDefn = getExtensionValueDefinition(extDefn);
             } catch (Exception except) {}
-            generateElementInner(b, sd, ec, valueDefn == null || valueDefn.prohibited() ? 2 : 3, valueDefn, compareElement, compareValueDefn);
+            generateElementInner(t, sd, ec, valueDefn == null || valueDefn.prohibited() ? 2 : 3, valueDefn, compareElement, compareValueDefn);
             // generateElementInner(b, extDefn, extDefn.getSnapshot().getElement().get(0), valueDefn == null ? 2 : 3, valueDefn);
           }
         } else {
-          String title = ec.getId();
-          b.append("  <tr><td colspan=\"2\" class=\"structure\"><span class=\"self-link-parent\">"+anchors);
-          b.append("<span style=\"color: grey\">" + Integer.toString(i++) + ".</span> <b>" + title + "</b>" + link(ec.getId(), anchorPrefix) + "</span></td></tr>\r\n");
-          generateElementInner(b, sd, ec, mode, null, compareElement, null);
-          if (ec.hasSlicing())
-            generateSlicing(b, sd, ec, ec.getSlicing(), compareElement, mode);
+          generateElementInner(t, sd, ec, mode, null, compareElement, null);
+          if (ec.hasSlicing()) {
+            generateSlicing(t, sd, ec, ec.getSlicing(), compareElement, mode);
+          }
         }
       }
+      t.tx("\r\n");
     }
-    b.append("</table>\r\n");
     i++;
-    return b.toString();
+    return new XhtmlComposer(false, false).compose(x.getChildNodes());
   }
 
   private void checkInScope(List<ElementDefinition> stack, List<ElementDefinition> excluded) {
@@ -1208,20 +1347,28 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return ec.getPath().startsWith(ed.getPath()+".");
   }
 
-  private String makeAnchors(ElementDefinition ed, String anchorPrefix) {
+  private List<String> makeAnchors(ElementDefinition ed, String anchorPrefix) {
     List<String> list = (List<String>) ed.getUserData("dict.generator.anchors");
-    StringBuilder b = new StringBuilder();
-    b.append("<a name=\"" + anchorPrefix + ed.getId() + "\"> </a>");
+    List<String>  res = new ArrayList<>();
+    res.add(anchorPrefix + ed.getId());
     for (String s : list) {
       if (!s.equals(ed.getId())) {
-        b.append("<a name=\"" + anchorPrefix + s + "\"> </a>");
+        res.add(anchorPrefix + s);
       }
     }
-    return b.toString();
+    return res;
   }
 
-  private String link(String id, String anchorPrefix) {
-    return "<a href=\"#" + anchorPrefix + id + "\" title=\"link to here\" class=\"self-link\"><svg viewBox=\"0 0 1792 1792\" width=\"16\" class=\"self-link\" height=\"16\"><path d=\"M1520 1216q0-40-28-68l-208-208q-28-28-68-28-42 0-72 32 3 3 19 18.5t21.5 21.5 15 19 13 25.5 3.5 27.5q0 40-28 68t-68 28q-15 0-27.5-3.5t-25.5-13-19-15-21.5-21.5-18.5-19q-33 31-33 73 0 40 28 68l206 207q27 27 68 27 40 0 68-26l147-146q28-28 28-67zm-703-705q0-40-28-68l-206-207q-28-28-68-28-39 0-68 27l-147 146q-28 28-28 67 0 40 28 68l208 208q27 27 68 27 42 0 72-31-3-3-19-18.5t-21.5-21.5-15-19-13-25.5-3.5-27.5q0-40 28-68t68-28q15 0 27.5 3.5t25.5 13 19 15 21.5 21.5 18.5 19q33-31 33-73zm895 705q0 120-85 203l-147 146q-83 83-203 83-121 0-204-85l-206-207q-83-83-83-203 0-123 88-209l-88-88q-86 88-208 88-120 0-204-84l-208-208q-84-84-84-204t85-203l147-146q83-83 203-83 121 0 204 85l206 207q83 83 83 203 0 123-88 209l88 88q86-88 208-88 120 0 204 84l208 208q84 84 84 204z\" fill=\"navy\"></path></svg></a>";
+  private void link(XhtmlNode x, String id, String anchorPrefix) {
+    var ah = x.ah("#" + anchorPrefix + id);
+    ah.attribute("title", "link to here");
+    ah.attribute("class", "self-link");
+    var svg = ah.svg();
+    svg.attribute("viewBox", "0 0 1792 1792");
+    svg.attribute("width", "16");
+    svg.attribute("height", "16");
+    svg.attribute("class", "self-link");
+    svg.path("M1520 1216q0-40-28-68l-208-208q-28-28-68-28-42 0-72 32 3 3 19 18.5t21.5 21.5 15 19 13 25.5 3.5 27.5q0 40-28 68t-68 28q-15 0-27.5-3.5t-25.5-13-19-15-21.5-21.5-18.5-19q-33 31-33 73 0 40 28 68l206 207q27 27 68 27 40 0 68-26l147-146q28-28 28-67zm-703-705q0-40-28-68l-206-207q-28-28-68-28-39 0-68 27l-147 146q-28 28-28 67 0 40 28 68l208 208q27 27 68 27 42 0 72-31-3-3-19-18.5t-21.5-21.5-15-19-13-25.5-3.5-27.5q0-40 28-68t68-28q15 0 27.5 3.5t25.5 13 19 15 21.5 21.5 18.5 19q33-31 33-73zm895 705q0 120-85 203l-147 146q-83 83-203 83-121 0-204-85l-206-207q-83-83-83-203 0-123 88-209l-88-88q-86 88-208 88-120 0-204-84l-208-208q-84-84-84-204t85-203l147-146q83-83 203-83 121 0 204 85l206 207q83 83 83 203 0 123-88 209l88 88q86-88 208-88 120 0 204 84l208 208q84 84 84 204z");     
   }
 
   private boolean isProfiledExtension(ElementDefinition ec) {
@@ -1235,148 +1382,229 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
     return null;
   }
-
-  public String compareMarkdown(String location, PrimitiveType md, PrimitiveType compare, int mode) throws FHIRException {
-    if (compare == null)
-      return processMarkdown(location, md);
-    String newMd = processMarkdown(location, md);
-    String oldMd = processMarkdown(location, compare);
-    return compareString(newMd, oldMd, mode);
-  }
-
-  public String compareString(String newStr, String oldStr, int mode) {
-    if (mode==GEN_MODE_SNAP || mode==GEN_MODE_MS)
-      return newStr;
-    if (oldStr==null || oldStr.isEmpty())
-      if (newStr==null || newStr.isEmpty())
+      
+  public XhtmlNode compareMarkdown(String location, PrimitiveType md, PrimitiveType compare, int mode) throws FHIRException, IOException {
+    if (compare == null || mode == GEN_MODE_DIFF) {
+      if (md.hasValue()) {
+        String xhtml = processMarkdown(location, md);
+        XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+        VersionComparisonAnnotation.renderDiv(md, x).add(new XhtmlParser().parseFragment(xhtml));
+        return x;
+      } else {
         return null;
-      else
-        return newStr;
-    if (oldStr!=null && !oldStr.isEmpty() && (newStr==null || newStr.isEmpty())) {
-      if (mode == GEN_MODE_DIFF)
-        return "";
-      else
-        return removed(oldStr);
-    }
-    if (oldStr.equals(newStr))
-      if (mode==GEN_MODE_DIFF)
-        return "";
-      else
-        return unchanged(newStr);
-    if (newStr.startsWith(oldStr))
-      return unchanged(oldStr) + newStr.substring(oldStr.length());
-    // TODO: improve comparision in this fall-through case, by looking for matches in sub-paragraphs?
-    return newStr + removed(oldStr);
-  }
-
-  public String unchanged(String s) {
-    return "<span style='color:DarkGray'>" + s + "</span>";
-  }
-
-  public String removed(String s) {
-    return "<span style='color:DarkGray;text-decoration:line-through'>" + s + "</span>";
-  }
-
-  private void generateElementInner(StringBuilder b, StructureDefinition profile, ElementDefinition d, int mode, ElementDefinition value, ElementDefinition compare, ElementDefinition compareValue) throws Exception {
-    boolean root = !d.getPath().contains(".");
-    tableRow(b, translate("sd.dict", "SliceName"), "profiling.html#slicing", d.getSliceName());
-    tableRowNE(b, translate("sd.dict", "Definition"), null, compareMarkdown(profile.getName(), d.getDefinitionElement(), compare==null ? null : compare.getDefinitionElement(), mode));
-    tableRowNE(b, translate("sd.dict", "Note"), null, businessIdWarning(profile.getName(), tail(d.getPath())));
-    tableRowNE(b, translate("sd.dict", "Control"), "conformance-rules.html#conformance", describeCardinality(d, compare, mode) + summariseConditions(d.getCondition(), compare==null?null:compare.getCondition(), mode));
-    tableRowNE(b, translate("sd.dict", "Binding"), "terminologies.html", describeBinding(profile, d, d.getPath(), compare, mode));
-    if (d.hasContentReference()) {
-      tableRow(b, translate("sd.dict", "Type"), null, "See " + d.getContentReference().substring(1));
+      }
+    } else if (areEqual(compare, md)) {
+      if (md.hasValue()) {
+        String xhtml = "<div>"+processMarkdown(location, md)+"</div>";
+        XhtmlNode div = new XhtmlParser().parseFragment(xhtml);
+        for (XhtmlNode n : div.getChildNodes()) {
+          if (n.getNodeType() == NodeType.Element) {
+            n.style(unchangedStyle());
+          }
+        }
+        return div;
+      } else {
+        return null;
+      }
     } else {
-      tableRowNE(b, translate("sd.dict", "Type"), "datatypes.html", describeTypes(d.getType(), false, compare, mode) + (value==null ? "" : processSecondary(mode, value, compareValue, mode)));
+      XhtmlNode ndiv = new XhtmlNode(NodeType.Element, "div");
+      if (md.hasValue()) {
+        String xhtml = "<div>"+processMarkdown(location, md)+"</div>";
+        XhtmlNode div = new XhtmlParser().parseFragment(xhtml);
+        ndiv.copyAllContent(div);
+      }
+      if (compare.hasValue()) {
+        String xhtml = "<div>"+processMarkdown(location, compare)+"</div>";
+        XhtmlNode div = new XhtmlParser().parseFragment(xhtml);
+        for (XhtmlNode n : div.getChildNodes()) {
+          if (n.getNodeType() == NodeType.Element) {
+            n.style(removedStyle());
+          }
+        }
+        ndiv.br();
+        ndiv.copyAllContent(div);
+      }
+      return ndiv;
+    }
+  }
+
+  private boolean areEqual(PrimitiveType compare, PrimitiveType md) {
+    if (compare == null && md == null) {
+      return true;
+    } else if (compare != null && md != null) {
+      String one = compare.getValueAsString();
+      String two = md.getValueAsString();
+      if (one == null && two == null) {
+        return true;
+      } else if (one != null && one.equals(two)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public XhtmlNode compareString(String newStr, Base source, String nLink, String oldStr, String oLink, int mode) {
+    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+    if (mode==GEN_MODE_SNAP || mode==GEN_MODE_MS) {
+      if (newStr != null) {
+        VersionComparisonAnnotation.render(source, x).ah(nLink).tx(newStr);
+      } else {
+        return null;
+      }
+    } else if (oldStr==null || oldStr.isEmpty()) {
+      if (newStr==null || newStr.isEmpty()) {
+        return null;
+      } else {
+        VersionComparisonAnnotation.render(source, x).ah(nLink).tx(newStr);
+      }
+    } else if (oldStr!=null && !oldStr.isEmpty() && (newStr==null || newStr.isEmpty())) {
+      if (mode == GEN_MODE_DIFF) {
+        return null;
+      } else {
+        removed(x).ah(oLink).tx(oldStr);
+      }
+    } else if (oldStr.equals(newStr)) {
+      if (mode==GEN_MODE_DIFF) {
+        return null;
+      } else {
+        unchanged(x).ah(nLink).tx(newStr);
+      }
+    } else if (newStr.startsWith(oldStr)) {
+      unchanged(x).ah(oLink).tx(oldStr);
+      VersionComparisonAnnotation.render(source, x).ah(nLink).tx(newStr.substring(oldStr.length()));
+    } else {
+      // TODO: improve comparision in this fall-through case, by looking for matches in sub-paragraphs?
+      VersionComparisonAnnotation.render(source, x).ah(nLink).tx(newStr);
+      removed(x).ah(oLink).tx(oldStr);
+    }
+    return x;
+  }
+
+  public boolean compareString(XhtmlNode x, String newStr, Base source, String nLink, String oldStr, String oLink, int mode) {
+    XhtmlNode x1 = compareString(newStr, source, nLink, oldStr, oLink, mode);
+    if (x1 == null) {
+      return false;
+    } else {
+      x.getChildNodes().addAll(x1.getChildNodes());
+      return true;
+    }
+  }
+
+  public XhtmlNode unchanged(XhtmlNode x) {
+    return x.span(unchangedStyle());
+  }
+
+  private String unchangedStyle() {
+    return "color:DarkGray";
+  }
+
+  public XhtmlNode removed(XhtmlNode x) {
+    return x.span(removedStyle());
+  }
+
+  private String removedStyle() {
+    return "color:DarkGray;text-decoration:line-through";
+  }
+
+  private void generateElementInner(XhtmlNode tbl, StructureDefinition profile, ElementDefinition d, int mode, ElementDefinition value, ElementDefinition compare, ElementDefinition compareValue) throws Exception {
+    boolean root = !d.getPath().contains(".");
+    boolean slicedExtension = d.hasSliceName() && (d.getPath().endsWith(".extension") || d.getPath().endsWith(".modifierExtension"));
+//    int slicedExtensionMode = (mode == GEN_MODE_KEY) && slicedExtension ? GEN_MODE_SNAP : mode; // see ProfileUtilities.checkExtensionDoco / Task 3970
+    if (d.hasSliceName()) {
+      tableRow(tbl, "SliceName", "profiling.html#slicing").tx(d.getSliceName());
+    }
+    tableRow(tbl, "Definition", null, compareMarkdown(profile.getName(), d.getDefinitionElement(), (compare==null) || slicedExtension ? null : compare.getDefinitionElement(), mode));
+    tableRow(tbl, "Note", null, businessIdWarning(profile.getName(), tail(d.getPath())));
+    tableRow(tbl, "Control", "conformance-rules.html#conformance", describeCardinality(d, compare, mode)); 
+    tableRow(tbl, "Binding", "terminologies.html", describeBinding(profile, d, d.getPath(), compare, mode));
+    if (d.hasContentReference()) {
+      tableRow(tbl, "Type", null, "See " + d.getContentReference().substring(1));
+    } else {
+      tableRow(tbl, "Type", "datatypes.html", describeTypes(d.getType(), false, compare, mode, value, compareValue)); 
     }
     if (d.hasExtension(ToolingExtensions.EXT_DEF_TYPE)) {
-      tableRowNE(b, translate("sd.dict", "Default Type"), "datatypes.html", ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_DEF_TYPE));          
+      tableRow(tbl, "Default Type", "datatypes.html", ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_DEF_TYPE));          
     }
     if (d.hasExtension(ToolingExtensions.EXT_TYPE_SPEC)) {
-      tableRowNE(b, translate("sd.dict", Utilities.pluralize("Type Specifier", d.getExtensionsByUrl(ToolingExtensions.EXT_TYPE_SPEC).size())), "datatypes.html", sdr.formatTypeSpecifiers(context, d));          
+      tableRow(tbl, Utilities.pluralize("Type Specifier", d.getExtensionsByUrl(ToolingExtensions.EXT_TYPE_SPEC).size()), "datatypes.html", sdr.formatTypeSpecifiers(context, d));          
     }
-    if (d.getPath().endsWith("[x]"))
-      tableRowNE(b, translate("sd.dict", "[x] Note"), null, translate("sd.dict", "See %sChoice of Data Types%s for further information about how to use [x]", "<a href=\"" + corePath + "formats.html#choice\">", "</a>"));
-    tableRowNE(b, translate("sd.dict", "Is Modifier"), "conformance-rules.html#ismodifier", displayBoolean(d.getIsModifier(), null, mode));
+    if (d.getPath().endsWith("[x]") && !d.prohibited()) {
+      tableRow(tbl, "[x] Note", null).ahWithText("See ", corePath + "formats.html#choice", null, "Choice of Data Types", " for further information about how to use [x]");
+    }
+    tableRow(tbl, "Is Modifier", "conformance-rules.html#ismodifier", displayBoolean(d.getIsModifier(), d.getIsModifierElement(), null, mode));
     if (d.getMustHaveValue()) {
-      tableRowNE(b, translate("sd.dict", "Primitive Value"), "elementdefinition.html#primitives", "This primitive type must have a value (the value must be present, and cannot be replaced by an extension)");
+      tableRow(tbl, "Primitive Value", "elementdefinition.html#primitives", "This primitive type must have a value (the value must be present, and cannot be replaced by an extension)");
     } else if (d.hasValueAlternatives()) {
-      XhtmlNode ul = renderCanonicalList(d.getValueAlternatives()); 
-      tableRowNE(b, translate("sd.dict", "Primitive Value"), "elementdefinition.html#primitives", "This primitive type may be present, or absent, or replaced by one of the following extensions: "+new XhtmlComposer(true).compose(ul));      
+      tableRow(tbl, "Primitive Value", "elementdefinition.html#primitives", renderCanonicalList(d.getValueAlternatives()));      
     } else if (hasPrimitiveTypes(d)) {
-      tableRowNE(b, translate("sd.dict", "Primitive Value"), "elementdefinition.html#primitives", "This primitive element may be present, or absent, or replaced by an extension");            
+      tableRow(tbl, "Primitive Value", "elementdefinition.html#primitives", "This primitive element may be present, or absent, or replaced by an extension");            
     }
     if (ToolingExtensions.hasAllowedUnits(d)) {      
-      tableRowNE(b, translate("sd.dict", "Allowed Units"), "http://hl7.org/fhir/extensions/StructureDefinition-elementdefinition-allowedUnits.html", describeAllowedUnits(d));        
+      tableRow(tbl, "Allowed Units", "http://hl7.org/fhir/extensions/StructureDefinition-elementdefinition-allowedUnits.html", describeAllowedUnits(d));        
     }
-    tableRowNE(b, translate("sd.dict", "Must Support"), "conformance-rules.html#mustSupport", displayBoolean(d.getMustSupport(), compare==null ? null : compare.getMustSupportElement(), mode));
+    tableRow(tbl, "Must Support", "conformance-rules.html#mustSupport", displayBoolean(d.getMustSupport(), d.getMustSupportElement(), compare==null ? null : compare.getMustSupportElement(), mode));
     if (d.getMustSupport()) {
       if (hasMustSupportTypes(d.getType())) {
-        tableRowNE(b, translate("sd.dict", "Must Support Types"), "datatypes.html", describeTypes(d.getType(), true, compare, mode));
+        tableRow(tbl, "Must Support Types", "datatypes.html", describeTypes(d.getType(), true, compare, mode, null, null));
       } else if (hasChoices(d.getType())) {
-        tableRowNE(b, translate("sd.dict", "Must Support Types"), "datatypes.html", "No must-support rules about the choice of types/profiles");
+        tableRow(tbl, "Must Support Types", "datatypes.html", "No must-support rules about the choice of types/profiles");
       }
     }
     if (root && sd.getKind() == StructureDefinitionKind.LOGICAL) {
-      tableRowNE(b, translate("sd.dict", "Logical Model"), null, ToolingExtensions.readBoolExtension(sd, ToolingExtensions.EXT_LOGICAL_TARGET) ?
-          "This logical model can be the target of a reference" : "This logical model cannot be the target of a reference");
+      tableRow(tbl, "Logical Model", null, ToolingExtensions.readBoolExtension(sd, ToolingExtensions.EXT_LOGICAL_TARGET) ? "This logical model can be the target of a reference" : "This logical model cannot be the target of a reference");
     }
 
     if (root && sd.hasExtension(ToolingExtensions.EXT_SD_IMPOSE_PROFILE)) {
-      tableRowNE(b, translate("sd.dict", "Impose Profile"), "http://hl7.org/fhir/extensions/StructureDefinition-structuredefinition-imposeProfile.html", 
+      tableRow(tbl, "Impose Profile", "http://hl7.org/fhir/extensions/StructureDefinition-structuredefinition-imposeProfile.html", 
           renderCanonicalListExt(sd.getExtensionsByUrl(ToolingExtensions.EXT_SD_IMPOSE_PROFILE)));
     }
     if (root && sd.hasExtension(ToolingExtensions.EXT_SD_COMPLIES_WITH_PROFILE)) {
-      tableRowNE(b, translate("sd.dict", "Complies with Profile"), "http://hl7.org/fhir/extensions/StructureDefinition-structuredefinition-compliesWithProfile.html", 
+      tableRow(tbl, "Complies with Profile", "http://hl7.org/fhir/extensions/StructureDefinition-structuredefinition-compliesWithProfile.html", 
           renderCanonicalListExt(sd.getExtensionsByUrl(ToolingExtensions.EXT_SD_COMPLIES_WITH_PROFILE)));
     }
-    tableRowNE(b, translate("sd.dict", "Obligations"), null, describeObligations(d, root));   
+    tableRow(tbl, "Obligations", null, describeObligations(d, root));   
 
     if (d.hasExtension(ToolingExtensions.EXT_EXTENSION_STYLE)) {
       String es = d.getExtensionString(ToolingExtensions.EXT_EXTENSION_STYLE);
       if ("named-elements".equals(es)) {
         if (gen.hasLink(KnownLinkType.JSON_NAMES)) {
-          tableRowNE(b, translate("sd.dict", "Extension Style"), gen.getLink(KnownLinkType.JSON_NAMES), "This element can be extended by named JSON elements");
+          tableRow(tbl, "Extension Style", gen.getLink(KnownLinkType.JSON_NAMES), "This element can be extended by named JSON elements");
         } else {
-          tableRowNE(b, translate("sd.dict", "Extension Style"), ToolingExtensions.WEB_EXTENSION_STYLE, "This element can be extended by named JSON elements");
+          tableRow(tbl, "Extension Style", ToolingExtensions.WEB_EXTENSION_STYLE, "This element can be extended by named JSON elements");
         }
       }
     }
 
     if (!d.getPath().contains(".") && ToolingExtensions.hasExtension(profile, ToolingExtensions.EXT_BINDING_STYLE)) {
-      tableRowNE(b, translate("sd.dict", "Binding Style"), ToolingExtensions.WEB_BINDING_STYLE, 
+      tableRow(tbl, "Binding Style", ToolingExtensions.WEB_BINDING_STYLE, 
           "This type can be bound to a value set using the " + ToolingExtensions.readStringExtension(profile, ToolingExtensions.EXT_BINDING_STYLE)+" binding style");            
     }
 
     if (d.hasExtension(ToolingExtensions.EXT_DATE_FORMAT)) {
-      String df = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_DATE_FORMAT);
-      if (df != null) {
-        tableRowNE(b, translate("sd.dict", "Date Format"), null, df);
-      }
+      tableRow(tbl, "Date Format", null, ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_DATE_FORMAT));
     }
     String ide = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_ID_EXPECTATION);
     if (ide != null) {
       if (ide.equals("optional")) {
-        tableRowNE(b, translate("sd.dict", "ID Expectation"), null, "Id may or not be present (this is the default for elements but not resources)");
+        tableRow(tbl, "ID Expectation", null, "Id may or not be present (this is the default for elements but not resources)");
       } else if (ide.equals("required")) {
-        tableRowNE(b, translate("sd.dict", "ID Expectation"), null, "Id is required to be present (this is the default for resources but not elements)");
+        tableRow(tbl, "ID Expectation", null, "Id is required to be present (this is the default for resources but not elements)");
       } else if (ide.equals("required")) {
-        tableRowNE(b, translate("sd.dict", "ID Expectation"), null, "An ID is not allowed in this context");
+        tableRow(tbl, "ID Expectation", null, "An ID is not allowed in this context");
       }
     }
     // tooling extensions for formats
     if (ToolingExtensions.hasExtensions(d, ToolingExtensions.EXT_JSON_EMPTY, ToolingExtensions.EXT_JSON_PROP_KEY, ToolingExtensions.EXT_JSON_NULLABLE, 
         ToolingExtensions.EXT_JSON_NAME, ToolingExtensions.EXT_JSON_PRIMITIVE_CHOICE)) {
-      tableRowNE(b, translate("sd.dict", "JSON Representation"), null,  describeJson(d).toString());          
+      tableRow(tbl, "JSON Format", null,  describeJson(d));          
     }
     if (d.hasExtension(ToolingExtensions.EXT_XML_NAMESPACE) || profile.hasExtension(ToolingExtensions.EXT_XML_NAMESPACE) || d.hasExtension(ToolingExtensions.EXT_XML_NAME) || (root && profile.hasExtension(ToolingExtensions.EXT_XML_NO_ORDER)) ||
         d.hasRepresentation()) {
-      tableRowNE(b, translate("sd.dict", "XML Representation"), null, describeXml(profile, d, root).toString());          
+      tableRow(tbl, "XML Format", null, describeXml(profile, d, root));          
     }
 
     if (d.hasExtension(ToolingExtensions.EXT_IMPLIED_PREFIX)) {
-      tableRowNE(b, translate("sd.dict", "Validation Rules"), null, "When this element is read <code>"
-          +ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_IMPLIED_PREFIX)+"</code> is prefixed to the value before validation");                
+      tableRow(tbl, "String Format", null).codeWithText("When this element is read ", ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_IMPLIED_PREFIX), "is prefixed to the value before validation");                
     }
 
     if (d.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
@@ -1386,50 +1614,50 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       if (sdb != null) {
         StandardsStatus base = determineStandardsStatus(sdb, (ElementDefinition) d.getUserData("derived.pointer"));
         if (base != null) {
-          tableRowNE(b, translate("sd.dict", "Standards Status"), "versions.html#std-process", ss.toDisplay()+" (from "+base.toDisplay()+")");
+          tableRow(tbl, "Standards Status", "versions.html#std-process", ss.toDisplay()+" (from "+base.toDisplay()+")");
         } else {
-          tableRowNE(b, translate("sd.dict", "Standards Status"), "versions.html#std-process", ss.toDisplay());          
+          tableRow(tbl, "Standards Status", "versions.html#std-process", ss.toDisplay());          
         }
       } else {
-        tableRowNE(b, translate("sd.dict", "Standards Status"), "versions.html#std-process", ss.toDisplay());
+        tableRow(tbl, "Standards Status", "versions.html#std-process", ss.toDisplay());
       }
     }
     if (mode != GEN_MODE_DIFF && d.hasIsSummary()) {
-      tableRow(b, "Summary", "search.html#summary", Boolean.toString(d.getIsSummary()));
+      tableRow(tbl, "Summary", "search.html#summary", Boolean.toString(d.getIsSummary()));
     }
-    tableRowNE(b, translate("sd.dict", "Requirements"), null, compareMarkdown(profile.getName(), d.getRequirementsElement(), compare==null ? null : compare.getRequirementsElement(), mode));
-    tableRowHint(b, translate("sd.dict", "Alternate Names"), translate("sd.dict", "Other names by which this resource/element may be known"), null, compareSimpleTypeLists(d.getAlias(), (compare==null ? new ArrayList<StringType>() : compare.getAlias()), mode));
-    tableRowNE(b, translate("sd.dict", "Comments"), null, compareMarkdown(profile.getName(), d.getCommentElement(), compare==null ? null : compare.getCommentElement(), mode));
-    tableRowNE(b, translate("sd.dict", "Max Length"), null, !d.hasMaxLengthElement() ? null : compare!= null && compare.hasMaxLengthElement() ? compareString(toStr(d.getMaxLength()), toStr(compare.getMaxLength()), mode) : toStr(d.getMaxLength()));
-    tableRowNE(b, translate("sd.dict", "Default Value"), null, encodeValue(d.getDefaultValue(), compare==null ? null : compare.getDefaultValue(), mode));
-    tableRowNE(b, translate("sd.dict", "Meaning if Missing"), null, d.getMeaningWhenMissing());
-    tableRowNE(b, translate("sd.dict", "Fixed Value"), null, encodeValue(d.getFixed(), compare==null ? null : compare.getFixed(), mode));
-    tableRowNE(b, translate("sd.dict", "Pattern Value"), null, encodeValue(d.getPattern(), compare==null ? null : compare.getPattern(), mode));
-    tableRowNE(b, translate("sd.dict", "Example"), null, encodeValues(d.getExample()));
-    tableRowNE(b, translate("sd.dict", "Invariants"), null, invariants(d.getConstraint(), compare==null ? null : compare.getConstraint(), mode));
-    tableRowNE(b, translate("sd.dict", "LOINC Code"), null, getMapping(profile, d, LOINC_MAPPING, compare, mode));
-    tableRowNE(b, translate("sd.dict", "SNOMED-CT Code"), null, getMapping(profile, d, SNOMED_MAPPING, compare, mode));
+    tableRow(tbl, "Requirements", null, compareMarkdown(profile.getName(), d.getRequirementsElement(), (compare==null) || slicedExtension ? null : compare.getRequirementsElement(), mode));
+    tableRow(tbl, "Alternate Names", null, compareSimpleTypeLists(d.getAlias(), ((compare==null) || slicedExtension ? null : compare.getAlias()), mode));
+    tableRow(tbl, "Comments", null, compareMarkdown(profile.getName(), d.getCommentElement(), (compare==null) || slicedExtension ? null : compare.getCommentElement(), mode));
+    tableRow(tbl, "Max Length", null, compareString(d.hasMaxLength() ? toStr(d.getMaxLength()) : null, d.getMaxLengthElement(), null, compare!= null && compare.hasMaxLengthElement() ? toStr(compare.getMaxLength()) : null, null, mode));
+    tableRow(tbl, "Default Value", null, encodeValue(d.getDefaultValue(), compare==null ? null : compare.getDefaultValue(), mode));
+    tableRow(tbl, "Meaning if Missing", null, d.getMeaningWhenMissing());
+    tableRow(tbl, "Fixed Value", null, encodeValue(d.getFixed(), compare==null ? null : compare.getFixed(), mode));
+    tableRow(tbl, "Pattern Value", null, encodeValue(d.getPattern(), compare==null ? null : compare.getPattern(), mode));
+    tableRow(tbl, "Example", null, encodeValues(d.getExample()));
+    tableRow(tbl, "Invariants", null, invariants(d.getConstraint(), compare==null ? null : compare.getConstraint(), mode));
+    tableRow(tbl, "LOINC Code", null, getMapping(profile, d, LOINC_MAPPING, compare, mode));
+    tableRow(tbl, "SNOMED-CT Code", null, getMapping(profile, d, SNOMED_MAPPING, compare, mode));
   }
 
-  private StringBuilder describeXml(StructureDefinition profile, ElementDefinition d, boolean root) {
-    StringBuilder s = new StringBuilder();
+  private XhtmlNode describeXml(StructureDefinition profile, ElementDefinition d, boolean root) {
+    XhtmlNode ret = new XhtmlNode(NodeType.Element, "div");
     for (PropertyRepresentation pr : PropertyRepresentation.values()) {
       if (d.hasRepresentation(pr)) {
         switch (pr) {
         case CDATEXT:
-          s.append("This property is represented as CDA Text in the XML.");
+          ret.tx("This property is represented as CDA Text in the XML.");
           break;
         case TYPEATTR:
-          s.append("The type of this property is determined using the xsi:type attribute.");
+          ret.codeWithText("The type of this property is determined using the ", "xsi:type", "attribute.");
           break;
         case XHTML:
-          s.append("This property is represented as XHTML Text in the XML.");
+          ret.tx("This property is represented as XHTML Text in the XML.");
           break;
         case XMLATTR:
-          s.append("In the XML format, this property is represented as an attribute.");
+          ret.tx("In the XML format, this property is represented as an attribute.");
           break;
         case XMLTEXT:
-          s.append("In the XML format, this property is represented as unadorned text.");
+          ret.tx("In the XML format, this property is represented as unadorned text.");
           break;
         default:
         }
@@ -1440,72 +1668,71 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       name = ToolingExtensions.readStringExtension(profile, ToolingExtensions.EXT_XML_NAMESPACE);
     }
     if (name != null) {
-      s.append("In the XML format, this property has the namespace <code>"+name+"</code>.");
+      ret.codeWithText("In the XML format, this property has the namespace ", name, ".");
     }
     name = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_XML_NAME);
     if (name != null) {
-      s.append("In the XML format, this property has the actual name <code>"+name+"</code>.");
+      ret.codeWithText("In the XML format, this property has the actual name", name, ".");
     }
     boolean no = root && ToolingExtensions.readBoolExtension(profile, ToolingExtensions.EXT_XML_NO_ORDER);
     if (no) {
-      s.append("The children of this property can appear in any order in the XML.");
+      ret.tx("The children of this property can appear in any order in the XML.");
     }
-    return s;
+    return ret;
   }
 
-  private StringBuilder describeJson(ElementDefinition d) {
+  private XhtmlNode describeJson(ElementDefinition d) {
+    XhtmlNode ret = new XhtmlNode(NodeType.Element, "div");
+    var ul = ret.ul();
     boolean list = ToolingExtensions.countExtensions(d, ToolingExtensions.EXT_JSON_EMPTY, ToolingExtensions.EXT_JSON_PROP_KEY, ToolingExtensions.EXT_JSON_NULLABLE, ToolingExtensions.EXT_JSON_NAME) > 1;
-    StringBuilder s = new StringBuilder();
-    String pfx = "";
-    String sfx = "";
-    if (list) {
-      s.append("<ul>\r\n");
-      pfx = "<li>";
-      sfx = "</li>\r\n";
-    }
+
     String code = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_JSON_EMPTY);
     if (code != null) {
       switch (code) {
       case "present":
-        s.append(pfx+"The JSON Array for this property is present even when there are no items in the instance (e.g. as an empty array)"+sfx);
+        ul.li().tx("The JSON Array for this property is present even when there are no items in the instance (e.g. as an empty array)");
         break;
       case "absent":
-        s.append(pfx+"The JSON Array for this property is not present when there are no items in the instance (e.g. never as an empty array)"+sfx);
+        ul.li().tx("The JSON Array for this property is not present when there are no items in the instance (e.g. never as an empty array)");
         break;
       case "either":
-        s.append(pfx+"The JSON Array for this property may be present even when there are no items in the instance (e.g. may be present as an empty array)</li>\r\n ");
+        ul.li().tx("The JSON Array for this property may be present even when there are no items in the instance (e.g. may be present as an empty array)");
         break;
       }
     }
     String jn = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_JSON_NAME);
     if (jn != null) {
       if (d.getPath().contains(".")) {
-        s.append(pfx+"This property appears in JSON with the property name <code>"+Utilities.escapeXml(jn)+"</code>"+sfx);
+        ul.li().codeWithText("This property appears in JSON with the property name ", jn, null);
       } else {
-        s.append(pfx+"This type can appear in JSON with the property name <code>"+Utilities.escapeXml(jn)+"</code> (in elements using named extensions)"+sfx);          
+        ul.li().codeWithText("This type can appear in JSON with the property name ", jn, " (in elements using named extensions)");          
       }
     }
     code = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_JSON_PROP_KEY);
     if (code != null) {
-      s.append(pfx+"This repeating object is represented as a single JSON object with named properties. The name of the property (key) is the value of the <code>"+Utilities.escapeXml(code)+"</code> child"+sfx);
+      ul.li().codeWithText("This repeating object is represented as a single JSON object with named properties. The name of the property (key) is the value of the ", code, " child");
     }
     if (ToolingExtensions.readBoolExtension(d, ToolingExtensions.EXT_JSON_NULLABLE)) {
-      s.append(pfx+"This object can be represented as null in the JSON structure (which counts as 'present' for cardinality purposes)"+sfx);
+      ul.li().tx("This object can be represented as null in the JSON structure (which counts as 'present' for cardinality purposes)");
     }
     if (ToolingExtensions.readBoolExtension(d, ToolingExtensions.EXT_JSON_PRIMITIVE_CHOICE)) {
-      s.append(pfx+"The type of this element is inferred from the JSON type in the instance"+sfx);
+      ul.li().tx("The type of this element is inferred from the JSON type in the instance");
     }
-    if (list) s.append("<ul>");
-    return s;
+
+    switch (ul.getChildNodes().size()) {
+    case 0: return null;
+    case 1: return ul.getChildNodes().get(0);
+    default: return ret;
+    }
   }
 
-  private String describeObligations(ElementDefinition d, boolean root) throws IOException {
+  private XhtmlNode describeObligations(ElementDefinition d, boolean root) throws IOException {
+    XhtmlNode ret = new XhtmlNode(NodeType.Element, "div");
     ObligationsRenderer obr = new ObligationsRenderer(corePath, sd, d.getPath(), gen, this, sdr);
     obr.seeObligations(d.getExtensionsByUrl(ToolingExtensions.EXT_OBLIGATION_CORE, ToolingExtensions.EXT_OBLIGATION_TOOLS));
     obr.seeRootObligations(d.getId(), sd.getExtensionsByUrl(ToolingExtensions.EXT_OBLIGATION_CORE, ToolingExtensions.EXT_OBLIGATION_TOOLS));
     if (obr.hasObligations() || (root && (sd.hasExtension(ToolingExtensions.EXT_OBLIGATION_PROFILE_FLAG) || sd.hasExtension(ToolingExtensions.EXT_OBLIGATION_INHERITS)))) {
-      StringBuilder s = new StringBuilder();
-      XhtmlNode ul = new XhtmlNode(NodeType.Element, "ul");
+      XhtmlNode ul = ret.ul();
       if (root) {
         if (sd.hasExtension(ToolingExtensions.EXT_OBLIGATION_PROFILE_FLAG)) {
           ul.li().tx("This is an obligation profile that only contains obligations and additional bindings");           
@@ -1523,40 +1750,41 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             bb.ah(iu).tx(sd.present());
           } 
         }  
-        if (ul.hasChildren()) {
-          s.append(new XhtmlComposer(true).compose(ul));
+        if (ul.isEmpty()) {
+          ret.remove(ul);
         }
       }
       if (obr.hasObligations()) {
-        XhtmlNode tbl = new XhtmlNode(NodeType.Element, "table").attribute("class", "grid");
+        XhtmlNode tbl = ret.table("grid");
         obr.renderTable(tbl.getChildNodes(), true);
-        if (tbl.hasChildren()) {
-          s.append(new XhtmlComposer(true).compose(tbl));
+        if (tbl.isEmpty()) {
+          ret.remove(tbl);
         }
       }
-      return s.toString();
+      return ret.hasChildren() ? ret : null;
     } else {
       return null;
     }
   }
 
-  private String describeAllowedUnits(ElementDefinition d) {
+  private XhtmlNode describeAllowedUnits(ElementDefinition d) {
+    XhtmlNode ret = new XhtmlNode(NodeType.Element, "div");
     DataType au = ToolingExtensions.getAllowedUnits(d);
-    String s = "";
     if (au instanceof CanonicalType) {
       String url = ((CanonicalType) au).asStringValue();
       ValueSet vs = context.fetchResource(ValueSet.class, url);
-      XhtmlNode x = new XhtmlNode(NodeType.Element, "div");          
-      genCT(x, url, vs);
-      s = "Value set "+new XhtmlComposer(true).compose(x.getChildNodes());
+      ret.tx("Value set ");         
+      genCT(ret, url, vs);
+      return ret;
     } else if (au instanceof CodeableConcept) {
       CodeableConcept cc = (CodeableConcept) au;
       if (cc.getCoding().size() != 1) {
-        s = "One of:";
+        ret.tx("One of:");
       }
-      s = s + summarise(cc);
+      ret.tx(summarise(cc));
+      return ret;
     }
-    return s;
+    return null;
   }
 
   private void genCT(XhtmlNode x, String url, CanonicalResource cr) {
@@ -1590,12 +1818,14 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   private XhtmlNode renderCanonicalList(List<CanonicalType> list) {
-    XhtmlNode ul = new XhtmlNode(NodeType.Element, "ul");
+    XhtmlNode ret = new XhtmlNode(NodeType.Element, "div");
+    ret.tx("This primitive type may be present, or absent, or replaced by one of the following extensions: ");
+    var ul = ret.ul();
     for (CanonicalType ct : list) {
       CanonicalResource cr = (CanonicalResource) context.fetchResource(Resource.class,  ct.getValue());
       genCT(ul.li(), ct.getValue(), cr);      
     }
-    return ul;
+    return ret;
   }
 
   private StandardsStatus determineStandardsStatus(StructureDefinition sd, ElementDefinition ed) {
@@ -1622,74 +1852,78 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private String sliceOrderString(ElementDefinitionSlicingComponent slicing) {
     if (slicing.getOrdered())
-      return translate("sd.dict", "ordered");
+      return "ordered";
     else
-      return translate("sd.dict", "unordered");
+      return "unordered";
   }
-  private void generateSlicing(StringBuilder b, StructureDefinition profile, ElementDefinition ed, ElementDefinitionSlicingComponent slicing, ElementDefinition compare, int mode) throws IOException {
+  
+  private void generateSlicing(XhtmlNode tbl, StructureDefinition profile, ElementDefinition ed, ElementDefinitionSlicingComponent slicing, ElementDefinition compare, int mode) throws IOException {
+    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+    
+    x.codeWithText("This element introduces a set of slices on ", ed.getPath(), ". The slices are ");
     String newOrdered = sliceOrderString(slicing);
     String oldOrdered = (compare==null || !compare.hasSlicing()) ? null : sliceOrderString(compare.getSlicing());
-    String slicingRules = compareString(slicing.hasRules() ? slicing.getRules().getDisplay() : null, compare!=null && compare.hasSlicing() && compare.getSlicing().hasRules() ? compare.getSlicing().getRules().getDisplay() : null, mode);
-    String rs = compareString(newOrdered, oldOrdered, mode) + " and " + slicingRules;
-
-    StringBuilder bl = new StringBuilder();
-    List<ElementDefinition.ElementDefinitionSlicingDiscriminatorComponent> newDiscs = slicing.getDiscriminator();
-    List<ElementDefinition.ElementDefinitionSlicingDiscriminatorComponent> oldDiscs;
-    if (compare!=null && compare.hasSlicing())
-      oldDiscs = compare.getSlicing().getDiscriminator();
-    else
-      oldDiscs = new ArrayList<>();
-    if (!newDiscs.isEmpty() || oldDiscs.isEmpty()) {
-      boolean first = true;
-      for (int i=0; i<newDiscs.size()||i<oldDiscs.size(); i++) {
-        ElementDefinitionSlicingDiscriminatorComponent newDisc = i<newDiscs.size() ? slicing.getDiscriminator().get(0) : null;
-        ElementDefinitionSlicingDiscriminatorComponent oldDisc = i<oldDiscs.size() ? slicing.getDiscriminator().get(0) : null;
-        String code = compareString(newDisc==null ? null : newDisc.getType().toCode(), oldDisc==null ? null : oldDisc.getType().toCode(), mode);
-        String path = compareString(newDisc==null ? null : newDisc.getPath(), oldDisc==null ? null : oldDisc.getPath(), mode);
-        bl.append("<li>" + code + " @ " + path + (i!=0 ? ", ": "") + "</li>");
+    compareString(x, newOrdered, slicing.getOrderedElement(), null, oldOrdered, null, mode);
+    x.tx(" and ");
+    compareString(x, slicing.hasRules() ? slicing.getRules().getDisplay() : null, slicing.getRulesElement(), null, compare!=null && compare.hasSlicing() && compare.getSlicing().hasRules() ? compare.getSlicing().getRules().getDisplay() : null, null, mode);
+    
+    if (slicing.hasDiscriminator()) {
+      x.tx(", and can be differentiated using the following discriminators: ");
+      StatusList<DiscriminatorWithStatus> list = new StatusList<>();
+      for (ElementDefinitionSlicingDiscriminatorComponent d : slicing.getDiscriminator()) {
+        list.add(new DiscriminatorWithStatus(d));
       }
-    }
-    if (slicing.hasDiscriminator())
-      tableRowNE(b, "" + translate("sd.dict", "Slicing"), "profiling.html#slicing", "This element introduces a set of slices on " + ed.getPath() + ". The slices are " + rs + ", and can be differentiated using the following discriminators: <ul> " + bl.toString() + "</ul>");
-    else
-      tableRowNE(b, "" + translate("sd.dict", "Slicing"), "profiling.html#slicing", "This element introduces a set of slices on " + ed.getPath() + ". The slices are " + rs + ", and defines no discriminators to differentiate the slices");
-  }
-
-  private void tableRow(StringBuilder b, String name, String defRef, String value) throws IOException {
-    if (value != null && !"".equals(value)) {
-      if (defRef != null)
-        b.append("  <tr><td><a href=\"" + corePath + defRef + "\">" + name + "</a></td><td>" + Utilities.escapeXml(value) + "</td></tr>\r\n");
-      else
-        b.append("  <tr><td>" + name + "</td><td>" + Utilities.escapeXml(value) + "</td></tr>\r\n");
-    }
-  }
-
-
-  private void tableRowHint(StringBuilder b, String name, String hint, String defRef, String value) throws IOException {
-    if (value != null && !"".equals(value)) {
-      if (defRef != null)
-        b.append("  <tr><td><a href=\"" + corePath + defRef + "\" title=\"" + Utilities.escapeXml(hint) + "\">" + name + "</a></td><td>" + value + "</td></tr>\r\n");
-      else
-        b.append("  <tr><td title=\"" + Utilities.escapeXml(hint) + "\">" + name + "</td><td>" + value + "</td></tr>\r\n");
-    }
-  }
-
-
-  private void tableRowNE(StringBuilder b, String name, String defRef, XhtmlNode value) throws IOException {
-    if (value != null) {
-      tableRowNE(b, name, defRef, new XhtmlComposer(true, true).compose(value));
-    }
-  }
-
-  private void tableRowNE(StringBuilder b, String name, String defRef, String value) throws IOException {
-    if (value != null && !"".equals(value))
-      if (defRef == null) {
-        b.append("  <tr><td>" + name + "</td><td>" + value + "</td></tr>\r\n");
-      } else if (Utilities.isAbsoluteUrl(defRef)) {
-        b.append("  <tr><td><a href=\"" + defRef + "\">" + name + "</a></td><td>" + value + "</td></tr>\r\n");
-      } else {
-        b.append("  <tr><td><a href=\"" + corePath + defRef + "\">" + name + "</a></td><td>" + value + "</td></tr>\r\n");
+      if (compare != null) {      
+        for (ElementDefinitionSlicingDiscriminatorComponent d : slicing.getDiscriminator()) {
+          list.merge(new DiscriminatorWithStatus(d));
+        }
       }
+      x.tx(", and can be differentiated using the following discriminators: ");
+      var ul = x.ul();
+      for (DiscriminatorWithStatus rc : list) {
+        rc.render(x.li());
+      }
+    } else {
+      x.tx(", and defines no discriminators to differentiate the slices");
+    }
+    tableRow(tbl, "Slicing", "profiling.html#slicing", x);
+  }
+
+  private XhtmlNode tableRow(XhtmlNode x, String name, String defRef) throws IOException {
+    var tr = x.tr();
+    addFirstCell(name, defRef, tr);
+    return tr.td();
+  }
+  
+
+  private void tableRow(XhtmlNode x, String name, String defRef, XhtmlNode possibleTd) throws IOException {
+    if (possibleTd != null && !possibleTd.isEmpty()) {
+      var tr = x.tr();
+      addFirstCell(name, defRef, tr);
+      tr.td().copyAllContent(possibleTd);
+    }
+  }
+
+  private void tableRow(XhtmlNode x, String name, String defRef, String text) throws IOException {
+    if (!Utilities.noString(text)) {
+      var tr = x.tr();
+      addFirstCell(name, defRef, tr);
+      tr.td().tx(text);
+    }
+  }
+
+  private void addFirstCell(String name, String defRef, XhtmlNode tr) {
+    var td = tr.td();
+    if (name.length() <= 16) {
+     td.style("white-space: nowrap");
+    }
+    if (defRef == null) {
+      td.tx(name);
+    } else if (Utilities.isAbsoluteUrl(defRef)) {
+      td.ah(defRef).tx(name);
+    } else {
+      td.ah(corePath+defRef).tx(name);
+    }
   }
 
   private String head(String path) {
@@ -1713,47 +1947,55 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return path;
   }
 
-  private String businessIdWarning(String resource, String name) {
-    if (name.equals("identifier"))
-      return "" + translate("sd.dict", "This is a business identifier, not a resource identifier (see %sdiscussion%s)", "<a href=\"" + corePath + "resource.html#identifiers\">", "</a>");
-    if (name.equals("version")) // && !resource.equals("Device"))
-      return "" + translate("sd.dict", "This is a business versionId, not a resource version id (see %sdiscussion%s)", "<a href=\"" + corePath + "resource.html#versions\">", "</a>");
+  private XhtmlNode businessIdWarning(String resource, String name) {
+    if (name.equals("identifier")) {
+      XhtmlNode ret = new XhtmlNode(NodeType.Element, "div");
+      ret.tx("This is a business identifier, not a resource identifier (see ");
+      ret.ah(corePath + "resource.html#identifiers").tx("discussion");
+      ret.tx(")");
+      return ret;
+    } 
+    if (name.equals("version")) {// && !resource.equals("Device"))
+      XhtmlNode ret = new XhtmlNode(NodeType.Element, "div");
+      ret.tx("This is a business versionId, not a resource version id (see ");
+      ret.ah(corePath + "resource.html#versions").tx("discussion");
+      ret.tx(")");
+      return ret;
+    }
     return null;
   }
 
-  private String describeCardinality(ElementDefinition d, ElementDefinition compare, int mode) {
-    if (compare==null) {
-      if (!d.hasMax() && d.getMinElement() == null)
-        return "";
-      else if (d.getMax() == null)
-        return toStr(d.getMin()) + "..?";
-      else
-        return toStr(d.getMin()) + ".." + d.getMax();
+  private XhtmlNode describeCardinality(ElementDefinition d, ElementDefinition compare, int mode) {
+    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+    if (compare==null || mode==GEN_MODE_DIFF) {
+      if (!d.hasMax() && !d.hasMin())
+        return null;
+      else if (d.getMax() == null) {
+        VersionComparisonAnnotation.render(d.getMinElement(), x).tx(toStr(d.getMin()));
+        x.tx("..?");
+      } else {
+        VersionComparisonAnnotation.render(d.getMinElement(), x).tx(toStr(d.getMin()));
+        x.tx( "..");
+        VersionComparisonAnnotation.render(d.getMaxElement(), x).tx( d.getMax());
+      }
     } else {
-      String min = compareString(toStr(d.getMin()), toStr(compare.getMin()), mode);
-      if (mode==GEN_MODE_DIFF && (d.getMin()==compare.getMin() || d.getMin()==0))
-        min=null;
-      String max = compareString(d.getMax(), compare.getMax(), mode);
-      if ((min==null || min.isEmpty()) && (max==null || max.isEmpty()))
-        return "";
-      if (mode==GEN_MODE_DIFF)
-        return( (min==null || min.isEmpty() ? unchanged(toStr(compare.getMin())) : min) + ".." + (max==null || max.isEmpty() ? unchanged(compare.getMax()) : max));
-      else
-        return( (min==null || min.isEmpty() ? "?" : min) + ".." + (max==null || max.isEmpty() ? "?" : max));
+      if (!(mode==GEN_MODE_DIFF && (d.getMin()==compare.getMin() || d.getMin()==0))) {
+        compareString(x, toStr(d.getMin()), d.getMinElement(), null, toStr(compare.getMin()), null, mode);
+      }
+      x.tx("..");
+      if (!(mode==GEN_MODE_DIFF && (d.getMax().equals(compare.getMax()) || "1".equals(d.getMax())))) {
+        compareString(x, d.getMax(), d.getMaxElement(), null, compare.getMax(), null, mode);
+      }
     }
+    XhtmlNode t = compareSimpleTypeLists(d.getCondition(), compare == null ? null : compare.getCondition(), mode);
+    if (t != null) {
+      x.br();
+      x.tx("This element is affected by the following invariants: "); 
+      x.copyAllContent(t);
+    }    
+    return x;
   }
-
-  private String summariseConditions(List<IdType> conditions, List<IdType> compare, int mode) {
-    if (conditions.isEmpty() && (compare==null || compare.isEmpty()))
-      return "";
-    else {
-      String comparedList = compareSimpleTypeLists(conditions, compare, mode);
-      if (comparedList.equals(""))
-        return "";
-      return " " + translate("sd.dict", "This element is affected by the following invariants") + ": " + comparedList;
-    }
-  }
-
+  
   private boolean hasMustSupportTypes(List<TypeRefComponent> types) {
     for (TypeRefComponent tr : types) {
       if (sdr.isMustSupport(tr)) {
@@ -1763,19 +2005,19 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return false;
   }
 
-  private String describeTypes(List<TypeRefComponent> types, boolean mustSupportOnly, ElementDefinition compare, int mode) throws Exception {
+  private XhtmlNode describeTypes(List<TypeRefComponent> types, boolean mustSupportOnly, ElementDefinition compare, int mode, ElementDefinition value, ElementDefinition compareValue) throws Exception {
     if (types.isEmpty())
-      return "";
+      return null;
 
     List<TypeRefComponent> compareTypes = compare==null ? new ArrayList<>() : compare.getType();
-    StringBuilder b = new StringBuilder();
+    XhtmlNode ret = new XhtmlNode(NodeType.Element, "div");
     if ((!mustSupportOnly && types.size() == 1 && compareTypes.size() <=1) || (mustSupportOnly && mustSupportCount(types) == 1)) {
       if (!mustSupportOnly || sdr.isMustSupport(types.get(0))) {
-        describeType(b, types.get(0), mustSupportOnly, compareTypes.size()==0 ? null : compareTypes.get(0), mode);
+        describeType(ret, types.get(0), mustSupportOnly, compareTypes.size()==0 ? null : compareTypes.get(0), mode);
       }
     } else {
       boolean first = true;
-      b.append(translate("sd.dict", "Choice of") + ": ");
+      ret.tx("Choice of: ");
       Map<String,TypeRefComponent> map = new HashMap<String, TypeRefComponent>();
       for (TypeRefComponent t : compareTypes) {
         map.put(t.getCode(), t);
@@ -1788,20 +2030,44 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           if (first) {
             first = false;
           } else {
-            b.append(", ");
+            ret.tx(", ");
           }
-          describeType(b, t, mustSupportOnly, compareType, mode);
+          describeType(ret, t, mustSupportOnly, compareType, mode);
         }
       }
       for (TypeRefComponent t : map.values()) {
-        b.append(", ");
-        StringBuilder b2 = new StringBuilder();
-        describeType(b2, t, mustSupportOnly, null, mode);
-        b.append(removed(b2.toString()));
+        ret.tx(", ");
+        describeType(removed(ret), t, mustSupportOnly, null, mode);
       }
     }
-    return b.toString();
+    if (value != null) {
+      XhtmlNode xt = processSecondary(mode, value, compareValue, mode);
+      if (xt != null) {
+        ret.copyAllContent(xt);
+      }    
+    }
+    return ret;
   }
+  
+  private XhtmlNode processSecondary(int mode, ElementDefinition value, ElementDefinition compareValue, int compMode) throws Exception {
+    switch (mode) {
+    case 1:
+      return null;
+    case 2:
+      XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+      x.tx(" (Complex Extension)");
+      return x;
+    case 3:
+      x = new XhtmlNode(NodeType.Element, "div");
+      x.tx(" (Extension Type: ");
+      x.copyAllContent(describeTypes(value.getType(), false, compareValue, compMode, null, null));
+      x.tx(")");
+      return x;
+    default:
+      return null;
+    }
+  }
+
 
   private int mustSupportCount(List<TypeRefComponent> types) {
     int c = 0;
@@ -1813,7 +2079,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return c;
   }
 
-  private void describeType(StringBuilder b, TypeRefComponent t, boolean mustSupportOnly, TypeRefComponent compare, int mode) throws Exception {
+  
+  private void describeType(XhtmlNode x, TypeRefComponent t, boolean mustSupportOnly, TypeRefComponent compare, int mode) throws Exception {
     if (t.getWorkingCode() == null) {
       return;
     }
@@ -1821,206 +2088,191 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return;
     }
 
+    boolean ts = false;
     if (t.getWorkingCode().startsWith("xs:")) {
-      b.append(compareString(t.getWorkingCode(), compare==null ? null : compare.getWorkingCode(), mode));
+      ts = compareString(x, t.getWorkingCode(), t.getCodeElement(), null, compare==null ? null : compare.getWorkingCode(), null, mode);
     } else {
-      b.append(compareString(getTypeLink(t), compare==null ? null : getTypeLink(compare), mode));
+      ts = compareString(x, t.getWorkingCode(), t.getCodeElement(), getTypeLink(t), compare==null ? null : compare.getWorkingCode(), compare==null ? null : getTypeLink(compare), mode);
     }
+    
     if ((!mustSupportOnly && (t.hasProfile() || (compare!=null && compare.hasProfile()))) || sdr.isMustSupport(t.getProfile())) {
-      List<String> newProfiles = new ArrayList<String>();
-      List<String> oldProfiles = new ArrayList<String>();
-      for (CanonicalType pt : t.getProfile()) {
-        newProfiles.add(getTypeProfile(pt, mustSupportOnly));
-      }
-      if (compare!=null) {
-        for (CanonicalType pt : compare.getProfile()) {
-          oldProfiles.add(getTypeProfile(pt, mustSupportOnly));
+      StatusList<ResolvedCanonical> profiles = analyseProfiles(t.getProfile(), compare == null ? null : compare.getProfile(), mustSupportOnly, mode);      
+      if (profiles.size() > 0) {
+        if (!ts) {
+          getTypeLink(unchanged(x), t);
+          ts = true;
         }
-      }
-      String profiles = compareSimpleTypeLists(newProfiles, oldProfiles, mode);
-      if (!profiles.isEmpty()) {
-        if (b.toString().isEmpty())
-          b.append(unchanged(getTypeLink(t)));
-        b.append("(");
-        b.append(profiles);
-        b.append(")");
+        x.tx("(");
+        boolean first = true;
+        for (ResolvedCanonical rc : profiles) {
+          if (first) first = false; else x.tx(", ");
+          rc.render(x);
+        }
+        x.tx(")");
       }
     }
+    
     if ((!mustSupportOnly && (t.hasTargetProfile() || (compare!=null && compare.hasTargetProfile()))) || sdr.isMustSupport(t.getTargetProfile())) {
-      List<StringType> newProfiles = new ArrayList<StringType>();
-      List<StringType> oldProfiles = new ArrayList<StringType>();
-      for (CanonicalType pt : t.getTargetProfile()) {
-        String tgtProfile = getTypeProfile(pt, mustSupportOnly);
-        if (!tgtProfile.isEmpty())
-          newProfiles.add(new StringType(tgtProfile));
-      }
-      if (compare!=null) {
-        for (CanonicalType pt : compare.getTargetProfile()) {
-          String tgtProfile = getTypeProfile(pt, mustSupportOnly);
-          if (!tgtProfile.isEmpty())
-            oldProfiles.add(new StringType(tgtProfile));
+      List<ResolvedCanonical> profiles = analyseProfiles(t.getTargetProfile(), compare == null ? null : compare.getTargetProfile(), mustSupportOnly, mode);      
+      if (profiles.size() > 0) {
+        if (!ts) {
+          getTypeLink(unchanged(x), t);
         }
-      }
-      String profiles = compareSimpleTypeLists(newProfiles, oldProfiles, mode, "|");
-      if (!profiles.isEmpty()) {
-        if (b.toString().isEmpty())
-          b.append(unchanged(getTypeLink(t)));
-        b.append("(");
-        b.append(profiles);
-        b.append(")");
+        x.tx("("); // todo: double use of "(" is problematic
+        boolean first = true;
+        for (ResolvedCanonical rc : profiles) {
+          if (first) first = false; else x.tx(", ");
+          rc.render(x);
+        }
+        x.tx(")");
       }
 
       if (!t.getAggregation().isEmpty() || (compare!=null && !compare.getAggregation().isEmpty())) {
-        b.append(" : ");
-        List<String> newAgg = new ArrayList<String>();
-        List<String> oldAgg = new ArrayList<String>();
+        
         for (Enumeration<AggregationMode> a :t.getAggregation()) {
-          newAgg.add(" <a href=\"" + corePath + "codesystem-resource-aggregation-mode.html#content\" title=\""+sdr.hintForAggregation(a.getValue())+"\">{" + sdr.codeForAggregation(a.getValue()) + "}</a>");
+          a.setUserData("render.link", corePath + "codesystem-resource-aggregation-mode.html#content");
         }
         if (compare!=null) {
           for (Enumeration<AggregationMode> a : compare.getAggregation()) {
-            newAgg.add(" <a href=\"" + corePath + "codesystem-resource-aggregation-mode.html#content\" title=\"" + sdr.hintForAggregation(a.getValue()) + "\">{" + sdr.codeForAggregation(a.getValue()) + "}</a>");
+            a.setUserData("render.link", corePath + "codesystem-resource-aggregation-mode.html#content");
           }
         }
-        b.append(compareSimpleTypeLists(newAgg, oldAgg, mode));
+        var xt = compareSimpleTypeLists(t.getAggregation(), compare == null ? null : compare.getAggregation(), mode);
+        if (xt != null) {
+          x.copyAllContent(xt);
+        }
       }
     }
   }
 
-  private String getTypeProfile(CanonicalType pt, boolean mustSupportOnly) {
-    StringBuilder b = new StringBuilder();
+  private StatusList<ResolvedCanonical> analyseProfiles(List<CanonicalType> newProfiles, List<CanonicalType> oldProfiles, boolean mustSupportOnly, int mode) {
+    StatusList<ResolvedCanonical> profiles = new StatusList<ResolvedCanonical>();
+    for (CanonicalType pt : newProfiles) {
+      ResolvedCanonical rc = fetchProfile(pt, mustSupportOnly);
+      profiles.add(rc);
+    }
+    if (oldProfiles!=null && mode != GEN_MODE_DIFF) {
+      for (CanonicalType pt : oldProfiles) {
+        profiles.merge(fetchProfile(pt, mustSupportOnly));
+      }
+    }
+    return profiles;
+  }
+
+  private ResolvedCanonical fetchProfile(CanonicalType pt, boolean mustSupportOnly) {
+    if (!pt.hasValue()) {
+      return null;
+    }
     if (!mustSupportOnly || sdr.isMustSupport(pt)) {
       StructureDefinition p = context.fetchResource(StructureDefinition.class, pt.getValue());
-      if (p == null)
-        b.append(pt.getValue());
-      else {
-        String pth = p.getWebPath();
-        b.append("<a href=\"" + Utilities.escapeXml(pth) + "\" title=\"" + pt.getValue() + "\">");
-        b.append(p.getName());
-        b.append("</a>");
-      }
+      return new ResolvedCanonical(pt.getValue(), p);
+    } else {
+      return null;
     }
-    return b.toString();
   }
+//
+//  private String getTypeProfile(CanonicalType pt, boolean mustSupportOnly) {
+//    StringBuilder b = new StringBuilder();
+//    if (!mustSupportOnly || sdr.isMustSupport(pt)) {
+//      StructureDefinition p = context.fetchResource(StructureDefinition.class, pt.getValue());
+//      if (p == null)
+//        b.append(pt.getValue());
+//      else {
+//        String pth = p.getWebPath();
+//        b.append("<a href=\"" + Utilities.escapeXml(pth) + "\" title=\"" + pt.getValue() + "\">");
+//        b.append(p.getName());
+//        b.append("</a>");
+//      }
+//    }
+//    return b.toString();
+//  }
 
-  private String getTypeLink(TypeRefComponent t) {
-    StringBuilder b = new StringBuilder();
+  private void getTypeLink(XhtmlNode x, TypeRefComponent t) {
     String s = igp.getLinkFor(sd.getWebPath(), t.getWorkingCode());
     if (s != null) {
-      b.append("<a href=\"");
-      //    GG 13/12/2016 - I think that this is always wrong now.
-      //      if (!s.startsWith("http:") && !s.startsWith("https:") && !s.startsWith(".."))
-      //        b.append(prefix);
-      b.append(s);
-      if (!s.contains(".html")) {
-        //     b.append(".html#");
-        //     String type = t.getCode();
-        //     if (type.equals("*"))
-        //       b.append("open");
-        //     else
-        //       b.append(t.getCode());
-      }
-      b.append("\">");
-      b.append(t.getWorkingCode());
-      b.append("</a>");
+      x.ah(s).tx(t.getWorkingCode());
     } else {
-      b.append(t.getWorkingCode());
-    }
-    return b.toString();
-  }
-
-  private String processSecondary(int mode, ElementDefinition value, ElementDefinition compareValue, int compMode) throws Exception {
-    switch (mode) {
-    case 1:
-      return "";
-    case 2:
-      return "  (" + translate("sd.dict", "Complex Extension") + ")";
-    case 3:
-      return "  (" + translate("sd.dict", "Extension Type") + ": " + describeTypes(value.getType(), false, compareValue, compMode) + ")";
-    default:
-      return "";
+      x.code().tx(t.getWorkingCode());
     }
   }
+  
 
-  private String displayBoolean(boolean value, BooleanType compare, int mode) {
-    String newValue = value ? "true" : null;
+  private String getTypeLink(TypeRefComponent t) {
+    String s = igp.getLinkFor(sd.getWebPath(), t.getWorkingCode());
+    return s;
+  }
+
+  private XhtmlNode displayBoolean(boolean value,BooleanType source, BooleanType compare, int mode) {
+    String newValue = value ? "true" : source.hasValue() ? "false" : null;
     String oldValue = compare==null || compare.getValue()==null ? null : (compare.getValue()!=true ? null : "true");
-    return compareString(newValue, oldValue, mode);
+    return compareString(newValue, source, null, oldValue, null, mode);
   }
 
-  private String invariants(List<ElementDefinitionConstraintComponent> constraints, List<ElementDefinitionConstraintComponent> compare, int mode) {
-    // Lloyd todo compare
-    if (constraints.isEmpty() && (compare==null || compare.isEmpty()))
-      return null;
-    if (compare == null)
-      compare = new ArrayList<ElementDefinitionConstraintComponent>();
-    StringBuilder s = new StringBuilder();
-    if (constraints.size() > 0) {
-      s.append("<b>" + translate("sd.dict", "Defined on this element") + "</b><br/>\r\n");
-      List<String> ids = new ArrayList<String>();
-      for (ElementDefinitionConstraintComponent id : constraints)
-        ids.add(id.hasKey() ? id.getKey() : id.toString());
-      Collections.sort(ids, new ConstraintKeyComparator());
-      boolean b = false;
-      for (String id : ids) {
-        ElementDefinitionConstraintComponent inv = getConstraint(constraints, id);
-        ElementDefinitionConstraintComponent invCompare = getConstraint(compare, id);
-        if (b)
-          s.append("<br/>");
-        else
-          b = true;
-        String human = compareString(Utilities.escapeXml(gt(inv.getHumanElement())), invCompare==null ? null : Utilities.escapeXml(gt(invCompare.getHumanElement())), mode);
-        String expression= compareString(Utilities.escapeXml(inv.getExpression()), invCompare==null ? null : Utilities.escapeXml(invCompare.getExpression()), mode);
-        s.append("<b title=\"" + translate("sd.dict", "Formal Invariant Identifier") + "\">" + id + "</b>: " + human + " (: " + expression + ")");
+
+  private XhtmlNode invariants(List<ElementDefinitionConstraintComponent> originalList, List<ElementDefinitionConstraintComponent> compareList, int mode) {
+    StatusList<InvariantWithStatus> list = new StatusList<>();
+    for (ElementDefinitionConstraintComponent v : originalList) {
+      if (!v.isEmpty()) {
+        list.add(new InvariantWithStatus(v));
       }
     }
-
-    return s.toString();
-  }
-
-  private ElementDefinitionConstraintComponent getConstraint(List<ElementDefinitionConstraintComponent> constraints, String id) {
-    for (ElementDefinitionConstraintComponent c : constraints) {
-      if (c.hasKey() && c.getKey().equals(id))
-        return c;
-      if (!c.hasKey() && c.toString().equals(id))
-        return c;
+    if (compareList != null && mode != GEN_MODE_DIFF) {
+      for (ElementDefinitionConstraintComponent v : compareList) {
+        list.merge(new InvariantWithStatus(v));
+      }
     }
-    return null;
+    if (list.size() == 0) {
+      return null;
+    }
+    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+    boolean first = true;
+    for (InvariantWithStatus t : list) {
+      if (first) first = false; else x.br();
+      t.render(x);
+    }
+    return x;
   }
 
-  private String describeBinding(StructureDefinition sd, ElementDefinition d, String path, ElementDefinition compare, int mode) throws Exception {
+  private XhtmlNode describeBinding(StructureDefinition sd, ElementDefinition d, String path, ElementDefinition compare, int mode) throws Exception {
     if (!d.hasBinding())
       return null;
     else {
       ElementDefinitionBindingComponent binding = d.getBinding();
       ElementDefinitionBindingComponent compBinding = compare == null ? null : compare.getBinding();
-      String bindingDesc = null;
+      XhtmlNode bindingDesc = null;
       if (binding.hasDescription()) {
         StringType newBinding = PublicationHacker.fixBindingDescriptions(context, binding.getDescriptionElement());
-        if (mode == GEN_MODE_SNAP || mode == GEN_MODE_MS)
-          bindingDesc = processMarkdown("Binding.description", newBinding);
-        else {
+        if (mode == GEN_MODE_SNAP || mode == GEN_MODE_MS) {
+          bindingDesc = new XhtmlNode(NodeType.Element, "div");
+          bindingDesc.add(new XhtmlParser().parseFragment(processMarkdown("Binding.description", newBinding)));
+        } else {
           StringType oldBinding = compBinding != null && compBinding.hasDescription() ? PublicationHacker.fixBindingDescriptions(context, compBinding.getDescriptionElement()) : null;
           bindingDesc = compareMarkdown("Binding.description", newBinding, oldBinding, mode);
         }
       }
       if (!binding.hasValueSet())
         return bindingDesc;
-      BindingResolution br = igp.resolveBinding(sd, binding, path);
-      String s = conf(binding) + (br.url == null ? "<code>" + Utilities.escapeXml(br.display) + "</code>" : "<a href=\"" + Utilities.escapeXml(br.url) + "\">" + Utilities.escapeXml(br.display) + "</a>") + confTail(binding);
+      
+      XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+      var nsp = x.span();
+      renderBinding(nsp, binding, path);      
       if (compBinding!=null ) {
-        BindingResolution compBr = igp.resolveBinding(sd, compBinding, path);
-        String compS = conf(compBinding) + "<a href=\"" + Utilities.escapeXml(compBr.url) + "\">" + Utilities.escapeXml(compBr.display) + "</a>" + confTail(compBinding);
-        s = compareString(s, compS, mode);
+        var osp = x.span();
+        renderBinding(osp, compBinding, path);
+        if (osp.allText().equals(nsp.allText())) {
+          nsp.style(unchangedStyle());
+          x.remove(osp);
+        } else {
+          osp.style(removedStyle());
+        }
       }
-      if (binding.hasDescription()) {
-        String desc = bindingDesc;
-        if (desc != null) {
-          if (desc.length() > 4 && desc.substring(4).contains("<p>")) {
-            s = s + "<br/>" + desc;
-          } else {
-            s = s + "\r\n" + stripPara(desc);
-          }
+      if (bindingDesc != null) {
+        if (isSimpleContent(bindingDesc)) {
+          x.tx(": ");
+          x.copyAllContent(bindingDesc.getChildNodes().get(0));
+        } else {
+          x.br();
+          x.copyAllContent(bindingDesc);
         }
       }
 
@@ -2035,12 +2287,30 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         abr.seeAdditionalBindings(binding.getExtensionsByUrl(ToolingExtensions.EXT_BINDING_ADDITIONAL), compBinding==null ? null : compBinding.getExtensionsByUrl(ToolingExtensions.EXT_BINDING_ADDITIONAL), mode!=GEN_MODE_SNAP && mode!=GEN_MODE_MS);
       }
 
-      s = s + abr.render();
-
-      return s;
+      if (abr.hasBindings()) {
+        var tbl = x.table("grid");
+        abr.render(tbl.getChildNodes(), true);
+      }
+      return x;
     }
   }
 
+
+  private boolean isSimpleContent(XhtmlNode bindingDesc) {
+    return bindingDesc.getChildNodes().size() == 1 && bindingDesc.getChildNodes().get(0).isPara();
+  }
+
+  private void renderBinding(XhtmlNode span, ElementDefinitionBindingComponent binding, String path) {
+    BindingResolution br = igp.resolveBinding(sd, binding, path);
+    span.tx(conf(binding));
+    if (br.url == null) {
+      span.code().tx(br.display);
+    } else {
+      span.ah(br.url).tx(br.display);
+    }
+    span.tx(confTail(binding));
+
+  }
 
   private String stripPara(String s) {
     if (s.startsWith("<p>")) {
@@ -2054,26 +2324,26 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private String confTail(ElementDefinitionBindingComponent def) {
     if (def.getStrength() == BindingStrength.EXTENSIBLE)
-      return "; " + translate("sd.dict", "other codes may be used where these codes are not suitable");
+      return "; other codes may be used where these codes are not suitable";
     else
       return "";
   }
 
   private String conf(ElementDefinitionBindingComponent def) {
     if (def.getStrength() == null) {
-      return "" + translate("sd.dict", "For codes, see ");
+      return "For codes, see ";
     }
     switch (def.getStrength()) {
     case EXAMPLE:
-      return "" + translate("sd.dict", "For example codes, see ");
+      return "For example codes, see ";
     case PREFERRED:
-      return "" + translate("sd.dict", "The codes SHOULD be taken from ");
+      return "The codes SHOULD be taken from ";
     case EXTENSIBLE:
-      return "" + translate("sd.dict", "The codes SHALL be taken from ");
+      return "The codes SHALL be taken from ";
     case REQUIRED:
-      return "" + translate("sd.dict", "The codes SHALL be taken from ");
+      return "The codes SHALL be taken from ";
     default:
-      return "" + "?sd-conf?";
+      return "?sd-conf?";
     }
   }
 
@@ -2091,10 +2361,10 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   }
 
-  private String encodeValue(DataType value, DataType compare, int mode) throws Exception {
+  private XhtmlNode encodeValue(DataType value, DataType compare, int mode) throws Exception {
     String oldValue = encodeValue(compare);
     String newValue = encodeValue(value);
-    return compareString(newValue, oldValue, mode);
+    return compareString(newValue, value, null, oldValue, null, mode);
   }
 
   private String encodeValue(DataType value) throws Exception {
@@ -2118,7 +2388,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   }
 
-  private String getMapping(StructureDefinition profile, ElementDefinition d, String uri, ElementDefinition compare, int mode) {
+  private XhtmlNode getMapping(StructureDefinition profile, ElementDefinition d, String uri, ElementDefinition compare, int mode) {
     String id = null;
     for (StructureDefinitionMappingComponent m : profile.getMapping()) {
       if (m.hasUri() && m.getUri().equals(uri))
@@ -2134,7 +2404,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
     }
     if (compare==null)
-      return newMap;
+      return new XhtmlNode(NodeType.Element, "div").tx(newMap);
     String oldMap = null;
     for (ElementDefinitionMappingComponent m : compare.getMapping()) {
       if (m.getIdentity().equals(id)) {
@@ -2143,66 +2413,36 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
     }
 
-    return compareString(Utilities.escapeXml(newMap), Utilities.escapeXml(oldMap), mode);
+    return compareString(Utilities.escapeXml(newMap), null, null, Utilities.escapeXml(oldMap), null, mode);
   }
 
-  private String compareSimpleTypeLists(List original, List compare, int mode) {
+  private XhtmlNode compareSimpleTypeLists(List<? extends PrimitiveType> original, List<? extends PrimitiveType> compare, int mode) {
     return compareSimpleTypeLists(original, compare, mode, ", ");
   }
 
-  private List<String> convertPrimitiveTypeList(List<PrimitiveType> original) {
-    List<String> originalList = new ArrayList<String>();
-    for (PrimitiveType pt : original) {
-      String s = gt(pt);
-      if (!s.startsWith("<"))
-        s = Utilities.escapeXml(s);
-      originalList.add(s);
-    }
-    return originalList;
-  }
-
-  private String compareSimpleTypeLists(List originalList, List compareList, int mode, String separator) {
-    List<String> original;
-    List<String> compare;
-    if (compareList == null)
-      compareList = new ArrayList<>();
-    if (!originalList.isEmpty() && originalList.get(0) instanceof PrimitiveType)
-      original = convertPrimitiveTypeList(originalList);
-    else
-      original = originalList;
-    if (!compareList.isEmpty() && compareList.get(0) instanceof PrimitiveType)
-      compare = convertPrimitiveTypeList(compareList);
-    else
-      compare = compareList;
-    StringBuilder b = new StringBuilder();
-    if (mode==GEN_MODE_SNAP || mode==GEN_MODE_MS) {
-      boolean first = true;
-      for (String s : original) {
-        if (first) first = false; else b.append(separator);
-        b.append(s);
-      }
-    } else {
-      boolean first = true;
-      for (String s : original) {
-        if (first) first = false; else b.append(separator);
-        if (compare.contains(s))
-          b.append(unchanged(s));
-        else
-          b.append(s);
-      }
-      if (original.size()!=0 || mode!=GEN_MODE_DIFF) {
-        for (String s : compare) {
-          if (!original.contains(s)) {
-            if (first)
-              first = false;
-            else
-              b.append(separator);
-            b.append(removed(s));
-          }
-        }
+ 
+  private XhtmlNode compareSimpleTypeLists(List<? extends PrimitiveType> originalList, List<? extends PrimitiveType> compareList, int mode, String separator) {
+    StatusList<ValueWithStatus> list = new StatusList<>();
+    for (PrimitiveType v : originalList) {
+      if (!v.isEmpty()) {
+        list.add(new ValueWithStatus(v));
       }
     }
-    return b.toString();
+    if (compareList != null && mode != GEN_MODE_DIFF) {
+      for (PrimitiveType v : compareList) {
+        list.merge(new ValueWithStatus(v));
+      }      
+    }
+    if (list.size() == 0) {
+      return null;
+    }
+    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+    boolean first = true;
+    for (ValueWithStatus t : list) {
+      if (first) first = false; else x.tx(separator);
+      t.render(x);
+    }
+    return x;
   }
 
   public String mappings(boolean complete, boolean diff) {
@@ -3206,7 +3446,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       b.append(" <li>This " + type + " is not used by any profiles in this Implementation Guide</li>\r\n");
     }
     b.append("</ul>\r\n");
-    return b.toString();
+    return b.toString()+changeSummary();
   }
 
   private void scanExtensions(Map<String, String> invoked, StructureDefinition sd, String u) {
@@ -3476,6 +3716,36 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           }
         }
       }
+      
+      
     }
   }
+  
+
+  protected void changeSummaryDetails(StringBuilder b) {
+    CanonicalResourceComparison<? extends CanonicalResource> comp = VersionComparisonAnnotation.artifactComparison(sd);
+    if (comp != null && comp.anyUpdates()) {
+      if (comp.getChangedMetadata() == ChangeAnalysisState.CannotEvaluate) {
+        b.append("<li>Unable to evaluate changes to metadata</li>\r\n");
+      } else if (comp.getChangedMetadata() == ChangeAnalysisState.Changed) {
+        b.append("<li>The resource metadata has changed ("+comp.getMetadataFieldsAsText()+")</li>\r\n");          
+      }
+      
+      if (comp.getChangedContent() == ChangeAnalysisState.CannotEvaluate) {
+        b.append("<li>Unable to evaluate changes to content</li>\r\n");
+      } else if (comp.getChangedContent() == ChangeAnalysisState.Changed) {
+        b.append("<li>The data elements list has changed</li>\r\n");          
+      }
+
+      if (comp.getChangedDefinitions() == ChangeAnalysisState.CannotEvaluate) {
+        b.append("<li>Unable to evaluate changes to definitions</li>\r\n");
+      } else if (comp.getChangedDefinitions() == ChangeAnalysisState.Changed) {
+        b.append("<li>One or more text definitions, invariants or bindings have changed</li>\r\n");          
+      }
+    } else {
+      b.append("<li>No changes</li>\r\n");
+    }
+  }
+  
+  
 }

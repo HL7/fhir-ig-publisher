@@ -286,7 +286,7 @@ public class Template {
     for (ImplementationGuideDefinitionResourceComponent or : ig.getDefinition().getResource()) {
       ImplementationGuideDefinitionResourceComponent nr = getMatchingResource(modIg, or.getReference()); 
       if (nr == null)
-        throw new FHIRException("Ths template is not allowed to modify the resources - didn't find '"+or.getReference()+"'");
+        throw new FHIRException("This template is not allowed to modify the resources - didn't find '"+or.getReference()+"'");
     }
     ig.setDefinition(modIg.getDefinition());
     ig.getManifest().setPage(modIg.getManifest().getPage());

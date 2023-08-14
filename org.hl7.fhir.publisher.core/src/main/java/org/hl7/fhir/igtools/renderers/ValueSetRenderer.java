@@ -32,7 +32,11 @@ import java.util.Set;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
+import org.hl7.fhir.r5.comparison.VersionComparisonAnnotation;
+import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.CanonicalResourceComparison;
+import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.ChangeAnalysisState;
 import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.model.Base;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.DataRequirement;
 import org.hl7.fhir.r5.model.DataRequirement.DataRequirementCodeFilterComponent;
@@ -60,8 +64,8 @@ public class ValueSetRenderer extends CanonicalRenderer {
 
   private ValueSet vs;
 
-  public ValueSetRenderer(IWorkerContext context, String corePath, ValueSet vs, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
-    super(context, corePath, vs, null, igp, maps, allTargets, markdownEngine, packge, gen);
+  public ValueSetRenderer(IWorkerContext context, String corePath, ValueSet vs, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen, String versionToAnnotate) {
+    super(context, corePath, vs, null, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate);
     this.vs = vs; 
   }
 
@@ -198,7 +202,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
       b.append("<p>"+translate("vs.usage", "This value set is not used here; it may be used elsewhere (e.g. specifications and/or implementations that use this content)")+"</p>\r\n");
     else
       b.append("</ul>\r\n");
-    return b.toString();
+    return b.toString()+changeSummary();
   }
 
   private boolean questionnaireUsesValueSet(List<QuestionnaireItemComponent> items, String url) {
@@ -230,5 +234,38 @@ public class ValueSetRenderer extends CanonicalRenderer {
     return false;
   }
 
-  
+
+  protected void changeSummaryDetails(StringBuilder b) {
+    CanonicalResourceComparison<? extends CanonicalResource> comp = VersionComparisonAnnotation.artifactComparison(vs);
+    if (comp != null) {
+      if (comp.anyUpdates()) {
+        if (comp.getChangedMetadata() == ChangeAnalysisState.CannotEvaluate) {
+          b.append("<li>Unable to evaluate changes to metadata</li>\r\n");
+        } else if (comp.getChangedMetadata() == ChangeAnalysisState.Changed) {
+          b.append("<li>The resource metadata has changed ("+comp.getMetadataFieldsAsText()+")</li>\r\n");          
+        }
+        
+        if (comp.getChangedContent() == ChangeAnalysisState.CannotEvaluate) {
+          b.append("<li>Unable to evaluate changes to content</li>\r\n");
+        } else if (comp.getChangedContent() == ChangeAnalysisState.Changed) {
+          b.append("<li>The logical definition of the value set has changed</li>\r\n");          
+        }
+
+        if (comp.getChangedDefinitions() == ChangeAnalysisState.CannotEvaluate) {
+          b.append("<li>Unable to evaluate changes to definitions</li>\r\n");
+        } else if (comp.getChangedDefinitions() == ChangeAnalysisState.Changed) {
+          b.append("<li>One or more text definitions/displays have changed</li>\r\n");          
+        }
+
+        if (comp.getChangedContentInterpretation() == ChangeAnalysisState.CannotEvaluate) {
+          b.append("<li>Unable to evaluate changes to the expansion</li>\r\n");
+        } else if (comp.getChangedContentInterpretation() == ChangeAnalysisState.Changed) {
+          b.append("<li>The expansion has changed</li>\r\n");          
+        }
+
+      } else {
+        b.append("<li>No changes</li>\r\n");
+      }
+    }
+  }
 }
