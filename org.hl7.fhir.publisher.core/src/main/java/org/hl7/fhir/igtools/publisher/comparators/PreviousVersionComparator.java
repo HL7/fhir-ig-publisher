@@ -19,6 +19,7 @@ import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.igtools.publisher.loaders.PublisherLoader;
 import org.hl7.fhir.r5.comparison.ComparisonRenderer;
 import org.hl7.fhir.r5.comparison.ComparisonSession;
+import org.hl7.fhir.r5.comparison.VersionComparisonAnnotation;
 import org.hl7.fhir.r5.conformance.profile.ProfileKnowledgeProvider;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
@@ -240,13 +241,15 @@ public class PreviousVersionComparator {
         comparisons.clear();
         Set<String> set = new HashSet<>();
         for (CanonicalResource rl : vi.resources) {
-          comparisons.add(new ProfilePair(rl, findByUrl(rl.getUrl(), resources, vi.ini)));
+          CanonicalResource t = findByUrl(rl.getUrl(), resources, vi.ini);
+          comparisons.add(new ProfilePair(rl, t));
           set.add(rl.getUrl());      
         }
         for (CanonicalResource rr : resources) {
           String url = fixForIniMap(rr.getUrl(), vi.ini);
           if (!set.contains(url)) {
-            comparisons.add(new ProfilePair(findByUrl(url, vi.resources, null), rr));
+            CanonicalResource t = findByUrl(url, vi.resources, null);
+            comparisons.add(new ProfilePair(t, rr));
           }
         }
 
