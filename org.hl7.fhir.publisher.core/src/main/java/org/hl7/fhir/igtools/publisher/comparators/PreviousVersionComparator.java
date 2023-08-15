@@ -19,6 +19,7 @@ import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.igtools.publisher.loaders.PublisherLoader;
 import org.hl7.fhir.r5.comparison.ComparisonRenderer;
 import org.hl7.fhir.r5.comparison.ComparisonSession;
+import org.hl7.fhir.r5.comparison.VersionComparisonAnnotation;
 import org.hl7.fhir.r5.conformance.profile.ProfileKnowledgeProvider;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
@@ -71,11 +72,13 @@ public class PreviousVersionComparator {
     private String errMsg;
     private IniFile ini;
     private ProfileKnowledgeProvider pkp;
+    private boolean annotate;
     
-    public VersionInstance(String version, IniFile ini) {
+    public VersionInstance(String version, IniFile ini, boolean annotate) {
       super();
       this.version = version;
       this.ini = ini;
+      this.annotate = annotate;
     }
   }
 
@@ -93,7 +96,7 @@ public class PreviousVersionComparator {
   private String lastUrl;
   private String businessVersion;
   
-  public PreviousVersionComparator(SimpleWorkerContext context, String version, String businessVersion, String rootDir, String dstDir, String canonical, ProfileKnowledgeProvider pkp, ILoggingService logger, List<String> versions) {
+  public PreviousVersionComparator(SimpleWorkerContext context, String version, String businessVersion, String rootDir, String dstDir, String canonical, ProfileKnowledgeProvider pkp, ILoggingService logger, List<String> versions, String versionToAnnotate) {
     super();
         
     this.context = context;
@@ -106,14 +109,14 @@ public class PreviousVersionComparator {
       if (businessVersion == null) {
          errMsg = "No Version Information Provided";
       } else {
-        processVersions(canonical, versions, rootDir);
+        processVersions(canonical, versions, rootDir, versionToAnnotate);
       }
     } catch (Exception e) {
       errMsg = "Unable to find version history at "+canonical+" ("+e.getMessage()+")";
     }
   }
 
-  private void processVersions(String canonical, List<String> versions, String rootDir) throws IOException {
+  private void processVersions(String canonical, List<String> versions, String rootDir, String versionToAnnotate) throws IOException {
     List<PackageListEntry> publishedVersions = null;
     for (String v : versions) {
       if (publishedVersions == null) {
@@ -138,18 +141,18 @@ public class PreviousVersionComparator {
           if(last == null) {
             throw new FHIRException("no {last} version found in package-list.json");
           } else if (!last.equals(businessVersion)) {
-            versionList.add(new VersionInstance(last, makeIni(rootDir, last)));
+            versionList.add(new VersionInstance(last, makeIni(rootDir, last), last.equals(versionToAnnotate) || "{last}".equals(versionToAnnotate)));
           }
         } 
         if ("{current}".equals(v)) {
           if(last == null) {
             throw new FHIRException("no {current} version found in package-list.json");
           } else if (!last.equals(businessVersion)) {
-            versionList.add(new VersionInstance(major, makeIni(rootDir, major)));
+            versionList.add(new VersionInstance(major, makeIni(rootDir, major), major.equals(versionToAnnotate) || "{current}".equals(versionToAnnotate)));
           }
         } 
       } else {
-        versionList.add(new VersionInstance(v, makeIni(rootDir, v)));
+        versionList.add(new VersionInstance(v, makeIni(rootDir, v), v.equals(versionToAnnotate)));
       }
     }
   }
@@ -238,18 +241,22 @@ public class PreviousVersionComparator {
         comparisons.clear();
         Set<String> set = new HashSet<>();
         for (CanonicalResource rl : vi.resources) {
-          comparisons.add(new ProfilePair(rl, findByUrl(rl.getUrl(), resources, vi.ini)));
+          CanonicalResource t = findByUrl(rl.getUrl(), resources, vi.ini);
+          comparisons.add(new ProfilePair(rl, t));
           set.add(rl.getUrl());      
         }
         for (CanonicalResource rr : resources) {
           String url = fixForIniMap(rr.getUrl(), vi.ini);
           if (!set.contains(url)) {
-            comparisons.add(new ProfilePair(findByUrl(url, vi.resources, null), rr));
+            CanonicalResource t = findByUrl(url, vi.resources, null);
+            comparisons.add(new ProfilePair(t, rr));
           }
         }
 
         try {
           ComparisonSession session = new ComparisonSession(vi.context, context, "Comparison of v"+vi.version+" with this version", vi.pkp, newpkp);
+          session.setForVersion(vi.version);
+          session.setAnnotate(vi.annotate);
           //    session.setDebug(true);
           for (ProfilePair c : comparisons) {
 //            System.out.println("Version Comparison: compare "+vi.version+" to current for "+c.getUrl());

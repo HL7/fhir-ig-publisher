@@ -106,6 +106,7 @@ import org.hl7.fhir.igtools.renderers.CanonicalRenderer;
 import org.hl7.fhir.igtools.renderers.CodeSystemRenderer;
 import org.hl7.fhir.igtools.renderers.CrossViewRenderer;
 import org.hl7.fhir.igtools.renderers.DependencyRenderer;
+import org.hl7.fhir.igtools.renderers.DraftDependenciesRenderer;
 import org.hl7.fhir.igtools.renderers.HTAAnalysisRenderer;
 import org.hl7.fhir.igtools.renderers.HistoryGenerator;
 import org.hl7.fhir.igtools.renderers.IPStatementsRenderer;
@@ -137,6 +138,8 @@ import org.hl7.fhir.igtools.web.PublicationProcess;
 import org.hl7.fhir.igtools.web.PublisherConsoleLogger;
 import org.hl7.fhir.igtools.web.WebSiteArchiveBuilder;
 import org.hl7.fhir.r4.formats.FormatUtilities;
+import org.hl7.fhir.r5.comparison.CanonicalResourceComparer;
+import org.hl7.fhir.r5.comparison.VersionComparisonAnnotation;
 import org.hl7.fhir.r5.conformance.ConstraintJavaGenerator;
 import org.hl7.fhir.r5.conformance.R5ExtensionsLoader;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
@@ -237,6 +240,7 @@ import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator.Category;
 import org.hl7.fhir.r5.utils.OperationOutcomeUtilities;
 import org.hl7.fhir.r5.utils.ResourceSorters;
+import org.hl7.fhir.r5.utils.ResourceSorters.CanonicalResourceSortByUrl;
 import org.hl7.fhir.r5.utils.ResourceUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.XVerExtensionManager;
@@ -810,6 +814,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private List<String> comparisonVersions;
   private List<String> ipaComparisons;
+  private String versionToAnnotate;
 
   private TimeTracker tt;
 
@@ -1051,6 +1056,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator,
           new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine).render(publishedIg, true, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
           new PublicationChecker(repoRoot, historyPage, markdownEngine).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
+          generateDraftDependencies(),
           noNarrativeResources, noValidateResources, noValidation, noGenerate, dependentIgFinder);
       tts.end();
       if (isChild()) {
@@ -1070,6 +1076,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       throw e;
     }
+  }
+
+  private String generateDraftDependencies() throws IOException {
+    DraftDependenciesRenderer dr = new DraftDependenciesRenderer(context, packageInfo.getVID());
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        dr.checkResource(r);
+      }
+    }
+    return dr.render();
   }
 
   private void processTranslationOutputs() throws IOException {
@@ -2659,7 +2675,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (comparisonVersions == null) {
           comparisonVersions = new ArrayList<>();
         }
-        if (!"n/a".equals(p.getValue())) {
+        if (!"n/a".equals(p.getValue()) && !comparisonVersions.contains(p.getValue())) {
+          comparisonVersions.add(p.getValue());
+        }        
+        break;
+      case "version-comparison-master":
+        versionToAnnotate = p.getValue();
+        if (comparisonVersions == null) {
+          comparisonVersions = new ArrayList<>();
+        }
+        if (!"n/a".equals(p.getValue()) && !comparisonVersions.contains(p.getValue())) {
           comparisonVersions.add(p.getValue());
         }        
         break;
@@ -2906,7 +2931,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
 
     if (!VersionUtilities.isR5Plus(context.getVersion())) {
-      System.out.print("Load R5 Specials");
+      System.out.println("Load R5 Specials");
       R5ExtensionsLoader r5e = new R5ExtensionsLoader(pcm, context);
       r5e.load();
       r5e.loadR5SpecialTypes(SpecialTypeHandler.specialTypes(context.getVersion()));
@@ -3993,7 +4018,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     loadFromPackage(name, canonical, pi, webref, igm, loadDeps);
   }
 
-
   private boolean isValidIGToken(String tail) {
     if (tail == null || tail.length() == 0)
       return false;
@@ -4002,7 +4026,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       result = result && (Utilities.isAlphabetic(tail.charAt(i)) || Utilities.isDigit(tail.charAt(i)) || (tail.charAt(i) == '_'));
     }
     return result;
-
   }
 
   private String idForDep(ImplementationGuideDependsOnComponent dep) {
@@ -5616,8 +5639,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (comparisonVersions == null) {
       comparisonVersions = new ArrayList<>();
       comparisonVersions.add("{last}");
+      versionToAnnotate = "{last}";  // #FIXME
     }
-    return new PreviousVersionComparator(context, version, businessVersion != null ? businessVersion : sourceIg == null ? null : sourceIg.getVersion(), rootDir, tempDir, igpkp.getCanonical(), igpkp, logger, comparisonVersions);
+    return new PreviousVersionComparator(context, version, businessVersion != null ? businessVersion : sourceIg == null ? null : sourceIg.getVersion(), rootDir, tempDir, igpkp.getCanonical(), igpkp, logger, comparisonVersions, versionToAnnotate);
   }
 
 
@@ -7003,6 +7027,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void generate() throws Exception {
+    Base.setCopyUserData(true); // just keep all the user data when copiying while rendering
+
     forceDir(tempDir);
     forceDir(Utilities.path(tempDir, "_includes"));
     forceDir(Utilities.path(tempDir, "_data"));
@@ -7428,6 +7454,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         parseVersion = str(r.getConfig(), "version", version);
       }
     }
+    XhtmlNode xhtml = null;
+    if (res instanceof DomainResource) {
+      xhtml = ((DomainResource) res).getText().getDiv();
+      if (xhtml != null) {
+        if (xhtml.isEmpty()) {
+          xhtml = null;
+        } else {
+          ((DomainResource) res).getText().setDiv(new XhtmlParser().parseFragment("<div xmlns=\"http://www.w3.org/1999/xhtml\">Placeholder</div>"));
+        }
+      }
+    }
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
     if (VersionUtilities.isR3Ver(parseVersion)) {
       org.hl7.fhir.dstu3.formats.JsonParser jp = new org.hl7.fhir.dstu3.formats.JsonParser();
@@ -7449,7 +7486,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       jp.compose(bs, res);
     }
     ByteArrayInputStream bi = new ByteArrayInputStream(bs.toByteArray());
-    return new org.hl7.fhir.r5.elementmodel.JsonParser(context).parseSingle(bi);
+    Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parseSingle(bi);
+    if (xhtml != null) {
+      Element div = e.getNamedChild("text").getNamedChild("div");
+      div.setXhtml(xhtml);
+      ((DomainResource) res).getText().setDiv(xhtml);
+//      div.setValue(new XhtmlComposer(true, false).compose(xhtml));
+    }
+    return e;
   }
 
   private Resource convertFromElement(Element res) throws IOException, org.hl7.fhir.exceptions.FHIRException, FHIRFormatError, DefinitionException {
@@ -7982,7 +8026,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     generateDataFile();
     generateCanonicalSummary();
 
-    CrossViewRenderer cvr = new CrossViewRenderer(igpkp.getCanonical(), altCanonical, context, igpkp.specPath());
+    CrossViewRenderer cvr = new CrossViewRenderer(igpkp.getCanonical(), altCanonical, context, igpkp.specPath(), versionToAnnotate);
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
@@ -8031,6 +8075,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (String s : cvr.getExtensionIds()) {
       fragment("extension-search-"+s, cvr.buildSearchTableForExtension(s), otherFilesRun);      
     }
+    fragment("codesystem-list", buildCodeSystemList(), otherFilesRun);      
+    fragment("valueset-list", buildValueSetList(), otherFilesRun);      
 
     trackedFragment("1", "ip-statements", new IPStatementsRenderer(context, markdownEngine, sourceIg.getPackageId()).genIpStatements(fileList), otherFilesRun);
     if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {
@@ -8280,6 +8326,214 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         applyPageTemplate(htmlTemplate, mdTemplate, publishedIg.getDefinition().getPage());
       }
     }
+  }
+
+  private String buildValueSetList() throws IOException {
+    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+    List<ValueSet> vslist = new ArrayList<>();
+    boolean versions = false;
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.fhirType().equals("ValueSet")) {
+          ValueSet vs = (ValueSet) r.getResource();
+          vslist.add(vs);
+          versions = !(publishedIg.getVersion().equals(vs.getVersion())) || versions;
+        }
+      }
+    }  
+    Collections.sort(vslist, new CanonicalResourceSortByUrl());
+    var tbl = x.table("grid");
+    var tr = tbl.tr();
+    tr.th().tx("URL");
+    if (versions) {
+      tr.th().tx("Version");
+    }
+    tr.th().tx("Name / Title");
+    tr.th().tx("Status");
+    tr.th().tx("Flags");
+    tr.th().tx("Source");
+    if (versionToAnnotate != null) {
+      var td = tr.th();
+      td.tx("Δ v");
+      td.tx(versionToAnnotate);
+    }
+    for (ValueSet vs : vslist) {
+      tr = tbl.tr();
+      tr.td().ah(vs.getWebPath()).tx(vs.getUrl());
+      if (versions) {
+        tr.td().tx(vs.getVersion());
+      }
+      var td = tr.td();
+      td.tx(vs.getName());
+      td.br();
+      td.tx(vs.getTitle());
+      td = tr.td();
+      td.tx(vs.getStatus().toCode());
+      if (vs.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
+        td.tx(" / ");
+        td.tx(ToolingExtensions.getStandardsStatus(vs).toCode());
+      }
+      if (vs.getExperimental()) {
+        td.tx(": experimental");
+      }
+      td = tr.td();
+      
+      if (vs.getCompose().hasLockedDate()) {
+        td.tx("Locked-Date");
+        td.tx(" ");
+      }
+      if (vs.getCompose().getInactive()) {
+        td.tx("Inactive");
+        td.tx(" ");
+      }
+      boolean i = false;
+      boolean e = false;
+      boolean v = false;
+      boolean a = false;
+      Set<String> sources = new HashSet<>();
+      for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
+        if (inc.hasValueSet()) {
+          v = true;
+        }
+        if (inc.hasSystem()) {
+          sources.add(describeSource(inc.getSystem()));
+          if (inc.hasConcept()) {
+            e = true;
+          } else if (inc.hasFilter()) {
+            i = true;
+          } else {
+            a = true;
+          }
+        }
+      }
+      if (a) {
+        td.span(null, "All Code System").tx("A ");
+      }
+      if (i) {
+        td.span(null, "Intensional").tx("I ");
+      }
+      if (e) {
+        td.span(null, "Extensional").tx("E ");
+      }
+      if (v) {
+        td.span(null, "Imports Valueset(s)").tx("V ");
+      }
+      
+      td = tr.td();
+      for (String s : Utilities.sorted(sources)) {
+        td.sep(", ");
+        td.tx(s);
+      }
+      
+      if (versionToAnnotate != null) {
+        VersionComparisonAnnotation.renderSummary(vs, tr.td(), versionToAnnotate);
+      }
+    }
+    
+    return new XhtmlComposer(false, false).compose(x.getChildNodes());
+  }
+
+  private String describeSource(String uri) {
+    CodeSystem cs = context.fetchCodeSystem(uri);
+    if (cs != null) {
+      if (!Utilities.isAbsoluteUrl(cs.getWebPath())) {
+        return "Internal";
+      }
+    }
+    if ("http://snomed.info/sct".equals(uri)) return "SCT";
+    if ("http://loinc.org".equals(uri)) return "LOINC";
+    if ("http://dicom.nema.org/resources/ontology/DCM".equals(uri)) return "DICOM";
+    if ("http://unitsofmeasure.org".equals(uri)) return "UCUM";
+    if ("http://www.nlm.nih.gov/research/umls/rxnorm".equals(uri)) return "RxNorm";
+    if (uri.startsWith("http://terminology.hl7.org/CodeSystem/v3-")) return "THO (V3)";
+    if (uri.startsWith("http://terminology.hl7.org/CodeSystem/v2-")) return "THO (V2)";
+    if (uri.startsWith("http://terminology.hl7.org")) return "THO";
+    if (cs != null && cs.hasSourcePackage()) {
+      return cs.getSourcePackage().getId();
+    }
+    if (uri.startsWith("http://hl7.org/fhir")) return "FHIR";
+    return "Other";
+  }
+
+  private String buildCodeSystemList() throws IOException {
+    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+    List<CodeSystem> cslist = new ArrayList<>();
+    boolean versions = false;
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.fhirType().equals("CodeSystem")) {
+          CodeSystem cs = (CodeSystem) r.getResource();
+          cslist.add(cs);
+          versions = !(publishedIg.getVersion().equals(cs.getVersion())) || versions;
+        }
+      }
+    }  
+    Collections.sort(cslist, new CanonicalResourceSortByUrl());
+    var tbl = x.table("grid");
+    var tr = tbl.tr();
+    tr.th().tx("URL");
+    if (versions) {
+      tr.th().tx("Version");
+    }
+    tr.th().tx("Name / Title");
+    tr.th().tx("Status");
+    tr.th().tx("Flags");
+    tr.th().tx("Count");
+    if (versionToAnnotate != null) {
+      var td = tr.th();
+      td.tx("Δ v");
+      td.tx(versionToAnnotate);
+    }
+    for (CodeSystem cs : cslist) {
+      tr = tbl.tr();
+      tr.td().ah(cs.getWebPath()).tx(cs.getUrl());
+      if (versions) {
+        tr.td().tx(cs.getVersion());
+      }
+      var td = tr.td();
+      td.tx(cs.getName());
+      td.br();
+      td.tx(cs.getTitle());
+      td = tr.td();
+      td.tx(cs.getStatus().toCode());
+      if (cs.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
+        td.tx(" / ");
+        td.tx(ToolingExtensions.getStandardsStatus(cs).toCode());
+      }
+      if (cs.getExperimental()) {
+        td.tx(": experimental");
+      }
+      td = tr.td();
+      if (cs.hasHierarchyMeaning()) {
+        td.tx(cs.getHierarchyMeaning().toCode());
+        td.tx(" ");
+      }
+      if (!CodeSystemUtilities.hasHierarchy(cs)) {
+        td.tx("flat ");
+      }
+      if (cs.hasCompositional() && cs.getCompositional()) {
+        td.tx("compositional");
+        td.tx(" ");
+      }
+      if (cs.hasVersionNeeded() && cs.getVersionNeeded()) {
+        td.tx("version-needed");
+        td.tx(" ");
+      }
+      
+      td = tr.td();
+      td.tx(CodeSystemUtilities.countCodes(cs));
+      if (cs.hasContent()) {
+        td.tx(" (");
+        td.tx(cs.getContent().toCode());
+        td.tx(")");
+      }
+      
+      if (versionToAnnotate != null) {
+        VersionComparisonAnnotation.renderSummary(cs, tr.td(), versionToAnnotate);
+      }
+    }
+    
+    return new XhtmlComposer(false, false).compose(x.getChildNodes());
   }
 
   private List<DependencyAnalyser.ArtifactDependency> makeDependencies() {
@@ -9762,7 +10016,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
   private void generateOutputsOperationDefinition(FetchedFile f, FetchedResource r, OperationDefinition od, Map<String, String> vars, boolean regen, String prefixForContainer) throws FHIRException, IOException {
-    OperationDefinitionRenderer odr = new OperationDefinitionRenderer(context, checkAppendSlash(specPath), od, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, rc);
+    OperationDefinitionRenderer odr = new OperationDefinitionRenderer(context, checkAppendSlash(specPath), od, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, rc, versionToAnnotate);
     if (igpkp.wantGen(r, "summary")) {
       fragment("OperationDefinition-"+prefixForContainer+od.getId()+"-summary", odr.summary(), f.getOutputNames(), r, vars, null);
     }
@@ -10514,7 +10768,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
    * @throws Exception
    */
   private void generateOutputsCodeSystem(FetchedFile f, FetchedResource fr, CodeSystem cs, Map<String, String> vars, String prefixForContainer) throws Exception {
-    CodeSystemRenderer csr = new CodeSystemRenderer(context, specPath, cs, igpkp, specMaps, pageTargets(), markdownEngine, packge, rc);
+    CodeSystemRenderer csr = new CodeSystemRenderer(context, specPath, cs, igpkp, specMaps, pageTargets(), markdownEngine, packge, rc, versionToAnnotate);
     if (igpkp.wantGen(fr, "summary")) {
       fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-summary", csr.summaryTable(fr, igpkp.wantGen(fr, "xml"), igpkp.wantGen(fr, "json"), igpkp.wantGen(fr, "ttl"), igpkp.summaryRows()), f.getOutputNames(), fr, vars, null);
     }
@@ -10526,6 +10780,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     if (igpkp.wantGen(fr, "xref")) {
       fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-xref", csr.xref(), f.getOutputNames(), fr, vars, null);
+    }
+    if (igpkp.wantGen(fr, "changes")) {
+      fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-changes", csr.changeSummary(), f.getOutputNames(), fr, vars, null);
     }
 
     if (igpkp.wantGen(fr, "xlsx")) {
@@ -10551,7 +10808,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
    * @throws Exception
    */
   private void generateOutputsValueSet(FetchedFile f, FetchedResource r, ValueSet vs, Map<String, String> vars, String prefixForContainer) throws Exception {
-    ValueSetRenderer vsr = new ValueSetRenderer(context, specPath, vs, igpkp, specMaps, pageTargets(), markdownEngine, packge, rc);
+    ValueSetRenderer vsr = new ValueSetRenderer(context, specPath, vs, igpkp, specMaps, pageTargets(), markdownEngine, packge, rc, versionToAnnotate);
     if (igpkp.wantGen(r, "summary")) {
       fragment("ValueSet-"+prefixForContainer+vs.getId()+"-summary", vsr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null);
     }
@@ -10567,6 +10824,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     if (igpkp.wantGen(r, "xref")) {
       fragment("ValueSet-"+prefixForContainer+vs.getId()+"-xref", vsr.xref(), f.getOutputNames(), r, vars, null);
+    }
+    if (igpkp.wantGen(r, "changes")) {
+      fragment("ValueSet-"+prefixForContainer+vs.getId()+"-changes", vsr.changeSummary(), f.getOutputNames(), r, vars, null);
     }
     if (igpkp.wantGen(r, "expansion")) {
       if (vs.getStatus() == PublicationStatus.RETIRED) {
@@ -10686,11 +10946,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void generateOutputsStructureDefinition(FetchedFile f, FetchedResource r, StructureDefinition sd, Map<String, String> vars, boolean regen, String prefixForContainer) throws Exception {
-    // todo : generate shex itself
+    // todo : generate shex itself    
     if (igpkp.wantGen(r, "shex"))
       fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-shex", "yet to be done: shex as html", null, f.getOutputNames());
-
-    // todo : generate json schema itself. JSON Schema generator
+    
+// todo : generate json schema itself. JSON Schema generator
     //    if (igpkp.wantGen(r, ".schema.json")) {
     //      String path = Utilities.path(tempDir, r.getId()+".sch");
     //      f.getOutputNames().add(path);
@@ -10699,7 +10959,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (igpkp.wantGen(r, "json-schema"))
       fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-json-schema", "yet to be done: json schema as html", null, f.getOutputNames());
 
-    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, rc, allInvariants, sdMapCache, specPath);
+    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, rc, allInvariants, sdMapCache, specPath, versionToAnnotate);
     if (igpkp.wantGen(r, "summary")) {
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-summary", sdr.summary(), f.getOutputNames(), r, vars, null);
     }
@@ -10786,6 +11046,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps-diff-all", sdr.mappings(true, true), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "xref"))
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-sd-xref", sdr.references(), f.getOutputNames(), r, vars, null);
+    if (igpkp.wantGen(r, "changes")) {
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-sd-changes", sdr.changeSummary(), f.getOutputNames(), r, vars, null);
+    }
     fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-typename", sdr.typeName(), f.getOutputNames(), r, vars, null);
     if (sd.getDerivation() == TypeDerivationRule.CONSTRAINT && igpkp.wantGen(r, "span"))
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-span", sdr.span(true, igpkp.getCanonical(), otherFilesRun), f.getOutputNames(), r, vars, null);
@@ -10886,7 +11149,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void generateOutputsStructureMap(FetchedFile f, FetchedResource r, StructureMap map, Map<String,String> vars, String prefixForContainer) throws Exception {
-    StructureMapRenderer smr = new StructureMapRenderer(context, checkAppendSlash(specPath), map, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, rc);
+    StructureMapRenderer smr = new StructureMapRenderer(context, checkAppendSlash(specPath), map, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, rc, versionToAnnotate);
     if (igpkp.wantGen(r, "summary"))
       fragment("StructureMap-"+prefixForContainer+map.getId()+"-summary", smr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "summary-table"))
@@ -10907,7 +11170,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void generateOutputsCanonical(FetchedFile f, FetchedResource r, CanonicalResource cr, Map<String,String> vars, String prefixForContainer) throws Exception {
-    CanonicalRenderer smr = new CanonicalRenderer(context, checkAppendSlash(specPath), cr, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, rc);
+    CanonicalRenderer smr = new CanonicalRenderer(context, checkAppendSlash(specPath), cr, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, rc, versionToAnnotate);
     if (igpkp.wantGen(r, "summary"))
       fragment(cr.fhirType()+"-"+prefixForContainer+cr.getId()+"-summary", smr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "summary-table"))
@@ -10928,7 +11191,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void generateOutputsExampleScenario(FetchedFile f, FetchedResource r, ExampleScenario scen, Map<String,String> vars, String prefixForContainer) throws Exception {
-    ExampleScenarioRenderer er = new ExampleScenarioRenderer(context, checkAppendSlash(specPath), scen, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, rc.copy().setDefinitionsTarget(igpkp.getDefinitionsName(r)));
+    ExampleScenarioRenderer er = new ExampleScenarioRenderer(context, checkAppendSlash(specPath), scen, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, rc.copy().setDefinitionsTarget(igpkp.getDefinitionsName(r)), versionToAnnotate);
     if (igpkp.wantGen(r, "actor-table"))
       fragment("ExampleScenario-"+prefixForContainer+scen.getId()+"-actor-table", er.render(ExampleScenarioRendererMode.ACTORS), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "instance-table"))
@@ -10940,7 +11203,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void generateOutputsQuestionnaire(FetchedFile f, FetchedResource r, Questionnaire q, Map<String,String> vars, String prefixForContainer) throws Exception {
-    QuestionnaireRenderer qr = new QuestionnaireRenderer(context, checkAppendSlash(specPath), q, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, rc.copy().setDefinitionsTarget(igpkp.getDefinitionsName(r)));
+    QuestionnaireRenderer qr = new QuestionnaireRenderer(context, checkAppendSlash(specPath), q, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, rc.copy().setDefinitionsTarget(igpkp.getDefinitionsName(r)), versionToAnnotate);
     if (igpkp.wantGen(r, "summary"))
       fragment("Questionnaire-"+prefixForContainer+q.getId()+"-summary", qr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null);
     if (igpkp.wantGen(r, "summary-table"))

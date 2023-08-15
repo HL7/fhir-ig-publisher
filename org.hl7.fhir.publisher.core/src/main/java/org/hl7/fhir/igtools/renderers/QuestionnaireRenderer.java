@@ -45,8 +45,8 @@ public class QuestionnaireRenderer extends CanonicalRenderer {
   private Questionnaire q;
   private String destDir;
 
-  public QuestionnaireRenderer(IWorkerContext context, String corePath, Questionnaire q, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
-    super(context, corePath, q, destDir, igp, maps, allTargets, markdownEngine, packge, gen);
+  public QuestionnaireRenderer(IWorkerContext context, String corePath, Questionnaire q, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen, String versionToAnnotate) {
+    super(context, corePath, q, destDir, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate);
     this.q = q;
     this.destDir = destDir;
   }

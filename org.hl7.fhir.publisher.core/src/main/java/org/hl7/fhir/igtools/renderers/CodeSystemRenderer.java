@@ -31,7 +31,12 @@ import java.util.Set;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
+import org.hl7.fhir.r5.comparison.VersionComparisonAnnotation;
+import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.CanonicalResourceComparison;
+import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.ChangeAnalysisState;
 import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.model.Base;
+import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
 import org.hl7.fhir.r5.model.ValueSet;
@@ -49,8 +54,8 @@ public class CodeSystemRenderer extends CanonicalRenderer {
 
   private CodeSystem cs;
 
-  public CodeSystemRenderer(IWorkerContext context, String corePath, CodeSystem cs, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
-    super(context, corePath, cs, null, igp, maps, allTargets, markdownEngine, packge, gen);
+  public CodeSystemRenderer(IWorkerContext context, String corePath, CodeSystem cs, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen, String versionToAnnotate) {
+    super(context, corePath, cs, null, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate);
     this.cs = cs;
   }
 
@@ -100,16 +105,17 @@ public class CodeSystemRenderer extends CanonicalRenderer {
   }
 
   public String content(Set<String> outputTracker) throws EOperationOutcome, FHIRException, IOException, org.hl7.fhir.exceptions.FHIRException  {
-//    if (cs.hasText() && cs.getText().hasDiv())
-//      return new XhtmlComposer().compose(cs.getText().getDiv());
-//    else {
-      CodeSystem csc = cs.copy();
-      csc.setId(cs.getId()); // because that's not copied
-      csc.setText(null);
-      RendererFactory.factory(csc, gen).render(csc);
+    //    if (cs.hasText() && cs.getText().hasDiv())
+    //      return new XhtmlComposer().compose(cs.getText().getDiv());
+    //    else {
+    CodeSystem csc = cs.copy();
 
-      return new XhtmlComposer(XhtmlComposer.HTML).compose(csc.getText().getDiv());
-//    }
+    csc.setId(cs.getId()); // because that's not copied
+    csc.setText(null);
+    RendererFactory.factory(csc, gen).render(csc);
+
+    return new XhtmlComposer(XhtmlComposer.HTML).compose(csc.getText().getDiv());
+    //    }
   }
 
   public String xref() throws FHIRException {
@@ -133,9 +139,10 @@ public class CodeSystemRenderer extends CanonicalRenderer {
     if (first)
       b.append("<ul><li>"+translate("cs.xref", "This CodeSystem is not used here; it may be used elsewhere (e.g. specifications and/or implementations that use this content)")+"</li></ul>\r\n");
     else
-      b.append("</ul>\r\n");
-    return b.toString();
+      b.append("</ul>\r\n");    
+    return b.toString()+changeSummary();
   }
+
 
   private boolean addLink(StringBuilder b, boolean first, ValueSet vc, ConceptSetComponent ed, Set<String> processed) {
     if (ed.hasSystem() && ed.getSystem().equals(cs.getUrl())) {
@@ -157,4 +164,30 @@ public class CodeSystemRenderer extends CanonicalRenderer {
   }
 
 
+  protected void changeSummaryDetails(StringBuilder b) {
+    CanonicalResourceComparison<? extends CanonicalResource> comp = VersionComparisonAnnotation.artifactComparison(cs);
+    if (comp != null && comp.anyUpdates()) {
+      if (comp.getChangedMetadata() == ChangeAnalysisState.CannotEvaluate) {
+        b.append("<li>Unable to evaluate changes to metadata</li>\r\n");
+      } else if (comp.getChangedMetadata() == ChangeAnalysisState.Changed) {
+        b.append("<li>The resource metadata has changed ("+comp.getMetadataFieldsAsText()+")</li>\r\n");          
+      }
+      
+      if (comp.getChangedContent() == ChangeAnalysisState.CannotEvaluate) {
+        b.append("<li>Unable to evaluate changes to content</li>\r\n");
+      } else if (comp.getChangedContent() == ChangeAnalysisState.Changed) {
+        b.append("<li>The list of codes defined by the code system has changed</li>\r\n");          
+      }
+
+      if (comp.getChangedDefinitions() == ChangeAnalysisState.CannotEvaluate) {
+        b.append("<li>Unable to evaluate changes to definitions</li>\r\n");
+      } else if (comp.getChangedDefinitions() == ChangeAnalysisState.Changed) {
+        b.append("<li>One or more text definitions/displays have changed</li>\r\n");          
+      }
+
+    } else {
+      b.append("<li>No changes</li>\r\n");
+    }
+  }
+  
 }
