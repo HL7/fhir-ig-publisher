@@ -22,11 +22,13 @@ public class CanonicalRenderer extends BaseRenderer {
 
   private CanonicalResource cr;
   private String destDir;
+  protected String versionToAnnotate;
 
-  public CanonicalRenderer(IWorkerContext context, String corePath, CanonicalResource cr, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
+  public CanonicalRenderer(IWorkerContext context, String corePath, CanonicalResource cr, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen, String versionToAnnotate) {
     super(context, corePath, igp, maps, allTargets, markdownEngine, packge, gen);
     this.cr = cr;
     this.destDir = destDir;
+    this.versionToAnnotate = versionToAnnotate;
   }
 
   public String summaryTable(FetchedResource r, boolean xml, boolean json, boolean ttl, Set<String> rows) throws Exception {
@@ -183,4 +185,20 @@ public class CanonicalRenderer extends BaseRenderer {
     }    
   }
 
+  public String changeSummary() {
+    if (versionToAnnotate == null) {
+      return "";
+    } 
+
+    StringBuilder b = new StringBuilder();
+    b.append("<div style=\"background-color: #fff2ff; border-left: solid 3px #ffa0ff; margin: 4px; padding: 4px\">\r\n");
+    b.append("<p><b>Changes since version "+versionToAnnotate+":</b></p>\r\n");
+    changeSummaryDetails(b);
+    b.append("</div>\r\n");
+    return b.toString();
+  }
+
+  protected void changeSummaryDetails(StringBuilder b) {
+    b.append("<ul><li>Not done yet</li></ul>\r\n");    
+  }
 }

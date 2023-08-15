@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.hl7.fhir.r5.comparison.VersionComparisonAnnotation;
 import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.ValidationResult;
@@ -34,6 +35,9 @@ import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.validation.ValidationOptions;
+import org.hl7.fhir.utilities.xhtml.NodeType;
+import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
+import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
 public class CrossViewRenderer {
 
@@ -106,13 +110,15 @@ public class CrossViewRenderer {
   private ContextUtilities cu;
   private FHIRPathEngine fpe;
   private List<SearchParameter> searchParams = new ArrayList<>();
+  private String versionToAnnotate;
 
-  public CrossViewRenderer(String canonical, String canonical2, IWorkerContext context, String corePath) {
+  public CrossViewRenderer(String canonical, String canonical2, IWorkerContext context, String corePath, String versionToAnnotate) {
     super();
     this.canonical = canonical;
     this.canonical2 = canonical2;
     this.context = context;
     this.corePath = corePath;
+    this.versionToAnnotate = versionToAnnotate;
     getBaseTypes();
     cu = new ContextUtilities(context);
     fpe = new FHIRPathEngine(context);
@@ -778,6 +784,9 @@ public class CrossViewRenderer {
     b.append("<td><b><a href=\""+Utilities.pathURL(context.getSpecUrl(), "defining-extensions.html")+"#context\">Context</a></b></td>");
     b.append("<td><b><a href=\""+Utilities.pathURL(context.getSpecUrl(), "versions.html")+"#std-process\">Status</a></b></td>");
     b.append("<td><b><a href=\""+Utilities.pathURL(context.getSpecUrl(), "versions.html")+"#maturity\">Maturity</a></b></td>");
+    if (versionToAnnotate != null) {
+      b.append("<td><b><a href=\"todo.html#maturity\">Δ v"+versionToAnnotate+"</a></b></td>");      
+    }
     b.append("</tr>");  
     if (type != null) {
       if ("Path".equals(type)) {
@@ -980,6 +989,11 @@ public class CrossViewRenderer {
     } else { 
       String fmm = ToolingExtensions.readStringExtension(ed, ToolingExtensions.EXT_FMM_LEVEL);
       s.append("<td><a href=\""+Utilities.pathURL(corePath, "versions.html")+"#std-process\" title=\"Trial-Use\" class=\"trial-use-flag\">Trial&nbsp;Use</a></td><td>"+(Utilities.noString(fmm) ? "0" : "&nbsp;(FMM"+fmm+")")+"</td>");      
+    }
+    if (versionToAnnotate != null) {
+XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+      VersionComparisonAnnotation.renderSummary(ed, x, versionToAnnotate);
+      s.append("<td>"+(new XhtmlComposer(false, false).compose(x.getChildNodes()))+"</td>");      
     }
 //    s.append("<td><a href=\"extension-"+ed.getId().toLowerCase()+ ".xml.html\">XML</a></td>");
 //    s.append("<td><a href=\"extension-"+ed.getId().toLowerCase()+ ".json.html\">JSON</a></td>");

@@ -1,5 +1,9 @@
 package org.hl7.fhir.igtools.renderers;
 
+import java.io.IOException;
+import java.util.List;
+import java.util.Set;
+
 /*-
  * #%L
  * org.hl7.fhir.publisher.core
@@ -35,18 +39,14 @@ import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 
-import java.io.IOException;
-import java.util.List;
-import java.util.Set;
-
 public class ExampleScenarioRenderer extends CanonicalRenderer {
 
 
   private ExampleScenario scen;
   private String destDir;
 
-  public ExampleScenarioRenderer(IWorkerContext context, String corePath, ExampleScenario scen, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen) {
-    super(context, corePath, scen, destDir, igp, maps, allTargets, markdownEngine, packge, gen);
+  public ExampleScenarioRenderer(IWorkerContext context, String corePath, ExampleScenario scen, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen, String versionToAnnotate) {
+    super(context, corePath, scen, destDir, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate);
     this.scen = scen;
     this.destDir = destDir;
   }

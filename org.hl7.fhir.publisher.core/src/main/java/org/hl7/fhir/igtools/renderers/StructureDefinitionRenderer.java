@@ -1,6 +1,5 @@
 package org.hl7.fhir.igtools.renderers;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -17,13 +16,13 @@ import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
+import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.CanonicalResourceComparison;
+import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.ChangeAnalysisState;
+import org.hl7.fhir.r5.comparison.VersionComparisonAnnotation;
 import org.hl7.fhir.r5.conformance.profile.BindingResolution;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.formats.IParser.OutputStyle;
-import org.hl7.fhir.r5.formats.XmlParser;
-import org.hl7.fhir.r5.model.BooleanType;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.CodeSystem;
@@ -33,24 +32,18 @@ import org.hl7.fhir.r5.model.ContactPoint;
 import org.hl7.fhir.r5.model.DataType;
 import org.hl7.fhir.r5.model.DateTimeType;
 import org.hl7.fhir.r5.model.ElementDefinition;
-import org.hl7.fhir.r5.model.ElementDefinition.AggregationMode;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionConstraintComponent;
-import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionExampleComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionMappingComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionSlicingComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionSlicingDiscriminatorComponent;
-import org.hl7.fhir.r5.model.ElementDefinition.PropertyRepresentation;
 import org.hl7.fhir.r5.model.ElementDefinition.SlicingRules;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
-import org.hl7.fhir.r5.model.Enumeration;
 import org.hl7.fhir.r5.model.Enumerations.BindingStrength;
 import org.hl7.fhir.r5.model.Extension;
-import org.hl7.fhir.r5.model.IdType;
 import org.hl7.fhir.r5.model.PackageInformation;
 import org.hl7.fhir.r5.model.PrimitiveType;
 import org.hl7.fhir.r5.model.Quantity;
-import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
@@ -63,15 +56,12 @@ import org.hl7.fhir.r5.profilemodel.PEDefinition;
 import org.hl7.fhir.r5.profilemodel.PEType;
 import org.hl7.fhir.r5.renderers.AdditionalBindingsRenderer;
 import org.hl7.fhir.r5.renderers.DataRenderer;
-import org.hl7.fhir.r5.renderers.ObligationsRenderer;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext.KnownLinkType;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.StructureDefinitionRendererMode;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities.SystemReference;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.utils.ElementDefinitionUtilities;
-import org.hl7.fhir.r5.utils.PublicationHacker;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
@@ -105,10 +95,6 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
   }
 
-  public static final String RIM_MAPPING = "http://hl7.org/v3";
-  public static final String v2_MAPPING = "http://hl7.org/v2";
-  public static final String LOINC_MAPPING = "http://loinc.org";
-  public static final String SNOMED_MAPPING = "http://snomed.info";
   public static final int GEN_MODE_SNAP = 1;
   public static final int GEN_MODE_DIFF = 2;
   public static final int GEN_MODE_MS = 3;
@@ -123,19 +109,19 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   private String destDir;
   private List<FetchedFile> files;
   private boolean allInvariants;
-  HashMap<String, ElementDefinition> differentialHash = null;
-  HashMap<String, ElementDefinition> mustSupportHash = null;
-  Map<String, Map<String, ElementDefinition>> sdMapCache;
-  List<ElementDefinition> diffElements = null;
-  List<ElementDefinition> mustSupportElements = null;
-  List<ElementDefinition> keyElements = null;
+  private HashMap<String, ElementDefinition> differentialHash = null;
+  private HashMap<String, ElementDefinition> mustSupportHash = null;
+  private Map<String, Map<String, ElementDefinition>> sdMapCache;
+  private List<ElementDefinition> diffElements = null;
+  private List<ElementDefinition> mustSupportElements = null;
+  private List<ElementDefinition> keyElements = null;
   private static JsonObject usages;
   private String specPath;
 
   private org.hl7.fhir.r5.renderers.StructureDefinitionRenderer sdr;
 
-  public StructureDefinitionRenderer(IWorkerContext context, String corePath, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants,Map<String, Map<String, ElementDefinition>> mapCache, String specPath) {
-    super(context, corePath, sd, destDir, igp, maps, allTargets, markdownEngine, packge, gen);
+  public StructureDefinitionRenderer(IWorkerContext context, String corePath, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants,Map<String, Map<String, ElementDefinition>> mapCache, String specPath, String versionToAnnotate) {
+    super(context, corePath, sd, destDir, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate);
     this.sd = sd;
     this.destDir = destDir;
     utils = new ProfileUtilities(context, null, igp);
@@ -143,6 +129,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     this.allInvariants = allInvariants;
     this.sdMapCache = mapCache;
     sdr = new org.hl7.fhir.r5.renderers.StructureDefinitionRenderer(gen);
+    sdr.setSdMapCache(sdMapCache);
+    sdr.setHostMd(this);
     this.specPath = specPath;
   }
 
@@ -470,6 +458,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     else {
       XhtmlComposer composer = new XhtmlComposer(XhtmlComposer.HTML);
       StructureDefinition sdCopy = sd.copy();
+      
       sdCopy.getSnapshot().setElement(getKeyElements());
       sdr.getContext().setStructureMode(mode);
       org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", false, false, outputTracker, true, gen, toTabs ? ANCHOR_PREFIX_KEY : ANCHOR_PREFIX_SNAP);
@@ -511,7 +500,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
               edCopy.setUserData("render.opaque", true);
             }
             edCopy.setBinding(null);
-            ed.getConstraint().clear();
+            edCopy.getConstraint().clear();
           }
           edCopy.setMustSupport(false);
           mustSupportElements.add(edCopy);
@@ -1047,1163 +1036,21 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   }
 
-  // Returns the ElementDefinition for the 'parent' of the current element
-  private ElementDefinition getBaseElement(ElementDefinition e, String url) {
-    if (e.hasUserData(ProfileUtilities.UD_DERIVATION_POINTER)) {
-      return getElementById(url, e.getUserString(ProfileUtilities.UD_DERIVATION_POINTER));
-    }
-    return null;
-  }
-
-  // Returns the ElementDefinition for the 'root' ancestor of the current element
-  private ElementDefinition getRootElement(ElementDefinition e) {
-    if (!e.hasBase())
-      return null;
-    String basePath = e.getBase().getPath();
-    String url = "http://hl7.org/fhir/StructureDefinition/" + (basePath.contains(".") ? basePath.substring(0, basePath.indexOf(".")) : basePath);
-    try {
-      return getElementById(url, basePath);
-    } catch (FHIRException except) {
-      // Likely a logical model, so this is ok
-      return null;
-    }
-  }
 
   public String dict(boolean incProfiledOut, int mode, String anchorPrefix) throws Exception {
-    int i = 1;
-    StringBuilder b = new StringBuilder();
-    b.append("<p>Guidance on how to interpret the contents of this table can be found <a href=\"https://build.fhir.org/ig/FHIR/ig-guidance//readingIgs.html#data-dictionaries\">here</a>.</p>\r\n");
-    b.append("<table class=\"dict\">\r\n");
+    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+    var p = x.para();
+    p.tx("Guidance on how to interpret the contents of this table can be found ");
+    p.ah("https://build.fhir.org/ig/FHIR/ig-guidance//readingIgs.html#data-dictionaries").tx("here");
+    XhtmlNode t = x.table("dict");
 
-    Map<String, ElementDefinition> allAnchors = new HashMap<>();
-    List<ElementDefinition> excluded = new ArrayList<>();
-
-    List<ElementDefinition> stack = new ArrayList<>(); // keeps track of parents, for anchor generation
     List<ElementDefinition> elements = elementsForMode(mode);
-    for (ElementDefinition ec : elements) {
-      addToStack(stack, ec);
-      generateAnchors(stack, allAnchors);
-      checkInScope(stack, excluded);
-    }
 
-    for (ElementDefinition ec : elements) {
-      if ((incProfiledOut || !"0".equals(ec.getMax())) && !excluded.contains(ec)) {
-        ElementDefinition compareElement = null;
-        if (mode==GEN_MODE_DIFF)
-          compareElement = getBaseElement(ec, sd.getBaseDefinition());
-        else if (mode==GEN_MODE_KEY)
-          compareElement = getRootElement(ec);
-
-        String anchors = makeAnchors(ec, anchorPrefix);
-        if (isProfiledExtension(ec)) {
-          StructureDefinition extDefn = context.fetchResource(StructureDefinition.class, ec.getType().get(0).getProfile().get(0).getValue());
-          if (extDefn == null) {
-            String title = ec.getId();
-            b.append("  <tr><td colspan=\"2\" class=\"structure\"><span class=\"self-link-parent\">"+anchors+"<span style=\"color: grey\">" + Integer.toString(i++) + ".</span> <b>" + title + "</b>" + link(ec.getId(), anchorPrefix) + "</span></td></tr>\r\n");
-            generateElementInner(b, sd, ec, 1, null, compareElement, null);
-          } else {
-            String title = ec.getId();
-            b.append("  <tr><td colspan=\"2\" class=\"structure\"><span class=\"self-link-parent\">"+anchors);
-            b.append("<span style=\"color: grey\">" + Integer.toString(i++) + ".</span> <b>" + title + "</b>" + link(ec.getId(), anchorPrefix) + "</span></td></tr>\r\n");
-            ElementDefinition valueDefn = getExtensionValueDefinition(extDefn);
-            ElementDefinition compareValueDefn = null;
-            try {
-              StructureDefinition compareExtDefn = context.fetchResource(StructureDefinition.class, compareElement.getType().get(0).getProfile().get(0).getValue());
-              compareValueDefn = getExtensionValueDefinition(extDefn);
-            } catch (Exception except) {}
-            generateElementInner(b, sd, ec, valueDefn == null || valueDefn.prohibited() ? 2 : 3, valueDefn, compareElement, compareValueDefn);
-            // generateElementInner(b, extDefn, extDefn.getSnapshot().getElement().get(0), valueDefn == null ? 2 : 3, valueDefn);
-          }
-        } else {
-          String title = ec.getId();
-          b.append("  <tr><td colspan=\"2\" class=\"structure\"><span class=\"self-link-parent\">"+anchors);
-          b.append("<span style=\"color: grey\">" + Integer.toString(i++) + ".</span> <b>" + title + "</b>" + link(ec.getId(), anchorPrefix) + "</span></td></tr>\r\n");
-          generateElementInner(b, sd, ec, mode, null, compareElement, null);
-          if (ec.hasSlicing())
-            generateSlicing(b, sd, ec, ec.getSlicing(), compareElement, mode);
-        }
-      }
-    }
-    b.append("</table>\r\n");
-    i++;
-    return b.toString();
+    sdr.renderDict(sd, elements, t, incProfiledOut, mode, anchorPrefix);
+    
+    return new XhtmlComposer(false, false).compose(x.getChildNodes());
   }
 
-  private void checkInScope(List<ElementDefinition> stack, List<ElementDefinition> excluded) {
-    if (stack.size() > 2) {
-      ElementDefinition parent = stack.get(stack.size()-2);
-      ElementDefinition focus = stack.get(stack.size()-1);
-
-      if (excluded.contains(parent) || "0".equals(parent.getMax())) {
-        excluded.add(focus);
-      }
-    }
-  }
-
-  private void generateAnchors(List<ElementDefinition> stack, Map<String, ElementDefinition> allAnchors) {
-    List<String> list = new ArrayList<>();
-    list.add(stack.get(0).getId()); // initialise
-    for (int i = 1; i < stack.size(); i++) {
-      ElementDefinition ed = stack.get(i);
-      List<String> aliases = new ArrayList<>();
-      String name = tail(ed.getPath());
-      if (name.endsWith("[x]")) {
-        aliases.add(name);
-        Set<String> tl = new HashSet<String>(); // guard against duplicate type names - can happn in some versions
-        for (TypeRefComponent tr : ed.getType()) {
-          String tc = tr.getWorkingCode();
-          if (!tl.contains(tc)) {
-            aliases.add(name.replace("[x]", Utilities.capitalize(tc)));
-            aliases.add(name+":"+name.replace("[x]", Utilities.capitalize(tc)));
-            tl.add(tc);
-          }
-        }
-      } else if (ed.hasSliceName()) {
-        aliases.add(name+":"+ed.getSliceName());
-        // names.add(name); no good generating this?
-      } else {
-        aliases.add(name);
-      }
-      List<String> generated = new ArrayList<>();
-      for (String l : list) {
-        for (String a : aliases) {
-          generated.add(l+"."+a);
-        }
-      }
-      list.clear();
-      list.addAll(generated);
-    }
-    ElementDefinition ed = stack.get(stack.size()-1);
-
-    // now we have all the possible names, but some of them might be inappropriate if we've
-    // already generated a type slicer. On the other hand, if we've already done that, we're
-    // going to steal any type specific ones off it.
-    List<String> removed = new ArrayList<>();
-    for (String s : list) {
-      if (!allAnchors.containsKey(s)) {
-        allAnchors.put(s, ed);
-      } else if (s.endsWith("[x]")) {
-        // that belongs on the earlier element
-        removed.add(s);
-      } else {
-        // we delete it from the other
-        @SuppressWarnings("unchecked")
-        List<String> other = (List<String>) allAnchors.get(s).getUserData("dict.generator.anchors");
-        other.remove(s);
-        allAnchors.put(s, ed);
-      }
-    }
-    list.removeAll(removed);
-    ed.setUserData("dict.generator.anchors", list);
-  }
-
-  private void addToStack(List<ElementDefinition> stack, ElementDefinition ec) {
-    while (!stack.isEmpty() && !isParent(stack.get(stack.size()-1), ec)) {
-      stack.remove(stack.size()-1);
-    }
-    stack.add(ec);
-  }
-
-  private boolean isParent(ElementDefinition ed, ElementDefinition ec) {      
-    return ec.getPath().startsWith(ed.getPath()+".");
-  }
-
-  private String makeAnchors(ElementDefinition ed, String anchorPrefix) {
-    List<String> list = (List<String>) ed.getUserData("dict.generator.anchors");
-    StringBuilder b = new StringBuilder();
-    b.append("<a name=\"" + anchorPrefix + ed.getId() + "\"> </a>");
-    for (String s : list) {
-      if (!s.equals(ed.getId())) {
-        b.append("<a name=\"" + anchorPrefix + s + "\"> </a>");
-      }
-    }
-    return b.toString();
-  }
-
-  private String link(String id, String anchorPrefix) {
-    return "<a href=\"#" + anchorPrefix + id + "\" title=\"link to here\" class=\"self-link\"><svg viewBox=\"0 0 1792 1792\" width=\"16\" class=\"self-link\" height=\"16\"><path d=\"M1520 1216q0-40-28-68l-208-208q-28-28-68-28-42 0-72 32 3 3 19 18.5t21.5 21.5 15 19 13 25.5 3.5 27.5q0 40-28 68t-68 28q-15 0-27.5-3.5t-25.5-13-19-15-21.5-21.5-18.5-19q-33 31-33 73 0 40 28 68l206 207q27 27 68 27 40 0 68-26l147-146q28-28 28-67zm-703-705q0-40-28-68l-206-207q-28-28-68-28-39 0-68 27l-147 146q-28 28-28 67 0 40 28 68l208 208q27 27 68 27 42 0 72-31-3-3-19-18.5t-21.5-21.5-15-19-13-25.5-3.5-27.5q0-40 28-68t68-28q15 0 27.5 3.5t25.5 13 19 15 21.5 21.5 18.5 19q33-31 33-73zm895 705q0 120-85 203l-147 146q-83 83-203 83-121 0-204-85l-206-207q-83-83-83-203 0-123 88-209l-88-88q-86 88-208 88-120 0-204-84l-208-208q-84-84-84-204t85-203l147-146q83-83 203-83 121 0 204 85l206 207q83 83 83 203 0 123-88 209l88 88q86-88 208-88 120 0 204 84l208 208q84 84 84 204z\" fill=\"navy\"></path></svg></a>";
-  }
-
-  private boolean isProfiledExtension(ElementDefinition ec) {
-    return ec.getType().size() == 1 && "Extension".equals(ec.getType().get(0).getWorkingCode()) && ec.getType().get(0).hasProfile();
-  }
-
-  private ElementDefinition getExtensionValueDefinition(StructureDefinition extDefn) {
-    for (ElementDefinition ed : extDefn.getSnapshot().getElement()) {
-      if (ed.getPath().startsWith("Extension.value"))
-        return ed;
-    }
-    return null;
-  }
-
-  public String compareMarkdown(String location, PrimitiveType md, PrimitiveType compare, int mode) throws FHIRException {
-    if (compare == null)
-      return processMarkdown(location, md);
-    String newMd = processMarkdown(location, md);
-    String oldMd = processMarkdown(location, compare);
-    return compareString(newMd, oldMd, mode);
-  }
-
-  public String compareString(String newStr, String oldStr, int mode) {
-    if (mode==GEN_MODE_SNAP || mode==GEN_MODE_MS)
-      return newStr;
-    if (oldStr==null || oldStr.isEmpty())
-      if (newStr==null || newStr.isEmpty())
-        return null;
-      else
-        return newStr;
-    if (oldStr!=null && !oldStr.isEmpty() && (newStr==null || newStr.isEmpty())) {
-      if (mode == GEN_MODE_DIFF)
-        return "";
-      else
-        return removed(oldStr);
-    }
-    if (oldStr.equals(newStr))
-      if (mode==GEN_MODE_DIFF)
-        return "";
-      else
-        return unchanged(newStr);
-    if (newStr.startsWith(oldStr))
-      return unchanged(oldStr) + newStr.substring(oldStr.length());
-    // TODO: improve comparision in this fall-through case, by looking for matches in sub-paragraphs?
-    return newStr + removed(oldStr);
-  }
-
-  public String unchanged(String s) {
-    return "<span style='color:DarkGray'>" + s + "</span>";
-  }
-
-  public String removed(String s) {
-    return "<span style='color:DarkGray;text-decoration:line-through'>" + s + "</span>";
-  }
-
-  private void generateElementInner(StringBuilder b, StructureDefinition profile, ElementDefinition d, int mode, ElementDefinition value, ElementDefinition compare, ElementDefinition compareValue) throws Exception {
-    boolean root = !d.getPath().contains(".");
-    tableRow(b, translate("sd.dict", "SliceName"), "profiling.html#slicing", d.getSliceName());
-    tableRowNE(b, translate("sd.dict", "Definition"), null, compareMarkdown(profile.getName(), d.getDefinitionElement(), compare==null ? null : compare.getDefinitionElement(), mode));
-    tableRowNE(b, translate("sd.dict", "Note"), null, businessIdWarning(profile.getName(), tail(d.getPath())));
-    tableRowNE(b, translate("sd.dict", "Control"), "conformance-rules.html#conformance", describeCardinality(d, compare, mode) + summariseConditions(d.getCondition(), compare==null?null:compare.getCondition(), mode));
-    tableRowNE(b, translate("sd.dict", "Binding"), "terminologies.html", describeBinding(profile, d, d.getPath(), compare, mode));
-    if (d.hasContentReference()) {
-      tableRow(b, translate("sd.dict", "Type"), null, "See " + d.getContentReference().substring(1));
-    } else {
-      tableRowNE(b, translate("sd.dict", "Type"), "datatypes.html", describeTypes(d.getType(), false, compare, mode) + (value==null ? "" : processSecondary(mode, value, compareValue, mode)));
-    }
-    if (d.hasExtension(ToolingExtensions.EXT_DEF_TYPE)) {
-      tableRowNE(b, translate("sd.dict", "Default Type"), "datatypes.html", ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_DEF_TYPE));          
-    }
-    if (d.hasExtension(ToolingExtensions.EXT_TYPE_SPEC)) {
-      tableRowNE(b, translate("sd.dict", Utilities.pluralize("Type Specifier", d.getExtensionsByUrl(ToolingExtensions.EXT_TYPE_SPEC).size())), "datatypes.html", sdr.formatTypeSpecifiers(context, d));          
-    }
-    if (d.getPath().endsWith("[x]"))
-      tableRowNE(b, translate("sd.dict", "[x] Note"), null, translate("sd.dict", "See %sChoice of Data Types%s for further information about how to use [x]", "<a href=\"" + corePath + "formats.html#choice\">", "</a>"));
-    tableRowNE(b, translate("sd.dict", "Is Modifier"), "conformance-rules.html#ismodifier", displayBoolean(d.getIsModifier(), null, mode));
-    if (d.getMustHaveValue()) {
-      tableRowNE(b, translate("sd.dict", "Primitive Value"), "elementdefinition.html#primitives", "This primitive type must have a value (the value must be present, and cannot be replaced by an extension)");
-    } else if (d.hasValueAlternatives()) {
-      XhtmlNode ul = renderCanonicalList(d.getValueAlternatives()); 
-      tableRowNE(b, translate("sd.dict", "Primitive Value"), "elementdefinition.html#primitives", "This primitive type may be present, or absent, or replaced by one of the following extensions: "+new XhtmlComposer(true).compose(ul));      
-    } else if (hasPrimitiveTypes(d)) {
-      tableRowNE(b, translate("sd.dict", "Primitive Value"), "elementdefinition.html#primitives", "This primitive element may be present, or absent, or replaced by an extension");            
-    }
-    if (ToolingExtensions.hasAllowedUnits(d)) {      
-      tableRowNE(b, translate("sd.dict", "Allowed Units"), "http://hl7.org/fhir/extensions/StructureDefinition-elementdefinition-allowedUnits.html", describeAllowedUnits(d));        
-    }
-    tableRowNE(b, translate("sd.dict", "Must Support"), "conformance-rules.html#mustSupport", displayBoolean(d.getMustSupport(), compare==null ? null : compare.getMustSupportElement(), mode));
-    if (d.getMustSupport()) {
-      if (hasMustSupportTypes(d.getType())) {
-        tableRowNE(b, translate("sd.dict", "Must Support Types"), "datatypes.html", describeTypes(d.getType(), true, compare, mode));
-      } else if (hasChoices(d.getType())) {
-        tableRowNE(b, translate("sd.dict", "Must Support Types"), "datatypes.html", "No must-support rules about the choice of types/profiles");
-      }
-    }
-    if (root && sd.getKind() == StructureDefinitionKind.LOGICAL) {
-      tableRowNE(b, translate("sd.dict", "Logical Model"), null, ToolingExtensions.readBoolExtension(sd, ToolingExtensions.EXT_LOGICAL_TARGET) ?
-          "This logical model can be the target of a reference" : "This logical model cannot be the target of a reference");
-    }
-
-    if (root && sd.hasExtension(ToolingExtensions.EXT_SD_IMPOSE_PROFILE)) {
-      tableRowNE(b, translate("sd.dict", "Impose Profile"), "http://hl7.org/fhir/extensions/StructureDefinition-structuredefinition-imposeProfile.html", 
-          renderCanonicalListExt(sd.getExtensionsByUrl(ToolingExtensions.EXT_SD_IMPOSE_PROFILE)));
-    }
-    if (root && sd.hasExtension(ToolingExtensions.EXT_SD_COMPLIES_WITH_PROFILE)) {
-      tableRowNE(b, translate("sd.dict", "Complies with Profile"), "http://hl7.org/fhir/extensions/StructureDefinition-structuredefinition-compliesWithProfile.html", 
-          renderCanonicalListExt(sd.getExtensionsByUrl(ToolingExtensions.EXT_SD_COMPLIES_WITH_PROFILE)));
-    }
-    tableRowNE(b, translate("sd.dict", "Obligations"), null, describeObligations(d, root));   
-
-    if (d.hasExtension(ToolingExtensions.EXT_EXTENSION_STYLE)) {
-      String es = d.getExtensionString(ToolingExtensions.EXT_EXTENSION_STYLE);
-      if ("named-elements".equals(es)) {
-        if (gen.hasLink(KnownLinkType.JSON_NAMES)) {
-          tableRowNE(b, translate("sd.dict", "Extension Style"), gen.getLink(KnownLinkType.JSON_NAMES), "This element can be extended by named JSON elements");
-        } else {
-          tableRowNE(b, translate("sd.dict", "Extension Style"), ToolingExtensions.WEB_EXTENSION_STYLE, "This element can be extended by named JSON elements");
-        }
-      }
-    }
-
-    if (!d.getPath().contains(".") && ToolingExtensions.hasExtension(profile, ToolingExtensions.EXT_BINDING_STYLE)) {
-      tableRowNE(b, translate("sd.dict", "Binding Style"), ToolingExtensions.WEB_BINDING_STYLE, 
-          "This type can be bound to a value set using the " + ToolingExtensions.readStringExtension(profile, ToolingExtensions.EXT_BINDING_STYLE)+" binding style");            
-    }
-
-    if (d.hasExtension(ToolingExtensions.EXT_DATE_FORMAT)) {
-      String df = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_DATE_FORMAT);
-      if (df != null) {
-        tableRowNE(b, translate("sd.dict", "Date Format"), null, df);
-      }
-    }
-    String ide = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_ID_EXPECTATION);
-    if (ide != null) {
-      if (ide.equals("optional")) {
-        tableRowNE(b, translate("sd.dict", "ID Expectation"), null, "Id may or not be present (this is the default for elements but not resources)");
-      } else if (ide.equals("required")) {
-        tableRowNE(b, translate("sd.dict", "ID Expectation"), null, "Id is required to be present (this is the default for resources but not elements)");
-      } else if (ide.equals("required")) {
-        tableRowNE(b, translate("sd.dict", "ID Expectation"), null, "An ID is not allowed in this context");
-      }
-    }
-    // tooling extensions for formats
-    if (ToolingExtensions.hasExtensions(d, ToolingExtensions.EXT_JSON_EMPTY, ToolingExtensions.EXT_JSON_PROP_KEY, ToolingExtensions.EXT_JSON_NULLABLE, 
-        ToolingExtensions.EXT_JSON_NAME, ToolingExtensions.EXT_JSON_PRIMITIVE_CHOICE)) {
-      tableRowNE(b, translate("sd.dict", "JSON Representation"), null,  describeJson(d).toString());          
-    }
-    if (d.hasExtension(ToolingExtensions.EXT_XML_NAMESPACE) || profile.hasExtension(ToolingExtensions.EXT_XML_NAMESPACE) || d.hasExtension(ToolingExtensions.EXT_XML_NAME) || (root && profile.hasExtension(ToolingExtensions.EXT_XML_NO_ORDER)) ||
-        d.hasRepresentation()) {
-      tableRowNE(b, translate("sd.dict", "XML Representation"), null, describeXml(profile, d, root).toString());          
-    }
-
-    if (d.hasExtension(ToolingExtensions.EXT_IMPLIED_PREFIX)) {
-      tableRowNE(b, translate("sd.dict", "Validation Rules"), null, "When this element is read <code>"
-          +ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_IMPLIED_PREFIX)+"</code> is prefixed to the value before validation");                
-    }
-
-    if (d.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
-      StandardsStatus ss = StandardsStatus.fromCode(d.getExtensionString(ToolingExtensions.EXT_STANDARDS_STATUS));
-      //      gc.addStyledText("Standards Status = "+ss.toDisplay(), ss.getAbbrev(), "black", ss.getColor(), baseSpecUrl()+, true);
-      StructureDefinition sdb = context.fetchResource(StructureDefinition.class, profile.getBaseDefinition());
-      if (sdb != null) {
-        StandardsStatus base = determineStandardsStatus(sdb, (ElementDefinition) d.getUserData("derived.pointer"));
-        if (base != null) {
-          tableRowNE(b, translate("sd.dict", "Standards Status"), "versions.html#std-process", ss.toDisplay()+" (from "+base.toDisplay()+")");
-        } else {
-          tableRowNE(b, translate("sd.dict", "Standards Status"), "versions.html#std-process", ss.toDisplay());          
-        }
-      } else {
-        tableRowNE(b, translate("sd.dict", "Standards Status"), "versions.html#std-process", ss.toDisplay());
-      }
-    }
-    if (mode != GEN_MODE_DIFF && d.hasIsSummary()) {
-      tableRow(b, "Summary", "search.html#summary", Boolean.toString(d.getIsSummary()));
-    }
-    tableRowNE(b, translate("sd.dict", "Requirements"), null, compareMarkdown(profile.getName(), d.getRequirementsElement(), compare==null ? null : compare.getRequirementsElement(), mode));
-    tableRowHint(b, translate("sd.dict", "Alternate Names"), translate("sd.dict", "Other names by which this resource/element may be known"), null, compareSimpleTypeLists(d.getAlias(), (compare==null ? new ArrayList<StringType>() : compare.getAlias()), mode));
-    tableRowNE(b, translate("sd.dict", "Comments"), null, compareMarkdown(profile.getName(), d.getCommentElement(), compare==null ? null : compare.getCommentElement(), mode));
-    tableRowNE(b, translate("sd.dict", "Max Length"), null, !d.hasMaxLengthElement() ? null : compare!= null && compare.hasMaxLengthElement() ? compareString(toStr(d.getMaxLength()), toStr(compare.getMaxLength()), mode) : toStr(d.getMaxLength()));
-    tableRowNE(b, translate("sd.dict", "Default Value"), null, encodeValue(d.getDefaultValue(), compare==null ? null : compare.getDefaultValue(), mode));
-    tableRowNE(b, translate("sd.dict", "Meaning if Missing"), null, d.getMeaningWhenMissing());
-    tableRowNE(b, translate("sd.dict", "Fixed Value"), null, encodeValue(d.getFixed(), compare==null ? null : compare.getFixed(), mode));
-    tableRowNE(b, translate("sd.dict", "Pattern Value"), null, encodeValue(d.getPattern(), compare==null ? null : compare.getPattern(), mode));
-    tableRowNE(b, translate("sd.dict", "Example"), null, encodeValues(d.getExample()));
-    tableRowNE(b, translate("sd.dict", "Invariants"), null, invariants(d.getConstraint(), compare==null ? null : compare.getConstraint(), mode));
-    tableRowNE(b, translate("sd.dict", "LOINC Code"), null, getMapping(profile, d, LOINC_MAPPING, compare, mode));
-    tableRowNE(b, translate("sd.dict", "SNOMED-CT Code"), null, getMapping(profile, d, SNOMED_MAPPING, compare, mode));
-  }
-
-  private StringBuilder describeXml(StructureDefinition profile, ElementDefinition d, boolean root) {
-    StringBuilder s = new StringBuilder();
-    for (PropertyRepresentation pr : PropertyRepresentation.values()) {
-      if (d.hasRepresentation(pr)) {
-        switch (pr) {
-        case CDATEXT:
-          s.append("This property is represented as CDA Text in the XML.");
-          break;
-        case TYPEATTR:
-          s.append("The type of this property is determined using the xsi:type attribute.");
-          break;
-        case XHTML:
-          s.append("This property is represented as XHTML Text in the XML.");
-          break;
-        case XMLATTR:
-          s.append("In the XML format, this property is represented as an attribute.");
-          break;
-        case XMLTEXT:
-          s.append("In the XML format, this property is represented as unadorned text.");
-          break;
-        default:
-        }
-      }
-    }
-    String name = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_XML_NAMESPACE);
-    if (name == null && root) {
-      name = ToolingExtensions.readStringExtension(profile, ToolingExtensions.EXT_XML_NAMESPACE);
-    }
-    if (name != null) {
-      s.append("In the XML format, this property has the namespace <code>"+name+"</code>.");
-    }
-    name = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_XML_NAME);
-    if (name != null) {
-      s.append("In the XML format, this property has the actual name <code>"+name+"</code>.");
-    }
-    boolean no = root && ToolingExtensions.readBoolExtension(profile, ToolingExtensions.EXT_XML_NO_ORDER);
-    if (no) {
-      s.append("The children of this property can appear in any order in the XML.");
-    }
-    return s;
-  }
-
-  private StringBuilder describeJson(ElementDefinition d) {
-    boolean list = ToolingExtensions.countExtensions(d, ToolingExtensions.EXT_JSON_EMPTY, ToolingExtensions.EXT_JSON_PROP_KEY, ToolingExtensions.EXT_JSON_NULLABLE, ToolingExtensions.EXT_JSON_NAME) > 1;
-    StringBuilder s = new StringBuilder();
-    String pfx = "";
-    String sfx = "";
-    if (list) {
-      s.append("<ul>\r\n");
-      pfx = "<li>";
-      sfx = "</li>\r\n";
-    }
-    String code = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_JSON_EMPTY);
-    if (code != null) {
-      switch (code) {
-      case "present":
-        s.append(pfx+"The JSON Array for this property is present even when there are no items in the instance (e.g. as an empty array)"+sfx);
-        break;
-      case "absent":
-        s.append(pfx+"The JSON Array for this property is not present when there are no items in the instance (e.g. never as an empty array)"+sfx);
-        break;
-      case "either":
-        s.append(pfx+"The JSON Array for this property may be present even when there are no items in the instance (e.g. may be present as an empty array)</li>\r\n ");
-        break;
-      }
-    }
-    String jn = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_JSON_NAME);
-    if (jn != null) {
-      if (d.getPath().contains(".")) {
-        s.append(pfx+"This property appears in JSON with the property name <code>"+Utilities.escapeXml(jn)+"</code>"+sfx);
-      } else {
-        s.append(pfx+"This type can appear in JSON with the property name <code>"+Utilities.escapeXml(jn)+"</code> (in elements using named extensions)"+sfx);          
-      }
-    }
-    code = ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_JSON_PROP_KEY);
-    if (code != null) {
-      s.append(pfx+"This repeating object is represented as a single JSON object with named properties. The name of the property (key) is the value of the <code>"+Utilities.escapeXml(code)+"</code> child"+sfx);
-    }
-    if (ToolingExtensions.readBoolExtension(d, ToolingExtensions.EXT_JSON_NULLABLE)) {
-      s.append(pfx+"This object can be represented as null in the JSON structure (which counts as 'present' for cardinality purposes)"+sfx);
-    }
-    if (ToolingExtensions.readBoolExtension(d, ToolingExtensions.EXT_JSON_PRIMITIVE_CHOICE)) {
-      s.append(pfx+"The type of this element is inferred from the JSON type in the instance"+sfx);
-    }
-    if (list) s.append("<ul>");
-    return s;
-  }
-
-  private String describeObligations(ElementDefinition d, boolean root) throws IOException {
-    ObligationsRenderer obr = new ObligationsRenderer(corePath, sd, d.getPath(), gen, this, sdr);
-    obr.seeObligations(d.getExtensionsByUrl(ToolingExtensions.EXT_OBLIGATION_CORE, ToolingExtensions.EXT_OBLIGATION_TOOLS));
-    obr.seeRootObligations(d.getId(), sd.getExtensionsByUrl(ToolingExtensions.EXT_OBLIGATION_CORE, ToolingExtensions.EXT_OBLIGATION_TOOLS));
-    if (obr.hasObligations() || (root && (sd.hasExtension(ToolingExtensions.EXT_OBLIGATION_PROFILE_FLAG) || sd.hasExtension(ToolingExtensions.EXT_OBLIGATION_INHERITS)))) {
-      StringBuilder s = new StringBuilder();
-      XhtmlNode ul = new XhtmlNode(NodeType.Element, "ul");
-      if (root) {
-        if (sd.hasExtension(ToolingExtensions.EXT_OBLIGATION_PROFILE_FLAG)) {
-          ul.li().tx("This is an obligation profile that only contains obligations and additional bindings");           
-        } 
-        for (Extension ext : sd.getExtensionsByUrl(ToolingExtensions.EXT_OBLIGATION_INHERITS)) {
-          String iu = ext.getValue().primitiveValue();
-          XhtmlNode bb = ul.li();
-          bb.tx("This profile picks up obligations and additional bindings from ");           
-          StructureDefinition sd = context.fetchResource(StructureDefinition.class, iu); 
-          if (sd == null) { 
-            bb.code().tx(iu);                     
-          } else if (sd.hasWebPath()) { 
-            bb.ah(sd.getWebPath()).tx(sd.present());
-          } else { 
-            bb.ah(iu).tx(sd.present());
-          } 
-        }  
-        if (ul.hasChildren()) {
-          s.append(new XhtmlComposer(true).compose(ul));
-        }
-      }
-      if (obr.hasObligations()) {
-        XhtmlNode tbl = new XhtmlNode(NodeType.Element, "table").attribute("class", "grid");
-        obr.renderTable(tbl.getChildNodes(), true);
-        if (tbl.hasChildren()) {
-          s.append(new XhtmlComposer(true).compose(tbl));
-        }
-      }
-      return s.toString();
-    } else {
-      return null;
-    }
-  }
-
-  private String describeAllowedUnits(ElementDefinition d) {
-    DataType au = ToolingExtensions.getAllowedUnits(d);
-    String s = "";
-    if (au instanceof CanonicalType) {
-      String url = ((CanonicalType) au).asStringValue();
-      ValueSet vs = context.fetchResource(ValueSet.class, url);
-      XhtmlNode x = new XhtmlNode(NodeType.Element, "div");          
-      genCT(x, url, vs);
-      s = "Value set "+new XhtmlComposer(true).compose(x.getChildNodes());
-    } else if (au instanceof CodeableConcept) {
-      CodeableConcept cc = (CodeableConcept) au;
-      if (cc.getCoding().size() != 1) {
-        s = "One of:";
-      }
-      s = s + summarise(cc);
-    }
-    return s;
-  }
-
-  private void genCT(XhtmlNode x, String url, CanonicalResource cr) {
-    if (cr == null) {
-      x.code().tx(url);
-    } else if (!cr.hasWebPath()) {
-      x.ah(url).tx(cr.present());
-    } else {
-      x.ah(cr.getWebPath()).tx(cr.present());
-    }
-  }
-
-  private boolean hasPrimitiveTypes(ElementDefinition d) {
-    for (TypeRefComponent tr : d.getType()) {
-      if (isPrimitive(tr.getCode())) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-
-  private XhtmlNode renderCanonicalListExt(List<Extension> list) {
-    List<CanonicalType> clist = new ArrayList<>();
-    for (Extension ext : list) {
-      if (ext.hasValueCanonicalType()) {
-        clist.add(ext.getValueCanonicalType());
-      }
-    }
-    return renderCanonicalList(clist);
-  }
-
-  private XhtmlNode renderCanonicalList(List<CanonicalType> list) {
-    XhtmlNode ul = new XhtmlNode(NodeType.Element, "ul");
-    for (CanonicalType ct : list) {
-      CanonicalResource cr = (CanonicalResource) context.fetchResource(Resource.class,  ct.getValue());
-      genCT(ul.li(), ct.getValue(), cr);      
-    }
-    return ul;
-  }
-
-  private StandardsStatus determineStandardsStatus(StructureDefinition sd, ElementDefinition ed) {
-    if (ed != null && ed.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
-      return StandardsStatus.fromCode(ed.getExtensionString(ToolingExtensions.EXT_STANDARDS_STATUS));
-    }
-    while (sd != null) {
-      if (sd.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
-        return ToolingExtensions.getStandardsStatus(sd);
-      }
-      sd = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition());
-    }
-    return null;
-  }
-
-  private boolean hasChoices(List<TypeRefComponent> types) {
-    for (TypeRefComponent type : types) {
-      if (type.getProfile().size() > 1 || type.getTargetProfile().size() > 1) {
-        return true;
-      }
-    }
-    return types.size() > 1;
-  }
-
-  private String sliceOrderString(ElementDefinitionSlicingComponent slicing) {
-    if (slicing.getOrdered())
-      return translate("sd.dict", "ordered");
-    else
-      return translate("sd.dict", "unordered");
-  }
-  private void generateSlicing(StringBuilder b, StructureDefinition profile, ElementDefinition ed, ElementDefinitionSlicingComponent slicing, ElementDefinition compare, int mode) throws IOException {
-    String newOrdered = sliceOrderString(slicing);
-    String oldOrdered = (compare==null || !compare.hasSlicing()) ? null : sliceOrderString(compare.getSlicing());
-    String slicingRules = compareString(slicing.hasRules() ? slicing.getRules().getDisplay() : null, compare!=null && compare.hasSlicing() && compare.getSlicing().hasRules() ? compare.getSlicing().getRules().getDisplay() : null, mode);
-    String rs = compareString(newOrdered, oldOrdered, mode) + " and " + slicingRules;
-
-    StringBuilder bl = new StringBuilder();
-    List<ElementDefinition.ElementDefinitionSlicingDiscriminatorComponent> newDiscs = slicing.getDiscriminator();
-    List<ElementDefinition.ElementDefinitionSlicingDiscriminatorComponent> oldDiscs;
-    if (compare!=null && compare.hasSlicing())
-      oldDiscs = compare.getSlicing().getDiscriminator();
-    else
-      oldDiscs = new ArrayList<>();
-    if (!newDiscs.isEmpty() || oldDiscs.isEmpty()) {
-      boolean first = true;
-      for (int i=0; i<newDiscs.size()||i<oldDiscs.size(); i++) {
-        ElementDefinitionSlicingDiscriminatorComponent newDisc = i<newDiscs.size() ? slicing.getDiscriminator().get(0) : null;
-        ElementDefinitionSlicingDiscriminatorComponent oldDisc = i<oldDiscs.size() ? slicing.getDiscriminator().get(0) : null;
-        String code = compareString(newDisc==null ? null : newDisc.getType().toCode(), oldDisc==null ? null : oldDisc.getType().toCode(), mode);
-        String path = compareString(newDisc==null ? null : newDisc.getPath(), oldDisc==null ? null : oldDisc.getPath(), mode);
-        bl.append("<li>" + code + " @ " + path + (i!=0 ? ", ": "") + "</li>");
-      }
-    }
-    if (slicing.hasDiscriminator())
-      tableRowNE(b, "" + translate("sd.dict", "Slicing"), "profiling.html#slicing", "This element introduces a set of slices on " + ed.getPath() + ". The slices are " + rs + ", and can be differentiated using the following discriminators: <ul> " + bl.toString() + "</ul>");
-    else
-      tableRowNE(b, "" + translate("sd.dict", "Slicing"), "profiling.html#slicing", "This element introduces a set of slices on " + ed.getPath() + ". The slices are " + rs + ", and defines no discriminators to differentiate the slices");
-  }
-
-  private void tableRow(StringBuilder b, String name, String defRef, String value) throws IOException {
-    if (value != null && !"".equals(value)) {
-      if (defRef != null)
-        b.append("  <tr><td><a href=\"" + corePath + defRef + "\">" + name + "</a></td><td>" + Utilities.escapeXml(value) + "</td></tr>\r\n");
-      else
-        b.append("  <tr><td>" + name + "</td><td>" + Utilities.escapeXml(value) + "</td></tr>\r\n");
-    }
-  }
-
-
-  private void tableRowHint(StringBuilder b, String name, String hint, String defRef, String value) throws IOException {
-    if (value != null && !"".equals(value)) {
-      if (defRef != null)
-        b.append("  <tr><td><a href=\"" + corePath + defRef + "\" title=\"" + Utilities.escapeXml(hint) + "\">" + name + "</a></td><td>" + value + "</td></tr>\r\n");
-      else
-        b.append("  <tr><td title=\"" + Utilities.escapeXml(hint) + "\">" + name + "</td><td>" + value + "</td></tr>\r\n");
-    }
-  }
-
-
-  private void tableRowNE(StringBuilder b, String name, String defRef, XhtmlNode value) throws IOException {
-    if (value != null) {
-      tableRowNE(b, name, defRef, new XhtmlComposer(true, true).compose(value));
-    }
-  }
-
-  private void tableRowNE(StringBuilder b, String name, String defRef, String value) throws IOException {
-    if (value != null && !"".equals(value))
-      if (defRef == null) {
-        b.append("  <tr><td>" + name + "</td><td>" + value + "</td></tr>\r\n");
-      } else if (Utilities.isAbsoluteUrl(defRef)) {
-        b.append("  <tr><td><a href=\"" + defRef + "\">" + name + "</a></td><td>" + value + "</td></tr>\r\n");
-      } else {
-        b.append("  <tr><td><a href=\"" + corePath + defRef + "\">" + name + "</a></td><td>" + value + "</td></tr>\r\n");
-      }
-  }
-
-  private String head(String path) {
-    if (path.contains("."))
-      return path.substring(0, path.indexOf("."));
-    else
-      return path;
-  }
-
-  private String tail(String path) {
-    if (path.contains("."))
-      return path.substring(path.lastIndexOf(".") + 1);
-    else
-      return path;
-  }
-
-  private String nottail(String path) {
-    if (path.contains("."))
-      return path.substring(0, path.lastIndexOf("."));
-    else
-      return path;
-  }
-
-  private String businessIdWarning(String resource, String name) {
-    if (name.equals("identifier"))
-      return "" + translate("sd.dict", "This is a business identifier, not a resource identifier (see %sdiscussion%s)", "<a href=\"" + corePath + "resource.html#identifiers\">", "</a>");
-    if (name.equals("version")) // && !resource.equals("Device"))
-      return "" + translate("sd.dict", "This is a business versionId, not a resource version id (see %sdiscussion%s)", "<a href=\"" + corePath + "resource.html#versions\">", "</a>");
-    return null;
-  }
-
-  private String describeCardinality(ElementDefinition d, ElementDefinition compare, int mode) {
-    if (compare==null) {
-      if (!d.hasMax() && d.getMinElement() == null)
-        return "";
-      else if (d.getMax() == null)
-        return toStr(d.getMin()) + "..?";
-      else
-        return toStr(d.getMin()) + ".." + d.getMax();
-    } else {
-      String min = compareString(toStr(d.getMin()), toStr(compare.getMin()), mode);
-      if (mode==GEN_MODE_DIFF && (d.getMin()==compare.getMin() || d.getMin()==0))
-        min=null;
-      String max = compareString(d.getMax(), compare.getMax(), mode);
-      if ((min==null || min.isEmpty()) && (max==null || max.isEmpty()))
-        return "";
-      if (mode==GEN_MODE_DIFF)
-        return( (min==null || min.isEmpty() ? unchanged(toStr(compare.getMin())) : min) + ".." + (max==null || max.isEmpty() ? unchanged(compare.getMax()) : max));
-      else
-        return( (min==null || min.isEmpty() ? "?" : min) + ".." + (max==null || max.isEmpty() ? "?" : max));
-    }
-  }
-
-  private String summariseConditions(List<IdType> conditions, List<IdType> compare, int mode) {
-    if (conditions.isEmpty() && (compare==null || compare.isEmpty()))
-      return "";
-    else {
-      String comparedList = compareSimpleTypeLists(conditions, compare, mode);
-      if (comparedList.equals(""))
-        return "";
-      return " " + translate("sd.dict", "This element is affected by the following invariants") + ": " + comparedList;
-    }
-  }
-
-  private boolean hasMustSupportTypes(List<TypeRefComponent> types) {
-    for (TypeRefComponent tr : types) {
-      if (sdr.isMustSupport(tr)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private String describeTypes(List<TypeRefComponent> types, boolean mustSupportOnly, ElementDefinition compare, int mode) throws Exception {
-    if (types.isEmpty())
-      return "";
-
-    List<TypeRefComponent> compareTypes = compare==null ? new ArrayList<>() : compare.getType();
-    StringBuilder b = new StringBuilder();
-    if ((!mustSupportOnly && types.size() == 1 && compareTypes.size() <=1) || (mustSupportOnly && mustSupportCount(types) == 1)) {
-      if (!mustSupportOnly || sdr.isMustSupport(types.get(0))) {
-        describeType(b, types.get(0), mustSupportOnly, compareTypes.size()==0 ? null : compareTypes.get(0), mode);
-      }
-    } else {
-      boolean first = true;
-      b.append(translate("sd.dict", "Choice of") + ": ");
-      Map<String,TypeRefComponent> map = new HashMap<String, TypeRefComponent>();
-      for (TypeRefComponent t : compareTypes) {
-        map.put(t.getCode(), t);
-      }
-      for (TypeRefComponent t : types) {
-        TypeRefComponent compareType = map.get(t.getCode());
-        if (compareType!=null)
-          map.remove(t.getCode());
-        if (!mustSupportOnly || sdr.isMustSupport(t)) {
-          if (first) {
-            first = false;
-          } else {
-            b.append(", ");
-          }
-          describeType(b, t, mustSupportOnly, compareType, mode);
-        }
-      }
-      for (TypeRefComponent t : map.values()) {
-        b.append(", ");
-        StringBuilder b2 = new StringBuilder();
-        describeType(b2, t, mustSupportOnly, null, mode);
-        b.append(removed(b2.toString()));
-      }
-    }
-    return b.toString();
-  }
-
-  private int mustSupportCount(List<TypeRefComponent> types) {
-    int c = 0;
-    for (TypeRefComponent tr : types) {
-      if (sdr.isMustSupport(tr)) {
-        c++;
-      }
-    }
-    return c;
-  }
-
-  private void describeType(StringBuilder b, TypeRefComponent t, boolean mustSupportOnly, TypeRefComponent compare, int mode) throws Exception {
-    if (t.getWorkingCode() == null) {
-      return;
-    }
-    if (t.getWorkingCode().startsWith("=")) {
-      return;
-    }
-
-    if (t.getWorkingCode().startsWith("xs:")) {
-      b.append(compareString(t.getWorkingCode(), compare==null ? null : compare.getWorkingCode(), mode));
-    } else {
-      b.append(compareString(getTypeLink(t), compare==null ? null : getTypeLink(compare), mode));
-    }
-    if ((!mustSupportOnly && (t.hasProfile() || (compare!=null && compare.hasProfile()))) || sdr.isMustSupport(t.getProfile())) {
-      List<String> newProfiles = new ArrayList<String>();
-      List<String> oldProfiles = new ArrayList<String>();
-      for (CanonicalType pt : t.getProfile()) {
-        newProfiles.add(getTypeProfile(pt, mustSupportOnly));
-      }
-      if (compare!=null) {
-        for (CanonicalType pt : compare.getProfile()) {
-          oldProfiles.add(getTypeProfile(pt, mustSupportOnly));
-        }
-      }
-      String profiles = compareSimpleTypeLists(newProfiles, oldProfiles, mode);
-      if (!profiles.isEmpty()) {
-        if (b.toString().isEmpty())
-          b.append(unchanged(getTypeLink(t)));
-        b.append("(");
-        b.append(profiles);
-        b.append(")");
-      }
-    }
-    if ((!mustSupportOnly && (t.hasTargetProfile() || (compare!=null && compare.hasTargetProfile()))) || sdr.isMustSupport(t.getTargetProfile())) {
-      List<StringType> newProfiles = new ArrayList<StringType>();
-      List<StringType> oldProfiles = new ArrayList<StringType>();
-      for (CanonicalType pt : t.getTargetProfile()) {
-        String tgtProfile = getTypeProfile(pt, mustSupportOnly);
-        if (!tgtProfile.isEmpty())
-          newProfiles.add(new StringType(tgtProfile));
-      }
-      if (compare!=null) {
-        for (CanonicalType pt : compare.getTargetProfile()) {
-          String tgtProfile = getTypeProfile(pt, mustSupportOnly);
-          if (!tgtProfile.isEmpty())
-            oldProfiles.add(new StringType(tgtProfile));
-        }
-      }
-      String profiles = compareSimpleTypeLists(newProfiles, oldProfiles, mode, "|");
-      if (!profiles.isEmpty()) {
-        if (b.toString().isEmpty())
-          b.append(unchanged(getTypeLink(t)));
-        b.append("(");
-        b.append(profiles);
-        b.append(")");
-      }
-
-      if (!t.getAggregation().isEmpty() || (compare!=null && !compare.getAggregation().isEmpty())) {
-        b.append(" : ");
-        List<String> newAgg = new ArrayList<String>();
-        List<String> oldAgg = new ArrayList<String>();
-        for (Enumeration<AggregationMode> a :t.getAggregation()) {
-          newAgg.add(" <a href=\"" + corePath + "codesystem-resource-aggregation-mode.html#content\" title=\""+sdr.hintForAggregation(a.getValue())+"\">{" + sdr.codeForAggregation(a.getValue()) + "}</a>");
-        }
-        if (compare!=null) {
-          for (Enumeration<AggregationMode> a : compare.getAggregation()) {
-            newAgg.add(" <a href=\"" + corePath + "codesystem-resource-aggregation-mode.html#content\" title=\"" + sdr.hintForAggregation(a.getValue()) + "\">{" + sdr.codeForAggregation(a.getValue()) + "}</a>");
-          }
-        }
-        b.append(compareSimpleTypeLists(newAgg, oldAgg, mode));
-      }
-    }
-  }
-
-  private String getTypeProfile(CanonicalType pt, boolean mustSupportOnly) {
-    StringBuilder b = new StringBuilder();
-    if (!mustSupportOnly || sdr.isMustSupport(pt)) {
-      StructureDefinition p = context.fetchResource(StructureDefinition.class, pt.getValue());
-      if (p == null)
-        b.append(pt.getValue());
-      else {
-        String pth = p.getWebPath();
-        b.append("<a href=\"" + Utilities.escapeXml(pth) + "\" title=\"" + pt.getValue() + "\">");
-        b.append(p.getName());
-        b.append("</a>");
-      }
-    }
-    return b.toString();
-  }
-
-  private String getTypeLink(TypeRefComponent t) {
-    StringBuilder b = new StringBuilder();
-    String s = igp.getLinkFor(sd.getWebPath(), t.getWorkingCode());
-    if (s != null) {
-      b.append("<a href=\"");
-      //    GG 13/12/2016 - I think that this is always wrong now.
-      //      if (!s.startsWith("http:") && !s.startsWith("https:") && !s.startsWith(".."))
-      //        b.append(prefix);
-      b.append(s);
-      if (!s.contains(".html")) {
-        //     b.append(".html#");
-        //     String type = t.getCode();
-        //     if (type.equals("*"))
-        //       b.append("open");
-        //     else
-        //       b.append(t.getCode());
-      }
-      b.append("\">");
-      b.append(t.getWorkingCode());
-      b.append("</a>");
-    } else {
-      b.append(t.getWorkingCode());
-    }
-    return b.toString();
-  }
-
-  private String processSecondary(int mode, ElementDefinition value, ElementDefinition compareValue, int compMode) throws Exception {
-    switch (mode) {
-    case 1:
-      return "";
-    case 2:
-      return "  (" + translate("sd.dict", "Complex Extension") + ")";
-    case 3:
-      return "  (" + translate("sd.dict", "Extension Type") + ": " + describeTypes(value.getType(), false, compareValue, compMode) + ")";
-    default:
-      return "";
-    }
-  }
-
-  private String displayBoolean(boolean value, BooleanType compare, int mode) {
-    String newValue = value ? "true" : null;
-    String oldValue = compare==null || compare.getValue()==null ? null : (compare.getValue()!=true ? null : "true");
-    return compareString(newValue, oldValue, mode);
-  }
-
-  private String invariants(List<ElementDefinitionConstraintComponent> constraints, List<ElementDefinitionConstraintComponent> compare, int mode) {
-    // Lloyd todo compare
-    if (constraints.isEmpty() && (compare==null || compare.isEmpty()))
-      return null;
-    if (compare == null)
-      compare = new ArrayList<ElementDefinitionConstraintComponent>();
-    StringBuilder s = new StringBuilder();
-    if (constraints.size() > 0) {
-      s.append("<b>" + translate("sd.dict", "Defined on this element") + "</b><br/>\r\n");
-      List<String> ids = new ArrayList<String>();
-      for (ElementDefinitionConstraintComponent id : constraints)
-        ids.add(id.hasKey() ? id.getKey() : id.toString());
-      Collections.sort(ids, new ConstraintKeyComparator());
-      boolean b = false;
-      for (String id : ids) {
-        ElementDefinitionConstraintComponent inv = getConstraint(constraints, id);
-        ElementDefinitionConstraintComponent invCompare = getConstraint(compare, id);
-        if (b)
-          s.append("<br/>");
-        else
-          b = true;
-        String human = compareString(Utilities.escapeXml(gt(inv.getHumanElement())), invCompare==null ? null : Utilities.escapeXml(gt(invCompare.getHumanElement())), mode);
-        String expression= compareString(Utilities.escapeXml(inv.getExpression()), invCompare==null ? null : Utilities.escapeXml(invCompare.getExpression()), mode);
-        s.append("<b title=\"" + translate("sd.dict", "Formal Invariant Identifier") + "\">" + id + "</b>: " + human + " (: " + expression + ")");
-      }
-    }
-
-    return s.toString();
-  }
-
-  private ElementDefinitionConstraintComponent getConstraint(List<ElementDefinitionConstraintComponent> constraints, String id) {
-    for (ElementDefinitionConstraintComponent c : constraints) {
-      if (c.hasKey() && c.getKey().equals(id))
-        return c;
-      if (!c.hasKey() && c.toString().equals(id))
-        return c;
-    }
-    return null;
-  }
-
-  private String describeBinding(StructureDefinition sd, ElementDefinition d, String path, ElementDefinition compare, int mode) throws Exception {
-    if (!d.hasBinding())
-      return null;
-    else {
-      ElementDefinitionBindingComponent binding = d.getBinding();
-      ElementDefinitionBindingComponent compBinding = compare == null ? null : compare.getBinding();
-      String bindingDesc = null;
-      if (binding.hasDescription()) {
-        StringType newBinding = PublicationHacker.fixBindingDescriptions(context, binding.getDescriptionElement());
-        if (mode == GEN_MODE_SNAP || mode == GEN_MODE_MS)
-          bindingDesc = processMarkdown("Binding.description", newBinding);
-        else {
-          StringType oldBinding = compBinding != null && compBinding.hasDescription() ? PublicationHacker.fixBindingDescriptions(context, compBinding.getDescriptionElement()) : null;
-          bindingDesc = compareMarkdown("Binding.description", newBinding, oldBinding, mode);
-        }
-      }
-      if (!binding.hasValueSet())
-        return bindingDesc;
-      BindingResolution br = igp.resolveBinding(sd, binding, path);
-      String s = conf(binding) + (br.url == null ? "<code>" + Utilities.escapeXml(br.display) + "</code>" : "<a href=\"" + Utilities.escapeXml(br.url) + "\">" + Utilities.escapeXml(br.display) + "</a>") + confTail(binding);
-      if (compBinding!=null ) {
-        BindingResolution compBr = igp.resolveBinding(sd, compBinding, path);
-        String compS = conf(compBinding) + "<a href=\"" + Utilities.escapeXml(compBr.url) + "\">" + Utilities.escapeXml(compBr.display) + "</a>" + confTail(compBinding);
-        s = compareString(s, compS, mode);
-      }
-      if (binding.hasDescription()) {
-        String desc = bindingDesc;
-        if (desc != null) {
-          if (desc.length() > 4 && desc.substring(4).contains("<p>")) {
-            s = s + "<br/>" + desc;
-          } else {
-            s = s + "\r\n" + stripPara(desc);
-          }
-        }
-      }
-
-      AdditionalBindingsRenderer abr = new AdditionalBindingsRenderer(igp, corePath, sd, d.getPath(), gen, this, sdr);
-      if (binding.hasExtension(ToolingExtensions.EXT_MAX_VALUESET)) {
-        abr.seeMaxBinding(ToolingExtensions.getExtension(binding, ToolingExtensions.EXT_MAX_VALUESET), compBinding==null ? null : ToolingExtensions.getExtension(compBinding, ToolingExtensions.EXT_MAX_VALUESET), mode!=GEN_MODE_SNAP && mode!=GEN_MODE_MS);
-      }
-      if (binding.hasExtension(ToolingExtensions.EXT_MIN_VALUESET)) {
-        abr.seeMinBinding(ToolingExtensions.getExtension(binding, ToolingExtensions.EXT_MIN_VALUESET), compBinding==null ? null : ToolingExtensions.getExtension(compBinding, ToolingExtensions.EXT_MIN_VALUESET), mode!=GEN_MODE_SNAP && mode!=GEN_MODE_MS);
-      }
-      if (binding.hasExtension(ToolingExtensions.EXT_BINDING_ADDITIONAL)) {
-        abr.seeAdditionalBindings(binding.getExtensionsByUrl(ToolingExtensions.EXT_BINDING_ADDITIONAL), compBinding==null ? null : compBinding.getExtensionsByUrl(ToolingExtensions.EXT_BINDING_ADDITIONAL), mode!=GEN_MODE_SNAP && mode!=GEN_MODE_MS);
-      }
-
-      s = s + abr.render();
-
-      return s;
-    }
-  }
-
-
-  private String stripPara(String s) {
-    if (s.startsWith("<p>")) {
-      s = s.substring(3);
-    }
-    if (s.trim().endsWith("</p>")) {
-      s = s.substring(0, s.lastIndexOf("</p>")-1) + s.substring(s.lastIndexOf("</p>") +4);
-    }
-    return s;
-  }
-
-  private String confTail(ElementDefinitionBindingComponent def) {
-    if (def.getStrength() == BindingStrength.EXTENSIBLE)
-      return "; " + translate("sd.dict", "other codes may be used where these codes are not suitable");
-    else
-      return "";
-  }
-
-  private String conf(ElementDefinitionBindingComponent def) {
-    if (def.getStrength() == null) {
-      return "" + translate("sd.dict", "For codes, see ");
-    }
-    switch (def.getStrength()) {
-    case EXAMPLE:
-      return "" + translate("sd.dict", "For example codes, see ");
-    case PREFERRED:
-      return "" + translate("sd.dict", "The codes SHOULD be taken from ");
-    case EXTENSIBLE:
-      return "" + translate("sd.dict", "The codes SHALL be taken from ");
-    case REQUIRED:
-      return "" + translate("sd.dict", "The codes SHALL be taken from ");
-    default:
-      return "" + "?sd-conf?";
-    }
-  }
-
-  private String encodeValues(List<ElementDefinitionExampleComponent> examples) throws Exception {
-    StringBuilder b = new StringBuilder();
-    boolean first = false;
-    for (ElementDefinitionExampleComponent ex : examples) {
-      if (first)
-        first = false;
-      else
-        b.append("<br/>");
-      b.append("<b>" + Utilities.escapeXml(ex.getLabel()) + "</b>:" + encodeValue(ex.getValue()) + "\r\n");
-    }
-    return b.toString();
-
-  }
-
-  private String encodeValue(DataType value, DataType compare, int mode) throws Exception {
-    String oldValue = encodeValue(compare);
-    String newValue = encodeValue(value);
-    return compareString(newValue, oldValue, mode);
-  }
-
-  private String encodeValue(DataType value) throws Exception {
-    if (value == null || value.isEmpty())
-      return null;
-    if (value instanceof PrimitiveType)
-      return Utilities.escapeXml(((PrimitiveType) value).asStringValue());
-
-    ByteArrayOutputStream bs = new ByteArrayOutputStream();
-    XmlParser parser = new XmlParser();
-    parser.setOutputStyle(OutputStyle.PRETTY);
-    parser.compose(bs, null, value);
-    String[] lines = bs.toString().split("\\r?\\n");
-    StringBuilder b = new StringBuilder();
-    for (String s : lines) {
-      if (!Utilities.noString(s) && !s.startsWith("<?")) { // eliminate the xml header
-        b.append(Utilities.escapeXml(s).replace(" ", "&nbsp;") + "<br/>");
-      }
-    }
-    return b.toString();
-
-  }
-
-  private String getMapping(StructureDefinition profile, ElementDefinition d, String uri, ElementDefinition compare, int mode) {
-    String id = null;
-    for (StructureDefinitionMappingComponent m : profile.getMapping()) {
-      if (m.hasUri() && m.getUri().equals(uri))
-        id = m.getIdentity();
-    }
-    if (id == null)
-      return null;
-    String newMap = null;
-    for (ElementDefinitionMappingComponent m : d.getMapping()) {
-      if (m.getIdentity().equals(id)) {
-        newMap = m.getMap();
-        break;
-      }
-    }
-    if (compare==null)
-      return newMap;
-    String oldMap = null;
-    for (ElementDefinitionMappingComponent m : compare.getMapping()) {
-      if (m.getIdentity().equals(id)) {
-        oldMap = m.getMap();
-        break;
-      }
-    }
-
-    return compareString(Utilities.escapeXml(newMap), Utilities.escapeXml(oldMap), mode);
-  }
-
-  private String compareSimpleTypeLists(List original, List compare, int mode) {
-    return compareSimpleTypeLists(original, compare, mode, ", ");
-  }
-
-  private List<String> convertPrimitiveTypeList(List<PrimitiveType> original) {
-    List<String> originalList = new ArrayList<String>();
-    for (PrimitiveType pt : original) {
-      String s = gt(pt);
-      if (!s.startsWith("<"))
-        s = Utilities.escapeXml(s);
-      originalList.add(s);
-    }
-    return originalList;
-  }
-
-  private String compareSimpleTypeLists(List originalList, List compareList, int mode, String separator) {
-    List<String> original;
-    List<String> compare;
-    if (compareList == null)
-      compareList = new ArrayList<>();
-    if (!originalList.isEmpty() && originalList.get(0) instanceof PrimitiveType)
-      original = convertPrimitiveTypeList(originalList);
-    else
-      original = originalList;
-    if (!compareList.isEmpty() && compareList.get(0) instanceof PrimitiveType)
-      compare = convertPrimitiveTypeList(compareList);
-    else
-      compare = compareList;
-    StringBuilder b = new StringBuilder();
-    if (mode==GEN_MODE_SNAP || mode==GEN_MODE_MS) {
-      boolean first = true;
-      for (String s : original) {
-        if (first) first = false; else b.append(separator);
-        b.append(s);
-      }
-    } else {
-      boolean first = true;
-      for (String s : original) {
-        if (first) first = false; else b.append(separator);
-        if (compare.contains(s))
-          b.append(unchanged(s));
-        else
-          b.append(s);
-      }
-      if (original.size()!=0 || mode!=GEN_MODE_DIFF) {
-        for (String s : compare) {
-          if (!original.contains(s)) {
-            if (first)
-              first = false;
-            else
-              b.append(separator);
-            b.append(removed(s));
-          }
-        }
-      }
-    }
-    return b.toString();
-  }
 
   public String mappings(boolean complete, boolean diff) {
     if (sd.getMapping().isEmpty())
@@ -3206,7 +2053,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       b.append(" <li>This " + type + " is not used by any profiles in this Implementation Guide</li>\r\n");
     }
     b.append("</ul>\r\n");
-    return b.toString();
+    return b.toString()+changeSummary();
   }
 
   private void scanExtensions(Map<String, String> invoked, StructureDefinition sd, String u) {
@@ -3284,31 +2131,6 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   @Override
   protected void genSummaryRowsSpecific(StringBuilder b, Set<String> rows) {
   }
-
-  public ElementDefinition getElementById(String url, String id) {
-    Map<String, ElementDefinition> sdCache = sdMapCache.get(url);
-
-    if (sdCache == null) {
-      StructureDefinition sd = (StructureDefinition) context.fetchResource(StructureDefinition.class, url);
-      if (sd == null) {
-        if (url.equals("http://hl7.org/fhir/StructureDefinition/Base")) {
-          sd = (StructureDefinition) context.fetchResource(StructureDefinition.class, "http://hl7.org/fhir/StructureDefinition/Element");                
-        }
-        if (sd == null) {
-          throw new FHIRException("Unable to retrieve StructureDefinition with URL " + url);
-        }
-      }
-      sdCache = new HashMap<String, ElementDefinition>();
-      sdMapCache.put(url, sdCache);
-      String webroot = sd.getUserString("webroot");
-      for (ElementDefinition e : sd.getSnapshot().getElement()) {
-        utils.updateURLs(sd.getUrl(), webroot, e);
-        sdCache.put(e.getId(), e);
-      }
-    }
-    return sdCache.get(id);
-  }
-
 
   public String dense(PackageInformation srcInfo) {
     if (srcInfo.getId().startsWith("hl7.fhir")) {
@@ -3476,6 +2298,42 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           }
         }
       }
+      
+      
     }
+  }
+  
+
+  protected void changeSummaryDetails(StringBuilder b) {
+    CanonicalResourceComparison<? extends CanonicalResource> comp = VersionComparisonAnnotation.artifactComparison(sd);
+    if (comp != null && comp.anyUpdates()) {
+      if (comp.getChangedMetadata() == ChangeAnalysisState.CannotEvaluate) {
+        b.append("<li>Unable to evaluate changes to metadata</li>\r\n");
+      } else if (comp.getChangedMetadata() == ChangeAnalysisState.Changed) {
+        b.append("<li>The resource metadata has changed ("+comp.getMetadataFieldsAsText()+")</li>\r\n");          
+      }
+      
+      if (comp.getChangedContent() == ChangeAnalysisState.CannotEvaluate) {
+        b.append("<li>Unable to evaluate changes to content</li>\r\n");
+      } else if (comp.getChangedContent() == ChangeAnalysisState.Changed) {
+        b.append("<li>The data elements list has changed</li>\r\n");          
+      }
+
+      if (comp.getChangedDefinitions() == ChangeAnalysisState.CannotEvaluate) {
+        b.append("<li>Unable to evaluate changes to definitions</li>\r\n");
+      } else if (comp.getChangedDefinitions() == ChangeAnalysisState.Changed) {
+        b.append("<li>One or more text definitions, invariants or bindings have changed</li>\r\n");          
+      }
+    } else {
+      b.append("<li>No changes</li>\r\n");
+    }
+  }
+  
+
+  private String tail(String path) {
+    if (path.contains("."))
+      return path.substring(path.lastIndexOf(".") + 1);
+    else
+      return path;
   }
 }
