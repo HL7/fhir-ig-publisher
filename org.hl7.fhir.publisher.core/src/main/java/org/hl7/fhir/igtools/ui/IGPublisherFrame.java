@@ -34,6 +34,7 @@ import java.util.List;
 import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
+import net.sf.saxon.trans.SymbolicName;
 import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.publisher.Publisher.CacheOption;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
@@ -269,7 +270,7 @@ public class IGPublisherFrame extends javax.swing.JFrame {
     chooseIGButton.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
     chooseIGButton.addActionListener(new java.awt.event.ActionListener() {
       public void actionPerformed(java.awt.event.ActionEvent evt) {
-        btnChooseClick(evt);
+        chooseIGClick(evt);
       }
     });
     return chooseIGButton;
@@ -335,33 +336,39 @@ public class IGPublisherFrame extends javax.swing.JFrame {
   }
 
 
-  private void btnChooseClick(java.awt.event.ActionEvent evt) {                                         
+  private void chooseIGClick(java.awt.event.ActionEvent evt) {
     JFileChooser igFileChooser = new JFileChooser();
     igFileChooser.setFileFilter(new FileNameExtensionFilter("IG ini file or IG Directory", "ini"));
     igFileChooser.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
     if (igNameComboBox.getSelectedItem() != null)
       igFileChooser.setCurrentDirectory(new File(Utilities.getDirectoryForFile((String) igNameComboBox.getSelectedItem())));
     if (igFileChooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-      int index = -1;
 
-      String selectedFile = igFileChooser.getSelectedFile().isDirectory()
-              ? igFileChooser.getSelectedFile().getAbsolutePath() + File.separatorChar + "ig.ini"
-              : igFileChooser.getSelectedFile().getAbsolutePath();
 
-      for (int i = 0; i < igNameComboBox.getItemCount(); i++) {
-        if (selectedFile.equals(igNameComboBox.getItemAt(i)))
-          index = i;;
-      }
-      if (index == -1) {
-        index = ini.getProperties("igs") == null ? 0 : ini.getIntegerProperty("igs", "count");
-        ini.setStringProperty("igs", "file"+Integer.toString(index), selectedFile, null);
-        ini.setIntegerProperty("igs", "count", index+1, null);
-        igNameComboBox.addItem(ini.getStringProperty("igs", "file"+Integer.toString(index)));
-      }
-      ini.setIntegerProperty("igs", "selected", index, null);
-      igNameComboBox.setSelectedIndex(ini.getIntegerProperty("igs", "selected"));
+      File selectedFile = igFileChooser.getSelectedFile();
+      setIGFromFile(selectedFile);
     }
   } 
+
+  private void setIGFromFile(File selectedFile) {
+    int index = -1;
+    String igIniAbsolutePath = selectedFile.isDirectory()
+            ? selectedFile.getAbsolutePath() + File.separatorChar + "ig.ini"
+            : selectedFile.getAbsolutePath();
+
+    for (int i = 0; i < igNameComboBox.getItemCount(); i++) {
+      if (igIniAbsolutePath.equals(igNameComboBox.getItemAt(i)))
+        index = i;;
+    }
+    if (index == -1) {
+      index = ini.getProperties("igs") == null ? 0 : ini.getIntegerProperty("igs", "count");
+      ini.setStringProperty("igs", "file"+Integer.toString(index), igIniAbsolutePath, null);
+      ini.setIntegerProperty("igs", "count", index+1, null);
+      igNameComboBox.addItem(ini.getStringProperty("igs", "file"+Integer.toString(index)));
+    }
+    ini.setIntegerProperty("igs", "selected", index, null);
+    igNameComboBox.setSelectedIndex(ini.getIntegerProperty("igs", "selected"));
+  }
 
   private void changeIGName(java.awt.event.ActionEvent evt) {
     int index = igNameComboBox.getSelectedIndex();
@@ -457,11 +464,21 @@ public class IGPublisherFrame extends javax.swing.JFrame {
       component.setEnabled(enabled);
     }
   }
+
+  public void runIGFromCLI(String configFile) throws IOException {
+    String absoluteConfigFile = Publisher.getAbsoluteConfigFilePath(configFile);
+    setIGFromFile(new File(absoluteConfigFile));
+    executePublisher();
+  }
+
   private void btnExecuteClick(java.awt.event.ActionEvent evt) {
+    executePublisher();
+  }
+
+  private void executePublisher() {
     executeButton.setEnabled(false);
 
     setIgOptionsEnabled(false);
-
     setPublishedIgComponentsEnabled(false);
 
     executeButton.setLabel("Running");
