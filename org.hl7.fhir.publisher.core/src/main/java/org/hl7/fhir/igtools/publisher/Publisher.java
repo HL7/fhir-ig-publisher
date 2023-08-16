@@ -6188,7 +6188,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                   b.append("version="+businessVersion);
                   bc.setVersion(businessVersion);
                 }
-              } else if (defaultBusinessVersion != null && bc.getVersion()==null) {
+              } else if (defaultBusinessVersion != null && !bc.getVersionElement().isEmpty()) {
                 altered = true;
                 b.append("version="+defaultBusinessVersion);
                 bc.setVersion(defaultBusinessVersion);
