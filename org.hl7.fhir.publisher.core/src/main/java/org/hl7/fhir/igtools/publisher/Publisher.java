@@ -66,6 +66,8 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
 import org.apache.commons.exec.ExecuteWatchdog;
@@ -831,8 +833,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private String copyrightYear;
 
-  private boolean noValidation;
-  private boolean noGenerate;
+  @Getter
+  @Setter
+  private boolean validationOff;
+
+  @Getter
+  @Setter
+  private boolean generationOff;
 
   private String fmtDateTime = "yyyy-MM-dd HH:mm:ssZZZ";
   private String fmtDate = "yyyy-MM-dd";
@@ -1040,7 +1047,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       tts = tt.start("generate");
       log("Processing Conformance Resources");
       loadConformance();
-      if (!noValidation) {
+      if (!validationOff) {
         log("Validating Resources");
         try {
           validate();
@@ -1064,7 +1071,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine).render(publishedIg, true, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
           new PublicationChecker(repoRoot, historyPage, markdownEngine).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
           generateDraftDependencies(),
-          noNarrativeResources, noValidateResources, noValidation, noGenerate, dependentIgFinder);
+          noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder);
       tts.end();
       if (isChild()) {
         log("Built. "+tt.report());      
@@ -5453,7 +5460,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     log("Generating Narratives");
     generateNarratives();
-    if (!noValidation) {
+    if (!validationOff) {
       log("Validating Conformance Resources");
       for (String s : metadataResourceNames()) {
         validate(s);
@@ -6732,7 +6739,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void validate() throws Exception {
-    if (noValidation) {
+    if (validationOff) {
       return;
     }
 
@@ -7143,12 +7150,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       createToc(childPublisher.getPublishedIg().getDefinition().getPage(), igArtifactsPage, nestedIgOutput);
     }
     fixSearchForm();
-    if (!noGenerate) {
+    if (!generationOff) {
       templateBeforeJekyll();
     }
 
     if (runTool()) {
-      if (!noGenerate) {
+      if (!generationOff) {
         templateOnCheck();
       }
 
@@ -7206,7 +7213,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (ipaComparator != null) {
         ipaComparator.addOtherFiles(inspector.getExceptions(), outputDir);
       }
-      List<ValidationMessage> linkmsgs = noGenerate ? new ArrayList<ValidationMessage>() : inspector.check(statusMessage);
+      List<ValidationMessage> linkmsgs = generationOff ? new ArrayList<ValidationMessage>() : inspector.check(statusMessage);
       int bl = 0;
       int lf = 0;
       for (ValidationMessage m : ValidationPresenter.filterMessages(linkmsgs, true, suppressedMessages)) {
@@ -7886,7 +7893,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private boolean runTool() throws Exception {
-    if (noGenerate) {
+    if (generationOff) {
       FileUtils.copyDirectory(new File(tempDir), new File(outputDir));
       return true;
     }
@@ -9770,7 +9777,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }    
   }
   private void generateHtmlOutputs(FetchedFile f, boolean regen) throws Exception {
-    if (noGenerate) {
+    if (generationOff) {
       return;
     }
     // System.out.println("gen2: "+f.getName());
@@ -11784,11 +11791,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
 
       if (CliParams.hasNamedParam(args, "-validation-off")) {
-        self.noValidation = true;
+        self.validationOff = true;
         System.out.println("Running without validation to shorten the run time (editor process only)");
       }
       if (CliParams.hasNamedParam(args, "-generation-off")) {
-        self.noGenerate = true;
+        self.generationOff = true;
         System.out.println("Running without generation to shorten the run time (editor process only)");
       }
 

@@ -25,6 +25,7 @@ import java.awt.*;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
@@ -32,9 +33,10 @@ import java.io.IOException;
 import java.util.List;
 
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
-import net.sf.saxon.trans.SymbolicName;
 import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.publisher.Publisher.CacheOption;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
@@ -46,6 +48,7 @@ import org.hl7.fhir.utilities.settings.FhirSettings;
 public class IGPublisherFrame extends javax.swing.JFrame {
 
   private static final String LOG_PREFIX = "--$%^^---";
+  public static final String IG_PARAMS = "ig-params";
 
   JTextField noValidateTextField;
   JTextField noNarrativeTextField;
@@ -227,24 +230,27 @@ public class IGPublisherFrame extends javax.swing.JFrame {
     txtLogTextArea = createTxLogTextArea();
 
     noNarrativeLabel = new JLabel("no-narrative");
-    noNarrativeTextField = new JTextField();
+    noNarrativeTextField = createParamTextField("no-narrative");
     noValidateLabel = new JLabel("no-validate");
-    noValidateTextField = new JTextField();
-    noSushiCheckbox = new JCheckBox("no-sushi");
-    debugCheckbox = new JCheckBox("debug");
-    validationOffCheckBox = new JCheckBox("validation-off");
-    generationOffCheckBox = new JCheckBox("generation-off");
+    noValidateTextField = createParamTextField("no-validate");
+    noSushiCheckbox = createParamCheckBox("no-sushi");
+    debugCheckbox = createParamCheckBox("debug");
+    validationOffCheckBox = createParamCheckBox("validation-off");
+    generationOffCheckBox = createParamCheckBox("generation-off");
 
     executeButton = createExecuteButton();
     chooseIGButton = createChooseIGButton();
     igNameComboBox = createIgNameComboBox();
 
-    igOptionsComponents = List.of(chooseIGButton,
-    igNameComboBox,
-    noSushiCheckbox,
-    debugCheckbox,
-    noNarrativeTextField,
-    noValidateTextField
+    igOptionsComponents = List.of(
+            chooseIGButton,
+            igNameComboBox,
+            noSushiCheckbox,
+            debugCheckbox,
+            noNarrativeTextField,
+            noValidateTextField,
+            validationOffCheckBox,
+            generationOffCheckBox
     );
 
     debugSummaryButton = createDebugSumaryButton();
@@ -258,6 +264,42 @@ public class IGPublisherFrame extends javax.swing.JFrame {
     );
   }
 
+  private JCheckBox createParamCheckBox(String paramName) {
+    JCheckBox checkBox = new JCheckBox(paramName);
+    checkBox.setSelected(ini.getBooleanProperty(IG_PARAMS, paramName));
+    checkBox.addActionListener(new ActionListener() {
+      @Override
+      public void actionPerformed(ActionEvent e) {
+        ini.setBooleanProperty(IG_PARAMS, paramName, ((JCheckBox) e.getSource()).isSelected(), null);
+      }
+    });
+    return checkBox;
+  }
+
+  private JTextField createParamTextField(String paramName) {
+    JTextField textField = new JTextField(paramName);
+    textField.setText(ini.getStringProperty(IG_PARAMS, paramName));
+    textField.getDocument().addDocumentListener(new DocumentListener() {
+      public void changedUpdate(DocumentEvent e) {
+        updateIni();
+      }
+      public void removeUpdate(DocumentEvent e) {
+        updateIni();
+      }
+      public void insertUpdate(DocumentEvent e) {
+        updateIni();
+      }
+
+      public void updateIni() {
+        ini.setStringProperty(IG_PARAMS, paramName, textField.getText(), null);
+      }
+    });
+
+
+
+    return textField;
+  }
+
   private JComboBox<String> createIgNameComboBox() {
     JComboBox igNameComboBox = new javax.swing.JComboBox<String>();
     if (ini.getProperties("igs") != null && ini.getProperties("igs").containsKey("selected")) {
@@ -265,7 +307,7 @@ public class IGPublisherFrame extends javax.swing.JFrame {
         igNameComboBox.addItem(ini.getStringProperty("igs", "file"+Integer.toString(i)));
       igNameComboBox.setSelectedIndex(ini.getIntegerProperty("igs", "selected"));
     }
-    igNameComboBox.addActionListener(new java.awt.event.ActionListener() {
+    igNameComboBox.addActionListener(new ActionListener() {
       public void actionPerformed(java.awt.event.ActionEvent evt) {
         changeIGName(evt);
       }
@@ -384,7 +426,7 @@ public class IGPublisherFrame extends javax.swing.JFrame {
   private void changeIGName(java.awt.event.ActionEvent evt) {
     int index = igNameComboBox.getSelectedIndex();
     ini.setIntegerProperty("igs", "selected", index, null);
-  }                                          
+  }
 
   protected void frameClose() {
     ini.setIntegerProperty("layout", "X", getX(), null); 
@@ -406,8 +448,10 @@ public class IGPublisherFrame extends javax.swing.JFrame {
       publisher.setConfigFile((String) igNameComboBox.getSelectedItem());
       publisher.setDebug(debugCheckbox.isSelected());
       publisher.setNoSushi(noSushiCheckbox.isSelected());
+      publisher.setValidationOff(validationOffCheckBox.isSelected());
+      publisher.setGenerationOff(generationOffCheckBox.isSelected());
       Publisher.parseAndAddNoNarrativeParam(publisher, noNarrativeTextField.getText());
-      Publisher.parseAndAddNoValidateParam(publisher, noNarrativeTextField.getText());
+      Publisher.parseAndAddNoValidateParam(publisher, noValidateTextField.getText());
       publisher.setLogger(this);
       publisher.setCacheOption(CacheOption.LEAVE);
       try {
