@@ -54,6 +54,10 @@ public class IGPublisherFrame extends javax.swing.JFrame {
 
   JCheckBox debugCheckbox;
 
+  JCheckBox validationOffCheckBox;
+
+  JCheckBox generationOffCheckBox;
+
   private javax.swing.JButton executeButton;
   private javax.swing.JButton chooseIGButton;
   private javax.swing.JButton debugSummaryButton;
@@ -181,14 +185,16 @@ public class IGPublisherFrame extends javax.swing.JFrame {
 
     // first column
     columnGroups.addGroup(groupLayout.createParallelGroup()
-            .addComponent(noSushiCheckbox)
-            .addComponent(debugCheckbox)
             .addComponent(noValidateLabel)
             .addComponent(noNarrativeLabel)
     );
 
     // second column
-    columnGroups.addGroup(groupLayout.createParallelGroup()
+    columnGroups.addGroup(groupLayout.createParallelGroup().addGroup(groupLayout .createSequentialGroup().addComponent(debugCheckbox)
+                            .addComponent(noSushiCheckbox)
+                            .addComponent(validationOffCheckBox)
+                            .addComponent(generationOffCheckBox))
+
                     .addComponent(noValidateTextField)
                     .addComponent(noNarrativeTextField)
             );
@@ -200,9 +206,12 @@ public class IGPublisherFrame extends javax.swing.JFrame {
 
     // add each row vertically.
 
-    rowGroups.addGroup(groupLayout.createSequentialGroup().addComponent(noSushiCheckbox));
+    rowGroups.addGroup(groupLayout.createParallelGroup()
+            .addComponent(noSushiCheckbox)
+            .addComponent(debugCheckbox)
+            .addComponent(validationOffCheckBox)
+            .addComponent(generationOffCheckBox));
 
-    rowGroups.addGroup(groupLayout.createSequentialGroup().addComponent(debugCheckbox));
 
     // first row
     rowGroups.addGroup(groupLayout.createParallelGroup(GroupLayout.Alignment.BASELINE).addComponent(noValidateLabel).addComponent(noValidateTextField));
@@ -223,6 +232,8 @@ public class IGPublisherFrame extends javax.swing.JFrame {
     noValidateTextField = new JTextField();
     noSushiCheckbox = new JCheckBox("no-sushi");
     debugCheckbox = new JCheckBox("debug");
+    validationOffCheckBox = new JCheckBox("validation-off");
+    generationOffCheckBox = new JCheckBox("generation-off");
 
     executeButton = createExecuteButton();
     chooseIGButton = createChooseIGButton();
