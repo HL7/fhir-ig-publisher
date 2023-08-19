@@ -1,5 +1,6 @@
 package org.hl7.fhir.igtools.renderers;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -9,6 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.hl7.fhir.igtools.publisher.FetchedFile;
+import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.r5.comparison.VersionComparisonAnnotation;
 import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
@@ -23,15 +26,21 @@ import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
 import org.hl7.fhir.r5.model.ExpressionNode;
 import org.hl7.fhir.r5.model.ExpressionNode.Kind;
+import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.SearchParameter;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.ExtensionContextType;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
+import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.renderers.DataRenderer;
+import org.hl7.fhir.r5.renderers.Renderer;
 import org.hl7.fhir.r5.renderers.TerminologyRenderer;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.utils.FHIRPathEngine;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
+import org.hl7.fhir.r5.utils.ResourceSorters.CanonicalResourceSortByUrl;
 import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.validation.ValidationOptions;
@@ -39,7 +48,7 @@ import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
-public class CrossViewRenderer {
+public class CrossViewRenderer extends Renderer {
 
   public class UsedType {
     public UsedType(String name, boolean ms) {
@@ -97,7 +106,7 @@ public class CrossViewRenderer {
 
   private String canonical;
   private String canonical2; 
-  private IWorkerContext context;
+  private IWorkerContext worker;
   private List<ObservationProfile> obsList = new ArrayList<>();
   private List<ExtensionDefinition> extList = new ArrayList<>();
   private Map<String, List<ExtensionDefinition>> extMap = new HashMap<>();
@@ -110,22 +119,20 @@ public class CrossViewRenderer {
   private ContextUtilities cu;
   private FHIRPathEngine fpe;
   private List<SearchParameter> searchParams = new ArrayList<>();
-  private String versionToAnnotate;
 
-  public CrossViewRenderer(String canonical, String canonical2, IWorkerContext context, String corePath, String versionToAnnotate) {
-    super();
+  public CrossViewRenderer(String canonical, String canonical2, IWorkerContext context, String corePath, RenderingContext rc) {
+    super(rc);
     this.canonical = canonical;
     this.canonical2 = canonical2;
-    this.context = context;
+    this.worker = context;
     this.corePath = corePath;
-    this.versionToAnnotate = versionToAnnotate;
     getBaseTypes();
     cu = new ContextUtilities(context);
     fpe = new FHIRPathEngine(context);
   }
 
   private void getBaseTypes() {
-    StructureDefinition sd = context.fetchTypeDefinition("Observation");
+    StructureDefinition sd = worker.fetchTypeDefinition("Observation");
     for (ElementDefinition ed : sd.getSnapshot().getElement()) {
       if (ed.getPath().equals("Observation.effective[x]")) {
         for (TypeRefComponent tr : ed.getType())
@@ -138,7 +145,7 @@ public class CrossViewRenderer {
             baseTypes.add(tr.getWorkingCode());
       }
     }
-    sd = context.fetchTypeDefinition("Extension");
+    sd = worker.fetchTypeDefinition("Extension");
     for (ElementDefinition ed : sd.getSnapshot().getElement()) {
       if (ed.getPath().startsWith("Extension.value") && !ed.getMax().equals("0")) {
         for (TypeRefComponent tr : ed.getType())
@@ -608,7 +615,7 @@ public class CrossViewRenderer {
             b.append(" <span style=\"color:white; background-color: red; font-weight:bold\">S</span> ");          
           }
           if (first) first = false; else b.append(" | ");
-          StructureDefinition sd = context.fetchTypeDefinition(t.name);
+          StructureDefinition sd = worker.fetchTypeDefinition(t.name);
           if (sd != null) {
             b.append("<a href=\""+sd.getWebPath()+"\" title=\""+t.name+"\">"+t.name+"</a>");
           } else {
@@ -651,7 +658,7 @@ public class CrossViewRenderer {
       boolean first = true;
       if (binding != null) {
         b.append("<a href=\""+Utilities.pathURL(corePath, "terminologies.html#"+binding.getStrength().toCode())+"\">"+binding.getStrength().toCode()+"</a> VS ");           
-        ValueSet vs = context.fetchResource(ValueSet.class, binding.getValueSet());
+        ValueSet vs = worker.fetchResource(ValueSet.class, binding.getValueSet());
         if (vs == null) {
           b.append(Utilities.escapeXml(binding.getValueSet()));                     
         } else if (vs.hasWebPath()) {
@@ -666,17 +673,17 @@ public class CrossViewRenderer {
           if (sys.equals(t.getSystem()))
             sys = null;
           if (sys == null) {
-            CodeSystem cs = context.fetchCodeSystem(t.getSystem());
+            CodeSystem cs = worker.fetchCodeSystem(t.getSystem());
             if (cs != null)
               sys = cs.getTitle();
           }
           t.setUserData("desc", sys);
-          ValidationResult vr = context.validateCode(ValidationOptions.defaults(), t.getSystem(), t.getVersion(), t.getCode(), null);
+          ValidationResult vr = worker.validateCode(ValidationOptions.defaults(), t.getSystem(), t.getVersion(), t.getCode(), null);
           if (vr != null & vr.getDisplay() != null) {
             //          if (Utilities.existsInList(t.getSystem(), "http://loinc.org"))
             //            b.append("<span title=\""+t.getSystem()+(sys == null ? "" : " ("+sys+")")+": "+ vr.getDisplay()+"\">"+t.getCode()+" "+vr.getDisplay()+"</span>");           
             //          else {
-            CodeSystem cs = context.fetchCodeSystem(t.getSystem());
+            CodeSystem cs = worker.fetchCodeSystem(t.getSystem());
             if (cs != null && cs.hasWebPath()) {
               b.append("<a href=\""+cs.getWebPath()+"#"+cs.getId()+"-"+t.getCode()+"\" title=\""+t.getSystem()+(sys == null ? "" : " ("+sys+")")+": "+ vr.getDisplay()+"\">"+t.getCode()+"</a>");                  
             } else {
@@ -768,33 +775,34 @@ public class CrossViewRenderer {
   }
 
   private String buildExtensionTable(String type, List<ExtensionDefinition> definitions) throws Exception {
-    StringBuilder b = new StringBuilder();
-
+    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+    
     String kind;
-    if (Utilities.existsInList(type, context.getResourceNames())) {
+    if (Utilities.existsInList(type, worker.getResourceNames())) {
       kind = "resource";
     } else {
       kind = "data type";
     }
-    b.append("<table class=\"list\">\r\n");
-    b.append("<tr>");
-    b.append("<td><b>Identity</b><a name=\"ext-"+type+"\"> </a></td>");
-    b.append("<td><b><a href=\""+Utilities.pathURL(context.getSpecUrl(), "defining-extensions.html")+"#cardinality\">Conf.</a></b></td>");
-    b.append("<td><b>Type</b></td>");
-    b.append("<td><b><a href=\""+Utilities.pathURL(context.getSpecUrl(), "defining-extensions.html")+"#context\">Context</a></b></td>");
-    b.append("<td><b><a href=\""+Utilities.pathURL(context.getSpecUrl(), "versions.html")+"#std-process\">Status</a></b></td>");
-    b.append("<td><b><a href=\""+Utilities.pathURL(context.getSpecUrl(), "versions.html")+"#maturity\">Maturity</a></b></td>");
-    if (versionToAnnotate != null) {
-      b.append("<td><b><a href=\"todo.html#maturity\">Δ v"+versionToAnnotate+"</a></b></td>");      
+    var tbl = x.table("list");
+    var tr = tbl.tr();
+    var td = tr.td();
+    td.b().tx("Identity");
+    td.an("ext-"+type);
+    tr.td().b().ah(Utilities.pathURL(worker.getSpecUrl(), "defining-extensions.html#cardinality")).tx("Conf.");
+    tr.td().b().tx("Type");
+    tr.td().b().ah(Utilities.pathURL(worker.getSpecUrl(), "defining-extensions.html")+"#context").tx("Context");
+    tr.td().b().ah(Utilities.pathURL(worker.getSpecUrl(), "versions.html")+"#std-process").tx("Status");
+    if (context.getChangeVersion() != null) {
+      tr.td().b().tx("Δ v"+context.getChangeVersion());
     }
-    b.append("</tr>");  
+
     if (type != null) {
       if ("Path".equals(type)) {
-        b.append("<tr><td colspan=\"5\"><b>Extensions defined by a FHIRPath expression</b></td></tr>\r\n");
+        tbl.tr().td().colspan(5).b().tx("Extensions defined by a FHIRPath expression");
       } else if ("primitives".equals(type)) {
-        b.append("<tr><td colspan=\"5\"><b>Extensions defined on primitive types</b></td></tr>\r\n");
+        tbl.tr().td().colspan(5).b().tx("Extensions defined on primitive types");
       } else {
-        b.append("<tr><td colspan=\"5\"><b>Extensions defined for the "+type+" "+kind+"</b></td></tr>\r\n");
+        tbl.tr().td().colspan(5).b().tx("Extensions defined for the "+type+" "+kind);
       }
     }
     Map<String, StructureDefinition> map = new HashMap<>();
@@ -803,26 +811,26 @@ public class CrossViewRenderer {
         map.put(sd.source.getUrl(), sd.source);
     }
     if (map.size() == 0) {
-      b.append("<tr><td colspan=\"5\">(None found)</td></tr>\r\n");      
+      tr.td().colspan(5).tx("None found");      
     } else {
       for (String s : Utilities.sorted(map.keySet())) {
-        genExtensionRow(b, map.get(s));
+        genExtensionRow(tbl, map.get(s));
       }
     }
 
     if (type != null && !Utilities.existsInList(type, "Path", "primitives", "datatypes")) {
       List<String> ancestors = new ArrayList<>();
-      StructureDefinition t = context.fetchTypeDefinition(type);
+      StructureDefinition t = worker.fetchTypeDefinition(type);
       if (t != null) {
-        t = context.fetchResource(StructureDefinition.class, t.getBaseDefinition());
+        t = worker.fetchResource(StructureDefinition.class, t.getBaseDefinition());
         while (t != null) {
           ancestors.add(t.getType());
-          t = context.fetchResource(StructureDefinition.class, t.getBaseDefinition());
+          t = worker.fetchResource(StructureDefinition.class, t.getBaseDefinition());
         }
       }
       
-      if (Utilities.existsInList(type, context.getResourceNames())) {
-        b.append("<tr><td colspan=\"5\"><b>Extensions defined for many resources including the "+type+" resource</b></td></tr>\r\n");
+      if (Utilities.existsInList(type, worker.getResourceNames())) {
+        tbl.tr().td().colspan(5).b().tx("Extensions defined for many resources including the "+type+" resource");
         map = new HashMap<>();
         for (ExtensionDefinition sd : this.extList) {
           if (forAncestor(ancestors, sd)) {
@@ -830,14 +838,14 @@ public class CrossViewRenderer {
           }
         }
         if (map.size() == 0) {
-          b.append("<tr><td colspan=\"5\">(None found)</td></tr>\r\n");      
+          tbl.tr().td().colspan(5).tx("None found");         
         } else {
           for (String s : Utilities.sorted(map.keySet())) {
-            genExtensionRow(b, map.get(s));
+            genExtensionRow(tbl, map.get(s));
           }
         }
 
-        b.append("<tr><td colspan=\"5\"><b>Extensions that refer to the "+type+" resource</b></td></tr>\r\n");
+        tbl.tr().td().colspan(5).b().tx("Extensions that refer to the "+type+" resource");
         map = new HashMap<>();
         for (ExtensionDefinition sd : this.extList) {
           if (refersToThisType(type, sd)) {
@@ -845,13 +853,13 @@ public class CrossViewRenderer {
           }
         }
         if (map.size() == 0) {
-          b.append("<tr><td colspan=\"5\">(None found)</td></tr>\r\n");      
+          tbl.tr().td().colspan(5).tx("None found");        
         } else {
           for (String s : Utilities.sorted(map.keySet())) {
-            genExtensionRow(b, map.get(s));
+            genExtensionRow(tbl, map.get(s));
           }
         }
-        b.append("<tr><td colspan=\"5\"><b>Extensions that refer to many resources including the "+type+" resource</b></td></tr>\r\n");
+        tbl.tr().td().colspan(5).b().tx("Extensions that refer to many resources including the "+type+" resource");
         map = new HashMap<>();
         for (ExtensionDefinition sd : this.extList) {
           if (refersToThisTypesAncestors(ancestors, sd)) {
@@ -859,23 +867,25 @@ public class CrossViewRenderer {
           }
         }
         if (map.size() == 0) {
-          b.append("<tr><td colspan=\"5\">(None found)</td></tr>\r\n");      
+          tbl.tr().td().colspan(5).tx("None found");       
         } else {
           for (String s : Utilities.sorted(map.keySet())) {
-            genExtensionRow(b, map.get(s));
+            genExtensionRow(tbl, map.get(s));
           }
         }
       } else {
-        StructureDefinition sd = context.fetchTypeDefinition(type);
+        StructureDefinition sd = worker.fetchTypeDefinition(type);
         if (sd != null && sd.hasBaseDefinition()) {
           String bt = Utilities.tail(sd.getBaseDefinition());
-          b.append("<tr><td colspan=\"5\"><br/>(See also Extensions defined on <a href=\"extensions-types.html#ext-"+bt+"\">"+bt+"</a>)</td></tr>\r\n");      
+          td = tr.td().colspan(5);
+          td.br();
+          td.tx("(See also Extensions defined on ");
+          td.ah("extensions-types.html#ext-"+bt).tx(bt);      
         }
       }
     }
 
-    b.append("</table>\r\n");
-    return b.toString();
+    return new XhtmlComposer(false, false).compose(x.getChildNodes());
   }
   
   private boolean refersToThisType(String type, ExtensionDefinition sd) {
@@ -921,31 +931,35 @@ public class CrossViewRenderer {
     return false;
   }
 
-  private void genExtensionRow(StringBuilder s, StructureDefinition ed) throws Exception {
+  private void genExtensionRow(XhtmlNode tbl, StructureDefinition ed) throws Exception {
     StandardsStatus status = ToolingExtensions.getStandardsStatus(ed);
+    String pstatus = ed.getStatus().toCode();
+    XhtmlNode tr;
     if (status  == StandardsStatus.DEPRECATED) {
-      s.append("<tr style=\"background-color: #ffeeee\">");
+      tr = tbl.tr().style("background-color: #ffeeee");
     } else if (status  == StandardsStatus.NORMATIVE) {
-      s.append("<tr style=\"background-color: #f2fff2\">");
+      tr = tbl.tr().style("background-color: #f2fff2");
     } else if (status  == StandardsStatus.INFORMATIVE) {
-      s.append("<tr style=\"background-color: #fffff6\">");
+      tr = tbl.tr().style("background-color: #fffff6");
     } else {
-      s.append("<tr>");
+      tr = tbl.tr();
     }
-    s.append("<td><a href=\""+ed.getWebPath()+"\" title=\""+Utilities.escapeXml(ed.getDescription())+"\">"+ed.getId()+"</a></td>");
-    s.append("<td>"+displayExtensionCardinality(ed)+"</td>");
-    s.append("<td>"+determineExtensionType(ed)+"</td>");
-    s.append("<td>");
+    tr.td().ah(ed.getWebPath(), ed.getDescription()).tx(ed.getId());
+    displayExtensionCardinality(ed, tr.td());
+    determineExtensionType(ed, tr.td());
+    var td = tr.td();
+
     boolean first = true;
     int l = 0;
     for (StructureDefinitionContextComponent ec : ed.getContext()) {
       if (first)
         first = false;
       else if (l > 60) {
-        s.append(",<br/> ");
+        td.tx(",");
+        td.br();
         l = 0;
       } else {
-        s.append(", ");
+        td.tx(", ");
         l++;        
       }
       l = l + (ec.hasExpression() ? ec.getExpression().length() : 0);
@@ -956,77 +970,76 @@ public class CrossViewRenderer {
         if (ref.contains(".")) {
           ref = ref.substring(0, ref.indexOf("."));
         }
-        StructureDefinition sd = context.fetchTypeDefinition(ref);
+        StructureDefinition sd = worker.fetchTypeDefinition(ref);
         if (sd != null && sd.hasWebPath()) {
-          s.append("<a href=\""+sd.getWebPath()+"\">"+ec.getExpression()+"</a>");          
+          td.ah(sd.getWebPath()).tx(ec.getExpression());          
         } else {
-          s.append(ec.getExpression());
+          td.tx(ec.getExpression());
         }
       } else if (ec.getType() == ExtensionContextType.FHIRPATH) {
-        s.append(Utilities.escapeXml(ec.getExpression()));
+        td.tx(Utilities.escapeXml(ec.getExpression()));
       } else if (ec.getType() == ExtensionContextType.EXTENSION) {
-        StructureDefinition extension = context.fetchResource(StructureDefinition.class, ec.getExpression());
+        StructureDefinition extension = worker.fetchResource(StructureDefinition.class, ec.getExpression());
         if (extension==null)
-          s.append(Utilities.escapeXml(ec.getExpression()));
+          td.tx(Utilities.escapeXml(ec.getExpression()));
         else {
-          s.append("<a href=\""+extension.getWebPath()+"\">"+ec.getExpression()+"</a>");
+          td.ah(extension.getWebPath()).tx(ec.getExpression());
         }
       } else if (ec.getType() == null) {
-        s.append("??error??: "+Utilities.escapeXml(ec.getExpression()));
+        td.tx("??error??: "+Utilities.escapeXml(ec.getExpression()));
       } else {
         throw new Error("Not done yet");
       }
     }
-    s.append("</td>");
+    
+    String fmm = ToolingExtensions.readStringExtension(ed, ToolingExtensions.EXT_FMM_LEVEL);
+    td = tr.td();
     if (status == StandardsStatus.NORMATIVE) {
-      s.append("<td><a href=\""+Utilities.pathURL(corePath, "versions.html")+"#std-process\" title=\"Normative\" class=\"normative-flag\">Normative</a></td><td></td>");
+      td.ahWithText(pstatus+" / ", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Normative", "Normative", null).attribute("class", "normative-flag");
     } else if (status == StandardsStatus.DEPRECATED) {
-      s.append("<td><a href=\""+Utilities.pathURL(corePath, "versions.html")+"#std-process\" title=\"Deprecated\" class=\"deprecated-flag\">Deprecated</a></td><td></td>");      
+      td.ahWithText(pstatus+" / ", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Deprecated", "Deprecated", null).attribute("class", "deprecated-flag");
     } else if (status == StandardsStatus.INFORMATIVE) {
-      s.append("<td><a href=\""+Utilities.pathURL(corePath, "versions.html")+"#std-process\" title=\"Informative\" class=\"deprecated-flag\">Informative</a></td><td></td>");      
+      td.ahWithText(pstatus+" / ", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Informative", "Informative", null).attribute("class", "informative-flag");
     } else if (status == StandardsStatus.DRAFT) {
-      s.append("<td><a href=\""+Utilities.pathURL(corePath, "versions.html")+"#std-process\" title=\"Draft\" class=\"draft-flag\">Draft</a></td><td></td>");      
+      td.ahWithText(pstatus+" / ", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Draft", "Draft", null).attribute("class", "draft-flag");
     } else { 
-      String fmm = ToolingExtensions.readStringExtension(ed, ToolingExtensions.EXT_FMM_LEVEL);
-      s.append("<td><a href=\""+Utilities.pathURL(corePath, "versions.html")+"#std-process\" title=\"Trial-Use\" class=\"trial-use-flag\">Trial&nbsp;Use</a></td><td>"+(Utilities.noString(fmm) ? "0" : "&nbsp;(FMM"+fmm+")")+"</td>");      
+      td.ahWithText(pstatus+" / ", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Trial-Use", "Trial-Use", null).attribute("class", "trial-use-flag");
     }
-    if (versionToAnnotate != null) {
-XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
-      VersionComparisonAnnotation.renderSummary(ed, x, versionToAnnotate);
-      s.append("<td>"+(new XhtmlComposer(false, false).compose(x.getChildNodes()))+"</td>");      
+    tr.td().tx(Utilities.noString(fmm) ? "" : ": FMM"+fmm+"");
+    if (context.getChangeVersion() != null) {
+      renderStatusSummary(ed, tr.td(), "status");
     }
-//    s.append("<td><a href=\"extension-"+ed.getId().toLowerCase()+ ".xml.html\">XML</a></td>");
-//    s.append("<td><a href=\"extension-"+ed.getId().toLowerCase()+ ".json.html\">JSON</a></td>");
-    s.append("</tr>");
   }
 
-  private String displayExtensionCardinality(StructureDefinition ed) {
+  private void displayExtensionCardinality(StructureDefinition ed, XhtmlNode x) {
     ElementDefinition e = ed.getSnapshot().getElementFirstRep();
-    String m = "";
-    if (ed.getSnapshot().getElementFirstRep().getIsModifier())
-      m = " <b title=\"This is a modifier extension\">M</b>";
-
-    return Integer.toString(e.getMin())+".."+e.getMax()+m;
+    x.tx(Integer.toString(e.getMin())+".."+e.getMax());
+    if (ed.getSnapshot().getElementFirstRep().getIsModifier()) {
+      x.b().attribute("title", "This is a modifier extension").tx("M");
+    }
   }
 
-  private String determineExtensionType(StructureDefinition ed) throws Exception {
+  private void determineExtensionType(StructureDefinition ed, XhtmlNode x) throws Exception {
     for (ElementDefinition e : ed.getSnapshot().getElement()) {
       if (e.getPath().startsWith("Extension.value") && !"0".equals(e.getMax())) {
         if (e.getType().size() == 1) {
-          StructureDefinition sd = context.fetchTypeDefinition(e.getType().get(0).getWorkingCode());
+          StructureDefinition sd = worker.fetchTypeDefinition(e.getType().get(0).getWorkingCode());
           if (sd != null) {
-            return "<a href=\""+sd.getWebPath()+"\">"+e.getType().get(0).getWorkingCode()+"</a>";            
+            x.ah(sd.getWebPath()).tx(e.getType().get(0).getWorkingCode());   
+            return;
           } else {
-            return e.getType().get(0).getWorkingCode();
+            x.tx(e.getType().get(0).getWorkingCode());
+            return;
           }
         } else if (e.getType().size() == 0) {
-          return "";
+          // nothing
         } else {
-          return "(Choice)";
+          x.tx("(Choice)");
+          return;
         }
       }
     }
-    return "(complex)";
+    x.tx("(complex)");
   }
 
 
@@ -1116,4 +1129,231 @@ XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
     }
     return false;
   }
+  
+
+  public String buildValueSetList(String thisVersion, String versionToAnnotate, List<FetchedFile> fileList) throws IOException {
+    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+    List<ValueSet> vslist = new ArrayList<>();
+    boolean versions = false;
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.fhirType().equals("ValueSet")) {
+          ValueSet vs = (ValueSet) r.getResource();
+          vslist.add(vs);
+          versions = !(thisVersion.equals(vs.getVersion())) || versions;
+        }
+      }
+    }  
+    Collections.sort(vslist, new CanonicalResourceSortByUrl());
+    var tbl = x.table("grid");
+    var tr = tbl.tr();
+    tr.th().tx("URL");
+    if (versions) {
+      tr.th().tx("Version");
+    }
+    tr.th().tx("Name / Title");
+    tr.th().tx("Status");
+    tr.th().tx("Flags");
+    tr.th().tx("Source");
+    if (versionToAnnotate != null) {
+      var td = tr.th();
+      td.tx("Δ v");
+      td.tx(versionToAnnotate);
+    }
+    for (ValueSet vs : vslist) {
+      tr = tbl.tr();
+      renderStatus(vs.getUrlElement(), tr.td().ah(vs.getWebPath())).tx(vs.getUrl());
+      if (versions) {
+        renderStatus(vs.getVersionElement(), tr.td()).tx(vs.getVersion());
+      }
+      var td = tr.td();
+      renderStatus(vs.getNameElement(), td).tx(vs.getName());
+      td.br();
+      renderStatus(vs.getTitleElement(), td).tx(vs.getTitle());
+      td = tr.td();
+      renderStatus(vs.getStatusElement(), td).tx(vs.getStatus().toCode());
+      if (vs.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
+        td.tx(" / ");
+        Extension ext = vs.getExtensionByUrl(ToolingExtensions.EXT_STANDARDS_STATUS);
+        String v = ToolingExtensions.getStandardsStatus(vs).toCode();
+        renderStatus(ext, td).attribute("class", v+"-flag").tx(v);
+      }
+      if (vs.hasExtension(ToolingExtensions.EXT_FMM_LEVEL)) {
+        td.tx(" / ");
+        Extension ext = vs.getExtensionByUrl(ToolingExtensions.EXT_FMM_LEVEL);
+        renderStatus(ext, td).tx("FMM"+ext.getValue().primitiveValue());
+      }
+      if (vs.getExperimental()) {
+        td.tx(":");
+        renderStatus(vs.getExperimentalElement(), td).tx("experimental");
+      }
+      td = tr.td();
+      
+      if (vs.getCompose().hasLockedDate()) {
+        renderStatus(vs.getCompose().getLockedDateElement(), td).tx("Locked-Date");
+        td.tx(" ");
+      }
+      if (vs.getCompose().getInactive()) {
+        renderStatus(vs.getCompose().getInactiveElement(), td).tx("Inactive");
+        td.tx(" ");
+      }
+      boolean i = false;
+      boolean e = false;
+      boolean v = false;
+      boolean a = false;
+      Set<String> sources = new HashSet<>();
+      for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
+        if (inc.hasValueSet()) {
+          v = true;
+        }
+        if (inc.hasSystem()) {
+          sources.add(describeSource(inc.getSystem()));
+          if (inc.hasConcept()) {
+            e = true;
+          } else if (inc.hasFilter()) {
+            i = true;
+          } else {
+            a = true;
+          }
+        }
+      }
+      if (a) {
+        td.span(null, "All Code System").tx("A ");
+      }
+      if (i) {
+        td.span(null, "Intensional").tx("I ");
+      }
+      if (e) {
+        td.span(null, "Extensional").tx("E ");
+      }
+      if (v) {
+        td.span(null, "Imports Valueset(s)").tx("V ");
+      }
+      
+      td = tr.td();
+      for (String s : Utilities.sorted(sources)) {
+        td.sep(", ");
+        td.tx(s);
+      }
+      
+      if (versionToAnnotate != null) {
+        renderStatusSummary(vs, tr.td(), versionToAnnotate, "url", "name", "title", "version", "status", "experimental");
+      }
+    }
+    
+    return new XhtmlComposer(false, false).compose(x.getChildNodes());
+  }
+
+  private String describeSource(String uri) {
+    CodeSystem cs = worker.fetchCodeSystem(uri);
+    if (cs != null) {
+      if (!Utilities.isAbsoluteUrl(cs.getWebPath())) {
+        return "Internal";
+      }
+    }
+    if ("http://snomed.info/sct".equals(uri)) return "SCT";
+    if ("http://loinc.org".equals(uri)) return "LOINC";
+    if ("http://dicom.nema.org/resources/ontology/DCM".equals(uri)) return "DICOM";
+    if ("http://unitsofmeasure.org".equals(uri)) return "UCUM";
+    if ("http://www.nlm.nih.gov/research/umls/rxnorm".equals(uri)) return "RxNorm";
+    if (uri.startsWith("http://terminology.hl7.org/CodeSystem/v3-")) return "THO (V3)";
+    if (uri.startsWith("http://terminology.hl7.org/CodeSystem/v2-")) return "THO (V2)";
+    if (uri.startsWith("http://terminology.hl7.org")) return "THO";
+    if (cs != null && cs.hasSourcePackage()) {
+      return cs.getSourcePackage().getId();
+    }
+    if (uri.startsWith("http://hl7.org/fhir")) return "FHIR";
+    return "Other";
+  }
+
+  public String buildCodeSystemList(String thisVersion, String versionToAnnotate, List<FetchedFile> fileList) throws IOException {
+    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+    List<CodeSystem> cslist = new ArrayList<>();
+    boolean versions = false;
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.fhirType().equals("CodeSystem")) {
+          CodeSystem cs = (CodeSystem) r.getResource();
+          cslist.add(cs);
+          versions = !(thisVersion.equals(cs.getVersion())) || versions;
+        }
+      }
+    }  
+    Collections.sort(cslist, new CanonicalResourceSortByUrl());
+    var tbl = x.table("grid");
+    var tr = tbl.tr();
+    tr.th().tx("URL");
+    if (versions) {
+      tr.th().tx("Version");
+    }
+    tr.th().tx("Name / Title");
+    tr.th().tx("Status");
+    tr.th().tx("Flags");
+    tr.th().tx("Count");
+    if (versionToAnnotate != null) {
+      var td = tr.th();
+      td.tx("Δ v");
+      td.tx(versionToAnnotate);
+    }
+    for (CodeSystem cs : cslist) {
+      tr = tbl.tr();
+      renderStatus(cs.getUrlElement(), tr.td().ah(cs.getWebPath())).tx(cs.getUrl());
+      if (versions) {
+        tr.td().tx(cs.getVersion());
+      }
+      var td = tr.td();
+      renderStatus(cs.getNameElement(), td).tx(cs.getName());
+      td.br();
+      renderStatus(cs.getTitleElement(), td).tx(cs.getTitle());
+      td = tr.td();
+      renderStatus(cs.getStatusElement(), td).tx(cs.getStatus().toCode());
+      if (cs.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
+        td.tx(" / ");
+        Extension ext = cs.getExtensionByUrl(ToolingExtensions.EXT_STANDARDS_STATUS);
+        String v = ToolingExtensions.getStandardsStatus(cs).toCode();
+        renderStatus(ext, td).attribute("class", v+"-flag").tx(v);
+      }
+      if (cs.hasExtension(ToolingExtensions.EXT_FMM_LEVEL)) {
+        td.tx(" / ");
+        Extension ext = cs.getExtensionByUrl(ToolingExtensions.EXT_FMM_LEVEL);
+        renderStatus(ext, td).tx("FMM"+ext.getValue().primitiveValue());
+      }
+      if (cs.getExperimental()) {
+        td.tx(": ");
+        renderStatus(cs.getExperimentalElement(), td).tx("experimental");
+      }
+      td = tr.td();
+      if (cs.hasHierarchyMeaning()) {
+        renderStatus(cs.getHierarchyMeaningElement(), td).tx(cs.getHierarchyMeaning().toCode());
+        td.tx(" ");
+      }
+      if (!CodeSystemUtilities.hasHierarchy(cs)) {
+        td.tx("flat ");
+      }
+      if (cs.hasCompositional() && cs.getCompositional()) {
+        renderStatus(cs.getCompositionalElement(), td).tx("compositional");
+        td.tx(" ");
+      }
+      if (cs.hasVersionNeeded() && cs.getVersionNeeded()) {
+        renderStatus(cs.getVersionNeededElement(), td).tx("version-needed");
+        td.tx(" ");
+      }
+      
+      td = tr.td();
+      td.tx(CodeSystemUtilities.countCodes(cs));
+      if (cs.hasContent()) {
+        td.tx(" (");
+        td.tx(cs.getContent().toCode());
+        td.tx(")");
+      }
+      
+      if (versionToAnnotate != null) {
+        renderStatusSummary(cs, tr.td(), versionToAnnotate, "url", "name", "title", "version", "status", "experimental", "hierarchyMeaning", "versionNeeded", "compositional");
+      }
+    }
+    
+    return new XhtmlComposer(false, false).compose(x.getChildNodes());
+  }
+
+  
 }

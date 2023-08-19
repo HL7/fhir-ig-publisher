@@ -4556,6 +4556,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     rc.setDateFormatString(fmtDate);
     rc.setDateTimeFormatString(fmtDateTime);
+    rc.setChangeVersion(versionToAnnotate);
     //    rc.setTargetVersion(pubVersion);
 
     if (igMode) {
@@ -5639,7 +5640,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (comparisonVersions == null) {
       comparisonVersions = new ArrayList<>();
       comparisonVersions.add("{last}");
-      versionToAnnotate = "{last}";  // #FIXME
     }
     return new PreviousVersionComparator(context, version, businessVersion != null ? businessVersion : sourceIg == null ? null : sourceIg.getVersion(), rootDir, tempDir, igpkp.getCanonical(), igpkp, logger, comparisonVersions, versionToAnnotate);
   }
@@ -8026,7 +8026,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     generateDataFile();
     generateCanonicalSummary();
 
-    CrossViewRenderer cvr = new CrossViewRenderer(igpkp.getCanonical(), altCanonical, context, igpkp.specPath(), versionToAnnotate);
+    CrossViewRenderer cvr = new CrossViewRenderer(igpkp.getCanonical(), altCanonical, context, igpkp.specPath(), rc.copy());
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
@@ -8075,8 +8075,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (String s : cvr.getExtensionIds()) {
       fragment("extension-search-"+s, cvr.buildSearchTableForExtension(s), otherFilesRun);      
     }
-    fragment("codesystem-list", buildCodeSystemList(), otherFilesRun);      
-    fragment("valueset-list", buildValueSetList(), otherFilesRun);      
+    fragment("codesystem-list", cvr.buildCodeSystemList(publishedIg.getVersion(), versionToAnnotate, fileList), otherFilesRun);      
+    fragment("valueset-list", cvr.buildValueSetList(publishedIg.getVersion(), versionToAnnotate, fileList), otherFilesRun);      
 
     trackedFragment("1", "ip-statements", new IPStatementsRenderer(context, markdownEngine, sourceIg.getPackageId()).genIpStatements(fileList), otherFilesRun);
     if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {
@@ -8327,215 +8327,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     }
   }
-
-  private String buildValueSetList() throws IOException {
-    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
-    List<ValueSet> vslist = new ArrayList<>();
-    boolean versions = false;
-    for (FetchedFile f : fileList) {
-      for (FetchedResource r : f.getResources()) {
-        if (r.fhirType().equals("ValueSet")) {
-          ValueSet vs = (ValueSet) r.getResource();
-          vslist.add(vs);
-          versions = !(publishedIg.getVersion().equals(vs.getVersion())) || versions;
-        }
-      }
-    }  
-    Collections.sort(vslist, new CanonicalResourceSortByUrl());
-    var tbl = x.table("grid");
-    var tr = tbl.tr();
-    tr.th().tx("URL");
-    if (versions) {
-      tr.th().tx("Version");
-    }
-    tr.th().tx("Name / Title");
-    tr.th().tx("Status");
-    tr.th().tx("Flags");
-    tr.th().tx("Source");
-    if (versionToAnnotate != null) {
-      var td = tr.th();
-      td.tx("Δ v");
-      td.tx(versionToAnnotate);
-    }
-    for (ValueSet vs : vslist) {
-      tr = tbl.tr();
-      tr.td().ah(vs.getWebPath()).tx(vs.getUrl());
-      if (versions) {
-        tr.td().tx(vs.getVersion());
-      }
-      var td = tr.td();
-      td.tx(vs.getName());
-      td.br();
-      td.tx(vs.getTitle());
-      td = tr.td();
-      td.tx(vs.getStatus().toCode());
-      if (vs.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
-        td.tx(" / ");
-        td.tx(ToolingExtensions.getStandardsStatus(vs).toCode());
-      }
-      if (vs.getExperimental()) {
-        td.tx(": experimental");
-      }
-      td = tr.td();
-      
-      if (vs.getCompose().hasLockedDate()) {
-        td.tx("Locked-Date");
-        td.tx(" ");
-      }
-      if (vs.getCompose().getInactive()) {
-        td.tx("Inactive");
-        td.tx(" ");
-      }
-      boolean i = false;
-      boolean e = false;
-      boolean v = false;
-      boolean a = false;
-      Set<String> sources = new HashSet<>();
-      for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
-        if (inc.hasValueSet()) {
-          v = true;
-        }
-        if (inc.hasSystem()) {
-          sources.add(describeSource(inc.getSystem()));
-          if (inc.hasConcept()) {
-            e = true;
-          } else if (inc.hasFilter()) {
-            i = true;
-          } else {
-            a = true;
-          }
-        }
-      }
-      if (a) {
-        td.span(null, "All Code System").tx("A ");
-      }
-      if (i) {
-        td.span(null, "Intensional").tx("I ");
-      }
-      if (e) {
-        td.span(null, "Extensional").tx("E ");
-      }
-      if (v) {
-        td.span(null, "Imports Valueset(s)").tx("V ");
-      }
-      
-      td = tr.td();
-      for (String s : Utilities.sorted(sources)) {
-        td.sep(", ");
-        td.tx(s);
-      }
-      
-      if (versionToAnnotate != null) {
-        VersionComparisonAnnotation.renderSummary(vs, tr.td(), versionToAnnotate);
-      }
-    }
-    
-    return new XhtmlComposer(false, false).compose(x.getChildNodes());
-  }
-
-  private String describeSource(String uri) {
-    CodeSystem cs = context.fetchCodeSystem(uri);
-    if (cs != null) {
-      if (!Utilities.isAbsoluteUrl(cs.getWebPath())) {
-        return "Internal";
-      }
-    }
-    if ("http://snomed.info/sct".equals(uri)) return "SCT";
-    if ("http://loinc.org".equals(uri)) return "LOINC";
-    if ("http://dicom.nema.org/resources/ontology/DCM".equals(uri)) return "DICOM";
-    if ("http://unitsofmeasure.org".equals(uri)) return "UCUM";
-    if ("http://www.nlm.nih.gov/research/umls/rxnorm".equals(uri)) return "RxNorm";
-    if (uri.startsWith("http://terminology.hl7.org/CodeSystem/v3-")) return "THO (V3)";
-    if (uri.startsWith("http://terminology.hl7.org/CodeSystem/v2-")) return "THO (V2)";
-    if (uri.startsWith("http://terminology.hl7.org")) return "THO";
-    if (cs != null && cs.hasSourcePackage()) {
-      return cs.getSourcePackage().getId();
-    }
-    if (uri.startsWith("http://hl7.org/fhir")) return "FHIR";
-    return "Other";
-  }
-
-  private String buildCodeSystemList() throws IOException {
-    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
-    List<CodeSystem> cslist = new ArrayList<>();
-    boolean versions = false;
-    for (FetchedFile f : fileList) {
-      for (FetchedResource r : f.getResources()) {
-        if (r.fhirType().equals("CodeSystem")) {
-          CodeSystem cs = (CodeSystem) r.getResource();
-          cslist.add(cs);
-          versions = !(publishedIg.getVersion().equals(cs.getVersion())) || versions;
-        }
-      }
-    }  
-    Collections.sort(cslist, new CanonicalResourceSortByUrl());
-    var tbl = x.table("grid");
-    var tr = tbl.tr();
-    tr.th().tx("URL");
-    if (versions) {
-      tr.th().tx("Version");
-    }
-    tr.th().tx("Name / Title");
-    tr.th().tx("Status");
-    tr.th().tx("Flags");
-    tr.th().tx("Count");
-    if (versionToAnnotate != null) {
-      var td = tr.th();
-      td.tx("Δ v");
-      td.tx(versionToAnnotate);
-    }
-    for (CodeSystem cs : cslist) {
-      tr = tbl.tr();
-      tr.td().ah(cs.getWebPath()).tx(cs.getUrl());
-      if (versions) {
-        tr.td().tx(cs.getVersion());
-      }
-      var td = tr.td();
-      td.tx(cs.getName());
-      td.br();
-      td.tx(cs.getTitle());
-      td = tr.td();
-      td.tx(cs.getStatus().toCode());
-      if (cs.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
-        td.tx(" / ");
-        td.tx(ToolingExtensions.getStandardsStatus(cs).toCode());
-      }
-      if (cs.getExperimental()) {
-        td.tx(": experimental");
-      }
-      td = tr.td();
-      if (cs.hasHierarchyMeaning()) {
-        td.tx(cs.getHierarchyMeaning().toCode());
-        td.tx(" ");
-      }
-      if (!CodeSystemUtilities.hasHierarchy(cs)) {
-        td.tx("flat ");
-      }
-      if (cs.hasCompositional() && cs.getCompositional()) {
-        td.tx("compositional");
-        td.tx(" ");
-      }
-      if (cs.hasVersionNeeded() && cs.getVersionNeeded()) {
-        td.tx("version-needed");
-        td.tx(" ");
-      }
-      
-      td = tr.td();
-      td.tx(CodeSystemUtilities.countCodes(cs));
-      if (cs.hasContent()) {
-        td.tx(" (");
-        td.tx(cs.getContent().toCode());
-        td.tx(")");
-      }
-      
-      if (versionToAnnotate != null) {
-        VersionComparisonAnnotation.renderSummary(cs, tr.td(), versionToAnnotate);
-      }
-    }
-    
-    return new XhtmlComposer(false, false).compose(x.getChildNodes());
-  }
-
+  
   private List<DependencyAnalyser.ArtifactDependency> makeDependencies() {
     DependencyAnalyser analyser = new DependencyAnalyser(context);
     for (FetchedFile f : fileList) {

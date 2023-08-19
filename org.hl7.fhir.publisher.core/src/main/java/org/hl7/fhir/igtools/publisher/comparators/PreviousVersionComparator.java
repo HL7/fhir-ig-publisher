@@ -255,7 +255,6 @@ public class PreviousVersionComparator {
 
         try {
           ComparisonSession session = new ComparisonSession(vi.context, context, "Comparison of v"+vi.version+" with this version", vi.pkp, newpkp);
-          session.setForVersion(vi.version);
           session.setAnnotate(vi.annotate);
           //    session.setDebug(true);
           for (ProfilePair c : comparisons) {
