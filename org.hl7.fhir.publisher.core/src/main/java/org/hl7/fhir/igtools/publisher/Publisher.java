@@ -66,6 +66,8 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
 import org.apache.commons.exec.ExecuteWatchdog;
@@ -138,7 +140,6 @@ import org.hl7.fhir.igtools.web.PublicationProcess;
 import org.hl7.fhir.igtools.web.PublisherConsoleLogger;
 import org.hl7.fhir.igtools.web.WebSiteArchiveBuilder;
 import org.hl7.fhir.r4.formats.FormatUtilities;
-import org.hl7.fhir.r5.comparison.CanonicalResourceComparer;
 import org.hl7.fhir.r5.comparison.VersionComparisonAnnotation;
 import org.hl7.fhir.r5.conformance.ConstraintJavaGenerator;
 import org.hl7.fhir.r5.conformance.R5ExtensionsLoader;
@@ -624,9 +625,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private Publisher childPublisher = null;
   private GenerationTool tool;
   private boolean genExampleNarratives = true;
-  private List<String> noNarratives = new ArrayList<>();
+  private final List<String> noNarratives = new ArrayList<>();
   private List<FetchedResource> noNarrativeResources = new ArrayList<>();
-  private List<String> noValidate = new ArrayList<>();
+  private final List<String> noValidate = new ArrayList<>();
   private List<FetchedResource> noValidateResources = new ArrayList<>();
 
   private List<String> resourceDirs = new ArrayList<String>();
@@ -806,7 +807,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private Coding expectedJurisdiction;
 
-  private boolean noFSH;
+  public boolean isNoSushi() {
+    return noSushi;
+  }
+
+  public void setNoSushi(boolean noSushi) {
+    this.noSushi = noSushi;
+  }
+
+  private boolean noSushi;
 
   private Set<String> loadedIds;
 
@@ -824,8 +833,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private String copyrightYear;
 
-  private boolean noValidation;
-  private boolean noGenerate;
+  @Getter
+  @Setter
+  private boolean validationOff;
+
+  @Getter
+  @Setter
+  private boolean generationOff;
 
   private String fmtDateTime = "yyyy-MM-dd HH:mm:ssZZZ";
   private String fmtDate = "yyyy-MM-dd";
@@ -1033,7 +1047,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       tts = tt.start("generate");
       log("Processing Conformance Resources");
       loadConformance();
-      if (!noValidation) {
+      if (!validationOff) {
         log("Validating Resources");
         try {
           validate();
@@ -1057,7 +1071,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine).render(publishedIg, true, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()), 
           new PublicationChecker(repoRoot, historyPage, markdownEngine).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
           generateDraftDependencies(),
-          noNarrativeResources, noValidateResources, noValidation, noGenerate, dependentIgFinder);
+          noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder);
       tts.end();
       if (isChild()) {
         log("Built. "+tt.report());      
@@ -2273,11 +2287,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     if (configFile != null) {
       File fsh = new File(Utilities.path(focusDir(), "fsh"));
-      if (fsh.exists() && fsh.isDirectory() && !noFSH) {
+      if (fsh.exists() && fsh.isDirectory() && !noSushi) {
         new FSHRunner(this).runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())), mode);
       } else {
         File fsh2 = new File(Utilities.path(focusDir(), "input", "fsh"));
-        if (fsh2.exists() && fsh2.isDirectory() && !noFSH) {
+        if (fsh2.exists() && fsh2.isDirectory() && !noSushi) {
           new FSHRunner(this).runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())), mode);
         }
       }
@@ -5447,7 +5461,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     log("Generating Narratives");
     generateNarratives();
-    if (!noValidation) {
+    if (!validationOff) {
       log("Validating Conformance Resources");
       for (String s : metadataResourceNames()) {
         validate(s);
@@ -6212,7 +6226,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                   b.append("version="+businessVersion);
                   bc.setVersion(businessVersion);
                 }
-              } else if (defaultBusinessVersion != null && bc.getVersion().isEmpty()) {
+              } else if (defaultBusinessVersion != null && !bc.getVersionElement().isEmpty()) {
                 altered = true;
                 b.append("version="+defaultBusinessVersion);
                 bc.setVersion(defaultBusinessVersion);
@@ -6725,7 +6739,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private void validate() throws Exception {
-    if (noValidation) {
+    if (validationOff) {
       return;
     }
 
@@ -7136,12 +7150,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       createToc(childPublisher.getPublishedIg().getDefinition().getPage(), igArtifactsPage, nestedIgOutput);
     }
     fixSearchForm();
-    if (!noGenerate) {
+    if (!generationOff) {
       templateBeforeJekyll();
     }
 
     if (runTool()) {
-      if (!noGenerate) {
+      if (!generationOff) {
         templateOnCheck();
       }
 
@@ -7199,7 +7213,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (ipaComparator != null) {
         ipaComparator.addOtherFiles(inspector.getExceptions(), outputDir);
       }
-      List<ValidationMessage> linkmsgs = noGenerate ? new ArrayList<ValidationMessage>() : inspector.check(statusMessage);
+      List<ValidationMessage> linkmsgs = generationOff ? new ArrayList<ValidationMessage>() : inspector.check(statusMessage);
       int bl = 0;
       int lf = 0;
       for (ValidationMessage m : ValidationPresenter.filterMessages(linkmsgs, true, suppressedMessages)) {
@@ -7879,7 +7893,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private boolean runTool() throws Exception {
-    if (noGenerate) {
+    if (generationOff) {
       FileUtils.copyDirectory(new File(tempDir), new File(outputDir));
       return true;
     }
@@ -9094,20 +9108,26 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     s = s + "<td style=\"vertical-align:top;text-align:left;background-color:white;padding:0px 4px 0px 4px;white-space:nowrap;background-image:url(tbl_bck0.png)\" class=\"hierarchy\">";
     s = s + "<img style=\"background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"tbl_spacer.png\"/>";
     s = s + indents;
-    if (!label.equals("0")) {
+    if (!label.equals("0") && !page.hasPage()) {
       if (last)
         s = s + "<img style=\"background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"tbl_vjoin_end.png\"/>";
       else
         s = s + "<img style=\"background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"tbl_vjoin.png\"/>";
     }
     // lloyd check
+    if (page.hasPage() && !label.equals("0"))
+      if (last)
+        s = s + "<img onClick=\"tableRowAction(this)\" src=\"tbl_vjoin_end-open.png\" alt=\".\" style=\"background-color: inherit\" class=\"hierarchy\"/>";
+      else
+        s = s + "<img onClick=\"tableRowAction(this)\" src=\"tbl_vjoin-open.png\" alt=\".\" style=\"background-color: inherit\" class=\"hierarchy\"/>";
     if (page.hasPage())
-      s = s + "<img onClick=\"tableRowAction(this)\" src=\"tbl_vjoin-open.png\" alt=\".\" style=\"background-color: inherit\" class=\"hierarchy\"/>";
-    s = s + "<img style=\"background-color:white;background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"icon_page.gif\"/>";
+      s = s + "<img style=\"background-color:white;background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"icon_page-child.gif\"/>";
+    else
+      s = s + "<img style=\"background-color:white;background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"icon_page.gif\"/>";
     if (page.hasName()) { 
-      s = s + "<a title=\"" + Utilities.escapeXml(page.getTitle()) + "\" href=\"" + (currentOffset!=null ? currentOffset + "/" : "") + page.getName() +"\">" + label + " " + Utilities.escapeXml(page.getTitle()) + "</a></td></tr>";
+      s = s + "<a title=\"" + Utilities.escapeXml(page.getTitle()) + "\" href=\"" + (currentOffset!=null ? currentOffset + "/" : "") + page.getName() +"\"> " + label + " " + Utilities.escapeXml(page.getTitle()) + "</a></td></tr>";
     } else {
-      s = s + "<a title=\"" + Utilities.escapeXml(page.getTitle()) + "\">" + label + " " + Utilities.escapeXml(page.getTitle()) + "</a></td></tr>";      
+      s = s + "<a title=\"" + Utilities.escapeXml(page.getTitle()) + "\"> " + label + " " + Utilities.escapeXml(page.getTitle()) + "</a></td></tr>";
     }
 
     int total = page.getPage().size();
@@ -9555,7 +9575,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }    
   }
   private void generateHtmlOutputs(FetchedFile f, boolean regen) throws Exception {
-    if (noGenerate) {
+    if (generationOff) {
       return;
     }
     // System.out.println("gen2: "+f.getName());
@@ -11229,8 +11249,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return configFile;
   }
 
-  private static void runGUI() throws InterruptedException, InvocationTargetException {
-    GraphicalPublisher.launchUI();
+  private static void runGUI(String[] args) throws InterruptedException, InvocationTargetException {
+
+    GraphicalPublisher.launchUI(args);
   }
 
   public void setTxServer(String s) {
@@ -11245,27 +11266,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void setIgPack(String s) {
     if (!Utilities.noString(s))
       igPack = s;
-  }
-
-  private static String getNamedParam(String[] args, String param) {
-    boolean found = false;
-    for (String a : args) {
-      if (found)
-        return a;
-      if (a.equals(param)) {
-        found = true;
-      }
-    }
-    return null;
-  }
-
-  private static boolean hasNamedParam(String[] args, String param) {
-    for (String a : args) {
-      if (a.equals(param)) {
-        return true;
-      }
-    }
-    return false;
   }
 
   public void setLogger(ILoggingService logger) {
@@ -11352,17 +11352,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     org.hl7.fhir.utilities.FileFormat.checkCharsetAndWarnIfNotUTF8(System.out);
 
-    if (hasNamedParam(args, FHIR_SETTINGS_PARAM)) {
-      FhirSettings.setExplicitFilePath(getNamedParam(args, FHIR_SETTINGS_PARAM));
+    if (CliParams.hasNamedParam(args, FHIR_SETTINGS_PARAM)) {
+      FhirSettings.setExplicitFilePath(CliParams.getNamedParam(args, FHIR_SETTINGS_PARAM));
     }
 
-    if (hasNamedParam(args, "-gui")) {
-      runGUI();
+    if (CliParams.hasNamedParam(args, "-gui")) {
+      runGUI(args);
       // Returning here ends the main thread but leaves the GUI running
       return; 
-    } else if (hasNamedParam(args, "-v")){
+    } else if (CliParams.hasNamedParam(args, "-v")){
       System.out.println(IGVersionUtil.getVersion());
-    } else if (hasNamedParam(args, "-package")) {
+    } else if (CliParams.hasNamedParam(args, "-package")) {
       System.out.println("FHIR IG Publisher "+IGVersionUtil.getVersionString());
       System.out.println("Detected Java version: " + System.getProperty("java.version")+" from "+System.getProperty("java.home")+" on "+System.getProperty("os.arch")+" ("+System.getProperty("sun.arch.data.model")+"bit). "+toMB(Runtime.getRuntime().maxMemory())+"MB available");
       System.out.println("dir = "+System.getProperty("user.dir")+", path = "+System.getenv("PATH"));
@@ -11371,9 +11371,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         s = s + " "+removePassword(args, i);
       }      
       System.out.println(s);
-      FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager(!hasNamedParam(args, "system"));
+      FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager(!CliParams.hasNamedParam(args, "system"));
       System.out.println("Cache = "+pcm.getFolder());
-      for (String p : getNamedParam(args, "-package").split("\\;")) {
+      for (String p : CliParams.getNamedParam(args, "-package").split("\\;")) {
         NpmPackage npm = pcm.loadPackage(p);
         System.out.println("OK: "+npm.name()+"#"+npm.version()+" for FHIR version(s) "+npm.fhirVersionList()+" with canonical "+npm.canonical());
       }
@@ -11385,7 +11385,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 //        pgen.setPattern(getNamedParam(args, "-pattern"));
 //      }
 //      pgen.execute();
-    } else if (hasNamedParam(args, "-help") || hasNamedParam(args, "-?") || hasNamedParam(args, "/?") || hasNamedParam(args, "?") || args.length == 0) {
+    } else if (CliParams.hasNamedParam(args, "-help") || CliParams.hasNamedParam(args, "-?") || CliParams.hasNamedParam(args, "/?") || CliParams.hasNamedParam(args, "?") || args.length == 0) {
       System.out.println("");
       System.out.println("To use this publisher to publish a FHIR Implementation Guide, run ");
       System.out.println("with the commands");
@@ -11438,7 +11438,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 //      conv.setLicense(getNamedParam(args, "-license"));
 //      conv.setWebsite(getNamedParam(args, "-website"));
 //      conv.execute();
-    } else if (hasNamedParam(args, "-delete-current")) {
+    } else if (CliParams.hasNamedParam(args, "-delete-current")) {
       if (!args[0].equals("-delete-current")) {
         throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history} (first argument is not -delete-current)");
       }
@@ -11449,7 +11449,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (!f.exists() || !f.isDirectory()) {
         throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history} ({root}/{realm}/{code} not found)");
       }
-      String history = getNamedParam(args, "-history");
+      String history = CliParams.getNamedParam(args, "-history");
       if (Utilities.noString(history)) {
         throw new Error("-delete-current must have the format -delete-current {root}/{realm}/{code} -history {history} (no history found)");
       }
@@ -11462,38 +11462,38 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       IGReleaseVersionDeleter deleter = new IGReleaseVersionDeleter();
       deleter.clear(f.getAbsolutePath(), fh.getAbsolutePath());
-    } else if (hasNamedParam(args, "-go-publish")) {
-      new PublicationProcess().publish(getNamedParam(args, "-source"), getNamedParam(args, "-web"), getNamedParam(args, "-date"),  getNamedParam(args, "-registry"), getNamedParam(args, "-history"), getNamedParam(args, "-templates"), getNamedParam(args, "-temp"), args);
-    } else if (hasNamedParam(args, "-generate-archives")) {
-      new WebSiteArchiveBuilder().start(getNamedParam(args, "-generate-archives"));
-    } else if (hasNamedParam(args, "-generate-package-registry")) {
-      new PackageRegistryBuilder(getNamedParam(args, "-generate-package-registry")).build();
-    } else if (hasNamedParam(args, "-xig")) {
-      new XIGGenerator(getNamedParam(args, "-xig")).execute();
-    } else if (hasNamedParam(args, "-update-history")) {
-      new HistoryPageUpdater().updateHistoryPages(getNamedParam(args, "-history"), getNamedParam(args, "-website"), getNamedParam(args, "-website"));
-    } else if (hasNamedParam(args, "-publish-update")) {
+    } else if (CliParams.hasNamedParam(args, "-go-publish")) {
+      new PublicationProcess().publish(CliParams.getNamedParam(args, "-source"), CliParams.getNamedParam(args, "-web"), CliParams.getNamedParam(args, "-date"),  CliParams.getNamedParam(args, "-registry"), CliParams.getNamedParam(args, "-history"), CliParams.getNamedParam(args, "-templates"), CliParams.getNamedParam(args, "-temp"), args);
+    } else if (CliParams.hasNamedParam(args, "-generate-archives")) {
+      new WebSiteArchiveBuilder().start(CliParams.getNamedParam(args, "-generate-archives"));
+    } else if (CliParams.hasNamedParam(args, "-generate-package-registry")) {
+      new PackageRegistryBuilder(CliParams.getNamedParam(args, "-generate-package-registry")).build();
+    } else if (CliParams.hasNamedParam(args, "-xig")) {
+      new XIGGenerator(CliParams.getNamedParam(args, "-xig")).execute();
+    } else if (CliParams.hasNamedParam(args, "-update-history")) {
+      new HistoryPageUpdater().updateHistoryPages(CliParams.getNamedParam(args, "-history"), CliParams.getNamedParam(args, "-website"), CliParams.getNamedParam(args, "-website"));
+    } else if (CliParams.hasNamedParam(args, "-publish-update")) {
       if (!args[0].equals("-publish-update")) {
         throw new Error("-publish-update must have the format -publish-update -folder {folder} -registry {registry}/fhir-ig-list.json -history {folder} (first argument is not -publish-update)");
       }
       if (args.length < 3) {
         throw new Error("-publish-update must have the format -publish-update -folder {folder} -registry {registry}/fhir-ig-list.json -history {folder} (not enough args)");
       }
-      File f = new File(getNamedParam(args, "-folder"));
+      File f = new File(CliParams.getNamedParam(args, "-folder"));
       if (!f.exists() || !f.isDirectory()) {
         throw new Error("-publish-update must have the format -publish-update -folder {folder} -registry {registry}/fhir-ig-list.json -history {folder} ({folder} not found)");
       }
 
-      String registry = getNamedParam(args, "-registry");
+      String registry = CliParams.getNamedParam(args, "-registry");
       if (Utilities.noString(registry)) {
         throw new Error("-publish-update must have the format -publish-update -url {url} -root {root} -registry {registry}/fhir-ig-list.json -history {folder} (-registry parameter not found)");
       }
-      String history = getNamedParam(args, "-history");
+      String history = CliParams.getNamedParam(args, "-history");
       if (Utilities.noString(history)) {
         throw new Error("-publish-update must have the format -publish-update -url {url} -root {root} -registry {registry}/fhir-ig-list.json -history {folder} (-history parameter not found)");
       }
-      String filter = getNamedParam(args, "-filter");
-      boolean skipPrompt = hasNamedParam(args, "-noconfirm");
+      String filter = CliParams.getNamedParam(args, "-filter");
+      boolean skipPrompt = CliParams.hasNamedParam(args, "-noconfirm");
 
       if (!"n/a".equals(registry)) {
         File fr = new File(registry);
@@ -11501,24 +11501,24 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           throw new Error("-publish-update must have the format -publish-update -url {url} -root {root} -registry {registry}/fhir-ig-list.json -history {folder} ({registry} not found)");
         }
       }
-      boolean doCore = "true".equals(getNamedParam(args, "-core"));
-      boolean updateStatements = !"false".equals(getNamedParam(args, "-statements"));
+      boolean doCore = "true".equals(CliParams.getNamedParam(args, "-core"));
+      boolean updateStatements = !"false".equals(CliParams.getNamedParam(args, "-statements"));
 
       IGRegistryMaintainer reg = "n/a".equals(registry) ? null : new IGRegistryMaintainer(registry);
-      IGWebSiteMaintainer.execute(f.getAbsolutePath(), reg, doCore, filter, skipPrompt, history, updateStatements, getNamedParam(args, "-templates"));
+      IGWebSiteMaintainer.execute(f.getAbsolutePath(), reg, doCore, filter, skipPrompt, history, updateStatements, CliParams.getNamedParam(args, "-templates"));
       reg.finish();      
-    } else if (hasNamedParam(args, "-multi")) {
+    } else if (CliParams.hasNamedParam(args, "-multi")) {
       int i = 1;
-      for (String ig : TextFile.fileToString(getNamedParam(args, "-multi")).split("\\r?\\n")) {
+      for (String ig : TextFile.fileToString(CliParams.getNamedParam(args, "-multi")).split("\\r?\\n")) {
         if (!ig.startsWith(";")) {
           System.out.println("=======================================================================================");
           System.out.println("Publish IG "+ig);
           Publisher self = new Publisher();
           self.setConfigFile(determineActualIG(ig, null));
           setTxServerValue(args, self);
-          if (hasNamedParam(args, "-resetTx")) {
+          if (CliParams.hasNamedParam(args, "-resetTx")) {
             self.setCacheOption(CacheOption.CLEAR_ALL);
-          } else if (hasNamedParam(args, "-resetTxErrors")) {
+          } else if (CliParams.hasNamedParam(args, "-resetTxErrors")) {
             self.setCacheOption(CacheOption.CLEAR_ERRORS);
           } else {
             self.setCacheOption(CacheOption.LEAVE);
@@ -11542,12 +11542,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
     } else {
       Publisher self = new Publisher();
-      String consoleLog = getNamedParam(args, "log");
+      String consoleLog = CliParams.getNamedParam(args, "log");
       if (consoleLog == null) {     
         consoleLog =  Utilities.path("[tmp]", "fhir-ig-publisher-tmp.log");
       }
       PublisherConsoleLogger logger = new PublisherConsoleLogger();
-      if (!hasNamedParam(args, "-auto-ig-build") && !hasNamedParam(args, "-publish-process")) {
+      if (!CliParams.hasNamedParam(args, "-auto-ig-build") && !CliParams.hasNamedParam(args, "-publish-process")) {
         logger.start(consoleLog);
       }
       self.logMessage("FHIR IG Publisher "+IGVersionUtil.getVersionString());
@@ -11567,47 +11567,45 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       //      }
       self.logMessage("Start Clock @ "+nowAsString(self.execTime)+" ("+nowAsDate(self.execTime)+")");
       self.logMessage("");
-      if (hasNamedParam(args, "-auto-ig-build")) {
+      if (CliParams.hasNamedParam(args, "-auto-ig-build")) {
         self.setMode(IGBuildMode.AUTOBUILD);
-        self.targetOutput = getNamedParam(args, "-target");
-        self.repoSource = getNamedParam(args, "-repo");
+        self.targetOutput = CliParams.getNamedParam(args, "-target");
+        self.repoSource = CliParams.getNamedParam(args, "-repo");
       }
 
-      if (hasNamedParam(args, "-no-narrative")) {
-        for (String p : getNamedParam(args, "-non-narrative").split("\\,")) {
-          self.noNarratives.add(p);
-        }
+      if (CliParams.hasNamedParam(args, "-no-narrative")) {
+        String param = CliParams.getNamedParam(args, "-no-narrative");
+        parseAndAddNoNarrativeParam(self, param);
       }
-      if (hasNamedParam(args, "-no-validate")) {
-        for (String p : getNamedParam(args, "-non-validate").split("\\,")) {
-          self.noValidate.add(p);
-        }
+      if (CliParams.hasNamedParam(args, "-no-validate")) {
+        String param = CliParams.getNamedParam(args, "-no-validate");
+        parseAndAddNoValidateParam(self, param);
       }
-      if (hasNamedParam(args, "-no-network")) {
+      if (CliParams.hasNamedParam(args, "-no-network")) {
         FhirSettings.setProhibitNetworkAccess(true);
       }
       if (FhirSettings.isProhibitNetworkAccess()) {
         System.out.println("Running without network access - output may not be correct unless cache contents are correct");        
       }
 
-      if (hasNamedParam(args, "-validation-off")) {
-        self.noValidation = true;
+      if (CliParams.hasNamedParam(args, "-validation-off")) {
+        self.validationOff = true;
         System.out.println("Running without validation to shorten the run time (editor process only)");
       }
-      if (hasNamedParam(args, "-generation-off")) {
-        self.noGenerate = true;
+      if (CliParams.hasNamedParam(args, "-generation-off")) {
+        self.generationOff = true;
         System.out.println("Running without generation to shorten the run time (editor process only)");
       }
 
       setTxServerValue(args, self);
-      if (hasNamedParam(args, "-source")) {
+      if (CliParams.hasNamedParam(args, "-source")) {
         // run with standard template. this is publishing lite
-        self.setSourceDir(getNamedParam(args, "-source"));
-        self.setDestDir(getNamedParam(args, "-destination"));
-        self.specifiedVersion = getNamedParam(args, "-version");
-      } else if (!hasNamedParam(args, "-ig") && args.length == 1 && new File(args[0]).exists()) {
+        self.setSourceDir(CliParams.getNamedParam(args, "-source"));
+        self.setDestDir(CliParams.getNamedParam(args, "-destination"));
+        self.specifiedVersion = CliParams.getNamedParam(args, "-version");
+      } else if (!CliParams.hasNamedParam(args, "-ig") && args.length == 1 && new File(args[0]).exists()) {
         self.setConfigFile(determineActualIG(args[0], IGBuildMode.MANUAL));
-      } else if (hasNamedParam(args, "-prompt")) {
+      } else if (CliParams.hasNamedParam(args, "-prompt")) {
         IniFile ini = new IniFile("publisher.ini");
         String last = ini.getStringProperty("execute", "path");
         boolean ok = false;
@@ -11644,17 +11642,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         } else {
           self.setConfigFile(determineActualIG(last, IGBuildMode.MANUAL));
         }
-      } else if (hasNamedParam(args, "-simplifier")) {
-        if (!hasNamedParam(args, "-destination")) {
+      } else if (CliParams.hasNamedParam(args, "-simplifier")) {
+        if (!CliParams.hasNamedParam(args, "-destination")) {
           throw new Exception("A destination folder (-destination) must be provided for the output from processing the simplifier IG");
         }
-        if (!hasNamedParam(args, "-canonical")) {
+        if (!CliParams.hasNamedParam(args, "-canonical")) {
           throw new Exception("A canonical URL (-canonical) must be provided in order to process a simplifier IG");
         }
-        if (!hasNamedParam(args, "-npm-name")) {
+        if (!CliParams.hasNamedParam(args, "-npm-name")) {
           throw new Exception("A package name (-npm-name) must be provided in order to process a simplifier IG");
         }
-        if (!hasNamedParam(args, "-license")) {
+        if (!CliParams.hasNamedParam(args, "-license")) {
           throw new Exception("A license code (-license) must be provided in order to process a simplifier IG");
         }
         List<String> packages = new ArrayList<String>();
@@ -11664,20 +11662,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           }
         }
         // create an appropriate ig.json in the specified folder
-        self.setConfigFile(generateIGFromSimplifier(getNamedParam(args, "-simplifier"), getNamedParam(args, "-destination"), getNamedParam(args, "-canonical"), getNamedParam(args, "-npm-name"), getNamedParam(args, "-license"), packages));
+        self.setConfigFile(generateIGFromSimplifier(CliParams.getNamedParam(args, "-simplifier"), CliParams.getNamedParam(args, "-destination"), CliParams.getNamedParam(args, "-canonical"), CliParams.getNamedParam(args, "-npm-name"), CliParams.getNamedParam(args, "-license"), packages));
         self.folderToDelete = Utilities.getDirectoryForFile(self.getConfigFile());
       } else {
-        self.setConfigFile(determineActualIG(getNamedParam(args, "-ig"), self.mode));
+        self.setConfigFile(determineActualIG(CliParams.getNamedParam(args, "-ig"), self.mode));
         if (Utilities.noString(self.getConfigFile())) {
           throw new Exception("No Implementation Guide Specified (-ig parameter)");
         }
-        if (!(new File(self.getConfigFile()).isAbsolute())) {
-          self.setConfigFile(Utilities.path(System.getProperty("user.dir"), self.getConfigFile()));
-        }
+        self.setConfigFile(getAbsoluteConfigFilePath(self.getConfigFile()));
       }
-      self.setJekyllCommand(getNamedParam(args, "-jekyll"));
-      self.setIgPack(getNamedParam(args, "-spec"));
-      String proxy = getNamedParam(args, "-proxy");
+      self.setJekyllCommand(CliParams.getNamedParam(args, "-jekyll"));
+      self.setIgPack(CliParams.getNamedParam(args, "-spec"));
+      String proxy = CliParams.getNamedParam(args, "-proxy");
       if (!Utilities.noString(proxy)) {
         String[] p = proxy.split("\\:");
         System.setProperty("http.proxyHost", p[0]);
@@ -11686,32 +11682,32 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         System.setProperty("https.proxyPort", p[1]);
         System.out.println("Web Proxy = "+p[0]+":"+p[1]);
       }
-      self.setTxServer(getNamedParam(args, "-tx"));
-      self.setPackagesFolder(getNamedParam(args, "-packages"));
-      if (hasNamedParam(args, "-watch")) {
+      self.setTxServer(CliParams.getNamedParam(args, "-tx"));
+      self.setPackagesFolder(CliParams.getNamedParam(args, "-packages"));
+      if (CliParams.hasNamedParam(args, "-watch")) {
         throw new Error("Watch mode (-watch) is no longer supported");
       }
-      self.debug = hasNamedParam(args, "-debug");
-      self.cacheVersion = hasNamedParam(args, "-cacheVersion");
-      if (hasNamedParam(args, "-publish")) {
+      self.debug = CliParams.hasNamedParam(args, "-debug");
+      self.cacheVersion = CliParams.hasNamedParam(args, "-cacheVersion");
+      if (CliParams.hasNamedParam(args, "-publish")) {
         self.setMode(IGBuildMode.PUBLICATION);
-        self.targetOutput = getNamedParam(args, "-publish");   
+        self.targetOutput = CliParams.getNamedParam(args, "-publish");
         self.publishing  = true;
-        self.targetOutputNested = getNamedParam(args, "-nested");        
+        self.targetOutputNested = CliParams.getNamedParam(args, "-nested");
       }
-      if (hasNamedParam(args, "-resetTx")) {
+      if (CliParams.hasNamedParam(args, "-resetTx")) {
         self.setCacheOption(CacheOption.CLEAR_ALL);
-      } else if (hasNamedParam(args, "-resetTxErrors")) {
+      } else if (CliParams.hasNamedParam(args, "-resetTxErrors")) {
         self.setCacheOption(CacheOption.CLEAR_ERRORS);
       } else {
         self.setCacheOption(CacheOption.LEAVE);
       }
-      if (hasNamedParam(args, "-no-sushi")) {
-        self.noFSH = true;
+      if (CliParams.hasNamedParam(args, "-no-sushi")) {
+        self.noSushi = true;
       }
       try {
         self.execute();
-        if (hasNamedParam(args, "-no-errors")) {
+        if (CliParams.hasNamedParam(args, "-no-errors")) {
           exitCode = self.countErrs(self.errors) > 0 ? 1 : 0;
         }
       } catch (Exception e) {
@@ -11734,13 +11730,32 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         exitCode = 1;
       } finally {
         if (self.mode == IGBuildMode.MANUAL) {
-          TextFile.stringToFile(buildReport(getNamedParam(args, "-ig"), getNamedParam(args, "-source"), self.filelog.toString(), Utilities.path(self.qaDir, "validation.txt"), self.txServer), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher.log"), false);
+          TextFile.stringToFile(buildReport(CliParams.getNamedParam(args, "-ig"), CliParams.getNamedParam(args, "-source"), self.filelog.toString(), Utilities.path(self.qaDir, "validation.txt"), self.txServer), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher.log"), false);
         }
       }
       logger.stop();
     }
-    if (!hasNamedParam(args, "-no-exit")) {
+    if (!CliParams.hasNamedParam(args, "-no-exit")) {
       System.exit(exitCode);
+    }
+  }
+
+  public static String getAbsoluteConfigFilePath(String configFilePath) throws IOException {
+    if (new File(configFilePath).isAbsolute()) {
+      return configFilePath;
+    }
+    return Utilities.path(System.getProperty("user.dir"), configFilePath);
+  }
+
+  public static void parseAndAddNoNarrativeParam(Publisher self, String param) {
+    for (String p : param.split("\\,")) {
+      self.noNarratives.add(p);
+    }
+  }
+
+  public static void parseAndAddNoValidateParam(Publisher publisher, String param) {
+    for (String p : param.split("\\,")) {
+      publisher.noValidate.add(p);
     }
   }
 
@@ -11758,9 +11773,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   public static void setTxServerValue(String[] args, Publisher self) {
-    if (hasNamedParam(args, "-tx")) {
-      self.setTxServer(getNamedParam(args, "-tx"));
-    } else if (hasNamedParam(args, "-devtx")) {
+    if (CliParams.hasNamedParam(args, "-tx")) {
+      self.setTxServer(CliParams.getNamedParam(args, "-tx"));
+    } else if (CliParams.hasNamedParam(args, "-devtx")) {
       self.setTxServer(FhirSettings.getTxFhirDevelopment());
     } else {
       self.setTxServer(FhirSettings.getTxFhirProduction());

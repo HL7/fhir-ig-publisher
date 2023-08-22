@@ -21,6 +21,12 @@ package org.hl7.fhir.igtools.ui;
  */
 
 
+import lombok.Getter;
+import lombok.Setter;
+import org.hl7.fhir.igtools.publisher.CliParams;
+import org.hl7.fhir.igtools.publisher.Publisher;
+import org.hl7.fhir.utilities.Utilities;
+
 import javax.swing.*;
 import java.awt.EventQueue;
 import java.io.IOException;
@@ -29,20 +35,33 @@ public class GraphicalPublisher {
 
   public IGPublisherFrame frame;
 
+  @Getter
+  @Setter
+  protected String configFile;
+
   /**
    * Launch the application.
    */
   public static void main(String[] args) {
-    launchUI();
+    launchUI(args);
   }
 
-  public static void launchUI() {
+  public static void launchUI(String[] args) {
     EventQueue.invokeLater(new Runnable() {
       public void run() {
         try {
           UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-          GraphicalPublisher window = new GraphicalPublisher();
-          window.frame.setVisible(true);
+          GraphicalPublisher graphicalPublisher = new GraphicalPublisher();
+
+          final String configFile = CliParams.hasNamedParam(args, "-ig")
+                  ? Publisher.determineActualIG(CliParams.getNamedParam(args, "-ig"), Publisher.IGBuildMode.PUBLICATION)
+                  : null;
+
+          graphicalPublisher.frame.setVisible(true);
+
+          if (!Utilities.noString(configFile)) {
+            graphicalPublisher.frame.runIGFromCLI(configFile);
+          }
         } catch (Exception e) {
           e.printStackTrace();
         }
