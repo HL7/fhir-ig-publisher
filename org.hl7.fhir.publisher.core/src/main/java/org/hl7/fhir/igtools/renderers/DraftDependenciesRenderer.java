@@ -13,6 +13,7 @@ import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.utils.ElementVisitor;
+import org.hl7.fhir.r5.utils.ElementVisitor.ElementVisitorInstruction;
 import org.hl7.fhir.r5.utils.ElementVisitor.IElementVisitor;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.xhtml.NodeType;
@@ -103,15 +104,17 @@ public class DraftDependenciesRenderer implements IElementVisitor {
   }
 
   @Override
-  public void visit(Object context, Resource resource) {
+  public ElementVisitorInstruction visit(Object context, Resource resource) {
    // nothing    
+    return ElementVisitorInstruction.VISIT_CHILDREN;
   }
 
   @Override
-  public void visit(Object context, org.hl7.fhir.r5.model.Element element) {
+  public ElementVisitorInstruction visit(Object context, org.hl7.fhir.r5.model.Element element) {
     if (element.isPrimitive()) {
       checkReference((FetchedResource) context, element.primitiveValue());
     }
+    return ElementVisitorInstruction.VISIT_CHILDREN;
   }
 
   public String render() throws IOException {
