@@ -290,6 +290,21 @@
     </dependencies>
 
     <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.owasp</groupId>
+                    <artifactId>dependency-check-maven</artifactId>
+                    <version>8.2.1</version>
+                    <configuration>
+                        <suppressionFiles>
+                            <suppressionFile>cve-suppression.xml</suppressionFile>
+                        </suppressionFiles>
+                        <formats>sarif,html</formats>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -316,12 +331,16 @@
                     <execution>
                         <id>java-compile</id>
                         <phase>compile</phase>
-                        <goals> <goal>compile</goal> </goals>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
                     </execution>
                     <execution>
                         <id>java-test-compile</id>
                         <phase>test-compile</phase>
-                        <goals> <goal>testCompile</goal> </goals>
+                        <goals>
+                            <goal>testCompile</goal>
+                        </goals>
                     </execution>
                 </executions>
             </plugin>
@@ -370,7 +389,7 @@
                     <verbose>false</verbose>
                     <debug>false</debug>
                     <additionalJOption>-Xdoclint:none</additionalJOption>
-		            <source>8</source>
+                    <source>8</source>
                 </configuration>
                 <executions>
                     <execution>
@@ -393,9 +412,9 @@
                     </execution>
                 </executions>
             </plugin>
-           <plugin>
+            <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
-               <version>${maven_surefire_version}</version>
+                <version>${maven_surefire_version}</version>
                 <configuration>
                     <trimStackTrace>false</trimStackTrace>
                     <testFailureIgnore>false</testFailureIgnore>
