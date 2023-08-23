@@ -36,7 +36,7 @@ public class PackageRegistryBuilder {
     JsonObject e = null;
     for (JsonObject t : json.forceArray("packages").asJsonObjects()) {
       if (!t.has("path")) {
-        throw new IllegalArgumentException("package entry in package-list.json is missing path entry: " + t.toString());
+        throw new IllegalArgumentException("package entry in package-registry.json is missing path entry: " + t.toString());
       }
       if (t.asString("path").equals(path)) {
         e = t;
