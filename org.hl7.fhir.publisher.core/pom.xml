@@ -13,13 +13,12 @@
     <artifactId>org.hl7.fhir.publisher.core</artifactId>
 
     <properties>
-        <graalvm.version>22.2.0</graalvm.version>
+        <graalvm.version>22.3.3</graalvm.version>
         <jackson_version>2.14.0</jackson_version>
         <info_cqframework_version>1.5.12</info_cqframework_version>
     </properties>
 
     <dependencies>
-
         <dependency>
             <groupId>org.apache.ant</groupId>
             <artifactId>ant</artifactId>
