@@ -22,17 +22,6 @@ public class AllGuidesTests {
 
 private static final String VER = "1.0.53";
 
-//  private void test(String path) throws Exception {
-//    System.out.println("=======================================================================================");
-//    System.out.println("Publish IG "+path);
-//    Publisher pub = new Publisher();
-//    pub.setConfigFile(path);
-//    pub.setCacheOption(CacheOption.LEAVE);
-//    pub.execute();
-//    System.out.println("=======================================================================================");
-//    System.out.println("");
-//  }
-
   private void testIg(String id, String path) throws Exception {
     if (!igsPathExists()) {
       Assertions.assertTrue(true);
@@ -44,7 +33,7 @@ private static final String VER = "1.0.53";
     Publisher pub = new Publisher();
     pub.setConfigFile(p);
     pub.setTxServer(FhirSettings.getTxFhirDevelopment());
-    pub.setCacheOption(CacheOption.LEAVE);
+    pub.setCacheOption(CacheOption.CLEAR_ALL);
     pub.execute();
     
     System.out.println("===== Analysis ======================================================================");

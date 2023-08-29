@@ -54,7 +54,8 @@ public class SimpleFetcher implements IFetchFile {
   private ILoggingService log;
   private String rootDir;
   private FmlParser fp;
-  private boolean debug;
+  private boolean debug = false;
+  private boolean report = true;
 
   
   public SimpleFetcher(ILoggingService log) {
@@ -333,9 +334,11 @@ public class SimpleFetcher implements IFetchFile {
                   ok = true;
                 } catch (Exception e) {
                   if (!f.getName().startsWith("Binary-") && !f.getName().startsWith("binary-") ) { // we don't notify here because Binary is special. 
-                    log.logMessage(e.getMessage() +" loading "+f);
-                    if (debug) {
-                      e.printStackTrace();
+                    if (report) {
+                      log.logMessage(e.getMessage() +" loading "+f);
+                      if (debug) {
+                        e.printStackTrace();
+                      }
                     }
                   }
                 }
@@ -349,9 +352,11 @@ public class SimpleFetcher implements IFetchFile {
                   }
                 } catch (Exception e) {
                   if (!f.getName().startsWith("Binary-")) { // we don't notify here because Binary is special. 
-                    log.logMessage(e.getMessage() +" loading "+f);
-                    if (debug) {
-                      e.printStackTrace();
+                    if (report) {
+                      log.logMessage(e.getMessage() +" loading "+f);
+                      if (debug) {
+                        e.printStackTrace();
+                      }
                     }
                   }
                 }
@@ -364,10 +369,13 @@ public class SimpleFetcher implements IFetchFile {
                   ok = true;
                 } catch (Exception e) {
                   if (!f.getName().startsWith("Binary-")) { // we don't notify here because Binary is special. 
-                    log.logMessage(e.getMessage() +" loading "+f);
-                    if (debug) {
-                      e.printStackTrace();
+                    if (report) {
+                      log.logMessage(e.getMessage() +" loading "+f);
+                      if (debug) {
+                        e.printStackTrace();
+                      }
                     }
+
                   }
                 }
               }              
@@ -382,9 +390,11 @@ public class SimpleFetcher implements IFetchFile {
                   ok = true;
                 } catch (Exception e) {
                   if (!f.getName().startsWith("Binary-")) { // we don't notify here because Binary is special. 
-                    log.logMessage(e.getMessage() +" loading "+f);
-                    if (debug) {
-                      e.printStackTrace();
+                    if (report) {
+                      log.logMessage(e.getMessage() +" loading "+f);
+                      if (debug) {
+                        e.printStackTrace();
+                      }
                     }
                   }
                 }
@@ -475,5 +485,21 @@ public class SimpleFetcher implements IFetchFile {
     }    
   }
 
-  
+  public boolean isDebug() {
+    return debug;
+  }
+
+  public void setDebug(boolean debug) {
+    this.debug = debug;
+  }
+
+  public boolean isReport() {
+    return report;
+  }
+
+  public void setReport(boolean report) {
+    this.report = report;
+  }
+
+   
 }
