@@ -648,7 +648,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private String igName;
   private IGBuildMode mode; // for the IG publication infrastructure
 
-  private IFetchFile fetcher = new SimpleFetcher(this);
+  private SimpleFetcher fetcher = new SimpleFetcher(this);
   private SimpleWorkerContext context; // 
   private DataRenderer dr;
   private InstanceValidator validator;
@@ -2754,6 +2754,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       case "translation-supplements":
         hasTranslations = true;
         translationSupplements.add(p.getValue());
+        break;
+      case "logged-when-scanning":
+        if ("false".equals(p.getValue())) {
+          fetcher.setReport(false);
+        } else if ("stack".equals(p.getValue())) {
+          fetcher.setReport(true);
+          fetcher.setDebug(true);
+        }  else {
+          fetcher.setReport(true);
+        }
         break;
       default: 
         if (!template.isParameter(pc)) {
@@ -12009,7 +12019,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
 
-  public void setFetcher(IFetchFile theFetcher) {
+  public void setFetcher(SimpleFetcher theFetcher) {
     fetcher = theFetcher;
   }
 
