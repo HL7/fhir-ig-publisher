@@ -1,0 +1,22 @@
+{
+  "packages" : [
+    {
+      "package-id" : "my.package.term",
+      "title" : "MyPackageTerm",
+      "canonical" : "http://example.org/term",
+      "category" : "Terminology",
+      "ci-build" : "http://build.fhir.org/ig/myorg/my-term/",
+      "version-count" : 2,
+      "latest" : {
+        "version" : "1.1.0",
+        "date" : "2023-07-10",
+        "path" : "http://example.org/term/1.1.0"
+      },
+      "milestone" : {
+        "version" : "1.1.0",
+        "date" : "2023-07-10",
+        "path" : "http://example.org/term/1.1.0"
+      }
+    }
+  ]
+}

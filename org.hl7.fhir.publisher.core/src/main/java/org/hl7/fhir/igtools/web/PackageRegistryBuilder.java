@@ -22,7 +22,7 @@ public class PackageRegistryBuilder {
     this.rootFolder = rootFolder;
   }
 
-  private File prFile() throws IOException {
+  protected File prFile() throws IOException {
     return new File(Utilities.path(rootFolder, "package-registry.json"));
   }
 
@@ -35,6 +35,9 @@ public class PackageRegistryBuilder {
   private void update(JsonObject json, String path, PackageList pl) {
     JsonObject e = null;
     for (JsonObject t : json.forceArray("packages").asJsonObjects()) {
+      if (!t.has("path")) {
+        throw new IllegalArgumentException("package entry in package-registry.json is missing path entry: " + t.toString());
+      }
       if (t.asString("path").equals(path)) {
         e = t;
         break;
@@ -72,7 +75,7 @@ public class PackageRegistryBuilder {
       jv.add("date", ple.date());
       jv.add("path", ple.path());
       e.add("milestone", jv);
-    }    
+    }
   }
   
   public void build() throws IOException {
