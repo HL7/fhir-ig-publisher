@@ -131,6 +131,8 @@ public class DependencyRenderer {
     TableModel model = createTable(gen, QA, hasDesc);
     
     String realm = determineRealmForIg(ig.getPackageId());
+    Set<String> processed = new HashSet<>();
+    Set<String> listed = new HashSet<>();
 
     StringBuilder b = new StringBuilder();
     
@@ -138,7 +140,7 @@ public class DependencyRenderer {
     for (ImplementationGuideDependsOnComponent d : ig.getDependsOn()) {
       try {
         NpmPackage p = resolve(d);
-        addPackageRow(gen, row.getSubRows(), p, d.getVersion(), realm, QA, b, ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_IGDEP_COMMENT), hasDesc);
+        addPackageRow(gen, row.getSubRows(), p, d.getVersion(), realm, QA, b, ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_IGDEP_COMMENT), hasDesc, processed, listed);
       } catch (Exception e) {
         e.printStackTrace();
         addErrorRow(gen, row.getSubRows(), d.getPackageId(), d.getVersion(), d.getUri(), null, e.getMessage(), QA, hasDesc);
@@ -196,8 +198,9 @@ public class DependencyRenderer {
     return null;
   }
 
-  private void addPackageRow(HierarchicalTableGenerator gen, List<Row> rows, NpmPackage npm, String originalVersion, String realm, boolean QA, StringBuilder b, String desc, boolean hasDesc) throws FHIRException, IOException {
-    if (!npm.isCore()) {
+  private void addPackageRow(HierarchicalTableGenerator gen, List<Row> rows, NpmPackage npm, String originalVersion, String realm, boolean QA, StringBuilder b, String desc, boolean hasDesc, Set<String> processed, Set<String> listed) throws FHIRException, IOException {
+    if (!npm.isCore() && (QA || !listed.contains(npm.name()+"#"+npm.version()))) {
+      listed.add(npm.name()+"#"+npm.version());
       String idv = npm.name()+"#"+npm.version();
       boolean isNew = !ids.contains(idv);
       ids.add(idv);
@@ -230,7 +233,7 @@ public class DependencyRenderer {
           String version = d.substring(d.indexOf("#")+1);
           try {
             NpmPackage p = resolve(id, version);
-            addPackageRow(gen, row.getSubRows(), p, d.substring(d.indexOf("#")+1), realm, QA, b, null, hasDesc);
+            addPackageRow(gen, row.getSubRows(), p, d.substring(d.indexOf("#")+1), realm, QA, b, null, hasDesc, processed, listed);
           } catch (Exception e) {
             addErrorRow(gen, row.getSubRows(), id, version, null, null, e.getMessage(), QA, hasDesc);
           }
@@ -240,7 +243,8 @@ public class DependencyRenderer {
     if (!QA) {
       checkGlobals(npm);
       boolean firstP = true;
-      if (!npm.isCore() && !npm.isTx()) {
+      if (!npm.isCore() && !npm.isTx() && npm.description() != null && !processed.contains(npm.name()+"#"+npm.version())) {
+        processed.add(npm.name()+"#"+npm.version());
         if (firstP) {
           firstP = false;
           b.append("<table class=\"grid\"><tr><td>");      
@@ -251,17 +255,16 @@ public class DependencyRenderer {
         b.append("<p><b>Package ");
         b.append(n);
         b.append("</b></p>\r\n");
-        if (npm.description() != null) {
-          if (npm.description().contains("<br") || npm.description().contains("<li") || npm.description().contains("<p") || npm.description().contains("<td") || npm.description().contains("<span")) {
-            if (npm.description().contains("<p ") || npm.description().contains("<p>")) {
-              b.append(npm.description());          
-            } else {
-              b.append("<p>"+npm.description()+"</p>");                      
-            }
+        if (npm.description().contains("<br") || npm.description().contains("<li") || npm.description().contains("<p") || npm.description().contains("<td") || npm.description().contains("<span")) {
+          if (npm.description().contains("<p ") || npm.description().contains("<p>")) {
+            b.append(npm.description());          
           } else {
-            b.append(mdEngine.process(npm.description(), "npm.description"));
+            b.append("<p>"+npm.description()+"</p>");                      
           }
+        } else {
+          b.append(mdEngine.process(npm.description(), "npm.description"));
         }
+
         StringBuilder b2 = new StringBuilder();
         b2.append("\r\n<p><b>Dependencies</b></p>\r\n");
         boolean first = true;

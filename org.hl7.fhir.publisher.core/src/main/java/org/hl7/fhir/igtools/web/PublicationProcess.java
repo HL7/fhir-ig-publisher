@@ -333,7 +333,7 @@ public class PublicationProcess {
     String pathVer = prSrc.asString("path");
     String vCode = pathVer.substring(pathVer.lastIndexOf("/")+1);
     
-    check(res, pathVer.equals(Utilities.pathURL(canonical, vCode)), "Source publication request path is wrong - is '"+prSrc.asString("path")+"', doesn't match canonical '"+canonical+"')");
+    check(res, pathVer.equals(Utilities.pathURL(canonical, vCode)), "Source publication request path is wrong - is '"+pathVer+"', doesn't match expected based on canonical of '"+Utilities.pathURL(canonical, vCode)+"')");
     // ok, the ids and canonicals are all lined up, and w're ready to publish     
 
     check(res, id.equals(qa.asString("package-id")), "Generated IG has wrong package "+qa.asString("package-id"));

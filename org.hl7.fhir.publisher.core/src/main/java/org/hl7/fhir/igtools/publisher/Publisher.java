@@ -235,6 +235,7 @@ import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.r5.utils.FHIRPathEngine;
 import org.hl7.fhir.r5.utils.FHIRPathEngine.IEvaluationContext;
+import org.hl7.fhir.r5.utils.FHIRPathUtilityClasses.FunctionDetails;
 import org.hl7.fhir.r5.utils.LiquidEngine;
 import org.hl7.fhir.r5.utils.MappingSheetParser;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
@@ -859,6 +860,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private String defaultTranslationLang;
   private List<String> translationLangs = new ArrayList<>();
   private List<String> translationSupplements = new ArrayList<>();
+  private int validationLogTime = 0;
 
   private class PreProcessInfo {
     private String xsltName;
@@ -2754,6 +2756,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       case "translation-supplements":
         hasTranslations = true;
         translationSupplements.add(p.getValue());
+        break;
+      case "validation-duration-report-cutoff":
+        validationLogTime = Utilities.parseInt(p.getValue(), 0) * 1000;
         break;
       case "logged-when-scanning":
         if ("false".equals(p.getValue())) {
@@ -6779,7 +6784,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             Session tts = tt.start("validation");
             List<StructureDefinition> profiles = new ArrayList<>();
             profiles.add(profile);
-            validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), fmt, profiles);    
+            validate(f, r, bin, errs, fmt, profiles);    
             tts.end();
           }
           processValidationOutcomes(f, r, errs);
@@ -6797,6 +6802,57 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }        
     }
+  }
+
+  private void validate(FetchedFile f, FetchedResource r, Binary bin, List<ValidationMessage> errs, FhirFormat fmt, List<StructureDefinition> profiles) {
+    long ts = System.currentTimeMillis();
+    validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), fmt, profiles);
+    long tf = System.currentTimeMillis();
+    if (tf-ts > validationLogTime) {
+      reportLongValidation(f, r, tf-ts);
+    }
+  }
+
+  private void validate(FetchedFile f, FetchedResource r, List<ValidationMessage> errs, List<StructureDefinition> profiles) {
+    long ts = System.currentTimeMillis();
+    validator.validate(r.getElement(), errs, null, r.getElement(), profiles);
+    long tf = System.currentTimeMillis();
+    if (tf-ts > validationLogTime) {
+      reportLongValidation(f, r, tf-ts);
+    }
+  }
+
+  private void validate(FetchedFile f, FetchedResource r, List<ValidationMessage> errs, Binary bin) {
+    long ts = System.currentTimeMillis();
+    validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), FhirFormat.readFromMimeType(bin.getContentType()));
+    long tf = System.currentTimeMillis();
+    if (tf-ts > validationLogTime) {
+      reportLongValidation(f, r, tf-ts);
+    }
+  }
+
+  private void validate(FetchedFile f, FetchedResource r, List<ValidationMessage> errs, Resource ber) {
+    long ts = System.currentTimeMillis();
+    validator.validate(r.getElement(), errs, ber, ber.getUserString("profile"));
+    long tf = System.currentTimeMillis();
+    if (tf-ts > validationLogTime) {
+      reportLongValidation(f, r, tf-ts);
+    }
+  }
+
+  private void validate(FetchedFile f, FetchedResource r, List<ValidationMessage> errs) {
+    long ts = System.currentTimeMillis();
+    validator.validate(r.getElement(), errs, null, r.getElement());
+    long tf = System.currentTimeMillis();
+    if (tf-ts > validationLogTime) {
+      reportLongValidation(f, r, tf-ts);
+    }
+  }
+
+  private void reportLongValidation(FetchedFile f, FetchedResource r, long l) {
+    String bps = Long.toString(f.getSize()/l);
+    System.out.println("Long Validation for "+f.getTitle()+" resource "+r.fhirType()+"/"+r.getId()+": "+Long.toString(l)+"ms ("+bps+" kb/sec)");
+    System.out.println("  * "+validator.reportTimes());
   }
 
   private void checkURLsUnique() {
@@ -6979,20 +7035,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (r.isValidateAsResource()) { 
       Resource res = r.getResource();
       if (res instanceof Bundle) {
-        validator.validate(r.getElement(), errs, null, r.getElement());
+        validate(file, r, errs);
 
         for (BundleEntryComponent be : ((Bundle) res).getEntry()) {
           Resource ber = be.getResource();
           if (ber.hasUserData("profile")) {
-            validator.validate(r.getElement(), errs, ber, ber.getUserString("profile"));
+            validate(file, r, errs, ber);
           }
         }
       } else if (res.hasUserData("profile")) {
-        validator.validate(r.getElement(), errs, res, res.getUserString("profile"));
+        validate(file, r, errs, res);
       }
     } else if (r.getResource() != null && r.getResource() instanceof Binary && r.getExampleUri() != null) {
       Binary bin = (Binary) r.getResource();
-      validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), FhirFormat.readFromMimeType(bin.getContentType()));    
+      validate(file, r, errs, bin);    
     } else {
       validator.setNoCheckAggregation(r.isExample() && ToolingExtensions.readBoolExtension(r.getResEntry(), "http://hl7.org/fhir/tools/StructureDefinition/igpublisher-no-check-aggregation"));
       List<StructureDefinition> profiles = new ArrayList<>();
@@ -7003,7 +7059,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       for (String s : r.getProfiles(false)) {
         addProfile(profiles, s, r.fhirType());
       }
-      validator.validate(r.getElement(), errs, null, r.getElement(), profiles);
+      validate(file, r, errs, profiles);
     }
     processValidationOutcomes(file, r, errs);
     r.setValidated(true);
