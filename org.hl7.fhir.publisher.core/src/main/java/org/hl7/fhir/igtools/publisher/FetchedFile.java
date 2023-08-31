@@ -285,5 +285,9 @@ public class FetchedFile {
       }
     }
   }
+  
+  public long getSize() {
+    return size;
+  }
 
 }
