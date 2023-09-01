@@ -1,12 +1,9 @@
 package org.hl7.fhir.igtools.web;
 
+import java.io.IOException;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-
-import java.io.File;
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.net.URL;
 
 public class PackageRegistryBuilderTest {
 	@Test

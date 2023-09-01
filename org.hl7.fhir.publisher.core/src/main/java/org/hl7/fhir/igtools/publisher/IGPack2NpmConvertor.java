@@ -62,7 +62,6 @@ import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.PackageGenerator.PackageType;
-import org.hl7.fhir.utilities.npm.ToolsVersion;
 
 public class IGPack2NpmConvertor {
 

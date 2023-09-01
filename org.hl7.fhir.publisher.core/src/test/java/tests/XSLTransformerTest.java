@@ -1,13 +1,14 @@
 package tests;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+
+import java.io.IOException;
+
+import javax.xml.transform.TransformerException;
+
 import org.apache.commons.io.IOUtils;
 import org.hl7.fhir.igtools.publisher.XSLTransformer;
 import org.junit.jupiter.api.Test;
-
-import javax.xml.transform.TransformerException;
-import java.io.IOException;
-
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 public class XSLTransformerTest {
     @Test

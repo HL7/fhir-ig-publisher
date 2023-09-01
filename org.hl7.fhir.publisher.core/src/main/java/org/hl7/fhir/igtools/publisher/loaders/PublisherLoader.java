@@ -15,7 +15,6 @@ import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.igtools.publisher.SpecMapManager.SpecialPackageType;
 import org.hl7.fhir.r5.context.IWorkerContext.IContextResourceLoader;
 import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;

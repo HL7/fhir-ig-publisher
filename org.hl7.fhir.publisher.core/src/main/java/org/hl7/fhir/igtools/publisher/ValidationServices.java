@@ -31,8 +31,6 @@ import java.util.List;
 import java.util.Locale;
 
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
-import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.Manager;

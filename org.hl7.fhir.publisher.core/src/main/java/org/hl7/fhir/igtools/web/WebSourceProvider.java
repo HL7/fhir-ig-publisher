@@ -15,12 +15,11 @@ import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-import org.hl7.fhir.igtools.web.WebSourceProvider.UploadSorter;
 import org.hl7.fhir.utilities.FTPClient;
 import org.hl7.fhir.utilities.SimpleHTTPClient;
-import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.SimpleHTTPClient.HTTPResult;
 import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.Utilities;
 
 public class WebSourceProvider {
 

@@ -4,10 +4,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.HashSet;
 
 import org.hl7.fhir.igtools.publisher.xig.XIGInformation.CanonicalResourceUsage;
 import org.hl7.fhir.igtools.publisher.xig.XIGInformation.UsageType;
@@ -16,7 +16,6 @@ import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ElementDefinition;
-import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionSlicingComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
 import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.r5.model.StructureDefinition;
@@ -25,8 +24,6 @@ import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
-import org.hl7.fhir.utilities.validation.ValidationMessage;
-import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
 
 public class XIGStructureDefinitionHandler extends XIGHandler {
 

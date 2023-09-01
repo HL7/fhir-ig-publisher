@@ -35,14 +35,12 @@ import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService.LogCategory;
 import org.hl7.fhir.r5.elementmodel.FmlParser;
 import org.hl7.fhir.r5.elementmodel.ParserBase.NamedElement;
-import org.hl7.fhir.r5.elementmodel.ParserBase.ValidationPolicy;
 import org.hl7.fhir.r5.formats.FormatUtilities;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.DataType;
 import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.UriType;
-import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 

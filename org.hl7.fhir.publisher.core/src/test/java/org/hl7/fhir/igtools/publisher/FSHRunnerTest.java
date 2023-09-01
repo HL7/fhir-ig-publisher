@@ -1,12 +1,13 @@
 package org.hl7.fhir.igtools.publisher;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.util.function.Consumer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import javax.annotation.Nonnull;
+
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests for the {@link FSHRunner} class.

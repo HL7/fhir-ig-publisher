@@ -36,6 +36,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import javax.annotation.Nonnull;
+
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.SpecMapManager.SpecialPackageType;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
@@ -55,8 +57,6 @@ import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode.Location;
 import org.hl7.fhir.utilities.xhtml.XhtmlParser;
-
-import javax.annotation.Nonnull;
 
 
 //import org.owasp.html.Handler;

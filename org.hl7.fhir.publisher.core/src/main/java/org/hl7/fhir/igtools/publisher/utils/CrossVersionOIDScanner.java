@@ -29,7 +29,6 @@ import org.hl7.fhir.utilities.CSVWriter;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
-import org.hl7.fhir.utilities.npm.ToolsVersion;
 
 public class CrossVersionOIDScanner {
   

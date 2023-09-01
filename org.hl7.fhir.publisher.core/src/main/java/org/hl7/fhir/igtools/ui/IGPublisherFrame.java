@@ -19,9 +19,8 @@ package org.hl7.fhir.igtools.ui;
  * limitations under the License.
  * #L%
  */
-
-
-import java.awt.*;
+import java.awt.Desktop;
+import java.awt.Toolkit;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.ActionEvent;
@@ -32,7 +31,19 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
-import javax.swing.*;
+import javax.swing.GroupLayout;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JFileChooser;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.SwingWorker;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
@@ -41,7 +52,6 @@ import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.publisher.Publisher.CacheOption;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.utilities.IniFile;
-
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.settings.FhirSettings;
 

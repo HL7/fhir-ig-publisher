@@ -1,5 +1,14 @@
 package org.hl7.fhir.igtools.ui;
 
+import java.awt.EventQueue;
+import java.io.IOException;
+
+import javax.swing.UIManager;
+
+import org.hl7.fhir.igtools.publisher.CliParams;
+import org.hl7.fhir.igtools.publisher.Publisher;
+import org.hl7.fhir.utilities.Utilities;
+
 /*-
  * #%L
  * org.hl7.fhir.publisher.core
@@ -23,13 +32,6 @@ package org.hl7.fhir.igtools.ui;
 
 import lombok.Getter;
 import lombok.Setter;
-import org.hl7.fhir.igtools.publisher.CliParams;
-import org.hl7.fhir.igtools.publisher.Publisher;
-import org.hl7.fhir.utilities.Utilities;
-
-import javax.swing.*;
-import java.awt.EventQueue;
-import java.io.IOException;
 
 public class GraphicalPublisher {
 

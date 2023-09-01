@@ -19,11 +19,13 @@ import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
-import org.hl7.fhir.utilities.npm.*;
+import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager.FilesystemPackageCacheMode;
+import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.npm.PackageClient;
+import org.hl7.fhir.utilities.npm.PackageList;
 import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
 import org.hl7.fhir.utilities.npm.PackageServer;
-import org.hl7.fhir.utilities.npm.ToolsVersion;
 import org.stringtemplate.v4.ST;
 
 

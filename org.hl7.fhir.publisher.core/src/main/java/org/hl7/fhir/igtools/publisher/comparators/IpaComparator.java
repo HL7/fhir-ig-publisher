@@ -27,15 +27,11 @@ import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
-import org.hl7.fhir.utilities.json.model.JsonArray;
-import org.hl7.fhir.utilities.json.model.JsonObject;
-import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.BasePackageCacheManager;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageList;
 import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
-import org.hl7.fhir.utilities.npm.ToolsVersion;
 
 
 public class IpaComparator {

@@ -14,7 +14,6 @@ import org.hl7.fhir.convertors.factory.VersionConvertorFactory_43_50;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.IGR2ConvertorAdvisor5;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
-import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.PackageInformation;

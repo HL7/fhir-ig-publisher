@@ -1,6 +1,18 @@
 package org.hl7.fhir.igtools.publisher;
 
-import com.google.common.collect.ImmutableList;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.StringJoiner;
+import java.util.function.Consumer;
+
+import javax.annotation.Nonnull;
+
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
 import org.apache.commons.exec.ExecuteWatchdog;
@@ -12,17 +24,7 @@ import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.settings.FhirSettings;
 
-import javax.annotation.Nonnull;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.function.Consumer;
-import java.util.StringJoiner;
+import com.google.common.collect.ImmutableList;
 
 public class FSHRunner {
 

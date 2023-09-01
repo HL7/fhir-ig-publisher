@@ -3,14 +3,8 @@ package org.hl7.fhir.igtools.publisher.loaders;
 import java.io.IOException;
 
 import org.hl7.fhir.convertors.loaders.loaderR5.ILoaderKnowledgeProviderR5;
-import org.hl7.fhir.convertors.loaders.loaderR5.R2016MayToR5Loader;
-import org.hl7.fhir.convertors.loaders.loaderR5.R2ToR5Loader;
-import org.hl7.fhir.convertors.loaders.loaderR5.R3ToR5Loader;
-import org.hl7.fhir.convertors.loaders.loaderR5.R4ToR5Loader;
-import org.hl7.fhir.convertors.loaders.loaderR5.R5ToR5Loader;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 
 import com.google.gson.JsonSyntaxException;

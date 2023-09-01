@@ -7,9 +7,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.hl7.fhir.igtools.publisher.CqlSubSystem;
+import org.hl7.fhir.igtools.publisher.CqlSubSystem.CqlSourceFileInformation;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
-import org.hl7.fhir.igtools.publisher.CqlSubSystem.CqlSourceFileInformation;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.model.Attachment;
 import org.hl7.fhir.r5.model.Base;

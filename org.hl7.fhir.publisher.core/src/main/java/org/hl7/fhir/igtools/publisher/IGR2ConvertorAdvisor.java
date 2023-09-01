@@ -1,5 +1,8 @@
 package org.hl7.fhir.igtools.publisher;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 /*-
  * #%L
  * org.hl7.fhir.publisher.core
@@ -26,8 +29,6 @@ import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.CodeSystem;
 import org.hl7.fhir.r4.model.ValueSet;
 import org.hl7.fhir.utilities.FhirPublication;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 public class IGR2ConvertorAdvisor extends BaseAdvisor_10_40 {
     @Override

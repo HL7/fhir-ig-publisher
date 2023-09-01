@@ -7,13 +7,11 @@ import java.io.FileOutputStream;
 import org.apache.commons.io.IOUtils;
 import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.publisher.Publisher.CacheOption;
-
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.settings.FhirSettings;
 import org.junit.jupiter.api.Assertions;
-
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 
