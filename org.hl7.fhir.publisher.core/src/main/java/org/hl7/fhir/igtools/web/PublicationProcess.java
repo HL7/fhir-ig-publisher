@@ -26,6 +26,8 @@ import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.ZipGenerator;
+import org.hl7.fhir.utilities.json.JsonException;
+import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -484,10 +486,11 @@ public class PublicationProcess {
     System.out.println("Copy the IG to "+destVer);    
     Utilities.createDirectory(destVer);
     FileUtils.copyDirectory(new File(Utilities.path(temp.getAbsolutePath(), "output")), new File(destVer));
+    List<String> subPackages = loadSubPackageList(Utilities.path(temp.getAbsolutePath(), "output", "sub-package-list.json"));
 
     // now, update the package list 
     System.out.println("Update "+Utilities.path(destination, "package-list.json"));    
-    PackageListEntry plVer = updatePackageList(pl, fSource.getAbsolutePath(), prSrc, pathVer,  Utilities.path(destination, "package-list.json"), mode, date, npm.fhirVersion(), Utilities.pathURL(pubSetup.asString("url"), tcName));
+    PackageListEntry plVer = updatePackageList(pl, fSource.getAbsolutePath(), prSrc, pathVer,  Utilities.path(destination, "package-list.json"), mode, date, npm.fhirVersion(), Utilities.pathURL(pubSetup.asString("url"), tcName), subPackages);
     updatePublishBox(pl, plVer, destVer, pathVer, destination, fRoot.getAbsolutePath(), false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null);
     
     List<String> existingFiles = new ArrayList<>();
@@ -575,6 +578,16 @@ public class PublicationProcess {
       System.out.println("No!");
       System.out.print("Changes not applied. Finished");
     }
+  }
+
+  private List<String> loadSubPackageList(String path) throws JsonException, IOException {
+    List<String> list = new ArrayList<>();
+    File f = new File(path);
+    if (f.exists()) {
+      JsonArray json = (JsonArray) JsonParser.parse(f);
+      list.addAll(json.asStrings());
+    }
+    return list;
   }
 
   private void produceArchive(String source, String dest) throws IOException {
@@ -813,7 +826,7 @@ public class PublicationProcess {
     return fDest;
   }
   
-  private PackageListEntry updatePackageList(PackageList pl, String folder, JsonObject prSrc, String webpath, String filepath, PublicationProcessMode mode, String date, String fhirVersion, String tcPath) throws Exception {
+  private PackageListEntry updatePackageList(PackageList pl, String folder, JsonObject prSrc, String webpath, String filepath, PublicationProcessMode mode, String date, String fhirVersion, String tcPath, List<String> subPackages) throws Exception {
     if (date == null) {
       SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
       date = sdf.format(new Date());      
@@ -848,6 +861,10 @@ public class PublicationProcess {
       }
     }    
     nv.describe(prSrc.asString("desc"), md, prSrc.asString("changes"));
+    nv.clearSubPackages();
+    for (String s : subPackages) {
+      nv.addSubPackage(s);
+    }
 
     pl.save(filepath);
     return nv;
