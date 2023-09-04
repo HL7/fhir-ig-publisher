@@ -5578,7 +5578,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               } else {
                 throw new Error("Cannot use resources of type "+r.fhirType()+" in a IG with version "+version);
               }
-              Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parseSingle(new ByteArrayInputStream(cnt));
+              Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parseSingle(new ByteArrayInputStream(cnt), null);
               e.copyUserData(r.getElement());
               r.setElement(e);
             } 
@@ -6073,8 +6073,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       throw new Error("Loading Map Files is not supported for version "+VersionUtilities.getNameForVersion(context.getVersion()));
     }
     FmlParser fp = new FmlParser(context);
-    fp.setupValidation(ValidationPolicy.EVERYTHING, file.getErrors());     
-    Element res = fp.parse(TextFile.bytesToString(file.getSource()));
+    fp.setupValidation(ValidationPolicy.EVERYTHING);     
+    Element res = fp.parse(file.getErrors(), TextFile.bytesToString(file.getSource()));
     if (res == null) {
       throw new Exception("Unable to parse Map Source for "+file.getName());
     }
@@ -6084,8 +6084,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private Element loadFromXml(FetchedFile file) throws Exception {
     org.hl7.fhir.r5.elementmodel.XmlParser xp = new org.hl7.fhir.r5.elementmodel.XmlParser(context);
     xp.setAllowXsiLocation(true);
-    xp.setupValidation(ValidationPolicy.EVERYTHING, file.getErrors());
-    Element res = xp.parseSingle(new ByteArrayInputStream(file.getSource()));
+    xp.setupValidation(ValidationPolicy.EVERYTHING);
+    Element res = xp.parseSingle(new ByteArrayInputStream(file.getSource()), file.getErrors());
     if (res == null) {
       throw new Exception("Unable to parse XML for "+file.getName());
     }
@@ -6094,9 +6094,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private Element loadFromJson(FetchedFile file) throws Exception {
     org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(context);
-    jp.setupValidation(ValidationPolicy.EVERYTHING, file.getErrors());
+    jp.setupValidation(ValidationPolicy.EVERYTHING);
     jp.setAllowComments(true);
-    return jp.parseSingle(new ByteArrayInputStream(file.getSource()));
+    return jp.parseSingle(new ByteArrayInputStream(file.getSource()), file.getErrors());
   }
 
   private void saveToXml(FetchedFile file, Element e) throws Exception {
@@ -6133,9 +6133,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     org.hl7.fhir.r5.elementmodel.XmlParser xp = new org.hl7.fhir.r5.elementmodel.XmlParser(context);
     xp.setAllowXsiLocation(true);
-    xp.setupValidation(ValidationPolicy.EVERYTHING, file.getErrors());
+    xp.setupValidation(ValidationPolicy.EVERYTHING);
     file.getErrors().clear();
-    Element res = xp.parseSingle(new ByteArrayInputStream(dst.toByteArray()));
+    Element res = xp.parseSingle(new ByteArrayInputStream(dst.toByteArray()), file.getErrors());
     if (res == null) {
       throw new Exception("Unable to parse XML for "+file.getName());
     }
@@ -6856,7 +6856,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     long ts = System.currentTimeMillis();
     validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), fmt, profiles);
     long tf = System.currentTimeMillis();
-    if (tf-ts > validationLogTime) {
+    if (tf-ts > validationLogTime && validationLogTime > 0) {
       reportLongValidation(f, r, tf-ts);
     }
   }
@@ -6865,7 +6865,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     long ts = System.currentTimeMillis();
     validator.validate(r.getElement(), errs, null, r.getElement(), profiles);
     long tf = System.currentTimeMillis();
-    if (tf-ts > validationLogTime) {
+    if (tf-ts > validationLogTime && validationLogTime > 0) {
       reportLongValidation(f, r, tf-ts);
     }
   }
@@ -6874,7 +6874,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     long ts = System.currentTimeMillis();
     validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), FhirFormat.readFromMimeType(bin.getContentType()));
     long tf = System.currentTimeMillis();
-    if (tf-ts > validationLogTime) {
+    if (tf-ts > validationLogTime && validationLogTime > 0) {
       reportLongValidation(f, r, tf-ts);
     }
   }
@@ -6883,7 +6883,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     long ts = System.currentTimeMillis();
     validator.validate(r.getElement(), errs, ber, ber.getUserString("profile"));
     long tf = System.currentTimeMillis();
-    if (tf-ts > validationLogTime) {
+    if (tf-ts > validationLogTime && validationLogTime > 0) {
       reportLongValidation(f, r, tf-ts);
     }
   }
@@ -6892,7 +6892,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     long ts = System.currentTimeMillis();
     validator.validate(r.getElement(), errs, null, r.getElement());
     long tf = System.currentTimeMillis();
-    if (tf-ts > validationLogTime) {
+    if (tf-ts > validationLogTime && validationLogTime > 0) {
       reportLongValidation(f, r, tf-ts);
     }
   }
@@ -7299,9 +7299,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         } else if (mode == IGBuildMode.PUBLICATION) {
           pcm.addPackageToCache(publishedIg.getPackageId(), publishedIg.getVersion(), new FileInputStream(npm.filename()), "[output]");
         }
+        JsonArray json = new JsonArray();
         for (String s : generateVersions) {
+          json.add(s);
           generatePackageVersion(npm.filename(), s);
         }
+        TextFile.bytesToFile(org.hl7.fhir.utilities.json.parser.JsonParser.composeBytes(json), Utilities.path(outputDir, "sub-package-list.json"));
         generateZips(df);
       }
     }
@@ -7614,7 +7617,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       jp.compose(bs, res);
     }
     ByteArrayInputStream bi = new ByteArrayInputStream(bs.toByteArray());
-    Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parseSingle(bi);
+    Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parseSingle(bi, null);
     if (xhtml != null) {
       Element div = e.getNamedChild("text").getNamedChild("div");
       div.setXhtml(xhtml);

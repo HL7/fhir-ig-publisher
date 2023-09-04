@@ -326,7 +326,7 @@ public class SimpleFetcher implements IFetchFile {
               boolean ok = false;
               if (!Utilities.existsInList(ext, fixedFileTypes()))
                 try {
-                  org.hl7.fhir.r5.elementmodel.Element e = new org.hl7.fhir.r5.elementmodel.XmlParser(context).parseSingle(new FileInputStream(f));
+                  org.hl7.fhir.r5.elementmodel.Element e = new org.hl7.fhir.r5.elementmodel.XmlParser(context).parseSingle(new FileInputStream(f), null);
                   addFile(res, f, e, "application/fhir+xml");
                   count++;
                   ok = true;
@@ -361,7 +361,7 @@ public class SimpleFetcher implements IFetchFile {
               }
               if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt", "fml")) {
                 try {
-                  org.hl7.fhir.r5.elementmodel.Element e = new org.hl7.fhir.r5.elementmodel.TurtleParser(context).parseSingle(new FileInputStream(fn));
+                  org.hl7.fhir.r5.elementmodel.Element e = new org.hl7.fhir.r5.elementmodel.TurtleParser(context).parseSingle(new FileInputStream(fn), null);
                   addFile(res, f, e, "application/fhir+turtle");
                   count++;
                   ok = true;
