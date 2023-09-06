@@ -74,7 +74,7 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
         for (TypeRefComponent tr : ed.getType()) {
           if (!"Extension".equals(tr.getCode()) && tr.getProfile().size() == 1&& !tr.getProfile().get(0).asStringValue().startsWith("http://hl7.org/fhir/StructureDefinition/")) {
             if (!pidlist.contains(pid)) {
-              System.out.println(pid+"\t"+sd.getUrl()+"\t"+ed.getPath()+":"+tr.getCode()+"\t"+tr.getProfile().get(0).asStringValue());
+//              System.out.println(pid+"\t"+sd.getUrl()+"\t"+ed.getPath()+":"+tr.getCode()+"\t"+tr.getProfile().get(0).asStringValue());
               pidlist.add(pid);
             }
           }

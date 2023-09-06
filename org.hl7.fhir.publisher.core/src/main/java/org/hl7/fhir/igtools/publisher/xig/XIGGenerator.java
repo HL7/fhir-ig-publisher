@@ -3,6 +3,7 @@ package org.hl7.fhir.igtools.publisher.xig;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Locale;
@@ -29,6 +30,7 @@ public class XIGGenerator {
   private static final String SNOMED_EDITION = "900000000000207008"; // international
 
   private String target;
+  private String cache;
   private XIGInformation info = new XIGInformation();
 
   private FilesystemPackageCacheManager pcm;
@@ -36,12 +38,14 @@ public class XIGGenerator {
   private String date;
     
   public static void main(String[] args) throws Exception {
-    new XIGGenerator(args[0]).execute();
+    new XIGGenerator(args[0], args[1]).execute(args[2]);
   }
 
-  public XIGGenerator(String target) throws FHIRException, IOException, URISyntaxException {
+  public XIGGenerator(String target, String cache) throws FHIRException, IOException, URISyntaxException {
     super();
     this.target = target;
+    this.cache = cache;
+    Utilities.createDirectory(cache);
     pcm = new FilesystemPackageCacheManager(org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager.FilesystemPackageCacheMode.USER);
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r5.core#5.0.0");
     info.setCtxt(new SimpleWorkerContext.SimpleWorkerContextBuilder().fromPackage(npm, new PublisherLoader(npm, SpecMapManager.fromPackage(npm), npm.getWebLocation(), null).makeLoader(), false));
@@ -131,40 +135,85 @@ public class XIGGenerator {
     return res;
   }
   
-  public void execute() throws IOException, ParserConfigurationException, SAXException, FHIRException, EOperationOutcome {
-    PackageVisitor pv = new PackageVisitor();
-    pv.getResourceTypes().add("CapabilityStatement");
-    pv.getResourceTypes().add("SearchParameter");
-    pv.getResourceTypes().add("OperationDefinition");
-    pv.getResourceTypes().add("StructureDefinition");
-    pv.getResourceTypes().add("ValueSet");
-    pv.getResourceTypes().add("CodeSystem");
-    pv.getResourceTypes().add("ConceptMap");
-    pv.getResourceTypes().add("StructureMap");
-    pv.getResourceTypes().add("NamingSystem");
-    pv.getResourceTypes().add("GraphDefinition");
-    pv.getResourceTypes().add("ActivityDefinition");
-    pv.getResourceTypes().add("ConditionDefinition");
-    pv.getResourceTypes().add("DeviceDefinition");
-    pv.getResourceTypes().add("EventDefinition");
-    pv.getResourceTypes().add("ObservationDefinition");
-    pv.getResourceTypes().add("PlanDefinition");
-    pv.getResourceTypes().add("Questionnaire");
-    pv.getResourceTypes().add("SpecimenDefinition");
-    pv.getResourceTypes().add("ExampleScenario");
-    pv.getResourceTypes().add("ActorDefinition");
-    pv.getResourceTypes().add("Requirements");
-    
-    pv.setOldVersions(false);
-    pv.setCorePackages(false);
-    pv.setProcessor(new XIGLoader(info));
-    pv.setCurrent(true);
-    pv.visitPackages();
-    
-    info.buildUsageMap();
+  public void execute(String step) throws IOException, ParserConfigurationException, SAXException, FHIRException, EOperationOutcome, ParseException {
+    if (step.equals("step1")) {
+      long ms = System.currentTimeMillis();
+      
+      Utilities.clearDirectory(target);
+      PackageVisitor pv = new PackageVisitor();
+      pv.getResourceTypes().add("CapabilityStatement");
+      pv.getResourceTypes().add("SearchParameter");
+      pv.getResourceTypes().add("OperationDefinition");
+      pv.getResourceTypes().add("StructureDefinition");
+      pv.getResourceTypes().add("ValueSet");
+      pv.getResourceTypes().add("CodeSystem");
+      pv.getResourceTypes().add("ConceptMap");
+      pv.getResourceTypes().add("StructureMap");
+      pv.getResourceTypes().add("NamingSystem");
+      pv.getResourceTypes().add("GraphDefinition");
+      pv.getResourceTypes().add("ActivityDefinition");
+      pv.getResourceTypes().add("ConditionDefinition");
+      pv.getResourceTypes().add("DeviceDefinition");
+      pv.getResourceTypes().add("EventDefinition");
+      pv.getResourceTypes().add("ObservationDefinition");
+      pv.getResourceTypes().add("PlanDefinition");
+      pv.getResourceTypes().add("Questionnaire");
+      pv.getResourceTypes().add("SpecimenDefinition");
+      pv.getResourceTypes().add("ExampleScenario");
+      pv.getResourceTypes().add("ActorDefinition");
+      pv.getResourceTypes().add("Requirements");
+      
+      pv.setCache(cache);
+      pv.setOldVersions(false);
+      pv.setCorePackages(false);
+      XIGGatherer gather = new XIGGatherer(target);
+      pv.setProcessor(gather);
+      pv.setCurrent(true);
+      pv.visitPackages();
+      gather.finish();
+      
+      System.out.println("Finished Part 1: "+Utilities.describeDuration(System.currentTimeMillis() - ms));
+    } else if  (step.equals("step2")) {
+      XIGLoader loader = new XIGLoader(info);
+      loader.loadFromCache(target);
+      info.buildUsageMap();
+      new XIGRenderer(info, target, date).produce(pcm);
+      printSummary(); 
+    } else {
+      PackageVisitor pv = new PackageVisitor();
+      pv.getResourceTypes().add("CapabilityStatement");
+      pv.getResourceTypes().add("SearchParameter");
+      pv.getResourceTypes().add("OperationDefinition");
+      pv.getResourceTypes().add("StructureDefinition");
+      pv.getResourceTypes().add("ValueSet");
+      pv.getResourceTypes().add("CodeSystem");
+      pv.getResourceTypes().add("ConceptMap");
+      pv.getResourceTypes().add("StructureMap");
+      pv.getResourceTypes().add("NamingSystem");
+      pv.getResourceTypes().add("GraphDefinition");
+      pv.getResourceTypes().add("ActivityDefinition");
+      pv.getResourceTypes().add("ConditionDefinition");
+      pv.getResourceTypes().add("DeviceDefinition");
+      pv.getResourceTypes().add("EventDefinition");
+      pv.getResourceTypes().add("ObservationDefinition");
+      pv.getResourceTypes().add("PlanDefinition");
+      pv.getResourceTypes().add("Questionnaire");
+      pv.getResourceTypes().add("SpecimenDefinition");
+      pv.getResourceTypes().add("ExampleScenario");
+      pv.getResourceTypes().add("ActorDefinition");
+      pv.getResourceTypes().add("Requirements");
 
-    new XIGRenderer(info, target, date).produce(pcm);
-    printSummary(); 
+      pv.setOldVersions(false);
+      pv.setCorePackages(false);
+      pv.setProcessor(new XIGLoader(info));
+      pv.setCurrent(true);
+      pv.visitPackages();
+
+      info.buildUsageMap();
+
+      new XIGRenderer(info, target, date).produce(pcm);
+      printSummary(); 
+    }
   }
 
   private void printSummary() throws FileNotFoundException, IOException {
