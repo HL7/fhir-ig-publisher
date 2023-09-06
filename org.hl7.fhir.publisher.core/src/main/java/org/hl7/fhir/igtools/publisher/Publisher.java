@@ -706,6 +706,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private XVerExtensionManager xverManager;
   private IGKnowledgeProvider igpkp;
   private List<SpecMapManager> specMaps = new ArrayList<SpecMapManager>();
+  private List<SpecMapManager> linkSpecMaps = new ArrayList<SpecMapManager>();
   private List<String> suppressedIds = new ArrayList<>();
 
   private Map<String, MappingSpace> mappingSpaces = new HashMap<String, MappingSpace>();
@@ -2986,7 +2987,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else {
       sourceIg.getDefinition().addExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency", new CodeType("hl7.fhir.uv.tools#current"));
     }
-    inspector = new HTMLInspector(outputDir, specMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), trackedFragments);
+    inspector = new HTMLInspector(outputDir, specMaps, linkSpecMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), trackedFragments);
     inspector.getManual().add("full-ig.zip");
     if (historyPage != null) {
       inspector.getManual().add(historyPage);
@@ -3001,6 +3002,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (ImplementationGuideDependsOnComponent dep : sourceIg.getDependsOn()) {
       loadIg(dep, i, !dep.hasUserData("no-load-deps"));
       i++;
+    }
+    // we're also going to look for packages that can be referred to but aren't dependencies
+    for (Extension ext : sourceIg.getDefinition().getExtensionsByUrl("http://hl7.org/fhir/tools/StructureDefinition/ig-link-dependency")) {
+      loadLinkIg(ext.getValue().primitiveValue());
     }
 
     if (!"hl7.fhir.uv.tools".equals(sourceIg.getPackageId())) {
@@ -3464,7 +3469,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       businessVersion = configuration.asString("fixed-business-version");
     }
 
-    inspector = new HTMLInspector(outputDir, specMaps, this, igpkp.getCanonical(), configuration.has("npm-name") ? configuration.asString("npm-name") : null, trackedFragments);
+    inspector = new HTMLInspector(outputDir, specMaps, linkSpecMaps, this, igpkp.getCanonical(), configuration.has("npm-name") ? configuration.asString("npm-name") : null, trackedFragments);
     inspector.getManual().add("full-ig.zip");
     historyPage = ostr(paths, "history");
     if (historyPage != null) {
@@ -4005,6 +4010,26 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     // all defaults....
     return ep;
   }
+
+  private void loadLinkIg(String packageId) throws Exception {
+    if (!Utilities.noString(packageId)) {
+      String[] p = packageId.split("\\#");
+      NpmPackage pi = p.length == 1 ? pcm.loadPackageFromCacheOnly(p[0]) : pcm.loadPackageFromCacheOnly(p[0], p[1]);
+      if (pi == null) {
+        throw new Exception("Package Id "+packageId+" is unknown");
+      }
+      logDebugMessage(LogCategory.PROGRESS, "Load Link package "+packageId);
+      String webref = pi.getWebLocation();
+      webref = PackageHacker.fixPackageUrl(webref);
+
+      SpecMapManager igm = pi.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion()) : SpecMapManager.createSpecialPackage(pi);
+      igm.setName(pi.title());
+      igm.setBase(pi.canonical());
+      igm.setBase2(PackageHacker.fixPackageUrl(pi.url()));
+      linkSpecMaps.add(igm);
+    }
+  }
+
 
   private void loadIg(ImplementationGuideDependsOnComponent dep, int index, boolean loadDeps) throws Exception {
     String name = dep.getId();
@@ -5578,7 +5603,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               } else {
                 throw new Error("Cannot use resources of type "+r.fhirType()+" in a IG with version "+version);
               }
-              Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parseSingle(new ByteArrayInputStream(cnt));
+              Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parseSingle(new ByteArrayInputStream(cnt), null);
               e.copyUserData(r.getElement());
               r.setElement(e);
             } 
@@ -6073,8 +6098,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       throw new Error("Loading Map Files is not supported for version "+VersionUtilities.getNameForVersion(context.getVersion()));
     }
     FmlParser fp = new FmlParser(context);
-    fp.setupValidation(ValidationPolicy.EVERYTHING, file.getErrors());     
-    Element res = fp.parse(TextFile.bytesToString(file.getSource()));
+    fp.setupValidation(ValidationPolicy.EVERYTHING);     
+    Element res = fp.parse(file.getErrors(), TextFile.bytesToString(file.getSource()));
     if (res == null) {
       throw new Exception("Unable to parse Map Source for "+file.getName());
     }
@@ -6084,8 +6109,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private Element loadFromXml(FetchedFile file) throws Exception {
     org.hl7.fhir.r5.elementmodel.XmlParser xp = new org.hl7.fhir.r5.elementmodel.XmlParser(context);
     xp.setAllowXsiLocation(true);
-    xp.setupValidation(ValidationPolicy.EVERYTHING, file.getErrors());
-    Element res = xp.parseSingle(new ByteArrayInputStream(file.getSource()));
+    xp.setupValidation(ValidationPolicy.EVERYTHING);
+    Element res = xp.parseSingle(new ByteArrayInputStream(file.getSource()), file.getErrors());
     if (res == null) {
       throw new Exception("Unable to parse XML for "+file.getName());
     }
@@ -6094,9 +6119,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private Element loadFromJson(FetchedFile file) throws Exception {
     org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(context);
-    jp.setupValidation(ValidationPolicy.EVERYTHING, file.getErrors());
+    jp.setupValidation(ValidationPolicy.EVERYTHING);
     jp.setAllowComments(true);
-    return jp.parseSingle(new ByteArrayInputStream(file.getSource()));
+    return jp.parseSingle(new ByteArrayInputStream(file.getSource()), file.getErrors());
   }
 
   private void saveToXml(FetchedFile file, Element e) throws Exception {
@@ -6133,9 +6158,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
     org.hl7.fhir.r5.elementmodel.XmlParser xp = new org.hl7.fhir.r5.elementmodel.XmlParser(context);
     xp.setAllowXsiLocation(true);
-    xp.setupValidation(ValidationPolicy.EVERYTHING, file.getErrors());
+    xp.setupValidation(ValidationPolicy.EVERYTHING);
     file.getErrors().clear();
-    Element res = xp.parseSingle(new ByteArrayInputStream(dst.toByteArray()));
+    Element res = xp.parseSingle(new ByteArrayInputStream(dst.toByteArray()), file.getErrors());
     if (res == null) {
       throw new Exception("Unable to parse XML for "+file.getName());
     }
@@ -6856,7 +6881,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     long ts = System.currentTimeMillis();
     validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), fmt, profiles);
     long tf = System.currentTimeMillis();
-    if (tf-ts > validationLogTime) {
+    if (tf-ts > validationLogTime && validationLogTime > 0) {
       reportLongValidation(f, r, tf-ts);
     }
   }
@@ -6865,7 +6890,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     long ts = System.currentTimeMillis();
     validator.validate(r.getElement(), errs, null, r.getElement(), profiles);
     long tf = System.currentTimeMillis();
-    if (tf-ts > validationLogTime) {
+    if (tf-ts > validationLogTime && validationLogTime > 0) {
       reportLongValidation(f, r, tf-ts);
     }
   }
@@ -6874,7 +6899,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     long ts = System.currentTimeMillis();
     validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), FhirFormat.readFromMimeType(bin.getContentType()));
     long tf = System.currentTimeMillis();
-    if (tf-ts > validationLogTime) {
+    if (tf-ts > validationLogTime && validationLogTime > 0) {
       reportLongValidation(f, r, tf-ts);
     }
   }
@@ -6883,7 +6908,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     long ts = System.currentTimeMillis();
     validator.validate(r.getElement(), errs, ber, ber.getUserString("profile"));
     long tf = System.currentTimeMillis();
-    if (tf-ts > validationLogTime) {
+    if (tf-ts > validationLogTime && validationLogTime > 0) {
       reportLongValidation(f, r, tf-ts);
     }
   }
@@ -6892,7 +6917,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     long ts = System.currentTimeMillis();
     validator.validate(r.getElement(), errs, null, r.getElement());
     long tf = System.currentTimeMillis();
-    if (tf-ts > validationLogTime) {
+    if (tf-ts > validationLogTime && validationLogTime > 0) {
       reportLongValidation(f, r, tf-ts);
     }
   }
@@ -7299,9 +7324,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         } else if (mode == IGBuildMode.PUBLICATION) {
           pcm.addPackageToCache(publishedIg.getPackageId(), publishedIg.getVersion(), new FileInputStream(npm.filename()), "[output]");
         }
+        JsonArray json = new JsonArray();
         for (String s : generateVersions) {
+          json.add(s);
           generatePackageVersion(npm.filename(), s);
         }
+        TextFile.bytesToFile(org.hl7.fhir.utilities.json.parser.JsonParser.composeBytes(json), Utilities.path(outputDir, "sub-package-list.json"));
         generateZips(df);
       }
     }
@@ -7614,7 +7642,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       jp.compose(bs, res);
     }
     ByteArrayInputStream bi = new ByteArrayInputStream(bs.toByteArray());
-    Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parseSingle(bi);
+    Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parseSingle(bi, null);
     if (xhtml != null) {
       Element div = e.getNamedChild("text").getNamedChild("div");
       div.setXhtml(xhtml);
@@ -11583,7 +11611,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else if (CliParams.hasNamedParam(args, "-generate-package-registry")) {
       new PackageRegistryBuilder(CliParams.getNamedParam(args, "-generate-package-registry")).build();
     } else if (CliParams.hasNamedParam(args, "-xig")) {
-      new XIGGenerator(CliParams.getNamedParam(args, "-xig")).execute();
+      new XIGGenerator(CliParams.getNamedParam(args, "-xig"), CliParams.getNamedParam(args, "-xig-cache")).execute("step1");
+      new XIGGenerator(CliParams.getNamedParam(args, "-xig"), CliParams.getNamedParam(args, "-xig-cache")).execute("step2");
     } else if (CliParams.hasNamedParam(args, "-update-history")) {
       new HistoryPageUpdater().updateHistoryPages(CliParams.getNamedParam(args, "-history"), CliParams.getNamedParam(args, "-website"), CliParams.getNamedParam(args, "-website"));
     } else if (CliParams.hasNamedParam(args, "-publish-update")) {

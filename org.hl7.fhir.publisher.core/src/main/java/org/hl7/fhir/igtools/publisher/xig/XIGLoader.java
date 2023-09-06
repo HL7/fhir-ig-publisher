@@ -1,6 +1,12 @@
 package org.hl7.fhir.igtools.publisher.xig;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -26,6 +32,7 @@ import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.json.JsonException;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageHacker;
@@ -38,7 +45,7 @@ public class XIGLoader implements IPackageVisitorProcessor {
   public XIGLoader(XIGInformation info) {
     super();
     this.info = info;
- }
+  }
 
   @Override
   public void processResource(String pid, NpmPackage npm, String version, String type, String id, byte[] content)
@@ -53,7 +60,7 @@ public class XIGLoader implements IPackageVisitorProcessor {
       smmList.put(pid, smm);
       info.getJson().getJsonObject("packages").add(pid, npm.getNpm());
     }
-        
+
     info.getPid().put(pid, npm.getWebLocation());
     Resource r = loadResource(pid, version, type, id, content);
     if (r != null && r instanceof CanonicalResource) {
@@ -190,7 +197,7 @@ public class XIGLoader implements IPackageVisitorProcessor {
 
   private boolean isExtension(CanonicalResource cr, String pid) {
     return pid.equals("hl7.fhir.uv.extensions");
-//    return  cr instanceof StructureDefinition && ProfileUtilities.isExtensionDefinition((StructureDefinition) cr);
+    //    return  cr instanceof StructureDefinition && ProfileUtilities.isExtensionDefinition((StructureDefinition) cr);
   }
 
   private boolean isCoreDefinition(CanonicalResource cr, String pid) {
@@ -262,6 +269,168 @@ public class XIGLoader implements IPackageVisitorProcessor {
     }
 
     return null;
+  }
+
+  public void loadFromCache(String folder) throws JsonException, IOException, ParseException {
+    Map<String, JsonObject> packages = new HashMap<String, JsonObject>();
+
+    JsonObject registry = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(Utilities.pathFile(folder, "cache.json"));
+    for (JsonObject j : registry.getJsonArray("packages").asJsonObjects()) {
+      packages.put(j.asString("pid"), j);
+      info.getJson().getJsonObject("packages").add(j.asString("pid"), j.getJsonObject("src"));
+      info.getPid().put(j.asString("pid"), j.asString("web"));
+    }
+
+    int total = registry.getJsonArray("resources").size();
+    int step = total / 100;
+    int count = 0;
+
+    for (JsonObject file : registry.getJsonArray("resources").asJsonObjects()) {
+      if (count == step) {
+        System.out.print(".");
+        count = 0;
+      } else {
+        count++;
+      }
+      String pid = file.asString("pid");
+      JsonObject npm = packages.get(pid); 
+
+      File f = Utilities.pathFile(folder, file.asString("file")+".json");
+      try {
+        FileInputStream fo = new FileInputStream(f);
+        CanonicalResource cr = (CanonicalResource) new JsonParser().parse(fo);
+        fo.close();
+
+        cr.setSourcePackage(new PackageInformation(npm.asString("id"), npm.asString("version"), toDate(npm.asString("date")), npm.asString("title"), npm.asString("canonical"), npm.asString("web")));
+        cr.setWebPath(file.asString("web"));
+        JsonObject j = new JsonObject();
+        info.getJson().getJsonArray("canonicals").add(j);
+        j.add("pid", pid);
+        cr.setUserData("pid", pid);
+        cr.setUserData("purl", npm.asString("web"));
+        cr.setUserData("pname", npm.asString("title"));
+        cr.setUserData("fver", npm.asString("fver"));
+        cr.setUserData("json", j);
+        String realm = getRealm(pid);
+        if (realm != null) {
+          cr.setUserData("realm", realm);
+          info.getJurisdictions().add(realm);
+        }
+        String auth = getAuth(pid);
+        if (auth != null) {
+          cr.setUserData("auth", auth);
+        }
+        cr.setUserData("filebase", (cr.fhirType()+"-"+pid.substring(0, pid.indexOf("#"))+"-"+cr.getId()).toLowerCase());
+        j.add("fver",  npm.asString("fver"));
+        j.add("published", pid.contains("#current"));
+        j.add("filebase", cr.getUserString("filebase"));
+        j.add("path", cr.getWebPath());
+
+        info.fillOutJson(pid, cr, j);
+        if (info.getResources().containsKey(cr.getUrl())) {
+          CanonicalResource crt = info.getResources().get(cr.getUrl());
+          if (VersionUtilities.isThisOrLater(crt.getVersion(), cr.getVersion())) {
+            info.getResources().put(cr.getUrl(), cr);
+          }
+        } else {
+          info.getResources().put(cr.getUrl(), cr);
+        }
+        info.getCtxt().cacheResource(cr);
+        String t = cr.fhirType();
+        if (cr instanceof StructureDefinition) {
+          StructureDefinition sd = (StructureDefinition) cr;
+          if (sd.getKind() == StructureDefinitionKind.LOGICAL) {
+            t = t + "/logical";
+          } else if (sd.getType().equals("Extension")) {
+            t = t + "/extension";
+          } else if (sd.getKind() == StructureDefinitionKind.RESOURCE) {
+            t = t + "/resource";
+          } else {
+            t = t + "/other";
+          }
+        } else if (cr instanceof ValueSet) {
+          ValueSet vs = (ValueSet) cr;
+          String sys = null;
+          for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
+            String s = null;
+            String system = inc.getSystem();
+            if (!Utilities.noString(system)) {
+              if ("http://snomed.info/sct".equals(system)) {
+                s = "sct";
+              } else if ("http://loinc.org".equals(system)) {
+                s = "loinc";
+              } else if ("http://unitsofmeasure.org".equals(system)) {
+                s = "ucum";
+              } else if ("http://hl7.org/fhir/sid/ndc".equals(system)) {
+                s = "ndc";
+              } else if ("http://hl7.org/fhir/sid/cvx".equals(system)) {
+                s = "cvx";
+              } else if (system.contains(":iso:")) {
+                s = "iso";
+              } else if (system.contains(":ietf:")) {
+                s = "ietf";
+              } else if (system.contains("ihe.net")) {
+                s = "ihe";
+              } else if (system.contains("icpc")) {
+                s = "icpc";
+              } else if (system.contains("ncpdp")) {
+                s = "ncpdp";
+              } else if (system.contains("nucc")) {
+                s = "nucc";
+              } else if (Utilities.existsInList(system, "http://hl7.org/fhir/sid/icd-9-cm", "http://hl7.org/fhir/sid/icd-10", "http://fhir.de/CodeSystem/dimdi/icd-10-gm", "http://hl7.org/fhir/sid/icd-10-nl 2.16.840.1.113883.6.3.2", "http://hl7.org/fhir/sid/icd-10-cm")) {
+                s = "icd";
+              } else if (system.contains("urn:oid:")) {
+                s = "oid";
+              } else if ("http://unitsofmeasure.org".equals(system)) {
+                s = "ucum";
+              } else if ("http://dicom.nema.org/resources/ontology/DCM".equals(system)) {
+                s = "dcm";
+              } else if ("http://unitsofmeasure.org".equals(system)) {
+                s = "ucum";
+              } else if ("http://www.ama-assn.org/go/cpt".equals(system)) {
+                s = "cpt";
+              } else if ("http://www.nlm.nih.gov/research/umls/rxnorm".equals(system)) {
+                s = "rx";
+              } else if (system.startsWith("http://terminology.hl7.org")) {
+                s = "tho";
+              } else if (system.startsWith("http://hl7.org/fhir")) {
+                s = "fhir";
+              } else if (npm.asString("canonical") != null && system.startsWith(npm.asString("canonical"))) {
+                s = "internal";
+              } else if (system.contains("example.org")) {
+                s = "example";
+              } else {
+                s = "?";
+              }
+            } else if (inc.hasValueSet()) {
+              s = "vs";
+            }
+            if (sys == null) {
+              sys = s;
+            } else if (!sys.equals(s)) {
+              sys = "mixed";
+            }
+          }
+          t = t + "/"+(sys == null ? "n/a" : sys);
+        }
+        if (!info.getCounts().containsKey(t)) {
+          info.getCounts().put(t, new HashMap<>());
+        }
+        Map<String, CanonicalResource> list = info.getCounts().get(t);
+        String url = cr.getUrl();
+        if (url == null) {
+          url = cr.getId();
+        }
+        list.put(url, cr);
+      } catch (Exception e) {
+        System.out.println("Error loading "+f.getName()+": "+e.getMessage());
+      }
+    }
+    System.out.println("Done");
+  }
+
+  private Date toDate(String d) throws ParseException {
+    return new SimpleDateFormat("yyyyMMddHHmmss").parse(d);    
   }
 
 }

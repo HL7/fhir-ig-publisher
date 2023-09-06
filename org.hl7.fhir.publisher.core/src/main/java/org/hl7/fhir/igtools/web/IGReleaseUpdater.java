@@ -53,6 +53,8 @@ import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.json.model.JsonString;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
+import org.hl7.fhir.utilities.npm.PackageList;
+import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
 
 
 public class IGReleaseUpdater {
@@ -104,17 +106,21 @@ public class IGReleaseUpdater {
         }
       }      
     }
-    this.ignoreList.addAll(otherSpecs);
+    if (otherSpecs != null) {
+      this.ignoreList.addAll(otherSpecs);
+    }
   }
 
   public void check(Map<String, IndexMaintainer> indexes, boolean throwError, boolean updateStatements, String templateSrc) throws IOException  {
     List<String> errs = new ArrayList<>(); 
     try {
+      List<PackageListEntry> milestones;
       String f = Utilities.path(folder, "package-list.json");
       if (!new File(f).exists())
         errs.add("unable to find package-list.json");
       else {
         JsonObject json = JsonParser.parseObjectFromFile(f);
+        PackageList pl = new PackageList(json);
         String canonical = json.asString("canonical");
         String packageId = json.asString("package-id");
         String realm = Utilities.charCount(packageId, '.') > 1 ? packageId.split("\\.")[2] : null;
@@ -159,7 +165,7 @@ public class IGReleaseUpdater {
             } else {
               String path = o.asString("path");
               String vf = Utilities.path(path.replace(url, rootFolder));
-              if (indexes.containsKey(realm)) {
+              if (indexes != null && indexes.containsKey(realm)) {
                 indexes.get(realm).seeEntry(packageId, json, o);
               }
 
@@ -181,7 +187,7 @@ public class IGReleaseUpdater {
                 } else {
                   System.out.println("-- updating version "+v+" in '"+vf+"'");
                   folders.add(vf);
-                  save = updateStatement(vf, null, ignoreList, json, o, errs, root, canonical, folder, canonical.equals("http://hl7.org/fhir"), false, list, updateStatements) | save;
+                  save = updateStatement(vf, null, ignoreList, json, o, errs, root, canonical, folder, canonical.equals("http://hl7.org/fhir"), false, list, updateStatements, pl.milestones()) | save;
                 }
               } else {
                 System.out.println("-- ignoring version "+v+" as it is an invalid path");
@@ -200,7 +206,7 @@ public class IGReleaseUpdater {
           }
         }
         if (root != null) {
-          updateStatement(folder, folders, ignoreList, json, root, errs, root, canonical, folder, canonical.equals("http://hl7.org/fhir"), true, list, updateStatements);
+          updateStatement(folder, folders, ignoreList, json, root, errs, root, canonical, folder, canonical.equals("http://hl7.org/fhir"), true, list, updateStatements, pl.milestones());
         }
         if (save)
           TextFile.stringToFile(JsonParser.compose(json, true), f, false);
@@ -312,16 +318,16 @@ public class IGReleaseUpdater {
 //  }
 //
   private boolean updateStatement(String vf, List<String> ignoreList, List<String> ignoreListOuter, JsonObject ig, JsonObject version, List<String> errs, JsonObject root, String canonical, String canonicalPath, boolean isCore, 
-      boolean isCurrent, JsonArray list, boolean updateStatements) throws FileNotFoundException, IOException, FHIRException, ParseException {
+      boolean isCurrent, JsonArray list, boolean updateStatements, List<PackageListEntry> milestones) throws FileNotFoundException, IOException, FHIRException, ParseException {
     if (!fullUpdate) {
       return false;
     }
     boolean vc = false;
-    IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(vf, ignoreList, ignoreListOuter, version, folder);
+    IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(vf, url, rootFolder, ignoreList, ignoreListOuter, version, folder);
     if (updateStatements) {
       String fragment = genFragment(ig, version, root, canonical, ignoreList != null, isCore);
       System.out.println("  "+vf+": "+fragment);
-      igvu.updateStatement(fragment, ignoreList != null ? 0 : 1);
+      igvu.updateStatement(fragment, ignoreList != null ? 0 : 1, milestones);
       System.out.println("  .. "+igvu.getCountTotal()+" files checked, "+igvu.getCountUpdated()+" updated");
     }
     igvu.checkXmlJsonClones(vf);
@@ -483,7 +489,7 @@ public class IGReleaseUpdater {
   private String searchLinks(boolean root, JsonObject focus, String canonical, JsonArray list) {
     StringBuilder b = new StringBuilder();
     if (!root) {
-      b.append(" <li><a href=\""+canonical+"/searchform.html\">All Versions</a></li>\r\n");
+      b.append(" <li><a no-external=\"true\" href=\""+canonical+"/searchform.html\">All Versions</a></li>\r\n");
     }
     for (JsonElement n : list) {
       JsonObject o = (JsonObject) n;
@@ -494,7 +500,7 @@ public class IGReleaseUpdater {
         if (o == focus && !root) {
           b.append(" <li>"+o.asString("sequence")+" "+Utilities.titleize(o.asString("status"))+" (v"+v+", "+summariseDate(date)+") (this version)</li>\r\n");
         } else {
-          b.append(" <li><a href=\""+path+"/searchform.html\">"+o.asString("sequence")+" "+Utilities.titleize(o.asString("status"))+" (v"+v+", "+summariseDate(date)+")</a></li>\r\n");
+          b.append(" <li><a no-external=\"true\" href=\""+path+"/searchform.html\">"+o.asString("sequence")+" "+Utilities.titleize(o.asString("status"))+" (v"+v+", "+summariseDate(date)+")</a></li>\r\n");
         }
       }
     }
@@ -523,16 +529,16 @@ public class IGReleaseUpdater {
   private String genFragment(JsonObject ig, JsonObject version, JsonObject root, String canonical, boolean currentPublication, boolean isCore) {
     String p1 = ig.asString("title")+" (v"+version.asString("version")+": "+state(ig, version)+")";
     if (!isCore) {
-      p1 = p1 + (version.has("fhirversion") ? " based on <a href=\"http://hl7.org/fhir/"+getPath(version.asString("fhirversion", "fhir-version"))+"\">FHIR "+fhirRef(version.asString("fhirversion"))+"</a>" : "")+". ";
+      p1 = p1 + (version.has("fhirversion") ? " based on <a no-external=\"true\" href=\"http://hl7.org/fhir/"+getPath(version.asString("fhirversion", "fhir-version"))+"\">FHIR "+fhirRef(version.asString("fhirversion"))+"</a>" : "")+". ";
     } else {
       p1 = p1 + ". ";      
     }
-    String p2 = root == null ? "" : version == root ? "This is the current published version"+(currentPublication ? "" : " in its permanent home (it will always be available at this URL)") : "The current version which supercedes this version is <a href=\""+(root.asString("path").startsWith(canonical) ? canonical : root.asString("path"))+"{{fn}}\">"+root.asString("version")+"</a>";
+    String p2 = root == null ? "" : version == root ? "This is the current published version"+(currentPublication ? "" : " in its permanent home (it will always be available at this URL)") : "The current version which supercedes this version is <a no-external=\"true\" href=\""+(root.asString("path").startsWith(canonical) ? canonical : root.asString("path"))+"{{fn}}\">"+root.asString("version")+"</a>";
     String p3;
     if (canonical.equals("http://hl7.org/fhir"))
-      p3 = " For a full list of available versions, see the <a href=\""+canonical+"/directory.html\">Directory of published versions <img src=\"external.png\" style=\"text-align: baseline\"></a>";
+      p3 = " For a full list of available versions, see the <a no-external=\"true\" href=\""+canonical+"/directory.html\">Directory of published versions</a>";
     else
-      p3 = " For a full list of available versions, see the <a href=\""+canonical+"/history.html\">Directory of published versions <img src=\"external.png\" style=\"text-align: baseline\"></a>";
+      p3 = " For a full list of available versions, see the <a no-external=\"true\" href=\""+canonical+"/history.html\">Directory of published versions</a>";
     return "This page is part of the "+p1+p2+". "+p3;
   }
 
@@ -624,11 +630,11 @@ public class IGReleaseUpdater {
   }
 
   private String decorate(String sequence) {
-    sequence = sequence.replace("Normative", "<a href=\"https://confluence.hl7.org/display/HL7/HL7+Balloting\" title=\"Normative Standard\">Normative</a>");
+    sequence = sequence.replace("Normative", "<a no-external=\"true\" href=\"https://confluence.hl7.org/display/HL7/HL7+Balloting\" title=\"Normative Standard\">Normative</a>");
     if (sequence.contains("DSTU"))
-      return sequence.replace("DSTU", "<a href=\"https://confluence.hl7.org/display/HL7/HL7+Balloting\" title=\"Draft Standard for Trial-Use\">DSTU</a>");
+      return sequence.replace("DSTU", "<a no-external=\"true\" href=\"https://confluence.hl7.org/display/HL7/HL7+Balloting\" title=\"Draft Standard for Trial-Use\">DSTU</a>");
     else
-      return sequence.replace("STU", "<a href=\"https://confluence.hl7.org/display/HL7/HL7+Balloting\" title=\"Standard for Trial-Use\">STU</a>");
+      return sequence.replace("STU", "<a no-external=\"true\" href=\"https://confluence.hl7.org/display/HL7/HL7+Balloting\" title=\"Standard for Trial-Use\">STU</a>");
   }
 
   private String ballotCount(JsonObject ig, String sequence, JsonObject version) {

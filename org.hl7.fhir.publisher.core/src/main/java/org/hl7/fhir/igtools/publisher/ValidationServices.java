@@ -115,7 +115,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
             s = npm.loadExampleResource(ul[0], ul[1]);
           }
           if (s != null)
-            return Manager.makeParser(context, FhirFormat.JSON).parseSingle(s);
+            return Manager.makeParser(context, FhirFormat.JSON).parseSingle(s, null);
         }
       }
     }
@@ -169,7 +169,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
         NpmPackage npm = packages.get(i);
         InputStream s = npm.loadExampleResource(parts[parts.length - 2], parts[parts.length - 1]);
         if (s != null) {
-            return Manager.makeParser(context, FhirFormat.JSON).parseSingle(s);
+            return Manager.makeParser(context, FhirFormat.JSON).parseSingle(s, null);
         }
       }
     }

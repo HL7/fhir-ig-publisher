@@ -26,6 +26,8 @@ import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.ZipGenerator;
+import org.hl7.fhir.utilities.json.JsonException;
+import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -484,11 +486,12 @@ public class PublicationProcess {
     System.out.println("Copy the IG to "+destVer);    
     Utilities.createDirectory(destVer);
     FileUtils.copyDirectory(new File(Utilities.path(temp.getAbsolutePath(), "output")), new File(destVer));
+    List<String> subPackages = loadSubPackageList(Utilities.path(temp.getAbsolutePath(), "output", "sub-package-list.json"));
 
     // now, update the package list 
     System.out.println("Update "+Utilities.path(destination, "package-list.json"));    
-    PackageListEntry plVer = updatePackageList(pl, fSource.getAbsolutePath(), prSrc, pathVer,  Utilities.path(destination, "package-list.json"), mode, date, npm.fhirVersion(), Utilities.pathURL(pubSetup.asString("url"), tcName));
-    updatePublishBox(pl, plVer, destVer, pathVer, destination, fRoot.getAbsolutePath(), false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null);
+    PackageListEntry plVer = updatePackageList(pl, fSource.getAbsolutePath(), prSrc, pathVer,  Utilities.path(destination, "package-list.json"), mode, date, npm.fhirVersion(), Utilities.pathURL(pubSetup.asString("url"), tcName), subPackages);
+    updatePublishBox(pl, plVer, destVer, pathVer, destination, fRoot.getAbsolutePath(), false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url);
     
     List<String> existingFiles = new ArrayList<>();
     if (mode != PublicationProcessMode.WORKING) {
@@ -514,7 +517,7 @@ public class PublicationProcess {
         }
       }
       // we do this first in the output so we can get a proper diff
-      updatePublishBox(pl, plVer, igSrc, pathVer, igSrc, fRoot.getAbsolutePath(), true, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null);
+      updatePublishBox(pl, plVer, igSrc, pathVer, igSrc, fRoot.getAbsolutePath(), true, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url);
       
       System.out.println("Check for Files to delete");        
       List<String> newFiles = Utilities.listAllFiles(igSrc, null);
@@ -575,6 +578,16 @@ public class PublicationProcess {
       System.out.println("No!");
       System.out.print("Changes not applied. Finished");
     }
+  }
+
+  private List<String> loadSubPackageList(String path) throws JsonException, IOException {
+    List<String> list = new ArrayList<>();
+    File f = new File(path);
+    if (f.exists()) {
+      JsonArray json = (JsonArray) JsonParser.parse(f);
+      list.addAll(json.asStrings());
+    }
+    return list;
   }
 
   private void produceArchive(String source, String dest) throws IOException {
@@ -716,11 +729,11 @@ public class PublicationProcess {
     return sdf.format(date);
   }
 
-  private void updatePublishBox(PackageList pl, PackageListEntry plVer, String destVer, String pathVer, String destination, String rootFolder, boolean current, ServerType serverType, File sft, List<String> ignoreList) throws FileNotFoundException, IOException {
-    IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(destVer, ignoreList, null, plVer.json(), destination);
+  private void updatePublishBox(PackageList pl, PackageListEntry plVer, String destVer, String pathVer, String destination, String rootFolder, boolean current, ServerType serverType, File sft, List<String> ignoreList, String url) throws FileNotFoundException, IOException {
+    IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(destVer, url, rootFolder, ignoreList, null, plVer.json(), destination);
     String fragment = PublishBoxStatementGenerator.genFragment(pl, plVer, pl.current(), pl.canonical(), current, false);
     System.out.println("Publish Box Statement: "+fragment);
-    igvu.updateStatement(fragment, current ? 0 : 1);
+    igvu.updateStatement(fragment, current ? 0 : 1, pl.milestones());
     System.out.println("  .. "+igvu.getCountTotal()+" files checked, "+igvu.getCountUpdated()+" updated");
     
     igvu.checkXmlJsonClones(destVer);
@@ -813,7 +826,7 @@ public class PublicationProcess {
     return fDest;
   }
   
-  private PackageListEntry updatePackageList(PackageList pl, String folder, JsonObject prSrc, String webpath, String filepath, PublicationProcessMode mode, String date, String fhirVersion, String tcPath) throws Exception {
+  private PackageListEntry updatePackageList(PackageList pl, String folder, JsonObject prSrc, String webpath, String filepath, PublicationProcessMode mode, String date, String fhirVersion, String tcPath, List<String> subPackages) throws Exception {
     if (date == null) {
       SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
       date = sdf.format(new Date());      
@@ -848,6 +861,10 @@ public class PublicationProcess {
       }
     }    
     nv.describe(prSrc.asString("desc"), md, prSrc.asString("changes"));
+    nv.clearSubPackages();
+    for (String s : subPackages) {
+      nv.addSubPackage(s);
+    }
 
     pl.save(filepath);
     return nv;

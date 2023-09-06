@@ -738,10 +738,14 @@ public class CrossViewRenderer extends Renderer {
         }
         if (cu.isPrimitiveDatatype(s)) {
           set.add("primitives");
-        }
+          s = null;
+        } 
         if (cu.isDatatype(s)) {
           set.add("datatypes");
         } 
+        if (s != null) {
+          set.add(s);
+        }
       }
       break;
     case EXTENSION:
