@@ -491,7 +491,7 @@ public class PublicationProcess {
     // now, update the package list 
     System.out.println("Update "+Utilities.path(destination, "package-list.json"));    
     PackageListEntry plVer = updatePackageList(pl, fSource.getAbsolutePath(), prSrc, pathVer,  Utilities.path(destination, "package-list.json"), mode, date, npm.fhirVersion(), Utilities.pathURL(pubSetup.asString("url"), tcName), subPackages);
-    updatePublishBox(pl, plVer, destVer, pathVer, destination, fRoot.getAbsolutePath(), false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null);
+    updatePublishBox(pl, plVer, destVer, pathVer, destination, fRoot.getAbsolutePath(), false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url);
     
     List<String> existingFiles = new ArrayList<>();
     if (mode != PublicationProcessMode.WORKING) {
@@ -517,7 +517,7 @@ public class PublicationProcess {
         }
       }
       // we do this first in the output so we can get a proper diff
-      updatePublishBox(pl, plVer, igSrc, pathVer, igSrc, fRoot.getAbsolutePath(), true, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null);
+      updatePublishBox(pl, plVer, igSrc, pathVer, igSrc, fRoot.getAbsolutePath(), true, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url);
       
       System.out.println("Check for Files to delete");        
       List<String> newFiles = Utilities.listAllFiles(igSrc, null);
@@ -729,11 +729,11 @@ public class PublicationProcess {
     return sdf.format(date);
   }
 
-  private void updatePublishBox(PackageList pl, PackageListEntry plVer, String destVer, String pathVer, String destination, String rootFolder, boolean current, ServerType serverType, File sft, List<String> ignoreList) throws FileNotFoundException, IOException {
-    IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(destVer, ignoreList, null, plVer.json(), destination);
+  private void updatePublishBox(PackageList pl, PackageListEntry plVer, String destVer, String pathVer, String destination, String rootFolder, boolean current, ServerType serverType, File sft, List<String> ignoreList, String url) throws FileNotFoundException, IOException {
+    IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(destVer, url, rootFolder, ignoreList, null, plVer.json(), destination);
     String fragment = PublishBoxStatementGenerator.genFragment(pl, plVer, pl.current(), pl.canonical(), current, false);
     System.out.println("Publish Box Statement: "+fragment);
-    igvu.updateStatement(fragment, current ? 0 : 1);
+    igvu.updateStatement(fragment, current ? 0 : 1, pl.milestones());
     System.out.println("  .. "+igvu.getCountTotal()+" files checked, "+igvu.getCountUpdated()+" updated");
     
     igvu.checkXmlJsonClones(destVer);

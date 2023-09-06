@@ -25,11 +25,14 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
+import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
 
 public class IGReleaseVersionUpdater {
 
@@ -49,26 +52,30 @@ public class IGReleaseVersionUpdater {
 
   private String folder;
   private List<String> ignoreList;
-  private Object version;
+  private JsonObject version;
   private List<String> ignoreListOuter;
   private String currentFolder;
   private int clonedCount;
   private int clonedTotal;
+  private String rootUrl;
+  private String rootFolder;
 
 
-  public IGReleaseVersionUpdater(String folder, List<String> ignoreList, List<String> ignoreListOuter, JsonObject version, String currentFolder) {
+  public IGReleaseVersionUpdater(String folder, String rootUrl, String rootFolder, List<String> ignoreList, List<String> ignoreListOuter, JsonObject version, String currentFolder) {
     this.folder = folder;
     this.ignoreList = ignoreList;
     this.ignoreListOuter = ignoreListOuter;
     this.version = version;
     this.currentFolder = currentFolder;
+    this.rootFolder = rootFolder;
+    this.rootUrl = rootUrl;
   }
 
-  public void updateStatement(String fragment, int level) throws FileNotFoundException, IOException {
-    updateFiles(fragment, new File(folder), level);
+  public void updateStatement(String fragment, int level, List<PackageListEntry> milestones) throws FileNotFoundException, IOException {
+    updateFiles(fragment, new File(folder), level, milestones);
   }
 
-  private void updateFiles(String fragment, File dir, int level) throws FileNotFoundException, IOException {
+  private void updateFiles(String fragment, File dir, int level, List<PackageListEntry> milestones) throws FileNotFoundException, IOException {
     for (File f : dir.listFiles()) {
       if (ignoreList != null && ignoreList.contains(f.getAbsolutePath())) {
         continue;
@@ -84,8 +91,9 @@ public class IGReleaseVersionUpdater {
       }
 
       if (f.isDirectory() && !Utilities.existsInList(f.getName(), "html")) {
-        updateFiles(fragment, f, level+1);
+        updateFiles(fragment, f, level+1, milestones);
       }
+      
       if (f.getName().endsWith(".html") || f.getName().endsWith(".htm")) {
         String src = TextFile.fileToString(f);
         String srcl = src.toLowerCase();
@@ -134,7 +142,7 @@ public class IGReleaseVersionUpdater {
               updatedFragment = fragment.replace("{{fn}}", "");
             }
           }
-          src = src.substring(0, b+l) + fixForLevel(updatedFragment, level)+src.substring(e);
+          src = src.substring(0, b+l) + fixForLevel(updatedFragment, level)+addPageVersions(f, milestones)+src.substring(e);
           if (!src.equals(o)) {
             TextFile.stringToFile(src, f, false);
             countUpdated++;
@@ -143,6 +151,27 @@ public class IGReleaseVersionUpdater {
         }
       }
     }
+  }
+
+  private String addPageVersions(File f, List<PackageListEntry> milestones) throws IOException {
+    String relpath = Utilities.getRelativePath(folder, f.getAbsolutePath()); 
+    CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder(" ");
+    int i = 0;
+    for (PackageListEntry t : milestones) {
+      String base = Utilities.path(rootFolder, Utilities.getRelativePath(rootUrl, t.path()));
+      File fv = Utilities.pathFile(base, relpath);
+      if (fv.exists()) {
+        i++;
+        if (t.version().equals(version.asString("version"))) {
+          b.append("<b>"+Utilities.escapeXml(t.name())+"</b>");
+        } else {
+          String link = Utilities.pathURL(t.path(), relpath);
+          b.append("<a no-external=\"true\" href=\""+link+"\">"+Utilities.escapeXml(t.name())+"</a>");
+        }
+      }
+    }
+    String result = ". Page versions: "+b.toString();
+    return i == 0 ? "" : result;
   }
 
   private String getRelativePath(String absolutePath) {
