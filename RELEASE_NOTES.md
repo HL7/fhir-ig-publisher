@@ -14,4 +14,4 @@
 * Link checker: Add support for linking to package content without depending on the packages (http://hl7.org/fhir/tools/StructureDefinition/ig-link-dependency)
 * Publication Process: fix handling of sub-packages for THO
 * Publication Process: update to support cross-linking between versions in header (US Core)
-* XIG: Rework XIG to slpit into two parts (WIP)
+* XIG: Rework XIG to split into two parts (WIP)
