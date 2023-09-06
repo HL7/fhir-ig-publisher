@@ -2099,9 +2099,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   private String refList(Map<String, String> base, String key) {
     StringBuilder b = new StringBuilder();
     int c = 0;
+    boolean showLink = false;
     for (String s : sorted(base.keySet())) {
       c++;
       if (c == MAX_DEF_SHOW && base.size() > MAX_DEF_SHOW) {
+        showLink = true;
         b.append("<span id=\"rr_"+key+"\" onClick=\"document.getElementById('rr_"+key+"').innerHTML = document.getElementById('rr2_"+key+"').innerHTML\">..."+
             " <span style=\"cursor: pointer; border: 1px grey solid; background-color: #fcdcb3; padding-left: 3px; padding-right: 3px; color: black\">"+
             "Show "+(base.size()-MAX_DEF_SHOW+1)+" more</span></span><span id=\"rr2_"+key+"\" style=\"display: none\">");
@@ -2113,9 +2115,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
 
       b.append("<a href=\"" + s + "\">" + base.get(s) + "</a>");
+      if (c % 80 == 0) {
+        b.append("\r\n");
+      }
     }
 
-    if (c >= MAX_DEF_SHOW && base.size() > MAX_DEF_SHOW) {
+    if (showLink) {
       b.append("</span>");
     }
     return b.toString();

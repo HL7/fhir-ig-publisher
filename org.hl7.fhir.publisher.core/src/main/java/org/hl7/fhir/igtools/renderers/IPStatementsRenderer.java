@@ -167,10 +167,11 @@ public class IPStatementsRenderer {
           }
           key2++;
           int c = 0;
-          
+          boolean closeSpan = false;
           for (String s : Utilities.sorted(links.keySet())) {
             c++;
             if (c == MAX_LIST_DISPLAY && links.size() > MAX_LIST_DISPLAY + 2) {
+              closeSpan = true;
               b.append("<span id=\"ips_"+key2+"\" onClick=\"document.getElementById('ips_"+key2+"').innerHTML = document.getElementById('ips2_"+key2+"').innerHTML\">..."+
                   " <span style=\"cursor: pointer; border: 1px grey solid; background-color: #fcdcb3; padding-left: 3px; padding-right: 3px; color: black\">"+
                   "Show "+(links.size()-MAX_LIST_DISPLAY+1)+" more</span></span><span id=\"ips2_"+key2+"\" style=\"display: none\">");
@@ -186,7 +187,7 @@ public class IPStatementsRenderer {
               b.append("<a href=\""+links.get(s)+"\">"+Utilities.escapeXml(s)+"</a>");
             }
           }
-          if (links.size() > MAX_LIST_DISPLAY + 2) {
+          if (closeSpan) {
             b.append("</span>");
           }
           b.append("</li>\r\n");
