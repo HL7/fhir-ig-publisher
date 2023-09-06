@@ -181,6 +181,7 @@ public class HTMLInspector {
   private String rootFolder;
   private String altRootFolder;
   private List<SpecMapManager> specs;
+  private List<SpecMapManager> linkSpecs;
   private Map<String, LoadedFile> cache = new HashMap<String, LoadedFile>();
   private int iteration = 0;
   private List<StringPair> otherlinks = new ArrayList<StringPair>();
@@ -191,9 +192,6 @@ public class HTMLInspector {
   private boolean requirePublishBox;
   private List<String> igs;
   private FilesystemPackageCacheManager pcm;
-  private Map<String, SpecMapManager> otherSpecs = new HashMap<String, SpecMapManager>();
-  private Map<String, String> specList = new HashMap<>();
-  private List<String> errorPackages = new ArrayList<>();
   private String canonical;
 
   private String statusText;
@@ -205,9 +203,10 @@ public class HTMLInspector {
   private Map<String, List<String>> trackedFragments;
   private Set<String> foundFragments = new HashSet<>();
 
-  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, ILoggingService log, String canonical, String packageId, Map<String, List<String>> trackedFragments) {
+  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<SpecMapManager> linkSpecs, ILoggingService log, String canonical, String packageId, Map<String, List<String>> trackedFragments) {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
+    this.linkSpecs = linkSpecs;
     this.log = log;
     this.canonical = canonical;
     this.forHL7 = canonical.contains("hl7.org/fhir");
@@ -639,6 +638,17 @@ public class HTMLInspector {
         }
       }
     }
+    if (!resolved && linkSpecs != null){
+      for (SpecMapManager spec : linkSpecs) {
+        if (!resolved && spec.getBase() != null) {
+          resolved = resolved || spec.getBase().equals(rref) || (spec.getBase()).equals(rref+"/") || (spec.getBase()+"/").equals(rref)|| spec.hasTarget(rref) || Utilities.existsInList(rref, Utilities.pathURL(spec.getBase(), "history.html"));
+        }
+        if (!resolved && spec.getBase2() != null) {
+          resolved = spec.getBase2().equals(rref) || (spec.getBase2()).equals(rref+"/"); 
+        }
+      }
+    }
+    
     
     if (!resolved) {
       if (Utilities.isAbsoluteFileName(ref)) {
@@ -825,7 +835,7 @@ public class HTMLInspector {
   }
 
   public static void main(String[] args) throws Exception {
-    HTMLInspector inspector = new HTMLInspector(args[0], null, null, "http://hl7.org/fhir/us/core", "hl7.fhir.us.core", new HashMap<>());
+    HTMLInspector inspector = new HTMLInspector(args[0], null, null, null, "http://hl7.org/fhir/us/core", "hl7.fhir.us.core", new HashMap<>());
     inspector.setStrict(false);
     List<ValidationMessage> linkmsgs = inspector.check("test text");
     int bl = 0;

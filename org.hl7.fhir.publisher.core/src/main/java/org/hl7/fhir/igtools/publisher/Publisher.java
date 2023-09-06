@@ -706,6 +706,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private XVerExtensionManager xverManager;
   private IGKnowledgeProvider igpkp;
   private List<SpecMapManager> specMaps = new ArrayList<SpecMapManager>();
+  private List<SpecMapManager> linkSpecMaps = new ArrayList<SpecMapManager>();
   private List<String> suppressedIds = new ArrayList<>();
 
   private Map<String, MappingSpace> mappingSpaces = new HashMap<String, MappingSpace>();
@@ -2986,7 +2987,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else {
       sourceIg.getDefinition().addExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency", new CodeType("hl7.fhir.uv.tools#current"));
     }
-    inspector = new HTMLInspector(outputDir, specMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), trackedFragments);
+    inspector = new HTMLInspector(outputDir, specMaps, linkSpecMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), trackedFragments);
     inspector.getManual().add("full-ig.zip");
     if (historyPage != null) {
       inspector.getManual().add(historyPage);
@@ -3001,6 +3002,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (ImplementationGuideDependsOnComponent dep : sourceIg.getDependsOn()) {
       loadIg(dep, i, !dep.hasUserData("no-load-deps"));
       i++;
+    }
+    // we're also going to look for packages that can be referred to but aren't dependencies
+    for (Extension ext : sourceIg.getDefinition().getExtensionsByUrl("http://hl7.org/fhir/tools/StructureDefinition/ig-link-dependency")) {
+      loadLinkIg(ext.getValue().primitiveValue());
     }
 
     if (!"hl7.fhir.uv.tools".equals(sourceIg.getPackageId())) {
@@ -3464,7 +3469,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       businessVersion = configuration.asString("fixed-business-version");
     }
 
-    inspector = new HTMLInspector(outputDir, specMaps, this, igpkp.getCanonical(), configuration.has("npm-name") ? configuration.asString("npm-name") : null, trackedFragments);
+    inspector = new HTMLInspector(outputDir, specMaps, linkSpecMaps, this, igpkp.getCanonical(), configuration.has("npm-name") ? configuration.asString("npm-name") : null, trackedFragments);
     inspector.getManual().add("full-ig.zip");
     historyPage = ostr(paths, "history");
     if (historyPage != null) {
@@ -4005,6 +4010,26 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     // all defaults....
     return ep;
   }
+
+  private void loadLinkIg(String packageId) throws Exception {
+    if (!Utilities.noString(packageId)) {
+      String[] p = packageId.split("\\#");
+      NpmPackage pi = p.length == 1 ? pcm.loadPackageFromCacheOnly(p[0]) : pcm.loadPackageFromCacheOnly(p[0], p[1]);
+      if (pi == null) {
+        throw new Exception("Package Id "+packageId+" is unknown");
+      }
+      logDebugMessage(LogCategory.PROGRESS, "Load Link package "+packageId);
+      String webref = pi.getWebLocation();
+      webref = PackageHacker.fixPackageUrl(webref);
+
+      SpecMapManager igm = pi.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion()) : SpecMapManager.createSpecialPackage(pi);
+      igm.setName(pi.title());
+      igm.setBase(pi.canonical());
+      igm.setBase2(PackageHacker.fixPackageUrl(pi.url()));
+      linkSpecMaps.add(igm);
+    }
+  }
+
 
   private void loadIg(ImplementationGuideDependsOnComponent dep, int index, boolean loadDeps) throws Exception {
     String name = dep.getId();
@@ -11586,7 +11611,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else if (CliParams.hasNamedParam(args, "-generate-package-registry")) {
       new PackageRegistryBuilder(CliParams.getNamedParam(args, "-generate-package-registry")).build();
     } else if (CliParams.hasNamedParam(args, "-xig")) {
-      new XIGGenerator(CliParams.getNamedParam(args, "-xig")).execute();
+      new XIGGenerator(CliParams.getNamedParam(args, "-xig"), CliParams.getNamedParam(args, "-xig-cache")).execute("step1");
+      new XIGGenerator(CliParams.getNamedParam(args, "-xig"), CliParams.getNamedParam(args, "-xig-cache")).execute("step2");
     } else if (CliParams.hasNamedParam(args, "-update-history")) {
       new HistoryPageUpdater().updateHistoryPages(CliParams.getNamedParam(args, "-history"), CliParams.getNamedParam(args, "-website"), CliParams.getNamedParam(args, "-website"));
     } else if (CliParams.hasNamedParam(args, "-publish-update")) {
