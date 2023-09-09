@@ -125,7 +125,7 @@ public class TemplateManager {
         for (String n : f.listFiles()) {
           if (!Utilities.existsInList(n.toLowerCase(), "license", "readme")) {
             String s = extension(n);
-            if (!Utilities.existsInList(s, ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini", ".eot", ".otf", ".svg", ".ttf", ".woff", ".txt", ".yml", ".liquid", ".gitignore")) {
+            if (!Utilities.existsInList(s, ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini", ".eot", ".otf", ".svg", ".ttf", ".woff", ".txt", ".yml", ".yaml", ".liquid", ".gitignore")) {
               noScripts = false;
               ext.add(s);
               break;
