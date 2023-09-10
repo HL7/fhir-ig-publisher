@@ -280,7 +280,7 @@ public class XIGLoader implements IPackageVisitorProcessor {
       info.getJson().getJsonObject("packages").add(j.asString("pid"), j.getJsonObject("src"));
       info.getPid().put(j.asString("pid"), j.asString("web"));
     }
-
+    System.out.print("Loading");
     int total = registry.getJsonArray("resources").size();
     int step = total / 100;
     int count = 0;
@@ -424,13 +424,18 @@ public class XIGLoader implements IPackageVisitorProcessor {
         list.put(url, cr);
       } catch (Exception e) {
         System.out.println("Error loading "+f.getName()+": "+e.getMessage());
+        e.printStackTrace();
       }
     }
     System.out.println("Done");
   }
 
   private Date toDate(String d) throws ParseException {
-    return new SimpleDateFormat("yyyyMMddHHmmss").parse(d);    
+    if (d == null) {
+      return null;
+    } else {
+      return new SimpleDateFormat("yyyyMMddHHmmss").parse(d);
+    }
   }
 
 }

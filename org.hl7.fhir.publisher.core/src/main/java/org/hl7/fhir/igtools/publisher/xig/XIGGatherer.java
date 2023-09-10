@@ -68,18 +68,18 @@ public class XIGGatherer implements IPackageVisitorProcessor {
       smmList.put(pid, smm);
       JsonObject p = new JsonObject();
       packages.add(p);
-      p.add("pid", pid);
-      p.add("id", npm.name());
-      p.add("date", npm.date());
-      p.add("title", npm.title());
-      p.add("canonical", npm.canonical());
-      p.add("web", npm.getWebLocation());
-      p.add("version", npm.version());
-      p.add("fhirVersion", npm.fhirVersionList());
-      p.add("fver", npm.fhirVersion());
-      p.add("realm", getRealm(pid));
-      p.add("auth", getAuth(pid));
-      p.add("src", npm.getNpm());
+      p.addIfNotNull("pid", pid);
+      p.addIfNotNull("id", npm.name());
+      p.addIfNotNull("date", npm.date());
+      p.addIfNotNull("title", npm.title());
+      p.addIfNotNull("canonical", npm.canonical());
+      p.addIfNotNull("web", npm.getWebLocation());
+      p.addIfNotNull("version", npm.version());
+      p.addIfNotNull("fhirVersion", npm.fhirVersionList());
+      p.addIfNotNull("fver", npm.fhirVersion());
+      p.addIfNotNull("realm", getRealm(pid));
+      p.addIfNotNull("auth", getAuth(pid));
+      p.addIfNotNull("src", npm.getNpm());
     }
         
     Resource r = loadResource(pid, version, type, id, content);
@@ -149,7 +149,7 @@ public class XIGGatherer implements IPackageVisitorProcessor {
 
     } catch (Exception e) {
       System.out.println("Error loading "+type+"/"+id+" from "+pid+"("+parseVersion+"):" +e.getMessage());
-      // e.printStackTrace();
+      e.printStackTrace();
       return null;
     }
   }

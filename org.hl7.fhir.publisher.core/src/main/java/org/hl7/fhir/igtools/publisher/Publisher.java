@@ -40,6 +40,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.SQLException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -103,6 +104,7 @@ import org.hl7.fhir.igtools.publisher.xig.XIGGenerator;
 import org.hl7.fhir.igtools.renderers.CanonicalRenderer;
 import org.hl7.fhir.igtools.renderers.CodeSystemRenderer;
 import org.hl7.fhir.igtools.renderers.CrossViewRenderer;
+import org.hl7.fhir.igtools.renderers.DBBuilder;
 import org.hl7.fhir.igtools.renderers.DependencyRenderer;
 import org.hl7.fhir.igtools.renderers.DraftDependenciesRenderer;
 import org.hl7.fhir.igtools.renderers.ExampleScenarioRenderer;
@@ -7192,22 +7194,28 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     otherFilesRun.clear();
     otherFilesRun.add(Utilities.path(outputDir, "package.tgz"));
     otherFilesRun.add(Utilities.path(outputDir, "package.manifest.json"));
+    otherFilesRun.add(Utilities.path(tempDir, "package.db"));
+    DBBuilder db = new DBBuilder(Utilities.path(tempDir, "package.db"));
     copyData();
     for (String rg : regenList) {
       regenerate(rg);
     }
 
     updateImplementationGuide();
-
+    generateDataFile(db);
+    
     logMessage("Generate Native Outputs");
 
     for (FetchedFile f : changeList) {
       f.start("generate1");
       try {
-        generateNativeOutputs(f, false);
+        generateNativeOutputs(f, false, db);
       } finally {
         f.finish("generate1");      
       }
+    }
+    if (db != null) {
+      db.finishResources();
     }
 
     templateBeforeGenerate();
@@ -7216,7 +7224,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (FetchedFile f : changeList) {
       f.start("generate2");
       try {
-        generateHtmlOutputs(f, false);
+        generateHtmlOutputs(f, false, db);
       } finally {
         f.finish("generate2");      
       }
@@ -7233,8 +7241,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     logMessage("Generate Summaries");
 
     if (!changeList.isEmpty()) {
-      generateSummaryOutputs();
+      generateSummaryOutputs(db);
     }
+    db.closeUp();
     TextFile.bytesToFile(extensionTracker.generate(), Utilities.path(tempDir, "usage-stats.json"));
     try {
       log("Sending Usage Stats to Server");
@@ -7597,8 +7606,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     r.setElement(convertToElement(r, bc));
     igpkp.findConfiguration(f, r);
     bc.setUserData("config", r.getConfig());
-    generateNativeOutputs(f, true);
-    generateHtmlOutputs(f, true);
+    generateNativeOutputs(f, true, null);
+    generateHtmlOutputs(f, true, null);
   }
 
   private Element convertToElement(FetchedResource r, Resource res) throws Exception {
@@ -8174,12 +8183,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     log("-----------------------");
   }
 
-  private void generateSummaryOutputs() throws Exception {
+  private void generateSummaryOutputs(DBBuilder db) throws Exception {
     log("Generating Summary Outputs");
     ContextUtilities cu = new ContextUtilities(context);
     generateResourceReferences();
 
-    generateDataFile();
     generateCanonicalSummary();
 
     CrossViewRenderer cvr = new CrossViewRenderer(igpkp.getCanonical(), altCanonical, context, igpkp.specPath(), rc.copy());
@@ -9314,7 +9322,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
-  private void generateDataFile() throws IOException, FHIRException {
+  private void generateDataFile(DBBuilder db) throws IOException, FHIRException, SQLException {
     JsonObject data = new JsonObject();
     data.add("path", checkAppendSlash(specPath));
     data.add("canonical", igpkp.getCanonical());
@@ -9333,6 +9341,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     data.add("processedFiles", changeList.size());
     data.add("genDate", genTime());
     data.add("genDay", genDate());
+    if (db != null) {
+      for (JsonProperty p : data.getProperties()) {
+        db.metadata(p.getName(), p.getValue().asString());
+      }
+    }
     JsonArray rt = data.forceArray("resourceTypes");
     List<String> rtl = context.getResourceNames();
     for (String s : rtl) {
@@ -9357,6 +9370,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     ig.add("experimental", publishedIg.getExperimental());
     ig.add("publisher", publishedIg.getPublisher());
     ig.add("gitstatus", getGitStatus());
+    if (db != null) {
+      db.metadata("gitstatus", getGitStatus());
+    }
     if (previousVersionComparator != null && previousVersionComparator.hasLast() && !targetUrl().startsWith("file:")) {
       JsonObject diff = new JsonObject();
       data.add("diff", diff);
@@ -9710,17 +9726,21 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     logger.logMessage(s);
   }
 
-  private void generateNativeOutputs(FetchedFile f, boolean regen) throws IOException, FHIRException {
+  private void generateNativeOutputs(FetchedFile f, boolean regen, DBBuilder db) throws IOException, FHIRException, SQLException {
     for (FetchedResource r : f.getResources()) {
       logDebugMessage(LogCategory.PROGRESS, "Produce resources for "+r.fhirType()+"/"+r.getId());
-      saveNativeResourceOutputs(f, r);
+      var json = saveNativeResourceOutputs(f, r);
+      if (db != null) {
+        db.saveResource(f, r, json);
+      }
     }    
   }
-  private void generateHtmlOutputs(FetchedFile f, boolean regen) throws Exception {
+  
+  private void generateHtmlOutputs(FetchedFile f, boolean regen, DBBuilder db) throws Exception {
     if (generationOff) {
       return;
     }
-    // System.out.println("gen2: "+f.getName());
+//    System.out.println("gen2: "+f.getName());
     if (f.getProcessMode() == FetchedFile.PROCESS_NONE) {
       String dst = tempDir;
       if (f.getRelativePath().startsWith(File.separator))
@@ -9732,9 +9752,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           f.getOutputNames().add(dst);
           Utilities.createDirectory(dst);
         } else if (f.getPath().endsWith(".md")) {
-          checkMakeFile(stripFrontMatter(f.getSource()), dst, f.getOutputNames());          
+          checkMakeFile(processSQL(db, stripFrontMatter(f.getSource()), f), dst, f.getOutputNames());          
         } else {
-          checkMakeFile(f.getSource(), dst, f.getOutputNames());
+          checkMakeFile(processSQL(db, f.getSource(), f), dst, f.getOutputNames());
         }
       } catch (IOException e) {
         log("Exception generating page "+dst+" for "+f.getRelativePath()+" in "+tempDir+": "+e.getMessage());
@@ -9752,7 +9772,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           f.getOutputNames().add(dst);
           Utilities.createDirectory(dst);
         } else
-          checkMakeFile(new XSLTransformer(debug).transform(f.getSource(), f.getXslt()), dst, f.getOutputNames());
+          checkMakeFile(processSQL(db, new XSLTransformer(debug).transform(f.getSource(), f.getXslt()), f), dst, f.getOutputNames());
       } catch (Exception e) {
         log("Exception generating xslt page "+dst+" for "+f.getRelativePath()+" in "+tempDir+": "+e.getMessage());
       }
@@ -9864,6 +9884,41 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       }
     }
+  }
+
+  private byte[] processSQL(DBBuilder db, byte[] content, FetchedFile f) {
+    try {
+      String src = new String(content);
+      boolean changed = false;
+      while (db != null &&  src.contains("{% sql")) {
+        int i = src.indexOf("{% sql");
+        String pfx = src.substring(0, i);
+        src = src.substring(i+6);
+        i = src.indexOf("%}");
+        String sfx = src.substring(i+2);
+        src = src.substring(0, i);
+        src = pfx+processSQlCommand(db, src, f)+sfx;
+        changed = true;
+      }
+      if (changed) {
+        return src.getBytes(StandardCharsets.UTF_8);
+      } else {
+        return content;
+      }
+    } catch (Exception e) {
+      if (debug) {
+        e.printStackTrace();
+      }
+      return content;
+    }
+  }
+
+  private int sqlIndex = 0;
+  private String processSQlCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
+    String output = db == null ? "<span style=\"color: maroon\">No SQL this build</span>" : db.processSQL(src);
+    int i = sqlIndex++;
+    fragment("sql-"+i+"-fragment", output, f.getOutputNames());
+    return "{% include sql-"+i+"-fragment.xhtml %}";
   }
 
   class StringPair {
@@ -10289,13 +10344,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
    * @throws FileNotFoundException
    * @throws Exception
    */
-  private void saveNativeResourceOutputs(FetchedFile f, FetchedResource r) throws FHIRException, IOException {
-    ByteArrayOutputStream bs = new ByteArrayOutputStream();
+  private byte[] saveNativeResourceOutputs(FetchedFile f, FetchedResource r) throws FHIRException, IOException {
+    ByteArrayOutputStream bsj = new ByteArrayOutputStream();
     org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(context);
-    jp.compose(r.getElement(), bs, OutputStyle.NORMAL, igpkp.getCanonical());
-    npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, r.getElement().fhirType()+"-"+r.getId()+".json", bs.toByteArray());
+    jp.compose(r.getElement(), bsj, OutputStyle.NORMAL, igpkp.getCanonical());
+    npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, r.getElement().fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
     String path = Utilities.path(tempDir, "_includes", r.fhirType()+"-"+r.getId()+".json");
-    TextFile.bytesToFile(bs.toByteArray(), path);
+    TextFile.bytesToFile(bsj.toByteArray(), path);
     String pathEsc = Utilities.path(tempDir, "_includes", r.fhirType()+"-"+r.getId()+".escaped.json");
     XmlEscaper.convert(path, pathEsc);
 
@@ -10331,6 +10386,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       tp.compose(r.getElement(), stream, OutputStyle.PRETTY, igpkp.getCanonical());
       stream.close();
     }    
+    return bsj.toByteArray();
   }
 
   private boolean isExample(FetchedFile f, FetchedResource r) {
