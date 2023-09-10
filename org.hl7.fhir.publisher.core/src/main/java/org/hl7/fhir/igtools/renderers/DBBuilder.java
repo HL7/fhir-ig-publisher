@@ -409,12 +409,14 @@ public class DBBuilder {
     if (con == null) {
       return "<span style=\"color: maroon\">Error processing SQL: SQL is not set up properly</span>";
     }
-    if (sql == null) {
-      throw new IllegalArgumentException("Param sql cannot be null.");
-    }
 
-    sql = sql.trim();
     try {
+      if (sql == null) {
+        throw new IllegalArgumentException("Param sql cannot be null.");
+      }
+
+      sql = sql.trim();
+
       String clss = "grid";
       List<RenderingRule> rules = new ArrayList<>();
       if (sql.startsWith("fmt:")) {
