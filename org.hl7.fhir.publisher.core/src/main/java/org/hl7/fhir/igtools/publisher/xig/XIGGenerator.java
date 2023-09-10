@@ -15,6 +15,7 @@ import org.hl7.fhir.convertors.analytics.PackageVisitor;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.igtools.publisher.loaders.PublisherLoader;
+import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.model.Parameters;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
@@ -136,6 +137,8 @@ public class XIGGenerator {
   }
   
   public void execute(String step) throws IOException, ParserConfigurationException, SAXException, FHIRException, EOperationOutcome, ParseException {
+    ProfileUtilities.setSuppressIgnorableExceptions(true);
+    
     if (step.equals("step1")) {
       long ms = System.currentTimeMillis();
       
@@ -172,13 +175,17 @@ public class XIGGenerator {
       pv.visitPackages();
       gather.finish();
       
-      System.out.println("Finished Part 1: "+Utilities.describeDuration(System.currentTimeMillis() - ms));
+      System.out.println("Finished Step 1: "+Utilities.describeDuration(System.currentTimeMillis() - ms));
     } else if  (step.equals("step2")) {
+      long ms = System.currentTimeMillis();
       XIGLoader loader = new XIGLoader(info);
       loader.loadFromCache(target);
+      System.out.println("Finished Step 2 A: "+Utilities.describeDuration(System.currentTimeMillis() - ms));
       info.buildUsageMap();
+      System.out.println("Finished Step 2 B: "+Utilities.describeDuration(System.currentTimeMillis() - ms));
+      System.out.println("Finished Step 2 C: "+Utilities.describeDuration(System.currentTimeMillis() - ms));      printSummary(); 
       new XIGRenderer(info, target, date).produce(pcm);
-      printSummary(); 
+      System.out.println("Finished Step 2 D: "+Utilities.describeDuration(System.currentTimeMillis() - ms));
     } else {
       PackageVisitor pv = new PackageVisitor();
       pv.getResourceTypes().add("CapabilityStatement");
