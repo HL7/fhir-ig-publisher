@@ -9820,7 +9820,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
         }
         if (r.getResource() != null) {
-          generateResourceHtml(f, regen, r, r.getResource(), vars, "");
+          generateResourceHtml(f, regen, r, r.getResource(), vars, "", db);
           if (r.getResource() instanceof DomainResource) {
             DomainResource container = (DomainResource) r.getResource();
             List<Element> containedElements = r.getElement().getChildren("contained");
@@ -9855,10 +9855,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                         cr.setVersion(((CanonicalResource) container).getVersion());
                       }
                     }
-                    generateResourceHtml(f, regen, r, cr, vars, prefixForContained);
+                    generateResourceHtml(f, regen, r, cr, vars, prefixForContained, db);
                     clist.add(new StringPair(cr.present(), fn));
                   } else {
-                    generateResourceHtml(f, regen, r, containedResource, vars, prefixForContained);
+                    generateResourceHtml(f, regen, r, containedResource, vars, prefixForContained, db);
                     clist.add(new StringPair(containedResource.fhirType()+"/"+containedResource.getId(), fn));
                   }
                 }
@@ -9979,7 +9979,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return src.getBytes(StandardCharsets.UTF_8);
   }
 
-  public boolean generateResourceHtml(FetchedFile f, boolean regen, FetchedResource r, Resource res, Map<String, String> vars, String prefixForContainer) {
+  public boolean generateResourceHtml(FetchedFile f, boolean regen, FetchedResource r, Resource res, Map<String, String> vars, String prefixForContainer, DBBuilder db) {
     boolean result = true;
     try {
 
@@ -9989,7 +9989,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         generateOutputsCodeSystem(f, r, (CodeSystem) res, vars, prefixForContainer);
         break;
       case ValueSet:
-        generateOutputsValueSet(f, r, (ValueSet) res, vars, prefixForContainer);
+        generateOutputsValueSet(f, r, (ValueSet) res, vars, prefixForContainer, db);
         break;
       case ConceptMap:
         generateOutputsConceptMap(f, r, (ConceptMap) res, vars, prefixForContainer);
@@ -10832,7 +10832,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
    * @throws org.hl7.fhir.exceptions.FHIRException
    * @throws Exception
    */
-  private void generateOutputsValueSet(FetchedFile f, FetchedResource r, ValueSet vs, Map<String, String> vars, String prefixForContainer) throws Exception {
+  private void generateOutputsValueSet(FetchedFile f, FetchedResource r, ValueSet vs, Map<String, String> vars, String prefixForContainer, DBBuilder db) throws Exception {
     ValueSetRenderer vsr = new ValueSetRenderer(context, specPath, vs, igpkp, specMaps, pageTargets(), markdownEngine, packge, rc, versionToAnnotate);
     if (igpkp.wantGen(r, "summary")) {
       fragment("ValueSet-"+prefixForContainer+vs.getId()+"-summary", vsr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null);
@@ -10859,6 +10859,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null);
       } else {
         ValueSetExpansionOutcome exp = context.expandVS(vs, true, true, true);
+        db.recordExpansion(vs, exp);
         if (exp.getValueset() != null) {
           expansions.add(exp.getValueset());
 
