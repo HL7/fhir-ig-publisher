@@ -107,7 +107,8 @@ public class TemplateManager {
     }
     // npm.debugDump("template");
     
-    npm.unPackWithAppend(templateDir);
+    List<String> files = new ArrayList<>();
+    npm.unPackWithAppend(templateDir, files);
     Set<String> ext = new HashSet<>();
     String scriptReason = null;
     JsonObject config = null;
@@ -134,16 +135,15 @@ public class TemplateManager {
       }
     }  
     if (scriptReason == null) {
-      for (NpmPackageFolder f : npm.getFolders().values()) {
-        for (String n : f.listFiles()) {
-          if (!Utilities.existsInList(n.toLowerCase(), "license", "readme")) {
-            String s = extension(n);
-            if (antScripts.contains(n)) {
-              scriptReason = "Template contains a registered ant script";              
-            } else if (!Utilities.existsInList(s, ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini", ".eot", ".otf", ".svg", ".ttf", ".woff", ".txt", ".yml", ".yaml", ".liquid", ".gitignore")) {
-              ext.add(s);
-              break;
-            }
+      for (String fn : files) {
+        String n = Utilities.getRelativePath(templateDir, fn);
+        if (!Utilities.existsInList(n.toLowerCase(), "license", "readme")) {
+          String s = extension(n);
+          if (antScripts.contains(n)) {
+            scriptReason = "Template contains a registered ant script";              
+          } else if (!Utilities.existsInList(s, ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini", ".eot", ".otf", ".svg", ".ttf", ".woff", ".txt", ".yml", ".yaml", ".liquid", ".gitignore")) {
+            ext.add(s);
+            break;
           }
         }
       }
