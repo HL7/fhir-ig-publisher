@@ -123,12 +123,12 @@ public class TemplateManager {
         scriptReason = "Template nominates an ant script or targets";
       }
       if (config.has("script")) {
-        scriptIds.add(config.asString("script"));
+        antScripts.add(config.asString("script"));
         if (!config.hasString("otherScripts")) {
-          scriptReason = "Template names a script, but is not explicit about all ant scripts";          
+          throw new Error("Template names a script, but is not explicit about all ant scripts - this is no longer allowed");          
         } else {
           for (String s : config.getStrings("otherScripts")) {
-            scriptIds.add(s);
+            antScripts.add(s);
           }
         }
       }
@@ -138,7 +138,7 @@ public class TemplateManager {
         for (String n : f.listFiles()) {
           if (!Utilities.existsInList(n.toLowerCase(), "license", "readme")) {
             String s = extension(n);
-            if (scriptIds.contains(n)) {
+            if (antScripts.contains(n)) {
               scriptReason = "Template contains a registered ant script";              
             } else if (!Utilities.existsInList(s, ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini", ".eot", ".otf", ".svg", ".ttf", ".woff", ".txt", ".yml", ".yaml", ".liquid", ".gitignore")) {
               ext.add(s);
