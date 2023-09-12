@@ -55,6 +55,7 @@ public class TemplateManager {
   String templateThatCantExecute;
   String templateReason;
   List<String> templateList = new ArrayList<>();
+  Set<String> antScripts = new HashSet<>();
 
   public TemplateManager(FilesystemPackageCacheManager pcm, ILoggingService logger) {
     this.pcm = pcm;
@@ -108,7 +109,7 @@ public class TemplateManager {
     
     npm.unPackWithAppend(templateDir);
     Set<String> ext = new HashSet<>();
-    boolean noScripts = true;
+    String scriptReason = null;
     JsonObject config = null;
     if (npm.hasFile(Utilities.path("package", "$root"), "config.json")) {
       try {
@@ -118,25 +119,36 @@ public class TemplateManager {
         throw new FHIRException("Error parsing "+npm.name()+"#"+npm.version()+"#"+Utilities.path("package", "$root", "config.json")+": "+e.getMessage(), e);
       }
       configs.add(config);
-      noScripts = !config.has("script") && !config.has("targets");
+      if (config.has("script") || config.has("targets")) {
+        scriptReason = "Template nominates an ant script or targets";
+      }
+      if (config.has("script")) {
+        scriptIds.add(config.asString("script"));
+        for (String s : config.getStrings("otherScripts")) {
+          scriptIds.add(s);
+        }
+      }
     }  
-    if (noScripts) {
+    if (scriptReason == null) {
       for (NpmPackageFolder f : npm.getFolders().values()) {
         for (String n : f.listFiles()) {
           if (!Utilities.existsInList(n.toLowerCase(), "license", "readme")) {
             String s = extension(n);
-            if (!Utilities.existsInList(s, ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini", ".eot", ".otf", ".svg", ".ttf", ".woff", ".txt", ".yml", ".yaml", ".liquid", ".gitignore")) {
-              noScripts = false;
+            if (scriptIds.contains(n)) {
+              scriptReason = "Template contains a registered ant script";              
+            } else if (!Utilities.existsInList(s, ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini", ".eot", ".otf", ".svg", ".ttf", ".woff", ".txt", ".yml", ".yaml", ".liquid", ".gitignore")) {
               ext.add(s);
               break;
             }
           }
         }
       }
+      if (!ext.isEmpty()) {
+        scriptReason = "Template has file extensions: "+ ext; 
+      }
     }
-    if (!noScripts) {
-      checkTemplateId(template, npm.name(), config == null ? "has file extensions: "+ ext : config.has("script") ? "template nominates a script" : 
-        config.has("targets") ? "template nominates ant targets" : "has file extensions: "+ ext);
+    if (scriptReason != null) {
+      checkTemplateId(template, npm.name(), scriptReason);
     }
     if (level==0 && configs.size() > 1) {
       config = configs.get(0);
