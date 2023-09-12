@@ -124,8 +124,12 @@ public class TemplateManager {
       }
       if (config.has("script")) {
         scriptIds.add(config.asString("script"));
-        for (String s : config.getStrings("otherScripts")) {
-          scriptIds.add(s);
+        if (!config.hasString("otherScripts")) {
+          scriptReason = "Template names a script, but is not explicit about all ant scripts";          
+        } else {
+          for (String s : config.getStrings("otherScripts")) {
+            scriptIds.add(s);
+          }
         }
       }
     }  
