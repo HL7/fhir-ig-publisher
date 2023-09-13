@@ -56,6 +56,7 @@ public class TemplateManager {
   String templateReason;
   List<String> templateList = new ArrayList<>();
   Set<String> antScripts = new HashSet<>();
+  private boolean autoMode;
 
   public TemplateManager(FilesystemPackageCacheManager pcm, ILoggingService logger) {
     this.pcm = pcm;
@@ -63,6 +64,7 @@ public class TemplateManager {
   }
 
   public Template loadTemplate(String template, String rootFolder, String packageId, boolean autoMode) throws FHIRException, IOException {
+    this.autoMode = autoMode;
     String templateDir = Utilities.path(rootFolder, "template");
     boolean inPlace = template.equals("#template");
     if (!inPlace) {
@@ -136,8 +138,12 @@ public class TemplateManager {
         // so the template has to declare what other any scripts it can call out to, so we can track to see if any template
         // later tries to overwrite them
         // if it doesn't declare the list - even if it's empty - we refuse to run at all- templates have to do this
-        if (!config.hasString("otherScripts")) {
-          throw new Error("Template names a script, but is not explicit about all ant scripts - this is no longer allowed");          
+        if (!config.has("otherScripts")) {
+          if (autoMode) {
+            throw new Error("Template "+npm.name()+"#"+npm.version()+" names a script, but is not explicit about all ant scripts - this is no longer allowed");  
+          } else {
+            System.out.println("Template "+npm.name()+"#"+npm.version()+" names a script, but is not explicit about all ant scripts. Note that this means that this template no longer works with the ci-build infrastructure");
+          }
         } else {
           for (String s : config.getStrings("otherScripts")) {
             antScripts.add(s);
@@ -145,6 +151,7 @@ public class TemplateManager {
         }
       }
     }  
+    
     // if we have't already found that it's considered a script, we'll look through the content
     if (scriptReason == null) {
       for (String fn : files) {
