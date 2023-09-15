@@ -188,7 +188,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
               } else if (ed.getPath().endsWith(".modifierExtension")) {
                 tryAdd(ext, summariseExtension(t.getProfile(), true));
               } else {
-                tryAdd(refs, describeProfile(t.getProfile().get(0).getValue()));
+                for (CanonicalType ct : t.getProfile()) {
+                  tryAdd(refs, describeProfile(ct.getValue()));
+                }
               }
             }
             for (CanonicalType ct : t.getTargetProfile()) {
