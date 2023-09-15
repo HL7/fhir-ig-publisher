@@ -257,23 +257,24 @@ public class DBBuilder {
 
 
   private void addContains(ValueSet vs, ValueSetExpansionContainsComponent e, PreparedStatement psql) throws SQLException {
-    // TODO Auto-generated method stub
-
-    psql.setInt(1, ++lastVSKey);
-    psql.setInt(2, ((Integer) vs.getUserData("db.key")).intValue());
-    bindString(psql, 3, vs.getUrl());
-    bindString(psql, 4, vs.getVersion());
-    bindString(psql, 5, e.getSystem());
-    bindString(psql, 6, e.getVersion());
-    bindString(psql, 7, e.getCode());
-    bindString(psql, 8, e.getDisplay());
-    psql.executeUpdate();   
-    for (ValueSetExpansionContainsComponent c : e.getContains()) {
-      addContains(vs, c, psql);
+    if (vs.hasUserData("db.key")) {
+      psql.setInt(1, ++lastVSKey);
+      psql.setInt(2, ((Integer) vs.getUserData("db.key")).intValue());
+      bindString(psql, 3, vs.getUrl());
+      bindString(psql, 4, vs.getVersion());
+      bindString(psql, 5, e.getSystem());
+      bindString(psql, 6, e.getVersion());
+      bindString(psql, 7, e.getCode());
+      bindString(psql, 8, e.getDisplay());
+      psql.executeUpdate();   
+      for (ValueSetExpansionContainsComponent c : e.getContains()) {
+        addContains(vs, c, psql);
+      }
     }
   }
 
   private void addConcepts(CodeSystem cs, List<ConceptDefinitionComponent> list, PreparedStatement psql, int parent) throws SQLException {
+    if (cs.hasUserData("db.key")) {
     for (ConceptDefinitionComponent cd : list) {
       psql.setInt(1, ++lastConceptKey);
       psql.setInt(2, ((Integer) cs.getUserData("db.key")).intValue());
@@ -289,10 +290,12 @@ public class DBBuilder {
       cd.setUserData("db.key", lastConceptKey);   
       addConcepts(cs, cd.getConcept(), psql, lastConceptKey);
     }
+    }
   }
 
   private void addConceptProperties(CodeSystem cs, List<ConceptDefinitionComponent> list, PreparedStatement psql) throws SQLException {
-    for (ConceptDefinitionComponent cd : list) {
+    if (cs.hasUserData("db.key")) {
+       for (ConceptDefinitionComponent cd : list) {
       for (ConceptPropertyComponent p : cd.getProperty()) { 
         psql.setInt(1, ++lastCPropKey);
         psql.setInt(2, ((Integer) cs.getUserData("db.key")).intValue());
@@ -310,10 +313,12 @@ public class DBBuilder {
       }
       addConceptProperties(cs, cd.getConcept(), psql);
     }
+    }
   }
 
   private void addConceptDesignations(CodeSystem cs, List<ConceptDefinitionComponent> list, PreparedStatement psql) throws SQLException {
-    for (ConceptDefinitionComponent cd : list) {
+    if (cs.hasUserData("db.key")) {
+      for (ConceptDefinitionComponent cd : list) {
       for (ConceptDefinitionDesignationComponent p : cd.getDesignation()) { 
         psql.setInt(1, ++lastDesgKey);
         psql.setInt(2, ((Integer) cs.getUserData("db.key")).intValue());
@@ -326,6 +331,7 @@ public class DBBuilder {
         p.setUserData("db.key", lastDesgKey);   
       }
       addConceptDesignations(cs, cd.getConcept(), psql);
+    }
     }
   }
 
