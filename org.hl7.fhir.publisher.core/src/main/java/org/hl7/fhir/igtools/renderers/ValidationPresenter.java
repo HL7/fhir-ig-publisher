@@ -601,7 +601,9 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     for (ValidationMessage message : messages) {
       boolean passesFilter = true;
       if (canSuppressErrors || !message.getLevel().isError()) {
-        if (suppressedMessages.contains(message.getDisplay(), message) || suppressedMessages.contains(message.getMessage(), message) || suppressedMessages.contains(message.getHtml(), message) || suppressedMessages.contains(message.getMessageId(), message) ) {
+        if (suppressedMessages.contains(message.getDisplay(), message) || suppressedMessages.contains(message.getMessage(), message) ||
+              suppressedMessages.contains(message.getHtml(), message) || suppressedMessages.contains(message.getMessageId(), message) || 
+              suppressedMessages.contains(message.getInvId(), message)) {
           passesFilter = false;
         } else if (msgs.contains(message.getLocation()+"|"+message.getMessage())) {
           passesFilter = false;
