@@ -301,7 +301,7 @@ public class XIGLoader implements IPackageVisitorProcessor {
         CanonicalResource cr = (CanonicalResource) new JsonParser().parse(fo);
         fo.close();
 
-        cr.setSourcePackage(new PackageInformation(npm.asString("id"), npm.asString("version"), toDate(npm.asString("date")), npm.asString("title"), npm.asString("canonical"), npm.asString("web")));
+        cr.setSourcePackage(new PackageInformation(npm.asString("id"), npm.asString("version"), npm.asString("fhirVersion"), toDate(npm.asString("date")), npm.asString("title"), npm.asString("canonical"), npm.asString("web")));
         cr.setWebPath(file.asString("web"));
         JsonObject j = new JsonObject();
         info.getJson().getJsonArray("canonicals").add(j);
