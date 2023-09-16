@@ -55,6 +55,8 @@ public class TemplateManager {
   String templateThatCantExecute;
   String templateReason;
   List<String> templateList = new ArrayList<>();
+  Set<String> antScripts = new HashSet<>();
+  private boolean autoMode;
 
   public TemplateManager(FilesystemPackageCacheManager pcm, ILoggingService logger) {
     this.pcm = pcm;
@@ -62,6 +64,7 @@ public class TemplateManager {
   }
 
   public Template loadTemplate(String template, String rootFolder, String packageId, boolean autoMode) throws FHIRException, IOException {
+    this.autoMode = autoMode;
     String templateDir = Utilities.path(rootFolder, "template");
     boolean inPlace = template.equals("#template");
     if (!inPlace) {
@@ -106,11 +109,16 @@ public class TemplateManager {
     }
     // npm.debugDump("template");
     
-    npm.unPackWithAppend(templateDir);
+    List<String> files = new ArrayList<>();
+    npm.unPackWithAppend(templateDir, files);
     Set<String> ext = new HashSet<>();
-    boolean noScripts = true;
+    String scriptReason = null;
     JsonObject config = null;
+    
+    // if scriptReason != null, then the template has active content, and scriptReason contains the reason why we decided that there's active content
+    
     if (npm.hasFile(Utilities.path("package", "$root"), "config.json")) {
+      // we found a config file
       try {
         config = JsonParser.parseObject(npm.load(Utilities.path("package", "$root"), "config.json"));
       } catch (Exception e) {
@@ -118,25 +126,56 @@ public class TemplateManager {
         throw new FHIRException("Error parsing "+npm.name()+"#"+npm.version()+"#"+Utilities.path("package", "$root", "config.json")+": "+e.getMessage(), e);
       }
       configs.add(config);
-      noScripts = !config.has("script") && !config.has("targets");
-    }  
-    if (noScripts) {
-      for (NpmPackageFolder f : npm.getFolders().values()) {
-        for (String n : f.listFiles()) {
-          if (!Utilities.existsInList(n.toLowerCase(), "license", "readme")) {
-            String s = extension(n);
-            if (!Utilities.existsInList(s, ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini", ".eot", ".otf", ".svg", ".ttf", ".woff", ".txt", ".yml", ".yaml", ".liquid", ".gitignore")) {
-              noScripts = false;
-              ext.add(s);
-              break;
-            }
+      
+      // check to see if it defines an active script
+      if (config.has("script") || config.has("targets")) {
+        scriptReason = "Template nominates an ant script or targets";
+      }
+      if (config.has("script")) {
+        antScripts.add(config.asString("script"));
+        
+        // the ant script might call other ant scripts. No way we can introspect the ant script to see what it calls, 
+        // so the template has to declare what other any scripts it can call out to, so we can track to see if any template
+        // later tries to overwrite them
+        // if it doesn't declare the list - even if it's empty - we refuse to run at all- templates have to do this
+        if (!config.has("otherScripts")) {
+          if (autoMode) {
+            throw new Error("Template "+npm.name()+"#"+npm.version()+" names a script, but is not explicit about all ant scripts - this is no longer allowed");  
+          } else {
+            System.out.println("Template "+npm.name()+"#"+npm.version()+" names a script, but is not explicit about all ant scripts. Note that this means that this template no longer works with the ci-build infrastructure");
+          }
+        } else {
+          for (String s : config.getStrings("otherScripts")) {
+            antScripts.add(s);
           }
         }
       }
+    }  
+    
+    // if we have't already found that it's considered a script, we'll look through the content
+    if (scriptReason == null) {
+      for (String fn : files) {
+        String n = Utilities.getRelativePath(templateDir, fn);
+        if (!Utilities.existsInList(n.toLowerCase(), "license", "readme")) {
+          String s = extension(n);
+          if (antScripts.contains(n)) {
+            // nah, if you overwrite an xml ant script, you're doing active content
+            scriptReason = "Template contains a registered ant script";              
+          } else if (!Utilities.existsInList(s, ".html", ".css", ".png", ".gif", ".oet", ".json", ".xml", ".ico", ".jpg", ".md", ".ini", ".eot", ".otf", ".svg", ".ttf", ".woff", ".txt", ".yml", ".yaml", ".liquid", ".gitignore")) {
+            // we don't track what other scripts are potentially active, so we only allow a whitelist of files. 
+            // this is safe if the base templates don't call out to scripts with weird file extensions (the template authors know about this rule)
+            ext.add(s);
+            break;
+          }
+        }
+      }
+      if (!ext.isEmpty()) {
+        scriptReason = "Template has file extensions: "+ ext; 
+      }
     }
-    if (!noScripts) {
-      checkTemplateId(template, npm.name(), config == null ? "has file extensions: "+ ext : config.has("script") ? "template nominates a script" : 
-        config.has("targets") ? "template nominates ant targets" : "has file extensions: "+ ext);
+    // if it has active content, then we check to see if it's trusted. Locally: always trusted. auto-build: only some trusted
+    if (scriptReason != null) {
+      checkTemplateId(template, npm.name(), scriptReason);
     }
     if (level==0 && configs.size() > 1) {
       config = configs.get(0);

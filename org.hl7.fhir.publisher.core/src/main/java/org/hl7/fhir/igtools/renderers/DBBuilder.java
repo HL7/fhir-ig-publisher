@@ -29,6 +29,9 @@ import org.hl7.fhir.r5.model.ConceptMap;
 import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
 import org.hl7.fhir.r5.model.ConceptMap.SourceElementComponent;
 import org.hl7.fhir.r5.model.ConceptMap.TargetElementComponent;
+import org.hl7.fhir.r5.model.ValueSet;
+import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
+import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.Utilities;
@@ -65,8 +68,16 @@ public class DBBuilder {
   private int lastConceptKey;
   private int lastDesgKey;
   private int lastMapKey;
+  private int lastVSKey;
 
+  private long cumulativeTime;
+  
+  private void time(long start) {
+    cumulativeTime = cumulativeTime + (System.currentTimeMillis() - start);
+  }
+  
   public DBBuilder(String path) {
+    long start = System.currentTimeMillis();
     try {
       con = connect(path);
     } catch (Exception e) {
@@ -76,9 +87,11 @@ public class DBBuilder {
       }
       con = null;
     }
+    time(start);
   }
 
   public void metadata(String name, String value)  {
+    long start = System.currentTimeMillis();
     if (con == null) {
       return;
     }
@@ -95,9 +108,11 @@ public class DBBuilder {
         e.printStackTrace();
       }
     }
+    time(start);
   }
 
   public void saveResource(FetchedFile f, FetchedResource r, byte[] json) {
+    long start = System.currentTimeMillis();
     if (con == null) {
       return;
     }
@@ -147,9 +162,11 @@ public class DBBuilder {
         e.printStackTrace();
       }
     }
+    time(start);
   }
 
   public void finishResources() {
+    long start = System.currentTimeMillis();
     if (con == null) {
       return;
     }
@@ -211,10 +228,53 @@ public class DBBuilder {
         e.printStackTrace();
       }
     }
+    time(start);
+  }
+
+  public void recordExpansion(ValueSet vs, ValueSetExpansionOutcome exp) throws SQLException {
+    long start = System.currentTimeMillis();
+    try {
+      if (con == null) {
+        return;
+      }
+      if (exp == null || exp.getValueset() == null) {
+        return;
+      }
+
+      PreparedStatement psql = con.prepareStatement("Insert into ValueSet_Codes (Key, ResourceKey, ValueSetUri, ValueSetVersion, System, Version, Code, Display) "+
+          "values (?, ?, ?, ?, ?, ?, ?, ?)");
+      for (ValueSetExpansionContainsComponent e : exp.getValueset().getExpansion().getContains()) {
+        addContains(vs, e, psql);
+      }
+    } catch (SQLException e) {
+      errors.add(e.getMessage());
+      if (debug) {
+        e.printStackTrace();
+      }
+    }
+    time(start);
   }
 
 
+  private void addContains(ValueSet vs, ValueSetExpansionContainsComponent e, PreparedStatement psql) throws SQLException {
+    if (vs.hasUserData("db.key")) {
+      psql.setInt(1, ++lastVSKey);
+      psql.setInt(2, ((Integer) vs.getUserData("db.key")).intValue());
+      bindString(psql, 3, vs.getUrl());
+      bindString(psql, 4, vs.getVersion());
+      bindString(psql, 5, e.getSystem());
+      bindString(psql, 6, e.getVersion());
+      bindString(psql, 7, e.getCode());
+      bindString(psql, 8, e.getDisplay());
+      psql.executeUpdate();   
+      for (ValueSetExpansionContainsComponent c : e.getContains()) {
+        addContains(vs, c, psql);
+      }
+    }
+  }
+
   private void addConcepts(CodeSystem cs, List<ConceptDefinitionComponent> list, PreparedStatement psql, int parent) throws SQLException {
+    if (cs.hasUserData("db.key")) {
     for (ConceptDefinitionComponent cd : list) {
       psql.setInt(1, ++lastConceptKey);
       psql.setInt(2, ((Integer) cs.getUserData("db.key")).intValue());
@@ -230,10 +290,12 @@ public class DBBuilder {
       cd.setUserData("db.key", lastConceptKey);   
       addConcepts(cs, cd.getConcept(), psql, lastConceptKey);
     }
+    }
   }
 
   private void addConceptProperties(CodeSystem cs, List<ConceptDefinitionComponent> list, PreparedStatement psql) throws SQLException {
-    for (ConceptDefinitionComponent cd : list) {
+    if (cs.hasUserData("db.key")) {
+       for (ConceptDefinitionComponent cd : list) {
       for (ConceptPropertyComponent p : cd.getProperty()) { 
         psql.setInt(1, ++lastCPropKey);
         psql.setInt(2, ((Integer) cs.getUserData("db.key")).intValue());
@@ -251,10 +313,12 @@ public class DBBuilder {
       }
       addConceptProperties(cs, cd.getConcept(), psql);
     }
+    }
   }
 
   private void addConceptDesignations(CodeSystem cs, List<ConceptDefinitionComponent> list, PreparedStatement psql) throws SQLException {
-    for (ConceptDefinitionComponent cd : list) {
+    if (cs.hasUserData("db.key")) {
+      for (ConceptDefinitionComponent cd : list) {
       for (ConceptDefinitionDesignationComponent p : cd.getDesignation()) { 
         psql.setInt(1, ++lastDesgKey);
         psql.setInt(2, ((Integer) cs.getUserData("db.key")).intValue());
@@ -267,6 +331,7 @@ public class DBBuilder {
         p.setUserData("db.key", lastDesgKey);   
       }
       addConceptDesignations(cs, cd.getConcept(), psql);
+    }
     }
   }
 
@@ -305,7 +370,22 @@ public class DBBuilder {
     makeConceptPropertiesTable(con);
     makeDesignationsTable(con);
     makeMappingsTable(con);
+    makeValueSetTable(con);
     return con;    
+  }
+
+  private void makeValueSetTable(Connection con) throws SQLException {
+    Statement stmt = con.createStatement();
+    stmt.execute("CREATE TABLE ValueSet_Codes (\r\n"+
+        "Key             integer NOT NULL,\r\n"+
+        "ResourceKey     integer NOT NULL,\r\n"+
+        "ValueSetUri     nvarchar NOT NULL,\r\n"+
+        "ValueSetVersion nvarchar NOT NULL,\r\n"+
+        "System          nvarchar NOT NULL,\r\n"+
+        "Version         nvarchar NULL,\r\n"+
+        "Code            nvarchar NOT NULL,\r\n"+
+        "Display        nvarchar NULL,\r\n"+
+        "PRIMARY KEY (Key))\r\n");
   }
 
   private void makeMetadataTable(Connection con) throws SQLException {
@@ -406,6 +486,7 @@ public class DBBuilder {
 
 
   public String processSQL(String sql) {
+    long start = System.currentTimeMillis();
     if (con == null) {
       return "<span style=\"color: maroon\">Error processing SQL: SQL is not set up properly</span>";
     }
@@ -478,12 +559,14 @@ public class DBBuilder {
           }
         }
       }
+      time(start);
       return new XhtmlComposer(true, false).compose(tbl);
     } catch (Exception e) {
       errors.add(e.getMessage());
       if (debug) {
         e.printStackTrace();
       }
+      time(start);
       return "<span style=\"color: maroon\">Error processing SQL: "+Utilities.escapeXml(e.getMessage())+"</span>";
     }
   }
@@ -517,6 +600,7 @@ public class DBBuilder {
   }
 
   public void closeUp() {
+    long start = System.currentTimeMillis();
     if (con != null) {
       try {
         con.close();
@@ -533,6 +617,8 @@ public class DBBuilder {
         System.out.println("  "+s);        
       }
     }
+    time(start);
+    System.out.println("DB Cumulative Time invested: "+Utilities.describeDuration(cumulativeTime));
   }
 
 

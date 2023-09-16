@@ -3180,7 +3180,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         System.out.println("Exception generating snapshot for "+sd.getUrl()+": "+e.getMessage());        
       }      
     }
-
+    Element element = (Element) sd.getUserData("element");
+    if (element != null) {
+      element.setUserData("profileutils.snapshot.messages", messages);
+    }
   }
 
   private boolean dependsOnUTG(JsonArray arr) throws Exception {
@@ -4341,7 +4344,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private boolean checkMakeFile(byte[] bs, String path, Set<String> outputTracker) throws IOException {
-    logDebugMessage(LogCategory.GENERATE, "Check Generate "+path);
+    // logDebugMessage(LogCategory.GENERATE, "Check Generate "+path);
     String s = path.toLowerCase();
     if (allOutputs.contains(s))
       throw new Error("Error generating build: the file "+path+" is being generated more than once (may differ by case)");
@@ -4444,7 +4447,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else if (!id.equals(publishedIg.getId()))
       errors.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "ImplementationGuide.id", "The Implementation Guide Resource id should be "+id, IssueSeverity.WARNING));
 
-    packageInfo = new PackageInformation(publishedIg.getPackageId(), publishedIg.getVersion(), new Date(), publishedIg.getName(), igpkp.getCanonical(), targetOutput); 
+    packageInfo = new PackageInformation(publishedIg.getPackageId(), publishedIg.getVersion(), context.getVersion(), new Date(), publishedIg.getName(), igpkp.getCanonical(), targetOutput); 
 
     // Cql Compile
     cql = new CqlSubSystem(npmList, binaryPaths, new LibraryLoader(version), this, context.getUcumService(), publishedIg.getPackageId(), igpkp.getCanonical());
@@ -5552,13 +5555,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void loadConformance() throws Exception {
     for (String s : metadataResourceNames()) 
       scan(s);
+    log("Load Dependency Info");
     loadDepInfo();
+    log("Load Info");
     loadInfo();
-    for (String s : metadataResourceNames()) 
+    for (String s : metadataResourceNames()) { 
+      log("Load "+s);
       load(s);
-    log("Generating Snapshots");
+    }
+    log("Load Paths");
     loadPaths();
+    log("Generating Snapshots");
     generateSnapshots();
+    log("Check R4 / R4B");
     checkR4R4B();
     if (isPropagateStatus) {
       log("Propagating status");
@@ -5819,6 +5828,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               worklist.addAll(transforms);
             }
           }
+          
+
+          ProfileUtilities putils = new ProfileUtilities(context, null, igpkp);
+          putils.setXver(context.getXVer());
+          putils.setForPublication(true);
+          putils.setMasterSourceFileNames(specMaps.get(0).getTargets());
+          putils.setLocalFileNames(pageTargets());
+          if (VersionUtilities.isR4Plus(version)) {
+            putils.setNewSlicingProcessing(true);
+          }
+           
 
           for (StructureMap map : worklist) {
             StructureMapAnalysis analysis = utils.analyse(null, map);
@@ -5832,7 +5852,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               f.getResources().add(nr);
               igpkp.findConfiguration(f, nr);
               sd.setWebPath(igpkp.getLinkFor(nr, true));
-              generateSnapshot(f, nr, sd, true);
+              generateSnapshot(f, nr, sd, true, putils);
             }
           }
         } finally {
@@ -6527,6 +6547,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private void generateSnapshots() throws Exception {
     context.setAllowLoadingDuplicates(true);
+
+    ProfileUtilities utils = new ProfileUtilities(context, null, igpkp);
+    utils.setXver(context.getXVer());
+    utils.setForPublication(true);
+    utils.setMasterSourceFileNames(specMaps.get(0).getTargets());
+    utils.setLocalFileNames(pageTargets());
+    if (VersionUtilities.isR4Plus(version)) {
+      utils.setNewSlicingProcessing(true);
+    }
+    
     logDebugMessage(LogCategory.PROGRESS, "Generate Snapshots");
     for (FetchedFile f : fileList) {
       f.start("generateSnapshots");
@@ -6539,9 +6569,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
             StructureDefinition sd = (StructureDefinition) r.getResource();
             if (!r.isSnapshotted()) {
-              sd.setSnapshot(null); // make sure its clrared out so we do actually regenerate it at this point
               try {
-                generateSnapshot(f, r, sd, false);
+                generateSnapshot(f, r, sd, false, utils);
               } catch (Exception e) {
                 throw new Exception("Error generating snapshot for "+f.getTitle()+(f.getResources().size() > 0 ? "("+r.getId()+")" : "")+": "+e.getMessage(), e);
               }
@@ -6575,24 +6604,21 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
-  private void generateSnapshot(FetchedFile f, FetchedResource r, StructureDefinition sd, boolean close) throws Exception {
+  private void generateSnapshot(FetchedFile f, FetchedResource r, StructureDefinition sd, boolean close, ProfileUtilities utils) throws Exception {
     boolean changed = false;
     logDebugMessage(LogCategory.PROGRESS, "Check Snapshot for "+sd.getUrl());
     sd.setFhirVersion(FHIRVersion.fromCode(version));
-    ProfileUtilities utils = new ProfileUtilities(context, f.getErrors(), igpkp);
+    List<ValidationMessage> messages = new ArrayList<>();
+    utils.setMessages(messages);
     StructureDefinition base = sd.hasBaseDefinition() ? fetchSnapshotted(sd.getBaseDefinition()) : null;
-    utils.setIds(sd, true);
-    utils.setXver(context.getXVer());
-    utils.setForPublication(true);
-    utils.setMasterSourceFileNames(specMaps.get(0).getTargets());
-    utils.setLocalFileNames(pageTargets());
-    if (VersionUtilities.isR4Plus(version)) {
-      utils.setNewSlicingProcessing(true);
-    }
     if (base == null) {
       throw new Exception("Cannot find or generate snapshot for base definition ("+sd.getBaseDefinition()+" from "+sd.getUrl()+")");
     }
-
+    if (sd.hasUserData("profileutils.snapshot.generated")) {
+      changed = true;
+    } else {
+      sd.setSnapshot(null); // make sure its cleared out if it came from elsewhere so that we do actually regenerate it at this point
+    }
     if (sd.getKind() != StructureDefinitionKind.LOGICAL || sd.getDerivation()==TypeDerivationRule.CONSTRAINT) {
       if (!sd.hasSnapshot()) {
         logDebugMessage(LogCategory.PROGRESS, "Generate Snapshot for "+sd.getUrl());
@@ -6603,13 +6629,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           try {
             utils.sortDifferential(base, sd, "profile " + sd.getUrl(), errors, true);
           } catch (Exception e) {
-            f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.EXCEPTION, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "Exception generating snapshot: "+e.getMessage(), IssueSeverity.ERROR));
-            r.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.EXCEPTION, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "Exception generating snapshot: "+e.getMessage(), IssueSeverity.ERROR));
+            messages.add(new ValidationMessage(Source.ProfileValidator, IssueType.EXCEPTION, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "Exception generating snapshot: "+e.getMessage(), IssueSeverity.ERROR));
           }
         }
         for (String s : errors) {
-          f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, "StructureDefinition.where(url = '"+sd.getUrl()+"')", s, IssueSeverity.ERROR));
-          r.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, "StructureDefinition.where(url = '"+sd.getUrl()+"')", s, IssueSeverity.ERROR));
+          messages.add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, "StructureDefinition.where(url = '"+sd.getUrl()+"')", s, IssueSeverity.ERROR));
         }
         utils.setIds(sd, true);
 
@@ -6641,16 +6665,20 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         changed = true;
       }
     }
+
     if (changed || (!r.getElement().hasChild("snapshot") && sd.hasSnapshot())) {
+      // for big snapshots, this can take considerable time, and there's really no reason to do it 
       r.setElement(convertToElement(r, sd));
     }
+    r.getElement().setUserData("profileutils.snapshot.errors", messages); 
+    f.getErrors().addAll(messages);
     r.setSnapshotted(true);
     logDebugMessage(LogCategory.CONTEXT, "Context.See "+sd.getUrl());
     context.cacheResourceFromPackage(sd, packageInfo);
   }
 
   private void validateExpressions() {
-    logDebugMessage(LogCategory.PROGRESS, "validate Expressions");
+    logDebugMessage(LogCategory.PROGRESS, "Validate Expressions");
     for (FetchedFile f : fileList) {
       f.start("validateExpressions");
       try {
@@ -6692,13 +6720,25 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private StructureDefinition fetchSnapshotted(String url) throws Exception {
+
+    ProfileUtilities utils = null;
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() instanceof StructureDefinition) {
           StructureDefinition sd = (StructureDefinition) r.getResource();
           if (sd.getUrl().equals(url)) {
             if (!r.isSnapshotted()) {
-              generateSnapshot(f, r, sd, false);
+              if (utils == null) {
+                utils = new ProfileUtilities(context, null, igpkp);
+                utils.setXver(context.getXVer());
+                utils.setForPublication(true);
+                utils.setMasterSourceFileNames(specMaps.get(0).getTargets());
+                utils.setLocalFileNames(pageTargets());
+                if (VersionUtilities.isR4Plus(version)) {
+                  utils.setNewSlicingProcessing(true);
+                }
+              }
+              generateSnapshot(f, r, sd, false, utils);
             }
             return sd;
           }
@@ -9820,7 +9860,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
         }
         if (r.getResource() != null) {
-          generateResourceHtml(f, regen, r, r.getResource(), vars, "");
+          generateResourceHtml(f, regen, r, r.getResource(), vars, "", db);
           if (r.getResource() instanceof DomainResource) {
             DomainResource container = (DomainResource) r.getResource();
             List<Element> containedElements = r.getElement().getChildren("contained");
@@ -9855,10 +9895,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                         cr.setVersion(((CanonicalResource) container).getVersion());
                       }
                     }
-                    generateResourceHtml(f, regen, r, cr, vars, prefixForContained);
+                    generateResourceHtml(f, regen, r, cr, vars, prefixForContained, db);
                     clist.add(new StringPair(cr.present(), fn));
                   } else {
-                    generateResourceHtml(f, regen, r, containedResource, vars, prefixForContained);
+                    generateResourceHtml(f, regen, r, containedResource, vars, prefixForContained, db);
                     clist.add(new StringPair(containedResource.fhirType()+"/"+containedResource.getId(), fn));
                   }
                 }
@@ -9979,7 +10019,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return src.getBytes(StandardCharsets.UTF_8);
   }
 
-  public boolean generateResourceHtml(FetchedFile f, boolean regen, FetchedResource r, Resource res, Map<String, String> vars, String prefixForContainer) {
+  public boolean generateResourceHtml(FetchedFile f, boolean regen, FetchedResource r, Resource res, Map<String, String> vars, String prefixForContainer, DBBuilder db) {
     boolean result = true;
     try {
 
@@ -9989,7 +10029,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         generateOutputsCodeSystem(f, r, (CodeSystem) res, vars, prefixForContainer);
         break;
       case ValueSet:
-        generateOutputsValueSet(f, r, (ValueSet) res, vars, prefixForContainer);
+        generateOutputsValueSet(f, r, (ValueSet) res, vars, prefixForContainer, db);
         break;
       case ConceptMap:
         generateOutputsConceptMap(f, r, (ConceptMap) res, vars, prefixForContainer);
@@ -10832,7 +10872,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
    * @throws org.hl7.fhir.exceptions.FHIRException
    * @throws Exception
    */
-  private void generateOutputsValueSet(FetchedFile f, FetchedResource r, ValueSet vs, Map<String, String> vars, String prefixForContainer) throws Exception {
+  private void generateOutputsValueSet(FetchedFile f, FetchedResource r, ValueSet vs, Map<String, String> vars, String prefixForContainer, DBBuilder db) throws Exception {
     ValueSetRenderer vsr = new ValueSetRenderer(context, specPath, vs, igpkp, specMaps, pageTargets(), markdownEngine, packge, rc, versionToAnnotate);
     if (igpkp.wantGen(r, "summary")) {
       fragment("ValueSet-"+prefixForContainer+vs.getId()+"-summary", vsr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null);
@@ -10859,6 +10899,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null);
       } else {
         ValueSetExpansionOutcome exp = context.expandVS(vs, true, true, true);
+        db.recordExpansion(vs, exp);
         if (exp.getValueset() != null) {
           expansions.add(exp.getValueset());
 
@@ -11490,12 +11531,25 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return Utilities.path(outputDir, "qa.html");
   }
 
+  private String lastMsg;
+  
   @Override
   public void logMessage(String msg) {
-    if (tt != null) {
-      System.out.println(Utilities.padRight(msg, ' ', 80)+" ("+tt.clock()+")");
-    } else {
-      System.out.println(Utilities.padRight(msg, ' ', 80));      
+//    String s = lastMsg;
+//    lastMsg = msg;
+//    if (s == null) {
+//      s = "";
+//    }
+    Runtime runtime = Runtime.getRuntime();
+    long totalMemory = runtime.totalMemory();
+    long freeMemory = runtime.freeMemory();
+    long usedMemory = totalMemory - freeMemory;
+    
+    String s = msg;
+    if (tt == null) {
+      System.out.println(Utilities.padRight(s, ' ', 190));      
+    } else { // if (tt.longerThan(4)) {
+      System.out.println(Utilities.padRight(s, ' ', 190)+" ("+tt.milestone()+" / "+tt.clock()+", "+Utilities.describeSize(usedMemory)+")");
     }
     if (killFile != null && killFile.exists()) {
       killFile.delete();

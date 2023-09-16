@@ -315,6 +315,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         return true;
       }
       match = getElementParent(profile.getSnapshot().getElement(), match);
+      if (match == null) {
+        return true;
+      }
     }
 
     return false;
