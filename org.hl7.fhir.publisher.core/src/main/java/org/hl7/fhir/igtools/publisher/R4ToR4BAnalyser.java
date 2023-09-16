@@ -431,7 +431,7 @@ public class R4ToR4BAnalyser {
   private void processFileSame(NPMPackageGenerator gen, String folder, String filename, byte[] content, Map<String, ResPointer> exemptions, String ver, String pver) {
     try {
       if (Utilities.existsInList(folder, "package", "example")) {
-        if (!Utilities.existsInList(filename, "package.json", ".index.json")) {
+        if (!Utilities.existsInList(filename, "package.json", ".index.json", ".index.db")) {
           org.hl7.fhir.r4b.model.Resource res = new org.hl7.fhir.r4b.formats.JsonParser().parse(content);
           boolean exempt = (exemptions.containsKey(res.fhirType()+"/"+res.getIdBase()) ||
               ((res instanceof org.hl7.fhir.r4b.model.CanonicalResource) && exemptions.containsKey(((org.hl7.fhir.r4b.model.CanonicalResource) res).getUrl())));
@@ -501,7 +501,7 @@ public class R4ToR4BAnalyser {
   // we use R4B here, whether it's r4 or r4b - if the content is in the differences, we won't get to the this point
   private void processFileOther(NPMPackageGenerator gen, String folder, String filename, byte[] content, String ver, String pver, String nver, Map<String, ResPointer> exemptions, String pathS, String pathT) throws IOException {
     if (Utilities.existsInList(folder, "package", "example")) {
-      if (!Utilities.existsInList(filename, "package.json", ".index.json")) {
+      if (!Utilities.existsInList(filename, "package.json", ".index.json", ".index.db")) {
         org.hl7.fhir.r4b.model.Resource res = new org.hl7.fhir.r4b.formats.JsonParser().parse(content);
         boolean exempt = (exemptions.containsKey(res.fhirType()+"/"+res.getId()) ||
             ((res instanceof org.hl7.fhir.r4b.model.CanonicalResource) && exemptions.containsKey(((org.hl7.fhir.r4b.model.CanonicalResource) res).getUrl())));

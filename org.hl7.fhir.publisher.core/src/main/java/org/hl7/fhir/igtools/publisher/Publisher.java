@@ -772,9 +772,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private SPDXLicense licenseInfo;
   private String publisher;
   private String businessVersion;
+  private String wgm;
   private List<ContactDetail> defaultContacts;
   private List<UsageContext> defaultContexts;
   private String defaultCopyright;
+  private String defaultWgm;
   private List<CodeableConcept> defaultJurisdictions;
   private SPDXLicense defaultLicenseInfo;
   private String defaultPublisher;
@@ -2705,6 +2707,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           businessVersion = sourceIg.getVersion();
         }
         break;
+      case "apply-wg":
+        if (p.getValue().equals("true")) {
+          wgm = ToolingExtensions.readStringExtension(sourceIg, ToolingExtensions.EXT_WORKGROUP);
+        }
+        break;
       case "default-contact":
         if (p.getValue().equals("true")) {
           defaultContacts = sourceIg.getContact();
@@ -2738,6 +2745,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       case "default-version":
         if (p.getValue().equals("true")) {
           defaultBusinessVersion = sourceIg.getVersion();
+        }
+        break;
+      case "default-wg":
+        if (p.getValue().equals("true")) {
+          defaultWgm = ToolingExtensions.readStringExtension(sourceIg, ToolingExtensions.EXT_WORKGROUP);
         }
         break;
       case "generate-version":   
@@ -4431,6 +4443,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       publishedIg.addFhirVersion(FHIRVersion.fromCode(version));
     if (!publishedIg.hasVersion() && businessVersion != null)
       publishedIg.setVersion(businessVersion);
+    if (!publishedIg.hasExtension(ToolingExtensions.EXT_WORKGROUP) && wgm != null) {
+      publishedIg.addExtension(ToolingExtensions.EXT_WORKGROUP, new CodeType(wgm));
+    }
 
     String id = npmName;
     if (npmName.startsWith("hl7.")) {
@@ -6356,6 +6371,23 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                 b.append("version="+defaultBusinessVersion);
                 bc.setVersion(defaultBusinessVersion);
               }
+              
+              if (wgm != null) {
+                if (!bc.hasExtension(ToolingExtensions.EXT_WORKGROUP)) {
+                  altered = true;
+                  b.append("wg="+wgm);
+                  bc.addExtension(ToolingExtensions.EXT_WORKGROUP, new CodeType(wgm));
+                } else if (!wgm.equals(ToolingExtensions.readStringExtension(bc, ToolingExtensions.EXT_WORKGROUP))) {
+                  altered = true;
+                  b.append("wg="+wgm);
+                  bc.getExtensionByUrl(ToolingExtensions.EXT_WORKGROUP).setValue(new CodeType(wgm));
+                }
+              } else if (defaultWgm != null && !bc.hasExtension(ToolingExtensions.EXT_WORKGROUP)) {
+                altered = true;
+                b.append("wg="+defaultWgm);
+                bc.addExtension(ToolingExtensions.EXT_WORKGROUP, new CodeType(defaultWgm));
+              }
+
               if (contacts != null && !contacts.isEmpty()) {
                 altered = true;
                 b.append("contact");
