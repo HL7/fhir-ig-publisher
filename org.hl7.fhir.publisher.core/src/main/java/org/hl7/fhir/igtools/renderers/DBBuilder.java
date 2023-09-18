@@ -462,10 +462,10 @@ public class DBBuilder {
         "Key          integer NOT NULL,\r\n"+
         "ResourceKey  integer NOT NULL,\r\n"+
         "ConceptKey   integer NOT NULL,\r\n"+
-        "UseSystem    varchar NOT NULL,\r\n"+
-        "UseCode      varchar NOT NULL,\r\n"+
-        "Lang         varchar NOT NULL,\r\n"+
-        "Value        text NOT NULL,\r\n"+
+        "UseSystem    varchar NULL,\r\n"+
+        "UseCode      varchar NULL,\r\n"+
+        "Lang         varchar NULL,\r\n"+
+        "Value        text NULL,\r\n"+
         "PRIMARY KEY (Key))\r\n");
   }
 
@@ -474,13 +474,13 @@ public class DBBuilder {
     stmt.execute("CREATE TABLE ConceptMappings (\r\n"+
         "Key           integer NOT NULL,\r\n"+
         "ResourceKey   integer NOT NULL,\r\n"+
-        "SourceSystem  varchar NOT NULL,\r\n"+
-        "SourceVersion varchar NOT NULL,\r\n"+
-        "SourceCode    varchar NOT NULL,\r\n"+
-        "Relationship  varchar NOT NULL,\r\n"+
-        "TargetSystem  varchar NOT NULL,\r\n"+
-        "TargetVersion varchar NOT NULL,\r\n"+
-        "TargetCode    varchar NOT NULL,\r\n"+
+        "SourceSystem  varchar NULL,\r\n"+
+        "SourceVersion varchar NULL,\r\n"+
+        "SourceCode    varchar NULL,\r\n"+
+        "Relationship  varchar NULL,\r\n"+
+        "TargetSystem  varchar NULL,\r\n"+
+        "TargetVersion varchar NULL,\r\n"+
+        "TargetCode    varchar NULL,\r\n"+
         "PRIMARY KEY (Key))\r\n");
   }
 
