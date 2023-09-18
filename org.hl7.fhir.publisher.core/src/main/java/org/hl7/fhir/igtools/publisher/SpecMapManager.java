@@ -106,9 +106,7 @@ public class SpecMapManager {
     images = spec.getJsonArray("images");
     if (targets != null)
       for (String e : targets.asStrings()) {
-        if (e != null){
-          targetSet.add(e);
-        }
+        targetSet.add(e);
     }
     if (images != null)
       for (String e : images.asStrings()) {
@@ -416,8 +414,15 @@ public class SpecMapManager {
   }
 
   public Set<String> listTargets() {
-    return targetSet;
+    Set<String> res = new HashSet<String>();
+    for (String n : targets.asStrings()) {
+      if (n != null) { // shouldn't be null, but apparently this has happemed in the past
+        res.add(n);
+      }
+    }
+    return res;
   }
+
 
   public SpecialPackageType getSpecial() {
     return special;
