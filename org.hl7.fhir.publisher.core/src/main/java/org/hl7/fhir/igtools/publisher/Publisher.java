@@ -772,9 +772,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private SPDXLicense licenseInfo;
   private String publisher;
   private String businessVersion;
+  private String wgm;
   private List<ContactDetail> defaultContacts;
   private List<UsageContext> defaultContexts;
   private String defaultCopyright;
+  private String defaultWgm;
   private List<CodeableConcept> defaultJurisdictions;
   private SPDXLicense defaultLicenseInfo;
   private String defaultPublisher;
@@ -919,6 +921,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private List<String> translationLangs = new ArrayList<>();
   private List<String> translationSupplements = new ArrayList<>();
   private int validationLogTime = 0;
+  private long maxMemory = 0;
 
   private class PreProcessInfo {
     private String xsltName;
@@ -1011,7 +1014,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       File od = new File(outputDir);
       FileUtils.cleanDirectory(od);
       npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), templateInfo, execTime.getTime(), !publishing);
-      npm.loadFiles(rootDir, new File(rootDir), ".git", "output", "package");
+      npm.loadFiles(rootDir, new File(rootDir), ".git", "output", "package", "temp");
       npm.finish();
 
       TextFile.stringToFile(makeTemplateIndexPage(), Utilities.path(outputDir, "index.html"), false);
@@ -1038,6 +1041,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     zip.addFileSource("index.html", REDIRECT_SOURCE, false);
     zip.close();
     Utilities.copyFile(Utilities.path(tempDir, "full-ig.zip"), Utilities.path(outputDir, "full-ig.zip"));
+    new File(Utilities.path(tempDir, "full-ig.zip")).delete();
 
     // registering the package locally
     log("Finished. "+DurationUtil.presentDuration(endTime - startTime)+". Output in "+outputDir);
@@ -1060,10 +1064,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private String makeTemplateJekyllIndexPage() {
-    String page = "---"+
-        "layout: page"+
-        "title: {{npm}}"+
-        "---"+
+    String page = "---\r\n"+
+        "layout: page\r\n"+
+        "title: {{npm}}\r\n"+
+        "---\r\n"+
         "  <p><b>Template {{npm}}</b></p>\r\n"+
         "  <p>You can <a href=\"package.tgz\">download the template</a>, though you should not need to; just refer to the template as {{npm}} in your IG configuration.</p>\r\n"+
         "  <p>A <a href=\"{{canonical}}/history.html\">full version history is published</a></p>\r\n";
@@ -1071,7 +1075,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private String makeTemplateQAPage() {
-    String page = "<!DOCTYPE HTML><html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\"><head><title>Template QA Page</title></head><body><p><b>Template {{npm}}</b></p><p>You  can <a href=\"package.tgz\">download the template</a>, though you should not need to; just refer to the template as {{npm}} in your IG configuration.</p></body></html>";
+    String page = "<!DOCTYPE HTML><html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\"><head><title>Template QA Page</title></head><body><p><b>Template {{npm}} QA</b></p><p>No useful QA on templates - if you see this page, the template buitl ok.</p></body></html>";
     return page.replace("{{npm}}", templateInfo.asString("name"));
   }
 
@@ -1141,7 +1145,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         log("Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
       }
       recordOutcome(null, val);
-      log("Finished");
+      log("Finished. Max Memory Used = "+Utilities.describeSize(maxMemory));
     } catch (Exception e) {
       try {
         recordOutcome(e, null);
@@ -1396,6 +1400,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         j.add("template", templatePck);
       }
       j.add("tool", Constants.VERSION+" ("+ToolsVersion.TOOLS_VERSION+")");
+      j.add("maxMemory", maxMemory);
       String json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(j, true);
       TextFile.stringToFile(json, Utilities.path(destDir != null ? destDir : outputDir, "qa.json"), false);
 
@@ -2705,6 +2710,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           businessVersion = sourceIg.getVersion();
         }
         break;
+      case "apply-wg":
+        if (p.getValue().equals("true")) {
+          wgm = ToolingExtensions.readStringExtension(sourceIg, ToolingExtensions.EXT_WORKGROUP);
+        }
+        break;
       case "default-contact":
         if (p.getValue().equals("true")) {
           defaultContacts = sourceIg.getContact();
@@ -2738,6 +2748,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       case "default-version":
         if (p.getValue().equals("true")) {
           defaultBusinessVersion = sourceIg.getVersion();
+        }
+        break;
+      case "default-wg":
+        if (p.getValue().equals("true")) {
+          defaultWgm = ToolingExtensions.readStringExtension(sourceIg, ToolingExtensions.EXT_WORKGROUP);
         }
         break;
       case "generate-version":   
@@ -4431,6 +4446,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       publishedIg.addFhirVersion(FHIRVersion.fromCode(version));
     if (!publishedIg.hasVersion() && businessVersion != null)
       publishedIg.setVersion(businessVersion);
+    if (!publishedIg.hasExtension(ToolingExtensions.EXT_WORKGROUP) && wgm != null) {
+      publishedIg.addExtension(ToolingExtensions.EXT_WORKGROUP, new CodeType(wgm));
+    }
 
     String id = npmName;
     if (npmName.startsWith("hl7.")) {
@@ -5559,8 +5577,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     loadDepInfo();
     log("Load Info");
     loadInfo();
+    log("Load Resources");
     for (String s : metadataResourceNames()) { 
-      log("Load "+s);
       load(s);
     }
     log("Load Paths");
@@ -6342,20 +6360,31 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               }
               CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
               if (businessVersion != null) {
-                if (!bc.hasVersion()) {
-                  altered = true;
-                  b.append("version="+businessVersion);
-                  bc.setVersion(businessVersion);
-                } else if (!bc.getVersion().equals(businessVersion)) {
-                  altered = true;
-                  b.append("version="+businessVersion);
-                  bc.setVersion(businessVersion);
-                }
-              } else if (defaultBusinessVersion != null && !bc.getVersionElement().isEmpty()) {
+                altered = true;
+                b.append("version="+businessVersion);
+                bc.setVersion(businessVersion);
+              } else if (defaultBusinessVersion != null && !bc.hasVersion()) {
                 altered = true;
                 b.append("version="+defaultBusinessVersion);
                 bc.setVersion(defaultBusinessVersion);
               }
+              
+              if (wgm != null) {
+                if (!bc.hasExtension(ToolingExtensions.EXT_WORKGROUP)) {
+                  altered = true;
+                  b.append("wg="+wgm);
+                  bc.addExtension(ToolingExtensions.EXT_WORKGROUP, new CodeType(wgm));
+                } else if (!wgm.equals(ToolingExtensions.readStringExtension(bc, ToolingExtensions.EXT_WORKGROUP))) {
+                  altered = true;
+                  b.append("wg="+wgm);
+                  bc.getExtensionByUrl(ToolingExtensions.EXT_WORKGROUP).setValue(new CodeType(wgm));
+                }
+              } else if (defaultWgm != null && !bc.hasExtension(ToolingExtensions.EXT_WORKGROUP)) {
+                altered = true;
+                b.append("wg="+defaultWgm);
+                bc.addExtension(ToolingExtensions.EXT_WORKGROUP, new CodeType(defaultWgm));
+              }
+
               if (contacts != null && !contacts.isEmpty()) {
                 altered = true;
                 b.append("contact");
@@ -7054,7 +7083,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   public void validateSD(FetchedFile f, FetchedResource r) {
     StructureDefinition sd = (StructureDefinition) r.getResource();
-    if (!sd.getAbstract()) {
+    if (!sd.getAbstract() && !isClosing(sd)) {
       if (sd.getKind() == StructureDefinitionKind.RESOURCE) {
         int cE = countStatedExamples(sd.getUrl());
         int cI = countFoundExamples(sd.getUrl());
@@ -7085,6 +7114,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
 
+  private boolean isClosing(StructureDefinition sd) {
+    StandardsStatus ss = ToolingExtensions.getStandardsStatus(sd);
+    if (ss == StandardsStatus.DEPRECATED || ss == StandardsStatus.WITHDRAWN) {
+      return true;
+    }
+    if (sd.getStatus() == PublicationStatus.RETIRED) {
+      return true; 
+    }
+    return false;
+  }
+  
+  
   private int countUsages(String fixedUrl) {
     int res = 0;
     for (FetchedFile f : fileList) {
@@ -7162,6 +7203,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     List<ValidationMessage> errs = new ArrayList<ValidationMessage>();
     r.getElement().setUserData("igpub.context.file", file);
     r.getElement().setUserData("igpub.context.resource", r);
+    validator.setExample(r.isExample());
     if (r.isValidateAsResource()) { 
       Resource res = r.getResource();
       if (res instanceof Bundle) {
@@ -11530,8 +11572,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   public String getQAFile() throws IOException {
     return Utilities.path(outputDir, "qa.html");
   }
-
-  private String lastMsg;
   
   @Override
   public void logMessage(String msg) {
@@ -11544,12 +11584,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     long totalMemory = runtime.totalMemory();
     long freeMemory = runtime.freeMemory();
     long usedMemory = totalMemory - freeMemory;
+    if (usedMemory > maxMemory) {
+      maxMemory = usedMemory;
+    }
     
     String s = msg;
     if (tt == null) {
-      System.out.println(Utilities.padRight(s, ' ', 190));      
+      System.out.println(Utilities.padRight(s, ' ', 100));      
     } else { // if (tt.longerThan(4)) {
-      System.out.println(Utilities.padRight(s, ' ', 190)+" ("+tt.milestone()+" / "+tt.clock()+", "+Utilities.describeSize(usedMemory)+")");
+      System.out.println(Utilities.padRight(s, ' ', 100)+" ("+tt.milestone()+" / "+tt.clock()+", "+Utilities.describeSize(usedMemory)+")");
     }
     if (killFile != null && killFile.exists()) {
       killFile.delete();

@@ -70,6 +70,7 @@ public class SpecMapManager {
   private String version;
   private NpmPackage pi;
   private SpecialPackageType special;
+  private int key;
 
   private SpecMapManager() {
     
@@ -428,4 +429,13 @@ public class SpecMapManager {
     return "SpecMapManager [base=" + base + ", name=" + name + ", pi=" + pi + "]";
   }
 
+  public int getKey() {
+    return key;
+  }
+
+  public void setKey(int key) {
+    this.key = key;
+  }
+
+  
 }

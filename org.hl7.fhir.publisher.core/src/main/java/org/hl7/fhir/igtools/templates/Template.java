@@ -281,11 +281,11 @@ public class Template {
     int oc = ig.getDefinition().getResource().size();
     int nc = modIg.getDefinition().getResource().size();
     if (oc != nc)
-      throw new FHIRException("This template is not allowed to modify the resources ("+oc+"/"+nc+")");
+      throw new FHIRException("Templates are not allowed to modify the resources ("+oc+"/"+nc+")");
     for (ImplementationGuideDefinitionResourceComponent or : ig.getDefinition().getResource()) {
       ImplementationGuideDefinitionResourceComponent nr = getMatchingResource(modIg, or.getReference()); 
       if (nr == null)
-        throw new FHIRException("This template is not allowed to modify the resources - didn't find '"+or.getReference()+"'");
+        throw new FHIRException("Templates are not allowed to modify the resources - didn't find '"+or.getReference()+"'");
     }
     ig.setDefinition(modIg.getDefinition());
     ig.getManifest().setPage(modIg.getManifest().getPage());

@@ -49,7 +49,10 @@ public class IGPublisherLiquidTemplateServices implements ILiquidTemplateProvide
         String fn = f.getName();
         fn = fn.substring(0, fn.indexOf("."));
         templates.put(fn.toLowerCase(), TextFile.fileToString(f));
-      }
+      } else if (f.getName().endsWith(".html")) {
+        String fn = f.getName();
+        templates.put(fn, TextFile.fileToString(f));
+      } 
     }
   }
 

@@ -1,5 +1,6 @@
 package org.hl7.fhir.igtools.renderers;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -8,11 +9,15 @@ import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.r5.model.ContactDetail;
+import org.hl7.fhir.r5.model.ContactPoint;
+import org.hl7.fhir.r5.model.ContactPoint.ContactPointSystem;
 import org.hl7.fhir.r5.model.DateTimeType;
 import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
 import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
+import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -81,7 +86,7 @@ public class CanonicalRenderer extends BaseRenderer {
     }
     if (hasSummaryRow(rows, "publisher")) {
       if (cr.hasPublisher())
-        b.append(" <tr><td>"+translate("cr.summary", "Publisher")+":</td><td>"+Utilities.escapeXml(gt(cr.getPublisherElement()))+"</td></tr>\r\n");
+        b.append(" <tr><td>"+translate("cr.summary", "Publisher")+":</td><td>"+buildPublisherLinks(cr)+"</td></tr>\r\n");
     }
     if (hasSummaryRow(rows, "committee")) {
       if (cr.hasExtension(ToolingExtensions.EXT_WORKGROUP)) {
@@ -98,6 +103,55 @@ public class CanonicalRenderer extends BaseRenderer {
         b.append(" <tr><td><a class=\"fmm\" href=\"http://hl7.org/fhir/versions.html#maturity\" title=\"Maturity Level\">"+translate("cs.summary", "Maturity")+"</a>:</td><td>"+ToolingExtensions.readStringExtension(cr, ToolingExtensions.EXT_FMM_LEVEL)+"</td></tr>\r\n");
       }    
     }
+  }
+
+  private String buildPublisherLinks(CanonicalResource cr) {
+    CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder(". ");
+    boolean useName = false;
+    for (ContactDetail cd : cr.getContact()) {
+      if (!cd.hasName()) {
+        useName = true;
+      }
+    }
+    if (!useName) {
+      b.append(Utilities.escapeXml(cr.getPublisher()));            
+    }    
+    for (ContactDetail cd : cr.getContact()) {
+      String name = cd.hasName() ? cd.getName() : cr.getPublisher();
+      b.append(renderContact(name, cd.getTelecom()));
+    }
+    return b.toString();
+  }
+
+  private String renderContact(String name, List<ContactPoint> telecom) {
+    List<String> urls = new ArrayList<>();
+    for (ContactPoint t : telecom) {
+      if (t.getSystem() == ContactPointSystem.URL && t.hasValue()) {
+        urls.add(t.getValue());
+      }
+    }
+    StringBuilder b = new StringBuilder();
+    if (urls.size() == 1) {
+      b.append("<a href=\""+Utilities.escapeXml(urls.get(0))+"\">"+Utilities.escapeXml(name)+"</a>");
+    } else if (urls.size() == 1) {
+      b.append(Utilities.escapeXml(name));
+    } 
+    for (ContactPoint t : telecom) {
+      b.append(", ");
+      if (t.getSystem() == ContactPointSystem.URL && t.hasValue() && urls.size() > 1) {
+        b.append("<a href=\""+Utilities.escapeXml(t.getValue())+"\">Link</a>");
+      }
+      if (t.getSystem() == ContactPointSystem.EMAIL && t.hasValue()) {
+        b.append("<a href=\"mailto:"+Utilities.escapeXml(t.getValue())+"\">Email</a>");
+      }
+      if (t.getSystem() == ContactPointSystem.PHONE && t.hasValue()) {
+        b.append(Utilities.escapeXml(t.getValue()));
+      }
+      if (t.getSystem() == ContactPointSystem.FAX && t.hasValue()) {
+        b.append("Fax:"+Utilities.escapeXml(t.getValue()));
+      }
+    } 
+    return b.toString();
   }
 
   protected boolean hasSummaryRow(Set<String> rows, String name) {
