@@ -337,7 +337,7 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
 
   @Override
   public boolean isPrimitiveType(String name) {
-    return new ContextUtilities(info.getCtxt()).isPrimitiveDatatype(name);
+    return info.getCtxt().isPrimitiveType(name);
   }
 
 
