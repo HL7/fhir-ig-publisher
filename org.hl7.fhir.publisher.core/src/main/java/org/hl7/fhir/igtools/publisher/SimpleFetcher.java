@@ -34,7 +34,7 @@ import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService.LogCategory;
 import org.hl7.fhir.r5.elementmodel.FmlParser;
-import org.hl7.fhir.r5.elementmodel.ParserBase.NamedElement;
+import org.hl7.fhir.r5.elementmodel.ValidatedFragment;
 import org.hl7.fhir.r5.formats.FormatUtilities;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.DataType;
@@ -342,7 +342,7 @@ public class SimpleFetcher implements IFetchFile {
                 }
               if (!ok && !Utilities.existsInList(ext, "xml", "ttl", "html", "txt", "fml")) {
                 try {
-                  List<NamedElement> el = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parse(new FileInputStream(fn));
+                  List<ValidatedFragment> el = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parse(new FileInputStream(fn));
                   if (el.size() == 1) {
                     addFile(res, f, el.get(0).getElement(), "application/fhir+json");
                     count++;

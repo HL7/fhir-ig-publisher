@@ -232,6 +232,7 @@ public class TemplateReleaser {
       }
     }
     Publisher.publishDirect(Utilities.path(source, vd.getId()));
+    vd.built = true;
   }
 
   private void updateVersions(String source, VersionDecision vd, List<VersionDecision> versionsList) throws FileNotFoundException, IOException {
@@ -509,6 +510,13 @@ public class TemplateReleaser {
       Utilities.copyDirectory(Utilities.path(source, vd.getId(), "output"), Utilities.path(dest, npm.name(), npm.version()), null);
       Utilities.copyDirectory(Utilities.path(source, vd.getId(), "output"), Utilities.path(dest, npm.name()), null);
       Utilities.copyFile(Utilities.path(source, vd.getId(), "package-list.json"), Utilities.path(dest, npm.name(), "package-list.json"));
+
+      // create history page 
+      JsonObject jh = JsonParser.parseObjectFromFile(Utilities.path(source, vd.getId(), "package-list.json"));
+      String history = TextFile.fileToString(Utilities.path(dest, "history.template"));
+      history = history.replace("{{id}}", vd.getId());
+      history = history.replace("{{pl}}", JsonParser.compose(jh, false));
+      TextFile.stringToFile(history, Utilities.path(dest, vd.getId(), "history.html"));
       
       // update rss feed      
       Element item = rss.createElement("item");

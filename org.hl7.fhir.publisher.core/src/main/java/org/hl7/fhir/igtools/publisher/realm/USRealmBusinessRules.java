@@ -227,7 +227,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
       ComparisonSession session = new ComparisonSession(context, context, "Comparison of "+name+" with US-Core", pkp, pkp);
       //    session.setDebug(true);
       for (ProfilePair c : comparisons) {
-        System.out.println("US Core Comparison: compare "+c.local+" to "+c.uscore);
+//        System.out.println("US Core Comparison: compare "+c.local+" to "+c.uscore);
         session.compare(c.uscore, c.local);      
       }
       Utilities.createDirectory(Utilities.path(dstDir, "us-core-comparisons"));

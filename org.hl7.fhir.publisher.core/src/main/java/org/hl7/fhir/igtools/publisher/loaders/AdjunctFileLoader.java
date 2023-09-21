@@ -18,6 +18,7 @@ import org.hl7.fhir.r5.model.Library;
 import org.hl7.fhir.r5.model.Property;
 import org.hl7.fhir.r5.model.RelatedArtifact.RelatedArtifactType;
 import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.utilities.NamedItemList;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
@@ -253,7 +254,7 @@ public class AdjunctFileLoader {
     return res;
   }
 
-  private void listAttachments(List<ElementWithPath> res, List<Element> children, String path) {
+  private void listAttachments(List<ElementWithPath> res, NamedItemList<Element> children, String path) {
     String lastName = "";
     int c = -1;
     for (int i = 0; i < children.size(); i++) {
