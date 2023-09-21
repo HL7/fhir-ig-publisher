@@ -40,6 +40,8 @@ import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.utils.FHIRPathEngine;
 import org.hl7.fhir.r5.utils.ResourceSorters.CanonicalResourceSortByUrl;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
+import org.hl7.fhir.utilities.HL7WorkGroups;
+import org.hl7.fhir.utilities.HL7WorkGroups.HL7WorkGroup;
 import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.validation.ValidationOptions;
@@ -115,7 +117,6 @@ public class CrossViewRenderer extends Renderer {
   public List<String> baseTypes = new ArrayList<>();
   public List<String> baseExtTypes = new ArrayList<>();
   public String corePath;
-  private ContextUtilities cu;
   private FHIRPathEngine fpe;
   private List<SearchParameter> searchParams = new ArrayList<>();
 
@@ -126,7 +127,6 @@ public class CrossViewRenderer extends Renderer {
     this.worker = context;
     this.corePath = corePath;
     getBaseTypes();
-    cu = new ContextUtilities(context);
     fpe = new FHIRPathEngine(context);
   }
 
@@ -736,11 +736,11 @@ public class CrossViewRenderer extends Renderer {
         if (s.contains(".")) {
           s = s.substring(0, s.indexOf("."));
         }
-        if (cu.isPrimitiveDatatype(s)) {
+        if (worker.isPrimitiveType(s)) {
           set.add("primitives");
           s = null;
         } 
-        if (cu.isDatatype(s)) {
+        if (worker.isDataType(s)) {
           set.add("datatypes");
         } 
         if (s != null) {
@@ -794,6 +794,7 @@ public class CrossViewRenderer extends Renderer {
     tr.td().b().ah(Utilities.pathURL(worker.getSpecUrl(), "defining-extensions.html#cardinality")).tx("Conf.");
     tr.td().b().tx("Type");
     tr.td().b().ah(Utilities.pathURL(worker.getSpecUrl(), "defining-extensions.html")+"#context").tx("Context");
+    tr.td().b().tx("WG");
     tr.td().b().ah(Utilities.pathURL(worker.getSpecUrl(), "versions.html")+"#std-process").tx("Status");
     if (context.getChangeVersion() != null) {
       tr.td().b().tx("Δ v"+context.getChangeVersion());
@@ -936,7 +937,6 @@ public class CrossViewRenderer extends Renderer {
 
   private void genExtensionRow(XhtmlNode tbl, StructureDefinition ed) throws Exception {
     StandardsStatus status = ToolingExtensions.getStandardsStatus(ed);
-    String pstatus = ed.getStatus().toCode();
     XhtmlNode tr;
     if (status  == StandardsStatus.DEPRECATED) {
       tr = tbl.tr().style("background-color: #ffeeee");
@@ -995,20 +995,31 @@ public class CrossViewRenderer extends Renderer {
       }
     }
     
+    String wg = ToolingExtensions.readStringExtension(ed, ToolingExtensions.EXT_WORKGROUP);
+    if (wg == null) {
+      tr.td();
+    } else {
+      HL7WorkGroup wgd = HL7WorkGroups.find(wg);
+      if (wgd == null) {
+        tr.td().tx(wg);        
+      } else {
+        tr.td().ah(wgd.getLink()).tx(wg);
+      }
+    }
     String fmm = ToolingExtensions.readStringExtension(ed, ToolingExtensions.EXT_FMM_LEVEL);
     td = tr.td();
     if (status == StandardsStatus.NORMATIVE) {
-      td.ahWithText(pstatus+" / ", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Normative", "Normative", null).attribute("class", "normative-flag");
+      td.ahWithText("", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Normative", "Normative", null).attribute("class", "normative-flag");
     } else if (status == StandardsStatus.DEPRECATED) {
-      td.ahWithText(pstatus+" / ", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Deprecated", "Deprecated", null).attribute("class", "deprecated-flag");
+      td.ahWithText("", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Deprecated", "Deprecated", null).attribute("class", "deprecated-flag");
     } else if (status == StandardsStatus.INFORMATIVE) {
-      td.ahWithText(pstatus+" / ", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Informative", "Informative", null).attribute("class", "informative-flag");
+      td.ahWithText("", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Informative", "Informative", null).attribute("class", "informative-flag");
     } else if (status == StandardsStatus.DRAFT) {
-      td.ahWithText(pstatus+" / ", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Draft", "Draft", null).attribute("class", "draft-flag");
+      td.ahWithText("", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Draft", "Draft", null).attribute("class", "draft-flag");
     } else { 
-      td.ahWithText(pstatus+" / ", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Trial-Use", "Trial-Use", null).attribute("class", "trial-use-flag");
+      td.ahWithText("", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Trial-Use", "Trial-Use", null).attribute("class", "trial-use-flag");
     }
-    tr.td().tx(Utilities.noString(fmm) ? "" : ": FMM"+fmm+"");
+    td.tx(Utilities.noString(fmm) ? "" : ": FMM"+fmm+"");
     if (context.getChangeVersion() != null) {
       renderStatusSummary(ed, tr.td(), "status");
     }
