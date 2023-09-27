@@ -1075,7 +1075,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private String makeTemplateQAPage() {
-    String page = "<!DOCTYPE HTML><html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\"><head><title>Template QA Page</title></head><body><p><b>Template {{npm}} QA</b></p><p>No useful QA on templates - if you see this page, the template buitl ok.</p></body></html>";
+    String page = "<!DOCTYPE HTML><html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\"><head><title>Template QA Page</title></head><body><p><b>Template {{npm}} QA</b></p><p>No useful QA on templates - if you see this page, the template built ok.</p></body></html>";
     return page.replace("{{npm}}", templateInfo.asString("name"));
   }
 
@@ -6029,34 +6029,46 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     if (e != null) {
       try {
-        if (!Utilities.noString(e.getIdBase())) {
-          checkResourceUnique(e.fhirType()+"/"+e.getIdBase());
-        }
+        String id;
         boolean altered = false;
+        boolean binary = false;
+        if (!context.getResourceNamesAsSet().contains(e.fhirType())) {
+          File f = new File(file.getPath());
+          id = f.getName();
+          id = id.substring(0, id.indexOf("."));
+          checkResourceUnique("Binary/"+id);
+          r.setElement(e).setId(id).setType("Binary");
+          igpkp.findConfiguration(file, r);
+          binary = true;
+        } else {
+          id = e.getChildValue("id");
+          if (!Utilities.noString(e.getIdBase())) {
+            checkResourceUnique(e.fhirType()+"/"+e.getIdBase());
+          }
 
-        String id = e.getChildValue("id");
-        if (Utilities.noString(id)) {
-          if (e.hasChild("url")) {
-            String url = e.getChildValue("url");
-            String prefix = Utilities.pathURL(igpkp.getCanonical(), e.fhirType())+"/";
-            if (url.startsWith(prefix)) {
-              id = e.getChildValue("url").substring(prefix.length());
-              e.setChildValue("id", id);
-              altered = true;
-            } 
-            prefix = Utilities.pathURL(altCanonical, e.fhirType())+"/";
-            if (url.startsWith(prefix)) {
-              id = e.getChildValue("url").substring(prefix.length());
-              e.setChildValue("id", id);
-              altered = true;
-            } 
-            if (Utilities.noString(id)) {
-              throw new Exception("Resource has no id in "+file.getPath()+" and canonical URL ("+url+") does not start with the IG canonical URL ("+prefix+")");
+          if (Utilities.noString(id)) {
+            if (e.hasChild("url")) {
+              String url = e.getChildValue("url");
+              String prefix = Utilities.pathURL(igpkp.getCanonical(), e.fhirType())+"/";
+              if (url.startsWith(prefix)) {
+                id = e.getChildValue("url").substring(prefix.length());
+                e.setChildValue("id", id);
+                altered = true;
+              } 
+              prefix = Utilities.pathURL(altCanonical, e.fhirType())+"/";
+              if (url.startsWith(prefix)) {
+                id = e.getChildValue("url").substring(prefix.length());
+                e.setChildValue("id", id);
+                altered = true;
+              } 
+              if (Utilities.noString(id)) {
+                throw new Exception("Resource has no id in "+file.getPath()+" and canonical URL ("+url+") does not start with the IG canonical URL ("+prefix+")");
+              }
             }
           }
+          r.setElement(e).setId(id);
+          igpkp.findConfiguration(file, r);
         }
-        r.setElement(e).setId(id);
-        igpkp.findConfiguration(file, r);
         if (!suppressLoading) {
           if (srcForLoad == null)
             srcForLoad = findIGReference(r.fhirType(), r.getId());
@@ -6116,8 +6128,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         if (new AdjunctFileLoader(binaryPaths, cql).replaceAttachments1(file, r, metadataResourceNames())) {
           altered = true;
         }
-        if ((altered && r.getResource() != null) || (ver.equals(Constants.VERSION) && r.getResource() == null))
+        if (!binary && ((altered && r.getResource() != null) || (ver.equals(Constants.VERSION) && r.getResource() == null && context.getResourceNamesAsSet().contains(r.fhirType())))) {
           r.setResource(new ObjectConverter(context).convert(r.getElement()));
+        }
         if ((altered && r.getResource() == null)) {
           if (file.getContentType().contains("json")) {
             saveToJson(file, e);
@@ -6696,7 +6709,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
 
     if (changed || (!r.getElement().hasChild("snapshot") && sd.hasSnapshot())) {
-      // for big snapshots, this can take considerable time, and there's really no reason to do it 
       r.setElement(convertToElement(r, sd));
     }
     r.getElement().setUserData("profileutils.snapshot.errors", messages); 
@@ -6925,28 +6937,32 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       try {
         logDebugMessage(LogCategory.PROGRESS, " .. validate "+f.getName());
         logDebugMessage(LogCategory.PROGRESS, " .. "+f.getName());
-        for (FetchedResource r : f.getResources()) {
-          if (!r.isValidated()) {
-            logDebugMessage(LogCategory.PROGRESS, "     validating "+r.getTitle());
-            validate(f, r);
+        FetchedResource r0 = f.getResources().get(0);
+        if (f.getLogical() != null && f.getResources().size() == 1 && !r0.fhirType().equals("Binary")) {
+          throw new Error("Not done yet");
+        } else {
+          for (FetchedResource r : f.getResources()) {
+            if (!r.isValidated()) {
+              logDebugMessage(LogCategory.PROGRESS, "     validating "+r.getTitle());
+              validate(f, r);
+            }
           }
-        }
-        FetchedResource r = f.getResources().get(0);
-        if (f.getLogical() != null && f.getResources().size() == 1 && r.fhirType().equals("Binary")) {
-          Binary bin = (Binary) r.getResource();
-          StructureDefinition profile = context.fetchResource(StructureDefinition.class, f.getLogical());
-          List<ValidationMessage> errs = new ArrayList<ValidationMessage>();
-          if (profile == null) {
-            errs.add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, "file", context.formatMessage(I18nConstants.Bundle_BUNDLE_Entry_NO_LOGICAL_EXPL, r.getId(), f.getLogical()), IssueSeverity.ERROR));
-          } else {
-            FhirFormat fmt = FhirFormat.readFromMimeType(bin.getContentType());        
-            Session tts = tt.start("validation");
-            List<StructureDefinition> profiles = new ArrayList<>();
-            profiles.add(profile);
-            validate(f, r, bin, errs, fmt, profiles);    
-            tts.end();
+          if (f.getLogical() != null && f.getResources().size() == 1 && r0.fhirType().equals("Binary")) {
+            Binary bin = (Binary) r0.getResource();
+            StructureDefinition profile = context.fetchResource(StructureDefinition.class, f.getLogical());
+            List<ValidationMessage> errs = new ArrayList<ValidationMessage>();
+            if (profile == null) {
+              errs.add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, "file", context.formatMessage(I18nConstants.Bundle_BUNDLE_Entry_NO_LOGICAL_EXPL, r0.getId(), f.getLogical()), IssueSeverity.ERROR));
+            } else {
+              FhirFormat fmt = FhirFormat.readFromMimeType(bin.getContentType());        
+              Session tts = tt.start("validation");
+              List<StructureDefinition> profiles = new ArrayList<>();
+              profiles.add(profile);
+              validate(f, r0, bin, errs, fmt, profiles);    
+              tts.end();
+            }
+            processValidationOutcomes(f, r0, errs);
           }
-          processValidationOutcomes(f, r, errs);
         }
       } finally {
         f.finish("validate");      
@@ -6984,6 +7000,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void validate(FetchedFile f, FetchedResource r, List<ValidationMessage> errs, Binary bin) {
     long ts = System.currentTimeMillis();
     validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), FhirFormat.readFromMimeType(bin.getContentType()));
+    long tf = System.currentTimeMillis();
+    if (tf-ts > validationLogTime && validationLogTime > 0) {
+      reportLongValidation(f, r, tf-ts);
+    }
+  }
+
+  private void validate(FetchedFile f, FetchedResource r, List<ValidationMessage> errs, Binary bin, StructureDefinition sd) {
+    long ts = System.currentTimeMillis();
+    List<StructureDefinition> profiles = new ArrayList<StructureDefinition>();
+    profiles.add(sd);
+    validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), FhirFormat.readFromMimeType(bin.getContentType()), profiles);
     long tf = System.currentTimeMillis();
     if (tf-ts > validationLogTime && validationLogTime > 0) {
       reportLongValidation(f, r, tf-ts);
@@ -7218,6 +7245,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       } else if (res.hasUserData("profile")) {
         validate(file, r, errs, res);
       }
+    } else if (r.getResource() != null && r.getResource() instanceof Binary && file.getLogical() != null && context.hasResource(StructureDefinition.class, file.getLogical())) {
+      StructureDefinition sd = context.fetchResource(StructureDefinition.class, file.getLogical());
+      Binary bin = (Binary) r.getResource();
+      validate(file, r, errs, bin, sd);    
     } else if (r.getResource() != null && r.getResource() instanceof Binary && r.getExampleUri() != null) {
       Binary bin = (Binary) r.getResource();
       validate(file, r, errs, bin);    
@@ -7747,7 +7778,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       org.hl7.fhir.r5.formats.JsonParser jp = new org.hl7.fhir.r5.formats.JsonParser();
       jp.compose(bs, res);
     }
-    ByteArrayInputStream bi = new ByteArrayInputStream(bs.toByteArray());
+    byte[] cnt = bs.toByteArray();
+    ByteArrayInputStream bi = new ByteArrayInputStream(cnt);
     Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parseSingle(bi, null);
     if (xhtml != null) {
       Element div = e.getNamedChild("text").getNamedChild("div");
