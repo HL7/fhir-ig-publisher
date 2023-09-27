@@ -704,27 +704,35 @@ public class HTMLInspector {
           page = filename;
         } else if (page.contains("#")) {
           name = page.substring(page.indexOf("#")+1);
+          try {
           if (altRootFolder != null && filename.startsWith(altRootFolder))
             page = Utilities.path(altRootFolder, page.substring(0, page.indexOf("#")).replace("/", File.separator));
           else
             page = Utilities.path(rootFolder, page.substring(0, page.indexOf("#")).replace("/", File.separator));
+          } catch (Exception e) {
+            page = null;
+          }
         } else {
           String folder = Utilities.getDirectoryForFile(filename);
           page = Utilities.path(folder == null ? (altRootFolder != null && filename.startsWith(altRootFolder) ? altRootFolder : rootFolder) : folder, page.replace("/", File.separator));
         }
-        LoadedFile f = cache.get(page);
-        if (f != null) {
-          if (Utilities.noString(name))
-            resolved = true;
-          else { 
-            resolved = f.targets.contains(name);
-            tgtList = " (valid targets: "+(f.targets.size() > 40 ? Integer.toString(f.targets.size())+" targets"  :  f.targets.toString())+")";
-            for (String s : f.targets) {
-              if (s.equalsIgnoreCase(name)) {
-                tgtList = (" - case is wrong ('"+s+"')");
+        if (page != null) {
+          LoadedFile f = cache.get(page);
+          if (f != null) {
+            if (Utilities.noString(name))
+              resolved = true;
+            else { 
+              resolved = f.targets.contains(name);
+              tgtList = " (valid targets: "+(f.targets.size() > 40 ? Integer.toString(f.targets.size())+" targets"  :  f.targets.toString())+")";
+              for (String s : f.targets) {
+                if (s.equalsIgnoreCase(name)) {
+                  tgtList = (" - case is wrong ('"+s+"')");
+                }
               }
             }
           }
+        } else {
+          resolved = false; 
         }
       }
     }
