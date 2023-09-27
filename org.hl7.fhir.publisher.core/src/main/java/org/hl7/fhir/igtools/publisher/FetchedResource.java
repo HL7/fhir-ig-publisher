@@ -82,6 +82,10 @@ public class FetchedResource {
     return this;
   }
 
+  public void setType(String type) {
+    this.type = type;
+  }
+
   public String getId() {
     return id;
   }

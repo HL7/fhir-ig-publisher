@@ -453,7 +453,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return "";
     else {
       sdr.getContext().setStructureMode(mode);
-      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", false, false, outputTracker, false, gen, toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP));
+      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen, toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP));
     }
   }
 
@@ -466,7 +466,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       
       sdCopy.getSnapshot().setElement(getKeyElements());
       sdr.getContext().setStructureMode(mode);
-      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", false, false, outputTracker, true, gen, toTabs ? ANCHOR_PREFIX_KEY : ANCHOR_PREFIX_SNAP);
+      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, true, gen, toTabs ? ANCHOR_PREFIX_KEY : ANCHOR_PREFIX_SNAP);
 
       return composer.compose(table);
     }
@@ -481,7 +481,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       sdr.getContext().setStructureMode(mode);
 
       sdCopy.getSnapshot().setElement(getMustSupportElements());
-      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", false, false, outputTracker, true, gen, toTabs ? ANCHOR_PREFIX_MS : ANCHOR_PREFIX_SNAP);
+      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, true, gen, toTabs ? ANCHOR_PREFIX_MS : ANCHOR_PREFIX_SNAP);
 
       return composer.compose(table);
     }
@@ -524,7 +524,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       List<ElementDefinition> keyElements = getKeyElements();
 
       sdCopy.getSnapshot().setElement(keyElements);
-      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", false, false, outputTracker, true, gen, ANCHOR_PREFIX_KEY);
+      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, true, gen, ANCHOR_PREFIX_KEY);
 
       return composer.compose(table);
     }

@@ -181,10 +181,23 @@ public class SpecMapManager {
     if (special != null) {
       switch (special) {
       case Simplifier: return "https://simplifier.net/resolve?scope="+pi.name()+"@"+pi.version()+"&canonical="+url;
-      case PhinVads:  if (url.startsWith(base)) 
-          return "??phinvads??"; 
-        else 
-          break;
+      case PhinVads:  
+        try {
+          if (url.startsWith(base)) {
+            final String fileName = Utilities.urlTail(url) + "json";
+  
+            if ((isValidFilename(fileName) && pi.hasFile("package", fileName))
+                    || pi.hasCanonical(url)) {
+              return "phinvads_broken_link.html"; 
+            } else {
+              return null;
+            }
+              
+          } else 
+            break;
+        } catch (IOException e) {
+          return null;
+        }
       case Vsac: if (url.contains("cts.nlm.nih.gov")) {
         return url.replace("http://cts.nlm.nih.gov/fhir/ValueSet/", "https://vsac.nlm.nih.gov/valueset/")+"/expansion";
       }
