@@ -48,6 +48,8 @@ import com.google.gson.JsonSyntaxException;
 
 public class PublicationProcess {
  
+  private int exitCode = 1;
+  
   /*
    * checks that must be run prior to runing this:
    *  
@@ -131,6 +133,7 @@ public class PublicationProcess {
       e.printStackTrace();
     }
     System.out.println("Full log in "+logger.getFilename());
+    System.exit(exitCode);
   }
 
   private static String removePassword(String[] args, int i) {
@@ -578,6 +581,7 @@ public class PublicationProcess {
       System.out.println("No!");
       System.out.print("Changes not applied. Finished");
     }
+    exitCode = 0;
   }
 
   private List<String> loadSubPackageList(String path) throws JsonException, IOException {
