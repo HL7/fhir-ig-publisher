@@ -72,6 +72,9 @@ public class SpecMapManager {
   private SpecialPackageType special;
   private int key;
 
+  private String auth;
+  private String realm;
+  
   private SpecMapManager() {
     
   }
@@ -448,6 +451,22 @@ public class SpecMapManager {
 
   public void setKey(int key) {
     this.key = key;
+  }
+
+  public String getAuth() {
+    return auth;
+  }
+
+  public void setAuth(String auth) {
+    this.auth = auth;
+  }
+
+  public String getRealm() {
+    return realm;
+  }
+
+  public void setRealm(String realm) {
+    this.realm = realm;
   }
 
   

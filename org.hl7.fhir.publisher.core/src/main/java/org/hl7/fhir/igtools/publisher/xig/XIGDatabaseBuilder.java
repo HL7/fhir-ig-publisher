@@ -17,9 +17,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.zip.Deflater;
+import java.util.zip.GZIPInputStream;
 
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipParameters;
+import org.apache.commons.io.IOUtils;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
 import org.hl7.fhir.convertors.analytics.PackageVisitor.IPackageVisitorProcessor;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_10_50;
@@ -63,6 +65,11 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
   private PreparedStatement psqlCI;
   private Set<String> vurls = new HashSet<>();
   private int lastMDKey;
+  private Set<String> authorities = new HashSet<>();
+  private Set<String> realms = new HashSet<>();
+  private Set<String> possibleAuthorities = new HashSet<>();
+  private Set<String> possibleRealms = new HashSet<>();
+  
   
   private Map<String, SpecMapManager> smmList = new HashMap<>();
 
@@ -72,7 +79,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
       con = connect(dest, date);
 
       psqlP = con.prepareStatement("Insert into Packages (PackageKey, PID, Id, Date, Title, Canonical, Web, Version, R2, R2B, R3, R4, R4B, R5, R6, Realm, Auth, Package) Values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-      psqlR = con.prepareStatement("Insert into Resources (ResourceKey, PackageKey, ResourceType, ResourceTypeR5, Id, R2, R2B, R3, R4, R4B, R5, R6, Web, Url, Version, Status, Date, Name, Title, Experimental, Realm, Description, Purpose, Copyright, CopyrightLabel, Kind, Type, Supplements, Content) Values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      psqlR = con.prepareStatement("Insert into Resources (ResourceKey, PackageKey, ResourceType, ResourceTypeR5, Id, R2, R2B, R3, R4, R4B, R5, R6, Web, Url, Version, Status, Date, Name, Title, Experimental, Realm, Description, Purpose, Copyright, CopyrightLabel, Kind, Type, Supplements, ValueSet, Content) Values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
       psqlC = con.prepareStatement("Insert into Contents (ResourceKey, Json, JsonR5) Values (?, ?, ?)");
       psqlRI = con.prepareStatement("Insert into ResourceFTS (ResourceKey, Name, Title, Description, Narrative) Values (?, ?, ?, ?, ?)");
       psqlCI = con.prepareStatement("Insert into CodeSystemFTS (ResourceKey, Code, Display, Definition) Values (?, ?, ?, ?)");
@@ -88,6 +95,8 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
     makePackageTable(con);
     makeResourcesTable(con);
     makeContentsTable(con);
+    makeRealmsTable(con);
+    makeAuthoritiesTable(con);
     makeResourceIndex(con);
     makeCodeIndex(con);
     PreparedStatement psql = con.prepareStatement("Insert into Metadata (key, name, value) values (?, ?, ?)");
@@ -169,6 +178,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
         "Title           nvarchar NULL,\r\n"+
         "Experimental    INTEGER NULL,\r\n"+
         "Realm           nvarchar NULL,\r\n"+
+        "Authority       nvarchar NULL,\r\n"+
         "Description     nvarchar NULL,\r\n"+
         "Purpose         nvarchar NULL,\r\n"+
         "Copyright       nvarchar NULL,\r\n"+
@@ -176,6 +186,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
         "Content         nvarchar NULL,\r\n"+
         "Type            nvarchar NULL,\r\n"+
         "Supplements     nvarchar NULL,\r\n"+
+        "ValueSet        nvarchar NULL,\r\n"+
         "Kind            nvarchar NULL,\r\n"+
         "PRIMARY KEY (ResourceKey))\r\n");
   }
@@ -188,11 +199,43 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
         "Json            BLOB NOT NULL,\r\n"+
         "JsonR5          BLOB NULL,\r\n"+
         "PRIMARY KEY (ResourceKey))\r\n");
-    
+  }
+  
+  private void makeRealmsTable(Connection con) throws SQLException {
+    Statement stmt = con.createStatement();
+    stmt.execute("CREATE TABLE Realms (\r\n"+
+        "Code            nvarchar NOT NULL,\r\n"+
+        "PRIMARY KEY (Code))\r\n");
+  }
+
+  private void makeAuthoritiesTable(Connection con) throws SQLException {
+    Statement stmt = con.createStatement();
+    stmt.execute("CREATE TABLE Authorities (\r\n"+
+        "Code            nvarchar NOT NULL,\r\n"+
+        "PRIMARY KEY (Code))\r\n"); 
   }
   
   public void finish() throws IOException {
     try {
+      PreparedStatement psql = con.prepareStatement("Insert into Realms (code) values (?)");
+      for (String s : realms) {
+        psql.setString(1, s);
+        psql.executeUpdate();
+      }
+      psql = con.prepareStatement("Insert into Authorities (code) values (?)");
+      for (String s : authorities) {
+        psql.setString(1, s);
+        psql.executeUpdate();
+      }
+      
+      System.out.println("Possible Realms:");
+      for (String s : possibleRealms) {
+        System.out.println(" "+s);        
+      }
+      System.out.println("Possible Authorities:");
+      for (String s : possibleAuthorities) {
+        System.out.println(" "+s);        
+      }
       con.close();
     } catch (Exception e) {
       throw new IOException(e);
@@ -204,6 +247,14 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
     if (!isCoreDefinition(pid)) {
 
       try {
+        Resource r = loadResource(pid, version, type, id, content);
+        CanonicalResource cr = null;
+        if (r != null && r instanceof CanonicalResource) {
+          cr = (CanonicalResource) r;
+        }  
+        String auth;
+        String realm;
+
         SpecMapManager smm = smmList.get(pid);
         if (smm == null) {
           smm = npm.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.fhirVersion()) : SpecMapManager.createSpecialPackage(npm);
@@ -213,7 +264,12 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
           smm.setBase2(PackageHacker.fixPackageUrl(npm.url()));
           smm.setKey(pckKey);
           smmList.put(pid, smm);
-
+          
+          auth = getAuth(pid, cr);
+          realm = getRealm(pid, cr);
+          smm.setAuth(auth);
+          smm.setRealm(realm);
+          
           psqlP.setInt(1, pckKey);
           psqlP.setString(2, pid);
           psqlP.setString(3, npm.name());
@@ -229,15 +285,16 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
           psqlP.setInt(13, hasVersion(npm.fhirVersionList(), "4.3"));
           psqlP.setInt(14, hasVersion(npm.fhirVersionList(), "5.0"));
           psqlP.setInt(15, hasVersion(npm.fhirVersionList(), "6.0"));
-          psqlP.setString(16, getRealm(pid));
-          psqlP.setString(17, getAuth(pid));
+          psqlP.setString(16, realm);
+          psqlP.setString(17, auth);
           psqlP.setBytes(18, org.hl7.fhir.utilities.json.parser.JsonParser.composeBytes(npm.getNpm()));
           psqlP.execute();
+        } else {
+          auth = smm.getAuth();
+          realm = smm.getRealm();
         }
 
-        Resource r = loadResource(pid, version, type, id, content);
         if (r != null && r instanceof CanonicalResource) {
-          CanonicalResource cr = (CanonicalResource) r;  
           if (!vurls.contains(cr.getUrl())) {
             vurls.add(cr.getUrl());
             JsonObject j = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(content);
@@ -265,7 +322,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
             psqlR.setString(18, cr.getName());
             psqlR.setString(19, cr.getTitle());
             psqlR.setBoolean(20, cr.getExperimental());
-            psqlR.setString(21, getRealm(pid));
+            psqlR.setString(21, realm);
             psqlR.setString(22, cr.getDescription());
             psqlR.setString(23, cr.getPurpose());
             psqlR.setString(24, cr.getCopyright());
@@ -273,7 +330,8 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
             psqlR.setString(26, j.asString("kind"));
             psqlR.setString(27, j.asString("type"));        
             psqlR.setString(28, j.asString("supplements"));        
-            psqlR.setString(29, j.asString("content"));        
+            psqlR.setString(29, j.asString("valueSet"));        
+            psqlR.setString(30, j.asString("content"));        
             psqlR.execute();
 
             psqlC.setInt(1, resKey);
@@ -311,7 +369,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
     }    
   }
 
-  private byte[] gzip(byte[] bytes) throws IOException {
+  public static byte[] gzip(byte[] bytes) throws IOException {
     ByteArrayOutputStream bOut = new ByteArrayOutputStream();
     
     GzipParameters gp = new GzipParameters();
@@ -321,6 +379,16 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
     gzip.flush();
     gzip.close();
     return bOut.toByteArray();
+  }
+
+  public static byte[] unGzip(byte[] bytes) throws IOException {
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    try{
+        IOUtils.copy(new GZIPInputStream(new ByteArrayInputStream(bytes)), out);
+    } catch(IOException e){
+        throw new RuntimeException(e);
+    }
+    return out.toByteArray();
   }
 
   private int hasVersion(String fhirVersionList, String ver) {
@@ -373,27 +441,160 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
     }
   }
 
-  private String getAuth(String pid) {
-    if (pid.startsWith("hl7.") || pid.startsWith("fhir.") || pid.startsWith("ch.fhir.")) {
-      return "hl7";
+  private String getAuth(String pid, CanonicalResource cr) {
+    if (pid.startsWith("hl7.") || pid.startsWith("hl7se.") || pid.startsWith("fhir.") || pid.startsWith("ch.fhir.")) {
+      return seeAuth("hl7");
     }
     if (pid.startsWith("ihe.")) {
-      return "ihe";
+      return seeAuth("ihe");
     }
+    if (pid.startsWith("ihe-")) {
+      return seeAuth("ihe");
+    }
+    if (pid.startsWith("au.digital")) {
+      return seeAuth("national");
+    }
+    if (pid.startsWith("ndhm.in")) {
+      return seeAuth("national");
+    }
+    if (pid.startsWith("tw.gov")) {
+      return seeAuth("national");
+    }
+    if (cr != null) {
+      String p = cr.getPublisher();
+      if (p != null) {
+        if (p.contains("Te Whatu Ora")) {
+          return "national";
+        }
+        if (p.contains("HL7")) {
+          return "hl7";
+        }
+        if (p.contains("WHO")) {
+          return "who";
+        }
+        switch (p) {
+        case "Argonaut": return "national";
+        case "Te Whatu Ora": return "national";
+        case "ANS": return "national";
+        case "Canada Health Infoway": return "national";
+        case "Carequality": return "carequality";
+        case "Israeli Ministry of Health" : return "national";
+        default: 
+          possibleRealms.add(pid+" : "+p);
+          return null;
+        }
+      }
+    }
+    possibleRealms.add(pid);
     return null;
   }
 
-  private String getRealm(String pid) {
+  private String seeAuth(String a) {
+    authorities.add(a);
+    return a;
+  }
+
+  private String getRealm(String pid, CanonicalResource cr) {
     if (pid.startsWith("hl7.fhir.")) {
-      return pid.split("\\.")[2];
+      return seeRealm(pid.split("\\.")[2]);
+    } 
+    if (pid.startsWith("hl7.cda.")) {
+      return seeRealm(pid.split("\\.")[2]);
+    }
+    if (pid.startsWith("hl7.fhirpath") || pid.startsWith("hl7.terminology") ) {
+      return seeRealm("uv");
+    }
+    if (cr != null && cr.hasJurisdiction()) {
+      String j = cr.getJurisdictionFirstRep().getCodingFirstRep().getCode();
+      if (j != null) {
+        switch (j) {
+        case "001" : return seeRealm("uv");
+        case "150" : return seeRealm("eu");
+        case "840" : return seeRealm("us");
+        case "AU" :  return seeRealm("au");
+        case "NZ" :  return seeRealm("nz");
+        case "BE" :  return seeRealm("be");
+        case "EE" :  return seeRealm("ee");
+        case "CH" :  return seeRealm("ch");
+        case "DK" :  return seeRealm("dk");
+        case "IL" :  return seeRealm("il");
+        case "CK" :  return seeRealm("ck");
+        case "CA" :  return seeRealm("ca");
+        case "GB" :  return seeRealm("uk");
+        case "CHE" :  return seeRealm("ch");
+        case "US" :  return seeRealm("us");
+        case "SE" :  return seeRealm("se");
+        case "BR" :  return seeRealm("br");
+        case "NL" :  return seeRealm("nl");
+        case "DE" :  return seeRealm("de");
+        case "NO" :  return seeRealm("no");
+        case "IN" :  return seeRealm("in");
+        default: 
+          possibleAuthorities.add(j+" : "+pid);
+          return null;
+        }
+      }
     }
     if (pid.startsWith("fhir.") || pid.startsWith("us.")) {
-      return "us";
+      return seeRealm("us");
     }
     if (pid.startsWith("ch.fhir.")) {
-      return "ch";
+      return seeRealm("ch");
     }
-
+    if (pid.startsWith("swiss.")) {
+      return seeRealm("ch");
+    }
+    if (pid.startsWith("who.")) {
+      return seeRealm("uv");
+    }
+    if (pid.startsWith("au.")) {
+      return seeRealm("au");
+    }
+    if (pid.contains(".de#")) {
+      return seeRealm("de");
+    }
+    if (pid.startsWith("ehi.")) {
+      return seeRealm("us");
+    }
+    if (pid.startsWith("hl7.eu")) {
+      return seeRealm("eu");
+    }
+    if (pid.startsWith("hl7se.")) {
+      return seeRealm("se");
+    }
+    if (pid.startsWith("ihe.")) {
+      return seeRealm("uv");
+    }
+    if (pid.startsWith("tw.")) {
+      return seeRealm("tw");
+    }
+    if (pid.contains(".dk.")) {
+      return seeRealm("dk");
+    }
+    if (pid.contains(".sl.")) {
+      return seeRealm("sl");
+    }
+    if (pid.contains(".nl.")) {
+      return seeRealm("nl");
+    }
+    if (pid.contains(".fr.")) {
+      return seeRealm("fr");
+    }
+    if (pid.startsWith("cinc.")) {
+      return seeRealm("nz");
+    }
+    if (pid.contains(".nz.")) {
+      return seeRealm("nz");
+    }
+    if (pid.startsWith("jp-")) {
+      return seeRealm("jp");
+    }
+    possibleAuthorities.add(pid);
     return null;
+  }
+
+  private String seeRealm(String r) {
+    realms.add(r);
+    return r;
   }
 }
