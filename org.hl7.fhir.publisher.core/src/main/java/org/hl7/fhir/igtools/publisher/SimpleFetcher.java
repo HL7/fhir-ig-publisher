@@ -333,7 +333,7 @@ public class SimpleFetcher implements IFetchFile {
                 } catch (Exception e) {
                   if (!f.getName().startsWith("Binary-") && !f.getName().startsWith("binary-") ) { // we don't notify here because Binary is special. 
                     if (report) {
-                      log.logMessage(e.getMessage() +" loading "+f);
+                      log.logMessage("Error loading "+f+" as XML: "+e.getMessage());
                       if (debug) {
                         e.printStackTrace();
                       }
@@ -351,7 +351,7 @@ public class SimpleFetcher implements IFetchFile {
                 } catch (Exception e) {
                   if (!f.getName().startsWith("Binary-")) { // we don't notify here because Binary is special. 
                     if (report) {
-                      log.logMessage(e.getMessage() +" loading "+f);
+                      log.logMessage("Error loading "+f+" as JSON: "+e.getMessage());
                       if (debug) {
                         e.printStackTrace();
                       }
@@ -368,7 +368,7 @@ public class SimpleFetcher implements IFetchFile {
                 } catch (Exception e) {
                   if (!f.getName().startsWith("Binary-")) { // we don't notify here because Binary is special. 
                     if (report) {
-                      log.logMessage(e.getMessage() +" loading "+f);
+                      log.logMessage("Error loading "+f+" as Turtle: "+e.getMessage());
                       if (debug) {
                         e.printStackTrace();
                       }
@@ -389,7 +389,7 @@ public class SimpleFetcher implements IFetchFile {
                 } catch (Exception e) {
                   if (!f.getName().startsWith("Binary-")) { // we don't notify here because Binary is special. 
                     if (report) {
-                      log.logMessage(e.getMessage() +" loading "+f);
+                      log.logMessage("Error loading "+f+" as FML: "+e.getMessage());
                       if (debug) {
                         e.printStackTrace();
                       }
