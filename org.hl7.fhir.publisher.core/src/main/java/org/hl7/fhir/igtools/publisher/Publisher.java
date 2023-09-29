@@ -3035,6 +3035,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       loadIg(dep, i, !dep.hasUserData("no-load-deps"));
       i++;
     }
+    
     // we're also going to look for packages that can be referred to but aren't dependencies
     for (Extension ext : sourceIg.getDefinition().getExtensionsByUrl("http://hl7.org/fhir/tools/StructureDefinition/ig-link-dependency")) {
       loadLinkIg(ext.getValue().primitiveValue());
@@ -7747,17 +7748,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         parseVersion = str(r.getConfig(), "version", version);
       }
     }
-    XhtmlNode xhtml = null;
-    if (res instanceof DomainResource) {
-      xhtml = ((DomainResource) res).getText().getDiv();
-      if (xhtml != null) {
-        if (xhtml.isEmpty()) {
-          xhtml = null;
-        } else {
-          ((DomainResource) res).getText().setDiv(new XhtmlParser().parseFragment("<div xmlns=\"http://www.w3.org/1999/xhtml\">Placeholder</div>"));
-        }
-      }
-    }
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
     if (VersionUtilities.isR3Ver(parseVersion)) {
       org.hl7.fhir.dstu3.formats.JsonParser jp = new org.hl7.fhir.dstu3.formats.JsonParser();
@@ -7781,12 +7771,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     byte[] cnt = bs.toByteArray();
     ByteArrayInputStream bi = new ByteArrayInputStream(cnt);
     Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parseSingle(bi, null);
-    if (xhtml != null) {
-      Element div = e.getNamedChild("text").getNamedChild("div");
-      div.setXhtml(xhtml);
-      ((DomainResource) res).getText().setDiv(xhtml);
-//      div.setValue(new XhtmlComposer(true, false).compose(xhtml));
-    }
     return e;
   }
 
@@ -10029,6 +10013,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         src = pfx+processSQlCommand(db, src, f)+sfx;
         changed = true;
       }
+      while (src.contains("[[[")) {
+        int i = src.indexOf("[[[");
+        String pfx = src.substring(0, i);
+        src = src.substring(i+6);
+        i = src.indexOf("]]]");
+        String sfx = src.substring(i+2);
+        src = src.substring(0, i);
+        src = pfx+processRefTag(db, src, f)+sfx;
+        changed = true;
+      }
       if (changed) {
         return src.getBytes(StandardCharsets.UTF_8);
       } else {
@@ -10040,6 +10034,19 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       }
       return content;
     }
+  }
+
+  private String processRefTag(DBBuilder db, String src, FetchedFile f) {
+    if (Utilities.isAbsoluteUrl(src)) {
+      try {
+        CanonicalResource cr = (CanonicalResource) context.fetchResource(Resource.class, src);
+        if (cr != null && cr.hasWebPath()) {
+          return "<a href=\""+cr.getWebPath()+"\">"+Utilities.escapeXml(cr.present())+"</a>";
+        }
+      } catch (Exception e) {
+      }
+    }  
+    return "[[["+src+"]]]";
   }
 
   private int sqlIndex = 0;

@@ -4,6 +4,10 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -57,7 +61,12 @@ public class XIGGenerator {
 
     long ms = System.currentTimeMillis();
 
-    new File(target).delete();
+    
+    File tgt = new File(target);
+//    if (tgt.exists()) {
+//      test(tgt);
+//    }
+    tgt.delete();
 
     PackageVisitor pv = new PackageVisitor();
     pv.getResourceTypes().add("CapabilityStatement");
@@ -92,7 +101,23 @@ public class XIGGenerator {
     gather.finish();
 
     System.out.println("Finished Step 1: "+Utilities.describeDuration(System.currentTimeMillis() - ms));
-    System.out.println("File size is "+Utilities.describeSize(new File(target).length()));
+    System.out.println("File size is "+Utilities.describeSize(tgt.length()));
   }
+//
+//  private void test(File tgt) {
+//    try {
+//      Connection con = DriverManager.getConnection("jdbc:sqlite:"+tgt.getAbsolutePath());
+//      Statement q = con.createStatement();
+//      q.execute("select JsonR5 from Contents where ResourceKey = 228");
+//      byte[] cnt = q.getResultSet().getBytes(1);
+//      cnt = XIGDatabaseBuilder.unGzip(cnt);
+//      String s = new String(cnt);
+//      System.out.println(s);
+//    } catch (Exception e) {
+//      e.printStackTrace();
+//    }
+//    throw new Error("Done");
+//    
+//  }
 
 }

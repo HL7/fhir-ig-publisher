@@ -26,7 +26,7 @@ public class WebSiteArchiveBuilder {
   
   
   public void start(String folder) throws IOException {
-    File f = new File(Utilities.path(folder, "publish.ini"));
+    File f = new File(Utilities.path(folder, "publish-setup.json"));
     if (f.exists()) {
       scanForAllIGs(folder);
     } else {
