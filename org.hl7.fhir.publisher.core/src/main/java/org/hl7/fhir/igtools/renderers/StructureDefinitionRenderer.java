@@ -1971,31 +1971,36 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     Map<String, String> refs = new HashMap<>();
     Map<String, String> trefs = new HashMap<>();
     Map<String, String> examples = new HashMap<>();
-    for (StructureDefinition sd : context.fetchResourcesByType(StructureDefinition.class)) {
-      if (this.sd.getUrl().equals(sd.getBaseDefinition())) {
-        base.put(sd.getWebPath(), sd.present());
+    for (StructureDefinition sdt : context.fetchResourcesByType(StructureDefinition.class)) {
+      if (this.sd.getUrl().equals(sdt.getBaseDefinition())) {
+        base.put(sdt.getWebPath(), sdt.present());
       }
-      scanExtensions(invoked, sd, ToolingExtensions.EXT_OBLIGATION_INHERITS);
-      scanExtensions(imposed, sd, ToolingExtensions.EXT_SD_IMPOSE_PROFILE);
-      scanExtensions(compliedWith, sd, ToolingExtensions.EXT_SD_COMPLIES_WITH_PROFILE);
+      scanExtensions(invoked, sdt, ToolingExtensions.EXT_OBLIGATION_INHERITS);
+      scanExtensions(imposed, sdt, ToolingExtensions.EXT_SD_IMPOSE_PROFILE);
+      scanExtensions(compliedWith, sdt, ToolingExtensions.EXT_SD_COMPLIES_WITH_PROFILE);
 
-      for (ElementDefinition ed : sd.getDifferential().getElement()) {
+      for (ElementDefinition ed : sdt.getDifferential().getElement()) {
         for (TypeRefComponent tr : ed.getType()) {
+          if (sd.getUrl().equals(tr.getCode())) {
+            if (sdt.hasWebPath()) {
+              refs.put(sdt.getWebPath(), sdt.present());
+            }
+          }
           for (CanonicalType u : tr.getProfile()) {
             if (this.sd.getUrl().equals(u.getValue())) {
-              if (sd.hasWebPath()) {
-                refs.put(sd.getWebPath(), sd.present());
+              if (sdt.hasWebPath()) {
+                refs.put(sdt.getWebPath(), sdt.present());
               } else {
-                System.out.println("SD "+sd.getVersionedUrl()+" has no path");
+                System.out.println("SD "+sdt.getVersionedUrl()+" has no path");
               }
             }
           }
           for (CanonicalType u : tr.getTargetProfile()) {
             if (this.sd.getUrl().equals(u.getValue())) {
-              if (sd.hasWebPath()) {
-                trefs.put(sd.getWebPath(), sd.present());
+              if (sdt.hasWebPath()) {
+                trefs.put(sdt.getWebPath(), sdt.present());
               } else {
-                System.out.println("SD "+sd.getVersionedUrl()+" has no path");
+                System.out.println("SD "+sdt.getVersionedUrl()+" has no path");
               }
             }
           }
