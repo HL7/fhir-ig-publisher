@@ -12,6 +12,7 @@ import java.util.Map;
 
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
 import org.hl7.fhir.convertors.analytics.PackageVisitor.IPackageVisitorProcessor;
+import org.hl7.fhir.convertors.analytics.PackageVisitor.PackageContext;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_10_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_14_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
@@ -48,8 +49,10 @@ public class XIGLoader implements IPackageVisitorProcessor {
   }
 
   @Override
-  public void processResource(String pid, NpmPackage npm, String version, String type, String id, byte[] content)
-      throws FHIRException, IOException, EOperationOutcome {
+  public void processResource(PackageContext context, Object clientContext, String type, String id, byte[] content) throws FHIRException, IOException, EOperationOutcome {
+    String pid = context.getPid();
+    String version = context.getVersion();
+    NpmPackage npm = context.getNpm();
 
     SpecMapManager smm = smmList.get(pid);
     if (smm == null) {
@@ -436,6 +439,24 @@ public class XIGLoader implements IPackageVisitorProcessor {
     } else {
       return new SimpleDateFormat("yyyyMMddHHmmss").parse(d);
     }
+  }
+
+  @Override
+  public void alreadyVisited(String pid) {
+    // TODO Auto-generated method stub
+    
+  }
+
+  @Override
+  public Object startPackage(PackageContext context) {
+    // TODO Auto-generated method stub
+    return null;
+  }
+
+  @Override
+  public void finishPackage(PackageContext context) {
+    // TODO Auto-generated method stub
+    
   }
 
 }

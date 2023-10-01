@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.HashMap;
@@ -24,6 +25,7 @@ import org.apache.commons.compress.compressors.gzip.GzipParameters;
 import org.apache.commons.io.IOUtils;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
 import org.hl7.fhir.convertors.analytics.PackageVisitor.IPackageVisitorProcessor;
+import org.hl7.fhir.convertors.analytics.PackageVisitor.PackageContext;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_10_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_14_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
@@ -32,17 +34,25 @@ import org.hl7.fhir.convertors.factory.VersionConvertorFactory_43_50;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.IGR2ConvertorAdvisor5;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
+import org.hl7.fhir.r5.model.CanonicalType;
+import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
+import org.hl7.fhir.r5.model.ConceptMap;
+import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
+import org.hl7.fhir.r5.model.ElementDefinition;
+import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
 import org.hl7.fhir.r5.model.PackageInformation;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
+import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
@@ -59,6 +69,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
   private PreparedStatement psqlP;
   private int pckKey;
   private PreparedStatement psqlR;
+  private PreparedStatement psqlCat;
   private int resKey;
   private PreparedStatement psqlC;
   private PreparedStatement psqlRI;
@@ -69,8 +80,9 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
   private Set<String> realms = new HashSet<>();
   private Set<String> possibleAuthorities = new HashSet<>();
   private Set<String> possibleRealms = new HashSet<>();
-  
-  
+  private int pck;
+
+
   private Map<String, SpecMapManager> smmList = new HashMap<>();
 
   public XIGDatabaseBuilder(String dest, String date) throws IOException {
@@ -78,9 +90,10 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
     try {
       con = connect(dest, date);
 
-      psqlP = con.prepareStatement("Insert into Packages (PackageKey, PID, Id, Date, Title, Canonical, Web, Version, R2, R2B, R3, R4, R4B, R5, R6, Realm, Auth, Package) Values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-      psqlR = con.prepareStatement("Insert into Resources (ResourceKey, PackageKey, ResourceType, ResourceTypeR5, Id, R2, R2B, R3, R4, R4B, R5, R6, Web, Url, Version, Status, Date, Name, Title, Experimental, Realm, Description, Purpose, Copyright, CopyrightLabel, Kind, Type, Supplements, ValueSet, Content) Values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      psqlP = con.prepareStatement("Insert into Packages (PackageKey, PID, Id, Date, Title, Canonical, Web, Version, R2, R2B, R3, R4, R4B, R5, R6, Realm, Auth, Package, Published) Values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)");
+      psqlR = con.prepareStatement("Insert into Resources (ResourceKey, PackageKey, ResourceType, ResourceTypeR5, Id, R2, R2B, R3, R4, R4B, R5, R6, Web, Url, Version, Status, Date, Name, Title, Experimental, Realm, Description, Purpose, Copyright, CopyrightLabel, Kind, Type, Supplements, ValueSet, Content, Authority, Details) Values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
       psqlC = con.prepareStatement("Insert into Contents (ResourceKey, Json, JsonR5) Values (?, ?, ?)");
+      psqlCat = con.prepareStatement("Insert into Categories (ResourceKey, Mode, Code) Values (?, ?, ?)");
       psqlRI = con.prepareStatement("Insert into ResourceFTS (ResourceKey, Name, Title, Description, Narrative) Values (?, ?, ?, ?, ?)");
       psqlCI = con.prepareStatement("Insert into CodeSystemFTS (ResourceKey, Code, Display, Definition) Values (?, ?, ?, ?)");
     } catch (Exception e) {
@@ -97,8 +110,10 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
     makeContentsTable(con);
     makeRealmsTable(con);
     makeAuthoritiesTable(con);
+    makeCategoriesTable(con);
     makeResourceIndex(con);
     makeCodeIndex(con);
+    makeTxSourceList(con);
     PreparedStatement psql = con.prepareStatement("Insert into Metadata (key, name, value) values (?, ?, ?)");
     psql.setInt(1, ++lastMDKey);
     psql.setString(2, "date");
@@ -106,7 +121,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
     psql.executeUpdate();
     return con;    
   }
-  
+
 
   private void makeMetadataTable(Connection con) throws SQLException {
     Statement stmt = con.createStatement();
@@ -139,6 +154,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
         "Canonical  nvarchar NULL,\r\n"+
         "Web        nvarchar NULL,\r\n"+
         "Version    nvarchar NULL,\r\n"+
+        "Published  INTEGER NULL,\r\n"+
         "R2         INTEGER NULL,\r\n"+
         "R2B        INTEGER NULL,\r\n"+
         "R3         INTEGER NULL,\r\n"+
@@ -188,6 +204,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
         "Supplements     nvarchar NULL,\r\n"+
         "ValueSet        nvarchar NULL,\r\n"+
         "Kind            nvarchar NULL,\r\n"+
+        "Details         nvarchar NULL,\r\n"+
         "PRIMARY KEY (ResourceKey))\r\n");
   }
 
@@ -200,7 +217,16 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
         "JsonR5          BLOB NULL,\r\n"+
         "PRIMARY KEY (ResourceKey))\r\n");
   }
-  
+
+  private void makeCategoriesTable(Connection con) throws SQLException {
+    Statement stmt = con.createStatement();
+    stmt.execute("CREATE TABLE Categories (\r\n"+
+        "ResourceKey   integer  NOT NULL,\r\n"+
+        "Mode          integer  NOT NULL,\r\n"+
+        "Code          nvarchar NOT NULL,\r\n"+
+        "PRIMARY KEY (ResourceKey, Mode, Code))\r\n");
+  }
+
   private void makeRealmsTable(Connection con) throws SQLException {
     Statement stmt = con.createStatement();
     stmt.execute("CREATE TABLE Realms (\r\n"+
@@ -214,7 +240,16 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
         "Code            nvarchar NOT NULL,\r\n"+
         "PRIMARY KEY (Code))\r\n"); 
   }
-  
+
+  private void makeTxSourceList(Connection con) throws SQLException {
+    Statement stmt = con.createStatement();
+    stmt.execute("CREATE TABLE TxSource (\r\n"+
+        "Code            nvarchar NOT NULL,\r\n"+
+        "Display         nvarchar NOT NULL,\r\n"+
+        "PRIMARY KEY (Code))\r\n"); 
+    defineTxSources(stmt);
+  }
+
   public void finish() throws IOException {
     try {
       PreparedStatement psql = con.prepareStatement("Insert into Realms (code) values (?)");
@@ -227,7 +262,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
         psql.setString(1, s);
         psql.executeUpdate();
       }
-      
+
       System.out.println("Possible Realms:");
       for (String s : possibleRealms) {
         System.out.println(" "+s);        
@@ -236,6 +271,49 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
       for (String s : possibleAuthorities) {
         System.out.println(" "+s);        
       }
+
+      Statement stmt = con.createStatement();
+      stmt.execute("Select Count(*) from Packages");
+      ResultSet res = stmt.getResultSet();
+      res.next();
+      int packages = res.getInt(1);
+      stmt = con.createStatement();
+      stmt.execute("Select Count(*) from Packages where published = 1");
+      res = stmt.getResultSet();
+      res.next();
+      int ppackages = res.getInt(1);
+      stmt = con.createStatement();
+      stmt.execute("Select Count(*) from Resources");
+      res = stmt.getResultSet();
+      res.next();
+      int resources = res.getInt(1);
+
+      psql = con.prepareStatement("Insert into Metadata (key, name, value) values (?, ?, ?)");
+      psql.setInt(1, ++lastMDKey);
+      psql.setString(2, "realms");
+      psql.setString(3, ""+realms.size());
+      psql.executeUpdate();
+      psql.setInt(1, ++lastMDKey);
+      psql.setString(2, "authorities");
+      psql.setString(3, ""+authorities.size());
+      psql.executeUpdate();
+      psql.setInt(1, ++lastMDKey);
+      psql.setString(2, "packages");
+      psql.setString(3, ""+packages);
+      psql.executeUpdate();
+      psql.setInt(1, ++lastMDKey);
+      psql.setString(2, "pubpackages");
+      psql.setString(3, ""+ppackages);
+      psql.executeUpdate();
+      psql.setInt(1, ++lastMDKey);
+      psql.setString(2, "resources");
+      psql.setString(3, ""+resources);
+      psql.executeUpdate();
+      psql.setInt(1, ++lastMDKey);
+      psql.setString(2, "totalpackages");
+      psql.setString(3, ""+pck);
+      psql.executeUpdate();
+
       con.close();
     } catch (Exception e) {
       throw new IOException(e);
@@ -243,77 +321,119 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
   }
 
   @Override
-  public void processResource(String pid, NpmPackage npm, String version, String type, String id, byte[] content) throws FHIRException, IOException, EOperationOutcome {
-    if (!isCoreDefinition(pid)) {
+  public Object startPackage(PackageContext context) throws IOException {
+    if (isCoreDefinition(context.getPid())) {
+      return null;
+    }
+    try {
+      String pid = context.getPid();
+      NpmPackage npm = context.getNpm();
+      SpecMapManager smm = smmList.get(pid);
+      if (smm == null) {
+        smm = npm.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.fhirVersion()) : SpecMapManager.createSpecialPackage(npm);
+        pckKey++;
+        smm.setName(npm.name());
+        smm.setBase(npm.canonical());
+        smm.setBase2(PackageHacker.fixPackageUrl(npm.url()));
+        smm.setKey(pckKey);
+        smmList.put(pid, smm);
+
+        String auth = getAuth(pid, null);
+        String realm = getRealm(pid, null);
+        smm.setAuth(auth);
+        smm.setRealm(realm);
+
+        psqlP.setInt(1, pckKey);
+        psqlP.setString(2, pid);
+        psqlP.setString(3, npm.name());
+        psqlP.setString(4, npm.date());
+        psqlP.setString(5, npm.title());
+        psqlP.setString(6, npm.canonical()); 
+        psqlP.setString(7, npm.getWebLocation());
+        psqlP.setString(8, npm.version()); 
+        psqlP.setInt(9, hasVersion(npm.fhirVersionList(), "1.0"));
+        psqlP.setInt(10, hasVersion(npm.fhirVersionList(), "1.4"));
+        psqlP.setInt(11, hasVersion(npm.fhirVersionList(), "3.0"));
+        psqlP.setInt(12, hasVersion(npm.fhirVersionList(), "4.0"));
+        psqlP.setInt(13, hasVersion(npm.fhirVersionList(), "4.3"));
+        psqlP.setInt(14, hasVersion(npm.fhirVersionList(), "5.0"));
+        psqlP.setInt(15, hasVersion(npm.fhirVersionList(), "6.0"));
+        psqlP.setString(16, realm);
+        psqlP.setString(17, auth);
+        psqlP.setBytes(18, org.hl7.fhir.utilities.json.parser.JsonParser.composeBytes(npm.getNpm()));
+        psqlP.execute();
+        pck++;
+      }
+      return smm;
+
+    } catch (Exception e) {
+      throw new IOException(e);
+    }
+  }
+
+  @Override
+  public void processResource(PackageContext context, Object clientContext, String type, String id, byte[] content) throws FHIRException, IOException, EOperationOutcome {
+    if (clientContext != null) {
+      SpecMapManager smm = (SpecMapManager) clientContext;
 
       try {
-        Resource r = loadResource(pid, version, type, id, content);
-        CanonicalResource cr = null;
-        if (r != null && r instanceof CanonicalResource) {
-          cr = (CanonicalResource) r;
-        }  
-        String auth;
-        String realm;
-
-        SpecMapManager smm = smmList.get(pid);
-        if (smm == null) {
-          smm = npm.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.fhirVersion()) : SpecMapManager.createSpecialPackage(npm);
-          pckKey++;
-          smm.setName(npm.name());
-          smm.setBase(npm.canonical());
-          smm.setBase2(PackageHacker.fixPackageUrl(npm.url()));
-          smm.setKey(pckKey);
-          smmList.put(pid, smm);
-          
-          auth = getAuth(pid, cr);
-          realm = getRealm(pid, cr);
-          smm.setAuth(auth);
-          smm.setRealm(realm);
-          
-          psqlP.setInt(1, pckKey);
-          psqlP.setString(2, pid);
-          psqlP.setString(3, npm.name());
-          psqlP.setString(4, npm.date());
-          psqlP.setString(5, npm.title());
-          psqlP.setString(6, npm.canonical()); 
-          psqlP.setString(7, npm.getWebLocation());
-          psqlP.setString(8, npm.version()); 
-          psqlP.setInt(9, hasVersion(npm.fhirVersionList(), "1.0"));
-          psqlP.setInt(10, hasVersion(npm.fhirVersionList(), "1.4"));
-          psqlP.setInt(11, hasVersion(npm.fhirVersionList(), "3.0"));
-          psqlP.setInt(12, hasVersion(npm.fhirVersionList(), "4.0"));
-          psqlP.setInt(13, hasVersion(npm.fhirVersionList(), "4.3"));
-          psqlP.setInt(14, hasVersion(npm.fhirVersionList(), "5.0"));
-          psqlP.setInt(15, hasVersion(npm.fhirVersionList(), "6.0"));
-          psqlP.setString(16, realm);
-          psqlP.setString(17, auth);
-          psqlP.setBytes(18, org.hl7.fhir.utilities.json.parser.JsonParser.composeBytes(npm.getNpm()));
-          psqlP.execute();
-        } else {
-          auth = smm.getAuth();
-          realm = smm.getRealm();
-        }
+        Resource r = loadResource(context.getPid(), context.getVersion(), type, id, content);
+        String auth = smm.getAuth();
+        String realm = smm.getRealm();
 
         if (r != null && r instanceof CanonicalResource) {
+          CanonicalResource cr = (CanonicalResource) r;
           if (!vurls.contains(cr.getUrl())) {
             vurls.add(cr.getUrl());
+            if (realm == null) {
+              realm = getRealm(context.getPid(), cr);
+              if (realm != null) {
+                smm.setRealm(realm);
+                Statement stmt = con.createStatement();
+                stmt.execute("update Packages set realm = '"+realm+"' where PackageKey = " + smm.getKey());
+              }
+            }
+            if (auth == null) {
+              auth = getAuth(context.getPid(), cr);
+              if (auth != null) {
+                smm.setAuth(auth);
+                Statement stmt = con.createStatement();
+                stmt.execute("update Packages set auth = '"+auth+"' where PackageKey = " + smm.getKey());
+              }
+            }
+
             JsonObject j = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(content);
             String narrative = cr.getText().getDiv().allText();
             cr.setText(null);
             resKey++;
+
+            String details = null;
+
+            if (cr instanceof CodeSystem) {
+              details = ""+processCodes(((CodeSystem) cr).getConcept());
+            }
+            if (cr instanceof ValueSet) {
+              details = processValueSet(resKey, (ValueSet) cr, context.getNpm());
+            }
+            if (cr instanceof ConceptMap) {
+              details = processConceptMap(resKey, (ConceptMap) cr, context.getNpm());
+            }
+            if (cr instanceof StructureDefinition) {              
+              details = processStructureDefinition(resKey, (StructureDefinition) cr, context.getNpm());
+            }
 
             psqlR.setInt(1, resKey);
             psqlR.setInt(2, pckKey);
             psqlR.setString(3, type);
             psqlR.setString(4, r.fhirType());
             psqlR.setString(5, r.hasId() ? r.getId() : id.replace(".json", ""));
-            psqlR.setInt(6, hasVersion(npm.fhirVersionList(), "1.0"));
-            psqlR.setInt(7, hasVersion(npm.fhirVersionList(), "1.4"));
-            psqlR.setInt(8, hasVersion(npm.fhirVersionList(), "3.0"));
-            psqlR.setInt(9, hasVersion(npm.fhirVersionList(), "4.0"));
-            psqlR.setInt(10, hasVersion(npm.fhirVersionList(), "4.3"));
-            psqlR.setInt(11, hasVersion(npm.fhirVersionList(), "5.0"));
-            psqlR.setInt(12, hasVersion(npm.fhirVersionList(), "6.0"));
+            psqlR.setInt(6, hasVersion(context.getVersion(), "1.0"));
+            psqlR.setInt(7, hasVersion(context.getVersion(), "1.4"));
+            psqlR.setInt(8, hasVersion(context.getVersion(), "3.0"));
+            psqlR.setInt(9, hasVersion(context.getVersion(), "4.0"));
+            psqlR.setInt(10, hasVersion(context.getVersion(), "4.3"));
+            psqlR.setInt(11, hasVersion(context.getVersion(), "5.0"));
+            psqlR.setInt(12, hasVersion(context.getVersion(), "6.0"));
             psqlR.setString(13, Utilities.pathURL(smm.getBase(), smm.getPath(cr.getUrl(), null, cr.fhirType(), cr.getIdBase())));
             psqlR.setString(14, cr.getUrl());
             psqlR.setString(15, cr.getVersion());
@@ -331,7 +451,9 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
             psqlR.setString(27, j.asString("type"));        
             psqlR.setString(28, j.asString("supplements"));        
             psqlR.setString(29, j.asString("valueSet"));        
-            psqlR.setString(30, j.asString("content"));        
+            psqlR.setString(30, j.asString("content"));         
+            psqlR.setString(31, auth);                
+            psqlR.setString(32, details);        
             psqlR.execute();
 
             psqlC.setInt(1, resKey);
@@ -346,9 +468,10 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
             psqlRI.setString(5, narrative);
             psqlRI.execute();
 
-            if (cr instanceof CodeSystem) {
-              processCodes(((CodeSystem) cr).getConcept());
-            }
+            //            if (cr instanceof StructureDefinition) {
+            //              dep = processStructureDefinition(resKey, (StructureDefinition) cr);
+            //              ext = processStructureDefinition2(resKey, (StructureDefinition) cr);
+            //            }
           }       
         }
 
@@ -357,21 +480,240 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
       }
     }
   }
+  
+  private String processStructureDefinition(int resKey, StructureDefinition sd, NpmPackage npm) throws SQLException {
+    if (ProfileUtilities.isExtensionDefinition(sd)) {
+      return processExtensionDefinition(resKey, sd);
+    } else {
+      return null;
+    }
+  }
 
-  private void processCodes(List<ConceptDefinitionComponent> concepts) throws SQLException {
+  private String processExtensionDefinition(int resKey, StructureDefinition sd) throws SQLException {
+    Set<String> tset = new HashSet<>();
+    Set<String> eset = new HashSet<>();
+    for (StructureDefinitionContextComponent ec : sd.getContext()) {
+      switch (ec.getType()) {
+      case ELEMENT:
+        eset.add(ec.getExpression());
+        tset.add(root(ec.getExpression()));
+        break;
+      case EXTENSION:
+        break;
+      case FHIRPATH:
+        break;
+      case NULL:
+        break;
+      default:
+        break;
+      }
+    }
+    for (String s : tset) {
+      seeReference(resKey, 2, s);
+    }
+    return "Context: "+CommaSeparatedStringBuilder.join(",", eset)+"|Type:"+typeDetails(sd)+"|Mod:"+(ProfileUtilities.isModifierExtension(sd) ? "1" : "0");
+  }
+
+  private String typeDetails(StructureDefinition sd) throws SQLException {
+    if (ProfileUtilities.isComplexExtension(sd)) {
+      return "complex";
+    } else {
+      ElementDefinition ed = sd.getSnapshot().getElementByPath("Extension.value[x]");
+      Set<String> tset = new HashSet<>();
+      for (TypeRefComponent tr : ed.getType()) {
+        tset.add(tr.getWorkingCode());
+      }
+      for (String s : tset) {
+        seeReference(resKey, 3, s);
+      }
+      return CommaSeparatedStringBuilder.join(",", tset);
+    }
+  }
+
+  private String root(String e) {
+    return e.contains(".") ? e.substring(0, e.indexOf(".")) : e;
+  }
+
+  //  private String processStructureDefinition(int resKey, StructureDefinition sd) throws SQLException {
+  //    Set<String> set = new HashSet<>();
+  //    for (ElementDefinition ed : sd.getDifferential().getElement()) {
+  //      for (TypeRefComponent tr : ed.getType()) {
+  //        if (Utilities.isAbsoluteUrl(tr.getWorkingCode()) && !isCore(tr.getWorkingCode())) {
+  //          set.add(seeReference(resKey, tr.getWorkingCode()));
+  //        }
+  //        for (CanonicalType c : tr.getProfile()) {
+  //          if (!isCore(c.getValue())) {
+  //            set.add(seeReference(resKey, c.asStringValue()));
+  //          }
+  //        }
+  //        for (CanonicalType c : tr.getTargetProfile()) {
+  //          if (!isCore(c.getValue())) {
+  //            set.add(seeReference(resKey, c.asStringValue()));
+  //          }
+  //        }
+  //      }
+  //    }
+  //    return CommaSeparatedStringBuilder.join(",", set);
+  //  }
+
+  private boolean isCore(String url) {
+    return url.startsWith("http://hl7.org/fhir/StructureDefinition");
+  }
+
+  private String processConceptMap(int resKey, ConceptMap cm, NpmPackage npm) throws SQLException {
+    Set<String> set = new HashSet<>();
+    if (cm.hasSourceScope()) {
+      set.add(seeTxReference(cm.getSourceScope().primitiveValue(), npm));
+    }
+    if (cm.hasTargetScope()) {
+      set.add(seeTxReference(cm.getTargetScope().primitiveValue(), npm));
+    }
+    for (ConceptMapGroupComponent g : cm.getGroup()) {
+      set.add(seeTxReference(g.getSource(), npm));
+      set.add(seeTxReference(g.getTarget(), npm));
+    }
+    for (String s : set) {
+      seeReference(resKey, 1, s);
+    }
+    return CommaSeparatedStringBuilder.join(",", set);
+  }
+
+  private String processValueSet(int resKey, ValueSet vs, NpmPackage npm) throws SQLException {
+    Set<String> set = new HashSet<>();
+    for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
+      for (CanonicalType c : inc.getValueSet()) {
+        set.add(seeTxReference(c.getValue(), npm));
+      }
+      set.add(seeTxReference(inc.getSystem(), npm));
+    }
+    for (String s : set) {
+      seeReference(resKey, 1, s);
+    }
+    return CommaSeparatedStringBuilder.join(",", set);
+  }
+
+  private String seeTxReference(String system, NpmPackage npm) {
+    if (!Utilities.noString(system)) {
+      if (system.contains("http://snomed.info/sct") || system.contains("snomed") || system.contains("sct") ) {
+        return "sct";
+      } else if (system.startsWith("http://loinc.org")) {
+        return  "loinc";
+      } else if (system.contains("http://unitsofmeasure.org")) {
+        return "ucum";
+      } else if ("http://hl7.org/fhir/sid/ndc".equals(system)) {
+        return "ndc";
+      } else if ("http://hl7.org/fhir/sid/cvx".equals(system)) {
+        return "cvx";
+      } else if (system.contains("iso.org") || system.contains(":iso:")) {
+        return "iso";
+      } else if (system.contains("cms.gov")) {
+        return "cms";
+      } else if (system.contains("cdc.gov")) {
+        return "cdc";
+      } else if (system.contains(":ietf:") || system.contains(":iana:")) {
+        return "ietf";
+      } else if (system.contains("ihe.net") || system.contains(":ihe:")) {
+        return "ihe";
+      } else if (system.contains("icpc")) {
+        return "icpc";
+      } else if (system.contains("ncpdp")) {
+        return "ncpdp";
+      } else if (system.contains("x12.org")) {
+        return "x12";
+      } else if (system.contains("nucc")) {
+        return "nucc";
+      } else if (Utilities.existsInList(system, "http://hl7.org/fhir/sid/icd-9-cm", "http://hl7.org/fhir/sid/icd-10", "http://fhir.de/CodeSystem/dimdi/icd-10-gm", "http://hl7.org/fhir/sid/icd-10-nl 2.16.840.1.113883.6.3.2", "http://hl7.org/fhir/sid/icd-10-cm", "http://id.who.int/icd11/mms")) {
+        return "icd";
+      } else if (system.contains("urn:oid:")) {
+        return "oid";
+      } else if ("http://unitsofmeasure.org".equals(system)) {
+        return "ucum";
+      } else if ("http://dicom.nema.org/resources/ontology/DCM".equals(system) || system.contains("http://dicom.nema.org/medical")) {
+        return "dcm";
+      } else if ("http://www.ama-assn.org/go/cpt".equals(system)) {
+        return "cpt";
+      } else if ("http://www.nlm.nih.gov/research/umls/rxnorm".equals(system)) {
+        return "rx";
+      } else if (system.startsWith("http://cts.nlm.nih.gov")) {
+        return "vsac";
+      } else if (system.startsWith("http://terminology.hl7.org")) {
+        return "tho";
+      } else if (system.startsWith("http://www.whocc.no/atc")) {
+        return "atc";
+      } else if (system.startsWith("http://ncicb.nci.nih.gov/xml/owl")) {
+        return "ncit";
+      } else if (system.startsWith("http://hl7.org/fhir")) {
+        return "fhir";
+      } else if (system.startsWith("http://sequenceontology.org") || system.startsWith("http://www.ebi.ac.uk/ols/ontologies/gen")  || system.startsWith("http://human-phenotype-ontology.org") || 
+          system.startsWith("http://purl.obolibrary.org/obo/sepio-clingen") ||  system.startsWith("http://www.genenames.org") ||  system.startsWith("http://varnomen.hgvs.org")) {
+        return "gene";
+      } else if (npm.canonical() != null && system.startsWith(npm.canonical())) {
+        return "internal";
+      } else if (system.contains("example.org")) {
+        return "example";
+      } else {
+        // System.out.println("Uncategorised: "+system);
+        return null;
+      }
+    } 
+    return null;
+  }
+
+  private void defineTxSources(Statement stmt) throws SQLException {
+    stmt.execute("insert into TxSource (Code, Display) values ('sct', 'SNOMED-CT')");
+    stmt.execute("insert into TxSource (Code, Display) values ('loinc', 'LOINC')");
+    stmt.execute("insert into TxSource (Code, Display) values ('ucum', 'UCUM')");
+    stmt.execute("insert into TxSource (Code, Display) values ('ndc', 'NDC')");
+    stmt.execute("insert into TxSource (Code, Display) values ('cvx', 'CVX')");
+    stmt.execute("insert into TxSource (Code, Display) values ('iso', 'ISO Standard')");
+    stmt.execute("insert into TxSource (Code, Display) values ('ietf', 'IETF')");
+    stmt.execute("insert into TxSource (Code, Display) values ('ihe', 'IHE')");
+    stmt.execute("insert into TxSource (Code, Display) values ('icpc', 'ICPC Variant')");
+    stmt.execute("insert into TxSource (Code, Display) values ('ncpdp', 'NCPDP')");
+    stmt.execute("insert into TxSource (Code, Display) values ('nucc', 'NUCC')");
+    stmt.execute("insert into TxSource (Code, Display) values ('icd', 'ICD-X')");
+    stmt.execute("insert into TxSource (Code, Display) values ('oid', 'OID-Based')");
+    stmt.execute("insert into TxSource (Code, Display) values ('dcm', 'DICOM')");
+    stmt.execute("insert into TxSource (Code, Display) values ('cpt', 'CPT')");
+    stmt.execute("insert into TxSource (Code, Display) values ('rx', 'RxNorm')");
+    stmt.execute("insert into TxSource (Code, Display) values ('tho', 'terminology.hl7.org')");
+    stmt.execute("insert into TxSource (Code, Display) values ('fhir', 'hl7.org/fhir')");
+    stmt.execute("insert into TxSource (Code, Display) values ('internal', 'Internal')");
+    stmt.execute("insert into TxSource (Code, Display) values ('example', 'Example')");
+    stmt.execute("insert into TxSource (Code, Display) values ('vsac', 'VSAC')");
+    stmt.execute("insert into TxSource (Code, Display) values ('act', 'ATC')");
+    stmt.execute("insert into TxSource (Code, Display) values ('ncit', 'NCI-Thesaurus')");
+    stmt.execute("insert into TxSource (Code, Display) values ('x12', 'X12')");
+    stmt.execute("insert into TxSource (Code, Display) values ('cms', 'CMS (USA)')");
+    stmt.execute("insert into TxSource (Code, Display) values ('cdc', 'CDC (USA)')");
+    stmt.execute("insert into TxSource (Code, Display) values ('gene', 'Sequence Codes')");
+  }
+
+  private void seeReference(int resKey, int mode, String code) throws SQLException {
+    if (code != null) {
+      psqlCat.setInt(1, resKey);
+      psqlCat.setInt(2, mode);
+      psqlCat.setString(3, code);
+      psqlCat.execute();
+    }
+  }
+
+  private int processCodes(List<ConceptDefinitionComponent> concepts) throws SQLException {
+    int c = concepts.size();
     for (ConceptDefinitionComponent concept : concepts) {
       psqlCI.setInt(1, resKey);
       psqlCI.setString(2, concept.getCode());
       psqlCI.setString(3, concept.getDisplay());
       psqlCI.setString(4, concept.getDefinition());
       psqlCI.execute();
-      processCodes(concept.getConcept());
+      c = c + processCodes(concept.getConcept());
     }    
+    return c;
   }
 
   public static byte[] gzip(byte[] bytes) throws IOException {
     ByteArrayOutputStream bOut = new ByteArrayOutputStream();
-    
+
     GzipParameters gp = new GzipParameters();
     gp.setCompressionLevel(Deflater.BEST_COMPRESSION);
     GzipCompressorOutputStream gzip = new GzipCompressorOutputStream(bOut, gp);
@@ -384,9 +726,9 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
   public static byte[] unGzip(byte[] bytes) throws IOException {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     try{
-        IOUtils.copy(new GZIPInputStream(new ByteArrayInputStream(bytes)), out);
+      IOUtils.copy(new GZIPInputStream(new ByteArrayInputStream(bytes)), out);
     } catch(IOException e){
-        throw new RuntimeException(e);
+      throw new RuntimeException(e);
     }
     return out.toByteArray();
   }
@@ -442,6 +784,9 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
   }
 
   private String getAuth(String pid, CanonicalResource cr) {
+    if (pid.contains("#")) {
+      pid = pid.substring(0, pid.indexOf("#"));
+    }
     if (pid.startsWith("hl7.") || pid.startsWith("hl7se.") || pid.startsWith("fhir.") || pid.startsWith("ch.fhir.")) {
       return seeAuth("hl7");
     }
@@ -495,8 +840,16 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
   }
 
   private String getRealm(String pid, CanonicalResource cr) {
+    if (pid.contains("#")) {
+      pid = pid.substring(0, pid.indexOf("#"));
+    }
     if (pid.startsWith("hl7.fhir.")) {
-      return seeRealm(pid.split("\\.")[2]);
+      String s = pid.split("\\.")[2];
+      if (Utilities.existsInList(s,  "core", "pubpack")) {
+        return "uv";
+      } else {
+        return seeRealm(s);
+      }
     } 
     if (pid.startsWith("hl7.cda.")) {
       return seeRealm(pid.split("\\.")[2]);
@@ -594,7 +947,27 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
   }
 
   private String seeRealm(String r) {
+    if ("mi".equals(r)) {
+      return null;
+    }
     realms.add(r);
     return r;
+  }
+
+  @Override
+  public void finishPackage(PackageContext context) throws FHIRException, IOException, EOperationOutcome {
+
+  }
+
+  @Override
+  public void alreadyVisited(String pid) throws FHIRException, IOException, EOperationOutcome {
+    try {
+      pck++;
+      Statement stmt = con.createStatement();
+      stmt.execute("Update Packages set Published = 1 where ID = '"+pid+"'");
+    } catch (SQLException e) {
+      throw new FHIRException(e);
+    } 
+
   }
 }
