@@ -26,16 +26,22 @@ jobs:
       script: 'wget https://github.com/HL7/fhir-ig-publisher/releases/latest/download/publisher.jar'
 
   - task: Bash@3
-    displayName: 'Make output dir'
+    displayName: 'Make output database'
     inputs:
       targetType: 'inline'
-      script: 'mkdir xig_output'
+      script: 'touch xig.db'
+
+  - task: Bash@3
+    displayName: 'Make cache dir'
+    inputs:
+      targetType: 'inline'
+      script: 'mkdir xig-cache'
 
   - task: Bash@3
     displayName: 'Run publisher with xig param'
     inputs:
       targetType: 'inline'
-      script: 'java -Xmx7168m -jar ./publisher.jar -xig xig_output'
+      script: 'java -Xmx7168m -jar ./publisher.jar -xig xig.db -xig-cache xig-cache'
 
 #  - task: Bash@3
 #    displayName: 'Make dummy file'
@@ -60,6 +66,7 @@ jobs:
 
   - task: Bash@3
     displayName: 'Tar results'
+    enabled: false
     inputs:
       targetType: 'inline'
       script: |
@@ -67,6 +74,7 @@ jobs:
 
   - task: Bash@3
     displayName: 'Copy tar'
+    enabled: false
     retryCountOnTaskFailure: 5
     inputs:
       targetType: 'inline'
@@ -75,6 +83,7 @@ jobs:
 
   - task: Bash@3
     displayName: 'Decompress tar'
+    enabled: false
     retryCountOnTaskFailure: 5
     inputs:
       targetType: 'inline'
