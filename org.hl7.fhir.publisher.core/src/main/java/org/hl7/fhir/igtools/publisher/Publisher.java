@@ -356,7 +356,7 @@ import org.hl7.fhir.utilities.xml.XMLUtil;
 import org.hl7.fhir.utilities.xml.XmlEscaper;
 import org.hl7.fhir.validation.ValidatorUtils;
 import org.hl7.fhir.validation.instance.InstanceValidator;
-import org.hl7.fhir.validation.instance.utils.ValidatorHostContext;
+import org.hl7.fhir.validation.instance.utils.ValidationContext;
 import org.hl7.fhir.validation.profile.ProfileValidator;
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
@@ -12506,8 +12506,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   public void recordProfileUsage(StructureDefinition profile, Object appContext, Element element) {
     if (profile.getUrl().startsWith(igpkp.getCanonical())) { // ignore anything we didn't define
       FetchedResource example;
-      if (appContext instanceof ValidatorHostContext) {
-        example = (FetchedResource) ((ValidatorHostContext) appContext).getResource().getUserData("igpub.context.resource");
+      if (appContext instanceof ValidationContext) {
+        example = (FetchedResource) ((ValidationContext) appContext).getResource().getUserData("igpub.context.resource");
       } else {
         example= (FetchedResource) ((Element) appContext).getUserData("igpub.context.resource");
       }
