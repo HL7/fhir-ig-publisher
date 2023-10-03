@@ -68,10 +68,16 @@ jobs:
 - job: xig_step_2
   dependsOn: xig_step_1
   steps:
-  - download: current
-    artifact: xig_step_1_cache
-  - download: current
-    artifact: xig_step_1_db
+  - task: DownloadPipelineArtifact@2
+    inputs:
+      buildType: 'current'
+      artifactName: xig_step_1_cache
+      targetPath: $(XIG_CACHE_FOLDER)
+  - task: DownloadPipelineArtifact@2
+    inputs:
+      buildType: 'current'
+      artifactName: xig_step_1_db
+      targetPath: $(XIG_DB_FILE)
 
   - task: Bash@3
     displayName: 'Make dummy file'
