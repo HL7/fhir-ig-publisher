@@ -18,6 +18,10 @@ variables:
   value: $(Pipeline.Workspace)/xig_cache
 - name: XIG_DB_FILE
   value: $(Pipeline.Workspace)/xig.db
+- name: TEMP_DB_FOLDER
+  value: $(Pipeline.Workspace)/temp_db
+- name: TEMP_CACHE_FOLDER
+  value: $(Pipeline.Workspace)/temp_cache
 
 jobs:
 - job: xig_step_1
@@ -76,13 +80,22 @@ jobs:
     inputs:
       buildType: 'current'
       artifactName: xig_step_1_cache
-      targetPath: $(XIG_CACHE_FOLDER)
-      itemPattern: '*'
+      targetPath: $(TEMP_DB_FOLDER)
   - task: DownloadPipelineArtifact@2
     inputs:
       buildType: 'current'
       artifactName: xig_step_1_db
-      targetPath: $(XIG_DB_FILE)
+      targetPath: $(TEMP_CACHE_FOLDER)
+  - task: CopyFiles@2
+    inputs:
+      SourceFolder: $(TEMP_DB_FOLDER)
+      Contents: '**' # string. Required. Contents. Default: **.
+      TargetFolder: $(Pipeline.Workspace)
+  - task: CopyFiles@2
+    inputs:
+      SourceFolder: $(TEMP_CACHE_FOLDER)
+      Contents: '**' # string. Required. Contents. Default: **.
+      TargetFolder: $(XIG_CACHE_FOLDER)
 
   - task: Bash@3
     displayName: 'Make dummy file'
