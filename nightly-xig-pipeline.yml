@@ -73,6 +73,7 @@ jobs:
       buildType: 'current'
       artifactName: xig_step_1_cache
       targetPath: $(XIG_CACHE_FOLDER)
+      itemPattern: '**/*'
   - task: DownloadPipelineArtifact@2
     inputs:
       buildType: 'current'
