@@ -32,13 +32,19 @@ jobs:
       script: 'wget https://github.com/HL7/fhir-ig-publisher/releases/latest/download/publisher.jar'
 
   - task: Bash@3
+    displayName: 'Make db folder'
+    inputs:
+      targetType: 'inline'
+      script: 'mkdir $(XIG_DB_FOLDER)'
+
+  - task: Bash@3
     displayName: 'Make output database'
     inputs:
       targetType: 'inline'
       script: 'touch $(XIG_DB_FOLDER)/'
 
   - task: Bash@3
-    displayName: 'Make cache dir'
+    displayName: 'Make cache folder'
     inputs:
       targetType: 'inline'
       script: 'mkdir $(XIG_CACHE_FOLDER)'
