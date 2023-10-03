@@ -60,10 +60,14 @@ jobs:
       targetType: 'inline'
       script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 1'
 
-  - publish: $(XIG_CACHE_FOLDER)
-    artifact: xig_step_1_cache
-  - publish: $(XIG_DB_FILE)
-    artifact: xig_step_1_db
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: $(XIG_DB_FILE)
+      artifactName: xig_step_1_db
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: $(XIG_CACHE_FOLDER)
+      artifactName: xig_step_1_cache
 
 - job: xig_step_2
   dependsOn: xig_step_1
@@ -73,7 +77,7 @@ jobs:
       buildType: 'current'
       artifactName: xig_step_1_cache
       targetPath: $(XIG_CACHE_FOLDER)
-      itemPattern: '**/*'
+      itemPattern: '*'
   - task: DownloadPipelineArtifact@2
     inputs:
       buildType: 'current'
