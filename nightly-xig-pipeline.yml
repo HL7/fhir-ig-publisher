@@ -44,8 +44,8 @@ jobs:
   - task: Bash@3
     displayName: 'Make dummy file'
     inputs:
-    targetType: 'inline'
-    script: 'echo "Why hello there" > $(XIG_DB_FILE)'
+      targetType: 'inline'
+      script: 'echo "Why hello there" > $(XIG_DB_FILE)'
 
   - task: Bash@3
     displayName: 'Run publisher with xig param'
