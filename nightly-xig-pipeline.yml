@@ -80,12 +80,12 @@ jobs:
     inputs:
       buildType: 'current'
       artifactName: xig_step_1_cache
-      targetPath: $(TEMP_DB_FOLDER)
+      targetPath: $(TEMP_CACHE_FOLDER)
   - task: DownloadPipelineArtifact@2
     inputs:
       buildType: 'current'
       artifactName: xig_step_1_db
-      targetPath: $(TEMP_CACHE_FOLDER)
+      targetPath: $(TEMP_DB_FOLDER)
   - task: CopyFiles@2
     inputs:
       SourceFolder: $(TEMP_DB_FOLDER)
