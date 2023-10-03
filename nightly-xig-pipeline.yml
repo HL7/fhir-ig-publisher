@@ -53,7 +53,7 @@ jobs:
     displayName: 'Make dummy file'
     inputs:
       targetType: 'inline'
-      script: 'echo "Stage 1" >> $(XIG_DB_FOLDER)/(XIG_DB_FILE)'
+      script: 'echo "Stage 1" >> $(XIG_DB_FOLDER)/$(XIG_DB_FILE)'
 
   - task: Bash@3
     displayName: 'Make dummy file for cache'
@@ -66,7 +66,7 @@ jobs:
     enabled: false
     inputs:
       targetType: 'inline'
-      script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FOLDER)/(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 1'
+      script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FOLDER)/$(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 1'
 
   - task: PublishPipelineArtifact@1
     inputs:
@@ -95,7 +95,7 @@ jobs:
     displayName: 'Make dummy file'
     inputs:
       targetType: 'inline'
-      script: 'echo "Stage 2" >> $(XIG_DB_FOLDER)/(XIG_DB_FILE)'
+      script: 'echo "Stage 2" >> $(XIG_DB_FOLDER)/$(XIG_DB_FILE)'
 
   - task: Bash@3
     displayName: 'Make dummy file for cache'
@@ -108,7 +108,7 @@ jobs:
     enabled: false
     inputs:
       targetType: 'inline'
-      script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FOLDER)/(XIG_DB_FILE) -xig_cache $(XIG_CACHE_FOLDER) -xig-step 2'
+      script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FOLDER)/$(XIG_DB_FILE) -xig_cache $(XIG_CACHE_FOLDER) -xig-step 2'
 
   - publish: $(XIG_CACHE_FOLDER)
     artifact: xig_step_2_cache
@@ -128,9 +128,9 @@ jobs:
       enabled: false
       inputs:
         targetType: 'inline'
-        script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 3'
+        script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FOLDER)/$(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 3'
 
-    - publish: $(XIG_DB_FILE)
+    - publish: $(XIG_DB_FOLDER)
       artifact: xig_step_3_db
 
 - job: transfer_db_to_remote
@@ -163,7 +163,7 @@ jobs:
     inputs:
       targetType: 'inline'
       script: |
-        tar -C ./xig_output -zcvf xig-www.tar.gz .
+        tar -C $(XIG_DB_FOLDER)/ -zcvf xig-www.tar.gz .
 
   - task: Bash@3
     displayName: 'Copy tar to remote'
