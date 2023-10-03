@@ -15,12 +15,12 @@ pool:
 variables:
 - group: XIG_VARIABLE_GROUP
 - name: XIG_CACHE_FOLDER
-  value: $(Pipeline.Workspace)/xig-cache
+  value: $(Pipeline.Workspace)/xig_cache
 - name: XIG_DB_FILE
   value: $(Pipeline.Workspace)/xig.db
 
 jobs:
-- job: xig-step-1
+- job: xig_step_1
   timeoutInMinutes: 70
   steps:
   - task: Bash@3
@@ -45,65 +45,67 @@ jobs:
     displayName: 'Make dummy file'
     inputs:
       targetType: 'inline'
-      script: 'echo "Why hello there" > $(XIG_DB_FILE)'
+      script: 'echo "Stage 1" >> $(XIG_DB_FILE)'
 
   - task: Bash@3
-    displayName: 'Run publisher with xig param'
+    displayName: 'Run publisher with xig param step 1'
     enabled: false
     inputs:
       targetType: 'inline'
       script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 1'
 
   - publish: $(XIG_CACHE_FOLDER)
-    artifact: xig-step-1-cache
+    artifact: xig_step_1_cache
   - publish: $(XIG_DB_FILE)
-    artifact: xig-step-1-db
+    artifact: xig_step_1_db
 
-- job: xig-step-2
-  dependsOn: xig-step-1
+- job: xig_step_2
+  dependsOn: xig_step_1
   steps:
   - download: current
-    artifact: xig-step-1-cache
+    artifact: xig_step_1_cache
   - download: current
-    artifact: xig-step-1-db
+    artifact: xig_step_1_db
 
   - task: Bash@3
-    displayName: 'Run publisher with xig param'
+    displayName: 'Run publisher with xig param step 2'
+    enabled: false
     inputs:
       targetType: 'inline'
-      script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 2'
+      script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FILE) -xig_cache $(XIG_CACHE_FOLDER) -xig-step 2'
 
   - publish: $(XIG_CACHE_FOLDER)
-    artifact: xig-step-2-cache
+    artifact: xig_step_2_cache
   - publish: $(XIG_DB_FILE)
-    artifact: xig-step-2-db
+    artifact: xig_step_2_db
 
-- job: xig-step-3
-  dependsOn: xig-step-2
+- job: xig_step_3
+  dependsOn: xig_step_2
   steps:
     - download: current
-      artifact: xig-step-2-cache
+      artifact: xig_step_2_cache
     - download: current
-      artifact: xig-step-2-db
+      artifact: xig_step_2_db
 
     - task: Bash@3
-      displayName: 'Run publisher with xig param'
+      displayName: 'Run publisher with xig param step 3'
+      enabled: false
       inputs:
         targetType: 'inline'
         script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 3'
 
     - publish: $(XIG_DB_FILE)
-      artifact: xig-step-3-db
+      artifact: xig_step_3_db
 
-- job: transfer-db-to-remote
+- job: transfer_db_to_remote
   condition: false
   dependsOn:
-  - xig-step-1
-  - xig-step-2
-  - xig-step-3
+  - xig_step_1
+  - xig_step_2
+  - xig_step_3
   steps:
   - download: current
-    artifact: xig-step-3-db
+    artifact: xig_step_3_db
 
   - task: DownloadSecureFile@1
     inputs:
