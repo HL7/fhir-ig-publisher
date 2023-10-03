@@ -48,6 +48,12 @@ jobs:
       script: 'echo "Stage 1" >> $(XIG_DB_FILE)'
 
   - task: Bash@3
+    displayName: 'Make dummy file for cache'
+    inputs:
+      targetType: 'inline'
+      script: 'echo "Stage 1 cache" >> $(XIG_CACHE_FOLDER)/file1.txt'
+
+  - task: Bash@3
     displayName: 'Run publisher with xig param step 1'
     enabled: false
     inputs:
@@ -66,6 +72,18 @@ jobs:
     artifact: xig_step_1_cache
   - download: current
     artifact: xig_step_1_db
+
+  - task: Bash@3
+    displayName: 'Make dummy file'
+    inputs:
+      targetType: 'inline'
+      script: 'echo "Stage 2" >> $(XIG_DB_FILE)'
+
+  - task: Bash@3
+    displayName: 'Make dummy file for cache'
+    inputs:
+      targetType: 'inline'
+      script: 'echo "Stage 2 cache" >> $(XIG_CACHE_FOLDER)/file2.txt'
 
   - task: Bash@3
     displayName: 'Run publisher with xig param step 2'
