@@ -16,12 +16,10 @@ variables:
 - group: XIG_VARIABLE_GROUP
 - name: XIG_CACHE_FOLDER
   value: $(Pipeline.Workspace)/xig_cache
+- name: XIG_DB_FOLDER
+  value: $(Pipeline.Workspace)/xig_db
 - name: XIG_DB_FILE
-  value: $(Pipeline.Workspace)/xig.db
-- name: TEMP_DB_FOLDER
-  value: $(Pipeline.Workspace)/temp_db
-- name: TEMP_CACHE_FOLDER
-  value: $(Pipeline.Workspace)/temp_cache
+  value: xig.db
 
 jobs:
 - job: xig_step_1
@@ -37,7 +35,7 @@ jobs:
     displayName: 'Make output database'
     inputs:
       targetType: 'inline'
-      script: 'touch $(XIG_DB_FILE)'
+      script: 'touch $(XIG_DB_FOLDER)/'
 
   - task: Bash@3
     displayName: 'Make cache dir'
@@ -49,7 +47,7 @@ jobs:
     displayName: 'Make dummy file'
     inputs:
       targetType: 'inline'
-      script: 'echo "Stage 1" >> $(XIG_DB_FILE)'
+      script: 'echo "Stage 1" >> $(XIG_DB_FOLDER)/(XIG_DB_FILE)'
 
   - task: Bash@3
     displayName: 'Make dummy file for cache'
@@ -62,11 +60,11 @@ jobs:
     enabled: false
     inputs:
       targetType: 'inline'
-      script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 1'
+      script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FOLDER)/(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 1'
 
   - task: PublishPipelineArtifact@1
     inputs:
-      targetPath: $(XIG_DB_FILE)
+      targetPath: $(XIG_DB_FOLDER)
       artifactName: xig_step_1_db
   - task: PublishPipelineArtifact@1
     inputs:
@@ -80,28 +78,18 @@ jobs:
     inputs:
       buildType: 'current'
       artifactName: xig_step_1_cache
-      targetPath: $(TEMP_CACHE_FOLDER)
+      targetPath: $(XIG_CACHE_FOLDER)
   - task: DownloadPipelineArtifact@2
     inputs:
       buildType: 'current'
       artifactName: xig_step_1_db
-      targetPath: $(TEMP_DB_FOLDER)
-  - task: CopyFiles@2
-    inputs:
-      SourceFolder: $(TEMP_DB_FOLDER)
-      Contents: '**' # string. Required. Contents. Default: **.
-      TargetFolder: $(Pipeline.Workspace)
-  - task: CopyFiles@2
-    inputs:
-      SourceFolder: $(TEMP_CACHE_FOLDER)
-      Contents: '**' # string. Required. Contents. Default: **.
-      TargetFolder: $(XIG_CACHE_FOLDER)
+      targetPath: $(XIG_DB_FOLDER)
 
   - task: Bash@3
     displayName: 'Make dummy file'
     inputs:
       targetType: 'inline'
-      script: 'echo "Stage 2" >> $(XIG_DB_FILE)'
+      script: 'echo "Stage 2" >> $(XIG_DB_FOLDER)/(XIG_DB_FILE)'
 
   - task: Bash@3
     displayName: 'Make dummy file for cache'
@@ -114,11 +102,11 @@ jobs:
     enabled: false
     inputs:
       targetType: 'inline'
-      script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FILE) -xig_cache $(XIG_CACHE_FOLDER) -xig-step 2'
+      script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FOLDER)/(XIG_DB_FILE) -xig_cache $(XIG_CACHE_FOLDER) -xig-step 2'
 
   - publish: $(XIG_CACHE_FOLDER)
     artifact: xig_step_2_cache
-  - publish: $(XIG_DB_FILE)
+  - publish: $(XIG_DB_FOLDER)
     artifact: xig_step_2_db
 
 - job: xig_step_3
