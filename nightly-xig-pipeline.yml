@@ -14,9 +14,13 @@ pool:
 
 variables:
 - group: XIG_VARIABLE_GROUP
+- name: XIG_CACHE_FOLDER
+  value: $(Pipeline.Workspace)/xig-cache
+- name: XIG_DB_FILE
+  value: $(Pipeline.Workspace)/xig.db
 
 jobs:
-- job: build_and_copy_xig
+- job: xig-step-1
   timeoutInMinutes: 70
   steps:
   - task: Bash@3
@@ -29,26 +33,77 @@ jobs:
     displayName: 'Make output database'
     inputs:
       targetType: 'inline'
-      script: 'touch xig.db'
+      script: 'touch $(XIG_DB_FILE)'
 
   - task: Bash@3
     displayName: 'Make cache dir'
     inputs:
       targetType: 'inline'
-      script: 'mkdir xig-cache'
+      script: 'mkdir $(XIG_CACHE_FOLDER)'
+
+  - task: Bash@3
+    displayName: 'Make dummy file'
+    inputs:
+    targetType: 'inline'
+    script: 'echo "Why hello there" > $(XIG_DB_FILE)'
+
+  - task: Bash@3
+    displayName: 'Run publisher with xig param'
+    enabled: false
+    inputs:
+      targetType: 'inline'
+      script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 1'
+
+  - publish: $(XIG_CACHE_FOLDER)
+    artifact: xig-step-1-cache
+  - publish: $(XIG_DB_FILE)
+    artifact: xig-step-1-db
+
+- job: xig-step-2
+  dependsOn: xig-step-1
+  steps:
+  - download: current
+    artifact: xig-step-1-cache
+  - download: current
+    artifact: xig-step-1-db
 
   - task: Bash@3
     displayName: 'Run publisher with xig param'
     inputs:
       targetType: 'inline'
-      script: 'java -Xmx7168m -jar ./publisher.jar -xig xig.db -xig-cache xig-cache'
+      script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 2'
 
-#  - task: Bash@3
-#    displayName: 'Make dummy file'
-#    inputs:
-#      targetType: 'inline'
-#      script: |
-#        echo 'Why hello there' > xig_output/hello.txt
+  - publish: $(XIG_CACHE_FOLDER)
+    artifact: xig-step-2-cache
+  - publish: $(XIG_DB_FILE)
+    artifact: xig-step-2-db
+
+- job: xig-step-3
+  dependsOn: xig-step-2
+  steps:
+    - download: current
+      artifact: xig-step-2-cache
+    - download: current
+      artifact: xig-step-2-db
+
+    - task: Bash@3
+      displayName: 'Run publisher with xig param'
+      inputs:
+        targetType: 'inline'
+        script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 3'
+
+    - publish: $(XIG_DB_FILE)
+      artifact: xig-step-3-db
+
+- job: transfer-db-to-remote
+  condition: false
+  dependsOn:
+  - xig-step-1
+  - xig-step-2
+  - xig-step-3
+  steps:
+  - download: current
+    artifact: xig-step-3-db
 
   - task: DownloadSecureFile@1
     inputs:
@@ -56,7 +111,7 @@ jobs:
 
   # This step includes chmod to the private key to avoid ssh complaining about permissions.
   - task: Bash@3
-    displayName: 'Clean previous results'
+    displayName: 'Clean previous results on remote'
     retryCountOnTaskFailure: 5
     inputs:
       targetType: 'inline'
@@ -66,15 +121,14 @@ jobs:
 
   - task: Bash@3
     displayName: 'Tar results'
-    enabled: false
+
     inputs:
       targetType: 'inline'
       script: |
         tar -C ./xig_output -zcvf xig-www.tar.gz .
 
   - task: Bash@3
-    displayName: 'Copy tar'
-    enabled: false
+    displayName: 'Copy tar to remote'
     retryCountOnTaskFailure: 5
     inputs:
       targetType: 'inline'
@@ -82,8 +136,7 @@ jobs:
         scp -o "StrictHostKeyChecking=no" -i $(Agent.TempDirectory)/xig.private.key xig-www.tar.gz $(XIG_USER)@$(XIG_SERVER):$(XIG_TARGET_DIRECTORY)/
 
   - task: Bash@3
-    displayName: 'Decompress tar'
-    enabled: false
+    displayName: 'Decompress tar on remote'
     retryCountOnTaskFailure: 5
     inputs:
       targetType: 'inline'
