@@ -42,7 +42,7 @@ public class XIGGenerator {
   private String date;
     
   public static void main(String[] args) throws Exception {
-    new XIGGenerator(args[0], args[1]).execute(args[2]);
+    new XIGGenerator(args[0], args[1]).execute(Integer.parseInt(args[3]));
   }
 
   public XIGGenerator(String target, String cache) throws FHIRException, IOException, URISyntaxException {
@@ -56,17 +56,17 @@ public class XIGGenerator {
     date = "<span title=\""+dl+"\">"+ds+"</span>";    
   }
   
-  public void execute(String step) throws IOException, ParserConfigurationException, SAXException, FHIRException, EOperationOutcome, ParseException {
+  public void execute(int step) throws IOException, ParserConfigurationException, SAXException, FHIRException, EOperationOutcome, ParseException {
     ProfileUtilities.setSuppressIgnorableExceptions(true);
 
     long ms = System.currentTimeMillis();
 
-    
+    System.out.println("Start Step "+step);
+
     File tgt = new File(target);
-//    if (tgt.exists()) {
-//      test(tgt);
-//    }
-    tgt.delete();
+    if (step == 1) {
+      tgt.delete();
+    }
 
     PackageVisitor pv = new PackageVisitor();
     
@@ -105,13 +105,14 @@ public class XIGGenerator {
     pv.setCache(cache);
     pv.setOldVersions(false);
     pv.setCorePackages(true);
-    XIGDatabaseBuilder gather = new XIGDatabaseBuilder(target, new SimpleDateFormat("dd MMM yyyy", new Locale("en", "US")).format(Calendar.getInstance().getTime()));
+    XIGDatabaseBuilder gather = new XIGDatabaseBuilder(target, step == 1, new SimpleDateFormat("dd MMM yyyy", new Locale("en", "US")).format(Calendar.getInstance().getTime()));
     pv.setProcessor(gather);
     pv.setCurrent(true);
+    pv.setStep(step);
     pv.visitPackages();
     gather.finish();
 
-    System.out.println("Finished Step 1: "+Utilities.describeDuration(System.currentTimeMillis() - ms));
+    System.out.println("Finished Step "+step+": "+Utilities.describeDuration(System.currentTimeMillis() - ms));
     System.out.println("File size is "+Utilities.describeSize(tgt.length()));
   }
 //
