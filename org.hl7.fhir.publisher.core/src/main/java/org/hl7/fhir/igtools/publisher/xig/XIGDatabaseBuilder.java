@@ -78,17 +78,15 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
   private int lastMDKey;
   private Set<String> authorities = new HashSet<>();
   private Set<String> realms = new HashSet<>();
-  private Set<String> possibleAuthorities = new HashSet<>();
-  private Set<String> possibleRealms = new HashSet<>();
   private int pck;
 
 
   private Map<String, SpecMapManager> smmList = new HashMap<>();
 
-  public XIGDatabaseBuilder(String dest, String date) throws IOException {
+  public XIGDatabaseBuilder(String dest, boolean init, String date) throws IOException {
     super();
     try {
-      con = connect(dest, date);
+      con = connect(dest, init, date);
 
       psqlP = con.prepareStatement("Insert into Packages (PackageKey, PID, Id, Date, Title, Canonical, Web, Version, R2, R2B, R3, R4, R4B, R5, R6, Realm, Auth, Package, Published) Values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)");
       psqlR = con.prepareStatement("Insert into Resources (ResourceKey, PackageKey, ResourceType, ResourceTypeR5, Id, R2, R2B, R3, R4, R4B, R5, R6, Web, Url, Version, Status, Date, Name, Title, Experimental, Realm, Description, Purpose, Copyright, CopyrightLabel, Kind, Type, Supplements, ValueSet, Content, Authority, Details) Values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -101,24 +99,56 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
     }
   }
 
-  private Connection connect(String filename, String date) throws IOException, SQLException {
-    new File(filename).delete();
-    Connection con = DriverManager.getConnection("jdbc:sqlite:"+filename); 
-    makeMetadataTable(con);
-    makePackageTable(con);
-    makeResourcesTable(con);
-    makeContentsTable(con);
-    makeRealmsTable(con);
-    makeAuthoritiesTable(con);
-    makeCategoriesTable(con);
-    makeResourceIndex(con);
-    makeCodeIndex(con);
-    makeTxSourceList(con);
-    PreparedStatement psql = con.prepareStatement("Insert into Metadata (key, name, value) values (?, ?, ?)");
-    psql.setInt(1, ++lastMDKey);
-    psql.setString(2, "date");
-    psql.setString(3, date);
-    psql.executeUpdate();
+  private Connection connect(String filename, boolean init, String date) throws IOException, SQLException {
+    Connection con = DriverManager.getConnection("jdbc:sqlite:"+filename);
+    if (init) {
+      makeMetadataTable(con);
+      makePackageTable(con);
+      makeResourcesTable(con);
+      makeContentsTable(con);
+      makeRealmsTable(con);
+      makeAuthoritiesTable(con);
+      makeCategoriesTable(con);
+      makeResourceIndex(con);
+      makeCodeIndex(con);
+      makeTxSourceList(con);
+      PreparedStatement psql = con.prepareStatement("Insert into Metadata (key, name, value) values (?, ?, ?)");
+      psql.setInt(1, ++lastMDKey);
+      psql.setString(2, "date");
+      psql.setString(3, date);
+      psql.executeUpdate();
+    } else {
+
+      ResultSet rs = con.createStatement().executeQuery("select * from Realms");
+      while (rs.next()) {
+        realms.add(rs.getString(1));
+      }
+      rs = con.createStatement().executeQuery("select * from Authorities");
+      while (rs.next()) {
+        authorities.add(rs.getString(1));
+      }
+      rs = con.createStatement().executeQuery("select * from Metadata");
+      while (rs.next()) {
+        lastMDKey = rs.getInt(1);
+        if ("pckKey".equals(rs.getString(2))) {
+          pckKey = rs.getInt(3);
+        }
+        if ("resKey".equals(rs.getString(2))) {
+          resKey = rs.getInt(3);
+        }
+        if ("totalpackages".equals(rs.getString(2))) {
+          pck = rs.getInt(3);
+        }
+      }
+      con.createStatement().execute("delete from Metadata");
+      con.createStatement().execute("delete from Realms");
+      con.createStatement().execute("delete from Authorities");
+      PreparedStatement psql = con.prepareStatement("Insert into Metadata (key, name, value) values (?, ?, ?)");
+      psql.setInt(1, ++lastMDKey);
+      psql.setString(2, "date");
+      psql.setString(3, date);
+      psql.executeUpdate();
+    }
     return con;    
   }
 
@@ -252,25 +282,19 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
 
   public void finish() throws IOException {
     try {
+      con.createStatement().execute("delete from Realms");
       PreparedStatement psql = con.prepareStatement("Insert into Realms (code) values (?)");
       for (String s : realms) {
         psql.setString(1, s);
         psql.executeUpdate();
       }
+      con.createStatement().execute("delete from Authorities");
       psql = con.prepareStatement("Insert into Authorities (code) values (?)");
       for (String s : authorities) {
         psql.setString(1, s);
         psql.executeUpdate();
       }
 
-      System.out.println("Possible Realms:");
-      for (String s : possibleRealms) {
-        System.out.println(" "+s);        
-      }
-      System.out.println("Possible Authorities:");
-      for (String s : possibleAuthorities) {
-        System.out.println(" "+s);        
-      }
 
       Statement stmt = con.createStatement();
       stmt.execute("Select Count(*) from Packages");
@@ -313,7 +337,15 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
       psql.setString(2, "totalpackages");
       psql.setString(3, ""+pck);
       psql.executeUpdate();
-
+      psql.setInt(1, ++lastMDKey);
+      psql.setString(2, "pckKey");
+      psql.setString(3, ""+pckKey);
+      psql.executeUpdate();
+      psql.setInt(1, ++lastMDKey);
+      psql.setString(2, "resKey");
+      psql.setString(3, ""+resKey);
+      psql.executeUpdate();
+    
       con.close();
     } catch (Exception e) {
       throw new IOException(e);
@@ -825,12 +857,12 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
         case "Carequality": return "carequality";
         case "Israeli Ministry of Health" : return "national";
         default: 
-          possibleRealms.add(pid+" : "+p);
+//          possibleRealms.add(pid+" : "+p);
           return null;
         }
       }
     }
-    possibleRealms.add(pid);
+//    possibleRealms.add(pid);
     return null;
   }
 
@@ -883,7 +915,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
         case "NO" :  return seeRealm("no");
         case "IN" :  return seeRealm("in");
         default: 
-          possibleAuthorities.add(j+" : "+pid);
+//          possibleAuthorities.add(j+" : "+pid);
           return null;
         }
       }
@@ -942,7 +974,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
     if (pid.startsWith("jp-")) {
       return seeRealm("jp");
     }
-    possibleAuthorities.add(pid);
+//    possibleAuthorities.add(pid);
     return null;
   }
 

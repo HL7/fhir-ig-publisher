@@ -11820,8 +11820,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     } else if (CliParams.hasNamedParam(args, "-generate-package-registry")) {
       new PackageRegistryBuilder(CliParams.getNamedParam(args, "-generate-package-registry")).build();
     } else if (CliParams.hasNamedParam(args, "-xig")) {
-      new XIGGenerator(CliParams.getNamedParam(args, "-xig"), CliParams.getNamedParam(args, "-xig-cache")).execute("step1");
-      new XIGGenerator(CliParams.getNamedParam(args, "-xig"), CliParams.getNamedParam(args, "-xig-cache")).execute("step2");
+      new XIGGenerator(CliParams.getNamedParam(args, "-xig"), CliParams.getNamedParam(args, "-xig-cache")).execute(Integer.parseInt(CliParams.getNamedParam(args, "-xig-step")));
     } else if (CliParams.hasNamedParam(args, "-update-history")) {
       new HistoryPageUpdater().updateHistoryPages(CliParams.getNamedParam(args, "-history"), CliParams.getNamedParam(args, "-website"), CliParams.getNamedParam(args, "-website"));
     } else if (CliParams.hasNamedParam(args, "-publish-update")) {
