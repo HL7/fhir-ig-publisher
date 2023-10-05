@@ -148,6 +148,18 @@ jobs:
         targetPath: $(XIG_DB_FOLDER)
 
     - task: Bash@3
+      displayName: 'ls cache folder'
+      inputs:
+        targetType: 'inline'
+        script: 'ls -al $(XIG_CACHE_FOLDER)'
+
+    - task: Bash@3
+      displayName: 'ls db folder'
+      inputs:
+        targetType: 'inline'
+        script: 'ls -al $(XIG_DB_FOLDER)'
+
+    - task: Bash@3
       displayName: 'Run publisher with xig param step 3'
       inputs:
         targetType: 'inline'
