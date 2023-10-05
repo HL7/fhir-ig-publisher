@@ -38,30 +38,10 @@ jobs:
       script: 'mkdir $(XIG_DB_FOLDER)'
 
   - task: Bash@3
-    displayName: 'Make output database'
-    inputs:
-      targetType: 'inline'
-      script: 'touch $(XIG_DB_FOLDER)/'
-
-  - task: Bash@3
     displayName: 'Make cache folder'
     inputs:
       targetType: 'inline'
       script: 'mkdir $(XIG_CACHE_FOLDER)'
-
-  - task: Bash@3
-    displayName: 'Make dummy file'
-    enabled: false
-    inputs:
-      targetType: 'inline'
-      script: 'echo "Stage 1" >> $(XIG_DB_FOLDER)/$(XIG_DB_FILE)'
-
-  - task: Bash@3
-    displayName: 'Make dummy file for cache'
-    enabled: false
-    inputs:
-      targetType: 'inline'
-      script: 'echo "Stage 1 cache" >> $(XIG_CACHE_FOLDER)/file1.txt'
 
   - task: Bash@3
     displayName: 'Run publisher with xig param step 1'
@@ -99,32 +79,6 @@ jobs:
       targetPath: $(XIG_DB_FOLDER)
 
   - task: Bash@3
-    displayName: 'ls cache folder'
-    inputs:
-      targetType: 'inline'
-      script: 'ls -al $(XIG_CACHE_FOLDER)'
-
-  - task: Bash@3
-    displayName: 'ls db folder'
-    inputs:
-      targetType: 'inline'
-      script: 'ls -al $(XIG_DB_FOLDER)'
-
-  - task: Bash@3
-    displayName: 'Make dummy file'
-    enabled: false
-    inputs:
-      targetType: 'inline'
-      script: 'echo "Stage 2" >> $(XIG_DB_FOLDER)/$(XIG_DB_FILE)'
-
-  - task: Bash@3
-    displayName: 'Make dummy file for cache'
-    enabled: false
-    inputs:
-      targetType: 'inline'
-      script: 'echo "Stage 2 cache" >> $(XIG_CACHE_FOLDER)/file2.txt'
-
-  - task: Bash@3
     displayName: 'Run publisher with xig param step 2'
     inputs:
       targetType: 'inline'
@@ -160,18 +114,6 @@ jobs:
         targetPath: $(XIG_DB_FOLDER)
 
     - task: Bash@3
-      displayName: 'ls cache folder'
-      inputs:
-        targetType: 'inline'
-        script: 'ls -al $(XIG_CACHE_FOLDER)'
-
-    - task: Bash@3
-      displayName: 'ls db folder'
-      inputs:
-        targetType: 'inline'
-        script: 'ls -al $(XIG_DB_FOLDER)'
-
-    - task: Bash@3
       displayName: 'Run publisher with xig param step 3'
       inputs:
         targetType: 'inline'
@@ -181,7 +123,6 @@ jobs:
       artifact: xig_step_3_db
 
 - job: transfer_db_to_remote
-  condition: false
   dependsOn:
   - xig_step_1
   - xig_step_2
