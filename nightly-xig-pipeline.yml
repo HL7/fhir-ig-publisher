@@ -157,11 +157,3 @@ jobs:
       targetType: 'inline'
       script: |
         scp -o "StrictHostKeyChecking=no" -i $(Agent.TempDirectory)/xig.private.key $(XIG_DB_FOLDER)/$(XIG_DB_FILE) $(XIG_USER)@$(XIG_SERVER):$(XIG_TARGET_DIRECTORY)/
-
-  - task: Bash@3
-    displayName: 'Decompress tar on remote'
-    retryCountOnTaskFailure: 5
-    inputs:
-      targetType: 'inline'
-      script: |
-        ssh -o "StrictHostKeyChecking=no" -i $(Agent.TempDirectory)/xig.private.key $(XIG_USER)@$(XIG_SERVER) 'tar -zxvf $(XIG_TARGET_DIRECTORY)/xig-www.tar.gz -C $(XIG_TARGET_DIRECTORY)'
