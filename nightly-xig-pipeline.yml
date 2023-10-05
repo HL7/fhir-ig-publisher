@@ -26,7 +26,7 @@ jobs:
   timeoutInMinutes: 70
   steps:
   - task: Bash@3
-    displayName: 'Download publisher'
+    displayName: 'Download latest publisher'
     inputs:
       targetType: 'inline'
       script: 'wget https://github.com/HL7/fhir-ig-publisher/releases/latest/download/publisher.jar'
@@ -51,19 +51,20 @@ jobs:
 
   - task: Bash@3
     displayName: 'Make dummy file'
+    enabled: false
     inputs:
       targetType: 'inline'
       script: 'echo "Stage 1" >> $(XIG_DB_FOLDER)/$(XIG_DB_FILE)'
 
   - task: Bash@3
     displayName: 'Make dummy file for cache'
+    enabled: false
     inputs:
       targetType: 'inline'
       script: 'echo "Stage 1 cache" >> $(XIG_CACHE_FOLDER)/file1.txt'
 
   - task: Bash@3
     displayName: 'Run publisher with xig param step 1'
-    enabled: false
     inputs:
       targetType: 'inline'
       script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FOLDER)/$(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 1'
@@ -93,19 +94,20 @@ jobs:
 
   - task: Bash@3
     displayName: 'Make dummy file'
+    enabled: false
     inputs:
       targetType: 'inline'
       script: 'echo "Stage 2" >> $(XIG_DB_FOLDER)/$(XIG_DB_FILE)'
 
   - task: Bash@3
     displayName: 'Make dummy file for cache'
+    enabled: false
     inputs:
       targetType: 'inline'
       script: 'echo "Stage 2 cache" >> $(XIG_CACHE_FOLDER)/file2.txt'
 
   - task: Bash@3
     displayName: 'Run publisher with xig param step 2'
-    enabled: false
     inputs:
       targetType: 'inline'
       script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FOLDER)/$(XIG_DB_FILE) -xig_cache $(XIG_CACHE_FOLDER) -xig-step 2'
@@ -135,7 +137,6 @@ jobs:
 
     - task: Bash@3
       displayName: 'Run publisher with xig param step 3'
-      enabled: false
       inputs:
         targetType: 'inline'
         script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FOLDER)/$(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 3'
