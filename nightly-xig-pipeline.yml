@@ -119,8 +119,10 @@ jobs:
         targetType: 'inline'
         script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FOLDER)/$(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 3'
 
-    - publish: $(XIG_DB_FOLDER)
-      artifact: xig_step_3_db
+    - task: PublishPipelineArtifact@1
+      inputs:
+        targetPath: $(XIG_DB_FOLDER)
+        artifactName: xig_step_3_db
 
 - job: transfer_db_to_remote
   dependsOn:
@@ -128,8 +130,11 @@ jobs:
   - xig_step_2
   - xig_step_3
   steps:
-  - download: current
-    artifact: xig_step_3_db
+  - task: DownloadPipelineArtifact@2
+    inputs:
+      buildType: 'current'
+      artifactName: xig_step_3_db
+      targetPath: $(XIG_DB_FOLDER)
 
   - task: DownloadSecureFile@1
     inputs:
