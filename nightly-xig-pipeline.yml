@@ -128,7 +128,7 @@ jobs:
     displayName: 'Run publisher with xig param step 2'
     inputs:
       targetType: 'inline'
-      script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FOLDER)/$(XIG_DB_FILE) -xig_cache $(XIG_CACHE_FOLDER) -xig-step 2'
+      script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FOLDER)/$(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 2'
 
   - task: PublishPipelineArtifact@1
     inputs:
