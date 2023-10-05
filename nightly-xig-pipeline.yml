@@ -81,6 +81,12 @@ jobs:
 - job: xig_step_2
   dependsOn: xig_step_1
   steps:
+  - task: Bash@3
+    displayName: 'Download latest publisher'
+    inputs:
+      targetType: 'inline'
+      script: 'wget https://github.com/HL7/fhir-ig-publisher/releases/latest/download/publisher.jar'
+
   - task: DownloadPipelineArtifact@2
     inputs:
       buildType: 'current'
@@ -124,6 +130,12 @@ jobs:
 - job: xig_step_3
   dependsOn: xig_step_2
   steps:
+    - task: Bash@3
+      displayName: 'Download latest publisher'
+      inputs:
+        targetType: 'inline'
+        script: 'wget https://github.com/HL7/fhir-ig-publisher/releases/latest/download/publisher.jar'
+
     - task: DownloadPipelineArtifact@2
       inputs:
         buildType: 'current'
