@@ -151,20 +151,12 @@ jobs:
         ssh -o "StrictHostKeyChecking=no" -i $(Agent.TempDirectory)/xig.private.key $(XIG_USER)@$(XIG_SERVER) 'if [ -d "$(XIG_TARGET_DIRECTORY)" ]; then find $(XIG_TARGET_DIRECTORY) -name "*" -delete; fi && mkdir $(XIG_TARGET_DIRECTORY)'
 
   - task: Bash@3
-    displayName: 'Tar results'
-
-    inputs:
-      targetType: 'inline'
-      script: |
-        tar -C $(XIG_DB_FOLDER)/ -zcvf xig-www.tar.gz .
-
-  - task: Bash@3
     displayName: 'Copy tar to remote'
     retryCountOnTaskFailure: 5
     inputs:
       targetType: 'inline'
       script: |
-        scp -o "StrictHostKeyChecking=no" -i $(Agent.TempDirectory)/xig.private.key xig-www.tar.gz $(XIG_USER)@$(XIG_SERVER):$(XIG_TARGET_DIRECTORY)/
+        scp -o "StrictHostKeyChecking=no" -i $(Agent.TempDirectory)/xig.private.key $(XIG_DB_FOLDER)/$(XIG_DB_FILE) $(XIG_USER)@$(XIG_SERVER):$(XIG_TARGET_DIRECTORY)/
 
   - task: Bash@3
     displayName: 'Decompress tar on remote'
