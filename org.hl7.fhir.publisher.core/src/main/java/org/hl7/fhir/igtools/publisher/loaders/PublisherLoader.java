@@ -103,16 +103,6 @@ public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProv
         r.setWebPath(path);
         r.setUserData("webroot", pathToSpec);
         String v = ((CanonicalResource) r).getVersion();
-        if (v != null) {
-          u = u + "|" + v;
-          p = spm.getPath(u, r.getMeta().getSource(), r.fhirType(), r.getId());
-          if (p == null) {
-            System.out.println("In IG "+npm.name()+"#"+npm.version()+" map: No identity found for "+u);
-          } else {
-            String vp = pathToSpec+"/"+ igpkp.doReplacements(p, r, null, null);
-            r.setUserData("versionpath", vp);
-          }
-        }
         return path;
       } 
       

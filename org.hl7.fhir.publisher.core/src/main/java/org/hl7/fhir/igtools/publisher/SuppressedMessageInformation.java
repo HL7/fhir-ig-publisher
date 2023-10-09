@@ -27,6 +27,14 @@ public class SuppressedMessageInformation {
     public SuppressedMessage(String message) {
       super();
       message = message.trim();
+      
+      // various special cases 
+      if (message.contains("Rule ") && message.contains("' Failed (")) {
+        message = message.replace("Rule ", "Constraint failed: ").replace("' Failed (", "' (");
+      } else if (message.startsWith("Rule ") && message.endsWith("%")) {
+        message = message.replace("Rule ", "Constraint failed: ");
+      }
+
       this.messageRaw = message;
       if (messageRaw.startsWith("%")) {
         if (messageRaw.endsWith("%")) {
@@ -43,6 +51,7 @@ public class SuppressedMessageInformation {
         compType = 0;
         messageComp = messageRaw.toLowerCase();
       }
+      
     }
 
     public String getMessageRaw() {

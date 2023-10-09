@@ -687,6 +687,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private List<String> resourceDirs = new ArrayList<String>();
   private List<String> pagesDirs = new ArrayList<String>();
+  private List<String> testDirs = new ArrayList<String>();
   private List<String> dataDirs = new ArrayList<String>();
   private String tempDir;
   private String tempLangDir;
@@ -2368,8 +2369,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       initializeFromIg(ini);
     } else if (isTemplate())
       initializeTemplate();
-    else
-      initializeFromJson();
+    else {
+      // initializeFromJson();
+      throw new Error("Old style JSON configuration is no longer supported");
+    }
     expectedJurisdiction = checkForJurisdiction();
     realmRules = makeRealmBusinessRules();
     previousVersionComparator = makePreviousVersionComparator();
@@ -2586,6 +2589,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         break;
       case "path-pages":     
         pagesDirs.add(Utilities.path(rootDir, p.getValue()));
+        break;
+      case "path-test":     
+        testDirs.add(Utilities.path(rootDir, p.getValue()));
         break;
       case "path-data":     
         dataDirs.add(Utilities.path(rootDir, p.getValue()));
@@ -5693,7 +5699,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
   private void checkConformanceResources() throws IOException {
-    logDebugMessage(LogCategory.PROGRESS, "check profiles & code systems");
+    log("Check profiles & code systems");
     for (FetchedFile f : fileList) {
       f.start("checkConformanceResources");
       try {
@@ -5716,9 +5722,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         f.finish("checkConformanceResources");      
       }
     }
-    logDebugMessage(LogCategory.PROGRESS, "check profiles & code systems");
     Session tts = tt.start("realm-rules");
     if (!realmRules.isExempt(publishedIg.getPackageId())) {
+      log("Check realm rules");
       realmRules.startChecks(publishedIg);
       for (FetchedFile f : fileList) {
         f.start("checkConformanceResources2");
@@ -5730,11 +5736,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             } else if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
               realmRules.checkCR(f, (CanonicalResource) r.getResource());
             }
-            if (r.fhirType().equals("CodeSystem")) {
-              logDebugMessage(LogCategory.PROGRESS, "process CodeSystem: "+r.getId());
-              CodeSystem cs = (CodeSystem) r.getResource();
-              f.getErrors().addAll(csvalidator.validate(cs, false));
-            }
           }
         } finally {
           f.finish("checkConformanceResources2");      
@@ -5743,7 +5744,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       realmRules.finishChecks();
     }
     tts.end();
-    logDebugMessage(LogCategory.PROGRESS, "check profiles & code systems");
+    log("Previous Version Comparison");
     tts = tt.start("previous-version");
     previousVersionComparator.startChecks(publishedIg);
     if (ipaComparator != null) {
@@ -6955,7 +6956,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             if (profile == null) {
               errs.add(new ValidationMessage(Source.InstanceValidator, IssueType.NOTFOUND, "file", context.formatMessage(I18nConstants.Bundle_BUNDLE_Entry_NO_LOGICAL_EXPL, r0.getId(), f.getLogical()), IssueSeverity.ERROR));
             } else {
-              FhirFormat fmt = FhirFormat.readFromMimeType(bin.getContentType());        
+              FhirFormat fmt = FhirFormat.readFromMimeType(bin.getContentType() == null ? f.getContentType() : bin.getContentType());       
               Session tts = tt.start("validation");
               List<StructureDefinition> profiles = new ArrayList<>();
               profiles.add(profile);
@@ -7000,7 +7001,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private void validate(FetchedFile f, FetchedResource r, List<ValidationMessage> errs, Binary bin) {
     long ts = System.currentTimeMillis();
-    validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), FhirFormat.readFromMimeType(bin.getContentType()));
+    validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), FhirFormat.readFromMimeType(bin.getContentType() == null ? f.getContentType() : bin.getContentType()));
     long tf = System.currentTimeMillis();
     if (tf-ts > validationLogTime && validationLogTime > 0) {
       reportLongValidation(f, r, tf-ts);
@@ -7011,7 +7012,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     long ts = System.currentTimeMillis();
     List<StructureDefinition> profiles = new ArrayList<StructureDefinition>();
     profiles.add(sd);
-    validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), FhirFormat.readFromMimeType(bin.getContentType()), profiles);
+    validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), FhirFormat.readFromMimeType(bin.getContentType() == null ? f.getContentType(): bin.getContentType()), profiles);
     long tf = System.currentTimeMillis();
     if (tf-ts > validationLogTime && validationLogTime > 0) {
       reportLongValidation(f, r, tf-ts);
@@ -7441,6 +7442,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         npm.addFile(Category.OTHER, "spec.internals", TextFile.fileToBytes(df.getAbsolutePath()));
         npm.addFile(Category.OTHER, "validation-summary.json", validationSummaryJson());
         npm.addFile(Category.OTHER, "validation-oo.json", validationSummaryOO());
+        for (String t : testDirs) {
+          addTestDir(new File(t), t);
+        }
         npm.finish();
         if (r4tor4b.canBeR4() && r4tor4b.canBeR4B()) {
           try {
@@ -7524,6 +7528,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       zip.close();
       Utilities.copyFile(Utilities.path(tempDir, "full-ig.zip"), Utilities.path(outputDir, "full-ig.zip"));
       log("Final .zip built");
+    }
+  }
+
+  private void addTestDir(File dir, String t) throws FileNotFoundException, IOException {
+    for (File f : dir.listFiles()) {
+      if (f.isDirectory()) {
+        addTestDir(f, t);        
+      } else {
+        npm.addFile("tests/"+Utilities.getRelativePath(t, f.getAbsolutePath()), f.getName(), TextFile.fileToBytes(f));        
+      }
     }
   }
 
@@ -7854,7 +7868,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           }
           String v = ((CanonicalResource) r.getResource()).getVersion();
           if (v != null) {
-            map.path(uc + "|" + v, v + "/" + igpkp.getLinkFor(r, true));
+            map.path(uc + "|" + v, igpkp.getLinkFor(r, true));
           }
         }
         map.path(u, igpkp.getLinkFor(r, true));
@@ -9893,6 +9907,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       saveFileOutputs(f);
       for (FetchedResource r : f.getResources()) {
         logDebugMessage(LogCategory.PROGRESS, "Produce outputs for "+r.fhirType()+"/"+r.getId());
+        if ("Location/hl7east".equals(r.fhirType()+"/"+r.getId())) {
+          System.out.println("!");
+        }
         Map<String, String> vars = makeVars(r);
         makeTemplates(f, r, vars);
         saveDirectResourceOutputs(f, r, r.getResource(), vars);
@@ -10000,6 +10017,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private byte[] processSQL(DBBuilder db, byte[] content, FetchedFile f) {
+    if (!Utilities.existsInList(Utilities.getFileExtension(f.getName()), ".html", "md")) {
+      return content;
+    }
     try {
       String src = new String(content);
       boolean changed = false;
@@ -12503,7 +12523,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   @Override
   public void recordProfileUsage(StructureDefinition profile, Object appContext, Element element) {
-    if (profile.getUrl().startsWith(igpkp.getCanonical())) { // ignore anything we didn't define
+    if (profile != null && profile.getUrl().startsWith(igpkp.getCanonical())) { // ignore anything we didn't define
       FetchedResource example;
       if (appContext instanceof ValidationContext) {
         example = (FetchedResource) ((ValidationContext) appContext).getResource().getUserData("igpub.context.resource");
