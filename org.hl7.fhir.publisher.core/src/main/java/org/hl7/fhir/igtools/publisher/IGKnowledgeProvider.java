@@ -619,10 +619,8 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
         ValueSet vs = context.fetchResource(ValueSet.class, ref);
         if (vs != null) {
           if (ref.contains("|")) {
-            br.url = vs.getUserString("versionpath");
-            if (br.url == null) {
-              br.url = vs.getWebPath();
-            }
+            // for now, we don't do anything different. This is a todo - what can we do? 
+            br.url = vs.getWebPath();
             br.display = vs.getName() + " (" + vs.getVersion() + ")"; 
           } else if (vs != null && vs.hasWebPath()) {
             br.url = vs.getWebPath();  

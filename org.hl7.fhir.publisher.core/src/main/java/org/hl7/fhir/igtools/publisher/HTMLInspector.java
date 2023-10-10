@@ -705,16 +705,20 @@ public class HTMLInspector {
         } else if (page.contains("#")) {
           name = page.substring(page.indexOf("#")+1);
           try {
-          if (altRootFolder != null && filename.startsWith(altRootFolder))
-            page = Utilities.path(altRootFolder, page.substring(0, page.indexOf("#")).replace("/", File.separator));
-          else
-            page = Utilities.path(rootFolder, page.substring(0, page.indexOf("#")).replace("/", File.separator));
-          } catch (Exception e) {
+            if (altRootFolder != null && filename.startsWith(altRootFolder))
+              page = Utilities.path(altRootFolder, page.substring(0, page.indexOf("#")).replace("/", File.separator));
+            else
+              page = Utilities.path(rootFolder, page.substring(0, page.indexOf("#")).replace("/", File.separator));
+          } catch (java.nio.file.InvalidPathException e) {
             page = null;
           }
         } else {
-          String folder = Utilities.getDirectoryForFile(filename);
-          page = Utilities.path(folder == null ? (altRootFolder != null && filename.startsWith(altRootFolder) ? altRootFolder : rootFolder) : folder, page.replace("/", File.separator));
+          try {
+            String folder = Utilities.getDirectoryForFile(filename);
+            page = Utilities.path(folder == null ? (altRootFolder != null && filename.startsWith(altRootFolder) ? altRootFolder : rootFolder) : folder, page.replace("/", File.separator));
+          } catch (java.nio.file.InvalidPathException e) {
+            page = null;
+          }
         }
         if (page != null) {
           LoadedFile f = cache.get(page);

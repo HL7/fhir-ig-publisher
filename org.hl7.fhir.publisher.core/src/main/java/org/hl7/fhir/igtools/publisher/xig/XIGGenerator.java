@@ -64,7 +64,7 @@ public class XIGGenerator {
     System.out.println("Start Step "+step);
 
     File tgt = new File(target);
-    if (step == 1) {
+    if (step == 1 || step == 0) {
       tgt.delete();
     }
 
@@ -105,12 +105,12 @@ public class XIGGenerator {
     pv.setCache(cache);
     pv.setOldVersions(false);
     pv.setCorePackages(true);
-    XIGDatabaseBuilder gather = new XIGDatabaseBuilder(target, step == 1, new SimpleDateFormat("dd MMM yyyy", new Locale("en", "US")).format(Calendar.getInstance().getTime()));
+    XIGDatabaseBuilder gather = new XIGDatabaseBuilder(target, step == 1 || step == 0, new SimpleDateFormat("dd MMM yyyy", new Locale("en", "US")).format(Calendar.getInstance().getTime()));
     pv.setProcessor(gather);
     pv.setCurrent(true);
     pv.setStep(step);
     pv.visitPackages();
-    gather.finish();
+    gather.finish(step == 0 || step == 3);
 
     System.out.println("Finished Step "+step+": "+Utilities.describeDuration(System.currentTimeMillis() - ms));
     System.out.println("File size is "+Utilities.describeSize(tgt.length()));

@@ -218,7 +218,7 @@ public class PublicationProcess {
     // --- Rules for layout depend on publisher ------
     boolean help = true;
     JsonObject rules = getPublishingRules(pubSetup, id, p);
-    if (check(res, rules != null, "This website is not set up to publish the IG with Package Id '"+id+"'")) {
+    if (check(res, rules != null, "This website is not set up in its publish-setup.json to publish the IG with Package Id '"+id+"'")) {
       String cURL = calcByRule(rules.str("url"), p);
       if (cURL == null) {
         cURL = url;
