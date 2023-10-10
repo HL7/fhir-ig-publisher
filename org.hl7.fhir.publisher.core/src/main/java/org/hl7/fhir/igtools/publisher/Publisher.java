@@ -1146,7 +1146,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         log("Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
       }
       recordOutcome(null, val);
-      log("Finished. Max Memory Used = "+Utilities.describeSize(maxMemory));
+      log("Finished. Max Memory Used = "+Utilities.describeSize(maxMemory)+logSummary());
     } catch (Exception e) {
       try {
         recordOutcome(e, null);
@@ -1154,6 +1154,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         ex.printStackTrace();
       }
       throw e;
+    }
+  }
+
+  private String logSummary() {
+    if (consoleLogger.started()) {
+      return ". Log file saved in "+consoleLogger.getFilename();
+    } else {
+      return "";
     }
   }
 
@@ -11293,6 +11301,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   long last = System.currentTimeMillis();
   private List<String> unknownParams = new ArrayList<>();
 
+  private static PublisherConsoleLogger consoleLogger;
+
   private void lapsed(String msg) {
     long now = System.currentTimeMillis();
     long d = now - last;
@@ -11917,9 +11927,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (consoleLog == null) {     
         consoleLog =  Utilities.path("[tmp]", "fhir-ig-publisher-tmp.log");
       }
-      PublisherConsoleLogger logger = new PublisherConsoleLogger();
+      consoleLogger = new PublisherConsoleLogger();
       if (!CliParams.hasNamedParam(args, "-auto-ig-build") && !CliParams.hasNamedParam(args, "-publish-process")) {
-        logger.start(consoleLog);
+        consoleLogger.start(consoleLog);
       }
       self.logMessage("FHIR IG Publisher "+IGVersionUtil.getVersionString());
       self.logMessage("Detected Java version: " + System.getProperty("java.version")+" from "+System.getProperty("java.home")+" on "+System.getProperty("os.name")+"/"+System.getProperty("os.arch")+" ("+System.getProperty("sun.arch.data.model")+"bit). "+toMB(Runtime.getRuntime().maxMemory())+"MB available");
@@ -12107,7 +12117,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           TextFile.stringToFile(buildReport(CliParams.getNamedParam(args, "-ig"), CliParams.getNamedParam(args, "-source"), self.filelog.toString(), Utilities.path(self.qaDir, "validation.txt"), self.txServer), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher.log"), false);
         }
       }
-      logger.stop();
+      consoleLogger.stop();
     }
     if (!CliParams.hasNamedParam(args, "-no-exit")) {
       System.exit(exitCode);
