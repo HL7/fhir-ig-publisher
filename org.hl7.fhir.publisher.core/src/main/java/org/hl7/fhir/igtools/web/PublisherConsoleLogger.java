@@ -78,4 +78,8 @@ public class PublisherConsoleLogger {
       }
     }
   }
+
+  public boolean started() {
+    return filename != null;
+  }
 }
