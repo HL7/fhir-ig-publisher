@@ -35,6 +35,11 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.IGR2ConvertorAdvisor5;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.model.CanonicalType;
+import org.hl7.fhir.r5.model.CapabilityStatement;
+import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestComponent;
+import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceComponent;
+import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceOperationComponent;
+import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceSearchParamComponent;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.model.CanonicalResource;
@@ -43,6 +48,7 @@ import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
 import org.hl7.fhir.r5.model.ConceptMap;
 import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
 import org.hl7.fhir.r5.model.ElementDefinition;
+import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingAdditionalComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
 import org.hl7.fhir.r5.model.PackageInformation;
 import org.hl7.fhir.r5.model.Resource;
@@ -51,6 +57,8 @@ import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextCompo
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
+import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
+import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionParameterComponent;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.TextFile;
@@ -74,6 +82,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
   private PreparedStatement psqlC;
   private PreparedStatement psqlRI;
   private PreparedStatement psqlCI;
+  private PreparedStatement psqlDep;
   private Set<String> vurls = new HashSet<>();
   private int lastMDKey;
   private Set<String> authorities = new HashSet<>();
@@ -94,6 +103,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
       psqlCat = con.prepareStatement("Insert into Categories (ResourceKey, Mode, Code) Values (?, ?, ?)");
       psqlRI = con.prepareStatement("Insert into ResourceFTS (ResourceKey, Name, Title, Description, Narrative) Values (?, ?, ?, ?, ?)");
       psqlCI = con.prepareStatement("Insert into CodeSystemFTS (ResourceKey, Code, Display, Definition) Values (?, ?, ?, ?)");
+      psqlDep = con.prepareStatement("Insert into DependencyTemp (TargetUrl, SourceKey) Values (?, ?)");
     } catch (Exception e) {
       throw new IOException(e);
     }
@@ -112,6 +122,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
       makeResourceIndex(con);
       makeCodeIndex(con);
       makeTxSourceList(con);
+      makeDependencyTable(con);
       PreparedStatement psql = con.prepareStatement("Insert into Metadata (key, name, value) values (?, ?, ?)");
       psql.setInt(1, ++lastMDKey);
       psql.setString(2, "date");
@@ -152,6 +163,18 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
     return con;    
   }
 
+
+  private void makeDependencyTable(Connection con) throws SQLException {
+    Statement stmt = con.createStatement();
+    stmt.execute("CREATE TABLE DependencyTemp (\r\n"+
+        "TargetUrl         nvarchar NOT NULL,\r\n"+
+        "SourceKey            integer NOT NULL,\r\n"+
+        "PRIMARY KEY (TargetUrl, SourceKey))\r\n"); 
+    stmt.execute("CREATE TABLE DependencyList (\r\n"+
+        "TargetKey         integer NOT NULL,\r\n"+
+        "SourceKey         integer NOT NULL,\r\n"+
+        "PRIMARY KEY (TargetKey, SourceKey))\r\n"); 
+  }
 
   private void makeMetadataTable(Connection con) throws SQLException {
     Statement stmt = con.createStatement();
@@ -280,21 +303,27 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
     defineTxSources(stmt);
   }
 
-  public void finish() throws IOException {
+  public void finish(boolean finalFinish) throws IOException {
     try {
+      if (finalFinish) {
+        con.createStatement().execute("insert into DependencyList (TargetKey, SourceKey) select ResourceKey as TargetKey, SourceKey from DependencyTemp, Resources where Resources.URL = DependencyTemp.targetUrl");
+        con.createStatement().execute("delete from DependencyTemp");
+        con.createStatement().execute("drop Table DependencyTemp");
+      }
+      
       con.createStatement().execute("delete from Realms");
       PreparedStatement psql = con.prepareStatement("Insert into Realms (code) values (?)");
       for (String s : realms) {
         psql.setString(1, s);
         psql.executeUpdate();
       }
+      
       con.createStatement().execute("delete from Authorities");
       psql = con.prepareStatement("Insert into Authorities (code) values (?)");
       for (String s : authorities) {
         psql.setString(1, s);
         psql.executeUpdate();
       }
-
 
       Statement stmt = con.createStatement();
       stmt.execute("Select Count(*) from Packages");
@@ -345,7 +374,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
       psql.setString(2, "resKey");
       psql.setString(3, ""+resKey);
       psql.executeUpdate();
-    
+
       con.close();
     } catch (Exception e) {
       throw new IOException(e);
@@ -441,17 +470,22 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
 
             String details = null;
 
+            Set<String> dependencies = new HashSet();;
+
             if (cr instanceof CodeSystem) {
-              details = ""+processCodes(((CodeSystem) cr).getConcept());
+              details = ""+processCodesystem(resKey, (CodeSystem) cr, dependencies);
             }
             if (cr instanceof ValueSet) {
-              details = processValueSet(resKey, (ValueSet) cr, context.getNpm());
+              details = processValueSet(resKey, (ValueSet) cr, context.getNpm(), dependencies);
             }
             if (cr instanceof ConceptMap) {
-              details = processConceptMap(resKey, (ConceptMap) cr, context.getNpm());
+              details = processConceptMap(resKey, (ConceptMap) cr, context.getNpm(), dependencies);
             }
             if (cr instanceof StructureDefinition) {              
-              details = processStructureDefinition(resKey, (StructureDefinition) cr, context.getNpm());
+              details = processStructureDefinition(resKey, (StructureDefinition) cr, context.getNpm(), dependencies);
+            }
+            if (cr instanceof CapabilityStatement) {              
+              details = processCapabilityStatement(resKey, (CapabilityStatement) cr, context.getNpm(), dependencies);
             }
 
             psqlR.setInt(1, resKey);
@@ -512,8 +546,85 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
       }
     }
   }
-  
-  private String processStructureDefinition(int resKey, StructureDefinition sd, NpmPackage npm) throws SQLException {
+
+  private int processCodesystem(int resKey, CodeSystem cs, Set<String> dependencies) throws SQLException {
+    if (cs.hasSupplements()) {
+      recordDependency(dependencies, resKey, cs.getSupplements());
+    }
+    return processCodes(cs.getConcept());
+  }
+
+  private void recordDependency(Set<String> dependencies, int resKey, String url) throws SQLException {
+    if (Utilities.isAbsoluteUrl(url)) {
+      if (url.contains("|")) {
+        url = url.substring(0, url.indexOf("|"));
+      }
+      if (!isCore(url) && !dependencies.contains(url)) {
+        dependencies.add(url);
+        psqlDep.setString(1, url);
+        psqlDep.setInt(2, resKey);
+        psqlDep.execute();
+      }
+    }
+  }
+
+  private String processCapabilityStatement(int resKey, CapabilityStatement cs, NpmPackage npm, Set<String> dependencies) throws SQLException {
+
+    for (CanonicalType cr : cs.getInstantiates()) {
+      recordDependency(dependencies, resKey, cr.asStringValue());
+    }
+    for (CanonicalType cr : cs.getImports()) {
+      recordDependency(dependencies, resKey, cr.asStringValue());
+    }
+    for (CanonicalType cr : cs.getImplementationGuide()) {
+      recordDependency(dependencies, resKey, cr.asStringValue());
+    }
+    for (CapabilityStatementRestComponent r : cs.getRest()) {
+      for (CapabilityStatementRestResourceComponent res : r.getResource()) {
+        recordDependency(dependencies, resKey, res.getProfile());
+        for (CanonicalType cr : res.getSupportedProfile()) {
+          recordDependency(dependencies, resKey, cr.asStringValue());
+        }
+        for (CapabilityStatementRestResourceSearchParamComponent sp : res.getSearchParam()) {
+          recordDependency(dependencies, resKey, sp.getDefinition());
+        }
+        for (CapabilityStatementRestResourceOperationComponent op : res.getOperation()) {
+          recordDependency(dependencies, resKey, op.getDefinition());
+        }
+      }
+      for (CapabilityStatementRestResourceSearchParamComponent sp : r.getSearchParam()) {
+        recordDependency(dependencies, resKey, sp.getDefinition());
+      }
+      for (CapabilityStatementRestResourceOperationComponent op : r.getOperation()) {
+        recordDependency(dependencies, resKey, op.getDefinition());
+      }
+    }
+    return null;
+  }
+
+  private String processStructureDefinition(int resKey, StructureDefinition sd, NpmPackage npm, Set<String> dependencies) throws SQLException {
+    recordDependency(dependencies, resKey, sd.getBaseDefinition());
+    for (ElementDefinition ed : sd.getDifferential().getElement()) {
+      if (ed.hasBinding()) {
+        recordDependency(dependencies, resKey, ed.getBinding().getValueSet());
+        for (ElementDefinitionBindingAdditionalComponent ab : ed.getBinding().getAdditional()) {
+          recordDependency(dependencies, resKey, ab.getValueSet());            
+        }
+      }
+      for (TypeRefComponent tr : ed.getType()) {
+        recordDependency(dependencies, resKey, tr.getWorkingCode());
+        for (CanonicalType cr : tr.getProfile()) {
+          recordDependency(dependencies, resKey, cr.asStringValue());
+        }
+        for (CanonicalType cr : tr.getTargetProfile()) {
+          recordDependency(dependencies, resKey, cr.asStringValue());
+        }
+      }
+      for (CanonicalType cr : ed.getValueAlternatives()) {
+        recordDependency(dependencies, resKey, cr.asStringValue());
+      }
+    }
+
     if (ProfileUtilities.isExtensionDefinition(sd)) {
       return processExtensionDefinition(resKey, sd);
     } else {
@@ -589,20 +700,25 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
   //  }
 
   private boolean isCore(String url) {
-    return url.startsWith("http://hl7.org/fhir/StructureDefinition");
+    return url.startsWith("http://hl7.org/fhir/StructureDefinition") || url.startsWith("http://hl7.org/fhir/ValueSet")
+        || url.startsWith("http://hl7.org/fhir/CodeSystem")  || url.startsWith("http://hl7.org/fhir/SearchParameter");
   }
 
-  private String processConceptMap(int resKey, ConceptMap cm, NpmPackage npm) throws SQLException {
+  private String processConceptMap(int resKey, ConceptMap cm, NpmPackage npm, Set<String> dependencies) throws SQLException {
     Set<String> set = new HashSet<>();
     if (cm.hasSourceScope()) {
       set.add(seeTxReference(cm.getSourceScope().primitiveValue(), npm));
+      recordDependency(dependencies, resKey, cm.getSourceScope().primitiveValue());
     }
     if (cm.hasTargetScope()) {
       set.add(seeTxReference(cm.getTargetScope().primitiveValue(), npm));
+      recordDependency(dependencies, resKey, cm.getTargetScope().primitiveValue());
     }
     for (ConceptMapGroupComponent g : cm.getGroup()) {
       set.add(seeTxReference(g.getSource(), npm));
+      recordDependency(dependencies, resKey, g.getSource());
       set.add(seeTxReference(g.getTarget(), npm));
+      recordDependency(dependencies, resKey, g.getTarget());
     }
     for (String s : set) {
       seeReference(resKey, 1, s);
@@ -610,18 +726,37 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
     return CommaSeparatedStringBuilder.join(",", set);
   }
 
-  private String processValueSet(int resKey, ValueSet vs, NpmPackage npm) throws SQLException {
+  private String processValueSet(int resKey, ValueSet vs, NpmPackage npm, Set<String> dependencies) throws SQLException {
     Set<String> set = new HashSet<>();
     for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
       for (CanonicalType c : inc.getValueSet()) {
+        recordDependency(dependencies, resKey, c.getValueAsString());
         set.add(seeTxReference(c.getValue(), npm));
       }
       set.add(seeTxReference(inc.getSystem(), npm));
+      recordDependency(dependencies, resKey, inc.getSystem());
+    }
+    if (vs.hasExpansion()) {
+      for (ValueSetExpansionParameterComponent p : vs.getExpansion().getParameter()) {
+        if (p.hasValue()) {
+          recordDependency(dependencies, resKey, p.getValue().primitiveValue());
+        }
+      }
+      checkVSEDependencies(resKey, dependencies, vs.getExpansion().getContains());
     }
     for (String s : set) {
       seeReference(resKey, 1, s);
     }
     return CommaSeparatedStringBuilder.join(",", set);
+  }
+
+  private void checkVSEDependencies(int resKey, Set<String> dependencies, List<ValueSetExpansionContainsComponent> list) throws SQLException {
+    for (ValueSetExpansionContainsComponent c : list) {
+      recordDependency(dependencies, resKey, c.getSystem());
+      if (c.hasContains()) {
+        checkVSEDependencies(resKey, dependencies, c.getContains());
+      }
+    }
   }
 
   private String seeTxReference(String system, NpmPackage npm) {
@@ -857,12 +992,12 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
         case "Carequality": return "carequality";
         case "Israeli Ministry of Health" : return "national";
         default: 
-//          possibleRealms.add(pid+" : "+p);
+          //          possibleRealms.add(pid+" : "+p);
           return null;
         }
       }
     }
-//    possibleRealms.add(pid);
+    //    possibleRealms.add(pid);
     return null;
   }
 
@@ -915,7 +1050,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
         case "NO" :  return seeRealm("no");
         case "IN" :  return seeRealm("in");
         default: 
-//          possibleAuthorities.add(j+" : "+pid);
+          //          possibleAuthorities.add(j+" : "+pid);
           return null;
         }
       }
@@ -974,7 +1109,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
     if (pid.startsWith("jp-")) {
       return seeRealm("jp");
     }
-//    possibleAuthorities.add(pid);
+    //    possibleAuthorities.add(pid);
     return null;
   }
 
