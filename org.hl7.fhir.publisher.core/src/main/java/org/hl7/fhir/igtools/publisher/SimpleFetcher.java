@@ -27,9 +27,12 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.igtools.publisher.SimpleFetcher.FetchedFileSorter;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService.LogCategory;
@@ -45,6 +48,15 @@ import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 
 public class SimpleFetcher implements IFetchFile {
+
+  public class FetchedFileSorter implements Comparator<FetchedFile> {
+
+    @Override
+    public int compare(FetchedFile o1, FetchedFile o2) {
+      return o1.getPath().compareTo(o2.getPath());
+    }
+
+  }
 
   private static final String[] EXTENSIONS = new String[] {".xml", ".json", ".map", ".fml", ".phinvads"};
   private IGKnowledgeProvider pkp;
@@ -313,7 +325,7 @@ public class SimpleFetcher implements IFetchFile {
       throw new FHIRException("No Source directories to scan found"); // though it's not possible to get to this point...
 
     List<FetchedFile> res = new ArrayList<>();
-    for (String s : sources) {
+    for (String s : Utilities.sorted(sources)) {
       int count = 0;
       File file = new File(s);
       if (file.exists()) {
@@ -403,6 +415,7 @@ public class SimpleFetcher implements IFetchFile {
       }
       log.logDebugMessage(LogCategory.PROGRESS, "Loaded "+Integer.toString(count)+" files from "+s);
     }
+    Collections.sort(res, new FetchedFileSorter());
     return res;
   }
 
