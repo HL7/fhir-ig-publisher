@@ -14,35 +14,127 @@ pool:
 
 variables:
 - group: XIG_VARIABLE_GROUP
+- name: XIG_CACHE_FOLDER
+  value: $(Pipeline.Workspace)/xig_cache
+- name: XIG_DB_FOLDER
+  value: $(Pipeline.Workspace)/xig_db
+- name: XIG_DB_FILE
+  value: xig.db
 
 jobs:
-- job: build_and_copy_xig
+- job: xig_step_1
   timeoutInMinutes: 70
   steps:
   - task: Bash@3
-    displayName: 'Download publisher'
+    displayName: 'Download latest publisher'
     inputs:
       targetType: 'inline'
       script: 'wget https://github.com/HL7/fhir-ig-publisher/releases/latest/download/publisher.jar'
 
   - task: Bash@3
-    displayName: 'Make output dir'
+    displayName: 'Make db folder'
     inputs:
       targetType: 'inline'
-      script: 'mkdir xig_output'
+      script: 'mkdir $(XIG_DB_FOLDER)'
 
   - task: Bash@3
-    displayName: 'Run publisher with xig param'
+    displayName: 'Make cache folder'
     inputs:
       targetType: 'inline'
-      script: 'java -Xmx7168m -jar ./publisher.jar -xig xig_output'
+      script: 'mkdir $(XIG_CACHE_FOLDER)'
 
-#  - task: Bash@3
-#    displayName: 'Make dummy file'
-#    inputs:
-#      targetType: 'inline'
-#      script: |
-#        echo 'Why hello there' > xig_output/hello.txt
+  - task: Bash@3
+    displayName: 'Run publisher with xig param step 1'
+    inputs:
+      targetType: 'inline'
+      script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FOLDER)/$(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 1'
+
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: $(XIG_DB_FOLDER)
+      artifactName: xig_step_1_db
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: $(XIG_CACHE_FOLDER)
+      artifactName: xig_step_1_cache
+
+- job: xig_step_2
+  dependsOn: xig_step_1
+  steps:
+  - task: Bash@3
+    displayName: 'Download latest publisher'
+    inputs:
+      targetType: 'inline'
+      script: 'wget https://github.com/HL7/fhir-ig-publisher/releases/latest/download/publisher.jar'
+
+  - task: DownloadPipelineArtifact@2
+    inputs:
+      buildType: 'current'
+      artifactName: xig_step_1_cache
+      targetPath: $(XIG_CACHE_FOLDER)
+  - task: DownloadPipelineArtifact@2
+    inputs:
+      buildType: 'current'
+      artifactName: xig_step_1_db
+      targetPath: $(XIG_DB_FOLDER)
+
+  - task: Bash@3
+    displayName: 'Run publisher with xig param step 2'
+    inputs:
+      targetType: 'inline'
+      script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FOLDER)/$(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 2'
+
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: $(XIG_DB_FOLDER)
+      artifactName: xig_step_2_db
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: $(XIG_CACHE_FOLDER)
+      artifactName: xig_step_2_cache
+
+- job: xig_step_3
+  dependsOn: xig_step_2
+  steps:
+    - task: Bash@3
+      displayName: 'Download latest publisher'
+      inputs:
+        targetType: 'inline'
+        script: 'wget https://github.com/HL7/fhir-ig-publisher/releases/latest/download/publisher.jar'
+
+    - task: DownloadPipelineArtifact@2
+      inputs:
+        buildType: 'current'
+        artifactName: xig_step_2_cache
+        targetPath: $(XIG_CACHE_FOLDER)
+    - task: DownloadPipelineArtifact@2
+      inputs:
+        buildType: 'current'
+        artifactName: xig_step_2_db
+        targetPath: $(XIG_DB_FOLDER)
+
+    - task: Bash@3
+      displayName: 'Run publisher with xig param step 3'
+      inputs:
+        targetType: 'inline'
+        script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FOLDER)/$(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 3'
+
+    - task: PublishPipelineArtifact@1
+      inputs:
+        targetPath: $(XIG_DB_FOLDER)
+        artifactName: xig_step_3_db
+
+- job: transfer_db_to_remote
+  dependsOn:
+  - xig_step_1
+  - xig_step_2
+  - xig_step_3
+  steps:
+  - task: DownloadPipelineArtifact@2
+    inputs:
+      buildType: 'current'
+      artifactName: xig_step_3_db
+      targetPath: $(XIG_DB_FOLDER)
 
   - task: DownloadSecureFile@1
     inputs:
@@ -50,7 +142,7 @@ jobs:
 
   # This step includes chmod to the private key to avoid ssh complaining about permissions.
   - task: Bash@3
-    displayName: 'Clean previous results'
+    displayName: 'Clean previous results on remote'
     retryCountOnTaskFailure: 5
     inputs:
       targetType: 'inline'
@@ -59,24 +151,9 @@ jobs:
         ssh -o "StrictHostKeyChecking=no" -i $(Agent.TempDirectory)/xig.private.key $(XIG_USER)@$(XIG_SERVER) 'if [ -d "$(XIG_TARGET_DIRECTORY)" ]; then find $(XIG_TARGET_DIRECTORY) -name "*" -delete; fi && mkdir $(XIG_TARGET_DIRECTORY)'
 
   - task: Bash@3
-    displayName: 'Tar results'
-    inputs:
-      targetType: 'inline'
-      script: |
-        tar -C ./xig_output -zcvf xig-www.tar.gz .
-
-  - task: Bash@3
-    displayName: 'Copy tar'
+    displayName: 'Copy tar to remote'
     retryCountOnTaskFailure: 5
     inputs:
       targetType: 'inline'
       script: |
-        scp -o "StrictHostKeyChecking=no" -i $(Agent.TempDirectory)/xig.private.key xig-www.tar.gz $(XIG_USER)@$(XIG_SERVER):$(XIG_TARGET_DIRECTORY)/
-
-  - task: Bash@3
-    displayName: 'Decompress tar'
-    retryCountOnTaskFailure: 5
-    inputs:
-      targetType: 'inline'
-      script: |
-        ssh -o "StrictHostKeyChecking=no" -i $(Agent.TempDirectory)/xig.private.key $(XIG_USER)@$(XIG_SERVER) 'tar -zxvf $(XIG_TARGET_DIRECTORY)/xig-www.tar.gz -C $(XIG_TARGET_DIRECTORY)'
+        scp -o "StrictHostKeyChecking=no" -i $(Agent.TempDirectory)/xig.private.key $(XIG_DB_FOLDER)/$(XIG_DB_FILE) $(XIG_USER)@$(XIG_SERVER):$(XIG_TARGET_DIRECTORY)/
