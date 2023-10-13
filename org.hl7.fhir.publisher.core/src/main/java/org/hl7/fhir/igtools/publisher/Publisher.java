@@ -1158,7 +1158,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private String logSummary() {
-    if (consoleLogger.started()) {
+    if (consoleLogger != null && consoleLogger.started()) {
       return ". Log file saved in "+consoleLogger.getFilename();
     } else {
       return "";
@@ -6946,6 +6946,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       f.start("validate");
       try {
         logDebugMessage(LogCategory.PROGRESS, " .. validate "+f.getName());
+        if (f.getName().equals("/Users/grahamegrieve/temp/igs/HL7-CDA-core-sd#binding-test/input/examples/act-example")) {
+          System.out.println("!"); // #FIXME
+        }
         logDebugMessage(LogCategory.PROGRESS, " .. "+f.getName());
         FetchedResource r0 = f.getResources().get(0);
         if (f.getLogical() != null && f.getResources().size() == 1 && !r0.fhirType().equals("Binary")) {
