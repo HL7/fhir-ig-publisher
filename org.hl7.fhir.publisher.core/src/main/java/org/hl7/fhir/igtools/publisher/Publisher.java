@@ -481,6 +481,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
 
     @Override
+    public boolean paramIsType(String name, int index) {
+      return false;
+    }
+    
+    @Override
     public boolean log(String argument, List<Base> focus) {
       return false;
     }

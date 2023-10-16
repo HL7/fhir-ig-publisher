@@ -3,28 +3,41 @@ package tests;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+
+import javax.xml.parsers.ParserConfigurationException;
 
 import org.apache.commons.io.IOUtils;
 import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.publisher.Publisher.CacheOption;
+import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.settings.FhirSettings;
+import org.hl7.fhir.utilities.xml.XMLUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.xml.sax.SAXException;
 
 @EnabledIf("igsPathExists")
 public class AllGuidesTests {
-
-private static final String VER = "1.0.53";
 
   private void testIg(String id, String path) throws Exception {
     if (!igsPathExists()) {
       Assertions.assertTrue(true);
       return;
     }
+    String version = readVersion();
+    File statsFile = determineStatsFile();
+    long time = System.currentTimeMillis();
+    
     System.out.println("=======================================================================================");
     String p = (path == null ? Utilities.path(FhirSettings.getTestIgsPath(), id) : Utilities.path(FhirSettings.getTestIgsPath(), id, path));
     System.out.println("Publish IG "+ p);
@@ -52,11 +65,41 @@ private static final String VER = "1.0.53";
     int pWarn = previous.hasNumber("warnings") ? previous.asInteger("warnings") : 0;
     int cHint = current.hasNumber("hints") ? current.asInteger("hints") : 0;
     int pHint = previous.hasNumber("hints") ? previous.asInteger("hints") : 0;
+
+    JsonObject stats = JsonParser.parseObject(statsFile);
+    JsonObject ver = stats.forceObject(version);
+    ver.set("sync-date", TextFile.fileToString(syncDateFile()).trim());
+    ver.set("date", new SimpleDateFormat("yyyy-MM-dd").format(new Date()));
+    JsonObject si = ver.forceObject(id);
+    si.set("errors", cErr);
+    si.set("warnings", cWarn);
+    si.set("hints", cHint);
+    si.set("time", System.currentTimeMillis() - time);
+    JsonParser.compose(stats, statsFile, true);
+    
     Assertions.assertTrue(cErr <= pErr, "Error count has increased from "+pErr+" to "+cErr);
     Assertions.assertTrue(cWarn <= pWarn, "Warning count has increased from "+pWarn+" to "+cWarn);
     Assertions.assertTrue(cHint <= pHint, "Hint count has increased from "+pHint+" to "+cHint);
     System.out.println("=======================================================================================");
     System.out.println("");
+  }
+
+  //---- todo: this class is only run by Grahame, so these ahts are hard-coded
+  
+  private File syncDateFile() {
+    return new File("/Users/grahamegrieve/work/test-igs/date.txt");
+  }
+
+  private File determineStatsFile() {
+    return new File("/Users/grahamegrieve/work/ig-pub/test-statistics.json");
+  }
+
+  private String readVersion() throws ParserConfigurationException, SAXException, IOException {
+    Document doc = XMLUtil.parseFileToDom("/Users/grahamegrieve/work/ig-pub/pom.xml");
+    Element root = doc.getDocumentElement();
+    Element ver = XMLUtil.getNamedChild(root, "version");
+    String version = ver.getTextContent();
+    return version.contains("-") ? version.substring(0, version.indexOf("-")) : version;
   }
 
   private static boolean igsPathExists() {

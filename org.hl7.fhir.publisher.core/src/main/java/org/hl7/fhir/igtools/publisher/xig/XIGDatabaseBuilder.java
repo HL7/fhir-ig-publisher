@@ -89,9 +89,6 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
   private Set<String> realms = new HashSet<>();
   private int pck;
 
-
-  private Map<String, SpecMapManager> smmList = new HashMap<>();
-
   public XIGDatabaseBuilder(String dest, boolean init, String date) throws IOException {
     super();
     try {
@@ -389,42 +386,39 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
     try {
       String pid = context.getPid();
       NpmPackage npm = context.getNpm();
-      SpecMapManager smm = smmList.get(pid);
-      if (smm == null) {
-        smm = npm.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.fhirVersion()) : SpecMapManager.createSpecialPackage(npm);
-        pckKey++;
-        smm.setName(npm.name());
-        smm.setBase(npm.canonical());
-        smm.setBase2(PackageHacker.fixPackageUrl(npm.url()));
-        smm.setKey(pckKey);
-        smmList.put(pid, smm);
+      SpecMapManager smm = npm.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.fhirVersion()) : SpecMapManager.createSpecialPackage(npm);
+      pckKey++;
+      smm.setName(npm.name());
+      smm.setBase(npm.canonical());
+      smm.setBase2(PackageHacker.fixPackageUrl(npm.url()));
+      smm.setKey(pckKey);
 
-        String auth = getAuth(pid, null);
-        String realm = getRealm(pid, null);
-        smm.setAuth(auth);
-        smm.setRealm(realm);
+      String auth = getAuth(pid, null);
+      String realm = getRealm(pid, null);
+      smm.setAuth(auth);
+      smm.setRealm(realm);
 
-        psqlP.setInt(1, pckKey);
-        psqlP.setString(2, pid);
-        psqlP.setString(3, npm.name());
-        psqlP.setString(4, npm.date());
-        psqlP.setString(5, npm.title());
-        psqlP.setString(6, npm.canonical()); 
-        psqlP.setString(7, npm.getWebLocation());
-        psqlP.setString(8, npm.version()); 
-        psqlP.setInt(9, hasVersion(npm.fhirVersionList(), "1.0"));
-        psqlP.setInt(10, hasVersion(npm.fhirVersionList(), "1.4"));
-        psqlP.setInt(11, hasVersion(npm.fhirVersionList(), "3.0"));
-        psqlP.setInt(12, hasVersion(npm.fhirVersionList(), "4.0"));
-        psqlP.setInt(13, hasVersion(npm.fhirVersionList(), "4.3"));
-        psqlP.setInt(14, hasVersion(npm.fhirVersionList(), "5.0"));
-        psqlP.setInt(15, hasVersion(npm.fhirVersionList(), "6.0"));
-        psqlP.setString(16, realm);
-        psqlP.setString(17, auth);
-        psqlP.setBytes(18, org.hl7.fhir.utilities.json.parser.JsonParser.composeBytes(npm.getNpm()));
-        psqlP.execute();
-        pck++;
-      }
+      psqlP.setInt(1, pckKey);
+      psqlP.setString(2, pid);
+      psqlP.setString(3, npm.name());
+      psqlP.setString(4, npm.date());
+      psqlP.setString(5, npm.title());
+      psqlP.setString(6, npm.canonical()); 
+      psqlP.setString(7, npm.getWebLocation());
+      psqlP.setString(8, npm.version()); 
+      psqlP.setInt(9, hasVersion(npm.fhirVersionList(), "1.0"));
+      psqlP.setInt(10, hasVersion(npm.fhirVersionList(), "1.4"));
+      psqlP.setInt(11, hasVersion(npm.fhirVersionList(), "3.0"));
+      psqlP.setInt(12, hasVersion(npm.fhirVersionList(), "4.0"));
+      psqlP.setInt(13, hasVersion(npm.fhirVersionList(), "4.3"));
+      psqlP.setInt(14, hasVersion(npm.fhirVersionList(), "5.0"));
+      psqlP.setInt(15, hasVersion(npm.fhirVersionList(), "6.0"));
+      psqlP.setString(16, realm);
+      psqlP.setString(17, auth);
+      psqlP.setBytes(18, org.hl7.fhir.utilities.json.parser.JsonParser.composeBytes(npm.getNpm()));
+      psqlP.execute();
+      pck++;
+
       return smm;
 
     } catch (Exception e) {
@@ -433,7 +427,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
   }
 
   @Override
-  public void processResource(PackageContext context, Object clientContext, String type, String id, byte[] content) throws FHIRException, IOException, EOperationOutcome {
+  public void processResource(PackageContext context, Object clientContext, String type, String id, byte[] content) throws FHIRException, IOException, EOperationOutcome {   
     if (clientContext != null) {
       SpecMapManager smm = (SpecMapManager) clientContext;
 
@@ -470,7 +464,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
 
             String details = null;
 
-            Set<String> dependencies = new HashSet();;
+            Set<String> dependencies = new HashSet<>();;
 
             if (cr instanceof CodeSystem) {
               details = ""+processCodesystem(resKey, (CodeSystem) cr, dependencies);
@@ -488,11 +482,12 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
               details = processCapabilityStatement(resKey, (CapabilityStatement) cr, context.getNpm(), dependencies);
             }
 
+            String rid = r.hasId() ? r.getId() : id.replace(".json", "");           
             psqlR.setInt(1, resKey);
-            psqlR.setInt(2, pckKey);
+            psqlR.setInt(2, smm.getKey());
             psqlR.setString(3, type);
             psqlR.setString(4, r.fhirType());
-            psqlR.setString(5, r.hasId() ? r.getId() : id.replace(".json", ""));
+            psqlR.setString(5, rid);
             psqlR.setInt(6, hasVersion(context.getVersion(), "1.0"));
             psqlR.setInt(7, hasVersion(context.getVersion(), "1.4"));
             psqlR.setInt(8, hasVersion(context.getVersion(), "3.0"));
