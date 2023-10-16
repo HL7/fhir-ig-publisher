@@ -113,7 +113,7 @@ public class XIGGenerator {
     gather.finish(step == 0 || step == 3);
 
     System.out.println("Finished Step "+step+": "+Utilities.describeDuration(System.currentTimeMillis() - ms));
-    System.out.println("File size is "+Utilities.describeSize(tgt.length()));
+    System.out.println("File "+target+", size is "+Utilities.describeSize(tgt.length()));
   }
 //
 //  private void test(File tgt) {
