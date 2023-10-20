@@ -543,6 +543,9 @@ public class HTMLInspector {
     if ("img".equals(x.getName()) && x.hasAttribute("src")) {
       changed = checkResolveImageLink(s, x.getLocation(), path, x.getAttribute("src"), messages, uuid) || changed;
     }
+    if ("area".equals(x.getName()) && x.hasAttribute("href")) {
+      changed = checkResolveLink(s, x.getLocation(), path, x.getAttribute("href"), x.getAttribute("coords"), messages, uuid) || changed;
+    }
     if ("link".equals(x.getName())) {
       changed = checkLinkElement(s, x.getLocation(), path, x.getAttribute("href"), messages, uuid) || changed;
     }
