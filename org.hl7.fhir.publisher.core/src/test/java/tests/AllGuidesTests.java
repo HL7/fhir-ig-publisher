@@ -6,7 +6,12 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 import javax.xml.parsers.ParserConfigurationException;
 
@@ -16,6 +21,7 @@ import org.hl7.fhir.igtools.publisher.Publisher.CacheOption;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.settings.FhirSettings;
 import org.hl7.fhir.utilities.xml.XMLUtil;
@@ -76,6 +82,41 @@ public class AllGuidesTests {
     si.set("hints", cHint);
     si.set("time", System.currentTimeMillis() - time);
     JsonParser.compose(stats, statsFile, true);
+    
+    Map<String, Map<String, String>> statsMap = new HashMap<>();
+    Set<String> cols = new HashSet<>();
+    for (JsonProperty v : stats.getProperties()) {
+      if (v.getValue().isJsonObject()) {
+        Map<String, String> map = new HashMap<>();
+        statsMap.put(v.getName(), map);
+        for (JsonProperty ig : ((JsonObject) v.getValue()).getProperties()) {
+          if (ig.getValue().isJsonObject()) {
+            cols.add(ig.getName());
+            map.put(ig.getName(), ((JsonObject) ig.getValue()).asString("time"));
+          }
+        }
+      }
+    }
+    
+    List<String> colNames = Utilities.sorted(cols);
+    StringBuilder b = new StringBuilder();
+    b.append("Version");
+    for (String s : colNames) {
+      b.append(",");
+      b.append(s);
+    }
+    b.append("\r\n");
+    for (String v : Utilities.sorted(statsMap.keySet())) {
+      b.append(v);
+      for (String s : colNames) {
+        b.append(",");
+        String t = statsMap.get(v).get(s);
+        b.append(t == null ? "" : t);
+      }
+      b.append("\r\n");
+    }
+    TextFile.stringToFile(b.toString(), Utilities.changeFileExt(statsFile.getAbsolutePath(), ".csv"));
+    
     
     Assertions.assertTrue(cErr <= pErr, "Error count has increased from "+pErr+" to "+cErr);
     Assertions.assertTrue(cWarn <= pWarn, "Warning count has increased from "+pWarn+" to "+cWarn);
