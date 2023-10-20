@@ -4470,6 +4470,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       publishedIg.addExtension(ToolingExtensions.EXT_WORKGROUP, new CodeType(wgm));
     }
 
+    if (!VersionUtilities.isSemVer(publishedIg.getVersion())) {
+      if (mode == IGBuildMode.AUTOBUILD) {
+        throw new Error("The version "+publishedIg.getVersion()+" is not a valid semantic version so cannot be published in the ci-build");
+      } else {
+        log("The version "+publishedIg.getVersion()+" is not a valid semantic version so cannot be published in the ci-build");
+        igf.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, "ImplementationGuide.version", "The version "+publishedIg.getVersion()+" is not a valid semantic version and will not be acceptible to the ci-build", IssueSeverity.ERROR));
+      }
+    }
     String id = npmName;
     if (npmName.startsWith("hl7.")) {
       if (!id.matches("[A-Za-z0-9\\-\\.]{1,64}"))
@@ -4740,12 +4748,22 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               failed = true;
             }
             if (rg != null) {
-              if (!rg.hasName()) {
+              if (r.getElement().hasExtension(ToolingExtensions.EXT_RESOURCE_NAME)) {
+                rg.setName(r.getElement().getExtensionValue(ToolingExtensions.EXT_RESOURCE_NAME).primitiveValue()); 
+                r.getElement().removeExtension(ToolingExtensions.EXT_RESOURCE_NAME);
+              } else if (r.getElement().hasExtension(ToolingExtensions.EXT_ARTIFACT_NAME)) {
+                rg.setName(r.getElement().getExtensionValue(ToolingExtensions.EXT_ARTIFACT_NAME).primitiveValue());                 
+              } else if (!rg.hasName()) {
                 if (r.getElement().hasChild("title")) {
                   rg.setName(r.getElement().getChildValue("title"));                
                 }
               }
-              if (!rg.hasDescription()) {
+              if (r.getElement().hasExtension(ToolingExtensions.EXT_RESOURCE_DESC)) {
+                rg.setDescription(r.getElement().getExtensionValue(ToolingExtensions.EXT_RESOURCE_DESC).primitiveValue()); 
+                r.getElement().removeExtension(ToolingExtensions.EXT_RESOURCE_DESC);
+              } else if (r.getElement().hasExtension(ToolingExtensions.EXT_ARTIFACT_DESC)) {
+                rg.setDescription(r.getElement().getExtensionValue(ToolingExtensions.EXT_ARTIFACT_DESC).primitiveValue());                 
+              } else if (!rg.hasDescription()) {
                 if (r.getElement().hasChild("description")) {
                   Element descriptionElement = r.getElement().getNamedChild("description");
                   if (descriptionElement.hasValue()) {
@@ -6962,6 +6980,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           for (FetchedResource r : f.getResources()) {
             if (!r.isValidated()) {
               logDebugMessage(LogCategory.PROGRESS, "     validating "+r.getTitle());
+              log("     validating "+r.getTitle());
               validate(f, r);
             }
           }
