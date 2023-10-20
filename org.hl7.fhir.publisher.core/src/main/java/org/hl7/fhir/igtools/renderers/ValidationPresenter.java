@@ -106,17 +106,40 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       Element e = r.getElement();
       String root = only ? "" : r.fhirType() + "/"+r.getId()+": ";
       StringBuilder b = new StringBuilder();
-      showMessages(b, root, e);
+      if (!showMessages(b, root, e)) {
+        List<String> paths = new ArrayList<>();
+        for (ValidationMessage vm : r.getErrors()) {
+          if (vm.isSignpost()) {
+            if (!paths.contains(vm.getLocation())) {
+              paths.add(vm.getLocation());
+            }
+          }
+        }
+        for (String path : paths) {
+          List<ValidationMessage> signposts = new ArrayList<>();
+          for (ValidationMessage vm : r.getErrors()) {
+            if (vm.isSignpost() && vm.getLocation().equals(path)) {
+              signposts.add(vm);
+            }
+          }
+          b.append("<li>"+path+": Validated against "+analyse(signposts)+"</li>");
+        }
+      }
       output.append(b.toString());      
     }
+    
 
-    private void showMessages(StringBuilder b, String root, Element e) {
+    private boolean showMessages(StringBuilder b, String root, Element e) {
+      boolean ok = false;
       if (e.hasMessages()) {
-        b.append("<li>"+root+e.getPath()+": Validated against "+analyse(e.getMessages())+"</li>");
+        String s = analyse(e.getMessages());
+        ok = ok || !Utilities.noString(s);
+        b.append("<li>"+root+e.getPath()+": Validated against "+s+"</li>");
       }
       for (Element c : e.getChildren()) {
-        showMessages(b, root, c);
+        ok = showMessages(b, root, c) || ok;
       }
+      return ok;
     }
 
     public boolean hasContent() {
@@ -130,9 +153,8 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     public String analyse(List<ValidationMessage> vmlist) {
       String base = context.formatMessage(I18nConstants.VALIDATION_VAL_PROFILE_SIGNPOST_BASE);
       List<String> list = new ArrayList<>();
-      List<String> others = new ArrayList<>();
       for (ValidationMessage vm : vmlist) {
-        if (vm.getMessage().startsWith(base)) {
+        if (vm.getMessage().startsWith(base) && vm.isSignpost()) {
           String s = vm.getMessage().substring(base.length()).trim();
           String url = s.contains(" ") ? s.substring(0, s.indexOf(" ")) : s;
           s = s.contains(" ") ? s.substring(s.indexOf(" ")) : "";
@@ -148,9 +170,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
             list.add(l);
             count++;
           }
-        } else {
-          others.add(vm.getMessage());
-        }
+        } 
       }
       return list(list);
     }
