@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.renderers;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -10,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.hl7.fhir.OperationDefinitionParameter;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.r5.context.ContextUtilities;
@@ -21,11 +23,21 @@ import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeableConcept;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ElementDefinition;
+import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingAdditionalComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
 import org.hl7.fhir.r5.model.ExpressionNode;
 import org.hl7.fhir.r5.model.ExpressionNode.Kind;
 import org.hl7.fhir.r5.model.Extension;
+import org.hl7.fhir.r5.model.OperationDefinition;
+import org.hl7.fhir.r5.model.OperationDefinition.OperationDefinitionParameterComponent;
+import org.hl7.fhir.r5.model.Questionnaire;
+import org.hl7.fhir.r5.model.Questionnaire.QuestionnaireItemComponent;
+import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.r5.model.StructureMap;
+import org.hl7.fhir.r5.model.ConceptMap;
+import org.hl7.fhir.r5.model.DataType;
+import org.hl7.fhir.r5.model.DomainResource;
 import org.hl7.fhir.r5.model.SearchParameter;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.ExtensionContextType;
@@ -1145,7 +1157,137 @@ public class CrossViewRenderer extends Renderer {
   }
   
 
-  public String buildValueSetList(String thisVersion, String versionToAnnotate, List<FetchedFile> fileList) throws IOException {
+  public String buildUsedValueSetList(String versionToAnnotate, boolean all, List<FetchedFile> fileList) throws IOException {
+    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+    List<ValueSet> vslist = new ArrayList<>();
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getResource() != null) {
+          findValueSetReferences(vslist, r.getResource(), all);
+        }
+      }
+    }  
+    return renderVSList(versionToAnnotate, x, vslist, true, true);
+  }
+
+  private void findValueSetReferences(List<ValueSet> vslist, Resource resource, boolean all) {
+    if (resource instanceof StructureDefinition) {
+      StructureDefinition sd = (StructureDefinition) resource;
+      findValueSets(vslist, sd, all);
+    }
+    if (resource instanceof Questionnaire) {
+      Questionnaire q = (Questionnaire) resource;
+      findValueSets(vslist, q);
+    }
+    if (resource instanceof ValueSet) {
+      ValueSet vs = (ValueSet) resource;
+      findValueSets(vslist, vs, all);
+    }
+    if (resource instanceof ConceptMap) {
+      ConceptMap sd = (ConceptMap) resource;
+      findValueSets(vslist, sd);
+    }
+    if (resource instanceof OperationDefinition) {
+      OperationDefinition sd = (OperationDefinition) resource;
+      findValueSets(vslist, sd);
+    }
+    if (resource instanceof DomainResource) {
+      DomainResource dr = (DomainResource) resource;
+      for (Resource r : dr.getContained()) {
+        findValueSetReferences(vslist, r, all);
+      }
+    }
+  }
+
+  private void findValueSets(List<ValueSet> list, OperationDefinition opd) {
+    for (OperationDefinitionParameterComponent p : opd.getParameter()) {
+      if (p.hasBinding()) {
+        resolveVS(list, p.getBinding().getValueSet(), opd);
+      };
+    }
+  }
+
+  private void findValueSets(List<ValueSet> list, ValueSet vs, boolean all) {
+    if (!list.contains(vs)) {
+      list.add(vs);
+    }
+    for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
+      for (CanonicalType u : inc.getValueSet()) {
+        resolveVS(list, u, vs);
+      }
+    }
+    if (all) {
+      for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
+        for (CanonicalType u : inc.getValueSet()) {
+          resolveVS(list, u, vs);
+        }
+      }
+    }
+  }
+
+  private void findValueSets(List<ValueSet> list, ConceptMap cm) {
+    resolveVS(list, cm.getSourceScope(), cm);
+    resolveVS(list, cm.getTargetScope(), cm);
+  }
+
+  private void findValueSets(List<ValueSet> list, Questionnaire q) {
+    for (QuestionnaireItemComponent item : q.getItem()) {
+      findValueSets(list, item, q);
+    }
+  }
+
+  private void findValueSets(List<ValueSet> list, QuestionnaireItemComponent item, Resource source) {
+    resolveVS(list, item.getAnswerValueSet(), source);
+    for (QuestionnaireItemComponent c : item.getItem()) {
+      findValueSets(list, c, source);
+    }    
+  }
+
+  private void findValueSets(List<ValueSet> list, StructureDefinition sd, boolean all) {
+    if (all) {
+      for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+        findValueSets(list, ed, sd);
+      }
+    } else {
+      for (ElementDefinition ed : sd.getDifferential().getElement()) {
+        findValueSets(list, ed, sd);
+      }
+    }
+  }
+
+  private void findValueSets(List<ValueSet> list, ElementDefinition ed, Resource source) {
+    if (ed.hasBinding()) {
+      resolveVS(list, ed.getBinding().getValueSet(), source);
+      for (ElementDefinitionBindingAdditionalComponent ab : ed.getBinding().getAdditional()) {
+        resolveVS(list, ab.getValueSet(), source);
+      }
+    }
+  }
+
+  private void resolveVS(List<ValueSet> list, DataType ref, Resource source) {
+    if (ref != null && ref.isPrimitive()) {
+      resolveVS(list, ref.primitiveValue(), source);
+    }
+  }
+
+
+  private void resolveVS(List<ValueSet> list, String url, Resource source) {
+    if (url != null) {
+      ValueSet vs = context.getContext().fetchResource(ValueSet.class, url);
+      if (vs != null) {
+        if (!vs.hasUserData("xref.used")) {
+          vs.setUserData("xref.used", new HashSet<>());
+        }
+        Set<Resource> rl = (Set<Resource>) vs.getUserData("xref.used");
+        rl.add(source);
+        if (!list.contains(vs)) {
+          list.add(vs);
+        }
+      }
+    }
+  }
+  
+  public String buildDefinedValueSetList(String thisVersion, String versionToAnnotate, List<FetchedFile> fileList) throws IOException {
     XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
     List<ValueSet> vslist = new ArrayList<>();
     boolean versions = false;
@@ -1158,6 +1300,11 @@ public class CrossViewRenderer extends Renderer {
         }
       }
     }  
+    return renderVSList(versionToAnnotate, x, vslist, versions, false);
+  }
+
+  private String renderVSList(String versionToAnnotate, XhtmlNode x, List<ValueSet> vslist, boolean versions, boolean used)
+      throws IOException {
     Collections.sort(vslist, new CanonicalResourceSortByUrl());
     var tbl = x.table("grid");
     var tr = tbl.tr();
@@ -1173,6 +1320,9 @@ public class CrossViewRenderer extends Renderer {
       var td = tr.th();
       td.tx("Δ v");
       td.tx(versionToAnnotate);
+    }
+    if (used) {
+      tr.th().tx("References");
     }
     for (ValueSet vs : vslist) {
       tr = tbl.tr();
@@ -1252,6 +1402,20 @@ public class CrossViewRenderer extends Renderer {
       
       if (versionToAnnotate != null) {
         renderStatusSummary(vs, tr.td(), versionToAnnotate, "url", "name", "title", "version", "status", "experimental");
+      }
+      if (used) {
+        td = tr.td();
+        Set<Resource> rl = (Set<Resource>) vs.getUserData("xref.used");
+        if (rl.size() < 10) {
+        for (Resource r : rl) {
+          String title = (r instanceof CanonicalResource) ? ((CanonicalResource) r).present() : r.fhirType()+"/"+r.getIdBase();
+          String link = r.getWebPath();
+          td.sep(", ");
+          td.ah(link).tx(title);
+        }
+        } else {
+          td.tx(""+rl.size()+" references");
+        }
       }
     }
     

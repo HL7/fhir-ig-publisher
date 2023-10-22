@@ -471,12 +471,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   public class IGPublisherHostServices implements IEvaluationContext {
 
     @Override
-    public List<Base> resolveConstant(Object appContext, String name, boolean beforeContext) throws PathEngineException {
+    public List<Base> resolveConstant(FHIRPathEngine engine, Object appContext, String name, boolean beforeContext, boolean explicitConstant) throws PathEngineException {
       return new ArrayList<>();
     }
 
     @Override
-    public TypeDetails resolveConstantType(Object appContext, String name) throws PathEngineException {
+    public TypeDetails resolveConstantType(FHIRPathEngine engine, Object appContext, String name, boolean explicitConstant) throws PathEngineException {
       throw new NotImplementedException("Not done yet (IGPublisherHostServices.resolveConstantType)");
     }
 
@@ -491,22 +491,22 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
 
     @Override
-    public FunctionDetails resolveFunction(String functionName) {
+    public FunctionDetails resolveFunction(FHIRPathEngine engine, String functionName) {
       throw new NotImplementedException("Not done yet (IGPublisherHostServices.resolveFunction)");
     }
 
     @Override
-    public TypeDetails checkFunction(Object appContext, String functionName, List<TypeDetails> parameters) throws PathEngineException {
+    public TypeDetails checkFunction(FHIRPathEngine engine, Object appContext, String functionName, TypeDetails focus, List<TypeDetails> parameters) throws PathEngineException {
       throw new NotImplementedException("Not done yet (IGPublisherHostServices.checkFunction)");
     }
 
     @Override
-    public List<Base> executeFunction(Object appContext, List<Base> focus, String functionName, List<List<Base>> parameters) {
+    public List<Base> executeFunction(FHIRPathEngine engine, Object appContext, List<Base> focus, String functionName, List<List<Base>> parameters) {
       throw new NotImplementedException("Not done yet (IGPublisherHostServices.executeFunction)");
     }
 
     @Override
-    public Base resolveReference(Object appContext, String url, Base refContext) {
+    public Base resolveReference(FHIRPathEngine engine, Object appContext, String url, Base refContext) {
       if (Utilities.isAbsoluteUrl(url)) {
         if (url.startsWith(igpkp.getCanonical())) {
           url = url.substring(igpkp.getCanonical().length());
@@ -527,7 +527,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
 
     @Override
-    public boolean conformsToProfile(Object appContext, Base item, String url) throws FHIRException {
+    public boolean conformsToProfile(FHIRPathEngine engine, Object appContext, Base item, String url) throws FHIRException {
       IResourceValidator val = context.newValidator();
       List<ValidationMessage> valerrors = new ArrayList<ValidationMessage>();
       if (item instanceof Resource) {
@@ -542,7 +542,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
 
     @Override
-    public ValueSet resolveValueSet(Object appContext, String url) {
+    public ValueSet resolveValueSet(FHIRPathEngine engine, Object appContext, String url) {
       throw new NotImplementedException("Not done yet (IGPublisherHostServices.resolveValueSet)"); // cause I don't know when we 'd need to do this
     }
   }
@@ -8402,7 +8402,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       fragment("extension-search-"+s, cvr.buildSearchTableForExtension(s), otherFilesRun);      
     }
     fragment("codesystem-list", cvr.buildCodeSystemList(publishedIg.getVersion(), versionToAnnotate, fileList), otherFilesRun);      
-    fragment("valueset-list", cvr.buildValueSetList(publishedIg.getVersion(), versionToAnnotate, fileList), otherFilesRun);      
+    fragment("valueset-list", cvr.buildDefinedValueSetList(publishedIg.getVersion(), versionToAnnotate, fileList), otherFilesRun);      
+    fragment("valueset-ref-list", cvr.buildUsedValueSetList(versionToAnnotate, false, fileList), otherFilesRun);      
+    fragment("valueset-ref-all-list", cvr.buildUsedValueSetList(versionToAnnotate, true, fileList), otherFilesRun);      
 
     trackedFragment("1", "ip-statements", new IPStatementsRenderer(context, markdownEngine, sourceIg.getPackageId()).genIpStatements(fileList), otherFilesRun);
     if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {
