@@ -36,6 +36,7 @@ import org.hl7.fhir.r5.model.Questionnaire.QuestionnaireItemComponent;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureMap;
 import org.hl7.fhir.r5.model.ConceptMap;
+import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
 import org.hl7.fhir.r5.model.DataType;
 import org.hl7.fhir.r5.model.DomainResource;
 import org.hl7.fhir.r5.model.SearchParameter;
@@ -1316,13 +1317,13 @@ public class CrossViewRenderer extends Renderer {
     tr.th().tx("Status");
     tr.th().tx("Flags");
     tr.th().tx("Source");
+    if (used) {
+      tr.th().tx("References");
+    }
     if (versionToAnnotate != null) {
       var td = tr.th();
       td.tx("Δ v");
       td.tx(versionToAnnotate);
-    }
-    if (used) {
-      tr.th().tx("References");
     }
     for (ValueSet vs : vslist) {
       tr = tbl.tr();
@@ -1399,10 +1400,6 @@ public class CrossViewRenderer extends Renderer {
         td.sep(", ");
         td.tx(s);
       }
-      
-      if (versionToAnnotate != null) {
-        renderStatusSummary(vs, tr.td(), versionToAnnotate, "url", "name", "title", "version", "status", "experimental");
-      }
       if (used) {
         td = tr.td();
         Set<Resource> rl = (Set<Resource>) vs.getUserData("xref.used");
@@ -1416,6 +1413,10 @@ public class CrossViewRenderer extends Renderer {
         } else {
           td.tx(""+rl.size()+" references");
         }
+      }
+      
+      if (versionToAnnotate != null) {
+        renderStatusSummary(vs, tr.td(), versionToAnnotate, "url", "name", "title", "version", "status", "experimental");
       }
     }
     
@@ -1444,7 +1445,7 @@ public class CrossViewRenderer extends Renderer {
     return "Other";
   }
 
-  public String buildCodeSystemList(String thisVersion, String versionToAnnotate, List<FetchedFile> fileList) throws IOException {
+  public String buildDefinedCodeSystemList(String thisVersion, String versionToAnnotate, List<FetchedFile> fileList) throws IOException {
     XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
     List<CodeSystem> cslist = new ArrayList<>();
     boolean versions = false;
@@ -1457,6 +1458,146 @@ public class CrossViewRenderer extends Renderer {
         }
       }
     }  
+    return renderCSList(versionToAnnotate, x, cslist, versions, false);
+  }
+
+
+  public String buildUsedCodeSystemList(String versionToAnnotate, boolean all, List<FetchedFile> fileList) throws IOException {
+    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+    List<CodeSystem> cslist = new ArrayList<>();
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getResource() != null) {
+          findCodeSystemReferences(cslist, r.getResource(), all);
+        }
+      }
+    }  
+    return renderCSList(versionToAnnotate, x, cslist, true, true);
+  }
+
+  private void findCodeSystemReferences(List<CodeSystem> cslist, Resource resource, boolean all) {
+    if (resource instanceof StructureDefinition) {
+      StructureDefinition sd = (StructureDefinition) resource;
+      findCodeSystems(cslist, sd, all);
+    }
+    if (resource instanceof Questionnaire) {
+      Questionnaire q = (Questionnaire) resource;
+      findCodeSystems(cslist, q, all);
+    }
+    if (resource instanceof ValueSet) {
+      ValueSet vs = (ValueSet) resource;
+      findCodeSystems(cslist, vs, all, vs);
+    }
+    if (resource instanceof ConceptMap) {
+      ConceptMap sd = (ConceptMap) resource;
+      findCodeSystems(cslist, sd, all);
+    }
+    if (resource instanceof OperationDefinition) {
+      OperationDefinition sd = (OperationDefinition) resource;
+      findCodeSystems(cslist, sd, all);
+    }
+    if (resource instanceof DomainResource) {
+      DomainResource dr = (DomainResource) resource;
+      for (Resource r : dr.getContained()) {
+        findCodeSystemReferences(cslist, r, all);
+      }
+    }
+  }
+
+  private void findCodeSystems(List<CodeSystem> list, OperationDefinition opd, boolean all) {
+    for (OperationDefinitionParameterComponent p : opd.getParameter()) {
+      if (p.hasBinding()) {
+        resolveCSFromVS(list, p.getBinding().getValueSet(), all, opd);
+      }
+    }
+  }
+
+  private void findCodeSystems(List<CodeSystem> list, ConceptMap cm, boolean all) {
+    resolveCSFromVS(list, cm.getSourceScope(), all, cm);
+    resolveCSFromVS(list, cm.getTargetScope(), all, cm);
+    for (ConceptMapGroupComponent grp : cm.getGroup()) {
+      resolveCS(list, grp.getSource(), cm);
+      resolveCS(list, grp.getTarget(), cm);      
+    }
+  }
+
+  private void findCodeSystems(List<CodeSystem> list, Questionnaire q, boolean all) {
+    for (QuestionnaireItemComponent item : q.getItem()) {
+      findCodeSystems(list, item, all, q);
+    }
+  }
+
+  private void findCodeSystems(List<CodeSystem> list, QuestionnaireItemComponent item, boolean all, Resource source) {
+    resolveCSFromVS(list, item.getAnswerValueSet(), all, source);
+    for (QuestionnaireItemComponent c : item.getItem()) {
+      findCodeSystems(list, c, all, source);
+    }    
+  }
+
+  private void findCodeSystems(List<CodeSystem> list, StructureDefinition sd, boolean all) {
+    if (all) {
+      for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+        findCodeSystems(list, ed, all, sd);
+      }
+    } else {
+      for (ElementDefinition ed : sd.getDifferential().getElement()) {
+        findCodeSystems(list, ed, all, sd);
+      }
+    }
+  }
+
+  private void findCodeSystems(List<CodeSystem> list, ElementDefinition ed, boolean all, Resource source) {
+    if (ed.hasBinding()) {
+      resolveCSFromVS(list, ed.getBinding().getValueSet(), all, source);
+      for (ElementDefinitionBindingAdditionalComponent ab : ed.getBinding().getAdditional()) {
+        resolveCSFromVS(list, ab.getValueSet(), all, source);
+      }
+    }
+  }
+
+  private void findCodeSystems(List<CodeSystem> list, ValueSet vs, boolean all, Resource source) {
+    for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
+      resolveCS(list, inc.getSystem(), vs);
+    }
+    if (all) {
+      for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
+        resolveCS(list, inc.getSystem(), vs);
+      }
+    }
+  }
+
+  private void resolveCSFromVS(List<CodeSystem> list, String valueSet, boolean all, Resource resource) {
+    if (valueSet != null) {
+      ValueSet vs = context.getContext().fetchResource(ValueSet.class, valueSet);
+      if (vs != null) {
+        findCodeSystems(list, vs, all, resource);
+      }
+    }    
+  }
+  
+  private void resolveCSFromVS(List<CodeSystem> list, DataType ref, boolean all, Resource resource) {
+    if (ref != null && ref.isPrimitive()) {
+      resolveCSFromVS(list, ref.primitiveValue(), all, resource);
+    }
+  }  
+
+  private void resolveCS(List<CodeSystem> list, String url, Resource source) {
+    if (url != null) {
+      CodeSystem cs = context.getContext().fetchResource(CodeSystem.class, url);
+      if (cs != null) {
+        if (!cs.hasUserData("xref.used")) {
+          cs.setUserData("xref.used", new HashSet<>());
+        }
+        Set<Resource> rl = (Set<Resource>) cs.getUserData("xref.used");
+        rl.add(source);
+        if (!list.contains(cs)) {
+          list.add(cs);
+        }
+      }
+    }
+  }
+  
+  private String renderCSList(String versionToAnnotate, XhtmlNode x, List<CodeSystem> cslist, boolean versions, boolean used) throws IOException {
     Collections.sort(cslist, new CanonicalResourceSortByUrl());
     var tbl = x.table("grid");
     var tr = tbl.tr();
@@ -1468,6 +1609,9 @@ public class CrossViewRenderer extends Renderer {
     tr.th().tx("Status");
     tr.th().tx("Flags");
     tr.th().tx("Count");
+    if (used) {
+      tr.th().tx("References");      
+    }
     if (versionToAnnotate != null) {
       var td = tr.th();
       td.tx("Δ v");
@@ -1523,6 +1667,20 @@ public class CrossViewRenderer extends Renderer {
         td.tx(" (");
         td.tx(cs.getContent().toCode());
         td.tx(")");
+      }
+      if (used) {
+        td = tr.td();
+        Set<Resource> rl = (Set<Resource>) cs.getUserData("xref.used");
+        if (rl.size() < 10) {
+        for (Resource r : rl) {
+          String title = (r instanceof CanonicalResource) ? ((CanonicalResource) r).present() : r.fhirType()+"/"+r.getIdBase();
+          String link = r.getWebPath();
+          td.sep(", ");
+          td.ah(link).tx(title);
+        }
+        } else {
+          td.tx(""+rl.size()+" references");
+        }
       }
       
       if (versionToAnnotate != null) {

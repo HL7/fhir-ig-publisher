@@ -8401,10 +8401,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (String s : cvr.getExtensionIds()) {
       fragment("extension-search-"+s, cvr.buildSearchTableForExtension(s), otherFilesRun);      
     }
-    fragment("codesystem-list", cvr.buildCodeSystemList(publishedIg.getVersion(), versionToAnnotate, fileList), otherFilesRun);      
     fragment("valueset-list", cvr.buildDefinedValueSetList(publishedIg.getVersion(), versionToAnnotate, fileList), otherFilesRun);      
     fragment("valueset-ref-list", cvr.buildUsedValueSetList(versionToAnnotate, false, fileList), otherFilesRun);      
     fragment("valueset-ref-all-list", cvr.buildUsedValueSetList(versionToAnnotate, true, fileList), otherFilesRun);      
+    fragment("codesystem-list", cvr.buildDefinedCodeSystemList(publishedIg.getVersion(), versionToAnnotate, fileList), otherFilesRun);      
+    fragment("codesystem-ref-list", cvr.buildUsedCodeSystemList(versionToAnnotate, false, fileList), otherFilesRun);      
+    fragment("codesystem-ref-all-list", cvr.buildUsedCodeSystemList(versionToAnnotate, true, fileList), otherFilesRun);      
 
     trackedFragment("1", "ip-statements", new IPStatementsRenderer(context, markdownEngine, sourceIg.getPackageId()).genIpStatements(fileList), otherFilesRun);
     if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {
