@@ -6,6 +6,9 @@
 * Validator: Update ViewDefinition validator for change (alias -> name)
 * Validator: Fix for NPE validating sql-on-fhir ViewDefinition
 * Validator: Fix for index out of bounds error when extension uses itself
+* Validator: Fix issue where .resolve() in FHIRPath didn't work with URL values (and fix typo in i18n system)
+* Validator: Implement FHIRPath slice() function in validator
 * NPM Package builder: Force version to be a proper semantic version on the ci-build site
 * QA: Add link checking for AreaMaps
 * QA: Update validation presenter for binary signposts
+
