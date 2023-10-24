@@ -135,10 +135,12 @@ public class AllGuidesTests {
   }
 
   private void dumpMem(String id) throws IOException {
+    File f = new File(Utilities.path("[tmp]", "memory-dump-"+id+".hprof"));
+    f.delete();
     System.gc();
     MBeanServer server = ManagementFactory.getPlatformMBeanServer();
     com.sun.management.HotSpotDiagnosticMXBean mxBean = ManagementFactory.newPlatformMXBeanProxy(server, "com.sun.management:type=HotSpotDiagnostic", com.sun.management.HotSpotDiagnosticMXBean.class);
-    mxBean.dumpHeap(Utilities.path("[tmp]", "memory-dump-"+id+".hprof"), true);
+    mxBean.dumpHeap(f.getAbsolutePath(), true);
   }
 
   private void writeMem(String name) {

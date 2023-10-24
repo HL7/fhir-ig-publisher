@@ -6972,9 +6972,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       f.start("validate");
       try {
         logDebugMessage(LogCategory.PROGRESS, " .. validate "+f.getName());
-        if (f.getName().equals("/Users/grahamegrieve/temp/igs/HL7-CDA-core-sd#binding-test/input/examples/act-example")) {
-          System.out.println("!"); // #FIXME
-        }
         logDebugMessage(LogCategory.PROGRESS, " .. "+f.getName());
         FetchedResource r0 = f.getResources().get(0);
         if (f.getLogical() != null && f.getResources().size() == 1 && !r0.fhirType().equals("Binary")) {
@@ -10132,9 +10129,6 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       saveFileOutputs(f);
       for (FetchedResource r : f.getResources()) {
         logDebugMessage(LogCategory.PROGRESS, "Produce outputs for "+r.fhirType()+"/"+r.getId());
-        if ("Location/hl7east".equals(r.fhirType()+"/"+r.getId())) {
-          System.out.println("!");
-        }
         Map<String, String> vars = makeVars(r);
         makeTemplates(f, r, vars);
         saveDirectResourceOutputs(f, r, r.getResource(), vars);
@@ -10242,7 +10236,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   }
 
   private byte[] processSQL(DBBuilder db, byte[] content, FetchedFile f) {
-    if (!Utilities.existsInList(Utilities.getFileExtension(f.getName()), ".html", "md")) {
+    if (!Utilities.existsInList(Utilities.getFileExtension(f.getPath()), "html", "md", "xml")) {
       return content;
     }
     try {
