@@ -1158,8 +1158,7 @@ public class CrossViewRenderer extends Renderer {
   }
   
 
-  public String buildUsedValueSetList(String versionToAnnotate, boolean all, List<FetchedFile> fileList) throws IOException {
-    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+  public List<ValueSet> buildUsedValueSetList(boolean all, List<FetchedFile> fileList) throws IOException {
     List<ValueSet> vslist = new ArrayList<>();
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
@@ -1168,7 +1167,8 @@ public class CrossViewRenderer extends Renderer {
         }
       }
     }  
-    return renderVSList(versionToAnnotate, x, vslist, true, true);
+    return vslist;
+//    return renderVSList(versionToAnnotate, x, vslist, true, true);
   }
 
   private void findValueSetReferences(List<ValueSet> vslist, Resource resource, boolean all) {
@@ -1288,24 +1288,33 @@ public class CrossViewRenderer extends Renderer {
     }
   }
   
-  public String buildDefinedValueSetList(String thisVersion, String versionToAnnotate, List<FetchedFile> fileList) throws IOException {
-    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+  public List<ValueSet> buildDefinedValueSetList(List<FetchedFile> fileList) throws IOException {
     List<ValueSet> vslist = new ArrayList<>();
-    boolean versions = false;
+    
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.fhirType().equals("ValueSet")) {
           ValueSet vs = (ValueSet) r.getResource();
           vslist.add(vs);
-          versions = !(thisVersion.equals(vs.getVersion())) || versions;
         }
       }
     }  
-    return renderVSList(versionToAnnotate, x, vslist, versions, false);
+    return vslist;
+//    return renderVSList(versionToAnnotate, x, vslist, versions, false);
   }
 
-  private String renderVSList(String versionToAnnotate, XhtmlNode x, List<ValueSet> vslist, boolean versions, boolean used)
+  public boolean needVersionReferences(List<? extends CanonicalResource> list, String thisVersion) throws IOException {
+    boolean versions = false;
+    for (CanonicalResource vs : list) {
+      versions = !(thisVersion.equals(vs.getVersion())) || versions;
+    }
+    return versions;
+  }
+  
+  public String renderVSList(String versionToAnnotate, List<ValueSet> vslist, boolean versions, boolean used)
       throws IOException {
+
+    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
     Collections.sort(vslist, new CanonicalResourceSortByUrl());
     var tbl = x.table("grid");
     var tr = tbl.tr();
@@ -1395,6 +1404,7 @@ public class CrossViewRenderer extends Renderer {
         td.span(null, "Imports Valueset(s)").tx("V ");
       }
       
+      vs.setUserData("xref.sources", sources);
       td = tr.td();
       for (String s : Utilities.sorted(sources)) {
         td.sep(", ");
@@ -1403,15 +1413,17 @@ public class CrossViewRenderer extends Renderer {
       if (used) {
         td = tr.td();
         Set<Resource> rl = (Set<Resource>) vs.getUserData("xref.used");
-        if (rl.size() < 10) {
-        for (Resource r : rl) {
-          String title = (r instanceof CanonicalResource) ? ((CanonicalResource) r).present() : r.fhirType()+"/"+r.getIdBase();
-          String link = r.getWebPath();
-          td.sep(", ");
-          td.ah(link).tx(title);
-        }
-        } else {
-          td.tx(""+rl.size()+" references");
+        if (rl != null) {
+          if (rl.size() < 10) {
+            for (Resource r : rl) {
+              String title = (r instanceof CanonicalResource) ? ((CanonicalResource) r).present() : r.fhirType()+"/"+r.getIdBase();
+              String link = r.getWebPath();
+              td.sep(", ");
+              td.ah(link).tx(title);
+            }
+          } else {
+            td.tx(""+rl.size()+" references");
+          }
         }
       }
       
@@ -1445,24 +1457,22 @@ public class CrossViewRenderer extends Renderer {
     return "Other";
   }
 
-  public String buildDefinedCodeSystemList(String thisVersion, String versionToAnnotate, List<FetchedFile> fileList) throws IOException {
-    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+  public List<CodeSystem> buildDefinedCodeSystemList(List<FetchedFile> fileList) throws IOException {
     List<CodeSystem> cslist = new ArrayList<>();
-    boolean versions = false;
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.fhirType().equals("CodeSystem")) {
           CodeSystem cs = (CodeSystem) r.getResource();
           cslist.add(cs);
-          versions = !(thisVersion.equals(cs.getVersion())) || versions;
         }
       }
     }  
-    return renderCSList(versionToAnnotate, x, cslist, versions, false);
+    return cslist;
+//    return renderCSList(versionToAnnotate, x, cslist, versions, false);
   }
 
 
-  public String buildUsedCodeSystemList(String versionToAnnotate, boolean all, List<FetchedFile> fileList) throws IOException {
+  public List<CodeSystem> buildUsedCodeSystemList(boolean all, List<FetchedFile> fileList) throws IOException {
     XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
     List<CodeSystem> cslist = new ArrayList<>();
     for (FetchedFile f : fileList) {
@@ -1472,7 +1482,8 @@ public class CrossViewRenderer extends Renderer {
         }
       }
     }  
-    return renderCSList(versionToAnnotate, x, cslist, true, true);
+    return cslist;
+//    return renderCSList(versionToAnnotate, x, cslist, true, true);
   }
 
   private void findCodeSystemReferences(List<CodeSystem> cslist, Resource resource, boolean all) {
@@ -1597,7 +1608,8 @@ public class CrossViewRenderer extends Renderer {
     }
   }
   
-  private String renderCSList(String versionToAnnotate, XhtmlNode x, List<CodeSystem> cslist, boolean versions, boolean used) throws IOException {
+  public String renderCSList(String versionToAnnotate, List<CodeSystem> cslist, boolean versions, boolean used) throws IOException {
+    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
     Collections.sort(cslist, new CanonicalResourceSortByUrl());
     var tbl = x.table("grid");
     var tr = tbl.tr();
@@ -1671,18 +1683,20 @@ public class CrossViewRenderer extends Renderer {
       if (used) {
         td = tr.td();
         Set<Resource> rl = (Set<Resource>) cs.getUserData("xref.used");
-        if (rl.size() < 10) {
-        for (Resource r : rl) {
-          String title = (r instanceof CanonicalResource) ? ((CanonicalResource) r).present() : r.fhirType()+"/"+r.getIdBase();
-          String link = r.getWebPath();
-          td.sep(", ");
-          td.ah(link).tx(title);
-        }
-        } else {
-          td.tx(""+rl.size()+" references");
+        if (rl != null) {
+          if (rl.size() < 10) {
+            for (Resource r : rl) {
+              String title = (r instanceof CanonicalResource) ? ((CanonicalResource) r).present() : r.fhirType()+"/"+r.getIdBase();
+              String link = r.getWebPath();
+              td.sep(", ");
+              td.ah(link).tx(title);
+            }
+          } else {
+            td.tx(""+rl.size()+" references");
+          }
         }
       }
-      
+
       if (versionToAnnotate != null) {
         renderStatusSummary(cs, tr.td(), versionToAnnotate, "url", "name", "title", "version", "status", "experimental", "hierarchyMeaning", "versionNeeded", "compositional");
       }

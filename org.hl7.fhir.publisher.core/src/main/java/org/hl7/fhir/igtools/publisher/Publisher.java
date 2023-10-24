@@ -40,6 +40,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -283,6 +284,8 @@ import org.hl7.fhir.r5.renderers.utils.Resolver.IReferenceResolver;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceContext;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceWithReference;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
+import org.hl7.fhir.r5.terminologies.TerminologyUtilities;
+import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.r5.utils.FHIRPathEngine;
@@ -8401,12 +8404,30 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     for (String s : cvr.getExtensionIds()) {
       fragment("extension-search-"+s, cvr.buildSearchTableForExtension(s), otherFilesRun);      
     }
-    fragment("valueset-list", cvr.buildDefinedValueSetList(publishedIg.getVersion(), versionToAnnotate, fileList), otherFilesRun);      
-    fragment("valueset-ref-list", cvr.buildUsedValueSetList(versionToAnnotate, false, fileList), otherFilesRun);      
-    fragment("valueset-ref-all-list", cvr.buildUsedValueSetList(versionToAnnotate, true, fileList), otherFilesRun);      
-    fragment("codesystem-list", cvr.buildDefinedCodeSystemList(publishedIg.getVersion(), versionToAnnotate, fileList), otherFilesRun);      
-    fragment("codesystem-ref-list", cvr.buildUsedCodeSystemList(versionToAnnotate, false, fileList), otherFilesRun);      
-    fragment("codesystem-ref-all-list", cvr.buildUsedCodeSystemList(versionToAnnotate, true, fileList), otherFilesRun);      
+    
+    List<ValueSet> vslist = cvr.buildDefinedValueSetList(fileList); 
+    fragment("valueset-list", cvr.renderVSList(versionToAnnotate, vslist, cvr.needVersionReferences(vslist, publishedIg.getVersion()), false), otherFilesRun);
+    saveVSList("valueset-list", vslist, db, 1);
+    
+    vslist = cvr.buildUsedValueSetList(false, fileList);
+    fragment("valueset-ref-list", cvr.renderVSList(versionToAnnotate, vslist, cvr.needVersionReferences(vslist, publishedIg.getVersion()), true), otherFilesRun);
+    saveVSList("valueset-ref-list", vslist, db, 2);
+    
+    vslist = cvr.buildUsedValueSetList(true, fileList);
+    fragment("valueset-ref-all-list", cvr.renderVSList(versionToAnnotate, vslist, cvr.needVersionReferences(vslist, publishedIg.getVersion()), true), otherFilesRun);
+    saveVSList("valueset-ref-all-list", vslist, db, 3);
+    
+    List<CodeSystem> cslist = cvr.buildDefinedCodeSystemList(fileList);
+    fragment("codesystem-list", cvr.renderCSList(versionToAnnotate, cslist, cvr.needVersionReferences(vslist, publishedIg.getVersion()), false), otherFilesRun);
+    saveCSList("codesystem-list", cslist, db, 1);
+    
+    cslist = cvr.buildUsedCodeSystemList(false, fileList);
+    fragment("codesystem-ref-list", cvr.renderCSList(versionToAnnotate, cslist, cvr.needVersionReferences(vslist, publishedIg.getVersion()), true), otherFilesRun);      
+    saveCSList("codesystem-ref-list", cslist, db, 2);
+
+    cslist = cvr.buildUsedCodeSystemList(true, fileList);
+    fragment("codesystem-ref-all-list", cvr.renderCSList(versionToAnnotate, cslist, cvr.needVersionReferences(vslist, publishedIg.getVersion()), true), otherFilesRun);      
+    saveCSList("codesystem-ref-all-list", cslist, db, 3);
 
     trackedFragment("1", "ip-statements", new IPStatementsRenderer(context, markdownEngine, sourceIg.getPackageId()).genIpStatements(fileList), otherFilesRun);
     if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {
@@ -8658,6 +8679,169 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     }
   }
   
+  private void saveCSList(String name, List<CodeSystem> cslist, DBBuilder db, int view) throws IOException {
+    StringBuilder b = new StringBuilder();
+    JsonObject json = new JsonObject();
+    JsonArray items = new JsonArray();
+    json.add("codeSystems", items);
+    
+    b.append("URL,Version,Status,OIDs,Name,Title,Descriptino,Used\r\n");
+    
+    for (CodeSystem cs : cslist) {
+      
+      JsonObject item = new JsonObject();
+      items.add(item);
+      item.add("url", cs.getUrl());
+      item.add("version", cs.getVersion());
+      if (cs.hasStatus()) {
+        item.add("status", cs.getStatus().toCode());
+      }
+      item.add("name", cs.getName());
+      item.add("title", cs.getTitle());
+      item.add("description", cs.getDescription());
+
+      Set<String> oids = TerminologyUtilities.listOids(cs);
+      if (!oids.isEmpty()) {
+        JsonArray oidArr = new JsonArray();
+        item.add("oids", oidArr);
+        for (String s : oids) {
+          oidArr.add(s);
+        }       
+      }
+      Set<Resource> rl = (Set<Resource>) cs.getUserData("xref.used");
+      Set<String> links = new HashSet<>();
+      if (rl != null) {
+        JsonObject uses = new JsonObject();
+        item.add("uses", uses);
+        for (Resource r : rl) {
+          String title = (r instanceof CanonicalResource) ? ((CanonicalResource) r).present() : r.fhirType()+"/"+r.getIdBase();
+          String link = r.getWebPath();
+          links.add(r.fhirType()+"/"+r.getIdBase());
+          item.add(link,  title);
+        }
+      }
+      
+      db.addToCSList(view, cs, oids, rl);
+      
+      b.append(cs.getUrl());
+      b.append(",");
+      b.append(cs.getVersion());
+      b.append(",");
+      if (cs.hasStatus()) {
+        b.append(cs.getStatus().toCode());
+      } else {
+        b.append("");
+      }
+      b.append(",");
+      b.append(oids.isEmpty() ? "" : "\""+CommaSeparatedStringBuilder.join(",", oids)+"\"");
+      b.append(",");
+      b.append(cs.getName());
+      b.append(",");
+      b.append(cs.getTitle());
+      b.append(",");
+      b.append("\""+Utilities.escapeCSV(cs.getDescription())+"\"");
+      b.append(",");
+      b.append(links.isEmpty() ? "" : "\""+CommaSeparatedStringBuilder.join(",", links)+"\"");
+      b.append("\r\n");
+    }   
+    TextFile.stringToFile(b.toString(), Utilities.path(tempDir, name+".csv"), false);
+    otherFilesRun.add(Utilities.path(tempDir, name+".csv"));    
+    org.hl7.fhir.utilities.json.parser.JsonParser.compose(json, new File(Utilities.path(tempDir, name+".json")), true);
+    otherFilesRun.add(Utilities.path(tempDir, name+".json"));    
+  }
+
+  private void saveVSList(String name, List<ValueSet> vslist, DBBuilder db, int view) throws IOException {
+    StringBuilder b = new StringBuilder();
+    JsonObject json = new JsonObject();
+    JsonArray items = new JsonArray();
+    json.add("codeSystems", items);
+    
+    b.append("URL,Version,Status,OIDs,Name,Title,Descriptino,Uses,Used,Sources\r\n");
+    
+    for (ValueSet vs : vslist) {
+      
+      JsonObject item = new JsonObject();
+      items.add(item);
+      item.add("url", vs.getUrl());
+      item.add("version", vs.getVersion());
+      if (vs.hasStatus()) {
+        item.add("status", vs.getStatus().toCode());
+      }
+      item.add("name", vs.getName());
+      item.add("title", vs.getTitle());
+      item.add("description", vs.getDescription());
+
+      Set<String> used = ValueSetUtilities.listSystems(context, vs);
+      if (!used.isEmpty()) {
+        JsonArray sysdArr = new JsonArray();
+        item.add("systems", sysdArr);
+        for (String s : used) {
+          sysdArr.add(s);
+        }       
+      }
+
+      Set<String> oids = TerminologyUtilities.listOids(vs);
+      if (!oids.isEmpty()) {
+        JsonArray oidArr = new JsonArray();
+        item.add("oids", oidArr);
+        for (String s : oids) {
+          oidArr.add(s);
+        }       
+      }
+
+      Set<String> sources = (Set<String>) vs.getUserData("xref.sources");
+      if (!oids.isEmpty()) {
+        JsonArray srcArr = new JsonArray();
+        item.add("sources", srcArr);
+        for (String s : oids) {
+          srcArr.add(s);
+        }       
+      }
+      
+      Set<Resource> rl = (Set<Resource>) vs.getUserData("xref.used");
+      Set<String> links = new HashSet<>();
+      if (rl != null) {
+        JsonObject uses = new JsonObject();
+        item.add("uses", uses);
+        for (Resource r : rl) {
+          String title = (r instanceof CanonicalResource) ? ((CanonicalResource) r).present() : r.fhirType()+"/"+r.getIdBase();
+          String link = r.getWebPath();
+          links.add(r.fhirType()+"/"+r.getIdBase());
+          item.add(link,  title);
+        }
+      }
+      
+      db.addToVSList(view, vs, oids, used, sources, rl);
+      
+      b.append(vs.getUrl());
+      b.append(",");
+      b.append(vs.getVersion());
+      b.append(",");
+      if (vs.hasStatus()) {
+        b.append(vs.getStatus().toCode());
+      } else {
+        b.append("");
+      }
+      b.append(",");
+      b.append(oids.isEmpty() ? "" : "\""+CommaSeparatedStringBuilder.join(",", oids)+"\"");
+      b.append(",");
+      b.append(vs.getName());
+      b.append(",");
+      b.append(vs.getTitle());
+      b.append(",");
+      b.append("\""+Utilities.escapeCSV(vs.getDescription())+"\"");
+      b.append(",");
+      b.append(links.isEmpty() ? "" : "\""+CommaSeparatedStringBuilder.join(",", links)+"\"");
+      b.append(",");
+      b.append(sources.isEmpty() ? "" : "\""+CommaSeparatedStringBuilder.join(",", sources)+"\"");
+      b.append("\r\n");
+    }   
+    TextFile.stringToFile(b.toString(), Utilities.path(tempDir, name+".csv"), false);
+    otherFilesRun.add(Utilities.path(tempDir, name+".csv"));    
+    org.hl7.fhir.utilities.json.parser.JsonParser.compose(json, new File(Utilities.path(tempDir, name+".json")), true);
+    otherFilesRun.add(Utilities.path(tempDir, name+".json"));   
+  }
+
   private List<DependencyAnalyser.ArtifactDependency> makeDependencies() {
     DependencyAnalyser analyser = new DependencyAnalyser(context);
     for (FetchedFile f : fileList) {
@@ -12603,6 +12787,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   @Override
   public String urlForContained(RenderingContext context, String containingType, String containingId, String containedType, String containedId) {
     return null;
+  }
+
+  public long getMaxMemory() {
+    return maxMemory;
   }
 
 
