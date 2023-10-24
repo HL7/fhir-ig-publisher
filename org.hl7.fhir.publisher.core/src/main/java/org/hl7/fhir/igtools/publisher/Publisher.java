@@ -8717,7 +8717,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           String title = (r instanceof CanonicalResource) ? ((CanonicalResource) r).present() : r.fhirType()+"/"+r.getIdBase();
           String link = r.getWebPath();
           links.add(r.fhirType()+"/"+r.getIdBase());
-          item.add(link,  title);
+          if (link != null) {
+            item.add(link,  title);
+          }
         }
       }
       

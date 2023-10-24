@@ -399,11 +399,11 @@ public class DBBuilder {
         "CodeSystemListKey integer NOT NULL,\r\n"+
         "ViewType          integer NOT NUll,\r\n"+
         "ResourceKey       integer NULL,\r\n"+
-        "Url               nvarchar NOT NULL,\r\n"+
-        "Version           nvarchar NOT NULL,\r\n"+
-        "Status            nvarchar NOT NULL,\r\n"+
+        "Url               nvarchar NULL,\r\n"+
+        "Version           nvarchar NULL,\r\n"+
+        "Status            nvarchar NULL,\r\n"+
         "Name              nvarchar NULL,\r\n"+
-        "Title             nvarchar NOT NULL,\r\n"+
+        "Title             nvarchar NULL,\r\n"+
         "Description       nvarchar NULL,\r\n"+
         "PRIMARY KEY (CodeSystemListKey))\r\n");
     stmt.execute("CREATE TABLE CodeSystemListOIDs (\r\n"+
@@ -415,8 +415,8 @@ public class DBBuilder {
         "Type              nvarchar NOT NULL,\r\n"+
         "Id                nvarchar NOT NULL,\r\n"+
         "ResourceKey       integer NULL,\r\n"+
-        "Title             nvarchar NOT NULL,\r\n"+
-        "Web               nvarchar NOT NULL,\r\n"+
+        "Title             nvarchar NULL,\r\n"+
+        "Web               nvarchar NULL,\r\n"+
         "PRIMARY KEY (CodeSystemListKey,Type,Id))\r\n");
   }
   
@@ -426,11 +426,11 @@ public class DBBuilder {
         "ValueSetListKey   integer NOT NULL,\r\n"+
         "ViewType          integer NOT NUll,\r\n"+
         "ResourceKey       integer NULL,\r\n"+
-        "Url               nvarchar NOT NULL,\r\n"+
-        "Version           nvarchar NOT NULL,\r\n"+
-        "Status            nvarchar NOT NULL,\r\n"+
+        "Url               nvarchar NULL,\r\n"+
+        "Version           nvarchar NULL,\r\n"+
+        "Status            nvarchar NULL,\r\n"+
         "Name              nvarchar NULL,\r\n"+
-        "Title             nvarchar NOT NULL,\r\n"+
+        "Title             nvarchar NULL,\r\n"+
         "Description       nvarchar NULL,\r\n"+
         "PRIMARY KEY (ValueSetListKey))\r\n");
     stmt.execute("CREATE TABLE ValueSetListOIDs (\r\n"+
@@ -450,8 +450,8 @@ public class DBBuilder {
         "Type              nvarchar NOT NULL,\r\n"+
         "Id                nvarchar NOT NULL,\r\n"+
         "ResourceKey       integer NULL,\r\n"+
-        "Title             nvarchar NOT NULL,\r\n"+
-        "Web               nvarchar NOT NULL,\r\n"+
+        "Title             nvarchar NULL,\r\n"+
+        "Web               nvarchar NULL,\r\n"+
         "PRIMARY KEY (ValueSetListKey,Type,Id))\r\n");
   }
 
@@ -716,19 +716,24 @@ public class DBBuilder {
       }
 
       if (rl != null) {
+        Set<String> keys = new HashSet<>();
         sql = con.prepareStatement("insert into CodeSystemListRefs (CodeSystemListKey, Type, Id, ResourceKey, Title, Web) values (?, ?, ?, ?, ?, ?)");      
         for (Resource r : rl) {
-          sql.setInt(1, lastCLKey);
-          sql.setString(2, r.fhirType());      
-          sql.setString(3, r.getIdBase());
-          if (cs.hasUserData("db.key")) {
-            sql.setInt(4, (int) cs.getUserData("db.key"));
-          } else {
-            sql.setNull(4, java.sql.Types.INTEGER);
-          }      
-          sql.setString(5, r instanceof CanonicalResource ? ((CanonicalResource) r).present() : r.fhirType()+"/"+r.getIdBase());
-          sql.setString(6, r.getWebPath());
-          sql.execute();
+          String key = r.fhirType()+"/"+r.getIdBase();
+          if (!keys.contains(key)) {
+            keys.add(key);
+            sql.setInt(1, lastCLKey);
+            sql.setString(2, r.fhirType());      
+            sql.setString(3, r.getIdBase());
+            if (cs.hasUserData("db.key")) {
+              sql.setInt(4, (int) cs.getUserData("db.key"));
+            } else {
+              sql.setNull(4, java.sql.Types.INTEGER);
+            }      
+            sql.setString(5, r instanceof CanonicalResource ? ((CanonicalResource) r).present() : r.fhirType()+"/"+r.getIdBase());
+            sql.setString(6, r.getWebPath());
+            sql.execute();
+          }
         }
       }
     } catch (SQLException e) {
