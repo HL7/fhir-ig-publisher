@@ -81,6 +81,7 @@ public class AllGuidesTests {
     si.set("warnings", cWarn);
     si.set("hints", cHint);
     si.set("time", System.currentTimeMillis() - time);
+    si.set("memory", pub.getMaxMemory());
     JsonParser.compose(stats, statsFile, true);
     
     Map<String, Map<String, String>> statsMap = new HashMap<>();
