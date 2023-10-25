@@ -2191,9 +2191,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     Row row = gen.new Row();
     rows.add(row);
     row.setAnchor(element.path());
-    row.setColor(element.fixedValue() ? "#eeeeee" : "#ffffff");
+    row.setColor(element.hasFixedValue() ? "#eeeeee" : "#ffffff");
     row.setLineColor(0);
-    if (element.fixedValue()) {
+    if (element.hasFixedValue()) {
       row.setIcon("icon_fixed.gif", "Fixed Value" /*HierarchicalTableGenerator.TEXT_ICON_FIXED*/);
     } else {
       switch (element.mode()) {
@@ -2285,7 +2285,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         Row trow = gen.new Row();
         row.getSubRows().add(trow);
         trow.setAnchor(element.path()+"-t-"+t.getName());
-        trow.setColor(element.fixedValue() ? "#eeeeee" : "#ffffff");
+        trow.setColor(element.hasFixedValue() ? "#eeeeee" : "#ffffff");
         trow.setLineColor(0);
         trow.setIcon("icon_slice.png", HierarchicalTableGenerator.TEXT_ICON_SLICE);
         gc = gen.new Cell();

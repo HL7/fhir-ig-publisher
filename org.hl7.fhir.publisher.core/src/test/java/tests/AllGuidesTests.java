@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
@@ -13,6 +14,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+import javax.management.MBeanServer;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.apache.commons.io.IOUtils;
@@ -36,6 +38,7 @@ import org.xml.sax.SAXException;
 public class AllGuidesTests {
 
   private void testIg(String id, String path) throws Exception {
+    writeMem("Starting memory");
     if (!igsPathExists()) {
       Assertions.assertTrue(true);
       return;
@@ -81,6 +84,7 @@ public class AllGuidesTests {
     si.set("warnings", cWarn);
     si.set("hints", cHint);
     si.set("time", System.currentTimeMillis() - time);
+    si.set("memory", pub.getMaxMemory());
     JsonParser.compose(stats, statsFile, true);
     
     Map<String, Map<String, String>> statsMap = new HashMap<>();
@@ -123,6 +127,29 @@ public class AllGuidesTests {
     Assertions.assertTrue(cHint <= pHint, "Hint count has increased from "+pHint+" to "+cHint);
     System.out.println("=======================================================================================");
     System.out.println("");
+    pub = null;
+
+    writeMem("Residual memory");
+
+    dumpMem(id);
+  }
+
+  private void dumpMem(String id) throws IOException {
+    File f = new File(Utilities.path("[tmp]", "memory-dump-"+id+".hprof"));
+    f.delete();
+    System.gc();
+    MBeanServer server = ManagementFactory.getPlatformMBeanServer();
+    com.sun.management.HotSpotDiagnosticMXBean mxBean = ManagementFactory.newPlatformMXBeanProxy(server, "com.sun.management:type=HotSpotDiagnostic", com.sun.management.HotSpotDiagnosticMXBean.class);
+    mxBean.dumpHeap(f.getAbsolutePath(), true);
+  }
+
+  private void writeMem(String name) {
+    System.gc();
+    Runtime runtime = Runtime.getRuntime();
+    long totalMemory = runtime.totalMemory();
+    long freeMemory = runtime.freeMemory();
+    long usedMemory = totalMemory - freeMemory;
+    System.out.println(name+": "+usedMemory);
   }
 
   //---- todo: this class is only run by Grahame, so these ahts are hard-coded

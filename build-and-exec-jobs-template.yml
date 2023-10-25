@@ -35,7 +35,7 @@ jobs:
               npm install -g fsh-sushi
             displayName: 'fsh-sushi install'
 
-          # Runs 'mvn clean package'
+          # Runs 'mvn install'
           - task: Maven@3
             displayName: 'Build project'
             inputs:
@@ -47,7 +47,7 @@ jobs:
               jdkArchitectureOption: 'x64'
               publishJUnitResults: true
               testResultsFiles: '**/surefire-reports/TEST-*.xml'
-              goals: 'package'
+              goals: 'install'
 
           - task: Bash@3
             displayName: 'Clone target IG'

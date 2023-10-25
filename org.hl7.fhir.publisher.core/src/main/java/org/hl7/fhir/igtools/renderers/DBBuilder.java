@@ -29,6 +29,7 @@ import org.hl7.fhir.r5.model.ConceptMap;
 import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
 import org.hl7.fhir.r5.model.ConceptMap.SourceElementComponent;
 import org.hl7.fhir.r5.model.ConceptMap.TargetElementComponent;
+import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
 import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
@@ -69,6 +70,8 @@ public class DBBuilder {
   private int lastDesgKey;
   private int lastMapKey;
   private int lastVSKey;
+  private int lastCLKey;
+  private int lastVLKey;
 
   private long cumulativeTime;
   
@@ -371,6 +374,8 @@ public class DBBuilder {
     makeDesignationsTable(con);
     makeMappingsTable(con);
     makeValueSetTable(con);
+    makeCSListTables(con);
+    makeVSListTables(con);
     return con;    
   }
 
@@ -386,6 +391,68 @@ public class DBBuilder {
         "Code            nvarchar NOT NULL,\r\n"+
         "Display        nvarchar NULL,\r\n"+
         "PRIMARY KEY (Key))\r\n");
+  }
+
+  private void makeCSListTables(Connection con) throws SQLException {
+    Statement stmt = con.createStatement();
+    stmt.execute("CREATE TABLE CodeSystemList (\r\n"+
+        "CodeSystemListKey integer NOT NULL,\r\n"+
+        "ViewType          integer NOT NUll,\r\n"+
+        "ResourceKey       integer NULL,\r\n"+
+        "Url               nvarchar NULL,\r\n"+
+        "Version           nvarchar NULL,\r\n"+
+        "Status            nvarchar NULL,\r\n"+
+        "Name              nvarchar NULL,\r\n"+
+        "Title             nvarchar NULL,\r\n"+
+        "Description       nvarchar NULL,\r\n"+
+        "PRIMARY KEY (CodeSystemListKey))\r\n");
+    stmt.execute("CREATE TABLE CodeSystemListOIDs (\r\n"+
+        "CodeSystemListKey integer NOT NULL,\r\n"+
+        "OID               nvarchar NOT NULL,\r\n"+
+        "PRIMARY KEY (CodeSystemListKey,OID))\r\n");
+    stmt.execute("CREATE TABLE CodeSystemListRefs (\r\n"+
+        "CodeSystemListKey integer NOT NULL,\r\n"+
+        "Type              nvarchar NOT NULL,\r\n"+
+        "Id                nvarchar NOT NULL,\r\n"+
+        "ResourceKey       integer NULL,\r\n"+
+        "Title             nvarchar NULL,\r\n"+
+        "Web               nvarchar NULL,\r\n"+
+        "PRIMARY KEY (CodeSystemListKey,Type,Id))\r\n");
+  }
+  
+  private void makeVSListTables(Connection con) throws SQLException {
+    Statement stmt = con.createStatement();
+    stmt.execute("CREATE TABLE ValueSetList (\r\n"+
+        "ValueSetListKey   integer NOT NULL,\r\n"+
+        "ViewType          integer NOT NUll,\r\n"+
+        "ResourceKey       integer NULL,\r\n"+
+        "Url               nvarchar NULL,\r\n"+
+        "Version           nvarchar NULL,\r\n"+
+        "Status            nvarchar NULL,\r\n"+
+        "Name              nvarchar NULL,\r\n"+
+        "Title             nvarchar NULL,\r\n"+
+        "Description       nvarchar NULL,\r\n"+
+        "PRIMARY KEY (ValueSetListKey))\r\n");
+    stmt.execute("CREATE TABLE ValueSetListOIDs (\r\n"+
+        "ValueSetListKey   integer NOT NULL,\r\n"+
+        "OID               nvarchar NOT NULL,\r\n"+
+        "PRIMARY KEY (ValueSetListKey,OID))\r\n");
+    stmt.execute("CREATE TABLE ValueSetListSystems (\r\n"+
+        "ValueSetListKey   integer NOT NULL,\r\n"+
+        "URL               nvarchar NOT NULL,\r\n"+
+        "PRIMARY KEY (ValueSetListKey,URL))\r\n");
+    stmt.execute("CREATE TABLE ValueSetListSources (\r\n"+
+        "ValueSetListKey   integer NOT NULL,\r\n"+
+        "Source            nvarchar NOT NULL,\r\n"+
+        "PRIMARY KEY (ValueSetListKey,Source))\r\n");
+    stmt.execute("CREATE TABLE ValueSetListRefs (\r\n"+
+        "ValueSetListKey   integer NOT NULL,\r\n"+
+        "Type              nvarchar NOT NULL,\r\n"+
+        "Id                nvarchar NOT NULL,\r\n"+
+        "ResourceKey       integer NULL,\r\n"+
+        "Title             nvarchar NULL,\r\n"+
+        "Web               nvarchar NULL,\r\n"+
+        "PRIMARY KEY (ValueSetListKey,Type,Id))\r\n");
   }
 
   private void makeMetadataTable(Connection con) throws SQLException {
@@ -619,6 +686,123 @@ public class DBBuilder {
     }
     time(start);
     System.out.println("DB Cumulative Time invested: "+Utilities.describeDuration(cumulativeTime));
+  }
+
+  public void addToCSList(int viewType, CodeSystem cs, Set<String> oids, Set<Resource> rl) {
+    try {
+      lastCLKey++;
+      PreparedStatement sql;
+      sql = con.prepareStatement("insert into CodeSystemList (CodeSystemListKey, ViewType, ResourceKey, Url, Version, Status, Name, Title, Description) values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      sql.setInt(1, lastCLKey);
+      sql.setInt(2, viewType);
+      if (cs.hasUserData("db.key")) {
+        sql.setInt(3, (int) cs.getUserData("db.key"));
+      } else {
+        sql.setNull(3, java.sql.Types.INTEGER);
+      }
+      sql.setString(4, cs.getUrl());
+      sql.setString(5, cs.getVersion());
+      sql.setString(6, cs.hasStatus() ? cs.getStatus().toCode() : null);
+      sql.setString(7, cs.getName());
+      sql.setString(8, cs.getTitle());
+      sql.setString(9, cs.getDescription());
+      sql.execute();
+
+      sql = con.prepareStatement("insert into CodeSystemListOIDs (CodeSystemListKey, OID) values (?, ?)");
+      for (String oid : oids) {
+        sql.setInt(1, lastCLKey);
+        sql.setString(2, oid);      
+        sql.execute();
+      }
+
+      if (rl != null) {
+        Set<String> keys = new HashSet<>();
+        sql = con.prepareStatement("insert into CodeSystemListRefs (CodeSystemListKey, Type, Id, ResourceKey, Title, Web) values (?, ?, ?, ?, ?, ?)");      
+        for (Resource r : rl) {
+          String key = r.fhirType()+"/"+r.getIdBase();
+          if (!keys.contains(key)) {
+            keys.add(key);
+            sql.setInt(1, lastCLKey);
+            sql.setString(2, r.fhirType());      
+            sql.setString(3, r.getIdBase());
+            if (cs.hasUserData("db.key")) {
+              sql.setInt(4, (int) cs.getUserData("db.key"));
+            } else {
+              sql.setNull(4, java.sql.Types.INTEGER);
+            }      
+            sql.setString(5, r instanceof CanonicalResource ? ((CanonicalResource) r).present() : r.fhirType()+"/"+r.getIdBase());
+            sql.setString(6, r.getWebPath());
+            sql.execute();
+          }
+        }
+      }
+    } catch (SQLException e) {
+      e.printStackTrace();
+    }
+  }
+
+  public void addToVSList(int viewType, ValueSet vs, Set<String> oids, Set<String> used, Set<String> sources, Set<Resource> rl) {
+    try {
+      lastVLKey++;
+      PreparedStatement sql;
+      sql = con.prepareStatement("insert into ValueSetList (ValueSetListKey, ViewType, ResourceKey, Url, Version, Status, Name, Title, Description) values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      sql.setInt(1, lastVLKey);
+      sql.setInt(2, viewType);
+      if (vs.hasUserData("db.key")) {
+        sql.setInt(3, (int) vs.getUserData("db.key"));
+      } else {
+        sql.setNull(3, java.sql.Types.INTEGER);
+      }
+      sql.setString(4, vs.getUrl());
+      sql.setString(5, vs.getVersion());
+      sql.setString(6, vs.hasStatus() ? vs.getStatus().toCode() : null);
+      sql.setString(7, vs.getName());
+      sql.setString(8, vs.getTitle());
+      sql.setString(9, vs.getDescription());
+      sql.execute();
+
+      sql = con.prepareStatement("insert into ValueSetListOIDs (ValueSetListKey, OID) values (?, ?)");
+      for (String oid : oids) {
+        sql.setInt(1, lastVLKey);
+        sql.setString(2, oid);      
+        sql.execute();
+      }
+
+      sql = con.prepareStatement("insert into ValueSetListSystems (ValueSetListKey, URL) values (?, ?)");
+      for (String u : used) {
+        sql.setInt(1, lastVLKey);
+        sql.setString(2, u);      
+        sql.execute();
+      }
+
+
+      sql = con.prepareStatement("insert into ValueSetListSources (ValueSetListKey, Source) values (?, ?)");
+      for (String s : sources) {
+        sql.setInt(1, lastVLKey);
+        sql.setString(2, s);      
+        sql.execute();
+      }
+
+      if (rl != null) {
+        sql = con.prepareStatement("insert into ValueSetListRefs (ValueSetListKey, Type, Id, ResourceKey, Title, Web) values (?, ?, ?, ?, ?, ?)");      
+        for (Resource r : rl) {
+          sql.setInt(1, lastVLKey);
+          sql.setString(2, r.fhirType());      
+          sql.setString(3, r.getIdBase());
+          if (vs.hasUserData("db.key")) {
+            sql.setInt(4, (int) vs.getUserData("db.key"));
+          } else {
+            sql.setNull(4, java.sql.Types.INTEGER);
+          }      
+          sql.setString(5, r instanceof CanonicalResource ? ((CanonicalResource) r).present() : r.fhirType()+"/"+r.getIdBase());
+          sql.setString(6, r.getWebPath());
+          sql.execute();
+        }
+      }
+    } catch (SQLException e) {
+      e.printStackTrace();
+    }
+    
   }
 
 
