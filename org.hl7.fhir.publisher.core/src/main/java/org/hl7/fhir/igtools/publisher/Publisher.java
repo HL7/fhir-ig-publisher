@@ -4728,6 +4728,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     rc.setDateFormatString(fmtDate);
     rc.setDateTimeFormatString(fmtDateTime);
     rc.setChangeVersion(versionToAnnotate);
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getResource() instanceof CanonicalResource) {
+          CanonicalResource cr = (CanonicalResource) r.getResource();
+          rc.getNamedLinks().put(cr.getName(), cr.getWebPath());
+        }
+      }
+    }
     //    rc.setTargetVersion(pubVersion);
 
     if (igMode) {
@@ -7520,7 +7528,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Checking Output HTML");
       String statusMessage;
       if (mode == IGBuildMode.AUTOBUILD) { 
-        statusMessage = Utilities.escapeXml(sourceIg.present())+", published by "+Utilities.escapeXml(sourceIg.getPublisher())+". This is not an authorized publication; it is the continuous build for version "+workingVersion()+"). This version is based on the current content of <a href=\""+gh()+"\">"+gh()+"</a> and changes regularly. See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>"; 
+        statusMessage = Utilities.escapeXml(sourceIg.present())+", published by "+Utilities.escapeXml(sourceIg.getPublisher())+". This is not an authorized publication; it is the continuous build for version "+workingVersion()+". This version is based on the current content of <a href=\""+gh()+"\">"+gh()+"</a> and changes regularly. See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>"; 
       } else if (mode == IGBuildMode.PUBLICATION) { 
         statusMessage = "Publication Build: This will be filled in by the publication tooling"; 
       } else { 
@@ -10255,9 +10263,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       while (src.contains("[[[")) {
         int i = src.indexOf("[[[");
         String pfx = src.substring(0, i);
-        src = src.substring(i+6);
+        src = src.substring(i+3);
         i = src.indexOf("]]]");
-        String sfx = src.substring(i+2);
+        String sfx = src.substring(i+3);
         src = src.substring(0, i);
         src = pfx+processRefTag(db, src, f)+sfx;
         changed = true;
@@ -10284,7 +10292,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       } catch (Exception e) {
       }
-    }  
+    } else {
+      for (FetchedFile f1 : fileList) {
+        for (FetchedResource r : f1.getResources()) {
+          if (r.getResource() instanceof CanonicalResource) {
+            CanonicalResource cr = (CanonicalResource) r.getResource();
+            if (src.equalsIgnoreCase(cr.getName()) && cr.hasWebPath()) {
+              return "<a href=\""+cr.getWebPath()+"\">"+Utilities.escapeXml(cr.present())+"</a>";
+            }
+          }
+        }
+      }
+    }
     return "[[["+src+"]]]";
   }
 
