@@ -13,23 +13,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.cqframework.cql.cql2elm.CqlTranslator;
-import org.cqframework.cql.cql2elm.CqlTranslatorException;
-import org.cqframework.cql.cql2elm.CqlTranslatorOptions;
-import org.cqframework.cql.cql2elm.CqlTranslatorOptionsMapper;
-import org.cqframework.cql.cql2elm.DefaultLibrarySourceProvider;
-import org.cqframework.cql.cql2elm.FhirLibrarySourceProvider;
-import org.cqframework.cql.cql2elm.LibraryManager;
-import org.cqframework.cql.cql2elm.LibrarySourceProvider;
-import org.cqframework.cql.cql2elm.ModelManager;
-import org.cqframework.cql.cql2elm.NamespaceInfo;
-import org.cqframework.cql.cql2elm.NamespaceManager;
-import org.cqframework.cql.cql2elm.model.TranslatedLibrary;
+import org.cqframework.cql.cql2elm.*;
+import org.cqframework.cql.cql2elm.CqlCompilerException;
+import org.cqframework.cql.cql2elm.model.CompiledLibrary;
+import org.cqframework.cql.cql2elm.quick.FhirLibrarySourceProvider;
+import org.hl7.cql.model.*;
+import org.hl7.cql.model.NamespaceManager;
 import org.cqframework.cql.elm.tracking.TrackBack;
 import org.fhir.ucum.UcumService;
-import org.hl7.cql.model.IntervalType;
-import org.hl7.cql.model.ListType;
-import org.hl7.cql.model.NamedType;
 import org.hl7.elm.r1.AccessModifier;
 import org.hl7.elm.r1.Code;
 import org.hl7.elm.r1.CodeDef;
@@ -49,8 +40,10 @@ import org.hl7.elm.r1.UsingDef;
 import org.hl7.elm.r1.ValueSetDef;
 import org.hl7.elm.r1.ValueSetRef;
 import org.hl7.elm.r1.VersionedIdentifier;
+import org.hl7.elm_modelinfo.r1.ModelInfo;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
+import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
 import org.hl7.fhir.r5.model.DataRequirement;
 import org.hl7.fhir.r5.model.Enumerations;
@@ -62,18 +55,27 @@ import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 
+import javax.xml.bind.JAXB;
+
 public class CqlSubSystem {
 
   /** 
    * information about a cql file
    */
   public class CqlSourceFileInformation {
+    private VersionedIdentifier identifier;
     private byte[] elm;
     private byte[] jsonElm;
     private List<ValidationMessage> errors = new ArrayList<>();
     private List<DataRequirement> dataRequirements = new ArrayList<>();
     private List<RelatedArtifact> relatedArtifacts = new ArrayList<>();
     private List<ParameterDefinition> parameters = new ArrayList<>();
+    public VersionedIdentifier getIdentifier() {
+      return identifier;
+    }
+    public void setIdentifier(VersionedIdentifier identifier) {
+      this.identifier = identifier;
+    }
     public byte[] getElm() {
       return elm;
     }
@@ -123,6 +125,45 @@ public class CqlSubSystem {
           }
         } catch (IOException e) {
           logger.logDebugMessage(ILoggingService.LogCategory.PROGRESS, String.format("Exceptions occurred attempting to load npm library source for %s", identifier.toString()));
+        }
+      }
+
+      return null;
+    }
+  }
+
+  public class NpmModelInfoProvider implements ModelInfoProvider {
+
+    public ModelInfo load(ModelIdentifier modelIdentifier) {
+      // VersionedIdentifier.id: Name of the model
+      // VersionedIdentifier.system: Namespace for the model, as a URL
+      // VersionedIdentifier.version: Version of the model
+      for (NpmPackage p : packages) {
+        try {
+          VersionedIdentifier identifier = new VersionedIdentifier()
+                  .withId(modelIdentifier.getId())
+                  .withVersion(modelIdentifier.getVersion())
+                  .withSystem(modelIdentifier.getSystem());
+
+          if (identifier.getSystem() == null) {
+            identifier.setSystem(p.canonical());
+          }
+
+          InputStream s = p.loadByCanonicalVersion(identifier.getSystem()+"/Library/"+identifier.getId()+"-ModelInfo", identifier.getVersion());
+          if (s != null) {
+            Library l = reader.readLibrary(s);
+            for (org.hl7.fhir.r5.model.Attachment a : l.getContent()) {
+              if (a.getContentType() != null && a.getContentType().equals("application/xml")) {
+                if (modelIdentifier.getSystem() == null) {
+                  modelIdentifier.setSystem(identifier.getSystem());
+                }
+                InputStream is = new ByteArrayInputStream(a.getData());
+                return JAXB.unmarshal(is, ModelInfo.class);
+              }
+            }
+          }
+        } catch (IOException e) {
+          logger.logDebugMessage(IWorkerContext.ILoggingService.LogCategory.PROGRESS, String.format("Exceptions occurred attempting to load npm library for model %s", modelIdentifier.toString()));
         }
       }
 
@@ -239,6 +280,11 @@ public class CqlSubSystem {
     }
 
     if (!fileMap.containsKey(filename)) {
+      for (Map.Entry<String, CqlSourceFileInformation> entry: fileMap.entrySet()) {
+        if (filename.equalsIgnoreCase(entry.getKey())) {
+          logger.logDebugMessage(ILoggingService.LogCategory.PROGRESS, String.format("File with a similar name but different casing was found. File found: '%s'", entry.getKey()));
+        }
+      }
       return null;
     }
 
@@ -271,7 +317,7 @@ public class CqlSubSystem {
    * @param folder
    * @return
    */
-  private CqlTranslatorOptions getTranslatorOptions(String folder) {
+    private CqlTranslatorOptions getTranslatorOptions(String folder) {
     String optionsFileName = folder + File.separator + "cql-options.json";
     CqlTranslatorOptions options = null;
     File file = new File(optionsFileName);
@@ -281,11 +327,35 @@ public class CqlSubSystem {
     else {
       options = CqlTranslatorOptions.defaultOptions();
       if (!options.getFormats().contains(CqlTranslator.Format.XML)) {
-        options.getFormats().add(CqlTranslator.Format.XML);
+        options.getFormats().add(CqlTranslatorOptions.Format.XML);
       }
     }
 
     return options;
+  }
+
+  private void checkCachedManager() {
+    if (cachedOptions == null) {
+      if (hasMultipleBinaryPaths) {
+        throw new RuntimeException("CqlProcessor has been used with multiple Cql paths, ambiguous options and manager");
+      }
+      else {
+        throw new RuntimeException("CqlProcessor has not been executed, no cached options or manager");
+      }
+    }
+  }
+
+  private boolean hasMultipleBinaryPaths = false;
+  private CqlTranslatorOptions cachedOptions;
+  private CqlTranslatorOptions getCqlTranslatorOptions() {
+    checkCachedManager();
+    return cachedOptions;
+  }
+
+  private LibraryManager cachedLibraryManager;
+  private LibraryManager getLibraryManager() {
+    checkCachedManager();
+    return cachedLibraryManager;
   }
 
   private void translateFolder(String folder) {
@@ -297,16 +367,37 @@ public class CqlSubSystem {
     // Construct DefaultLibrarySourceProvider
     // Construct FhirLibrarySourceProvider
     ModelManager modelManager = new ModelManager();
-    LibraryManager libraryManager = new LibraryManager(modelManager);
+    modelManager.getModelInfoLoader().registerModelInfoProvider(new NpmModelInfoProvider());
+    modelManager.getModelInfoLoader().registerModelInfoProvider(new DefaultModelInfoProvider(Paths.get(folder)));
+
+    LibraryManager libraryManager = new LibraryManager(modelManager, options.getCqlCompilerOptions());
     libraryManager.getLibrarySourceLoader().registerProvider(new NpmLibrarySourceProvider());
-    libraryManager.getLibrarySourceLoader().registerProvider(new FhirLibrarySourceProvider());
     libraryManager.getLibrarySourceLoader().registerProvider(new DefaultLibrarySourceProvider(Paths.get(folder)));
+    libraryManager.getLibrarySourceLoader().registerProvider(new FhirLibrarySourceProvider());
 
     loadNamespaces(libraryManager);
 
     // foreach *.cql file
+    boolean hadCqlFiles = false;
     for (File file : new File(folder).listFiles(getCqlFilenameFilter())) {
+      hadCqlFiles = true;
       translateFile(modelManager, libraryManager, file, options);
+    }
+
+    if (hadCqlFiles) {
+      if (cachedOptions == null) {
+        if (!hasMultipleBinaryPaths) {
+          cachedOptions = options;
+          cachedLibraryManager = libraryManager;
+        }
+      }
+      else {
+        if (!hasMultipleBinaryPaths) {
+          hasMultipleBinaryPaths = true;
+          cachedOptions = null;
+          cachedLibraryManager = null;
+        }
+      }
     }
   }
 
@@ -323,7 +414,7 @@ public class CqlSubSystem {
     }
   }
 
-  private ValidationMessage.IssueType severityToIssueType(CqlTranslatorException.ErrorSeverity severity) {
+  private ValidationMessage.IssueType severityToIssueType(CqlCompilerException.ErrorSeverity severity) {
     switch (severity) {
       case Info: return ValidationMessage.IssueType.INFORMATIONAL;
       case Warning:
@@ -332,7 +423,7 @@ public class CqlSubSystem {
     }
   }
 
-  private ValidationMessage.IssueSeverity severityToIssueSeverity(CqlTranslatorException.ErrorSeverity severity) {
+  private ValidationMessage.IssueSeverity severityToIssueSeverity(CqlCompilerException.ErrorSeverity severity) {
     switch (severity) {
       case Info: return ValidationMessage.IssueSeverity.INFORMATION;
       case Warning: return ValidationMessage.IssueSeverity.WARNING;
@@ -341,7 +432,7 @@ public class CqlSubSystem {
     }
   }
 
-  private ValidationMessage exceptionToValidationMessage(File file, CqlTranslatorException exception) {
+  private ValidationMessage exceptionToValidationMessage(File file, CqlCompilerException exception) {
     TrackBack tb = exception.getLocator();
     if (tb != null) {
       return new ValidationMessage(ValidationMessage.Source.Publisher, severityToIssueType(exception.getSeverity()),
@@ -362,11 +453,10 @@ public class CqlSubSystem {
     try {
 
       // translate toXML
-      CqlTranslator translator = CqlTranslator.fromFile(namespaceInfo, file, modelManager, libraryManager,
-              options.getValidateUnits() ? ucumService : null, options);
+      CqlTranslator translator = CqlTranslator.fromFile(namespaceInfo, file, libraryManager);
 
       // record errors and warnings
-      for (CqlTranslatorException exception : translator.getExceptions()) {
+      for (CqlCompilerException exception : translator.getExceptions()) {
         result.getErrors().add(exceptionToValidationMessage(file, exception));
       }
 
@@ -376,34 +466,42 @@ public class CqlSubSystem {
         logger.logMessage(String.format("Translation failed with (%d) errors; see the error log for more information.", translator.getErrors().size()));
       }
       else {
-        // convert to base64 bytes
-        // NOTE: Publication tooling requires XML content
-        result.setElm(translator.toXml().getBytes());
-        if (options.getFormats().contains(CqlTranslator.Format.JSON)) {
-          result.setJsonElm(translator.toJson().getBytes());
+        try {
+          // convert to base64 bytes
+          // NOTE: Publication tooling requires XML content
+          result.setElm(translator.toXml().getBytes());
+          result.setIdentifier(translator.toELM().getIdentifier());
+          if (options.getFormats().contains(CqlTranslator.Format.JSON)) {
+            result.setJsonElm(translator.toJson().getBytes());
+          }
+
+          // Add the translated library to the library manager (NOTE: This should be a "cacheLibrary" call on the LibraryManager, available in 1.5.3+)
+          // Without this, the data requirements processor will try to load the current library, resulting in a re-translation
+          CompiledLibrary compiledLibrary = translator.getTranslatedLibrary();
+          libraryManager.getCompiledLibraries().put(compiledLibrary.getIdentifier(), compiledLibrary);
+
+          // TODO: Report context, requires 1.5 translator (ContextDef)
+          // NOTE: In STU3, only Patient context is supported
+
+          // Extract relatedArtifact data (models, libraries, code systems, and value sets)
+          result.relatedArtifacts.addAll(extractRelatedArtifacts(translator.toELM()));
+
+          // Extract parameter data and validate result types are supported types
+          List<ValidationMessage> paramMessages = new ArrayList<>();
+          result.parameters.addAll(extractParameters(translator.toELM(), paramMessages));
+          for (ValidationMessage paramMessage : paramMessages) {
+            result.getErrors().add(new ValidationMessage(paramMessage.getSource(), paramMessage.getType(), file.getName(),
+                    paramMessage.getMessage(), paramMessage.getLevel()));
+          }
+
+          // Extract dataRequirement data
+          result.dataRequirements.addAll(extractDataRequirements(translator.toRetrieves(), translator.getTranslatedLibrary(), libraryManager));
+
+          logger.logMessage("CQL translation completed successfully.");
         }
-        if (options.getFormats().contains(CqlTranslator.Format.JXSON)) {
-          result.setJsonElm(translator.toJxson().getBytes());
+        catch (Exception ex) {
+          logger.logMessage(String.format("CQL Translation succeeded for file: '%s', but ELM generation failed with the following error: %s", file.getAbsolutePath(), ex.getMessage()));
         }
-
-        // TODO: Report context, requires 1.5 translator (ContextDef)
-        // NOTE: In STU3, only Patient context is supported
-
-        // Extract relatedArtifact data (models, libraries, code systems, and value sets)
-        result.relatedArtifacts.addAll(extractRelatedArtifacts(translator.toELM()));
-
-        // Extract parameter data and validate result types are supported types
-        List<ValidationMessage> paramMessages = new ArrayList<>();
-        result.parameters.addAll(extractParameters(translator.toELM(), paramMessages));
-        for (ValidationMessage paramMessage : paramMessages) {
-          result.getErrors().add(new ValidationMessage(paramMessage.getSource(), paramMessage.getType(), file.getName(),
-                  paramMessage.getMessage(), paramMessage.getLevel()));
-        }
-
-        // Extract dataRequirement data
-        result.dataRequirements.addAll(extractDataRequirements(translator.toRetrieves(), translator.getTranslatedLibrary(), libraryManager));
-
-        logger.logMessage("CQL translation completed successfully.");
       }
     }
     catch (Exception e) {
@@ -429,7 +527,10 @@ public class CqlSubSystem {
       for (UsingDef def : library.getUsings().getDef()) {
         // System model info is an implicit dependency, do not report
         if (!def.getLocalIdentifier().equals("System")) {
-          result.add(toRelatedArtifact(def));
+          // FHIR model info included from the translator is implicit, do not report
+          if (!(def.getLocalIdentifier().equals("FHIR") && def.getUri() != null && def.getUri().equals("http://hl7.org/fhir"))) {
+            result.add(toRelatedArtifact(def));
+          }
         }
       }
     }
@@ -437,7 +538,13 @@ public class CqlSubSystem {
     // Report library dependencies
     if (library.getIncludes() != null && !library.getIncludes().getDef().isEmpty()) {
       for (IncludeDef def : library.getIncludes().getDef()) {
-        result.add(toRelatedArtifact(def));
+        // System library is an implicit dependency, do not report
+        if (!def.getLocalIdentifier().equals("System")) {
+          // FHIR Helpers included from the translator is impicit, do not report
+          if (!(def.getPath().equals("http://hl7.org/fhir/FHIRHelpers"))) {
+            result.add(toRelatedArtifact(def));
+          }
+        }
       }
     }
 
@@ -478,7 +585,7 @@ public class CqlSubSystem {
     return result;
   }
 
-  private List<DataRequirement> extractDataRequirements(List<org.hl7.elm.r1.Retrieve> retrieves, TranslatedLibrary library, LibraryManager libraryManager) {
+  private List<DataRequirement> extractDataRequirements(List<org.hl7.elm.r1.Retrieve> retrieves, CompiledLibrary library, LibraryManager libraryManager) {
     List<DataRequirement> result = new ArrayList<>();
 
     for (Retrieve retrieve : retrieves) {
@@ -491,6 +598,7 @@ public class CqlSubSystem {
   private org.hl7.fhir.r5.model.RelatedArtifact toRelatedArtifact(UsingDef usingDef) {
     return new org.hl7.fhir.r5.model.RelatedArtifact()
             .setType(RelatedArtifact.RelatedArtifactType.DEPENDSON)
+            .setDisplay("Model " + usingDef.getLocalIdentifier())
             .setResource(getModelInfoReferenceUrl(usingDef.getUri(), usingDef.getLocalIdentifier(), usingDef.getVersion()));
   }
 
@@ -505,6 +613,7 @@ public class CqlSubSystem {
   private org.hl7.fhir.r5.model.RelatedArtifact toRelatedArtifact(IncludeDef includeDef) {
     return new org.hl7.fhir.r5.model.RelatedArtifact()
             .setType(org.hl7.fhir.r5.model.RelatedArtifact.RelatedArtifactType.DEPENDSON)
+            .setDisplay(includeDef.getLocalIdentifier() != null ? "Library " + includeDef.getLocalIdentifier() : null)
             .setResource(getReferenceUrl(includeDef.getPath(), includeDef.getVersion()));
   }
 
@@ -513,11 +622,6 @@ public class CqlSubSystem {
     String name = NamespaceManager.getNamePart(path);
 
     if (uri != null) {
-      // The translator has no way to correctly infer the namespace of the FHIRHelpers library, since it will happily provide that source to any namespace that wants it
-      // So override the declaration here so that it points back to the FHIRHelpers library in the base specification
-      if (name.equals("FHIRHelpers") && !uri.equals("http://hl7.org/fhir")) {
-        uri = "http://hl7.org/fhir";
-      }
       return String.format("%s/Library/%s%s", uri, name, version != null ? ("|" + version) : "");
     }
 
@@ -527,12 +631,14 @@ public class CqlSubSystem {
   private org.hl7.fhir.r5.model.RelatedArtifact toRelatedArtifact(CodeSystemDef codeSystemDef) {
     return new org.hl7.fhir.r5.model.RelatedArtifact()
             .setType(org.hl7.fhir.r5.model.RelatedArtifact.RelatedArtifactType.DEPENDSON)
+            .setDisplay("Code System " + codeSystemDef.getName())
             .setResource(toReference(codeSystemDef));
   }
 
   private org.hl7.fhir.r5.model.RelatedArtifact toRelatedArtifact(ValueSetDef valueSetDef) {
     return new org.hl7.fhir.r5.model.RelatedArtifact()
             .setType(org.hl7.fhir.r5.model.RelatedArtifact.RelatedArtifactType.DEPENDSON)
+            .setDisplay("Value Set " + valueSetDef.getName())
             .setResource(toReference(valueSetDef));
   }
 
@@ -634,7 +740,7 @@ public class CqlSubSystem {
     return "Any";
   }
 
-  private org.hl7.fhir.r5.model.DataRequirement toDataRequirement(Retrieve retrieve, TranslatedLibrary library, LibraryManager libraryManager) {
+  private org.hl7.fhir.r5.model.DataRequirement toDataRequirement(Retrieve retrieve, CompiledLibrary library, LibraryManager libraryManager) {
     org.hl7.fhir.r5.model.DataRequirement dr = new org.hl7.fhir.r5.model.DataRequirement();
 
     dr.setType(org.hl7.fhir.r5.model.Enumerations.FHIRTypes.fromCode(retrieve.getDataType().getLocalPart()));
@@ -679,7 +785,7 @@ public class CqlSubSystem {
   }
 
   private void resolveCodeFilterCodes(org.hl7.fhir.r5.model.DataRequirement.DataRequirementCodeFilterComponent cfc, Expression e,
-                                      TranslatedLibrary library, LibraryManager libraryManager) {
+                                      CompiledLibrary library, LibraryManager libraryManager) {
     if (e instanceof org.hl7.elm.r1.CodeRef) {
       CodeRef cr = (CodeRef)e;
       cfc.addCode(toCoding(toCode(resolveCodeRef(cr, library, libraryManager)), library, libraryManager));
@@ -705,7 +811,7 @@ public class CqlSubSystem {
     }
   }
 
-  private org.hl7.fhir.r5.model.Coding toCoding(Code code, TranslatedLibrary library, LibraryManager libraryManager) {
+  private org.hl7.fhir.r5.model.Coding toCoding(Code code, CompiledLibrary library, LibraryManager libraryManager) {
     CodeSystemDef codeSystemDef = resolveCodeSystemRef(code.getSystem(), library, libraryManager);
     org.hl7.fhir.r5.model.Coding coding = new org.hl7.fhir.r5.model.Coding();
     coding.setCode(code.getCode());
@@ -715,7 +821,7 @@ public class CqlSubSystem {
     return coding;
   }
 
-  private org.hl7.fhir.r5.model.CodeableConcept toCodeableConcept(Concept concept, TranslatedLibrary library, LibraryManager libraryManager) {
+  private org.hl7.fhir.r5.model.CodeableConcept toCodeableConcept(Concept concept, CompiledLibrary library, LibraryManager libraryManager) {
     org.hl7.fhir.r5.model.CodeableConcept codeableConcept = new org.hl7.fhir.r5.model.CodeableConcept();
     codeableConcept.setText(concept.getDisplay());
     for (Code code : concept.getCode()) {
@@ -734,7 +840,7 @@ public class CqlSubSystem {
 
   // TODO: Move to the CQL-to-ELM translator
 
-  private org.hl7.elm.r1.Concept toConcept(ConceptDef conceptDef, TranslatedLibrary library, LibraryManager libraryManager) {
+  private org.hl7.elm.r1.Concept toConcept(ConceptDef conceptDef, CompiledLibrary library, LibraryManager libraryManager) {
     org.hl7.elm.r1.Concept concept = new org.hl7.elm.r1.Concept();
     concept.setDisplay(conceptDef.getDisplay());
     for (org.hl7.elm.r1.CodeRef codeRef : conceptDef.getCode()) {
@@ -747,7 +853,7 @@ public class CqlSubSystem {
     return new org.hl7.elm.r1.Code().withCode(codeDef.getId()).withSystem(codeDef.getCodeSystem()).withDisplay(codeDef.getDisplay());
   }
 
-  private org.hl7.elm.r1.CodeDef resolveCodeRef(CodeRef codeRef, TranslatedLibrary library, LibraryManager libraryManager) {
+  private org.hl7.elm.r1.CodeDef resolveCodeRef(CodeRef codeRef, CompiledLibrary library, LibraryManager libraryManager) {
     // If the reference is to another library, resolve to that library
     if (codeRef.getLibraryName() != null) {
       library = resolveLibrary(codeRef.getLibraryName(), library, libraryManager);
@@ -756,7 +862,7 @@ public class CqlSubSystem {
     return library.resolveCodeRef(codeRef.getName());
   }
 
-  private org.hl7.elm.r1.ConceptDef resolveConceptRef(ConceptRef conceptRef, TranslatedLibrary library, LibraryManager libraryManager) {
+  private org.hl7.elm.r1.ConceptDef resolveConceptRef(ConceptRef conceptRef, CompiledLibrary library, LibraryManager libraryManager) {
     // If the reference is to another library, resolve to that library
     if (conceptRef.getLibraryName() != null) {
       library = resolveLibrary(conceptRef.getLibraryName(), library, libraryManager);
@@ -765,7 +871,7 @@ public class CqlSubSystem {
     return library.resolveConceptRef(conceptRef.getName());
   }
 
-  private CodeSystemDef resolveCodeSystemRef(CodeSystemRef codeSystemRef, TranslatedLibrary library, LibraryManager libraryManager) {
+  private CodeSystemDef resolveCodeSystemRef(CodeSystemRef codeSystemRef, CompiledLibrary library, LibraryManager libraryManager) {
     if (codeSystemRef.getLibraryName() != null) {
       library = resolveLibrary(codeSystemRef.getLibraryName(), library, libraryManager);
     }
@@ -773,7 +879,7 @@ public class CqlSubSystem {
     return library.resolveCodeSystemRef(codeSystemRef.getName());
   }
 
-  private ValueSetDef resolveValueSetRef(ValueSetRef valueSetRef, TranslatedLibrary library, LibraryManager libraryManager) {
+  private ValueSetDef resolveValueSetRef(ValueSetRef valueSetRef, CompiledLibrary library, LibraryManager libraryManager) {
     // If the reference is to another library, resolve to that library
     if (valueSetRef.getLibraryName() != null) {
       library = resolveLibrary(valueSetRef.getLibraryName(), library, libraryManager);
@@ -782,16 +888,12 @@ public class CqlSubSystem {
     return library.resolveValueSetRef(valueSetRef.getName());
   }
 
-  private TranslatedLibrary resolveLibrary(String localLibraryName, TranslatedLibrary library, LibraryManager libraryManager) {
+  private CompiledLibrary resolveLibrary(String localLibraryName, CompiledLibrary library, LibraryManager libraryManager) {
     IncludeDef includeDef = library.resolveIncludeRef(localLibraryName);
     return resolveLibrary(libraryManager, new VersionedIdentifier().withId(includeDef.getPath()).withVersion(includeDef.getVersion()));
   }
 
-  private TranslatedLibrary resolveLibrary(LibraryManager libraryManager, VersionedIdentifier libraryIdentifier) {
-    if (libraryManager.getTranslatedLibraries().containsKey(libraryIdentifier.getId())) {
-      return libraryManager.getTranslatedLibraries().get(libraryIdentifier.getId());
-    }
-
-    throw new IllegalArgumentException(String.format("Could not resolve reference to translated library %s", libraryIdentifier.getId()));
+  private CompiledLibrary resolveLibrary(LibraryManager libraryManager, VersionedIdentifier libraryIdentifier) {
+    return libraryManager.resolveLibrary(libraryIdentifier);
   }
 }
