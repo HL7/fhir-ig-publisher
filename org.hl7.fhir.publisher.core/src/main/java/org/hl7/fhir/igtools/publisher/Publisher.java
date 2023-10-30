@@ -302,6 +302,8 @@ import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.XVerExtensionManager;
 import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
 import org.hl7.fhir.r5.utils.formats.CSVWriter;
+import org.hl7.fhir.r5.utils.sql.Runner;
+import org.hl7.fhir.r5.utils.sql.StorageSqlite3;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.validation.IResourceValidator;
@@ -721,6 +723,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private XVerExtensionManager xverManager;
   private IGKnowledgeProvider igpkp;
   private List<SpecMapManager> specMaps = new ArrayList<SpecMapManager>();
+  private List<NpmPackage> npms = new ArrayList<NpmPackage>();
   private List<SpecMapManager> linkSpecMaps = new ArrayList<SpecMapManager>();
   private List<String> suppressedIds = new ArrayList<>();
 
@@ -929,6 +932,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private String defaultTranslationLang;
   private List<String> translationLangs = new ArrayList<>();
   private List<String> translationSupplements = new ArrayList<>();
+  private List<String> viewDefinitions = new ArrayList<>();
   private int validationLogTime = 0;
   private long maxMemory = 0;
 
@@ -2862,6 +2866,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         break;
       case "validation-duration-report-cutoff":
         validationLogTime = Utilities.parseInt(p.getValue(), 0) * 1000;
+        break;
+      case "viewDefinition":
+        viewDefinitions.add(p.getValue());
         break;
       case "logged-when-scanning":
         if ("false".equals(p.getValue())) {
@@ -8682,8 +8689,40 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         applyPageTemplate(htmlTemplate, mdTemplate, publishedIg.getDefinition().getPage());
       }
     }
+    
+    generateViewDefinitions(db);
   }
   
+  private void generateViewDefinitions(DBBuilder db) {
+    for (String vdn : viewDefinitions) {
+      logMessage("Generate View "+vdn);
+      Runner runner = new Runner();
+      try {
+        runner.setContext(context);;
+        PublisherProvider pprov = new PublisherProvider(context, npmList, fileList, igpkp.getCanonical());
+        runner.setProvider(pprov);
+        runner.setStorage(new StorageSqlite3(db.getConnection()));
+        JsonObject vd = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(new File(Utilities.path(Utilities.getDirectoryForFile(igName), vdn)));
+        pprov.inspect(vd);
+        runner.execute(vd);
+        captureIssues(vdn, runner.getIssues());
+      } catch (Exception e) {
+        e.printStackTrace();
+        errors.add(new ValidationMessage(Source.Publisher, IssueType.REQUIRED, vdn, "Error Processing ViewDefinition: "+e.getMessage(), IssueSeverity.ERROR));
+        captureIssues(vdn, runner.getIssues());
+      }      
+    }    
+  }
+
+  private void captureIssues(String vdn, List<ValidationMessage> issues) {
+    if (issues != null) {
+      for (ValidationMessage msg : issues) {
+        ValidationMessage nmsg = new ValidationMessage(msg.getSource(), msg.getType(), msg.getLine(), msg.getCol(), vdn+msg.getLocation(), msg.getMessage(), msg.getLevel());
+        errors.add(nmsg);
+      }    
+    }
+  }
+
   private void saveCSList(String name, List<CodeSystem> cslist, DBBuilder db, int view) throws IOException {
     StringBuilder b = new StringBuilder();
     JsonObject json = new JsonObject();
@@ -10271,7 +10310,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         changed = true;
       }
       if (changed) {
-        return src.getBytes(StandardCharsets.UTF_8);
+        return src.replace("[[~[", "[[[").getBytes(StandardCharsets.UTF_8);
       } else {
         return content;
       }
@@ -10303,8 +10342,17 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           }
         }
       }
+      try {
+        StructureDefinition sd = context.fetchTypeDefinition(src);
+        if (sd != null) {
+          return "<a href=\""+sd.getWebPath()+"\">"+Utilities.escapeXml(sd.present())+"</a>";
+        }
+      } catch (Exception e) {
+        // nothing
+      }
     }
-    return "[[["+src+"]]]";
+    // use [[~[ so we don't get stuck in a loop
+    return "[[~["+src+"]]]";
   }
 
   private int sqlIndex = 0;

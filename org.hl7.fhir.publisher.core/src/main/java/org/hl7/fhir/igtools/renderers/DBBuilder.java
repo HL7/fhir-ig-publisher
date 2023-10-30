@@ -322,19 +322,19 @@ public class DBBuilder {
   private void addConceptDesignations(CodeSystem cs, List<ConceptDefinitionComponent> list, PreparedStatement psql) throws SQLException {
     if (cs.hasUserData("db.key")) {
       for (ConceptDefinitionComponent cd : list) {
-      for (ConceptDefinitionDesignationComponent p : cd.getDesignation()) { 
-        psql.setInt(1, ++lastDesgKey);
-        psql.setInt(2, ((Integer) cs.getUserData("db.key")).intValue());
-        psql.setInt(3, ((Integer) cd.getUserData("db.key")).intValue());        
-        bindString(psql, 4, p.getUse().getSystem());
-        bindString(psql, 5, p.getUse().getCode());
-        bindString(psql, 6, p.getLanguage());
-        bindString(psql, 7, p.getValue());
-        psql.executeUpdate();    
-        p.setUserData("db.key", lastDesgKey);   
+        for (ConceptDefinitionDesignationComponent p : cd.getDesignation()) { 
+          psql.setInt(1, ++lastDesgKey);
+          psql.setInt(2, ((Integer) cs.getUserData("db.key")).intValue());
+          psql.setInt(3, ((Integer) cd.getUserData("db.key")).intValue());        
+          bindString(psql, 4, p.getUse().getSystem());
+          bindString(psql, 5, p.getUse().getCode());
+          bindString(psql, 6, p.getLanguage());
+          bindString(psql, 7, p.getValue());
+          psql.executeUpdate();    
+          p.setUserData("db.key", lastDesgKey);   
+        }
+        addConceptDesignations(cs, cd.getConcept(), psql);
       }
-      addConceptDesignations(cs, cd.getConcept(), psql);
-    }
     }
   }
 
@@ -803,6 +803,10 @@ public class DBBuilder {
       e.printStackTrace();
     }
     
+  }
+
+  public Connection getConnection() {
+    return con;
   }
 
 
