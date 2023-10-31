@@ -482,7 +482,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     @Override
     public TypeDetails resolveConstantType(FHIRPathEngine engine, Object appContext, String name, boolean explicitConstant) throws PathEngineException {
-      throw new NotImplementedException("Not done yet (IGPublisherHostServices.resolveConstantType)");
+      return null; // whatever it is, we don't know about it.
     }
 
     @Override
@@ -7586,7 +7586,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (f.isDirectory()) {
         addTestDir(f, t);        
       } else {
-        npm.addFile("tests/"+Utilities.getRelativePath(t, f.getAbsolutePath()), f.getName(), TextFile.fileToBytes(f));        
+        npm.addFile("tests/"+Utilities.getRelativePath(t, dir.getAbsolutePath()), f.getName(), TextFile.fileToBytes(f));        
       }
     }
   }
