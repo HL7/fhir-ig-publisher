@@ -533,7 +533,7 @@ public class IGReleaseUpdater {
     } else {
       p1 = p1 + ". ";      
     }
-    String p2 = root == null ? "" : version == root ? "This is the current published version"+(currentPublication ? "" : " in its permanent home (it will always be available at this URL)") : "The current version which supercedes this version is <a no-external=\"true\" href=\""+(root.asString("path").startsWith(canonical) ? canonical : root.asString("path"))+"{{fn}}\">"+root.asString("version")+"</a>";
+    String p2 = root == null ? "" : version == root ? "This is the current published version"+(currentPublication ? "" : " in its permanent home (it will always be available at this URL)") : "The current version which supersedes this version is <a no-external=\"true\" href=\""+(root.asString("path").startsWith(canonical) ? canonical : root.asString("path"))+"{{fn}}\">"+root.asString("version")+"</a>";
     String p3;
     if (canonical.equals("http://hl7.org/fhir"))
       p3 = " For a full list of available versions, see the <a no-external=\"true\" href=\""+canonical+"/directory.html\">Directory of published versions</a>";
