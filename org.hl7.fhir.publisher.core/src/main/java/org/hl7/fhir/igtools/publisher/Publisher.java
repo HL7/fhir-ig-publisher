@@ -302,6 +302,8 @@ import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.XVerExtensionManager;
 import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
 import org.hl7.fhir.r5.utils.formats.CSVWriter;
+import org.hl7.fhir.r5.utils.sql.Runner;
+import org.hl7.fhir.r5.utils.sql.StorageSqlite3;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.validation.IResourceValidator;
@@ -480,7 +482,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     @Override
     public TypeDetails resolveConstantType(FHIRPathEngine engine, Object appContext, String name, boolean explicitConstant) throws PathEngineException {
-      throw new NotImplementedException("Not done yet (IGPublisherHostServices.resolveConstantType)");
+      return null; // whatever it is, we don't know about it.
     }
 
     @Override
@@ -721,6 +723,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private XVerExtensionManager xverManager;
   private IGKnowledgeProvider igpkp;
   private List<SpecMapManager> specMaps = new ArrayList<SpecMapManager>();
+  private List<NpmPackage> npms = new ArrayList<NpmPackage>();
   private List<SpecMapManager> linkSpecMaps = new ArrayList<SpecMapManager>();
   private List<String> suppressedIds = new ArrayList<>();
 
@@ -929,6 +932,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private String defaultTranslationLang;
   private List<String> translationLangs = new ArrayList<>();
   private List<String> translationSupplements = new ArrayList<>();
+  private List<String> viewDefinitions = new ArrayList<>();
   private int validationLogTime = 0;
   private long maxMemory = 0;
 
@@ -2863,6 +2867,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       case "validation-duration-report-cutoff":
         validationLogTime = Utilities.parseInt(p.getValue(), 0) * 1000;
         break;
+      case "viewDefinition":
+        viewDefinitions.add(p.getValue());
+        break;
       case "logged-when-scanning":
         if ("false".equals(p.getValue())) {
           fetcher.setReport(false);
@@ -4728,6 +4735,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     rc.setDateFormatString(fmtDate);
     rc.setDateTimeFormatString(fmtDateTime);
     rc.setChangeVersion(versionToAnnotate);
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getResource() instanceof CanonicalResource) {
+          CanonicalResource cr = (CanonicalResource) r.getResource();
+          rc.getNamedLinks().put(cr.getName(), cr.getWebPath());
+        }
+      }
+    }
     //    rc.setTargetVersion(pubVersion);
 
     if (igMode) {
@@ -7520,7 +7535,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Checking Output HTML");
       String statusMessage;
       if (mode == IGBuildMode.AUTOBUILD) { 
-        statusMessage = Utilities.escapeXml(sourceIg.present())+", published by "+Utilities.escapeXml(sourceIg.getPublisher())+". This is not an authorized publication; it is the continuous build for version "+workingVersion()+"). This version is based on the current content of <a href=\""+gh()+"\">"+gh()+"</a> and changes regularly. See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>"; 
+        statusMessage = Utilities.escapeXml(sourceIg.present())+", published by "+Utilities.escapeXml(sourceIg.getPublisher())+". This is not an authorized publication; it is the continuous build for version "+workingVersion()+". This version is based on the current content of <a href=\""+gh()+"\">"+gh()+"</a> and changes regularly. See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>"; 
       } else if (mode == IGBuildMode.PUBLICATION) { 
         statusMessage = "Publication Build: This will be filled in by the publication tooling"; 
       } else { 
@@ -7571,7 +7586,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (f.isDirectory()) {
         addTestDir(f, t);        
       } else {
-        npm.addFile("tests/"+Utilities.getRelativePath(t, f.getAbsolutePath()), f.getName(), TextFile.fileToBytes(f));        
+        npm.addFile("tests/"+Utilities.getRelativePath(t, dir.getAbsolutePath()), f.getName(), TextFile.fileToBytes(f));        
       }
     }
   }
@@ -8674,8 +8689,40 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         applyPageTemplate(htmlTemplate, mdTemplate, publishedIg.getDefinition().getPage());
       }
     }
+    
+    generateViewDefinitions(db);
   }
   
+  private void generateViewDefinitions(DBBuilder db) {
+    for (String vdn : viewDefinitions) {
+      logMessage("Generate View "+vdn);
+      Runner runner = new Runner();
+      try {
+        runner.setContext(context);;
+        PublisherProvider pprov = new PublisherProvider(context, npmList, fileList, igpkp.getCanonical());
+        runner.setProvider(pprov);
+        runner.setStorage(new StorageSqlite3(db.getConnection()));
+        JsonObject vd = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(new File(Utilities.path(Utilities.getDirectoryForFile(igName), vdn)));
+        pprov.inspect(vd);
+        runner.execute(vd);
+        captureIssues(vdn, runner.getIssues());
+      } catch (Exception e) {
+        e.printStackTrace();
+        errors.add(new ValidationMessage(Source.Publisher, IssueType.REQUIRED, vdn, "Error Processing ViewDefinition: "+e.getMessage(), IssueSeverity.ERROR));
+        captureIssues(vdn, runner.getIssues());
+      }      
+    }    
+  }
+
+  private void captureIssues(String vdn, List<ValidationMessage> issues) {
+    if (issues != null) {
+      for (ValidationMessage msg : issues) {
+        ValidationMessage nmsg = new ValidationMessage(msg.getSource(), msg.getType(), msg.getLine(), msg.getCol(), vdn+msg.getLocation(), msg.getMessage(), msg.getLevel());
+        errors.add(nmsg);
+      }    
+    }
+  }
+
   private void saveCSList(String name, List<CodeSystem> cslist, DBBuilder db, int view) throws IOException {
     StringBuilder b = new StringBuilder();
     JsonObject json = new JsonObject();
@@ -10255,15 +10302,15 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       while (src.contains("[[[")) {
         int i = src.indexOf("[[[");
         String pfx = src.substring(0, i);
-        src = src.substring(i+6);
+        src = src.substring(i+3);
         i = src.indexOf("]]]");
-        String sfx = src.substring(i+2);
+        String sfx = src.substring(i+3);
         src = src.substring(0, i);
         src = pfx+processRefTag(db, src, f)+sfx;
         changed = true;
       }
       if (changed) {
-        return src.getBytes(StandardCharsets.UTF_8);
+        return src.replace("[[~[", "[[[").getBytes(StandardCharsets.UTF_8);
       } else {
         return content;
       }
@@ -10284,8 +10331,28 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
       } catch (Exception e) {
       }
-    }  
-    return "[[["+src+"]]]";
+    } else {
+      for (FetchedFile f1 : fileList) {
+        for (FetchedResource r : f1.getResources()) {
+          if (r.getResource() instanceof CanonicalResource) {
+            CanonicalResource cr = (CanonicalResource) r.getResource();
+            if (src.equalsIgnoreCase(cr.getName()) && cr.hasWebPath()) {
+              return "<a href=\""+cr.getWebPath()+"\">"+Utilities.escapeXml(cr.present())+"</a>";
+            }
+          }
+        }
+      }
+      try {
+        StructureDefinition sd = context.fetchTypeDefinition(src);
+        if (sd != null) {
+          return "<a href=\""+sd.getWebPath()+"\">"+Utilities.escapeXml(sd.present())+"</a>";
+        }
+      } catch (Exception e) {
+        // nothing
+      }
+    }
+    // use [[~[ so we don't get stuck in a loop
+    return "[[~["+src+"]]]";
   }
 
   private int sqlIndex = 0;

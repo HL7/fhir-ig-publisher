@@ -234,6 +234,11 @@ public class AllGuidesTests {
   public void testExtensions() throws Exception {
     testIg("hl7.fhir.uv.extensions", null);
   }
+  
+  @Test
+  public void testCDA() throws Exception {
+    testIg("hl7.cda.uv.core", null);
+  }
 
 //
 //  @Test

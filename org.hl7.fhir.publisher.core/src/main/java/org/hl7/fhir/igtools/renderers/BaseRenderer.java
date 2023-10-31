@@ -64,14 +64,23 @@ public class BaseRenderer extends TranslatingUtilities implements IMarkdownProce
 	      String left = text.substring(0, text.indexOf("[[["));
 	      String linkText = text.substring(text.indexOf("[[[")+3, text.indexOf("]]]"));
 	      String right = text.substring(text.indexOf("]]]")+3);
-	      String url = getBySpecMap(linkText);
+	      String url = null;
+	      url = gen.getNamedLinks().get(url);
+	      if (url == null) {
+	        url = getBySpecMap(linkText);
+	      }
 	      String[] parts = linkText.split("\\#");
 	      
-	      if (url == null && parts[0].contains("/StructureDefinition/")) {
-	        StructureDefinition ed = context.fetchResource(StructureDefinition.class, parts[0]);
-	        if (ed == null)
+
+	      if (url == null) {
+	        Resource r = context.fetchResource(Resource.class, parts[0]);
+	        if (r == null)
 	          throw new Error("Unable to find extension "+parts[0]);
-	        url = ed.getUserData("filename")+".html";
+	        if (r.hasWebPath()) {
+	          url = r.getWebPath();
+	        } else {
+	          url = r.getUserData("filename")+".html";
+	        }
 	      } 
 	      if (Utilities.noString(url)) {
 	        String[] paths = parts[0].split("\\.");
