@@ -27,3 +27,8 @@ jobs:
           pip3 install Requests
         displayName: 'Set up python packages'
 
+      - task: PythonScript@0
+        inputs:
+          scriptSource: 'filePath'
+          scriptPath: .azure/plot-ig-builder-auto/plot-ig-builder-auto.py
+          arguments: --source ./test-statistics.json --output ./plot-ig-builder-auto.png
