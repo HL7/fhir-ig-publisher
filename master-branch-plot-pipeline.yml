@@ -34,8 +34,6 @@ jobs:
           arguments: --source ./test-statistics.json --output ./plot-ig-builder-auto.png
 
       - bash: |
-          cd $(System.DefaultWorkingDirectory)/$(GIT_REPO)
-      
           git status
           git add ./plot-ig-builder-auto.png
           git commit . -m "Updating plot-ig-builder-auto.png ***NO_CI***"
