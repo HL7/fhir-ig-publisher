@@ -32,3 +32,14 @@ jobs:
           scriptSource: 'filePath'
           scriptPath: .azure/plot-ig-builder-auto/plot-ig-builder-auto.py
           arguments: --source ./test-statistics.json --output ./plot-ig-builder-auto.png
+
+      - bash: |
+          cd $(System.DefaultWorkingDirectory)/$(GIT_REPO)
+      
+          git status
+          git add ./plot-ig-builder-auto.png
+          git commit . -m "Updating plot-ig-builder-auto.png ***NO_CI***"
+      
+          git push https://$(GIT_PAT)@github.com/HL7/fhir-ig-publisher.git
+
+        displayName: 'Push updated plot to git.'
