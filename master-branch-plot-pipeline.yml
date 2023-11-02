@@ -1,0 +1,45 @@
+# This pipeline runs a python script to generate a plot of IG publisher performance, and commits it to GitHub
+pr: none
+
+trigger:
+- master
+
+variables:
+- group: PGP_VAR_GROUP
+- group: SONATYPE_VAR_GROUP
+- group: GIT_VAR_GROUP
+
+jobs:
+  - job: run_plot_and_commit
+    pool:
+      vmImage: "ubuntu-latest"
+    steps:
+      # For creating the snapshot release with maven, we need to build a fake settings.xml for it to read from.
+      # This is done for the master branch merges only.
+      - bash: |
+          git config --global user.email $(GIT_USER_EMAIL)
+          git config --global user.name $(GIT_USER_NAME)
+        displayName: 'Set up git'
+
+      # Install pip packages
+      - bash: |
+          pip3 install matplotlib
+          pip3 install Requests
+        displayName: 'Set up python packages'
+
+      - task: PythonScript@0
+        inputs:
+          scriptSource: 'filePath'
+          scriptPath: .azure/plot-ig-builder-auto/plot-ig-builder-auto.py
+          arguments: --source ./test-statistics.json --output ./plot-ig-builder-auto.png
+
+      - bash: |
+          git fetch
+          git checkout master
+          git status
+          git add ./plot-ig-builder-auto.png
+          git commit . -m "Updating plot-ig-builder-auto.png ***NO_CI***"
+      
+          git push https://$(GIT_PAT)@github.com/HL7/fhir-ig-publisher.git
+
+        displayName: 'Push updated plot to git.'
