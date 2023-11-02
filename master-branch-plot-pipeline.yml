@@ -34,6 +34,7 @@ jobs:
           arguments: --source ./test-statistics.json --output ./plot-ig-builder-auto.png
 
       - bash: |
+          git fetch
           git checkout master
           git status
           git add ./plot-ig-builder-auto.png
