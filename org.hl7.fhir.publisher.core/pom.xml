@@ -135,6 +135,11 @@
             <version>1.18.22</version>
             <scope>compile</scope>
         </dependency>
+        <dependency>
+            <groupId>org.openjdk.jol</groupId>
+            <artifactId>jol-core</artifactId>
+            <version>0.17</version>
+        </dependency>
         <!--   TODO, figure out why this causes issues     -->
 <!--        <dependency>-->
 <!--            <groupId>org.eclipse.jgit</groupId>-->

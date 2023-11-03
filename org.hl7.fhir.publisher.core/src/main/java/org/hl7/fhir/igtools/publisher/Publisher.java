@@ -363,6 +363,7 @@ import org.hl7.fhir.validation.ValidatorUtils;
 import org.hl7.fhir.validation.instance.InstanceValidator;
 import org.hl7.fhir.validation.instance.utils.ValidationContext;
 import org.hl7.fhir.validation.profile.ProfileValidator;
+import org.openjdk.jol.info.GraphLayout;
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
 
@@ -7664,6 +7665,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void printMemUsage() {
     int mb = 1024*1024;
     Runtime runtime = Runtime.getRuntime();
+    System.out.println("## Memory (Publisher instance size): " + GraphLayout.parseInstance(this).totalSize());
     System.out.print("## Memory (MB): ");
     System.out.print("Use = " + (runtime.totalMemory() - runtime.freeMemory()) / mb);
     System.out.print(", Free = " + runtime.freeMemory() / mb);
