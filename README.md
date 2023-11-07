@@ -24,6 +24,14 @@ This is the code for the HL7 IG publisher: a tool to take a set of inputs
 and create a standard FHIR IG. The HL7 FHIR IG publisher does not provide 
 an authoring environment - that's left to other parties.
 
+## Performance Monitoring
+
+![Performance Tracking](plot-ig-builder-auto.png)
+
+This graph plots the time taken to build a set of key implementation guides across
+the versions of the IG publisher. Note that the implementation guides themselves 
+change over time, so these times are only a rough indication of performance.
+
 ## Building this Project
 
 You can find detailed instructions on setting up this project in your IDE [here](https://hl7.github.io/docs/ig_publisher/getting-started).
@@ -55,7 +63,7 @@ The built binary for the FHIR IG publisher is released through [GitHub releases]
 
 ## CI/CD
 
-All intergration and delivery done on Azure pipelines. Azure project can be viewed [here][Link-AzureProject].
+All integration and delivery done on Azure pipelines. Azure project can be viewed [here][Link-AzureProject].
 
 * **Pull Request Pipeline** is automatically run for every Pull Request to ensure that the project can be built by maven. [[Azure Pipeline]][Link-AzurePullRequestPipeline] [[source]](pull-request-pipeline.yml)
 * **Master Branch Pipeline** is automatically run whenever code is merged to the master branch and builds the SNAPSHOT binaries distributed to OSSRH [[Azure Pipeline]][Link-AzureMasterPipeline][[source]](master-branch-pipeline.yml)
