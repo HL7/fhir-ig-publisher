@@ -29,8 +29,9 @@ an authoring environment - that's left to other parties.
 ![Performance Tracking](plot-ig-builder-auto.png)
 
 This graph plots the time taken to build a set of key implementation guides across
-the versions of the IG publisher. Note that the implementation guides themselves 
-change over time, so these times are only a rough indication of performance.
+the versions of the IG publisher, which are performed as part of the QA release testing. 
+Note that the implementation guides themselves change over time, and the time varies due to network 
+dependencies, so these times are only a rough indication of performance.
 
 ## Building this Project
 
