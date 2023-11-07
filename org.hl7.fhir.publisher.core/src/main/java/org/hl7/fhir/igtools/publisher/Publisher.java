@@ -3016,7 +3016,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient("Tx-Server", webTxServer.getAddress(), "fhir/publisher", FhirPublication.fromCode(version)), txLog));
 
     loadPubPack();
-    igpkp = new IGKnowledgeProvider(context, checkAppendSlash(specPath), determineCanonical(sourceIg.getUrl(), "ImplementationGuide.url"), template.config(), errors, VersionUtilities.isR2Ver(version), template, listedURLExemptions, altCanonical);
+    igpkp = new IGKnowledgeProvider(context, checkAppendSlash(specPath), determineCanonical(sourceIg.getUrl(), "ImplementationGuide.url"), template.config(), errors, VersionUtilities.isR2Ver(version), template, listedURLExemptions, altCanonical, fileList);
     if (autoLoad) {
       igpkp.setAutoPath(true);
     }
@@ -3522,7 +3522,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
     loadPubPack();
 
-    igpkp = new IGKnowledgeProvider(context, checkAppendSlash(specPath), cb.asString(), configuration, errors, VersionUtilities.isR2Ver(version), null, listedURLExemptions, altCanonical);
+    igpkp = new IGKnowledgeProvider(context, checkAppendSlash(specPath), cb.asString(), configuration, errors, VersionUtilities.isR2Ver(version), null, listedURLExemptions, altCanonical, fileList);
     igpkp.loadSpecPaths(specMaps.get(0));
     fetcher.setPkp(igpkp);
 
