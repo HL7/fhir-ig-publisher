@@ -183,7 +183,11 @@ public class SpecMapManager {
     }
     if (special != null) {
       switch (special) {
-      case Simplifier: return "https://simplifier.net/resolve?scope="+pi.name()+"@"+pi.version()+"&canonical="+url;
+      case Simplifier: if (url.contains("fhir.philips.com")) {
+          return url;
+        } else {
+          return "https://simplifier.net/resolve?scope="+pi.name()+"@"+pi.version()+"&canonical="+url;
+      }
       case PhinVads:  
         try {
           if (url.startsWith(base)) {
