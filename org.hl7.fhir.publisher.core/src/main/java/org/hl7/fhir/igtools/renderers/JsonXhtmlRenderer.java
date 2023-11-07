@@ -215,5 +215,10 @@ public class JsonXhtmlRenderer extends TranslatingUtilities implements JsonCreat
     b.append("<a name=\""+name+"\"></a>");
   }
 
+  @Override
+  public void externalLink(String ref) {
+    b.append("<a href=\""+Utilities.escapeXml(ref)+"\" style=\"color: Maroon\">&#x1F517;</a> ");
+  }
+
   
 }

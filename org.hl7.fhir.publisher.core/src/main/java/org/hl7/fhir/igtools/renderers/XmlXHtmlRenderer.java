@@ -785,4 +785,18 @@ public class XmlXHtmlRenderer implements IXMLWriter {
   @Override
   public void setSchemaLocation(String s, String s1) throws IOException {
   }
+  
+
+  @Override
+  public void externalLink(String ref) throws IOException {
+    if (pendingClose) { 
+      b.append("&gt;");
+      writeDecorations();
+      writePendingComment();
+      pendingClose = false;
+    }
+    b.append("<a href=\""+Utilities.escapeXml(ref)+"\" style=\"color: Maroon\">&#x1F517;</a> ");
+  }
+
+  
 }
