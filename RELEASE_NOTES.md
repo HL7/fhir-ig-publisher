@@ -1,17 +1,13 @@
-* TxClient: Remove "profile" from tx operations
-* Validator: Validate contextInvariant in extension definitions
-* Validator: Fix Typo in TI WG name
-* Validator: Handle unknown constants properly in FHIRPath
-* Validator: Fix handling of type ancestors at the root of FHIRPath expressions
-* Validator: CDA templates with no extension value use urn:oid: not urn:hl7ii:
-* Validator: Allow URL as a type of string in FHIRPath type checking
-* Validator: Fix semver validation
-* Validator: Fix problem resolving context in CDA invariants
-* Validator: Fix for FHIRPath constant handling
-* Renderer: SQL in FHIR Implementation of ViewDefinitions available as beta
-* Renderer: Fixes to Search Parameter rendering of multiples per FHIR-I decision
-* Renderer: Fix broken links in extension references done by [[[]]]
-* Renderer: Fix broken links in code system rendering of parents
-* Renderer: Support using names in [[[markdown]]] when rendering
-* Renderer: Fix [[[ and ]]] in markdown processing, and allow names
-* Test Cases: Add CDA to test IGs
+* General: Corrected spelling of 'supercedes' to 'supersedes' in IG…
+* Snapshot Generation: Support suppress examples when generating snapshots
+* Validator: Validate Vital signs Profiles when validating observations
+* Validator: Hack around problem with vs-1 constraint in R4
+* Validator: Check for retired status when multiple OID matches exist
+* Validator: Fix for validating extensions on R5 resources in R4 (R4 special case)
+* Validator: Minor fixes for standalone ViewDefinition validator
+* Renderer: Revised Capability Statement rendering (Thanks Vassil Peytchev)
+* Renderer: Fix bug rendering primitive types with an extension that provides a value alternative
+* Renderer: Add clickable links for references when rendering json and xml instances in IG publisher
+* Renderer: Fix bug generating profile spreadsheets
+* Cross-Version: Handle SubscriptionTopic in cross-version analysis
+* Internal QA: track memory during IG tests

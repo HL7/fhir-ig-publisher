@@ -67,6 +67,10 @@ public class SuppressedMessageInformation {
     }
 
     public boolean matches(String msg) {
+      return matchesInner(msg) || matchesInner(msg.replace(" (this may not be a problem, but you should check that it's not intended to match a slice)", ""));
+    }
+    
+    private boolean matchesInner(String msg) {
       switch (compType) {
        case 0: return msg.equals(messageComp);
        case 1: return msg.startsWith(messageComp);

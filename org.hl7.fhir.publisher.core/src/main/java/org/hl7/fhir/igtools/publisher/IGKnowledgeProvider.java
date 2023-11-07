@@ -77,8 +77,9 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   private Set<String> summaryRows = new HashSet<>();
   private String altCanonical;
   private XVerExtensionManager xver;
+  private List<FetchedFile> files;
   
-  public IGKnowledgeProvider(IWorkerContext context, String pathToSpec, String canonical, JsonObject igs, List<ValidationMessage> errors, boolean noXhtml, Template template, List<String> listedURLExemptions, String altCanonical) throws Exception {
+  public IGKnowledgeProvider(IWorkerContext context, String pathToSpec, String canonical, JsonObject igs, List<ValidationMessage> errors, boolean noXhtml, Template template, List<String> listedURLExemptions, String altCanonical, List<FetchedFile> files) throws Exception {
     super();
     this.context = context;
     this.pathToSpec = pathToSpec;
@@ -90,6 +91,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     this.template = template;
     this.listedURLExemptions = listedURLExemptions;
     this.altCanonical = altCanonical;
+    this.files = files;
     if (igs != null) {
       loadPaths(igs);
     }
@@ -758,6 +760,31 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
 
   public Set<String> summaryRows() {
     return summaryRows ;
+  }
+
+  @Override
+  public String resolveReference(String ref) {
+    if (ref == null) {
+      return null;
+    }
+    Resource res = context.fetchResource(Resource.class, ref);
+    if (res != null && res.hasWebPath()) {
+      return res.getWebPath();
+    }
+    if (ref.startsWith(canonical)) {
+      ref = Utilities.getRelativeUrlPath(canonical, ref);
+    }
+    String[] p = ref.split("/");
+    if (p.length == 2 && files != null) {
+      for (FetchedFile f : files) {
+        for (FetchedResource r : f.getResources()) {
+          if (p[0].equals(r.fhirType()) && p[1].equals(r.getId())) {
+            return getLinkFor(r, true);
+          }
+        }
+      }
+    }
+    return null;
   }
 
   

@@ -46,6 +46,7 @@ public class AllGuidesTests {
     String version = readVersion();
     File statsFile = determineStatsFile();
     long time = System.currentTimeMillis();
+    long startingMem = getCurrentmem();
     
     System.out.println("=======================================================================================");
     String p = (path == null ? Utilities.path(FhirSettings.getTestIgsPath(), id) : Utilities.path(FhirSettings.getTestIgsPath(), id, path));
@@ -84,7 +85,7 @@ public class AllGuidesTests {
     si.set("warnings", cWarn);
     si.set("hints", cHint);
     si.set("time", System.currentTimeMillis() - time);
-    si.set("memory", pub.getMaxMemory());
+    si.set("memory", pub.getMaxMemory() - startingMem);
     JsonParser.compose(stats, statsFile, true);
     
     Map<String, Map<String, String>> statsMap = new HashMap<>();
@@ -132,6 +133,15 @@ public class AllGuidesTests {
     writeMem("Residual memory");
 
     dumpMem(id);
+  }
+
+  private long getCurrentmem() {
+
+    Runtime runtime = Runtime.getRuntime();
+    long totalMemory = runtime.totalMemory();
+    long freeMemory = runtime.freeMemory();
+    long usedMemory = totalMemory - freeMemory;
+    return usedMemory;
   }
 
   private void dumpMem(String id) throws IOException {
