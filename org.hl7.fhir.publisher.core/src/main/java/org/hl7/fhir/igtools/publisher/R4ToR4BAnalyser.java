@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
+import org.hl7.fhir.convertors.factory.VersionConvertorFactory_43_50;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.loaders.PublisherLoader;
 import org.hl7.fhir.r4b.model.Bundle;
@@ -80,7 +82,7 @@ public class R4ToR4BAnalyser {
   private static final List<String> R4BOnlyTypes = Collections.unmodifiableList(
       Arrays.asList(new String[] {"CodeableReference", "RatioRange", "NutritionProduct", 
           "AdministrableProductDefinition", "ClinicalUseDefinition", "PackagedProductDefinition", "ManufacturedItemDefinition", "RegulatedAuthorization",
-          "MedicinalProductDefinition", "Ingredient", "SubstanceDefinition", "Citation", "EvidenceReport", "SubscriptionStatus", "SubscriptionTopic"}));
+          "MedicinalProductDefinition", "Ingredient", "SubstanceDefinition", "Citation", "EvidenceReport", "SubscriptionStatus"/*, "SubscriptionTopic"*/}));
   
   private static final List<String> R4OnlyTypes = Collections.unmodifiableList(
       Arrays.asList(new String[] {"MedicinalProduct", "MedicinalProductIngredient", "SubstanceSpecification", "MedicinalProductAuthorization", 
@@ -269,17 +271,40 @@ public class R4ToR4BAnalyser {
 
   public String generate(String pid, boolean inline) {
     if (VersionUtilities.isR4Ver(context.getVersion())) {
-      return gen(pid, "R4", "R4B", r4BOK, r4Problems, r4BProblems, r4Exemptions, r4BExemptions, inline);
+      return gen(pid, "R4", "R4B", r4OK, r4BOK, r4Problems, r4BProblems, r4Exemptions, r4BExemptions, inline);
     } else if (VersionUtilities.isR4BVer(context.getVersion())) {
-      return gen(pid, "R4B", "R4", r4OK, r4BProblems, r4Problems, r4BExemptions, r4Exemptions, inline);
+      return gen(pid, "R4B", "R4", r4BOK, r4OK, r4BProblems, r4Problems, r4BExemptions, r4Exemptions, inline);
     } else {
       return "";
     }
   }
 
-  private String gen(String pid, String src, String dst, boolean dstOk, List<String> srcProblems, List<String> dstProblems, Map<String, ResPointer> srcExempt, Map<String, ResPointer> dstExempt, boolean inline) {
+  private String gen(String pid, String src, String dst, boolean srcOk, boolean dstOk, List<String> srcProblems, List<String> dstProblems, Map<String, ResPointer> srcExempt, Map<String, ResPointer> dstExempt, boolean inline) {
     StringBuilder b = new StringBuilder();
-    if (dstOk) {
+    if (!srcOk) {
+      if (!inline) {
+        b.append("<p>");
+      }
+      b.append("Something went wrong with the cross-version analysis because: \r\n");
+      if (!inline) {
+        b.append("</p>\r\n");
+        b.append("<ul>\r\n");
+      }
+      boolean first = true;
+      for (String s : srcProblems) {
+        if (!inline) {
+          b.append("<li>");
+        }
+        if (first) first = false; else if (inline) b.append(", ");
+        b.append(s);
+        if (!inline) {
+          b.append("</li>\r\n");
+        }
+      }
+      if (!inline) {
+        b.append("</ul>\r\n");
+      }
+    } else if (dstOk) {
       if (!inline) {
         b.append("<p>");
       }
@@ -503,6 +528,11 @@ public class R4ToR4BAnalyser {
     if (Utilities.existsInList(folder, "package", "example")) {
       if (!Utilities.existsInList(filename, "package.json", ".index.json", ".index.db")) {
         org.hl7.fhir.r4b.model.Resource res = new org.hl7.fhir.r4b.formats.JsonParser().parse(content);
+        if (VersionUtilities.isR4Ver(context.getVersion()) && "Basic".equals(res.fhirType())) {
+          org.hl7.fhir.r4.model.Resource r4 =  new org.hl7.fhir.r4.formats.JsonParser().parse(content);
+          org.hl7.fhir.r5.model.Resource r5 = VersionConvertorFactory_40_50.convertResource(r4);
+          res = VersionConvertorFactory_43_50.convertResource(r5);
+        }
         boolean exempt = (exemptions.containsKey(res.fhirType()+"/"+res.getId()) ||
             ((res instanceof org.hl7.fhir.r4b.model.CanonicalResource) && exemptions.containsKey(((org.hl7.fhir.r4b.model.CanonicalResource) res).getUrl())));
         if (!exempt) {
