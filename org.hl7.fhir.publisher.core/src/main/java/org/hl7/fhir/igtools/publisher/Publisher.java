@@ -183,6 +183,7 @@ import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
 import org.hl7.fhir.r5.model.CodeType;
 import org.hl7.fhir.r5.model.CodeableConcept;
 import org.hl7.fhir.r5.model.Coding;
+import org.hl7.fhir.r5.model.Composition;
 import org.hl7.fhir.r5.model.ConceptMap;
 import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
 import org.hl7.fhir.r5.model.Constants;
@@ -4773,7 +4774,21 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
                 rg.setName(r.getElement().getExtensionValue(ToolingExtensions.EXT_ARTIFACT_NAME).primitiveValue());                 
               } else if (!rg.hasName()) {
                 if (r.getElement().hasChild("title")) {
-                  rg.setName(r.getElement().getChildValue("title"));                
+                  rg.setName(r.getElement().getChildValue("title"));
+                } else if (r.getResource() instanceof Bundle) {
+                  // If the resource is a document Bundle, get the title from the Composition
+                  Bundle bundle = (Bundle) r.getResource();
+                  if (BundleType.DOCUMENT == bundle.getType()) {
+                    List<BundleEntryComponent> entryList = bundle.getEntry();
+                    if (entryList != null && !entryList.isEmpty()) {
+                      BundleEntryComponent entryComponent = entryList.get(0);
+                      Resource entryResource = entryComponent.getResource();
+                      if (entryResource instanceof Composition) {
+                        Composition composition = (Composition) entryResource;
+                        rg.setName(composition.getTitle() + " (Bundle)");
+                      }
+                    }
+                  }
                 }
               }
               if (r.getElement().hasExtension(ToolingExtensions.EXT_RESOURCE_DESC)) {
