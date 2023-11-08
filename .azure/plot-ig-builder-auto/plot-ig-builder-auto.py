@@ -22,6 +22,8 @@ import matplotlib.pyplot as plt
 import requests
 import sys
 import os
+import numpy as np
+
 
 # Function to parse and sort version numbers
 def parse_version(version):
@@ -61,9 +63,6 @@ def main(source):
     # The latest version is the last one in the sorted list
     latest_version = sorted_versions[-1]
 
-    # ... [The script continues here. The rest of the script remains unchanged.]
-
-
     # Construct the filename using the version number
     filename = f"{latest_version}.png"
 
@@ -83,34 +82,94 @@ def main(source):
                 build_times[guide_name] = {}
             build_times[guide_name][version] = time
 
+    # Determine the number of unique guides to plot
+    num_guides = len(build_times)
+
+    # Define the colormaps
+    # More on colormaps: https://matplotlib.org/stable/gallery/color/colormap_reference.html
+    cmap1 = plt.get_cmap('tab20', 20) # This map has 20 distinct colors
+    cmap2 = plt.get_cmap('tab20b', 20) # This map has 20 distinct colors too
+    cmap3 = plt.get_cmap('tab20c', 20)
+
+    # Initialize an empty list to store the colors
+    combined_colors = []
+
+    # Function to add colors to the list from a given colormap
+    def add_colors_from_cmap(cmap, num_colors, color_list):
+        for i in range(num_colors):
+            color_list.append(cmap(i))
+
+    # Add colors from each colormap to the combined list
+    add_colors_from_cmap(cmap1, 20, combined_colors)
+    add_colors_from_cmap(cmap2, 20, combined_colors)
+    #add_colors_from_cmap(cmap3, 20, combined_colors)
+
     # Create the visualization
+    color_index = 0
+
+    # Assuming 'build_times' is a dictionary where keys are guide names and values are dictionaries
+    # of version: build_time pairs.
+    # Start by collecting all timings and labels
+    timing_label_pairs = []
+
     for guide, times in build_times.items():
+        # Extract the total build time for the current guide
+        total_build_time = sum(times.values())
+        # Append the total build time and the guide label to the list as a tuple
+        timing_label_pairs.append((total_build_time, guide))
+
+    # Sort the list by timings in descending order
+    timing_label_pairs.sort(reverse=True, key=lambda x: x[0])
+
+    # Now we plot in the sorted order and collect handles for the legend
+    handles = []
+    for total_build_time, guide in timing_label_pairs:
+        times = build_times[guide]
         sorted_items = sorted(times.items())
         versions = [item[0] for item in sorted_items]
         timings = [item[1] for item in sorted_items]
+        
+        # Use the next color in the color list
+        handle, = plt.plot(versions, timings, marker='o', label=guide, color=combined_colors[color_index % len(combined_colors)])
+        handles.append(handle)
+        color_index += 1
 
-        plt.plot(versions, timings, marker='o', label=guide)
+    # Update the legend with the sorted handles
+    plt.legend(handles=handles, bbox_to_anchor=(1.05, 1), loc='upper left')
 
     plt.ylabel('Build Time (seconds)')  # Update label to reflect new units
     plt.xlabel('Version')
     plt.title('Build Time for each Implementation Guide by Version')
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.xticks(rotation=45)
+   
+    # Set x-axis ticks to correspond to the actual versions present in the data
+    plt.xticks(ticks=np.arange(len(sorted_versions)), labels=sorted_versions, rotation=90, fontsize=8)
+
+    # Assume 'sorted_versions' is the list of version strings from the JSON data
+    base_width = 8  # Base width for up to 10 versions
+    additional_width_per_version = 0.2  # Additional width for each version above 10
+    max_reasonable_width = 30  # Maximum width to keep the plot reasonable
+    fixed_height = 5 # Fixed height in inches
+
+    # Calculate the dynamic width based on the number of versions
+    dynamic_width = calculate_dynamic_width(sorted_versions, base_width, additional_width_per_version, max_reasonable_width)
+
+    # Set the dynamic figure size
+    plt.gcf().set_size_inches(dynamic_width, fixed_height)
     plt.tight_layout()
-
-    # NEW: Specify the directory and create it if it doesn't exist
-    # directory = "../data/publisher-build-time-trends"
-    # if not os.path.exists(directory):
-    #    os.makedirs(directory)
-
-    # NEW: Modify the filename to include the directory path
-    # filename = os.path.join(directory, filename)
 
     # Save the figure
     plt.savefig(args.output)
     # plt.show()
 
     plt.close(args.output)
+
+def calculate_dynamic_width(versions, base_width, additional_width_per_version, max_width):
+    num_versions = len(versions)
+    if num_versions <= 10:
+        return base_width
+    else:
+        additional_width = (num_versions - 10) * additional_width_per_version
+        return min(base_width + additional_width, max_width)
 
 if __name__ == "__main__":
     # Set up the command-line argument parser
