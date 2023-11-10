@@ -114,6 +114,11 @@ public class SpecMapManager {
           targetSet.add(e);
         }
     }
+    if (paths != null) {
+      for (JsonProperty p : paths.getProperties()) {
+        targetSet.add(p.getValue().asString());
+      }
+    }
     if (images != null)
       for (String e : images.asStrings()) {
         imageSet.add(e);
