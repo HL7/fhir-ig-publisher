@@ -9,7 +9,7 @@ import java.util.Map;
 
 import org.hl7.fhir.igtools.publisher.loaders.PublisherLoader;
 import org.hl7.fhir.r4.test.utils.TestingUtilities;
-import org.hl7.fhir.r5.context.IWorkerContext.IContextResourceLoader;
+import org.hl7.fhir.r5.context.IContextResourceLoader;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.Resource;

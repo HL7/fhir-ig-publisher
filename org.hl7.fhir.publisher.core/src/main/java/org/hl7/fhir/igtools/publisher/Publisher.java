@@ -145,10 +145,9 @@ import org.hl7.fhir.r5.conformance.ConstraintJavaGenerator;
 import org.hl7.fhir.r5.conformance.R5ExtensionsLoader;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.ContextUtilities;
+import org.hl7.fhir.r5.context.IContextResourceLoader;
 import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.context.IWorkerContext.IContextResourceLoader;
 import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
-import org.hl7.fhir.r5.context.IWorkerContext.ValidationResult;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.FmlParser;
@@ -287,6 +286,7 @@ import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.terminologies.TerminologyUtilities;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
+import org.hl7.fhir.r5.terminologies.utilities.ValidationResult;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.r5.utils.FHIRPathEngine;
 import org.hl7.fhir.r5.utils.FHIRPathEngine.IEvaluationContext;
@@ -3606,7 +3606,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           c.setSystem("http://unstats.un.org/unsd/methods/m49/m49.htm").setCode(sc);
         else
           c.setSystem("urn:iso:std:iso:3166").setCode(sc);
-        ValidationResult vr = context.validateCode(new ValidationOptions("en-US"), c, null);
+        ValidationResult vr = context.validateCode(new ValidationOptions(FhirPublication.R5, "en-US"), c, null);
         if (vr.getDisplay() != null)
           c.setDisplay(vr.getDisplay());
       }
@@ -9003,7 +9003,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         for (CodeableConcept cc : cr.getJurisdiction()) {
           JsonObject jNode = new JsonObject();
           jNodes.add(jNode);
-          ValidationResult vr = jvs==null ? null : context.validateCode(new ValidationOptions("en-US"),  cc, jvs);
+          ValidationResult vr = jvs==null ? null : context.validateCode(new ValidationOptions(FhirPublication.R5, "en-US"),  cc, jvs);
           if (vr != null && vr.asCoding()!=null) {
             Coding cd = vr.asCoding();
             jNode.add("code", cd.getCode());
@@ -11390,7 +11390,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       else
         oa = new Writer(new FileOutputStream(Utilities.path(tempDir, cpbs.getId()+ ".openapi.json")));
       String lic = license();
-      String displ = context.validateCode(new ValidationOptions("en-US"), new Coding("http://hl7.org/fhir/spdx-license",  lic, null), null).getDisplay();
+      String displ = context.validateCode(new ValidationOptions(FhirPublication.R5, "en-US"), new Coding("http://hl7.org/fhir/spdx-license",  lic, null), null).getDisplay();
       new OpenApiGenerator(context, cpbs, oa).generate(displ, "http://spdx.org/licenses/"+lic+".html");
       oa.commit();
       otherFilesRun.add(Utilities.path(tempDir, cpbs.getId()+ ".openapi.json"));

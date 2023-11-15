@@ -12,7 +12,6 @@ import org.hl7.fhir.convertors.factory.VersionConvertorFactory_14_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
 import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.context.IWorkerContext.ValidationResult;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.XmlParser;
@@ -25,6 +24,7 @@ import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionCo
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.SPDXLicense;
+import org.hl7.fhir.r5.terminologies.utilities.ValidationResult;
 import org.hl7.fhir.r5.model.Parameters;
 import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.model.Resource;
@@ -32,6 +32,7 @@ import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.r5.utils.GuideParameterCode;
 import org.hl7.fhir.r5.utils.IGHelper;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
+import org.hl7.fhir.utilities.FhirPublication;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonArray;
@@ -133,7 +134,7 @@ public class ConfigFileConverter {
           c.setSystem("http://unstats.un.org/unsd/methods/m49/m49.htm").setCode(sc);
         else
           c.setSystem("urn:iso:std:iso:3166").setCode(sc);
-        ValidationResult vr = context.validateCode(new ValidationOptions(), c, null);
+        ValidationResult vr = context.validateCode(new ValidationOptions(FhirPublication.R5), c, null);
         if (vr.getDisplay() != null)
           c.setDisplay(vr.getDisplay());
       }
