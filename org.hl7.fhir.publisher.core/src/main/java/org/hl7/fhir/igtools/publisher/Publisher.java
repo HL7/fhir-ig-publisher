@@ -7164,8 +7164,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     StructureDefinition sd = (StructureDefinition) r.getResource();
     if (!sd.getAbstract() && !isClosing(sd)) {
       if (sd.getKind() == StructureDefinitionKind.RESOURCE) {
-        int cE = countStatedExamples(sd.getUrl());
-        int cI = countFoundExamples(sd.getUrl());
+        int cE = countStatedExamples(sd.getUrl(), sd.getVersionedUrl());
+        int cI = countFoundExamples(sd.getUrl(), sd.getVersionedUrl());
         if (cE + cI == 0) {
           f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this profile", IssueSeverity.WARNING));
           r.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this profile", IssueSeverity.WARNING));
@@ -7182,7 +7182,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               r.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this extension", IssueSeverity.WARNING));
             }
           } else {
-            int cI = countFoundExamples(sd.getUrl());
+            int cI = countFoundExamples(sd.getUrl(), sd.getVersionedUrl());
             if (cI == 0) {
               f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this data type profile", IssueSeverity.WARNING));
               r.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this data type profile", IssueSeverity.WARNING));
@@ -7241,12 +7241,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
 
-  private int countStatedExamples(String url) {
+  private int countStatedExamples(String url, String vurl) {
     int res = 0;
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         for (String p : r.getStatedProfiles()) {
-          if (url.equals(p)) {
+          if (url.equals(p) || vurl.equals(p)) {
             res++;
           }
         }
@@ -7255,12 +7255,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return res;
   }
 
-  private int countFoundExamples(String url) {
+  private int countFoundExamples(String url, String vurl) {
     int res = 0;
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         for (String p : r.getFoundProfiles()) {
-          if (url.equals(p)) {
+          if (url.equals(p) || vurl.equals(p)) {
             res++;
           }
         }
