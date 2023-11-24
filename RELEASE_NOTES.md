@@ -1,4 +1,3 @@
-
 * Loader: Reduce memory utilization (clean up before Jekyll)
 * Loader: Fix NPE on descriptions on spreadsheets
 * Loader: Fix committee URLs
@@ -22,3 +21,4 @@
 * Renderer: Fix missing examples when using versioned canonical URLs
 * Renderer: fix broken markdown processing generating IP statements fragment
 * Generator: add Jekyll/windows note
+
