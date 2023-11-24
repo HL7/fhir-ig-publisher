@@ -8383,7 +8383,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       }
       log("Note: usual cases for Jekyll to fail are:");
       log("* A failure to produce a fragment that is already logged in the output above");
-      log("* A reference to a mnually edited fiel that hasn't been provided");
+      log("* A reference to a manually edited file that hasn't been provided");
       if (SystemUtils.IS_OS_WINDOWS) {
         final String enclosedOutputDir = "\"" + outputDir + "\"";
         final CommandLine commandLine = new CommandLine("cmd")
