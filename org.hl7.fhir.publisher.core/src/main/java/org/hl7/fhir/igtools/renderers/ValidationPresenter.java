@@ -43,6 +43,7 @@ import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SuppressedMessageInformation;
 import org.hl7.fhir.igtools.publisher.SuppressedMessageInformation.SuppressedMessage;
 import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
+import org.hl7.fhir.igtools.publisher.comparators.IpsComparator;
 import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
 import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
 import org.hl7.fhir.r5.context.IWorkerContext;
@@ -280,12 +281,13 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private String dependencies;
   private DependentIGFinder dependentIgs;
   private IpaComparator ipaComparator;
+  private IpsComparator ipsComparator;
   private List<StructureDefinition> modifierExtensions;
   private String globalCheck;
   private String draftDependencies;
   
   public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, 
-      String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, IpaComparator ipaComparator,
+      String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, IpaComparator ipaComparator, IpsComparator ipsComparator,
       String dependencies, String csAnalysis, String pubReqCheck, String globalCheck, String copyrightYear, IWorkerContext context,
       Set<String> r5Extensions, List<StructureDefinition> modifierExtensions, String draftDependencies,
       List<FetchedResource> noNarratives, List<FetchedResource> noValidation, boolean noValidate, boolean noGenerate, DependentIGFinder dependentIgs) {
@@ -302,6 +304,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     this.currentToolsVersion = currentToolsVersion;
     this.previousVersionComparator = previousVersionComparator;
     this.ipaComparator = ipaComparator;
+    this.ipsComparator = ipsComparator;
     this.dependencies = dependencies;
     this.dependentIgs = dependentIgs;
     this.csAnalysis = csAnalysis;
@@ -702,6 +705,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       " <tr><td>Modifier Extensions:</td><td>$modifiers$</td></tr>\r\n"+
       " <tr><td>Previous Version Comparison:</td><td> $previousVersion$</td></tr>\r\n"+
       " <tr><td>IPA Comparison:</td><td> $ipaComparison$</td></tr>\r\n"+
+      " <tr><td>IPS Comparison:</td><td> $ipsComparison$</td></tr>\r\n"+
       "$noNarrative$"+
       "$noValidation$"+
       " <tr><td>Summary:</td><td> errors = $err$, warn = $warn$, info = $info$, broken links = $links$</td></tr>\r\n"+
@@ -834,6 +838,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("otherFilePath", allIssues ? "qa.min.html" : "qa.html");
     t.add("previousVersion", previousVersionComparator.checkHtml());
     t.add("ipaComparison", ipaComparator == null ? "n/a" : ipaComparator.checkHtml());
+    t.add("ipsComparison", ipsComparator == null ? "n/a" : ipsComparator.checkHtml());
     t.add("noNarrative", genResourceList(noNarratives, "Narratives Suppressed"));
     t.add("noValidation", genResourceList(noValidation, "Validation Suppressed"));
     if (noGenerate || noValidate) {
@@ -924,6 +929,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("csAnalysis", csAnalysis);
     t.add("previousVersion", previousVersionComparator.checkHtml());
     t.add("ipaComparison", ipaComparator == null ? "n/a" : ipaComparator.checkHtml());
+    t.add("ipsComparison", ipsComparator == null ? "n/a" : ipsComparator.checkHtml());
     if (noGenerate || noValidate) {
       if (noGenerate && noValidate) {
         t.add("warning", "Warning: This IG was generated with both validation and HTML generation off. Many kinds of errors will not be reported.\r\n");        

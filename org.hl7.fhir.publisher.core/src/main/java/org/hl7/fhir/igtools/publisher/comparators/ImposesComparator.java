@@ -34,7 +34,7 @@ import org.hl7.fhir.utilities.npm.PackageList;
 import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
 
 
-public class IpaComparator {
+public class ImposesComparator {
 
   public class ComparisonPair {
     CanonicalResource left;
@@ -84,7 +84,7 @@ public class IpaComparator {
   private String lastName;
   private String lastUrl;
   
-  public IpaComparator(SimpleWorkerContext context, String rootDir, String dstDir, ProfileKnowledgeProvider pkp, ILoggingService logger, List<String> versions) {
+  public ImposesComparator(SimpleWorkerContext context, String rootDir, String dstDir, ProfileKnowledgeProvider pkp, ILoggingService logger, List<String> versions) {
     super();
         
     this.context = context;

@@ -2313,8 +2313,6 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           }
         }
       }
-      
-      
     }
   }
   
@@ -2350,5 +2348,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return path.substring(path.lastIndexOf(".") + 1);
     else
       return path;
+  }
+
+  public String compareImposes(StructureDefinition sdi) {
+    return "todo";
   }
 }
