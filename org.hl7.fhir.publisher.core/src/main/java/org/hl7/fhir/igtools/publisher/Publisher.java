@@ -9723,8 +9723,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       }        
     }
     String id = idPrefix + (char)(position+33);
-    String s = "<tr style=\"border:0px;padding:0px;vertical-align:top;background-color:white;\" id=\"" + Utilities.escapeXml(id) + "\">";
-    s = s + "<td style=\"vertical-align:top;text-align:left;background-color:white;padding:0px 4px 0px 4px;white-space:nowrap;background-image:url(tbl_bck0.png)\" class=\"hierarchy\">";
+    String s = "<tr style=\"border:0px;padding:0px;vertical-align:top;background-color:inherit;\" id=\"" + Utilities.escapeXml(id) + "\">";
+    s = s + "<td style=\"vertical-align:top;text-align:left;background-color:inherit;padding:0px 4px 0px 4px;white-space:nowrap;background-image:url(tbl_bck0.png)\" class=\"hierarchy\">";
     s = s + "<img style=\"background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"tbl_spacer.png\"/>";
     s = s + indents;
     if (!label.equals("0") && !page.hasPage()) {
@@ -9740,9 +9740,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       else
         s = s + "<img onClick=\"tableRowAction(this)\" src=\"tbl_vjoin-open.png\" alt=\".\" style=\"background-color: inherit\" class=\"hierarchy\"/>";
     if (page.hasPage())
-      s = s + "<img style=\"background-color:white;background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"icon_page-child.gif\"/>";
+      s = s + "<img style=\"background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"icon_page-child.gif\"/>";
     else
-      s = s + "<img style=\"background-color:white;background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"icon_page.gif\"/>";
+      s = s + "<img style=\"background-color:inherit\" alt=\".\" class=\"hierarchy\" src=\"icon_page.gif\"/>";
     if (page.hasName()) { 
       s = s + "<a title=\"" + Utilities.escapeXml(page.getTitle()) + "\" href=\"" + (currentOffset!=null ? currentOffset + "/" : "") + page.getName() +"\"> " + label + " " + Utilities.escapeXml(page.getTitle()) + "</a></td></tr>";
     } else {
