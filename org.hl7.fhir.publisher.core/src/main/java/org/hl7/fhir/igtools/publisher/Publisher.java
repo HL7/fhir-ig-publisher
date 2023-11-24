@@ -888,7 +888,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private boolean noSushi;
 
-  private Set<String> loadedIds;
+  private Map<String, String> loadedIds;
 
   private boolean duplicateInputResourcesDetected;
 
@@ -4522,7 +4522,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       cql.execute();
     }
     fetcher.setRootDir(rootDir);
-    loadedIds = new HashSet<>();
+    loadedIds = new HashMap<>();
     duplicateInputResourcesDetected = false;
     // load any bundles
     if (sourceDir != null || igpkp.isAutoPath())
@@ -5363,7 +5363,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         if (res == null) {
           f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, "Bundle.element["+i+"]", "All entries must have resources when loading a bundle", IssueSeverity.ERROR));
         } else {
-          checkResourceUnique(res.fhirType()+"/"+res.getIdBase());
+          checkResourceUnique(res.fhirType()+"/"+res.getIdBase(), name);
           FetchedResource r = f.addResource(f.getName()+"["+i+"]");
           r.setElement(res);
           r.setId(res.getIdBase());
@@ -5512,7 +5512,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       f.setBundleType(FetchedBundleType.SPREADSHEET);
       f.getBundle().setResource(bnd);
       for (BundleEntryComponent b : bnd.getEntry()) {
-        checkResourceUnique(b.getResource().fhirType()+"/"+b.getResource().getIdBase());
+        checkResourceUnique(b.getResource().fhirType()+"/"+b.getResource().getIdBase(), name);
         FetchedResource r = f.addResource(f.getName());
         r.setResource(b.getResource());
         r.setId(b.getResource().getId());
@@ -5527,7 +5527,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     for (String id : f.getValuesetsToLoad().keySet()) {
       if (!knownValueSetIds.contains(id)) {
         String vr = f.getValuesetsToLoad().get(id);
-        checkResourceUnique("ValueSet/"+id);
+        checkResourceUnique("ValueSet/"+id, name);
 
         FetchedFile fv = fetcher.fetchFlexible(vr);
         boolean vrchanged = noteFile("sp-ValueSet/"+vr, fv);
@@ -6105,7 +6105,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     bin.setContent(file.getSource());
     bin.setContentType(format);
     Element e = new ObjectConverter(context).convert(bin);
-    checkResourceUnique(e.fhirType()+"/"+e.getIdBase());        
+    checkResourceUnique(e.fhirType()+"/"+e.getIdBase(), file.getPath());        
     r.setElement(e).setId(bin.getId());
     r.setResource(bin);
     r.setResEntry(srcForLoad);
@@ -6148,14 +6148,14 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           File f = new File(file.getPath());
           id = f.getName();
           id = id.substring(0, id.indexOf("."));
-          checkResourceUnique("Binary/"+id);
+          checkResourceUnique("Binary/"+id, file.getPath());
           r.setElement(e).setId(id).setType("Binary");
           igpkp.findConfiguration(file, r);
           binary = true;
         } else {
           id = e.getChildValue("id");
           if (!Utilities.noString(e.getIdBase())) {
-            checkResourceUnique(e.fhirType()+"/"+e.getIdBase());
+            checkResourceUnique(e.fhirType()+"/"+e.getIdBase(), file.getPath());
           }
 
           if (Utilities.noString(id)) {
@@ -6256,12 +6256,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
   }
 
-  public void checkResourceUnique(String tid) throws Error {
-    if (loadedIds.contains(tid)) {
-      System.out.println("Duplicate Resource in IG: "+tid);
+  public void checkResourceUnique(String tid, String source) throws Error {
+    if (loadedIds.containsKey(tid)) {
+      System.out.println("Duplicate Resource in IG: "+tid+". first found in "+loadedIds.get(tid)+", now in "+source);
       duplicateInputResourcesDetected = true;
     }
-    loadedIds.add(tid);
+    loadedIds.put(tid, source);
   }
 
   private ImplementationGuideDefinitionResourceComponent findIGReference(String type, String id) {
