@@ -208,6 +208,8 @@ public class SpecMapManager {
         }
       case Vsac: if (url.contains("cts.nlm.nih.gov")) {
         return url.replace("http://cts.nlm.nih.gov/fhir/ValueSet/", "https://vsac.nlm.nih.gov/valueset/")+"/expansion";
+      } else {
+        return url;
       }
       case Examples:
         return str(spec, "webUrl")+"/"+rt.toLowerCase()+"-"+id.toLowerCase()+".html";

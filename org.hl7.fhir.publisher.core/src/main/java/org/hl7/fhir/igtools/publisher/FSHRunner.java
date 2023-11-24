@@ -19,7 +19,7 @@ import org.apache.commons.exec.ExecuteWatchdog;
 import org.apache.commons.exec.PumpStreamHandler;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
-import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.context.ILoggingService;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.settings.FhirSettings;
@@ -28,13 +28,13 @@ import com.google.common.collect.ImmutableList;
 
 public class FSHRunner {
 
-    private final IWorkerContext.ILoggingService logger;
+    private final ILoggingService logger;
 
     private static final long FSH_TIMEOUT = 60000 * 5; // 5 minutes....
 
     private long fshTimeout = FSH_TIMEOUT;
 
-    public FSHRunner(IWorkerContext.ILoggingService logger) {
+    public FSHRunner(ILoggingService logger) {
         this.logger = logger;
     }
 

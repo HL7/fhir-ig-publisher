@@ -529,7 +529,7 @@ public class IGReleaseUpdater {
   private String genFragment(JsonObject ig, JsonObject version, JsonObject root, String canonical, boolean currentPublication, boolean isCore) {
     String p1 = ig.asString("title")+" (v"+version.asString("version")+": "+state(ig, version)+")";
     if (!isCore) {
-      p1 = p1 + (version.has("fhirversion") ? " based on <a no-external=\"true\" href=\"http://hl7.org/fhir/"+getPath(version.asString("fhirversion", "fhir-version"))+"\">FHIR "+fhirRef(version.asString("fhirversion"))+"</a>" : "")+". ";
+      p1 = p1 + (version.has("fhirversion") ? " based on <a no-external=\"true\" href=\"http://hl7.org/fhir/"+getPath(version.asString("fhirversion", "fhir-version"))+"\">FHIR (HL7® FHIR® Standard) "+fhirRef(version.asString("fhirversion"))+"</a>" : "")+". ";
     } else {
       p1 = p1 + ". ";      
     }

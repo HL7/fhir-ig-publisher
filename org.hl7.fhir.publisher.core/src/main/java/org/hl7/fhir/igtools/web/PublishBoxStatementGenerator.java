@@ -21,7 +21,7 @@ public class PublishBoxStatementGenerator {
   public static String genFragment(PackageList ig, PackageListEntry version, PackageListEntry root, String canonical, boolean currentPublication, boolean isCore) {
     String p1 = ig.title()+" (v"+version.version()+": "+state(ig, version)+")";
     if (!isCore) {
-      p1 = p1 + (version.fhirVersion() != null ? " based on <a no-external=\"true\" href=\"http://hl7.org/fhir/"+getPath(version.fhirVersion())+"\">FHIR "+fhirRef(version.fhirVersion())+"</a>" : "")+". ";
+      p1 = p1 + (version.fhirVersion() != null ? " based on <a no-external=\"true\" href=\"http://hl7.org/fhir/"+getPath(version.fhirVersion())+"\">FHIR (HL7® FHIR® Standard) "+fhirRef(version.fhirVersion())+"</a>" : "")+". ";
     } else {
       p1 = p1 + ". ";      
     }

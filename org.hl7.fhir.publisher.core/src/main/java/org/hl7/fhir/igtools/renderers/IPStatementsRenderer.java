@@ -1,5 +1,6 @@
 package org.hl7.fhir.igtools.renderers;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -25,6 +26,9 @@ import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
+import org.hl7.fhir.utilities.xhtml.XhtmlNode;
+import org.hl7.fhir.utilities.xhtml.XhtmlParser;
 
 public class IPStatementsRenderer {
 
@@ -74,7 +78,7 @@ public class IPStatementsRenderer {
   }
   
 
-  public String genIpStatements(FetchedResource r, boolean example) throws FHIRException {
+  public String genIpStatements(FetchedResource r, boolean example) throws FHIRException, IOException {
     listAllCodeSystems(r, r.getElement());
     if (r.getResource() != null) {
       listAllCodeSystems(r, r.getResource());
@@ -101,7 +105,7 @@ public class IPStatementsRenderer {
     }
   }
 
-  public String genIpStatements(List<FetchedFile> files) throws FHIRException {
+  public String genIpStatements(List<FetchedFile> files) throws FHIRException, IOException {
     for (FetchedFile f : files) {
       for (FetchedResource r : f.getResources()) {
         listAllCodeSystems(r, r.getElement());
@@ -114,7 +118,7 @@ public class IPStatementsRenderer {
     return render("publication");
   }
   
-  private String render(String title) {
+  private String render(String title) throws IOException {
     for (SystemUsage su : systems.values()) {
       String stmt = getCopyRightStatement(su);
       if (stmt != null) {
@@ -205,7 +209,7 @@ public class IPStatementsRenderer {
     return packageId.startsWith("hl7.");
   }
   
-  private String getCopyRightStatement(SystemUsage system) {
+  private String getCopyRightStatement(SystemUsage system) throws IOException {
     if ("http://snomed.info/sct".equals(system.system)) {
       system.desc = "SNOMED Clinical Terms® (SNOMED CT®)";
       return "This material contains content that is copyright of SNOMED International. Implementers of these specifications must have the appropriate SNOMED CT Affiliate license - "+
@@ -219,7 +223,12 @@ public class IPStatementsRenderer {
     if (system.cs != null) {
       system.desc = system.cs.present();
       if (system.cs.hasCopyright()) {
-        return Utilities.stripPara(markdownEngine.process(system.cs.getCopyright(), "Copyright"));        
+        List<XhtmlNode> xl = new XhtmlParser().parseMDFragmentStripParas(markdownEngine.process(system.cs.getCopyright(), "Copyright"));
+        if (xl.size() == 0) {
+          return "?";
+        } else {
+          return new XhtmlComposer(false, true).setAutoLinks(true).compose(xl);
+        }
       }
     }
     return null;

@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import org.apache.commons.exec.CommandLine;
-import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.context.ILoggingService;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -33,7 +33,7 @@ public class FSHRunnerTests {
 	@ParameterizedTest
 	@MethodSource("defaultExecStringParams")
 	public void testDefaultExecString(Publisher.IGBuildMode mode, String fshVersion, String expectedExecString) {
-		FSHRunner fshRunner = new FSHRunner(Mockito.mock(IWorkerContext.ILoggingService.class));
+		FSHRunner fshRunner = new FSHRunner(Mockito.mock(ILoggingService.class));
 		final CommandLine actualCommandLine = fshRunner.getDefaultCommandLine(fshVersion, mode);
 		assertIsEqual(CommandLine.parse(expectedExecString), actualCommandLine);
 	}
@@ -53,7 +53,7 @@ public class FSHRunnerTests {
 	@ParameterizedTest
 	@MethodSource("sushiCommandParams")
 	public void testGetSushiCommand(Publisher.IGBuildMode mode, String fshVersion, String expectedSushiCommand) {
-		FSHRunner fshRunner = new FSHRunner(Mockito.mock(IWorkerContext.ILoggingService.class));
+		FSHRunner fshRunner = new FSHRunner(Mockito.mock(ILoggingService.class));
 		assertEquals(expectedSushiCommand, fshRunner.getSushiCommandString(fshVersion,mode));
 	}
 
@@ -76,7 +76,7 @@ public class FSHRunnerTests {
 	@ParameterizedTest
 	@MethodSource("windowsExecStringParams")
 	public void testWindowsExecString(Publisher.IGBuildMode mode, String fshVersion, String expectedExecString) {
-		FSHRunner fshRunner = new FSHRunner(Mockito.mock(IWorkerContext.ILoggingService.class));
+		FSHRunner fshRunner = new FSHRunner(Mockito.mock(ILoggingService.class));
 		final CommandLine actualCommandLine = fshRunner.getWindowsCommandLine(fshVersion, mode);
 		assertIsEqual(CommandLine.parse(expectedExecString), actualCommandLine);
 	}
@@ -95,7 +95,7 @@ public class FSHRunnerTests {
 	@ParameterizedTest
 	@MethodSource("npmPathExecStringParams")
 	public void testNpmPathExecString(Publisher.IGBuildMode mode, String fshVersion, String expectedExecString) {
-		FSHRunner fshRunner = new FSHRunner(Mockito.mock(IWorkerContext.ILoggingService.class));
+		FSHRunner fshRunner = new FSHRunner(Mockito.mock(ILoggingService.class));
 		final CommandLine actualCommandLine = fshRunner.getNpmPathCommandLine(fshVersion, mode);
 		assertIsEqual(CommandLine.parse(expectedExecString), actualCommandLine);
 	}

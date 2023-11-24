@@ -95,6 +95,7 @@ import org.hl7.fhir.exceptions.PathEngineException;
 import org.hl7.fhir.igtools.publisher.FetchedFile.FetchedBundleType;
 import org.hl7.fhir.igtools.publisher.IFetchFile.FetchState;
 import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
+import org.hl7.fhir.igtools.publisher.comparators.IpsComparator;
 import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
 import org.hl7.fhir.igtools.publisher.loaders.AdjunctFileLoader;
 import org.hl7.fhir.igtools.publisher.loaders.LibraryLoader;
@@ -146,8 +147,7 @@ import org.hl7.fhir.r5.conformance.R5ExtensionsLoader;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IContextResourceLoader;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.context.IWorkerContext.ILoggingService;
+import org.hl7.fhir.r5.context.ILoggingService;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.FmlParser;
@@ -404,7 +404,7 @@ import lombok.Setter;
  * @author Grahame Grieve
  */
 
-public class Publisher implements IWorkerContext.ILoggingService, IReferenceResolver, IValidationProfileUsageTracker {
+public class Publisher implements ILoggingService, IReferenceResolver, IValidationProfileUsageTracker {
 
   private static final String PACKAGE_CACHE_FOLDER_PARAM = "-package-cache-folder";
 
@@ -852,6 +852,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private RealmBusinessRules realmRules;
   private PreviousVersionComparator previousVersionComparator;
   private IpaComparator ipaComparator;
+  private IpsComparator ipsComparator;
 
   private IGPublisherLiquidTemplateServices templateProvider;
 
@@ -893,6 +894,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
   private List<String> comparisonVersions;
   private List<String> ipaComparisons;
+  private List<String> ipsComparisons;
   private String versionToAnnotate;
 
   private TimeTracker tt;
@@ -1144,8 +1146,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       clean();
       dependentIgFinder.finish(outputDir, sourceIg.present());
       ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), rootDir, npmName, childPublisher == null? null : childPublisher.npmName,
-          IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator,
-          new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine).render(publishedIg, true, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()),
+          IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator, ipsComparator,
+          new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine).render(publishedIg, true, false, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()),
           new PublicationChecker(repoRoot, historyPage, markdownEngine).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
           generateDraftDependencies(),
           noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder);
@@ -2397,6 +2399,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     realmRules = makeRealmBusinessRules();
     previousVersionComparator = makePreviousVersionComparator();
     ipaComparator = makeIpaComparator();
+    ipsComparator = makeIpsComparator();
     if (context != null) {
       r4tor4b.setContext(context);
     }
@@ -2817,6 +2820,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         }
         if (!"n/a".equals(p.getValue())) {
           ipaComparisons.add(p.getValue());
+        }        
+        break;
+      case "ips-comparison":   
+        if (ipsComparisons == null) {
+          ipsComparisons = new ArrayList<>();
+        }
+        if (!"n/a".equals(p.getValue())) {
+          ipsComparisons.add(p.getValue());
         }        
         break;
       case "validation":
@@ -5545,8 +5556,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
         res.setGroupingId(pck.getId());
         if (!res.hasName())
           res.setName(r.getTitle());
-        if (!res.hasDescription())
+        if (!res.hasDescription() && ((CanonicalResource)r.getResource()).hasDescription()) {
           res.setDescription(((CanonicalResource)r.getResource()).getDescription().trim());
+        }
         res.setReference(new Reference().setReference(r.fhirType()+"/"+r.getId()));
       }
       res.setUserData("loaded.resource", r);
@@ -5643,6 +5655,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     generateSnapshots();
     log("Check R4 / R4B");
     checkR4R4B();
+    log("Assign Comparison Ids");
+    assignComparisonIds();
     if (isPropagateStatus) {
       log("Propagating status");
       propagateStatus();
@@ -5666,6 +5680,25 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     errors.addAll(cql.getGeneralErrors());
     scanForUsageStats();
   }
+
+  private void assignComparisonIds() {
+    int i = 0;
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getResource() instanceof StructureDefinition) {            
+          StructureDefinition sd = (StructureDefinition) r.getResource();
+          for (Extension ext : sd.getExtensionsByUrl(ToolingExtensions.EXT_SD_IMPOSE_PROFILE)) {
+            StructureDefinition sdi = context.fetchResource(StructureDefinition.class, ext.getValue().primitiveValue());
+            if (sdi != null && !sdi.hasUserData("imposes.compare.id")) {
+              String cid = "c"+Integer.toString(i);
+              sdi.setUserData("imposes.compare.id", cid);
+            }
+          }
+        }
+      }
+    }
+  }
+
 
   private void loadPaths() {
     for (FetchedFile f : fileList) {
@@ -5799,6 +5832,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (ipaComparator != null) {
       ipaComparator.startChecks(publishedIg);      
     }
+    if (ipsComparator != null) {
+      ipsComparator.startChecks(publishedIg);      
+    }
     for (FetchedFile f : fileList) {
       f.start("checkConformanceResources3");
       try {
@@ -5807,6 +5843,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
             previousVersionComparator.check((CanonicalResource) r.getResource());
             if (ipaComparator != null) {
               ipaComparator.check((CanonicalResource) r.getResource());      
+            }
+            if (ipsComparator != null) {
+              ipsComparator.check((CanonicalResource) r.getResource());      
             }
           }
 
@@ -5818,6 +5857,9 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     previousVersionComparator.finishChecks();
     if (ipaComparator != null) {
       ipaComparator.finishChecks();      
+    }
+    if (ipsComparator != null) {
+      ipsComparator.finishChecks();      
     }
     tts.end();
   }
@@ -5850,6 +5892,16 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       return null;
     }
     return new IpaComparator(context, rootDir, tempDir, igpkp, logger, ipaComparisons);
+  }
+
+  private IpsComparator makeIpsComparator() throws IOException {
+    if (isTemplate()) {
+      return null;
+    }
+    if (ipsComparisons == null) {
+      return null;
+    }
+    return new IpsComparator(context, rootDir, tempDir, igpkp, logger, ipsComparisons);
   }
 
   private void checkJurisdiction(FetchedFile f, CanonicalResource resource, IssueSeverity error, String verb) {
@@ -6995,7 +7047,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
           for (FetchedResource r : f.getResources()) {
             if (!r.isValidated()) {
               logDebugMessage(LogCategory.PROGRESS, "     validating "+r.getTitle());
-              log("     validating "+r.getTitle());
+//              log("     validating "+r.getTitle());
               validate(f, r);
             }
           }
@@ -7164,8 +7216,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     StructureDefinition sd = (StructureDefinition) r.getResource();
     if (!sd.getAbstract() && !isClosing(sd)) {
       if (sd.getKind() == StructureDefinitionKind.RESOURCE) {
-        int cE = countStatedExamples(sd.getUrl());
-        int cI = countFoundExamples(sd.getUrl());
+        int cE = countStatedExamples(sd.getUrl(), sd.getVersionedUrl());
+        int cI = countFoundExamples(sd.getUrl(), sd.getVersionedUrl());
         if (cE + cI == 0) {
           f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this profile", IssueSeverity.WARNING));
           r.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this profile", IssueSeverity.WARNING));
@@ -7182,7 +7234,7 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
               r.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this extension", IssueSeverity.WARNING));
             }
           } else {
-            int cI = countFoundExamples(sd.getUrl());
+            int cI = countFoundExamples(sd.getUrl(), sd.getVersionedUrl());
             if (cI == 0) {
               f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this data type profile", IssueSeverity.WARNING));
               r.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no examples for this data type profile", IssueSeverity.WARNING));
@@ -7241,12 +7293,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
 
 
-  private int countStatedExamples(String url) {
+  private int countStatedExamples(String url, String vurl) {
     int res = 0;
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         for (String p : r.getStatedProfiles()) {
-          if (url.equals(p)) {
+          if (url.equals(p) || vurl.equals(p)) {
             res++;
           }
         }
@@ -7255,12 +7307,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     return res;
   }
 
-  private int countFoundExamples(String url) {
+  private int countFoundExamples(String url, String vurl) {
     int res = 0;
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         for (String p : r.getFoundProfiles()) {
-          if (url.equals(p)) {
+          if (url.equals(p) || vurl.equals(p)) {
             res++;
           }
         }
@@ -7437,14 +7489,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     if (ipaComparator != null) {
       ipaComparator.addOtherFiles(otherFilesRun, outputDir);
     }
+    if (ipsComparator != null) {
+      ipsComparator.addOtherFiles(otherFilesRun, outputDir);
+    }
     otherFilesRun.add(Utilities.path(tempDir, "usage-stats.json"));
 
     printMemUsage();
-    System.out.println("Reclaiming memory...");
+    log("Reclaiming memory...");
     cleanOutput(tempDir);
     for (FetchedFile f : fileList) {
       f.trim();
     }
+    context.unload();
     System.gc();
     printMemUsage();
 
@@ -7535,11 +7591,11 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       log("Checking Output HTML");
       String statusMessage;
       if (mode == IGBuildMode.AUTOBUILD) { 
-        statusMessage = Utilities.escapeXml(sourceIg.present())+", published by "+Utilities.escapeXml(sourceIg.getPublisher())+". This is not an authorized publication; it is the continuous build for version "+workingVersion()+". This version is based on the current content of <a href=\""+gh()+"\">"+gh()+"</a> and changes regularly. See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>"; 
+        statusMessage = Utilities.escapeXml(sourceIg.present())+", published by "+Utilities.escapeXml(sourceIg.getPublisher())+". This guide is not an authorized publication; it is the continuous build for version "+workingVersion()+" built by the FHIR (HL7® FHIR® Standard) CI Build. This version is based on the current content of <a href=\""+gh()+"\">"+gh()+"</a> and changes regularly. See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>"; 
       } else if (mode == IGBuildMode.PUBLICATION) { 
         statusMessage = "Publication Build: This will be filled in by the publication tooling"; 
       } else { 
-        statusMessage = Utilities.escapeXml(sourceIg.present())+" - Local Development build (v"+workingVersion()+"). See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>";
+        statusMessage = Utilities.escapeXml(sourceIg.present())+" - Local Development build (v"+workingVersion()+") built by the FHIR (HL7® FHIR® Standard) Build Tools. See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>";
       }
 
       realmRules.addOtherFiles(inspector.getExceptions(), outputDir);
@@ -7547,6 +7603,10 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       if (ipaComparator != null) {
         ipaComparator.addOtherFiles(inspector.getExceptions(), outputDir);
       }
+      if (ipsComparator != null) {
+        ipsComparator.addOtherFiles(inspector.getExceptions(), outputDir);
+      }
+      
       List<ValidationMessage> linkmsgs = generationOff ? new ArrayList<ValidationMessage>() : inspector.check(statusMessage);
       int bl = 0;
       int lf = 0;
@@ -7664,11 +7724,12 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
   private void printMemUsage() {
     int mb = 1024*1024;
     Runtime runtime = Runtime.getRuntime();
-    System.out.print("## Memory (MB): ");
-    System.out.print("Use = " + (runtime.totalMemory() - runtime.freeMemory()) / mb);
-    System.out.print(", Free = " + runtime.freeMemory() / mb);
-    System.out.print(", Total = " + runtime.totalMemory() / mb);
-    System.out.println(", Max = " + runtime.maxMemory() / mb);
+    String s = "## Memory (MB): " +
+               "Use = " + (runtime.totalMemory() - runtime.freeMemory()) / mb+
+               ", Free = " + runtime.freeMemory() / mb+
+               ", Total = " + runtime.totalMemory() / mb+
+               ", Max = " + runtime.maxMemory() / mb;
+    log(s);
   }
 
   private void generatePackageVersion(String filename, String ver) throws IOException {
@@ -8303,6 +8364,18 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
     try {
       log("Run jekyll: "+jekyllCommand+" build --destination \""+outputDir+"\" (in folder "+tempDir+")");
       if (SystemUtils.IS_OS_WINDOWS) {
+        log("Due to a known issue, Jekyll errors are lost between Java and Ruby. If the build process hangs at this point,");
+        log("you have to go to a command prompt, and then run these two commands:");
+        log("");
+        log("cd "+tempDir);
+        log(jekyllCommand+" build --destination \""+outputDir+"\"");
+        log("");
+        log("and then investigate why Jekyll has failed");
+      }
+      log("Note: usual cases for Jekyll to fail are:");
+      log("* A failure to produce a fragment that is already logged in the output above");
+      log("* A reference to a mnually edited fiel that hasn't been provided");
+      if (SystemUtils.IS_OS_WINDOWS) {
         final String enclosedOutputDir = "\"" + outputDir + "\"";
         final CommandLine commandLine = new CommandLine("cmd")
                 .addArgument( "/C")
@@ -8450,8 +8523,8 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       fragment("cross-version-analysis-inline", r4tor4b.generate(npmName, true), otherFilesRun);      
     }
     DependencyRenderer depr = new DependencyRenderer(pcm, tempDir, npmName, templateManager, makeDependencies(), context, markdownEngine);
-    trackedFragment("3", "dependency-table", depr.render(publishedIg, false, true), otherFilesRun);
-    trackedFragment("3", "dependency-table-short", depr.render(publishedIg, false, false), otherFilesRun);
+    trackedFragment("3", "dependency-table", depr.render(publishedIg, false, true, true), otherFilesRun);
+    trackedFragment("3", "dependency-table-short", depr.render(publishedIg, false, false, false), otherFilesRun);
     trackedFragment("4", "globals-table", depr.renderGlobals(), otherFilesRun);
 
     // now, list the profiles - all the profiles
@@ -9782,6 +9855,13 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
       diff.add("name", Utilities.encodeUri(ipaComparator.getLastName()));
       diff.add("current", Utilities.encodeUri(targetUrl()));
       diff.add("previous", Utilities.encodeUri(ipaComparator.getLastUrl()));
+    }
+    if (ipsComparator != null && ipsComparator.hasLast() && !targetUrl().startsWith("file:")) {
+      JsonObject diff = new JsonObject();
+      data.add("iga-diff", diff);
+      diff.add("name", Utilities.encodeUri(ipsComparator.getLastName()));
+      diff.add("current", Utilities.encodeUri(targetUrl()));
+      diff.add("previous", Utilities.encodeUri(ipsComparator.getLastUrl()));
     }
 
     if (publishedIg.hasContact()) {
@@ -11540,6 +11620,14 @@ public class Publisher implements IWorkerContext.ILoggingService, IReferenceReso
 
       }
       pu.addToCSV(allProfilesCsv, sd);
+    }
+    
+    for (Extension ext : sd.getExtensionsByUrl(ToolingExtensions.EXT_SD_IMPOSE_PROFILE)) {
+      StructureDefinition sdi = context.fetchResource(StructureDefinition.class, ext.getValue().primitiveValue());
+      if (sdi != null) {
+        String cid = sdi.getUserString("imposes.compare.id");
+        fragment("StructureDefinition-imposes-"+prefixForContainer+sd.getId()+"-"+cid, sdr.compareImposes(sdi), f.getOutputNames(), r, vars, null);
+      }
     }
 
     if (igpkp.wantGen(r, "java")) {

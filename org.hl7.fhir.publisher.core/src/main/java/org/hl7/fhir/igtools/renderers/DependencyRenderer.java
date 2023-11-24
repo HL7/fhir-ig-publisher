@@ -121,7 +121,7 @@ public class DependencyRenderer {
     this.mdEngine = mdEngine;
   }
 
-  public String render(ImplementationGuide ig, boolean QA, boolean details) throws FHIRException, IOException {
+  public String render(ImplementationGuide ig, boolean QA, boolean details, boolean first) throws FHIRException, IOException {
     boolean hasDesc = false;
     for (ImplementationGuideDependsOnComponent d : ig.getDependsOn()) {
       hasDesc = hasDesc || d.hasExtension(ToolingExtensions.EXT_IGDEP_COMMENT);
@@ -148,7 +148,7 @@ public class DependencyRenderer {
     }
     if (QA) {
       
-    } else {
+    } else if (first) {
       checkGlobals(ig, null);
     }
     // create the table

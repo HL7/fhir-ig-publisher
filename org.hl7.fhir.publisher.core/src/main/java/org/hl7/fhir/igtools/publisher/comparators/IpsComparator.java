@@ -34,7 +34,7 @@ import org.hl7.fhir.utilities.npm.PackageList;
 import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
 
 
-public class IpaComparator {
+public class IpsComparator {
 
   public class ComparisonPair {
     CanonicalResource left;
@@ -84,7 +84,7 @@ public class IpaComparator {
   private String lastName;
   private String lastUrl;
   
-  public IpaComparator(SimpleWorkerContext context, String rootDir, String dstDir, ProfileKnowledgeProvider pkp, ILoggingService logger, List<String> versions) {
+  public IpsComparator(SimpleWorkerContext context, String rootDir, String dstDir, ProfileKnowledgeProvider pkp, ILoggingService logger, List<String> versions) {
     super();
         
     this.context = context;
@@ -94,12 +94,12 @@ public class IpaComparator {
     try {
       processVersions(versions, rootDir);
     } catch (Exception e) {
-      errMsg = "Unable to find version history at http://hl7.org/fhir/uv/ipa/ ("+e.getMessage()+")";
+      errMsg = "Unable to find version history at http://hl7.org/fhir/uv/ips/ ("+e.getMessage()+")";
     }
   }
 
   private void processVersions(List<String> versions, String rootDir) throws IOException {
-    String canonical = "http://hl7.org/fhir/uv/ipa";
+    String canonical = "http://hl7.org/fhir/uv/ips";
     List<PackageListEntry> publishedVersions = null;
     for (String v : versions) {
       if (publishedVersions == null) {
@@ -226,8 +226,8 @@ public class IpaComparator {
 //            System.out.println("Version Comparison: compare "+vi.version+" to current for "+c.getUrl());
             session.compare(c.left, c.right);      
           }
-          Utilities.createDirectory(Utilities.path(dstDir, "ipa-comparison-v"+vi.version));
-          ComparisonRenderer cr = new ComparisonRenderer(vi.context, context, Utilities.path(dstDir, "ipa-comparison-v"+vi.version), session);
+          Utilities.createDirectory(Utilities.path(dstDir, "ips-comparison-v"+vi.version));
+          ComparisonRenderer cr = new ComparisonRenderer(vi.context, context, Utilities.path(dstDir, "ips-comparison-v"+vi.version), session);
           cr.getTemplates().put("CodeSystem", new String(context.getBinaryForKey("template-comparison-CodeSystem.html")));
           cr.getTemplates().put("ValueSet", new String(context.getBinaryForKey("template-comparison-ValueSet.html")));
           cr.getTemplates().put("Profile", new String(context.getBinaryForKey("template-comparison-Profile.html")));
@@ -320,7 +320,7 @@ public class IpaComparator {
 
   public void addOtherFiles(Set<String> otherFilesRun, String outputDir) throws IOException {
     for (VersionInstance vi : versionList) {
-      otherFilesRun.add(Utilities.path(outputDir, "ipa-comparison-v"+vi.version));
+      otherFilesRun.add(Utilities.path(outputDir, "ips-comparison-v"+vi.version));
     }
   }
 
@@ -332,7 +332,7 @@ public class IpaComparator {
       boolean first = true;
       for (VersionInstance vi : versionList) {
         if(first) first = false; else b.append("<br/>");
-        b.append("<a href=\"ipa-comparison-v"+vi.version+"/index.html\">Comparison with version "+vi.version+"</a>");
+        b.append("<a href=\"ips-comparison-v"+vi.version+"/index.html\">Comparison with version "+vi.version+"</a>");
       }
       return b.toString();
     }
