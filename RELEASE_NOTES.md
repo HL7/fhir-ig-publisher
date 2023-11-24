@@ -1,6 +1,7 @@
 * Loader: Reduce memory utilization (clean up before Jekyll)
 * Loader: Fix NPE on descriptions on spreadsheets
 * Loader: Fix committee URLs
+* Loader: When autoloading document Bundles, read title from Composition
 * Terminology Sub-system: Improve expansion error messages
 * Terminology Sub-system: Fix expansion language - don't set for displayName parameter
 * Validator: Fix validator not allowing canonical resource extensions in canonical resources in bundles
