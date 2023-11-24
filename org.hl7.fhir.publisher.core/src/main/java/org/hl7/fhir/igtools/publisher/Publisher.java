@@ -4784,7 +4784,16 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
                 rg.setName(r.getElement().getExtensionValue(ToolingExtensions.EXT_ARTIFACT_NAME).primitiveValue());                 
               } else if (!rg.hasName()) {
                 if (r.getElement().hasChild("title")) {
-                  rg.setName(r.getElement().getChildValue("title"));                
+                  rg.setName(r.getElement().getChildValue("title"));
+                } else if ("Bundle".equals(r.getElement().getName())) {
+                  // If the resource is a document Bundle, get the title from the Composition
+                  List<Element> entryList = r.getElement().getChildren("entry");
+                  if (entryList != null && !entryList.isEmpty()) {
+                    Element resource = entryList.get(0).getNamedChild("resource");
+                    if (resource != null) {
+                      rg.setName(resource.getChildValue("title") + " (Bundle)");
+                    }
+                  }
                 }
               }
               if (r.getElement().hasExtension(ToolingExtensions.EXT_RESOURCE_DESC)) {
