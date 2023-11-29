@@ -35,7 +35,7 @@
         <maven.compiler.testRelease>11</maven.compiler.testRelease>
         <maven.compiler.testSource>11</maven.compiler.testSource>
         <maven.compiler.testTarget>11</maven.compiler.testTarget>
-        <logback-classic.version>1.2.9</logback-classic.version>
+        <logback-classic.version>1.3.12</logback-classic.version>
     </properties>
 
     <groupId>org.hl7.fhir.publisher</groupId>
