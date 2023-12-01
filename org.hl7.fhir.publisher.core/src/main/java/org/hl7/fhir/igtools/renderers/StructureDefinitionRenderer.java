@@ -1293,7 +1293,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   private List<StructureDefinition> findDerived() {
     List<StructureDefinition> res = new ArrayList<>();
     for (StructureDefinition t : context.fetchResourcesByType(StructureDefinition.class)) {
-      if (sd.getUrl().equals(t.getBaseDefinition())) {
+      if (refersToThisSD(t.getBaseDefinition())) {
         res.add(t);
       }
     }
@@ -1325,7 +1325,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       for (FetchedResource r : f.getResources()) {
         if (!r.fhirType().equals("ImplementationGuide")) {
           for (String p : r.getProfiles(statedOnly)) {
-            if (sd.getUrl().equals(p)) {
+            if (refersToThisSD(p)) {
               String name = r.getTitle();
               if (Utilities.noString(name))
                 name = "example";
@@ -1345,7 +1345,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       for (FetchedResource r : f.getResources()) {
         if (!r.fhirType().equals("ImplementationGuide")) {
           for (String p : r.getProfiles(statedOnly)) {
-            if (sd.getUrl().equals(p)) {
+            if (refersToThisSD(p)) {
               String name = r.fhirType() + "/" + r.getId();
               String title = r.getTitle();
               if (Utilities.noString(title))
@@ -1371,7 +1371,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       for (FetchedResource r : f.getResources()) {
         if (r.fhirType().equals("TestPlan")) {
           for (String p : r.getTestArtifacts()) {
-            if (sd.getUrl().equals(p)) {
+            if (refersToThisSD(p)) {
               String name = r.getTitle();
               if (Utilities.noString(name))
                 name = "TestPlan";
@@ -1391,7 +1391,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       for (FetchedResource r : f.getResources()) {
         if (r.fhirType().equals("TestPlan")) {
           for (String p : r.getTestArtifacts()) {
-            if (sd.getUrl().equals(p)) {
+            if (refersToThisSD(p)) {
               String name = r.fhirType() + "/" + r.getId();
               String title = r.getTitle();
               if (Utilities.noString(title))
@@ -1417,7 +1417,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       for (FetchedResource r : f.getResources()) {
         if (r.fhirType().equals("TestScript")) {
           for (String p : r.getTestArtifacts()) {
-            if (sd.getUrl().equals(p)) {
+            if (refersToThisSD(p)) {
               String name = r.getTitle();
               if (Utilities.noString(name))
                 name = "TestScript";
@@ -1437,7 +1437,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       for (FetchedResource r : f.getResources()) {
         if (r.fhirType().equals("TestScript")) {
           for (String p : r.getTestArtifacts()) {
-            if (sd.getUrl().equals(p)) {
+            if (refersToThisSD(p)) {
               String name = r.fhirType() + "/" + r.getId();
               String title = r.getTitle();
               if (Utilities.noString(title))
@@ -1972,7 +1972,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     Map<String, String> trefs = new HashMap<>();
     Map<String, String> examples = new HashMap<>();
     for (StructureDefinition sdt : context.fetchResourcesByType(StructureDefinition.class)) {
-      if (this.sd.getUrl().equals(sdt.getBaseDefinition())) {
+      if (refersToThisSD(sdt.getBaseDefinition())) {
         base.put(sdt.getWebPath(), sdt.present());
       }
       scanExtensions(invoked, sdt, ToolingExtensions.EXT_OBLIGATION_INHERITS);
@@ -1981,13 +1981,13 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
       for (ElementDefinition ed : sdt.getDifferential().getElement()) {
         for (TypeRefComponent tr : ed.getType()) {
-          if (sd.getUrl().equals(tr.getCode())) {
+          if (refersToThisSD(tr.getCode())) {
             if (sdt.hasWebPath()) {
               refs.put(sdt.getWebPath(), sdt.present());
             }
           }
           for (CanonicalType u : tr.getProfile()) {
-            if (this.sd.getUrl().equals(u.getValue())) {
+            if (refersToThisSD(u.getValue())) {
               if (sdt.hasWebPath()) {
                 refs.put(sdt.getWebPath(), sdt.present());
               } else {
@@ -1996,7 +1996,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             }
           }
           for (CanonicalType u : tr.getTargetProfile()) {
-            if (this.sd.getUrl().equals(u.getValue())) {
+            if (refersToThisSD(u.getValue())) {
               if (sdt.hasWebPath()) {
                 trefs.put(sdt.getWebPath(), sdt.present());
               } else {
@@ -2066,10 +2066,24 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return b.toString()+changeSummary();
   }
 
+  private boolean refersToThisSD(String url) {
+    if (url == null) {
+      return false;
+    }
+    if (url.contains("|")) {
+      url = url.substring(0, url.indexOf("|"));
+    }
+    if (this.sd.getUrl().equals(url)) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
   private void scanExtensions(Map<String, String> invoked, StructureDefinition sd, String u) {
     for (Extension ext : sd.getExtensionsByUrl(u)) {
       String v = ext.getValue().primitiveValue();
-      if (this.sd.getUrl().equals(v)) {
+      if (refersToThisSD(v)) {
         invoked.put(sd.getWebPath(), sd.present());
       }
     }
@@ -2087,7 +2101,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (resource.hasChild("meta")) {
       Element meta = resource.getNamedChild("meta");
       for (Element p : meta.getChildrenByName("profile")) {
-        if (sd.getUrl().equals(p.getValue()))
+        if (refersToThisSD(p.getValue()))
           return true;
       }
     }
@@ -2096,7 +2110,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private boolean usesExtension(Element focus) {
     for (Element child : focus.getChildren()) {
-      if (child.getName().equals("extension") && sd.getUrl().equals(child.getChildValue("url")))
+      if (child.getName().equals("extension") && refersToThisSD(child.getChildValue("url")))
         return true;
       if (usesExtension(child))
         return true;
