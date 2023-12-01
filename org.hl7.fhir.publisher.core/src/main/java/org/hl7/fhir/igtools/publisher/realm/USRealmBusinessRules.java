@@ -124,7 +124,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
         problems.add(sd);
         StringBuilder b = new StringBuilder();
         ValidationMessage vm = new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"').baseDefinition", "US FHIR Usage rules require that all profiles on "+sd.getType()+
-            (matches(usCoreProfiles, sd.getType()) > 1 ? " derive from one of the base US profiles" : " derive from the core US profile"),
+            (matches(usCoreProfiles, sd.getType()) > 1 ? " derive from one of the base US profiles" : " derive from the core US profile")+". See https://confluence.hl7.org/display/CGP/US+Core+Variance+Request+Process",
             IssueSeverity.WARNING).setMessageId(PublisherMessageIds.US_CORE_DERIVATION); 
         b.append(vm.getMessage());
         f.getErrors().add(vm);
