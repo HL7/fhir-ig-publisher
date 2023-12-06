@@ -172,18 +172,18 @@ public class USRealmBusinessRules extends RealmBusinessRules {
       PackageList pl = PackageList.fromUrl("https://hl7.org/fhir/us/core/package-list.json");
       for (PackageListEntry v : pl.versions()) {
         if (VersionUtilities.versionsCompatible(version, v.fhirVersion())) {
-          return new FilesystemPackageCacheManager(org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager.FilesystemPackageCacheMode.USER).loadPackage("hl7.fhir.us.core", v.version());
+          return new FilesystemPackageCacheManager.FilesystemPackageCacheManagerBuilder().build().loadPackage("hl7.fhir.us.core", v.version());
         }
       }
       // we didn't find a compatible version, we'll just take the last version
       for (PackageListEntry v : pl.versions()) {
-        return new FilesystemPackageCacheManager(org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager.FilesystemPackageCacheMode.USER).loadPackage("hl7.fhir.us.core", v.version());
+        return new FilesystemPackageCacheManager.FilesystemPackageCacheManagerBuilder().build().loadPackage("hl7.fhir.us.core", v.version());
       }
       return null;
     } catch (Exception e) {
       System.out.println("Error checking US Core: "+e.getMessage());
     }
-    FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager(true);
+    FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager.FilesystemPackageCacheManagerBuilder().build();
     return pcm.loadPackage("hl7.fhir.us.core");
   }
 

@@ -167,7 +167,7 @@ public class IpaComparator {
         String filename = "";
         try {
           vi.resources = new ArrayList<>();
-          BasePackageCacheManager pcm = new FilesystemPackageCacheManager(org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager.FilesystemPackageCacheMode.USER);
+          BasePackageCacheManager pcm = new FilesystemPackageCacheManager.FilesystemPackageCacheManagerBuilder().build();
           NpmPackage current = pcm.loadPackage(pid, vi.version);
           for (String id : current.listResources("StructureDefinition", "ValueSet", "CodeSystem", "CapabilityStatement")) {
             filename = id;

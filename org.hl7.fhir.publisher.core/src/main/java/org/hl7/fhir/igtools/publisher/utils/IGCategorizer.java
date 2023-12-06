@@ -19,7 +19,6 @@ import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
-import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager.FilesystemPackageCacheMode;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 
 
@@ -36,7 +35,7 @@ public class IGCategorizer {
   private FilesystemPackageCacheManager pcm;
   
   public IGCategorizer() throws IOException {
-    pcm = new FilesystemPackageCacheManager(FilesystemPackageCacheMode.USER);
+    pcm = new FilesystemPackageCacheManager.FilesystemPackageCacheManagerBuilder().build();
     pcm.setSuppressErrors(true);
   }
   
