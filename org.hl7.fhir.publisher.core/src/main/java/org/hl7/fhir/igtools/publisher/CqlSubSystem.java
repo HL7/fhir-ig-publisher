@@ -325,7 +325,7 @@ public class CqlSubSystem {
     }
     else {
       options = CqlTranslatorOptions.defaultOptions();
-      if (!options.getFormats().contains(CqlTranslator.Format.XML)) {
+      if (!options.getFormats().contains(CqlTranslatorOptions.Format.XML)) {
         options.getFormats().add(CqlTranslatorOptions.Format.XML);
       }
     }
@@ -470,7 +470,7 @@ public class CqlSubSystem {
           // NOTE: Publication tooling requires XML content
           result.setElm(translator.toXml().getBytes());
           result.setIdentifier(translator.toELM().getIdentifier());
-          if (options.getFormats().contains(CqlTranslator.Format.JSON)) {
+          if (options.getFormats().contains(CqlTranslatorOptions.Format.JSON)) {
             result.setJsonElm(translator.toJson().getBytes());
           }
 
