@@ -8391,7 +8391,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         log("");
         log("and then investigate why Jekyll has failed");
       }
-      log("Note: usual cases for Jekyll to fail are:");
+      log("Troubleshooting Note: usual cases for Jekyll to fail are:");
       log("* A failure to produce a fragment that is already logged in the output above");
       log("* A reference to a manually edited file that hasn't been provided");
       if (SystemUtils.IS_OS_WINDOWS) {
