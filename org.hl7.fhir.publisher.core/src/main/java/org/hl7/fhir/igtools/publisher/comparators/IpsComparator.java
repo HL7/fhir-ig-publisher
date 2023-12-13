@@ -167,7 +167,7 @@ public class IpsComparator {
         String filename = "";
         try {
           vi.resources = new ArrayList<>();
-          BasePackageCacheManager pcm = new FilesystemPackageCacheManager.FilesystemPackageCacheManagerBuilder().build();
+          BasePackageCacheManager pcm = new FilesystemPackageCacheManager.Builder().build();
           NpmPackage current = pcm.loadPackage(pid, vi.version);
           for (String id : current.listResources("StructureDefinition", "ValueSet", "CodeSystem", "CapabilityStatement")) {
             filename = id;

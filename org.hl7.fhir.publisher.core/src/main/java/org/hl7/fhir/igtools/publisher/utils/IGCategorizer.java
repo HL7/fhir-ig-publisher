@@ -35,7 +35,7 @@ public class IGCategorizer {
   private FilesystemPackageCacheManager pcm;
   
   public IGCategorizer() throws IOException {
-    pcm = new FilesystemPackageCacheManager.FilesystemPackageCacheManagerBuilder().build();
+    pcm = new FilesystemPackageCacheManager.Builder().build();
     pcm.setSuppressErrors(true);
   }
   

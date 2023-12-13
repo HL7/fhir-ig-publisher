@@ -188,7 +188,7 @@ public class PreviousVersionComparator {
         String filename = "";
         try {
           vi.resources = new ArrayList<>();
-          BasePackageCacheManager pcm = new FilesystemPackageCacheManager.FilesystemPackageCacheManagerBuilder().build();
+          BasePackageCacheManager pcm = new FilesystemPackageCacheManager.Builder().build();
           NpmPackage current = pcm.loadPackage(pid, vi.version);
           for (String id : current.listResources("StructureDefinition", "ValueSet", "CodeSystem")) {
             filename = id;

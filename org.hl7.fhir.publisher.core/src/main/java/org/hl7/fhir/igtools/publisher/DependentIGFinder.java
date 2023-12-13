@@ -113,7 +113,7 @@ public class DependentIGFinder {
   public DependentIGFinder(String id) throws IOException {
     super();
     this.id = id;
-    pcm = new FilesystemPackageCacheManager.FilesystemPackageCacheManagerBuilder().build();
+    pcm = new FilesystemPackageCacheManager.Builder().build();
     pcm.setSilent(true);
     outcome = "Finding Dependent IGs not done yet";
   }

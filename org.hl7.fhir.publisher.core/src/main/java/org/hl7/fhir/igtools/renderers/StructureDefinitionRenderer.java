@@ -2009,7 +2009,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
     if (VersionUtilities.isR5Plus(context.getVersion())) {
       if (usages == null) {
-        FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager.FilesystemPackageCacheManagerBuilder().build();
+        FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager.Builder().build();
         NpmPackage npm = pcm.loadPackage("hl7.fhir.r5.core");
         usages = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(npm.load("other", "sdmap.details"));
       }

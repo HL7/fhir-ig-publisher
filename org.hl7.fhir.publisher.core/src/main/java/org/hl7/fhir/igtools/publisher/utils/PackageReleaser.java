@@ -210,7 +210,7 @@ public class PackageReleaser {
   }
 
   private void release(String source, String dest) throws Exception {
-    pcm = new FilesystemPackageCacheManager.FilesystemPackageCacheManagerBuilder().build();
+    pcm = new FilesystemPackageCacheManager.Builder().build();
     System.out.println("Load hl7.fhir.r4.core");
     r4 = org.hl7.fhir.r4.context.SimpleWorkerContext.fromPackage(pcm.loadPackage("hl7.fhir.r4.core", "4.0.1"));
     System.out.println("Load hl7.fhir.r3.core");

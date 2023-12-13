@@ -164,7 +164,7 @@ public class IGPack2NpmConvertor {
   }
 
   private void init() throws IOException {
-    pcm = new FilesystemPackageCacheManager.FilesystemPackageCacheManagerBuilder().build();
+    pcm = new FilesystemPackageCacheManager.Builder().build();
     scanner = new Scanner(System. in);
     paths = new ArrayList<String>();
   }

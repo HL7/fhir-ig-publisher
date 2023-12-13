@@ -291,7 +291,7 @@ public class CrossVersionOIDScanner {
 
   private void loadPackage(String pid, List<LoadedCanonicalResource> reslist) throws IOException {
     System.out.println("Load Package "+pid);
-    FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager.FilesystemPackageCacheManagerBuilder().build();
+    FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager.Builder().build();
     NpmPackage npm = pcm.loadPackage(pid);
 //    SpecMapManager spm = new SpecMapManager(TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.fhirVersion());
     IContextResourceLoader loader = new PublisherLoader(npm, null, npm.getWebLocation(), null).makeLoader();
