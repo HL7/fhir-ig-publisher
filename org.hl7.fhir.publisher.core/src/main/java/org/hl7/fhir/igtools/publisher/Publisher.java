@@ -2408,9 +2408,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   @Nonnull
   private FilesystemPackageCacheManager getFilesystemPackageCacheManager() throws IOException {
     if (getPackageCacheFolder() != null) {
-      return new FilesystemPackageCacheManager(getPackageCacheFolder());
+      return new FilesystemPackageCacheManager.Builder().withCacheFolder(getPackageCacheFolder()).build();
     }
-    return new FilesystemPackageCacheManager(mode == null || mode == IGBuildMode.MANUAL || mode == IGBuildMode.PUBLICATION);
+    return mode == null || mode == IGBuildMode.MANUAL || mode == IGBuildMode.PUBLICATION ?
+            new FilesystemPackageCacheManager.Builder().build()
+            : new FilesystemPackageCacheManager.Builder().withSystemCacheFolder().build();
+
   }
 
   private Coding checkForJurisdiction() {
@@ -3940,7 +3943,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       Utilities.createDirectory(adHocTmpDir);
     Utilities.clearDirectory(adHocTmpDir);
 
-    FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager(org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager.FilesystemPackageCacheMode.USER);
+    FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager.Builder().build();
 
     NpmPackage npm = null; 
     if (specifiedVersion == null) {
@@ -12128,7 +12131,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         s = s + " "+removePassword(args, i);
       }      
       System.out.println(s);
-      FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager(!CliParams.hasNamedParam(args, "system"));
+      FilesystemPackageCacheManager pcm = CliParams.hasNamedParam(args, "system")
+              ? new FilesystemPackageCacheManager.Builder().withSystemCacheFolder().build()
+              : new FilesystemPackageCacheManager.Builder().build();
       System.out.println("Cache = "+pcm.getFolder());
       for (String p : CliParams.getNamedParam(args, "-package").split("\\;")) {
         NpmPackage npm = pcm.loadPackage(p);

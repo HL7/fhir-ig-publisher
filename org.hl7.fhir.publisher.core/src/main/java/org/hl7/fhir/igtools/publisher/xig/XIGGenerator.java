@@ -50,7 +50,7 @@ public class XIGGenerator {
     this.target = target;
     this.cache = cache;
     Utilities.createDirectory(cache);
-    pcm = new FilesystemPackageCacheManager(org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager.FilesystemPackageCacheMode.USER);
+    pcm = new FilesystemPackageCacheManager.Builder().build();
     String ds = new SimpleDateFormat("dd MMM yyyy", new Locale("en", "US")).format(Calendar.getInstance().getTime());
     String dl = new SimpleDateFormat("yyyy-MM-dd'T'hh:mm:ssZ", new Locale("en", "US")).format(Calendar.getInstance().getTime());
     date = "<span title=\""+dl+"\">"+ds+"</span>";    
