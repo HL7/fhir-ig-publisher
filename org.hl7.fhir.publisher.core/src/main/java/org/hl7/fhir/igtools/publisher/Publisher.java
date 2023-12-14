@@ -1404,6 +1404,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       if (sourceIg != null) {
         j.add("url", sourceIg.getUrl());
         j.add("name", sourceIg.getName());
+        j.add("title", sourceIg.getTitle());
       }
       if (publishedIg != null && publishedIg.hasPackageId()) {
         j.add("package-id", publishedIg.getPackageId());
