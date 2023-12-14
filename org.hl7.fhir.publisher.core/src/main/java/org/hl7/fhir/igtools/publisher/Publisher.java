@@ -7097,7 +7097,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private void validate(FetchedFile f, FetchedResource r, Binary bin, List<ValidationMessage> errs, FhirFormat fmt, List<StructureDefinition> profiles) {
     long ts = System.currentTimeMillis();
-    validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), fmt, profiles);
+    r.setLogicalElement(validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), fmt, profiles));
     long tf = System.currentTimeMillis();
     if (tf-ts > validationLogTime && validationLogTime > 0) {
       reportLongValidation(f, r, tf-ts);
