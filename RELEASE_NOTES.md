@@ -1,6 +1,8 @@
-* Validator: Fix narrative link validation and add id/idref validation (for IPS)
-* Validator: Fix stated path for error when code not in value set
-* Renderer: Fix rendering of trigger definition using tables inside paragraphs
-* Renderer: Fix problem with profiled resources being called examples in IG publisher
-* Renderer: Fix bug where version specific references to profiles not picked up
-* US Realm: Add link to US Core derivation process
+* Loader: Upgrade xver to latest R5 definitions
+* Loader: fix binary loading problem (unknown file types for txt json xml)
+* Validator: Fix up validation of fragment and example value sets
+* Validator: Improve handling of terminology messages
+* Validator: Add support for logical_container extension (for CDA constraint validation)
+* Validator: Clean up handling of xml_name
+* Validator: Check for xver extension canonical urls when validating uri elements
+* Renderer: Fix rendering of type for previous versions
