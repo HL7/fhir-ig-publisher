@@ -5,4 +5,3 @@
 * Renderer: Fix bug where version specific references to profiles not picked up
 * US Realm: Add link to US Core derivation process
 * Add more data to qa.json
-
