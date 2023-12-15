@@ -214,6 +214,12 @@ public class AdjunctFileLoader {
       return "image/jpeg";
     } else if ("cql".equals(ext)) {
       return "text/cql";
+    } else if ("txt".equals(ext)) {
+      return "text/plain";
+    } else if ("json".equals(ext)) {
+      return "application/json";
+    } else if ("xml".equals(ext)) {
+      return "application/xml";
     } else {
       return null;
     }
