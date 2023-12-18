@@ -480,6 +480,13 @@ public class PublicationProcess {
 
     // 2. make a copy of what we built
     System.out.println("Keep a copy of the build directory at "+Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".zip"));    
+
+    // 2.1. Delete the ".git" subfolder
+    File gitFolder = new File(temp, ".git");
+    if (gitFolder.exists()) {
+        FileUtils.deleteDirectory(gitFolder);
+    }
+
     zipFolder(temp, Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".zip"));
 
     System.out.println("");        
