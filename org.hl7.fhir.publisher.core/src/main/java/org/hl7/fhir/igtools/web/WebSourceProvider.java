@@ -83,6 +83,7 @@ public class WebSourceProvider {
       long t = System.currentTimeMillis();
       HTTPResult res = fetcher.get(url);
       res.checkThrowException();
+      Utilities.createDirectory(Utilities.getDirectoryForFile(df.getAbsolutePath()));
       TextFile.bytesToFile(res.getContent(), df);
       System.out.println("  ... done ("+stats(res.getContent().length, t)+")");
     } else {
@@ -94,6 +95,19 @@ public class WebSourceProvider {
     }
   }
 
+  public boolean checkForFolder(String path) throws IOException {
+    File df = new File(Utilities.path(destination, path));
+    if (df.exists()) {
+      return true;
+    }
+    
+    if (web) {
+      return true; // todo: do a head request on "_ig-pub-archive.zip"
+    } else {
+      File sf = new File(Utilities.path(source, path));
+      return sf.exists() && sf.isDirectory();
+    }
+  }
   public void needFolder(String path, boolean clear) throws IOException {
     File df = new File(Utilities.path(destination, path));
     if (df.exists() && !df.isDirectory()) {
@@ -316,4 +330,9 @@ public class WebSourceProvider {
   public String verb() {
     return web ? "Upload" : "Copy";
   }
+
+  public String getSource() {
+    return source;
+  }
+
 }

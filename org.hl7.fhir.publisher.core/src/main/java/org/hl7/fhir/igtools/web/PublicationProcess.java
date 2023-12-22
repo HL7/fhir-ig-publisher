@@ -72,7 +72,7 @@ public class PublicationProcess {
 
     public static PublicationProcessMode fromCode(String s) {
       if (Utilities.noString(s)) {
-        return WORKING;
+        throw new Error("No publication process mode found");
       }
       s = s.toLowerCase();
       if ("working".equals(s)) {
@@ -182,9 +182,11 @@ public class PublicationProcess {
     String url = pubSetup.getJsonObject("website").asString("url");
 
     src.needOptionalFile("package-registry.json");
-    if (!check(res, new File(Utilities.path(workingRoot, "package-registry.json")).exists(), "There is no package-registry.json file. Create one by running the publisher -generate-package-registry {folder} (where folder contains the entire website)")) {
+    File fPckReg = new File(Utilities.path(workingRoot, "package-registry.json"));
+    if (!check(res, fPckReg.exists(), "There is no package-registry.json file. Create one by running the publisher -generate-package-registry {folder} (where folder contains the entire website)")) {
       return res;
     }
+    JsonParser.parseObject(fPckReg); // just check it's ok 
 
     src.needOptionalFile("publish-counter.json");
     File fPubCounter = new File(Utilities.path(workingRoot, "publish-counter.json"));
@@ -230,7 +232,7 @@ public class PublicationProcess {
           help = false;
           publishInner2(source, web, date, registrySource, history, templateSrc, temp, logger, args,
               manualCheck, destination, workingRoot, res, src, id, canonical, version, npm, pubSetup, qa,
-              fSource, fOutput, fRoot, fRegistry, fHistory, runNumber);
+              fSource, fOutput, fRoot, fRegistry, fHistory, runNumber, cURL);
         }        
       }
     }
@@ -276,17 +278,22 @@ public class PublicationProcess {
   public List<ValidationMessage> publishInner2(String source, String web, String date, String registrySource, String history, String templateSrc, String temp, 
       PublisherConsoleLogger logger, String[] args, boolean manualCheck, String destination, String workingRoot, List<ValidationMessage> res, WebSourceProvider src,
       String id, String canonical, String version, NpmPackage npm, JsonObject pubSetup, JsonObject qa, 
-      File fSource, File fOutput, File fRoot, File fRegistry, File fHistory, int runNumber) throws Exception {
+      File fSource, File fOutput, File fRoot, File fRegistry, File fHistory, int runNumber, String calcUrl) throws Exception {
     System.out.println("Relative directory for IG is '"+destination.substring(workingRoot.length())+"'");
     String relDest = Utilities.getRelativePath(workingRoot, destination);
     Utilities.createDirectory(destination);
+
+    System.out.println("===== Web Publication Run Details ===============================");
+    System.out.println(" Source IG: "+npm.name()+"#"+npm.version()+" : "+npm.canonical()+" ("+VersionUtilities.getNameForVersion(npm.fhirVersion())+" from "+source); 
     
     // ----------------------------------------------
 
     if (!check(res, !(new File(Utilities.path(source, "package-list.json")).exists()), "Source '"+source+"' contains a package-list.json - must not exist")) {
+      System.out.println("===== Web Publication Run Details ===============================");
       return res;
     }            
     if (!check(res, new File(Utilities.path(source, "publication-request.json")).exists(), "Source '"+source+"' does not contain a publication-request.json - consult documentation to see how to set it up")) {
+      System.out.println("===== Web Publication Run Details ===============================");
       return res;
     }            
     
@@ -305,6 +312,7 @@ public class PublicationProcess {
         ok = check(res, !Utilities.noString(prSrc.asString("introduction")), "No introduction in the publication request") && ok;
         ok = check(res, !Utilities.noString(prSrc.asString("ci-build")), "No ci-build in the publication request") && ok;
         if (!ok) {
+          System.out.println("===== Web Publication Run Details ===============================");
           return res;
         }
         PackageList pl = new PackageList();
@@ -314,8 +322,19 @@ public class PublicationProcess {
       }      
     }
     if (!check(res, new File(Utilities.path(destination, "package-list.json")).exists(), "Destination '"+destination+"' does not contain a package-list.json - cannot proceed")) {
+      System.out.println("===== Web Publication Run Details ===============================");
       return res;
     }
+
+    if (!check(res, version.equals(prSrc.asString("version")), "Source Package version "+version+" does not match publication request version "+prSrc.asString("version"))) {
+      System.out.println("===== Web Publication Run Details ===============================");
+      return res;
+    }   
+    System.out.println(" Operation: "+prSrc.asString("package-id")+"#"+prSrc.asString("version")+" @ "+prSrc.asString("path")+" as "+mode.toCode());
+    System.out.println("");
+    System.out.println("Existing Web site:");
+    System.out.println(" "+pubSetup.forceObject("website").asString("url")+" from "+src.getSource());
+        
     PackageList pl = PackageList.fromFile(Utilities.path(destination, "package-list.json"));
 
     check(res, id.equals(prSrc.asString("package-id")), "Source publication request has the wrong package id: "+prSrc.asString("package-id")+" (should be "+id+")");
@@ -323,16 +342,39 @@ public class PublicationProcess {
     check(res, canonical.equals(pl.canonical()), "Package List has the wrong canonical: "+pl.canonical()+" (should be "+canonical+")");
     check(res, pl.category() != null, "No Entry found in dest package-list 'category'");
     check(res, pl.ciBuild() != null, "Package List does not have an entry for the current version in the list of versions");
+    check(res, pl.list().size() > 0, "Destination package-list has no existent version (should have ci-build entry)");
 
     PackageListEntry vPub = pl.findByVersion(version);
     
-    check(res, pl.list().size() > 0, "Destination package-list has no existent version (should have ci-build entry)");
     check(res, vPub == null, "Found an entry in the publication package-list for v"+version+" - it looks like it has already been published");
     check(res, prSrc.has("desc") || prSrc.has("descmd"), "Source publication request has no description for v"+version);
     String pathVer = prSrc.asString("path");
     String vCode = pathVer.substring(pathVer.lastIndexOf("/")+1);
     
     check(res, pathVer.equals(Utilities.pathURL(canonical, vCode)), "Source publication request path is wrong - is '"+pathVer+"', doesn't match expected based on canonical of '"+Utilities.pathURL(canonical, vCode)+"')");
+
+    boolean pathExists = pl.hasPath(pathVer);
+    if (mode == PublicationProcessMode.TECHNICAL_CORRECTION) {
+      check(res, pathExists, "Mode is technical correction, but the path '"+pathVer+"' does not already exist");      
+    } else {
+      check(res, !pathExists, "A publication already exists at '"+pathVer+"'");      
+    }
+    if (mode == PublicationProcessMode.MILESTONE) {
+      // check at this point that all the paths already exist, rather than blowing up later if they don't
+      for (PackageListEntry v : pl.versions()) {
+        String path = v.determineLocalPath(pubSetup.getJsonObject("website").asString("url"), fRoot.getAbsolutePath());
+        if (path != null) {
+          String relPath = Utilities.getRelativePath(fRoot.getAbsolutePath(), path);
+          check(res, src.checkForFolder(relPath), "The package-list.json file contains a reference to "+path+" but that path wasn't found at "+relPath);
+        }
+      }
+    }
+    System.out.println("  "+pl.pid()+" / "+pl.canonical()+" @ "+calcUrl);
+    for (PackageListEntry v : pl.versions()) {
+      System.out.println("   "+v.version()+" @ "+v.path()+". "+v.status()+" in "+v.sequence());
+    }
+  
+    
     // ok, the ids and canonicals are all lined up, and w're ready to publish     
 
     check(res, id.equals(qa.asString("package-id")), "Generated IG has wrong package "+qa.asString("package-id"));
@@ -343,6 +385,7 @@ public class PublicationProcess {
     
     String destVer = Utilities.path(destination, vCode);
     if (!check(res, new File(destination).exists(), "Destination '"+destVer+"' not found - must be set up manually for first publication")) {
+      System.out.println("===== Web Publication Run Details ===============================");
       return res;
     }    
     check(res, !(new File(destVer).exists()), "Nominated path '"+destVer+"' already exists");
@@ -384,6 +427,8 @@ public class PublicationProcess {
 //      src.needFolder(relDest, false);
 //    }
     // todo: check the license, header, footer?... 
+    
+    System.out.println("===== Web Publication Run Details ===============================");
     
     // well, we've run out of things to test... time to actually try...
     if (res.size() == 0) {
@@ -649,7 +694,7 @@ public class PublicationProcess {
   private IndexMaintainer getIndexForIg(Map<String, IndexMaintainer> indexes, String packageId) {
     String realm = Utilities.charCount(packageId, '.') > 1 ? packageId.split("\\.")[2] : null;
     String code = Utilities.charCount(packageId, '.') > 2 ? packageId.split("\\.")[3] : null;
-    return realm == null || ("uv".equals(realm) && Utilities.existsInList(code, "smart-app-launch", "extensions")) ? null : indexes.get(realm);
+    return realm == null || ("uv".equals(realm) && Utilities.existsInList(code, "smart-app-launch", "extensions", "tools")) ? null : indexes.get(realm);
   }
 
   private void updateFeed(File fRoot, String destVer, PackageList pl, PackageListEntry plVer, String file, boolean isPublication, WebSourceProvider src, String orgName, NpmPackage npm, String genDate, String username, String version, String gitSrcId, String runNumber) throws IOException {
