@@ -1681,7 +1681,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         code.addExtension(ToolingExtensions.EXT_FMM_DERIVED, new CanonicalType(parentCanonical));
         res.addExtension(ToolingExtensions.EXT_STANDARDS_STATUS, code);
       } else if (!status.getValue().equals("informative") && !status.getValue().equals("draft")) {
-        errors.add(new ValidationMessage(Source.Publisher, IssueType.INVALID, res.getResourceType() + " " + r.getId(), "If a resource is not implementable, is marked as experimental or example, the standards status can only be 'informative' or 'draft'.", IssueSeverity.ERROR));
+        errors.add(new ValidationMessage(Source.Publisher, IssueType.INVALID, res.getResourceType() + "." + r.getId(), "If a resource is not implementable, is marked as experimental or example, the standards status can only be 'informative' or 'draft'.", IssueSeverity.ERROR));
       }
 
     } else {
@@ -6255,7 +6255,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           }
         }
       } catch ( Exception ex ) {
-        throw new Exception("Unable to determine type for  "+file.getName()+": " +ex.getMessage(), ex);
+        throw new Exception("Error processing "+file.getName()+" after loading: " +ex.getMessage(), ex);
       }
     }
   }
