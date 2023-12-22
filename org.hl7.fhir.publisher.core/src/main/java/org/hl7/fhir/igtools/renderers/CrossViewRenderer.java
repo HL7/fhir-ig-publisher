@@ -738,7 +738,7 @@ public class CrossViewRenderer extends Renderer {
     switch (ctxt.getType()) {
     case ELEMENT:
       String s = ctxt.getExpression();
-      if (s.contains(":")) {
+      if (s != null && s.contains(":")) {
         if (s.contains("#")) {
           s = s.substring(s.indexOf("#")+1);
         } else {
