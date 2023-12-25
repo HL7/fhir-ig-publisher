@@ -280,6 +280,9 @@ public class PublicationProcess {
     System.out.println("Relative directory for IG is '"+destination.substring(workingRoot.length())+"'");
     String relDest = Utilities.getRelativePath(workingRoot, destination);
     Utilities.createDirectory(destination);
+
+    System.out.println("===== Web Publication Run Details ===============================");
+    System.out.println(" Source IG: "+npm.name()+"#"+npm.version()+" : "+npm.canonical()+" ("+VersionUtilities.getNameForVersion(npm.fhirVersion())+") from "+source); 
     
     // ----------------------------------------------
 
