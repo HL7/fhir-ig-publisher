@@ -39,6 +39,7 @@ public class FetchedResource {
   private String path; // where published
   private Resource resource;
   private Element element;
+  private Element logicalElement;
   private JsonObject config;
   private boolean validated;
   private boolean validateAsResource;
@@ -290,6 +291,14 @@ public class FetchedResource {
 
   public void setNameForErrors(String nameForErrors) {
     this.nameForErrors = nameForErrors;
+  }
+
+  public Element getLogicalElement() {
+    return logicalElement;
+  }
+
+  public void setLogicalElement(Element logicalElement) {
+    this.logicalElement = logicalElement;
   }
   
 }
