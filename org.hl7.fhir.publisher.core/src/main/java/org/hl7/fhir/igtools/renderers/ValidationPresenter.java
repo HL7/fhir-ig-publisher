@@ -431,6 +431,21 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     StringBuilder b = new StringBuilder();
     files = sorted(files);
 
+    b.append(title + "\n");
+    b.append("=========================================");
+    b.append("\n\n");
+
+    for (ValidationMessage vm : linkErrors) {
+        String eslintSeverity = vm.getLevel().getDisplay();
+        if (eslintSeverity.equals("Information"))
+          eslintSeverity = "Info";
+
+        if (eslintSeverity.equals("Fatal"))
+          eslintSeverity = "Error";
+
+      b.append("Generic: line 0, col 0, " + eslintSeverity + " - " + vm.getMessage() + " (" + vm.getType() + ")" + "\n");
+    }
+
     for (FetchedFile f : files) {
       for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages)) {
         String eslintSeverity = vm.getLevel().getDisplay();
@@ -453,8 +468,9 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     }
 
     b.append("\n");
-    b.append(genHeaderTxt(title, err, warn, info));
-    
+    b.append("err = " + err + ", warn = " + warn + ", info = " + info + "\n");
+    b.append("IG Publisher Version: " + toolsVersion);
+
     TextFile.stringToFile(b.toString(), Utilities.changeFileExt(path, "-eslintcompact.txt"));
   }
 
