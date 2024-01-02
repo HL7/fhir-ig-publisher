@@ -122,6 +122,8 @@ public class TemplateReleaser {
 
   private File xml;
 
+  private Boolean assumeValidDependencies;
+
 
   // 3 parameters: source of package, package dest folder, and release note
   public static void main(String[] args) throws Exception {
@@ -137,6 +139,7 @@ public class TemplateReleaser {
 
   private void release(String source, String dest) throws Exception {
     SimpleDateFormat df = new SimpleDateFormat(RSS_DATE, new Locale("en", "US"));
+    assumeValidDependencies = ("YES".equals(System.getenv("PUB_ASSUME_VALID_DEPENDENCIES")));
     checkDest(dest);
     Map<String, String> currentPublishedVersions = scanForCurrentVersions(dest);
     System.out.println("Current Published Versions");
@@ -214,13 +217,21 @@ public class TemplateReleaser {
     for (String id : Utilities.sorted(currentVersions.keySet())) {
       tr = tbl.tr();
       PackageList pl = new PackageList(JsonParser.parseObject(new File(Utilities.path(path, id, "package-list.json"))));
-      tr.td().ah("http://fhir.org/templates/"+id).tx(pl.pid());
+      tr.td().ah(pl.canonical()).tx(pl.pid());
       tr.td().tx(pl.title());
-      tr.td().ah("http://fhir.org/templates/"+id+"/"+pl.current().version()+"/package.tgz").tx(pl.current().version());
+      tr.td().ah(pl.canonical() + "/" + pl.current().version() + "/package.tgz").tx(pl.current().version());
       tr.td().tx(pl.current().date());
     }
-    String s = INDEX_TEMPLATE.replace("{{index}}", new XhtmlComposer(false, false).compose(tbl));
-    TextFile.stringToFile(s, Utilities.path(path, "index.html"), false);
+
+    String templateName = System.getenv("PUB_INDEX_TEMPLATE_FILE");
+    if (templateName != null) {
+      String s = TextFile.fileToString(templateName).replace("{{index}}", new XhtmlComposer(false, false).compose(tbl));
+      TextFile.stringToFile(s, Utilities.path(path, "index.html"), false);
+    } 
+    else {
+      String s = INDEX_TEMPLATE.replace("{{index}}", new XhtmlComposer(false, false).compose(tbl));
+      TextFile.stringToFile(s, Utilities.path(path, "index.html"), false);
+    }
   }
 
   private void build(String source, VersionDecision vd, List<VersionDecision> versions) throws Exception {
@@ -242,12 +253,23 @@ public class TemplateReleaser {
     if (npm.has("dependencies")) {
       JsonObject d = npm.getJsonObject("dependencies");
       List<String> deps = new ArrayList<>();
-      for (JsonProperty e : d.getProperties()) {
-        deps.add(e.getName());
+      if (assumeValidDependencies) {
+        for (JsonProperty e : d.getProperties()) {
+          if (assumeValidDependencies && "current".equals(e.getValue().asJsonString().getValue())) {
+            throw new Error("When skipping dependency checks, cannot use \"current\" for "+e.getName()+" in "+vd.getId()+".");
+          }
+        }
       }
-      for (String s : deps) {
-        d.remove(s);
-        d.add(s, findVersion(versionsList, s).newVersion);
+      else {
+        for (JsonProperty e : d.getProperties()) {
+          deps.add(e.getName());
+        }
+        if (!assumeValidDependencies) {
+          for (String s : deps) {
+            d.remove(s);
+            d.add(s, findVersion(versionsList, s).newVersion);
+          }
+        }
       }
     }
     String jcnt = JsonParser.compose(npm, true);
@@ -255,6 +277,9 @@ public class TemplateReleaser {
   }
 
   private void resetVersions(String source, VersionDecision vd, List<VersionDecision> versionsList) throws FileNotFoundException, IOException {
+    if (assumeValidDependencies) {
+      return;
+    }
     JsonObject npm = JsonParser.parseObject(new FileInputStream(Utilities.path(source, vd.getId(), "package", "package.json")));
     if (npm.has("dependencies")) {
       JsonObject d = npm.getJsonObject("dependencies");
@@ -282,7 +307,7 @@ public class TemplateReleaser {
       }
     }
     if (!ok) {
-      throw new Error("unable to find version "+vd.getNewVersion()+" in pacjage list");
+      throw new Error("unable to find version "+vd.getNewVersion()+" in package list");
     }
     TextFile.stringToFile(pl.toJson(), Utilities.path(source, vd.getId(), "package-list.json"));
   }
@@ -356,8 +381,8 @@ public class TemplateReleaser {
   
   private void checkDependencies(String source, VersionDecision vd, List<VersionDecision> versions) throws Exception {
     vd.checked = false;
-    List<String> dependendencies = listDependencies(source, vd.getId());
-    for (String s : dependendencies) {
+    List<String> dependencies = listDependencies(source, vd.getId());
+    for (String s : dependencies) {
       VersionDecision v = findVersion(versions, s);
       if (v.checked == null) {
         checkDependencies(source, v, versions);
@@ -395,7 +420,7 @@ public class TemplateReleaser {
   private List<String> listDependencies(String source, String id) throws Exception {
     JsonObject npm = JsonParser.parseObject(TextFile.fileToString(Utilities.path(source, id, "package", "package.json")));
     List<String> res = new ArrayList<String>();
-    if (npm.has("dependencies")) {
+    if (!assumeValidDependencies && npm.has("dependencies")) {
       for (JsonProperty s : npm.getJsonObject("dependencies").getProperties()) {
 //        if (!"current".equals(s.getValue().getAsString())) {
 //          throw new Exception("Dependency is not 'current'");
