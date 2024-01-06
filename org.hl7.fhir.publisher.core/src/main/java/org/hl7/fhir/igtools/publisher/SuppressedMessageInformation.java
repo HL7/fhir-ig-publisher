@@ -100,6 +100,7 @@ public class SuppressedMessageInformation {
           if (!vMsg.isMatched()) {
             sm.use();
             vMsg.setMatched(true);
+            vMsg.setComment(c.name);
           }
           return true;
         }
