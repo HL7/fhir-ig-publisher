@@ -1150,7 +1150,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine).render(publishedIg, true, false, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()),
           new PublicationChecker(repoRoot, historyPage, markdownEngine).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
           generateDraftDependencies(),
-          noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder);
+          noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder, context.getTxCache().servers());
       tts.end();
       if (isChild()) {
         log("Built. "+tt.report());
@@ -3065,12 +3065,15 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       dep.setVersion(pcm.getLatestVersion(dep.getPackageId()));
       dep.addExtension(ToolingExtensions.EXT_IGDEP_COMMENT, new MarkdownType("Automatically added as a dependency - all IGs depend on HL7 Terminology"));
       sourceIg.getDependsOn().add(0, dep);
+    }    
+    if (!"hl7.fhir.uv.tools".equals(sourceIg.getPackageId()) && !dependsOnTooling(sourceIg.getDependsOn())) {
+      if (sourceIg.getDefinition().hasExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency")) {
+        sourceIg.getDefinition().getExtensionByUrl("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency").setValue(new CodeType("hl7.fhir.uv.tools#0.1.0"));      
+      } else {
+        sourceIg.getDefinition().addExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency", new CodeType("hl7.fhir.uv.tools#0.1.0"));
+      }
     }
-    if (sourceIg.getDefinition().hasExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency")) {
-      sourceIg.getDefinition().getExtensionByUrl("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency").setValue(new CodeType("hl7.fhir.uv.tools#current"));      
-    } else {
-      sourceIg.getDefinition().addExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency", new CodeType("hl7.fhir.uv.tools#current"));
-    }
+    
     inspector = new HTMLInspector(outputDir, specMaps, linkSpecMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), trackedFragments);
     inspector.getManual().add("full-ig.zip");
     if (historyPage != null) {
@@ -3087,15 +3090,15 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       loadIg(dep, i, !dep.hasUserData("no-load-deps"));
       i++;
     }
-    
+    if (!"hl7.fhir.uv.tools".equals(sourceIg.getPackageId()) && !dependsOnTooling(sourceIg.getDependsOn())) {
+      loadIg("igtools", "hl7.fhir.uv.tools", "0.1.0", "http://hl7.org/fhir/tools/ImplementationGuide/hl7.fhir.uv.tools", i, false);   
+    }
+
     // we're also going to look for packages that can be referred to but aren't dependencies
     for (Extension ext : sourceIg.getDefinition().getExtensionsByUrl("http://hl7.org/fhir/tools/StructureDefinition/ig-link-dependency")) {
       loadLinkIg(ext.getValue().primitiveValue());
     }
 
-    if (!"hl7.fhir.uv.tools".equals(sourceIg.getPackageId())) {
-      loadIg("igtools", "hl7.fhir.uv.tools", "current", "http://hl7.org/fhir/tools/ImplementationGuide/hl7.fhir.uv.tools", i, false);   
-    }
 
     if (!VersionUtilities.isR5Plus(context.getVersion())) {
       System.out.println("Load R5 Specials");
@@ -3279,6 +3282,19 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         return true;
       }
       if (d.hasUri() && d.getUri().contains("terminology.hl7")) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+
+  private boolean dependsOnTooling(List<ImplementationGuideDependsOnComponent> dependsOn) {
+    for (ImplementationGuideDependsOnComponent d : dependsOn) {
+      if (d.hasPackageId() && d.getPackageId().contains("hl7.fhir.uv.tools")) {
+        return true;
+      }
+      if (d.hasUri() && d.getUri().contains("hl7.org/fhir/tools")) {
         return true;
       }
     }

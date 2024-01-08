@@ -27,6 +27,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 
@@ -52,6 +53,10 @@ import org.hl7.fhir.r5.terminologies.ImplicitValueSets;
 import org.hl7.fhir.r5.utils.validation.IResourceValidator;
 import org.hl7.fhir.r5.utils.validation.IValidationPolicyAdvisor;
 import org.hl7.fhir.r5.utils.validation.IValidatorResourceFetcher;
+import org.hl7.fhir.r5.utils.validation.IValidationPolicyAdvisor.AdditionalBindingPurpose;
+import org.hl7.fhir.r5.utils.validation.IValidationPolicyAdvisor.CodedContentValidationAction;
+import org.hl7.fhir.r5.utils.validation.IValidationPolicyAdvisor.ElementValidationAction;
+import org.hl7.fhir.r5.utils.validation.IValidationPolicyAdvisor.ResourceValidationAction;
 import org.hl7.fhir.r5.utils.validation.constants.BindingKind;
 import org.hl7.fhir.r5.utils.validation.constants.CodedContentValidationPolicy;
 import org.hl7.fhir.r5.utils.validation.constants.ContainedReferenceValidationPolicy;
@@ -191,7 +196,15 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   }
 
   @Override
-  public ContainedReferenceValidationPolicy policyForContained(IResourceValidator validator, Object appContext, String containerType, String containerId, Element.SpecialElement containingResourceType, String path, String url) {
+  public ContainedReferenceValidationPolicy policyForContained(IResourceValidator validator,
+      Object appContext,
+      StructureDefinition structure,
+      ElementDefinition element,
+      String containerType,
+      String containerId,
+      Element.SpecialElement containingResourceType,
+      String path,
+      String url) {
     return ContainedReferenceValidationPolicy.CHECK_VALID;
   }
 
@@ -333,13 +346,31 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   }
 
   @Override
-  public CodedContentValidationPolicy policyForCodedContent(IResourceValidator validator, Object appContext, String stackPath, ElementDefinition definition,
-      StructureDefinition structure, BindingKind kind, ValueSet valueSet, List<String> systems) {
+  public EnumSet<CodedContentValidationAction> policyForCodedContent(IResourceValidator validator,
+      Object appContext,
+      String stackPath,
+      ElementDefinition definition,
+      StructureDefinition structure,
+      BindingKind kind,
+      AdditionalBindingPurpose purpose,
+      ValueSet valueSet,
+      List<String> systems) {
     if (VersionUtilities.isR4BVer(context.getVersion()) && 
         "ImplementationGuide.definition.parameter.code".equals(definition.getBase().getPath())) {
-      return CodedContentValidationPolicy.IGNORE;
+      return EnumSet.noneOf(CodedContentValidationAction.class);
     }
-    return CodedContentValidationPolicy.VALUESET;
+    return EnumSet.allOf(CodedContentValidationAction.class);
   }
 
+  @Override
+  public EnumSet<ResourceValidationAction> policyForResource(IResourceValidator validator, Object appContext,
+      StructureDefinition type, String path) {
+    return EnumSet.allOf(ResourceValidationAction.class);
+  }
+
+  @Override
+  public EnumSet<ElementValidationAction> policyForElement(IResourceValidator validator, Object appContext,
+      StructureDefinition structure, ElementDefinition element, String path) {
+    return EnumSet.allOf(ElementValidationAction.class);
+  }
 }

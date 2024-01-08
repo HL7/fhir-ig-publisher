@@ -34,6 +34,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.DependentIGFinder;
@@ -285,12 +286,13 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private List<StructureDefinition> modifierExtensions;
   private String globalCheck;
   private String draftDependencies;
+  private Map<String, String> txServers;
   
   public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, 
       String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, IpaComparator ipaComparator, IpsComparator ipsComparator,
       String dependencies, String csAnalysis, String pubReqCheck, String globalCheck, String copyrightYear, IWorkerContext context,
       Set<String> r5Extensions, List<StructureDefinition> modifierExtensions, String draftDependencies,
-      List<FetchedResource> noNarratives, List<FetchedResource> noValidation, boolean noValidate, boolean noGenerate, DependentIGFinder dependentIgs) {
+      List<FetchedResource> noNarratives, List<FetchedResource> noValidation, boolean noValidate, boolean noGenerate, DependentIGFinder dependentIgs, Map<String, String> txServers) {
     super();
     this.statedVersion = statedVersion;
     this.igVersion = igVersion;
@@ -319,6 +321,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     this.modifierExtensions = modifierExtensions;
     this.draftDependencies = draftDependencies;
     this.globalCheck = globalCheck;
+    this.txServers = txServers;
     ruleDateCutoff = Date.from(LocalDate.now().minusMonths(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
     determineCode();
   }
@@ -648,6 +651,15 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
           passesFilter = false;
         }
       }
+      if (message.getLevel().isError()) {
+        if (suppressedMessages.contains(message.getDisplay(), message) || suppressedMessages.contains(message.getMessage(), message) ||
+            suppressedMessages.contains(message.getHtml(), message) || suppressedMessages.contains(message.getMessageId(), message) || 
+            suppressedMessages.contains(message.getInvId(), message)) {
+          // nothing - we're just letting the message get a comment here
+      } else if (msgs.contains(message.getLocation()+"|"+message.getMessage())) {
+        // nothing - we're just letting the message get a comment here
+      }
+    }
       if (NO_FILTER) {
         passesFilter = true;
       }
@@ -767,28 +779,33 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
 
   private final String detailsTemplate = 
       "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b>$path$</b></td><td><b>$level$</b></td><td title=\"$mid$\"><b>$msg$</b></td>\r\n"+
+      "     <td><b>$path$</b></td><td><b>$level$</b></td><td title=\"$mid$\"><b>$msg$</b>$comment$</td>\r\n"+
       "   </tr>\r\n";
   
   private final String groupDetailsTemplate = 
       "   <tr style=\"background-color: $halfcolor$\">\r\n"+
-      "     <td><a href=\"$xlink$\">$fpath$</a></td><td><b>$msg$</b></td>\r\n"+
+      "     <td><a href=\"$xlink$\">$fpath$</a></td><td><b>$msg$</b>$comment$</td>\r\n"+
       "   </tr>\r\n";
   
   
-  private final String detailsTemplateTx = 
+  private final String detailsTemplateTxLink = 
       "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b> (<a href=\"$tx$\">see Tx log</a>)</td>\r\n"+
+      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txsrvr.html#$txsrvr$\">$txsrvr$</ta>, see <a href=\"$tx$\">log</a>)</td>\r\n"+
+      "   </tr>\r\n";
+  
+  private final String detailsTemplateTxNoLink = 
+      "   <tr style=\"background-color: $color$\">\r\n"+
+      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txsrvr.html#$txsrvr$\">$txsrvr$</ta>)</td>\r\n"+
       "   </tr>\r\n";
   
   private final String detailsTemplateWithExtraDetails = 
       "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b><a href=\"$pathlink$\">$path$</a></b></td><td><b>$level$</b></td><td><b>$msg$</b> <span id=\"s$id$\" class=\"flip\" onclick=\"flip('$id$')\">Show Reasoning</span><div id=\"$id$\" style=\"display: none\"><p>&nbsp;</p>$msgdetails$</div></td>\r\n"+
+      "     <td><b><a href=\"$pathlink$\">$path$</a></b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ <span id=\"s$id$\" class=\"flip\" onclick=\"flip('$id$')\">Show Reasoning</span><div id=\"$id$\" style=\"display: none\"><p>&nbsp;</p>$msgdetails$</div></td>\r\n"+
       "   </tr>\r\n";
       
   private final String detailsTemplateWithLink = 
       "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b><a href=\"$pathlink$\">$path$</a></b></td><td><b>$level$</b></td><td><b>$msg$</b></td>\r\n"+
+      "     <td><b><a href=\"$pathlink$\">$path$</a></b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$</td>\r\n"+
       "   </tr>\r\n";
   
   private final String footerTemplate = 
@@ -1179,7 +1196,19 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   }
   
   private String genDetails(ValidationMessage vm, int id) {
-    ST t = template(vm.isSlicingHint() ? detailsTemplateWithExtraDetails : vm.getLocationLink() != null ? detailsTemplateWithLink : vm.getTxLink() != null ? detailsTemplateTx : detailsTemplate);
+    String tid = null;
+    if (vm.isSlicingHint()) {
+      tid = detailsTemplateWithExtraDetails;
+    } else if (vm.getLocationLink() != null) {
+      tid = detailsTemplateWithLink;
+    } else if (vm.getTxLink() != null) {
+      tid = detailsTemplateTxLink;
+    } else if (vm.getServer() != null) {
+      tid = detailsTemplateTxNoLink;
+    } else {
+      tid = detailsTemplate;
+    }
+    ST t = template(tid);
     if (vm.getLocation()!=null) {
       t.add("path", makeBreakable(stripId(makeLocal(vm.getLocation())+lineCol(vm))));
       t.add("pathlink", vm.getLocationLink());
@@ -1194,8 +1223,18 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("mid", vm.getMessageId());
     t.add("msg", (isNewRule(vm) ? "<img style=\"vertical-align: text-bottom\" src=\"new.png\" height=\"16px\" width=\"36px\" alt=\"New Rule: \"> " : "")+ vm.getHtml());
     t.add("msgdetails", vm.isSlicingHint() ? vm.getSliceHtml() : vm.getHtml());
+    t.add("comment", vm.getComment() == null ? "" : "<br/><br/><span style=\"border: 1px grey solid; border-radius: 5px; background-color: #eeeeee; padding: 3px; margin: 3px \"><i><b>Editor's Comment</b>: "+Utilities.escapeXml(vm.getComment())+"</i></span>");
     t.add("tx", "qa-tx.html#l"+vm.getTxLink());
+    t.add("txsrvr", getServer(vm.getServer()));
     return t.render();
+  }
+
+  private String getServer(String server) {
+    if (txServers.containsKey(server)) {
+      return txServers.get(server);
+    } else {
+      return server;
+    }
   }
 
   private Object makeBreakable(String path) {

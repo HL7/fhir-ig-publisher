@@ -1485,7 +1485,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           generateCoreElemExtension(b, sd.getSnapshot().getElement(), child, children, 2, rn, false, child.getType().get(0), ++c == l, complex);
         extDone = true;
       } else if (child.hasSlicing())
-        generateCoreElemSliced(b, sd.getSnapshot().getElement(), child, children, 2, rn, false, child.getType().get(0), ++c == l, complex);
+        generateCoreElemSliced(b, sd.getSnapshot().getElement(), child, children, 2, rn, false, child.getType().isEmpty() ? null : child.getType().get(0), ++c == l, complex);
       else if (wasSliced(child, children))
         ; // nothing
       else if (child.getType().size() == 1 || allTypesAreReference(child))
@@ -1711,8 +1711,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
     String name = tail(elem.getPath());
     String en = asValue ? "value[x]" : name;
-    if (en.contains("[x]"))
+    if (en.contains("[x]")) {
+      if (type == null) {
+        throw new Error("Type cannot be unknown for element with [x] in the name @ "+pathName);
+      }
       en = en.replace("[x]", upFirst(type.getWorkingCode()));
+    }
     boolean unbounded = elem.hasMax() && elem.getMax().equals("*");
 
     String indentS = "";

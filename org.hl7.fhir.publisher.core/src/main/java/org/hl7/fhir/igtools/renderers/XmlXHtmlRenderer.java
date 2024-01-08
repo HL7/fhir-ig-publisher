@@ -81,9 +81,9 @@ public class XmlXHtmlRenderer implements IXMLWriter {
     started = true;
     b = new StringBuilder();
     if (prism) {
-      b.append("<pre class=\"xml\" style=\"white-space: pre; overflow: hidden\"><code class=\"language-xml\">\r\n");
+      b.append("<pre class=\"xml\" style=\"white-space: pre; text-wrap: nowrap;\"><code class=\"language-xml\" style=\"white-space: pre; text-wrap: nowrap;\">\r\n");
     } else {
-      b.append("<pre class=\"xml\" style=\"white-space: pre; overflow: hidden\"><code>\r\n");
+      b.append("<pre class=\"xml\" style=\"white-space: pre; text-wrap: nowrap;\"><code style=\"white-space: pre; text-wrap: nowrap;\">\r\n");
     }
   }
 
