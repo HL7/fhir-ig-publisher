@@ -2057,6 +2057,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
                 if (isDomainResource(r) && !hasNarrative(r.getElement())) {
                   ResourceWrapper rw = new ElementWrappers.ResourceWrapperMetaElement(lrc, r.getElement());
                   RendererFactory.factory(rw, lrc).setRcontext(new ResourceContext(null, rw)).render(rw);
+                  otherFilesRun.addAll(lrc.getFiles());
                 } else if (r.fhirType().equals("Bundle")) {
                   for (Element e : r.getElement().getChildrenByName("entry")) {
                     Element res = e.getNamedChild("resource");
@@ -7462,7 +7463,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       forceDir(tempLangDir);
     }
 
-    otherFilesRun.clear();
     otherFilesRun.add(Utilities.path(outputDir, "package.tgz"));
     otherFilesRun.add(Utilities.path(outputDir, "package.manifest.json"));
     otherFilesRun.add(Utilities.path(tempDir, "package.db"));
