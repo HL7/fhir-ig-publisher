@@ -1150,7 +1150,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine).render(publishedIg, true, false, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()),
           new PublicationChecker(repoRoot, historyPage, markdownEngine).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
           generateDraftDependencies(),
-          noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder, context.getTxCache().servers());
+          noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder, context.getTxClientManager());
       tts.end();
       if (isChild()) {
         log("Built. "+tt.report());
@@ -3025,6 +3025,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     for (String n : expParamMap.values())
       context.getExpansionParameters().addParameter(n, expParamMap.get(n));
 
+    TerminologyClientFactory txFactory = new TerminologyClientFactory(version);
     txLog = Utilities.createTempFile("fhir-ig-", ".log").getAbsolutePath();
     if (mode != IGBuildMode.WEBSERVER) {
       if (txServer == null || !txServer.contains(":")) {
@@ -3033,10 +3034,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         txLog = null;
       } else {
         log("Connect to Terminology Server at "+txServer);
-        checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient("Tx-Server", txServer, "fhir/publisher", FhirPublication.fromCode(version)), txLog));
+        checkTSVersion(vsCache, context.connectToTSServer(txFactory, txFactory.makeClient("Tx-Server", txServer, "fhir/publisher"), txLog));
       }
     } else 
-      checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient("Tx-Server", webTxServer.getAddress(), "fhir/publisher", FhirPublication.fromCode(version)), txLog));
+      checkTSVersion(vsCache, context.connectToTSServer(txFactory, txFactory.makeClient("Tx-Server", webTxServer.getAddress(), "fhir/publisher"), txLog));
 
     loadPubPack();
     igpkp = new IGKnowledgeProvider(context, checkAppendSlash(specPath), determineCanonical(sourceIg.getUrl(), "ImplementationGuide.url"), template.config(), errors, VersionUtilities.isR2Ver(version), template, listedURLExemptions, altCanonical, fileList);
@@ -3533,6 +3534,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     context.getExpansionParameters().addParameter("system-version", "http://snomed.info/sct|"+sct);
     txLog = Utilities.createTempFile("fhir-ig-", ".log").getAbsolutePath();
     context.getExpansionParameters().addParameter("activeOnly", "true".equals(ostr(configuration, "activeOnly")));
+    TerminologyClientFactory txFactory = new TerminologyClientFactory(version);
     if (mode != IGBuildMode.WEBSERVER) {
       if (txServer == null || !txServer.contains(":")) {
         log("WARNING: Running without terminology server - terminology content will likely not publish correctly");
@@ -3541,14 +3543,14 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       } else {
         log("Connect to Terminology Server at "+txServer);
         try {
-          checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient("Tx-Server", txServer, "fhir/publisher", FhirPublication.fromCode(version)), txLog));
+          checkTSVersion(vsCache, context.connectToTSServer(txFactory, txFactory.makeClient("Tx-Server", txServer, "fhir/publisher"), txLog));
         } catch (Exception e) {
           log("WARNING: Could not connect to terminology server - terminology content will likely not publish correctly ("+e.getMessage()+")");          
         }
       }
     } else 
       try {
-        checkTSVersion(vsCache, context.connectToTSServer(TerminologyClientFactory.makeClient("Tx-Server", webTxServer.getAddress(), "fhir/publisher", FhirPublication.fromCode(version)), txLog));
+        checkTSVersion(vsCache, context.connectToTSServer(txFactory, txFactory.makeClient("Tx-Server", webTxServer.getAddress(), "fhir/publisher"), txLog));
       } catch (Exception e) {
         log("WARNING: Could not connect to terminology server - terminology content will likely not publish correctly ("+e.getMessage()+")");          
       }

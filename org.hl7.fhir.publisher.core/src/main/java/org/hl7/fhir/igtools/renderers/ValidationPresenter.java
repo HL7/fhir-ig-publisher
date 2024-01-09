@@ -53,6 +53,10 @@ import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
 import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.model.Bundle;
 import org.hl7.fhir.r5.model.Bundle.BundleEntryComponent;
+import org.hl7.fhir.r5.model.CodeSystem;
+import org.hl7.fhir.r5.terminologies.client.TerminologyClientContext;
+import org.hl7.fhir.r5.terminologies.client.TerminologyClientContext.TerminologyClientContextUseCount;
+import org.hl7.fhir.r5.terminologies.client.TerminologyClientManager;
 import org.hl7.fhir.r5.model.Constants;
 import org.hl7.fhir.r5.model.OperationOutcome;
 import org.hl7.fhir.r5.model.PackageInformation;
@@ -60,12 +64,16 @@ import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.utils.OperationOutcomeUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.TranslatingUtilities;
+import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.i18n.I18nConstants;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
+import org.hl7.fhir.utilities.xhtml.NodeType;
+import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
+import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.stringtemplate.v4.ST;
 
 public class ValidationPresenter extends TranslatingUtilities implements Comparator<FetchedFile> {
@@ -286,13 +294,13 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private List<StructureDefinition> modifierExtensions;
   private String globalCheck;
   private String draftDependencies;
-  private Map<String, String> txServers;
+  private TerminologyClientManager txServers;
   
   public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, 
       String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, IpaComparator ipaComparator, IpsComparator ipsComparator,
       String dependencies, String csAnalysis, String pubReqCheck, String globalCheck, String copyrightYear, IWorkerContext context,
       Set<String> r5Extensions, List<StructureDefinition> modifierExtensions, String draftDependencies,
-      List<FetchedResource> noNarratives, List<FetchedResource> noValidation, boolean noValidate, boolean noGenerate, DependentIGFinder dependentIgs, Map<String, String> txServers) {
+      List<FetchedResource> noNarratives, List<FetchedResource> noValidation, boolean noValidate, boolean noGenerate, DependentIGFinder dependentIgs, TerminologyClientManager txServers) {
     super();
     this.statedVersion = statedVersion;
     this.igVersion = igVersion;
@@ -424,9 +432,113 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
 
     genQAText(title, files, path, filteredMessages, linkErrors);
     genQAESLintCompactText(title, files, path, filteredMessages, linkErrors);
+    genTXServerQA(title, path);
     
     String summary = "Errors: " + err + ", Warnings: " + warn + ", Info: " + info+", Broken Links: "+link;
     return path + "\r\n" + summary;
+  }
+
+  private void genTXServerQA(String title, String path) throws IOException {
+    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+    
+    
+    if (!txServers.hasClient()) {
+      x.para("This IG was published without any terminology support");      
+    } else {
+      x.para("This page provides a report on which terminology servers were used while publishing this IG. Note that terminology caching reduces the server hit count - this page only reports content that wasn't cached");
+      x.h2().tx("Internal Errors choosing Server using '"+txServers.getMonitorServiceURL()+"':");
+      XhtmlNode ul = x.ul();
+      if (txServers.getInternalErrors().isEmpty()) {
+        ul.li().tx("(None - all good)");        
+      } else {
+        for (String s : txServers.getInternalErrors()) {
+          ul.li().tx(s);        
+        }        
+      }
+      
+      TerminologyClientContext master = txServers.getServerList().get(0);
+      x.h2().tx("Primary Server: "+master.getAddress());
+      genServerReport(x, master);
+      for (String s : Utilities.sorted(txServers.getServerMap().keySet())) {
+        TerminologyClientContext t = txServers.getServerMap().get(s);
+        if (t != master) {
+          x.h2().tx("Server: "+t.getAddress());
+          genServerReport(x, t);          
+        }
+      }
+    }
+    
+    String page = genTxServersHeader(title)+new XhtmlComposer(false, true).compose(x.getChildNodes())+genTxServerFooter(title);
+    TextFile.stringToFile(page, Utilities.path(Utilities.getDirectoryForFile(path), "qa-txservers.html"));    
+  }
+
+  private void genServerReport(XhtmlNode x, TerminologyClientContext t) {
+    x.para("Use Count: "+t.getUseCount()+". Code Systems used: ");
+    Map<String, TerminologyClientContextUseCount> uc = t.getUseCounts();
+    if (uc.isEmpty()) {
+      XhtmlNode ul = x.ul();
+      ul.li().tx("(None)");
+    } else {        
+      XhtmlNode tbl = x.table("grid");
+      XhtmlNode tr = tbl.tr();
+      tr.th().b().tx("URL");
+      tr.th().b().tx("#Exp.");
+      tr.th().b().tx("#Val.");
+      tr.th().b().tx("Details");
+      for (String s : Utilities.sorted(uc.keySet())) {
+        tr = tbl.tr();
+        tr.td().tx(s);        
+        tr.td().tx(uc.get(s).getExpands());
+        tr.td().tx(uc.get(s).getValidates());
+        XhtmlNode td = tr.td();
+        CodeSystem cs = context.fetchResource(CodeSystem.class, s);
+        if (cs != null) {
+          if (cs.hasWebPath()) {
+            td.ah(cs.getWebPath()).tx(cs.present());
+          } else 
+            td.tx(cs.present());
+        }
+      }
+    }
+  }
+
+  private String genTxServerFooter(String title) {
+    ST t = template(footerTemplateTxServers);
+    t.add("version", Constants.VERSION);
+    t.add("igversion", statedVersion);
+    t.add("title", title);
+    t.add("time", genDate);
+    return t.render();
+  }
+
+  private String genTxServersHeader(String title) {
+
+    ST t = template(headerTemplateTxServers);
+    t.add("version", statedVersion);
+    t.add("toolsVersion", toolsVersion);
+    t.add("versionCheck", versionCheckText());
+    t.add("igversion", igVersion);
+    t.add("title", title);
+    t.add("time", genDate);
+    t.add("err",  Integer.toString(err));
+    t.add("warn",  Integer.toString(warn));
+    t.add("info",  Integer.toString(info));
+    t.add("packageId", packageId);
+    t.add("canonical", provider.getCanonical());
+    t.add("copyrightYearCheck", checkCopyRightYear());
+    t.add("realmCheck", realm.checkText());
+    t.add("igcode", igcode);
+    t.add("igcodeerror", igCodeError);
+    t.add("igrealmerror", igRealmError);
+    t.add("realm", igrealm == null ? "n/a" : igrealm.toUpperCase());
+    t.add("dependencyCheck", dependencies);
+    t.add("dependentIgs", dependentIgs.getCountDesc());
+    t.add("pubReqCheck", pubReqCheck);
+    t.add("csAnalysis", csAnalysis);
+    t.add("previousVersion", previousVersionComparator.checkHtml());
+    t.add("ipaComparison", ipaComparator == null ? "n/a" : ipaComparator.checkHtml());
+    t.add("ipsComparison", ipsComparator == null ? "n/a" : ipsComparator.checkHtml());
+    return t.render();
   }
 
   public void genQAESLintCompactText(String title, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, List<ValidationMessage> linkErrors)
@@ -711,6 +823,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       " <tr><td>Dependency Checks:</td><td>$dependencyCheck$</td></tr>\r\n"+
       " <tr><td>Dependent IGs:</td><td><a href=\"qa-dep.html\">$dependentIgs$</a></td></tr>\r\n"+
       " <tr><td>Global Profiles:</td><td>$globalCheck$</td></tr>\r\n"+
+      " <tr><td>Terminology Server(s):</td><td>$txserverlist$ (<a href=\"qa-txservers.html\">details</a>)</td></tr>\r\n"+
       " <tr><td>HTA Analysis:</td><td>$csAnalysis$</td></tr>\r\n"+
       " <tr><td>R5 Dependencies:</td><td>$r5usage$</td></tr>\r\n"+
       " <tr><td>Draft Dependencies:</td><td>$draftDependencies$</td></tr>\r\n"+
@@ -726,6 +839,22 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       "   <tr>\r\n"+
       "     <td><b>Filename</b></td><td><b>Errors</b></td><td><b>Warnings</b></td><td><b>Hints</b></td>\r\n"+
       "   </tr>\r\n";
+  
+  private final String headerTemplateTxServers = 
+      "<!DOCTYPE HTML>\r\n"+
+      "<html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\">\r\n"+
+      "<head>\r\n"+
+      "  <title>$title$ : Terminology Server Report</title>\r\n"+
+      "  <link href=\"fhir.css\" rel=\"stylesheet\"/>\r\n"+
+      "  <style>\r\n"+
+      "    span.flip  { background-color: #4CAF50; color: white; border: solid 1px #a6d8a8; padding: 2px }\r\n"+
+      "    span.toggle  { background-color: #e6f2ff; color: black; border: solid 1px #0056b3; padding: 2px; font-size: 10px }\r\n"+
+      "    span.toggle  { font-size: 10px }\r\n"+
+      "  </style>\r\n"+
+      "</head>\r\n"+
+      "<body style=\"margin: 20px; background-color: #ffffff\">\r\n"+
+      " <h1>Terminology Server Report for $title$</h1>\r\n"+
+      " <p>Generated $time$, FHIR version $version$ for $packageId$#$igversion$ (canonical = <a href=\"$canonical$\">$canonical$</a> (<a href=\"$canonical$/history.html\">history</a>))</p>\r\n";
   
   private final String summaryTemplate = 
       "   <tr style=\"background-color: $color$\">\r\n"+
@@ -796,6 +925,10 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       "</body>\r\n"+
       "</html>\r\n";
   
+  private final String footerTemplateTxServers = 
+      "</body>\r\n"+
+      "</html>\r\n";
+  
   // Text templates
   private final String headerTemplateText = 
       "$title$ : Validation Results\r\n"+
@@ -818,6 +951,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   
   private final String footerTemplateText = 
       "\r\n";
+  private String genDate = new Date().toString();
 
   private ST template(String t) {
     return new ST(t, '$', '$');
@@ -830,7 +964,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("toolsVersion", toolsVersion);
     t.add("versionCheck", versionCheckHtml());
     t.add("title", title);
-    t.add("time", new Date().toString());
+    t.add("time", genDate);
     t.add("err", Integer.toString(err));
     t.add("warn", Integer.toString(warn));
     t.add("info", Integer.toString(info));
@@ -845,6 +979,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("pubReqCheck", pubReqCheck);
     t.add("realm", igrealm == null ? "n/a" : igrealm.toUpperCase());
     t.add("globalCheck", globalCheck);
+    t.add("txserverlist", txserverlist());
     t.add("dependencyCheck", dependencies);
     t.add("draftDependencies", draftDependencies);
     t.add("dependentIgs", dependentIgs.getCountDesc());
@@ -875,6 +1010,14 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     else
       t.add("suppressedmsgssummary", "<a href=\"#suppressed\">"+msgCount+" Suppressed "+Utilities.pluralize("Issue", msgCount)+"</a>\r\n");
     return t.render();
+  }
+
+  private String txserverlist() {
+    CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder(", ");
+    for (String s : Utilities.sorted(txServers.getServerMap().keySet())) {
+      b.append("<a href=\""+s+"\">"+s+"</a>");
+    }
+    return b.toString();
   }
 
   private String genR5() {
@@ -928,7 +1071,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("versionCheck", versionCheckText());
     t.add("igversion", igVersion);
     t.add("title", title);
-    t.add("time", new Date().toString());
+    t.add("time", genDate);
     t.add("err",  Integer.toString(err));
     t.add("warn",  Integer.toString(warn));
     t.add("info",  Integer.toString(info));
@@ -985,7 +1128,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     ST t = template(endTemplate);
     t.add("version", Constants.VERSION);
     t.add("igversion", statedVersion);
-    t.add("time", new Date().toString());
+    t.add("time", genDate);
     return t.render();
   }
 
@@ -998,7 +1141,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     ST t = template(endTemplateText);
     t.add("version", Constants.VERSION);
     t.add("igversion", statedVersion);
-    t.add("time", new Date().toString());
+    t.add("time", genDate);
     return t.render();
   }
 
@@ -1007,7 +1150,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("version", Constants.VERSION);
     t.add("igversion", statedVersion);
     t.add("title", title);
-    t.add("time", new Date().toString());
+    t.add("time", genDate);
     return t.render();
   }
 
@@ -1016,7 +1159,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("version", Constants.VERSION);
     t.add("igversion", statedVersion);
     t.add("title", title);
-    t.add("time", new Date().toString());
+    t.add("time", genDate);
     return t.render();
   }
 
@@ -1214,8 +1357,8 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   }
 
   private String getServer(String server) {
-    if (txServers.containsKey(server)) {
-      return txServers.get(server);
+    if (txServers.getServerMap().containsKey(server)) {
+      return txServers.getServerMap().get(server).getClient().getAddress();
     } else {
       return server;
     }
