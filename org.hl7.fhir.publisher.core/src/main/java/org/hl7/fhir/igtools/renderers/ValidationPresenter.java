@@ -481,7 +481,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     } else {        
       XhtmlNode tbl = x.table("grid");
       XhtmlNode tr = tbl.tr();
-      tr.th().b().tx("URL");
+      tr.th().b().tx("System");
       tr.th().b().tx("#Exp.");
       tr.th().b().tx("#Val.");
       tr.th().b().tx("Details");

@@ -1,5 +1,6 @@
 * Terminology System: Properly populate property definitions in expansions
 * Terminology System: Support for multiple servers
+* Package System: Suppress date errors when searching for packages (some packages couldn't be installed)
 * Validator: Major rework of tx and validation test cases associated with reworking terminology / validator interface and ongoing testing + reconciliation with Ontoserver
 major upgrade to validation - use terminology server to perform more logic, and standardise interface based on agreements with Vocab & Ontoserver
 * Validator: Improve slicing error message
