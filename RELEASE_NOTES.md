@@ -8,7 +8,10 @@ major upgrade to validation - use terminology server to perform more logic, and 
 * Validator: Fix bug handling null objects in JSON (R5)
 * Validator: Fix for missing search parameter definition in R4
 * Validator: fix bug handling XML name extension
+* Validator: Fix FHIRPath validation errors around use of %resource and %rootResource
 * Renderer: fix presentation issues for formatted xml and json
+* Renderer: Fix bug around extra image files produced when rendering resources
+* Fix bugs handling extended Unicode characters
 * QA: show source server for message in QA
 * QA: add editor comments to errors + be explicit about tooling IG dependency
 * Publication Process: Improved errors publishing IGs
