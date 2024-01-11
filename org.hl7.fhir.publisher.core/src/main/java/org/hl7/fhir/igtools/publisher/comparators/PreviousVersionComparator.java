@@ -203,7 +203,7 @@ public class PreviousVersionComparator {
           //vi.context.initTS();
           vi.context.connectToTSServer(context.getTxClientManager().getFactory(), context.getTxClientManager().getMasterClient(), null);
           vi.context.setAllowLoadingDuplicates(true);
-          vi.context.setExpansionProfile(context.getExpansionParameters());
+          vi.context.setExpansionParameters(context.getExpansionParameters());
           vi.context.setUcumService(context.getUcumService());
           vi.context.setLocale(context.getLocale());
           vi.context.setLogger(context.getLogger());

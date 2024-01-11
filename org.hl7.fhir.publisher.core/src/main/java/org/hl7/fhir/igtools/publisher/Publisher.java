@@ -2987,7 +2987,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     context.setLogger(logger);
     context.setAllowLoadingDuplicates(true);
     context.setExpandCodesLimit(1000);
-    context.setExpansionProfile(makeExpProfile());
+    context.setExpansionParameters(makeExpProfile());
+    context.getTxClientManager().setUsage("publication");
     for (PageFactory pf : pageFactories) {
       pf.setContext(context);
     }
@@ -3019,9 +3020,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       /* This call to uncheckedPath is allowed here because the path is used to
          load an existing resource, and is not persisted in the loadFile method.
        */
-      context.setExpansionProfile((Parameters) VersionConvertorFactory_40_50.convertResource(FormatUtilities.loadFile(Utilities.uncheckedPath(Utilities.getDirectoryForFile(igName), expParams))));
+      context.setExpansionParameters((Parameters) VersionConvertorFactory_40_50.convertResource(FormatUtilities.loadFile(Utilities.uncheckedPath(Utilities.getDirectoryForFile(igName), expParams))));
     } else if (!expParamMap.isEmpty()) {
-      context.setExpansionProfile(new Parameters());      
+      context.setExpansionParameters(new Parameters());      
     }
     for (String n : expParamMap.values())
       context.getExpansionParameters().addParameter(n, expParamMap.get(n));
@@ -3522,7 +3523,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     context.setLogger(logger);
     context.setAllowLoadingDuplicates(false);
     context.setExpandCodesLimit(1000);
-    context.setExpansionProfile(makeExpProfile());
+    context.setExpansionParameters(makeExpProfile());
     dr = new DataRenderer(context);
     try {
       new ConfigFileConverter().convert(configFile, context, pcm);
@@ -7981,6 +7982,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private boolean isValidFile(String p) {
+    if (p.contains("tbl_bck")) {
+      return true; // these are not always tracked
+    }
     if (otherFilesStartup.contains(p)) {
       return true;
     }
