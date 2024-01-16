@@ -558,8 +558,10 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     if (ref.startsWith("http://hl7.org/fhir/ValueSet/v3-")) {
       br.url = specPath("v3/"+ref.substring(32)+"/vs.html");
       br.display = ref.substring(32);
+      br.uri = ref;
+      br.external = false;
     } else if (ref.startsWith("ValueSet/")) {
-      ValueSet vs = context.fetchResource(ValueSet.class, makeCanonical(ref));
+      ValueSet vs = context.findTxResource(ValueSet.class, makeCanonical(ref));
       if (vs == null) {
         br.url = ref;  
         if (ref.equals("http://tools.ietf.org/html/bcp47"))
@@ -580,13 +582,17 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       } else {
         br.url = vs.getWebPath();
         br.display = vs.getName(); 
+        br.uri = vs.getVersionedUrl();
+        br.external = vs.hasUserData("External.Link");
       }
     } else { 
       if (ref.startsWith("http://hl7.org/fhir/ValueSet/")) {
-        ValueSet vs = context.fetchResource(ValueSet.class, ref);
+        ValueSet vs = context.findTxResource(ValueSet.class, ref);
         if (vs != null) { 
           br.url = vs.getWebPath();
           br.display = vs.getName(); 
+          br.uri = vs.getUrl();
+          br.external = vs.hasUserData("External.Link");
         } else {
           String nvref = ref;
           if (nvref.contains("|")) {
@@ -618,7 +624,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
           br.display = "LOINC "+code;
         }
       } else {
-        ValueSet vs = context.fetchResource(ValueSet.class, ref);
+        ValueSet vs = context.findTxResource(ValueSet.class, ref);
         if (vs != null) {
           if (ref.contains("|")) {
             // for now, we don't do anything different. This is a todo - what can we do? 
@@ -631,10 +637,14 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
             br.url = vs.getWebPath();
             br.display = vs.getName(); 
           }
+          br.uri = vs.getUrl();
+          br.external = vs.hasUserData("External.Link");
         } else if (ref.startsWith("http://cts.nlm.nih.gov/fhir/ValueSet/")) {          
           String oid = ref.substring("http://cts.nlm.nih.gov/fhir/ValueSet/".length());
           br.url = "https://vsac.nlm.nih.gov/valueset/"+oid+"/expansion";  
           br.display = "VSAC "+oid;
+          br.uri = ref;
+          br.external = true;
         } else if (Utilities.isAbsoluteUrlLinkable(ref) && (!ref.startsWith("http://hl7.org") || !ref.startsWith("http://terminology.hl7.org"))) {
           br.url = Utilities.encodeUri(ref);  
           br.display = ref;

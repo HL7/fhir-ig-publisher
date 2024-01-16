@@ -118,7 +118,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
       }
 
       for (String url : sorted(vsurls)) {
-        ValueSet vc = context.fetchResource(ValueSet.class, url);
+        ValueSet vc = context.findTxResource(ValueSet.class, url);
         for (ConceptSetComponent t : vc.getCompose().getInclude()) {
           for (UriType ed : t.getValueSet()) {
             if (ed.getValueAsString().equals(vs.getUrl())) {

@@ -101,6 +101,9 @@ public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProv
           path = pathToSpec+"/"+ igpkp.doReplacements(p, r, null, null);
         }
         r.setWebPath(path);
+        if (path.contains("vsac")) {
+          r.setUserData("External.Link", "https://vsac.nlm.nih.gov");
+        }
         r.setUserData("webroot", pathToSpec);
         String v = ((CanonicalResource) r).getVersion();
         return path;

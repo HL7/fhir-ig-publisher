@@ -1032,9 +1032,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       npm.loadFiles(rootDir, new File(rootDir), ".git", "output", "package", "temp");
       npm.finish();
 
-      TextFile.stringToFile(makeTemplateIndexPage(), Utilities.path(outputDir, "index.html"), false);
-      TextFile.stringToFile(makeTemplateJekyllIndexPage(), Utilities.path(outputDir, "jekyll.html"), false);
-      TextFile.stringToFile(makeTemplateQAPage(), Utilities.path(outputDir, "qa.html"), false);
+      TextFile.stringToFile(makeTemplateIndexPage(), Utilities.path(outputDir, "index.html"));
+      TextFile.stringToFile(makeTemplateJekyllIndexPage(), Utilities.path(outputDir, "jekyll.html"));
+      TextFile.stringToFile(makeTemplateQAPage(), Utilities.path(outputDir, "qa.html"));
 
       if (mode != IGBuildMode.AUTOBUILD) {
         pcm.addPackageToCache(templateInfo.asString("name"), templateInfo.asString("version"), new FileInputStream(npm.filename()), Utilities.path(outputDir, "package.tgz"));
@@ -1047,8 +1047,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
     long endTime = System.nanoTime();
     String json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(qaJson, true);
-    TextFile.stringToFile(json, Utilities.path(outputDir, "qa.json"), false);
-    TextFile.stringToFile(txt.toString(), Utilities.path(outputDir, "qa.txt"), false);
+    TextFile.stringToFile(json, Utilities.path(outputDir, "qa.json"));
+    TextFile.stringToFile(txt.toString(), Utilities.path(outputDir, "qa.txt"));
 
     Utilities.createDirectory(tempDir);
     ZipGenerator zip = new ZipGenerator(Utilities.path(tempDir, "full-ig.zip"));
@@ -1433,7 +1433,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       j.add("tool", Constants.VERSION+" ("+ToolsVersion.TOOLS_VERSION+")");
       j.add("maxMemory", maxMemory);
       String json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(j, true);
-      TextFile.stringToFile(json, Utilities.path(destDir != null ? destDir : outputDir, "qa.json"), false);
+      TextFile.stringToFile(json, Utilities.path(destDir != null ? destDir : outputDir, "qa.json"));
 
       j = new JsonObject();
       j.add("date", new SimpleDateFormat("EEE, dd MMM, yyyy HH:mm:ss Z", new Locale("en", "US")).format(execTime.getTime()));
@@ -1445,7 +1445,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         f.processReport(f, fj);
       }
       json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(j, true);
-      TextFile.stringToFile(json, Utilities.path(destDir != null ? destDir : outputDir, "qa-time-report.json"), false);
+      TextFile.stringToFile(json, Utilities.path(destDir != null ? destDir : outputDir, "qa-time-report.json"));
 
       StringBuilder b = new StringBuilder();
       b.append("Source File");
@@ -1460,7 +1460,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         f.appendReport(b);
         b.append("\r\n");
       }
-      TextFile.stringToFile(b.toString(), Utilities.path(destDir != null ? destDir : outputDir, "qa-time-report.tsv"), false);
+      TextFile.stringToFile(b.toString(), Utilities.path(destDir != null ? destDir : outputDir, "qa-time-report.tsv"));
 
 
     } catch (Exception e) {
@@ -2981,21 +2981,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     else
       markdownEngine = new MarkDownProcessor(Dialect.COMMON_MARK);
 
-    // loading the specifications
-    context = loadCorePackage();
-    context.setProgress(true);
-    context.setLogger(logger);
-    context.setAllowLoadingDuplicates(true);
-    context.setExpandCodesLimit(1000);
-    context.setExpansionParameters(makeExpProfile());
-    context.getTxClientManager().setUsage("publication");
-    for (PageFactory pf : pageFactories) {
-      pf.setContext(context);
-    }
-    dr = new DataRenderer(context);
-    for (String s : conversionVersions) {
-      loadConversionVersion(s);
-    }
 
     // initializing the tx sub-system
     Utilities.createDirectory(vsCache);
@@ -3014,6 +2999,23 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (!new File(vsCache).exists())
       throw new Exception("Unable to access or create the cache directory at "+vsCache);
     logDebugMessage(LogCategory.INIT, "Load Terminology Cache from "+vsCache);
+
+    
+    // loading the specifications
+    context = loadCorePackage();
+    context.setProgress(true);
+    context.setLogger(logger);
+    context.setAllowLoadingDuplicates(true);
+    context.setExpandCodesLimit(1000);
+    context.setExpansionParameters(makeExpProfile());
+    context.getTxClientManager().setUsage("publication");
+    for (PageFactory pf : pageFactories) {
+      pf.setContext(context);
+    }
+    dr = new DataRenderer(context);
+    for (String s : conversionVersions) {
+      loadConversionVersion(s);
+    }
 
 
     if (expParams != null) {
@@ -3920,7 +3922,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         context.clearTS();
       }
     }
-    TextFile.stringToFile(FIXED_CACHE_VERSION+"|"+version, verFile, false);
+    TextFile.stringToFile(FIXED_CACHE_VERSION+"|"+version, verFile);
   }
 
 
@@ -4036,7 +4038,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
             "  },\r\n"+
             "  \"sct-edition\": \"http://snomed.info/sct/900000000000207008\",\r\n"+
             "  \"source\": \""+igs+"\"\r\n"+
-            "}\r\n", configFile, false);
+            "}\r\n", configFile);
     Utilities.createDirectory(Utilities.path(adHocTmpDir, "resources"));
     Utilities.createDirectory(Utilities.path(adHocTmpDir, "pages"));
   }
@@ -8206,7 +8208,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       }
     }
     ri.append("resourcecount="+Integer.toString(i)+"\r\n");
-    zip.addBytes("registry.info",TextFile.stringToBytes(ri.toString(), false), false);
+    zip.addBytes("registry.info",TextFile.stringToBytes(ri.toString()), false);
     zip.close();
   }
 
@@ -8261,7 +8263,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private byte[] makeNewVersionInfo(String version) throws IOException {
     String is = "[FHIR]\r\nversion="+version+"\r\n";
-    IniFile ini = new IniFile(new ByteArrayInputStream(TextFile.stringToBytes(is, false)));
+    IniFile ini = new IniFile(new ByteArrayInputStream(TextFile.stringToBytes(is)));
     ini.setStringProperty("IG", "version", version, null);
     ini.setStringProperty("IG", "date",  new SimpleDateFormat("yyyyMMddhhmmssZ", new Locale("en", "US")).format(execTime.getTime()), null);
     ByteArrayOutputStream b = new ByteArrayOutputStream();
@@ -8689,7 +8691,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
 
     String json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(data, true);
-    TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "structuredefinitions.json"), false);
+    TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "structuredefinitions.json"));
 
     // now, list the profiles - all the profiles
     data = new JsonObject();
@@ -8716,7 +8718,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
 
     json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(data, true);
-    TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "questionnaires.json"), false);
+    TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "questionnaires.json"));
 
     // now, list the profiles - all the profiles
     data = new JsonObject();
@@ -8781,7 +8783,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
 
     json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(data, true);
-    TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "resources.json"), false);
+    TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "resources.json"));
 
     if (publishedIg.getDefinition().hasPage()) {
       JsonObject pages = new JsonObject();
@@ -8799,7 +8801,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         priorEntry = entry;
       }
       json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(pages, true);
-      TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "pages.json"), false);
+      TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "pages.json"));
 
       createToc();
       if (htmlTemplate != null || mdTemplate != null) {
@@ -8907,7 +8909,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       b.append(links.isEmpty() ? "" : "\""+CommaSeparatedStringBuilder.join(",", links)+"\"");
       b.append("\r\n");
     }   
-    TextFile.stringToFile(b.toString(), Utilities.path(tempDir, name+".csv"), false);
+    TextFile.stringToFile(b.toString(), Utilities.path(tempDir, name+".csv"));
     otherFilesRun.add(Utilities.path(tempDir, name+".csv"));    
     org.hl7.fhir.utilities.json.parser.JsonParser.compose(json, new File(Utilities.path(tempDir, name+".json")), true);
     otherFilesRun.add(Utilities.path(tempDir, name+".json"));    
@@ -8999,7 +9001,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       b.append(sources.isEmpty() ? "" : "\""+CommaSeparatedStringBuilder.join(",", sources)+"\"");
       b.append("\r\n");
     }   
-    TextFile.stringToFile(b.toString(), Utilities.path(tempDir, name+".csv"), false);
+    TextFile.stringToFile(b.toString(), Utilities.path(tempDir, name+".csv"));
     otherFilesRun.add(Utilities.path(tempDir, name+".csv"));    
     org.hl7.fhir.utilities.json.parser.JsonParser.compose(json, new File(Utilities.path(tempDir, name+".json")), true);
     otherFilesRun.add(Utilities.path(tempDir, name+".json"));   
@@ -9410,8 +9412,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       list.add(obj);
     }
     String json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(list, true);
-    TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "canonicals.json"), false);
-    TextFile.stringToFile(json, Utilities.path(tempDir, "canonicals.json"), false);
+    TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "canonicals.json"));
+    TextFile.stringToFile(json, Utilities.path(tempDir, "canonicals.json"));
     otherFilesRun.add(Utilities.path(tempDir, "canonicals.json"));
 
     Collections.sort(crlist, new ResourceSorters.CanonicalResourceSortByTypeId());    
@@ -9507,7 +9509,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       FetchedFile f = relativeNames.get(sourcePath);
       String s = "---\r\n---\r\n{% include " + template + "%}";
       String targetPath = Utilities.path(tempDir, p);
-      TextFile.stringToFile(s, targetPath, false);
+      TextFile.stringToFile(s, targetPath);
       if (f==null) { // toc.xml
         checkMakeFile(s.getBytes(), targetPath, otherFilesRun);
       } else {
@@ -9755,7 +9757,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     String s = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><div style=\"col-12\"><table style=\"border:0px;font-size:11px;font-family:verdana;vertical-align:top;\" cellpadding=\"0\" border=\"0\" cellspacing=\"0\"><tbody>";
     s = s + createTocPage(publishedIg.getDefinition().getPage(), insertPage, insertAfterName, insertOffset, null, "", "0", false, "", 0);
     s = s + "</tbody></table></div>";
-    TextFile.stringToFile(s, Utilities.path(tempDir, "_includes", "toc.xml"), false);
+    TextFile.stringToFile(s, Utilities.path(tempDir, "_includes", "toc.xml"));
   }
 
   private String createTocPage(ImplementationGuideDefinitionPageComponent page, ImplementationGuideDefinitionPageComponent insertPage, String insertAfterName, String insertOffset, String currentOffset, String indents, String label, boolean last, String idPrefix, int position) throws FHIRException {
@@ -9943,7 +9945,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       }
     }
     String json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(data, true);
-    TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "fhir.json"), false);
+    TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "fhir.json"));
   }
 
   public String workingVersion() {
@@ -11280,7 +11282,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           String path = Utilities.path(tempDir, outputName);
           if (recordPath)
             r.setPath(outputName);
-          checkMakeFile(TextFile.stringToBytes(template, false), path, outputTracker);
+          checkMakeFile(TextFile.stringToBytes(template), path, outputTracker);
         }
       }
     }
@@ -11313,7 +11315,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         outputName = determineOutputName(outputName, r, res, vars, format, extension, prefixForContained);
         if (!outputName.contains("#")) {
           String path = Utilities.path(tempDir, outputName);
-          checkMakeFile(TextFile.stringToBytes(template, false), path, outputTracker);
+          checkMakeFile(TextFile.stringToBytes(template), path, outputTracker);
         }
       }
     }
@@ -11966,9 +11968,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private void fragment(String name, String content, Set<String> outputTracker, FetchedResource r, Map<String, String> vars, String format) throws IOException, FHIRException {
     String fixedContent = (r==null? content : igpkp.doReplacements(content, r, vars, format));
-    if (checkMakeFile(TextFile.stringToBytes(wrapLiquid(fixedContent), false), Utilities.path(tempDir, "_includes", name+".xhtml"), outputTracker)) {
+    if (checkMakeFile(TextFile.stringToBytes(wrapLiquid(fixedContent)), Utilities.path(tempDir, "_includes", name+".xhtml"), outputTracker)) {
       if (mode != IGBuildMode.AUTOBUILD && makeQA)
-        TextFile.stringToFile(pageWrap(fixedContent, name), Utilities.path(qaDir, name+".html"), true);
+        TextFile.stringToFile(pageWrap(fixedContent, name), Utilities.path(qaDir, name+".html"));
     }
   }
 
@@ -12326,7 +12328,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
             e.printStackTrace();
             break;
           }
-          TextFile.stringToFile(buildReport(ig, null, self.filelog.toString(), Utilities.path(self.qaDir, "validation.txt"), self.txServer), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher-"+Integer.toString(i)+".log"), false);
+          TextFile.stringToFile(buildReport(ig, null, self.filelog.toString(), Utilities.path(self.qaDir, "validation.txt"), self.txServer), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher-"+Integer.toString(i)+".log"));
           System.out.println("=======================================================================================");
           System.out.println("");
           System.out.println("");
@@ -12526,7 +12528,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         exitCode = 1;
       } finally {
         if (self.mode == IGBuildMode.MANUAL) {
-          TextFile.stringToFile(buildReport(CliParams.getNamedParam(args, "-ig"), CliParams.getNamedParam(args, "-source"), self.filelog.toString(), Utilities.path(self.qaDir, "validation.txt"), self.txServer), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher.log"), false);
+          TextFile.stringToFile(buildReport(CliParams.getNamedParam(args, "-ig"), CliParams.getNamedParam(args, "-source"), self.filelog.toString(), Utilities.path(self.qaDir, "validation.txt"), self.txServer), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher.log"));
         }
       }
       consoleLogger.stop();

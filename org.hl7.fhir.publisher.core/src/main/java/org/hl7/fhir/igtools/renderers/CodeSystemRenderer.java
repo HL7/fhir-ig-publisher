@@ -72,7 +72,7 @@ public class CodeSystemRenderer extends CanonicalRenderer {
     }
     if (hasSummaryRow(rows, "cs.vs")) {
       if (cs.hasValueSet()) {
-        ValueSet vs = context.fetchResource(ValueSet.class, cs.getValueSet());
+        ValueSet vs = context.findTxResource(ValueSet.class, cs.getValueSet());
         if (vs == null) {
           b.append(" <tr><td>"+translate("cs.summary", "Value Set")+":</td><td>"+ cs.getValueSet()+" ("+translate("cs.summary", " is the value set for all codes in this code system")+")</td></tr>\r\n");
         } else {
@@ -129,7 +129,7 @@ public class CodeSystemRenderer extends CanonicalRenderer {
 
     Set<String> processed = new HashSet<String>();
     for (String url : vsurls) {
-      ValueSet vc = context.fetchResource(ValueSet.class, url);
+      ValueSet vc = context.findTxResource(ValueSet.class, url);
       for (ConceptSetComponent ed : vc.getCompose().getInclude())
         first = addLink(b, first, vc, ed, processed);
       for (ConceptSetComponent ed : vc.getCompose().getExclude())

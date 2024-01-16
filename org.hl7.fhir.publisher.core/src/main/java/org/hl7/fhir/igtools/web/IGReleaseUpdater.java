@@ -209,7 +209,7 @@ public class IGReleaseUpdater {
           updateStatement(folder, folders, ignoreList, json, root, errs, root, canonical, folder, canonical.equals("http://hl7.org/fhir"), true, list, updateStatements, pl.milestones());
         }
         if (save)
-          TextFile.stringToFile(JsonParser.compose(json, true), f, false);
+          TextFile.stringToFile(JsonParser.compose(json, true), f);
         new HistoryPageUpdater().updateHistoryPage(historySource, folder, templateSrc, false);
       }
         
@@ -381,7 +381,7 @@ public class IGReleaseUpdater {
       html = fixParameter(html, "note", isCurrent ? "this search searches all versions of the "+ig.asString("title")+", including balloted versions. You can also search specific versions" :
         "this search searches version "+version.asString("version")+" of the "+ig.asString("title")+". You can also search other versions, or all versions at once");
       html = fixParameter(html, "prefix", "");            
-      TextFile.stringToFile(html, Utilities.path(vf, "searchform.html"), false);          
+      TextFile.stringToFile(html, Utilities.path(vf, "searchform.html"));          
     }
 
     return vc;

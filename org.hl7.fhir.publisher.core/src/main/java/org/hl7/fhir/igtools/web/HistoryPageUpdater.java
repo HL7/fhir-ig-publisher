@@ -55,9 +55,9 @@ public class HistoryPageUpdater {
     html = fixParameter(html, "json", jsonv);
     File tgt = new File(Utilities.path(folder, "directory.html"));
     if (tgt.exists() && TextFile.fileToString(tgt).contains("<div id=\"history-data\"></div>")) {
-      TextFile.stringToFile(html, Utilities.path(folder, "directory.html"), false);      
+      TextFile.stringToFile(html, Utilities.path(folder, "directory.html"));      
     } else {
-      TextFile.stringToFile(html, Utilities.path(folder, "history.html"), false);
+      TextFile.stringToFile(html, Utilities.path(folder, "history.html"));
     }
 
     if (delta) {
@@ -74,7 +74,7 @@ public class HistoryPageUpdater {
         html = fixParameter(html, "title", json.asString("title"));
         html = fixParameter(html, "id", json.asString("package-id"));
         html = fixParameter(html, "json", jsonv);
-        TextFile.stringToFile(html, Utilities.path(folder, "index.html"), false);      
+        TextFile.stringToFile(html, Utilities.path(folder, "index.html"));      
       }
     }
   }

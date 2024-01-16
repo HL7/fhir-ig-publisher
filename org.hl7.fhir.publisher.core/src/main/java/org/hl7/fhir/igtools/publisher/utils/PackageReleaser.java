@@ -303,7 +303,7 @@ public class PackageReleaser {
     i = source.indexOf("</ul>");
     source = source.substring(i);
     source = pfx + b.toString()+source;
-    TextFile.stringToFile(source, file, false);
+    TextFile.stringToFile(source, file);
   }
   
   
