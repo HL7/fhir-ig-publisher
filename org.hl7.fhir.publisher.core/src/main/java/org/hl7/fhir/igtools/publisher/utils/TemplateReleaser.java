@@ -220,7 +220,7 @@ public class TemplateReleaser {
       tr.td().tx(pl.current().date());
     }
     String s = INDEX_TEMPLATE.replace("{{index}}", new XhtmlComposer(false, false).compose(tbl));
-    TextFile.stringToFile(s, Utilities.path(path, "index.html"), false);
+    TextFile.stringToFile(s, Utilities.path(path, "index.html"));
   }
 
   private void build(String source, VersionDecision vd, List<VersionDecision> versions) throws Exception {

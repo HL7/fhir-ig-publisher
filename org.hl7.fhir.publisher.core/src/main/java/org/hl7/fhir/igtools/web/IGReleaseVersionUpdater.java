@@ -144,7 +144,7 @@ public class IGReleaseVersionUpdater {
           }
           src = src.substring(0, b+l) + fixForLevel(updatedFragment, level)+addPageVersions(f, milestones)+src.substring(e);
           if (!src.equals(o)) {
-            TextFile.stringToFile(src, f, false);
+            TextFile.stringToFile(src, f);
             countUpdated++;
           }
           countTotal++;

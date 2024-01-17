@@ -784,7 +784,7 @@ public class PublicationProcess {
       html = fixParameter(html, "note", current ? "this search searches all versions of the "+pl.title()+", including balloted versions. You can also search specific versions" :
         "this search searches version "+plVer.version()+" of the "+pl.title()+". You can also search other versions, or all versions at once");
       html = fixParameter(html, "prefix", "");            
-      TextFile.stringToFile(html, Utilities.path(destVer, "searchform.html"), false);          
+      TextFile.stringToFile(html, Utilities.path(destVer, "searchform.html"));          
     }
   }
 

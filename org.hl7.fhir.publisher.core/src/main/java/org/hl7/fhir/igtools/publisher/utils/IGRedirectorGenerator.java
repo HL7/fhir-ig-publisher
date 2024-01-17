@@ -83,7 +83,7 @@ public class IGRedirectorGenerator {
         "</script>\r\n"+
         "<title>Page Redirection</title></head><body>If you are not redirected automatically, follow this <a href='{{url}}'>link to Resource Index</a>.</body></html>\r\n";
     redirect = redirect.replace("{{url}}", relativeLocation+"/"+name);
-    TextFile.stringToFile(redirect, Utilities.path(dest.getAbsolutePath(), name), false);
+    TextFile.stringToFile(redirect, Utilities.path(dest.getAbsolutePath(), name));
     total++;
   }
   

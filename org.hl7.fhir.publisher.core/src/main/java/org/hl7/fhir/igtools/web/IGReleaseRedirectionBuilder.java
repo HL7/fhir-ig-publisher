@@ -345,7 +345,7 @@ public class IGReleaseRedirectionBuilder {
     Utilities.createDirectory(Utilities.getDirectoryForFile(path));
     countTotal++;
     if (!new File(path).exists() || !TextFile.fileToString(path).equals(t)) {
-      TextFile.stringToFile(t, path, false);
+      TextFile.stringToFile(t, path);
       countUpdated++;
     }
   }
@@ -357,7 +357,7 @@ public class IGReleaseRedirectionBuilder {
     Utilities.createDirectory(Utilities.getDirectoryForFile(path));
     countTotal++;
     if (!new File(path).exists() || !TextFile.fileToString(path).equals(t)) {
-      TextFile.stringToFile(t, path, false);
+      TextFile.stringToFile(t, path);
       countUpdated++;
     }
   }
@@ -369,7 +369,7 @@ public class IGReleaseRedirectionBuilder {
     Utilities.createDirectory(Utilities.getDirectoryForFile(path));
     countTotal++;
     if (!new File(path).exists() || !TextFile.fileToString(path).equals(t)) {
-      TextFile.stringToFile(t, path, false);
+      TextFile.stringToFile(t, path);
       countUpdated++;
     }
   }

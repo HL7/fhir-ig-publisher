@@ -200,7 +200,7 @@ public class IGRegistryMaintainer {
           a.add(makeEdition(p, ig.packageId));
         }
       }
-      TextFile.stringToFile(new GsonBuilder().setPrettyPrinting().create().toJson(json), path, false);
+      TextFile.stringToFile(new GsonBuilder().setPrettyPrinting().create().toJson(json), path);
     }
     for (ImplementationGuideEntry ig : igs) {
       System.out.println(ig.packageId+" ("+ig.canonical+"): "+ig.title+" @ "+ig.cibuild);

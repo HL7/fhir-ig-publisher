@@ -61,6 +61,7 @@ import org.hl7.fhir.r5.model.Constants;
 import org.hl7.fhir.r5.model.OperationOutcome;
 import org.hl7.fhir.r5.model.PackageInformation;
 import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.utils.OperationOutcomeUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.TranslatingUtilities;
@@ -475,7 +476,23 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private void genServerReport(XhtmlNode x, TerminologyClientContext t) {
     x.para("Use Count: "+t.getUseCount()+". Code Systems used: ");
     Map<String, TerminologyClientContextUseCount> uc = t.getUseCounts();
-    if (uc.isEmpty()) {
+    List<String> nl = Utilities.sorted(uc.keySet());
+    boolean hvs = false;
+    boolean hcs = false;
+    for (String s : nl) {
+      TerminologyClientContextUseCount us = uc.get(s);
+      if (us.getExpands() + us.getValidates() > 0) {
+        hcs = true;
+      } 
+      if (us.getReadVS() > 0) {
+        hvs = true;
+      }
+      if (hcs & hvs) {
+        break;
+      }
+    }
+    
+    if (!hcs) {
       XhtmlNode ul = x.ul();
       ul.li().tx("(None)");
     } else {        
@@ -485,18 +502,36 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       tr.th().b().tx("#Exp.");
       tr.th().b().tx("#Val.");
       tr.th().b().tx("Details");
-      for (String s : Utilities.sorted(uc.keySet())) {
-        tr = tbl.tr();
-        tr.td().tx(s);        
-        tr.td().tx(uc.get(s).getExpands());
-        tr.td().tx(uc.get(s).getValidates());
-        XhtmlNode td = tr.td();
-        CodeSystem cs = context.fetchResource(CodeSystem.class, s);
-        if (cs != null) {
-          if (cs.hasWebPath()) {
-            td.ah(cs.getWebPath()).tx(cs.present());
-          } else 
-            td.tx(cs.present());
+      for (String s : nl) {
+        TerminologyClientContextUseCount us = uc.get(s);
+        if (us.getExpands() + us.getValidates() > 0) {
+          tr = tbl.tr();
+          tr.td().tx(s);        
+          tr.td().tx(us.getExpands());
+          tr.td().tx(us.getValidates());
+          XhtmlNode td = tr.td();
+          CodeSystem cs = context.fetchResource(CodeSystem.class, s);
+          if (cs != null) {
+            if (cs.hasWebPath()) {
+              td.ah(cs.getWebPath()).tx(cs.present());
+            } else 
+              td.tx(cs.present());
+          }
+        }
+      }
+    }
+    if (hvs) {
+      x.para().tx("ValueSets fetched:");
+      XhtmlNode ul = x.ul();
+      for (String s : nl) { 
+        TerminologyClientContextUseCount us = uc.get(s);
+        if (us.getReadVS() > 0) {
+          ValueSet vs = context.fetchResource(ValueSet.class, s);
+          if (vs != null && vs.hasWebPath()) {
+            ul.li().ah(vs.getWebPath()).tx(s);
+          } else {
+            ul.li().tx(s);
+          }
         }
       }
     }

@@ -403,7 +403,7 @@ public class HTMLInspector {
         hl7State = src.contains(RELEASE_HTML_MARKER);
         if (hl7State) {
           src = src.replace(RELEASE_HTML_MARKER, START_HTML_MARKER + statusText+END_HTML_MARKER);
-          TextFile.stringToFile(src, f, false);
+          TextFile.stringToFile(src, f);
         }
         x = new XhtmlParser().setMustBeWellFormed(strict).parse(new FileInputStream(f), null);
       } catch (Exception e1) {
@@ -757,7 +757,7 @@ public class HTMLInspector {
 
   @Nonnull
   private String buildRef(String refParentPath, String ref) throws IOException {
-    //FIXME This logic should be in Utilities.path
+    // #TODO This logic should be in Utilities.path
     // Utilities path will try to assemble a filesystem path,
     // and this will fail in Windows if it contains ':' characters.
     return Utilities.path(refParentPath) + File.separator + ref;

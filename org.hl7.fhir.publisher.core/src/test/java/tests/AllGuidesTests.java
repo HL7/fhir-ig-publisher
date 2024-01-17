@@ -6,6 +6,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -22,6 +25,7 @@ import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.publisher.Publisher.CacheOption;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
@@ -111,7 +115,7 @@ public class AllGuidesTests {
       b.append(s);
     }
     b.append("\r\n");
-    for (String v : Utilities.sorted(statsMap.keySet())) {
+    for (String v : sortedbySemVer(statsMap.keySet())) {
       b.append(v);
       for (String s : colNames) {
         b.append(",");
@@ -133,6 +137,13 @@ public class AllGuidesTests {
     writeMem("Residual memory");
 
     dumpMem(id);
+  }
+
+  private List<String> sortedbySemVer(Collection<String> set) {
+    List<String> list = new ArrayList<>();
+    list.addAll(set);
+    Collections.sort(list, new VersionUtilities.SemVerSorter());
+    return list;
   }
 
   private long getCurrentmem() {

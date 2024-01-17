@@ -111,7 +111,7 @@ public class DownloadBuilder {
         "</body>\n" + 
         "</html>\n" + 
         "";
-    return TextFile.stringToBytes(html, false);
+    return TextFile.stringToBytes(html);
   }
 
   private void addBytes(String absolutePath, byte[] content) throws IOException {
@@ -163,7 +163,7 @@ public class DownloadBuilder {
             }
             String html = TextFile.fileToString(f);
             html = fixLinks(html, level);
-            addBytes(f.getAbsolutePath(), TextFile.stringToBytes(html, false));
+            addBytes(f.getAbsolutePath(), TextFile.stringToBytes(html));
           } else if (!Utilities.existsInList(ext, DO_NOT_DOWNLOAD)) {
             addBytes(f.getAbsolutePath(), TextFile.fileToBytes(f));
           }

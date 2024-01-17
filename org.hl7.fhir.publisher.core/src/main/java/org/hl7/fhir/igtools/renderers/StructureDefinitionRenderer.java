@@ -667,7 +667,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       if (withHeadings)
         b.append("<h4>" + translate("sd.tx", "Terminology Bindings (Differential)") + "</h4>\r\n");
       b.append("<table class=\"list\">\r\n");
-      b.append("<tr><td><b>" + translate("sd.tx", "Path") + "</b></td><td><b>" + translate("sd.tx", "Conformance") + "</b></td><td><b>" + translate("sd.tx", hasFixed ? "ValueSet / Code" : "ValueSet") + "</b></td></tr>\r\n");
+      b.append("<tr><td><b>" + translate("sd.tx", "Path") + "</b></td><td><b>" + translate("sd.tx", "Conformance") + "</b></td><td><b>" + translate("sd.tx", hasFixed ? "ValueSet / Code" : "ValueSet") + "</b></td><td><b>" + translate("sd.tx", "URI") + "</b></td></tr>\r\n");
       for (String path : txlist) {
         txItem(txmap, b, path, sd.getUrl());
       }
@@ -708,7 +708,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       if (withHeadings)
         b.append("<h4>" + translate("sd.tx", "Terminology Bindings") + "</h4>\r\n");
       b.append("<table class=\"list\">\r\n");
-      b.append("<tr><td><b>" + translate("sd.tx", "Path") + "</b></td><td><b>" + translate("sd.tx", "Conformance") + "</b></td><td><b>" + translate("sd.tx", hasFixed ? "ValueSet / Code" : "ValueSet") + "</b></td></tr>\r\n");
+      b.append("<tr><td><b>" + translate("sd.tx", "Path") + "</b></td><td><b>" + translate("sd.tx", "Conformance") + "</b></td><td><b>" + translate("sd.tx", hasFixed ? "ValueSet / Code" : "ValueSet") + "</b></td>"+
+      "<td><b>" + translate("sd.tx", "URI") + "</b></td></tr>\r\n");
       for (String path : txlist) {
         txItem(txmap, b, path, sd.getUrl());
       }
@@ -739,11 +740,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     ElementDefinition ed = txmap.get(path);
     ElementDefinitionBindingComponent tx = ed.getBinding();
     BindingResolutionDetails brd = new BindingResolutionDetails("", "?ext");
+    String link = null;
     if (tx.hasValueSet()) {
-      txDetails(tx, brd, false);
+      link = txDetails(tx, brd, false);
     } else if (ed.hasUserData(ProfileUtilities.UD_DERIVATION_POINTER)) {
       ElementDefinitionBindingComponent txi = ((ElementDefinition) ed.getUserData(ProfileUtilities.UD_DERIVATION_POINTER)).getBinding();
-      txDetails(txi, brd, true);
+      link = txDetails(txi, brd, true);
     }
     boolean strengthInh = false;
     BindingStrength strength = null;
@@ -793,24 +795,24 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       abr.render(x.getChildNodes(), true);
       b.append(new XhtmlComposer(true, true).compose(x));
     }
-    //
-    //        if (tx.hasExtension(ToolingExtensions.EXT_MAX_VALUESET)) {
-    //            BindingResolution br = igp.resolveBinding(sd, ToolingExtensions.readStringExtension(tx, ToolingExtensions.EXT_MAX_VALUESET), path);
-    //            b.append("<br/>");
-    //            b.append("<a style=\"font-weight:bold\" title=\"Max Value Set Extension\" href=\"" + corePath + "extension-elementdefinition-maxvalueset.html\">Max Binding</a>: ");
-    //            b.append((br.url == null ? processMarkdown("binding", br.display) : "<a href=\"" + Utilities.escapeXml((Utilities.isAbsoluteUrlLinkable(br.url) || !igp.prependLinks() ? br.url : corePath + br.url)) + "\">" + Utilities.escapeXml(br.display) + "</a>"));
-    //        }
-    //        if (tx.hasExtension(ToolingExtensions.EXT_MIN_VALUESET)) {
-    //            BindingResolution br = igp.resolveBinding(sd, ToolingExtensions.readStringExtension(tx, ToolingExtensions.EXT_MIN_VALUESET), path);
-    //            b.append("<br/>");
-    //            b.append("<a style=\"font-weight:bold\" title=\"Min Value Set Extension\" href=\"" + corePath + "extension-elementdefinition-minvalueset.html\">Min Binding</a>: ");
-    //            b.append((br.url == null ? processMarkdown("binding", br.display) : "<a href=\"" + Utilities.escapeXml((Utilities.isAbsoluteUrlLinkable(br.url) || !igp.prependLinks() ? br.url : corePath + br.url)) + "\">" + Utilities.escapeXml(br.display) + "</a>"));
-    //        }
-    b.append("</td></tr>\r\n");
+    if (tx.hasValueSet()) { 
+      b.append("<div><code>"+Utilities.escapeXml(tx.getValueSet())+"</code><button title=\"Click to copy URL\" class=\"btn-copy\" data-clipboard-text=\""+Utilities.escapeXml(tx.getValueSet())+"\"/></div>");
+      if (link != null) {
+        if (Utilities.isAbsoluteUrlLinkable(link)) {
+          b.append("<div>from <a href=\""+Utilities.escapeXml(link)+"\">"+Utilities.escapeXml(link)+"</a></div>");  
+        } else {
+          b.append("<div>from "+Utilities.escapeXml(link)+"</div>");  
+        }
+      }
+    } else {
+    }
+    b.append("</td>");
+    b.append("</tr>\r\n");
   }
 
-  public void txDetails(ElementDefinitionBindingComponent tx, BindingResolutionDetails brd, boolean inherited) {
+  public String txDetails(ElementDefinitionBindingComponent tx, BindingResolutionDetails brd, boolean inherited) {
     String uri = null;
+    String link = null;
     if (tx.getValueSet() != null) {
       uri = tx.getValueSet().trim();
     }
@@ -819,7 +821,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       brd.vss = "<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"" + Utilities.escapeXml(uri) + "\">" + Utilities.escapeXml(name) + "</a>";
       brd.vsn = name;
     } else {
-      ValueSet vs = context.fetchResource(ValueSet.class, canonicalise(uri));
+      ValueSet vs = context.findTxResource(ValueSet.class, canonicalise(uri));
       if (vs == null) {
         BindingResolution br = igp.resolveActualUrl(uri);
         if (br.url == null)
@@ -831,12 +833,29 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
       } else {
         String p = vs.getWebPath();
+        if (vs.hasUserData("External.Link")) {
+          link = vs.getUserString("External.Link");
+        } else if (vs.hasSourcePackage()) {
+          if (VersionUtilities.isCorePackage(vs.getSourcePackage().getId())) {
+            link = "the FHIR Standard";
+          } else if (!Utilities.isAbsoluteUrlLinkable(vs.getWebPath())) {
+            link = "this IG";
+          } else if (!Utilities.isAbsoluteUrlLinkable(vs.getWebPath())) {
+            link = "Package: "+vs.getSourcePackage();
+          }
+        }
+        StringBuilder b = new StringBuilder();
         if (p == null)
-          brd.vss = "<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"??\">" + Utilities.escapeXml(gt(vs.getNameElement())) + " (" + translate("sd.tx", "missing link") + ")</a>";
+          b.append("<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"??\">" + Utilities.escapeXml(gt(vs.getNameElement())) + " (" + translate("sd.tx", "missing link")+")");
         else if (p.startsWith("http:"))
-          brd.vss = "<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"" + Utilities.escapeXml(p) + "\">" + Utilities.escapeXml(gt(vs.getNameElement())) + "</a>";
+          b.append("<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"" + Utilities.escapeXml(p) + "\">" + Utilities.escapeXml(gt(vs.getNameElement())));
         else
-          brd.vss = "<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"" + Utilities.escapeXml(p) + "\">" + Utilities.escapeXml(gt(vs.getNameElement())) + "</a>";
+          b.append("<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"" + Utilities.escapeXml(p) + "\">" + Utilities.escapeXml(gt(vs.getNameElement())));
+        if (vs.hasUserData("External.Link")) {
+          b.append(" <img src=\"external.png\"/>");
+        }
+        b.append("</a>");
+        brd.vss = b.toString();
         StringType title = vs.hasTitleElement() ? vs.getTitleElement() : vs.getNameElement();
         if (title != null) {
           brd.vsn = gt(title);
@@ -856,6 +875,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
       }
     }
+    return link;
   }
 
   private String opacityStr(boolean inherited) {
@@ -1652,7 +1672,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     // 4. doco
     if (!elem.hasFixed()) {
       if (elem.hasBinding() && elem.getBinding().hasValueSet()) {
-        ValueSet vs = context.fetchResource(ValueSet.class, elem.getBinding().getValueSet());
+        ValueSet vs = context.findTxResource(ValueSet.class, elem.getBinding().getValueSet());
         if (vs != null)
           b.append(" <span style=\"color: navy; opacity: 0.8\"><a href=\"" + corePath + vs.getUserData("filename") + ".html\" style=\"color: navy\">" + Utilities.escapeXml(elem.getShort()) + "</a></span>");
         else

@@ -670,7 +670,7 @@ public class CrossViewRenderer extends Renderer {
       boolean first = true;
       if (binding != null) {
         b.append("<a href=\""+Utilities.pathURL(corePath, "terminologies.html#"+binding.getStrength().toCode())+"\">"+binding.getStrength().toCode()+"</a> VS ");           
-        ValueSet vs = worker.fetchResource(ValueSet.class, binding.getValueSet());
+        ValueSet vs = worker.findTxResource(ValueSet.class, binding.getValueSet());
         if (vs == null) {
           b.append(Utilities.escapeXml(binding.getValueSet()));                     
         } else if (vs.hasWebPath()) {
@@ -1274,7 +1274,7 @@ public class CrossViewRenderer extends Renderer {
 
   private void resolveVS(List<ValueSet> list, String url, Resource source) {
     if (url != null) {
-      ValueSet vs = context.getContext().fetchResource(ValueSet.class, url);
+      ValueSet vs = context.getContext().findTxResource(ValueSet.class, url);
       if (vs != null) {
         if (!vs.hasUserData("xref.used")) {
           vs.setUserData("xref.used", new HashSet<>());
@@ -1579,7 +1579,7 @@ public class CrossViewRenderer extends Renderer {
 
   private void resolveCSFromVS(List<CodeSystem> list, String valueSet, boolean all, Resource resource) {
     if (valueSet != null) {
-      ValueSet vs = context.getContext().fetchResource(ValueSet.class, valueSet);
+      ValueSet vs = context.getContext().findTxResource(ValueSet.class, valueSet);
       if (vs != null) {
         findCodeSystems(list, vs, all, resource);
       }

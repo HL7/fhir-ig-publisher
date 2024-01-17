@@ -184,7 +184,7 @@ public class TemplateManager {
       }
       String configString = JsonParser.compose(config, true);
       String configPath = Utilities.path(templateDir, "config.json");
-      TextFile.stringToFile(configString, configPath, false);
+      TextFile.stringToFile(configString, configPath);
     }
   }
   
