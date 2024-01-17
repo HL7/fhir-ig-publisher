@@ -664,8 +664,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private static final long FSH_TIMEOUT = 60000 * 5; // 5 minutes....
   private static final int PRISM_SIZE_LIMIT = 16384;
 
-  private static final String FIXED_CACHE_VERSION = "2"; // invalidating validation cache becaise it was incomplete
-
   private String consoleLog;
   private String configFile;
   private String sourceDir;
@@ -3029,8 +3027,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     for (String n : expParamMap.values())
       context.getExpansionParameters().addParameter(n, expParamMap.get(n));
 
-    TerminologyClientFactory txFactory = new TerminologyClientFactory(version);
     txLog = Utilities.createTempFile("fhir-ig-", ".log").getAbsolutePath();
+    System.out.println("Running Terminology Log: "+txLog);
     if (mode != IGBuildMode.WEBSERVER) {
       if (txServer == null || !txServer.contains(":")) {
         log("WARNING: Running without terminology server - terminology content will likely not publish correctly");
@@ -3038,10 +3036,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         txLog = null;
       } else {
         log("Connect to Terminology Server at "+txServer);
-        checkTSVersion(vsCache, context.connectToTSServer(txFactory, txFactory.makeClient("Tx-Server", txServer, "fhir/publisher"), txLog));
+        context.connectToTSServer(new TerminologyClientFactory(version), txServer, "fhir/publisher", txLog);
       }
-    } else 
-      checkTSVersion(vsCache, context.connectToTSServer(txFactory, txFactory.makeClient("Tx-Server", webTxServer.getAddress(), "fhir/publisher"), txLog));
+    } else { 
+      context.connectToTSServer(new TerminologyClientFactory(version), webTxServer.getAddress(), "fhir/publisher", txLog);
+    }
 
     loadPubPack();
     igpkp = new IGKnowledgeProvider(context, checkAppendSlash(specPath), determineCanonical(sourceIg.getUrl(), "ImplementationGuide.url"), template.config(), errors, VersionUtilities.isR2Ver(version), template, listedURLExemptions, altCanonical, fileList);
@@ -3537,8 +3536,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     String sct = str(configuration, "sct-edition", "http://snomed.info/sct/900000000000207008");
     context.getExpansionParameters().addParameter("system-version", "http://snomed.info/sct|"+sct);
     txLog = Utilities.createTempFile("fhir-ig-", ".log").getAbsolutePath();
+    System.out.println("Running Terminology Log: "+txLog);
     context.getExpansionParameters().addParameter("activeOnly", "true".equals(ostr(configuration, "activeOnly")));
-    TerminologyClientFactory txFactory = new TerminologyClientFactory(version);
     if (mode != IGBuildMode.WEBSERVER) {
       if (txServer == null || !txServer.contains(":")) {
         log("WARNING: Running without terminology server - terminology content will likely not publish correctly");
@@ -3547,18 +3546,18 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       } else {
         log("Connect to Terminology Server at "+txServer);
         try {
-          checkTSVersion(vsCache, context.connectToTSServer(txFactory, txFactory.makeClient("Tx-Server", txServer, "fhir/publisher"), txLog));
+          context.connectToTSServer(new TerminologyClientFactory(version), txServer, "fhir/publisher", txLog);
         } catch (Exception e) {
           log("WARNING: Could not connect to terminology server - terminology content will likely not publish correctly ("+e.getMessage()+")");          
         }
       }
-    } else 
+    } else {
       try {
-        checkTSVersion(vsCache, context.connectToTSServer(txFactory, txFactory.makeClient("Tx-Server", webTxServer.getAddress(), "fhir/publisher"), txLog));
+        context.connectToTSServer(new TerminologyClientFactory(version), webTxServer.getAddress(), "fhir/publisher", txLog);
       } catch (Exception e) {
         log("WARNING: Could not connect to terminology server - terminology content will likely not publish correctly ("+e.getMessage()+")");          
       }
-
+    }
 
     loadSpecDetails(context.getBinaryForKey("spec.internals"), "basespecJson", specPath);
     JsonElement cb = configuration.get("canonicalBase");
@@ -3900,32 +3899,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
   }
 
-  private void checkTSVersion(String dir, String version) throws FileNotFoundException, IOException {
-    if (Utilities.noString(version))
-      return;
-
-    // we wipe the terminology cache if the terminology server version has changed
-    File verFile = new File(Utilities.path(dir, "version.ctl"));
-    if (verFile.exists()) {
-      String ver = TextFile.fileToString(verFile);
-      if (!ver.equals(FIXED_CACHE_VERSION+"|"+version)) {
-        if (!ver.startsWith(FIXED_CACHE_VERSION+"|")) {
-          if (!ver.contains("|")) {
-            logDebugMessage(LogCategory.PROGRESS, "Terminology Cache Version has changed from 1 to "+FIXED_CACHE_VERSION+", so clearing txCache");
-          } else {
-            logDebugMessage(LogCategory.PROGRESS, "Terminology Cache Version has changed from "+ver.substring(0, ver.indexOf("|"))+" to "+FIXED_CACHE_VERSION+", so clearing txCache");
-          }
-        } else {
-          logDebugMessage(LogCategory.PROGRESS, "Terminology Server Version has changed from "+ver.substring(ver.indexOf("|")+1)+" to "+version+", so clearing txCache");
-        }
-        Utilities.clearDirectory(dir);
-        context.clearTS();
-      }
-    }
-    TextFile.stringToFile(FIXED_CACHE_VERSION+"|"+version, verFile);
-  }
-
-
   private int clearErrors(String dirName) throws FileNotFoundException, IOException {
     File dir = new File(dirName);
     int i = 0;
@@ -4079,7 +4052,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     IContextResourceLoader loader = new PublisherLoader(pi, spm, specPath, igpkp).makeLoader();
     sp = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(vsCache).fromPackage(pi, loader, false);
     sp.loadBinariesFromFolder(pi);
-    sp.setCacheId(UUID.randomUUID().toString());
     sp.setForPublication(true);
     if (!version.equals(Constants.VERSION)) {
       // If it wasn't a 4.0 source, we need to set the ids because they might not have been set in the source
@@ -6188,9 +6160,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           binary = true;
         } else {
           id = e.getChildValue("id");
-          if (!Utilities.noString(e.getIdBase())) {
-            checkResourceUnique(e.fhirType()+"/"+e.getIdBase(), file.getPath());
-          }
 
           if (Utilities.noString(id)) {
             if (e.hasChild("url")) {
@@ -6210,9 +6179,17 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               if (Utilities.noString(id)) {
                 throw new Exception("Resource has no id in "+file.getPath()+" and canonical URL ("+url+") does not start with the IG canonical URL ("+prefix+")");
               }
+            } else {
+              id = tail(file.getName());
             }
+            e.setChildValue("id", id);
+            altered = true;
           }
-          r.setElement(e).setId(id);
+          if (!Utilities.noString(e.getIdBase())) {
+            checkResourceUnique(e.fhirType()+"/"+e.getIdBase(), file.getPath());
+          }
+          r.setId(id);
+          r.setElement(e);
           igpkp.findConfiguration(file, r);
         }
         if (!suppressLoading) {
@@ -6221,7 +6198,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           if (srcForLoad == null && !"ImplementationGuide".equals(r.fhirType())) {
             srcForLoad = publishedIg.getDefinition().addResource();
             srcForLoad.getReference().setReference(r.fhirType()+"/"+r.getId());
-          }
+          } 
         }
 
         String ver = ToolingExtensions.readStringExtension(srcForLoad, ToolingExtensions.EXT_IGP_LOADVERSION); 
@@ -6276,6 +6253,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         }
         if (!binary && ((altered && r.getResource() != null) || (ver.equals(Constants.VERSION) && r.getResource() == null && context.getResourceNamesAsSet().contains(r.fhirType())))) {
           r.setResource(new ObjectConverter(context).convert(r.getElement()));
+          if (!r.getResource().hasId() && r.getId() != null) {
+            r.getResource().setId(r.getId());
+          }
         }
         if ((altered && r.getResource() == null)) {
           if (file.getContentType().contains("json")) {
