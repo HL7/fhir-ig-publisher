@@ -276,6 +276,7 @@ import org.hl7.fhir.r5.renderers.utils.DirectWrappers;
 import org.hl7.fhir.r5.renderers.utils.ElementWrappers;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.ExampleScenarioRendererMode;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext.FixedValueFormat;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.GenerationRules;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.ITypeParser;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.KnownLinkType;
@@ -386,7 +387,7 @@ import lombok.Setter;
  *   load resources in this order:
  *     naming system
  *     code system
- *     value set
+ *     value setx
  *     data element?
  *     structure definition
  *     concept map
@@ -935,6 +936,13 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private List<String> viewDefinitions = new ArrayList<>();
   private int validationLogTime = 0;
   private long maxMemory = 0;
+
+  long last = System.currentTimeMillis();
+  private List<String> unknownParams = new ArrayList<>();
+
+  private FixedValueFormat fixedFormat = FixedValueFormat.JSON;
+
+  private static PublisherConsoleLogger consoleLogger;
 
   private class PreProcessInfo {
     private String xsltName;
@@ -2892,6 +2900,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       case "viewDefinition":
         viewDefinitions.add(p.getValue());
         break;
+      case "fixed-value-format":
+        fixedFormat = FixedValueFormat.fromCode(p.getValue());
+        break;
       case "logged-when-scanning":
         if ("false".equals(p.getValue())) {
           fetcher.setReport(false);
@@ -4738,6 +4749,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     rc.getCodeSystemPropList().addAll(codeSystemProps);
     rc.setParser(getTypeLoader(version));
     rc.addLink(KnownLinkType.SELF, targetOutput);
+    rc.setFixedFormat(fixedFormat);
     if (publishedIg.hasJurisdiction()) {
       Locale locale = null;
       try {
@@ -11391,21 +11403,23 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         String html = "<p style=\"color: maroon\">Expansions are not generated for retired value sets</p>";
         fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null);
       } else {
-        ValueSetExpansionOutcome exp = context.expandVS(vs, true, true, true);
+        if (vs.getUrl().equals("http://hl7.org/fhir/us/core/ValueSet/us-core-survey-codes") || vs.getUrl().equals("http://hl7.org/fhir/us/core/ValueSet/simple-observation")) {          
+          System.out.println("!"); // #FIXME
+        }
+        ValueSetExpansionOutcome exp = context.expandVS(vs, true, true, true);        
         db.recordExpansion(vs, exp);
         if (exp.getValueset() != null) {
           expansions.add(exp.getValueset());
 
           RenderingContext lrc = rc.copy();
-          lrc.setTooCostlyNoteNotEmpty("This value set has >1000 codes in it. In order to keep the publication size manageable, only a selection (1000 codes) of the whole set of codes is shown");
-          lrc.setTooCostlyNoteEmpty("This value set cannot be expanded because of the way it is defined - it has an infinite number of members");
-          lrc.setTooCostlyNoteNotEmptyDependent("One of this value set's dependencies has >1000 codes in it. In order to keep the publication size manageable, only a selection of the whole set of codes is shown");
-          lrc.setTooCostlyNoteEmptyDependent("This value set cannot be expanded because of the way it is defined - one of it's dependents has an infinite number of members");
           exp.getValueset().setCompose(null);
           exp.getValueset().setText(null);  
           RendererFactory.factory(exp.getValueset(), lrc).render(exp.getValueset());
           String html = new XhtmlComposer(XhtmlComposer.XML).compose(exp.getValueset().getText().getDiv());
           fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null);
+          if (ValueSetUtilities.isIncompleteExpansion(exp.getValueset())) {
+            f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.INFORMATIONAL, "ValueSet.where(id = '"+vs.getId()+"')", "The value set expansion is incomplete", IssueSeverity.INFORMATION).setTxLink(exp.getTxLink()));
+          }
         } else {
           if (exp.getError() != null) { 
             if (exp.getError().contains("Unable to provide support")) {
@@ -11416,6 +11430,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               }
               f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, "ValueSet.where(id = '"+vs.getId()+"')", exp.getError(), IssueSeverity.WARNING).setTxLink(exp.getTxLink()));
               r.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, "ValueSet.where(id = '"+vs.getId()+"')", exp.getError(), IssueSeverity.WARNING).setTxLink(exp.getTxLink()));
+            } else if (exp.getError().contains("grammar") || exp.getError().contains("enumerated") ) {
+              fragmentErrorHtml("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", "This value set cannot be expanded because of the way it is defined - it has an infinite number of members<!-- "+Utilities.escapeXml(exp.getAllErrors().toString())+" -->", "Publication Tooling Error: "+Utilities.escapeXml(exp.getAllErrors().toString()), f.getOutputNames());
+              f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, "ValueSet.where(id = '"+vs.getId()+"')", exp.getError(), IssueSeverity.ERROR).setTxLink(exp.getTxLink()));
+            } else if (exp.getError().contains("too many") ) {
+              fragmentErrorHtml("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", "This value set cannot be expanded because the terminology server(s) deemed it too costly to do so<!-- "+Utilities.escapeXml(exp.getAllErrors().toString())+" -->", "Publication Tooling Error: "+Utilities.escapeXml(exp.getAllErrors().toString()), f.getOutputNames());
+              f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, "ValueSet.where(id = '"+vs.getId()+"')", exp.getError(), IssueSeverity.ERROR).setTxLink(exp.getTxLink()));
             } else {
               fragmentErrorHtml("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", "No Expansion for this valueset (not supported by Publication Tooling<!-- "+Utilities.escapeXml(exp.getAllErrors().toString())+" -->)", "Publication Tooling Error: "+Utilities.escapeXml(exp.getAllErrors().toString()), f.getOutputNames());
               f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, "ValueSet.where(id = '"+vs.getId()+"')", exp.getError(), IssueSeverity.ERROR).setTxLink(exp.getTxLink()));
@@ -11450,10 +11470,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private void fragmentErrorHtml(String name, String error, String overlay, Set<String> outputTracker) throws IOException, FHIRException {
     if (Utilities.noString(overlay))
-      fragment(name, "<p><span style=\"color: maroon; font-weight: bold\">"+error+"</span></p>\r\n", outputTracker);
+      fragment(name, "<p style=\"border: maroon 1px solid; background-color: #FFCCCC; font-weight: bold; padding: 8px\">"+error+"</p>\r\n", outputTracker);
     else
-      fragment(name, "<p><span style=\"color: maroon; font-weight: bold\" title=\""+overlay+"\">"+error+"</span></p>\r\n", outputTracker);
+      fragment(name, "<p style=\"border: maroon 1px solid; background-color: #FFCCCC; font-weight: bold; padding: 8px\">"+error+"</p>\r\n", outputTracker);
   }
+  
 
   /**
    * Generate:
@@ -11689,11 +11710,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (igpkp.wantGen(r, "sch"))
       fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-sch", "yet to be done: schematron as html", null, f.getOutputNames());
   }
-
-  long last = System.currentTimeMillis();
-  private List<String> unknownParams = new ArrayList<>();
-
-  private static PublisherConsoleLogger consoleLogger;
 
   private void lapsed(String msg) {
     long now = System.currentTimeMillis();
