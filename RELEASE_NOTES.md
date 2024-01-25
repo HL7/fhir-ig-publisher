@@ -1,1 +1,0 @@
-* Fix text creation on wrong xhtml node type
