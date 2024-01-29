@@ -5719,6 +5719,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
             if (sdi != null && !sdi.hasUserData("imposes.compare.id")) {
               String cid = "c"+Integer.toString(i);
               sdi.setUserData("imposes.compare.id", cid);
+              i++;
             }
           }
         }
