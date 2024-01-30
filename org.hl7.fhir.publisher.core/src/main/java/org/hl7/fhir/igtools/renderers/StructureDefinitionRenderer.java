@@ -796,7 +796,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       b.append(new XhtmlComposer(true, true).compose(x));
     }
     if (tx.hasValueSet()) { 
-      b.append("<div><code>"+Utilities.escapeXml(tx.getValueSet())+"</code><button title=\"Click to copy URL\" class=\"btn-copy\" data-clipboard-text=\""+Utilities.escapeXml(tx.getValueSet())+"\"/></div>");
+      b.append("<div><code>"+Utilities.escapeXml(tx.getValueSet())+"</code><button title=\"Click to copy URL\" class=\"btn-copy\" data-clipboard-text=\""+Utilities.escapeXml(tx.getValueSet())+"\"></button></div>");
       if (link != null) {
         if (Utilities.isAbsoluteUrlLinkable(link)) {
           b.append("<div>from <a href=\""+Utilities.escapeXml(link)+"\">"+Utilities.escapeXml(link)+"</a></div>");  
