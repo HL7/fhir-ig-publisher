@@ -60,6 +60,7 @@ import org.hl7.fhir.r5.terminologies.client.TerminologyClientManager;
 import org.hl7.fhir.r5.model.Constants;
 import org.hl7.fhir.r5.model.OperationOutcome;
 import org.hl7.fhir.r5.model.PackageInformation;
+import org.hl7.fhir.r5.model.Parameters.ParametersParameterComponent;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.utils.OperationOutcomeUtilities;
@@ -447,15 +448,27 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
       x.para("This IG was published without any terminology support");      
     } else {
       x.para("This page provides a report on which terminology servers were used while publishing this IG. Note that terminology caching reduces the server hit count - this page only reports content that wasn't cached");
-      x.h2().tx("Internal Errors choosing Server using '"+txServers.getMonitorServiceURL()+"':");
+      x.h2().tx("Terminology Parameters");
       XhtmlNode ul = x.ul();
-      if (txServers.getInternalErrors().isEmpty()) {
-        ul.li().tx("(None - all good)");        
+      for (ParametersParameterComponent p : context.getExpansionParameters().getParameter()) {
+        XhtmlNode li = ul.li();
+        li.b().tx(p.getName());
+        li.tx(": ");
+        if (p.hasValuePrimitive()) {
+          li.code().tx(p.getValue().primitiveValue());
+        } else if (p.hasValue()) {
+          li.code().tx(p.getValue().fhirType()+"??");
+        }
+      }
+      x.h2().tx("Tx Manager report for '"+txServers.getMonitorServiceURL()+"'");
+      ul = x.ul();
+      if (txServers.getInternalLog().isEmpty()) {
+        ul.li().tx("(No Errors/Reports - all good)");        
       } else {
-        for (String s : txServers.getInternalErrors()) {
+        for (String s : txServers.getInternalLog()) {
           ul.li().tx(s);        
         }        
-      }
+      }     
       
       TerminologyClientContext master = txServers.getServerList().get(0);
       x.h2().tx("Primary Server: "+master.getAddress());

@@ -1163,6 +1163,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       } else {
         processTxLog(Utilities.path(destDir != null ? destDir : outputDir, "qa-tx.html"));
         log("Built. "+tt.report());
+        log("Generating QA");
         log("Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
       }
       recordOutcome(null, val);
