@@ -24,12 +24,14 @@ public class PublicationChecker {
   private String folder; // the root folder being built
   private String historyPage;
   private MarkDownProcessor mdEngine;
+  private String releaseLabel;
 
-  public PublicationChecker(String folder, String historyPage, MarkDownProcessor markdownEngine) {
+  public PublicationChecker(String folder, String historyPage, MarkDownProcessor markdownEngine, String releaseLabel) {
     super();
     this.folder = folder;
     this.historyPage = historyPage;
     this.mdEngine = markdownEngine;
+    this.releaseLabel = releaseLabel;
   }
   
   /**
@@ -180,6 +182,7 @@ public class PublicationChecker {
         summary.add(new StringPair("status", pr.asString("status")));                        
       }
     }
+    summary.add(new StringPair("Release-Label", releaseLabel));
     if (mode == PublicationProcessMode.TECHNICAL_CORRECTION) {
       if (check(messages, pl != null, "Can't publish a technical correction when nothing is published yet."+mkWarning())) {
         PackageListEntry cv = getCurrentPublication(pl);
