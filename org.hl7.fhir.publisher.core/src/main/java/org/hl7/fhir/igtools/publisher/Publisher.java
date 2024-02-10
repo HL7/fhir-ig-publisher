@@ -1154,7 +1154,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), rootDir, npmName, childPublisher == null? null : childPublisher.npmName,
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator, ipsComparator,
           new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine).render(publishedIg, true, false, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()),
-          new PublicationChecker(repoRoot, historyPage, markdownEngine).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
+          new PublicationChecker(repoRoot, historyPage, markdownEngine, findReleaseLabel()).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
           generateDraftDependencies(),
           noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder, context.getTxClientManager());
       tts.end();
@@ -1176,6 +1176,15 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       }
       throw e;
     }
+  }
+
+  private String findReleaseLabel() {
+    for (ImplementationGuideDefinitionParameterComponent p : publishedIg.getDefinition().getParameter()) {
+      if ("releaselabel".equals(p.getCode().getCode())) {
+        return p.getValue();
+      }
+    }
+    return "n/a";
   }
 
   private String logSummary() {
@@ -1429,6 +1438,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         j.add("errs", val.getErr());
         j.add("warnings", val.getWarn());
         j.add("hints", val.getInfo());
+        j.add("suppressed-hints", val.getSuppressedInfo());
+        j.add("suppressed-warnings", val.getSuppressedWarnings());
       }
       if (ex != null) {
         j.add("exception", ex.getMessage());
@@ -2066,11 +2077,16 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
                   RendererFactory.factory(rw, lrc).setRcontext(new ResourceContext(null, rw)).render(rw);
                   otherFilesRun.addAll(lrc.getFiles());
                 } else if (r.fhirType().equals("Bundle")) {
+                  lrc.setAddName(true);
                   for (Element e : r.getElement().getChildrenByName("entry")) {
                     Element res = e.getNamedChild("resource");
-                    if (res!=null && "http://hl7.org/fhir/StructureDefinition/DomainResource".equals(res.getProperty().getStructure().getBaseDefinition()) && !hasNarrative(res)) {
+                    if (res!=null && "http://hl7.org/fhir/StructureDefinition/DomainResource".equals(res.getProperty().getStructure().getBaseDefinition())) {
                       ResourceWrapper rw = new ElementWrappers.ResourceWrapperMetaElement(lrc, res);
-                      RendererFactory.factory(rw, lrc, new ResourceContext(null, r.getElement())).render(rw);
+                      if (hasNarrative(res)) {
+                        RendererFactory.factory(rw, lrc, new ResourceContext(null, r.getElement())).checkNarrative(rw);                        
+                      } else {
+                        RendererFactory.factory(rw, lrc, new ResourceContext(null, r.getElement())).render(rw);
+                      }
                     }
                   }
                 } else if (isDomainResource(r) && hasNarrative(r.getElement())) {
@@ -3090,7 +3106,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       }
     }
     
-    inspector = new HTMLInspector(outputDir, specMaps, linkSpecMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), trackedFragments);
+    inspector = new HTMLInspector(outputDir, specMaps, linkSpecMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), trackedFragments, fileList);
     inspector.getManual().add("full-ig.zip");
     if (historyPage != null) {
       inspector.getManual().add(historyPage);
@@ -3590,7 +3606,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       businessVersion = configuration.asString("fixed-business-version");
     }
 
-    inspector = new HTMLInspector(outputDir, specMaps, linkSpecMaps, this, igpkp.getCanonical(), configuration.has("npm-name") ? configuration.asString("npm-name") : null, trackedFragments);
+    inspector = new HTMLInspector(outputDir, specMaps, linkSpecMaps, this, igpkp.getCanonical(), configuration.has("npm-name") ? configuration.asString("npm-name") : null, trackedFragments, fileList);
     inspector.getManual().add("full-ig.zip");
     historyPage = ostr(paths, "history");
     if (historyPage != null) {
@@ -11405,9 +11421,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         String html = "<p style=\"color: maroon\">Expansions are not generated for retired value sets</p>";
         fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null);
       } else {
-        if (vs.getUrl().equals("http://hl7.org/fhir/us/core/ValueSet/us-core-survey-codes") || vs.getUrl().equals("http://hl7.org/fhir/us/core/ValueSet/simple-observation")) {          
-          System.out.println("!"); // #FIXME
-        }
         ValueSetExpansionOutcome exp = context.expandVS(vs, true, true, true);        
         db.recordExpansion(vs, exp);
         if (exp.getValueset() != null) {
@@ -11420,7 +11433,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           String html = new XhtmlComposer(XhtmlComposer.XML).compose(exp.getValueset().getText().getDiv());
           fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null);
           if (ValueSetUtilities.isIncompleteExpansion(exp.getValueset())) {
-            f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.INFORMATIONAL, "ValueSet.where(id = '"+vs.getId()+"')", "The value set expansion is incomplete", IssueSeverity.INFORMATION).setTxLink(exp.getTxLink()));
+            f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.INFORMATIONAL, "ValueSet.where(id = '"+vs.getId()+"')", "The value set expansion is too large, and only a subset has been displayed", IssueSeverity.INFORMATION).setTxLink(exp.getTxLink()));
           }
         } else {
           if (exp.getError() != null) { 
