@@ -5697,6 +5697,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     loadPaths();
     log("Generating Snapshots");
     generateSnapshots();
+
     log("Check R4 / R4B");
     checkR4R4B();
     log("Assign Comparison Ids");
@@ -10972,7 +10973,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (igr == null)
       return false;
     else 
-      return igr.getIsExample() || igr.hasProfile();
+      return igr.getIsExample();
   }
 
 
