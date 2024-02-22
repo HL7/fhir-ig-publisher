@@ -1140,9 +1140,11 @@ public class CrossViewRenderer extends Renderer {
   }
 
   private boolean refersToExtension(ExpressionNode n, String url) {
-    if (n != null && n.getKind() == Kind.Function && n.getName().equals("extension") && n.getParameters().size() == 1) {
+    if (n != null && n.getKind() == Kind.Function && "extension".equals(n.getName()) && n.getParameters().size() == 1) {
       ExpressionNode p = n.getParameters().get(0);
-      return p.getKind() == Kind.Constant && p.getConstant().primitiveValue().equals(url);
+      if (p.getConstant() != null && p.getConstant().hasPrimitiveValue()) {
+        return p.getKind() == Kind.Constant && p.getConstant().primitiveValue().equals(url);
+      }
     }
     if (n.getInner() != null) {
       if (refersToExtension(n.getInner(), url)) {
