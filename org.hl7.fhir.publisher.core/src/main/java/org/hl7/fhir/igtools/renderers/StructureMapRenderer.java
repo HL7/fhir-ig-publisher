@@ -96,7 +96,8 @@ public class StructureMapRenderer extends CanonicalRenderer {
       }
       map.setUserData("analysis", analysis);
     }      
-    return new XhtmlComposer(XhtmlComposer.HTML).compose(analysis.getSummary());
+    XhtmlNode summary = analysis.getSummary();
+    return summary == null ? "" : new XhtmlComposer(XhtmlComposer.HTML).compose(summary);        
   }
 
 

@@ -852,7 +852,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         else
           b.append("<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"" + Utilities.escapeXml(p) + "\">" + Utilities.escapeXml(gt(vs.getNameElement())));
         if (vs.hasUserData("External.Link")) {
-          b.append(" <img src=\"external.png\"/>");
+          b.append(" <img src=\"external.png\" alt=\".\"/>");
         }
         b.append("</a>");
         brd.vss = b.toString();

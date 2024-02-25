@@ -1478,6 +1478,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("halfcolor", halfColorForLevel(vm.getLevel(), vm.isSignpost()));
     t.add("msg", vm.getHtml());
     t.add("msgdetails", vm.isSlicingHint() ? vm.getSliceHtml() : vm.getHtml());
+    t.add("comment", "");
     return t.render();
   }
   
@@ -1491,6 +1492,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("level", vm.getLevel().toCode());
     t.add("color", colorForLevel(vm.getLevel(), vm.isSignpost()));
     t.add("msg", vm.getHtml());
+    t.add("comment", "");
     return t.render();
   }
 
