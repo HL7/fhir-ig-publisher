@@ -543,6 +543,8 @@ public class IGReleaseUpdater {
   }
 
   private String getPath(String v) {
+    if ("5.0.0".equals(v))
+      return "R5";
     if ("4.0.1".equals(v))
       return "R4";
     if ("4.0.0".equals(v))
