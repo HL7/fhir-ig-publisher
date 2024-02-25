@@ -106,6 +106,7 @@ public class DependencyRenderer {
   private Map<String, PackageList> packageListCache = new HashMap<>();
   private List<DependencyAnalyser.ArtifactDependency> dependencies;
   private List<GlobalProfile> globals = new ArrayList<>();
+  private Set<String> globalPackages = new HashSet<>();
   private IWorkerContext context;
   private MarkDownProcessor mdEngine;
   
@@ -334,10 +335,14 @@ public class DependencyRenderer {
   }
 
   private void checkGlobals(ImplementationGuide ig, NpmPackage npm) {
-    for (ImplementationGuideGlobalComponent g : ig.getGlobal()) {
-      StructureDefinition sd = context.fetchResource(StructureDefinition.class, g.getProfile());
-      globals.add(new GlobalProfile(npm, ig, g.getType(), g.getProfile(), sd));
-    }    
+    String key = ig.getVersionedUrl();
+    if (!globalPackages.contains(key)) {
+      globalPackages.add(key);
+      for (ImplementationGuideGlobalComponent g : ig.getGlobal()) {
+        StructureDefinition sd = context.fetchResource(StructureDefinition.class, g.getProfile());
+        globals.add(new GlobalProfile(npm, ig, g.getType(), g.getProfile(), sd));
+      }    
+    }
   }
 
   private String getLatestVersion(String name, String canonical) {

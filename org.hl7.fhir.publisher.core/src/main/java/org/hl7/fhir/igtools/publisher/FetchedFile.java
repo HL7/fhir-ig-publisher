@@ -240,7 +240,7 @@ public class FetchedFile {
   }
   
   public void processReport(FetchedFile f, JsonObject fj) {
-    fj.add("name", statedPath.startsWith(root) ? statedPath.substring(root.length()) : statedPath);
+    fj.add("name", root != null && statedPath.startsWith(root) ? statedPath.substring(root.length()) : statedPath);
     fj.add("size", size);
     for (ProcessingReport pr : processes) {
       long duration = (pr.finish - pr.start);
