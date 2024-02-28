@@ -42,10 +42,13 @@ import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.SpecMapManager.SpecialPackageType;
 import org.hl7.fhir.r5.context.ILoggingService;
 import org.hl7.fhir.r5.context.ILoggingService.LogCategory;
+import org.hl7.fhir.r5.elementmodel.Element;
+import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.PathBuilder;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.i18n.I18nConstants;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageHacker;
@@ -57,6 +60,8 @@ import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode.Location;
+import org.hl7.fhir.validation.BaseValidator.BooleanHolder;
+import org.hl7.fhir.validation.instance.utils.ValidationContext;
 import org.hl7.fhir.utilities.xhtml.XhtmlParser;
 
 
@@ -203,8 +208,9 @@ public class HTMLInspector {
   private boolean referencesValidatorPack;
   private Map<String, List<String>> trackedFragments;
   private Set<String> foundFragments = new HashSet<>();
+  private List<FetchedFile> sources;
 
-  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<SpecMapManager> linkSpecs, ILoggingService log, String canonical, String packageId, Map<String, List<String>> trackedFragments) {
+  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<SpecMapManager> linkSpecs, ILoggingService log, String canonical, String packageId, Map<String, List<String>> trackedFragments, List<FetchedFile> sources) {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
     this.linkSpecs = linkSpecs;
@@ -212,6 +218,7 @@ public class HTMLInspector {
     this.canonical = canonical;
     this.forHL7 = canonical.contains("hl7.org/fhir");
     this.trackedFragments = trackedFragments;
+    this.sources = sources;
     requirePublishBox = Utilities.startsWithInList(packageId, "hl7."); 
   }
 
@@ -248,6 +255,12 @@ public class HTMLInspector {
     System.out.println();
 
 
+    log.logDebugMessage(LogCategory.HTML, "Checking Resources");
+    for (FetchedFile f : sources) {
+      for (FetchedResource r : f.getResources()) {
+        checkNarrativeLinks(f, r);
+      }
+    }
     log.logDebugMessage(LogCategory.HTML, "Checking Files");
     links = 0;
     // check links
@@ -324,6 +337,70 @@ public class HTMLInspector {
       }
     }
     return messages;
+  }
+
+  private void checkNarrativeLinks(FetchedFile f, FetchedResource r) throws IOException {
+    Element t = r.getElement().getNamedChild("text");
+    if (t != null) {
+      t = t.getNamedChild("div");
+    }
+    if (t != null) {
+      XhtmlNode x = t.getXhtml();
+      if (x != null) {
+        checkReferences(f.getErrors(), r.fhirType()+".text.div", "div", x);
+        checkImgSources(f.getErrors(), r.fhirType()+".text.div", "div", x);
+      }
+    }
+  }
+
+  private boolean checkReferences(List<ValidationMessage> errors, String path, String xpath, XhtmlNode node) throws IOException {
+    boolean ok = true;
+    if (node.getNodeType() == NodeType.Element & "a".equals(node.getName()) && node.getAttribute("href") != null) {
+      String href = node.getAttribute("href");
+      BooleanHolder bh = new BooleanHolder();
+      if (!href.startsWith("#") && !isKnownTarget(href, bh)) {
+        String msg = "Hyperlink '"+href+"' at '"+xpath+"' for '"+node.allText()+"' does not resolve";
+        errors.add(new ValidationMessage(Source.Publisher, IssueType.INVALID, path, msg, msg, IssueSeverity.ERROR).setRuleDate("2024-02-08"));
+      } else if (!bh.ok()) {
+        String msg = "Hyperlink '"+href+"' at '"+xpath+"' for '"+node.allText()+"' is a canonical reference, and is unsafe because of version handling (points to the current version, not this version)";
+        errors.add(new ValidationMessage(Source.Publisher, IssueType.INVALID, path, msg, msg, IssueSeverity.WARNING).setRuleDate("2024-02-09"));
+      }
+    }
+    if (node.hasChildren()) {
+      for (XhtmlNode child : node.getChildNodes()) {
+        checkReferences(errors, path, xpath+"/"+child.getName(), child);
+      }        
+    }
+    return ok;
+  }
+
+  private boolean checkImgSources(List<ValidationMessage> errors, String path, String xpath, XhtmlNode node) throws IOException {
+    boolean ok = true;
+    if (node.getNodeType() == NodeType.Element & "img".equals(node.getName()) && node.getAttribute("src") != null) {
+      String src = node.getAttribute("src");
+      if (!src.startsWith("#") && !checkImgSourceExists(null, src)) {
+        String msg = "Img Source '"+src+"' at '"+xpath+(node.hasAttribute("alt") ? "' for '"+node.getAttribute("alt")+"'" : "")+" does not resolve";
+        errors.add(new ValidationMessage(Source.Publisher, IssueType.INVALID, path, msg, msg, IssueSeverity.ERROR).setRuleDate("2024-02-08"));
+      }
+    }
+    if (node.hasChildren()) {
+      for (XhtmlNode child : node.getChildNodes()) {
+        checkImgSources(errors, path, xpath+"/"+child.getName(), child);
+      }        
+    }
+    return ok;
+  }
+
+  
+  private boolean isKnownTarget(String target, BooleanHolder bh) throws IOException {
+    return checkTarget(null, target, target, new StringBuilder(), bh);
+  }
+
+  private boolean isKnownImgTarget(String target) {
+    if (target.contains("#")) {
+      return false;
+    }
+    return false;
   }
 
   private void checkFragmentIds(String src) {
@@ -603,6 +680,29 @@ public class HTMLInspector {
     if ((rref.startsWith("http:") || rref.startsWith("https:") ) && (rref.endsWith(".sch") || rref.endsWith(".xsd") || rref.endsWith(".shex"))) { // work around for the fact that spec.internals does not track all these minor things 
       rref = Utilities.changeFileExt(ref, ".html");
     }
+    if (rref.contains("validator.pack")) {
+      referencesValidatorPack = true;
+    }
+
+    StringBuilder tgtList = new StringBuilder();
+    BooleanHolder bh = new BooleanHolder();
+    boolean resolved = checkTarget(filename, ref, rref, tgtList, bh);
+    if (!resolved) {
+      if (text == null)
+        text = "";
+      messages.add(new ValidationMessage(Source.LinkChecker, IssueType.NOTFOUND, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The link '"+ref+"' for \""+text.replaceAll("[\\s\\n]+", " ").trim()+"\" cannot be resolved"+tgtList, IssueSeverity.ERROR).setLocationLink(uuid == null ? null : makeLocal(filename)+"#"+uuid));
+      return true;
+    } else if (!bh.ok()) {
+      if (text == null)
+        text = "";
+      messages.add(new ValidationMessage(Source.LinkChecker, IssueType.NOTFOUND, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The link '"+ref+"' for \""+text.replaceAll("[\\s\\n]+", " ").trim()+"\" is a canonical link and is therefore unsafe with regard to versions", IssueSeverity.WARNING).setLocationLink(uuid == null ? null : makeLocal(filename)+"#"+uuid));
+      return false;
+    } else {
+      return false;
+    }
+  }
+
+  private boolean checkTarget(String filename, String ref, String rref, StringBuilder tgtList, BooleanHolder bh) throws IOException {
     if (rref.startsWith("./")) {
       rref = rref.substring(2);
     }
@@ -610,18 +710,14 @@ public class HTMLInspector {
       rref = rref.substring(0, rref.length()-1);
     }
     
-    if (rref.contains("validator.pack")) {
-      referencesValidatorPack = true;
-    }
     if (ref.startsWith("data:")) {
       return true;
     }
-    String tgtList = "";
     boolean resolved = Utilities.existsInList(ref, "qa.html", "http://hl7.org/fhir", "http://hl7.org", "http://www.hl7.org", "http://hl7.org/fhir/search.cfm") || 
         ref.startsWith("http://gforge.hl7.org/gf/project/fhir/tracker/") || ref.startsWith("mailto:") || ref.startsWith("javascript:");
     if (!resolved && forHL7)
       resolved = Utilities.pathURL(canonical, "history.html").equals(ref) || ref.equals("searchform.html"); 
-    if (!resolved )
+    if (!resolved && filename != null)
       resolved = filename.contains("searchform.html") && ref.equals("history.html"); 
     if (!resolved)
       resolved = manual.contains(rref);
@@ -659,7 +755,7 @@ public class HTMLInspector {
         if (new File(ref).exists()) {
           resolved = true;
         }
-      } else if (!resolved && !Utilities.isAbsoluteUrl(ref) && !rref.startsWith("#")) {
+      } else if (!resolved && !Utilities.isAbsoluteUrl(ref) && !rref.startsWith("#") && filename != null) {
         String fref =  buildRef(Utilities.getDirectoryForFile(filename), ref);
         if (fref.equals(Utilities.path(rootFolder, "qa.html"))) {
           resolved = true;
@@ -678,7 +774,7 @@ public class HTMLInspector {
        }
      }
      // a local file may have been created by some poorly tracked process, so we'll consider that as a possible
-     if (!resolved && !Utilities.isAbsoluteUrl(rref) && !rref.contains("..")) { // .. is security check. Maybe there's some ways it could be valid, but we're not interested for now
+     if (!resolved && !Utilities.isAbsoluteUrl(rref) && !rref.contains("..") && filename != null) { // .. is security check. Maybe there's some ways it could be valid, but we're not interested for now
        String fname = buildRef(new File(filename).getParent(), rref);
        if (new File(fname).exists()) {
          resolved = true;
@@ -693,7 +789,18 @@ public class HTMLInspector {
     if (!resolved) {
       if (rref.startsWith("http://") || rref.startsWith("https://") || rref.startsWith("ftp://") || rref.startsWith("tel:") || rref.startsWith("urn:")) {
         resolved = true;
-        if (specs != null) {
+        if (rref.startsWith(canonical)) {
+          resolved = false;
+          for (FetchedFile f : sources)  {
+            for (FetchedResource r : f.getResources()) {
+              if (r.getResource() != null && r.getResource() instanceof CanonicalResource && rref.equals(((CanonicalResource) r.getResource()).getUrl())) {
+                resolved = true;
+                bh.fail();
+                break;
+              }
+            }
+          }
+        } else if (specs != null) {
           for (SpecMapManager spec : specs) {
             if (spec.getSpecial() != SpecialPackageType.Examples && spec.getBase() != null && rref.startsWith(spec.getBase())) {
               resolved = false;
@@ -716,6 +823,12 @@ public class HTMLInspector {
           } catch (java.nio.file.InvalidPathException e) {
             page = null;
           }
+        } else if (filename == null) {
+          try {
+            page = PathBuilder.getPathBuilder().withRequiredTarget(rootFolder).buildPath(rootFolder, page.replace("/", File.separator));
+          } catch (java.nio.file.InvalidPathException e) {
+            page = null;
+          }
         } else {
           try {
             String folder = Utilities.getDirectoryForFile(filename);
@@ -732,10 +845,10 @@ public class HTMLInspector {
               resolved = true;
             else { 
               resolved = f.targets.contains(name);
-              tgtList = " (valid targets: "+(f.targets.size() > 40 ? Integer.toString(f.targets.size())+" targets"  :  f.targets.toString())+")";
+              tgtList.append(" (valid targets: "+(f.targets.size() > 40 ? Integer.toString(f.targets.size())+" targets"  :  f.targets.toString())+")");
               for (String s : f.targets) {
                 if (s.equalsIgnoreCase(name)) {
-                  tgtList = (" - case is wrong ('"+s+"')");
+                  tgtList.append(" - case is wrong ('"+s+"')");
                 }
               }
             }
@@ -745,14 +858,7 @@ public class HTMLInspector {
         }
       }
     }
-    if (resolved) {
-      return false;
-    } else {
-      if (text == null)
-        text = "";
-      messages.add(new ValidationMessage(Source.LinkChecker, IssueType.NOTFOUND, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The link '"+ref+"' for \""+text.replaceAll("[\\s\\n]+", " ").trim()+"\" cannot be resolved"+tgtList, IssueSeverity.ERROR).setLocationLink(uuid == null ? null : makeLocal(filename)+"#"+uuid));
-      return true;
-    } 
+    return resolved;
   }
 
   @Nonnull
@@ -797,8 +903,17 @@ public class HTMLInspector {
 
   private boolean checkResolveImageLink(String filename, Location loc, String path, String ref, List<ValidationMessage> messages, String uuid) throws IOException {
     links++;
-    String tgtList = "";
-    boolean resolved = Utilities.existsInList(ref);
+    boolean resolved = checkImgSourceExists(filename, ref);
+    if (resolved)
+      return false;
+    else {
+      messages.add(new ValidationMessage(Source.LinkChecker, IssueType.NOTFOUND, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The image source '"+ref+"' cannot be resolved", IssueSeverity.ERROR).setLocationLink(uuid == null ? null : filename+"#"+uuid));
+      return true;
+    } 
+  }
+
+  private boolean checkImgSourceExists(String filename, String ref) throws IOException {
+    boolean resolved = false;
     if (ref.startsWith("data:"))
       resolved = true;
     if (ref.startsWith("./")) {
@@ -824,18 +939,12 @@ public class HTMLInspector {
           }
         }
       } else if (!ref.contains("#")) { 
-        String page = Utilities.path(Utilities.getDirectoryForFile(filename), ref.replace("/", File.separator));
+        String page = Utilities.path(filename == null ? rootFolder : Utilities.getDirectoryForFile(filename), ref.replace("/", File.separator));
         LoadedFile f = cache.get(page);
         resolved = f != null;
       }
     }
-      
-    if (resolved)
-      return false;
-    else {
-      messages.add(new ValidationMessage(Source.LinkChecker, IssueType.NOTFOUND, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The image source '"+ref+"' cannot be resolved"+tgtList, IssueSeverity.ERROR).setLocationLink(uuid == null ? null : filename+"#"+uuid));
-      return true;
-    } 
+    return resolved;
   }
 
   public void addLinkToCheck(String source, String link, String text) {
@@ -852,7 +961,7 @@ public class HTMLInspector {
   }
 
   public static void main(String[] args) throws Exception {
-    HTMLInspector inspector = new HTMLInspector(args[0], null, null, null, "http://hl7.org/fhir/us/core", "hl7.fhir.us.core", new HashMap<>());
+    HTMLInspector inspector = new HTMLInspector(args[0], null, null, null, "http://hl7.org/fhir/us/core", "hl7.fhir.us.core", new HashMap<>(), null);
     inspector.setStrict(false);
     List<ValidationMessage> linkmsgs = inspector.check("test text");
     int bl = 0;

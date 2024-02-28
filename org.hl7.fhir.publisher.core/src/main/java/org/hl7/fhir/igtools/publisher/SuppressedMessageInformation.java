@@ -6,6 +6,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import org.hl7.fhir.utilities.validation.ValidationMessage;
+import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 
 public class SuppressedMessageInformation {
 
@@ -22,7 +23,8 @@ public class SuppressedMessageInformation {
     private String messageRaw;
     private String messageComp;
     private int compType;
-    private int useCount;
+    private int hintUseCount;
+    private int warningUseCount;
     
     public SuppressedMessage(String message) {
       super();
@@ -58,12 +60,24 @@ public class SuppressedMessageInformation {
       return messageRaw;
     }
     
-    public void use() {
-      useCount++;
+    public void useHint() {
+      hintUseCount++;
     }
 
+    public void useWarning() {
+      warningUseCount++;
+    }
+
+    public int getUseCountHint() {
+      return hintUseCount;
+    }
+    
+    public int getUseCountWarning() {
+      return warningUseCount;
+    }
+    
     public int getUseCount() {
-      return useCount;
+      return hintUseCount + warningUseCount;
     }
 
     public boolean matches(String msg) {
@@ -98,7 +112,11 @@ public class SuppressedMessageInformation {
         boolean match = sm.matches(msg);
         if (match) {
           if (!vMsg.isMatched()) {
-            sm.use();
+            if (vMsg.getLevel() == IssueSeverity.WARNING) {
+              sm.useWarning();
+            } else {
+              sm.useHint();
+            }
             vMsg.setMatched(true);
             vMsg.setComment(c.name);
           }

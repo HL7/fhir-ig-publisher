@@ -489,11 +489,14 @@ public class SimpleFetcher implements IFetchFile {
   
   public void scanFolders(File dir, List<String> dirs) {
     dirs.add(dir.getAbsolutePath());
-    for (File f : dir.listFiles()) {
-      if (f.isDirectory()) {
-        scanFolders(f, dirs);
-      }
-    }    
+    File[] list = dir.listFiles();
+    if (list != null) {
+      for (File f : list) {
+        if (f.isDirectory()) {
+          scanFolders(f, dirs);
+        }
+      }    
+    }
   }
 
   public boolean isDebug() {

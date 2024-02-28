@@ -70,6 +70,7 @@ import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.i18n.I18nConstants;
+import org.hl7.fhir.utilities.json.model.JsonElement;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
@@ -782,9 +783,13 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     StringBuilder b = new StringBuilder();
     b.append("<a name=\"suppressed\"> </a>\r\n<p><b>Suppressed Messages (Warnings, hints, broken links)</b></p>\r\n");
     boolean found = false;
+    suppressedInfo = 0;
+    suppressedWarnings = 0;
     for (String s : msgs.categories()) {
       b.append("<p><b>"+Utilities.escapeXml(s)+"</b></p><ul>\r\n");
       for (SuppressedMessage m : msgs.list(s)) {
+        suppressedInfo += m.getUseCountHint();
+        suppressedWarnings += m.getUseCountWarning();
         found = true;
         b.append(" <li>"+Utilities.escapeXml(m.getMessageRaw())+" <span style=\"color: "+(m.getUseCount() == 0 ? "maroon" : "navy")+"\">("+m.getUseCount()+" uses)<span></li>\r\n");
       }
@@ -1016,6 +1021,8 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
   private final String footerTemplateText = 
       "\r\n";
   private String genDate = new Date().toString();
+  private int suppressedInfo;
+  private int suppressedWarnings;
 
   private ST template(String t) {
     return new ST(t, '$', '$');
@@ -1471,6 +1478,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("halfcolor", halfColorForLevel(vm.getLevel(), vm.isSignpost()));
     t.add("msg", vm.getHtml());
     t.add("msgdetails", vm.isSlicingHint() ? vm.getSliceHtml() : vm.getHtml());
+    t.add("comment", "");
     return t.render();
   }
   
@@ -1484,6 +1492,7 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("level", vm.getLevel().toCode());
     t.add("color", colorForLevel(vm.getLevel(), vm.isSignpost()));
     t.add("msg", vm.getHtml());
+    t.add("comment", "");
     return t.render();
   }
 
@@ -1568,5 +1577,13 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     }
     b.append("</span>");
     return b.toString();
+  }
+
+  public int getSuppressedInfo() {
+    return suppressedInfo;
+  }
+
+  public int getSuppressedWarnings() {
+    return suppressedWarnings;
   }  
 }

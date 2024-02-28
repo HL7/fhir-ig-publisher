@@ -101,6 +101,9 @@ import org.hl7.fhir.igtools.publisher.loaders.AdjunctFileLoader;
 import org.hl7.fhir.igtools.publisher.loaders.LibraryLoader;
 import org.hl7.fhir.igtools.publisher.loaders.PatchLoaderKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.loaders.PublisherLoader;
+import org.hl7.fhir.igtools.publisher.modules.CrossVersionModule;
+import org.hl7.fhir.igtools.publisher.modules.IPublisherModule;
+import org.hl7.fhir.igtools.publisher.modules.NullModule;
 import org.hl7.fhir.igtools.publisher.realm.NullRealmBusinessRules;
 import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
 import org.hl7.fhir.igtools.publisher.realm.USRealmBusinessRules;
@@ -943,6 +946,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private FixedValueFormat fixedFormat = FixedValueFormat.JSON;
 
   private static PublisherConsoleLogger consoleLogger;
+  private IPublisherModule module;
 
   private class PreProcessInfo {
     private String xsltName;
@@ -1154,7 +1158,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), rootDir, npmName, childPublisher == null? null : childPublisher.npmName,
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator, ipsComparator,
           new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine).render(publishedIg, true, false, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()),
-          new PublicationChecker(repoRoot, historyPage, markdownEngine).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
+          new PublicationChecker(repoRoot, historyPage, markdownEngine, findReleaseLabel()).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
           generateDraftDependencies(),
           noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder, context.getTxClientManager());
       tts.end();
@@ -1176,6 +1180,15 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       }
       throw e;
     }
+  }
+
+  private String findReleaseLabel() {
+    for (ImplementationGuideDefinitionParameterComponent p : publishedIg.getDefinition().getParameter()) {
+      if ("releaselabel".equals(p.getCode().getCode())) {
+        return p.getValue();
+      }
+    }
+    return "n/a";
   }
 
   private String logSummary() {
@@ -1429,6 +1442,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         j.add("errs", val.getErr());
         j.add("warnings", val.getWarn());
         j.add("hints", val.getInfo());
+        j.add("suppressed-hints", val.getSuppressedInfo());
+        j.add("suppressed-warnings", val.getSuppressedWarnings());
       }
       if (ex != null) {
         j.add("exception", ex.getMessage());
@@ -2066,11 +2081,16 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
                   RendererFactory.factory(rw, lrc).setRcontext(new ResourceContext(null, rw)).render(rw);
                   otherFilesRun.addAll(lrc.getFiles());
                 } else if (r.fhirType().equals("Bundle")) {
+                  lrc.setAddName(true);
                   for (Element e : r.getElement().getChildrenByName("entry")) {
                     Element res = e.getNamedChild("resource");
-                    if (res!=null && "http://hl7.org/fhir/StructureDefinition/DomainResource".equals(res.getProperty().getStructure().getBaseDefinition()) && !hasNarrative(res)) {
+                    if (res!=null && "http://hl7.org/fhir/StructureDefinition/DomainResource".equals(res.getProperty().getStructure().getBaseDefinition())) {
                       ResourceWrapper rw = new ElementWrappers.ResourceWrapperMetaElement(lrc, res);
-                      RendererFactory.factory(rw, lrc, new ResourceContext(null, r.getElement())).render(rw);
+                      if (hasNarrative(res)) {
+                        RendererFactory.factory(rw, lrc, new ResourceContext(null, r.getElement())).checkNarrative(rw);                        
+                      } else {
+                        RendererFactory.factory(rw, lrc, new ResourceContext(null, r.getElement())).render(rw);
+                      }
                     }
                   }
                 } else if (isDomainResource(r) && hasNarrative(r.getElement())) {
@@ -2523,6 +2543,15 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     String templateName = ini.getStringProperty("IG", "template");
     if (templateName == null)
       throw new Exception("You must nominate a template - consult the IG Publisher documentation");
+    module = loadModule(ini.getStringProperty("IG", "module"));
+    if (module.useRoutine("preProcess")) {
+      log("== Ask "+module.name()+" to pre-process the IG ============================");
+      if (!module.preProcess(rootDir)) {
+        throw new Exception("Process terminating due to Module failure");
+      } else {
+        log("== Done ====================================================================");
+      }
+    }
     igName = Utilities.path(repoRoot, ini.getStringProperty("IG", "ig"));
     try {
       try {
@@ -3090,7 +3119,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       }
     }
     
-    inspector = new HTMLInspector(outputDir, specMaps, linkSpecMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), trackedFragments);
+    inspector = new HTMLInspector(outputDir, specMaps, linkSpecMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), trackedFragments, fileList);
     inspector.getManual().add("full-ig.zip");
     if (historyPage != null) {
       inspector.getManual().add(historyPage);
@@ -3206,6 +3235,15 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       extensionTracker.setoptIn(!ini.getBooleanProperty("IG", "usage-stats-opt-out"));
 
     log("Initialization complete");
+  }
+
+  private IPublisherModule loadModule(String name) throws Exception {
+    if (Utilities.noString(name)) {
+      return new NullModule();
+    } else switch (name) {
+    case "x-version": return new CrossVersionModule();
+    default: throw new Exception("Unknown module name \""+name+"\" in ig.ini");
+    }
   }
 
   private void loadConversionVersion(String version) throws FHIRException, IOException {
@@ -3362,388 +3400,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private String processVersion(String v) {
     return v.equals("$build") ? Constants.VERSION : v;
-  }
-
-
-  private void initializeFromJson() throws Exception {
-    JsonObject configuration = null;
-    if (configFile == null) {
-      adHocTmpDir = Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-scratch");
-      log("Using inbuilt IG template in "+sourceDir);
-      copyDefaultTemplate();
-      buildConfigFile();
-    } else
-      log("Load Configuration from "+configFile);
-    if (!new File(configFile).exists())
-      throw new Exception("Unable to find file " + configFile + " and no ig.ini file specified - nothing to build.");
-    try {
-      configuration = org.hl7.fhir.utilities.json.parser.JsonParser.parseObjectFromFile(configFile);
-    } catch (Exception e) {
-      throw new Exception("Error Reading JSON Config file at "+configFile+": "+e.getMessage(), e);
-    }
-    repoRoot = Utilities.getDirectoryForFile(configFile);
-    killFile = new File(Utilities.path(repoRoot, "ig-publisher.kill"));    
-
-    if (configuration.has("redirect")) { // redirect to support auto-build for complex projects with IG folder in subdirectory
-      String redirectFile = Utilities.path(Utilities.getDirectoryForFile(configFile), configuration.asString("redirect"));
-      log("Redirecting to Configuration from " + redirectFile);
-      configFile = redirectFile;
-      configuration = org.hl7.fhir.utilities.json.parser.JsonParser.parseObjectFromFile(redirectFile);
-    }
-    if (configuration.has("logging")) {
-      for (JsonElement n : configuration.getJsonArray("logging")) {
-        String level = n.asJsonPrimitive().asString();
-        logOptions.add(level);
-      }
-    }
-    if (configuration.has("exampleNarratives")) {
-      genExampleNarratives = configuration.asBoolean("exampleNarratives");
-    }
-
-    if (configuration.has("tool") && !"jekyll".equals(str(configuration, "tool")))
-      throw new Exception("Error: At present, configuration file must include a \"tool\" property with a value of 'jekyll'");
-    tool = GenerationTool.Jekyll;
-    version = ostr(configuration, "version");
-    if (Utilities.noString(version))
-      version = Constants.VERSION;
-
-    if (!VersionUtilities.isSupportedVersion(version)) {
-      throw new Exception("Error: the IG declares that is based on version "+version+" but this IG publisher only supports publishing the following versions: "+VersionUtilities.listSupportedVersions());
-    }
-    pubVersion = FhirPublication.fromCode(version);
-
-    if (configuration.has("paths") && !(configuration.get("paths") instanceof JsonObject))
-      throw new Exception("Error: if configuration file has a \"paths\", it must be an object");
-    JsonObject paths = configuration.getJsonObject("paths");
-
-    rootDir = Utilities.getDirectoryForFile(configFile);
-    if (Utilities.noString(rootDir)) {
-      rootDir = getCurentDirectory();
-    }
-    // We need the root to be expressed as a full path.  getDirectoryForFile will do that in general, but not in Eclipse
-    rootDir = new File(rootDir).getCanonicalPath();
-
-
-    if (configuration.has("template")) {
-      template = templateManager.loadTemplate(str(configuration, "template"), rootDir, configuration.has("npm-name") ? configuration.asString("npm-name") : null, mode == IGBuildMode.AUTOBUILD);
-      if (!configuration.has("defaults"))
-        configuration.add("defaults", template.config().get("defaults"));
-      else
-        configuration.getJsonObject("defaults").merge(template.config().getJsonObject("defaults"));
-    }
-
-    if (Utilities.existsInList(version.substring(0,  3), "1.0", "1.4", "1.6", "3.0"))
-      markdownEngine = new MarkDownProcessor(Dialect.DARING_FIREBALL);
-    else
-      markdownEngine = new MarkDownProcessor(Dialect.COMMON_MARK);
-
-    log("Root directory: "+rootDir);
-    if (paths != null && paths.get("resources") instanceof JsonArray) {
-      for (JsonElement e : (JsonArray) paths.get("resources")) {
-        String dir = Utilities.path(rootDir, e.asJsonPrimitive().asString());
-        if (!resourceDirs.contains(dir)) {
-          resourceDirs.add(dir);
-        }
-      }
-    } else {
-      String dir = Utilities.path(rootDir, str(paths, "resources", "resources"));
-      if (!resourceDirs.contains(dir)) {
-        resourceDirs.add(dir);
-      }
-    }
-    if (paths != null && paths.get("binaries") instanceof JsonArray) {
-      for (JsonElement e : (JsonArray) paths.get("binaries")) {
-        binaryPaths.add(Utilities.path(rootDir, e.asJsonPrimitive().asString()));
-      }
-    } 
-    if (paths != null && paths.get("pages") instanceof JsonArray) {
-      for (JsonElement e : (JsonArray) paths.get("pages"))
-        pagesDirs.add(Utilities.path(rootDir, e.asJsonPrimitive().asString()));
-    } else
-      pagesDirs.add(Utilities.path(rootDir, str(paths, "pages", "pages")));
-
-    if (mode != IGBuildMode.WEBSERVER){
-      tempDir = Utilities.path(rootDir, str(paths, "temp", "temp"));
-      String p = str(paths, "output", "output");
-      outputDir = Paths.get(p).isAbsolute() ? p : Utilities.path(rootDir, p);
-    }
-    qaDir = Utilities.path(rootDir, str(paths, "qa", "qa"));
-    vsCache = ostr(paths, "txCache");
-    templateProvider.clear();
-    if (paths != null && paths.has("liquid")) {
-      templateProvider.load(Utilities.path(rootDir, str(paths, "liquid", "liquid")));
-    } 
-
-    if (mode == IGBuildMode.WEBSERVER) 
-      vsCache = Utilities.path(System.getProperty("java.io.tmpdir"), "fhircache");
-    else if (vsCache != null)
-      vsCache = Utilities.path(rootDir, vsCache);
-    else if (mode == IGBuildMode.AUTOBUILD)
-      vsCache = Utilities.path(System.getProperty("java.io.tmpdir"), "fhircache");
-    else
-      vsCache = Utilities.path(System.getProperty("user.home"), "fhircache");
-
-    specPath = str(paths, "specification", "http://hl7.org/fhir/");
-    if (configuration.has("pre-process")) {
-      if (configuration.get("pre-process") instanceof JsonArray) {
-        for (JsonElement e : (JsonArray) configuration.get("pre-process")) {
-          handlePreProcess((JsonObject)e, rootDir);
-        }
-      } else
-        handlePreProcess(configuration.getJsonObject("pre-process"), rootDir);
-    }
-
-    igName = Utilities.path(resourceDirs.get(0), str(configuration, "source", "ig.xml"));
-
-    logDebugMessage(LogCategory.INIT, "Check folders");
-    for (String s : resourceDirs) {
-      logDebugMessage(LogCategory.INIT, "Source: "+s);
-      checkDir(s);
-    }
-    for (String s : pagesDirs) {
-      logDebugMessage(LogCategory.INIT, "Pages: "+s);
-      checkDir(s);
-    }
-    logDebugMessage(LogCategory.INIT, "Temp: "+tempDir);
-    Utilities.clearDirectory(tempDir);
-    forceDir(tempDir);
-    forceDir(Utilities.path(tempDir, "_includes"));
-    forceDir(Utilities.path(tempDir, "_data"));
-    logDebugMessage(LogCategory.INIT, "Output: "+outputDir);
-    forceDir(outputDir);
-    Utilities.clearDirectory(outputDir);
-    logDebugMessage(LogCategory.INIT, "Temp: "+qaDir);
-    forceDir(qaDir);
-
-    Utilities.createDirectory(vsCache);
-    if (cacheOption == CacheOption.CLEAR_ALL) {
-      log("Terminology Cache is at "+vsCache+". Clearing now");
-      Utilities.clearDirectory(vsCache);
-    } else if (mode == IGBuildMode.AUTOBUILD) {
-      log("Terminology Cache is at "+vsCache+". Trimming now");
-      Utilities.clearDirectory(vsCache, "snomed.cache", "loinc.cache", "ucum.cache");
-    } else if (cacheOption == CacheOption.CLEAR_ERRORS) {
-      log("Terminology Cache is at "+vsCache+". Clearing Errors now");
-      logDebugMessage(LogCategory.INIT, "Deleted "+Integer.toString(clearErrors(vsCache))+" files");
-    } else
-      log("Terminology Cache is at "+vsCache+". "+Integer.toString(Utilities.countFilesInDirectory(vsCache))+" files in cache");
-    if (!new File(vsCache).exists())
-      throw new Exception("Unable to access or create the cache directory at "+vsCache);
-    log("Load Terminology Cache from "+vsCache);
-
-    context = loadCorePackage();
-    context.setProgress(true);
-    context.setLogger(logger);
-    context.setAllowLoadingDuplicates(false);
-    context.setExpandCodesLimit(1000);
-    context.setExpansionParameters(makeExpProfile());
-    dr = new DataRenderer(context);
-    try {
-      new ConfigFileConverter().convert(configFile, context, pcm);
-    } catch (Exception e) {
-      log("exception generating new IG");
-      e.printStackTrace();
-    }
-
-    String sct = str(configuration, "sct-edition", "http://snomed.info/sct/900000000000207008");
-    context.getExpansionParameters().addParameter("system-version", "http://snomed.info/sct|"+sct);
-    txLog = Utilities.createTempFile("fhir-ig-", ".log").getAbsolutePath();
-    System.out.println("Running Terminology Log: "+txLog);
-    context.getExpansionParameters().addParameter("activeOnly", "true".equals(ostr(configuration, "activeOnly")));
-    if (mode != IGBuildMode.WEBSERVER) {
-      if (txServer == null || !txServer.contains(":")) {
-        log("WARNING: Running without terminology server - terminology content will likely not publish correctly");
-        context.setCanRunWithoutTerminology(true);
-        txLog = null;
-      } else {
-        log("Connect to Terminology Server at "+txServer);
-        try {
-          context.connectToTSServer(new TerminologyClientFactory(version), txServer, "fhir/publisher", txLog);
-        } catch (Exception e) {
-          log("WARNING: Could not connect to terminology server - terminology content will likely not publish correctly ("+e.getMessage()+")");          
-        }
-      }
-    } else {
-      try {
-        context.connectToTSServer(new TerminologyClientFactory(version), webTxServer.getAddress(), "fhir/publisher", txLog);
-      } catch (Exception e) {
-        log("WARNING: Could not connect to terminology server - terminology content will likely not publish correctly ("+e.getMessage()+")");          
-      }
-    }
-
-    loadSpecDetails(context.getBinaryForKey("spec.internals"), "basespecJson", specPath);
-    JsonElement cb = configuration.get("canonicalBase");
-    if (cb == null)
-      throw new Exception("You must define a canonicalBase in the json file");
-
-    loadPubPack();
-
-    igpkp = new IGKnowledgeProvider(context, checkAppendSlash(specPath), cb.asString(), configuration, errors, VersionUtilities.isR2Ver(version), null, listedURLExemptions, altCanonical, fileList);
-    igpkp.loadSpecPaths(specMaps.get(0));
-    fetcher.setPkp(igpkp);
-
-    if (!dependsOnUTG(configuration.getJsonArray("dependencyList")) && (npmName == null || !npmName.contains("hl7.terminology"))) {
-      loadUTG();
-    }
-
-    if (configuration.has("fixed-business-version")) {
-      businessVersion = configuration.asString("fixed-business-version");
-    }
-
-    inspector = new HTMLInspector(outputDir, specMaps, linkSpecMaps, this, igpkp.getCanonical(), configuration.has("npm-name") ? configuration.asString("npm-name") : null, trackedFragments);
-    inspector.getManual().add("full-ig.zip");
-    historyPage = ostr(paths, "history");
-    if (historyPage != null) {
-      inspector.getManual().add(historyPage);
-      inspector.getManual().add(Utilities.pathURL(igpkp.getCanonical(), historyPage));
-    }
-    inspector.getManual().add("qa.html");
-    inspector.getManual().add("qa-tx.html");
-    if (configuration.has("exemptHtmlPatterns")) {
-      for (JsonElement e : configuration.getJsonArray("exemptHtmlPatterns"))
-        inspector.getExemptHtmlPatterns().add(e.asString());
-    }
-    inspector.setStrict("true".equals(ostr(configuration, "allow-malformed-html")));
-    inspector.setPcm(pcm);
-    makeQA = mode == IGBuildMode.WEBSERVER ? false : !"true".equals(ostr(configuration, "suppress-qa"));
-
-    JsonArray deps = configuration.getJsonArray("dependencyList");
-    if (deps != null) {
-      for (JsonElement dep : deps) {
-        loadIg((JsonObject) dep, true);
-      }
-    }
-    copyrightYear = ostr(configuration, "copyrightYear");
-
-    generateLoadedSnapshots();
-
-    JsonArray cspl = configuration.getJsonArray("code.system.property.list");
-    if (cspl != null) {
-      for (JsonElement csp : cspl) {
-        codeSystemProps.add(csp.asString());
-      }
-    }
-
-
-    // ;
-    validator = new InstanceValidator(context, new IGPublisherHostServices(), context.getXVer()); // todo: host services for reference resolution....
-    validator.setAllowXsiLocation(true);
-    validator.setNoBindingMsgSuppressed(true);
-    validator.setNoExtensibleWarnings(true);
-    validator.setHintAboutNonMustSupport(bool(configuration, "hintAboutNonMustSupport"));
-    validator.setAnyExtensionsAllowed(bool(configuration, "anyExtensionsAllowed"));
-    validator.setAllowExamples(true);
-    validator.setCrumbTrails(true);
-    validator.setWantCheckSnapshotUnchanged(true);
-    validator.setForPublication(true);
-
-    pvalidator = new ProfileValidator(context, context.getXVer());
-    csvalidator = new CodeSystemValidator(context, context.getXVer());
-    if (configuration.has("check-aggregation") && configuration.asBoolean("check-aggregation"))
-      pvalidator.setCheckAggregation(true);
-    if (configuration.has("check-mustSupport") && configuration.asBoolean("check-mustSupport"))
-      pvalidator.setCheckMustSupport(true);
-    if (configuration.has("show-reference-messages") && configuration.asBoolean("show-reference-messages"))
-      validator.setShowMessagesFromReferences(true);
-
-    if (paths.get("extension-domains") instanceof JsonArray) {
-      for (JsonElement e : (JsonArray) paths.get("extension-domains"))
-        validator.getExtensionDomains().add(e.asJsonPrimitive().asString());
-    }
-    validator.getExtensionDomains().add(ToolingExtensions.EXT_PRIVATE_BASE);
-    if (configuration.has("jurisdiction")) {
-      jurisdictions = new ArrayList<CodeableConcept>();
-      for (String s : configuration.asString("jurisdiction").trim().split("\\,")) {
-        CodeableConcept cc = new CodeableConcept();
-        jurisdictions.add(cc);
-        Coding c = cc.addCoding();
-        String sc = s.trim();
-        if (Utilities.isInteger(sc)) 
-          c.setSystem("http://unstats.un.org/unsd/methods/m49/m49.htm").setCode(sc);
-        else
-          c.setSystem("urn:iso:std:iso:3166").setCode(sc);
-        ValidationResult vr = context.validateCode(new ValidationOptions(FhirPublication.R5, "en-US"), c, null);
-        if (vr.getDisplay() != null)
-          c.setDisplay(vr.getDisplay());
-      }
-    }
-    if (configuration.has("suppressedWarningFile")) {
-      String suppressPath = configuration.asString("suppressedWarningFile");
-      if (!suppressPath.isEmpty())
-        loadSuppressedMessages(Utilities.path(rootDir, suppressPath), "ConfigFile.suppressedWarningFile");
-    }
-    validationFetcher = new ValidationServices(context, igpkp, fileList, npmList, bool(configuration, "bundleReferencesResolve"), specMaps);
-    validator.setFetcher(validationFetcher);
-    validator.setPolicyAdvisor(validationFetcher);
-    validator.setTracker(this);
-    for (String s : context.getBinaryKeysAsSet())
-      if (needFile(s)) {
-        if (makeQA)
-          checkMakeFile(context.getBinaryForKey(s), Utilities.path(qaDir, s), otherFilesStartup);
-        checkMakeFile(context.getBinaryForKey(s), Utilities.path(tempDir, s), otherFilesStartup);
-      }
-    otherFilesStartup.add(Utilities.path(tempDir, "_data"));
-    otherFilesStartup.add(Utilities.path(tempDir, "_data", "fhir.json"));
-    otherFilesStartup.add(Utilities.path(tempDir, "_data", "structuredefinitions.json"));
-    otherFilesStartup.add(Utilities.path(tempDir, "_data", "questionnaires.json"));
-    otherFilesStartup.add(Utilities.path(tempDir, "_data", "pages.json"));
-    otherFilesStartup.add(Utilities.path(tempDir, "_includes"));
-
-    JsonArray urls = configuration.getJsonArray("special-urls");
-    if (urls != null) {
-      for (JsonElement url : urls) {
-        listedURLExemptions.add(url.asString());
-      }
-    }
-    includeHeadings = !configuration.has("includeHeadings") || configuration.asBoolean("includeHeadings");
-    openApiTemplate = configuration.has("openapi-template") ? configuration.asString("openapi-template") : null;
-    license = ostr(configuration, "license");
-    htmlTemplate = configuration.has("html-template") ? str(configuration, "html-template") : null;
-    mdTemplate = configuration.has("md-template") ? str(configuration, "md-template") : null;
-    npmName = configuration.has("npm-name") ? configuration.asString("npm-name"): null;
-    brokenLinksError = "error".equals(ostr(configuration, "broken-links"));
-    nestedIgConfig = configuration.has("nestedIgConfig") ? configuration.asString("nestedIgConfig") : null;
-    nestedIgOutput = configuration.has("nestedIgOutput") ? configuration.asString("nestedIgOutput") : null;
-    igArtifactsPage = configuration.has("igArtifactsPage") ? configuration.asString("igArtifactsPage") : null;
-    genExamples = "true".equals(ostr(configuration, "gen-examples"));
-    doTransforms = "true".equals(ostr(configuration, "do-transforms"));
-    appendTrailingSlashInDataFile = "true".equals(ostr(configuration, "append-slash-to-dependency-urls"));
-    allInvariants = configuration.has("show-inherited-invariants") ? "true".equals(ostr(configuration, "show-inherited-invariants")) : true;
-    HierarchicalTableGenerator.ACTIVE_TABLES = configuration.has("activeTables") && configuration.asBoolean("activeTables");
-
-    JsonArray array = configuration.getJsonArray("spreadsheets");
-    if (array != null) {
-      for (JsonElement be : array) 
-        spreadsheets.add(be.asString());
-    }
-    if (configuration.has("mappings") && configuration.get("mappings").isJsonArray()) {
-      array = configuration.getJsonArray("mappings");
-      if (array != null) {
-        for (JsonElement be : array) 
-          mappings.add(be.asString());
-      }
-    }
-    array = configuration.getJsonArray("bundles");
-    if (array != null) {
-      for (JsonElement be : array) 
-        bundles.add(be.asString());
-    }
-    processExtraTemplates(configuration.getJsonArray("extraTemplates"));
-    if (mode == IGBuildMode.AUTOBUILD)
-      extensionTracker.setoptIn(true);
-    else if (npmName.contains("hl7") || npmName.contains("argonaut") || npmName.contains("ihe"))
-      extensionTracker.setoptIn(true);
-    else 
-      extensionTracker.setoptIn(!configuration.has("usage-stats-opt-out"));
-
-    logDebugMessage(LogCategory.INIT, "Initialization complete");
-    // now, do regeneration
-    JsonArray regenlist = configuration.getJsonArray("regenerate");
-    if (regenlist != null) {
-      for (JsonElement regen : regenlist) {
-        regenList.add(regen.asString());
-      }
-    }
   }
 
   private void loadPubPack() throws FHIRException, IOException {
@@ -5681,6 +5337,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     loadPaths();
     log("Generating Snapshots");
     generateSnapshots();
+
     log("Check R4 / R4B");
     checkR4R4B();
     log("Assign Comparison Ids");
@@ -10956,7 +10613,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (igr == null)
       return false;
     else 
-      return igr.getIsExample() || igr.hasProfile();
+      return igr.getIsExample();
   }
 
 
@@ -11405,9 +11062,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         String html = "<p style=\"color: maroon\">Expansions are not generated for retired value sets</p>";
         fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null);
       } else {
-        if (vs.getUrl().equals("http://hl7.org/fhir/us/core/ValueSet/us-core-survey-codes") || vs.getUrl().equals("http://hl7.org/fhir/us/core/ValueSet/simple-observation")) {          
-          System.out.println("!"); // #FIXME
-        }
         ValueSetExpansionOutcome exp = context.expandVS(vs, true, true, true);        
         db.recordExpansion(vs, exp);
         if (exp.getValueset() != null) {
@@ -11420,7 +11074,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           String html = new XhtmlComposer(XhtmlComposer.XML).compose(exp.getValueset().getText().getDiv());
           fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null);
           if (ValueSetUtilities.isIncompleteExpansion(exp.getValueset())) {
-            f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.INFORMATIONAL, "ValueSet.where(id = '"+vs.getId()+"')", "The value set expansion is incomplete", IssueSeverity.INFORMATION).setTxLink(exp.getTxLink()));
+            f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.INFORMATIONAL, "ValueSet.where(id = '"+vs.getId()+"')", "The value set expansion is too large, and only a subset has been displayed", IssueSeverity.INFORMATION).setTxLink(exp.getTxLink()));
           }
         } else {
           if (exp.getError() != null) { 
