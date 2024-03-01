@@ -2,13 +2,14 @@ package org.hl7.fhir.igtools.publisher.modules.xver;
 
 import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 
 public class SourcedElementDefinition {
   private StructureDefinition sd;
   private ElementDefinition ed;
 
   private boolean valid;
-  private String statusReason;
+  private CommaSeparatedStringBuilder statusReasons = new CommaSeparatedStringBuilder(",",  " and ");
   private String ver;
   private String startVer;
   private String stopVer;
@@ -43,11 +44,11 @@ public class SourcedElementDefinition {
   }
 
   public String getStatusReason() {
-    return statusReason;
+    return statusReasons.length() == 0 ? "No Change" : statusReasons.toString();
   }
 
-  void setStatusReason(String statusReason) {
-    this.statusReason = statusReason;
+  void addStatusReason(String statusReason) {
+    statusReasons.append(statusReason);
   }
 
   public String getVer() {
@@ -88,5 +89,9 @@ public class SourcedElementDefinition {
 
   void setRepeater(SourcedElementDefinition repeater) {
     this.repeater = repeater;
+  }
+
+  public void clearStatusReason() {
+    statusReasons = new CommaSeparatedStringBuilder(",",  "and ");    
   }
 }

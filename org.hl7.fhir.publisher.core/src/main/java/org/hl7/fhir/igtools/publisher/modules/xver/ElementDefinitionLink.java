@@ -16,6 +16,8 @@ public class ElementDefinitionLink {
   private ConceptMap prevCM;
   private int leftWidth; 
   Set<String> chainIds = new HashSet<>();
+  private Set<String> newCodes;
+  private Set<String> oldCodes;
 
   @Override
   public String toString() {
@@ -81,4 +83,22 @@ public class ElementDefinitionLink {
   Set<String> getChainIds() {
     return chainIds;
   }
+
+  public Set<String> getNewCodes() {
+    return newCodes;
+  }
+
+  public void setNewCodes(Set<String> newCodes) {
+    this.newCodes = newCodes;
+  }
+
+  public Set<String> getOldCodes() {
+    return oldCodes;
+  }
+
+  public void setOldCodes(Set<String> oldCodes) {
+    this.oldCodes = oldCodes;
+  }
+  
+  
 }

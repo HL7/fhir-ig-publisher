@@ -60,19 +60,21 @@ import org.hl7.fhir.r5.model.UriType;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptReferenceComponent;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
-import org.hl7.fhir.r5.renderers.ConceptMapRenderer.IConceptMapInformationProvider;
+import org.hl7.fhir.r5.renderers.ConceptMapRenderer.IMultiMapRendererAdvisor;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.terminologies.ConceptMapUtilities;
 import org.hl7.fhir.r5.terminologies.ConceptMapUtilities.TranslatedCode;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
+import org.hl7.fhir.utilities.DebugUtilities;
 import org.hl7.fhir.utilities.FhirPublication;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.validation.BaseValidator.BooleanHolder;
 
 /**
@@ -86,7 +88,7 @@ import org.hl7.fhir.validation.BaseValidator.BooleanHolder;
  *  - extension definitions in input/extensions 
  *  - 
  */
-public class XVerAnalysisEngine implements IConceptMapInformationProvider {
+public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
   public class LoadedFile {
 
@@ -151,19 +153,25 @@ public class XVerAnalysisEngine implements IConceptMapInformationProvider {
 
     logProgress("Building Links");
     // 2. build all the links. At the end, chains are all the terminating elements
-    buildLinks(XVersions.VER_2_3, vdr2, cm("resources-2to3"), cm("elements-2to3"), vdr3);
-    buildLinks(XVersions.VER_3_4, vdr3, cm("resources-3to4"), cm("elements-3to4"), vdr4);
-    buildLinks(XVersions.VER_4_4B, vdr4, cm("resources-4to4b"), cm("elements-4to4b"), vdr4b);
-    buildLinks(XVersions.VER_4B_5, vdr4b, cm("resources-4bto5"), cm("elements-4bto5"), vdr5);    
+    buildLinks(XVersions.VER_2_3, vdr2, cm("resources-2to3"), cm("elements-2to3"), vdr3, false);
+    buildLinks(XVersions.VER_3_4, vdr3, cm("resources-3to4"), cm("elements-3to4"), vdr4, false);
+    buildLinks(XVersions.VER_4_4B, vdr4, cm("resources-4to4b"), cm("elements-4to4b"), vdr4b, false);
+    buildLinks(XVersions.VER_4B_5, vdr4b, cm("resources-4bto5"), cm("elements-4bto5"), vdr5, true);    
 
     logProgress("Building & processing Chains");
     findTerminalElements();    
     for (SourcedElementDefinition te : terminatingElements) {
+      if (te.getEd().getPath().startsWith("SampledData.interval")) {
+        DebugUtilities.breakpoint();
+      }
       identifyChain(te);
     }
     checkAllLinksInChains();
 
     for (SourcedElementDefinition te : terminatingElements) {
+      if (te.getEd().getPath().startsWith("SampledData.interval")) {
+        DebugUtilities.breakpoint();
+      }
       scanChainElements(te);
     }
 
@@ -197,26 +205,7 @@ public class XVerAnalysisEngine implements IConceptMapInformationProvider {
       }
       if (file.cr != null) {
         String id = file.cr.getId();
-        String nid = id;
-        if (id.contains(".")) {
-          String[] parts = id.split("\\-"); 
-          for (int i = 0; i < parts.length; i++) {
-            String s = parts[i];
-            if (Utilities.charCount(s, '.') > 1) {
-              String[] sp = s.split("\\.");
-              CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder(".");
-              b.append(getTLA(sp[0]));
-              for (int j = 1; j < sp.length-1; j++) {
-                b.append(sp[j].substring(0, 2));
-              }
-              b.append(sp[sp.length-1]);
-              parts[i] = b.toString();
-            } else if (Utilities.charCount(s, '.') == 1) {
-              parts[i] = getTLA(s.substring(0, s.indexOf(".")))+"."+s.substring(s.lastIndexOf(".")+1);
-            }
-          }
-          nid = CommaSeparatedStringBuilder.join("-", parts);
-        } 
+        String nid = generateConciseId(id); 
         if (nid.length() > 60) {
           System.out.println("id too long: "+nid+" (from "+id+")");
         }
@@ -273,6 +262,30 @@ public class XVerAnalysisEngine implements IConceptMapInformationProvider {
     System.out.println("!");
     System.out.println("Found "+ids.size()+" IDs, changed ");
     throw new Error("here");
+  }
+
+  private String generateConciseId(String id) {
+    String nid = id;
+    if (id.contains(".")) {
+      String[] parts = id.split("\\-"); 
+      for (int i = 0; i < parts.length; i++) {
+        String s = parts[i];
+        if (Utilities.charCount(s, '.') > 1) {
+          String[] sp = s.split("\\.");
+          CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder(".");
+          b.append(getTLA(sp[0]));
+          for (int j = 1; j < sp.length-1; j++) {
+            b.append(sp[j].substring(0, 2));
+          }
+          b.append(sp[sp.length-1]);
+          parts[i] = b.toString();
+        } else if (Utilities.charCount(s, '.') == 1) {
+          parts[i] = getTLA(s.substring(0, s.indexOf(".")))+"."+s.substring(s.lastIndexOf(".")+1);
+        }
+      }
+      nid = CommaSeparatedStringBuilder.join("-", parts);
+    }
+    return nid;
   }
 
   private void loadAllFiles(List<LoadedFile> files, File dir) throws FileNotFoundException, IOException {
@@ -992,8 +1005,8 @@ public class XVerAnalysisEngine implements IConceptMapInformationProvider {
     if (ConceptMapUtilities.checkReciprocal(left, right, issues)) {
       if (save) {
         // wipes formatting in files
-        new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream("/Users/grahamegrieve/work/fhir-cross-version/input/"+folder+"/ConceptMap-"+left.getId()+".json"), left);
-        new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream("/Users/grahamegrieve/work/fhir-cross-version/input/"+folder+"/ConceptMap-"+right.getId()+".json"), right);
+        // new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream("/Users/grahamegrieve/work/fhir-cross-version/input/"+folder+"/ConceptMap-"+left.getId()+".json"), left);
+        // new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream("/Users/grahamegrieve/work/fhir-cross-version/input/"+folder+"/ConceptMap-"+right.getId()+".json"), right);
       } else {
         qaMsg("Unsaved corrections checking reciprocity of "+left.getId()+" and "+right.getId(), true);
       }
@@ -1056,7 +1069,13 @@ public class XVerAnalysisEngine implements IConceptMapInformationProvider {
         cm.setWebPath("ConceptMap-"+cm.getId()+".html");
         conceptMaps.put(id.toLowerCase(), cm);
         conceptMapsByUrl.put(cm.getUrl(), cm);
-        conceptMapsByScope.put(cm.getSourceScope().primitiveValue()+"-"+cm.getTargetScope().primitiveValue(), cm);
+        if (!cm.hasSourceScope() || !cm.hasTargetScope()) {
+          throw new Error("ConceptMap "+cm.getId()+" is missing scopes");
+        }
+        if ("http://hl7.org/fhir/1.0/StructureDefinition/AuditEvent#AuditEvent.participant.media".equals(cm.getSourceScope().primitiveValue())) {
+          System.out.println(cm.getSourceScope().primitiveValue()+":"+cm.getTargetScope().primitiveValue());
+        }
+        conceptMapsByScope.put(cm.getSourceScope().primitiveValue()+":"+cm.getTargetScope().primitiveValue(), cm);
         i++;
       }
     }
@@ -1127,10 +1146,14 @@ public class XVerAnalysisEngine implements IConceptMapInformationProvider {
     // this chain can include multiple logical subchains that all terminate at the same point. 
     // we're going to make a list of all origins, and then build a chain for each origin that only contains links in this chain (because links can be in more than one chain) 
     List<SourcedElementDefinition> origins = new ArrayList<>();
-    for (ElementDefinitionLink link : chain) {
-      List<ElementDefinitionLink> links = makeEDLinks(link.getPrev(), MakeLinkMode.INWARD);
-      if (links.size() == 0) {
-        origins.add(link.getPrev());       
+    if (chain.isEmpty()) {
+      origins.add(terminus);
+    } else {
+      for (ElementDefinitionLink link : chain) {
+        List<ElementDefinitionLink> links = makeEDLinks(link.getPrev(), MakeLinkMode.INWARD);
+        if (links.size() == 0) {
+          origins.add(link.getPrev());       
+        }
       }
     }
     for (SourcedElementDefinition origin : origins) {
@@ -1159,7 +1182,8 @@ public class XVerAnalysisEngine implements IConceptMapInformationProvider {
     // now we have a nice single chain across a set of versions
     List<SourcedElementDefinition> all = new ArrayList<SourcedElementDefinition>();
 
-    origin.setStatusReason(null);
+    assert Utilities.noString(origin.getStatusReason());
+    
     origin.setValid(true);
     origin.setStartVer(origin.getVer());
     origin.setStopVer(origin.getVer());
@@ -1170,13 +1194,13 @@ public class XVerAnalysisEngine implements IConceptMapInformationProvider {
       SourcedElementDefinition element = link.getNext();
       all.add(element);
       if (link.getRel() != ConceptMapRelationship.EQUIVALENT) {
-        element.setStatusReason("Not Equivalent");
+        element.addStatusReason("Not Equivalent");
         element.setValid(true);
         template = element;        
         template.setStartVer(element.getVer());
         template.setStopVer(element.getVer()); 
       } else if (!template.getEd().repeats() && element.getEd().repeats()) {
-        element.setStatusReason("Element repeats");
+        element.addStatusReason("Element repeats");
         element.setValid(true);
         template.setRepeater(element);
         template = element;        
@@ -1185,7 +1209,7 @@ public class XVerAnalysisEngine implements IConceptMapInformationProvider {
       } else {
         List<String> newTypes = findNewTypes(template.getEd(), element.getEd());
         if (!newTypes.isEmpty()) {
-          element.setStatusReason("New Types "+CommaSeparatedStringBuilder.join("|", newTypes));
+          element.addStatusReason("New Types "+CommaSeparatedStringBuilder.join("|", newTypes));
           element.setValid(true);
           template = element;        
           template.setStartVer(element.getVer());
@@ -1193,13 +1217,13 @@ public class XVerAnalysisEngine implements IConceptMapInformationProvider {
         } else {
           List<String> newTargets = findNewTargets(template.getEd(), element.getEd());
           if (!newTargets.isEmpty()) {
-            element.setStatusReason("New Targets "+CommaSeparatedStringBuilder.join("|", newTargets));
+            element.addStatusReason("New Targets "+CommaSeparatedStringBuilder.join("|", newTargets));
             element.setValid(true);
             template = element;        
             template.setStartVer(element.getVer());
             template.setStopVer(element.getVer()); 
           } else {
-            element.setStatusReason("No Change");
+            element.clearStatusReason();
             element.setValid(false);
             template.setStopVer(element.getVer()); 
           }
@@ -1209,28 +1233,12 @@ public class XVerAnalysisEngine implements IConceptMapInformationProvider {
 
     for (SourcedElementDefinition element : all) {
       if (element.isValid()) {
-        CommaSeparatedStringBuilder vers = new CommaSeparatedStringBuilder();
         String bv = element.getStartVer();
         String ev = element.getRepeater() != null ? element.getRepeater().getStopVer() : element.getStopVer();
-
-        if (!VersionUtilities.includedInRange(bv, ev, "1.0.2")) {
-          vers.append("R2");
-        }
-        if (!VersionUtilities.includedInRange(bv, ev, "3.0.2")) {
-          vers.append("R3");
-        }
-        if (!VersionUtilities.includedInRange(bv, ev, "4.0.1")) {
-          vers.append("R4");
-        }
-        if (!VersionUtilities.includedInRange(bv, ev, "4.3.0")) {
-          vers.append("R4B");
-        }
-        if (!VersionUtilities.includedInRange(bv, ev, "5.0.0")) {
-          vers.append("R5");
-        }
+        CommaSeparatedStringBuilder vers = makeVerList(bv, ev);
         if (vers.count() == 0) {
           element.setValid(false);
-          element.setStatusReason("??");
+          element.addStatusReason("??");
         } else {
           element.setVerList(vers.toString());
         }
@@ -1252,8 +1260,8 @@ public class XVerAnalysisEngine implements IConceptMapInformationProvider {
           
           String idF = link.getNext().getEd().getPath().equals(link.getPrev().getEd().getPath()) ? link.getNext().getEd().getPath()+"-"+l.getVersion()+"to"+r.getVersion() : link.getPrev().getEd().getPath()+"-"+link.getNext().getEd().getPath()+"-"+l.getVersion()+"to"+r.getVersion();
           String idR = link.getNext().getEd().getPath().equals(link.getPrev().getEd().getPath()) ? link.getNext().getEd().getPath()+"-"+r.getVersion()+"to"+l.getVersion() : link.getNext().getEd().getPath()+"-"+link.getPrev().getEd().getPath()+"-"+r.getVersion()+"to"+l.getVersion();
-          ConceptMap cmF = conceptMaps.get(idF.toLowerCase());
-          ConceptMap cmR = conceptMaps.get(idR.toLowerCase());
+          ConceptMap cmF = conceptMapsByScope.get(leftScope + ":"+rightScope);
+          ConceptMap cmR = conceptMapsByScope.get(rightScope + ":"+leftScope);
           Set<String> lset = CodeSystemUtilities.codes(l.getCs());
           Set<String> rset = CodeSystemUtilities.codes(r.getCs());
           Set<String> lvset = ValueSetUtilities.codes(l.getVs(), l.getCs());
@@ -1262,13 +1270,17 @@ public class XVerAnalysisEngine implements IConceptMapInformationProvider {
           if (cmF != null) {
             checkCM(cmF, link.getPrev(), link.getNext(), l, r, lset, rset, lvset, rvset);
           } else { // if (!rset.containsAll(lset)) {
-            cmF = makeCM(idF, link.getPrev(), link.getNext(), l, r, lset, rset, lvset, rvset);              
+            System.out.println("didn't find "+leftScope + ":"+rightScope);
+            String nid = generateConciseId(idF);
+            cmF = makeCM(nid, idF, link.getPrev(), link.getNext(), l, r, lset, rset, lvset, rvset, leftScope, rightScope);              
           }
 
           if (cmR != null) {
             checkCM(cmR, link.getNext(), link.getPrev(), r, l, rset, lset, rvset, lvset);
           } else { // if (!lset.containsAll(rset)) {
-            cmR = makeCM(idR, link.getNext(), link.getPrev(), r, l, rset, lset, rvset, lvset);            
+            System.out.println("didn't find "+rightScope + ":"+leftScope);
+            String nid = generateConciseId(idR);
+            cmR = makeCM(nid, idR, link.getNext(), link.getPrev(), r, l, rset, lset, rvset, lvset, rightScope, leftScope);            
           }
           if (cmF != null && cmR != null) {
             List<String> errs = new ArrayList<String>();
@@ -1283,25 +1295,93 @@ public class XVerAnalysisEngine implements IConceptMapInformationProvider {
           }
           link.setNextCM(cmF);
           link.setPrevCM(cmR);
-
+          
+          if (!rvset.isEmpty() && cmR != null && !link.getNext().isValid()) {
+            link.setNewCodes(ConceptMapUtilities.listCodesWithNoMappings(rvset, cmR));
+            if (!link.getNewCodes().isEmpty()) {
+              link.getNext().setValid(true);
+              link.getNext().setStartVer(template.getVer());
+              link.getNext().setStopVer(link.getPrev().getVer());
+              CommaSeparatedStringBuilder vers = makeVerListPositive(template.getVer(), link.getPrev().getVer());
+              link.getNext().setVerList(vers.toString());
+              link.getNext().addStatusReason("Added "+Utilities.pluralize("code", link.getNewCodes().size())+" '"+CommaSeparatedStringBuilder.join(", ", link.getNewCodes())+"'");              
+            }
+          }
+          if (!lvset.isEmpty() && cmF != null && !link.getPrev().isValid()) {
+            link.setOldCodes(ConceptMapUtilities.listCodesWithNoMappings(lvset, cmF));
+            if (!link.getOldCodes().isEmpty()) {
+              link.getPrev().setValid(true);
+              // no we need to know... which version was it defined in? and how far does this chain go?
+              link.getPrev().setStartVer(link.getNext().getVer());
+              link.getPrev().setStopVer("5.0.0");
+              CommaSeparatedStringBuilder vers = makeVerListPositive(link.getNext().getVer(), "5.0.0");
+              link.getPrev().setVerList(vers.toString());
+              link.getPrev().addStatusReason("Removed "+Utilities.pluralize("code", link.getOldCodes().size())+" '"+CommaSeparatedStringBuilder.join(", ", link.getOldCodes())+"'");              
+            }
+          }
         }
       }        
     }
   }
 
-  private ConceptMap makeCM(String id, SourcedElementDefinition se, SourcedElementDefinition de, VSPair s, VSPair d, Set<String> source, Set<String> dest, Set<String> lvset, Set<String> rvset) throws FileNotFoundException, IOException {
+  private CommaSeparatedStringBuilder makeVerList(String bv, String ev) {
+    CommaSeparatedStringBuilder vers = new CommaSeparatedStringBuilder();
+
+    if (!VersionUtilities.includedInRange(bv, ev, "1.0.2")) {
+      vers.append("R2");
+    }
+    if (!VersionUtilities.includedInRange(bv, ev, "3.0.2")) {
+      vers.append("R3");
+    }
+    if (!VersionUtilities.includedInRange(bv, ev, "4.0.1")) {
+      vers.append("R4");
+    }
+    if (!VersionUtilities.includedInRange(bv, ev, "4.3.0")) {
+      vers.append("R4B");
+    }
+    if (!VersionUtilities.includedInRange(bv, ev, "5.0.0")) {
+      vers.append("R5");
+    }
+    return vers;
+  }
+  
+
+
+  private CommaSeparatedStringBuilder makeVerListPositive(String bv, String ev) {
+    CommaSeparatedStringBuilder vers = new CommaSeparatedStringBuilder();
+
+    if (VersionUtilities.includedInRange(bv, ev, "1.0.2")) {
+      vers.append("R2");
+    }
+    if (VersionUtilities.includedInRange(bv, ev, "3.0.2")) {
+      vers.append("R3");
+    }
+    if (VersionUtilities.includedInRange(bv, ev, "4.0.1")) {
+      vers.append("R4");
+    }
+    if (VersionUtilities.includedInRange(bv, ev, "4.3.0")) {
+      vers.append("R4B");
+    }
+    if (VersionUtilities.includedInRange(bv, ev, "5.0.0")) {
+      vers.append("R5");
+    }
+    return vers;
+  }
+
+  
+
+  private ConceptMap makeCM(String id, String rawId, SourcedElementDefinition se, SourcedElementDefinition de, VSPair s, VSPair d, 
+         Set<String> source, Set<String> dest, Set<String> lvset, Set<String> rvset, String scopeUri, String targetUri) throws FileNotFoundException, IOException {
     ConceptMap cm = new ConceptMap();
     cm.setId(id);
     cm.setUrl("http://hl7.org/fhir/uv/xver/ConceptMap/"+id);
-    cm.setName(id.replace("-", ""));
+    cm.setName(rawId.replace("-", ""));
     if (se.getEd().getPath().equals(de.getEd().getPath())) {
       cm.setTitle("Mapping for "+se.getEd().getPath()+" from "+se.getVer()+" to "+de.getVer());
     } else {
       cm.setTitle("Mapping for "+se.getEd().getPath()+"/"+de.getEd().getPath()+" from "+se.getVer()+" to "+de.getVer());
     }
-    String scopeUri = "http://hl7.org/fhir/"+VersionUtilities.getMajMin(se.getVer())+"/StructureDefinition/"+se.getSd().getName()+"#"+se.getEd().getPath();
     cm.setSourceScope(new UriType(scopeUri));
-    String targetUri = "http://hl7.org/fhir/"+VersionUtilities.getMajMin(de.getVer())+"/StructureDefinition/"+de.getSd().getName()+"#"+de.getEd().getPath();
     cm.setTargetScope(new UriType(targetUri));
     ConceptMapGroupComponent g = cm.addGroup();
     scopeUri = injectVersionToUri(s.getCs().getUrl(), VersionUtilities.getMajMin(se.getVer()));
@@ -1450,7 +1530,7 @@ public class XVerAnalysisEngine implements IConceptMapInformationProvider {
                 tgt.setComment("The code "+tgt.getCode()+" is not in the target code system - FIX");
                 qaMsg("Issue with "+cm.getId()+": The code "+tgt.getCode()+" is not in the target code system", true);
               } else if (!rvset.contains(tgt.getCode())) {
-                qaMsg("Issue with "+cm.getId()+": The code "+tgt.getCode()+" not in the target value set, but is the correct translation", true);
+                // qaMsg("Issue with "+cm.getId()+": The code "+tgt.getCode()+" not in the target value set, but is the correct translation", true);
               }
             }
           }
@@ -1539,7 +1619,7 @@ public class XVerAnalysisEngine implements IConceptMapInformationProvider {
     return res;
   }
 
-  private void buildLinks(XVersions ver, VersionDefinitions defsPrev, ConceptMap resFwd, ConceptMap elementFwd, VersionDefinitions defsNext) {
+  private void buildLinks(XVersions ver, VersionDefinitions defsPrev, ConceptMap resFwd, ConceptMap elementFwd, VersionDefinitions defsNext, boolean last) {
     logProgress("Build links between "+defsPrev.getVersion().toCode()+" and "+defsNext.getVersion().toCode());
 
     for (String name : Utilities.sorted(defsPrev.getStructures().keySet())) {
@@ -1554,6 +1634,7 @@ public class XVerAnalysisEngine implements IConceptMapInformationProvider {
     for (String name : Utilities.sorted(defsPrev.getStructures().keySet())) {
       StructureDefinition sd = defsPrev.getStructures().get(name);
       if (sd.getKind() == StructureDefinitionKind.RESOURCE && !sd.getAbstract() && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
+        
         List<SourcedStructureDefinition> matches = new ArrayList<>();
         List<TranslatedCode> names = translateResourceName(resFwd, name);
         if (names.isEmpty()) {
@@ -1564,6 +1645,34 @@ public class XVerAnalysisEngine implements IConceptMapInformationProvider {
           }
         }
         buildLinksForElements(ver, elementFwd, sd, matches);
+      }
+    }
+    
+    if (last) {
+      // now that we've done that, scan anything in defsNext that didn't get mapped to from destPrev
+
+      for (String name : Utilities.sorted(defsNext.getStructures().keySet())) {
+        StructureDefinition sd = defsNext.getStructures().get(name);
+        if (sd.getKind() == StructureDefinitionKind.COMPLEXTYPE && (!sd.getAbstract() || Utilities.existsInList(sd.getName(), "Quantity")) && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
+          for (ElementDefinition ed : sd.getDifferential().getElement()) {
+            if (!ed.hasUserData("sed")) {
+              List<ElementDefinitionLink> links = makeEDLinks(ed, MakeLinkMode.OUTWARD);
+              terminatingElements.add(makeSED(sd, ed));
+            }
+          }     
+        }
+      }
+
+      for (String name : Utilities.sorted(defsNext.getStructures().keySet())) {
+        StructureDefinition sd = defsNext.getStructures().get(name);
+        if (sd.getKind() == StructureDefinitionKind.RESOURCE && !sd.getAbstract() && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
+          for (ElementDefinition ed : sd.getDifferential().getElement()) {   
+            if (!ed.hasUserData("sed")) {
+              List<ElementDefinitionLink> links = makeEDLinks(ed, MakeLinkMode.OUTWARD);
+              terminatingElements.add(makeSED(sd, ed));
+            }
+          }     
+        }
       }
     }
   }
@@ -1792,8 +1901,22 @@ public class XVerAnalysisEngine implements IConceptMapInformationProvider {
     case "http://hl7.org/fhir/4.0/resource-types" : return determineResourceLink("4.0", code);
     case "http://hl7.org/fhir/4.3/resource-types" : return determineResourceLink("4.3", code);
     case "http://hl7.org/fhir/5.0/resource-types" : return determineResourceLink("5.0", code);
+    case "http://hl7.org/fhir/1.0/data-types" : return determineDataTypeLink("1.0", code);
+    case "http://hl7.org/fhir/3.0/data-types" : return determineDataTypeLink("3.0", code);
+    case "http://hl7.org/fhir/4.0/data-types" : return determineDataTypeLink("4.0", code);
+    case "http://hl7.org/fhir/4.3/data-types" : return determineDataTypeLink("4.3", code);
+    case "http://hl7.org/fhir/5.0/data-types" : return determineDataTypeLink("5.0", code);
     default:
       return null;
+    }
+  }
+
+  private String determineDataTypeLink(String string, String code) {
+    if (Utilities.existsInList(code, "base64Binary", "boolean", "canonical", "code", "date", "dateTime", "decimal", "id", "instant", "integer", "integer64",
+        "markdown", "oid", "positiveInt", "string", "time", "unsignedInt", "uri", "url", "uuid", "xhtml")) {
+      return null;
+    } else {
+      return "cross-version-"+code+".html"; 
     }
   }
 
@@ -1862,11 +1985,39 @@ public class XVerAnalysisEngine implements IConceptMapInformationProvider {
           ElementDefinition ed = sd.getDifferential().getElementByPath(ep);
           return processVS(vd, ed.getBinding().getValueSet());
         }
+      } else if (uri.endsWith("/ValueSet/resource-types")) {
+        return listResources(vd.getStructures(),  VersionUtilities.getMajMin(vd.getVersion().toCode()));
+      } else if (uri.endsWith("/ValueSet/data-types")) {
+        return listDatatypes(vd.getStructures(),  VersionUtilities.getMajMin(vd.getVersion().toCode()));
       } else {
-        // todo
+        System.out.println(uri);
       }
     }
     return null;
+  }
+
+  private List<Coding> listResources(Map<String, StructureDefinition> structures, String ver) {
+    List<Coding> list = new ArrayList<>();
+    for (String n : Utilities.sorted(structures.keySet())) {
+      StructureDefinition sd = structures.get(n);
+      if (sd.getKind() == StructureDefinitionKind.RESOURCE && !sd.getAbstract() && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
+        list.add(new Coding("http://hl7.org/fhir/"+ver+"/resource-types", sd.getType(), sd.getType()));
+      }
+    }
+//        if (!types.contains(sd.getType()) && sd.getKind() == StructureDefinitionKind.COMPLEXTYPE && (!sd.getAbstract() || Utilities.existsInList(sd.getName(), "Quantity")) && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
+    return list;
+  }
+
+  private List<Coding> listDatatypes(Map<String, StructureDefinition> structures, String ver) {
+    List<Coding> list = new ArrayList<>();
+    for (String n : Utilities.sorted(structures.keySet())) {
+      StructureDefinition sd = structures.get(n);
+      if ((sd.getKind() == StructureDefinitionKind.COMPLEXTYPE || sd.getKind() == StructureDefinitionKind.PRIMITIVETYPE) && !sd.getAbstract() && !Utilities.existsInList(sd.getType(), "BackboneElement") && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
+        list.add(new Coding("http://hl7.org/fhir/"+ver+"/data-types", sd.getType(), sd.getType()));
+      }
+    }
+//        if (!types.contains(sd.getType()) && sd.getKind() == StructureDefinitionKind.COMPLEXTYPE && (!sd.getAbstract() || Utilities.existsInList(sd.getName(), "Quantity")) && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
+    return list;
   }
 
   private List<Coding> processVS(VersionDefinitions vd, String url) {
@@ -1944,6 +2095,48 @@ public class XVerAnalysisEngine implements IConceptMapInformationProvider {
 
   public List<SourcedElementDefinition> getOrigins() {
     return origins;
+  }
+
+  @Override
+  public boolean describeMap(ConceptMap map, XhtmlNode x) {
+    switch (map.getTargetScope().primitiveValue()) {
+    case "http://hl7.org/fhir/1.0/ValueSet/data-types":
+      x.b().ah("http://hl7.org/fhir/DSTU2/datatypes.html").tx("R2 DataTypes");
+      break;
+    case "http://hl7.org/fhir/1.0/ValueSet/resource-types":
+      x.b().ah("http://hl7.org/fhir/DSTU2/resourcelist.html").tx("R2 Resources");
+      break;
+    case "http://hl7.org/fhir/3.0/ValueSet/data-types":
+      x.b().ah("http://hl7.org/fhir/STU3/datatypes.html").tx("R3 DataTypes");
+      break;
+    case "http://hl7.org/fhir/3.0/ValueSet/resource-types":
+      x.b().ah("http://hl7.org/fhir/STU3/resourcelist.html").tx("R3 Resources");
+      break;
+    case "http://hl7.org/fhir/4.0/ValueSet/data-types":
+      x.b().ah("http://hl7.org/fhir/R4/datatypes.html").tx("R4 DataTypes");
+      break;
+    case "http://hl7.org/fhir/4.0/ValueSet/resource-types":
+      x.b().ah("http://hl7.org/fhir/R4/resourcelist.html").tx("R4 Resources");
+      break;
+    case "http://hl7.org/fhir/4.3/ValueSet/data-types":
+      x.b().ah("http://hl7.org/fhir/R4B/datatypes.html").tx("R4B DataTypes");
+      break;
+    case "http://hl7.org/fhir/4.3/ValueSet/resource-types":
+      x.b().ah("http://hl7.org/fhir/R4B/resourcelist.html").tx("R4B Resources");
+      break;
+    case "http://hl7.org/fhir/5.0/ValueSet/data-types":
+      x.b().ah("http://hl7.org/fhir/R5/datatypes.html").tx("R5 DataTypes");
+      break;
+    case "http://hl7.org/fhir/5.0/ValueSet/resource-types":
+      x.b().ah("http://hl7.org/fhir/R5/resourcelist.html").tx("R5 Resources");
+      break;
+    default:
+      return false;
+    }
+    x.tx(" (");
+    x.ah(map.getWebPath()).tx("Map");
+    x.tx(")");
+    return true;
   }
 
 

@@ -158,8 +158,15 @@ public class CrossVersionModule implements IPublisherModule {
     x1.tx("].");
     if (ed.isValid()) {
       x.tx(" Valid versions: "+ed.getVerList());
+      if (ed.getStatusReason() != null && !"No Change".equals(ed.getStatusReason())) {
+        x.tx(" (because "+ed.getStatusReason()+")");
+      }
     } else {
-      x.tx(" Not valid because "+ed.getStatusReason());
+      if (ed.getStatusReason() != null && !"??".equals(ed.getStatusReason())) {
+        x.tx(" Not valid because "+ed.getStatusReason());
+      } else {
+        x.tx(" Not valid because No Change");        
+      }
     }
   }
 
@@ -262,7 +269,7 @@ public class CrossVersionModule implements IPublisherModule {
         }
       }
       body.hr();
-      body.add(ConceptMapRenderer.renderMultipleMaps(name, maps, engine, RenderMultiRowSortPolicy.UNSORTED));
+      body.add(ConceptMapRenderer.renderMultipleMaps(name, null, maps, engine, RenderMultiRowSortPolicy.UNSORTED));
     }
 
     TextFile.stringToFile(new XhtmlComposer(false, false).compose(body), Utilities.path(path, "input", "includes", "cross-version-"+sd.getName()+".xhtml"));
@@ -397,7 +404,7 @@ public class CrossVersionModule implements IPublisherModule {
     maps.add(engine.cm("resources-3to4"));
     maps.add(engine.cm("resources-4to4b"));
     maps.add(engine.cm("resources-4bto5"));
-    XhtmlNode page = ConceptMapRenderer.renderMultipleMaps("Resource", maps, engine, RenderMultiRowSortPolicy.FIRST_COL);
+    XhtmlNode page = ConceptMapRenderer.renderMultipleMaps("R2 Resources", "http://hl7.org/fhir/R2/resourcelist.html", maps, engine, RenderMultiRowSortPolicy.FIRST_COL);
 
     TextFile.stringToFile(new XhtmlComposer(false, false).compose(page), Utilities.path(path, "input", "includes", "cross-version-resources.xhtml"));
     TextFile.stringToFile(new XhtmlComposer(false, false).compose(wrapPage(page, "Resource Map")), Utilities.path(path, "temp", "xver-qa", "cross-version-resources.html"));
@@ -407,7 +414,7 @@ public class CrossVersionModule implements IPublisherModule {
     maps.add(engine.cm("types-3to4"));
     maps.add(engine.cm("types-4to4b"));
     maps.add(engine.cm("types-4bto5"));
-    page = ConceptMapRenderer.renderMultipleMaps("Type", maps, engine, RenderMultiRowSortPolicy.FIRST_COL);
+    page = ConceptMapRenderer.renderMultipleMaps("R2 DataTypes", "http://hl7.org/fhir/R2/datatypes.html", maps, engine, RenderMultiRowSortPolicy.FIRST_COL);
 
     TextFile.stringToFile(new XhtmlComposer(false, false).compose(page), Utilities.path(path, "input", "includes", "cross-version-types.xhtml"));
     TextFile.stringToFile(new XhtmlComposer(false, false).compose(wrapPage(page, "Type Map")), Utilities.path(path, "temp", "xver-qa", "cross-version-types.html"));
