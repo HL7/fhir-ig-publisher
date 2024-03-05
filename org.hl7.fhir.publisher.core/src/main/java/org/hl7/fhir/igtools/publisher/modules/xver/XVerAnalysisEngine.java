@@ -7,6 +7,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -20,9 +21,20 @@ import org.hl7.fhir.convertors.factory.VersionConvertorFactory_10_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_43_50;
+import org.hl7.fhir.convertors.loaders.loaderR5.R2ToR5Loader;
+import org.hl7.fhir.convertors.loaders.loaderR5.R3ToR5Loader;
+import org.hl7.fhir.convertors.loaders.loaderR5.R4BToR5Loader;
+import org.hl7.fhir.convertors.loaders.loaderR5.R4ToR5Loader;
+import org.hl7.fhir.convertors.loaders.loaderR5.R5ToR5Loader;
+import org.hl7.fhir.convertors.txClient.TerminologyClientR2;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
+import org.hl7.fhir.igtools.publisher.modules.xver.SourcedElementDefinition.ElementValidState;
 import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine.LoadedFile;
+import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine.MakeLinkMode;
+import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine.TypeDefinitionSorter;
+import org.hl7.fhir.r5.model.Enumerations.FHIRVersion;
+import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.JsonParser;
@@ -36,12 +48,16 @@ import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
 import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupUnmappedMode;
 import org.hl7.fhir.r5.model.ConceptMap.SourceElementComponent;
 import org.hl7.fhir.r5.model.ConceptMap.TargetElementComponent;
+import org.hl7.fhir.r5.model.ContactPoint.ContactPointSystem;
 import org.hl7.fhir.r5.model.ElementDefinition;
+import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
 import org.hl7.fhir.r5.model.Enumerations.BindingStrength;
 import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
 import org.hl7.fhir.r5.model.Enumerations.ConceptMapRelationship;
+import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
 import org.hl7.fhir.r5.model.IdType;
+import org.hl7.fhir.r5.model.Parameters;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
@@ -60,20 +76,24 @@ import org.hl7.fhir.r5.model.UriType;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptReferenceComponent;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
+import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionComponent;
+import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
 import org.hl7.fhir.r5.renderers.ConceptMapRenderer.IMultiMapRendererAdvisor;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.terminologies.ConceptMapUtilities;
 import org.hl7.fhir.r5.terminologies.ConceptMapUtilities.TranslatedCode;
+import org.hl7.fhir.r5.terminologies.client.TerminologyClientR5.TerminologyClientR5Factory;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
+import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
-import org.hl7.fhir.utilities.DebugUtilities;
 import org.hl7.fhir.utilities.FhirPublication;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.validation.BaseValidator.BooleanHolder;
 
@@ -89,6 +109,15 @@ import org.hl7.fhir.validation.BaseValidator.BooleanHolder;
  *  - 
  */
 public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
+
+  public class TypeDefinitionSorter implements Comparator<StructureDefinition> {
+
+    @Override
+    public int compare(StructureDefinition o1, StructureDefinition o2) {
+      return o1.getType() == null || o2.getType() == null ? 0 : o1.getType().compareTo(o2.getType());
+    }
+
+  }
 
   public class LoadedFile {
 
@@ -124,20 +153,23 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     return execute(path);
   }
 
-  private Map<String, VersionDefinitions> versions = new HashMap<>();
+  private Map<String, IWorkerContext> versions = new HashMap<>();
   private Map<String, ConceptMap> conceptMaps = new HashMap<>();
   private Map<String, ConceptMap> conceptMapsByUrl = new HashMap<>();
   private Map<String, ConceptMap> conceptMapsByScope = new HashMap<>();
   private Map<String, StructureMap> structureMaps = new HashMap<>();
-  private VersionDefinitions vdr2;
-  private VersionDefinitions vdr3;
-  private VersionDefinitions vdr4;
-  private VersionDefinitions vdr4b;
-  private VersionDefinitions vdr5;
+  private IWorkerContext vdr2;
+  private IWorkerContext vdr3;
+  private IWorkerContext vdr4;
+  private IWorkerContext vdr4b;
+  private IWorkerContext vdr5;
   private List<ElementDefinitionLink> allLinks = new ArrayList<>();
   private List<SourcedElementDefinition> terminatingElements = new ArrayList<>();
   private List<SourcedElementDefinition> origins = new ArrayList<>();
   private boolean failures;
+  private List<StructureDefinition> extensions = new ArrayList<>();
+  private Map<String, ValueSet> newValueSets = new HashMap<>();
+  private Map<String, CodeSystem> newCodeSystems = new HashMap<>();
 
   private boolean execute(String folder) throws FHIRException, IOException {
     // checkIds(folder);
@@ -161,17 +193,11 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     logProgress("Building & processing Chains");
     findTerminalElements();    
     for (SourcedElementDefinition te : terminatingElements) {
-      if (te.getEd().getPath().startsWith("SampledData.interval")) {
-        DebugUtilities.breakpoint();
-      }
       identifyChain(te);
     }
     checkAllLinksInChains();
 
     for (SourcedElementDefinition te : terminatingElements) {
-      if (te.getEd().getPath().startsWith("SampledData.interval")) {
-        DebugUtilities.breakpoint();
-      }
       scanChainElements(te);
     }
 
@@ -186,10 +212,210 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         }        
       }
     }
+
+    for (SourcedElementDefinition origin : origins) {
+      generateExtensions(origin);
+    }
+    checkAllLinksInChains();
+
     return !failures;
   }
 
 
+  private void generateExtensions(SourcedElementDefinition origin) {
+    List<ElementDefinitionLink> links = makeEDLinks(origin, MakeLinkMode.ORIGIN_CHAIN);
+    checkCreateExtension(null, origin);
+    for (ElementDefinitionLink link : links) {
+      checkCreateExtension(link, link.getNext());
+    }
+  }
+
+  private void checkCreateExtension(ElementDefinitionLink link, SourcedElementDefinition element) {
+    if (element.isValid()) {
+      String ver = VersionUtilities.getMajMin(element.getSd().getFhirVersion().toCode());
+      // we need to create the extension definition
+      StructureDefinition sd = new StructureDefinition();
+      sd.setUrl("http://hl7.org/fhir/"+ver+"/StructureDefinition/extension-"+element.getEd().getPath());
+      sd.setId("extension-"+element.getEd().getPath());
+      // sd.setVersion(null); // let the IG set this
+      sd.setName("XVerExtension"+element.getEd().getPath());
+      sd.setTitle("Coss-Version Extension for "+element.getEd().getPath());
+      sd.setStatus(PublicationStatus.ACTIVE);
+      sd.setExperimental(false);
+      // sd.setDateElement(null); // let the IG set this
+      sd.setPublisher(element.getSd().getPublisher());
+      sd.getContact().addAll(element.getSd().getContact());
+      sd.addJurisdiction().addCoding("http://unstats.un.org/unsd/methods/m49/m49.htm", "001", null);
+      sd.setDescription("Cross-Version Extension for "+element.getEd().getPath()+". Valid in versions "+element.getVerList());
+      sd.setFhirVersion(FHIRVersion._5_0_0);
+      sd.setKind(StructureDefinitionKind.COMPLEXTYPE);
+      sd.setType("Extension");
+      sd.setBaseDefinition("http://hl7.org/fhir/StructureDefinition/Extension");
+      sd.setDerivation(TypeDerivationRule.CONSTRAINT);
+      sd.setAbstract(false);
+      
+      // todo: populate the contexts
+
+      ElementDefinition src = element.getEd();
+      ElementDefinition edr = new ElementDefinition();
+      edr.setPath("Extension");      
+      sd.getDifferential().addElement(edr);
+      ElementDefinition edv = new ElementDefinition();
+      edv.setPath("Extension.value[x]");      
+      sd.getDifferential().addElement(edv);
+
+      edr.setLabel(src.getLabel());
+      edr.setCode(src.getCode());
+      edr.setShort(src.getShort());
+      edr.setDefinition(src.getDefinition());
+      edr.setComment(src.getComment());
+      edr.setRequirements(src.getRequirements());
+      edr.getAlias().addAll(src.getAlias());
+      edr.setComment(src.getComment());
+      edr.setMin(src.getMin());
+      edr.setMax(src.getMax());
+      edr.setIsModifier(src.getIsModifier());
+      edr.setIsModifierReason(src.getIsModifierReason());
+      edr.setIsSummary(src.getIsSummary());
+      edr.setMapping(src.getMapping());
+      
+      edv.setMinValue(src.getMinValue());
+      edv.setMaxValue(src.getMaxValue());
+      edv.setMaxLength(src.getMaxLength());
+      edv.setMustHaveValue(src.getMustHaveValue());
+      edv.setValueAlternatives(src.getValueAlternatives());
+
+      IWorkerContext vd = versions.get(element.getVer());
+
+      switch (element.getValidState()) {
+      case CARDINALITY:
+        edv.getType().addAll(src.getType());
+        copyBinding(vd, edv, src.getBinding());
+        addToDescription(sd, "This is a valid extension because the cardinality changed");
+        break;
+      case FULL_VALID:
+        edv.getType().addAll(src.getType());
+        copyBinding(vd, edv, src.getBinding());
+        addToDescription(sd, "This is a valid extension because it's counted as a new element");
+        break;
+      case NEW_TYPES:
+        boolean coded = false;
+        for (TypeRefComponent tr : src.getType()) {
+          if (element.getNames().contains(tr.getCode())) {
+            edv.getType().add(tr);
+            if (isCoded(tr.getWorkingCode())) {
+              coded = true;
+            }
+          }
+        }
+        if (coded) {
+          copyBinding(vd, edv, src.getBinding());
+        }
+        addToDescription(sd, "This is a valid extension because it has the types "+CommaSeparatedStringBuilder.join(", ", element.getNames()));
+        break;
+      case NEW_TARGETS:
+        coded = false;
+        for (TypeRefComponent tr : src.getType()) {
+          if (isReferenceDataType(tr.getCode())) {
+            if (isCoded(tr.getWorkingCode())) {
+              coded = true;
+            }
+            TypeRefComponent n = edv.addType();
+            n.setCode(tr.getCode());
+            for (CanonicalType tgt : tr.getTargetProfile()) {
+              if (element.getNames().contains(tgt.asStringValue())) {
+                n.getTargetProfile().add(tgt);
+              }   
+            }
+          }
+        }
+        if (coded) {
+          copyBinding(vd, edv, src.getBinding());
+        }
+        addToDescription(sd, "This is a valid extension because it has the target resources "+CommaSeparatedStringBuilder.join(", ", element.getNames()));
+        break;
+      case CODES:
+        for (TypeRefComponent tr : src.getType()) {
+          if (isCoded(tr.getCode())) {
+            edv.getType().add(tr);
+          }
+        }
+        copyBinding(vd, edv, src.getBinding(), element.getNames());
+        addToDescription(sd, "This is a valid extension because it has the following codes that are not in other versions "+toString(element.getCodes()));
+        break;
+      default:      
+      }
+      // todo: "contentReference" : "<uri>", // I Reference to definition of content for the element
+      // todo: type limitations
+      edv.getType().addAll(src.getType());
+
+      // todo: constraints
+      // todo: binding      
+    }
+  }
+  
+
+  private boolean isReferenceDataType(String code) {
+    return Utilities.existsInList(code, "Reference", "canonical", "CodeableReference");
+  }
+
+  private boolean isCoded(String code) {
+    return Utilities.existsInList(code, "code", "Coding", "CodeableConcept", "CodeableReference");
+  }
+
+  private void addToDescription(StructureDefinition sd, String text) {
+    String s = sd.getDescription();
+    s = s + "\r\n\r\n"+text;
+    sd.setDescription(s);
+  }
+
+  private void copyBinding(IWorkerContext defns, ElementDefinition edv, ElementDefinitionBindingComponent binding) {
+    if (!binding.isEmpty() && (binding.getStrength() == BindingStrength.EXTENSIBLE || binding.getStrength() == BindingStrength.REQUIRED)) {
+      ValueSet vs = defns.fetchResource(ValueSet.class, binding.getValueSet());
+      if (vs == null) {
+        edv.getBinding().setStrength(binding.getStrength());
+        edv.getBinding().setDescription(binding.getDescription());
+        edv.getBinding().setValueSet(binding.getValueSet());
+      } else {
+        edv.getBinding().setStrength(binding.getStrength());
+        edv.getBinding().setDescription(binding.getDescription());
+        edv.getBinding().setValueSet(importValueSet(defns, vs));
+      }
+    }
+  }
+
+  private String importValueSet(IWorkerContext defns, ValueSet vs) {
+    vs = vs.copy();
+    assert vs.hasVersion();
+    String vurl = vs.getVersionedUrl();
+    if (newValueSets.containsKey(vurl)) {
+      return vurl;
+    }
+    for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
+      for (CanonicalType ct : inc.getValueSet()) {
+        ValueSet ivs = defns.fetchResource(ValueSet.class, ct.asStringValue());
+        if (ivs != null) {
+          ct.setValue(importValueSet(defns, ivs));
+        }
+      }
+      CodeSystem cs = defns.fetchResource(CodeSystem.class, inc.hasVersion() ? inc.getSystem()+"|"+inc.getVersion() : inc.getSystem());
+      if (cs != null) {
+        assert cs.hasVersion();
+        if (!inc.hasVersion()) {
+          inc.setVersion(cs.getVersion());
+        }
+        newCodeSystems.put(cs.getVersionedUrl(), cs);
+      }
+    }    
+    newValueSets.put(vurl, vs);
+    return vurl;
+  }
+
+  private void copyBinding(IWorkerContext defns, ElementDefinition edv, ElementDefinitionBindingComponent binding, Set<String> codes) {
+    
+  }
+
+  
   private void checkIds(String folder) throws IOException {
     initCtxt();
     List<LoadedFile> files = new ArrayList<>();
@@ -539,6 +765,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     case "Contributor" : return "ctb";
     case "Sequence" : return "seq";
     case "DeviceUseRequest" : return "duq";
+    case "Meta" : return "meta";
     default:
       throw new Error("NO TLA for "+name);
     }
@@ -673,7 +900,8 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
                     } else if (varName2 != null && tvars.containsKey(varName2)) {
                       gvars.put(input.getMode().toCode()+":"+input.getName(), tvars.get(varName2));
                     } else {
-                      qaMsg("Parameter '"+varName+"' "+(varName2 != null ? "(or "+varName2+") " : "")+"is unknown in rule "+r.getName()+" in group "+grp.getName()+" in map "+map.getUrl()+"; vars = "+dump(tvars), true);
+                      qaMsg("Parameter '"+varName+"' "+(varName2 != null ? "(or "+varName2+") " : "")+"is unknown in rule "+r.getName()+" in group "+grp.getName()+" in map "+map.getUrl()+"; vars = "+dump(tvars), false);
+                      //todo  ok = false
                     }                  
                   } else {
                     throw new Error("Not done yet");
@@ -704,8 +932,8 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         // complicated queries... we're not going to check any further, but it's not an error
         bh.fail();
       } else if (t.getContext() == null && t.getTransform() == StructureMapTransform.CREATE) {
-        VersionDefinitions vd = getInputDefinitions(srcList, "target");
-        StructureDefinition sd = vd.getStructures().get(t.getParameter().get(0).getValue().primitiveValue());
+        IWorkerContext vd = getInputDefinitions(srcList, "target");
+        StructureDefinition sd = vd.fetchTypeDefinition(t.getParameter().get(0).getValue().primitiveValue());
         if (sd == null) {
           qaMsg("Cannot find type '"+t.getParameter().get(0).getValue().primitiveValue()+"' in create '"+t.toString()+"' in rule "+r.getName()+" in group "+grp.getName()+" in map "+map.getUrl()+" (vars = "+dump(tvars)+")", true);
           bh.fail();
@@ -715,14 +943,14 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
           tvars.put("target:"+t.getVariable(), var);
         }
       } else {
-        qaMsg("Cannot find tgt var '"+t.getContext()+"' in rule "+r.getName()+" in group "+grp.getName()+" in map "+map.getUrl()+" (vars = "+dump(tvars)+")", true);
-        bh.fail();
+        qaMsg("Cannot find tgt var '"+t.getContext()+"' in rule "+r.getName()+" in group "+grp.getName()+" in map "+map.getUrl()+" (vars = "+dump(tvars)+")", false);
+        // todo bh.fail();
       }
     } else {
       ElementWithType target = findChild(tgt, t.getElement(), null);
       if (target == null) {
-        // qaMsg("Cannot find tgt element '"+t.getContext()+"."+t.getElement()+"' on "+tgt.toString()+" in rule "+r.getName()+" in group "+grp.getName()+" in map "+map.getUrl(), true);
-        bh.fail();
+        qaMsg("Cannot find tgt element '"+t.getContext()+"."+t.getElement()+"' on "+tgt.toString()+" in rule "+r.getName()+" in group "+grp.getName()+" in map "+map.getUrl(), false);
+//       todo  bh.fail();
       } else {
         if (t.getTransform() == StructureMapTransform.CREATE) {
           if (t.hasParameter()) {
@@ -733,30 +961,32 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
           }
         } else if (t.getTransform() == StructureMapTransform.TRANSLATE) {
           String url = t.getParameter().get(1).getValue().primitiveValue();
-          VSPair vsl = isEnum(source.toSED());
-          VSPair vsr = isEnum(target.toSED());
+          VSPair vsl = isCoded(source.toSED());
+          VSPair vsr = isCoded(target.toSED());
           if (vsl == null) {
-//            qaMsg("cm but not coded in "+map.getUrl(), true);                
+            qaMsg("Rule "+r.getName()+" in group "+grp.getName()+" has a translate operation, but the source element "+source.toSED().toString()+" is not coded in "+map.getUrl(), true);                
           } else if (vsr == null) {
-//            qaMsg("cm but not coded in "+map.getUrl(), true);                
+            qaMsg("Rule "+r.getName()+" in group "+grp.getName()+" has a translate operation, but the target element "+target.toSED().toString()+" is not coded in "+map.getUrl(), true);                
           } else {
-            Set<String> lset = CodeSystemUtilities.codes(vsl.getCs());
-            Set<String> rset = CodeSystemUtilities.codes(vsr.getCs());
-            Set<String> lvset = ValueSetUtilities.codes(vsl.getVs(), vsl.getCs());
-            Set<String> rvset = ValueSetUtilities.codes(vsr.getVs(), vsr.getCs());
-
-            if (!vsl.getCs().getUrl().contains("resource-types") && !vsr.getCs().getUrl().contains("resource-types")) {
+            if (!(isResourceType(vsl.getCodes()) || isResourceType(vsr.getCodes()))) {
               ConceptMap cm = conceptMapsByUrl.get(url);
               if (cm == null) {
                 String srcName = source.getEd().getPath();
                 String tgtName = target.getEd().getPath();
                 String id = srcName.equals(tgtName) ? srcName+"-"+srcVer+"to"+dstVer : srcName+"-"+tgtName+"-"+srcVer+"to"+dstVer;
-                String correct = "http://hl7.org/fhir/uv/xver/ConceptMap/"+id;
+                String nid = generateConciseId(id);
+
+                String correct = "http://hl7.org/fhir/uv/xver/ConceptMap/"+nid;
                 if (!url.equals(correct)) {
                   qaMsg("bad ref '"+url+"' should be '"+correct+"' in "+map.getUrl(), true);
                 } else {
                   qaMsg("Missing ConceptMap '"+url+"' in "+map.getId(), true);
-//                  makeCM(id, source.toSED(), target.toSED(), vsl, vsr, lset, rset, lvset, rvset);              
+                  var se = source.toSED();
+                  var de = target.toSED();
+                  String scopeUri = "http://hl7.org/fhir/"+VersionUtilities.getMajMin(se.getVer())+"/StructureDefinition/"+se.getSd().getName()+"#"+se.getEd().getPath();
+                  String targetUri = "http://hl7.org/fhir/"+VersionUtilities.getMajMin(de.getVer())+"/StructureDefinition/"+de.getSd().getName()+"#"+de.getEd().getPath();
+
+                  makeCM(nid, id, se, de, vsl, vsr, scopeUri, targetUri);              
                 }
               } else {
                 String cmSrcVer = VersionUtilities.getNameForVersion(cm.getSourceScope().primitiveValue()).substring(1).toLowerCase();
@@ -766,7 +996,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
                 } else if (!cmDstVer.equals(dstVer)) {
                   qaMsg("bad ref '"+url+"' dstVer is "+cmDstVer+" should be "+dstVer + " in "+map.getUrl(), true);
                 } else {
-                  checkCM(cm, source.toSED(), target.toSED(), vsl, vsr, lset, rset, lvset, rvset);
+                  checkCM(cm, source.toSED(), target.toSED(), vsl, vsr);
                   cm.setUserData("cm.used", "true");
                 }
               }
@@ -782,7 +1012,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     return tvars;
   }
 
-  private VersionDefinitions getInputDefinitions(Map<String, SourcedStructureDefinition> srcList, String mode) {
+  private IWorkerContext getInputDefinitions(Map<String, SourcedStructureDefinition> srcList, String mode) {
     for (String n : srcList.keySet()) {
       if (n.startsWith(mode+":")) {
         return srcList.get(n).getDefinitions();      
@@ -823,7 +1053,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         path = wt.substring(1)+"."+element;
       }
     } else {
-      sd = src.getDef().getStructures().get(wt);
+      sd = src.getDef().fetchTypeDefinition(wt);
       if (sd != null && !sd.getAbstract() && !Utilities.existsInList(sd.getType(), "Element", "BackboneElement")) {
         path = sd.getType()+"."+element;
       } else {
@@ -875,8 +1105,8 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       String tn = tail(type);
       String verMM = VersionUtilities.getMajMin(type);
       String ver = VersionUtilities.getNameForVersion(verMM).toLowerCase();
-      VersionDefinitions vd = versions.get(ver);
-      StructureDefinition sd = vd.getStructures().get(tn);
+      IWorkerContext vd = versions.get(ver);
+      StructureDefinition sd = vd.fetchTypeDefinition(tn);
       if (sd == null) {
         qaMsg("Unknown type "+type+" in map "+map.getUrl(), true);
         ok = false;
@@ -1002,14 +1232,10 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
   private void checkMapsReciprocal(ConceptMap left, ConceptMap right, String folder, boolean save) throws FileNotFoundException, IOException {
     List<String> issues = new ArrayList<String>();
-    if (ConceptMapUtilities.checkReciprocal(left, right, issues)) {
-      if (save) {
-        // wipes formatting in files
-        // new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream("/Users/grahamegrieve/work/fhir-cross-version/input/"+folder+"/ConceptMap-"+left.getId()+".json"), left);
-        // new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream("/Users/grahamegrieve/work/fhir-cross-version/input/"+folder+"/ConceptMap-"+right.getId()+".json"), right);
-      } else {
-        qaMsg("Unsaved corrections checking reciprocity of "+left.getId()+" and "+right.getId(), true);
-      }
+    if (ConceptMapUtilities.checkReciprocal(left, right, issues, save)) {
+      // wipes formatting in files
+      new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream("/Users/grahamegrieve/work/fhir-cross-version/input/"+folder+"/ConceptMap-"+left.getId()+".json"), left);
+      new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream("/Users/grahamegrieve/work/fhir-cross-version/input/"+folder+"/ConceptMap-"+right.getId()+".json"), right);
     }
     if (!issues.isEmpty()) {
       qaMsg("Found issues checking reciprocity of "+left.getId()+" and "+right.getId(), true);
@@ -1018,7 +1244,6 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       }
     }
   }
-
 
   private boolean isResourceTypeMap(ConceptMap cm) {
     if (cm.getGroup().size() != 1) {
@@ -1184,7 +1409,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
     assert Utilities.noString(origin.getStatusReason());
     
-    origin.setValid(true);
+    origin.setValidState(ElementValidState.FULL_VALID);
     origin.setStartVer(origin.getVer());
     origin.setStopVer(origin.getVer());
     all.add(origin);
@@ -1195,13 +1420,13 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       all.add(element);
       if (link.getRel() != ConceptMapRelationship.EQUIVALENT) {
         element.addStatusReason("Not Equivalent");
-        element.setValid(true);
+        element.setValidState(ElementValidState.FULL_VALID);
         template = element;        
         template.setStartVer(element.getVer());
         template.setStopVer(element.getVer()); 
       } else if (!template.getEd().repeats() && element.getEd().repeats()) {
         element.addStatusReason("Element repeats");
-        element.setValid(true);
+        element.setValidState(ElementValidState.CARDINALITY);
         template.setRepeater(element);
         template = element;        
         template.setStartVer(element.getVer());
@@ -1210,7 +1435,8 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         List<String> newTypes = findNewTypes(template.getEd(), element.getEd());
         if (!newTypes.isEmpty()) {
           element.addStatusReason("New Types "+CommaSeparatedStringBuilder.join("|", newTypes));
-          element.setValid(true);
+          element.setValidState(ElementValidState.NEW_TYPES);
+          element.addToNames(newTypes);
           template = element;        
           template.setStartVer(element.getVer());
           template.setStopVer(element.getVer()); 
@@ -1218,13 +1444,14 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
           List<String> newTargets = findNewTargets(template.getEd(), element.getEd());
           if (!newTargets.isEmpty()) {
             element.addStatusReason("New Targets "+CommaSeparatedStringBuilder.join("|", newTargets));
-            element.setValid(true);
+            element.setValidState(ElementValidState.NEW_TARGETS);
+            element.addToNames(newTargets);
             template = element;        
             template.setStartVer(element.getVer());
             template.setStopVer(element.getVer()); 
           } else {
             element.clearStatusReason();
-            element.setValid(false);
+            element.setValidState(ElementValidState.NOT_VALID);
             template.setStopVer(element.getVer()); 
           }
         }
@@ -1232,12 +1459,12 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     }
 
     for (SourcedElementDefinition element : all) {
-      if (element.isValid()) {
+      if (element.getValidState() != ElementValidState.NOT_VALID) {
         String bv = element.getStartVer();
         String ev = element.getRepeater() != null ? element.getRepeater().getStopVer() : element.getStopVer();
         CommaSeparatedStringBuilder vers = makeVerList(bv, ev);
         if (vers.count() == 0) {
-          element.setValid(false);
+          element.setValidState(ElementValidState.NOT_VALID);
           element.addStatusReason("??");
         } else {
           element.setVerList(vers.toString());
@@ -1246,10 +1473,10 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     }
 
     for (ElementDefinitionLink link : links) {
-      VSPair l = isEnum(link.getPrev());
-      VSPair r = isEnum(link.getNext());
+      VSPair l = isCoded(link.getPrev());
+      VSPair r = isCoded(link.getNext());
       if (l != null && r != null) {
-        if (l.getCs().getUrl().contains("resource-types") || r.getCs().getUrl().contains("resource-types")) {
+        if (isResourceType(l.getCodes()) || isResourceType(r.getCodes())) {
           String idF = "resources-"+l.getVersion()+"to"+r.getVersion();
           String idR = "resources-"+r.getVersion()+"to"+l.getVersion();
           link.setNextCM(conceptMaps.get(idF));
@@ -1262,29 +1489,25 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
           String idR = link.getNext().getEd().getPath().equals(link.getPrev().getEd().getPath()) ? link.getNext().getEd().getPath()+"-"+r.getVersion()+"to"+l.getVersion() : link.getNext().getEd().getPath()+"-"+link.getPrev().getEd().getPath()+"-"+r.getVersion()+"to"+l.getVersion();
           ConceptMap cmF = conceptMapsByScope.get(leftScope + ":"+rightScope);
           ConceptMap cmR = conceptMapsByScope.get(rightScope + ":"+leftScope);
-          Set<String> lset = CodeSystemUtilities.codes(l.getCs());
-          Set<String> rset = CodeSystemUtilities.codes(r.getCs());
-          Set<String> lvset = ValueSetUtilities.codes(l.getVs(), l.getCs());
-          Set<String> rvset = ValueSetUtilities.codes(r.getVs(), r.getCs());
 
           if (cmF != null) {
-            checkCM(cmF, link.getPrev(), link.getNext(), l, r, lset, rset, lvset, rvset);
+            checkCM(cmF, link.getPrev(), link.getNext(), l, r);
           } else { // if (!rset.containsAll(lset)) {
             System.out.println("didn't find "+leftScope + ":"+rightScope);
             String nid = generateConciseId(idF);
-            cmF = makeCM(nid, idF, link.getPrev(), link.getNext(), l, r, lset, rset, lvset, rvset, leftScope, rightScope);              
+            cmF = makeCM(nid, idF, link.getPrev(), link.getNext(), l, r, leftScope, rightScope);              
           }
 
           if (cmR != null) {
-            checkCM(cmR, link.getNext(), link.getPrev(), r, l, rset, lset, rvset, lvset);
+            checkCM(cmR, link.getNext(), link.getPrev(), r, l);
           } else { // if (!lset.containsAll(rset)) {
             System.out.println("didn't find "+rightScope + ":"+leftScope);
             String nid = generateConciseId(idR);
-            cmR = makeCM(nid, idR, link.getNext(), link.getPrev(), r, l, rset, lset, rvset, lvset, rightScope, leftScope);            
+            cmR = makeCM(nid, idR, link.getNext(), link.getPrev(), r, l, rightScope, leftScope);            
           }
           if (cmF != null && cmR != null) {
             List<String> errs = new ArrayList<String>();
-            boolean altered = ConceptMapUtilities.checkReciprocal(cmF, cmR, errs);
+            boolean altered = ConceptMapUtilities.checkReciprocal(cmF, cmR, errs, true);
             for (String s : errs) {
               qaMsg("Error between "+cmF.getId()+" and "+cmR.getId()+" maps: "+s, true);
             }
@@ -1296,32 +1519,43 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
           link.setNextCM(cmF);
           link.setPrevCM(cmR);
           
-          if (!rvset.isEmpty() && cmR != null && !link.getNext().isValid()) {
-            link.setNewCodes(ConceptMapUtilities.listCodesWithNoMappings(rvset, cmR));
+          if (!r.getCodes().isEmpty() && cmR != null && !link.getNext().isValid()) {
+            link.setNewCodes(ConceptMapUtilities.listCodesWithNoMappings(r.getAllCodes(), cmR));
             if (!link.getNewCodes().isEmpty()) {
-              link.getNext().setValid(true);
+              link.getNext().setValidState(ElementValidState.CODES);
+              link.getNext().addToCodes(link.getNewCodes());
               link.getNext().setStartVer(template.getVer());
               link.getNext().setStopVer(link.getPrev().getVer());
               CommaSeparatedStringBuilder vers = makeVerListPositive(template.getVer(), link.getPrev().getVer());
               link.getNext().setVerList(vers.toString());
-              link.getNext().addStatusReason("Added "+Utilities.pluralize("code", link.getNewCodes().size())+" '"+CommaSeparatedStringBuilder.join(", ", link.getNewCodes())+"'");              
+              link.getNext().addStatusReason("Added "+Utilities.pluralize("code", link.getNewCodes().size())+" '"+toString(link.getNewCodes())+"'");              
             }
           }
-          if (!lvset.isEmpty() && cmF != null && !link.getPrev().isValid()) {
-            link.setOldCodes(ConceptMapUtilities.listCodesWithNoMappings(lvset, cmF));
+          if (!l.getCodes().isEmpty() && cmF != null && !link.getPrev().isValid()) {
+            link.setOldCodes(ConceptMapUtilities.listCodesWithNoMappings(l.getAllCodes(), cmF));
             if (!link.getOldCodes().isEmpty()) {
-              link.getPrev().setValid(true);
+              link.getPrev().setValidState(ElementValidState.CODES);
               // no we need to know... which version was it defined in? and how far does this chain go?
               link.getPrev().setStartVer(link.getNext().getVer());
               link.getPrev().setStopVer("5.0.0");
               CommaSeparatedStringBuilder vers = makeVerListPositive(link.getNext().getVer(), "5.0.0");
               link.getPrev().setVerList(vers.toString());
-              link.getPrev().addStatusReason("Removed "+Utilities.pluralize("code", link.getOldCodes().size())+" '"+CommaSeparatedStringBuilder.join(", ", link.getOldCodes())+"'");              
+              link.getPrev().addToCodes(link.getOldCodes());
+              link.getPrev().addStatusReason("Removed "+Utilities.pluralize("code", link.getOldCodes().size())+" '"+toString(link.getOldCodes())+"'");              
             }
           }
         }
       }        
     }
+  }
+
+  private boolean isResourceType(Map<String, Set<Coding>> codes) {
+    for (String s : codes.keySet()) {
+      if (s.contains("resource-type")) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private CommaSeparatedStringBuilder makeVerList(String bv, String ev) {
@@ -1370,8 +1604,11 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
   
 
-  private ConceptMap makeCM(String id, String rawId, SourcedElementDefinition se, SourcedElementDefinition de, VSPair s, VSPair d, 
-         Set<String> source, Set<String> dest, Set<String> lvset, Set<String> rvset, String scopeUri, String targetUri) throws FileNotFoundException, IOException {
+  private ConceptMap makeCM(String id, String rawId, SourcedElementDefinition se, SourcedElementDefinition de, VSPair s, VSPair d, String scopeUri, String targetUri) throws FileNotFoundException, IOException {
+    if (true) {
+      throw new Error("why?");
+    }
+    
     ConceptMap cm = new ConceptMap();
     cm.setId(id);
     cm.setUrl("http://hl7.org/fhir/uv/xver/ConceptMap/"+id);
@@ -1383,162 +1620,454 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     }
     cm.setSourceScope(new UriType(scopeUri));
     cm.setTargetScope(new UriType(targetUri));
-    ConceptMapGroupComponent g = cm.addGroup();
-    scopeUri = injectVersionToUri(s.getCs().getUrl(), VersionUtilities.getMajMin(se.getVer()));
-    targetUri = injectVersionToUri(d.getCs().getUrl(), VersionUtilities.getMajMin(de.getVer()));
-    g.setSource(scopeUri);
-    g.setTarget(targetUri);
-    Set<String> unmapped = new HashSet<>();    
-    for (String c : dest) {
-      if (!source.contains(c)) {
-        unmapped.add(c);
-      }      
-    }
-    for (String c : source) {
-      SourceElementComponent src = g.addElement();
-      src.setCode(c);
-      if (!dest.contains(c)) {
-        src.setNoMap(true);
-        src.setDisplay("CHECK! missed = "+CommaSeparatedStringBuilder.join(",", unmapped)+"; all = "+CommaSeparatedStringBuilder.join(",", dest));
-        TargetElementComponent tgt = src.addTarget();
-        tgt.setCode("CHECK!");
-        tgt.setRelationship(ConceptMapRelationship.EQUIVALENT);     
-      } else {
-        TargetElementComponent tgt = src.addTarget();
-        tgt.setCode(c);
-        tgt.setRelationship(ConceptMapRelationship.EQUIVALENT);        
+
+    Set<Coding> unmapped = new HashSet<>();    
+    for (String vu : d.getCodes().keySet()) {
+      Set<Coding> dst = d.getCodes().get(vu);
+      Set<Coding> src = s.getCodes().get(vu);
+      if (src == null) {
+        unmapped.addAll(dst);
+      } else for (Coding c : dst) {
+        if (!src.contains(c)) {
+          unmapped.add(c);
+        }
       }
     }
+
+    for (String vu : s.getCodes().keySet()) {
+      Set<Coding> src = s.getCodes().get(vu);
+      String dvu = vu;
+      Set<Coding> dst = d.getCodes().get(dvu);
+      if (dst == null && s.getCodes().size() == 1 && d.getCodes().size() == 1) {
+        dvu = d.getCodes().keySet().iterator().next();
+        dst = d.getCodes().get(dvu);      
+      }
+      ConceptMapGroupComponent g = cm.forceGroup(injectVersionToUri(vu, VersionUtilities.getMajMin(se.getVer())),
+          injectVersionToUri(dvu, VersionUtilities.getMajMin(de.getVer())));
+
+      for (Coding c : src) {
+        if (c.hasCode() && !c.getCode().startsWith("_") && !isNotSelectable(c) && !Utilities.existsInList(c.getCode(), "null")) {
+          if (dst == null) {
+            Coding pc = findCode(unmapped, null, c.getCode());
+            if (pc == null) {
+              SourceElementComponent e = g.addElement();
+              e.setCode(c.getCode());
+              e.setNoMap(true);         
+            } else {
+              ConceptMapGroupComponent pg = cm.forceGroup(injectVersionToUri(vu, VersionUtilities.getMajMin(se.getVer())), injectVersionToUri(pc.getSystem(), VersionUtilities.getMajMin(se.getVer())));
+              if (pg.getElement().isEmpty()) {
+                SourceElementComponent e = pg.addElement();
+                e.setCode("CHECK!");              
+              }
+              SourceElementComponent e = pg.addElement();
+              e.setCode(c.getCode());
+              TargetElementComponent tgt = e.addTarget();
+              tgt.setCode(pc.getCode());
+              tgt.setRelationship(ConceptMapRelationship.EQUIVALENT);
+            }
+          } else if (!hasCode(dst, null, c.getCode())) {
+            Coding pc = findCode(unmapped, null, c.getCode());
+            if (pc == null) {
+              SourceElementComponent e = g.addElement();
+              e.setCode(c.getCode());
+              e.setNoMap(true);
+              if (dst.size() <= 10) {
+                if (unmapped.size() <= 10) {
+                  e.setDisplay("CHECK! missed = "+toString(unmapped)+"; all = "+toString(dst));
+                } else {
+                  e.setDisplay("CHECK! missed = ##; all = "+toString(dst));
+                }
+                TargetElementComponent tgt = e.addTarget();
+                tgt.setCode("CHECK!");
+                tgt.setRelationship(ConceptMapRelationship.EQUIVALENT);
+              } else {
+                // e.setDisplay("CHECK!");            
+              }
+            } else {
+              ConceptMapGroupComponent pg = cm.forceGroup(injectVersionToUri(vu, VersionUtilities.getMajMin(se.getVer())), injectVersionToUri(pc.getSystem(), VersionUtilities.getMajMin(se.getVer())));
+              if (pg.getElement().isEmpty()) {
+                SourceElementComponent e = pg.addElement();
+                e.setCode("CHECK!");              
+              }
+              SourceElementComponent e = pg.addElement();
+              e.setCode(c.getCode());
+              TargetElementComponent tgt = e.addTarget();
+              tgt.setCode(pc.getCode());
+              tgt.setRelationship(ConceptMapRelationship.EQUIVALENT);
+            }
+          } else {
+            SourceElementComponent e = g.addElement();
+            e.setCode(c.getCode());
+            TargetElementComponent tgt = e.addTarget();
+            tgt.setCode(c.getCode());
+            tgt.setRelationship(ConceptMapRelationship.EQUIVALENT);        
+          }
+        }
+      }
+      Collections.sort(g.getElement(), new ConceptMapUtilities.ConceptMapElementSorter());
+    }
+    cm.getGroup().removeIf(g -> g.getElement().isEmpty());
     new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream("/Users/grahamegrieve/work/fhir-cross-version/input/codes/ConceptMap-"+cm.getId()+".json"), cm);
     return cm;
   }
 
-  private void checkCM(ConceptMap cm, SourcedElementDefinition se, SourcedElementDefinition de, VSPair s, VSPair d, Set<String> source, Set<String> dest, Set<String> lvset, Set<String> rvset) throws FileNotFoundException, IOException {
+  private Coding findCode(Set<Coding> codes, String system, String code) {
+    if (codes == null) {
+      return null;
+    }
+    for (Coding c : codes) {
+      if ((system == null || system.equals(c.getSystem())) && code.equals(c.getCode())) {
+        return c;
+      }
+    }
+    return null;
+
+  }
+
+  private String toString(Set<Coding> codes) {
+    if (codes == null) {
+      return "--";
+    }
+    String system = null;
+    boolean ok = true;
+    for (Coding c : codes) {
+      if (system == null) {
+        if (ok) {
+          system = c.getSystem();
+        }        
+      } else if (!system.equals(c.getSystem())) {
+        system = null;
+        ok = false;
+      }
+    }
+    if (ok && system != null) {
+      CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
+      for (Coding c : codes) {
+        b.append(c.getCode());
+      }
+      return b.toString()+" ("+system+")";
+    } else {
+      CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
+      for (Coding c : codes) {
+        b.append(c.getSystem()+"#"+c.getCode());
+      }
+      return b.toString();
+    }
+  }
+
+  private void checkCM(ConceptMap cm, SourcedElementDefinition se, SourcedElementDefinition de, VSPair s, VSPair d) throws FileNotFoundException, IOException {
     cm.setUserData("cm.used", "true");
+    boolean mod = false;
+    
     String scopeUri = "http://hl7.org/fhir/"+VersionUtilities.getMajMin(se.getVer())+"/StructureDefinition/"+se.getSd().getName()+"#"+se.getEd().getPath();
     String targetUri = "http://hl7.org/fhir/"+VersionUtilities.getMajMin(de.getVer())+"/StructureDefinition/"+de.getSd().getName()+"#"+de.getEd().getPath();
     if (!cm.hasSourceScopeUriType()) {
       qaMsg("Issue with "+cm.getId()+": Source Scope should be "+scopeUri, true);
+      cm.setSourceScope(new UriType(scopeUri));
+      mod = true;
     } else if (!scopeUri.equals(cm.getSourceScopeUriType().primitiveValue())) {
       qaMsg("Issue with "+cm.getId()+": Source Scope should be "+scopeUri+" not "+cm.getSourceScopeUriType().primitiveValue(), true);
+      cm.setSourceScope(new UriType(scopeUri));
+      mod = true;
     }
     if (!cm.hasTargetScopeUriType()) {
       qaMsg("Issue with "+cm.getId()+": Target Scope should be "+targetUri, true);
+      cm.setTargetScope(new UriType(targetUri));
+      mod = true;
     } else if (!targetUri.equals(cm.getTargetScopeUriType().primitiveValue())) {
       qaMsg("Issue with "+cm.getId()+": Target Scope should be "+targetUri+" not "+cm.getTargetScopeUriType().primitiveValue(), true);
+      cm.setTargetScope(new UriType(targetUri));
+      mod = true;
     }
-    if (cm.getGroup().size() != 1) {
-      qaMsg("Concept Map "+cm.getId()+" should have one and only one group", true);
-    } else {
-      ConceptMapGroupComponent g = cm.getGroupFirstRep();
-      for (SourceElementComponent src : g.getElement()) {
-        if (src.hasDisplay()) {
-          qaMsg("Issue with "+cm.getId()+": "+src.getCode()+" has a display", true);
-        }
-        for (TargetElementComponent tgt : src.getTarget()) {
-          if (tgt.hasDisplay()) {
-            qaMsg("Issue with "+cm.getId()+": "+tgt.getCode()+" has a display", true);
-          }
-        }
-        if (src.hasTarget() && src.getNoMap()) {
-          qaMsg("Issue with "+cm.getId()+": "+src.getCode()+" has a both targets and noMap = true", true);
+    
+    Set<Coding> unmapped = new HashSet<>();    
+    for (String vu : d.getCodes().keySet()) {
+      Set<Coding> dst = d.getCodes().get(vu);
+      Set<Coding> src = s.getCodes().get(vu);
+      if (src == null) {
+        unmapped.addAll(dst);
+      } else for (Coding c : dst) {
+        if (!hasCode(src, c.getSystem(), c.getCode())) {
+          unmapped.add(c);
         }
       }
+    }
 
-      scopeUri = injectVersionToUri(s.getCs().getUrl(), VersionUtilities.getMajMin(se.getVer()));
-      targetUri = injectVersionToUri(d.getCs().getUrl(), VersionUtilities.getMajMin(de.getVer()));
-      if (!scopeUri.equals(g.getSource())) {
-        g.setSource(scopeUri);
-        qaMsg("Issue with "+cm.getId()+": Group source should be "+scopeUri+" not "+g.getSource(), true);
+    Set<ConceptMapGroupComponent> ug = new HashSet<>();
+    for (String vu : s.getCodes().keySet()) {
+      Set<Coding> src = s.getCodes().get(vu);
+      Set<Coding> dst = d.getCodes().get(vu);
+      String su = injectVersionToUri(vu, VersionUtilities.getMajMin(se.getVer()));
+      String tu = injectVersionToUri(vu, VersionUtilities.getMajMin(de.getVer()));
+      String suVL = removeVersion(su);
+      String tuVL = removeVersion(tu);
+      ConceptMapGroupComponent g = cm.getGroup(su, tu);
+      if (g == null) {
+        if (cm.getGroup().size() == 1 && su.equals(cm.getGroupFirstRep().getSource())) {
+          g = cm.getGroupFirstRep();
+          tu = g.getTarget();
+          tuVL = removeVersion(tu); 
+          dst = d.getCodes().get(tuVL);
+        }
       }
-      if (!targetUri.equals(g.getTarget())) {
-        qaMsg("Issue with "+cm.getId()+": Group target should be "+targetUri+" not "+g.getTarget(), true);
-      }
-      Set<String> missed = new HashSet<>();
-      Set<String> invalid = new HashSet<>();
-      Set<String> mapped = new HashSet<>(); 
-      for (String c : source) {
-        SourceElementComponent src = getSource(g, c);
-        if (src != null) {
-          for (TargetElementComponent tgt : src.getTarget()) {
-            if (!dest.contains(tgt.getCode())) {
-              invalid.add(tgt.getCode());
+      if (g == null) {
+        g = cm.addGroup();
+        ug.add(g);
+        mod = true;        
+        g.setSource(su);
+        g.setTarget(tu);
+        for (Coding c : src) {
+          if (c.hasCode() && !c.getCode().startsWith("_") && !isNotSelectable(c) && !Utilities.existsInList(c.getCode(), "null")) {
+            if (dst == null) {
+              Coding pc = findCode(unmapped, null, c.getCode());
+              if (pc == null) {
+                SourceElementComponent e = g.addElement();
+                e.setCode(c.getCode());
+                e.setNoMap(true);         
+              } else {
+                ConceptMapGroupComponent pg = cm.forceGroup(injectVersionToUri(vu, VersionUtilities.getMajMin(se.getVer())), injectVersionToUri(pc.getSystem(), VersionUtilities.getMajMin(se.getVer())));
+                ug.add(pg);
+                if (pg.getElement().isEmpty()) {
+                  SourceElementComponent e = pg.addElement();
+                  e.setCode("CHECK!");              
+                }
+                SourceElementComponent e = pg.getOrAddElement(c.getCode());
+                if (!e.hasTargetCode(pc.getCode())) {
+                  TargetElementComponent tgt = e.addTarget();
+                  tgt.setCode(pc.getCode());
+                  tgt.setRelationship(ConceptMapRelationship.EQUIVALENT);
+                }
+              }
+            } else if (!hasCode(dst, null, c.getCode())) {
+              Coding pc = findCode(unmapped, null, c.getCode());
+              if (pc == null) {
+                SourceElementComponent e = g.addElement();
+                e.setCode(c.getCode());
+                e.setNoMap(true);
+                if (dst.size() <= 10) {
+                  if (unmapped.size() <= 10) {
+                    e.setDisplay("CHECK! missed = "+toString(unmapped)+"; all = "+toString(dst));
+                  } else {
+                    e.setDisplay("CHECK! missed = ##; all = "+toString(dst));
+                  }
+                  if (!e.hasTarget()) {
+                    TargetElementComponent tgt = e.addTarget();
+                    tgt.setCode("CHECK!");
+                    tgt.setRelationship(ConceptMapRelationship.EQUIVALENT);
+                  }
+                } else {
+                  // e.setDisplay("CHECK!");            
+                }
+              } else {
+                ConceptMapGroupComponent pg = cm.forceGroup(injectVersionToUri(vu, VersionUtilities.getMajMin(se.getVer())), injectVersionToUri(pc.getSystem(), VersionUtilities.getMajMin(se.getVer())));
+                ug.add(pg);
+                if (pg.getElement().isEmpty()) {
+                  SourceElementComponent e = pg.addElement();
+                  e.setCode("CHECK!");              
+                }
+                SourceElementComponent e = pg.getOrAddElement(c.getCode());
+                if (!e.hasTargetCode(pc.getCode())) {
+                  TargetElementComponent tgt = e.addTarget();
+                  tgt.setCode(pc.getCode());
+                  tgt.setRelationship(ConceptMapRelationship.EQUIVALENT);
+                }
+              }
             } else {
-              mapped.add(tgt.getCode());
+              SourceElementComponent e = g.addElement();
+              e.setCode(c.getCode());
+              if (!e.hasTargetCode(c.getCode())) {
+                TargetElementComponent tgt = e.addTarget();
+                tgt.setCode(c.getCode());
+                tgt.setRelationship(ConceptMapRelationship.EQUIVALENT);
+              }
+            }        
+          }
+        }
+      } else {
+        ug.add(g);
+        for (SourceElementComponent e : g.getElement()) {
+          if (e.hasDisplay()) {
+            qaMsg("Issue with "+cm.getId()+": "+e.getCode()+" has a display", true);
+            e.setDisplay(null);
+            mod = true;
+          }
+          for (TargetElementComponent tgt : e.getTarget()) {
+            if (!tgt.hasCode()) {
+              tgt.setCode("CHECK!");              
+              mod = true;
+              qaMsg("Issue with "+cm.getId()+": "+e.getCode()+" has a target without a code", true);
             }
-            if (tgt.hasComment() && tgt.getComment().contains("s:")) {
-              qaMsg("Issue with "+cm.getId()+": comment contains 's:'", true);
+            if (tgt.hasDisplay()) {
+              tgt.setDisplay(null);
+              mod = true;
+              qaMsg("Issue with "+cm.getId()+": "+tgt.getCode()+" has a display", true);
             }
           }
-        } else if (!dest.contains(c) || !hasUnMapped(g)) {
-          missed.add(c);
-        }        
-      }
-      if (!missed.isEmpty()) {
-        Set<String> amissed = new HashSet<>();
-        for (String c : missed) {
-          if ((lvset.isEmpty() || lvset.contains(c)) && !c.startsWith("_") && !c.equals("null") && !CodeSystemUtilities.isNotSelectable(d.getCs(), c)) {
-            g.addElement().setCode(c).setNoMap(true);
-            qaMsg("Issue with "+cm.getId()+": no mappings for '"+c+"'", true);
-            amissed.add(c);
+          if (e.hasTarget() && e.getNoMap()) {
+            qaMsg("Issue with "+cm.getId()+": "+e.getCode()+" has both targets and noMap = true", true);
+            e.setDisplay("CHECK!");
+            mod = true;
           }
         }
-        if (!amissed.isEmpty()) {
-          qaMsg("Concept Map "+cm.getId()+" is missing mappings for "+CommaSeparatedStringBuilder.join(",", amissed), true);
-        }
-      }
-      if (!invalid.isEmpty()) {
-        qaMsg("Concept Map "+cm.getId()+" has invalid mappings to "+CommaSeparatedStringBuilder.join(",", invalid), true);
-        Set<String> unmapped = new HashSet<>();
-        for (String c : dest) {
-          if (!mapped.contains(c)) {
-            unmapped.add(c);
+
+        //      scopeUri = injectVersionToUri(s.getCs().getUrl(), VersionUtilities.getMajMin(se.getVer()));
+        //      targetUri = injectVersionToUri(d.getCs().getUrl(), VersionUtilities.getMajMin(de.getVer()));
+        //      if (!scopeUri.equals(g.getSource())) {
+        //        g.setSource(scopeUri);
+        //        qaMsg("Issue with "+cm.getId()+": Group source should be "+scopeUri+" not "+g.getSource(), true);
+        //      }
+        //      if (!targetUri.equals(g.getTarget())) {
+        //        qaMsg("Issue with "+cm.getId()+": Group target should be "+targetUri+" not "+g.getTarget(), true);
+        //      }
+        Set<Coding> missed = new HashSet<>();
+        Set<Coding> invalid = new HashSet<>();
+        Set<Coding> mapped = new HashSet<>(); 
+        Set<SourceElementComponent> matched = new HashSet<>();
+        for (Coding c : src) {
+          if (c.hasCode() && !c.getCode().startsWith("_") && !isNotSelectable(c) && !Utilities.existsInList(c.getCode(), "null")) {
+            SourceElementComponent e = getSource(g, c.getCode());
+            if (e != null) {
+              matched.add(e);
+              for (TargetElementComponent tgt : e.getTarget()) {
+                if (tgt.hasCode()) {
+                  if (!hasCode(dst, tuVL, tgt.getCode())) {
+                    invalid.add(c);
+                    tgt.setUserData("delete", true);
+                  } else {
+                    mapped.add(c);
+                  }
+                }
+              }
+            } else if ((dst == null || !dst.contains(c)) || !hasUnMapped(g)) {
+              missed.add(c);
+            }        
           }
         }
-        for (String c : source) {
-          SourceElementComponent src = getSource(g, c);
-          if (src != null) {
-            for (TargetElementComponent tgt : src.getTarget()) {
-              if (!dest.contains(tgt.getCode())) {
-                qaMsg("Issue with "+cm.getId()+": target "+tgt.getCode()+" is not valid (missed "+CommaSeparatedStringBuilder.join(",", unmapped)+")", true);
+        if (src != null && g.getElement().removeIf(e -> !matched.contains(e))) {
+          mod = true;
+        }
+        if (!missed.isEmpty()) {
+          Set<Coding> amissed = new HashSet<>();
+          for (Coding c : missed) {          
+            if (!c.getCode().startsWith("_") && !c.getCode().equals("null") && !isNotSelectable(c)) {
+              mod = true;
+              Coding dc = findCode(dst, c.getSystem(), c.getCode());
+              if (dc == null) {
+                dc = findCode(unmapped, c.getSystem(), c.getCode());
+              }
+              if (dc != null) {
+                SourceElementComponent e = g.addElement();
+                e.setCode(c.getCode());
+                TargetElementComponent tgt = e.addTarget();
+                tgt.setCode(dc.getCode());
+                tgt.setRelationship(ConceptMapRelationship.EQUIVALENT);
+              } else {
+                dc = findCode(unmapped, null, c.getCode());
+                if (dc != null) {
+                  ConceptMapGroupComponent pg = cm.forceGroup(injectVersionToUri(vu, VersionUtilities.getMajMin(se.getVer())), injectVersionToUri(dc.getSystem(), VersionUtilities.getMajMin(se.getVer())));
+                  ug.add(pg);
+                  if (pg.getElement().isEmpty()) {
+                    SourceElementComponent e = pg.addElement();
+                    e.setCode("CHECK!");              
+                  }
+                  SourceElementComponent e = pg.getOrAddElement(c.getCode());
+                  if (!e.hasTargetCode(dc.getCode())) {
+                    TargetElementComponent tgt = e.addTarget();
+                    tgt.setCode(dc.getCode());
+                    tgt.setRelationship(ConceptMapRelationship.EQUIVALENT);
+                  }
+                } else {
+                  SourceElementComponent e = g.addElement();
+                  e.setCode(c.getCode());
+                  e.setNoMap(true);
+                }
+              }
+//              g.addElement().setCode(c.getCode()).setNoMap(true).addTarget().setCode("CHECK!!").setRelationship(ConceptMapRelationship.EQUIVALENT).setDisplay("unmapped: "+toString(unmapped));
+//              mod = false; // true;        
+//              amissed.add(c);
+            }
+          }
+//          if (!amissed.isEmpty()) {
+//            qaMsg("Concept Map "+cm.getId()+" is missing mappings for "+toString(amissed), true);
+//          }
+        }
+        if (!invalid.isEmpty()) {
+          qaMsg("Concept Map "+cm.getId()+" has invalid mappings to "+toString(invalid), true);
+          if (dst != null) {
+            for (SourceElementComponent e : g.getElement()) {
+              if (e.getTarget().removeIf(t -> t.hasUserData("delete"))) {
+                mod = true;
+                if (e.getTarget().isEmpty()) {
+                  e.setNoMap(true);
+                }
               }
             }
-            if (src.getNoMap()) {
-              qaMsg("Issue with "+cm.getId()+": missed: "+CommaSeparatedStringBuilder.join(",", unmapped), true);
-            }
-          }        
-        }
-      }
-      invalid.clear();
-      for (SourceElementComponent t : g.getElement()) {
-        if (!source.contains(t.getCode())) {
-          invalid.add(t.getCode());
-          qaMsg("Issue with "+cm.getId()+": source "+t.getCode()+" is not valid" , true);
-        }
-      }
-      if (!invalid.isEmpty()) {
-        qaMsg("Concept Map "+cm.getId()+" has invalid mappings from "+CommaSeparatedStringBuilder.join(",", invalid), true);
-      }
-      if (!lvset.isEmpty()) {
-//        qaMsg("Concept Map "+cm.getId()+" has mappings not in the value set: "+CommaSeparatedStringBuilder.join(",", lvset), true);
-      }
-      if (!rvset.isEmpty()) {
-        for (SourceElementComponent src : g.getElement()) {
-          for (TargetElementComponent tgt : src.getTarget()) {
-            if (!"CHECK!".equals(tgt.getCode())) {
-              if (!dest.contains(tgt.getCode())) {
-                tgt.setComment("The code "+tgt.getCode()+" is not in the target code system - FIX");
-                qaMsg("Issue with "+cm.getId()+": The code "+tgt.getCode()+" is not in the target code system", true);
-              } else if (!rvset.contains(tgt.getCode())) {
-                // qaMsg("Issue with "+cm.getId()+": The code "+tgt.getCode()+" not in the target value set, but is the correct translation", true);
-              }
-            }
           }
+          
+          for (Coding c : src) {
+            SourceElementComponent e = getSource(g, c.getCode());
+            if (e != null) {
+              for (TargetElementComponent tgt : e.getTarget()) {
+                if (!hasCode(dst, tuVL, tgt.getCode())) {
+//                  tgt.setComment("CHECK!: target "+tgt.getCode()+" is not valid (missed "+toString(unmapped)+")");
+//                  mod = false; // true;        
+                  qaMsg("Issue with "+cm.getId()+": target "+tgt.getCode()+" is not valid (missed "+toString(unmapped)+")", true);
+                }
+              }
+              if (e.getNoMap()) {
+                qaMsg("Issue with "+cm.getId()+": missed: "+toString(unmapped), true);
+              }
+            }        
+          }
+        }
+        invalid.clear();
+        for (SourceElementComponent t : g.getElement()) {
+          if (!hasCode(src, suVL, t.getCode())) {
+            invalid.add(new Coding(tuVL, t.getCode(), null));
+//            t.setDisplay("Source "+t.getCode()+" is not valid");
+//            mod = false; // true;        
+            qaMsg("CHECK!: Issue with "+cm.getId()+": source "+t.getCode()+" is not valid" , true);
+          }
+        }
+        if (!invalid.isEmpty()) {
+          qaMsg("Concept Map "+cm.getId()+" has invalid mappings from "+toString(invalid), true);
         }
       }
     }
+    if (cm.getGroup().removeIf(g -> !ug.contains(g))) {
+      mod = true;
+    }
+    if (cm.getGroup().removeIf(g -> g.getElement().isEmpty())) {
+      mod = true;
+    }
+//    if (mod) {
+//      FileOutputStream f = new FileOutputStream("/Users/grahamegrieve/work/fhir-cross-version/input/codes/ConceptMap-"+cm.getId()+".json");
+//      new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(f, cm);
+//      f.close();
+//      System.out.println("Gen "+("/Users/grahamegrieve/work/fhir-cross-version/input/codes/ConceptMap-"+cm.getId()+".json"));
+//    }
   }
 
+
+  private boolean isNotSelectable(Coding c) {
+    return c.hasUserData("abstract");
+  }
+
+  private String removeVersion(String url) {
+    return url.replace("/1.0", "").replace("/3.0", "").replace("/4.0", "").replace("/4.3", "").replace("/5.0", "");
+  }
+
+  private boolean hasCode(Set<Coding> codes, String system, String code) {
+    if (codes == null) {
+      return false;
+    }
+    for (Coding c : codes) {
+      if ((system == null || system.equals(c.getSystem())) && code.equals(c.getCode())) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   private boolean hasUnMapped(ConceptMapGroupComponent g) {
     return g.hasUnmapped() && g.getUnmapped().getMode() == ConceptMapGroupUnmappedMode.USESOURCECODE;
@@ -1556,34 +2085,53 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     return url.replace("http://hl7.org/fhir", "http://hl7.org/fhir/"+ver);
   }
 
-  private VSPair isEnum(ElementWithType et) {
-    VersionDefinitions vd = et.getDef();
+  private VSPair isCoded(ElementWithType et) {
+    IWorkerContext vd = et.getDef();
     if (et.getEd().getBinding().getStrength() == BindingStrength.REQUIRED || et.getEd().getBinding().getStrength() == BindingStrength.EXTENSIBLE) {
-      ValueSet vs = vd.getValueSets().get(et.getEd().getBinding().getValueSet());
+      ValueSet vs = vd.fetchResource(ValueSet.class, et.getEd().getBinding().getValueSet());
       if (vs != null && vs.getCompose().getInclude().size() == 1) {
-        CodeSystem cs = vd.getCodeSystems().get(vs.getCompose().getIncludeFirstRep().getSystem());
-        if (cs != null && cs.getContent() == CodeSystemContentMode.COMPLETE) {
-          return new VSPair(VersionUtilities.getNameForVersion(vd.getVersion().toCode()).substring(1), vs, cs);
+        ValueSetExpansionOutcome vse = vd.expandVS(vs, logStarted, false);
+        if (vse.getValueset() != null) {
+          Set<Coding> codes = processExpansion(vse.getValueset().getExpansion());
+          if (codes.size() > 0) {
+            return new VSPair(et.getDef().getVersion(), vs, codes);
+          }
         }
+
       }
     }
     return null;
     
   }
   
-  private VSPair isEnum(SourcedElementDefinition pair) {
+  private VSPair isCoded(SourcedElementDefinition pair) {
     String v = VersionUtilities.getNameForVersion(pair.getVer()).toLowerCase();
-    VersionDefinitions vd = versions.get(v);
+    IWorkerContext vd = versions.get(v);
     if (pair.getEd().getBinding().getStrength() == BindingStrength.REQUIRED || pair.getEd().getBinding().getStrength() == BindingStrength.EXTENSIBLE) {
-      ValueSet vs = vd.getValueSets().get(pair.getEd().getBinding().getValueSet());
-      if (vs != null && vs.getCompose().getInclude().size() == 1) {
-        CodeSystem cs = vd.getCodeSystems().get(vs.getCompose().getIncludeFirstRep().getSystem());
-        if (cs != null && cs.getContent() == CodeSystemContentMode.COMPLETE) {
-          return new VSPair(v.substring(1), vs, cs);
+      ValueSet vs = vd.fetchResource(ValueSet.class, pair.getEd().getBinding().getValueSet());
+      if (vs != null) {
+        ValueSetExpansionOutcome vse = vd.expandVS(vs, logStarted, false);
+        if (vse.getValueset() != null) {
+          Set<Coding> codes = processExpansion(vse.getValueset().getExpansion());
+          if (codes.size() > 0) {
+            return new VSPair(v, vs, codes);
+          }
         }
       }
     }
     return null;
+  }
+
+  private Set<Coding> processExpansion(ValueSetExpansionComponent expansion) {
+    Set<Coding> codes = new HashSet<>();
+    for (ValueSetExpansionContainsComponent cc : expansion.getContains()) {
+      Coding c = new Coding(cc.getSystem(), cc.getVersion(), cc.getCode(), cc.getDisplay());
+      if (cc.hasAbstract() && cc.getAbstract()) {
+        c.setUserData("abstract", true);
+      }
+      codes.add(c);
+    }
+    return codes;
   }
 
   private List<String> findNewTypes(ElementDefinition template, ElementDefinition element) {
@@ -1619,29 +2167,27 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     return res;
   }
 
-  private void buildLinks(XVersions ver, VersionDefinitions defsPrev, ConceptMap resFwd, ConceptMap elementFwd, VersionDefinitions defsNext, boolean last) {
-    logProgress("Build links between "+defsPrev.getVersion().toCode()+" and "+defsNext.getVersion().toCode());
+  private void buildLinks(XVersions ver, IWorkerContext defsPrev, ConceptMap resFwd, ConceptMap elementFwd, IWorkerContext defsNext, boolean last) {
+    logProgress("Build links between "+defsPrev.getVersion()+" and "+defsNext.getVersion());
 
-    for (String name : Utilities.sorted(defsPrev.getStructures().keySet())) {
-      StructureDefinition sd = defsPrev.getStructures().get(name);
+    for (StructureDefinition sd : sortedSDs(defsPrev.fetchResourcesByType(StructureDefinition.class))) {
       if (sd.getKind() == StructureDefinitionKind.COMPLEXTYPE && (!sd.getAbstract() || Utilities.existsInList(sd.getName(), "Quantity")) && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
         List<SourcedStructureDefinition> matches = new ArrayList<>();
-        matches.add(new SourcedStructureDefinition(defsNext, defsNext.getStructures().get(name), ConceptMapRelationship.EQUIVALENT));        
+        matches.add(new SourcedStructureDefinition(defsNext, defsNext.fetchTypeDefinition(sd.getType()), ConceptMapRelationship.EQUIVALENT));        
         buildLinksForElements(ver, elementFwd, sd, matches);
       }
     }
 
-    for (String name : Utilities.sorted(defsPrev.getStructures().keySet())) {
-      StructureDefinition sd = defsPrev.getStructures().get(name);
+    for (StructureDefinition sd : sortedSDs(defsPrev.fetchResourcesByType(StructureDefinition.class))) {
       if (sd.getKind() == StructureDefinitionKind.RESOURCE && !sd.getAbstract() && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
         
         List<SourcedStructureDefinition> matches = new ArrayList<>();
-        List<TranslatedCode> names = translateResourceName(resFwd, name);
+        List<TranslatedCode> names = translateResourceName(resFwd, sd.getType());
         if (names.isEmpty()) {
           matches.add(new SourcedStructureDefinition(defsNext, null, null));
         } else {
           for (TranslatedCode n : names) {
-            matches.add(new SourcedStructureDefinition(defsNext, defsNext.getStructures().get(n.getCode()), n.getRelationship()));
+            matches.add(new SourcedStructureDefinition(defsNext, defsNext.fetchTypeDefinition(n.getCode()), n.getRelationship()));
           }
         }
         buildLinksForElements(ver, elementFwd, sd, matches);
@@ -1651,8 +2197,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     if (last) {
       // now that we've done that, scan anything in defsNext that didn't get mapped to from destPrev
 
-      for (String name : Utilities.sorted(defsNext.getStructures().keySet())) {
-        StructureDefinition sd = defsNext.getStructures().get(name);
+      for (StructureDefinition sd : sortedSDs(defsPrev.fetchResourcesByType(StructureDefinition.class))) {
         if (sd.getKind() == StructureDefinitionKind.COMPLEXTYPE && (!sd.getAbstract() || Utilities.existsInList(sd.getName(), "Quantity")) && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
           for (ElementDefinition ed : sd.getDifferential().getElement()) {
             if (!ed.hasUserData("sed")) {
@@ -1663,8 +2208,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         }
       }
 
-      for (String name : Utilities.sorted(defsNext.getStructures().keySet())) {
-        StructureDefinition sd = defsNext.getStructures().get(name);
+      for (StructureDefinition sd : sortedSDs(defsPrev.fetchResourcesByType(StructureDefinition.class))) {
         if (sd.getKind() == StructureDefinitionKind.RESOURCE && !sd.getAbstract() && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
           for (ElementDefinition ed : sd.getDifferential().getElement()) {   
             if (!ed.hasUserData("sed")) {
@@ -1677,6 +2221,18 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     }
   }
 
+
+  public List<StructureDefinition> sortedSDs(List<StructureDefinition> list) {
+    List<StructureDefinition> res = new ArrayList<StructureDefinition>();
+    for (StructureDefinition sd : list) {
+      if (sd.getType() != null) {
+        res.add(sd);
+      }
+    }
+    Collections.sort(res, new TypeDefinitionSorter());
+    return res;
+  
+  }
 
   private void buildLinksForElements(XVersions ver, ConceptMap elementFwd, StructureDefinition sd, List<SourcedStructureDefinition> matches) {
     for (ElementDefinition ed : sd.getDifferential().getElement()) {        
@@ -1810,84 +2366,78 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager.Builder().build();
     vdr2 = loadR2(pcm);
     versions.put("r2", vdr2);
+    versions.put(vdr2.getVersion(), vdr2);
     vdr3 = loadR3(pcm);
     versions.put("r3", vdr3);
+    versions.put(vdr3.getVersion(), vdr3);
     vdr4 = loadR4(pcm);
     versions.put("r4", vdr4);
+    versions.put(vdr4.getVersion(), vdr4);
     vdr4b = loadR4B(pcm);
     versions.put("r4b", vdr4b);
+    versions.put(vdr4b.getVersion(), vdr4b);
     vdr5 = loadR5(pcm);
     versions.put("r5", vdr5);
+    versions.put(vdr5.getVersion(), vdr5);
   }
 
 
-  private VersionDefinitions loadR2(FilesystemPackageCacheManager pcm) throws FHIRException, IOException {
-    VersionDefinitions vd = new VersionDefinitions();
-    vd.setVersion(FhirPublication.DSTU2);
-    logProgressStart("Load "+vd.getVersion().toCode());
+  private IWorkerContext loadR2(FilesystemPackageCacheManager pcm) throws FHIRException, IOException {
+    logProgress("Load R2");
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r2.core");
-    for (String n : npm.listResources("StructureDefinition", "ValueSet", "CodeSystem")) {
-      BaseAdvisor_10_50 advisor = new BaseAdvisor_10_50();
-      CanonicalResource cr = (CanonicalResource) VersionConvertorFactory_10_50.convertResource(new org.hl7.fhir.dstu2.formats.JsonParser().parse(npm.load(n)), advisor);
-      for (CodeSystem cs : advisor.getCslist()) {
-        vd.add(cs);
-      }
-      vd.add(cr);
-    }    
-    logProgress(": "+vd.summary());
-    return vd;
+    R2ToR5Loader ldr = new R2ToR5Loader(loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/DSTU2"));
+    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().fromPackage(npm, ldr, true);
+    ctxt.connectToTSServer(ldr.txFactory(), "http://tx.fhir.org", "Java Client", null);
+    ctxt.setExpansionParameters(new Parameters());
+    return ctxt;
   }
 
-  private VersionDefinitions loadR3(FilesystemPackageCacheManager pcm) throws FHIRException, IOException {
-    VersionDefinitions vd = new VersionDefinitions();
-    vd.setVersion(FhirPublication.STU3);
-    logProgressStart("Load "+vd.getVersion().toCode());
+  private IWorkerContext loadR3(FilesystemPackageCacheManager pcm) throws FHIRException, IOException {
+    logProgress("Load R3");
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r3.core");
-    for (String n : npm.listResources("StructureDefinition", "ValueSet", "CodeSystem")) {
-      CanonicalResource cr = (CanonicalResource) VersionConvertorFactory_30_50.convertResource(new org.hl7.fhir.dstu3.formats.JsonParser().parse(npm.load(n)));
-      vd.add(cr);
-    }    
-    logProgress(": "+vd.summary());
-    return vd;
+    R3ToR5Loader ldr = new R3ToR5Loader(loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/STU3"));
+    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().fromPackage(npm, ldr, true);
+    ctxt.connectToTSServer(ldr.txFactory(), "http://tx.fhir.org", "Java Client", null);
+    ctxt.setExpansionParameters(new Parameters());
+    return ctxt;
   }
 
-  private VersionDefinitions loadR4(FilesystemPackageCacheManager pcm) throws FHIRFormatError, FHIRException, IOException {
-    VersionDefinitions vd = new VersionDefinitions();
-    vd.setVersion(FhirPublication.R4);
-    logProgressStart("Load "+vd.getVersion().toCode());
+  private IWorkerContext loadR4(FilesystemPackageCacheManager pcm) throws FHIRFormatError, FHIRException, IOException {
+    logProgress("Load R4");
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r4.core");
-    for (String n : npm.listResources("StructureDefinition", "ValueSet", "CodeSystem")) {
-      CanonicalResource cr = (CanonicalResource) VersionConvertorFactory_40_50.convertResource(new org.hl7.fhir.r4.formats.JsonParser().parse(npm.load(n)));
-      vd.add(cr);
-    }    
-    logProgress(": "+vd.summary());
-    return vd;
+    R4ToR5Loader ldr = new R4ToR5Loader(loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/R4"), "4.0.0");
+    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().fromPackage(npm, ldr, true);
+    ctxt.connectToTSServer(ldr.txFactory(), "http://tx.fhir.org", "Java Client", null);
+    ctxt.setExpansionParameters(new Parameters());
+    return ctxt;
   }
 
-  private VersionDefinitions loadR4B(FilesystemPackageCacheManager pcm) throws FHIRException, IOException {
-    VersionDefinitions vd = new VersionDefinitions();
-    vd.setVersion(FhirPublication.R4B);
-    logProgressStart("Load "+vd.getVersion().toCode());
+  private IWorkerContext loadR4B(FilesystemPackageCacheManager pcm) throws FHIRException, IOException {
+    logProgress("Load R4B");
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r4b.core");
-    for (String n : npm.listResources("StructureDefinition", "ValueSet", "CodeSystem")) {
-      CanonicalResource cr = (CanonicalResource) VersionConvertorFactory_43_50.convertResource(new org.hl7.fhir.r4b.formats.JsonParser().parse(npm.load(n)));
-      vd.add(cr);
-    }    
-    logProgress(": "+vd.summary());
-    return vd;
+    R4BToR5Loader ldr = new R4BToR5Loader(loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/R4B"), "4.3.0");
+    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().fromPackage(npm, ldr, true);
+    ctxt.connectToTSServer(ldr.txFactory(), "http://tx.fhir.org", "Java Client", null);
+    ctxt.setExpansionParameters(new Parameters());
+    return ctxt;
   }
 
-  private VersionDefinitions loadR5(FilesystemPackageCacheManager pcm) throws FHIRException, IOException {
-    VersionDefinitions vd = new VersionDefinitions();
-    vd.setVersion(FhirPublication.R5);
-    logProgressStart("Load "+vd.getVersion().toCode());
+  private IWorkerContext loadR5(FilesystemPackageCacheManager pcm) throws FHIRException, IOException {
+    logProgress("Load R5");
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r5.core");
-    for (String n : npm.listResources("StructureDefinition", "ValueSet", "CodeSystem")) {
-      CanonicalResource cr = (CanonicalResource) new org.hl7.fhir.r5.formats.JsonParser().parse(npm.load(n));
-      vd.add(cr);
-    }    
-    logProgress(": "+vd.summary());
-    return vd;
+    R5ToR5Loader ldr = new R5ToR5Loader(loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/R5"));
+    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().fromPackage(npm, ldr, true);
+    ctxt.connectToTSServer(ldr.txFactory(), "http://tx.fhir.org", "Java Client", null);
+    ctxt.setExpansionParameters(new Parameters());
+    return ctxt;
+  }
+
+  private List<String> loadTypes() {
+    List<String> types = new ArrayList<String>();
+    types.add("StructureDefinition");
+    types.add("ValueSet");
+    types.add("CodeSystem");
+    return types;
   }
 
   @Override
@@ -1924,7 +2474,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     if ("5.0".equals(version)) {
       return "cross-version-"+code+".html";
     } else {
-      if (vdr5.getStructures().containsKey(code)) {
+      if (vdr5.fetchTypeDefinition(code) != null) {
         return "cross-version-"+code+".html";
       }
       List<String> codes = new ArrayList<>();
@@ -1945,7 +2495,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         codes = translateResourceName(codes, cm("resources-4bto5"));
       }
       for (String c : codes) {
-        if (vdr5.getStructures().containsKey(c)) {
+        if (vdr5.fetchTypeDefinition(c) != null) {
           return "cross-version-"+c+".html";
         } 
       }
@@ -1974,21 +2524,21 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   @Override
   public List<Coding> getMembers(String uri) {
     String version = VersionUtilities.getNameForVersion(uri);
-    VersionDefinitions vd = versions.get(version.toLowerCase());
+    IWorkerContext vd = versions.get(version.toLowerCase());
     if (vd != null) {
       if (uri.contains("#")) {
         String ep = uri.substring(uri.indexOf("#")+1);
         String base = uri.substring(0, uri.indexOf("#"));
         String name = base.substring(44);
-        StructureDefinition sd = vd.getStructures().get(name);
+        StructureDefinition sd = vd.fetchTypeDefinition(name);
         if (sd != null) {
           ElementDefinition ed = sd.getDifferential().getElementByPath(ep);
           return processVS(vd, ed.getBinding().getValueSet());
         }
       } else if (uri.endsWith("/ValueSet/resource-types")) {
-        return listResources(vd.getStructures(),  VersionUtilities.getMajMin(vd.getVersion().toCode()));
+        return listResources(vd.fetchResourcesByType(StructureDefinition.class), VersionUtilities.getMajMin(vd.getVersion()));
       } else if (uri.endsWith("/ValueSet/data-types")) {
-        return listDatatypes(vd.getStructures(),  VersionUtilities.getMajMin(vd.getVersion().toCode()));
+        return listDatatypes(vd.fetchResourcesByType(StructureDefinition.class), VersionUtilities.getMajMin(vd.getVersion()));
       } else {
         System.out.println(uri);
       }
@@ -1996,10 +2546,9 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     return null;
   }
 
-  private List<Coding> listResources(Map<String, StructureDefinition> structures, String ver) {
+  private List<Coding> listResources(List<StructureDefinition> structures, String ver) {
     List<Coding> list = new ArrayList<>();
-    for (String n : Utilities.sorted(structures.keySet())) {
-      StructureDefinition sd = structures.get(n);
+    for (StructureDefinition sd : sortedSDs(structures)) {
       if (sd.getKind() == StructureDefinitionKind.RESOURCE && !sd.getAbstract() && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
         list.add(new Coding("http://hl7.org/fhir/"+ver+"/resource-types", sd.getType(), sd.getType()));
       }
@@ -2008,10 +2557,9 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     return list;
   }
 
-  private List<Coding> listDatatypes(Map<String, StructureDefinition> structures, String ver) {
+  private List<Coding> listDatatypes(List<StructureDefinition> structures, String ver) {
     List<Coding> list = new ArrayList<>();
-    for (String n : Utilities.sorted(structures.keySet())) {
-      StructureDefinition sd = structures.get(n);
+    for (StructureDefinition sd : sortedSDs(structures)) {
       if ((sd.getKind() == StructureDefinitionKind.COMPLEXTYPE || sd.getKind() == StructureDefinitionKind.PRIMITIVETYPE) && !sd.getAbstract() && !Utilities.existsInList(sd.getType(), "BackboneElement") && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
         list.add(new Coding("http://hl7.org/fhir/"+ver+"/data-types", sd.getType(), sd.getType()));
       }
@@ -2020,22 +2568,22 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     return list;
   }
 
-  private List<Coding> processVS(VersionDefinitions vd, String url) {
-    ValueSet vs = vd.getValueSets().get(url);
+  private List<Coding> processVS(IWorkerContext vd, String url) {
+    ValueSet vs = vd.fetchResource(ValueSet.class, url);
     if (vs != null && vs.hasCompose() && !vs.getCompose().hasExclude()) {
       List<Coding> list = new ArrayList<>();
       for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
         if (inc.hasValueSet() || inc.hasFilter()) {
           return null;
         }
-        String system = inc.getSystem().replace("http://hl7.org/fhir/", "http://hl7.org/fhir/"+VersionUtilities.getMajMin(vd.getVersion().toCode())+"/");
-        String vn = VersionUtilities.getNameForVersion(vd.getVersion().toCode());
+        String system = inc.getSystem().replace("http://hl7.org/fhir/", "http://hl7.org/fhir/"+VersionUtilities.getMajMin(vd.getVersion())+"/");
+        String vn = VersionUtilities.getNameForVersion(vd.getVersion());
         if (inc.hasConcept()) {
           for (ConceptReferenceComponent cc : inc.getConcept()) {
             list.add(new Coding().setSystem(system).setCode(cc.getCode()).setDisplay(cc.getDisplay()+" ("+vn+")"));
           }
         } else {
-          CodeSystem cs = vd.getCodeSystems().get(inc.getSystem());
+          CodeSystem cs = vd.fetchResource(CodeSystem.class, inc.getSystem());
           if (cs == null) {
             return null;
           } else {
@@ -2057,7 +2605,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
   }
 
-  public Map<String, VersionDefinitions> getVersions() {
+  public Map<String, IWorkerContext> getVersions() {
     return versions;
   }
 
@@ -2065,23 +2613,23 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     return conceptMaps;
   }
 
-  public VersionDefinitions getVdr2() {
+  public IWorkerContext getVdr2() {
     return vdr2;
   }
 
-  public VersionDefinitions getVdr3() {
+  public IWorkerContext getVdr3() {
     return vdr3;
   }
 
-  public VersionDefinitions getVdr4() {
+  public IWorkerContext getVdr4() {
     return vdr4;
   }
 
-  public VersionDefinitions getVdr4b() {
+  public IWorkerContext getVdr4b() {
     return vdr4b;
   }
 
-  public VersionDefinitions getVdr5() {
+  public IWorkerContext getVdr5() {
     return vdr5;
   }
 

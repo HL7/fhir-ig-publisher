@@ -1,20 +1,32 @@
 package org.hl7.fhir.igtools.publisher.modules.xver;
 
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
+
+import org.hl7.fhir.igtools.publisher.modules.xver.SourcedElementDefinition.ElementValidState;
+import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 
 public class SourcedElementDefinition {
+  public enum ElementValidState {
+    FULL_VALID, CARDINALITY, NEW_TYPES, NEW_TARGETS, NOT_VALID, CODES
+  }
+
   private StructureDefinition sd;
   private ElementDefinition ed;
 
-  private boolean valid;
+  private ElementValidState validState;
   private CommaSeparatedStringBuilder statusReasons = new CommaSeparatedStringBuilder(",",  " and ");
   private String ver;
   private String startVer;
   private String stopVer;
   private String verList;
   private SourcedElementDefinition repeater;
+  private Set<String> names;
+  private Set<Coding> codes;
 
   public SourcedElementDefinition(StructureDefinition sd, ElementDefinition ed) {
     this.sd = sd;
@@ -33,14 +45,6 @@ public class SourcedElementDefinition {
 
   public ElementDefinition getEd() {
     return ed;
-  }
-
-  public boolean isValid() {
-    return valid;
-  }
-
-  void setValid(boolean valid) {
-    this.valid = valid;
   }
 
   public String getStatusReason() {
@@ -94,4 +98,39 @@ public class SourcedElementDefinition {
   public void clearStatusReason() {
     statusReasons = new CommaSeparatedStringBuilder(",",  "and ");    
   }
+
+  public ElementValidState getValidState() {
+    return validState;
+  }
+
+  public void setValidState(ElementValidState validState) {
+    this.validState = validState;
+  }
+
+  public boolean isValid() {
+    return getValidState() != ElementValidState.NOT_VALID;
+  }
+
+  public void addToNames(Collection<String> names) {
+    if (this.names == null) {
+      this.names = new HashSet<>();
+    }
+    this.names.addAll(names);    
+  }
+
+  public Set<String> getNames() {
+    return names;
+  }
+  
+  public void addToCodes(Collection<Coding> codes) {
+    if (this.codes == null) {
+      this.codes = new HashSet<>();
+    }
+    this.codes.addAll(codes);    
+  }
+
+  public Set<Coding> getCodes() {
+    return codes;
+  }
+  
 }

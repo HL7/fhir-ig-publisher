@@ -18,6 +18,7 @@ import org.hl7.fhir.igtools.publisher.modules.xver.SourcedElementDefinitionSorte
 import org.hl7.fhir.igtools.publisher.modules.xver.StructureDefinitionColumn;
 import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine;
 import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine.MakeLinkMode;
+import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.ConceptMap;
 import org.hl7.fhir.r5.model.ElementDefinition;
@@ -66,8 +67,7 @@ public class CrossVersionModule implements IPublisherModule {
         genChainsHtml(path, "cross-version-chains-valid", true, false);
         genChainsHtml(path, "cross-version-chains-min", true, true);
 
-        for (String name : Utilities.sorted(engine.getVdr5().getStructures().keySet())) {
-          StructureDefinition sd = engine.getVdr5().getStructures().get(name);
+        for (StructureDefinition sd : engine.sortedSDs(engine.getVdr5().fetchResourcesByType(StructureDefinition.class))) {
           if ((sd.getKind() == StructureDefinitionKind.COMPLEXTYPE || sd.getKind() == StructureDefinitionKind.RESOURCE) && !sd.getAbstract() && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
             genVersionType(path, sd);
           }
@@ -87,7 +87,7 @@ public class CrossVersionModule implements IPublisherModule {
   }
 
   private void genChainsHtml(String path, String filename, boolean validOnly, boolean itemsOnly) throws IOException {
-   engine.logProgress("Create "+filename);
+    engine.logProgress("Create "+filename);
 
     XhtmlNode body = new XhtmlNode(NodeType.Element, "div");    
     body.h1().tx("FHIR Cross Version Extensions");
@@ -125,7 +125,7 @@ public class CrossVersionModule implements IPublisherModule {
   private void renderElementDefinition(XhtmlNode x, SourcedElementDefinition ed) {
     String ver = VersionUtilities.getMajMin(ed.getVer());
     String prefix = VersionUtilities.getNameForVersion(ver).toLowerCase();
-    Map<String, StructureDefinition> structures = engine.getVersions().get(prefix).getStructures();
+    IWorkerContext ctxt = engine.getVersions().get(prefix);
 
     XhtmlNode x1 = ed.isValid() ? x : x.strikethrough();
 
@@ -133,7 +133,7 @@ public class CrossVersionModule implements IPublisherModule {
 
     boolean first = true;
     for (TypeRefComponent t : ed.getEd().getType()) {
-      StructureDefinition sd = structures.get(t.getWorkingCode());
+      StructureDefinition sd = ctxt.fetchTypeDefinition(t.getWorkingCode());
       if (sd != null && !sd.getAbstract()) {
         if (first) {x1.tx(" : "); first = false; } else { x1.tx("|");  x1.wbr(); }
         x1.ah(prefix+"#"+t.getWorkingCode()).tx(t.getWorkingCode());
@@ -318,7 +318,7 @@ public class CrossVersionModule implements IPublisherModule {
         XhtmlNode ctr = rows.get(i);
         i = i + (entry.getLink() == null ? 1 : entry.getLink().getLeftWidth());
         col.getElements().add(new ElementDefinitionPair(entry.getEd(), ed));
-        XhtmlNode td1 = rendererElementForType(ctr.td(), col.isRoot() ? sd : col.getSd(), entry.getEd(), col.isRoot() ? engine.getVdr5().getStructures() : engine.getVersions().get(VersionUtilities.getNameForVersion(col.getSd().getFhirVersion().toCode()).toLowerCase()).getStructures(), ed.getPath());
+        XhtmlNode td1 = rendererElementForType(ctr.td(), col.isRoot() ? sd : col.getSd(), entry.getEd(), col.isRoot() ? engine.getVdr5() : engine.getVersions().get(VersionUtilities.getNameForVersion(col.getSd().getFhirVersion().toCode()).toLowerCase()), ed.getPath());
         if (entry.getLink() != null && entry.getLink().getLeftWidth() > 1) {
           td1.rowspan(entry.getLink().getLeftWidth());
         }
@@ -421,7 +421,7 @@ public class CrossVersionModule implements IPublisherModule {
 
   }
 
-  private XhtmlNode rendererElementForType(XhtmlNode td, StructureDefinition sdt, ElementDefinition ed, Map<String, StructureDefinition> structures, String origName) {
+  private XhtmlNode rendererElementForType(XhtmlNode td, StructureDefinition sdt, ElementDefinition ed, IWorkerContext context, String origName) {
     if (ed.getPath().contains(".")) {
       XhtmlNode span = td.span().attribute("title", ed.getPath());
       if (origName != null && !origName.equals(ed.getPath())) {
@@ -438,7 +438,7 @@ public class CrossVersionModule implements IPublisherModule {
       }
       boolean first = true;
       for (TypeRefComponent t : ed.getType()) {
-        StructureDefinition sd = structures.get(t.getWorkingCode());
+        StructureDefinition sd = context.fetchTypeDefinition(t.getWorkingCode());
         if (sd != null && !sd.getAbstract()) {
           if (first) {td.tx(" : "); first = false; } else { td.tx("|");  td.wbr(); }
           td.ah(linkforType(t.getWorkingCode())).tx(t.getWorkingCode());

@@ -1,22 +1,23 @@
 package org.hl7.fhir.igtools.publisher.modules.xver;
 
+import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition;
 
 public class ElementWithType {
 
-  private VersionDefinitions def;
+  private IWorkerContext def;
   private StructureDefinition sd;
   private ElementDefinition ed;
   private String type;
 
-  public ElementWithType(VersionDefinitions def, StructureDefinition sd, ElementDefinition ed) {
+  public ElementWithType(IWorkerContext def, StructureDefinition sd, ElementDefinition ed) {
     this.def = def;
     this.sd = sd;
     this.ed = ed;
    }
 
-  public ElementWithType(VersionDefinitions def, StructureDefinition sd, ElementDefinition ed, String type) {
+  public ElementWithType(IWorkerContext def, StructureDefinition sd, ElementDefinition ed, String type) {
     this.def = def;
     this.sd = sd;
     this.ed = ed;
@@ -35,7 +36,7 @@ public class ElementWithType {
     return type;
   }
 
-  public VersionDefinitions getDef() {
+  public IWorkerContext getDef() {
     return def;
   }
 

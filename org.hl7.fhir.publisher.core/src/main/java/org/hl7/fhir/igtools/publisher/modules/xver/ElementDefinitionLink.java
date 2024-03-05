@@ -4,6 +4,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine.XVersions;
+import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ConceptMap;
 import org.hl7.fhir.r5.model.Enumerations.ConceptMapRelationship;
 
@@ -16,8 +17,8 @@ public class ElementDefinitionLink {
   private ConceptMap prevCM;
   private int leftWidth; 
   Set<String> chainIds = new HashSet<>();
-  private Set<String> newCodes;
-  private Set<String> oldCodes;
+  private Set<Coding> newCodes;
+  private Set<Coding> oldCodes;
 
   @Override
   public String toString() {
@@ -84,19 +85,19 @@ public class ElementDefinitionLink {
     return chainIds;
   }
 
-  public Set<String> getNewCodes() {
+  public Set<Coding> getNewCodes() {
     return newCodes;
   }
 
-  public void setNewCodes(Set<String> newCodes) {
+  public void setNewCodes(Set<Coding> newCodes) {
     this.newCodes = newCodes;
   }
 
-  public Set<String> getOldCodes() {
+  public Set<Coding> getOldCodes() {
     return oldCodes;
   }
 
-  public void setOldCodes(Set<String> oldCodes) {
+  public void setOldCodes(Set<Coding> oldCodes) {
     this.oldCodes = oldCodes;
   }
   
