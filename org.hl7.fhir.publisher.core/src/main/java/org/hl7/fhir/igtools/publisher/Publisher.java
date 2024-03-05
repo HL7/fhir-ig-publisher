@@ -1033,6 +1033,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     qaJson.add("ig-ver", templateInfo.asString("version"));
     txt.append("ig-ver = "+templateInfo.asString("version")+"\r\n");
     qaJson.add("date", new SimpleDateFormat("EEE, dd MMM, yyyy HH:mm:ss Z", new Locale("en", "US")).format(execTime.getTime()));
+    qaJson.add("dateISO8601", new DateTimeType(execTime).asStringValue());
     qaJson.add("version", Constants.VERSION);
     qaJson.add("tool", Constants.VERSION+" ("+ToolsVersion.TOOLS_VERSION+")");
     try {
@@ -1438,6 +1439,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         j.add("ig-ver", publishedIg.getVersion());
       }
       j.add("date", new SimpleDateFormat("EEE, dd MMM, yyyy HH:mm:ss Z", new Locale("en", "US")).format(execTime.getTime()));
+      j.add("dateISO8601", new DateTimeType(execTime).asStringValue());
       if (val != null) {
         j.add("errs", val.getErr());
         j.add("warnings", val.getWarn());
@@ -12182,7 +12184,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         if (self.mode == IGBuildMode.MANUAL) {
           TextFile.stringToFile(buildReport(CliParams.getNamedParam(args, "-ig"), CliParams.getNamedParam(args, "-source"), self.filelog.toString(), Utilities.path(self.qaDir, "validation.txt"), self.txServer), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher.log"));
         }
-      }
+    }
       consoleLogger.stop();
     }
     if (!CliParams.hasNamedParam(args, "-no-exit")) {
