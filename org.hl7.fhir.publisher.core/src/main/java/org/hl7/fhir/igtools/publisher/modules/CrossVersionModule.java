@@ -1,5 +1,8 @@
 package org.hl7.fhir.igtools.publisher.modules;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -8,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.modules.xver.CodeChainsSorter;
 import org.hl7.fhir.igtools.publisher.modules.xver.ColumnEntry;
 import org.hl7.fhir.igtools.publisher.modules.xver.ColumnSorter;
@@ -18,27 +22,47 @@ import org.hl7.fhir.igtools.publisher.modules.xver.SourcedElementDefinitionSorte
 import org.hl7.fhir.igtools.publisher.modules.xver.StructureDefinitionColumn;
 import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine;
 import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine.MakeLinkMode;
+import org.hl7.fhir.r5.conformance.profile.BindingResolution;
+import org.hl7.fhir.r5.conformance.profile.ProfileKnowledgeProvider;
+import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.formats.IParser.OutputStyle;
+import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.model.CanonicalType;
+import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.ConceptMap;
 import org.hl7.fhir.r5.model.ElementDefinition;
+import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
+import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
+import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.renderers.ConceptMapRenderer;
 import org.hl7.fhir.r5.renderers.ConceptMapRenderer.RenderMultiRowSortPolicy;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext.GenerationRules;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext.ResourceRendererMode;
+import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
+import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.ZipGenerator;
+import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
-public class CrossVersionModule implements IPublisherModule {
+import kotlin.NotImplementedError;
+
+public class CrossVersionModule implements IPublisherModule, ProfileKnowledgeProvider {
 
   private XVerAnalysisEngine engine;
+  private ContextUtilities cu;
 
   public CrossVersionModule() {
     engine = new XVerAnalysisEngine();
@@ -61,7 +85,11 @@ public class CrossVersionModule implements IPublisherModule {
 
   public boolean preProcess(String path) {
     try {
+      cleanup(path);
       if (engine.process(path)) {
+        cu = new ContextUtilities(engine.getVdr5());
+
+        
         engine.logProgress("Generating fragments");
         genChainsHtml(path, "cross-version-chains-all", false, false);
         genChainsHtml(path, "cross-version-chains-valid", true, false);
@@ -73,7 +101,19 @@ public class CrossVersionModule implements IPublisherModule {
           }
         }
 
+        engine.logProgress("Generating extensions");
+        for (StructureDefinition sd : engine.getExtensions()) {
+          new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "input", "extensions", "StructureDefinition-"+sd.getId()+".json")), sd);
+          genExtensionPage(path, sd);
+        }  
+        for (ValueSet vs : engine.getNewValueSets().values()) {
+          new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "input", "extensions", "ValueSet-"+vs.getId()+".json")), vs);
+        }
+        for (CodeSystem cs : engine.getNewCodeSystems().values()) {
+          new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "input", "extensions", "CodeSystem-"+cs.getId()+".json")), cs);
+        }
         genSummaryPages(path);
+        genZips(path);
         return true;
       } else {
         return false;
@@ -86,6 +126,99 @@ public class CrossVersionModule implements IPublisherModule {
 
   }
 
+  private void genZips(String path) throws FileNotFoundException, IOException {
+    ZipGenerator zip = new ZipGenerator(Utilities.path(path, "temp", "xver-qa", "sd.zip"));
+    zip.addFiles(Utilities.path(path, "input", "extensions"), "", null, null);   
+    zip.close();
+
+    zip = new ZipGenerator(Utilities.path(path, "temp", "xver-qa", "cm.zip"));
+    zip.addFiles(Utilities.path(path, "input", "codes"), "", null, null);   
+    zip.addFiles(Utilities.path(path, "input", "elements"), "", null, null);   
+    zip.addFiles(Utilities.path(path, "input", "resources"), "", null, null);   
+    zip.addFiles(Utilities.path(path, "input", "types"), "", null, null);   
+    zip.close();
+
+    zip = new ZipGenerator(Utilities.path(path, "temp", "xver-qa", "sm.zip"));
+    zip.addFiles(Utilities.path(path, "input", "R2toR3"), "R2toR3/", null, null);   
+    zip.addFiles(Utilities.path(path, "input", "R3toR4"), "R3toR4/", null, null);   
+    zip.addFiles(Utilities.path(path, "input", "R4toR5"), "R4toR5/", null, null);   
+    zip.addFiles(Utilities.path(path, "input", "R4BtoR5"), "R4BtoR5/", null, null);   
+    zip.addFiles(Utilities.path(path, "input", "R3toR2"), "R3toR2/", null, null);   
+    zip.addFiles(Utilities.path(path, "input", "R4toR3"), "R4toR3/", null, null);   
+    zip.addFiles(Utilities.path(path, "input", "R5toR4"), "R5toR4/", null, null);   
+    zip.addFiles(Utilities.path(path, "input", "R5toR4B"), "R5toR4B/", null, null);   
+    zip.close();      
+  }
+
+  private void cleanup(String path) throws IOException {
+    Utilities.clearDirectory(Utilities.path(path, "input", "extensions"));
+    File dir = new File(Utilities.path(path, "temp", "xver-qa"));
+    for (File f : dir.listFiles()) {
+      if (f.getName().endsWith(".html") && f.getName().contains("-")) {
+        f.delete();
+      }
+    }
+  }
+
+  private void genExtensionPage(String path, StructureDefinition sd) throws IOException {
+    XhtmlNode body = new XhtmlNode(NodeType.Element, "div");  
+    body.h1().tx(sd.getTitle());
+    var tbl = body.table("grid");
+    var tr = tbl.tr();
+    tr.td().b().tx("URL");
+    tr.td().tx(sd.getUrl());
+    tr = tbl.tr();
+    tr.td().b().tx("Version");
+    tr.td().tx(sd.getVersion());
+    tr = tbl.tr();
+    tr.td().b().tx("Status");
+    tr.td().tx(sd.getStatus().toCode());
+    tr = tbl.tr();
+    tr.td().b().tx("Description");
+    tr.td().markdown(sd.getDescription(),sd.getName()+".description");
+    
+    body.para().b().tx("Context of Use");
+    body.para().tx("This extension may be used in the following contexts:");
+    XhtmlNode ul = body.ul();
+    for (StructureDefinitionContextComponent ctxt : sd.getContext()) {
+      var li = ul.li();
+      li.tx(ctxt.getType().toCode());
+      li.tx(" ");
+      li.tx(ctxt.getExpression());
+      if (ctxt.hasExtension(ToolingExtensions.EXT_APPLICABLE_VERSION)) {
+        li.tx(" (");
+        renderVersionRange(li, ctxt.getExtensionByUrl(ToolingExtensions.EXT_APPLICABLE_VERSION));
+        li.tx(")");
+      }
+    }
+    body.hr();
+    
+    RenderingContext rc = new RenderingContext(engine.getVdr5(), new MarkDownProcessor(Dialect.COMMON_MARK), null, "http://hl7.org/fhir", "", "", ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
+    rc.setPkp(this);
+    var sdr = new org.hl7.fhir.r5.renderers.StructureDefinitionRenderer(rc);
+    body.add(sdr.generateTable("todo", sd, true,  Utilities.path(path, "temp", "xver-qa"), false, "Extension", false, "http://hl7.org/fhir", "", false, false, null, false, rc, ""));
+    body.hr();
+    
+    body.pre().tx(new JsonParser().setOutputStyle(OutputStyle.PRETTY).composeString(sd));
+    TextFile.stringToFile(new XhtmlComposer(false, false).compose(wrapPage(body, sd.getName())), Utilities.path(path, "temp", "xver-qa", "StructureDefinition-"+sd.getId()+".html"));
+  }
+
+  private void renderVersionRange(XhtmlNode x, Extension ext) {
+    String sv = ext.hasExtension("startFhirVersion") ? ext.getExtensionString("startFhirVersion") : null;
+    String ev = ext.hasExtension("endFhirVersion") ? ext.getExtensionString("endFhirVersion") : null;
+    if (ev != null && ev.equals(sv)) {
+      x.tx("For version "+VersionUtilities.getNameForVersion(ev));
+    } else if (ev != null && sv != null) {
+      x.tx("For versions "+VersionUtilities.getNameForVersion(sv)+" to "+VersionUtilities.getNameForVersion(ev));
+    } else if (ev == null && sv != null) {
+      x.tx("For versions "+VersionUtilities.getNameForVersion(sv)+" onwards");
+    } else if (ev == null && sv != null) {
+      x.tx("For versions until "+VersionUtilities.getNameForVersion(ev));
+    } else {
+      x.tx("For unknown versions");
+    }
+  }
+  
   private void genChainsHtml(String path, String filename, boolean validOnly, boolean itemsOnly) throws IOException {
     engine.logProgress("Create "+filename);
 
@@ -174,7 +307,7 @@ public class CrossVersionModule implements IPublisherModule {
   private void genVersionType(String path, StructureDefinition sd) throws IOException {
     XhtmlNode body = new XhtmlNode(NodeType.Element, "div");  
     body.h1().tx(sd.getName());
-    body.para().tx("something");
+    body.para().tx("FHIR Cross-version Mappings for "+sd.getType()+" based on the R5 structure");
     XhtmlNode tbl = body.table("grid");
     XhtmlNode tr = tbl.tr();
 
@@ -423,6 +556,15 @@ public class CrossVersionModule implements IPublisherModule {
 
   private XhtmlNode rendererElementForType(XhtmlNode td, StructureDefinition sdt, ElementDefinition ed, IWorkerContext context, String origName) {
     if (ed.getPath().contains(".")) {
+      SourcedElementDefinition sed = (SourcedElementDefinition) ed.getUserData("sed");
+      if (sed != null) {
+        if (sed.getExtension() == null) {
+          td.imgT("icon-extension-no.png", "No cross-version extension allowed for this element because "+sed.getStatusReason());
+        } else {
+          td.ah("StructureDefinition-"+sed.getExtension().getId()+".html").imgT("icon-extension.png", "Extension definition for this version of the element. Defined because: "+sed.getStatusReason());
+        }
+        td.tx(" ");
+      }
       XhtmlNode span = td.span().attribute("title", ed.getPath());
       if (origName != null && !origName.equals(ed.getPath())) {
         span.style("color: maroon; font-weight: bold");
@@ -520,5 +662,55 @@ public class CrossVersionModule implements IPublisherModule {
 
   private String tail(String value) {
     return value.contains("/") ? value.substring(value.lastIndexOf("/")+1) : value;
+  }
+
+  @Override
+  public boolean isDatatype(String typeSimple) {
+    return !cu.isDatatype(typeSimple);
+  }
+
+  @Override
+  public boolean isPrimitiveType(String typeSimple) {
+    return cu.isPrimitiveType(typeSimple);
+  }
+
+  @Override
+  public boolean isResource(String typeSimple) {
+    return cu.isResource(typeSimple);
+  }
+
+  @Override
+  public boolean hasLinkFor(String typeSimple) {
+    return !cu.isPrimitiveType(typeSimple);
+  }
+
+  @Override
+  public String getLinkFor(String corePath, String typeSimple) {
+    return Utilities.pathURL(corePath, typeSimple.toLowerCase()+".html");
+  }
+
+  @Override
+  public BindingResolution resolveBinding(StructureDefinition def, ElementDefinitionBindingComponent binding, String path) throws FHIRException {
+    return new BindingResolution("todo", "todo");
+  }
+
+  @Override
+  public BindingResolution resolveBinding(StructureDefinition def, String url, String path) throws FHIRException {
+    return new BindingResolution("todo", "todo");
+  }
+
+  @Override
+  public String getLinkForProfile(StructureDefinition profile, String url) {
+    return profile.getWebPath();
+  }
+  
+  @Override
+  public boolean prependLinks() {
+    return false;
+  }
+
+  @Override
+  public String getLinkForUrl(String corePath, String s) {
+    throw new NotImplementedError();
   }
 }
