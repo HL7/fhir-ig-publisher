@@ -46,6 +46,7 @@ import org.hl7.fhir.r5.model.PrimitiveType;
 import org.hl7.fhir.r5.model.Quantity;
 import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionMappingComponent;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
@@ -437,6 +438,39 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return "<span title=\"" + coding.getSystem() + "\">" + coding.getCode() + "</a>" + (!coding.hasDisplay() ? "" : "(\"" + gt(coding.getDisplayElement()) + "\")");
     else
       return "<a title=\"" + cs.present() + "\" href=\"" + Utilities.escapeXml(cs.getWebPath()) + "#" + cs.getId() + "-" + coding.getCode() + "\">" + coding.getCode() + "</a>" + (!coding.hasDisplay() ? "" : "(\"" + gt(coding.getDisplayElement()) + "\")");
+  }
+  
+  public String contexts() throws IOException {
+    XhtmlNode ul = new XhtmlNode(NodeType.Element, "ul");
+    for (StructureDefinitionContextComponent ctxt : sd.getContext()) {
+      var li = ul.li();
+      li.tx(ctxt.getType().toCode());
+      li.tx(" ");
+      li.tx(ctxt.getExpression());
+      if (ctxt.hasExtension(ToolingExtensions.EXT_APPLICABLE_VERSION)) {
+        li.tx(" (");
+        renderVersionRange(li, ctxt.getExtensionByUrl(ToolingExtensions.EXT_APPLICABLE_VERSION));
+        li.tx(")");
+          
+      }
+    }
+    return new XhtmlComposer(XhtmlComposer.HTML).compose(ul);
+  }
+
+  private void renderVersionRange(XhtmlNode x, Extension ext) {
+    String sv = ext.hasExtension("startFhirVersion") ? ext.getExtensionString("startFhirVersion") : null;
+    String ev = ext.hasExtension("endFhirVersion") ? ext.getExtensionString("endFhirVersion") : null;
+    if (ev != null && ev.equals(sv)) {
+      x.tx("For version "+VersionUtilities.getNameForVersion(ev));
+    } else if (ev != null && sv != null) {
+      x.tx("For versions "+VersionUtilities.getNameForVersion(sv)+" to "+VersionUtilities.getNameForVersion(ev));
+    } else if (ev == null && sv != null) {
+      x.tx("For versions "+VersionUtilities.getNameForVersion(sv)+" onwards");
+    } else if (ev == null && sv != null) {
+      x.tx("For versions until "+VersionUtilities.getNameForVersion(ev));
+    } else {
+      x.tx("For unknown versions");
+    }
   }
 
   public String diff(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
