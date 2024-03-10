@@ -9,6 +9,7 @@ import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
+import org.hl7.fhir.utilities.VersionUtilities;
 
 public class SourcedElementDefinition {
   public enum ElementValidState {
@@ -23,10 +24,12 @@ public class SourcedElementDefinition {
   private String ver;
   private String startVer;
   private String stopVer;
+  private Set<String> versions;
   private String verList;
   private SourcedElementDefinition repeater;
   private Set<String> names;
   private Set<Coding> codes;
+  private StructureDefinition extension;
 
   public SourcedElementDefinition(StructureDefinition sd, ElementDefinition ed) {
     this.sd = sd;
@@ -87,6 +90,14 @@ public class SourcedElementDefinition {
     this.verList = verList;
   }
 
+  public Set<String> getVersions() {
+    return versions;
+  }
+
+  public void setVersions(Set<String> versions) {
+    this.versions = versions;
+  }
+
   SourcedElementDefinition getRepeater() {
     return repeater;
   }
@@ -131,6 +142,22 @@ public class SourcedElementDefinition {
 
   public Set<Coding> getCodes() {
     return codes;
+  }
+
+  public StructureDefinition getExtension() {
+    return extension;
+  }
+
+  public void setExtension(StructureDefinition extension) {
+    this.extension = extension;
+  }
+
+  public boolean appliesToVersion(String tgtVer) {
+    return versions != null && versions.contains(tgtVer);
+  }
+
+  public String extensionPath() {
+    return "http://hl7.org/fhir/"+VersionUtilities.getMajMin(ver)+"/StructureDefinition/extension-"+ed.getPath();
   }
   
 }

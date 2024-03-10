@@ -16,24 +16,14 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_10_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_43_50;
 import org.hl7.fhir.convertors.loaders.loaderR5.R2ToR5Loader;
 import org.hl7.fhir.convertors.loaders.loaderR5.R3ToR5Loader;
 import org.hl7.fhir.convertors.loaders.loaderR5.R4BToR5Loader;
 import org.hl7.fhir.convertors.loaders.loaderR5.R4ToR5Loader;
 import org.hl7.fhir.convertors.loaders.loaderR5.R5ToR5Loader;
-import org.hl7.fhir.convertors.txClient.TerminologyClientR2;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.modules.xver.SourcedElementDefinition.ElementValidState;
-import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine.LoadedFile;
-import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine.MakeLinkMode;
-import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine.TypeDefinitionSorter;
-import org.hl7.fhir.r5.model.Enumerations.FHIRVersion;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
@@ -42,23 +32,28 @@ import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
+import org.hl7.fhir.r5.model.CodeType;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ConceptMap;
 import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
 import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupUnmappedMode;
 import org.hl7.fhir.r5.model.ConceptMap.SourceElementComponent;
 import org.hl7.fhir.r5.model.ConceptMap.TargetElementComponent;
-import org.hl7.fhir.r5.model.ContactPoint.ContactPointSystem;
+import org.hl7.fhir.r5.model.Element;
 import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
 import org.hl7.fhir.r5.model.Enumerations.BindingStrength;
-import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
 import org.hl7.fhir.r5.model.Enumerations.ConceptMapRelationship;
+import org.hl7.fhir.r5.model.Enumerations.FHIRVersion;
 import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
+import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.IdType;
+import org.hl7.fhir.r5.model.IntegerType;
 import org.hl7.fhir.r5.model.Parameters;
 import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.r5.model.StructureDefinition.ExtensionContextType;
+import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.StructureMap;
@@ -79,21 +74,17 @@ import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionComponent;
 import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
 import org.hl7.fhir.r5.renderers.ConceptMapRenderer.IMultiMapRendererAdvisor;
-import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.terminologies.ConceptMapUtilities;
 import org.hl7.fhir.r5.terminologies.ConceptMapUtilities.TranslatedCode;
-import org.hl7.fhir.r5.terminologies.client.TerminologyClientR5.TerminologyClientR5Factory;
-import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
+import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
-import org.hl7.fhir.utilities.FhirPublication;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
-import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.validation.BaseValidator.BooleanHolder;
 
@@ -175,7 +166,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     // checkIds(folder);
     
     failures = false;
-    loadVersions();
+    loadVersions(folder);
     loadConceptMaps(folder);
     loadStructureMaps(folder);
 
@@ -230,16 +221,28 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     }
   }
 
+  private List<String> allVersions() {
+    List<String> res = new ArrayList<String>();
+    res.add("5.0");
+    res.add("4.3");
+    res.add("4.0");
+    res.add("3.0");
+    res.add("1.0");
+    return res;
+  }
+  
   private void checkCreateExtension(ElementDefinitionLink link, SourcedElementDefinition element) {
-    if (element.isValid()) {
+    if (element.isValid() && element.getEd().getPath().contains(".") && !Utilities.existsInList(element.getSd().getType(), "Type", "Base", "DataType", "Datatype", "PrimitiveType", "Element", "BackboneElement", "BackboneType", "Extension")) {
       String ver = VersionUtilities.getMajMin(element.getSd().getFhirVersion().toCode());
       // we need to create the extension definition
       StructureDefinition sd = new StructureDefinition();
-      sd.setUrl("http://hl7.org/fhir/"+ver+"/StructureDefinition/extension-"+element.getEd().getPath());
-      sd.setId("extension-"+element.getEd().getPath());
+      element.setExtension(sd);
+      extensions.add(sd);
+      sd.setUrl(element.extensionPath()); 
+      sd.setId("extension-"+VersionUtilities.getNameForVersion(element.getVer()).toLowerCase()+"-"+element.getEd().getPath());
       // sd.setVersion(null); // let the IG set this
-      sd.setName("XVerExtension"+element.getEd().getPath());
-      sd.setTitle("Coss-Version Extension for "+element.getEd().getPath());
+      sd.setName("XVerExtension"+element.getEd().getPath()+VersionUtilities.getNameForVersion(element.getVer()).toUpperCase());
+      sd.setTitle("Cross-Version Extension for "+element.getEd().getPath()+" ("+VersionUtilities.getNameForVersion(element.getVer()).toUpperCase()+")");
       sd.setStatus(PublicationStatus.ACTIVE);
       sd.setExperimental(false);
       // sd.setDateElement(null); // let the IG set this
@@ -254,16 +257,41 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       sd.setDerivation(TypeDerivationRule.CONSTRAINT);
       sd.setAbstract(false);
       
-      // todo: populate the contexts
+      String thisVersionParent = element.getEd().getPath().substring(0, element.getEd().getPath().lastIndexOf("."));
+      ElementDefinition ed = element.getSd().getDifferential().getElementByPath(thisVersionParent);
+      for (String tgtVer : allVersions()) {
+        if (element.appliesToVersion(tgtVer)) {
+          List<StructureDefinitionContextComponent> contexts = getParentContextsForVersion((SourcedElementDefinition) ed.getUserData("sed"), ver, tgtVer);
+          for (StructureDefinitionContextComponent ctxt : contexts) {
+            tagForVersion(tgtVer, ctxt); 
+            sd.addContext(ctxt);
+          }
+        }
+      }
+      
+      switch (element.getValidState()) {
+      case CARDINALITY:
+        addToDescription(sd, "This is a valid cross-version extension because the cardinality changed");
+        break;
+      case FULL_VALID:
+        addToDescription(sd, "This is a valid cross-version extension because it's counted as a new element");
+        break;
+      case NEW_TYPES:
+        addToDescription(sd, "This is a valid extension because it has the types "+CommaSeparatedStringBuilder.join(", ", element.getNames()));
+        break;
+      case NEW_TARGETS:
+        addToDescription(sd, "This is a valid extension because it has the target resources "+CommaSeparatedStringBuilder.join(", ", element.getNames()));
+        break;
+      case CODES:
+        addToDescription(sd, "This is a valid extension because it has the following codes that are not in other versions "+toString(element.getCodes()));
+        break;
+      default:      
+      }
 
       ElementDefinition src = element.getEd();
       ElementDefinition edr = new ElementDefinition();
       edr.setPath("Extension");      
       sd.getDifferential().addElement(edr);
-      ElementDefinition edv = new ElementDefinition();
-      edv.setPath("Extension.value[x]");      
-      sd.getDifferential().addElement(edv);
-
       edr.setLabel(src.getLabel());
       edr.setCode(src.getCode());
       edr.setShort(src.getShort());
@@ -276,84 +304,166 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       edr.setMax(src.getMax());
       edr.setIsModifier(src.getIsModifier());
       edr.setIsModifierReason(src.getIsModifierReason());
-      edr.setIsSummary(src.getIsSummary());
+//      edr.setIsSummary(src.getIsSummary());
       edr.setMapping(src.getMapping());
+
+      ElementDefinition ede = new ElementDefinition();
+      ede.setPath("Extension.extension");      
+      sd.getDifferential().addElement(ede);
       
-      edv.setMinValue(src.getMinValue());
-      edv.setMaxValue(src.getMaxValue());
-      edv.setMaxLength(src.getMaxLength());
-      edv.setMustHaveValue(src.getMustHaveValue());
-      edv.setValueAlternatives(src.getValueAlternatives());
-
-      IWorkerContext vd = versions.get(element.getVer());
-
-      switch (element.getValidState()) {
-      case CARDINALITY:
-        edv.getType().addAll(src.getType());
-        copyBinding(vd, edv, src.getBinding());
-        addToDescription(sd, "This is a valid extension because the cardinality changed");
-        break;
-      case FULL_VALID:
-        edv.getType().addAll(src.getType());
-        copyBinding(vd, edv, src.getBinding());
-        addToDescription(sd, "This is a valid extension because it's counted as a new element");
-        break;
-      case NEW_TYPES:
-        boolean coded = false;
-        for (TypeRefComponent tr : src.getType()) {
-          if (element.getNames().contains(tr.getCode())) {
-            edv.getType().add(tr);
-            if (isCoded(tr.getWorkingCode())) {
-              coded = true;
-            }
+      ElementDefinition edv = new ElementDefinition();
+      edv.setPath("Extension.value[x]");      
+      sd.getDifferential().addElement(edv);
+      if (isBackboneElement(src)) {
+        edv.setMax("0");        
+        ede.setMin(1);     
+        // todo: iterate all the extensions to see what goes here 
+      } else {
+        ede.setMax("0");
+        edv.setMin(1);        
+        edv.setMinValue(src.getMinValue());
+        edv.setMaxValue(src.getMaxValue());
+        edv.setMaxLengthElement(src.getMaxLengthElement());
+        edv.setMustHaveValueElement(src.getMustHaveValueElement());
+        edv.setValueAlternatives(src.getValueAlternatives());
+  
+        IWorkerContext vd = versions.get(element.getVer());
+  
+        switch (element.getValidState()) {
+        case CARDINALITY:
+          for (TypeRefComponent tr : src.getType()) {
+            edv.getType().add(fixType(tr, element.getVer()));
           }
-        }
-        if (coded) {
           copyBinding(vd, edv, src.getBinding());
-        }
-        addToDescription(sd, "This is a valid extension because it has the types "+CommaSeparatedStringBuilder.join(", ", element.getNames()));
-        break;
-      case NEW_TARGETS:
-        coded = false;
-        for (TypeRefComponent tr : src.getType()) {
-          if (isReferenceDataType(tr.getCode())) {
-            if (isCoded(tr.getWorkingCode())) {
-              coded = true;
-            }
-            TypeRefComponent n = edv.addType();
-            n.setCode(tr.getCode());
-            for (CanonicalType tgt : tr.getTargetProfile()) {
-              if (element.getNames().contains(tgt.asStringValue())) {
-                n.getTargetProfile().add(tgt);
-              }   
-            }
+          break;
+        case FULL_VALID:
+          for (TypeRefComponent tr : src.getType()) {
+            edv.getType().add(fixType(tr, element.getVer()));
           }
-        }
-        if (coded) {
           copyBinding(vd, edv, src.getBinding());
-        }
-        addToDescription(sd, "This is a valid extension because it has the target resources "+CommaSeparatedStringBuilder.join(", ", element.getNames()));
-        break;
-      case CODES:
-        for (TypeRefComponent tr : src.getType()) {
-          if (isCoded(tr.getCode())) {
-            edv.getType().add(tr);
+          break;
+        case NEW_TYPES:
+          boolean coded = false;
+          for (TypeRefComponent tr : src.getType()) {
+            if (element.getNames().contains(tr.getCode())) {
+              edv.getType().add(fixType(tr, element.getVer()));
+              if (isCoded(tr.getWorkingCode())) {
+                coded = true;
+              }
+            }
           }
+          if (coded) {
+            copyBinding(vd, edv, src.getBinding());
+          }
+          break;
+        case NEW_TARGETS:
+          coded = false;
+          for (TypeRefComponent tr : src.getType()) {
+            if (isReferenceDataType(tr.getCode())) {
+              if (isCoded(tr.getWorkingCode())) {
+                coded = true;
+              }
+              TypeRefComponent n = edv.addType();
+              n.setCode(tr.getCode());
+              for (CanonicalType tgt : tr.getTargetProfile()) {
+                if (element.getNames().contains(tgt.asStringValue())) {
+                  n.getTargetProfile().add(tgt);
+                }   
+              }
+            }
+          }
+          if (coded) {
+            copyBinding(vd, edv, src.getBinding());
+          }
+          break;
+        case CODES:
+          if (isBackboneElement(src)) {
+            throw new Error("what?");
+          }
+          for (TypeRefComponent tr : src.getType()) {
+            if (isCoded(tr.getCode())) {
+              edv.getType().add(fixType(tr, element.getVer()));
+            }
+          }
+          copyBinding(vd, edv, src.getBinding(), element.getNames());
+          break;
+        default:      
         }
-        copyBinding(vd, edv, src.getBinding(), element.getNames());
-        addToDescription(sd, "This is a valid extension because it has the following codes that are not in other versions "+toString(element.getCodes()));
-        break;
-      default:      
+        // todo: "contentReference" : "<uri>", // I Reference to definition of content for the element
+        // todo: type limitations
+  //      edv.getType().addAll(src.getType());
+  
+        // todo: constraints
+        // todo: binding
       }
-      // todo: "contentReference" : "<uri>", // I Reference to definition of content for the element
-      // todo: type limitations
-      edv.getType().addAll(src.getType());
-
-      // todo: constraints
-      // todo: binding      
     }
   }
   
+
+  private TypeRefComponent fixType(TypeRefComponent tr, String ver) {
+    if ("Quantity".equals(tr.getWorkingCode()) && tr.hasProfile()) {
+      String tu = tr.getProfile().get(0).getValueAsString();
+      String t = tail(tu);
+      if (!Utilities.existsInList(t, "SimpleQuantity")) {        
+        return new TypeRefComponent(t);
+      }
+    }
+    return tr.copy();
+  }
+
+  private boolean isBackboneElement(ElementDefinition src) {
+    for (TypeRefComponent tr : src.getType()) {
+      if (Utilities.existsInList(tr.getWorkingCode(), "BackboneElement")) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private void tagForVersion(String tgtVer, Element element) {
+    Extension ext = element.addExtension();
+    ext.setUrl(ToolingExtensions.EXT_APPLICABLE_VERSION);
+    ext.addExtension("startFhirVersion", new CodeType(tgtVer));    
+    ext.addExtension("endFhirVersion", new CodeType(tgtVer));    
+  }
+
+  private List<StructureDefinitionContextComponent> getParentContextsForVersion(SourcedElementDefinition ed, String ver, String tgtVer) {
+    // ok we have a handle to the parent. it's in multiple chains, and we're going to walk forward or backwards to the tgtVer looking for a match
+    List<SourcedElementDefinition> list = new ArrayList<>();
+    list.add(ed);
+    boolean forwards = VersionUtilities.isThisOrLater(ver, tgtVer);
+    MakeLinkMode mode = forwards ? MakeLinkMode.OUTWARD : MakeLinkMode.INWARD;
+    while (true) {
+      List<SourcedElementDefinition> nlist = new ArrayList<>();
+      for (SourcedElementDefinition t : list) {
+        List<ElementDefinitionLink> links = makeEDLinks(t, mode);
+        for (ElementDefinitionLink link : links) {
+          SourcedElementDefinition sed = forwards ? link.getNext() : link.getPrev();
+          nlist.add(sed);
+        }        
+      }
+      if (nlist.isEmpty()) {
+        List<StructureDefinitionContextComponent> res = new ArrayList<>();
+        // if it's a contained element, and it's lost its home, it goes onto it's parent extension
+        if (ed.getEd().getPath().contains(".")) {
+          res.add(new StructureDefinitionContextComponent().setType(ExtensionContextType.EXTENSION).setExpression(ed.extensionPath()));
+          
+        } else { // otherwise it goes on Basic
+          res.add(new StructureDefinitionContextComponent().setType(ExtensionContextType.ELEMENT).setExpression("Basic"));
+        }
+        return res;
+      }
+      String fver = VersionUtilities.getMajMin(nlist.get(0).getSd().getFhirVersion().toCode());
+      if (fver.equals(tgtVer)) {
+        List<StructureDefinitionContextComponent> res = new ArrayList<>();
+        for (SourcedElementDefinition t : nlist) {
+          res.add(new StructureDefinitionContextComponent().setType(ExtensionContextType.ELEMENT).setExpression(t.getEd().getPath()));        
+        }
+        return res;
+      }
+      list = nlist;
+    }    
+  }
 
   private boolean isReferenceDataType(String code) {
     return Utilities.existsInList(code, "Reference", "canonical", "CodeableReference");
@@ -417,7 +527,6 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
   
   private void checkIds(String folder) throws IOException {
-    initCtxt();
     List<LoadedFile> files = new ArrayList<>();
     loadAllFiles(files, new File(Utilities.path(folder, "input")));
     Set<String> ids = new HashSet<>();
@@ -524,7 +633,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
           CanonicalResource cr = null;
           try {
             if (f.getName().endsWith(".fml")) {
-              cr = new StructureMapUtilities(ctxt).parse(source, f.getName());
+              cr = new StructureMapUtilities(vdr5).parse(source, f.getName());
             } else {
               cr = (CanonicalResource) new JsonParser().parse(source);
             }
@@ -1119,7 +1228,6 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
   private boolean logStarted = false;
-  private SimpleWorkerContext ctxt;
   public void logProgress(String msg) {
     System.out.println((logStarted ? "" : "xve: ")+msg);
     logStarted = false;
@@ -1308,26 +1416,17 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
   private void loadStructureMaps(String dir) throws FHIRFormatError, FileNotFoundException, IOException {
-    initCtxt();
-    loadStructureMaps(ctxt, new File(Utilities.path(dir, "input", "R2toR3")));
-    loadStructureMaps(ctxt, new File(Utilities.path(dir, "input", "R3toR2")));
-    loadStructureMaps(ctxt, new File(Utilities.path(dir, "input", "R3toR4")));
-    loadStructureMaps(ctxt, new File(Utilities.path(dir, "input", "R4BtoR5")));
-    loadStructureMaps(ctxt, new File(Utilities.path(dir, "input", "R4toR3")));
-    loadStructureMaps(ctxt, new File(Utilities.path(dir, "input", "R4toR5")));
-    loadStructureMaps(ctxt, new File(Utilities.path(dir, "input", "R5toR4")));
-    loadStructureMaps(ctxt, new File(Utilities.path(dir, "input", "R5toR4B")));
+    loadStructureMaps(vdr5, new File(Utilities.path(dir, "input", "R2toR3")));
+    loadStructureMaps(vdr5, new File(Utilities.path(dir, "input", "R3toR2")));
+    loadStructureMaps(vdr5, new File(Utilities.path(dir, "input", "R3toR4")));
+    loadStructureMaps(vdr5, new File(Utilities.path(dir, "input", "R4BtoR5")));
+    loadStructureMaps(vdr5, new File(Utilities.path(dir, "input", "R4toR3")));
+    loadStructureMaps(vdr5, new File(Utilities.path(dir, "input", "R4toR5")));
+    loadStructureMaps(vdr5, new File(Utilities.path(dir, "input", "R5toR4")));
+    loadStructureMaps(vdr5, new File(Utilities.path(dir, "input", "R5toR4B")));
   }
 
-  private void initCtxt() throws IOException {
-    if (ctxt == null) {
-      FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager.Builder().build();
-      NpmPackage npm = pcm.loadPackage("hl7.fhir.r5.core");    
-      ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().withAllowLoadingDuplicates(true).fromPackage(npm);
-    }
-  }
-
-  private void loadStructureMaps(SimpleWorkerContext ctxt, File file) throws FHIRFormatError, FileNotFoundException, IOException {
+  private void loadStructureMaps(IWorkerContext ctxt, File file) throws FHIRFormatError, FileNotFoundException, IOException {
     logProgressStart("Load StructureMaps from "+file.getAbsolutePath()+": ");
     int i = 0;
     for (File f : file.listFiles()) {
@@ -1462,11 +1561,13 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       if (element.getValidState() != ElementValidState.NOT_VALID) {
         String bv = element.getStartVer();
         String ev = element.getRepeater() != null ? element.getRepeater().getStopVer() : element.getStopVer();
-        CommaSeparatedStringBuilder vers = makeVerList(bv, ev);
+        Set<String> versions = new HashSet<>();
+        CommaSeparatedStringBuilder vers = makeVerList(bv, ev, versions);
         if (vers.count() == 0) {
           element.setValidState(ElementValidState.NOT_VALID);
           element.addStatusReason("??");
         } else {
+          element.setVersions(versions);
           element.setVerList(vers.toString());
         }
       }
@@ -1558,23 +1659,28 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     return false;
   }
 
-  private CommaSeparatedStringBuilder makeVerList(String bv, String ev) {
+  private CommaSeparatedStringBuilder makeVerList(String bv, String ev, Set<String> versions) {
     CommaSeparatedStringBuilder vers = new CommaSeparatedStringBuilder();
 
     if (!VersionUtilities.includedInRange(bv, ev, "1.0.2")) {
       vers.append("R2");
+      versions.add("1.0");
     }
     if (!VersionUtilities.includedInRange(bv, ev, "3.0.2")) {
       vers.append("R3");
+      versions.add("3.0");
     }
     if (!VersionUtilities.includedInRange(bv, ev, "4.0.1")) {
       vers.append("R4");
+      versions.add("4.0");
     }
     if (!VersionUtilities.includedInRange(bv, ev, "4.3.0")) {
       vers.append("R4B");
+      versions.add("4.3");
     }
     if (!VersionUtilities.includedInRange(bv, ev, "5.0.0")) {
       vers.append("R5");
+      versions.add("5.0");
     }
     return vers;
   }
@@ -1605,9 +1711,9 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   
 
   private ConceptMap makeCM(String id, String rawId, SourcedElementDefinition se, SourcedElementDefinition de, VSPair s, VSPair d, String scopeUri, String targetUri) throws FileNotFoundException, IOException {
-    if (true) {
-      throw new Error("why?");
-    }
+//    if (true) {
+//      throw new Error("why?");
+//    }
     
     ConceptMap cm = new ConceptMap();
     cm.setId(id);
@@ -2197,7 +2303,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     if (last) {
       // now that we've done that, scan anything in defsNext that didn't get mapped to from destPrev
 
-      for (StructureDefinition sd : sortedSDs(defsPrev.fetchResourcesByType(StructureDefinition.class))) {
+      for (StructureDefinition sd : sortedSDs(defsNext.fetchResourcesByType(StructureDefinition.class))) {
         if (sd.getKind() == StructureDefinitionKind.COMPLEXTYPE && (!sd.getAbstract() || Utilities.existsInList(sd.getName(), "Quantity")) && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
           for (ElementDefinition ed : sd.getDifferential().getElement()) {
             if (!ed.hasUserData("sed")) {
@@ -2208,7 +2314,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         }
       }
 
-      for (StructureDefinition sd : sortedSDs(defsPrev.fetchResourcesByType(StructureDefinition.class))) {
+      for (StructureDefinition sd : sortedSDs(defsNext.fetchResourcesByType(StructureDefinition.class))) {
         if (sd.getKind() == StructureDefinitionKind.RESOURCE && !sd.getAbstract() && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
           for (ElementDefinition ed : sd.getDifferential().getElement()) {   
             if (!ed.hasUserData("sed")) {
@@ -2362,71 +2468,71 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
 
-  private void loadVersions() throws IOException {
+  private void loadVersions(String path) throws IOException {
     FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager.Builder().build();
-    vdr2 = loadR2(pcm);
+    vdr2 = loadR2(path, pcm);
     versions.put("r2", vdr2);
     versions.put(vdr2.getVersion(), vdr2);
-    vdr3 = loadR3(pcm);
+    vdr3 = loadR3(path, pcm);
     versions.put("r3", vdr3);
     versions.put(vdr3.getVersion(), vdr3);
-    vdr4 = loadR4(pcm);
+    vdr4 = loadR4(path, pcm);
     versions.put("r4", vdr4);
     versions.put(vdr4.getVersion(), vdr4);
-    vdr4b = loadR4B(pcm);
+    vdr4b = loadR4B(path, pcm);
     versions.put("r4b", vdr4b);
     versions.put(vdr4b.getVersion(), vdr4b);
-    vdr5 = loadR5(pcm);
+    vdr5 = loadR5(path, pcm);
     versions.put("r5", vdr5);
     versions.put(vdr5.getVersion(), vdr5);
   }
 
 
-  private IWorkerContext loadR2(FilesystemPackageCacheManager pcm) throws FHIRException, IOException {
+  private IWorkerContext loadR2(String path, FilesystemPackageCacheManager pcm) throws FHIRException, IOException {
     logProgress("Load R2");
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r2.core");
     R2ToR5Loader ldr = new R2ToR5Loader(loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/DSTU2"));
-    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().fromPackage(npm, ldr, true);
+    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(Utilities.path(path, "input-cache", "xv-tx", "r2")).fromPackage(npm, ldr, true);
     ctxt.connectToTSServer(ldr.txFactory(), "http://tx.fhir.org", "Java Client", null);
     ctxt.setExpansionParameters(new Parameters());
     return ctxt;
   }
 
-  private IWorkerContext loadR3(FilesystemPackageCacheManager pcm) throws FHIRException, IOException {
+  private IWorkerContext loadR3(String path, FilesystemPackageCacheManager pcm) throws FHIRException, IOException {
     logProgress("Load R3");
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r3.core");
     R3ToR5Loader ldr = new R3ToR5Loader(loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/STU3"));
-    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().fromPackage(npm, ldr, true);
+    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(Utilities.path(path, "input-cache", "xv-tx", "r3")).fromPackage(npm, ldr, true);
     ctxt.connectToTSServer(ldr.txFactory(), "http://tx.fhir.org", "Java Client", null);
     ctxt.setExpansionParameters(new Parameters());
     return ctxt;
   }
 
-  private IWorkerContext loadR4(FilesystemPackageCacheManager pcm) throws FHIRFormatError, FHIRException, IOException {
+  private IWorkerContext loadR4(String path, FilesystemPackageCacheManager pcm) throws FHIRFormatError, FHIRException, IOException {
     logProgress("Load R4");
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r4.core");
     R4ToR5Loader ldr = new R4ToR5Loader(loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/R4"), "4.0.0");
-    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().fromPackage(npm, ldr, true);
+    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(Utilities.path(path, "input-cache", "xv-tx", "r4")).fromPackage(npm, ldr, true);
     ctxt.connectToTSServer(ldr.txFactory(), "http://tx.fhir.org", "Java Client", null);
     ctxt.setExpansionParameters(new Parameters());
     return ctxt;
   }
 
-  private IWorkerContext loadR4B(FilesystemPackageCacheManager pcm) throws FHIRException, IOException {
+  private IWorkerContext loadR4B(String path, FilesystemPackageCacheManager pcm) throws FHIRException, IOException {
     logProgress("Load R4B");
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r4b.core");
     R4BToR5Loader ldr = new R4BToR5Loader(loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/R4B"), "4.3.0");
-    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().fromPackage(npm, ldr, true);
+    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(Utilities.path(path, "input-cache", "xv-tx", "r4b")).fromPackage(npm, ldr, true);
     ctxt.connectToTSServer(ldr.txFactory(), "http://tx.fhir.org", "Java Client", null);
     ctxt.setExpansionParameters(new Parameters());
     return ctxt;
   }
 
-  private IWorkerContext loadR5(FilesystemPackageCacheManager pcm) throws FHIRException, IOException {
+  private IWorkerContext loadR5(String path, FilesystemPackageCacheManager pcm) throws FHIRException, IOException {
     logProgress("Load R5");
     NpmPackage npm = pcm.loadPackage("hl7.fhir.r5.core");
     R5ToR5Loader ldr = new R5ToR5Loader(loadTypes(), new XVerAnalysisLoader("http://hl7.org/fhir/R5"));
-    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().fromPackage(npm, ldr, true);
+    SimpleWorkerContext ctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(Utilities.path(path, "input-cache", "xv-tx", "r5")).fromPackage(npm, ldr, true);
     ctxt.connectToTSServer(ldr.txFactory(), "http://tx.fhir.org", "Java Client", null);
     ctxt.setExpansionParameters(new Parameters());
     return ctxt;
@@ -2685,6 +2791,18 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     x.ah(map.getWebPath()).tx("Map");
     x.tx(")");
     return true;
+  }
+
+  public List<StructureDefinition> getExtensions() {
+    return extensions;
+  }
+
+  public Map<String, ValueSet> getNewValueSets() {
+    return newValueSets;
+  }
+
+  public Map<String, CodeSystem> getNewCodeSystems() {
+    return newCodeSystems;
   }
 
 
