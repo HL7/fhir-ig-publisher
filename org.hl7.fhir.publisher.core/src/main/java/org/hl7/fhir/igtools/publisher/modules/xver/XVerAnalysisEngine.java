@@ -49,6 +49,7 @@ import org.hl7.fhir.r5.model.Enumerations.FHIRVersion;
 import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
 import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.IdType;
+import org.hl7.fhir.r5.model.IntegerType;
 import org.hl7.fhir.r5.model.Parameters;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.ExtensionContextType;
@@ -232,7 +233,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
   
   private void checkCreateExtension(ElementDefinitionLink link, SourcedElementDefinition element) {
-    if (element.isValid() && element.getEd().getPath().contains(".")) {
+    if (element.isValid() && element.getEd().getPath().contains(".") && !Utilities.existsInList(element.getSd().getType(), "Type", "Base", "DataType", "Datatype", "PrimitiveType", "Element", "BackboneElement", "BackboneType", "Extension")) {
       String ver = VersionUtilities.getMajMin(element.getSd().getFhirVersion().toCode());
       // we need to create the extension definition
       StructureDefinition sd = new StructureDefinition();
@@ -269,15 +270,29 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         }
       }
       
+      switch (element.getValidState()) {
+      case CARDINALITY:
+        addToDescription(sd, "This is a valid cross-version extension because the cardinality changed");
+        break;
+      case FULL_VALID:
+        addToDescription(sd, "This is a valid cross-version extension because it's counted as a new element");
+        break;
+      case NEW_TYPES:
+        addToDescription(sd, "This is a valid extension because it has the types "+CommaSeparatedStringBuilder.join(", ", element.getNames()));
+        break;
+      case NEW_TARGETS:
+        addToDescription(sd, "This is a valid extension because it has the target resources "+CommaSeparatedStringBuilder.join(", ", element.getNames()));
+        break;
+      case CODES:
+        addToDescription(sd, "This is a valid extension because it has the following codes that are not in other versions "+toString(element.getCodes()));
+        break;
+      default:      
+      }
 
       ElementDefinition src = element.getEd();
       ElementDefinition edr = new ElementDefinition();
       edr.setPath("Extension");      
       sd.getDifferential().addElement(edr);
-      ElementDefinition edv = new ElementDefinition();
-      edv.setPath("Extension.value[x]");      
-      sd.getDifferential().addElement(edv);
-
       edr.setLabel(src.getLabel());
       edr.setCode(src.getCode());
       edr.setShort(src.getShort());
@@ -292,82 +307,119 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       edr.setIsModifierReason(src.getIsModifierReason());
 //      edr.setIsSummary(src.getIsSummary());
       edr.setMapping(src.getMapping());
+
+      ElementDefinition ede = new ElementDefinition();
+      ede.setPath("Extension.extension");      
+      sd.getDifferential().addElement(ede);
       
-      edv.setMinValue(src.getMinValue());
-      edv.setMaxValue(src.getMaxValue());
-      edv.setMaxLengthElement(src.getMaxLengthElement());
-      edv.setMustHaveValueElement(src.getMustHaveValueElement());
-      edv.setValueAlternatives(src.getValueAlternatives());
-
-      IWorkerContext vd = versions.get(element.getVer());
-
-      switch (element.getValidState()) {
-      case CARDINALITY:
-        edv.getType().addAll(src.getType());
-        copyBinding(vd, edv, src.getBinding());
-        addToDescription(sd, "This is a valid cross-version extension because the cardinality changed");
-        break;
-      case FULL_VALID:
-        edv.getType().addAll(src.getType());
-        copyBinding(vd, edv, src.getBinding());
-        addToDescription(sd, "This is a valid cross-version extension because it's counted as a new element");
-        break;
-      case NEW_TYPES:
-        boolean coded = false;
-        for (TypeRefComponent tr : src.getType()) {
-          if (element.getNames().contains(tr.getCode())) {
-            edv.getType().add(tr);
-            if (isCoded(tr.getWorkingCode())) {
-              coded = true;
-            }
+      ElementDefinition edv = new ElementDefinition();
+      edv.setPath("Extension.value[x]");      
+      sd.getDifferential().addElement(edv);
+      if (isBackboneElement(src)) {
+        edv.setMax("0");        
+        ede.setMin(1);     
+        // todo: iterate all the extensions to see what goes here 
+      } else {
+        ede.setMax("0");
+        edv.setMin(1);        
+        edv.setMinValue(src.getMinValue());
+        edv.setMaxValue(src.getMaxValue());
+        edv.setMaxLengthElement(src.getMaxLengthElement());
+        edv.setMustHaveValueElement(src.getMustHaveValueElement());
+        edv.setValueAlternatives(src.getValueAlternatives());
+  
+        IWorkerContext vd = versions.get(element.getVer());
+  
+        switch (element.getValidState()) {
+        case CARDINALITY:
+          for (TypeRefComponent tr : src.getType()) {
+            edv.getType().add(fixType(tr, element.getVer()));
           }
-        }
-        if (coded) {
           copyBinding(vd, edv, src.getBinding());
-        }
-        addToDescription(sd, "This is a valid extension because it has the types "+CommaSeparatedStringBuilder.join(", ", element.getNames()));
-        break;
-      case NEW_TARGETS:
-        coded = false;
-        for (TypeRefComponent tr : src.getType()) {
-          if (isReferenceDataType(tr.getCode())) {
-            if (isCoded(tr.getWorkingCode())) {
-              coded = true;
-            }
-            TypeRefComponent n = edv.addType();
-            n.setCode(tr.getCode());
-            for (CanonicalType tgt : tr.getTargetProfile()) {
-              if (element.getNames().contains(tgt.asStringValue())) {
-                n.getTargetProfile().add(tgt);
-              }   
-            }
+          break;
+        case FULL_VALID:
+          for (TypeRefComponent tr : src.getType()) {
+            edv.getType().add(fixType(tr, element.getVer()));
           }
-        }
-        if (coded) {
           copyBinding(vd, edv, src.getBinding());
-        }
-        addToDescription(sd, "This is a valid extension because it has the target resources "+CommaSeparatedStringBuilder.join(", ", element.getNames()));
-        break;
-      case CODES:
-        for (TypeRefComponent tr : src.getType()) {
-          if (isCoded(tr.getCode())) {
-            edv.getType().add(tr);
+          break;
+        case NEW_TYPES:
+          boolean coded = false;
+          for (TypeRefComponent tr : src.getType()) {
+            if (element.getNames().contains(tr.getCode())) {
+              edv.getType().add(fixType(tr, element.getVer()));
+              if (isCoded(tr.getWorkingCode())) {
+                coded = true;
+              }
+            }
           }
+          if (coded) {
+            copyBinding(vd, edv, src.getBinding());
+          }
+          break;
+        case NEW_TARGETS:
+          coded = false;
+          for (TypeRefComponent tr : src.getType()) {
+            if (isReferenceDataType(tr.getCode())) {
+              if (isCoded(tr.getWorkingCode())) {
+                coded = true;
+              }
+              TypeRefComponent n = edv.addType();
+              n.setCode(tr.getCode());
+              for (CanonicalType tgt : tr.getTargetProfile()) {
+                if (element.getNames().contains(tgt.asStringValue())) {
+                  n.getTargetProfile().add(tgt);
+                }   
+              }
+            }
+          }
+          if (coded) {
+            copyBinding(vd, edv, src.getBinding());
+          }
+          break;
+        case CODES:
+          if (isBackboneElement(src)) {
+            throw new Error("what?");
+          }
+          for (TypeRefComponent tr : src.getType()) {
+            if (isCoded(tr.getCode())) {
+              edv.getType().add(fixType(tr, element.getVer()));
+            }
+          }
+          copyBinding(vd, edv, src.getBinding(), element.getNames());
+          break;
+        default:      
         }
-        copyBinding(vd, edv, src.getBinding(), element.getNames());
-        addToDescription(sd, "This is a valid extension because it has the following codes that are not in other versions "+toString(element.getCodes()));
-        break;
-      default:      
+        // todo: "contentReference" : "<uri>", // I Reference to definition of content for the element
+        // todo: type limitations
+  //      edv.getType().addAll(src.getType());
+  
+        // todo: constraints
+        // todo: binding
       }
-      // todo: "contentReference" : "<uri>", // I Reference to definition of content for the element
-      // todo: type limitations
-//      edv.getType().addAll(src.getType());
-
-      // todo: constraints
-      // todo: binding      
     }
   }
   
+
+  private TypeRefComponent fixType(TypeRefComponent tr, String ver) {
+    if ("Quantity".equals(tr.getWorkingCode()) && tr.hasProfile()) {
+      String tu = tr.getProfile().get(0).getValueAsString();
+      String t = tail(tu);
+      if (!Utilities.existsInList(t, "SimpleQuantity")) {        
+        return new TypeRefComponent(t);
+      }
+    }
+    return tr.copy();
+  }
+
+  private boolean isBackboneElement(ElementDefinition src) {
+    for (TypeRefComponent tr : src.getType()) {
+      if (Utilities.existsInList(tr.getWorkingCode(), "BackboneElement")) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   private void tagForVersion(String tgtVer, Element element) {
     Extension ext = element.addExtension();
