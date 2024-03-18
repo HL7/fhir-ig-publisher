@@ -74,8 +74,16 @@ public class BaseRenderer extends TranslatingUtilities implements IMarkdownProce
 
 	      if (url == null) {
 	        Resource r = context.fetchResource(Resource.class, parts[0]);
+	        if (r == null) {
+	          // well, that failed; we'll try to interpret that as a link to a path in FHIR
+	          String rt = parts[0].contains(".") ? parts[0].substring(parts[0].indexOf(".")) : parts[0];
+	          StructureDefinition sd = context.fetchTypeDefinition(rt);
+	          if (sd != null && sd.getSnapshot().getElementByPath(parts[0]) != null) {
+	            r = sd;
+	          }
+	        }
 	        if (r == null)
-	          throw new Error("Unable to find extension "+parts[0]);
+	          throw new Error("Unable to find definition for '"+parts[0]+"'");
 	        if (r.hasWebPath()) {
 	          url = r.getWebPath();
 	        } else {
