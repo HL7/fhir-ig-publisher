@@ -18,7 +18,6 @@ import org.hl7.fhir.igtools.publisher.modules.xver.ColumnSorter;
 import org.hl7.fhir.igtools.publisher.modules.xver.ElementDefinitionLink;
 import org.hl7.fhir.igtools.publisher.modules.xver.ElementDefinitionPair;
 import org.hl7.fhir.igtools.publisher.modules.xver.SourcedElementDefinition;
-import org.hl7.fhir.igtools.publisher.modules.xver.SourcedElementDefinitionSorter;
 import org.hl7.fhir.igtools.publisher.modules.xver.StructureDefinitionColumn;
 import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine;
 import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine.MakeLinkMode;
@@ -32,10 +31,10 @@ import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.ConceptMap;
 import org.hl7.fhir.r5.model.ElementDefinition;
-import org.hl7.fhir.r5.model.Extension;
-import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
+import org.hl7.fhir.r5.model.Extension;
+import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
@@ -48,11 +47,11 @@ import org.hl7.fhir.r5.renderers.utils.RenderingContext.ResourceRendererMode;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
+import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.ZipGenerator;
-import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
@@ -161,6 +160,10 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
   }
 
   private void genExtensionPage(String path, StructureDefinition sd) throws IOException {
+    String fn = Utilities.path(path, "temp", "xver-qa", "StructureDefinition-"+sd.getId()+".html");
+    if (new File(fn).exists()) {
+      throw new FHIRException("Duplicate id: "+sd.getId());
+    }
     XhtmlNode body = new XhtmlNode(NodeType.Element, "div");  
     body.h1().tx(sd.getTitle());
     var tbl = body.table("grid");
@@ -200,7 +203,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     body.hr();
     
     body.pre().tx(new JsonParser().setOutputStyle(OutputStyle.PRETTY).composeString(sd));
-    TextFile.stringToFile(new XhtmlComposer(false, false).compose(wrapPage(body, sd.getName())), Utilities.path(path, "temp", "xver-qa", "StructureDefinition-"+sd.getId()+".html"));
+    TextFile.stringToFile(new XhtmlComposer(false, false).compose(wrapPage(body, sd.getName())), fn);
   }
 
   private void renderVersionRange(XhtmlNode x, Extension ext) {
@@ -712,5 +715,11 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
   @Override
   public String getLinkForUrl(String corePath, String s) {
     throw new NotImplementedError();
+  }
+
+  @Override
+  public void defineTypeMap(Map<String, String> typeMap) {
+    typeMap.putAll(engine.getTypeMap());
+    
   }
 }

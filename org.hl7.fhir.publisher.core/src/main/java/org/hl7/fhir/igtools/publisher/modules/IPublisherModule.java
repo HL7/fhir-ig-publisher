@@ -1,5 +1,7 @@
 package org.hl7.fhir.igtools.publisher.modules;
 
+import java.util.Map;
+
 // modules are triggered from ig.ini 
 public interface IPublisherModule {
 
@@ -17,4 +19,7 @@ public interface IPublisherModule {
   // should be documented clearly in the console output
   // all the actions will be taken on the files in the path (which is the root of the IG that contains ig.ini)
   public boolean preProcess(String path);
+
+  // if the module lnows of type aliases, define them for the rendering system
+  public void defineTypeMap(Map<String, String> typeMap);
 }

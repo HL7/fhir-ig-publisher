@@ -2,11 +2,9 @@ package org.hl7.fhir.igtools.publisher.modules.xver;
 
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ValueSet;
 

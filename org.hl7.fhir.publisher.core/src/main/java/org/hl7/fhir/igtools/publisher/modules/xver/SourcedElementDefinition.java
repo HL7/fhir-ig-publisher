@@ -4,7 +4,6 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.hl7.fhir.igtools.publisher.modules.xver.SourcedElementDefinition.ElementValidState;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition;
@@ -13,7 +12,7 @@ import org.hl7.fhir.utilities.VersionUtilities;
 
 public class SourcedElementDefinition {
   public enum ElementValidState {
-    FULL_VALID, CARDINALITY, NEW_TYPES, NEW_TARGETS, NOT_VALID, CODES
+    FULL_VALID, CARDINALITY, NEW_TYPES, NEW_TARGETS, NOT_VALID, CODES, REMOVED_TYPES, PARENT
   }
 
   private StructureDefinition sd;
@@ -51,7 +50,11 @@ public class SourcedElementDefinition {
   }
 
   public String getStatusReason() {
-    return statusReasons.length() == 0 ? "No Change" : statusReasons.toString();
+    if (statusReasons.length() == 0) {
+      return validState == ElementValidState.FULL_VALID ? "Made up reason" : "No Change"; 
+    } else {
+      return statusReasons.toString();
+    }
   }
 
   void addStatusReason(String statusReason) {

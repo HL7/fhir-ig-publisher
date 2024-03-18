@@ -1,5 +1,7 @@
 package org.hl7.fhir.igtools.publisher.modules;
 
+import java.util.Map;
+
 public class NullModule implements IPublisherModule {
   
   public boolean preProcess(String path) {
@@ -20,6 +22,12 @@ public class NullModule implements IPublisherModule {
   @Override
   public boolean useRoutine(String name) {
     return false;
+  }
+
+  @Override
+  public void defineTypeMap(Map<String, String> typeMap) {
+    // TODO Auto-generated method stub
+    
   }
 
 }
