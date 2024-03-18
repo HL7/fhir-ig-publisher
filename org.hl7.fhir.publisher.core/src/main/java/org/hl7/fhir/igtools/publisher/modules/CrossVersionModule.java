@@ -101,15 +101,16 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
         }
 
         engine.logProgress("Generating extensions");
+        Utilities.createDirectory(Utilities.path(path, "temp", "xver", "extensions"));
         for (StructureDefinition sd : engine.getExtensions()) {
-          new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "input", "extensions", "StructureDefinition-"+sd.getId()+".json")), sd);
+          new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "temp", "xver", "extensions", "StructureDefinition-"+sd.getId()+".json")), sd);
           genExtensionPage(path, sd);
         }  
         for (ValueSet vs : engine.getNewValueSets().values()) {
-          new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "input", "extensions", "ValueSet-"+vs.getId()+".json")), vs);
+          new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "temp", "xver", "extensions", "ValueSet-"+vs.getId()+".json")), vs);
         }
         for (CodeSystem cs : engine.getNewCodeSystems().values()) {
-          new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "input", "extensions", "CodeSystem-"+cs.getId()+".json")), cs);
+          new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "temp", "xver", "extensions", "CodeSystem-"+cs.getId()+".json")), cs);
         }
         genSummaryPages(path);
         genZips(path);
