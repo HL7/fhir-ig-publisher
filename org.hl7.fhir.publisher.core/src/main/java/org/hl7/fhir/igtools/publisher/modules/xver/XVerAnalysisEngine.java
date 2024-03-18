@@ -79,7 +79,6 @@ import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
-import org.hl7.fhir.utilities.DebugUtilities;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
@@ -239,9 +238,6 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         ElementDefinition ed = new ElementDefinition("Extension.extension");
         sd.getDifferential().getElement().add(i, ed);
         ed.setSliceName(urls.get(s).getUserString("sliceName"));
-        if ("http://hl7.org/fhir/3.0/StructureDefinition/extension-TestReport.teardown.action".equals(s)) {
-          DebugUtilities.breakpoint();
-        }
         ed.addType().setCode("Extension").addProfile(s);
         i++;
       }
@@ -2413,7 +2409,6 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(f, cm);
       f.close();
       System.out.println("Gen "+("/Users/grahamegrieve/work/fhir-cross-version/input/codes/ConceptMap-"+cm.getId()+".json"));
-      DebugUtilities.breakpoint();
     }
   }
 
