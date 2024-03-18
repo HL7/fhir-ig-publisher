@@ -939,6 +939,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private List<String> viewDefinitions = new ArrayList<>();
   private int validationLogTime = 0;
   private long maxMemory = 0;
+  private String oidRoot;
+  private IniFile oidIni;
 
   long last = System.currentTimeMillis();
   private List<String> unknownParams = new ArrayList<>();
@@ -2945,7 +2947,25 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           fetcher.setReport(true);
         }
         break;
-      default: 
+      case "auto-oid-root":
+        oidRoot = p.getValue(); 
+        if (!Utilities.isValidOID(oidRoot)) {
+          throw new Error("Invalid oid found in assign-missing-oids-root: "+oidRoot);
+        }
+        oidIni = new IniFile(Utilities.path(Utilities.getDirectoryForFile(igName), "oids.ini"));
+        if (!oidIni.hasSection("Documentation")) {
+          oidIni.setStringProperty("Documentation", "information1", "This file stores the OID assignments for resources defined in this IG.", null);
+          oidIni.setStringProperty("Documentation", "information2", "It must be added to git and committed when resources are added or their id is changed", null);
+          oidIni.setStringProperty("Documentation", "information3", "You should not generally need to edit this file, but if you do:", null);
+          oidIni.setStringProperty("Documentation", "information4", " (a) you can change the id of a resource (left side) if you change it's actual id in your source, to maintain OID consistency", null);
+          oidIni.setStringProperty("Documentation", "information5", " (b) you can change the oid of the resource to an OID you assign manually. If you really know what you're doing with OIDs", null);
+          oidIni.setStringProperty("Documentation", "information6", "There is never a reason to edit anything else", null);
+          oidIni.save();
+        }
+        if (!hasOid(sourceIg.getIdentifier())) {
+          sourceIg.getIdentifier().add(new Identifier().setSystem("urn:ietf:rfc:3986").setValue("urn:oid:"+oidRoot));
+        }
+        default: 
         if (!template.isParameter(pc)) {
           unknownParams.add(pc+"="+p.getValue());
         }
@@ -4409,6 +4429,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     rc.setParser(getTypeLoader(version));
     rc.addLink(KnownLinkType.SELF, targetOutput);
     rc.setFixedFormat(fixedFormat);
+    module.defineTypeMap(rc.getTypeMap());
     if (publishedIg.hasJurisdiction()) {
       Locale locale = null;
       try {
@@ -6266,6 +6287,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               if (new AdjunctFileLoader(binaryPaths, cql).replaceAttachments2(f, r)) {
                 altered = true;
               }
+              if (oidRoot != null && !hasOid(bc.getIdentifier())) {
+                String oid = getOid(r.fhirType(), bc.getIdBase());
+                bc.getIdentifier().add(new Identifier().setSystem("urn:ietf:rfc:3986").setValue("urn:oid:"+oid));
+                altered = true;
+              }
               if (altered) {
                 if (Utilities.existsInList(r.fhirType(), "GraphDefinition")) {
                   f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.PROCESSING, bc.fhirType()+".where(url = '"+bc.getUrl()+"')", 
@@ -6313,6 +6339,75 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         f.finish("load");      
       }
     }
+  }
+
+  private String getOid(String type, String id) {
+    String ot = oidNodeForType(type);
+    String oid = oidIni.getStringProperty(type, id);
+    if (oid != null) {
+      return oid;
+    }
+    Integer keyR = oidIni.getIntegerProperty("Key", type);
+    int key = keyR == null ? 0 : keyR.intValue();
+    key++;
+    oid = oidRoot+"."+ot+"."+key;
+    oidIni.setIntegerProperty("Key", type, key, null);
+    oidIni.setStringProperty(type, id, oid, null);
+    oidIni.save();
+    return oid;
+  }
+
+  private String oidNodeForType(String type) {
+    switch (type) {
+    case "ActivityDefinition" : return "11";
+    case "ActorDefinition" : return "12";
+    case "CapabilityStatement" : return "13";
+    case "ChargeItemDefinition" : return "14";
+    case "Citation" : return "15";
+    case "CodeSystem" : return "16";
+    case "CompartmentDefinition" : return "17";
+    case "ConceptMap" : return "18";
+    case "ConditionDefinition" : return "19";
+    case "EffectEvidenceSynthesis" : return "20";
+    case "EventDefinition" : return "21";
+    case "Evidence" : return "22";
+    case "EvidenceReport" : return "23";
+    case "EvidenceVariable" : return "24";
+    case "ExampleScenario" : return "25";
+    case "GraphDefinition" : return "26";
+    case "ImplementationGuide" : return "27";
+    case "Library" : return "28";
+    case "Measure" : return "29";
+    case "MessageDefinition" : return "30";
+    case "NamingSystem" : return "31";
+    case "ObservationDefinition" : return "32";
+    case "OperationDefinition" : return "33";
+    case "PlanDefinition" : return "34";
+    case "Questionnaire" : return "35";
+    case "Requirements" : return "36";
+    case "ResearchDefinition" : return "37";
+    case "ResearchElementDefinition" : return "38";
+    case "RiskEvidenceSynthesis" : return "39";
+    case "SearchParameter" : return "40";
+    case "SpecimenDefinition" : return "41";
+    case "StructureDefinition" : return "42";
+    case "StructureMap" : return "43";
+    case "SubscriptionTopic" : return "44";
+    case "TerminologyCapabilities" : return "45";
+    case "TestPlan" : return "46";
+    case "TestScript" : return "47";
+    case "ValueSet" : return "48";
+    default: return "10";
+    }
+  }
+
+  private boolean hasOid(List<Identifier> identifiers) {
+    for (Identifier id : identifiers) {
+      if ("urn:ietf:rfc:3986".equals(id.getSystem()) && id.hasValue() && id.getValue().startsWith("urn:oid:")) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private boolean canonicalUrlIsOk(CanonicalResource bc) {
@@ -6869,19 +6964,57 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private void checkOIDsUnique() {
+    if (oidRoot != null) {
+      try {
+        JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObjectFromUrl("https://raw.githubusercontent.com/FHIR/ig-registry/master/oid-assignments.json");
+        JsonObject assignments = json.getJsonObject("assignments");
+        String ig = null;
+        String oid = null;
+        if (assignments.has(oidRoot)) {
+          ig = assignments.getJsonObject(oidRoot).asString("id");
+        }
+        for (JsonProperty p : assignments.getProperties()) {
+          if (p.getValue().isJsonObject() && sourceIg.getPackageId().equals(p.getValue().asJsonObject().asString("id"))) {
+            oid = p.getName();
+          }
+        }
+        if (oid == null && ig == null) {
+          errors.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "ImplementationGuide", "The assigned auto-oid-root value '"+oidRoot+"' is not registered in https://github.com/FHIR/ig-registry/blob/master/oid-assignments.json so isn't known to be valid", IssueSeverity.WARNING));          
+        } else if (oid != null && !oid.equals(oidRoot)) {
+          throw new FHIRException("The assigned auto-oid-root value '"+oidRoot+"' does not match the value of '"+oidRoot+"' registered in https://github.com/FHIR/ig-registry/blob/master/oid-assignments.json so cannot proceed");                    
+        } else if (ig != null && !ig.equals(sourceIg.getPackageId())) {
+          throw new FHIRException("The assigned auto-oid-root value '"+oidRoot+"' is already registered to the IG '"+ig+"' in https://github.com/FHIR/ig-registry/blob/master/oid-assignments.json so cannot proceed");                    
+        }
+      } catch (Exception e) {
+        errors.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "ImplementationGuide", "Unable to check auto-oid-root because "+e.getMessage(), IssueSeverity.INFORMATION));
+      }
+    }
+    String oidHint = " (OIDs are easy to assign - see https://build.fhir.org/ig/FHIR/fhir-tools-ig/CodeSystem-ig-parameters.html#ig-parameters-auto-oid-root)";
     Map<String, FetchedResource> oidMap = new HashMap<>();
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
           List<String> oids = loadOids(((CanonicalResource) r.getResource())); 
-          for (String oid : oids) {
-            if (oidMap.containsKey(oid)) {
-              FetchedResource rs = oidMap.get(oid);
-              FetchedFile fs = findFileForResource(rs);
-              f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "The OID '"+oid+"' has already been used by "+rs.getId()+" in "+fs.getName(), IssueSeverity.ERROR));
-              fs.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "The OID '"+oid+"' is also used by "+r.getId()+" in "+f.getName(), IssueSeverity.ERROR));
+          if (oids.isEmpty()) {
+            if (Utilities.existsInList(r.getResource().fhirType(), "CodeSystem", "ValueSet")) {
+              if (forHL7orFHIR()) {
+                f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "This resource must have an OID assigned to cater for possible e.g. CDA usage"+oidHint, IssueSeverity.ERROR));
+              } else {
+                f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "This resource should have an OID assigned to cater for possible e.g. CDA usage"+oidHint, IssueSeverity.WARNING));                
+              }
             } else {
-              oidMap.put(oid, r);
+              f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "This resource could usefully have an OID assigned"+oidHint, IssueSeverity.INFORMATION));
+            }
+          } else {
+            for (String oid : oids) {
+              if (oidMap.containsKey(oid)) {
+                FetchedResource rs = oidMap.get(oid);
+                FetchedFile fs = findFileForResource(rs);
+                f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "The OID '"+oid+"' has already been used by "+rs.getId()+" in "+fs.getName(), IssueSeverity.ERROR));
+                fs.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "The OID '"+oid+"' is also used by "+r.getId()+" in "+f.getName(), IssueSeverity.ERROR));
+              } else {
+                oidMap.put(oid, r);
+              }
             }
           }
         }
