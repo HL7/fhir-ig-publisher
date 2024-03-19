@@ -338,7 +338,6 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       String id = generateConciseId("xv-"+VersionUtilities.getNameForVersion(element.getVer()).toLowerCase()+"-"+element.getEd().getPath());
       if (extMap.containsKey(id)) {
         System.out.println("duplicate id "+id+" for "+extMap.get(id)+" and "+element.extensionPath());
-        DebugUtilities.breakpoint();
       }
       extMap.put(id, sd.getUrl());
       sd.setId(id);
