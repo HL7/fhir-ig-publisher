@@ -34,18 +34,32 @@ public class PublisherTranslator {
 
   public void start(String dst) throws IOException {
     Utilities.createDirectory(dst);
-    Utilities.createDirectory(Utilities.path(dst, "po"));
-    Utilities.createDirectory(Utilities.path(dst, "xliff"));
-    Utilities.createDirectory(Utilities.path(dst, "json"));
+    
+    if (translationLangs.size() > 1) {
+      for (String l : translationLangs) {
+        if (baseLang == null || !baseLang.equals(l)) {
+          Utilities.createDirectory(Utilities.path(dst, l, "po"));
+          Utilities.createDirectory(Utilities.path(dst, l, "xliff"));
+          Utilities.createDirectory(Utilities.path(dst, l, "json"));
+          
+        }
+      }
+    } else {
+      Utilities.createDirectory(Utilities.path(dst, "po"));
+      Utilities.createDirectory(Utilities.path(dst, "xliff"));
+      Utilities.createDirectory(Utilities.path(dst, "json"));
+    }
 
-    po = new PoGetTextProducer(Utilities.path(dst, "po"));
-    xliff = new XLIFFProducer(Utilities.path(dst, "xliff"));
-    json = new JsonLangFileProducer(Utilities.path(dst, "json"));
+    po = new PoGetTextProducer(dst, "po", translationLangs.size() > 1);
+    xliff = new XLIFFProducer(dst, "xliff", translationLangs.size() > 1);
+    json = new JsonLangFileProducer(dst, "json", translationLangs.size() > 1);
   }
 
   public void translate(FetchedFile f, FetchedResource r) throws IOException {
     for (String lang : translationLangs) {
-      genTranslations(f, r, lang, translationLangs.size() > 0); 
+      if (baseLang == null || !baseLang.equals(lang)) {
+        genTranslations(f, r, lang, translationLangs.size() > 0);
+      }
     }
   }
 //
@@ -75,7 +89,7 @@ public class PublisherTranslator {
       json.produce(srcFile, baseLang, lang, translations, srcFile+".json");
       
     } else if (LanguageUtils.handlesAsElement(r.getElement())) {
-
+      
       List<TranslationUnit> translations = LanguageUtils.generateTranslations(r.getElement(), lang);
       String srcFile = r.fhirType()+"-"+r.getId();
       

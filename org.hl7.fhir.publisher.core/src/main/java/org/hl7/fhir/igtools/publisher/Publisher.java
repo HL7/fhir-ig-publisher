@@ -6006,43 +6006,50 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private List<TranslationUnit> findTranslations(String fhirType, String id, List<ValidationMessage> messages) throws IOException {
-    for (String dir : translationSources) {
-      String base = Utilities.path(rootDir, dir, fhirType+"-"+id);
-      File f = new File(base+".po");
-      LanguageFileProducer lp = null;
-      if (f.exists()) {
-        lp = new PoGetTextProducer();
-      } else {
-        f = new File(base+".xliff");
-        if (f.exists()) {
-          lp = new XLIFFProducer();
-        } else {
-          f = new File(base+".json");
-          if (f.exists()) {
-            lp = new JsonLangFileProducer();
+    List<TranslationUnit> res = null;
+    
+    String base = fhirType+"-"+id;
+    for (String dir : translationSources) {      
+      File df = new File(Utilities.path(rootDir, dir));
+      if (df.exists()) {
+        for (String fn : df.list()) {
+          if (fn.startsWith(base+".") || fn.startsWith(base+"-") || fn.startsWith(base+"_")) {
+            LanguageFileProducer lp = null;
+            switch (Utilities.getFileExtension(fn)) {
+            case "po":
+              lp = new PoGetTextProducer();
+              break;
+            case "xliff":
+              lp = new XLIFFProducer();
+              break;
+            case "json":
+              lp = new JsonLangFileProducer();
+              break;
+            }
+            if (lp != null) {
+              if (res == null) {
+                res = new ArrayList<>();
+              }
+              File f = new File(Utilities.path(rootDir, dir, fn));
+              usedLangFiles.add(f.getAbsolutePath());
+              if (!Utilities.noString(TextFile.fileToString(f).trim())) {
+                try {
+                  FileInputStream s = new FileInputStream(f);
+                  try {
+                    res.addAll(lp.loadSource(s));
+                  } finally {
+                    s.close();
+                  }
+                } catch (Exception e) {
+                  messages.add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, fhirType, "Error loading "+f.getAbsolutePath()+": "+e.getMessage(), IssueSeverity.ERROR));                    
+                }
+              }
+            }
           }
         }
       }
-      if (!f.exists() || lp == null) {
-        return null;
-      }
-      usedLangFiles.add(f.getAbsolutePath());
-      if (Utilities.noString(TextFile.fileToString(f).trim())) {
-        return new ArrayList<>();
-      }    
-      try {
-        FileInputStream s = new FileInputStream(f);
-        try {
-          return lp.loadSource(s);
-        } finally {
-          s.close();
-        }
-      } catch (Exception e) {
-        messages.add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, fhirType, "Error loading "+f.getAbsolutePath()+": "+e.getMessage(), IssueSeverity.ERROR));
-        return new ArrayList<>();
-      }
     }
-    return null;
+    return res;
   }
 
   public void checkResourceUnique(String tid, String source) throws Error {
