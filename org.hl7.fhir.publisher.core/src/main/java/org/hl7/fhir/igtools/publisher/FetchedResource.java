@@ -57,6 +57,7 @@ public class FetchedResource {
   private List<ValidationMessage> errors = new ArrayList<ValidationMessage>();
   private boolean isProvenance = false;
   private String nameForErrors;
+  private boolean hasTranslations;
 
   public FetchedResource(String nameForErrors) {
     super();
@@ -299,6 +300,14 @@ public class FetchedResource {
 
   public void setLogicalElement(Element logicalElement) {
     this.logicalElement = logicalElement;
+  }
+
+  public boolean isHasTranslations() {
+    return hasTranslations;
+  }
+
+  public void setHasTranslations(boolean hasTranslations) {
+    this.hasTranslations = hasTranslations;
   }
   
 }

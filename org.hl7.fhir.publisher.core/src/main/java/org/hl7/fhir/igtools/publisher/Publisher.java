@@ -331,6 +331,7 @@ import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.ZipGenerator;
 import org.hl7.fhir.utilities.i18n.I18nConstants;
 import org.hl7.fhir.utilities.i18n.JsonLangFileProducer;
+import org.hl7.fhir.utilities.i18n.LanguageFileProducer;
 import org.hl7.fhir.utilities.i18n.LanguageFileProducer.TranslationUnit;
 import org.hl7.fhir.utilities.i18n.PoGetTextProducer;
 import org.hl7.fhir.utilities.i18n.XLIFFProducer;
@@ -935,7 +936,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private boolean hasTranslations;
   private String defaultTranslationLang;
   private List<String> translationLangs = new ArrayList<>();
-  private List<String> translationSupplements = new ArrayList<>();
+  private List<String> translationSources = new ArrayList<>();
+  private List<String> usedLangFiles = new ArrayList<>();
   private List<String> viewDefinitions = new ArrayList<>();
   private int validationLogTime = 0;
   private long maxMemory = 0;
@@ -2418,10 +2420,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       File fsh = new File(Utilities.path(focusDir(), "fsh"));
       if (fsh.exists() && fsh.isDirectory() && !noSushi) {
         new FSHRunner(this).runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())), mode);
+        isSushi = true;
       } else {
         File fsh2 = new File(Utilities.path(focusDir(), "input", "fsh"));
         if (fsh2.exists() && fsh2.isDirectory() && !noSushi) {
           new FSHRunner(this).runFsh(new File(Utilities.getDirectoryForFile(fsh.getAbsolutePath())), mode);
+          isSushi = true;
         }
       }
     }
@@ -2926,7 +2930,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         break;
       case "translation-supplements":
         hasTranslations = true;
-        translationSupplements.add(p.getValue());
+        translationSources.add(p.getValue());
+        break;
+      case "translation-sources":
+        hasTranslations = true;
+        translationSources.add(p.getValue());
         break;
       case "validation-duration-report-cutoff":
         validationLogTime = Utilities.parseInt(p.getValue(), 0) * 1000;
@@ -2952,7 +2960,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         if (!Utilities.isValidOID(oidRoot)) {
           throw new Error("Invalid oid found in assign-missing-oids-root: "+oidRoot);
         }
-        oidIni = new IniFile(Utilities.path(Utilities.getDirectoryForFile(igName), "oids.ini"));
+        oidIni = new IniFile(oidIniLocation());
         if (!oidIni.hasSection("Documentation")) {
           oidIni.setStringProperty("Documentation", "information1", "This file stores the OID assignments for resources defined in this IG.", null);
           oidIni.setStringProperty("Documentation", "information2", "It must be added to git and committed when resources are added or their id is changed", null);
@@ -2965,7 +2973,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         if (!hasOid(sourceIg.getIdentifier())) {
           sourceIg.getIdentifier().add(new Identifier().setSystem("urn:ietf:rfc:3986").setValue("urn:oid:"+oidRoot));
         }
-        default: 
+        break;
+      default: 
         if (!template.isParameter(pc)) {
           unknownParams.add(pc+"="+p.getValue());
         }
@@ -3257,6 +3266,23 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       extensionTracker.setoptIn(!ini.getBooleanProperty("IG", "usage-stats-opt-out"));
 
     log("Initialization complete");
+  }
+
+  private String oidIniLocation() throws IOException {
+    String f = Utilities.path(Utilities.getDirectoryForFile(igName), "oids.ini");
+    if (new File(f).exists()) {
+      if (isSushi) {
+        String nf = Utilities.path(rootDir, "oids.ini");
+        Utilities.copyFile(f, nf);
+        new File(f).delete();
+        return nf;
+      }
+      return f;
+    }
+    if (isSushi) {
+      f = Utilities.path(rootDir, "oids.ini");      
+    }
+    return f;
   }
 
   private IPublisherModule loadModule(String name) throws Exception {
@@ -4581,11 +4607,13 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private boolean loadTranslationSupplements(boolean needToBuild, FetchedFile igf) throws Exception {
-    for (String p : translationSupplements) {
+    for (String p : translationSources) {
       File dir = new File(Utilities.path(rootDir, p));
       Utilities.createDirectory(dir.getAbsolutePath());
       for (File f : dir.listFiles()) {
-        needToBuild = loadTranslationSupplement(f, needToBuild);
+        if (!usedLangFiles.contains(f.getAbsolutePath())) {
+          needToBuild = loadTranslationSupplement(f, needToBuild);
+        }
       }
     }
     return needToBuild;
@@ -4594,7 +4622,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private boolean loadTranslationSupplement(File f, boolean needToBuild) throws Exception {
     String name = f.getName();
     if (!name.contains("-")) {
-      System.out.println("Ignoring file "+f.getAbsolutePath()+" - name is not {type}-{id}.xxx");
+      if (!name.equals(".DS_Store")) {
+        System.out.println("Ignoring file "+f.getAbsolutePath()+" - name is not {type}-{id}.xxx");
+      }
     } else {
       String rtype = name.substring(0, name.indexOf("-"));
       String id = name.substring(name.indexOf("-")+1);
@@ -4776,10 +4806,14 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private List<TranslationUnit> loadTranslations(File f, String ext) throws FileNotFoundException, IOException, ParserConfigurationException, SAXException {
-    switch (ext) {
-    case "po": return new PoGetTextProducer().loadSource(new FileInputStream(f));
-    case "xliff": return new XLIFFProducer().loadSource(new FileInputStream(f));
-    case "json": return new JsonLangFileProducer().loadSource(new FileInputStream(f));
+    try {
+      switch (ext) {
+      case "po": return new PoGetTextProducer().loadSource(new FileInputStream(f));
+      case "xliff": return new XLIFFProducer().loadSource(new FileInputStream(f));
+      case "json": return new JsonLangFileProducer().loadSource(new FileInputStream(f));
+      }
+    } catch (Exception e) {
+      throw new FHIRException("Error parsing "+f.getAbsolutePath()+": "+e.getMessage(), e);
     }
     throw new IOException("Unknown extension "+ext); // though we won't get to here
   }
@@ -5901,7 +5935,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         if (ver == null)
           ver = version; // fall back to global version
 
-        // version check: for some conformance resources, they may be saved in a different vrsion from that stated for the IG. 
+        // version check: for some conformance resources, they may be saved in a different version from that stated for the IG. 
         // so we might need to convert them prior to loading. Note that this is different to the conversion below - we need to 
         // convert to the current version. Here, we need to convert to the stated version. Note that we need to do this after
         // the first load above because above, we didn't have enough data to get the configuration, but we do now. 
@@ -5945,6 +5979,13 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         if (new AdjunctFileLoader(binaryPaths, cql).replaceAttachments1(file, r, metadataResourceNames())) {
           altered = true;
         }
+        List<TranslationUnit> translations = findTranslations(r.fhirType(), r.getId(), r.getErrors());
+        if (translations != null) {
+          r.setHasTranslations(true);
+          if (new LanguageUtils(context).importFromTranslations(e, translations, r.getErrors()) > 0) {
+            altered = true;
+          }
+        }
         if (!binary && ((altered && r.getResource() != null) || (ver.equals(Constants.VERSION) && r.getResource() == null && context.getResourceNamesAsSet().contains(r.fhirType())))) {
           r.setResource(new ObjectConverter(context).convert(r.getElement()));
           if (!r.getResource().hasId() && r.getId() != null) {
@@ -5962,6 +6003,53 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         throw new Exception("Unable to determine type for  "+file.getName()+": " +ex.getMessage(), ex);
       }
     }
+  }
+
+  private List<TranslationUnit> findTranslations(String fhirType, String id, List<ValidationMessage> messages) throws IOException {
+    List<TranslationUnit> res = null;
+    
+    String base = fhirType+"-"+id;
+    for (String dir : translationSources) {      
+      File df = new File(Utilities.path(rootDir, dir));
+      if (df.exists()) {
+        for (String fn : df.list()) {
+          if (fn.startsWith(base+".") || fn.startsWith(base+"-") || fn.startsWith(base+"_")) {
+            LanguageFileProducer lp = null;
+            switch (Utilities.getFileExtension(fn)) {
+            case "po":
+              lp = new PoGetTextProducer();
+              break;
+            case "xliff":
+              lp = new XLIFFProducer();
+              break;
+            case "json":
+              lp = new JsonLangFileProducer();
+              break;
+            }
+            if (lp != null) {
+              if (res == null) {
+                res = new ArrayList<>();
+              }
+              File f = new File(Utilities.path(rootDir, dir, fn));
+              usedLangFiles.add(f.getAbsolutePath());
+              if (!Utilities.noString(TextFile.fileToString(f).trim())) {
+                try {
+                  FileInputStream s = new FileInputStream(f);
+                  try {
+                    res.addAll(lp.loadSource(s));
+                  } finally {
+                    s.close();
+                  }
+                } catch (Exception e) {
+                  messages.add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, fhirType, "Error loading "+f.getAbsolutePath()+": "+e.getMessage(), IssueSeverity.ERROR));                    
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return res;
   }
 
   public void checkResourceUnique(String tid, String source) throws Error {
@@ -6994,26 +7082,29 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
-          List<String> oids = loadOids(((CanonicalResource) r.getResource())); 
-          if (oids.isEmpty()) {
-            if (Utilities.existsInList(r.getResource().fhirType(), "CodeSystem", "ValueSet")) {
-              if (forHL7orFHIR()) {
-                f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "This resource must have an OID assigned to cater for possible e.g. CDA usage"+oidHint, IssueSeverity.ERROR));
+          CanonicalResource cr = (CanonicalResource) r.getResource();
+          if (r.isExample()) {
+            List<String> oids = loadOids(cr); 
+            if (oids.isEmpty()) {
+              if (Utilities.existsInList(r.getResource().fhirType(), "CodeSystem", "ValueSet")) {
+                if (forHL7orFHIR()) {
+                  f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "This resource must have an OID assigned to cater for possible use with OID based terminology systems e.g. CDA usage"+oidHint, IssueSeverity.ERROR));
+                } else {
+                  f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "This resource should have an OID assigned to cater for possible use with OID based terminology systems e.g. CDA usage"+oidHint, IssueSeverity.WARNING));                
+                }
               } else {
-                f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "This resource should have an OID assigned to cater for possible e.g. CDA usage"+oidHint, IssueSeverity.WARNING));                
+                f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "This resource could usefully have an OID assigned"+oidHint, IssueSeverity.INFORMATION));
               }
             } else {
-              f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "This resource could usefully have an OID assigned"+oidHint, IssueSeverity.INFORMATION));
-            }
-          } else {
-            for (String oid : oids) {
-              if (oidMap.containsKey(oid)) {
-                FetchedResource rs = oidMap.get(oid);
-                FetchedFile fs = findFileForResource(rs);
-                f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "The OID '"+oid+"' has already been used by "+rs.getId()+" in "+fs.getName(), IssueSeverity.ERROR));
-                fs.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "The OID '"+oid+"' is also used by "+r.getId()+" in "+f.getName(), IssueSeverity.ERROR));
-              } else {
-                oidMap.put(oid, r);
+              for (String oid : oids) {
+                if (oidMap.containsKey(oid)) {
+                  FetchedResource rs = oidMap.get(oid);
+                  FetchedFile fs = findFileForResource(rs);
+                  f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "The OID '"+oid+"' has already been used by "+rs.getId()+" in "+fs.getName(), IssueSeverity.ERROR));
+                  fs.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "The OID '"+oid+"' is also used by "+r.getId()+" in "+f.getName(), IssueSeverity.ERROR));
+                } else {
+                  oidMap.put(oid, r);
+                }
               }
             }
           }
@@ -10268,6 +10359,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private int sqlIndex = 0;
+
+  private boolean isSushi;
   private String processSQlCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     String output = db == null ? "<span style=\"color: maroon\">No SQL this build</span>" : db.processSQL(src);
     int i = sqlIndex++;
