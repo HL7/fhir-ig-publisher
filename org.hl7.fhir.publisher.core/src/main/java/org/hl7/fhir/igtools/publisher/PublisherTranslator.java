@@ -73,8 +73,15 @@ public class PublisherTranslator {
       po.produce(srcFile, baseLang, lang, translations, srcFile+".po");
       xliff.produce(srcFile, baseLang, lang, translations, srcFile+".xliff");
       json.produce(srcFile, baseLang, lang, translations, srcFile+".json");
-    } else if (LanguageUtils.handlesAsElement(r.getElement())) {
       
+    } else if (LanguageUtils.handlesAsElement(r.getElement())) {
+
+      List<TranslationUnit> translations = LanguageUtils.generateTranslations(r.getElement(), lang);
+      String srcFile = r.fhirType()+"-"+r.getId();
+      
+      po.produce(srcFile, baseLang, lang, translations, srcFile+".po");
+      xliff.produce(srcFile, baseLang, lang, translations, srcFile+".xliff");
+      json.produce(srcFile, baseLang, lang, translations, srcFile+".json");
     }
   }
   
