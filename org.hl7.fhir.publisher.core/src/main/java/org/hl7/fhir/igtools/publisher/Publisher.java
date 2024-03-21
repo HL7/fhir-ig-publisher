@@ -4713,7 +4713,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       CodeSystem cs = (CodeSystem) res;
       for (ConceptDefinitionComponent cd : cs.getConcept()) {
         ConceptDefinitionComponent clone = supplement.addConcept().setCode(cd.getCode()).setDisplay(cd.getDisplay());
-        CodeSystemUtilities.setProperty(supplement, clone, "translation-context", cd.getDefinitionElement());
+        // don't create this - it's just admin overhead
+        // CodeSystemUtilities.setProperty(supplement, clone, "translation-context", cd.getDefinitionElement());
         copyConcepts(clone, cd, supplement);
       }
     } else if (res instanceof StructureDefinition) {
@@ -4776,7 +4777,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private void copyConcepts(ConceptDefinitionComponent tgt, ConceptDefinitionComponent src, CodeSystem supplement) {
     for (ConceptDefinitionComponent cd : src.getConcept()) {
       ConceptDefinitionComponent clone = tgt.addConcept().setCode(cd.getCode()).setDisplay(cd.getDisplay());
-      CodeSystemUtilities.setProperty(supplement, clone, "translation-context", cd.getDefinitionElement());
+      // don't create this - it's just admin overhead
+      // CodeSystemUtilities.setProperty(supplement, clone, "translation-context", cd.getDefinitionElement());
       copyConcepts(clone, cd, supplement);
     }
   }
@@ -4785,7 +4787,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (display != null) {
       ConceptDefinitionComponent cs = supplement.addConcept().setCode(code).setDisplay(display.replace("\r", "\\r").replace("\n", "\\n"));
       if (context != null) {
-        CodeSystemUtilities.setProperty(supplement, cs, "translation-context", context);
+        // don't create this - it's just admin overhead
+        //  CodeSystemUtilities.setProperty(supplement, cs, "translation-context", context);
       }
     }    
   }
@@ -4800,7 +4803,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (display != null) {
       ConceptDefinitionComponent cs = supplement.addConcept().setCode(code).setDisplay(display.replace("\r", "\\r").replace("\n", "\\n"));
       if (context != null) {
-        CodeSystemUtilities.setProperty(supplement, cs, "translation-context", new StringType(context));
+         // don't create this - it's just admin overhead
+        // CodeSystemUtilities.setProperty(supplement, cs, "translation-context", new StringType(context));
       }
     }    
   }
@@ -5145,7 +5149,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     for (FetchedFile ff : resources) {
       ff.start("loadResources");
       try {
-
         if (!ff.matches(igf) && !isBundle(ff)) {
           needToBuild = loadResource(needToBuild, ff);
         }
