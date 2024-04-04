@@ -27,10 +27,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.hl7.fhir.r5.formats.JsonCreator;
-import org.hl7.fhir.r5.utils.TranslatingUtilities;
 import org.hl7.fhir.utilities.Utilities;
 
-public class JsonXhtmlRenderer extends TranslatingUtilities implements JsonCreator {
+public class JsonXhtmlRenderer implements JsonCreator {
 
   StringBuilder b;
   
@@ -155,7 +154,7 @@ public class JsonXhtmlRenderer extends TranslatingUtilities implements JsonCreat
   @Override
   public void value(Boolean value) throws IOException {
     checkInArray();
-    b.append(value ? translate("json", "true") : translate("json", "false"));
+    b.append(value ? /*#!*/"true" : /*#!*/"false");
   }
 
   @Override

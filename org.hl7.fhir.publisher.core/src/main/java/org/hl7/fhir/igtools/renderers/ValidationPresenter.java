@@ -65,8 +65,8 @@ import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.utils.OperationOutcomeUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
-import org.hl7.fhir.r5.utils.TranslatingUtilities;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
+import org.hl7.fhir.utilities.DebugUtilities;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.i18n.I18nConstants;
@@ -79,7 +79,7 @@ import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.stringtemplate.v4.ST;
 
-public class ValidationPresenter extends TranslatingUtilities implements Comparator<FetchedFile> {
+public class ValidationPresenter implements Comparator<FetchedFile> {
 
   private class ProfileSignpostBuilder {
 
@@ -1418,6 +1418,9 @@ public class ValidationPresenter extends TranslatingUtilities implements Compara
     t.add("color", colorForLevel(vm.getLevel(), vm.isSignpost()));
     t.add("halfcolor", halfColorForLevel(vm.getLevel(), vm.isSignpost()));
     t.add("id", "l"+id);
+    if (Utilities.noString(vm.getMessage())) {
+      DebugUtilities.breakpoint();
+    }
     t.add("mid", vm.getMessageId());
     t.add("msg", (isNewRule(vm) ? "<img style=\"vertical-align: text-bottom\" src=\"new.png\" height=\"16px\" width=\"36px\" alt=\"New Rule: \"> " : "")+ vm.getHtml());
     t.add("msgdetails", vm.isSlicingHint() ? vm.getSliceHtml() : vm.getHtml());

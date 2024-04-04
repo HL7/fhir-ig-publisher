@@ -27,25 +27,29 @@ public class WebSourceProvider {
 
     @Override
     public int compare(String o1, String o2) {
-      String f1 = Utilities.getDirectoryForFile(o1);
-      String f2 = Utilities.getDirectoryForFile(o2);
-      if (f1 == null && f2 == null) {
-        return o1.compareToIgnoreCase(o2);
+      try {
+        String f1;
+        f1 = Utilities.getDirectoryForFile(o1);
+        String f2 = Utilities.getDirectoryForFile(o2);
+        if (f1 == null && f2 == null) {
+          return o1.compareToIgnoreCase(o2);
+        }
+        if (f1 == null) {
+          return 1;
+        }
+        if (f2 == null) {
+          return -1;
+        }
+        if (f1.equals(f2)) {
+          return o1.compareToIgnoreCase(o2);
+        }
+        return f2.compareToIgnoreCase(f1); // reversal is deliberate
+      } catch (Exception e2) {
+        return 0;
       }
-      if (f1 == null) {
-        return 1;
-      }
-      if (f2 == null) {
-        return -1;
-      }
-      if (f1.equals(f2)) {
-        return o1.compareToIgnoreCase(o2);
-      }
-      return f2.compareToIgnoreCase(f1); // reversal is deliberate
     }
-
   }
-
+  
   private String destination;
   private String source;
   private boolean web;
@@ -268,7 +272,7 @@ public class WebSourceProvider {
     }
   }
 
-  private int doProgressNote(String file, int count, long start, int size, int length) {
+  private int doProgressNote(String file, int count, long start, int size, int length) throws IOException {
     System.out.print(Utilities.padLeft("", '\b', length));
     String note;
     

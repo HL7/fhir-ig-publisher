@@ -333,7 +333,11 @@ public class IGPublisherFrame extends javax.swing.JFrame {
     chooseIGButton.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
     chooseIGButton.addActionListener(new java.awt.event.ActionListener() {
       public void actionPerformed(java.awt.event.ActionEvent evt) {
-        chooseIGClick(evt);
+        try {
+          chooseIGClick(evt);
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
       }
     });
     return chooseIGButton;
@@ -399,7 +403,7 @@ public class IGPublisherFrame extends javax.swing.JFrame {
   }
 
 
-  private void chooseIGClick(java.awt.event.ActionEvent evt) {
+  private void chooseIGClick(java.awt.event.ActionEvent evt) throws IOException {
     JFileChooser igFileChooser = new JFileChooser();
     igFileChooser.setFileFilter(new FileNameExtensionFilter("IG ini file or IG Directory", "ini"));
     igFileChooser.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
@@ -553,7 +557,7 @@ public class IGPublisherFrame extends javax.swing.JFrame {
     task.execute();
   }
 
-  private String folder() {
+  private String folder() throws IOException {
     return Utilities.getDirectoryForFile((String) igNameComboBox.getSelectedItem());
   }
   

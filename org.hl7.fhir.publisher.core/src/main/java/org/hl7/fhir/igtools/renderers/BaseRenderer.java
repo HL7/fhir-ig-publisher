@@ -18,15 +18,14 @@ import org.hl7.fhir.r5.renderers.IMarkdownProcessor;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
-import org.hl7.fhir.r5.utils.TranslatingUtilities;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 
-public class BaseRenderer extends TranslatingUtilities implements IMarkdownProcessor {
+public class BaseRenderer implements IMarkdownProcessor {
   protected IWorkerContext context;
   protected String corePath;
-  protected String prefix = ""; // path to relative root of IG, if not the same directory (currenly always is)
+  protected String prefix = ""; // path to relative root of IG, if not the same directory (currently always is)
   protected IGKnowledgeProvider igp;
   protected List<SpecMapManager> specmaps;
   protected Set<String> allTargets;
@@ -49,7 +48,7 @@ public class BaseRenderer extends TranslatingUtilities implements IMarkdownProce
 
   @SuppressWarnings("rawtypes")
   public String processMarkdown(String location, PrimitiveType md) throws FHIRException {
-    String text = gt(md);
+    String text = gen.getTranslated(md);
     return processMarkdown(location, text);
   }
   

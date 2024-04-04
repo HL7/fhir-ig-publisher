@@ -26,6 +26,7 @@ import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideGlobalComponent;
 import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
@@ -109,9 +110,10 @@ public class DependencyRenderer {
   private Set<String> globalPackages = new HashSet<>();
   private IWorkerContext context;
   private MarkDownProcessor mdEngine;
+  private RenderingContext rc;
   
   public DependencyRenderer(BasePackageCacheManager pcm, String dstFolder, String npmName, TemplateManager templateManager,
-      List<DependencyAnalyser.ArtifactDependency> dependencies, IWorkerContext context, MarkDownProcessor mdEngine) {
+      List<DependencyAnalyser.ArtifactDependency> dependencies, IWorkerContext context, MarkDownProcessor mdEngine, RenderingContext rc) {
     super();
     this.pcm = pcm;
     this.dstFolder = dstFolder;
@@ -120,6 +122,7 @@ public class DependencyRenderer {
     this.dependencies = dependencies;
     this.context = context;
     this.mdEngine = mdEngine;
+    this.rc = rc;
   }
 
   public String render(ImplementationGuide ig, boolean QA, boolean details, boolean first) throws FHIRException, IOException {
@@ -128,7 +131,7 @@ public class DependencyRenderer {
       hasDesc = hasDesc || d.hasExtension(ToolingExtensions.EXT_IGDEP_COMMENT);
     }
     
-    HierarchicalTableGenerator gen = new HierarchicalTableGenerator(dstFolder, true, true);
+    HierarchicalTableGenerator gen = new HierarchicalTableGenerator(rc, dstFolder, true, true);
     TableModel model = createTable(gen, QA, hasDesc);
     
     String realm = determineRealmForIg(ig.getPackageId());

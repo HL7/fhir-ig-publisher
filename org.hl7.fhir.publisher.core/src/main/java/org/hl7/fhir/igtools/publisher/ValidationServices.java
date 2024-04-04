@@ -34,14 +34,18 @@ import java.util.Locale;
 import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.igtools.publisher.modules.IPublisherModule;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.Manager;
 import org.hl7.fhir.r5.elementmodel.Manager.FhirFormat;
 import org.hl7.fhir.r5.elementmodel.ObjectConverter;
 import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.r5.model.ActorDefinition;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.ElementDefinition;
+import org.hl7.fhir.r5.model.ImplementationGuide;
+import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
 import org.hl7.fhir.r5.model.NamingSystem;
 import org.hl7.fhir.r5.model.NamingSystem.NamingSystemIdentifierType;
 import org.hl7.fhir.r5.model.NamingSystem.NamingSystemUniqueIdComponent;
@@ -52,6 +56,7 @@ import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureMap;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.terminologies.ImplicitValueSets;
+import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.validation.IResourceValidator;
 import org.hl7.fhir.r5.utils.validation.IValidationPolicyAdvisor;
 import org.hl7.fhir.r5.utils.validation.IValidatorResourceFetcher;
@@ -73,22 +78,26 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
 
   private IWorkerContext context;
   private IGKnowledgeProvider ipg;
+  private ImplementationGuide ig;
   private List<FetchedFile> files;
   private List<NpmPackage> packages;
   private List<String> otherUrls = new ArrayList<>();
   private List<String> mappingUrls = new ArrayList<>();
   private boolean bundleReferencesResolve;
   private List<SpecMapManager> specMaps;
+  private IPublisherModule module;
   
   
-  public ValidationServices(IWorkerContext context, IGKnowledgeProvider ipg, List<FetchedFile> files, List<NpmPackage> packages, boolean bundleReferencesResolve, List<SpecMapManager> specMaps) {
+  public ValidationServices(IWorkerContext context, IGKnowledgeProvider ipg, ImplementationGuide ig, List<FetchedFile> files, List<NpmPackage> packages, boolean bundleReferencesResolve, List<SpecMapManager> specMaps, IPublisherModule module) {
     super();
     this.context = context;
     this.ipg = ipg;
+    this.ig = ig;
     this.files = files;
     this.packages = packages;
     this.bundleReferencesResolve = bundleReferencesResolve;
     this.specMaps = specMaps;
+    this.module = module;
     initOtherUrls();
   }
 
@@ -180,8 +189,37 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
         }
       }
     }
+    
+
+    for (FetchedFile f : files) {
+      for (FetchedResource r : f.getResources()) {
+        if ("ActorDefinition".equals(r.fhirType())) {
+          ActorDefinition act = ((ActorDefinition) r.getResource());
+          String aurl = ToolingExtensions.readStringExtension(act, "http://hl7.org/fhir/tools/StructureDefinition/ig-actor-example-url");
+          if (aurl != null && turl.startsWith(aurl)) {
+            String tail = turl.substring(aurl.length()+1);
+            for (ImplementationGuideDefinitionResourceComponent igr : ig.getDefinition().getResource()) {
+              if (tail.equals(igr.getReference().getReference())) {
+                String actor = ToolingExtensions.readStringExtension(igr, "http://hl7.org/fhir/tools/StructureDefinition/ig-example-actor");
+                if (actor.equals(act.getUrl())) {
+                  for (FetchedFile f2 : files) {
+                    for (FetchedResource r2 : f2.getResources()) {
+                      String id = r2.fhirType()+"/"+r2.getId();
+                      if (tail.equals(id)) {
+                        return r2.getElement();
+                      }
+                    }
+                  }
+                }
+              } 
+            }
+          }
+        }
+      }
+    }
     return null;
   }
+
 
   private Class getResourceType(String url) {
     if (url.contains("/ValueSet/"))
@@ -276,6 +314,11 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
         return true;
       }
     }
+
+    if (module.resolve(u)) {
+      return true;
+    }
+    
     if (u.startsWith("http://hl7.org/fhir")) {
       if (org.hl7.fhir.r5.utils.BuildExtensions.allConsts().contains(u)) {
         return true;
@@ -339,7 +382,10 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
 
   @Override
   public CanonicalResource fetchCanonicalResource(IResourceValidator validator, Object appContext, String url) {
-    return null;
+    if (url.equals(ig.getUrl())) {
+      return ig;
+    }
+    return module.fetchCanonicalResource(url);
   }
 
   @Override
