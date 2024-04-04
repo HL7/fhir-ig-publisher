@@ -177,7 +177,11 @@ public class SpecMapManager {
       return null;
     }
     if (paths.has(url)) {
-      return strOpt(paths, url);      
+      String p = strOpt(paths, url);
+      if (!Utilities.isAbsoluteUrl(p) ) {
+        p = Utilities.pathURL(base2 == null ? base : base2, p);
+      }
+      return p;      
     }
     String path = getSpecialPath(url);
     if (path != null) {

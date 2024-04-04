@@ -24,6 +24,7 @@ import org.hl7.fhir.convertors.loaders.loaderR5.R5ToR5Loader;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.modules.xver.SourcedElementDefinition.ElementValidState;
+import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine.MultiConceptMapType;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
@@ -72,7 +73,9 @@ import org.hl7.fhir.r5.model.ValueSet.ConceptReferenceComponent;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionComponent;
 import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
+import org.hl7.fhir.r5.renderers.ConceptMapRenderer.CollateralDefinition;
 import org.hl7.fhir.r5.renderers.ConceptMapRenderer.IMultiMapRendererAdvisor;
+import org.hl7.fhir.r5.renderers.ConceptMapRenderer.RenderMultiRowSortPolicy;
 import org.hl7.fhir.r5.terminologies.ConceptMapUtilities;
 import org.hl7.fhir.r5.terminologies.ConceptMapUtilities.TranslatedCode;
 import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
@@ -109,6 +112,47 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
   }
 
+  public enum MultiConceptMapType {
+    RESOURCE, DATATYPE, SUMMARY, CODED
+
+  }
+
+  public static class MultiRowRenderingContext {
+    private MultiConceptMapType type;
+    private String base;
+    private RenderMultiRowSortPolicy sortPolicy;
+    private List<ElementDefinitionLink> links;
+    
+
+    public MultiRowRenderingContext(MultiConceptMapType type, RenderMultiRowSortPolicy sortPolicy, String base) {
+      super();
+      this.type = type;
+      this.sortPolicy = sortPolicy;
+      this.base = base;
+    }
+
+    public MultiRowRenderingContext(MultiConceptMapType type, RenderMultiRowSortPolicy sortPolicy, List<ElementDefinitionLink> links) {
+      this.type = type;
+      this.sortPolicy = sortPolicy;
+      this.links = links;
+    }
+    public RenderMultiRowSortPolicy getSortPolicy() {
+      return sortPolicy;
+    }
+
+    public MultiConceptMapType getType() {
+      return type;
+    }
+
+    public String getBase() {
+      return base;
+    }
+
+    public List<ElementDefinitionLink> getLinks() {
+      return links;
+    }
+  }
+  
   public class LoadedFile {
 
     private String filename;
@@ -1642,6 +1686,14 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         String id = null;
         try {
           cm = (ConceptMap) new org.hl7.fhir.r5.formats.JsonParser().parse(new FileInputStream(f));
+
+          if (cm.getName().contains("-")) {
+            cm.setName(fixName(cm.getName(), cm.getSourceScope().primitiveValue()));
+            new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(f), cm);                      
+          }
+          if (addRelationships(cm)) {
+            new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(f), cm);                      
+          }
           id = f.getName().replace("ConceptMap-", "").replace(".json", "");
           if (!cm.getId().equals(id)) {
             throw new Error("Error parsing "+f.getAbsolutePath()+": id mismatch - is "+cm.getId()+", should be "+id);
@@ -1668,6 +1720,54 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     }
     logProgress(" "+i+" loaded");
   }
+    
+  private String fixName(String name, String scope) {
+    String path = scope.substring(scope.indexOf("#")+1);
+    StringBuilder b = new StringBuilder();
+    boolean upcase = false;
+    for (char ch : path.toCharArray()) {
+      if (ch == '.') {
+        upcase = true;
+      } else if (upcase) {
+        b.append(Character.toUpperCase(ch));
+        upcase = false;
+      } else {
+        b.append(ch);
+      }
+    }
+    return b.toString()+name.substring(name.lastIndexOf("-")+1);
+  }
+
+  private boolean addRelationships(ConceptMap cm) {
+    boolean changed = false;
+    for (ConceptMapGroupComponent g : cm.getGroup()) {
+      for (SourceElementComponent e : g.getElement()) {
+        for (TargetElementComponent t : e.getTarget()) {
+          if (!t.hasRelationship()) {
+            changed = true;
+            t.setRelationship(ConceptMapRelationship.EQUIVALENT);
+          }
+        }
+      }
+    }
+    return changed;
+  }
+
+  private String cleanName(String name) {
+    StringBuilder b = new StringBuilder();
+    boolean upcase = false;
+    for (char ch : name.toCharArray()) {
+      if (ch == '.') {
+        upcase = true;
+      } else if (upcase) {
+        b.append(Character.toUpperCase(ch));
+        upcase = false;
+      } else {
+        b.append(ch); 
+      }
+    }
+    return b.toString();
+  }
 
   private void loadStructureMaps(String dir) throws FHIRFormatError, FileNotFoundException, IOException {
     loadStructureMaps(vdr5, new File(Utilities.path(dir, "input", "R2toR3")));
@@ -1692,7 +1792,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
           qaMsg("Error parsing "+f.getAbsolutePath()+": "+e.getMessage(), true);
         }
         if (map != null) {
-          map.setWebPath("StructreMap-"+map.getId()+".html");
+          map.setWebPath("StructureMap-"+map.getId()+".html");
           String url = "http://hl7.org/fhir/uv/xver/StructureMap/"+map.getId();
           if (!map.getUrl().equals(url)) {
             qaMsg("Error parsing "+f.getAbsolutePath()+": url mismatch - is "+map.getUrl()+", should be "+url, true);
@@ -1919,7 +2019,11 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
               link.getNext().setStopVer(link.getPrev().getVer());
               CommaSeparatedStringBuilder vers = makeVerListPositive(template.getVer(), link.getPrev().getVer());
               link.getNext().setVerList(vers.toString());
-              link.getNext().addStatusReason("Added "+Utilities.pluralize("code", link.getNewCodes().size())+" '"+toString(link.getNewCodes())+"'");              
+              if (link.getNewCodes().size() > 20) {
+                link.getNext().addStatusReason("Added "+link.getNewCodes().size()+" codes");                              
+              } else {
+                link.getNext().addStatusReason("Added "+Utilities.pluralize("code", link.getNewCodes().size())+" '"+toString(link.getNewCodes())+"'");
+              }
             }
           }
           if (!l.getCodes().isEmpty() && cmF != null && !link.getPrev().isValid()) {
@@ -1932,7 +2036,11 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
               CommaSeparatedStringBuilder vers = makeVerListPositive(link.getNext().getVer(), "5.0.0");
               link.getPrev().setVerList(vers.toString());
               link.getPrev().addToCodes(link.getOldCodes());
-              link.getPrev().addStatusReason("Removed "+Utilities.pluralize("code", link.getOldCodes().size())+" '"+toString(link.getOldCodes())+"'");              
+              if (link.getOldCodes().size() > 20) {
+                link.getPrev().addStatusReason("Removed "+link.getOldCodes().size()+" codes");                
+              } else {
+                link.getPrev().addStatusReason("Removed "+Utilities.pluralize("code", link.getOldCodes().size())+" '"+toString(link.getOldCodes())+"'");
+              }
             }
           }
         }
@@ -2898,7 +3006,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
   @Override
-  public String getLink(String system, String code) {
+  public String getLink(Object rmmContext, String system, String code) {
     if (system == null) {
       return null;
     }
@@ -2979,7 +3087,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
 
   @Override
-  public List<Coding> getMembers(String uri) {
+  public List<Coding> getMembers(Object rmmContext, String uri) {
     String version = VersionUtilities.getNameForVersion(uri);
     IWorkerContext vd = versions.get(version.toLowerCase());
     if (vd != null) {
@@ -3103,7 +3211,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
   @Override
-  public boolean describeMap(ConceptMap map, XhtmlNode x) {
+  public boolean describeMap(Object rmmContext, ConceptMap map, XhtmlNode x) {
     switch (map.getTargetScope().primitiveValue()) {
     case "http://hl7.org/fhir/1.0/ValueSet/data-types":
       x.b().ah("http://hl7.org/fhir/DSTU2/datatypes.html").tx("R2 DataTypes");
@@ -3138,9 +3246,9 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     default:
       return false;
     }
-    x.tx(" (");
-    x.ah(map.getWebPath()).tx("Map");
-    x.tx(")");
+//    x.tx(" (");
+//    x.ah(map.getWebPath()).tx("Map");
+//    x.tx(")");
     return true;
   }
 
@@ -3158,6 +3266,81 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
   public Map<String, String> getTypeMap() {
     return typeMap;
+  }
+
+  @Override
+  public boolean hasCollateral(Object rmmContext) {
+    MultiRowRenderingContext mrr = (MultiRowRenderingContext) rmmContext;
+    return mrr.type == MultiConceptMapType.SUMMARY || mrr.type == MultiConceptMapType.CODED;
+  }
+
+  @Override
+  public List<CollateralDefinition> getCollateral(Object rmmContext, String uri) {
+    MultiRowRenderingContext mrr = (MultiRowRenderingContext) rmmContext;
+    
+    List<CollateralDefinition> res = new ArrayList<>();
+    switch (mrr.type) {
+    case SUMMARY:
+      if (uri == null) {
+        res.add(new CollateralDefinition(cm(mrr.getBase()+"-2to3"), "M:R2->R3"));
+      } else if (uri.equals("http://hl7.org/fhir/uv/xver/ConceptMap/"+mrr.getBase()+"-2to3")) {
+          res.add(new CollateralDefinition(cm(mrr.getBase()+"-3to2"), "M:R2<-R3"));
+          res.add(new CollateralDefinition(cm(mrr.getBase()+"-3to4"), "M:R3->R4"));
+      } else if (uri.equals("http://hl7.org/fhir/uv/xver/ConceptMap/"+mrr.getBase()+"-3to4")) {
+          res.add(new CollateralDefinition(cm(mrr.getBase()+"-4to3"), "M:R3<-R4"));
+          res.add(new CollateralDefinition(cm(mrr.getBase()+"-4to4b"), "M:R4->R4B"));
+      } else if (uri.equals("http://hl7.org/fhir/uv/xver/ConceptMap/"+mrr.getBase()+"-4to4b")) {
+          res.add(new CollateralDefinition(cm(mrr.getBase()+"-4bto4"), "M:R4<-R4"));
+          res.add(new CollateralDefinition(cm(mrr.getBase()+"-4bto5"), "M:R4->R4B"));
+      } else if (uri.equals("http://hl7.org/fhir/uv/xver/ConceptMap/"+mrr.getBase()+"-4bto5")) {
+          res.add(new CollateralDefinition(cm(mrr.getBase()+"-5to4b"), "M:R4B<-R5"));
+      }
+      return res;
+    case CODED:
+      if (uri == null) {
+        ElementDefinitionLink link = mrr.getLinks().get(0);
+        if (link.getNextCM() != null) {
+          res.add(new CollateralDefinition(link.getNextCM(), VersionUtilities.getNameForVersion(link.getPrev().getVer())+"-"+VersionUtilities.getNameForVersion(link.getNext().getVer())));
+        }
+      } else {
+        ElementDefinitionLink link = null;
+        ElementDefinitionLink next = null;
+        for (int i = 0; i < mrr.getLinks().size(); i++) {
+          ElementDefinitionLink t = mrr.getLinks().get(i);
+          if (t.getNextCM() != null && t.getNextCM().getUrl().equals(uri)) {
+            link = t;
+            if (i < mrr.getLinks().size() - 1) {
+              next = mrr.getLinks().get(i+1);
+            }
+          }
+        }
+        if (link != null && link.getPrevCM() != null) {
+            res.add(new CollateralDefinition(link.getPrevCM(), "M:"+VersionUtilities.getNameForVersion(link.getNext().getVer())+"<-"+VersionUtilities.getNameForVersion(link.getPrev().getVer())));
+        }
+        if (next != null && next.getNextCM() != null) {
+            res.add(new CollateralDefinition(next.getNextCM(), "M:"+VersionUtilities.getNameForVersion(next.getPrev().getVer())+"->"+VersionUtilities.getNameForVersion(next.getNext().getVer())));
+        }
+      }
+      return res;
+    default:
+      System.out.println("not done yet");
+    }
+    return null;
+  }
+
+  @Override
+  public RenderMultiRowSortPolicy sortPolicy(Object rmmContext) {
+    MultiRowRenderingContext mrr = (MultiRowRenderingContext) rmmContext;
+    return mrr.getSortPolicy();
+  }
+
+  @Override
+  public boolean makeMapLinks() {
+    return false;
+  }
+
+  public Map<String, StructureMap> getStructureMaps() {
+    return structureMaps;
   }
 
 }

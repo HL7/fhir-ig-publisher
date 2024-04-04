@@ -82,7 +82,7 @@ public class PublisherTranslator {
     if (res != null && LanguageUtils.handlesAsResource(res)) {
 
       List<TranslationUnit> translations = LanguageUtils.generateTranslations(res, lang);
-      String srcFile = res.getUserString("source.filename");
+      String srcFile = res.hasUserData("source.filename") ? res.getUserString("source.filename") : r.fhirType()+"-"+r.getId();
       
       po.produce(srcFile, baseLang, lang, translations, srcFile+".po");
       xliff.produce(srcFile, baseLang, lang, translations, srcFile+".xliff");

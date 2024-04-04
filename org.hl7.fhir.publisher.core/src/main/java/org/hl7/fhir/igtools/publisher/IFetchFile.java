@@ -35,7 +35,7 @@ public interface IFetchFile {
   
   public enum FetchState { NOT_FOUND, DIR, FILE }
   FetchState check(String path);
-  String pathForFile(String path);
+  String pathForFile(String path) throws IOException;
   
   FetchedFile fetch(String path) throws Exception;
   FetchedFile fetchFlexible(String path) throws Exception;

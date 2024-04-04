@@ -33,12 +33,6 @@ public class OperationDefinitionRenderer extends CanonicalRenderer {
   }
 
   @Override
-  public void setTranslator(org.hl7.fhir.utilities.TranslationServices translator) {
-    super.setTranslator(translator);
-    utils.setTranslator(translator);
-  }
-
-  @Override
   protected void genSummaryRowsSpecific(StringBuilder b, Set<String> rows) {
   }
 

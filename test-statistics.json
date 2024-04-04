@@ -1715,5 +1715,125 @@
       "time" : 427114,
       "memory" : 4633938232
     }
+  },
+  "1.6.3" : {
+    "sync-date" : "2024-01-18",
+    "date" : "2024-03-20",
+    "hl7.fhir.template.ig" : {
+      "errors" : 0,
+      "warnings" : 0,
+      "hints" : 0,
+      "time" : 1944,
+      "memory" : 16040160
+    }
+  },
+  "1.6.4" : {
+    "sync-date" : "2024-01-18",
+    "date" : "2024-04-04",
+    "hl7.fhir.template.ig" : {
+      "errors" : 0,
+      "warnings" : 0,
+      "hints" : 0,
+      "time" : 877,
+      "memory" : 21657536
+    },
+    "hl7.cda.uv.core" : {
+      "errors" : 3,
+      "warnings" : 1,
+      "hints" : 2,
+      "time" : 115936,
+      "memory" : 3762487096
+    },
+    "hl7.fhir.us.ecr" : {
+      "errors" : 4594,
+      "warnings" : 78,
+      "hints" : 109,
+      "time" : 730617,
+      "memory" : 8275851536
+    },
+    "hl7.fhir.uv.ipa" : {
+      "errors" : 24,
+      "warnings" : 8,
+      "hints" : 43,
+      "time" : 118063,
+      "memory" : 2566579656
+    },
+    "hl7.fhir.uv.ips" : {
+      "errors" : 144,
+      "warnings" : 34,
+      "hints" : 67,
+      "time" : 354300,
+      "memory" : 2571808376
+    },
+    "ihe.mhd.fhir" : {
+      "errors" : 7,
+      "warnings" : 10,
+      "hints" : 109,
+      "time" : 354058,
+      "memory" : 2773605176
+    },
+    "hl7.fhir.uv.sdc" : {
+      "errors" : 33,
+      "warnings" : 73,
+      "hints" : 464,
+      "time" : 371279,
+      "memory" : 398668912
+    },
+    "hl7.fhir.uv.tools" : {
+      "errors" : 17,
+      "warnings" : 2,
+      "hints" : 175,
+      "time" : 64694,
+      "memory" : 3469634424
+    },
+    "hl7.base.template.ig" : {
+      "errors" : 0,
+      "warnings" : 0,
+      "hints" : 0,
+      "time" : 94,
+      "memory" : 4415200
+    },
+    "hl7.fhir.uv.howto" : {
+      "errors" : 1,
+      "warnings" : 0,
+      "hints" : 1,
+      "time" : 37334,
+      "memory" : 1641302920
+    },
+    "fhir.base.template.ig" : {
+      "errors" : 0,
+      "warnings" : 0,
+      "hints" : 0,
+      "time" : 969,
+      "memory" : 35265432
+    },
+    "hl7.fhir.au.base" : {
+      "errors" : 180,
+      "warnings" : 17,
+      "hints" : 168,
+      "time" : 387356,
+      "memory" : 2227313368
+    },
+    "example.fhir.uv.myig" : {
+      "errors" : 17,
+      "warnings" : 19,
+      "hints" : 3,
+      "time" : 69834,
+      "memory" : 1389336664
+    },
+    "hl7.fhir.us.core" : {
+      "errors" : 13,
+      "warnings" : 121,
+      "hints" : 95,
+      "time" : 734863,
+      "memory" : 10272990992
+    },
+    "hl7.fhir.uv.extensions" : {
+      "errors" : 0,
+      "warnings" : 34,
+      "hints" : 830,
+      "time" : 382710,
+      "memory" : 4342622472
+    }
   }
 }

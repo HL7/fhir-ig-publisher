@@ -169,6 +169,7 @@ import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.RdfParser;
 import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.model.ActivityDefinition;
+import org.hl7.fhir.r5.model.ActorDefinition;
 import org.hl7.fhir.r5.model.Attachment;
 import org.hl7.fhir.r5.model.Base;
 import org.hl7.fhir.r5.model.Binary;
@@ -288,6 +289,7 @@ import org.hl7.fhir.r5.renderers.utils.RenderingContext.ResourceRendererMode;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.StructureDefinitionRendererMode;
 import org.hl7.fhir.r5.renderers.utils.Resolver.IReferenceResolver;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceContext;
+import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceReferenceKind;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceWithReference;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.terminologies.TerminologyUtilities;
@@ -312,7 +314,6 @@ import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.validation.IResourceValidator;
 import org.hl7.fhir.r5.utils.validation.IValidationProfileUsageTracker;
-import org.hl7.fhir.utilities.CSFile;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.DurationUtil;
 import org.hl7.fhir.utilities.FhirPublication;
@@ -326,6 +327,7 @@ import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.TimeTracker;
 import org.hl7.fhir.utilities.TimeTracker.Session;
+import org.hl7.fhir.utilities.filesystem.CSFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.ZipGenerator;
@@ -1162,7 +1164,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       dependentIgFinder.finish(outputDir, sourceIg.present());
       ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), rootDir, npmName, childPublisher == null? null : childPublisher.npmName,
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator, ipsComparator,
-          new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine).render(publishedIg, true, false, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()),
+          new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine, rc).render(publishedIg, true, false, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()),
           new PublicationChecker(repoRoot, historyPage, markdownEngine, findReleaseLabel()).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
           generateDraftDependencies(),
           noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder, context.getTxClientManager());
@@ -1519,12 +1521,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         for (FetchedResource r : f.getResources()) {
           if (r.getElement() != null && r.fhirType().equals(parts[0]) && r.getId().equals(parts[1])) {
             String path = igpkp.getLinkFor(r, true);
-            return new ResourceWithReference(path, new ElementWrappers.ResourceWrapperMetaElement(context, r.getElement()));
+            return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, path, new ElementWrappers.ResourceWrapperMetaElement(context, r.getElement()));
           }
           if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
             if (url.equals(((CanonicalResource) r.getResource()).getUrl())) {
               String path = igpkp.getLinkFor(r, true);
-              return new ResourceWithReference(path, new DirectWrappers.ResourceWrapperDirect(context, r.getResource()));
+              return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, path, new DirectWrappers.ResourceWrapperDirect(context, r.getResource()));
             }
           }
         }
@@ -1537,7 +1539,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               Element res = entry.getNamedChild("resource");
               if (res != null && res.fhirType().equals(parts[0]) && res.hasChild("id") && res.getNamedChildValue("id").equals(parts[1])) {
                 String path = igpkp.getLinkFor(r, true)+"#"+parts[0]+"_"+parts[1];
-                return new ResourceWithReference(path, new ElementWrappers.ResourceWrapperMetaElement(context, r.getElement()));
+                return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, path, new ElementWrappers.ResourceWrapperMetaElement(context, r.getElement()));
               }
             }
           }
@@ -1553,7 +1555,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
             String fu = entry.getNamedChildValue("fullUrl");
             if (res != null && fu != null && fu.equals(url)) {
               String path = igpkp.getLinkFor(r, true)+"#"+fu.replace(":", "-");
-              return new ResourceWithReference(path, new ElementWrappers.ResourceWrapperMetaElement(context, r.getElement()));
+              return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, path, new ElementWrappers.ResourceWrapperMetaElement(context, r.getElement()));
             }
           }
         }
@@ -1569,7 +1571,35 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         path = null;
       }
       if (path != null)
-        return new ResourceWithReference(path, null);
+        return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, path, null);
+    }
+
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if ("ActorDefinition".equals(r.fhirType())) {
+          ActorDefinition act = ((ActorDefinition) r.getResource());
+          String aurl = ToolingExtensions.readStringExtension(act, "http://hl7.org/fhir/tools/StructureDefinition/ig-actor-example-url");
+          if (aurl != null && url.startsWith(aurl)) {
+            String tail = url.substring(aurl.length()+1);
+            for (ImplementationGuideDefinitionResourceComponent igr : sourceIg.getDefinition().getResource()) {
+              if (tail.equals(igr.getReference().getReference())) {
+                String actor = ToolingExtensions.readStringExtension(igr, "http://hl7.org/fhir/tools/StructureDefinition/ig-example-actor");
+                if (actor.equals(act.getUrl())) {
+                  for (FetchedFile f2 : fileList) {
+                    for (FetchedResource r2 : f2.getResources()) {
+                      String id = r2.fhirType()+"/"+r2.getId();
+                      if (tail.equals(id)) {
+                        String path = igpkp.getLinkFor(r2, true);
+                        return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, path, new ElementWrappers.ResourceWrapperMetaElement(context, r2.getElement()));
+                      }
+                    }
+                  }
+                }
+              } 
+            }
+          }
+        }
+      }
     }
     return null;
 
@@ -2055,24 +2085,28 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               }
               r.getElement().removeChild("text");
             } else {
+              List<String> langs = narrativeLangs();
               logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId());
               if (r.getResource() != null && isConvertableResource(r.getResource().fhirType())) {
                 boolean regen = false;
-                RenderingContext lrc = rc.copy().setDefinitionsTarget(igpkp.getDefinitionsName(r));
-                lrc.setRules(GenerationRules.VALID_RESOURCE);
-                lrc.setDefinitionsTarget(igpkp.getDefinitionsName(r));
-                if (r.getResource() instanceof DomainResource && !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv())) {
-                  regen = true;
-                  RendererFactory.factory(r.getResource(), lrc).render((DomainResource) r.getResource());
-                } else if (r.getResource() instanceof Bundle) {
-                  regen = true;
-                  new BundleRenderer(lrc).render((Bundle) r.getResource());
-                } else if (r.getResource() instanceof Parameters) {
-                  regen = true;
-                  Parameters p = (Parameters) r.getResource();
-                  new ParametersRenderer(lrc, new ResourceContext(null, p)).render(p);
-                } else if (r.getResource() instanceof DomainResource) {
-                  checkExistingNarrative(f, r, ((DomainResource) r.getResource()).getText().getDiv());
+                for (String lang : langs) {
+                  RenderingContext lrc = rc.copy().setDefinitionsTarget(igpkp.getDefinitionsName(r));
+                  lrc.setLang(lang);
+                  lrc.setRules(GenerationRules.VALID_RESOURCE);
+                  lrc.setDefinitionsTarget(igpkp.getDefinitionsName(r));
+                  if (r.getResource() instanceof DomainResource && (langs.size() > 1 || !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv()))) {
+                    regen = true;
+                    RendererFactory.factory(r.getResource(), lrc).setMultiLangMode(langs.size() > 1).render((DomainResource) r.getResource());
+                  } else if (r.getResource() instanceof Bundle) {
+                    regen = true;
+                    new BundleRenderer(lrc).setMultiLangMode(langs.size() > 1).render((Bundle) r.getResource());
+                  } else if (r.getResource() instanceof Parameters) {
+                    regen = true;
+                    Parameters p = (Parameters) r.getResource();
+                    new ParametersRenderer(lrc, new ResourceContext(null, p)).setMultiLangMode(langs.size() > 1).render(p);
+                  } else if (r.getResource() instanceof DomainResource) {
+                    checkExistingNarrative(f, r, ((DomainResource) r.getResource()).getText().getDiv());
+                  }
                 }
                 if (regen) {
                   Element e = convertToElement(r, r.getResource());
@@ -2080,27 +2114,30 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
                   r.setElement(e);
                 }
               } else {
-                RenderingContext lrc = rc.copy().setParser(getTypeLoader(f,r));
-                lrc.setRules(GenerationRules.VALID_RESOURCE);
-                if (isDomainResource(r) && !hasNarrative(r.getElement())) {
-                  ResourceWrapper rw = new ElementWrappers.ResourceWrapperMetaElement(lrc, r.getElement());
-                  RendererFactory.factory(rw, lrc).setRcontext(new ResourceContext(null, rw)).render(rw);
-                  otherFilesRun.addAll(lrc.getFiles());
-                } else if (r.fhirType().equals("Bundle")) {
-                  lrc.setAddName(true);
-                  for (Element e : r.getElement().getChildrenByName("entry")) {
-                    Element res = e.getNamedChild("resource");
-                    if (res!=null && "http://hl7.org/fhir/StructureDefinition/DomainResource".equals(res.getProperty().getStructure().getBaseDefinition())) {
-                      ResourceWrapper rw = new ElementWrappers.ResourceWrapperMetaElement(lrc, res);
-                      if (hasNarrative(res)) {
-                        RendererFactory.factory(rw, lrc, new ResourceContext(null, r.getElement())).checkNarrative(rw);                        
-                      } else {
-                        RendererFactory.factory(rw, lrc, new ResourceContext(null, r.getElement())).render(rw);
+                for (String lang : langs) {
+                  RenderingContext lrc = rc.copy().setParser(getTypeLoader(f,r));
+                  lrc.setLang(lang);
+                  lrc.setRules(GenerationRules.VALID_RESOURCE);
+                  if (isDomainResource(r) && (langs.size() > 1|| !hasNarrative(r.getElement()))) {
+                    ResourceWrapper rw = new ElementWrappers.ResourceWrapperMetaElement(lrc, r.getElement());
+                    RendererFactory.factory(rw, lrc).setRcontext(new ResourceContext(null, rw)).setMultiLangMode(langs.size() > 1).render(rw);
+                    otherFilesRun.addAll(lrc.getFiles());
+                  } else if (r.fhirType().equals("Bundle")) {
+                    lrc.setAddName(true);
+                    for (Element e : r.getElement().getChildrenByName("entry")) {
+                      Element res = e.getNamedChild("resource");
+                      if (res!=null && "http://hl7.org/fhir/StructureDefinition/DomainResource".equals(res.getProperty().getStructure().getBaseDefinition())) {
+                        ResourceWrapper rw = new ElementWrappers.ResourceWrapperMetaElement(lrc, res);
+                        if (hasNarrative(res)) {
+                          RendererFactory.factory(rw, lrc, new ResourceContext(null, r.getElement())).checkNarrative(rw);                        
+                        } else {
+                          RendererFactory.factory(rw, lrc, new ResourceContext(null, r.getElement())).setMultiLangMode(langs.size() > 1).render(rw);
+                        }
                       }
                     }
+                  } else if (isDomainResource(r) && hasNarrative(r.getElement())) {
+                    checkExistingNarrative(f, r, r.getElement().getNamedChild("text").getNamedChild("div").getXhtml());
                   }
-                } else if (isDomainResource(r) && hasNarrative(r.getElement())) {
-                  checkExistingNarrative(f, r, r.getElement().getNamedChild("text").getNamedChild("div").getXhtml());
                 }
               }
             }
@@ -2113,6 +2150,20 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       }
     }
     tts.end();
+  }
+
+  private List<String> narrativeLangs() {
+    List<String> res = new ArrayList<>();
+    res.add(defaultTranslationLang);
+    for (String s : translationLangs) {
+      if (!res.contains(s)) {
+        res.add(s);
+      }
+    }
+    if (res.isEmpty()) {
+      res.add(null);
+    }
+    return res;
   }
 
   private boolean isDomainResource(FetchedResource r) {
@@ -3150,7 +3201,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       }
     }
     
-    inspector = new HTMLInspector(outputDir, specMaps, linkSpecMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), trackedFragments, fileList);
+    inspector = new HTMLInspector(outputDir, specMaps, linkSpecMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), trackedFragments, fileList, module);
     inspector.getManual().add("full-ig.zip");
     if (historyPage != null) {
       inspector.getManual().add(historyPage);
@@ -3215,7 +3266,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     validator.setShowMessagesFromReferences(showReferenceMessages);
     validator.getExtensionDomains().addAll(extensionDomains);
     validator.getExtensionDomains().add(ToolingExtensions.EXT_PRIVATE_BASE);
-    validationFetcher = new ValidationServices(context, igpkp, fileList, npmList, bundleReferencesResolve, specMaps);
+    validationFetcher = new ValidationServices(context, igpkp, sourceIg, fileList, npmList, bundleReferencesResolve, specMaps, module);
     validator.setFetcher(validationFetcher);
     validator.setPolicyAdvisor(validationFetcher);
     validator.setTracker(this);
@@ -3812,7 +3863,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private void loadLinkIg(String packageId) throws Exception {
     if (!Utilities.noString(packageId)) {
       String[] p = packageId.split("\\#");
-      NpmPackage pi = p.length == 1 ? pcm.loadPackageFromCacheOnly(p[0]) : pcm.loadPackageFromCacheOnly(p[0], p[1]);
+      NpmPackage pi = p.length == 1 ? pcm.loadPackage(p[0]) : pcm.loadPackage(p[0], p[1]);
       if (pi == null) {
         throw new Exception("Package Id "+packageId+" is unknown");
       }
@@ -4713,7 +4764,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       CodeSystem cs = (CodeSystem) res;
       for (ConceptDefinitionComponent cd : cs.getConcept()) {
         ConceptDefinitionComponent clone = supplement.addConcept().setCode(cd.getCode()).setDisplay(cd.getDisplay());
-        CodeSystemUtilities.setProperty(supplement, clone, "translation-context", cd.getDefinitionElement());
+        // don't create this - it's just admin overhead
+        // CodeSystemUtilities.setProperty(supplement, clone, "translation-context", cd.getDefinitionElement());
         copyConcepts(clone, cd, supplement);
       }
     } else if (res instanceof StructureDefinition) {
@@ -4776,7 +4828,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private void copyConcepts(ConceptDefinitionComponent tgt, ConceptDefinitionComponent src, CodeSystem supplement) {
     for (ConceptDefinitionComponent cd : src.getConcept()) {
       ConceptDefinitionComponent clone = tgt.addConcept().setCode(cd.getCode()).setDisplay(cd.getDisplay());
-      CodeSystemUtilities.setProperty(supplement, clone, "translation-context", cd.getDefinitionElement());
+      // don't create this - it's just admin overhead
+      // CodeSystemUtilities.setProperty(supplement, clone, "translation-context", cd.getDefinitionElement());
       copyConcepts(clone, cd, supplement);
     }
   }
@@ -4785,7 +4838,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (display != null) {
       ConceptDefinitionComponent cs = supplement.addConcept().setCode(code).setDisplay(display.replace("\r", "\\r").replace("\n", "\\n"));
       if (context != null) {
-        CodeSystemUtilities.setProperty(supplement, cs, "translation-context", context);
+        // don't create this - it's just admin overhead
+        //  CodeSystemUtilities.setProperty(supplement, cs, "translation-context", context);
       }
     }    
   }
@@ -4800,7 +4854,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (display != null) {
       ConceptDefinitionComponent cs = supplement.addConcept().setCode(code).setDisplay(display.replace("\r", "\\r").replace("\n", "\\n"));
       if (context != null) {
-        CodeSystemUtilities.setProperty(supplement, cs, "translation-context", new StringType(context));
+         // don't create this - it's just admin overhead
+        // CodeSystemUtilities.setProperty(supplement, cs, "translation-context", new StringType(context));
       }
     }    
   }
@@ -5145,7 +5200,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     for (FetchedFile ff : resources) {
       ff.start("loadResources");
       try {
-
         if (!ff.matches(igf) && !isBundle(ff)) {
           needToBuild = loadResource(needToBuild, ff);
         }
@@ -6290,20 +6344,22 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
                 bc.setVersion(defaultBusinessVersion);
               }
               
-              if (wgm != null) {
-                if (!bc.hasExtension(ToolingExtensions.EXT_WORKGROUP)) {
+              if (!r.isExample()) {
+                if (wgm != null) {
+                  if (!bc.hasExtension(ToolingExtensions.EXT_WORKGROUP)) {
+                    altered = true;
+                    b.append("wg="+wgm);
+                    bc.addExtension(ToolingExtensions.EXT_WORKGROUP, new CodeType(wgm));
+                  } else if (!wgm.equals(ToolingExtensions.readStringExtension(bc, ToolingExtensions.EXT_WORKGROUP))) {
+                    altered = true;
+                    b.append("wg="+wgm);
+                    bc.getExtensionByUrl(ToolingExtensions.EXT_WORKGROUP).setValue(new CodeType(wgm));
+                  }
+                } else if (defaultWgm != null && !bc.hasExtension(ToolingExtensions.EXT_WORKGROUP)) {
                   altered = true;
-                  b.append("wg="+wgm);
-                  bc.addExtension(ToolingExtensions.EXT_WORKGROUP, new CodeType(wgm));
-                } else if (!wgm.equals(ToolingExtensions.readStringExtension(bc, ToolingExtensions.EXT_WORKGROUP))) {
-                  altered = true;
-                  b.append("wg="+wgm);
-                  bc.getExtensionByUrl(ToolingExtensions.EXT_WORKGROUP).setValue(new CodeType(wgm));
+                  b.append("wg="+defaultWgm);
+                  bc.addExtension(ToolingExtensions.EXT_WORKGROUP, new CodeType(defaultWgm));
                 }
-              } else if (defaultWgm != null && !bc.hasExtension(ToolingExtensions.EXT_WORKGROUP)) {
-                altered = true;
-                b.append("wg="+defaultWgm);
-                bc.addExtension(ToolingExtensions.EXT_WORKGROUP, new CodeType(defaultWgm));
               }
 
               if (contacts != null && !contacts.isEmpty()) {
@@ -8445,7 +8501,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       fragment("cross-version-analysis", r4tor4b.generate(npmName, false), otherFilesRun);      
       fragment("cross-version-analysis-inline", r4tor4b.generate(npmName, true), otherFilesRun);      
     }
-    DependencyRenderer depr = new DependencyRenderer(pcm, tempDir, npmName, templateManager, makeDependencies(), context, markdownEngine);
+    DependencyRenderer depr = new DependencyRenderer(pcm, tempDir, npmName, templateManager, makeDependencies(), context, markdownEngine, rc);
     trackedFragment("3", "dependency-table", depr.render(publishedIg, false, true, true), otherFilesRun);
     trackedFragment("3", "dependency-table-short", depr.render(publishedIg, false, false, false), otherFilesRun);
     trackedFragment("4", "globals-table", depr.renderGlobals(), otherFilesRun);
@@ -11857,7 +11913,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   /**
-   * None of the fragments presently generated inclde {{ }} liquid tags. So any 
+   * None of the fragments presently generated include {{ }} liquid tags. So any 
    * liquid tags found in the fragments are actually what should be displayed post-jekyll.
    * So we're going to globally escape them here. If any fragments want to include actual
    * Jekyll tags, we'll have to do something much harder.

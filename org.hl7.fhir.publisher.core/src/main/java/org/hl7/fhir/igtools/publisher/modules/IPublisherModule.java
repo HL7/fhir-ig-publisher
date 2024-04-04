@@ -2,6 +2,8 @@ package org.hl7.fhir.igtools.publisher.modules;
 
 import java.util.Map;
 
+import org.hl7.fhir.r5.model.CanonicalResource;
+
 // modules are triggered from ig.ini 
 public interface IPublisherModule {
 
@@ -20,6 +22,10 @@ public interface IPublisherModule {
   // all the actions will be taken on the files in the path (which is the root of the IG that contains ig.ini)
   public boolean preProcess(String path);
 
-  // if the module lnows of type aliases, define them for the rendering system
+  // if the module knows of type aliases, define them for the rendering system
   public void defineTypeMap(Map<String, String> typeMap);
+
+  boolean resolve(String ref);
+
+  CanonicalResource fetchCanonicalResource(String url);
 }

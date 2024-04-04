@@ -1,6 +1,7 @@
 package org.hl7.fhir.igtools.publisher.modules;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -21,32 +22,48 @@ import org.hl7.fhir.igtools.publisher.modules.xver.SourcedElementDefinition;
 import org.hl7.fhir.igtools.publisher.modules.xver.StructureDefinitionColumn;
 import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine;
 import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine.MakeLinkMode;
+import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine.MultiConceptMapType;
+import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine.MultiRowRenderingContext;
 import org.hl7.fhir.r5.conformance.profile.BindingResolution;
 import org.hl7.fhir.r5.conformance.profile.ProfileKnowledgeProvider;
 import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.JsonParser;
+import org.hl7.fhir.r5.formats.XmlParser;
+import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.ConceptMap;
 import org.hl7.fhir.r5.model.ElementDefinition;
+import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
+import org.hl7.fhir.r5.model.Enumerations.FHIRVersion;
 import org.hl7.fhir.r5.model.Extension;
+import org.hl7.fhir.r5.model.ImplementationGuide;
+import org.hl7.fhir.r5.model.ImplementationGuide.GuidePageGeneration;
+import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionPageComponent;
 import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.r5.model.UrlType;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
+import org.hl7.fhir.r5.model.StructureMap;
+import org.hl7.fhir.r5.model.StructureMap.StructureMapModelMode;
+import org.hl7.fhir.r5.model.StructureMap.StructureMapStructureComponent;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.renderers.ConceptMapRenderer;
 import org.hl7.fhir.r5.renderers.ConceptMapRenderer.RenderMultiRowSortPolicy;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.GenerationRules;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.ResourceRendererMode;
+import org.hl7.fhir.r5.utils.CanonicalResourceUtilities;
+import org.hl7.fhir.r5.utils.ResourceSorters;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
+import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
@@ -86,9 +103,13 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     try {
       cleanup(path);
       if (engine.process(path)) {
-        cu = new ContextUtilities(engine.getVdr5());
-
+        ImplementationGuide ig = (ImplementationGuide) new XmlParser().parse(new FileInputStream(Utilities.path(path, "input", "xver-ig.xml")));
+        ImplementationGuideDefinitionPageComponent resPage = ig.getPageByName("cross-version-resources.html");
+        ImplementationGuideDefinitionPageComponent dtPage = ig.getPageByName("cross-version-types.html");
+        resPage.getPage().clear();
+        dtPage.getPage().clear();
         
+        cu = new ContextUtilities(engine.getVdr5());
         engine.logProgress("Generating fragments");
         genChainsHtml(path, "cross-version-chains-all", false, false);
         genChainsHtml(path, "cross-version-chains-valid", true, false);
@@ -96,24 +117,26 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
 
         for (StructureDefinition sd : engine.sortedSDs(engine.getVdr5().fetchResourcesByType(StructureDefinition.class))) {
           if ((sd.getKind() == StructureDefinitionKind.COMPLEXTYPE || sd.getKind() == StructureDefinitionKind.RESOURCE) && !sd.getAbstract() && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
-            genVersionType(path, sd);
+            genVersionType(path, sd, sd.getKind() == StructureDefinitionKind.COMPLEXTYPE ? dtPage : resPage);
           }
         }
 
         engine.logProgress("Generating extensions");
-        Utilities.createDirectory(Utilities.path(path, "temp", "xver", "extensions"));
+        Utilities.createDirectory(Utilities.path(path, "temp", "xver", "x-extensions"));
         for (StructureDefinition sd : engine.getExtensions()) {
-          new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "temp", "xver", "extensions", "StructureDefinition-"+sd.getId()+".json")), sd);
+          new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "temp", "xver", "x-extensions", "StructureDefinition-"+sd.getId()+".json")), sd);
           genExtensionPage(path, sd);
         }  
         for (ValueSet vs : engine.getNewValueSets().values()) {
-          new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "temp", "xver", "extensions", "ValueSet-"+vs.getId()+".json")), vs);
+          new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "temp", "xver", "x-extensions", "ValueSet-"+vs.getId()+".json")), vs);
         }
         for (CodeSystem cs : engine.getNewCodeSystems().values()) {
-          new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "temp", "xver", "extensions", "CodeSystem-"+cs.getId()+".json")), cs);
+          new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "temp", "xver", "x-extensions", "CodeSystem-"+cs.getId()+".json")), cs);
         }
         genSummaryPages(path);
-        genZips(path);
+        genZips(path); 
+        new XmlParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "input", "xver-ig.xml")), ig);
+
         return true;
       } else {
         return false;
@@ -308,7 +331,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
   }
 
   
-  private void genVersionType(String path, StructureDefinition sd) throws IOException {
+  private void genVersionType(String path, StructureDefinition sd, ImplementationGuideDefinitionPageComponent page) throws IOException {
     XhtmlNode body = new XhtmlNode(NodeType.Element, "div");  
     body.h1().tx(sd.getName());
     body.para().tx("FHIR Cross-version Mappings for "+sd.getType()+" based on the R5 structure");
@@ -326,6 +349,21 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     for (StructureDefinitionColumn col : columns) {
       tr.th().colspan(col.isRoot() ? 1 : 2).tx(col.getSd().getName()+" ("+col.getSd().getFhirVersion().toCode()+")");
     }
+
+    tr = tbl.tr();
+    for (StructureDefinitionColumn col : columns) {
+      XhtmlNode td = tr.td().colspan(col.isRoot() ? 1 : 2);
+      List<StructureMap> inList = findStructureMaps(col.getSd().getType(), col.getSd().getFhirVersion().toCode(), true);
+      List<StructureMap> outList = findStructureMaps(col.getSd().getType(), col.getSd().getFhirVersion().toCode(), false);
+      if (inList.size() > 0 || outList.size() > 0) {
+        td.tx("Links:");
+        for (StructureMap sm : inList) {
+          td.tx(" ");
+          td.ah(sm.getWebPath()).tx(versionSummary(sm));
+        }
+      }
+    }
+
     List<List<ElementDefinitionLink>> codeChains = new ArrayList<>();
 
     for (ElementDefinition ed : sd.getDifferential().getElement()) {
@@ -406,13 +444,52 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
         }
       }
       body.hr();
-      body.add(ConceptMapRenderer.renderMultipleMaps(name, null, maps, engine, RenderMultiRowSortPolicy.UNSORTED));
+      body.add(ConceptMapRenderer.renderMultipleMaps(name, maps, engine, new MultiRowRenderingContext(MultiConceptMapType.CODED, RenderMultiRowSortPolicy.UNSORTED, links)));
     }
 
     TextFile.stringToFile(new XhtmlComposer(false, false).compose(body), Utilities.path(path, "input", "includes", "cross-version-"+sd.getName()+".xhtml"));
+    TextFile.stringToFile("{% include cross-version-"+sd.getName()+".xhtml %}\r\n", Utilities.path(path, "input", "pagecontent", "cross-version-"+sd.getName()+".md"));
+    ImplementationGuideDefinitionPageComponent p = page.addPage();
+    p.setSource(new UrlType("cross-version-"+sd.getName()+".md"));
+    p.setName("cross-version-"+sd.getName()+".html");
+    p.setTitle("Cross-Version summary for "+sd.getName());
+    p.setGeneration(GuidePageGeneration.MARKDOWN);
+    ToolingExtensions.setStandardsStatus(p, StandardsStatus.INFORMATIVE, null);
     TextFile.stringToFile(new XhtmlComposer(false, false).compose(wrapPage(body, sd.getName())), Utilities.path(path, "temp", "xver-qa", "cross-version-"+sd.getName()+".html"));
   }
 
+
+  private String versionSummary(StructureMap sm) {
+    String src = null;
+    String tgt = null;
+    for (StructureMapStructureComponent u : sm.getStructure()) {
+      String v = VersionUtilities.getNameForVersion(VersionUtilities.getMajMin(u.getUrl()));
+      if (u.getMode() == StructureMapModelMode.SOURCE) {
+        src = v;
+      } else if (u.getMode() == StructureMapModelMode.TARGET) {
+        tgt = v;
+      }
+    }
+    return "T:"+src+"->"+tgt;
+  }
+
+  private List<StructureMap> findStructureMaps(String type, String fhirVersion, boolean inwards) {
+    List<StructureMap> res = new ArrayList<>();
+    String v = VersionUtilities.getMajMin(fhirVersion);
+    String url = "http://hl7.org/fhir/"+v+"/"+type;
+    for (StructureMap sm : engine.getStructureMaps().values()) {
+      for (StructureMapStructureComponent u : sm.getStructure()) {
+        if (u.getUrl().equals(url)) {
+          if ((inwards && u.getMode() == StructureMapModelMode.SOURCE) ||
+              (!inwards && u.getMode() == StructureMapModelMode.TARGET)) {
+            res.add(sm);
+          }
+        }
+      }
+    }
+    Collections.sort(res, new ResourceSorters.CanonicalResourceSortByUrl());
+    return res;
+  }
 
   public Set<StructureDefinition> findLinkedStructures(StructureDefinition sd) {
     Set<StructureDefinition> res = new HashSet<>();
@@ -425,12 +502,10 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
 
 
   private void findLinkedStructures(Set<StructureDefinition> res, SourcedElementDefinition sed) {
-
     List<ElementDefinitionLink> links = engine.makeEDLinks(sed, MakeLinkMode.CHAIN);
     for (ElementDefinitionLink link : links) {
       res.add(link.getPrev().getSd());
     }
-
   }
 
 
@@ -541,7 +616,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     maps.add(engine.cm("resources-3to4"));
     maps.add(engine.cm("resources-4to4b"));
     maps.add(engine.cm("resources-4bto5"));
-    XhtmlNode page = ConceptMapRenderer.renderMultipleMaps("R2 Resources", "http://hl7.org/fhir/R2/resourcelist.html", maps, engine, RenderMultiRowSortPolicy.FIRST_COL);
+    XhtmlNode page = ConceptMapRenderer.renderMultipleMaps("R2 Resources", maps, engine, new MultiRowRenderingContext(MultiConceptMapType.SUMMARY, RenderMultiRowSortPolicy.FIRST_COL, "resources"));
 
     TextFile.stringToFile(new XhtmlComposer(false, false).compose(page), Utilities.path(path, "input", "includes", "cross-version-resources.xhtml"));
     TextFile.stringToFile(new XhtmlComposer(false, false).compose(wrapPage(page, "Resource Map")), Utilities.path(path, "temp", "xver-qa", "cross-version-resources.html"));
@@ -551,7 +626,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     maps.add(engine.cm("types-3to4"));
     maps.add(engine.cm("types-4to4b"));
     maps.add(engine.cm("types-4bto5"));
-    page = ConceptMapRenderer.renderMultipleMaps("R2 DataTypes", "http://hl7.org/fhir/R2/datatypes.html", maps, engine, RenderMultiRowSortPolicy.FIRST_COL);
+    page = ConceptMapRenderer.renderMultipleMaps("R2 DataTypes", maps, engine, new MultiRowRenderingContext(MultiConceptMapType.SUMMARY, RenderMultiRowSortPolicy.FIRST_COL, "types"));
 
     TextFile.stringToFile(new XhtmlComposer(false, false).compose(page), Utilities.path(path, "input", "includes", "cross-version-types.xhtml"));
     TextFile.stringToFile(new XhtmlComposer(false, false).compose(wrapPage(page, "Type Map")), Utilities.path(path, "temp", "xver-qa", "cross-version-types.html"));
@@ -619,7 +694,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
   private String linkforType(String type) {
     if (Utilities.existsInList(type, "instant", "time", "date", "dateTime", "decimal", "boolean", "integer", "string", "uri", "base64Binary", "code", "id", "oid", 
         "unsignedInt", "positiveInt", "markdown", "url", "canonical", "uuid", "integer64")) {
-      return "cross-version-primitives.html";
+      return "cross-version-types.html";
     } else {
       return "cross-version-"+type+".html";
     }
@@ -722,5 +797,105 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
   public void defineTypeMap(Map<String, String> typeMap) {
     typeMap.putAll(engine.getTypeMap());
     
+  }
+
+  @Override
+  public boolean resolve(String ref) {
+    if (ref.contains("#")) {
+      ref = ref.substring(0, ref.indexOf("#"));
+    }
+    if (ref.startsWith("StructureDefinition-xv-")) {
+      return true;
+    }
+    if (Utilities.existsInList(ref,
+        "http://hl7.org/fhir/1.0/elements", "http://hl7.org/fhir/3.0/elements", "http://hl7.org/fhir/4.0/elements", "http://hl7.org/fhir/4.3/elements", "http://hl7.org/fhir/5.0/elements",
+        "http://hl7.org/fhir/1.0/element-names", "http://hl7.org/fhir/3.0/element-names", "http://hl7.org/fhir/4.0/element-names", "http://hl7.org/fhir/4.3/element-names", "http://hl7.org/fhir/5.0/element-names",
+        "http://hl7.org/fhir/1.0/SearchParameter", "http://hl7.org/fhir/3.0/SearchParameter", "http://hl7.org/fhir/4.0/SearchParameter", "http://hl7.org/fhir/4.3/SearchParameter", "http://hl7.org/fhir/5.0/SearchParameter",
+        "http://hl7.org/fhir/1.0/SearchParameter-codes", "http://hl7.org/fhir/3.0/SearchParameter-codes", "http://hl7.org/fhir/4.0/SearchParameter-codes", "http://hl7.org/fhir/4.3/SearchParameter-codes", "http://hl7.org/fhir/5.0/SearchParameter-codes",
+        "http://hl7.org/fhir/5.0/resource-types")) {
+      return true;
+    }
+    if (ref.startsWith("http://hl7.org/fhir/1.0/")) {
+      String tail = ref.replace("http://hl7.org/fhir/1.0/", "");
+      if (engine.getVdr2().getResourceNamesAsSet().contains(tail) || engine.getVdr2().fetchTypeDefinition(tail) != null) {
+        return true;
+      }
+      return engine.getVdr2().fetchResource(Resource.class, ref.replace("/1.0/", "/")) != null;
+    }
+    if (ref.startsWith("http://hl7.org/fhir/3.0/")) {
+      String tail = ref.replace("http://hl7.org/fhir/3.0/", "");
+      if (engine.getVdr3().getResourceNamesAsSet().contains(tail) || engine.getVdr3().fetchTypeDefinition(tail) != null) {
+        return true;
+      }
+      return engine.getVdr3().fetchResource(Resource.class, ref.replace("/3.0/", "/")) != null;
+    }
+    if (ref.startsWith("http://hl7.org/fhir/4.0/")) {
+      String tail = ref.replace("http://hl7.org/fhir/4.0/", "");
+      if (engine.getVdr4().getResourceNamesAsSet().contains(tail) || engine.getVdr4().fetchTypeDefinition(tail) != null) {
+        return true;
+      }
+      return engine.getVdr4().fetchResource(Resource.class, ref.replace("/4.0/", "/")) != null;
+    }
+    if (ref.startsWith("http://hl7.org/fhir/4.3/")) {
+      String tail = ref.replace("http://hl7.org/fhir/4.3/", "");
+      if (engine.getVdr4b().getResourceNamesAsSet().contains(tail) || engine.getVdr4b().fetchTypeDefinition(tail) != null) {
+        return true;
+      }
+      return engine.getVdr4b().fetchResource(Resource.class, ref.replace("/4.3/", "/")) != null;
+    }
+    if (ref.startsWith("http://hl7.org/fhir/5.0/")) {
+      String tail = ref.replace("http://hl7.org/fhir/5.0/", "");
+      if (engine.getVdr5().getResourceNamesAsSet().contains(tail) || engine.getVdr5().fetchTypeDefinition(tail) != null) {
+        return true;
+      }
+      return engine.getVdr5().fetchResource(Resource.class, ref.replace("/5.0/", "/")) != null;
+    }
+    return false;
+  }
+
+  @Override
+  public CanonicalResource fetchCanonicalResource(String ref) {
+
+    if (ref.startsWith("http://hl7.org/fhir/1.0/")) {
+      String tail = ref.replace("http://hl7.org/fhir/1.0/", "");
+      StructureDefinition sd = engine.getVdr2().fetchTypeDefinition(tail);
+      if (sd != null) {
+        return sd;
+      }
+      return (CanonicalResource) engine.getVdr2().fetchResource(Resource.class, ref.replace("/1.0/", "/"));
+    }
+    if (ref.startsWith("http://hl7.org/fhir/3.0/")) {
+      String tail = ref.replace("http://hl7.org/fhir/3.0/", "");
+      StructureDefinition sd = engine.getVdr3().fetchTypeDefinition(tail);
+      if (sd != null) {
+        return sd;
+      }
+      return (CanonicalResource) engine.getVdr3().fetchResource(Resource.class, ref.replace("/3.0/", "/"));
+    }
+    if (ref.startsWith("http://hl7.org/fhir/4.0/")) {
+      String tail = ref.replace("http://hl7.org/fhir/4.0/", "");
+      StructureDefinition sd = engine.getVdr4().fetchTypeDefinition(tail);
+      if (sd != null) {
+        return sd;
+      }
+      return (CanonicalResource) engine.getVdr4().fetchResource(Resource.class, ref.replace("/4.0/", "/"));
+    }
+    if (ref.startsWith("http://hl7.org/fhir/4.3/")) {
+      String tail = ref.replace("http://hl7.org/fhir/4.3/", "");
+      StructureDefinition sd = engine.getVdr4b().fetchTypeDefinition(tail);
+      if (sd != null) {
+        return sd;
+      }
+      return (CanonicalResource) engine.getVdr4b().fetchResource(Resource.class, ref.replace("/4.3/", "/"));
+    }
+    if (ref.startsWith("http://hl7.org/fhir/5.0/")) {
+      String tail = ref.replace("http://hl7.org/fhir/5.0/", "");
+      StructureDefinition sd = engine.getVdr5().fetchTypeDefinition(tail);
+      if (sd != null) {
+        return sd;
+      }
+      return (CanonicalResource) engine.getVdr5().fetchResource(Resource.class, ref.replace("/5.0/", "/"));
+    }
+    return null;
   }
 }

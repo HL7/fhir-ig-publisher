@@ -2,6 +2,8 @@ package org.hl7.fhir.igtools.publisher.modules;
 
 import java.util.Map;
 
+import org.hl7.fhir.r5.model.CanonicalResource;
+
 public class NullModule implements IPublisherModule {
   
   public boolean preProcess(String path) {
@@ -28,6 +30,18 @@ public class NullModule implements IPublisherModule {
   public void defineTypeMap(Map<String, String> typeMap) {
     // TODO Auto-generated method stub
     
+  }
+
+  @Override
+  public boolean resolve(String ref) {
+    // TODO Auto-generated method stub
+    return false;
+  }
+
+  @Override
+  public CanonicalResource fetchCanonicalResource(String url) {
+    // TODO Auto-generated method stub
+    return null;
   }
 
 }
