@@ -468,7 +468,7 @@ public class SimpleFetcher implements IFetchFile {
   }
 
   @Override
-  public String pathForFile(String path) {
+  public String pathForFile(String path) throws IOException {
     return Utilities.getDirectoryForFile(path);
   }
 
