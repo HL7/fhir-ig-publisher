@@ -40,6 +40,7 @@ import javax.annotation.Nonnull;
 
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.SpecMapManager.SpecialPackageType;
+import org.hl7.fhir.igtools.publisher.modules.IPublisherModule;
 import org.hl7.fhir.r5.context.ILoggingService;
 import org.hl7.fhir.r5.context.ILoggingService.LogCategory;
 import org.hl7.fhir.r5.elementmodel.Element;
@@ -209,8 +210,9 @@ public class HTMLInspector {
   private Map<String, List<String>> trackedFragments;
   private Set<String> foundFragments = new HashSet<>();
   private List<FetchedFile> sources;
+  private IPublisherModule module;
 
-  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<SpecMapManager> linkSpecs, ILoggingService log, String canonical, String packageId, Map<String, List<String>> trackedFragments, List<FetchedFile> sources) {
+  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<SpecMapManager> linkSpecs, ILoggingService log, String canonical, String packageId, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module) {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
     this.linkSpecs = linkSpecs;
@@ -219,6 +221,7 @@ public class HTMLInspector {
     this.forHL7 = canonical.contains("hl7.org/fhir");
     this.trackedFragments = trackedFragments;
     this.sources = sources;
+    this.module = module;
     requirePublishBox = Utilities.startsWithInList(packageId, "hl7."); 
   }
 
@@ -800,6 +803,10 @@ public class HTMLInspector {
               }
             }
           }
+          if ("http://hl7.org.au/fhir".equals(ref)) {
+            // special case because au - wrongly - posts AU Base at http://hl7.org.au/fhir
+            resolved = true;
+          }
         } else if (specs != null) {
           for (SpecMapManager spec : specs) {
             if (spec.getSpecial() != SpecialPackageType.Examples && spec.getBase() != null && rref.startsWith(spec.getBase())) {
@@ -857,6 +864,9 @@ public class HTMLInspector {
           resolved = false; 
         }
       }
+    }
+    if (module.resolve(ref)) {
+      resolved = true;
     }
     return resolved;
   }
@@ -958,30 +968,6 @@ public class HTMLInspector {
 
   public int links() {
     return links;
-  }
-
-  public static void main(String[] args) throws Exception {
-    HTMLInspector inspector = new HTMLInspector(args[0], null, null, null, "http://hl7.org/fhir/us/core", "hl7.fhir.us.core", new HashMap<>(), null);
-    inspector.setStrict(false);
-    List<ValidationMessage> linkmsgs = inspector.check("test text");
-    int bl = 0;
-    int lf = 0;
-    for (ValidationMessage m : linkmsgs) {
-      if ((m.getLevel() == IssueSeverity.ERROR) || (m.getLevel() == IssueSeverity.FATAL)) {
-        if (m.getType() == IssueType.NOTFOUND)
-          bl++;
-        else
-          lf++;
-      } 
-    }
-    System.out.println("  ... "+Integer.toString(inspector.total())+" html "+checkPlural("file", inspector.total())+", "+Integer.toString(lf)+" "+checkPlural("page", lf)+" invalid xhtml ("+(inspector.total() == 0 ? "" : Integer.toString((lf*100)/inspector.total())+"%)"));
-    System.out.println("  ... "+Integer.toString(inspector.links())+" "+checkPlural("link", inspector.links())+", "+Integer.toString(bl)+" broken "+checkPlural("link", lf)+" ("+(inspector.links() == 0 ? "" : Integer.toString((bl*100)/inspector.links())+"%)"));
-    
-    System.out.println("");
-    
-    for (ValidationMessage m : linkmsgs) 
-      if ((m.getLevel() == IssueSeverity.ERROR) || (m.getLevel() == IssueSeverity.FATAL)) 
-        System.out.println(m.summary());
   }
 
   private static String checkPlural(String word, int c) {
