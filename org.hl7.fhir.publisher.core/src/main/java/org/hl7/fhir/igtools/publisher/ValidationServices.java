@@ -44,6 +44,7 @@ import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.ActorDefinition;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.ElementDefinition;
+import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
 import org.hl7.fhir.r5.model.NamingSystem;
@@ -55,6 +56,7 @@ import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureMap;
 import org.hl7.fhir.r5.model.ValueSet;
+import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
 import org.hl7.fhir.r5.terminologies.ImplicitValueSets;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.validation.IResourceValidator;
@@ -319,6 +321,13 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
       return true;
     }
     
+    for (Extension ext : ig.getExtensionsByUrl(ToolingExtensions.EXT_IG_URL)) {
+      String value = ext.getExtensionString("uri");
+      if (value != null && value.equals(url)) {
+        return true;
+      }
+    }    
+    
     if (u.startsWith("http://hl7.org/fhir")) {
       if (org.hl7.fhir.r5.utils.BuildExtensions.allConsts().contains(u)) {
         return true;
@@ -429,7 +438,18 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
       if (r instanceof CanonicalResource) {
         
         CanonicalResource cr = (CanonicalResource) r;
-        res.add(cr.hasVersion() ? cr.getVersion() : "{{unversioned}}");
+        if (cr instanceof CodeSystem) {
+          CodeSystem cs = (CodeSystem) cr;
+          if (cs.getContent() == CodeSystemContentMode.NOTPRESENT) {
+            if (!context.isServerSideSystem(cs.getUrl())) {
+              // ?? res.add(cr.hasVersion() ? cr.getVersion() : "{{unversioned}}");                          
+            }
+          } else {
+            res.add(cr.hasVersion() ? cr.getVersion() : "{{unversioned}}");            
+          }
+        } else {
+          res.add(cr.hasVersion() ? cr.getVersion() : "{{unversioned}}");
+        }
       }
     }
     return res;

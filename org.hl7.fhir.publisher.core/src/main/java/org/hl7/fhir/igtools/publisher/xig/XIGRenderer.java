@@ -4,6 +4,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.Locale;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.xig.XIGInformation.CanonicalResourceUsage;
@@ -66,7 +67,7 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
     this.info = info;
     this.target = target;
     this.rc = new RenderingContext(info.getCtxt(), new MarkDownProcessor(Dialect.COMMON_MARK), 
-        new ValidationOptions(FhirPublication.R5, "en"), "http://hl7.org/fhir", "", "en", ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
+        new ValidationOptions(FhirPublication.R5, "en"), "http://hl7.org/fhir", "", new Locale("en"), ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
     this.rc.setDestDir(target);
     this.rc.setPkp(this);
     this.rc.setNoSlowLookup(true);
