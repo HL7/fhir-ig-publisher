@@ -7,6 +7,7 @@ import org.hl7.fhir.convertors.loaders.loaderR5.ILoaderKnowledgeProviderR5;
 import org.hl7.fhir.convertors.loaders.loaderR5.R2016MayToR5Loader;
 import org.hl7.fhir.convertors.loaders.loaderR5.R2ToR5Loader;
 import org.hl7.fhir.convertors.loaders.loaderR5.R3ToR5Loader;
+import org.hl7.fhir.convertors.loaders.loaderR5.R4BToR5Loader;
 import org.hl7.fhir.convertors.loaders.loaderR5.R4ToR5Loader;
 import org.hl7.fhir.convertors.loaders.loaderR5.R5ToR5Loader;
 import org.hl7.fhir.exceptions.FHIRException;
@@ -47,7 +48,7 @@ public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProv
     } else if (VersionUtilities.isR4Ver(npm.fhirVersion())) {
       return new R4ToR5Loader(types, this, npm.version());
     } else if (VersionUtilities.isR4BVer(npm.fhirVersion())) {
-      return new R4ToR5Loader(types, this, npm.version());
+      return new R4BToR5Loader(types, this, npm.version());
     } else {
       return new R5ToR5Loader(types, this);
     }

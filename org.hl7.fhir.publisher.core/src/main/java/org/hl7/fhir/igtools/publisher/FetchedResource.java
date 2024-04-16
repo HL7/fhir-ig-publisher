@@ -309,5 +309,22 @@ public class FetchedResource {
   public void setHasTranslations(boolean hasTranslations) {
     this.hasTranslations = hasTranslations;
   }
+
+  public String getContentType() {
+    switch (element.getFormat()) {
+    case FML: return "application/fhir+fml";
+    case JSON: return "application/fhir+json";
+    case SHC: return "application/smart-health-card";
+    case SHL: return "application/smart-api-access";
+    case TEXT: return "text/plain";
+    case TURTLE: return "application/fhir+ttl";
+    case VBAR: return "application/hl7-v2";
+    case XML: return "application/fhir+xml";
+    default:
+      break;
+    
+    }
+    return "application/bin";
+  }
   
 }

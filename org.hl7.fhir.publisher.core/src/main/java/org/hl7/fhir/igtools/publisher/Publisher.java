@@ -2091,7 +2091,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
                 boolean regen = false;
                 for (String lang : langs) {
                   RenderingContext lrc = rc.copy().setDefinitionsTarget(igpkp.getDefinitionsName(r));
-                  lrc.setLang(lang);
+                  lrc.setLocale(lang == null ? null : new Locale(lang));
                   lrc.setRules(GenerationRules.VALID_RESOURCE);
                   lrc.setDefinitionsTarget(igpkp.getDefinitionsName(r));
                   if (r.getResource() instanceof DomainResource && (langs.size() > 1 || !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv()))) {
@@ -2116,7 +2116,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               } else {
                 for (String lang : langs) {
                   RenderingContext lrc = rc.copy().setParser(getTypeLoader(f,r));
-                  lrc.setLang(lang);
+                  lrc.setLocale(lang == null ? null : new Locale(lang));
                   lrc.setRules(GenerationRules.VALID_RESOURCE);
                   if (isDomainResource(r) && (langs.size() > 1|| !hasNarrative(r.getElement()))) {
                     ResourceWrapper rw = new ElementWrappers.ResourceWrapperMetaElement(lrc, r.getElement());
@@ -3483,16 +3483,21 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     while (v.indexOf(".") != v.lastIndexOf(".")) {
       v = v.substring(0, v.lastIndexOf("."));
     }
-    if (v.equals("1.0"))
+    if (v.equals("1.0")) {
       return PackageHacker.fixPackageUrl("http://hl7.org/fhir/DSTU2");
-    if (v.equals("1.4"))
+    }
+    if (v.equals("1.4")) {
       return PackageHacker.fixPackageUrl("http://hl7.org/fhir/2016May");
-    if (v.equals("3.0"))
+    }
+    if (v.equals("3.0")) {
       return PackageHacker.fixPackageUrl("http://hl7.org/fhir/STU3");
-    if (v.equals("4.0"))
+    }
+    if (v.equals("4.0")) {
       return PackageHacker.fixPackageUrl("http://hl7.org/fhir/R4");
-    if (v.equals("4.1"))
-      return PackageHacker.fixPackageUrl("http://hl7.org/fhir/2021Mar");
+    }
+    if (v.equals("4.3")) {
+      return PackageHacker.fixPackageUrl("http://hl7.org/fhir/R4B");
+    }
     return PackageHacker.fixPackageUrl("http://hl7.org/fhir/R5");
   }
 
@@ -11068,7 +11073,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         List<ProvenanceDetails> entries = loadProvenanceForBundle(igpkp.getLinkFor(r, true), r.getElement(), f);
         xhtml = new HistoryGenerator(ctxt).generateForBundle(entries); 
         fragment(r.fhirType()+"-"+r.getId()+"-html", new XhtmlComposer(XhtmlComposer.XML).compose(xhtml), f.getOutputNames(), r, vars, null);
-      } else if (r.getResource() instanceof Binary) {
+      } else if (r.fhirType().equals("Binary")) {
         String pfx = "";
         if (r.getExampleUri() != null) {
           StructureDefinition sd = context.fetchResource(StructureDefinition.class, r.getExampleUri());
@@ -11076,8 +11081,17 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
             pfx = "<p>This content is an example of the <a href=\""+Utilities.escapeXml(sd.getWebPath())+"\">"+Utilities.escapeXml(sd.present())+"</a> Logical Model and is not a FHIR Resource</p>\r\n";
           }          
         }
+        String html = null;
         BinaryRenderer br = new BinaryRenderer(tempDir);
-        String html = pfx+br.display((Binary) r.getResource());
+        if (r.getResource() instanceof Binary) {
+          html = pfx+br.display((Binary) r.getResource());
+        } else if (r.getElement().fhirType().equals("Binary")) {
+          html = pfx+br.display(r.getElement());
+        } else if (f.getResources().size() == 1 && f.getSource() != null) {
+          html = pfx+br.display(r.getId(), r.getContentType(), f.getSource());        
+        } else {
+          html = pfx+br.display(r.getElement());
+        }
         for (String fn : br.getFilenames()) {
           otherFilesRun.add(Utilities.path(tempDir, fn));
         }
@@ -12928,6 +12942,20 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   public long getMaxMemory() {
     return maxMemory;
+  }
+
+  @Override
+  public String resolveUri(RenderingContext context, String uri) {
+    for (Extension ext : sourceIg.getExtensionsByUrl(ToolingExtensions.EXT_IG_URL)) {
+      String value = ext.getExtensionString("uri");
+      if (value != null && value.equals(uri)) {
+        return ext.getExtensionString("target");
+      }
+    }
+    if (!uri.contains("example.org")) {
+      DebugUtilities.ln("Unknown URI: "+uri);
+    }
+    return null;
   }
 
 
