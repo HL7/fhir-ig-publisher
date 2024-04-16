@@ -519,7 +519,7 @@ public class IGReleaseUpdater {
    * 
    * 1. statement of what this is 
    * 2. reference to current version
-   * 3. referenceto list of published versions
+   * 3. reference to list of published versions
    * 
    * @param version
    * @param root
@@ -529,7 +529,7 @@ public class IGReleaseUpdater {
   private String genFragment(JsonObject ig, JsonObject version, JsonObject root, String canonical, boolean currentPublication, boolean isCore) {
     String p1 = ig.asString("title")+" (v"+version.asString("version")+": "+state(ig, version)+")";
     if (!isCore) {
-      p1 = p1 + (version.has("fhirversion") ? " based on <a no-external=\"true\" href=\"http://hl7.org/fhir/"+getPath(version.asString("fhirversion", "fhir-version"))+"\">FHIR (HL7® FHIR® Standard) "+fhirRef(version.asString("fhirversion"))+"</a>" : "")+". ";
+      p1 = p1 + (version.has("fhirversion") ? (isCDA(canonical) ? " generated with " : " based on ")+"<a no-external=\"true\" href=\"http://hl7.org/fhir/"+getPath(version.asString("fhirversion", "fhir-version"))+"\">FHIR (HL7® FHIR® Standard) "+fhirRef(version.asString("fhirversion"))+"</a>" : "")+". ";
     } else {
       p1 = p1 + ". ";      
     }
@@ -540,6 +540,10 @@ public class IGReleaseUpdater {
     else
       p3 = " For a full list of available versions, see the <a no-external=\"true\" href=\""+canonical+"/history.html\">Directory of published versions</a>";
     return "This page is part of the "+p1+p2+". "+p3;
+  }
+
+  private boolean isCDA(String canonical) {
+    return canonical.startsWith("http://hl7.org/cda");
   }
 
   private String getPath(String v) {

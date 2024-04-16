@@ -11,7 +11,7 @@ public class PublishBoxStatementGenerator {
    * 
    * 1. statement of what this is 
    * 2. reference to current version
-   * 3. referenceto list of published versions
+   * 3. reference to list of published versions
    * 
    * @param version
    * @param root
@@ -21,7 +21,7 @@ public class PublishBoxStatementGenerator {
   public static String genFragment(PackageList ig, PackageListEntry version, PackageListEntry root, String canonical, boolean currentPublication, boolean isCore) {
     String p1 = ig.title()+" (v"+version.version()+": "+state(ig, version)+")";
     if (!isCore) {
-      p1 = p1 + (version.fhirVersion() != null ? " based on <a no-external=\"true\" href=\"http://hl7.org/fhir/"+getPath(version.fhirVersion())+"\">FHIR (HL7® FHIR® Standard) "+fhirRef(version.fhirVersion())+"</a>" : "")+". ";
+      p1 = p1 + (version.fhirVersion() != null ? (isCDA(canonical) ? " generated with " : " based on ")+"<a no-external=\"true\" href=\"http://hl7.org/fhir/"+getPath(version.fhirVersion())+"\">FHIR (HL7® FHIR® Standard) "+fhirRef(version.fhirVersion())+"</a>" : "")+". ";
     } else {
       p1 = p1 + ". ";      
     }
@@ -35,7 +35,11 @@ public class PublishBoxStatementGenerator {
     return "This page is part of the "+p1+p2+". "+p3;
   }
 
-  
+  private static boolean isCDA(String canonical) {
+    return canonical.startsWith("http://hl7.org/cda");
+  }
+
+
   private static String getPath(String v) {
     if ("5.0.0".equals(v))
       return "R5";
