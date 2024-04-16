@@ -12952,9 +12952,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         return ext.getExtensionString("target");
       }
     }
-    if (!uri.contains("example.org")) {
-      DebugUtilities.ln("Unknown URI: "+uri);
-    }
+    
     return null;
   }
 
