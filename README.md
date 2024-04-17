@@ -33,6 +33,9 @@ the versions of the IG publisher, which are performed as part of the QA release 
 Note that the implementation guides themselves change over time, and the time varies due to network 
 dependencies, so these times are only a rough indication of performance.
 
+Note: For some previous versions, the tests were run over a slow/obstructed starlink connection, so
+have been removed from the graph
+
 ## Building this Project
 
 You can find detailed instructions on setting up this project in your IDE [here](https://hl7.github.io/docs/ig_publisher/getting-started).
