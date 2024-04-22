@@ -2,8 +2,9 @@ Mulit-lingual IGs
 
 #1 Introduction 
 
-All IGs are authored in a single primary language that is the master language. 
-This does not have to be in english (even though most existing IGs are)
+All IGs are authored in a single primary language that is the master language, and then
+additional languages are provided through the use of translation infrastructure.
+The primary language does not have to be in english (even though most existing IGs use english)
 Note that the external resources to the IG are also have a single primary 
 language, but may provide translations. 
 

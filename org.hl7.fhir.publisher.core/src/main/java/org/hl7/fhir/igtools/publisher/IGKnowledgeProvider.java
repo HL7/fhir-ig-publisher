@@ -673,12 +673,24 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     if (xver.matchingUrl(url)) {
       return xver.getReference(url); 
     }
-    if (sd != null && sd.hasWebPath())
-      return sd.getWebPath()+"|"+sd.getName();
+    if (sd != null && sd.hasWebPath()) {
+      if (url.contains("|") || hasMultipleVersions(context.fetchResourcesByUrl(StructureDefinition.class, url))) {
+        return sd.getWebPath()+"|"+sd.getName()+"("+sd.getVersion()+")";        
+      } else {
+        return sd.getWebPath()+"|"+sd.getName();
+      }
+    }
     brokenLinkMessage("?pkp-1?", url, false);
     return "unknown.html|?pkp-2?";
   }
 
+  private boolean hasMultipleVersions(List<? extends CanonicalResource> list) {
+    Set<String> vl = new HashSet<>();
+    for (CanonicalResource cr : list) {
+      vl.add(cr.getVersion());
+    }
+    return vl.size() > 1;
+  }
 
   @Override
   public String resolveType(String type) {
