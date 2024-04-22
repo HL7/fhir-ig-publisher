@@ -211,8 +211,10 @@ public class HTMLInspector {
   private Set<String> foundFragments = new HashSet<>();
   private List<FetchedFile> sources;
   private IPublisherModule module;
+  private boolean isCIBuild;
+  private Map<String, ValidationMessage> jsmsgs = new HashMap<>();
 
-  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<SpecMapManager> linkSpecs, ILoggingService log, String canonical, String packageId, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module) {
+  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<SpecMapManager> linkSpecs, ILoggingService log, String canonical, String packageId, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild) {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
     this.linkSpecs = linkSpecs;
@@ -222,6 +224,7 @@ public class HTMLInspector {
     this.trackedFragments = trackedFragments;
     this.sources = sources;
     this.module = module;
+    this.isCIBuild = isCIBuild;
     requirePublishBox = Utilities.startsWithInList(packageId, "hl7."); 
   }
 
@@ -665,8 +668,29 @@ public class HTMLInspector {
   private void checkScriptElement(String filename, Location loc, String path, XhtmlNode x, List<ValidationMessage> messages) {
     String src = x.getAttribute("src");
     if (!Utilities.noString(src) && Utilities.isAbsoluteUrl(src) && !Utilities.existsInList(src, 
-        "http://hl7.org/fhir/history-cm.js", "http://hl7.org/fhir/assets-hist/js/jquery.js") && !src.contains("googletagmanager.com"))
-      messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, filename+(loc == null ? "" : " at "+loc.toString()), "The <script> src '"+src+"' is llegal", IssueSeverity.FATAL));    
+        "http://hl7.org/fhir/history-cm.js", "http://hl7.org/fhir/assets-hist/js/jquery.js") && !src.contains("googletagmanager.com")) {
+      messages.add(new ValidationMessage(Source.Publisher, IssueType.INVALID, filename+(loc == null ? "" : " at "+loc.toString()), "The <script> src '"+src+"' is illegal", IssueSeverity.FATAL));
+    } else if (src == null && x.allText() != null) {
+      String js = x.allText();
+      if (jsmsgs.containsKey(js)) {
+        ValidationMessage vm = jsmsgs.get(js);
+        vm.incCount();
+      } else {
+        ValidationMessage vm;
+        if (isCIBuild) {
+          vm = new ValidationMessage(Source.Publisher, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> tag containing the javascript '"+subset(x.allText())+"'... is illegal - put the script in a  .js file in a trusted template", IssueSeverity.FATAL);
+        } else {
+          vm =  new ValidationMessage(Source.Publisher, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> tag containing the javascript '"+subset(x.allText())+"'... is illegal and not allowed on the HL7 cibuild - put the script in a  .js file in a trusted template", IssueSeverity.ERROR);
+        }
+        messages.add(vm);
+        jsmsgs.put(js, vm);
+      }
+    }
+  }
+
+  private String subset(String src) {
+    src = Utilities.stripEoln(src.strip()).replace("\"", "'");
+    return src.length() < 20 ? src : src.substring(0, 20);
   }
 
   private boolean checkLinkElement(String filename, Location loc, String path, String href, List<ValidationMessage> messages, String uuid) {
