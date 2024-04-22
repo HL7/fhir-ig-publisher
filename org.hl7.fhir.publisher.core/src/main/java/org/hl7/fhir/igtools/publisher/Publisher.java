@@ -238,6 +238,7 @@ import org.hl7.fhir.r5.model.PackageInformation;
 import org.hl7.fhir.r5.model.Parameters;
 import org.hl7.fhir.r5.model.PlanDefinition;
 import org.hl7.fhir.r5.model.PlanDefinition.PlanDefinitionActionComponent;
+import org.hl7.fhir.r5.model.PrimitiveType;
 import org.hl7.fhir.r5.model.Property;
 import org.hl7.fhir.r5.model.Provenance;
 import org.hl7.fhir.r5.model.Provenance.ProvenanceAgentComponent;
@@ -335,6 +336,9 @@ import org.hl7.fhir.utilities.i18n.I18nConstants;
 import org.hl7.fhir.utilities.i18n.JsonLangFileProducer;
 import org.hl7.fhir.utilities.i18n.LanguageFileProducer;
 import org.hl7.fhir.utilities.i18n.LanguageFileProducer.TranslationUnit;
+import org.hl7.fhir.utilities.i18n.LanguageTag;
+import org.hl7.fhir.utilities.i18n.subtag.LanguageSubtagRegistry;
+import org.hl7.fhir.utilities.i18n.subtag.LanguageSubtagRegistryLoader;
 import org.hl7.fhir.utilities.i18n.PoGetTextProducer;
 import org.hl7.fhir.utilities.i18n.XLIFFProducer;
 import org.hl7.fhir.utilities.json.model.JsonArray;
@@ -3201,7 +3205,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       }
     }
     
-    inspector = new HTMLInspector(outputDir, specMaps, linkSpecMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), trackedFragments, fileList, module);
+    inspector = new HTMLInspector(outputDir, specMaps, linkSpecMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), trackedFragments, fileList, module, mode == IGBuildMode.AUTOBUILD || mode == IGBuildMode.WEBSERVER);
     inspector.getManual().add("full-ig.zip");
     if (historyPage != null) {
       inspector.getManual().add(historyPage);
@@ -4310,9 +4314,17 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     needToBuild = loadBundles(needToBuild, igf);
     needToBuild = loadTranslationSupplements(needToBuild, igf);
     int i = 0;
+    Set<String> resLinks = new HashSet<>();
     for (ImplementationGuideDefinitionResourceComponent res : publishedIg.getDefinition().getResource()) {
-      if (!res.hasReference())
+      if (!res.hasReference()) {
         throw new Exception("Missing source reference on a resource in the IG with the name '"+res.getName()+"' (index = "+i+")");
+      } else if (!res.getReference().hasReference()) {
+        throw new Exception("Missing source reference.reference on a resource in the IG with the name '"+res.getName()+"' (index = "+i+")");
+      } else if (resLinks.contains(res.getReference().getReference())) {
+        throw new Exception("Duplicate source reference '"+res.getReference().getReference()+"' on a resource in the IG with the name '"+res.getName()+"' (index = "+i+")");
+      } else {
+        resLinks.add(res.getReference().getReference());      
+      }
       i++;
       FetchedFile f = null;
       if (!bndIds.contains(res.getReference().getReference()) && !res.hasUserData("loaded.resource")) { 
@@ -8531,6 +8543,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           item.add("url", sd.getUrl());
           item.add("name", sd.getName());
           item.add("title", sd.present());
+          addTranslationsToJson(item, "title-translations", sd.getTitleElement(), false); 
           item.add("path", sd.getWebPath());
           if (sd.hasKind()) {
             item.add("kind", sd.getKind().toCode());
@@ -8540,6 +8553,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           StructureDefinition base = sd.hasBaseDefinition() ? context.fetchResource(StructureDefinition.class, sd.getBaseDefinition()) : null;
           if (base != null) {
             item.add("basename", base.getName());
+            addTranslationsToJson(item, "basename-translations", base.getNameElement(), false); 
             item.add("basepath", Utilities.escapeXml(base.getWebPath()));
           } else if ("http://hl7.org/fhir/StructureDefinition/Base".equals(sd.getBaseDefinition())) {
             item.add("basename", "Base");
@@ -8556,8 +8570,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
             item.add("derivation", sd.getDerivation().toCode());
           }
           item.add("publisher", sd.getPublisher());
+          addTranslationsToJson(item, "publisher-translations", sd.getPublisherElement(), false); 
           item.add("copyright", sd.getCopyright());
+          addTranslationsToJson(item, "copyright-translations", sd.getCopyrightElement(), false); 
           item.add("description", ProfileUtilities.processRelativeUrls(sd.getDescription(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
+          addTranslationsToJson(item, "description-translations", sd.getDescriptionElement(), true); 
 
           if (sd.hasContext()) {
             JsonArray contexts = new JsonArray();
@@ -8643,12 +8660,16 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           item.add("index", i);
           item.add("url", q.getUrl());
           item.add("name", q.getName());
+          addTranslationsToJson(item, "name-translations", q.getNameElement(), false); 
           item.add("path", q.getWebPath());
           item.add("status", q.getStatus().toCode());
           item.add("date", q.getDate().toString());
           item.add("publisher", q.getPublisher());
+          addTranslationsToJson(item, "publisher-translations", q.getPublisherElement(), false); 
           item.add("copyright", q.getCopyright());
+          addTranslationsToJson(item, "copyright-translations", q.getCopyrightElement(), false); 
           item.add("description", ProfileUtilities.processRelativeUrls(q.getDescription(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
+          addTranslationsToJson(item, "description-translations", q.getDescriptionElement(), true); 
 
           i++;
         }
@@ -8696,7 +8717,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           contained.add(jo);
           jo.add("type", crd.getType());
           jo.add("id", crd.getId());
-          jo.add("title", crd.getType());
+          jo.add("title", crd.getTitle()); 
           jo.add("description", ProfileUtilities.processRelativeUrls(crd.getDescription(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
 
           JsonObject citem = new JsonObject();
@@ -8722,7 +8743,25 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
     json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(data, true);
     TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "resources.json"));
+    
+    data = new JsonObject();
+    if (sourceIg.hasLanguage()) {
+      data.add("ig", sourceIg.getLanguage());
+    }
+    data.add("hasTranslations", hasTranslations);
+    data.add("defLang", defaultTranslationLang);
+    JsonObject langs = new JsonObject();
+    data.add("langs", langs); 
+    for (String s : translationLangs) {
+      JsonObject lu = new JsonObject();
+      langs.add(s, lu);
+      lu.add("en", getLangDesc(s));
+      // todo: translation to other languages
+    }
 
+    json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(data, true);
+    TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "languages.json"));
+    
     if (publishedIg.getDefinition().hasPage()) {
       JsonObject pages = new JsonObject();
       addPageData(pages, publishedIg.getDefinition().getPage(), "0", "");
@@ -8750,12 +8789,41 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     generateViewDefinitions(db);
   }
   
+  private String getLangDesc(String s) throws IOException {
+    if (registry == null) {
+      registry = new LanguageSubtagRegistry();
+      LanguageSubtagRegistryLoader loader = new LanguageSubtagRegistryLoader(registry);
+      loader.loadFromDefaultResource();
+    }
+    LanguageTag tag = new LanguageTag(registry, s);
+    return tag.present();
+  }
+
+  private void addTranslationsToJson(JsonObject item, String name, PrimitiveType<?> element, boolean processDesc) {
+    JsonArray jt = null;
+    for (Entry<String, String> t : ToolingExtensions.getLanguageTranslations(element).entrySet()) {
+      if (jt == null) {
+        jt = new JsonArray();
+        item.add(name, jt);
+      }
+      JsonObject ji = new JsonObject();
+      jt.add(ji);     
+      ji.add("lang", t.getKey()); 
+      if (processDesc) {
+        ji.add("content", 
+          ProfileUtilities.processRelativeUrls(t.getValue(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
+      } else {
+        ji.add("content", t.getValue());
+      }
+    }
+  }
+
   private void generateViewDefinitions(DBBuilder db) {
     for (String vdn : viewDefinitions) {
       logMessage("Generate View "+vdn);
       Runner runner = new Runner();
       try {
-        runner.setContext(context);;
+        runner.setContext(context);
         PublisherProvider pprov = new PublisherProvider(context, npmList, fileList, igpkp.getCanonical());
         runner.setProvider(pprov);
         runner.setStorage(new StorageSqlite3(db.getConnection()));
@@ -10422,6 +10490,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private int sqlIndex = 0;
 
   private boolean isSushi;
+
+  private LanguageSubtagRegistry registry;
   private String processSQlCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     String output = db == null ? "<span style=\"color: maroon\">No SQL this build</span>" : db.processSQL(src);
     int i = sqlIndex++;
@@ -10855,46 +10925,60 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private byte[] saveNativeResourceOutputs(FetchedFile f, FetchedResource r) throws FHIRException, IOException {
     ByteArrayOutputStream bsj = new ByteArrayOutputStream();
     org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(context);
-    jp.compose(r.getElement(), bsj, OutputStyle.NORMAL, igpkp.getCanonical());
-    npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, r.getElement().fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
+    Element element = r.getElement();
+    jp.compose(element, bsj, OutputStyle.NORMAL, igpkp.getCanonical());
+    npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
     String path = Utilities.path(tempDir, "_includes", r.fhirType()+"-"+r.getId()+".json");
     TextFile.bytesToFile(bsj.toByteArray(), path);
     String pathEsc = Utilities.path(tempDir, "_includes", r.fhirType()+"-"+r.getId()+".escaped.json");
     XmlEscaper.convert(path, pathEsc);
 
+    saveNativeResourceOutputFormats(f, r, element, ""); 
+    for (String lang : translationLangs) {
+      Element e = (Element) element.copy();
+      if (LanguageUtils.switchLanguage(e, lang)) {
+        saveNativeResourceOutputFormats(f, r, e, "-"+lang);         
+      }
+    }
+    
+    return bsj.toByteArray();
+  }
+
+  private void saveNativeResourceOutputFormats(FetchedFile f, FetchedResource r, Element element, String suffix) throws IOException, FileNotFoundException {
+    String path;
     if (igpkp.wantGen(r, "xml") || forHL7orFHIR()) {
-      path = Utilities.path(tempDir, r.fhirType()+"-"+r.getId()+".xml");
+      path = Utilities.path(tempDir, r.fhirType()+"-"+r.getId()+suffix+".xml");
       f.getOutputNames().add(path);
       FileOutputStream stream = new FileOutputStream(path);
       org.hl7.fhir.r5.elementmodel.XmlParser xp = new org.hl7.fhir.r5.elementmodel.XmlParser(context);
       if (suppressId(f, r)) {
         xp.setIdPolicy(IdRenderingPolicy.NotRoot);
       }
-      xp.compose(r.getElement(), stream, OutputStyle.PRETTY, igpkp.getCanonical());
+      xp.compose(element, stream, OutputStyle.PRETTY, igpkp.getCanonical());
       stream.close();
     }
     if (igpkp.wantGen(r, "json") || forHL7orFHIR()) {
-      path = Utilities.path(tempDir, r.fhirType()+"-"+r.getId()+".json");
+      path = Utilities.path(tempDir, r.fhirType()+"-"+r.getId()+suffix+".json");
       f.getOutputNames().add(path);
       FileOutputStream stream = new FileOutputStream(path);
+      org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(context); 
       if (suppressId(f, r)) {
         jp.setIdPolicy(IdRenderingPolicy.NotRoot);
       }
-      jp.compose(r.getElement(), stream, OutputStyle.PRETTY, igpkp.getCanonical());
+      jp.compose(element, stream, OutputStyle.PRETTY, igpkp.getCanonical());
       stream.close();
     } 
     if (igpkp.wantGen(r, "ttl")) {
-      path = Utilities.path(tempDir, r.fhirType()+"-"+r.getId()+".ttl");
+      path = Utilities.path(tempDir, r.fhirType()+"-"+r.getId()+suffix+".ttl");
       f.getOutputNames().add(path);
       FileOutputStream stream = new FileOutputStream(path);
       org.hl7.fhir.r5.elementmodel.TurtleParser tp = new org.hl7.fhir.r5.elementmodel.TurtleParser(context);
       if (suppressId(f, r)) {
         tp.setIdPolicy(IdRenderingPolicy.NotRoot);
       }
-      tp.compose(r.getElement(), stream, OutputStyle.PRETTY, igpkp.getCanonical());
+      tp.compose(element, stream, OutputStyle.PRETTY, igpkp.getCanonical());
       stream.close();
-    }    
-    return bsj.toByteArray();
+    }
   }
 
   private boolean isExample(FetchedFile f, FetchedResource r) {
