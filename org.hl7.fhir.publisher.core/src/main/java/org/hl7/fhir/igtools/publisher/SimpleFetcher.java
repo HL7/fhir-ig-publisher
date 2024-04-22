@@ -429,8 +429,9 @@ public class SimpleFetcher implements IFetchFile {
   }
 
   private void addFile(List<FetchedFile> res, File f, org.hl7.fhir.r5.elementmodel.Element e, String cnt) throws IOException {
-    if (!e.fhirType().equals("ImplementationGuide"))
+    if (!e.fhirType().equals("ImplementationGuide")) {
       addFile(res, f, cnt);
+    }
   }
   
   private void addFile(List<FetchedFile> res, File f, String cnt) throws IOException {
