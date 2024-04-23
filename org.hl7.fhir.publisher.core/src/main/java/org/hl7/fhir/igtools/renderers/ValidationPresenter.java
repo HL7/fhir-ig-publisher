@@ -500,6 +500,9 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       if (us.getReadVS() > 0) {
         hvs = true;
       }
+      if (us.getReadCS() > 0) {
+        hcs = true;
+      }
       if (hcs & hvs) {
         break;
       }

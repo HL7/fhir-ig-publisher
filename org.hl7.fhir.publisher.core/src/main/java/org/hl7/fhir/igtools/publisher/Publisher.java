@@ -3163,10 +3163,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         txLog = null;
       } else {
         log("Connect to Terminology Server at "+txServer);
-        context.connectToTSServer(new TerminologyClientFactory(version), txServer, "fhir/publisher", txLog);
+        context.connectToTSServer(new TerminologyClientFactory(version), txServer, "fhir/publisher", txLog, true);
       }
     } else { 
-      context.connectToTSServer(new TerminologyClientFactory(version), webTxServer.getAddress(), "fhir/publisher", txLog);
+      context.connectToTSServer(new TerminologyClientFactory(version), webTxServer.getAddress(), "fhir/publisher", txLog, true);
     }
 
     loadPubPack();
