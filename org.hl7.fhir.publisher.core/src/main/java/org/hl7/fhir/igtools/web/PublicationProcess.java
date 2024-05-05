@@ -659,7 +659,7 @@ public class PublicationProcess {
   private IndexMaintainer getIndexForIg(Map<String, IndexMaintainer> indexes, String packageId) {
     String realm = Utilities.charCount(packageId, '.') > 1 ? packageId.split("\\.")[2] : null;
     String code = Utilities.charCount(packageId, '.') > 2 ? packageId.split("\\.")[3] : null;
-    return realm == null || ("uv".equals(realm) && Utilities.existsInList(code, "smart-app-launch", "extensions")) ? null : indexes.get(realm);
+    return realm == null || ("uv".equals(realm) && Utilities.existsInList(code, "smart-app-launch", "extensions", "tools")) ? null : indexes.get(realm);
   }
 
   private void updateFeed(File fRoot, String destVer, PackageList pl, PackageListEntry plVer, String file, boolean isPublication, WebSourceProvider src, String orgName, NpmPackage npm, String genDate, String username, String version, String gitSrcId, String runNumber) throws IOException {

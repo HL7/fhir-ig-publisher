@@ -39,6 +39,7 @@ import java.util.Set;
 import javax.annotation.Nonnull;
 
 import org.hl7.fhir.exceptions.FHIRFormatError;
+import org.hl7.fhir.igtools.publisher.Publisher.FragmentUseRecord;
 import org.hl7.fhir.igtools.publisher.SpecMapManager.SpecialPackageType;
 import org.hl7.fhir.igtools.publisher.modules.IPublisherModule;
 import org.hl7.fhir.r5.context.ILoggingService;
@@ -213,8 +214,9 @@ public class HTMLInspector {
   private IPublisherModule module;
   private boolean isCIBuild;
   private Map<String, ValidationMessage> jsmsgs = new HashMap<>();
+  private Map<String, FragmentUseRecord> fragmentUses = new HashMap<>();
 
-  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<SpecMapManager> linkSpecs, ILoggingService log, String canonical, String packageId, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild) {
+  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<SpecMapManager> linkSpecs, ILoggingService log, String canonical, String packageId, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, FragmentUseRecord> fragmentUses) {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
     this.linkSpecs = linkSpecs;
@@ -225,6 +227,7 @@ public class HTMLInspector {
     this.sources = sources;
     this.module = module;
     this.isCIBuild = isCIBuild;
+    this.fragmentUses = fragmentUses;
     requirePublishBox = Utilities.startsWithInList(packageId, "hl7."); 
   }
 
@@ -302,6 +305,9 @@ public class HTMLInspector {
       checkFragmentIds(TextFile.fileToString(lf.filename));
       
       if (lf.isHasXhtml()) {
+        if (fragmentUses != null) {
+          checkFragmentMarkers(TextFile.fileToString(lf.getFilename()));
+        }
         XhtmlNode x = new XhtmlParser().setMustBeWellFormed(strict).parse(new FileInputStream(lf.filename), null);
         referencesValidatorPack = false;
         if (checkLinks(lf, s, "", x, null, messages, false) != NodeChangeType.NONE) { // returns true if changed
@@ -343,6 +349,20 @@ public class HTMLInspector {
       }
     }
     return messages;
+  }
+
+  private void checkFragmentMarkers(String s) {
+    for (int i = 0; i < s.length() - 14; i++) {
+      char ch = s.charAt(i);
+      if (ch == '<') {
+        if ("<!-- fragment:".equals(s.substring(i, i+14))) {
+          String v = s.substring(i+14);
+          int j = v.indexOf("-->");
+          v = v.substring(0, j).trim();
+          fragmentUses.get(v).setUsed();          
+        }
+      }
+    }
   }
 
   private void checkNarrativeLinks(FetchedFile f, FetchedResource r) throws IOException {

@@ -843,7 +843,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
     String name = getSpecialValueSetName(uri);
     if (name != null) {
-      brd.vss = "<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"" + Utilities.escapeXml(uri) + "\">" + Utilities.escapeXml(name) + "</a>";
+      brd.vss = "<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"" + Utilities.escapeXml(getSpecialValueSetUrl(uri)) + "\">" + Utilities.escapeXml(name) + "</a>";
       brd.vsn = name;
     } else {
       ValueSet vs = context.findTxResource(ValueSet.class, canonicalise(uri));
@@ -910,6 +910,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   private String getSpecialValueSetName(String uri) {
     if (uri != null && uri.startsWith("http://loinc.org/vs/"))
       return "LOINC " + uri.substring(20);
+    return null;
+  }
+
+  private String getSpecialValueSetUrl(String uri) {
+    if (uri != null && uri.startsWith("http://loinc.org/vs/"))
+      return "https://loinc.org/" + uri.substring(20);
     return null;
   }
 

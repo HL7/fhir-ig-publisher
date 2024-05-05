@@ -28,4 +28,7 @@ public interface IPublisherModule {
   boolean resolve(String ref);
 
   CanonicalResource fetchCanonicalResource(String url);
+
+  // approve the generation of a fragment - mainly for performance reasons
+  boolean approveFragment(boolean value, String code);
 }

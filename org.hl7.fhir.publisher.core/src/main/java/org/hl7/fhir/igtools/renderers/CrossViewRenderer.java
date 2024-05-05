@@ -681,7 +681,7 @@ public class CrossViewRenderer extends Renderer {
       } else {
         for (Coding t : list) {
           if (first) first = false; else b.append(", ");
-          String sys = TerminologyRenderer.describeSystem(t.getSystem());
+          String sys = new DataRenderer(context).displaySystem(t.getSystem());
           if (sys.equals(t.getSystem()))
             sys = null;
           if (sys == null) {

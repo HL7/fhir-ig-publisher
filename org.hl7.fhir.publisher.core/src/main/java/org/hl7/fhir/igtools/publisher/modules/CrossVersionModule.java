@@ -898,4 +898,23 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     }
     return null;
   }
+  
+
+  private Set<String> APPROVED_FRAGMENTS = Set.of("cld", "content", "ctxts", "dict", "diff", "example-list", "example-list-all", "example-table", "example-table-all", "expansion", "form",
+      "grid", "header", "history", "html", "idempotence", "instance-table", "inv", "ip-statements", "java", "jekyll-data", "json", "json-html",
+      "json-schema", "links", "list-list", "list-list-simple", "list-list-table", "logic", "maturity", "openapi", "process-diagram", "processes",
+      "profiles", "pseudo-json", "pseudo-ttl", "pseudo-xml", "responses", "sch", "script", "script-plain", "sheet", "shex", "snapshot", "span",
+      "spanall", "status", "summary", "summary-table", "swagger", "tree", "tx", "tx-diff", "tx-diff-must-support", "tx-key", "tx-must-support", "uml",
+      "uses", "validate", "xml", "xml-html", "xref" );
+
+  @Override
+  public boolean approveFragment(boolean value, String code) {
+    if (value) {
+      return APPROVED_FRAGMENTS.contains(code);
+    } else {
+      return value;
+    }
+  }
+  
+  
 }

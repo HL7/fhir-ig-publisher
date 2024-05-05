@@ -28,6 +28,7 @@ import java.util.Set;
 
 import org.hl7.fhir.convertors.VersionConvertorConstants;
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.igtools.publisher.modules.IPublisherModule;
 import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.r5.conformance.profile.BindingResolution;
 import org.hl7.fhir.r5.conformance.profile.ProfileKnowledgeProvider;
@@ -78,8 +79,9 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   private String altCanonical;
   private XVerExtensionManager xver;
   private List<FetchedFile> files;
+  private IPublisherModule module;
   
-  public IGKnowledgeProvider(IWorkerContext context, String pathToSpec, String canonical, JsonObject igs, List<ValidationMessage> errors, boolean noXhtml, Template template, List<String> listedURLExemptions, String altCanonical, List<FetchedFile> files) throws Exception {
+  public IGKnowledgeProvider(IWorkerContext context, String pathToSpec, String canonical, JsonObject igs, List<ValidationMessage> errors, boolean noXhtml, Template template, List<String> listedURLExemptions, String altCanonical, List<FetchedFile> files, IPublisherModule module) throws Exception {
     super();
     this.context = context;
     this.pathToSpec = pathToSpec;
@@ -96,6 +98,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       loadPaths(igs);
     }
     this.xver = new XVerExtensionManager(context);
+    this.module = module;
   }
   
   private void loadPaths(JsonObject igs) throws Exception {
@@ -208,19 +211,19 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
 
   public boolean wantGen(FetchedResource r, String code) {
     if (r.getConfig() != null && r.getConfig().hasBoolean(code))
-      return r.getConfig().asBoolean(code);
+      return module.approveFragment(r.getConfig().asBoolean(code), code);
     JsonObject cfg = null;
     if (defaultConfig != null) {
       cfg = defaultConfig.getJsonObject(r.fhirType());
       if (cfg != null && cfg.hasBoolean(code)) {
-        return cfg.asBoolean(code);
+        return module.approveFragment(cfg.asBoolean(code), code);
       }
       cfg = defaultConfig.getJsonObject("Any");
       if (cfg != null && cfg.hasBoolean(code)) {
-        return cfg.asBoolean(code);
+        return module.approveFragment(cfg.asBoolean(code), code);
       }
     }
-    return true;
+    return module.approveFragment(true, code);
   }
 
   public String getPropertyContained(FetchedResource r, String propertyName, Resource contained) {

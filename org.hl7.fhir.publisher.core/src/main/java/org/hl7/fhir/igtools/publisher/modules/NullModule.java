@@ -44,4 +44,9 @@ public class NullModule implements IPublisherModule {
     return null;
   }
 
+  @Override
+  public boolean approveFragment(boolean value, String code) {
+    return value;
+  }
+
 }

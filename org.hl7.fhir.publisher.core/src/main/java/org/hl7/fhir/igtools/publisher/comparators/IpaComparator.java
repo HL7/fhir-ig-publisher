@@ -15,6 +15,7 @@ import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.PastProcessHackerUtilities;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.igtools.publisher.loaders.PublisherLoader;
+import org.hl7.fhir.igtools.publisher.modules.NullModule;
 import org.hl7.fhir.r5.comparison.ComparisonRenderer;
 import org.hl7.fhir.r5.comparison.ComparisonSession;
 import org.hl7.fhir.r5.conformance.profile.ProfileKnowledgeProvider;
@@ -186,7 +187,7 @@ public class IpaComparator {
           vi.context.setLocale(context.getLocale());
           vi.context.setLogger(context.getLogger());
           vi.context.loadFromPackageAndDependencies(current, new PublisherLoader(current, SpecMapManager.fromPackage(current), current.getWebLocation(), null).makeLoader(), pcm);
-          vi.pkp = new IGKnowledgeProvider(vi.context, current.getWebLocation(), current.canonical(), null, null, false, null, null, null, null);
+          vi.pkp = new IGKnowledgeProvider(vi.context, current.getWebLocation(), current.canonical(), null, null, false, null, null, null, null, new NullModule());
         } catch (Exception e) {
           vi.errMsg = "Unable to find load package "+pid+"#"+vi.version+" ("+e.getMessage()+" on file "+filename+")";
           e.printStackTrace();
