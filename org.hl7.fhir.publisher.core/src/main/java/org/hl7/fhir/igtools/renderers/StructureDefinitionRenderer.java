@@ -1300,9 +1300,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       b.append("<p class=\"profile-derivation\">\r\n");
       StructureDefinition sdb = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition());
       if (sdb != null)
-        b.append(/\*#!\*/"This profile builds on" + " <a href=\\"" + Utilities.escapeXml(sdb.getWebPath()) + "\\">" + gen.getTranslated(sdb.getNameElement()) + "</a>.");
+        b.append(/*#!*/"This profile builds on" + " <a href=\"" + Utilities.escapeXml(sdb.getWebPath()) + "\">" + gen.getTranslated(sdb.getNameElement()) + "</a>.");
       else
-        b.append(/\*#!\*/"This profile builds on" + " " + sd.getBaseDefinition() + ".");
+        b.append(/*#!*/"This profile builds on" + " " + sd.getBaseDefinition() + ".");
       b.append("</p>\r\n");
     }
     b.append("<p class=\"profile-publication\">\r\n");
