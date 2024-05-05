@@ -1289,25 +1289,25 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   public String header() throws Exception {
     StringBuilder b = new StringBuilder();
-    b.append("<p class=\"profile-url-label\">\\r\\n");
-    b.append("The official URL for this profile is:" + "\\r\\n");
-    b.append("</p>\\r\\n");
-    b.append("<pre class=\"profile-url\">" + sd.getUrl() + "</pre>\\r\\n");
-    b.append("<div class=\"profile-description\">\\r\\n");
+    b.append("<p class=\"profile-url-label\">\r\n");
+    b.append("The official URL for this profile is:" + "\r\n");
+    b.append("</p>\r\n");
+    b.append("<pre class=\"profile-url\">" + sd.getUrl() + "</pre>\r\n");
+    b.append("<div class=\"profile-description\">\r\n");
     b.append(processMarkdown("description", sd.getDescriptionElement()));
-    b.append("</div>\\r\\n");
+    b.append("</div>\r\n");
     if (sd.getDerivation() == TypeDerivationRule.CONSTRAINT) {
-      b.append("<p class=\"profile-derivation\">\\r\\n");
+      b.append("<p class=\"profile-derivation\">\r\n");
       StructureDefinition sdb = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition());
       if (sdb != null)
         b.append(/\*#!\*/"This profile builds on" + " <a href=\\"" + Utilities.escapeXml(sdb.getWebPath()) + "\\">" + gen.getTranslated(sdb.getNameElement()) + "</a>.");
       else
         b.append(/\*#!\*/"This profile builds on" + " " + sd.getBaseDefinition() + ".");
-      b.append("</p>\\r\\n");
+      b.append("</p>\r\n");
     }
-    b.append("<p class=\"profile-publication\">\\r\\n");
-    b.append(gen.formatMessage(RenderingContext.SD_SUMMARY_PUBLICATION, renderDate(sd.getDateElement()), gen.getTranslated(sd.getStatusElement()), gen.getTranslated(sd.getPublisherElement()))+"\\r\\n");
-    b.append("</p>\\r\\n");
+    b.append("<p class=\"profile-publication\">\r\n");
+    b.append(gen.formatMessage(RenderingContext.SD_SUMMARY_PUBLICATION, renderDate(sd.getDateElement()), gen.getTranslated(sd.getStatusElement()), gen.getTranslated(sd.getPublisherElement()))+"\r\n");
+    b.append("</p>\r\n");
     return b.toString();
   }
 
