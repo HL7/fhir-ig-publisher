@@ -10623,27 +10623,21 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private String processSQLData(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();
-    
+
     if (db == null) {
         return "<span style=\"color: maroon\">No SQL this build</span>";
     }
-    
-    String[] parts = src.trim().split("\s+", 2);
-    String fileName = parts[0];
-    String sql = parts[1];
-    
+
+    String[] parts = src.trim().split("\\s+", 3);
+    String fileName = parts[1];
+    String sql = parts[2];
+
     try {
         String json = db.executeQueryToJson(sql);
-        String outputPath = Utilities.path(f.getTempDir(), "_data", fileName + ".json");
-        TextFile.stringToFile(json, outputPath, false);
-        time(start);
+        String outputPath = Utilities.path(tempDir, "_data", fileName + ".json");
+        TextFile.stringToFile(json, outputPath);
         return "{% assign " + fileName + " = site.data." + fileName + " %}";
     } catch (Exception e) {
-        db.errors.add(e.getMessage());
-        if (db.debug) {
-            e.printStackTrace();
-        }
-        time(start);
         return "<span style=\"color: maroon\">Error processing SQL: " + Utilities.escapeXml(e.getMessage()) + "</span>";
     }
   }
