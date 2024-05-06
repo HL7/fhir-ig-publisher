@@ -36,6 +36,12 @@ import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.json.model.JsonArray;
+import org.hl7.fhir.utilities.json.model.JsonBoolean;
+import org.hl7.fhir.utilities.json.model.JsonNull;
+import org.hl7.fhir.utilities.json.model.JsonNumber;
+import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.model.JsonString;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
@@ -636,6 +642,45 @@ public class DBBuilder {
       time(start);
       return "<span style=\"color: maroon\">Error processing SQL: "+Utilities.escapeXml(e.getMessage())+"</span>";
     }
+  }
+
+  public String executeQueryToJson(String sql) throws SQLException {
+    if (con == null) {
+      throw new IllegalStateException("No database connection available.");
+    }
+    
+    if (sql == null) {
+      throw new IllegalArgumentException("Param sql cannot be null.");
+    }
+    
+    Statement stmt = con.createStatement();
+    ResultSet rs = stmt.executeQuery(sql);
+    ResultSetMetaData rsmd = rs.getMetaData();
+    
+    JsonArray jsonArray = new JsonArray();
+    
+    while (rs.next()) {
+      JsonObject jsonObject = new JsonObject();
+      for (int i = 1; i <= rsmd.getColumnCount(); i++) {
+        String colName = rsmd.getColumnName(i);
+        Object value = rs.getObject(i);
+        
+        if (value == null) {
+          jsonObject.add(colName, new JsonNull());
+        } else if (value instanceof String) {
+          jsonObject.add(colName, new JsonString((String) value));
+        } else if (value instanceof Integer || value instanceof Long) {
+          jsonObject.add(colName, new JsonNumber(value.toString()));
+        } else if (value instanceof Boolean) {
+          jsonObject.add(colName, new JsonBoolean((Boolean) value));
+        } else {
+          jsonObject.add(colName, new JsonString(value.toString()));
+        }
+      }
+      jsonArray.add(jsonObject);
+    }
+    
+    return jsonArray.toString();
   }
 
   private String readFormatRules(List<RenderingRule> rules, String fmt) {
