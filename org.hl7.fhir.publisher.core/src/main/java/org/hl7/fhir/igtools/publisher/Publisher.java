@@ -2760,8 +2760,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       case "path-test":     
         testDirs.add(Utilities.path(rootDir, p.getValue()));
         break;
-      case "path-data":     
-        dataDirs.add(Utilities.path(rootDir, p.getValue()));
+      case "path-data":
+        try {
+          dataDirs.add(Utilities.path(rootDir, p.getValue()));
+        } catch (Exception e) {
+          throw new Exception("Error adding path-data directory: " + p.getValue(), e);
+        }
         break;
       case "copyrightyear":     
         copyrightYear = p.getValue();
