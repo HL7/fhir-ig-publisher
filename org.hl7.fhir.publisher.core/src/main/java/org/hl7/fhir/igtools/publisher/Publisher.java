@@ -10522,8 +10522,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         String sfx = src.substring(i + 2);
         String sql = src.substring(0, i);
 
-        if (sql.trim().startsWith("sqlToData")) {
-          src = pfx + processSQLData(db, sql, f) + sfx;
+        if (sql.trim().startsWith("ToData ")) {
+          src = pfx + processSQLData(db, sql.substring(7), f) + sfx;
         } else {
           src = pfx + processSQLCommand(db, sql, f) + sfx;
         }
@@ -10628,9 +10628,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         return "<span style=\"color: maroon\">No SQL this build</span>";
     }
 
-    String[] parts = src.trim().split("\\s+", 3);
-    String fileName = parts[1];
-    String sql = parts[2];
+    String[] parts = src.trim().split("\\s+", 2);
+    String fileName = parts[0];
+    String sql = parts[1];
 
     try {
         String json = db.executeQueryToJson(sql);

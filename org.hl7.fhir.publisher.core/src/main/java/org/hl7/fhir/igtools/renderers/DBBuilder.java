@@ -648,23 +648,23 @@ public class DBBuilder {
     if (con == null) {
       throw new IllegalStateException("No database connection available.");
     }
-    
+
     if (sql == null) {
       throw new IllegalArgumentException("Param sql cannot be null.");
     }
-    
+
     Statement stmt = con.createStatement();
     ResultSet rs = stmt.executeQuery(sql);
     ResultSetMetaData rsmd = rs.getMetaData();
-    
+
     JsonArray jsonArray = new JsonArray();
-    
+
     while (rs.next()) {
       JsonObject jsonObject = new JsonObject();
       for (int i = 1; i <= rsmd.getColumnCount(); i++) {
         String colName = rsmd.getColumnName(i);
         Object value = rs.getObject(i);
-        
+
         if (value == null) {
           jsonObject.add(colName, new JsonNull());
         } else if (value instanceof String) {
@@ -679,7 +679,7 @@ public class DBBuilder {
       }
       jsonArray.add(jsonObject);
     }
-    
+
     return jsonArray.toString();
   }
 
