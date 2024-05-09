@@ -7711,10 +7711,15 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private void copyData() throws IOException {
     for (String d : dataDirs) {
-      for (File f : new File(d).listFiles()) {
-        String df = Utilities.path(tempDir, "_data", f.getName());
-        otherFilesRun.add(df);
-        Utilities.copyFile(f, new File(df));
+      File[] fl = new File(d).listFiles();
+      if (fl == null) {
+        logDebugMessage(LogCategory.PROGRESS, "No files found to copy at "+d);
+      } else {
+        for (File f : fl) {
+          String df = Utilities.path(tempDir, "_data", f.getName());
+          otherFilesRun.add(df);
+          Utilities.copyFile(f, new File(df));
+        }
       }
     }
   }
@@ -9948,6 +9953,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     data.add("toolingVersionFull", Constants.VERSION+" ("+ToolsVersion.TOOLS_VERSION_STR+")");
     data.add("totalFiles", fileList.size());
     data.add("processedFiles", changeList.size());
+    
+    if (repoSource != null) {
+      data.add("repoSource", gh());
+    }
     data.add("genDate", genTime());
     data.add("genDay", genDate());
     if (db != null) {
@@ -9977,8 +9986,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     ig.add("version", workingVersion());
     ig.add("status", publishedIg.getStatusElement().asStringValue());
     ig.add("experimental", publishedIg.getExperimental());
-    ig.add("publisher", publishedIg.getPublisher());
-    ig.add("gitstatus", getGitStatus());
+    ig.add("publisher", publishedIg.getPublisher());    
     if (db != null) {
       db.metadata("gitstatus", getGitStatus());
     }
@@ -11325,6 +11333,20 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         }
         fragment(r.fhirType()+"-"+r.getId()+"-html", html, f.getOutputNames(), r, vars, null, start, "html", "Resource");
       } else {
+        if (xhtml == null) {
+          RenderingContext lrc = rc.copy();
+          if (r.getResource() != null && r.getResource() instanceof DomainResource) {
+            xhtml = RendererFactory.factory(r.fhirType(), lrc).build((DomainResource) r.getResource());
+          } else {
+            ResourceWrapper rw = new ElementWrappers.ResourceWrapperMetaElement(lrc, r.getElement()); 
+            try {
+              xhtml = RendererFactory.factory(r.fhirType(), lrc).render(rw);
+            } catch (Exception ex) {
+              xhtml = new XhtmlNode(NodeType.Element, "div");
+              xhtml.para("Error rendering resource: "+ex.getMessage());
+            }
+          }
+        }
         String html = xhtml == null ? "" : new XhtmlComposer(XhtmlComposer.XML).compose(xhtml);
         fragment(r.fhirType()+"-"+r.getId()+"-html", html, f.getOutputNames(), r, vars, null, start, "html", "Resource");
       }
