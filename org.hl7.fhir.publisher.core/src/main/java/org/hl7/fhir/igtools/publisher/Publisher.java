@@ -10514,14 +10514,19 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     try {
       String src = new String(content);
       boolean changed = false;
-      while (db != null &&  src.contains("{% sql")) {
+      while (db != null && src.contains("{% sql")) {
         int i = src.indexOf("{% sql");
         String pfx = src.substring(0, i);
-        src = src.substring(i+6);
+        src = src.substring(i + 6);
         i = src.indexOf("%}");
-        String sfx = src.substring(i+2);
-        src = src.substring(0, i);
-        src = pfx+processSQlCommand(db, src, f)+sfx;
+        String sfx = src.substring(i + 2);
+        String sql = src.substring(0, i);
+
+        if (sql.trim().startsWith("ToData ")) {
+          src = pfx + processSQLData(db, sql.substring(7), f) + sfx;
+        } else {
+          src = pfx + processSQLCommand(db, sql, f) + sfx;
+        }
         changed = true;
       }
       while (src.contains("[[[")) {
@@ -10589,7 +10594,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private Map<String, FragmentUseRecord> fragmentUses = new HashMap<>();
   private boolean trackFragments = false;
   
-  private String processSQlCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
+  private String processSQLCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();
     String output = db == null ? "<span style=\"color: maroon\">No SQL this build</span>" : db.processSQL(src);
     int i = sqlIndex++;
@@ -10613,6 +10618,27 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
     public String getValue() {
       return value;
+    }
+  }
+
+  private String processSQLData(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
+    long start = System.currentTimeMillis();
+
+    if (db == null) {
+        return "<span style=\"color: maroon\">No SQL this build</span>";
+    }
+
+    String[] parts = src.trim().split("\\s+", 2);
+    String fileName = parts[0];
+    String sql = parts[1];
+
+    try {
+        String json = db.executeQueryToJson(sql);
+        String outputPath = Utilities.path(tempDir, "_data", fileName + ".json");
+        TextFile.stringToFile(json, outputPath);
+        return "{% assign " + fileName + " = site.data." + fileName + " %}";
+    } catch (Exception e) {
+        return "<span style=\"color: maroon\">Error processing SQL: " + Utilities.escapeXml(e.getMessage()) + "</span>";
     }
   }
 
