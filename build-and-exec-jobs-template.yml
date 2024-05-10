@@ -7,63 +7,18 @@ jobs:
         pool:
           vmImage: ${{execTest.vmImage}}
 
-
         variables:
           currentImage: ${{execTest.vmImage}}
           VERSION:
           JAVA_TOOL_OPTIONS: ${{execTest.javaToolOptions}}
 
         steps:
+          - template: ./.azure/qa-diff/pipelines/build-and-exec-steps-template.yml
+            parameters:
+                igName: ${{execTest.igName}}
+                gitRepo: ${{execTest.gitRepo}}
+                gitCommitHash: ${{execTest.gitCommitHash}}
+                jdkVersion: ${{execTest.jdkVersion}}
+                javaToolOptions: ${{execTest.javaToolOptions}}
 
-          - task: UseRubyVersion@0
-            inputs:
-              versionSpec: '>= 3.0'
-
-          - script : |
-              ridk install 3
-            condition: eq( variables['Agent.OS'], 'Windows_NT' )
-            displayName: 'ridk for ruby install'
-
-          - script: |
-              gem install jekyll bundler
-              bundle init
-              bundle update --bundler
-              bundle install --retry=3 --jobs=4
-            displayName: 'jekyll install'
-
-          - script: |
-              npm install -g fsh-sushi
-            displayName: 'fsh-sushi install'
-
-          # Runs 'mvn install'
-          - task: Maven@3
-            displayName: 'Build project'
-            inputs:
-              mavenPomFile: 'pom.xml'
-              mavenOptions: '-Xmx3072m'
-              options: '-DskipTests'
-              javaHomeOption: 'JDKVersion'
-              jdkVersionOption: '${{execTest.jdkVersion}}'
-              jdkArchitectureOption: 'x64'
-              publishJUnitResults: true
-              testResultsFiles: '**/surefire-reports/TEST-*.xml'
-              goals: 'install'
-
-          - task: Bash@3
-            displayName: 'Clone target IG'
-            inputs:
-              targetType: 'inline'
-              script: mkdir -p $(Pipeline.Workspace)/target-ig; git clone ${{execTest.gitRepo}} "$(Pipeline.Workspace)/target-ig"
-
-          - task: Maven@3
-            displayName: 'Run IG Publisher with IG'
-            inputs:
-              mavenPomFile: 'pom.xml'
-              mavenOptions: '-Xmx3072m'
-              javaHomeOption: 'JDKVersion'
-              jdkVersionOption: '${{execTest.jdkVersion}}'
-              jdkArchitectureOption: 'x64'
-              options: '-pl org.hl7.fhir.publisher.cli -Dpublisher.cli.exec.target-ig="$(Pipeline.Workspace)/target-ig"'
-              publishJUnitResults: false
-              testResultsFiles: '**/surefire-reports/TEST-*.xml'
-              goals: 'org.codehaus.mojo:exec-maven-plugin:exec@target-ig-cli'
+              

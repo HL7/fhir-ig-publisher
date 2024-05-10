@@ -35,6 +35,7 @@ jobs:
           vmImage: ubuntu-latest
           jdkVersion: 1.11
           gitRepo: https://github.com/FHIR/fhir-tools-ig.git
+          gitCommitHash:
         - igName: fhir-tools-ig-exec
           vmImage: ubuntu-latest
           jdkVersion: 1.17
