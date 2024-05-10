@@ -20,5 +20,6 @@ jobs:
                 gitCommitHash: ${{execTest.gitCommitHash}}
                 jdkVersion: ${{execTest.jdkVersion}}
                 javaToolOptions: ${{execTest.javaToolOptions}}
+                publishQAArtifacts: false
 
-              
+
