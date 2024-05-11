@@ -433,6 +433,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     s.close();
 
     genQAText(title, files, path, filteredMessages, linkErrors);
+    genQATextForCompare(title, files, path, filteredMessages, linkErrors);
     genQAESLintCompactText(title, files, path, filteredMessages, linkErrors);
     genTXServerQA(title, path);
     
@@ -661,6 +662,29 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     }    
     b.append(genFooterTxt(title));
     TextFile.stringToFile(b.toString(), Utilities.changeFileExt(path, ".txt"));
+  }
+
+  public void genQATextForCompare(String title, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, List<ValidationMessage> linkErrors)
+      throws IOException {
+    StringBuilder b = new StringBuilder();
+    b.append(genHeaderTxtForCompare(title, err, warn, info));
+    b.append(genSummaryRowTxtInternal(linkErrors));
+    files = sorted(files);
+    for (FetchedFile f : files) 
+      b.append(genSummaryRowTxt(f));
+    b.append(genEnd());
+    b.append(genStartTxtInternal());
+    for (ValidationMessage vm : linkErrors)
+      b.append(vm.getDisplay() + "\r\n");
+    b.append(genEndTxt());
+    for (FetchedFile f : files) {
+      b.append(genStartTxt(f));
+      for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages))
+        b.append(vm.getDisplay() + "\r\n");
+      b.append(genEndTxt());
+    }    
+    b.append(genFooterTxt(title));
+    TextFile.stringToFile(b.toString(), Utilities.changeFileExt(path, ".compare.txt"));
   }
 
   public List<FetchedFile> genQAHtml(String title, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, List<ValidationMessage> linkErrors, boolean allIssues) throws IOException {
@@ -1145,6 +1169,46 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("igversion", igVersion);
     t.add("title", title);
     t.add("time", genDate);
+    t.add("err",  Integer.toString(err));
+    t.add("warn",  Integer.toString(warn));
+    t.add("info",  Integer.toString(info));
+    t.add("packageId", packageId);
+    t.add("canonical", provider.getCanonical());
+    t.add("copyrightYearCheck", checkCopyRightYear());
+    t.add("realmCheck", realm.checkText());
+    t.add("igcode", igcode);
+    t.add("igcodeerror", igCodeError);
+    t.add("igrealmerror", igRealmError);
+    t.add("realm", igrealm == null ? "n/a" : igrealm.toUpperCase());
+    t.add("dependencyCheck", dependencies);
+    t.add("dependentIgs", dependentIgs.getCountDesc());
+    t.add("pubReqCheck", pubReqCheck);
+    t.add("csAnalysis", csAnalysis);
+    t.add("previousVersion", previousVersionComparator.checkHtml());
+    t.add("ipaComparison", ipaComparator == null ? "n/a" : ipaComparator.checkHtml());
+    t.add("ipsComparison", ipsComparator == null ? "n/a" : ipsComparator.checkHtml());
+    if (noGenerate || noValidate) {
+      if (noGenerate && noValidate) {
+        t.add("warning", "Warning: This IG was generated with both validation and HTML generation off. Many kinds of errors will not be reported.\r\n");        
+      } else if (noGenerate) {
+        t.add("warning", "Warning: This IG was generated with HTML generation off. Some kinds of errors will not be reported.\r\n");        
+      } else {
+        t.add("warning", "Warning: This IG was generated with validation off. Many kinds of errors will not be reported.\r\n");        
+      }      
+    } else {
+      t.add("warning", "");
+    }
+    return t.render();
+  }
+
+  private String genHeaderTxtForCompare(String title, int err, int warn, int info) {
+    ST t = template(headerTemplateText);
+    t.add("version", "$--");
+    t.add("toolsVersion", "$--");
+    t.add("versionCheck", "$--");
+    t.add("igversion", "$--");
+    t.add("title", title);
+    t.add("time", "$--");
     t.add("err",  Integer.toString(err));
     t.add("warn",  Integer.toString(warn));
     t.add("info",  Integer.toString(info));

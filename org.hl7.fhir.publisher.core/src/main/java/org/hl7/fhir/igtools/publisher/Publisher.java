@@ -1068,12 +1068,16 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     long startTime = System.nanoTime();
     JsonObject qaJson = new JsonObject();
     StringBuilder txt = new StringBuilder();
+    StringBuilder txtGen = new StringBuilder();
     qaJson.add("url", templateInfo.asString("canonical"));
     txt.append("url = "+templateInfo.asString("canonical")+"\r\n");
+    txtGen.append("url = "+templateInfo.asString("canonical")+"\r\n");
     qaJson.add("package-id", templateInfo.asString("name"));
     txt.append("package-id = "+templateInfo.asString("name")+"\r\n");
+    txtGen.append("package-id = "+templateInfo.asString("name")+"\r\n");
     qaJson.add("ig-ver", templateInfo.asString("version"));
     txt.append("ig-ver = "+templateInfo.asString("version")+"\r\n");
+    txtGen.append("ig-ver = "+templateInfo.asString("version")+"\r\n");
     qaJson.add("date", new SimpleDateFormat("EEE, dd MMM, yyyy HH:mm:ss Z", new Locale("en", "US")).format(execTime.getTime()));
     qaJson.add("dateISO8601", new DateTimeType(execTime).asStringValue());
     qaJson.add("version", Constants.VERSION);
@@ -1097,11 +1101,13 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       e.printStackTrace();
       qaJson.add("exception", e.getMessage());
       txt.append("exception = "+e.getMessage()+"\r\n");
+      txtGen.append("exception = "+e.getMessage()+"\r\n");
     }
     long endTime = System.nanoTime();
     String json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(qaJson, true);
     TextFile.stringToFile(json, Utilities.path(outputDir, "qa.json"));
     TextFile.stringToFile(txt.toString(), Utilities.path(outputDir, "qa.txt"));
+    TextFile.stringToFile(txtGen.toString(), Utilities.path(outputDir, "qa.compare.txt"));
 
     Utilities.createDirectory(tempDir);
     ZipGenerator zip = new ZipGenerator(Utilities.path(tempDir, "full-ig.zip"));
