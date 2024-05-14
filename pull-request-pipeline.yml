@@ -30,7 +30,7 @@ jobs:
           javaToolOptions:
   - template: build-and-exec-qa-jobs-template.yml
     parameters:
-      execTests:
+      execQaJobs:
         - igName: example.fhir.uv.myig
           vmImage: ubuntu-latest
           jdkVersion: 1.11

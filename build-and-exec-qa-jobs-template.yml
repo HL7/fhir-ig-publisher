@@ -1,31 +1,31 @@
 jobs:
-  - ${{ each execTest in parameters.execTests }}:
-      - job: ${{execTest.igName}}_qa
+  - ${{ each execQaJob in parameters.execQaJobs }}:
+      - job: ${{ replace(execQaJob.igName,',', '_')}}_qa
 
-        displayName: Test publisher.jar exec on ${{execTest.igName}} ${{execTest.vmImage}}
+        displayName: Test publisher.jar exec on ${{execQaJob.igName}} ${{execQaJob.vmImage}}
         
         pool:
-          vmImage: ${{execTest.vmImage}}
+          vmImage: ${{execQaJob.vmImage}}
 
         variables:
-          currentImage: ${{execTest.vmImage}}
+          currentImage: ${{execQaJob.vmImage}}
           VERSION:
-          JAVA_TOOL_OPTIONS: ${{execTest.javaToolOptions}}
+          JAVA_TOOL_OPTIONS: ${{execQaJob.javaToolOptions}}
 
         steps:
           - template: ./.azure/qa-diff/pipelines/build-and-exec-steps-template.yml
             parameters:
-                igName: ${{execTest.igName}}
-                gitRepo: ${{execTest.gitRepo}}
-                gitCommitHash: ${{execTest.gitCommitHash}}
-                jdkVersion: ${{execTest.jdkVersion}}
-                javaToolOptions: ${{execTest.javaToolOptions}}
+                igName: ${{execQaJob.igName}}
+                gitRepo: ${{execQaJob.gitRepo}}
+                gitCommitHash: ${{execQaJob.gitCommitHash}}
+                jdkVersion: ${{execQaJob.jdkVersion}}
+                javaToolOptions: ${{execQaJob.javaToolOptions}}
                 publishQAArtifacts: true
 
   - job: publish_qa_diff
     dependsOn:
-      - ${{ each execTest in parameters.execTests }}:
-          - ${{execTest.igName}}_qa
+      - ${{ each execQaJob in parameters.execQaJobs }}:
+          - ${{ replace(execQaJob.igName,',', '_')}}_qa
     steps:
-      - ${{ each execTest in parameters.execTests }}:
-          - script: echo "$(execTest.igName) says hello."
+      - ${{ each execQaJob in parameters.execQaJobs }}:
+          - script: echo "$(execQaJob.igName) says hello."
