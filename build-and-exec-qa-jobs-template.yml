@@ -2,7 +2,7 @@ jobs:
   - ${{ each execQaJob in parameters.execQaJobs }}:
       - job: ${{ replace(execQaJob.igName,'.', '_')}}_qa
 
-        displayName: Test publisher.jar exec on ${{execQaJob.igName}} ${{execQaJob.vmImage}}
+        displayName: Run publisher.jar exec on ${{execQaJob.igName}} and publish QA results
         
         pool:
           vmImage: ${{execQaJob.vmImage}}
@@ -23,9 +23,12 @@ jobs:
                 publishQAArtifacts: true
 
   - job: publish_qa_diff
+    displayName: 'Generate diff zip'
     dependsOn:
       - ${{ each execQaJob in parameters.execQaJobs }}:
           - ${{ replace(execQaJob.igName,'.', '_')}}_qa
+    pool:
+      vmImage: 'ubuntu-latest'
     steps:
       - ${{ each execQaJob in parameters.execQaJobs }}:
           - script: echo "$(execQaJob.igName) says hello."
