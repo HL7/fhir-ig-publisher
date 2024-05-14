@@ -31,4 +31,4 @@ jobs:
       vmImage: 'ubuntu-latest'
     steps:
       - ${{ each execQaJob in parameters.execQaJobs }}:
-          - script: echo "${{execQaJob.igName)}} says hello."
+          - script: echo "${{execQaJob.igName}} says hello."
