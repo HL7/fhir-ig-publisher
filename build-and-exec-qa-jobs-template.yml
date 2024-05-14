@@ -1,6 +1,6 @@
 jobs:
   - ${{ each execTest in parameters.execTests }}:
-      - job:
+      - job: ${{execTest.igName}}_${{value}}
 
         displayName: Test publisher.jar exec on ${{execTest.igName}} ${{execTest.vmImage}}
         
@@ -22,4 +22,7 @@ jobs:
                 javaToolOptions: ${{execTest.javaToolOptions}}
                 publishQAArtifacts: true
 
-
+  - job: publish_qa_diff
+    dependsOn:
+      - ${{ each execTest in parameters.execTests }}:
+          - ubuntu_java_11_${{ module }}
