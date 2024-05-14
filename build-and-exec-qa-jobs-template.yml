@@ -1,6 +1,6 @@
 jobs:
   - ${{ each execQaJob in parameters.execQaJobs }}:
-      - job: ${{ replace(execQaJob.igName,',', '_')}}_qa
+      - job: ${{ replace(execQaJob.igName,'.', '_')}}_qa
 
         displayName: Test publisher.jar exec on ${{execQaJob.igName}} ${{execQaJob.vmImage}}
         
@@ -25,7 +25,7 @@ jobs:
   - job: publish_qa_diff
     dependsOn:
       - ${{ each execQaJob in parameters.execQaJobs }}:
-          - ${{ replace(execQaJob.igName,',', '_')}}_qa
+          - ${{ replace(execQaJob.igName,'.', '_')}}_qa
     steps:
       - ${{ each execQaJob in parameters.execQaJobs }}:
           - script: echo "$(execQaJob.igName) says hello."
