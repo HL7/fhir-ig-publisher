@@ -698,9 +698,9 @@ public class HTMLInspector {
       } else {
         ValidationMessage vm;
         if (isCIBuild) {
-          vm = new ValidationMessage(Source.Publisher, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> tag containing the javascript '"+subset(x.allText())+"'... is illegal - put the script in a  .js file in a trusted template", IssueSeverity.FATAL);
+          vm = new ValidationMessage(Source.Publisher, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> tag in the file '"+filename+"' containing the javascript '"+subset(x.allText())+"'... is illegal - put the script in a  .js file in a trusted template", IssueSeverity.FATAL);
         } else {
-          vm =  new ValidationMessage(Source.Publisher, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> tag containing the javascript '"+subset(x.allText())+"'... is illegal and not allowed on the HL7 cibuild - put the script in a  .js file in a trusted template", IssueSeverity.ERROR);
+          vm =  new ValidationMessage(Source.Publisher, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> containing the javascript '"+subset(x.allText())+"'... is illegal and not allowed on the HL7 cibuild - put the script in a  .js file in a trusted template", IssueSeverity.ERROR);
         }
         messages.add(vm);
         jsmsgs.put(js, vm);

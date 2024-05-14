@@ -1068,12 +1068,16 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     long startTime = System.nanoTime();
     JsonObject qaJson = new JsonObject();
     StringBuilder txt = new StringBuilder();
+    StringBuilder txtGen = new StringBuilder();
     qaJson.add("url", templateInfo.asString("canonical"));
     txt.append("url = "+templateInfo.asString("canonical")+"\r\n");
+    txtGen.append("url = "+templateInfo.asString("canonical")+"\r\n");
     qaJson.add("package-id", templateInfo.asString("name"));
     txt.append("package-id = "+templateInfo.asString("name")+"\r\n");
+    txtGen.append("package-id = "+templateInfo.asString("name")+"\r\n");
     qaJson.add("ig-ver", templateInfo.asString("version"));
     txt.append("ig-ver = "+templateInfo.asString("version")+"\r\n");
+    txtGen.append("ig-ver = "+templateInfo.asString("version")+"\r\n");
     qaJson.add("date", new SimpleDateFormat("EEE, dd MMM, yyyy HH:mm:ss Z", new Locale("en", "US")).format(execTime.getTime()));
     qaJson.add("dateISO8601", new DateTimeType(execTime).asStringValue());
     qaJson.add("version", Constants.VERSION);
@@ -1097,11 +1101,13 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       e.printStackTrace();
       qaJson.add("exception", e.getMessage());
       txt.append("exception = "+e.getMessage()+"\r\n");
+      txtGen.append("exception = "+e.getMessage()+"\r\n");
     }
     long endTime = System.nanoTime();
     String json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(qaJson, true);
     TextFile.stringToFile(json, Utilities.path(outputDir, "qa.json"));
     TextFile.stringToFile(txt.toString(), Utilities.path(outputDir, "qa.txt"));
+    TextFile.stringToFile(txtGen.toString(), Utilities.path(outputDir, "qa.compare.txt"));
 
     Utilities.createDirectory(tempDir);
     ZipGenerator zip = new ZipGenerator(Utilities.path(tempDir, "full-ig.zip"));
@@ -7711,10 +7717,15 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private void copyData() throws IOException {
     for (String d : dataDirs) {
-      for (File f : new File(d).listFiles()) {
-        String df = Utilities.path(tempDir, "_data", f.getName());
-        otherFilesRun.add(df);
-        Utilities.copyFile(f, new File(df));
+      File[] fl = new File(d).listFiles();
+      if (fl == null) {
+        logDebugMessage(LogCategory.PROGRESS, "No files found to copy at "+d);
+      } else {
+        for (File f : fl) {
+          String df = Utilities.path(tempDir, "_data", f.getName());
+          otherFilesRun.add(df);
+          Utilities.copyFile(f, new File(df));
+        }
       }
     }
   }
@@ -9948,6 +9959,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     data.add("toolingVersionFull", Constants.VERSION+" ("+ToolsVersion.TOOLS_VERSION_STR+")");
     data.add("totalFiles", fileList.size());
     data.add("processedFiles", changeList.size());
+    
+    if (repoSource != null) {
+      data.add("repoSource", gh());
+    }
     data.add("genDate", genTime());
     data.add("genDay", genDate());
     if (db != null) {
@@ -9977,8 +9992,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     ig.add("version", workingVersion());
     ig.add("status", publishedIg.getStatusElement().asStringValue());
     ig.add("experimental", publishedIg.getExperimental());
-    ig.add("publisher", publishedIg.getPublisher());
-    ig.add("gitstatus", getGitStatus());
+    ig.add("publisher", publishedIg.getPublisher());    
     if (db != null) {
       db.metadata("gitstatus", getGitStatus());
     }
@@ -10514,14 +10528,19 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     try {
       String src = new String(content);
       boolean changed = false;
-      while (db != null &&  src.contains("{% sql")) {
+      while (db != null && src.contains("{% sql")) {
         int i = src.indexOf("{% sql");
         String pfx = src.substring(0, i);
-        src = src.substring(i+6);
+        src = src.substring(i + 6);
         i = src.indexOf("%}");
-        String sfx = src.substring(i+2);
-        src = src.substring(0, i);
-        src = pfx+processSQlCommand(db, src, f)+sfx;
+        String sfx = src.substring(i + 2);
+        String sql = src.substring(0, i);
+
+        if (sql.trim().startsWith("ToData ")) {
+          src = pfx + processSQLData(db, sql.substring(7), f) + sfx;
+        } else {
+          src = pfx + processSQLCommand(db, sql, f) + sfx;
+        }
         changed = true;
       }
       while (src.contains("[[[")) {
@@ -10589,7 +10608,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private Map<String, FragmentUseRecord> fragmentUses = new HashMap<>();
   private boolean trackFragments = false;
   
-  private String processSQlCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
+  private String processSQLCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();
     String output = db == null ? "<span style=\"color: maroon\">No SQL this build</span>" : db.processSQL(src);
     int i = sqlIndex++;
@@ -10613,6 +10632,27 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
     public String getValue() {
       return value;
+    }
+  }
+
+  private String processSQLData(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
+    long start = System.currentTimeMillis();
+
+    if (db == null) {
+        return "<span style=\"color: maroon\">No SQL this build</span>";
+    }
+
+    String[] parts = src.trim().split("\\s+", 2);
+    String fileName = parts[0];
+    String sql = parts[1];
+
+    try {
+        String json = db.executeQueryToJson(sql);
+        String outputPath = Utilities.path(tempDir, "_data", fileName + ".json");
+        TextFile.stringToFile(json, outputPath);
+        return "{% assign " + fileName + " = site.data." + fileName + " %}";
+    } catch (Exception e) {
+        return "<span style=\"color: maroon\">Error processing SQL: " + Utilities.escapeXml(e.getMessage()) + "</span>";
     }
   }
 
@@ -11299,6 +11339,20 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         }
         fragment(r.fhirType()+"-"+r.getId()+"-html", html, f.getOutputNames(), r, vars, null, start, "html", "Resource");
       } else {
+        if (xhtml == null) {
+          RenderingContext lrc = rc.copy();
+          if (r.getResource() != null && r.getResource() instanceof DomainResource) {
+            xhtml = RendererFactory.factory(r.fhirType(), lrc).build((DomainResource) r.getResource());
+          } else {
+            ResourceWrapper rw = new ElementWrappers.ResourceWrapperMetaElement(lrc, r.getElement()); 
+            try {
+              xhtml = RendererFactory.factory(r.fhirType(), lrc).render(rw);
+            } catch (Exception ex) {
+              xhtml = new XhtmlNode(NodeType.Element, "div");
+              xhtml.para("Error rendering resource: "+ex.getMessage());
+            }
+          }
+        }
         String html = xhtml == null ? "" : new XhtmlComposer(XhtmlComposer.XML).compose(xhtml);
         fragment(r.fhirType()+"-"+r.getId()+"-html", html, f.getOutputNames(), r, vars, null, start, "html", "Resource");
       }
