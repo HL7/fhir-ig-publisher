@@ -28,7 +28,7 @@ jobs:
           vmImage: windows-latest
           jdkVersion: 1.11
           javaToolOptions:
-  - template: build-and-exec-jobs-template.yml
+  - template: build-and-exec-qa-jobs-template.yml
     parameters:
       execTests:
         - igName: example.fhir.uv.myig

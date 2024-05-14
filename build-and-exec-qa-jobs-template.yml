@@ -1,6 +1,6 @@
 jobs:
   - ${{ each execTest in parameters.execTests }}:
-      - job: ${{execTest.igName}}_${{value}}
+      - job: ${{execTest.igName}}_qa
 
         displayName: Test publisher.jar exec on ${{execTest.igName}} ${{execTest.vmImage}}
         
@@ -25,4 +25,7 @@ jobs:
   - job: publish_qa_diff
     dependsOn:
       - ${{ each execTest in parameters.execTests }}:
-          - ubuntu_java_11_${{ module }}
+          - ${{execTest.igName}}_qa
+    steps:
+      - ${{ each execTest in parameters.execTests }}:
+          - script: echo "$(execTest.igName) says hello."
