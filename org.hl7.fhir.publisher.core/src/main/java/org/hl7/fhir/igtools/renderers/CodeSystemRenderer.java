@@ -62,21 +62,21 @@ public class CodeSystemRenderer extends CanonicalRenderer {
   protected void genSummaryRowsSpecific(StringBuilder b, Set<String> rows) {
     if (hasSummaryRow(rows, "content")) {
       if (cs.hasContent()) {
-        b.append(" <tr><td>"+(/*#!*/"Content")+":</td><td>"+(/*#!*/cs.getContent().getDisplay())+": "+describeContent(cs.getContent())+"</td></tr>\r\n");
+        b.append(" <tr><td>"+(/*!#*/"Content")+":</td><td>"+(/*!#*/cs.getContent().getDisplay())+": "+describeContent(cs.getContent())+"</td></tr>\r\n");
       }
     }
     if (hasSummaryRow(rows, "oid")) {
       if (CodeSystemUtilities.hasOID(cs)) {
-        b.append(" <tr><td>"+(/*#!*/"OID")+":</td><td>"+CodeSystemUtilities.getOID(cs)+" ("+(/*#!*/"for OID based terminology systems")+")</td></tr>\r\n");
+        b.append(" <tr><td>"+(/*!#*/"OID")+":</td><td>"+CodeSystemUtilities.getOID(cs)+" ("+(/*!#*/"for OID based terminology systems")+")</td></tr>\r\n");
       }
     }
     if (hasSummaryRow(rows, "cs.vs")) {
       if (cs.hasValueSet()) {
         ValueSet vs = context.findTxResource(ValueSet.class, cs.getValueSet());
         if (vs == null) {
-          b.append(" <tr><td>"+(/*#!*/"Value Set")+":</td><td>"+ cs.getValueSet()+" ("+(/*#!*/" is the value set for all codes in this code system")+")</td></tr>\r\n");
+          b.append(" <tr><td>"+(/*!#*/"Value Set")+":</td><td>"+ cs.getValueSet()+" ("+(/*!#*/" is the value set for all codes in this code system")+")</td></tr>\r\n");
         } else {
-          b.append(" <tr><td>"+(/*#!*/"Value Set")+":</td><td><a href=\""+vs.getWebPath()+"\">"+ cs.getValueSet()+"</a> ("+(/*#!*/" is the value set for all codes in this code system")+")</td></tr>\r\n");        
+          b.append(" <tr><td>"+(/*!#*/"Value Set")+":</td><td><a href=\""+vs.getWebPath()+"\">"+ cs.getValueSet()+"</a> ("+(/*!#*/" is the value set for all codes in this code system")+")</td></tr>\r\n");        
         }
       }
     }
@@ -84,11 +84,11 @@ public class CodeSystemRenderer extends CanonicalRenderer {
 
   private String describeContent(CodeSystemContentMode content) {
     switch (content) {
-    case COMPLETE: return (/*#!*/"All the concepts defined by the code system are included in the code system resource");
-    case NOTPRESENT: return (/*#!*/"None of the concepts defined by the code system are included in the code system resource");
-    case EXAMPLE: return (/*#!*/"A few representative concepts are included in the code system resource");
-    case FRAGMENT: return (/*#!*/"A subset of the code system concepts are included in the code system resource");
-    case SUPPLEMENT: return (/*#!*/"This code system resource is a supplement to ")+refCS(cs.getSupplements());
+    case COMPLETE: return (/*!#*/"All the concepts defined by the code system are included in the code system resource");
+    case NOTPRESENT: return (/*!#*/"None of the concepts defined by the code system are included in the code system resource");
+    case EXAMPLE: return (/*!#*/"A few representative concepts are included in the code system resource");
+    case FRAGMENT: return (/*!#*/"A subset of the code system concepts are included in the code system resource");
+    case SUPPLEMENT: return (/*!#*/"This code system resource is a supplement to ")+refCS(cs.getSupplements());
     default:
       return "?? illegal content status value "+(content == null ? "(null)" : content.toCode());
     }
@@ -136,7 +136,7 @@ public class CodeSystemRenderer extends CanonicalRenderer {
         first = addLink(b, first, vc, ed, processed);
     }
     if (first)
-      b.append("<ul><li>"+(/*#!*/"This CodeSystem is not used here; it may be used elsewhere (e.g. specifications and/or implementations that use this content)")+"</li></ul>\r\n");
+      b.append("<ul><li>"+(/*!#*/"This CodeSystem is not used here; it may be used elsewhere (e.g. specifications and/or implementations that use this content)")+"</li></ul>\r\n");
     else
       b.append("</ul>\r\n");    
     return b.toString()+changeSummary();

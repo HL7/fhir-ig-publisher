@@ -72,7 +72,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
   protected void genSummaryRowsSpecific(StringBuilder b, Set<String> rows) {
     if (hasSummaryRow(rows, "oid")) {
       if (ValueSetUtilities.hasOID(vs)) {
-        b.append(" <tr><td>"+/*#!*/"OID"+":</td><td>"+ValueSetUtilities.getOID(vs)+" ("+/*#!*/"for OID based terminology systems"+")</td></tr>\r\n");
+        b.append(" <tr><td>"+/*!#*/"OID"+":</td><td>"+ValueSetUtilities.getOID(vs)+" ("+/*!#*/"for OID based terminology systems"+")</td></tr>\r\n");
       }
     }
   }
@@ -126,7 +126,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
                 first = false;
                 b.append("<ul>\r\n");
               }
-              b.append(" <li>"+/*#!*/"Included into "+"<a href=\""+vc.getWebPath()+"\">"+Utilities.escapeXml(gen.getTranslated(vc.getNameElement()))+"</a></li>\r\n");
+              b.append(" <li>"+/*!#*/"Included into "+"<a href=\""+vc.getWebPath()+"\">"+Utilities.escapeXml(gen.getTranslated(vc.getNameElement()))+"</a></li>\r\n");
               break;
             }
           }
@@ -138,7 +138,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
                 first = false;
                 b.append("<ul>\r\n");
               }
-              b.append(" <li>"+/*#!*/"Excluded from "+"<a href=\""+vc.getWebPath()+"\">"+Utilities.escapeXml(gen.getTranslated(vc.getNameElement()))+"</a></li>\r\n");
+              b.append(" <li>"+/*!#*/"Excluded from "+"<a href=\""+vc.getWebPath()+"\">"+Utilities.escapeXml(gen.getTranslated(vc.getNameElement()))+"</a></li>\r\n");
               break;
             }
           }
@@ -198,7 +198,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
       }
     }
     if (first)
-      b.append("<p>"+/*#!*/"This value set is not used here; it may be used elsewhere (e.g. specifications and/or implementations that use this content)"+"</p>\r\n");
+      b.append("<p>"+/*!#*/"This value set is not used here; it may be used elsewhere (e.g. specifications and/or implementations that use this content)"+"</p>\r\n");
     else
       b.append("</ul>\r\n");
     return b.toString()+changeSummary();
