@@ -31,36 +31,14 @@ jobs:
   - template: build-and-exec-jobs-template.yml
     parameters:
       execTests:
-        - igName: fhir-tools-ig-exec
+        - igName: example.fhir.uv.myig
           vmImage: ubuntu-latest
           jdkVersion: 1.11
-          gitRepo: https://github.com/FHIR/fhir-tools-ig.git
-          gitCommitHash:
-        - igName: fhir-tools-ig-exec
-          vmImage: ubuntu-latest
-          jdkVersion: 1.17
-          gitRepo: https://github.com/FHIR/fhir-tools-ig.git
-        - igName: fhir-tools-ig-exec
-          vmImage: windows-latest
-          jdkVersion: 1.11
-          gitRepo: https://github.com/FHIR/fhir-tools-ig.git
-        - igName: fhir-tools-ig-exec
-          vmImage: windows-latest
-          jdkVersion: 1.17
-          gitRepo: https://github.com/FHIR/fhir-tools-ig.git
-        - igName: fhir-tools-ig-exec
-          vmImage: macos-latest
-          jdkVersion: 1.11
-          gitRepo: https://github.com/FHIR/fhir-tools-ig.git
-        - igName: ACME-FSH-IG-Example
+          gitRepo: https://github.com/FHIR/sample-ig.git
+          gitCommitHash: 3167a0b
+        - igName: fhir.base.template.ig
           vmImage: ubuntu-latest
           jdkVersion: 1.11
-          gitRepo: https://github.com/FirelyTeam/ACME-FSH-IG-Example.git
-        - igName: ACME-FSH-IG-Example
-          vmImage: windows-latest
-          jdkVersion: 1.11
-          gitRepo: https://github.com/FirelyTeam/ACME-FSH-IG-Example.git
-        - igName: ACME-FSH-IG-Example
-          vmImage: macos-latest
-          jdkVersion: 1.11
-          gitRepo: https://github.com/FirelyTeam/ACME-FSH-IG-Example.git
+          gitRepo: https://github.com/HL7/ig-template-base.git
+          gitCommitHash: cc52687
+
