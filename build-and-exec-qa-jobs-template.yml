@@ -30,8 +30,9 @@ jobs:
     pool:
       vmImage: 'ubuntu-latest'
     steps:
-      - download: current
-        patterns: '**/*.json'
-      - download: current
-        patterns: '**/*.txt'
-      - script: ls -al $(Pipeline.Workspace)
+      - task: DownloadPipelineArtifact@2
+        inputs:
+          buildType: 'current'
+          itemPattern: '**/*.txt'
+          targetPath: '$(Pipeline.Workspace)/qaDiff'
+      - script: ls -al $(Pipeline.Workspace)/qaDiff
