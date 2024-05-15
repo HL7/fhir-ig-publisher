@@ -34,4 +34,4 @@ jobs:
         patterns: '**/*.json'
       - download: current
         patterns: '**/*.txt'
-      - script: ls -al
+      - script: ls -al ${{Pipeline.Workspace}}
