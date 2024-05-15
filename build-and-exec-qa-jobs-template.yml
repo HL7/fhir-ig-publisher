@@ -30,5 +30,7 @@ jobs:
     pool:
       vmImage: 'ubuntu-latest'
     steps:
-      - ${{ each execQaJob in parameters.execQaJobs }}:
-          - script: echo "${{execQaJob.igName}} says hello."
+      - download: current
+        patterns: '**/*.json'
+      - download: current
+        patterns: '**/*.json'
