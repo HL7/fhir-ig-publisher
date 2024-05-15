@@ -41,4 +41,5 @@ jobs:
           itemPattern: '**/*.json'
           targetPath: '$(Pipeline.Workspace)/qaDiff/actual'
       - script: mkdir $(Pipeline.Workspace)/qaDiff/expected
+      - script: cp ./.azure/qa-diff/expected/* $(Pipeline.Workspace)/qaDiff/expected
 
