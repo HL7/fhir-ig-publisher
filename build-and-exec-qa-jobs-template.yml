@@ -33,4 +33,5 @@ jobs:
       - download: current
         patterns: '**/*.json'
       - download: current
-        patterns: '**/*.json'
+        patterns: '**/*.txt'
+      - script: ls -al
