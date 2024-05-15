@@ -34,5 +34,11 @@ jobs:
         inputs:
           buildType: 'current'
           itemPattern: '**/*.txt'
-          targetPath: '$(Pipeline.Workspace)/qaDiff'
-      - script: ls -al $(Pipeline.Workspace)/qaDiff
+          targetPath: '$(Pipeline.Workspace)/qaDiff/actual'
+      - task: DownloadPipelineArtifact@2
+        inputs:
+          buildType: 'current'
+          itemPattern: '**/*.json'
+          targetPath: '$(Pipeline.Workspace)/qaDiff/actual'
+      - script: mkdir $(Pipeline.Workspace)/qaDiff/expected
+
