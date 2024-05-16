@@ -42,5 +42,8 @@ jobs:
           targetPath: '$(Pipeline.Workspace)/qaDiff/actual'
       - script: mkdir $(Pipeline.Workspace)/qaDiff/expected
       - script: cp ./.azure/qa-diff/expected/* $(Pipeline.Workspace)/qaDiff/expected
-      - script: ls -al $(Pipeline.Workspace)/qaDiff/expected ; ls -al $(Pipeline.Workspace)/qaDiff/actual
-
+      - task: PublishPipelineArtifact@1
+        inputs:
+          targetPath: '$(Pipeline.Workspace)/qaDiff'
+          artifact: qaDiff.zip
+        displayName: 'Publish QA diff artifact'
