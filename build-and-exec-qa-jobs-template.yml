@@ -45,5 +45,5 @@ jobs:
       - task: PublishPipelineArtifact@1
         inputs:
           targetPath: '$(Pipeline.Workspace)/qaDiff'
-          artifact: qaDiff.zip
+          artifact: qa-diff
         displayName: 'Publish QA diff artifact'
