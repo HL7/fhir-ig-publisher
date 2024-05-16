@@ -32,13 +32,9 @@ jobs:
     parameters:
       execQaJobs:
         - igName: example.fhir.uv.myig
-          vmImage: ubuntu-latest
-          jdkVersion: 1.11
           gitRepo: https://github.com/FHIR/sample-ig.git
           gitCommitHash: 3167a0b
         - igName: fhir.base.template.ig
-          vmImage: ubuntu-latest
-          jdkVersion: 1.11
           gitRepo: https://github.com/HL7/ig-template-base.git
           gitCommitHash: cc52687
   - template: ./.azure/templates/build-and-exec-jobs-template.yml
