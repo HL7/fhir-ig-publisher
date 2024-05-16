@@ -129,6 +129,9 @@
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.0.0</version>
+                <configuration>
+                    <mainClass>org.hl7.fhir.igtools.publisher.Publisher</mainClass>
+                </configuration>
                 <executions>
                     <!-- This is the default execution (only prints out help) -->
                     <!-- Usage: mvn exec:exec -pl org.hl7.fhir.publisher.cli -->
