@@ -33,8 +33,9 @@ jobs:
       - task: DownloadPipelineArtifact@2
         inputs:
           buildType: 'current'
-          itemPattern: '**/*.qa'
-          targetPath: '$(Pipeline.Workspace)/qaDiff/actual'
+          targetPath: '$(Pipeline.Workspace)/qaDiffTemp'
+      - script: mkdir $(Pipeline.Workspace)/qaDiff/actual
+      - script: cp $(Pipeline.Workspace)/qaDiffTemp/**/*.(json|txt) $(Pipeline.Workspace)/qaDiff/actual
       - script: mkdir $(Pipeline.Workspace)/qaDiff/expected
       - script: cp ./.azure/qa-diff/expected/* $(Pipeline.Workspace)/qaDiff/expected
       - task: PublishPipelineArtifact@1
