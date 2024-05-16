@@ -13,7 +13,7 @@ jobs:
           JAVA_TOOL_OPTIONS: ${{execQaJob.javaToolOptions}}
 
         steps:
-          - template: ./.azure/qa-diff/pipelines/build-and-exec-steps-template.yml
+          - template: ./.azure/templates/build-and-exec-steps-template.yml
             parameters:
                 igName: ${{execQaJob.igName}}
                 gitRepo: ${{execQaJob.gitRepo}}
