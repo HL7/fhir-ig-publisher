@@ -1034,7 +1034,7 @@ public class CrossViewRenderer extends Renderer {
     }
     td.tx(Utilities.noString(fmm) ? "" : ": FMM"+fmm+"");
     if (context.getChangeVersion() != null) {
-      renderStatusSummary(ed, tr.td(), "status");
+      renderStatusSummary(context, ed, tr.td(), "status");
     }
   }
 
@@ -1430,7 +1430,7 @@ public class CrossViewRenderer extends Renderer {
       }
       
       if (versionToAnnotate != null) {
-        renderStatusSummary(vs, tr.td(), versionToAnnotate, "url", "name", "title", "version", "status", "experimental");
+        renderStatusSummary(context, vs, tr.td(), versionToAnnotate, "url", "name", "title", "version", "status", "experimental");
       }
     }
     
@@ -1700,7 +1700,7 @@ public class CrossViewRenderer extends Renderer {
       }
 
       if (versionToAnnotate != null) {
-        renderStatusSummary(cs, tr.td(), versionToAnnotate, "url", "name", "title", "version", "status", "experimental", "hierarchyMeaning", "versionNeeded", "compositional");
+        renderStatusSummary(context, cs, tr.td(), versionToAnnotate, "url", "name", "title", "version", "status", "experimental", "hierarchyMeaning", "versionNeeded", "compositional");
       }
     }
     
