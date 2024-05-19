@@ -66,16 +66,6 @@ import org.hl7.fhir.validation.BaseValidator.BooleanHolder;
 import org.hl7.fhir.validation.instance.utils.ValidationContext;
 import org.hl7.fhir.utilities.xhtml.XhtmlParser;
 
-
-//import org.owasp.html.Handler;
-//import org.owasp.html.HtmlChangeListener;
-//import org.owasp.html.HtmlPolicyBuilder;
-//import org.owasp.html.HtmlSanitizer;
-//import org.owasp.html.HtmlStreamEventReceiver;
-//import org.owasp.html.HtmlStreamRenderer;
-//import org.owasp.html.PolicyFactory;
-//import org.owasp.html.Sanitizers;
-
 public class HTMLInspector {
 
   
@@ -699,8 +689,10 @@ public class HTMLInspector {
         ValidationMessage vm;
         if (isCIBuild) {
           vm = new ValidationMessage(Source.Publisher, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> tag in the file '"+filename+"' containing the javascript '"+subset(x.allText())+"'... is illegal - put the script in a  .js file in a trusted template", IssueSeverity.FATAL);
-        } else {
+        } else if (forHL7) {
           vm =  new ValidationMessage(Source.Publisher, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> containing the javascript '"+subset(x.allText())+"'... is illegal and not allowed on the HL7 cibuild - put the script in a  .js file in a trusted template", IssueSeverity.ERROR);
+        } else {
+          vm =  new ValidationMessage(Source.Publisher, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> containing the javascript '"+subset(x.allText())+"'... is illegal and not allowed on the HL7 cibuild - need to put the script in a  .js file in a trusted template if this IG is to build on the HL7 cibuild", IssueSeverity.WARNING);
         }
         messages.add(vm);
         jsmsgs.put(js, vm);
