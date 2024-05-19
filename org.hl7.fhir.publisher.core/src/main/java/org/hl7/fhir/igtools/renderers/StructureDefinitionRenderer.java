@@ -142,7 +142,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
 
       if (sd.getDifferential() == null)
-        return "<p>" + /*#!*/"No Summary, as this profile has no differential" + "</p>";
+        return "<p>" + context.formatMessage(RenderingContext.STRUC_DEF_NO_SUMMARY) + "</p>";
 
       // references
       List<String> refs = new ArrayList<String>(); // profile references
@@ -198,7 +198,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           }
         }
       }
-      StringBuilder res = new StringBuilder("<a name=\"summary\"> </a>\r\n<p><b>\r\n" + (/*#!*/"Summary") + "\r\n</b></p>\r\n");
+      StringBuilder res = new StringBuilder("<a name=\"summary\"> </a>\r\n<p><b>\r\n" + (context.formatMessage(RenderingContext.STRUC_DEF_SUMMARY)) + "\r\n</b></p>\r\n");
       if (ToolingExtensions.hasExtension(sd, ToolingExtensions.EXT_SUMMARY)) {
         Extension v = ToolingExtensions.getExtension(sd, ToolingExtensions.EXT_SUMMARY);
         res.append(processMarkdown("Profile.summary", (PrimitiveType) v.getValue()));
@@ -211,45 +211,45 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           res.append("<p>");
           if (requiredOutrights > 0 || requiredNesteds > 0) {
             started = true;
-            res.append(gen.formatMessage(RenderingContext.SD_SUMMARY_MANDATORY, gen.toStr(requiredOutrights), (requiredOutrights > 1 ? (/*#!*/Utilities.pluralizeMe("element")) : (/*#!*/"element"))));
+            res.append(gen.formatMessage(RenderingContext.SD_SUMMARY_MANDATORY, gen.toStr(requiredOutrights), (requiredOutrights > 1 ? (Utilities.pluralizeMe(context.formatMessage(RenderingContext.STRUC_DEF_ELEMENT))) : (context.formatMessage(RenderingContext.STRUC_DEF_ELEMENT)))));
             if (requiredNesteds > 0)
-              res.append(gen.formatMessage(RenderingContext.SD_SUMMARY_NESTED_MANDATORY, gen.toStr(requiredNesteds), requiredNesteds > 1 ? (/*#!*/Utilities.pluralizeMe("element")) : (/*#!*/"element")));
+              res.append(gen.formatMessage(RenderingContext.SD_SUMMARY_NESTED_MANDATORY, gen.toStr(requiredNesteds), requiredNesteds > 1 ? (Utilities.pluralizeMe(context.formatMessage(RenderingContext.STRUC_DEF_ELEMENT))) : (context.formatMessage(RenderingContext.STRUC_DEF_ELEMENT))));
           }
           if (supports > 0) {
             if (started)
               res.append("<br/> ");
             started = true;
-            res.append(gen.formatMessage(RenderingContext.SD_SUMMARY_MUST_SUPPORT, gen.toStr(supports), supports > 1 ? (/*#!*/Utilities.pluralizeMe("element")) : (/*#!*/"element")));
+            res.append(gen.formatMessage(RenderingContext.SD_SUMMARY_MUST_SUPPORT, gen.toStr(supports), supports > 1 ? (Utilities.pluralizeMe(context.formatMessage(RenderingContext.STRUC_DEF_ELEMENT))) : (context.formatMessage(RenderingContext.STRUC_DEF_ELEMENT))));
           }
           if (fixeds > 0) {
             if (started)
               res.append("<br/> ");
             started = true;
-            res.append(gen.formatMessage(RenderingContext.SD_SUMMARY_FIXED, gen.toStr(fixeds), fixeds > 1 ? (/*#!*/Utilities.pluralizeMe("element")) : (/*#!*/"element")));
+            res.append(gen.formatMessage(RenderingContext.SD_SUMMARY_FIXED, gen.toStr(fixeds), fixeds > 1 ? (Utilities.pluralizeMe(context.formatMessage(RenderingContext.STRUC_DEF_ELEMENT))) : (context.formatMessage(RenderingContext.STRUC_DEF_ELEMENT))));
           }
           if (prohibits > 0) {
             if (started)
               res.append("<br/> ");
             started = true;
-            res.append(gen.formatMessage(RenderingContext.SD_SUMMARY_PROHIBITED, gen.toStr(prohibits), prohibits > 1 ? (/*#!*/Utilities.pluralizeMe("element")) : (/*#!*/"element")));
+            res.append(gen.formatMessage(RenderingContext.SD_SUMMARY_PROHIBITED, gen.toStr(prohibits), prohibits > 1 ? (Utilities.pluralizeMe(context.formatMessage(RenderingContext.STRUC_DEF_ELEMENT))) : (context.formatMessage(RenderingContext.STRUC_DEF_ELEMENT))));
           }
           res.append("</p>");
         }
 
         if (!refs.isEmpty()) {
-          res.append("<p><b>" + (/*#!*/"Structures") + "</b></p>\r\n<p>" + (/*#!*/"This structure refers to these other structures") + ":</p>\r\n<ul>\r\n");
+          res.append("<p><b>" + (context.formatMessage(RenderingContext.STRUC_DEF_STRUCTURES)) + "</b></p>\r\n<p>" + (context.formatMessage(RenderingContext.STRUC_DEF_THIS_REFERS)) + ":</p>\r\n<ul>\r\n");
           for (String s : refs)
             res.append(s);
           res.append("\r\n</ul>\r\n\r\n");
         }
         if (!ext.isEmpty()) {
-          res.append("<p><b>" + (/*#!*/"Extensions") + "</b></p>\r\n<p>" + (/*#!*/"This structure refers to these extensions") + ":</p>\r\n<ul>\r\n");
+          res.append("<p><b>" + (context.formatMessage(RenderingContext.STRUC_DEF_EXTENSIONS)) + "</b></p>\r\n<p>" + (context.formatMessage(RenderingContext.STRUC_DEF_REFERS_EXT)) + ":</p>\r\n<ul>\r\n");
           for (String s : ext)
             res.append(s);
           res.append("\r\n</ul>\r\n\r\n");
         }
         if (!slices.isEmpty()) {
-          res.append("<p><b>" + (/*#!*/"Slices") + "</b></p>\r\n<p>" + gen.formatMessage(RenderingContext.SD_SUMMARY_SLICES, "<a href=\"" + corePath + "profiling.html#slices\">", "</a>") + ":</p>\r\n<ul>\r\n");
+          res.append("<p><b>" + (context.formatMessage(RenderingContext.STRUC_DEF_SLIC)) + "</b></p>\r\n<p>" + gen.formatMessage(RenderingContext.SD_SUMMARY_SLICES, "<a href=\"" + corePath + "profiling.html#slices\">", "</a>") + ":</p>\r\n<ul>\r\n");
           for (String s : slices)
             res.append(s);
           res.append("\r\n</ul>\r\n\r\n");
@@ -257,7 +257,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
       if (ToolingExtensions.hasExtension(sd, ToolingExtensions.EXT_FMM_LEVEL)) {
         // Use hard-coded spec link to point to current spec because DSTU2 had maturity listed on a different page
-        res.append("<p><b><a class=\"fmm\" href=\"http://hl7.org/fhir/versions.html#maturity\" title=\"Maturity Level\">" + /*#!*/"Maturity" + "</a></b>: " + ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_FMM_LEVEL) + "</p>\r\n");
+        res.append("<p><b><a class=\"fmm\" href=\"http://hl7.org/fhir/versions.html#maturity\" title=\"Maturity Level\">" + (context.formatMessage(RenderingContext.STRUC_DEF_MATURITY)) + "</a></b>: " + ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_FMM_LEVEL) + "</p>\r\n");
       }
 
       return res.toString();
@@ -358,9 +358,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (ed == null)
       return "<li>" + gen.formatMessage(RenderingContext.SD_SUMMARY_MISSING_EXTENSION, url) + "</li>";
     if (ed.getWebPath() == null)
-      return "<li><a href=\"" + "extension-" + ed.getId().toLowerCase() + ".html\">" + url + "</a>" + (modifier ? " (<b>" + (/*#!*/"Modifier") + "</b>) " : "") + "</li>\r\n";
+      return "<li><a href=\"" + "extension-" + ed.getId().toLowerCase() + ".html\">" + url + "</a>" + (modifier ? " (<b>" + (context.formatMessage(RenderingContext.STRUC_DEF_MODIF)) + "</b>) " : "") + "</li>\r\n";
     else
-      return "<li><a href=\"" + Utilities.escapeXml(ed.getWebPath()) + "\">" + url + "</a>" + (modifier ? " (<b>" + (/*#!*/"Modifier") + "</b>) " : "") + "</li>\r\n";
+      return "<li><a href=\"" + Utilities.escapeXml(ed.getWebPath()) + "\">" + url + "</a>" + (modifier ? " (<b>" + (context.formatMessage(RenderingContext.STRUC_DEF_MODIF)) + "</b>) " : "") + "</li>\r\n";
   }
 
   private String describeProfile(String url) throws Exception {
@@ -395,9 +395,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   private String summarise(Quantity quantity) {
     String cu = "";
     if ("http://unitsofmeasure.org/".equals(quantity.getSystem()))
-      cu = " (" + (/*#!*/"UCUM") + ": " + quantity.getCode() + ")";
+      cu = " (" + (context.formatMessage(RenderingContext.STRUC_DEF_UCUM)) + ": " + quantity.getCode() + ")";
     if ("http://snomed.info/sct".equals(quantity.getSystem()))
-      cu = " (" + (/*#!*/"SNOMED CT") + ": " + quantity.getCode() + ")";
+      cu = " (" + (context.formatMessage(RenderingContext.STRUC_DEF_SNOMED)) + ": " + quantity.getCode() + ")";
     return quantity.getValue().toString() + quantity.getUnit() + cu;
   }
 
@@ -419,11 +419,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private String summarise(Coding coding) throws FHIRException {
     if ("http://snomed.info/sct".equals(coding.getSystem()))
-      return "" + (/*#!*/"SNOMED CT code") + " " + coding.getCode() + (!coding.hasDisplay() ? "" : "(\"" + gen.getTranslated(coding.getDisplayElement()) + "\")");
+      return "" + (context.formatMessage(RenderingContext.STRUC_DEF_SNOMED)) + " " + coding.getCode() + (!coding.hasDisplay() ? "" : "(\"" + gen.getTranslated(coding.getDisplayElement()) + "\")");
     if ("http://loinc.org".equals(coding.getSystem()))
-      return "" + (/*#!*/"LOINC code") + " " + coding.getCode() + (!coding.hasDisplay() ? "" : "(\"" + gen.getTranslated(coding.getDisplayElement()) + "\")");
+      return "" + (context.formatMessage(RenderingContext.STRUC_DEF_LOINC)) + " " + coding.getCode() + (!coding.hasDisplay() ? "" : "(\"" + gen.getTranslated(coding.getDisplayElement()) + "\")");
     if ("http://unitsofmeasure.org/".equals(coding.getSystem()))
-      return " (" + (/*#!*/"UCUM") + ": " + coding.getCode() + ")";
+      return " (" + (context.formatMessage(RenderingContext.STRUC_DEF_UCUM)) + ": " + coding.getCode() + ")";
     CodeSystem cs = context.fetchCodeSystem(coding.getSystem());
     if (cs == null)
       return "<span title=\"" + coding.getSystem() + "\">" + coding.getCode() + "</a>" + (!coding.hasDisplay() ? "" : "(\"" + gen.getTranslated(coding.getDisplayElement()) + "\")");
@@ -690,9 +690,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     else {
       StringBuilder b = new StringBuilder();
       if (withHeadings)
-        b.append("<h4>" + (/*#!*/"Terminology Bindings (Differential)") + "</h4>\r\n");
+        b.append("<h4>" + (context.formatMessage(RenderingContext.STRUC_DEF_TERM_BIND)) + "</h4>\r\n");
       b.append("<table class=\"list\">\r\n");
-      b.append("<tr><td><b>" + (/*#!*/"Path") + "</b></td><td><b>" + (/*#!*/"Conformance") + "</b></td><td><b>" + (/*#!*/hasFixed ? "ValueSet / Code" : "ValueSet") + "</b></td><td><b>" + (/*#!*/"URI") + "</b></td></tr>\r\n");
+      b.append("<tr><td><b>" + (context.formatMessage(RenderingContext.STRUC_DEF_PATH)) + "</b></td><td><b>" + (context.formatMessage(RenderingContext.STRUC_DEF_CONFORMANCE)) + "</b></td><td><b>" + (hasFixed ? (context.formatMessage(RenderingContext.STRUC_DEF_VALUESET_CODE)) : (context.formatMessage(RenderingContext.STRUC_DEF_VALUESET))) + "</b></td><td><b>" + (context.formatMessage(RenderingContext.STRUC_DEF_URI)) + "</b></td></tr>\r\n");
       for (String path : txlist) {
         txItem(txmap, b, path, sd.getUrl());
       }
@@ -731,10 +731,10 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     else {
       StringBuilder b = new StringBuilder();
       if (withHeadings)
-        b.append("<h4>" + (/*#!*/"Terminology Bindings") + "</h4>\r\n");
+        b.append("<h4>" + (context.formatMessage(RenderingContext.STRUC_DEF_TERM_BINDS)) + "</h4>\r\n");
       b.append("<table class=\"list\">\r\n");
-      b.append("<tr><td><b>" + (/*#!*/"Path") + "</b></td><td><b>" + (/*#!*/"Conformance") + "</b></td><td><b>" + (/*#!*/hasFixed ? "ValueSet / Code" : "ValueSet") + "</b></td>"+
-      "<td><b>" + (/*#!*/"URI") + "</b></td></tr>\r\n");
+      b.append("<tr><td><b>" + (context.formatMessage(RenderingContext.STRUC_DEF_PATH)) + "</b></td><td><b>" + (context.formatMessage(RenderingContext.STRUC_DEF_CONFORMANCE)) + "</b></td><td><b>" + (hasFixed ?  (context.formatMessage(RenderingContext.STRUC_DEF_VALUESET_CODE)) : (context.formatMessage(RenderingContext.STRUC_DEF_VALUESET))) + "</b></td>"+
+      "<td><b>" + (context.formatMessage(RenderingContext.STRUC_DEF_URI)) + "</b></td></tr>\r\n");
       for (String path : txlist) {
         txItem(txmap, b, path, sd.getUrl());
       }
@@ -871,7 +871,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
         StringBuilder b = new StringBuilder();
         if (p == null)
-          b.append("<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"??\">" + Utilities.escapeXml(gen.getTranslated(vs.getNameElement())) + " (" + (/*#!*/"missing link")+")");
+          b.append("<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"??\">" + Utilities.escapeXml(gen.getTranslated(vs.getNameElement())) + " (" + (context.formatMessage(RenderingContext.STRUC_DEF_MISSING_LINK))+")");
         else if (p.startsWith("http:"))
           b.append("<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"" + Utilities.escapeXml(p) + "\">" + Utilities.escapeXml(gen.getTranslated(vs.getNameElement())));
         else
@@ -1029,9 +1029,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     else {
       StringBuilder b = new StringBuilder();
       if (withHeadings)
-        b.append("<h4>" + (/*#!*/"Constraints") + "</h4>\r\n");
+        b.append("<h4>" + (context.formatMessage(RenderingContext.STRUC_DEF_CONSTRAINTS)) + "</h4>\r\n");
       b.append("<table class=\"list\">\r\n");
-      b.append("<tr><td width=\"60\"><b>" + (/*#!*/"Id") + "</b></td><td><b>" + (/*#!*/"Grade") + "</b></td><td><b>" + (/*#!*/"Path(s)") + "</b></td><td><b>" + (/*#!*/"Details") + "</b></td><td><b>" + (/*#!*/"Requirements") + "</b></td></tr>\r\n");
+      b.append("<tr><td width=\"60\"><b>" + (context.formatMessage(RenderingContext.STRUC_DEF_ID)) + "</b></td><td><b>" + (context.formatMessage(RenderingContext.STRUC_DEF_GRADE)) + "</b></td><td><b>" + (context.formatMessage(RenderingContext.STRUC_DEF_PATHS)) + "</b></td><td><b>" + (context.formatMessage(RenderingContext.STRUC_DEF_DETAILS)) + "</b></td><td><b>" + (context.formatMessage(RenderingContext.STRUC_DEF_REQUIREMENTS)) + "</b></td></tr>\r\n");
       List<String> keys = new ArrayList<>(constraintMap.keySet());
 
       Collections.sort(keys, new ConstraintKeyComparator());
@@ -1110,7 +1110,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   public String mappings(boolean complete, boolean diff) {
     if (sd.getMapping().isEmpty())
-      return "<p>" + (/*#!*/"No Mappings") + "</p>";
+      return "<p>" + (context.formatMessage(RenderingContext.STRUC_DEF_NO_MAPPINGS)) + "</p>";
     else {
       boolean allEmpty = true;  // assume all the mappings are empty; 
       StringBuilder s = new StringBuilder();
@@ -1161,7 +1161,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
       // Well all the mappings are empty
       if(allEmpty) {
-        s.append("<p>" + /*#!*/"All Mappings are Empty" + "</p>");
+        s.append("<p>" + context.formatMessage(RenderingContext.STRUC_DEF_ALL_MAP_KEY) + "</p>");
       }
 
       return s.toString();
@@ -1306,9 +1306,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       b.append("<p class=\"profile-derivation\">\r\n");
       StructureDefinition sdb = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition());
       if (sdb != null)
-        b.append(/*#!*/"This profile builds on" + " <a href=\"" + Utilities.escapeXml(sdb.getWebPath()) + "\">" + gen.getTranslated(sdb.getNameElement()) + "</a>.");
+        b.append(context.formatMessage(RenderingContext.STRUC_DEF_PROFILE_BUILDS) + " <a href=\"" + Utilities.escapeXml(sdb.getWebPath()) + "\">" + gen.getTranslated(sdb.getNameElement()) + "</a>.");
       else
-        b.append(/*#!*/"This profile builds on" + " " + sd.getBaseDefinition() + ".");
+        b.append(context.formatMessage(RenderingContext.STRUC_DEF_PROFILE_BUILDS) + " " + sd.getBaseDefinition() + ".");
       b.append("</p>\r\n");
     }
     b.append("<p class=\"profile-publication\">\r\n");
@@ -1326,14 +1326,14 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     List<StructureDefinition> derived = findDerived();
     if (!derived.isEmpty()) {
       b.append("<p>\r\n");
-      b.append(/*#!*/"In this IG, the following structures are derived from this profile: ");
+      b.append(context.formatMessage(RenderingContext.STRUC_DEF_DERIVED_PROFILE) + " ");
       listResources(b, derived);
       b.append("</p>\r\n");
     }
     List<StructureDefinition> users = findUses();
     if (!users.isEmpty()) {
       b.append("<p>\r\n");
-      b.append(/*#!*/"In this IG, the following structures refer to this profile: ");
+      b.append(context.formatMessage(RenderingContext.STRUC_DEF_REFER_PROFILE)+" ");
       listResources(b, users);
       b.append("</p>\r\n");
     }
@@ -2288,17 +2288,17 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     gc = gen.new Cell();
     row.getCells().add(gc);
     if (element.definition().getIsModifier()) {
-      gc.addStyledText((/*#!*/"This element is a modifier element"), "?!", null, null, null, false);
+      gc.addStyledText((context.formatMessage(RenderingContext.STRUC_DEF_MOD_ELEMENT)), "?!", null, null, null, false);
     }
     if (element.definition().getMustSupport() || element.definition().hasExtension(ToolingExtensions.EXT_OBLIGATION_CORE, ToolingExtensions.EXT_OBLIGATION_TOOLS)) {
-      gc.addStyledText((/*#!*/"This element must be supported"), "S", "white", "red", null, false);
+      gc.addStyledText((context.formatMessage(RenderingContext.STRUC_DEF_ELE_MUST_SUPP)), "S", "white", "red", null, false);
     }
     if (element.definition().getIsSummary()) {
-      gc.addStyledText((/*#!*/"This element is included in summaries"), "\u03A3", null, null, null, false);
+      gc.addStyledText((context.formatMessage(RenderingContext.STRUC_DEF_ELE_INCLUDED)), "\u03A3", null, null, null, false);
     }
     if (sdr.hasNonBaseConstraints(element.definition().getConstraint()) || sdr.hasNonBaseConditions(element.definition().getCondition())) {
       Piece p = gc.addText(org.hl7.fhir.r5.renderers.StructureDefinitionRenderer.CONSTRAINT_CHAR);
-      p.setHint((/*#!*/"This element has or is affected by constraints ("+sdr.listConstraintsAndConditions(element.definition())+")"));
+      p.setHint((context.formatMessage(RenderingContext.STRUC_DEF_AFFECT_CONSTRAINTS)+sdr.listConstraintsAndConditions(element.definition())+")"));
       p.addStyle(org.hl7.fhir.r5.renderers.StructureDefinitionRenderer.CONSTRAINT_STYLE);
       p.setReference(Utilities.pathURL(VersionUtilities.getSpecUrl(context.getVersion()), "conformance-rules.html#constraints"));
     }
