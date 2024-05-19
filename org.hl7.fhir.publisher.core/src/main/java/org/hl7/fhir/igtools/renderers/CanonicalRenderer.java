@@ -50,11 +50,11 @@ public class CanonicalRenderer extends BaseRenderer {
   private void genSummaryCore1(StringBuilder b, Set<String> rows) {
     if (hasSummaryRow(rows, "url")) {
       if (cr.hasUrl()) {
-        b.append("<tr><td>"+(/*!#*/"Defining URL")+":</td><td>"+Utilities.escapeXml(cr.getUrl())+"</td></tr>\r\n");
+        b.append("<tr><td>"+(context.formatMessage(RenderingContext.CANON_REND_URL))+":</td><td>"+Utilities.escapeXml(cr.getUrl())+"</td></tr>\r\n");
       } else if (cr.hasExtension("http://hl7.org/fhir/5.0/StructureDefinition/extension-NamingSystem.url")) {
-        b.append("<tr><td>"+(/*!#*/"Defining URL")+":</td><td>"+Utilities.escapeXml(ToolingExtensions.readStringExtension(cr, "http://hl7.org/fhir/5.0/StructureDefinition/extension-NamingSystem.url"))+"</td></tr>\r\n");      
+        b.append("<tr><td>"+(context.formatMessage(RenderingContext.CANON_REND_URL))+":</td><td>"+Utilities.escapeXml(ToolingExtensions.readStringExtension(cr, "http://hl7.org/fhir/5.0/StructureDefinition/extension-NamingSystem.url"))+"</td></tr>\r\n");      
       } else {
-        b.append("<tr><td>"+(/*!#*/"Defining URL")+":</td><td></td></tr>\r\n");      
+        b.append("<tr><td>"+(context.formatMessage(RenderingContext.CANON_REND_URL))+":</td><td></td></tr>\r\n");      
       }
     }
     if (hasSummaryRow(rows, "version")) {
