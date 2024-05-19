@@ -189,6 +189,7 @@ import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResource
 import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceSearchParamComponent;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
+import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionDesignationComponent;
 import org.hl7.fhir.r5.model.CodeType;
 import org.hl7.fhir.r5.model.CodeableConcept;
 import org.hl7.fhir.r5.model.Coding;
@@ -4761,15 +4762,16 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
           boolean changed = noteFile(f.getPath(), ff);
           // ok good to go
-          CodeSystem cs = makeSupplement(cr);
-          cs.setUserData("source.filename", f.getName().substring(0, f.getName().indexOf(".")));
+          CodeSystem csSrc = makeSupplement(cr, true); // what could be translated
+          CodeSystem csDst = makeSupplement(cr, false); // what has been translated
+          csDst.setUserData("source.filename", f.getName().substring(0, f.getName().indexOf(".")));
           List<TranslationUnit> list = loadTranslations(f, ext);
-          LanguageUtils.fillSupplement(cs, list);
+          LanguageUtils.fillSupplement(csSrc, csDst, list);
           FetchedResource rr = ff.addResource("CodeSystemSupplement");
-          rr.setElement(convertToElement(rr, cs));
-          rr.setResource(cs);          
-          rr.setId(cs.getId());
-          rr.setTitle(cs.getName());
+          rr.setElement(convertToElement(rr, csDst));
+          rr.setResource(csDst);          
+          rr.setId(csDst.getId());
+          rr.setTitle(csDst.getName());
           igpkp.findConfiguration(ff, rr);
           for (FetchedResource r : ff.getResources()) {
             ImplementationGuideDefinitionResourceComponent res = findIGReference(r.fhirType(), r.getId());
@@ -4777,8 +4779,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               res = publishedIg.getDefinition().addResource();
               if (!res.hasName())
                 res.setName(r.getTitle());
-              if (!res.hasDescription())
-                res.setDescription(((CanonicalResource)r.getResource()).getDescription().trim());
+              if (!res.hasDescription() && csDst.hasDescription()) {
+                res.setDescription(csDst.getDescription().trim());
+              }
               res.setReference(new Reference().setReference(r.fhirType()+"/"+r.getId()));
             }
             res.setUserData("loaded.resource", r);
@@ -4791,93 +4794,118 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     return false;
   }
 
-  private CodeSystem makeSupplement(CanonicalResource res) {
+  private CodeSystem makeSupplement(CanonicalResource res, boolean content) {
     String id = "cs-"+defaultTranslationLang+"-"+res.getId();
     CodeSystem supplement = new CodeSystem();
-    supplement.setLanguage("en"); // base is EN? 
+    supplement.setLanguage(content ? "en" : defaultTranslationLang); // base is EN? 
     supplement.setId(id);
     supplement.setUrl(Utilities.pathURL(igpkp.getCanonical(), "CodeSystem", id));
     supplement.setVersion(res.getVersion());
     supplement.setStatus(res.getStatus());
-    supplement.setName(res.getTitle()+LanguageUtils.nameForLang(defaultTranslationLang));
-    supplement.setName(res.getTitle()+" ("+LanguageUtils.titleForLang(defaultTranslationLang)+" translation)");
     supplement.setContent(CodeSystemContentMode.SUPPLEMENT);
     supplement.setSupplements(res.getUrl());
     supplement.setCaseSensitive(false);
     supplement.setPublisher(sourceIg.getPublisher());
     supplement.setContact(sourceIg.getContact());
-    supplement.setDescription("Language Pack:"+LanguageUtils.titleForLang(defaultTranslationLang)+"\r\n"+res.getDescription());
     supplement.setCopyright(sourceIg.getCopyright());
 
-    addConcept(supplement, res.getId(), res.getName());
-    addConcept(supplement, res.getId()+"/title", res.getTitle());
-    addConcept(supplement, res.getId()+"/purpose", res.getPurpose());
-    addConcept(supplement, res.getId()+"/copyright", res.getCopyright());
-    addConcept(supplement, res.getId()+"/description", res.getDescription());
-
-    if (res instanceof CodeSystem) {
-      CodeSystem cs = (CodeSystem) res;
-      for (ConceptDefinitionComponent cd : cs.getConcept()) {
-        ConceptDefinitionComponent clone = supplement.addConcept().setCode(cd.getCode()).setDisplay(cd.getDisplay());
-        // don't create this - it's just admin overhead
-        // CodeSystemUtilities.setProperty(supplement, clone, "translation-context", cd.getDefinitionElement());
-        copyConcepts(clone, cd, supplement);
-      }
-    } else if (res instanceof StructureDefinition) {
-      StructureDefinition sd = (StructureDefinition) res;
-      for (ElementDefinition ed : sd.getSnapshot().getElement()) {
-        addConcept(supplement, ed.getId(), ed.getDefinition());
-        addConcept(supplement, ed.getId()+"/requirements", ed.getRequirements(), ed.getDefinitionElement());
-        addConcept(supplement, ed.getId()+"/comment", ed.getComment(), ed.getDefinitionElement());
-        addConcept(supplement, ed.getId()+"/meaningWhenMissing", ed.getMeaningWhenMissing(), ed.getDefinitionElement());
-        addConcept(supplement, ed.getId()+"/orderMeaning", ed.getOrderMeaning(), ed.getDefinitionElement());
-        addConcept(supplement, ed.getId()+"/isModifierMeaning", ed.getIsModifierReason(), ed.getDefinitionElement());
-        addConcept(supplement, ed.getId()+"/binding", ed.getBinding().getDescription(), ed.getDefinitionElement());
-      }
-    } else if (res instanceof Questionnaire) {
-      Questionnaire q = (Questionnaire) res;
-      for (QuestionnaireItemComponent item : q.getItem()) {
-        addItem(supplement, item, null);
+    supplement.setName(res.getName());
+    supplement.setTitle(res.getTitle());
+    supplement.setPublisher(res.getPublisher());
+    supplement.setPurpose(res.getPurpose());
+    supplement.setDescription(res.getDescription());
+    supplement.setCopyright(res.getCopyright());
+    
+    if (content) {
+      if (res instanceof CodeSystem) {
+        CodeSystem cs = (CodeSystem) res;
+        for (ConceptDefinitionComponent cd : cs.getConcept()) {
+          cloneConcept(supplement.getConcept(), cd);
+        }
+      } else if (res instanceof StructureDefinition) {
+        StructureDefinition sd = (StructureDefinition) res;
+        for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+          addConcept(supplement, ed.getId(), ed.getDefinition());
+          addConcept(supplement, ed.getId()+"@requirements", ed.getRequirements(), ed.getDefinitionElement());
+          addConcept(supplement, ed.getId()+"@comment", ed.getComment(), ed.getDefinitionElement());
+          addConcept(supplement, ed.getId()+"@meaningWhenMissing", ed.getMeaningWhenMissing(), ed.getDefinitionElement());
+          addConcept(supplement, ed.getId()+"@orderMeaning", ed.getOrderMeaning(), ed.getDefinitionElement());
+          addConcept(supplement, ed.getId()+"@isModifierMeaning", ed.getIsModifierReason(), ed.getDefinitionElement());
+          addConcept(supplement, ed.getId()+"@binding", ed.getBinding().getDescription(), ed.getDefinitionElement());
+        }
+      } else if (res instanceof Questionnaire) {
+        Questionnaire q = (Questionnaire) res;
+        for (QuestionnaireItemComponent item : q.getItem()) {
+          addItem(supplement, item, null);
+        }
       }
     }
     return supplement;
   }
 
+  private void cloneConcept(List<ConceptDefinitionComponent> dest, ConceptDefinitionComponent source) {
+    // we clone everything translatable but the child concepts (need to flatten the hierarchy if there is one so we 
+    // can filter it later 
+
+    ConceptDefinitionComponent clone = new ConceptDefinitionComponent();
+    clone.setCode(source.getCode()); 
+    dest.add(clone);
+    clone.setDisplay(source.getDisplay());
+    clone.setDefinition(source.getDefinition());
+    for (ConceptDefinitionDesignationComponent d : source.getDesignation()) {
+      if (wantToTranslate(d)) {
+        clone.addDesignation(d.copy());
+      }
+    }
+    for (Extension ext : source.getExtension()) {
+      if (ext.hasValue() && Utilities.existsInList(ext.getValue().fhirType(), "string", "markdown")) {
+        clone.addExtension(ext.copy());
+      }
+    }
+
+    for (ConceptDefinitionComponent cd : source.getConcept()) {
+      cloneConcept(dest, cd);
+    }
+  }
+
+  private boolean wantToTranslate(ConceptDefinitionDesignationComponent d) {
+    return !d.hasLanguage() && d.hasUse(); // todo: only if the source language is the right language?
+  }
+
   private void addItem(CodeSystem supplement, QuestionnaireItemComponent item, QuestionnaireItemComponent parent) {
     addConcept(supplement, item.getLinkId(), item.getText(), parent == null ? null : parent.getTextElement());   
-    addConcept(supplement, item.getLinkId()+"/prefix", item.getPrefix(), item.getTextElement());   
+    addConcept(supplement, item.getLinkId()+"@prefix", item.getPrefix(), item.getTextElement());   
     for (QuestionnaireItemAnswerOptionComponent ao : item.getAnswerOption()) {
       if (ao.hasValueCoding()) {
         if (ao.getValueCoding().hasDisplay()) {
-          addConcept(supplement, item.getLinkId()+"/option="+ao.getValueCoding().getCode(), ao.getValueCoding().getDisplay(), item.getTextElement());
+          addConcept(supplement, item.getLinkId()+"@option="+ao.getValueCoding().getCode(), ao.getValueCoding().getDisplay(), item.getTextElement());
         }
       } else if (ao.hasValueStringType()) {
-        addConcept(supplement, item.getLinkId()+"/option", ao.getValueStringType().primitiveValue(), item.getTextElement());
+        addConcept(supplement, item.getLinkId()+"@option", ao.getValueStringType().primitiveValue(), item.getTextElement());
       } else if (ao.hasValueReference()) {
         if (ao.getValueReference().hasDisplay()) {
-          addConcept(supplement, item.getLinkId()+"/option="+ao.getValueReference().getReference(), ao.getValueReference().getDisplay(), item.getText()+": "+ao.getValueReference().getReference());
+          addConcept(supplement, item.getLinkId()+"@option="+ao.getValueReference().getReference(), ao.getValueReference().getDisplay(), item.getText()+": "+ao.getValueReference().getReference());
         }
       }
     }
     for (QuestionnaireItemInitialComponent ao : item.getInitial()) {
       if (ao.hasValueCoding()) {
         if (ao.getValueCoding().hasDisplay()) {
-          addConcept(supplement, item.getLinkId()+"/initial="+ao.getValueCoding().getCode(), ao.getValueCoding().getDisplay(), item.getTextElement());
+          addConcept(supplement, item.getLinkId()+"@initial="+ao.getValueCoding().getCode(), ao.getValueCoding().getDisplay(), item.getTextElement());
         }
       } else if (ao.hasValueStringType()) {
-        addConcept(supplement, item.getLinkId()+"/initial", ao.getValueStringType().primitiveValue(), item.getText());
+        addConcept(supplement, item.getLinkId()+"@initial", ao.getValueStringType().primitiveValue(), item.getText());
       } else if (ao.hasValueQuantity()) {
-        addConcept(supplement, item.getLinkId()+"/initial", ao.getValueQuantity().getDisplay(), item.getText()+": "+ao.getValueQuantity().toString());
+        addConcept(supplement, item.getLinkId()+"@initial", ao.getValueQuantity().getDisplay(), item.getText()+": "+ao.getValueQuantity().toString());
       } else if (ao.hasValueReference()) {
         if (ao.getValueReference().hasDisplay()) {
-          addConcept(supplement, item.getLinkId()+"/initial="+ao.getValueReference().getReference(), ao.getValueReference().getDisplay(), item.getText()+": "+ao.getValueReference().getReference());
+          addConcept(supplement, item.getLinkId()+"@initial="+ao.getValueReference().getReference(), ao.getValueReference().getDisplay(), item.getText()+": "+ao.getValueReference().getReference());
         }
       }
     }
     for (QuestionnaireItemComponent child : item.getItem()) {
       addItem(supplement, child, item);
     }
-
   }
 
   private void copyConcepts(ConceptDefinitionComponent tgt, ConceptDefinitionComponent src, CodeSystem supplement) {
