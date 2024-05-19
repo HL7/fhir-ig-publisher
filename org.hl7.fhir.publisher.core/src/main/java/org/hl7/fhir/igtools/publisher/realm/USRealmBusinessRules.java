@@ -26,10 +26,10 @@ import org.hl7.fhir.r5.model.Parameters.ParametersParameterComponent;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
-import org.hl7.fhir.utilities.SimpleHTTPClient;
-import org.hl7.fhir.utilities.SimpleHTTPClient.HTTPResult;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.http.HTTPResult;
+import org.hl7.fhir.utilities.http.ManagedWebAccess;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
@@ -202,9 +202,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
 
   private JsonObject fetchJson(String source) throws IOException {
     try {
-      SimpleHTTPClient http = new SimpleHTTPClient();
-      HTTPResult res;
-        res = http.get(source+"?nocache=" + System.currentTimeMillis());
+      HTTPResult res = ManagedWebAccess.get(source+"?nocache=" + System.currentTimeMillis());
       res.checkThrowException();
       return JsonParser.parseObject(res.getContent());
     } catch (IOException e) {

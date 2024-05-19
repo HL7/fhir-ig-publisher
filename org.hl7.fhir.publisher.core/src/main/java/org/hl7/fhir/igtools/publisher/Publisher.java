@@ -324,13 +324,13 @@ import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.MimeType;
-import org.hl7.fhir.utilities.SimpleHTTPClient;
-import org.hl7.fhir.utilities.SimpleHTTPClient.HTTPResult;
 import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.TimeTracker;
 import org.hl7.fhir.utilities.TimeTracker.Session;
 import org.hl7.fhir.utilities.filesystem.CSFile;
+import org.hl7.fhir.utilities.http.HTTPResult;
+import org.hl7.fhir.utilities.http.ManagedWebAccess;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.ZipGenerator;
@@ -13159,9 +13159,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     throw new Error("Extracting GitHub source failed.");
   }
 
-  private static InputStream fetchGithubUrl(String ghUrl) throws IOException {    
-    SimpleHTTPClient http = new SimpleHTTPClient();
-    HTTPResult res = http.get(ghUrl+"?nocache=" + System.currentTimeMillis());
+  private static InputStream fetchGithubUrl(String ghUrl) throws IOException {  
+    HTTPResult res = ManagedWebAccess.get(ghUrl+"?nocache=" + System.currentTimeMillis());
     res.checkThrowException();
     return new ByteArrayInputStream(res.getContent());
   }

@@ -62,7 +62,7 @@ public class CodeSystemRenderer extends CanonicalRenderer {
   protected void genSummaryRowsSpecific(StringBuilder b, Set<String> rows) {
     if (hasSummaryRow(rows, "content")) {
       if (cs.hasContent()) {
-        b.append(" <tr><td>"+(context.formatMessage(RenderingContext.CODE_SYS_CONTENT))+":</td><td>"+(/*!#*/cs.getContent().getDisplay())+": "+describeContent(cs.getContent())+"</td></tr>\r\n");
+        b.append(" <tr><td>"+(context.formatMessage(RenderingContext.CODE_SYS_CONTENT))+":</td><td>"+(cs.getContent().getDisplay())+": "+describeContent(cs.getContent())+"</td></tr>\r\n");
       }
     }
     if (hasSummaryRow(rows, "oid")) {
