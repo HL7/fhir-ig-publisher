@@ -29,6 +29,7 @@ import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.i18n.RenderingI18nContext;
 import org.hl7.fhir.utilities.npm.BasePackageCacheManager;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -91,8 +92,9 @@ public class PreviousVersionComparator {
   private String lastName;
   private String lastUrl;
   private String businessVersion;
+  private RenderingI18nContext i18n;
   
-  public PreviousVersionComparator(SimpleWorkerContext context, String version, String businessVersion, String rootDir, String dstDir, String canonical, ProfileKnowledgeProvider pkp, ILoggingService logger, List<String> versions, String versionToAnnotate) {
+  public PreviousVersionComparator(SimpleWorkerContext context, String version, String businessVersion, String rootDir, String dstDir, String canonical, ProfileKnowledgeProvider pkp, ILoggingService logger, List<String> versions, String versionToAnnotate, RenderingI18nContext i18n) {
     super();
         
     this.context = context;
@@ -101,6 +103,7 @@ public class PreviousVersionComparator {
     this.dstDir = dstDir;
     this.newpkp = pkp;
     this.logger = logger;
+    this.i18n = i18n;
     try {
       if (businessVersion == null) {
          errMsg = "No Version Information Provided";
@@ -250,7 +253,7 @@ public class PreviousVersionComparator {
         }
 
         try {
-          ComparisonSession session = new ComparisonSession(vi.context, context, "Comparison of v"+vi.version+" with this version", vi.pkp, newpkp);
+          ComparisonSession session = new ComparisonSession(i18n, vi.context, context, "Comparison of v"+vi.version+" with this version", vi.pkp, newpkp);
           session.setAnnotate(vi.annotate);
           //    session.setDebug(true);
           for (ProfilePair c : comparisons) {
