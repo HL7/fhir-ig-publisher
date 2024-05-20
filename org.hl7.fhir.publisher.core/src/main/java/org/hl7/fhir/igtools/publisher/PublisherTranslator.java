@@ -21,10 +21,12 @@ public class PublisherTranslator {
   private JsonLangFileProducer json;
   private List<String> translationLangs = new ArrayList<>();
   private String baseLang;
+  private LanguageUtils lu;
 
   public PublisherTranslator(SimpleWorkerContext context, String baseLang, String defaultTranslationLang, List<String> translationLangs) {
     super();
     this.context = context;
+    this.lu = new LanguageUtils(context);
     this.baseLang = baseLang;
     this.translationLangs.addAll(translationLangs);
     if (!this.translationLangs.contains(defaultTranslationLang)) {
@@ -79,24 +81,28 @@ public class PublisherTranslator {
   
   private void genTranslations(FetchedFile f, FetchedResource r, String lang, boolean langInId) throws IOException {
     Resource res = r.getResource();
-    if (res != null && LanguageUtils.handlesAsResource(res)) {
+    if (res != null && lu.handlesAsResource(res)) {
 
-      List<TranslationUnit> translations = LanguageUtils.generateTranslations(res, lang);
+      List<TranslationUnit> translations = lu.generateTranslations(res, lang);
       String srcFile = res.hasUserData("source.filename") ? res.getUserString("source.filename") : r.fhirType()+"-"+r.getId();
       
       po.produce(srcFile, baseLang, lang, translations, srcFile+".po");
       xliff.produce(srcFile, baseLang, lang, translations, srcFile+".xliff");
       json.produce(srcFile, baseLang, lang, translations, srcFile+".json");
       
-    } else if (LanguageUtils.handlesAsElement(r.getElement())) {
+    } else if (lu.handlesAsElement(r.getElement())) {
       
-      List<TranslationUnit> translations = LanguageUtils.generateTranslations(r.getElement(), lang);
+      List<TranslationUnit> translations = lu.generateTranslations(r.getElement(), lang);
       String srcFile = r.fhirType()+"-"+r.getId();
       
       po.produce(srcFile, baseLang, lang, translations, srcFile+".po");
       xliff.produce(srcFile, baseLang, lang, translations, srcFile+".xliff");
       json.produce(srcFile, baseLang, lang, translations, srcFile+".json");
     }
+  }
+
+  public LanguageUtils getLu() {
+    return lu;
   }
   
 }

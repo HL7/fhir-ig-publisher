@@ -821,19 +821,19 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private List<ContactDetail> contacts;
   private List<UsageContext> contexts;
   private List<String> binaryPaths = new ArrayList<>();
-  private String copyright;
+  private MarkdownType copyright;
   private List<CodeableConcept> jurisdictions;
-  private SPDXLicense licenseInfo;
-  private String publisher;
+  private Enumeration<SPDXLicense> licenseInfo;
+  private StringType publisher;
   private String businessVersion;
   private String wgm;
   private List<ContactDetail> defaultContacts;
   private List<UsageContext> defaultContexts;
-  private String defaultCopyright;
+  private MarkdownType defaultCopyright;
   private String defaultWgm;
   private List<CodeableConcept> defaultJurisdictions;
-  private SPDXLicense defaultLicenseInfo;
-  private String defaultPublisher;
+  private Enumeration<SPDXLicense> defaultLicenseInfo;
+  private StringType defaultPublisher;
   private String defaultBusinessVersion;
 
   private CacheOption cacheOption;
@@ -2535,10 +2535,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       throw new Error("Old style JSON configuration is no longer supported");
     }
     expectedJurisdiction = checkForJurisdiction();
-    realmRules = makeRealmBusinessRules();
-    previousVersionComparator = makePreviousVersionComparator();
-    ipaComparator = makeIpaComparator();
-    ipsComparator = makeIpsComparator();
     if (context != null) {
       r4tor4b.setContext(context);
     }
@@ -2867,7 +2863,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         break;
       case "apply-copyright":
         if (p.getValue().equals("true")) {
-          copyright = sourceIg.getCopyright();
+          copyright = sourceIg.getCopyrightElement();
         }
         break;
       case "apply-jurisdiction":
@@ -2877,12 +2873,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         break;
       case "apply-license":
         if (p.getValue().equals("true")) {
-          licenseInfo = sourceIg.getLicense();
+          licenseInfo = sourceIg.getLicenseElement();
         }
         break;
       case "apply-publisher":
         if (p.getValue().equals("true")) {
-          publisher = sourceIg.getPublisher();
+          publisher = sourceIg.getPublisherElement();
         }
         break;
       case "apply-version":
@@ -2907,7 +2903,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         break;
       case "default-copyright":
         if (p.getValue().equals("true")) {
-          defaultCopyright = sourceIg.getCopyright();
+          defaultCopyright = sourceIg.getCopyrightElement();
         }
         break;
       case "default-jurisdiction":
@@ -2917,12 +2913,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         break;
       case "default-license":
         if (p.getValue().equals("true")) {
-          defaultLicenseInfo = sourceIg.getLicense();
+          defaultLicenseInfo = sourceIg.getLicenseElement();
         }
         break;
       case "default-publisher":
         if (p.getValue().equals("true")) {
-          defaultPublisher = sourceIg.getPublisher();
+          defaultPublisher = sourceIg.getPublisherElement();
         }
         break;
       case "default-version":
@@ -3180,7 +3176,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     for (String s : conversionVersions) {
       loadConversionVersion(s);
     }
-
+    langUtils = new LanguageUtils(context);
 
     if (expParams != null) {
       /* This call to uncheckedPath is allowed here because the path is used to
@@ -4273,6 +4269,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (needToBuild) {
       if (sourceIg == null) // old JSON approach
         sourceIg = (ImplementationGuide) parse(igf);
+      List<TranslationUnit> translations = findTranslations(sourceIg.fhirType(), sourceIg.getId(), igf.getErrors());
+      if (translations != null) {
+        langUtils.importFromTranslations(sourceIg, translations, igf.getErrors());
+      }
       publishedIg = sourceIg.copy();
       FetchedResource igr = igf.addResource("$IG");
       //      loadAsElementModel(igf, igr, null);
@@ -4281,6 +4281,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       igr.setId(sourceIg.getId()).setTitle(publishedIg.getName());
     } else {
       // special case; the source is updated during the build, so we track it differently
+      List<TranslationUnit> translations = findTranslations(sourceIg.fhirType(), sourceIg.getId(), igf.getErrors());
+      if (translations != null) {
+        langUtils.importFromTranslations(sourceIg, translations, igf.getErrors());
+      }
       publishedIg = sourceIg.copy();
       altMap.get(IG_NAME).getResources().get(0).setResource(publishedIg);
     }
@@ -4585,6 +4589,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         }
       }
     }
+    realmRules = makeRealmBusinessRules();
+    previousVersionComparator = makePreviousVersionComparator();
+    ipaComparator = makeIpaComparator();
+    ipsComparator = makeIpsComparator();
     //    rc.setTargetVersion(pubVersion);
 
     if (igMode) {
@@ -4766,7 +4774,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           CodeSystem csDst = makeSupplement(cr, false); // what has been translated
           csDst.setUserData("source.filename", f.getName().substring(0, f.getName().indexOf(".")));
           List<TranslationUnit> list = loadTranslations(f, ext);
-          LanguageUtils.fillSupplement(csSrc, csDst, list);
+          langUtils.fillSupplement(csSrc, csDst, list);
           FetchedResource rr = ff.addResource("CodeSystemSupplement");
           rr.setElement(convertToElement(rr, csDst));
           rr.setResource(csDst);          
@@ -5746,7 +5754,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private RealmBusinessRules makeRealmBusinessRules() {
     if (expectedJurisdiction != null && expectedJurisdiction.getCode().equals("US")) {
-      return new USRealmBusinessRules(context, version, tempDir, igpkp.getCanonical(), igpkp);
+      return new USRealmBusinessRules(context, version, tempDir, igpkp.getCanonical(), igpkp, rc);
     } else {
       return new NullRealmBusinessRules(igrealm);
     }
@@ -5760,7 +5768,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       comparisonVersions = new ArrayList<>();
       comparisonVersions.add("{last}");
     }
-    return new PreviousVersionComparator(context, version, businessVersion != null ? businessVersion : sourceIg == null ? null : sourceIg.getVersion(), rootDir, tempDir, igpkp.getCanonical(), igpkp, logger, comparisonVersions, versionToAnnotate);
+    return new PreviousVersionComparator(context, version, businessVersion != null ? businessVersion : sourceIg == null ? null : sourceIg.getVersion(), rootDir, tempDir, igpkp.getCanonical(), igpkp, logger, comparisonVersions, versionToAnnotate, rc);
   }
 
 
@@ -5771,7 +5779,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (ipaComparisons == null) {
       return null;
     }
-    return new IpaComparator(context, rootDir, tempDir, igpkp, logger, ipaComparisons);
+    return new IpaComparator(context, rootDir, tempDir, igpkp, logger, ipaComparisons, rc);
   }
 
   private IpsComparator makeIpsComparator() throws IOException {
@@ -5781,7 +5789,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (ipsComparisons == null) {
       return null;
     }
-    return new IpsComparator(context, rootDir, tempDir, igpkp, logger, ipsComparisons);
+    return new IpsComparator(context, rootDir, tempDir, igpkp, logger, ipsComparisons, rc);
   }
 
   private void checkJurisdiction(FetchedFile f, CanonicalResource resource, IssueSeverity error, String verb) {
@@ -6119,7 +6127,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         List<TranslationUnit> translations = findTranslations(r.fhirType(), r.getId(), r.getErrors());
         if (translations != null) {
           r.setHasTranslations(true);
-          if (new LanguageUtils(context).importFromTranslations(e, translations, r.getErrors()) > 0) {
+          if (langUtils.importFromTranslations(e, translations, r.getErrors()) > 0) {
             altered = true;
           }
         }
@@ -6469,11 +6477,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               if (copyright != null && !bc.hasCopyright() && bc.supportsCopyright()) {
                 altered = true;
                 b.append("copyright="+copyright);
-                bc.setCopyright(copyright);
+                bc.setCopyrightElement(copyright);
               } else if (!bc.hasCopyright() && defaultCopyright != null) {
                 altered = true;
                 b.append("copyright="+defaultCopyright);
-                bc.setCopyright(defaultCopyright);
+                bc.setCopyrightElement(defaultCopyright);
               }
               if (bc.hasCopyright() && bc.getCopyright().contains("{{{year}}}")) {
                 bc.setCopyright(bc.getCopyright().replace("{{{year}}}", Integer.toString(Calendar.getInstance().get(Calendar.YEAR))));
@@ -6493,11 +6501,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               if (publisher != null) {
                 altered = true;
                 b.append("publisher="+publisher);
-                bc.setPublisher(publisher);
+                bc.setPublisherElement(publisher);
               } else if (!bc.hasPublisher() && defaultPublisher != null) {
                 altered = true;
                 b.append("publisher="+defaultPublisher);
-                bc.setPublisher(defaultPublisher);
+                bc.setPublisherElement(defaultPublisher);
               }
 
 
@@ -10635,6 +10643,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private Map<String, FragmentUseRecord> fragmentUses = new HashMap<>();
   private boolean trackFragments = false;
+
+  private LanguageUtils langUtils;
   
   private String processSQLCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();
@@ -11113,7 +11123,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     saveNativeResourceOutputFormats(f, r, element, ""); 
     for (String lang : translationLangs) {
       Element e = (Element) element.copy();
-      if (LanguageUtils.switchLanguage(e, lang)) {
+      if (langUtils.switchLanguage(e, lang)) {
         saveNativeResourceOutputFormats(f, r, e, "-"+lang);         
       }
     }
