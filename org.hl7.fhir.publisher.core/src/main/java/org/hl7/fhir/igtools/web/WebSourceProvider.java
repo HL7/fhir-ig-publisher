@@ -16,10 +16,10 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import org.hl7.fhir.utilities.FTPClient;
-import org.hl7.fhir.utilities.SimpleHTTPClient;
-import org.hl7.fhir.utilities.SimpleHTTPClient.HTTPResult;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.http.HTTPResult;
+import org.hl7.fhir.utilities.http.ManagedWebAccess;
 
 public class WebSourceProvider {
 
@@ -81,11 +81,10 @@ public class WebSourceProvider {
       df.delete();
     }
     if (web) {
-      SimpleHTTPClient fetcher = new SimpleHTTPClient();
       String url = Utilities.pathURL(source, path)+"?nocache=" + System.currentTimeMillis();
       System.out.println("Fetch "+ url);
       long t = System.currentTimeMillis();
-      HTTPResult res = fetcher.get(url);
+      HTTPResult res = ManagedWebAccess.get(url);
       res.checkThrowException();
       TextFile.bytesToFile(res.getContent(), df);
       System.out.println("  ... done ("+stats(res.getContent().length, t)+")");
@@ -109,11 +108,10 @@ public class WebSourceProvider {
       Utilities.clearDirectory(df.getAbsolutePath());
     }
     if (web) {
-      SimpleHTTPClient fetcher = new SimpleHTTPClient();
       String url = Utilities.pathURL(source, path, "_ig-pub-archive.zip")+"?nocache=" + System.currentTimeMillis();
       System.out.println("Fetch "+ url);
       long t = System.currentTimeMillis();
-      HTTPResult res = fetcher.get(url);
+      HTTPResult res = ManagedWebAccess.get(url);
       res.checkThrowException();
       folderSources.put(path, res.getContent());
       Utilities.unzip(new ByteArrayInputStream(res.getContent()), df.getAbsolutePath());
@@ -175,11 +173,10 @@ public class WebSourceProvider {
       df.delete();
     }
     if (web) {
-      SimpleHTTPClient fetcher = new SimpleHTTPClient();
       String url = Utilities.pathURL(source, path)+"?nocache=" + System.currentTimeMillis();
       System.out.println("Fetch "+ url);
       long t = System.currentTimeMillis();
-      HTTPResult res = fetcher.get(url);
+      HTTPResult res = ManagedWebAccess.get(url);
       if (res.getCode() < 300 && res.getContent().length > 0) {
         TextFile.bytesToFile(res.getContent(), df);
       }

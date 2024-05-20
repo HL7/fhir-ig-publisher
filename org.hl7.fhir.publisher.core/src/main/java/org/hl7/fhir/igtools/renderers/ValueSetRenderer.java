@@ -72,7 +72,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
   protected void genSummaryRowsSpecific(StringBuilder b, Set<String> rows) {
     if (hasSummaryRow(rows, "oid")) {
       if (ValueSetUtilities.hasOID(vs)) {
-        b.append(" <tr><td>"+ (context.formatMessage(RenderingContext.VALUE_SET_OID))+":</td><td>"+ValueSetUtilities.getOID(vs)+" ("+ context.formatMessage(RenderingContext.VALUE_SET_OID_TERM_SYS)+")</td></tr>\r\n");
+        b.append(" <tr><td>"+ (gen.formatPhrase(RenderingContext.VALUE_SET_OID))+":</td><td>"+ValueSetUtilities.getOID(vs)+" ("+ gen.formatPhrase(RenderingContext.VALUE_SET_OID_TERM_SYS)+")</td></tr>\r\n");
       }
     }
   }
@@ -126,7 +126,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
                 first = false;
                 b.append("<ul>\r\n");
               }
-              b.append(" <li>"+ (context.formatMessage(RenderingContext.VALUE_SET_INCLUDED_INTO)+" ")+"<a href=\""+vc.getWebPath()+"\">"+Utilities.escapeXml(gen.getTranslated(vc.getNameElement()))+"</a></li>\r\n");
+              b.append(" <li>"+ (gen.formatPhrase(RenderingContext.VALUE_SET_INCLUDED_INTO)+" ")+"<a href=\""+vc.getWebPath()+"\">"+Utilities.escapeXml(gen.getTranslated(vc.getNameElement()))+"</a></li>\r\n");
               break;
             }
           }
@@ -138,7 +138,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
                 first = false;
                 b.append("<ul>\r\n");
               }
-              b.append(" <li>"+ (context.formatMessage(RenderingContext.VALUE_SET_EXCLUDED_FROM)+" ")+"<a href=\""+vc.getWebPath()+"\">"+Utilities.escapeXml(gen.getTranslated(vc.getNameElement()))+"</a></li>\r\n");
+              b.append(" <li>"+ (gen.formatPhrase(RenderingContext.VALUE_SET_EXCLUDED_FROM)+" ")+"<a href=\""+vc.getWebPath()+"\">"+Utilities.escapeXml(gen.getTranslated(vc.getNameElement()))+"</a></li>\r\n");
               break;
             }
           }
@@ -198,7 +198,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
       }
     }
     if (first)
-      b.append("<p>"+ (context.formatMessage(RenderingContext.VALUE_SET_USED_ELSEWHERE))+"</p>\r\n");
+      b.append("<p>"+ (gen.formatPhrase(RenderingContext.VALUE_SET_USED_ELSEWHERE))+"</p>\r\n");
     else
       b.append("</ul>\r\n");
     return b.toString()+changeSummary();

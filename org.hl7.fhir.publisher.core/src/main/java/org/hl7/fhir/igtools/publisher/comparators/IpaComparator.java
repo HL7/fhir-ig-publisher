@@ -28,6 +28,7 @@ import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.i18n.RenderingI18nContext;
 import org.hl7.fhir.utilities.npm.BasePackageCacheManager;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -84,14 +85,16 @@ public class IpaComparator {
   private List<CanonicalResource> resources;
   private String lastName;
   private String lastUrl;
+  private RenderingI18nContext i18n;
   
-  public IpaComparator(SimpleWorkerContext context, String rootDir, String dstDir, ProfileKnowledgeProvider pkp, ILoggingService logger, List<String> versions) {
+  public IpaComparator(SimpleWorkerContext context, String rootDir, String dstDir, ProfileKnowledgeProvider pkp, ILoggingService logger, List<String> versions, RenderingI18nContext i18n) {
     super();
         
     this.context = context;
     this.dstDir = dstDir;
     this.newpkp = pkp;
     this.logger = logger;
+    this.i18n = i18n;
     try {
       processVersions(versions, rootDir);
     } catch (Exception e) {
@@ -221,7 +224,7 @@ public class IpaComparator {
         }
 
         try {
-          ComparisonSession session = new ComparisonSession(vi.context, context, "Comparison of v"+vi.version+" with this version", vi.pkp, newpkp);
+          ComparisonSession session = new ComparisonSession(i18n, vi.context, context, "Comparison of v"+vi.version+" with this version", vi.pkp, newpkp);
           //    session.setDebug(true);
           for (ComparisonPair c : comparisons) {
 //            System.out.println("Version Comparison: compare "+vi.version+" to current for "+c.getUrl());

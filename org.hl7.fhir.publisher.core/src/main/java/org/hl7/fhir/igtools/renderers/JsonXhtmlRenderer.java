@@ -154,7 +154,7 @@ public class JsonXhtmlRenderer implements JsonCreator {
   @Override
   public void value(Boolean value) throws IOException {
     checkInArray();
-    b.append(value ? /*!#*/"true" : /*!#*/"false");
+    b.append(value ? "true" : "false");
   }
 
   @Override
