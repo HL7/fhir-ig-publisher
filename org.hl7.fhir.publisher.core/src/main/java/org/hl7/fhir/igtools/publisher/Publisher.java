@@ -334,15 +334,10 @@ import org.hl7.fhir.utilities.http.ManagedWebAccess;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.ZipGenerator;
-import org.hl7.fhir.utilities.i18n.I18nConstants;
-import org.hl7.fhir.utilities.i18n.JsonLangFileProducer;
-import org.hl7.fhir.utilities.i18n.LanguageFileProducer;
+import org.hl7.fhir.utilities.i18n.*;
 import org.hl7.fhir.utilities.i18n.LanguageFileProducer.TranslationUnit;
-import org.hl7.fhir.utilities.i18n.LanguageTag;
 import org.hl7.fhir.utilities.i18n.subtag.LanguageSubtagRegistry;
 import org.hl7.fhir.utilities.i18n.subtag.LanguageSubtagRegistryLoader;
-import org.hl7.fhir.utilities.i18n.PoGetTextProducer;
-import org.hl7.fhir.utilities.i18n.XLIFFProducer;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonBoolean;
 import org.hl7.fhir.utilities.json.model.JsonElement;
@@ -2134,7 +2129,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
                 boolean regen = false;
                 for (String lang : langs) {
                   RenderingContext lrc = rc.copy().setDefinitionsTarget(igpkp.getDefinitionsName(r));
-                  lrc.setLocale(lang == null ? null : new Locale(lang));
+
+                  lrc.setLocale(lang == null ? inferNarrativeLang() : new Locale(lang));
                   lrc.setRules(GenerationRules.VALID_RESOURCE);
                   lrc.setDefinitionsTarget(igpkp.getDefinitionsName(r));
                   if (r.getResource() instanceof DomainResource && (langs.size() > 1 || !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv()))) {
@@ -2159,7 +2155,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               } else {
                 for (String lang : langs) {
                   RenderingContext lrc = rc.copy().setParser(getTypeLoader(f,r));
-                  lrc.setLocale(lang == null ? null : new Locale(lang));
+
+                  lrc.setLocale(lang == null ? inferNarrativeLang() : new Locale(lang));
                   lrc.setRules(GenerationRules.VALID_RESOURCE);
                   if (isDomainResource(r) && (langs.size() > 1|| !hasNarrative(r.getElement()))) {
                     ResourceWrapper rw = new ElementWrappers.ResourceWrapperMetaElement(lrc, r.getElement());
@@ -2195,6 +2192,25 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     tts.end();
   }
 
+  private Locale inferNarrativeLang() {
+    if (sourceIg.hasLanguage()) {
+      return new Locale(sourceIg.getLanguage());
+    }
+    if (sourceIg.hasJurisdiction()) {
+      return RegionToLocaleMapper.getLocaleFromRegion(sourceIg.getJurisdictionFirstRep().getCodingFirstRep().getCode());
+    }
+    return new Locale("en", "US");
+  }
+
+  /**
+   * Return all translation langs, including the defaultTranslationLang.
+   *
+   * Note that if the defaultTranslationLang is null, it will be included in the
+   * output list. The publisher should then use inferNarrativeLang to pick an
+   * appropriate locale.
+   *
+   * @return all translation langs, including the defaultTranslationLang
+   */
   private List<String> narrativeLangs() {
     List<String> res = new ArrayList<>();
     res.add(defaultTranslationLang);
@@ -4555,7 +4571,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, execTime.getTime(), !publishing);
     execTime = Calendar.getInstance();
 
-    rc = new RenderingContext(context, markdownEngine, ValidationOptions.defaults(), checkAppendSlash(specPath), "", null, ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
+    rc = new RenderingContext(context, markdownEngine, ValidationOptions.defaults(), checkAppendSlash(specPath), "", inferNarrativeLang(), ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
     rc.setTemplateProvider(templateProvider);
     rc.setResolver(this);    
     rc.setServices(validator.getExternalHostServices());
@@ -11813,6 +11829,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
 
     StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, rc, allInvariants, sdMapCache, specPath, versionToAnnotate);
+
     if (igpkp.wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-summary", sdr.summary(), f.getOutputNames(), r, vars, null, start, "summary", "StructureDefinition");
