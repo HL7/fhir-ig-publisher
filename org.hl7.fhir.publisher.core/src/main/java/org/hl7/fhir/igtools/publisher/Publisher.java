@@ -6152,13 +6152,15 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private List<TranslationUnit> findTranslations(String fhirType, String id, List<ValidationMessage> messages) throws IOException {
     List<TranslationUnit> res = null;
-    
+
     String base = fhirType+"-"+id;
+    String tbase = fhirType+"-$all";
     for (String dir : translationSources) {      
       File df = new File(Utilities.path(rootDir, dir));
       if (df.exists()) {
         for (String fn : df.list()) {
-          if (fn.startsWith(base+".") || fn.startsWith(base+"-") || fn.startsWith(base+"_")) {
+          if ((fn.startsWith(base+".") || fn.startsWith(base+"-") || fn.startsWith(base+"_")) ||
+              (fn.startsWith(tbase+".") || fn.startsWith(tbase+"-") || fn.startsWith(tbase+"_"))) {
             LanguageFileProducer lp = null;
             switch (Utilities.getFileExtension(fn)) {
             case "po":
@@ -9988,6 +9990,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     data.add("igVer", workingVersion());
     data.add("errorCount", getErrorCount());
     data.add("version", version);
+    data.add("releaseLabel", findReleaseLabel());
     data.add("revision", specMaps.get(0).getBuild());
     data.add("versionFull", version+"-"+specMaps.get(0).getBuild());
     data.add("toolingVersion", Constants.VERSION);
