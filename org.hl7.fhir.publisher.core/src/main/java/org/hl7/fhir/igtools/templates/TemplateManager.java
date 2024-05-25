@@ -256,6 +256,7 @@ public class TemplateManager {
         "who.fhir.template",
         "who.template.root",
         "hl7.davinci.template",
+        "hl7.extensions.template",
         "ihe.fhir.template",
         "ch.fhir.ig.template")) {
       canExecute = false;

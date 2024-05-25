@@ -2307,7 +2307,10 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
     for (String su : s.getCodes().keySet()) {
       Set<Coding> src = s.getCodes().get(su);
-      for (ConceptMapGroupComponent g : cm.getGroup()) {
+      int i = 0;
+      while (i < cm.getGroup().size()) {
+        ConceptMapGroupComponent g = cm.getGroup().get(i);
+        i++;
         if (su.equals(g.getSource()) && d.getCodes().containsKey(g.getTarget())) {
           noGroup.remove(su);
           String tu = g.getTarget();

@@ -72,7 +72,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
   protected void genSummaryRowsSpecific(StringBuilder b, Set<String> rows) {
     if (hasSummaryRow(rows, "oid")) {
       if (ValueSetUtilities.hasOID(vs)) {
-        b.append(" <tr><td>"+ (gen.formatPhrase(RenderingContext.VALUE_SET_OID))+":</td><td>"+ValueSetUtilities.getOID(vs)+" ("+ gen.formatPhrase(RenderingContext.VALUE_SET_OID_TERM_SYS)+")</td></tr>\r\n");
+        b.append(" <tr><td>"+ (gen.formatPhrase(RenderingContext.GENERAL_OID))+":</td><td>"+ValueSetUtilities.getOID(vs)+" ("+ gen.formatPhrase(RenderingContext.CODE_SYS_FOR_OID)+")</td></tr>\r\n");
       }
     }
   }
