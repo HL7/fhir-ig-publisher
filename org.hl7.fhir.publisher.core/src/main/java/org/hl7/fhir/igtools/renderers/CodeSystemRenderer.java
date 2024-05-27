@@ -62,21 +62,21 @@ public class CodeSystemRenderer extends CanonicalRenderer {
   protected void genSummaryRowsSpecific(StringBuilder b, Set<String> rows) {
     if (hasSummaryRow(rows, "content")) {
       if (cs.hasContent()) {
-        b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.CODE_SYS_CONTENT))+":</td><td>"+(cs.getContent().getDisplay())+": "+describeContent(cs.getContent())+"</td></tr>\r\n");
+        b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_CONTENT))+":</td><td>"+(cs.getContent().getDisplay())+": "+describeContent(cs.getContent())+"</td></tr>\r\n");
       }
     }
     if (hasSummaryRow(rows, "oid")) {
       if (CodeSystemUtilities.hasOID(cs)) {
-        b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.CODE_SYS_OID))+":</td><td>"+CodeSystemUtilities.getOID(cs)+" ("+(gen.formatPhrase(RenderingContext.CODE_SYS_FOR_OID))+")</td></tr>\r\n");
+        b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_OID))+":</td><td>"+CodeSystemUtilities.getOID(cs)+" ("+(gen.formatPhrase(RenderingContext.CODE_SYS_FOR_OID))+")</td></tr>\r\n");
       }
     }
     if (hasSummaryRow(rows, "cs.vs")) {
       if (cs.hasValueSet()) {
         ValueSet vs = context.findTxResource(ValueSet.class, cs.getValueSet());
         if (vs == null) {
-          b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.CODE_SYS_VALUE_SET))+":</td><td>"+ cs.getValueSet()+" ("+(" "+gen.formatPhrase(RenderingContext.CODE_SYS_THE_VALUE_SET))+")</td></tr>\r\n");
+          b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_VALUESET))+":</td><td>"+ cs.getValueSet()+" ("+(" "+gen.formatPhrase(RenderingContext.CODE_SYS_THE_VALUE_SET))+")</td></tr>\r\n");
         } else {
-          b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.CODE_SYS_VALUE_SET))+":</td><td><a href=\""+vs.getWebPath()+"\">"+ cs.getValueSet()+"</a> ("+(" "+ gen.formatPhrase(RenderingContext.CODE_SYS_THE_VALUE_SET))+")</td></tr>\r\n");        
+          b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_VALUESET))+":</td><td><a href=\""+vs.getWebPath()+"\">"+ cs.getValueSet()+"</a> ("+(" "+ gen.formatPhrase(RenderingContext.CODE_SYS_THE_VALUE_SET))+")</td></tr>\r\n");        
         }
       }
     }

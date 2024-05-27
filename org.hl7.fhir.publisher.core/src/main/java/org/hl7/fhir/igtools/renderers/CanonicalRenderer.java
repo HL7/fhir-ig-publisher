@@ -50,18 +50,18 @@ public class CanonicalRenderer extends BaseRenderer {
   private void genSummaryCore1(StringBuilder b, Set<String> rows) {
     if (hasSummaryRow(rows, "url")) {
       if (cr.hasUrl()) {
-        b.append("<tr><td>"+(gen.formatPhrase(RenderingContext.CANON_REND_URL))+":</td><td>"+Utilities.escapeXml(cr.getUrl())+"</td></tr>\r\n");
+        b.append("<tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_DEFINING_URL))+":</td><td>"+Utilities.escapeXml(cr.getUrl())+"</td></tr>\r\n");
       } else if (cr.hasExtension("http://hl7.org/fhir/5.0/StructureDefinition/extension-NamingSystem.url")) {
-        b.append("<tr><td>"+(gen.formatPhrase(RenderingContext.CANON_REND_URL))+":</td><td>"+Utilities.escapeXml(ToolingExtensions.readStringExtension(cr, "http://hl7.org/fhir/5.0/StructureDefinition/extension-NamingSystem.url"))+"</td></tr>\r\n");      
+        b.append("<tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_DEFINING_URL))+":</td><td>"+Utilities.escapeXml(ToolingExtensions.readStringExtension(cr, "http://hl7.org/fhir/5.0/StructureDefinition/extension-NamingSystem.url"))+"</td></tr>\r\n");      
       } else {                                          
-        b.append("<tr><td>"+(gen.formatPhrase(RenderingContext.CANON_REND_URL))+":</td><td></td></tr>\r\n");      
+        b.append("<tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_DEFINING_URL))+":</td><td></td></tr>\r\n");      
       }
     }
     if (hasSummaryRow(rows, "version")) {
       if (cr.hasVersion()) {
-        b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.CANON_REND_VER))+":</td><td>"+Utilities.escapeXml(cr.getVersion())+"</td></tr>\r\n");
+        b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_VER))+":</td><td>"+Utilities.escapeXml(cr.getVersion())+"</td></tr>\r\n");
       } else if (cr.hasExtension("http://terminology.hl7.org/StructureDefinition/ext-namingsystem-version")) {
-        b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.CANON_REND_VER))+":</td><td>"+Utilities.escapeXml(ToolingExtensions.readStringExtension(cr, "http://terminology.hl7.org/StructureDefinition/ext-namingsystem-version"))+"</td></tr>\r\n");
+        b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_VER))+":</td><td>"+Utilities.escapeXml(ToolingExtensions.readStringExtension(cr, "http://terminology.hl7.org/StructureDefinition/ext-namingsystem-version"))+"</td></tr>\r\n");
       }
     }
 
@@ -69,19 +69,19 @@ public class CanonicalRenderer extends BaseRenderer {
     String title = cr.hasTitle() ? gen.getTranslated(cr.getTitleElement()) : null;
     if (hasSummaryRow(rows, "name")) {
 
-      b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.CANON_REND_NAME))+":</td><td>"+Utilities.escapeXml(name)+"</td></tr>\r\n");
+      b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_NAME))+":</td><td>"+Utilities.escapeXml(name)+"</td></tr>\r\n");
     }
     if (hasSummaryRow(rows, "title")) {
       if (title != null && !title.equalsIgnoreCase(name)) {
-        b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.CANON_REND_TITLE))+":</td><td>"+Utilities.escapeXml(title)+"</td></tr>\r\n");
+        b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_TITLE))+":</td><td>"+Utilities.escapeXml(title)+"</td></tr>\r\n");
       }
     }
     if (hasSummaryRow(rows, "status")) {
-      b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.CANON_REND_STATUS))+":</td><td>"+describeStatus(cr)+"</td></tr>\r\n");
+      b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_STATUS))+":</td><td>"+describeStatus(cr)+"</td></tr>\r\n");
     }
     if (hasSummaryRow(rows, "definition")) {
       if (cr.hasDescription()) {
-        b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.CANON_REND_DEFINITION))+":</td><td>"+processMarkdown("description", cr.getDescriptionElement())+"</td></tr>\r\n");
+        b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_DEFINITION))+":</td><td>"+processMarkdown("description", cr.getDescriptionElement())+"</td></tr>\r\n");
       }
     }
     if (hasSummaryRow(rows, "publisher")) {
@@ -95,7 +95,7 @@ public class CanonicalRenderer extends BaseRenderer {
     }
     if (hasSummaryRow(rows, "copyright")) {
       if (cr.hasCopyright())
-        b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.CANON_REND_COPYRIGHT))+":</td><td>"+processMarkdown("copyright", cr.getCopyrightElement())+"</td></tr>\r\n");
+        b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_COPYRIGHT))+":</td><td>"+processMarkdown("copyright", cr.getCopyrightElement())+"</td></tr>\r\n");
     }
     if (hasSummaryRow(rows, "maturity")) {
       if (ToolingExtensions.hasExtension(cr, ToolingExtensions.EXT_FMM_LEVEL)) {
@@ -172,7 +172,7 @@ public class CanonicalRenderer extends BaseRenderer {
           filename = r.fhirType()+"-"+r.getId()+".{{[fmt]}}.html";
         if (xml) {
           first = false;
-          b.append("<a href=\""+igp.doReplacements(filename,  r,  null, "xml")+"\">"+(gen.formatPhrase(RenderingContext.CANON_REND_XML))+"</a>");
+          b.append("<a href=\""+igp.doReplacements(filename,  r,  null, "xml")+"\">"+(gen.formatPhrase(RenderingContext.GENERAL_XML))+"</a>");
         }
         if (json) {
           if (first) first = false; else b.append(" / ");

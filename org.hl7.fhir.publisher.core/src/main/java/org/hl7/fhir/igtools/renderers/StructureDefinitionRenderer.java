@@ -198,7 +198,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           }
         }
       }
-      StringBuilder res = new StringBuilder("<a name=\"summary\"> </a>\r\n<p><b>\r\n" + (gen.formatPhrase(RenderingContext.STRUC_DEF_SUMMARY)) + "\r\n</b></p>\r\n");
+      StringBuilder res = new StringBuilder("<a name=\"summary\"> </a>\r\n<p><b>\r\n" + (gen.formatPhrase(RenderingContext.GENERAL_SUMM)) + "\r\n</b></p>\r\n");
       if (ToolingExtensions.hasExtension(sd, ToolingExtensions.EXT_SUMMARY)) {
         Extension v = ToolingExtensions.getExtension(sd, ToolingExtensions.EXT_SUMMARY);
         res.append(processMarkdown("Profile.summary", (PrimitiveType) v.getValue()));
@@ -257,7 +257,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
       if (ToolingExtensions.hasExtension(sd, ToolingExtensions.EXT_FMM_LEVEL)) {
         // Use hard-coded spec link to point to current spec because DSTU2 had maturity listed on a different page
-        res.append("<p><b><a class=\"fmm\" href=\"http://hl7.org/fhir/versions.html#maturity\" title=\"Maturity Level\">" + (gen.formatPhrase(RenderingContext.STRUC_DEF_MATURITY)) + "</a></b>: " + ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_FMM_LEVEL) + "</p>\r\n");
+        res.append("<p><b><a class=\"fmm\" href=\"http://hl7.org/fhir/versions.html#maturity\" title=\"Maturity Level\">" + (gen.formatPhrase(RenderingContext.CANON_REND_MATURITY)) + "</a></b>: " + ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_FMM_LEVEL) + "</p>\r\n");
       }
 
       return res.toString();
@@ -395,9 +395,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   private String summarise(Quantity quantity) {
     String cu = "";
     if ("http://unitsofmeasure.org/".equals(quantity.getSystem()))
-      cu = " (" + (gen.formatPhrase(RenderingContext.STRUC_DEF_UCUM)) + ": " + quantity.getCode() + ")";
+      cu = " (" + (gen.formatPhrase(RenderingContext.GENERAL_UCUM)) + ": " + quantity.getCode() + ")";
     if ("http://snomed.info/sct".equals(quantity.getSystem()))
-      cu = " (" + (gen.formatPhrase(RenderingContext.STRUC_DEF_SNOMED)) + ": " + quantity.getCode() + ")";
+      cu = " (" + (gen.formatPhrase(RenderingContext.STRUC_DEF_SNOMED_CODE)) + ": " + quantity.getCode() + ")";
     return quantity.getValue().toString() + quantity.getUnit() + cu;
   }
 
@@ -419,11 +419,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private String summarise(Coding coding) throws FHIRException {
     if ("http://snomed.info/sct".equals(coding.getSystem()))
-      return "" + (gen.formatPhrase(RenderingContext.STRUC_DEF_SNOMED)) + " " + coding.getCode() + (!coding.hasDisplay() ? "" : "(\"" + gen.getTranslated(coding.getDisplayElement()) + "\")");
+      return "" + (gen.formatPhrase(RenderingContext.STRUC_DEF_SNOMED_CODE)) + " " + coding.getCode() + (!coding.hasDisplay() ? "" : "(\"" + gen.getTranslated(coding.getDisplayElement()) + "\")");
     if ("http://loinc.org".equals(coding.getSystem()))
       return "" + (gen.formatPhrase(RenderingContext.STRUC_DEF_LOINC)) + " " + coding.getCode() + (!coding.hasDisplay() ? "" : "(\"" + gen.getTranslated(coding.getDisplayElement()) + "\")");
     if ("http://unitsofmeasure.org/".equals(coding.getSystem()))
-      return " (" + (gen.formatPhrase(RenderingContext.STRUC_DEF_UCUM)) + ": " + coding.getCode() + ")";
+      return " (" + (gen.formatPhrase(RenderingContext.GENERAL_UCUM)) + ": " + coding.getCode() + ")";
     CodeSystem cs = context.fetchCodeSystem(coding.getSystem());
     if (cs == null)
       return "<span title=\"" + coding.getSystem() + "\">" + coding.getCode() + "</a>" + (!coding.hasDisplay() ? "" : "(\"" + gen.getTranslated(coding.getDisplayElement()) + "\")");
@@ -692,7 +692,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       if (withHeadings)
         b.append("<h4>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_TERM_BIND)) + "</h4>\r\n");
       b.append("<table class=\"list\">\r\n");
-      b.append("<tr><td><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_PATH)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_CONFORMANCE)) + "</b></td><td><b>" + (hasFixed ? (gen.formatPhrase(RenderingContext.STRUC_DEF_VALUESET_CODE)) : (gen.formatPhrase(RenderingContext.STRUC_DEF_VALUESET))) + "</b></td><td><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_URI)) + "</b></td></tr>\r\n");
+      b.append("<tr><td><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_PATH)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingContext.GENERAL_CONFORMANCE)) + "</b></td><td><b>" + (hasFixed ? (gen.formatPhrase(RenderingContext.STRUC_DEF_VALUESET_CODE)) : (gen.formatPhrase(RenderingContext.STRUC_DEF_VALUESET))) + "</b></td><td><b>" + (gen.formatPhrase(RenderingContext.GENERAL_URI)) + "</b></td></tr>\r\n");
       for (String path : txlist) {
         txItem(txmap, b, path, sd.getUrl());
       }
@@ -733,8 +733,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       if (withHeadings)
         b.append("<h4>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_TERM_BINDS)) + "</h4>\r\n");
       b.append("<table class=\"list\">\r\n");
-      b.append("<tr><td><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_PATH)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_CONFORMANCE)) + "</b></td><td><b>" + (hasFixed ?  (gen.formatPhrase(RenderingContext.STRUC_DEF_VALUESET_CODE)) : (gen.formatPhrase(RenderingContext.STRUC_DEF_VALUESET))) + "</b></td>"+
-      "<td><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_URI)) + "</b></td></tr>\r\n");
+      b.append("<tr><td><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_PATH)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingContext.GENERAL_CONFORMANCE)) + "</b></td><td><b>" + (hasFixed ?  (gen.formatPhrase(RenderingContext.STRUC_DEF_VALUESET_CODE)) : (gen.formatPhrase(RenderingContext.STRUC_DEF_VALUESET))) + "</b></td>"+
+      "<td><b>" + (gen.formatPhrase(RenderingContext.GENERAL_URI)) + "</b></td></tr>\r\n");
       for (String path : txlist) {
         txItem(txmap, b, path, sd.getUrl());
       }
@@ -1031,7 +1031,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       if (withHeadings)
         b.append("<h4>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_CONSTRAINTS)) + "</h4>\r\n");
       b.append("<table class=\"list\">\r\n");
-      b.append("<tr><td width=\"60\"><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_ID)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_GRADE)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_PATHS)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_DETAILS)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_REQUIREMENTS)) + "</b></td></tr>\r\n");
+      b.append("<tr><td width=\"60\"><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_ID)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_GRADE)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_PATHS)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingContext.GENERAL_DETAILS)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_REQUIREMENTS)) + "</b></td></tr>\r\n");
       List<String> keys = new ArrayList<>(constraintMap.keySet());
 
       Collections.sort(keys, new ConstraintKeyComparator());
@@ -2288,7 +2288,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     gc = gen.new Cell();
     row.getCells().add(gc);
     if (element.definition().getIsModifier()) {
-      gc.addStyledText((this.gen.formatPhrase(RenderingContext.STRUC_DEF_MOD_ELEMENT)), "?!", null, null, null, false);
+      gc.addStyledText((this.gen.formatPhrase(RenderingContext.STRUC_DEF_MOD)), "?!", null, null, null, false);
     }
     if (element.definition().getMustSupport() || element.definition().hasExtension(ToolingExtensions.EXT_OBLIGATION_CORE, ToolingExtensions.EXT_OBLIGATION_TOOLS)) {
       gc.addStyledText((this.gen.formatPhrase(RenderingContext.STRUC_DEF_ELE_MUST_SUPP)), "S", "white", "red", null, false);
