@@ -2119,7 +2119,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               }
               r.getElement().removeChild("text");
             } else {
-              List<Locale> langs = narrativeLangs();
+              List<Locale> langs = translationLocales();
               logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId());
               if (r.getResource() != null && isConvertableResource(r.getResource().fhirType())) {
                 boolean regen = false;
@@ -2200,15 +2200,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   /**
-   * Return all translation langs, including the defaultTranslationLang.
+   * Return a list of locales containing the translation languages for the IG, as well as the inferred default language
+   * of the IG.
    *
-   * Note that if the defaultTranslationLang is null, it will be included in the
-   * output list. The publisher should then use inferNarrativeLang to pick an
-   * appropriate locale.
-   *
-   * @return all translation langs, including the defaultTranslationLang
+   * @return translation locales
    */
-  private List<Locale> narrativeLangs() {
+  private List<Locale> translationLocales() {
     List<Locale> res = new ArrayList<>();
     res.add(inferDefaultNarrativeLang());
 
@@ -2217,9 +2214,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       if (!res.contains(locale)) {
         res.add(locale);
       }
-    }
-    if (res.isEmpty()) {
-      res.add(null);
     }
     return res;
   }
