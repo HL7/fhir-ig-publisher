@@ -40,7 +40,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -69,7 +68,6 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
-import net.sf.saxon.trans.SymbolicName;
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
 import org.apache.commons.exec.ExecuteWatchdog;
@@ -94,7 +92,6 @@ import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.exceptions.PathEngineException;
 import org.hl7.fhir.igtools.publisher.FetchedFile.FetchedBundleType;
 import org.hl7.fhir.igtools.publisher.IFetchFile.FetchState;
-import org.hl7.fhir.igtools.publisher.Publisher.FragmentUseRecord;
 import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
 import org.hl7.fhir.igtools.publisher.comparators.IpsComparator;
 import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
@@ -294,7 +291,6 @@ import org.hl7.fhir.r5.renderers.utils.Resolver.IReferenceResolver;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceContext;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceReferenceKind;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceWithReference;
-import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.terminologies.TerminologyUtilities;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
@@ -2123,14 +2119,13 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               }
               r.getElement().removeChild("text");
             } else {
-              List<String> langs = narrativeLangs();
+              List<Locale> langs = narrativeLangs();
               logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId());
               if (r.getResource() != null && isConvertableResource(r.getResource().fhirType())) {
                 boolean regen = false;
-                for (String lang : langs) {
+                for (Locale lang : langs) {
                   RenderingContext lrc = rc.copy().setDefinitionsTarget(igpkp.getDefinitionsName(r));
-
-                  lrc.setLocale(lang == null ? inferNarrativeLang() : new Locale(lang));
+                  lrc.setLocale(lang);
                   lrc.setRules(GenerationRules.VALID_RESOURCE);
                   lrc.setDefinitionsTarget(igpkp.getDefinitionsName(r));
                   if (r.getResource() instanceof DomainResource && (langs.size() > 1 || !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv()))) {
@@ -2153,10 +2148,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
                   r.setElement(e);
                 }
               } else {
-                for (String lang : langs) {
+                for (Locale lang : langs) {
                   RenderingContext lrc = rc.copy().setParser(getTypeLoader(f,r));
-
-                  lrc.setLocale(lang == null ? inferNarrativeLang() : new Locale(lang));
+                  lrc.setLocale(lang);
                   lrc.setRules(GenerationRules.VALID_RESOURCE);
                   if (isDomainResource(r) && (langs.size() > 1|| !hasNarrative(r.getElement()))) {
                     ResourceWrapper rw = new ElementWrappers.ResourceWrapperMetaElement(lrc, r.getElement());
@@ -2192,7 +2186,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     tts.end();
   }
 
-  private Locale inferNarrativeLang() {
+  private Locale inferDefaultNarrativeLang() {
+    if (defaultTranslationLang != null) {
+      return new Locale(defaultTranslationLang);
+    }
     if (sourceIg.hasLanguage()) {
       return new Locale(sourceIg.getLanguage());
     }
@@ -2211,12 +2208,14 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
    *
    * @return all translation langs, including the defaultTranslationLang
    */
-  private List<String> narrativeLangs() {
-    List<String> res = new ArrayList<>();
-    res.add(defaultTranslationLang);
-    for (String s : translationLangs) {
-      if (!res.contains(s)) {
-        res.add(s);
+  private List<Locale> narrativeLangs() {
+    List<Locale> res = new ArrayList<>();
+    res.add(inferDefaultNarrativeLang());
+
+    for (String translationLang : translationLangs) {
+      Locale locale = new Locale(translationLang);
+      if (!res.contains(locale)) {
+        res.add(locale);
       }
     }
     if (res.isEmpty()) {
@@ -4571,7 +4570,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, execTime.getTime(), !publishing);
     execTime = Calendar.getInstance();
 
-    rc = new RenderingContext(context, markdownEngine, ValidationOptions.defaults(), checkAppendSlash(specPath), "", inferNarrativeLang(), ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
+    rc = new RenderingContext(context, markdownEngine, ValidationOptions.defaults(), checkAppendSlash(specPath), "", inferDefaultNarrativeLang(), ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
     rc.setTemplateProvider(templateProvider);
     rc.setResolver(this);    
     rc.setServices(validator.getExternalHostServices());
