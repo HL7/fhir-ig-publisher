@@ -705,6 +705,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private String destDir;
   private FHIRToolingClient webTxServer;
   private String txServer;
+  private Locale forcedLanguage;
   private String igPack = "";
   private boolean debug;
   private boolean isChild;
@@ -2187,14 +2188,48 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private Locale inferDefaultNarrativeLang() {
+    return inferDefaultNarrativeLang(false);
+  }
+
+  private Locale inferDefaultNarrativeLang(final boolean logDecision) {
+    if (logDecision) {
+      logDebugMessage(LogCategory.INIT, "-force-language="+forcedLanguage
+              + " defaultTranslationLang="+defaultTranslationLang
+            + (sourceIg == null ? "" : " sourceIg.language="+sourceIg.getLanguage()
+              + " sourceIg.jurisdiction="+sourceIg.getJurisdictionFirstRep().getCodingFirstRep().getCode())
+      );
+    }
+    if (forcedLanguage != null) {
+      if (logDecision) {
+        logMessage("Using " + forcedLanguage + " as the default narrative language. (-force-language has been set)");
+      }
+      return forcedLanguage;
+    }
     if (defaultTranslationLang != null) {
+      if (logDecision) {
+        logMessage("Using " + defaultTranslationLang + " as the default narrative language. (i18n-default-lang has been set in Implementation Guide ini)");
+      }
       return new Locale(defaultTranslationLang);
     }
-    if (sourceIg.hasLanguage()) {
-      return new Locale(sourceIg.getLanguage());
+    if (sourceIg != null) {
+      if (sourceIg.hasLanguage()) {
+        if (logDecision) {
+          logMessage("Using " + sourceIg.getLanguage() + " as the default narrative language. (ImplementationGuide.language has been set)");
+        }
+        return new Locale(sourceIg.getLanguage());
+      }
+      if (sourceIg.hasJurisdiction()) {
+        final String jurisdiction = sourceIg.getJurisdictionFirstRep().getCodingFirstRep().getCode();
+        Locale localeFromRegion = RegionToLocaleMapper.getLocaleFromRegion(jurisdiction);
+
+        if (logDecision) {
+          logMessage("Using " + localeFromRegion + " as the default narrative language. (inferred from ImplementationGuide.jurisdiction=" + jurisdiction + ")");
+        }
+        return localeFromRegion;
+      }
     }
-    if (sourceIg.hasJurisdiction()) {
-      return RegionToLocaleMapper.getLocaleFromRegion(sourceIg.getJurisdictionFirstRep().getCodingFirstRep().getCode());
+    if (logDecision) {
+      logMessage("Using en-US as the default narrative language. (no language information in Implementation Guide or command line");
     }
     return new Locale("en", "US");
   }
@@ -4297,6 +4332,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       publishedIg = sourceIg.copy();
       altMap.get(IG_NAME).getResources().get(0).setResource(publishedIg);
     }
+    inferDefaultNarrativeLang(true);
     dependentIgFinder = new DependentIGFinder(sourceIg.getPackageId());
 
 
@@ -12924,6 +12960,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       }
       self.setTxServer(CliParams.getNamedParam(args, "-tx"));
       self.setPackagesFolder(CliParams.getNamedParam(args, "-packages"));
+
+      if (CliParams.hasNamedParam(args, "-force-language")) {
+        self.setForcedLanguage(CliParams.getNamedParam(args,"-force-language"));
+      }
+
       if (CliParams.hasNamedParam(args, "-watch")) {
         throw new Error("Watch mode (-watch) is no longer supported");
       }
@@ -12981,6 +13022,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (!CliParams.hasNamedParam(args, "-no-exit")) {
       System.exit(exitCode);
     }
+  }
+
+  private void setForcedLanguage(String language) {
+    this.forcedLanguage = new Locale(language);
   }
 
   public static String getAbsoluteConfigFilePath(String configFilePath) throws IOException {
