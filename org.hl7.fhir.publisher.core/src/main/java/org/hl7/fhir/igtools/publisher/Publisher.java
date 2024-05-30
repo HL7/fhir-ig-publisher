@@ -189,6 +189,7 @@ import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResource
 import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceSearchParamComponent;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
+import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionDesignationComponent;
 import org.hl7.fhir.r5.model.CodeType;
 import org.hl7.fhir.r5.model.CodeableConcept;
 import org.hl7.fhir.r5.model.Coding;
@@ -323,13 +324,13 @@ import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.MimeType;
-import org.hl7.fhir.utilities.SimpleHTTPClient;
-import org.hl7.fhir.utilities.SimpleHTTPClient.HTTPResult;
 import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.TimeTracker;
 import org.hl7.fhir.utilities.TimeTracker.Session;
 import org.hl7.fhir.utilities.filesystem.CSFile;
+import org.hl7.fhir.utilities.http.HTTPResult;
+import org.hl7.fhir.utilities.http.ManagedWebAccess;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.ZipGenerator;
@@ -820,19 +821,19 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private List<ContactDetail> contacts;
   private List<UsageContext> contexts;
   private List<String> binaryPaths = new ArrayList<>();
-  private String copyright;
+  private MarkdownType copyright;
   private List<CodeableConcept> jurisdictions;
-  private SPDXLicense licenseInfo;
-  private String publisher;
+  private Enumeration<SPDXLicense> licenseInfo;
+  private StringType publisher;
   private String businessVersion;
   private String wgm;
   private List<ContactDetail> defaultContacts;
   private List<UsageContext> defaultContexts;
-  private String defaultCopyright;
+  private MarkdownType defaultCopyright;
   private String defaultWgm;
   private List<CodeableConcept> defaultJurisdictions;
-  private SPDXLicense defaultLicenseInfo;
-  private String defaultPublisher;
+  private Enumeration<SPDXLicense> defaultLicenseInfo;
+  private StringType defaultPublisher;
   private String defaultBusinessVersion;
 
   private CacheOption cacheOption;
@@ -1068,12 +1069,16 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     long startTime = System.nanoTime();
     JsonObject qaJson = new JsonObject();
     StringBuilder txt = new StringBuilder();
+    StringBuilder txtGen = new StringBuilder();
     qaJson.add("url", templateInfo.asString("canonical"));
     txt.append("url = "+templateInfo.asString("canonical")+"\r\n");
+    txtGen.append("url = "+templateInfo.asString("canonical")+"\r\n");
     qaJson.add("package-id", templateInfo.asString("name"));
     txt.append("package-id = "+templateInfo.asString("name")+"\r\n");
+    txtGen.append("package-id = "+templateInfo.asString("name")+"\r\n");
     qaJson.add("ig-ver", templateInfo.asString("version"));
     txt.append("ig-ver = "+templateInfo.asString("version")+"\r\n");
+    txtGen.append("ig-ver = "+templateInfo.asString("version")+"\r\n");
     qaJson.add("date", new SimpleDateFormat("EEE, dd MMM, yyyy HH:mm:ss Z", new Locale("en", "US")).format(execTime.getTime()));
     qaJson.add("dateISO8601", new DateTimeType(execTime).asStringValue());
     qaJson.add("version", Constants.VERSION);
@@ -1097,11 +1102,13 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       e.printStackTrace();
       qaJson.add("exception", e.getMessage());
       txt.append("exception = "+e.getMessage()+"\r\n");
+      txtGen.append("exception = "+e.getMessage()+"\r\n");
     }
     long endTime = System.nanoTime();
     String json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(qaJson, true);
     TextFile.stringToFile(json, Utilities.path(outputDir, "qa.json"));
     TextFile.stringToFile(txt.toString(), Utilities.path(outputDir, "qa.txt"));
+    TextFile.stringToFile(txtGen.toString(), Utilities.path(outputDir, "qa.compare.txt"));
 
     Utilities.createDirectory(tempDir);
     ZipGenerator zip = new ZipGenerator(Utilities.path(tempDir, "full-ig.zip"));
@@ -2528,10 +2535,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       throw new Error("Old style JSON configuration is no longer supported");
     }
     expectedJurisdiction = checkForJurisdiction();
-    realmRules = makeRealmBusinessRules();
-    previousVersionComparator = makePreviousVersionComparator();
-    ipaComparator = makeIpaComparator();
-    ipsComparator = makeIpsComparator();
     if (context != null) {
       r4tor4b.setContext(context);
     }
@@ -2860,7 +2863,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         break;
       case "apply-copyright":
         if (p.getValue().equals("true")) {
-          copyright = sourceIg.getCopyright();
+          copyright = sourceIg.getCopyrightElement();
         }
         break;
       case "apply-jurisdiction":
@@ -2870,12 +2873,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         break;
       case "apply-license":
         if (p.getValue().equals("true")) {
-          licenseInfo = sourceIg.getLicense();
+          licenseInfo = sourceIg.getLicenseElement();
         }
         break;
       case "apply-publisher":
         if (p.getValue().equals("true")) {
-          publisher = sourceIg.getPublisher();
+          publisher = sourceIg.getPublisherElement();
         }
         break;
       case "apply-version":
@@ -2900,7 +2903,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         break;
       case "default-copyright":
         if (p.getValue().equals("true")) {
-          defaultCopyright = sourceIg.getCopyright();
+          defaultCopyright = sourceIg.getCopyrightElement();
         }
         break;
       case "default-jurisdiction":
@@ -2910,12 +2913,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         break;
       case "default-license":
         if (p.getValue().equals("true")) {
-          defaultLicenseInfo = sourceIg.getLicense();
+          defaultLicenseInfo = sourceIg.getLicenseElement();
         }
         break;
       case "default-publisher":
         if (p.getValue().equals("true")) {
-          defaultPublisher = sourceIg.getPublisher();
+          defaultPublisher = sourceIg.getPublisherElement();
         }
         break;
       case "default-version":
@@ -3173,7 +3176,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     for (String s : conversionVersions) {
       loadConversionVersion(s);
     }
-
+    langUtils = new LanguageUtils(context);
 
     if (expParams != null) {
       /* This call to uncheckedPath is allowed here because the path is used to
@@ -4266,6 +4269,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (needToBuild) {
       if (sourceIg == null) // old JSON approach
         sourceIg = (ImplementationGuide) parse(igf);
+      List<TranslationUnit> translations = findTranslations(sourceIg.fhirType(), sourceIg.getId(), igf.getErrors());
+      if (translations != null) {
+        langUtils.importFromTranslations(sourceIg, translations, igf.getErrors());
+      }
       publishedIg = sourceIg.copy();
       FetchedResource igr = igf.addResource("$IG");
       //      loadAsElementModel(igf, igr, null);
@@ -4274,6 +4281,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       igr.setId(sourceIg.getId()).setTitle(publishedIg.getName());
     } else {
       // special case; the source is updated during the build, so we track it differently
+      List<TranslationUnit> translations = findTranslations(sourceIg.fhirType(), sourceIg.getId(), igf.getErrors());
+      if (translations != null) {
+        langUtils.importFromTranslations(sourceIg, translations, igf.getErrors());
+      }
       publishedIg = sourceIg.copy();
       altMap.get(IG_NAME).getResources().get(0).setResource(publishedIg);
     }
@@ -4578,6 +4589,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         }
       }
     }
+    realmRules = makeRealmBusinessRules();
+    previousVersionComparator = makePreviousVersionComparator();
+    ipaComparator = makeIpaComparator();
+    ipsComparator = makeIpsComparator();
     //    rc.setTargetVersion(pubVersion);
 
     if (igMode) {
@@ -4755,15 +4770,16 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
           boolean changed = noteFile(f.getPath(), ff);
           // ok good to go
-          CodeSystem cs = makeSupplement(cr);
-          cs.setUserData("source.filename", f.getName().substring(0, f.getName().indexOf(".")));
+          CodeSystem csSrc = makeSupplement(cr, true); // what could be translated
+          CodeSystem csDst = makeSupplement(cr, false); // what has been translated
+          csDst.setUserData("source.filename", f.getName().substring(0, f.getName().indexOf(".")));
           List<TranslationUnit> list = loadTranslations(f, ext);
-          LanguageUtils.fillSupplement(cs, list);
+          langUtils.fillSupplement(csSrc, csDst, list);
           FetchedResource rr = ff.addResource("CodeSystemSupplement");
-          rr.setElement(convertToElement(rr, cs));
-          rr.setResource(cs);          
-          rr.setId(cs.getId());
-          rr.setTitle(cs.getName());
+          rr.setElement(convertToElement(rr, csDst));
+          rr.setResource(csDst);          
+          rr.setId(csDst.getId());
+          rr.setTitle(csDst.getName());
           igpkp.findConfiguration(ff, rr);
           for (FetchedResource r : ff.getResources()) {
             ImplementationGuideDefinitionResourceComponent res = findIGReference(r.fhirType(), r.getId());
@@ -4771,8 +4787,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               res = publishedIg.getDefinition().addResource();
               if (!res.hasName())
                 res.setName(r.getTitle());
-              if (!res.hasDescription())
-                res.setDescription(((CanonicalResource)r.getResource()).getDescription().trim());
+              if (!res.hasDescription() && csDst.hasDescription()) {
+                res.setDescription(csDst.getDescription().trim());
+              }
               res.setReference(new Reference().setReference(r.fhirType()+"/"+r.getId()));
             }
             res.setUserData("loaded.resource", r);
@@ -4785,93 +4802,118 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     return false;
   }
 
-  private CodeSystem makeSupplement(CanonicalResource res) {
+  private CodeSystem makeSupplement(CanonicalResource res, boolean content) {
     String id = "cs-"+defaultTranslationLang+"-"+res.getId();
     CodeSystem supplement = new CodeSystem();
-    supplement.setLanguage("en"); // base is EN? 
+    supplement.setLanguage(content ? "en" : defaultTranslationLang); // base is EN? 
     supplement.setId(id);
     supplement.setUrl(Utilities.pathURL(igpkp.getCanonical(), "CodeSystem", id));
     supplement.setVersion(res.getVersion());
     supplement.setStatus(res.getStatus());
-    supplement.setName(res.getTitle()+LanguageUtils.nameForLang(defaultTranslationLang));
-    supplement.setName(res.getTitle()+" ("+LanguageUtils.titleForLang(defaultTranslationLang)+" translation)");
     supplement.setContent(CodeSystemContentMode.SUPPLEMENT);
     supplement.setSupplements(res.getUrl());
     supplement.setCaseSensitive(false);
     supplement.setPublisher(sourceIg.getPublisher());
     supplement.setContact(sourceIg.getContact());
-    supplement.setDescription("Language Pack:"+LanguageUtils.titleForLang(defaultTranslationLang)+"\r\n"+res.getDescription());
     supplement.setCopyright(sourceIg.getCopyright());
 
-    addConcept(supplement, res.getId(), res.getName());
-    addConcept(supplement, res.getId()+"/title", res.getTitle());
-    addConcept(supplement, res.getId()+"/purpose", res.getPurpose());
-    addConcept(supplement, res.getId()+"/copyright", res.getCopyright());
-    addConcept(supplement, res.getId()+"/description", res.getDescription());
-
-    if (res instanceof CodeSystem) {
-      CodeSystem cs = (CodeSystem) res;
-      for (ConceptDefinitionComponent cd : cs.getConcept()) {
-        ConceptDefinitionComponent clone = supplement.addConcept().setCode(cd.getCode()).setDisplay(cd.getDisplay());
-        // don't create this - it's just admin overhead
-        // CodeSystemUtilities.setProperty(supplement, clone, "translation-context", cd.getDefinitionElement());
-        copyConcepts(clone, cd, supplement);
-      }
-    } else if (res instanceof StructureDefinition) {
-      StructureDefinition sd = (StructureDefinition) res;
-      for (ElementDefinition ed : sd.getSnapshot().getElement()) {
-        addConcept(supplement, ed.getId(), ed.getDefinition());
-        addConcept(supplement, ed.getId()+"/requirements", ed.getRequirements(), ed.getDefinitionElement());
-        addConcept(supplement, ed.getId()+"/comment", ed.getComment(), ed.getDefinitionElement());
-        addConcept(supplement, ed.getId()+"/meaningWhenMissing", ed.getMeaningWhenMissing(), ed.getDefinitionElement());
-        addConcept(supplement, ed.getId()+"/orderMeaning", ed.getOrderMeaning(), ed.getDefinitionElement());
-        addConcept(supplement, ed.getId()+"/isModifierMeaning", ed.getIsModifierReason(), ed.getDefinitionElement());
-        addConcept(supplement, ed.getId()+"/binding", ed.getBinding().getDescription(), ed.getDefinitionElement());
-      }
-    } else if (res instanceof Questionnaire) {
-      Questionnaire q = (Questionnaire) res;
-      for (QuestionnaireItemComponent item : q.getItem()) {
-        addItem(supplement, item, null);
+    supplement.setName(res.getName());
+    supplement.setTitle(res.getTitle());
+    supplement.setPublisher(res.getPublisher());
+    supplement.setPurpose(res.getPurpose());
+    supplement.setDescription(res.getDescription());
+    supplement.setCopyright(res.getCopyright());
+    
+    if (content) {
+      if (res instanceof CodeSystem) {
+        CodeSystem cs = (CodeSystem) res;
+        for (ConceptDefinitionComponent cd : cs.getConcept()) {
+          cloneConcept(supplement.getConcept(), cd);
+        }
+      } else if (res instanceof StructureDefinition) {
+        StructureDefinition sd = (StructureDefinition) res;
+        for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+          addConcept(supplement, ed.getId(), ed.getDefinition());
+          addConcept(supplement, ed.getId()+"@requirements", ed.getRequirements(), ed.getDefinitionElement());
+          addConcept(supplement, ed.getId()+"@comment", ed.getComment(), ed.getDefinitionElement());
+          addConcept(supplement, ed.getId()+"@meaningWhenMissing", ed.getMeaningWhenMissing(), ed.getDefinitionElement());
+          addConcept(supplement, ed.getId()+"@orderMeaning", ed.getOrderMeaning(), ed.getDefinitionElement());
+          addConcept(supplement, ed.getId()+"@isModifierMeaning", ed.getIsModifierReason(), ed.getDefinitionElement());
+          addConcept(supplement, ed.getId()+"@binding", ed.getBinding().getDescription(), ed.getDefinitionElement());
+        }
+      } else if (res instanceof Questionnaire) {
+        Questionnaire q = (Questionnaire) res;
+        for (QuestionnaireItemComponent item : q.getItem()) {
+          addItem(supplement, item, null);
+        }
       }
     }
     return supplement;
   }
 
+  private void cloneConcept(List<ConceptDefinitionComponent> dest, ConceptDefinitionComponent source) {
+    // we clone everything translatable but the child concepts (need to flatten the hierarchy if there is one so we 
+    // can filter it later 
+
+    ConceptDefinitionComponent clone = new ConceptDefinitionComponent();
+    clone.setCode(source.getCode()); 
+    dest.add(clone);
+    clone.setDisplay(source.getDisplay());
+    clone.setDefinition(source.getDefinition());
+    for (ConceptDefinitionDesignationComponent d : source.getDesignation()) {
+      if (wantToTranslate(d)) {
+        clone.addDesignation(d.copy());
+      }
+    }
+    for (Extension ext : source.getExtension()) {
+      if (ext.hasValue() && Utilities.existsInList(ext.getValue().fhirType(), "string", "markdown")) {
+        clone.addExtension(ext.copy());
+      }
+    }
+
+    for (ConceptDefinitionComponent cd : source.getConcept()) {
+      cloneConcept(dest, cd);
+    }
+  }
+
+  private boolean wantToTranslate(ConceptDefinitionDesignationComponent d) {
+    return !d.hasLanguage() && d.hasUse(); // todo: only if the source language is the right language?
+  }
+
   private void addItem(CodeSystem supplement, QuestionnaireItemComponent item, QuestionnaireItemComponent parent) {
     addConcept(supplement, item.getLinkId(), item.getText(), parent == null ? null : parent.getTextElement());   
-    addConcept(supplement, item.getLinkId()+"/prefix", item.getPrefix(), item.getTextElement());   
+    addConcept(supplement, item.getLinkId()+"@prefix", item.getPrefix(), item.getTextElement());   
     for (QuestionnaireItemAnswerOptionComponent ao : item.getAnswerOption()) {
       if (ao.hasValueCoding()) {
         if (ao.getValueCoding().hasDisplay()) {
-          addConcept(supplement, item.getLinkId()+"/option="+ao.getValueCoding().getCode(), ao.getValueCoding().getDisplay(), item.getTextElement());
+          addConcept(supplement, item.getLinkId()+"@option="+ao.getValueCoding().getCode(), ao.getValueCoding().getDisplay(), item.getTextElement());
         }
       } else if (ao.hasValueStringType()) {
-        addConcept(supplement, item.getLinkId()+"/option", ao.getValueStringType().primitiveValue(), item.getTextElement());
+        addConcept(supplement, item.getLinkId()+"@option", ao.getValueStringType().primitiveValue(), item.getTextElement());
       } else if (ao.hasValueReference()) {
         if (ao.getValueReference().hasDisplay()) {
-          addConcept(supplement, item.getLinkId()+"/option="+ao.getValueReference().getReference(), ao.getValueReference().getDisplay(), item.getText()+": "+ao.getValueReference().getReference());
+          addConcept(supplement, item.getLinkId()+"@option="+ao.getValueReference().getReference(), ao.getValueReference().getDisplay(), item.getText()+": "+ao.getValueReference().getReference());
         }
       }
     }
     for (QuestionnaireItemInitialComponent ao : item.getInitial()) {
       if (ao.hasValueCoding()) {
         if (ao.getValueCoding().hasDisplay()) {
-          addConcept(supplement, item.getLinkId()+"/initial="+ao.getValueCoding().getCode(), ao.getValueCoding().getDisplay(), item.getTextElement());
+          addConcept(supplement, item.getLinkId()+"@initial="+ao.getValueCoding().getCode(), ao.getValueCoding().getDisplay(), item.getTextElement());
         }
       } else if (ao.hasValueStringType()) {
-        addConcept(supplement, item.getLinkId()+"/initial", ao.getValueStringType().primitiveValue(), item.getText());
+        addConcept(supplement, item.getLinkId()+"@initial", ao.getValueStringType().primitiveValue(), item.getText());
       } else if (ao.hasValueQuantity()) {
-        addConcept(supplement, item.getLinkId()+"/initial", ao.getValueQuantity().getDisplay(), item.getText()+": "+ao.getValueQuantity().toString());
+        addConcept(supplement, item.getLinkId()+"@initial", ao.getValueQuantity().getDisplay(), item.getText()+": "+ao.getValueQuantity().toString());
       } else if (ao.hasValueReference()) {
         if (ao.getValueReference().hasDisplay()) {
-          addConcept(supplement, item.getLinkId()+"/initial="+ao.getValueReference().getReference(), ao.getValueReference().getDisplay(), item.getText()+": "+ao.getValueReference().getReference());
+          addConcept(supplement, item.getLinkId()+"@initial="+ao.getValueReference().getReference(), ao.getValueReference().getDisplay(), item.getText()+": "+ao.getValueReference().getReference());
         }
       }
     }
     for (QuestionnaireItemComponent child : item.getItem()) {
       addItem(supplement, child, item);
     }
-
   }
 
   private void copyConcepts(ConceptDefinitionComponent tgt, ConceptDefinitionComponent src, CodeSystem supplement) {
@@ -5712,7 +5754,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private RealmBusinessRules makeRealmBusinessRules() {
     if (expectedJurisdiction != null && expectedJurisdiction.getCode().equals("US")) {
-      return new USRealmBusinessRules(context, version, tempDir, igpkp.getCanonical(), igpkp);
+      return new USRealmBusinessRules(context, version, tempDir, igpkp.getCanonical(), igpkp, rc);
     } else {
       return new NullRealmBusinessRules(igrealm);
     }
@@ -5726,7 +5768,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       comparisonVersions = new ArrayList<>();
       comparisonVersions.add("{last}");
     }
-    return new PreviousVersionComparator(context, version, businessVersion != null ? businessVersion : sourceIg == null ? null : sourceIg.getVersion(), rootDir, tempDir, igpkp.getCanonical(), igpkp, logger, comparisonVersions, versionToAnnotate);
+    return new PreviousVersionComparator(context, version, businessVersion != null ? businessVersion : sourceIg == null ? null : sourceIg.getVersion(), rootDir, tempDir, igpkp.getCanonical(), igpkp, logger, comparisonVersions, versionToAnnotate, rc);
   }
 
 
@@ -5737,7 +5779,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (ipaComparisons == null) {
       return null;
     }
-    return new IpaComparator(context, rootDir, tempDir, igpkp, logger, ipaComparisons);
+    return new IpaComparator(context, rootDir, tempDir, igpkp, logger, ipaComparisons, rc);
   }
 
   private IpsComparator makeIpsComparator() throws IOException {
@@ -5747,7 +5789,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (ipsComparisons == null) {
       return null;
     }
-    return new IpsComparator(context, rootDir, tempDir, igpkp, logger, ipsComparisons);
+    return new IpsComparator(context, rootDir, tempDir, igpkp, logger, ipsComparisons, rc);
   }
 
   private void checkJurisdiction(FetchedFile f, CanonicalResource resource, IssueSeverity error, String verb) {
@@ -6085,7 +6127,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         List<TranslationUnit> translations = findTranslations(r.fhirType(), r.getId(), r.getErrors());
         if (translations != null) {
           r.setHasTranslations(true);
-          if (new LanguageUtils(context).importFromTranslations(e, translations, r.getErrors()) > 0) {
+          if (langUtils.importFromTranslations(e, translations, r.getErrors()) > 0) {
             altered = true;
           }
         }
@@ -6110,13 +6152,15 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private List<TranslationUnit> findTranslations(String fhirType, String id, List<ValidationMessage> messages) throws IOException {
     List<TranslationUnit> res = null;
-    
+
     String base = fhirType+"-"+id;
+    String tbase = fhirType+"-$all";
     for (String dir : translationSources) {      
       File df = new File(Utilities.path(rootDir, dir));
       if (df.exists()) {
         for (String fn : df.list()) {
-          if (fn.startsWith(base+".") || fn.startsWith(base+"-") || fn.startsWith(base+"_")) {
+          if ((fn.startsWith(base+".") || fn.startsWith(base+"-") || fn.startsWith(base+"_")) ||
+              (fn.startsWith(tbase+".") || fn.startsWith(tbase+"-") || fn.startsWith(tbase+"_"))) {
             LanguageFileProducer lp = null;
             switch (Utilities.getFileExtension(fn)) {
             case "po":
@@ -6435,11 +6479,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               if (copyright != null && !bc.hasCopyright() && bc.supportsCopyright()) {
                 altered = true;
                 b.append("copyright="+copyright);
-                bc.setCopyright(copyright);
+                bc.setCopyrightElement(copyright);
               } else if (!bc.hasCopyright() && defaultCopyright != null) {
                 altered = true;
                 b.append("copyright="+defaultCopyright);
-                bc.setCopyright(defaultCopyright);
+                bc.setCopyrightElement(defaultCopyright);
               }
               if (bc.hasCopyright() && bc.getCopyright().contains("{{{year}}}")) {
                 bc.setCopyright(bc.getCopyright().replace("{{{year}}}", Integer.toString(Calendar.getInstance().get(Calendar.YEAR))));
@@ -6459,11 +6503,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               if (publisher != null) {
                 altered = true;
                 b.append("publisher="+publisher);
-                bc.setPublisher(publisher);
+                bc.setPublisherElement(publisher);
               } else if (!bc.hasPublisher() && defaultPublisher != null) {
                 altered = true;
                 b.append("publisher="+defaultPublisher);
-                bc.setPublisher(defaultPublisher);
+                bc.setPublisherElement(defaultPublisher);
               }
 
 
@@ -9946,6 +9990,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     data.add("igVer", workingVersion());
     data.add("errorCount", getErrorCount());
     data.add("version", version);
+    data.add("releaseLabel", findReleaseLabel());
     data.add("revision", specMaps.get(0).getBuild());
     data.add("versionFull", version+"-"+specMaps.get(0).getBuild());
     data.add("toolingVersion", Constants.VERSION);
@@ -10601,6 +10646,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private Map<String, FragmentUseRecord> fragmentUses = new HashMap<>();
   private boolean trackFragments = false;
+
+  private LanguageUtils langUtils;
   
   private String processSQLCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();
@@ -11079,7 +11126,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     saveNativeResourceOutputFormats(f, r, element, ""); 
     for (String lang : translationLangs) {
       Element e = (Element) element.copy();
-      if (LanguageUtils.switchLanguage(e, lang)) {
+      if (langUtils.switchLanguage(e, lang)) {
         saveNativeResourceOutputFormats(f, r, e, "-"+lang);         
       }
     }
@@ -13125,9 +13172,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     throw new Error("Extracting GitHub source failed.");
   }
 
-  private static InputStream fetchGithubUrl(String ghUrl) throws IOException {    
-    SimpleHTTPClient http = new SimpleHTTPClient();
-    HTTPResult res = http.get(ghUrl+"?nocache=" + System.currentTimeMillis());
+  private static InputStream fetchGithubUrl(String ghUrl) throws IOException {  
+    HTTPResult res = ManagedWebAccess.get(ghUrl+"?nocache=" + System.currentTimeMillis());
     res.checkThrowException();
     return new ByteArrayInputStream(res.getContent());
   }
