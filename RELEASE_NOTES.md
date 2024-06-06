@@ -1,3 +1,4 @@
+* Loader: Fix bug loading language pack NPMs
 * Validator: Find value sets on tx server if not tx.fhir.org
 * Validator: Do not send Content-Type header with GET requests for tx servers
 * Validator: Fix npe validating code system
