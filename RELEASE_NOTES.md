@@ -13,3 +13,4 @@
 * Renderer: Partial implementation of type parameters
 * Renderer: Fixed rendering of actor-specific obligations, added elementIds to obligation narrative rendering
 * Renderer: Corrected ObligationsRenderer to handle multiple actors and multiple codes.  Also got obligations with elements to render properly (which means knowing whether you're on a table page or definitions page, what tab you're on, and whether the element for the obligation is in-scope for that tab (so you know whether to hyperlink or not).  Had to make links on the tables point to definitions because table anchors are not unique.
+* Renderer: Fix issue generating dependency table for packages in error
