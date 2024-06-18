@@ -429,7 +429,7 @@ public class SimpleFetcher implements IFetchFile {
   }
 
   private void addFile(List<FetchedFile> res, File f, org.hl7.fhir.r5.elementmodel.Element e, String cnt) throws IOException {
-    if (!e.fhirType().equals("ImplementationGuide")) {
+    if (!e.fhirType().equals("ImplementationGuide") && !(f.getName().startsWith("Binary") && !"Binary".equals(e.fhirType()))) {
       addFile(res, f, cnt);
     }
   }
