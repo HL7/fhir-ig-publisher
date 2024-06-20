@@ -178,7 +178,7 @@ public class PublicationChecker {
       }
     }
     if (check(messages, pr.has("status"), "No publication request status found"+mkError())) {
-      if (check(messages, isValidStatus(pr.asString("status")), "Proposed status for this publication is not valid (valid values: release|trial-use|update|qa-preview|ballot|draft|normative+trial-use|normative|informative)"+mkError())) {
+      if (check(messages, isValidStatus(pr.asString("status")), "Proposed status for this publication is not valid (valid values: release|trial-use|update|preview|ballot|draft|normative+trial-use|normative|informative)"+mkError())) {
         summary.add(new StringPair("status", pr.asString("status")));                        
       }
     }
@@ -299,7 +299,7 @@ public class PublicationChecker {
   }
 
   private boolean isValidStatus(String str) {
-    return Utilities.existsInList(str, "release", "trial-use", "update", "qa-preview", "ballot", "draft", "normative+trial-use", "normative", "informative", "public-comment");
+    return Utilities.existsInList(str, "release", "trial-use", "update", "preview", "ballot", "draft", "normative+trial-use", "normative", "informative", "public-comment");
   }
 
   private String getCurrentSequence(PackageList pl) {
