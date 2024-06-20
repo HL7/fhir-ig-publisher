@@ -2019,6 +2019,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   public String references() throws FHIRFormatError, IOException {
+    
     Map<String, String> base = new HashMap<>();
     Map<String, String> invoked = new HashMap<>();
     Map<String, String> imposed = new HashMap<>();
@@ -2092,6 +2093,16 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
 
     StringBuilder b = new StringBuilder();
+    if (sd.hasExtension(ToolingExtensions.EXT_WEB_SOURCE)) {
+      String url = ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_WEB_SOURCE);
+      if (Utilities.isAbsoluteUrlLinkable(url)) {
+        b.append("<p><b>Original Source:</b> <a href=\""+Utilities.escapeXml(url)+"\">"+Utilities.escapeXml(Utilities.extractDomain(url))+"</a></p>\r\n");      
+      } else {
+        b.append("<p><b>Original Source:</b> <code>"+Utilities.escapeXml(url)+"</a></p>\r\n");        
+      }
+    } else if (sd.getMeta().hasSource() && Utilities.isAbsoluteUrlLinkable(sd.getMeta().getSource())) {
+      b.append("<p><b>Original Source:</b> <a href=\""+sd.getMeta().getSource()+"\">"+Utilities.extractDomain(sd.getMeta().getSource())+"</a></p>\r\n");
+    }
     String type = sd.describeType();
     if (ToolingExtensions.readBoolExtension(sd, ToolingExtensions.EXT_OBLIGATION_PROFILE_FLAG)) {
       type = "Obligation Profile";

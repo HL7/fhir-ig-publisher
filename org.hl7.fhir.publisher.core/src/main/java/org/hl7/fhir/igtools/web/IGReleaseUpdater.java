@@ -615,7 +615,7 @@ public class IGReleaseUpdater {
       return decorate(sequence);
     else if ("release".equals(status))
       return "Release";
-    else if ("qa-preview".equals(status))
+    else if ("preview".equals(status))
       return "QA Preview";
     else if ("ballot".equals(status))
       return decorate(sequence)+" Ballot "+ballotCount(ig, sequence, version);

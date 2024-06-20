@@ -176,9 +176,11 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
   private void cleanup(String path) throws IOException {
     Utilities.clearDirectory(Utilities.path(path, "input", "extensions"));
     File dir = new File(Utilities.path(path, "temp", "xver-qa"));
-    for (File f : dir.listFiles()) {
-      if (f.getName().endsWith(".html") && f.getName().contains("-")) {
-        f.delete();
+    if (dir.exists()) {
+      for (File f : dir.listFiles()) {
+        if (f.getName().endsWith(".html") && f.getName().contains("-")) {
+          f.delete();
+        }
       }
     }
   }

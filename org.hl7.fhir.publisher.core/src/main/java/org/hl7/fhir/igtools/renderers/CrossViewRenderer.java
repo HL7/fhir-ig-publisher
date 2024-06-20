@@ -387,12 +387,12 @@ public class CrossViewRenderer extends Renderer {
   private void seeExtensionDefinition(StructureDefinition sd) {
     allExtensions.add(sd);
     String code = null;
-    if (sd.getUrl().startsWith(canonical)) {
+    if (sd.getUrl().startsWith(canonical+"/StructureDefinition/")) {
       code = sd.getUrl().substring(canonical.length()+21);
-    } else if (canonical2 != null && sd.getUrl().startsWith(canonical2)) {
+    } else if (canonical2 != null && sd.getUrl().startsWith(canonical2+"/StructureDefinition/")) {
       code = sd.getUrl().substring(canonical2.length()+21);
     } else {
-     //  System.out.println("extension url doesn't follow canonical pattern: "+sd.getUrl()+", so omitted from extension summary");
+     //  System.out.println("extension url doesn't follow canonical pattern: "+sd.getUrl()+"/StructureDefinition, so omitted from extension summary");
       return;
     }
     ExtensionDefinition exd = new ExtensionDefinition();
