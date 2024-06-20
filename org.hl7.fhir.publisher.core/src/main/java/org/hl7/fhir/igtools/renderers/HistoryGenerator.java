@@ -96,7 +96,7 @@ public class HistoryGenerator {
           }
         }
         
-        tr.td().ah(pd.getPath()).tx(new DataRenderer(context).display(pd.getDate()));          
+        tr.td().ah(pd.getPath()).tx(new DataRenderer(context).displayDataType(pd.getDate()));          
         
 
         XhtmlNode td = tr.td(); 
@@ -113,11 +113,11 @@ public class HistoryGenerator {
           td = tr.td();
           if (aa != null) {
             if (aa.getReference() != null) {
-              ResourceWithReference rr = context.getResolver().resolve(context, aa.getReference());
+              ResourceWithReference rr = context.getResolver().resolve(context, aa.getReference(), null);
               if (rr == null) {
                 td.tx(aa.getDisplay());
               } else {
-                td.ah(rr.getReference()).tx(aa.getDisplay());                
+                td.ah(rr.getWebPath()).tx(aa.getDisplay());                
               }
             } else {
               td.tx(aa.getDisplay());

@@ -32,9 +32,9 @@ import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.renderers.utils.ElementWrappers;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.QuestionnaireRendererMode;
+import org.hl7.fhir.r5.renderers.utils.ResourceElement;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -55,7 +55,7 @@ public class QuestionnaireResponseRenderer extends BaseRenderer {
   public String render(QuestionnaireRendererMode mode) throws IOException, FHIRFormatError, DefinitionException, FHIRException, EOperationOutcome {
     org.hl7.fhir.r5.renderers.QuestionnaireResponseRenderer qr = new org.hl7.fhir.r5.renderers.QuestionnaireResponseRenderer(gen);
     gen.setQuestionnaireMode(mode);
-    return new XhtmlComposer(XhtmlComposer.HTML).compose(qr.render(new ElementWrappers.ResourceWrapperMetaElement(gen, this.qr)));
+    return new XhtmlComposer(XhtmlComposer.HTML).compose(qr.build(ResourceElement.forResource(gen.getContextUtilities(), gen.getProfileUtilities(), this.qr)));
   }
 
 }
