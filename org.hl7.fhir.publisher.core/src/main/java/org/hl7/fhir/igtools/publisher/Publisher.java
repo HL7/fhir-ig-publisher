@@ -4444,7 +4444,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         examples.add(r);
         String ref = res.getProfile().get(0).getValueAsString();
         if (Utilities.isAbsoluteUrl(ref)) {
-          r.setExampleUri(ref);
+          r.setExampleUri(stripVersion(ref));
         } else {
           r.setExampleUri(Utilities.pathURL(igpkp.getCanonical(), ref));
         }
@@ -6143,7 +6143,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           r.setResEntry(srcForLoad);
           if (srcForLoad.hasProfile()) {
             r.getElement().setUserData("profile", srcForLoad.getProfile().get(0).getValue());
-            r.getStatedProfiles().add(srcForLoad.getProfile().get(0).getValue());
+            r.getStatedProfiles().add(stripVersion(srcForLoad.getProfile().get(0).getValue()));
           }
         }
 
@@ -6152,7 +6152,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         if (m != null) {
           List<Element> profiles = m.getChildrenByName("profile");
           for (Element p : profiles)
-            r.getStatedProfiles().add(p.getValue());
+            r.getStatedProfiles().add(stripVersion(p.getValue()));
         }
         if ("1.0.1".equals(ver)) {
           file.getErrors().clear();
@@ -6193,6 +6193,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         throw new Exception("Unable to determine type for  "+file.getName()+": " +ex.getMessage(), ex);
       }
     }
+  }
+
+  private String stripVersion(String url) {
+    return url.endsWith("|"+businessVersion) ? url.substring(0, url.lastIndexOf("|")) : url;
   }
 
   private List<TranslationUnit> findTranslations(String fhirType, String id, List<ValidationMessage> messages) throws IOException {

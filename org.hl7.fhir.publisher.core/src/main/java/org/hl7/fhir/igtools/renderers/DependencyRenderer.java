@@ -511,12 +511,17 @@ public class DependencyRenderer {
     Row row = gen.new Row();
     rows.add(row);
     row.setIcon("icon-fhir-16.png", "NPM Package");
+    if (!QA) {
+      row.getCells().add(gen.new Cell(null, null, null, null, null));
+    }
     row.getCells().add(gen.new Cell(null, null, id, null, null));
-    row.getCells().add(gen.new Cell(null, null, ver, null, null));
-    row.getCells().add(gen.new Cell(null, null, null, null, null));
-    row.getCells().add(gen.new Cell(null, null, uri, null, null));
-    row.getCells().add(gen.new Cell(null, null, web, null, null));
     if (QA) {
+      row.getCells().add(gen.new Cell(null, null, ver, null, null));
+    }
+    row.getCells().add(gen.new Cell(null, null, null, null, null));
+    if (QA) {
+      row.getCells().add(gen.new Cell(null, null, uri, null, null));
+      row.getCells().add(gen.new Cell(null, null, web, null, null));
       row.getCells().add(gen.new Cell(null, null, message, null, null));
     } else if (hasDesc) {
       row.getCells().add(gen.new Cell(null, null, message, null, null));
