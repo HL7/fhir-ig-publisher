@@ -9286,7 +9286,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
                   Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
                 } catch (Exception e2) {
                   ignoreFlags.add(code);
-                  System.out.println("Unable to access " + url + " or " + url2+" ("+e.getMessage()+", "+e2.getMessage()+")");
+                  System.out.println("Unable to access " + url2 + " or " + url2+" ("+e2.getMessage()+")");
                 }
               }
               if (flagFile.exists()) {
