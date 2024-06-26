@@ -1,7 +1,9 @@
+* Command Line Params: Add ```-force-language``` param for dev support
 * Loader: work around bad r4 extension definitions
 * Loader: don't reload different sub-version of extensions pack
 * Loader: Handle extra profiles on resources in an IG when converting between versions
 * Validator: Add IG dependency validator
+* Renderer: refactor how default language detection is done - no longer system dependent
 * Renderer: Change how count is calculated when expanding value sets
 * Renderer: Fix value set expansion bugs
 * Renderer: Rework rendering library from ground up
