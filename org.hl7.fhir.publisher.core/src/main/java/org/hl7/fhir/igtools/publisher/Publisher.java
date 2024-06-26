@@ -327,13 +327,8 @@ import org.hl7.fhir.utilities.ZipGenerator;
 import org.hl7.fhir.utilities.filesystem.CSFile;
 import org.hl7.fhir.utilities.http.HTTPResult;
 import org.hl7.fhir.utilities.http.ManagedWebAccess;
-import org.hl7.fhir.utilities.i18n.I18nConstants;
-import org.hl7.fhir.utilities.i18n.JsonLangFileProducer;
-import org.hl7.fhir.utilities.i18n.LanguageFileProducer;
+import org.hl7.fhir.utilities.i18n.*;
 import org.hl7.fhir.utilities.i18n.LanguageFileProducer.TranslationUnit;
-import org.hl7.fhir.utilities.i18n.LanguageTag;
-import org.hl7.fhir.utilities.i18n.PoGetTextProducer;
-import org.hl7.fhir.utilities.i18n.XLIFFProducer;
 import org.hl7.fhir.utilities.i18n.subtag.LanguageSubtagRegistry;
 import org.hl7.fhir.utilities.i18n.subtag.LanguageSubtagRegistryLoader;
 import org.hl7.fhir.utilities.json.model.JsonArray;
@@ -707,6 +702,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private String destDir;
   private FHIRToolingClient webTxServer;
   private String txServer;
+  private Locale forcedLanguage;
   private String igPack = "";
   private boolean debug;
   private boolean isChild;
@@ -2121,14 +2117,14 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               }
               r.getElement().removeChild("text");
             } else {
-              List<String> langs = narrativeLangs();
+              List<Locale> langs = translationLocales();
               logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId());
               if (r.getResource() != null && isConvertableResource(r.getResource().fhirType())) {
                 boolean regen = false;
+                for (Locale lang : langs) {
                 boolean first = true;
-                for (String lang : langs) {
                   RenderingContext lrc = rc.copy().setDefinitionsTarget(igpkp.getDefinitionsName(r));
-                  lrc.setLocale(lang == null ? null : new Locale(lang));
+                  lrc.setLocale(lang);
                   lrc.setRules(GenerationRules.VALID_RESOURCE);
                   lrc.setDefinitionsTarget(igpkp.getDefinitionsName(r));
                   lrc.setSecondaryLang(!first);
@@ -2154,9 +2150,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
                 }
               } else {
                 boolean first = true;
-                for (String lang : langs) {
+                for (Locale lang : langs) {
                   RenderingContext lrc = rc.copy().setParser(getTypeLoader(f,r));
-                  lrc.setLocale(lang == null ? null : new Locale(lang));
+                  lrc.setLocale(lang);
                   lrc.setRules(GenerationRules.VALID_RESOURCE);
                   lrc.setSecondaryLang(!first);
                   first = false;
@@ -2194,16 +2190,68 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     tts.end();
   }
 
-  private List<String> narrativeLangs() {
-    List<String> res = new ArrayList<>();
-    res.add(defaultTranslationLang);
-    for (String s : translationLangs) {
-      if (!res.contains(s)) {
-        res.add(s);
+  private Locale inferDefaultNarrativeLang() {
+    return inferDefaultNarrativeLang(false);
+  }
+
+  private Locale inferDefaultNarrativeLang(final boolean logDecision) {
+    if (logDecision) {
+      logDebugMessage(LogCategory.INIT, "-force-language="+forcedLanguage
+              + " defaultTranslationLang="+defaultTranslationLang
+            + (sourceIg == null ? "" : " sourceIg.language="+sourceIg.getLanguage()
+              + " sourceIg.jurisdiction="+sourceIg.getJurisdictionFirstRep().getCodingFirstRep().getCode())
+      );
+    }
+    if (forcedLanguage != null) {
+      if (logDecision) {
+        logMessage("Using " + forcedLanguage + " as the default narrative language. (-force-language has been set)");
+      }
+      return forcedLanguage;
+    }
+    if (defaultTranslationLang != null) {
+      if (logDecision) {
+        logMessage("Using " + defaultTranslationLang + " as the default narrative language. (i18n-default-lang has been set in Implementation Guide ini)");
+      }
+      return new Locale(defaultTranslationLang);
+    }
+    if (sourceIg != null) {
+      if (sourceIg.hasLanguage()) {
+        if (logDecision) {
+          logMessage("Using " + sourceIg.getLanguage() + " as the default narrative language. (ImplementationGuide.language has been set)");
+        }
+        return new Locale(sourceIg.getLanguage());
+      }
+      if (sourceIg.hasJurisdiction()) {
+        final String jurisdiction = sourceIg.getJurisdictionFirstRep().getCodingFirstRep().getCode();
+        Locale localeFromRegion = RegionToLocaleMapper.getLocaleFromRegion(jurisdiction);
+
+        if (logDecision) {
+          logMessage("Using " + localeFromRegion + " as the default narrative language. (inferred from ImplementationGuide.jurisdiction=" + jurisdiction + ")");
+        }
+        return localeFromRegion;
       }
     }
-    if (res.isEmpty()) {
-      res.add(null);
+    if (logDecision) {
+      logMessage("Using en-US as the default narrative language. (no language information in Implementation Guide or command line");
+    }
+    return new Locale("en", "US");
+  }
+
+  /**
+   * Return a list of locales containing the translation languages for the IG, as well as the inferred default language
+   * of the IG.
+   *
+   * @return translation locales
+   */
+  private List<Locale> translationLocales() {
+    List<Locale> res = new ArrayList<>();
+    res.add(inferDefaultNarrativeLang());
+
+    for (String translationLang : translationLangs) {
+      Locale locale = new Locale(translationLang);
+      if (!res.contains(locale)) {
+        res.add(locale);
+      }
     }
     return res;
   }
@@ -4287,6 +4335,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       publishedIg = sourceIg.copy();
       altMap.get(IG_NAME).getResources().get(0).setResource(publishedIg);
     }
+    inferDefaultNarrativeLang(true);
     dependentIgFinder = new DependentIGFinder(sourceIg.getPackageId());
 
 
@@ -4554,7 +4603,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, execTime.getTime(), !publishing);
     execTime = Calendar.getInstance();
 
-    rc = new RenderingContext(context, markdownEngine, ValidationOptions.defaults(), checkAppendSlash(specPath), "", null, ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
+    rc = new RenderingContext(context, markdownEngine, ValidationOptions.defaults(), checkAppendSlash(specPath), "", inferDefaultNarrativeLang(), ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
     rc.setTemplateProvider(templateProvider);
     rc.setResolver(this);    
     rc.setServices(validator.getExternalHostServices());
@@ -11815,6 +11864,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
 
     StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, rc, allInvariants, sdMapCache, specPath, versionToAnnotate);
+
     if (igpkp.wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-summary", sdr.summary(), f.getOutputNames(), r, vars, null, start, "summary", "StructureDefinition");
@@ -12924,6 +12974,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       }
       self.setTxServer(CliParams.getNamedParam(args, "-tx"));
       self.setPackagesFolder(CliParams.getNamedParam(args, "-packages"));
+
+      if (CliParams.hasNamedParam(args, "-force-language")) {
+        self.setForcedLanguage(CliParams.getNamedParam(args,"-force-language"));
+      }
+
       if (CliParams.hasNamedParam(args, "-watch")) {
         throw new Error("Watch mode (-watch) is no longer supported");
       }
@@ -12981,6 +13036,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (!CliParams.hasNamedParam(args, "-no-exit")) {
       System.exit(exitCode);
     }
+  }
+
+  private void setForcedLanguage(String language) {
+    this.forcedLanguage = new Locale(language);
   }
 
   public static String getAbsoluteConfigFilePath(String configFilePath) throws IOException {
