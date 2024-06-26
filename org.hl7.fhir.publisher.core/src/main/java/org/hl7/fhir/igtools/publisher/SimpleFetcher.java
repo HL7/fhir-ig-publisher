@@ -32,7 +32,6 @@ import java.util.Comparator;
 import java.util.List;
 
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.igtools.publisher.SimpleFetcher.FetchedFileSorter;
 import org.hl7.fhir.r5.context.ILoggingService;
 import org.hl7.fhir.r5.context.ILoggingService.LogCategory;
 import org.hl7.fhir.r5.context.IWorkerContext;

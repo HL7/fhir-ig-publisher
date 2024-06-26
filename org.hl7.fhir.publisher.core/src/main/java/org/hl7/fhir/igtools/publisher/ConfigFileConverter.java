@@ -24,11 +24,11 @@ import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionCo
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.SPDXLicense;
-import org.hl7.fhir.r5.terminologies.utilities.ValidationResult;
 import org.hl7.fhir.r5.model.Parameters;
 import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StringType;
+import org.hl7.fhir.r5.terminologies.utilities.ValidationResult;
 import org.hl7.fhir.r5.utils.GuideParameterCode;
 import org.hl7.fhir.r5.utils.IGHelper;
 import org.hl7.fhir.r5.utils.ToolingExtensions;

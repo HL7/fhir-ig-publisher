@@ -51,6 +51,7 @@ import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.renderers.RendererFactory;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.utilities.MarkDownProcessor;
@@ -89,7 +90,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
     vsc.setText(null);
     if (vsc.hasCompose()) {
       vsc.setExpansion(null); // we don't want to render an expansion by mistake
-      RendererFactory.factory(vsc, gen).renderOrError(vsc);
+      RendererFactory.factory(vsc, gen).renderOrError(ResourceWrapper.forResource(gen, vsc));
       return "<h3>Logical Definition (CLD)</h3>\r\n" + new XhtmlComposer(XhtmlComposer.HTML).compose(vsc.getText().getDiv());
     } else {
       return "<h3>Logical Definition (CLD)</h3>\r\n<p>No formal definition provided for this ValueSet</p>\r\n";

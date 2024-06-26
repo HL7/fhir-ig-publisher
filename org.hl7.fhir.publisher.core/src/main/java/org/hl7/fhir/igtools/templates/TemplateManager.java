@@ -43,7 +43,6 @@ import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
-import org.hl7.fhir.utilities.npm.NpmPackage.NpmPackageFolder;
 import org.hl7.fhir.utilities.npm.PackageGenerator.PackageType;
 
 public class TemplateManager {
