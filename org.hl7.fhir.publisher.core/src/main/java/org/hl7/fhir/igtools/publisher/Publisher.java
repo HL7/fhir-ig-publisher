@@ -9280,19 +9280,13 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               jNode.add("name", displayForCountryCode(cd.getCode()));
               File flagFile = new File(vsCache + "/" + code + ".svg");
               if (!flagFile.exists() && !ignoreFlags.contains(code)) {
-                URL url = new URL("https://restcountries.eu/data/" + code + ".svg");
+                URL url2 = new URL("https://flagcdn.com/" + shortCountryCode.get(code.toUpperCase()).toLowerCase() + ".svg");
                 try {
-                  InputStream in = url.openStream();
+                  InputStream in = url2.openStream();
                   Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
-                } catch (Exception e) {
-                  URL url2 = new URL("https://flagcdn.com/" + shortCountryCode.get(code.toUpperCase()).toLowerCase() + ".svg");
-                  try {
-                    InputStream in = url2.openStream();
-                    Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
-                  } catch (Exception e2) {
-                    ignoreFlags.add(code);
-                    System.out.println("Unable to access " + url + " or " + url2+" ("+e.getMessage()+", "+e2.getMessage()+")");
-                  }
+                } catch (Exception e2) {
+                  ignoreFlags.add(code);
+                  System.out.println("Unable to access " + url + " or " + url2+" ("+e.getMessage()+", "+e2.getMessage()+")");
                 }
               }
               if (flagFile.exists()) {
