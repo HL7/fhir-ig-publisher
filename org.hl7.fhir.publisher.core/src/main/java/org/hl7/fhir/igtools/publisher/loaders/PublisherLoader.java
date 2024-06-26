@@ -90,6 +90,10 @@ public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProv
             // processed correctly
             return null;
           }
+          if (spm.getSpecial() != null) {
+            // these weird packages don't always have paths
+            return null;
+          }
           throw new FHIRException("Internal error in IG "+npm.name()+"#"+npm.version()+" map: No identity found for "+u);
         }
         if (!r.hasId()) {
@@ -106,7 +110,7 @@ public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProv
           r.setUserData("External.Link", "https://vsac.nlm.nih.gov");
         }
         r.setUserData("webroot", pathToSpec);
-        String v = ((CanonicalResource) r).getVersion();
+//        String v = ((CanonicalResource) r).getVersion();
         return path;
       } 
       

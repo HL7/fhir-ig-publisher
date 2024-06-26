@@ -18,7 +18,9 @@ import org.hl7.fhir.r5.model.StructureMap.StructureMapGroupComponent;
 import org.hl7.fhir.r5.model.StructureMap.StructureMapGroupInputComponent;
 import org.hl7.fhir.r5.model.StructureMap.StructureMapInputMode;
 import org.hl7.fhir.r5.model.StructureMap.StructureMapStructureComponent;
+import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.Utilities;
@@ -120,7 +122,7 @@ public class MappingSummaryRenderer {
         x.an(mode+"-"+map.getId(), " ");
         x.h4().tx(map.getTitle()+" ("+(map.getStatus() == PublicationStatus.ACTIVE ? "Ready for Use" : map.getStatus().getDisplay())+
             (ToolingExtensions.getStandardsStatus(map) != null ? "/"+ToolingExtensions.getStandardsStatus(map).toDisplay() : "")+")");
-        new org.hl7.fhir.r5.renderers.StructureMapRenderer(rc).render(x, map);
+        new org.hl7.fhir.r5.renderers.StructureMapRenderer(rc).buildNarrative(new RenderingStatus(), x, ResourceWrapper.forResource(rc.getContextUtilities(), map));
       }
     }
     return new XhtmlComposer(false, false).compose(x); 

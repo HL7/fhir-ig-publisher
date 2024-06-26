@@ -24,7 +24,6 @@ import org.hl7.fhir.convertors.loaders.loaderR5.R5ToR5Loader;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.modules.xver.SourcedElementDefinition.ElementValidState;
-import org.hl7.fhir.igtools.publisher.modules.xver.XVerAnalysisEngine.MultiConceptMapType;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;

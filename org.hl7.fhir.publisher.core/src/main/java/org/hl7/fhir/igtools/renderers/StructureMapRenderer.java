@@ -31,8 +31,10 @@ import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureMap;
+import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
 import org.hl7.fhir.r5.renderers.RendererFactory;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
@@ -82,7 +84,7 @@ public class StructureMapRenderer extends CanonicalRenderer {
       return StructureMapUtilities.render(map);
     } else {
       XhtmlNode node = new XhtmlNode(NodeType.Element, "div");
-      RendererFactory.factory(map, gen).render(node, map);
+      RendererFactory.factory(map, gen).buildNarrative(new RenderingStatus(), node, ResourceWrapper.forResource(gen.getContextUtilities(), map));
       return new XhtmlComposer(false, false).compose(node);
     }
   }
