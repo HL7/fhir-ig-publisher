@@ -23,7 +23,7 @@ import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.renderers.RendererFactory;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.ResourceElement;
+import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.GenerationRules;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.ResourceRendererMode;
 import org.hl7.fhir.r5.terminologies.JurisdictionUtilities;
@@ -324,7 +324,7 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
   }
 
   private void renderResource(String pid, CanonicalResource cr) throws FHIRException, IOException, EOperationOutcome {
-    RendererFactory.factory(cr, rc).renderResource(ResourceElement.forResource(rc.getContextUtilities(), rc.getProfileUtilities(), cr));
+    RendererFactory.factory(cr, rc).renderResource(ResourceWrapper.forResource(rc.getContextUtilities(), cr));
     String s = new XhtmlComposer(false, true).compose(cr.getText().getDiv());
     new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(target, cr.getUserString("filebase")+".json")), cr);
     //    new XmlParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(target, cr.getUserString("filebase")+".xml")), cr);
@@ -392,6 +392,12 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
 
   @Override
   public String getLinkForUrl(String corePath, String s) {
+    // TODO Auto-generated method stub
+    return null;
+  }
+
+  @Override
+  public String getCanonicalForDefaultContext() {
     // TODO Auto-generated method stub
     return null;
   }

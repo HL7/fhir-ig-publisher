@@ -56,7 +56,7 @@ import org.hl7.fhir.r5.renderers.ConceptMapRenderer;
 import org.hl7.fhir.r5.renderers.ConceptMapRenderer.RenderMultiRowSortPolicy;
 import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.ResourceElement;
+import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.GenerationRules;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.ResourceRendererMode;
 import org.hl7.fhir.r5.utils.ResourceSorters;
@@ -225,7 +225,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     RenderingContext rc = new RenderingContext(engine.getVdr5(), new MarkDownProcessor(Dialect.COMMON_MARK), null, "http://hl7.org/fhir", "", null, ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
     rc.setPkp(this);
     var sdr = new org.hl7.fhir.r5.renderers.StructureDefinitionRenderer(rc);
-    body.add(sdr.generateTable(new RenderingStatus(), "todo", sd, true,  Utilities.path(path, "temp", "xver-qa"), false, "Extension", false, "http://hl7.org/fhir", "", false, false, null, false, rc, "", ResourceElement.forResource(rc.getContextUtilities(), rc.getProfileUtilities(), sd)));
+    body.add(sdr.generateTable(new RenderingStatus(), "todo", sd, true,  Utilities.path(path, "temp", "xver-qa"), false, "Extension", false, "http://hl7.org/fhir", "", false, false, null, false, rc, "", ResourceWrapper.forResource(rc.getContextUtilities(), sd)));
     body.hr();
     
     body.pre().tx(new JsonParser().setOutputStyle(OutputStyle.PRETTY).composeString(sd));
@@ -916,6 +916,12 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     } else {
       return value;
     }
+  }
+
+  @Override
+  public String getCanonicalForDefaultContext() {
+    // TODO Auto-generated method stub
+    return null;
   }
   
   

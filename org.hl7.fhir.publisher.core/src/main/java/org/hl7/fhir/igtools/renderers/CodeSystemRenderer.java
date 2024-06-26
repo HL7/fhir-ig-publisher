@@ -42,7 +42,7 @@ import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.renderers.RendererFactory;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.ResourceElement;
+import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.utilities.MarkDownProcessor;
@@ -112,7 +112,7 @@ public class CodeSystemRenderer extends CanonicalRenderer {
 
     csc.setId(cs.getId()); // because that's not copied
     csc.setText(null);
-    RendererFactory.factory(csc, gen).renderResource(ResourceElement.forResource(gen.getContextUtilities(), gen.getProfileUtilities(), csc));
+    RendererFactory.factory(csc, gen).renderResource(ResourceWrapper.forResource(gen.getContextUtilities(), csc));
 
     return new XhtmlComposer(XhtmlComposer.HTML).compose(csc.getText().getDiv());
     //    }

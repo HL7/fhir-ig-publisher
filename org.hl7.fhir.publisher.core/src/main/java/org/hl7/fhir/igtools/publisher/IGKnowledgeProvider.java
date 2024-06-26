@@ -812,5 +812,10 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     return null;
   }
 
+  @Override
+  public String getCanonicalForDefaultContext() {
+    return canonical;
+  }
+
   
 }

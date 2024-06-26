@@ -34,7 +34,7 @@ import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.ExampleScenario;
 import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.ResourceElement;
+import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.ExampleScenarioRendererMode;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.utilities.MarkDownProcessor;
@@ -60,11 +60,11 @@ public class ExampleScenarioRenderer extends CanonicalRenderer {
   public String render(ExampleScenarioRendererMode mode) throws IOException, FHIRFormatError, DefinitionException, FHIRException, EOperationOutcome {
     org.hl7.fhir.r5.renderers.ExampleScenarioRenderer sr = new org.hl7.fhir.r5.renderers.ExampleScenarioRenderer(gen);
     gen.setScenarioMode(mode);
-    return new XhtmlComposer(XhtmlComposer.HTML).compose(sr.build(ResourceElement.forResource(gen.getContextUtilities(), gen.getProfileUtilities(), scen)));
+    return new XhtmlComposer(XhtmlComposer.HTML).compose(sr.buildNarrative(ResourceWrapper.forResource(gen.getContextUtilities(), scen)));
   }
 
   public String renderDiagram() throws IOException, FHIRFormatError, DefinitionException, FHIRException, EOperationOutcome {
     org.hl7.fhir.r5.renderers.ExampleScenarioRenderer sr = new org.hl7.fhir.r5.renderers.ExampleScenarioRenderer(gen);
-    return sr.renderDiagram(new RenderingStatus(), ResourceElement.forResource(gen.getContextUtilities(), gen.getProfileUtilities(), scen), scen);
+    return sr.renderDiagram(new RenderingStatus(), ResourceWrapper.forResource(gen.getContextUtilities(), scen), scen);
   }
 }
