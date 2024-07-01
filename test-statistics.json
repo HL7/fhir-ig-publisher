@@ -2471,5 +2471,37 @@
       "time" : 482017,
       "memory" : 1640639464
     }
+  },
+  "1.6.13" : {
+    "sync-date" : "2024-06-30",
+    "date" : "2024-06-30",
+    "hl7.fhir.template.ig" : {
+      "errors" : 0,
+      "warnings" : 0,
+      "hints" : 0,
+      "time" : 1434,
+      "memory" : 11867728
+    },
+    "hl7.cda.uv.core" : {
+      "errors" : 113,
+      "warnings" : 142,
+      "hints" : 0,
+      "time" : 117746,
+      "memory" : 2706421672
+    },
+    "hl7.fhir.us.ecr" : {
+      "errors" : 5540,
+      "warnings" : 160,
+      "hints" : 112,
+      "time" : 623214,
+      "memory" : 9628041304
+    },
+    "hl7.fhir.uv.ipa" : {
+      "errors" : 108,
+      "warnings" : 20,
+      "hints" : 43,
+      "time" : 86041,
+      "memory" : 2045682336
+    }
   }
 }

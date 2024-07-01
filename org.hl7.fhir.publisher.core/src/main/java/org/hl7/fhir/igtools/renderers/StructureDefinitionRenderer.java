@@ -139,7 +139,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     this.resE = ResourceWrapper.forResource(gen.getContextUtilities(), sd);
   }
 
-  public String summary() {
+  public String summary(boolean all) {
     try {
       if (sd.hasExtension(ToolingExtensions.EXT_SUMMARY)) {
         return processMarkdown("Profile Summary", (PrimitiveType) sd.getExtensionByUrl(ToolingExtensions.EXT_SUMMARY).getValue());
@@ -202,7 +202,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           }
         }
       }
-      StringBuilder res = new StringBuilder("<a name=\"summary\"> </a>\r\n<p><b>\r\n" + (gen.formatPhrase(RenderingContext.GENERAL_SUMM)) + "\r\n</b></p>\r\n");
+      StringBuilder res = new StringBuilder("<a name=\""+(all ? "a" : "s")+"-summary\"> </a>\r\n<p><b>\r\n" + (gen.formatPhrase(RenderingContext.GENERAL_SUMM)) + "\r\n</b></p>\r\n");      
       if (ToolingExtensions.hasExtension(sd, ToolingExtensions.EXT_SUMMARY)) {
         Extension v = ToolingExtensions.getExtension(sd, ToolingExtensions.EXT_SUMMARY);
         res.append(processMarkdown("Profile.summary", (PrimitiveType) v.getValue()));
@@ -482,7 +482,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return "";
     else {
       sdr.getContext().setStructureMode(mode);
-      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? "sa" :"s"), toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP, resE));
+      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? "sa" : null), toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP, resE));
     }
   }
 
@@ -1512,8 +1512,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return b.toString();
   }
 
-  public String span(boolean onlyConstraints, String canonical, Set<String> outputTracker) throws IOException, FHIRException {
-    return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateSpanningTable(sd, destDir, onlyConstraints, canonical, outputTracker));
+  public String span(boolean onlyConstraints, String canonical, Set<String> outputTracker, String anchorPrefix) throws IOException, FHIRException {
+    return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateSpanningTable(sd, destDir, onlyConstraints, canonical, outputTracker, anchorPrefix));
   }
 
   public String pseudoJson() throws Exception {
@@ -2255,9 +2255,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return b.toString();
   }
 
-  public String expansion(String definitionsName, Set<String> otherFilesRun) throws IOException {
+  public String expansion(String definitionsName, Set<String> otherFilesRun, String anchorPrefix) throws IOException {
     PEBuilder pe = context.getProfiledElementBuilder(PEElementPropertiesPolicy.NONE, true);
-    HierarchicalTableGenerator gen = new HierarchicalTableGenerator(this.gen, destDir, true, true);
+    HierarchicalTableGenerator gen = new HierarchicalTableGenerator(this.gen, destDir, true, true, anchorPrefix);
 
     TableModel model = gen.initNormalTable(corePath, false, true, sd.getId()+"x", true, TableGenerationMode.XHTML);
     XhtmlNode x = null;

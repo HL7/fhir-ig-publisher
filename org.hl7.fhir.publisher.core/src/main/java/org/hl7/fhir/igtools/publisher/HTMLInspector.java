@@ -84,7 +84,7 @@ public class HTMLInspector {
     }
 
     public String listDuplicates() {
-      return CommaSeparatedStringBuilder.join(",", duplicates);
+      return CommaSeparatedStringBuilder.join(",", Utilities.sorted(duplicates));
     }
   }
 

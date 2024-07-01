@@ -131,7 +131,7 @@ public class DependencyRenderer {
       hasDesc = hasDesc || d.hasExtension(ToolingExtensions.EXT_IGDEP_COMMENT);
     }
     
-    HierarchicalTableGenerator gen = new HierarchicalTableGenerator(rc, dstFolder, true, true);
+    HierarchicalTableGenerator gen = new HierarchicalTableGenerator(rc, dstFolder, true, true, "dep");
     TableModel model = createTable(gen, QA, hasDesc);
     
     String realm = determineRealmForIg(ig.getPackageId());
