@@ -2224,11 +2224,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       if (sourceIg.hasJurisdiction()) {
         final String jurisdiction = sourceIg.getJurisdictionFirstRep().getCodingFirstRep().getCode();
         Locale localeFromRegion = RegionToLocaleMapper.getLocaleFromRegion(jurisdiction);
-
-        if (logDecision) {
-          logMessage("Using " + localeFromRegion + " as the default narrative language. (inferred from ImplementationGuide.jurisdiction=" + jurisdiction + ")");
+        if (localeFromRegion != null) {
+          if (logDecision) {
+            logMessage("Using " + localeFromRegion + " as the default narrative language. (inferred from ImplementationGuide.jurisdiction=" + jurisdiction + ")");
+          }
+          return localeFromRegion;
         }
-        return localeFromRegion;
       }
     }
     if (logDecision) {
