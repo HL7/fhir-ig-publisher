@@ -176,7 +176,7 @@ public class SpecMapManager {
     if (url == null) {
       return null;
     }
-    if (paths.has(url)) {
+    if (paths.has(url) && !("http://hl7.org/fhir/R5".equals(base) && url.startsWith("http://terminology.hl7.org"))) {
       String p = strOpt(paths, url);
       if (!Utilities.isAbsoluteUrl(p) ) {
         p = Utilities.pathURL(base2 == null ? base : base2, p);
