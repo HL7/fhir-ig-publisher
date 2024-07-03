@@ -1023,6 +1023,10 @@ public class CrossViewRenderer extends Renderer {
     } else if (status == StandardsStatus.INFORMATIVE) {
       td.ahWithText("", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Informative", "Informative", null).attribute("class", "informative-flag");
     } else if (status == StandardsStatus.DRAFT) {
+      if (ed.getExperimental()) {
+        td.ahWithText("", Utilities.pathURL(corePath, "canonicalresource-definitions.html") +"#CanonicalResource.experimental", "Experimental", "Experimental", null).attribute("class", "experimental-flag");
+        td.br();
+      } 
       td.ahWithText("", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Draft", "Draft", null).attribute("class", "draft-flag");
     } else { 
       td.ahWithText("", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Trial-Use", "Trial-Use", null).attribute("class", "trial-use-flag");

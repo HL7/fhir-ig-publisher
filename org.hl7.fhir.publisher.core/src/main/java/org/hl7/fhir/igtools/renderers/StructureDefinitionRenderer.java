@@ -2436,4 +2436,15 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   public String compareImposes(StructureDefinition sdi) {
     return "todo";
   }
+
+  public String experimentalWarning() {
+    if (sd.getExperimental()) {
+      return "<div><div style=\"border: 1px solid maroon; padding: 10px; background-color: #fffbf7; min-height: 160px;\">\r\n"+
+             "<img src=\"assets/images/dragon.png\" width=\"150\" style=\"float:left; mix-blend-mode: multiply; margin-right: 10px;\" title=\"Here Be Dragons!\" height=\"150\"/>\r\n"+
+             "<p><b>This is an experimental extension definition; the committee is seeking implementation feedback, and the " + 
+             "definition or contents of the extension may change in future versions.</b></p></div></div>";
+    } else {
+      return "";
+    }
+  }
 }

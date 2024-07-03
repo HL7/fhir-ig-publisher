@@ -11889,6 +11889,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       long start = System.currentTimeMillis();
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-ctxts", sdr.contexts(), f.getOutputNames(), r, vars, null, start, "ctxts", "StructureDefinition");
     }
+    if (igpkp.wantGen(r, "experimental-warning")) {
+      long start = System.currentTimeMillis();
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-experimental-warning", sdr.experimentalWarning(), f.getOutputNames(), r, vars, null, start, "experimental-warning", "StructureDefinition");
+    }
 
     if (igpkp.wantGen(r, "diff")) {
       long start = System.currentTimeMillis();
