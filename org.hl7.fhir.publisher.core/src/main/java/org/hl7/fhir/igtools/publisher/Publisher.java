@@ -3989,9 +3989,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (Utilities.noString(canonical))
       throw new Exception("You must specify a canonical URL for the IG "+name);
     String igver = dep.getVersion();
-    if (Utilities.noString(igver))
-      throw new Exception("You must specify a version for the IG "+packageId+" ("+canonical+")");
-
+    if (Utilities.noString(igver)) {
+      igver = pcm.getLatestVersion(packageId);
+      if (Utilities.noString(igver)) {
+        throw new Exception("The latest version could not be determined, so you must specify a version for the IG "+packageId+" ("+canonical+")");
+      }
+    }
 
     NpmPackage pi = packageId == null ? null : pcm.loadPackageFromCacheOnly(packageId, igver);
     if (pi == null) {
