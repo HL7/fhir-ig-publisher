@@ -125,7 +125,7 @@ public class SimpleFetcher implements IFetchFile {
   }
 
   private boolean isIgnoredFile(String name) {
-    return name.startsWith(".");
+    return name.startsWith(".") || Utilities.existsInList(Utilities.getFileExtension(name), "ini");
   }
 
   @Override

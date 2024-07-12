@@ -1778,8 +1778,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         CodeType code = new CodeType("informative");
         code.addExtension(ToolingExtensions.EXT_FMM_DERIVED, new CanonicalType(parentCanonical));
         res.addExtension(ToolingExtensions.EXT_STANDARDS_STATUS, code);
-      } else if (!status.getValue().equals("informative") && !status.getValue().equals("draft")) {
-        errors.add(new ValidationMessage(Source.Publisher, IssueType.INVALID, res.getResourceType() + " " + r.getId(), "If a resource is not implementable, is marked as experimental or example, the standards status can only be 'informative' or 'draft'.", IssueSeverity.ERROR));
+      } else if (!Utilities.existsInList(status.getValue(), "informative", "draft", "deprecated")) {
+        errors.add(new ValidationMessage(Source.Publisher, IssueType.INVALID, res.getResourceType() + " " + r.getId(), "If a resource is not implementable, is marked as experimental or example, the standards status can only be 'informative', 'draft' or 'deprecated', not '"+status.getValue()+"'.", IssueSeverity.ERROR));
       }
 
     } else {
