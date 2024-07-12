@@ -2514,10 +2514,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       mod = true;
     }
     if (mod) {
-      FileOutputStream f = new FileOutputStream("/Users/grahamegrieve/work/fhir-cross-version/input/codes/ConceptMap-"+cm.getId()+".json");
-      new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(f, cm);
-      f.close();
-      System.out.println("Gen "+("/Users/grahamegrieve/work/fhir-cross-version/input/codes/ConceptMap-"+cm.getId()+".json"));
+      System.out.println("Gen input/codes/ConceptMap-"+cm.getId()+".json");
     }
   }
 
