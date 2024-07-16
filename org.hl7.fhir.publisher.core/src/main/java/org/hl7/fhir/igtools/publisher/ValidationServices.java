@@ -86,6 +86,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   private boolean bundleReferencesResolve;
   private List<SpecMapManager> specMaps;
   private IPublisherModule module;
+  private static boolean nsFailHasFailed = false; // work around for an THO 6.0.0 problem
   
   
   public ValidationServices(IWorkerContext context, IGKnowledgeProvider ipg, ImplementationGuide ig, List<FetchedFile> files, List<NpmPackage> packages, boolean bundleReferencesResolve, List<SpecMapManager> specMaps, IPublisherModule module) {
@@ -301,10 +302,17 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
         }
       }
     }
-    for (NamingSystem ns : context.fetchResourcesByType(NamingSystem.class)) {
-      if (hasURL(ns, u)) {
-        // ignore the version?
-        return true;
+    try {
+      for (NamingSystem ns : context.fetchResourcesByType(NamingSystem.class)) {
+        if (hasURL(ns, u)) {
+          // ignore the version?
+          return true;
+        }
+      }
+    } catch (Exception e) {
+      if (!nsFailHasFailed) {
+        e.printStackTrace();
+        nsFailHasFailed  = true;
       }
     }
     

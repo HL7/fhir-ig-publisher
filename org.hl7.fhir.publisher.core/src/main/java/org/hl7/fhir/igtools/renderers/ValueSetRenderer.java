@@ -63,6 +63,7 @@ import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 public class ValueSetRenderer extends CanonicalRenderer {
 
   private ValueSet vs;
+  private static boolean nsFailHasFailed;
 
   public ValueSetRenderer(IWorkerContext context, String corePath, ValueSet vs, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen, String versionToAnnotate) {
     super(context, corePath, vs, null, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate);
@@ -99,6 +100,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
   }
 
   public String xref() throws FHIRException {
+    try {
     StringBuilder b = new StringBuilder();
     boolean first = true;
     b.append("\r\n");
@@ -203,6 +205,13 @@ public class ValueSetRenderer extends CanonicalRenderer {
     else
       b.append("</ul>\r\n");
     return b.toString()+changeSummary();
+    } catch (Exception e) {
+      if (!nsFailHasFailed) {
+        e.printStackTrace();
+        nsFailHasFailed  = true;
+      }
+      return " <p>"+Utilities.escapeXml(e.getMessage())+"</p>\r\n";
+    }
   }
 
   private boolean questionnaireUsesValueSet(List<QuestionnaireItemComponent> items, String url) {
