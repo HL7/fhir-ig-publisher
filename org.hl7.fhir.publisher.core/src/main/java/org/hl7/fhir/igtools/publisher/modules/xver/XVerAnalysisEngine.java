@@ -237,7 +237,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     checkAllLinksInChains();
 
     for (SourcedElementDefinition te : terminatingElements) {
-      scanChainElements(te);
+      scanChainElements(folder, te);
     }
     for (SourcedElementDefinition te : terminatingElements) {
       checkIfParentIsExtension(te);
@@ -245,7 +245,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     
     Collections.sort(origins, new SourcedElementDefinitionSorter());
 
-    checkStructureMaps();
+    checkStructureMaps(folder);
 
     for (ConceptMap cm : conceptMaps.values()) {
       if (cm.hasUserData("cm.used") && "false".equals(cm.getUserString("cm.used"))) {
@@ -1181,13 +1181,13 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
 
-  private void checkStructureMaps() throws FileNotFoundException, IOException {
+  private void checkStructureMaps(String folder) throws FileNotFoundException, IOException {
     for (StructureMap map : structureMaps.values()) {
-      checkStructureMap(map);
+      checkStructureMap(folder, map);
     }
   }
 
-  private void checkStructureMap(StructureMap map) throws FileNotFoundException, IOException {
+  private void checkStructureMap(String folder, StructureMap map) throws FileNotFoundException, IOException {
     Map<String, SourcedStructureDefinition> srcList = new HashMap();
     if (determineSources(map, srcList)) {
       String srcVer = VersionUtilities.getNameForVersion(getInputUrl(map, "source")).substring(1).toLowerCase();
@@ -1196,7 +1196,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       for (StructureMapGroupComponent grp : map.getGroup()) {
         if (isStart(grp)) {
           Map<String, ElementWithType> vars = processInputs(map, grp, srcList);
-          processGroup(map, grpList, srcVer, dstVer, srcList, vars, grp);          
+          processGroup(folder, map, grpList, srcVer, dstVer, srcList, vars, grp);          
         }
       }
 
@@ -1248,14 +1248,14 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     return grp.getTypeMode() == StructureMapGroupTypeMode.TYPEANDTYPES && grp.getInput().size() == 2;
   }
 
-  private void processGroup(StructureMap map, List<StructureMapGroupComponent> grpList, String srcVer, String dstVer, Map<String, SourcedStructureDefinition> srcList, Map<String, ElementWithType> vars,  StructureMapGroupComponent grp) throws FileNotFoundException, IOException {
+  private void processGroup(String folder, StructureMap map, List<StructureMapGroupComponent> grpList, String srcVer, String dstVer, Map<String, SourcedStructureDefinition> srcList, Map<String, ElementWithType> vars,  StructureMapGroupComponent grp) throws FileNotFoundException, IOException {
     grpList.add(grp);
     for (StructureMapGroupRuleComponent r : grp.getRule()) {
-      processRuleSource(map, grpList, srcVer, dstVer, vars, grp, r, srcList);
+      processRuleSource(folder, map, grpList, srcVer, dstVer, vars, grp, r, srcList);
     }    
   }
 
-  private void processRuleSource(StructureMap map, List<StructureMapGroupComponent> grpList, String srcVer, String dstVer, Map<String, ElementWithType> vars, StructureMapGroupComponent grp, StructureMapGroupRuleComponent r, Map<String, SourcedStructureDefinition> srcList) throws FileNotFoundException, IOException {
+  private void processRuleSource(String folder, StructureMap map, List<StructureMapGroupComponent> grpList, String srcVer, String dstVer, Map<String, ElementWithType> vars, StructureMapGroupComponent grp, StructureMapGroupRuleComponent r, Map<String, SourcedStructureDefinition> srcList) throws FileNotFoundException, IOException {
     if (!isProcessible(r)) {
       qaMsg("Cannot process rule "+r.getName()+" in group "+grp.getName()+" in map "+map.getUrl(), true);
     } else {
@@ -1276,7 +1276,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
             tvars.put("source:"+srcR.getVariable(), source);
           }
           for (StructureMapGroupRuleTargetComponent t : r.getTarget()) {
-            tvars = processRuleTarget(map, srcVer, dstVer, grp, r, source, tvars, t, srcList, bh);
+            tvars = processRuleTarget(folder, map, srcVer, dstVer, grp, r, source, tvars, t, srcList, bh);
           }
         }
       }
@@ -1284,7 +1284,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         if (r.hasRule()) {
           for (StructureMapGroupRuleComponent dr : r.getRule()) {
             Map<String, ElementWithType> rvars = clone(tvars);
-            processRuleSource(map, grpList, srcVer, dstVer, rvars, grp, dr, srcList);
+            processRuleSource(folder, map, grpList, srcVer, dstVer, rvars, grp, dr, srcList);
           }
         }
         if (r.hasDependent()) {
@@ -1316,7 +1316,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
                     throw new Error("Not done yet");
                   }
                 }
-                processGroup(map, grpList, srcVer, dstVer, srcList, gvars, dgrp);
+                processGroup(folder, map, grpList, srcVer, dstVer, srcList, gvars, dgrp);
               }
             }
           }
@@ -1334,7 +1334,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     return null;
   }
 
-  private Map<String, ElementWithType> processRuleTarget(StructureMap map, String srcVer, String dstVer, StructureMapGroupComponent grp, StructureMapGroupRuleComponent r, ElementWithType source, Map<String, ElementWithType> tvars, StructureMapGroupRuleTargetComponent t, Map<String, SourcedStructureDefinition> srcList, BooleanHolder bh) throws FileNotFoundException, IOException {
+  private Map<String, ElementWithType> processRuleTarget(String folder, StructureMap map, String srcVer, String dstVer, StructureMapGroupComponent grp, StructureMapGroupRuleComponent r, ElementWithType source, Map<String, ElementWithType> tvars, StructureMapGroupRuleTargetComponent t, Map<String, SourcedStructureDefinition> srcList, BooleanHolder bh) throws FileNotFoundException, IOException {
     ElementWithType tgt = tvars.get("target:"+t.getContext());
     if (tgt == null) {
       if (t.getContext() == null && t.getTransform() == StructureMapTransform.EVALUATE) {
@@ -1395,7 +1395,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
                   String scopeUri = "http://hl7.org/fhir/"+VersionUtilities.getMajMin(se.getVer())+"/StructureDefinition/"+se.getSd().getName()+"#"+se.getEd().getPath();
                   String targetUri = "http://hl7.org/fhir/"+VersionUtilities.getMajMin(de.getVer())+"/StructureDefinition/"+de.getSd().getName()+"#"+de.getEd().getPath();
 
-                  makeCM(nid, id, se, de, vsl, vsr, scopeUri, targetUri);              
+                  makeCM(folder, nid, id, se, de, vsl, vsr, scopeUri, targetUri);              
                 }
               } else {
                 String cmSrcVer = VersionUtilities.getNameForVersion(cm.getSourceScope().primitiveValue()).substring(1).toLowerCase();
@@ -1642,8 +1642,8 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     List<String> issues = new ArrayList<String>();
     if (ConceptMapUtilities.checkReciprocal(left, right, issues, save)) {
       // wipes formatting in files
-      new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream("/Users/grahamegrieve/work/fhir-cross-version/input/"+folder+"/ConceptMap-"+left.getId()+".json"), left);
-      new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream("/Users/grahamegrieve/work/fhir-cross-version/input/"+folder+"/ConceptMap-"+right.getId()+".json"), right);
+      new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(folder + "/input/"+folder+"/ConceptMap-"+left.getId()+".json"), left);
+      new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(folder + "/input/"+folder+"/ConceptMap-"+right.getId()+".json"), right);
     }
     if (!issues.isEmpty()) {
       qaMsg("Found issues checking reciprocity of "+left.getId()+" and "+right.getId(), true);
@@ -1817,7 +1817,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
 
-  private void scanChainElements(SourcedElementDefinition terminus) throws FileNotFoundException, IOException {
+  private void scanChainElements(String folder, SourcedElementDefinition terminus) throws FileNotFoundException, IOException {
     List<ElementDefinitionLink> chain = makeEDLinks(terminus, MakeLinkMode.CHAIN);
 
     // this chain can include multiple logical subchains that all terminate at the same point. 
@@ -1840,7 +1840,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         this.origins.add(origin);
         List<ElementDefinitionLink> originChain = makeEDLinks(origin, MakeLinkMode.ORIGIN_CHAIN);
         buildSubChain(originChain, origin, chain);
-        scanChainElements(origin, originChain);
+        scanChainElements(folder, origin, originChain);
       }
     }
   }
@@ -1855,7 +1855,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     }
   }
 
-  private void scanChainElements(SourcedElementDefinition origin, List<ElementDefinitionLink> links) throws FileNotFoundException, IOException {
+  private void scanChainElements(String folder, SourcedElementDefinition origin, List<ElementDefinitionLink> links) throws FileNotFoundException, IOException {
 
     // now we have a nice single chain across a set of versions
     List<SourcedElementDefinition> all = new ArrayList<SourcedElementDefinition>();
@@ -1985,7 +1985,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
           } else { // if (!rset.containsAll(lset)) {
             System.out.println("didn't find "+leftScope + ":"+rightScope);
             String nid = generateConciseId(idF);
-            cmF = makeCM(nid, idF, link.getPrev(), link.getNext(), l, r, leftScope, rightScope);              
+            cmF = makeCM(folder, nid, idF, link.getPrev(), link.getNext(), l, r, leftScope, rightScope);              
           }
 
           if (cmR != null) {
@@ -1993,7 +1993,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
           } else { // if (!lset.containsAll(rset)) {
             System.out.println("didn't find "+rightScope + ":"+leftScope);
             String nid = generateConciseId(idR);
-            cmR = makeCM(nid, idR, link.getNext(), link.getPrev(), r, l, rightScope, leftScope);            
+            cmR = makeCM(folder, nid, idR, link.getNext(), link.getPrev(), r, l, rightScope, leftScope);            
           }
           if (cmF != null && cmR != null) {
             List<String> errs = new ArrayList<String>();
@@ -2002,8 +2002,8 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
               qaMsg("Error between "+cmF.getId()+" and "+cmR.getId()+" maps: "+s, true);
             }
             if (altered) {
-              new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream("/Users/grahamegrieve/work/fhir-cross-version/input/codes/ConceptMap-"+cmR.getId()+".json"), cmR);
-              new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream("/Users/grahamegrieve/work/fhir-cross-version/input/codes/ConceptMap-"+cmF.getId()+".json"), cmF);
+              new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(folder + "/input/codes/ConceptMap-"+cmR.getId()+".json"), cmR);
+              new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(folder + "/input/codes/ConceptMap-"+cmF.getId()+".json"), cmF);
             }
           }
           link.setNextCM(cmF);
@@ -2107,7 +2107,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
   
 
-  private ConceptMap makeCM(String id, String rawId, SourcedElementDefinition se, SourcedElementDefinition de, VSPair s, VSPair d, String scopeUri, String targetUri) throws FileNotFoundException, IOException {
+  private ConceptMap makeCM(String folder, String id, String rawId, SourcedElementDefinition se, SourcedElementDefinition de, VSPair s, VSPair d, String scopeUri, String targetUri) throws FileNotFoundException, IOException {
 //    if (true) {
 //      throw new Error("why?");
 //    }
@@ -2210,7 +2210,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       Collections.sort(g.getElement(), new ConceptMapUtilities.ConceptMapElementSorter());
     }
     cm.getGroup().removeIf(g -> g.getElement().isEmpty());
-    new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream("/Users/grahamegrieve/work/fhir-cross-version/input/codes/ConceptMap-"+cm.getId()+".json"), cm);
+    new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(folder + "/input/codes/ConceptMap-"+cm.getId()+".json"), cm);
     return cm;
   }
 
