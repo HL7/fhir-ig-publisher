@@ -1515,6 +1515,11 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       String verMM = VersionUtilities.getMajMin(type);
       String ver = VersionUtilities.getNameForVersion(verMM).toLowerCase();
       IWorkerContext vd = versions.get(ver);
+      if (vd == null) {
+        qaMsg("Type "+ type +" has unknown version `"+ver+"` in map "+map.getUrl()+" sources (uses)", true);
+        ok = false;
+        return false;
+      }
       StructureDefinition sd = vd.fetchTypeDefinition(tn);
       if (sd == null) {
         qaMsg("Unknown type "+type+" in map "+map.getUrl(), true);
