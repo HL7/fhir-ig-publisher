@@ -111,6 +111,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
         
         cu = new ContextUtilities(engine.getVdr5());
         engine.logProgress("Generating fragments");
+        Utilities.createDirectory(Utilities.path(path, "temp", "xver-qa"));
         genChainsHtml(path, "cross-version-chains-all", false, false);
         genChainsHtml(path, "cross-version-chains-valid", true, false);
         genChainsHtml(path, "cross-version-chains-min", true, true);
