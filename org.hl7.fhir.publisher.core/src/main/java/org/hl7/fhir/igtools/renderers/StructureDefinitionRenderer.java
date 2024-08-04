@@ -44,6 +44,7 @@ import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.PackageInformation;
 import org.hl7.fhir.r5.model.PrimitiveType;
 import org.hl7.fhir.r5.model.Quantity;
+import org.hl7.fhir.r5.model.SearchParameter;
 import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
@@ -2031,6 +2032,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     Map<String, String> refs = new HashMap<>();
     Map<String, String> trefs = new HashMap<>();
     Map<String, String> examples = new HashMap<>();
+    Map<String, String> searches = new HashMap<>();
     for (StructureDefinition sdt : context.fetchResourcesByType(StructureDefinition.class)) {
       if (refersToThisSD(sdt.getBaseDefinition())) {
         base.put(sdt.getWebPath(), sdt.present());
@@ -2084,6 +2086,13 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     for (FetchedFile f : files) {
       for (FetchedResource r : f.getResources()) {
         if (!r.fhirType().equals("ImplementationGuide")) {
+          if (r.fhirType().equals("SearchParameter")) {
+            SearchParameter sp = (SearchParameter) r.getResource();
+            String exp = sp.getExpression();
+            if (exp.contains("extension('"+sd.getUrl()+"')")) {
+              searches.put(igp.getLinkFor(r, true), r.getTitle());
+            }
+          }
           if (usesSD(r.getElement())) {
             String p = igp.getLinkFor(r, true);
             if (p != null) {
@@ -2123,12 +2132,18 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (!compliedWith.isEmpty()) {
       b.append(" <li>Comply with this profile " + type + ": " + refList(compliedWith, "compliedWith") + "</li>\r\n");
     }
-    if (!refs.isEmpty())
+    if (!refs.isEmpty()) {
       b.append(" <li>Use this " + type + ": " + refList(refs, "ref") + "</li>\r\n");
-    if (!trefs.isEmpty())
+    }
+    if (!trefs.isEmpty()) {
       b.append(" <li>Refer to this " + type + ": " + refList(trefs, "tref") + "</li>\r\n");
-    if (!examples.isEmpty())
+    }
+    if (!examples.isEmpty()) {
       b.append(" <li>Examples for this " + type + ": " + refList(examples, "ex") + "</li>\r\n");
+    }
+    if (!searches.isEmpty()) {
+      b.append(" <li>Search Parameters using this " + type + ": " + refList(searches, "sp") + "</li>\r\n");
+    }
     if (base.isEmpty() && refs.isEmpty() && trefs.isEmpty() && examples.isEmpty() & invoked.isEmpty() && imposed.isEmpty() && compliedWith.isEmpty()) {
       b.append(" <li>This " + type + " is not used by any profiles in this Implementation Guide</li>\r\n");
     }

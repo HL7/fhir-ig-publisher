@@ -1006,6 +1006,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   public void execute() throws Exception {
+    XhtmlNode.setCheckParaGeneral(true);
+    
     tt = new TimeTracker();
     initialize();
     if (isBuildingTemplate) {
@@ -2123,7 +2125,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
                 boolean regen = false;
                 for (Locale lang : langs) {
                 boolean first = true;
-                  RenderingContext lrc = rc.copy().setDefinitionsTarget(igpkp.getDefinitionsName(r));
+                  RenderingContext lrc = rc.copy(false).setDefinitionsTarget(igpkp.getDefinitionsName(r));
                   lrc.setLocale(lang);
                   lrc.setRules(GenerationRules.VALID_RESOURCE);
                   lrc.setDefinitionsTarget(igpkp.getDefinitionsName(r));
@@ -2151,7 +2153,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               } else {
                 boolean first = true;
                 for (Locale lang : langs) {
-                  RenderingContext lrc = rc.copy().setParser(getTypeLoader(f,r));
+                  RenderingContext lrc = rc.copy(false).setParser(getTypeLoader(f,r));
+                  lrc.clearAnchors();
                   lrc.setLocale(lang);
                   lrc.setRules(GenerationRules.VALID_RESOURCE);
                   lrc.setSecondaryLang(!first);
@@ -4373,7 +4376,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         throw new Error("The version "+publishedIg.getVersion()+" is not a valid semantic version so cannot be published in the ci-build");
       } else {
         log("The version "+publishedIg.getVersion()+" is not a valid semantic version so cannot be published in the ci-build");
-        igf.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, "ImplementationGuide.version", "The version "+publishedIg.getVersion()+" is not a valid semantic version and will not be acceptible to the ci-build", IssueSeverity.ERROR));
+        igf.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, "ImplementationGuide.version", "The version "+publishedIg.getVersion()+" is not a valid semantic version and will not be acceptible to the ci-build, nor will it be a valid vesion in the NPM package system", IssueSeverity.WARNING));
       }
     }
     String id = npmName;
@@ -8608,7 +8611,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
     generateCanonicalSummary();
 
-    CrossViewRenderer cvr = new CrossViewRenderer(igpkp.getCanonical(), altCanonical, context, igpkp.specPath(), rc.copy());
+    CrossViewRenderer cvr = new CrossViewRenderer(igpkp.getCanonical(), altCanonical, context, igpkp.specPath(), rc.copy(false));
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
@@ -11403,7 +11406,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       long start = System.currentTimeMillis();
       XhtmlNode xhtml = getXhtml(f, r);
       if (xhtml == null && HistoryGenerator.allEntriesAreHistoryProvenance(r.getElement())) {
-        RenderingContext ctxt = rc.copy().setParser(getTypeLoader(f, r));
+        RenderingContext ctxt = rc.copy(false).setParser(getTypeLoader(f, r));
         List<ProvenanceDetails> entries = loadProvenanceForBundle(igpkp.getLinkFor(r, true), r.getElement(), f);
         xhtml = new HistoryGenerator(ctxt).generateForBundle(entries); 
         fragment(r.fhirType()+"-"+r.getId()+"-html", new XhtmlComposer(XhtmlComposer.XML).compose(xhtml), f.getOutputNames(), r, vars, null, start, "html", "Resource");
@@ -11432,7 +11435,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         fragment(r.fhirType()+"-"+r.getId()+"-html", html, f.getOutputNames(), r, vars, null, start, "html", "Resource");
       } else {
         if (xhtml == null) {
-          RenderingContext lrc = rc.copy();
+          RenderingContext lrc = rc.copy(false);
           if (r.getResource() != null && r.getResource() instanceof DomainResource) {
             xhtml = RendererFactory.factory(r.fhirType(), lrc).buildNarrative(ResourceWrapper.forResource(lrc, r.getResource()));
           } else {
@@ -11499,7 +11502,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       long start = System.currentTimeMillis();
       XhtmlNode xhtml = getXhtml(f, r, res);
       if (xhtml == null && HistoryGenerator.allEntriesAreHistoryProvenance(r.getElement())) {
-        RenderingContext ctxt = rc.copy().setParser(getTypeLoader(f, r));
+        RenderingContext ctxt = rc.copy(false).setParser(getTypeLoader(f, r));
         List<ProvenanceDetails> entries = loadProvenanceForBundle(igpkp.getLinkFor(r, true), r.getElement(), f);
         xhtml = new HistoryGenerator(ctxt).generateForBundle(entries); 
         fragment(res.fhirType()+"-"+prefixForContained+res.getId()+"-html", new XhtmlComposer(XhtmlComposer.XML).compose(xhtml), f.getOutputNames(), r, vars, prefixForContained, start, "html", "Resource");
@@ -12247,7 +12250,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private void generateOutputsExampleScenario(FetchedFile f, FetchedResource r, ExampleScenario scen, Map<String,String> vars, String prefixForContainer) throws Exception {
-    ExampleScenarioRenderer er = new ExampleScenarioRenderer(context, checkAppendSlash(specPath), scen, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, rc.copy().setDefinitionsTarget(igpkp.getDefinitionsName(r)), versionToAnnotate);
+    ExampleScenarioRenderer er = new ExampleScenarioRenderer(context, checkAppendSlash(specPath), scen, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, rc.copy(false).setDefinitionsTarget(igpkp.getDefinitionsName(r)), versionToAnnotate);
     if (igpkp.wantGen(r, "actor-table")) {
       long start = System.currentTimeMillis();
       fragment("ExampleScenario-"+prefixForContainer+scen.getId()+"-actor-table", er.render(ExampleScenarioRendererMode.ACTORS), f.getOutputNames(), r, vars, null, start, "actor-table", "ExampleScenario");
@@ -12267,7 +12270,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private void generateOutputsQuestionnaire(FetchedFile f, FetchedResource r, Questionnaire q, Map<String,String> vars, String prefixForContainer) throws Exception {
-    QuestionnaireRenderer qr = new QuestionnaireRenderer(context, checkAppendSlash(specPath), q, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, rc.copy().setDefinitionsTarget(igpkp.getDefinitionsName(r)), versionToAnnotate);
+    QuestionnaireRenderer qr = new QuestionnaireRenderer(context, checkAppendSlash(specPath), q, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, rc.copy(false).setDefinitionsTarget(igpkp.getDefinitionsName(r)), versionToAnnotate);
     if (igpkp.wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
       fragment("Questionnaire-"+prefixForContainer+q.getId()+"-summary", qr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary", "Questionnaire");
@@ -12330,7 +12333,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private void generateOutputsQuestionnaireResponse(FetchedFile f, FetchedResource r, Map<String,String> vars, String prefixForContainer) throws Exception {
-    RenderingContext lrc = rc.copy().setParser(getTypeLoader(f, r));
+    RenderingContext lrc = rc.copy(false).setParser(getTypeLoader(f, r));
     String qu = getQuestionnaireURL(r);
     if (qu != null) {
       Questionnaire q = context.fetchResource(Questionnaire.class, qu);
@@ -12387,7 +12390,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       //        return new BundleRenderer(lrc).render(ResourceElement.forResource(lrc, r.getElement()));
       //      }
       if (r.getResource() != null && r.getResource() instanceof Bundle) {
-        RenderingContext lrc = rc.copy().setParser(getTypeLoader(f, r));
+        RenderingContext lrc = rc.copy(false).setParser(getTypeLoader(f, r));
         Bundle b = (Bundle) r.getResource();
         BundleRenderer br = new BundleRenderer(lrc);
         if (br.canRender(b)) {
@@ -12405,7 +12408,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       return new ParametersRenderer(rc).buildNarrative(ResourceWrapper.forResource(rc, p));
     }
     if (r.fhirType().equals("Parameters")) {
-      RenderingContext lrc = rc.copy().setParser(getTypeLoader(f, r));
+      RenderingContext lrc = rc.copy(false).setParser(getTypeLoader(f, r));
       return new ParametersRenderer(lrc).buildNarrative(ResourceWrapper.forResource(lrc, r.getElement()));
     } else {
       return getHtmlForResource(r.getElement());
@@ -12426,7 +12429,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       Parameters p = (Parameters) resource;
       return new ParametersRenderer(rc).buildNarrative(ResourceWrapper.forResource(rc, p));
     }
-    RenderingContext lrc = rc.copy().setParser(getTypeLoader(f, r));
+    RenderingContext lrc = rc.copy(false).setParser(getTypeLoader(f, r));
     return RendererFactory.factory(resource, lrc).buildNarrative(ResourceWrapper.forResource(rc, resource));
   }
 

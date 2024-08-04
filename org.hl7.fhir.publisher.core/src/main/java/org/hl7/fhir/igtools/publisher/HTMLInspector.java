@@ -688,7 +688,7 @@ public class HTMLInspector {
     if (nSelfChanged) {
       XhtmlNode a = new XhtmlNode(NodeType.Element);
       a.setName("a").setAttribute("name", nuid).addText("\u200B");
-      x.getChildNodes().add(0, a);
+      x.addChildNode(0, a);
     } 
     if (changed)
       return NodeChangeType.SELF;
