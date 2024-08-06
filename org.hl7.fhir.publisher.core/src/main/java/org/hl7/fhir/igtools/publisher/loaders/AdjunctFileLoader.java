@@ -214,6 +214,8 @@ public class AdjunctFileLoader {
       return "image/jpeg";
     } else if ("cql".equals(ext)) {
       return "text/cql";
+    } else if ("feature".equals(ext)) {
+      return "text/x-gherkin";
     } else {
       return null;
     }
