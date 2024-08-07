@@ -177,7 +177,7 @@ public class FSHRunner {
             try {
                 this.buffer.write(b);}
             catch (Exception e) {
-                this.buffer.write('X');
+                this.buffer.write('?');
             }
             if (b == 10) { // eoln
                 final String s = this.getBufferString();
