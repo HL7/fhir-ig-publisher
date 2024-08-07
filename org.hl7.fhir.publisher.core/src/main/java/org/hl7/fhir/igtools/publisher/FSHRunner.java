@@ -174,9 +174,9 @@ public class FSHRunner {
 
         @Override
         public void write(int b) throws IOException {
-            try {
-                this.buffer.write(b);}
-            catch (Exception e) {
+            if (b >= -128 && b <= 127) {
+                this.buffer.write(b);
+            } else {
                 this.buffer.write('?');
             }
             if (b == 10) { // eoln
