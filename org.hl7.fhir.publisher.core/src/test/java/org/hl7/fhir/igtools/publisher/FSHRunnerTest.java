@@ -3,10 +3,12 @@ package org.hl7.fhir.igtools.publisher;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.function.Consumer;
 
 import javax.annotation.Nonnull;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -21,14 +23,30 @@ class FSHRunnerTest {
 
         final StringBuilder stringBuilder = new StringBuilder(512);
         final FSHRunner.MySushiHandler mySushiHandler = getMySushiHandler(stringBuilder);
-        for (final int codePoint : "1234".codePoints().toArray()) {
-            mySushiHandler.write(codePoint);
+        for (final int myByte : "1234".getBytes(StandardCharsets.UTF_8)) {
+            mySushiHandler.write(myByte);
         }
         assertEquals("1234", mySushiHandler.getBufferString());
         assertEquals(0, stringBuilder.length());
         mySushiHandler.write(10); // EOL
         assertEquals("", mySushiHandler.getBufferString());
         assertEquals("Sushi: 1234", stringBuilder.toString());
+    }
+
+    @Test
+    @DisplayName("Test MySushiHandler with UTF-8 two-byte characters")
+    void testMySushiHandlerTwoByte() throws IOException {
+
+        final StringBuilder stringBuilder = new StringBuilder(512);
+        final FSHRunner.MySushiHandler mySushiHandler = getMySushiHandler(stringBuilder);
+        for (final int myByte : "МЗРФ".getBytes(StandardCharsets.UTF_8)) {
+            mySushiHandler.write(myByte);
+        }
+        assertEquals("МЗРФ", mySushiHandler.getBufferString());
+        assertEquals(0, stringBuilder.length());
+        mySushiHandler.write(10); // EOL
+        assertEquals("", mySushiHandler.getBufferString());
+        assertEquals("Sushi: МЗРФ", stringBuilder.toString());
     }
 
     @Nonnull

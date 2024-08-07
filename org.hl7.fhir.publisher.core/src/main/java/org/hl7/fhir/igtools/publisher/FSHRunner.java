@@ -1,9 +1,7 @@
 package org.hl7.fhir.igtools.publisher;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -155,17 +153,17 @@ public class FSHRunner {
   
     public static class MySushiHandler extends OutputStream {
 
-        private final StringBuilder buffer;
+        private final ByteArrayOutputStream buffer;
         private int errorCount = -1;
         private final Consumer<String> outputConsumer;
 
         public MySushiHandler(final Consumer<String> outputConsumer) {
-            buffer = new StringBuilder(256);
+            buffer = new ByteArrayOutputStream(256);
             this.outputConsumer = Objects.requireNonNull(outputConsumer);
         }
 
         public String getBufferString() {
-            return this.buffer.toString();
+            return this.buffer.toString(StandardCharsets.UTF_8);
         }
 
         private boolean passSushiFilter(String s) {
@@ -176,7 +174,11 @@ public class FSHRunner {
 
         @Override
         public void write(int b) throws IOException {
-            this.buffer.appendCodePoint(b);
+            try {
+                this.buffer.write(b);}
+            catch (Exception e) {
+                this.buffer.write('X');
+            }
             if (b == 10) { // eoln
                 final String s = this.getBufferString();
                 if (passSushiFilter(s)) {
@@ -185,7 +187,7 @@ public class FSHRunner {
                         errorCount = Integer.parseInt(s.substring(10).trim());
                     }
                 }
-                this.buffer.setLength(0);
+                this.buffer.reset();
             }
         }
 
