@@ -108,3 +108,30 @@ This project is maintained by [Grahame Grieve][Link-grahameGithub] and [Lloyd Mc
 [Badge-AzureReleasePipeline]: https://dev.azure.com/fhir-pipelines/ig-publisher/_apis/build/status/Release%20Branch%20Pipeline?branchName=master
 [Badge-SonatypeReleases]: https://img.shields.io/nexus/r/https/oss.sonatype.org/org.hl7.fhir.publisher/org.hl7.fhir.publisher.svg "Sonatype Releases"
 [Badge-SonatypeSnapshots]: https://img.shields.io/nexus/s/https/oss.sonatype.org/org.hl7.fhir.publisher/org.hl7.fhir.publisher.svg "Sonatype Snapshots"
+
+## Debugging this project with VS-Code
+Setup a launch.json file in the .vscode folder with the following content:
+``` json
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Publisher",
+            "request": "launch",
+            "mainClass": "org.hl7.fhir.igtools.publisher.Publisher",
+            "projectName": "org.hl7.fhir.publisher.core",
+            "cwd": "c:/git/hl7/utg",
+            "args": [
+                "-ig", ".",
+                "-tx", "http://tx.fhir.org/r4"
+            ]
+        }
+    ]
+}
+```
+Update the path to the location of the IG that you want to debug the generation of
+and click debug in VS-Code.
