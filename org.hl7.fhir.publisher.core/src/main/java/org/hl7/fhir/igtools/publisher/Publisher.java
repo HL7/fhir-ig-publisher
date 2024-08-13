@@ -3966,7 +3966,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       String webref = pi.getWebLocation();
       webref = PackageHacker.fixPackageUrl(webref);
 
-      SpecMapManager igm = pi.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion()) : SpecMapManager.createSpecialPackage(pi);
+      SpecMapManager igm = pi.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion()) : SpecMapManager.createSpecialPackage(pi, pcm);
       igm.setName(pi.title());
       igm.setBase(pi.canonical());
       igm.setBase2(PackageHacker.fixPackageUrl(pi.url()));
@@ -4052,7 +4052,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     String webref = pi.getWebLocation();
     webref = PackageHacker.fixPackageUrl(webref);
 
-    SpecMapManager igm = pi.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion()) : SpecMapManager.createSpecialPackage(pi);
+    SpecMapManager igm = pi.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion()) : SpecMapManager.createSpecialPackage(pi, pcm);
     igm.setName(name);
     igm.setBase(canonical);
     igm.setBase2(PackageHacker.fixPackageUrl(pi.url()));
@@ -4122,7 +4122,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               SpecMapManager smm = null;
               logDebugMessage(LogCategory.PROGRESS, "Load package dependency "+dep);
               try {
-                smm = dpi.hasFile("other", "spec.internals") ?  new SpecMapManager(TextFile.streamToBytes(dpi.load("other", "spec.internals")), dpi.fhirVersion()) : SpecMapManager.createSpecialPackage(dpi);
+                smm = dpi.hasFile("other", "spec.internals") ?  new SpecMapManager(TextFile.streamToBytes(dpi.load("other", "spec.internals")), dpi.fhirVersion()) : SpecMapManager.createSpecialPackage(dpi, pcm);
                 smm.setName(dpi.name()+"_"+dpi.version());
                 smm.setBase(dpi.canonical());
                 smm.setBase2(PackageHacker.fixPackageUrl(dpi.url()));

@@ -41,8 +41,12 @@ import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonPrimitive;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
+import org.hl7.fhir.utilities.npm.BasePackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.npm.PackageHacker;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
+
+import net.sourceforge.plantuml.salt.element.WrappedElement;
 
 /**
  * TODO: should we call versionless references ok? not sure....
@@ -54,7 +58,7 @@ import org.hl7.fhir.utilities.npm.ToolsVersion;
 public class SpecMapManager {
 
   public enum SpecialPackageType {
-    Simplifier, PhinVads, Vsac, Examples, DICOM
+    Simplifier, PhinVads, Vsac, Examples, DICOM, FACADE
   }
 
   private JsonObject spec;
@@ -70,6 +74,7 @@ public class SpecMapManager {
   private String version;
   private NpmPackage pi;
   private SpecialPackageType special;
+  private SpecMapManager wrapped;
   private int key;
 
   private String auth;
@@ -192,6 +197,12 @@ public class SpecMapManager {
     }
     if (special != null) {
       switch (special) {
+      case FACADE:
+        if (wrapped != null && url.startsWith(base)) {
+          return wrapped.getPath(url, def, rt, id); 
+        } else {
+          return null;
+        }
       case Simplifier: return "https://simplifier.net/resolve?scope="+pi.name()+"@"+pi.version()+"&canonical="+url;
       case PhinVads:  
         try {
@@ -339,6 +350,9 @@ public class SpecMapManager {
   }
   
   public boolean hasTarget(String tgt) {
+    if (wrapped != null) {
+      return wrapped.hasTarget(tgt);
+    }
     if (hasTarget1(tgt))
       return true;
     else 
@@ -426,12 +440,21 @@ public class SpecMapManager {
     return res;
   }
 
-  public static SpecMapManager createSpecialPackage(NpmPackage pi) {
+  public static SpecMapManager createSpecialPackage(NpmPackage pi, BasePackageCacheManager pcm) throws FHIRException, IOException {
     SpecMapManager res = new SpecMapManager(pi.name(), pi.fhirVersion(), ToolsVersion.TOOLS_VERSION_STR, null, null, pi.url());
     if (pi.name().equals("us.cdc.phinvads")) {
       res.special = SpecialPackageType.PhinVads;
     } else if (pi.name().equals("us.nlm.vsac")) {
       res.special = SpecialPackageType.Vsac;
+    } else if (pi.name().equals("hl7.fhir.us.core.3.1.1")) {
+      res.special = SpecialPackageType.FACADE;
+      if (pcm != null) {
+        NpmPackage npm = pcm.loadPackage("hl7.fhir.us.core#3.1.1"); 
+        res.wrapped = new SpecMapManager(TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.fhirVersion());
+        res.wrapped.setName(npm.name());
+        res.wrapped.setBase2(PackageHacker.fixPackageUrl(npm.getWebLocation()));
+        res.wrapped.setBase(npm.canonical());
+      }
     } else if (pi.name().equals("fhir.dicom")) {
       res.special = SpecialPackageType.DICOM;
     } else if (pi.name().startsWith("hl7.fhir.") && pi.name().endsWith(".examples") ) {

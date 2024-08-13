@@ -55,7 +55,7 @@ public class XIGLoader implements IPackageVisitorProcessor {
 
     SpecMapManager smm = smmList.get(pid);
     if (smm == null) {
-      smm = npm.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.fhirVersion()) : SpecMapManager.createSpecialPackage(npm);
+      smm = npm.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.fhirVersion()) : SpecMapManager.createSpecialPackage(npm, null);
       smm.setName(npm.name());
       smm.setBase(npm.canonical());
       smm.setBase2(PackageHacker.fixPackageUrl(npm.url()));

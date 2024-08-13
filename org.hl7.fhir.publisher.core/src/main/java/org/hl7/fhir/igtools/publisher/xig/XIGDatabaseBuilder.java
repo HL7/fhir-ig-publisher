@@ -378,7 +378,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
     try {
       String pid = context.getPid();
       NpmPackage npm = context.getNpm();
-      SpecMapManager smm = npm.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.fhirVersion()) : SpecMapManager.createSpecialPackage(npm);
+      SpecMapManager smm = npm.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.fhirVersion()) : SpecMapManager.createSpecialPackage(npm, null);
       pckKey++;
       smm.setName(npm.name());
       smm.setBase(npm.canonical());
