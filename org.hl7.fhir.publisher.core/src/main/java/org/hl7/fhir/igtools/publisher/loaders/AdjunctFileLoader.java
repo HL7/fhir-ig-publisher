@@ -216,6 +216,14 @@ public class AdjunctFileLoader {
       return "text/cql";
     } else if ("feature".equals(ext)) {
       return "text/x-gherkin";
+    } else if ("json".equals(ext)) {
+      return "application/json";
+    } else if ("xml".equals(ext)) {
+      return "application/xml";
+    } else if ("text".equals(ext)) {
+      return "text/plain";
+    } else if ("txt".equals(ext)) {
+      return "text/plain";
     } else {
       return null;
     }
