@@ -22,20 +22,17 @@ package org.hl7.fhir.igtools.web;
 
 
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.json.JsonUtilities;
-
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import com.google.gson.JsonPrimitive;
-import com.google.gson.JsonSyntaxException;
+import org.hl7.fhir.utilities.json.model.JsonArray;
+import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.model.JsonString;
+import org.hl7.fhir.utilities.json.parser.JsonParser;
 
 public class IGRegistryMaintainer {
 
@@ -113,7 +110,7 @@ public class IGRegistryMaintainer {
     }
 
     public String getCategory() {
-      return JsonUtilities.str(entry, "category");
+      return entry.asString("category");
     }
   }
 
@@ -121,10 +118,10 @@ public class IGRegistryMaintainer {
   private List<ImplementationGuideEntry> igs = new ArrayList<>();
   private JsonObject json;
 
-  public IGRegistryMaintainer(String path) throws JsonSyntaxException, FileNotFoundException, IOException {
+  public IGRegistryMaintainer(String path) throws FileNotFoundException, IOException {
     this.path = path;
     if (path != null) {
-      json = (JsonObject) new JsonParser().parse(TextFile.fileToString(path));
+      json = JsonParser.parseObject(TextFile.fileToString(path));
     }
   }
 
@@ -135,23 +132,23 @@ public class IGRegistryMaintainer {
   public ImplementationGuideEntry seeIg(String packageId, String canonical, String title, String category) {
     ImplementationGuideEntry ig = new ImplementationGuideEntry(packageId, canonical, title);
     igs.add(ig);
-    ig.entry = JsonUtilities.findByStringProp(json.getAsJsonArray("guides"), "npm-name", ig.packageId);
+    ig.entry = json.getJsonArray("guides").findByStringProp("npm-name", ig.packageId);
     if (ig.entry == null) {
       ig.entry = new JsonObject();
-      json.getAsJsonArray("guides").add(ig.entry);
-      ig.entry.addProperty("name", ig.title);
-      ig.entry.addProperty("category", Utilities.noString(category) ? "??" : category);
-      ig.entry.addProperty("npm-name", ig.packageId);
-      ig.entry.addProperty("description", "??");
-      ig.entry.addProperty("authority", getAuthority(ig.canonical));
-      ig.entry.addProperty("country", getCountry(ig.canonical));
-      ig.entry.addProperty("history", getHistoryPage(ig.canonical));
+      json.getJsonArray("guides").add(ig.entry);
+      ig.entry.add("name", ig.title);
+      ig.entry.add("category", Utilities.noString(category) ? "??" : category);
+      ig.entry.add("npm-name", ig.packageId);
+      ig.entry.add("description", "??");
+      ig.entry.add("authority", getAuthority(ig.canonical));
+      ig.entry.add("country", getCountry(ig.canonical));
+      ig.entry.add("history", getHistoryPage(ig.canonical));
       JsonArray a = new JsonArray();
       ig.entry.add("language", a);
-      a.add(new JsonPrimitive("en"));
+      a.add(new JsonString("en"));
     } 
     if (!ig.entry.has("category") && !Utilities.noString(category)) {
-      ig.entry.addProperty("category", category);      
+      ig.entry.add("category", category);      
     }
     return ig;
   }
@@ -174,16 +171,16 @@ public class IGRegistryMaintainer {
     ig.candidates.add(p);
   }
 
-  public void finish() throws JsonSyntaxException, FileNotFoundException, IOException {
+  public void finish() throws FileNotFoundException, IOException {
     if (json != null) {
       for (ImplementationGuideEntry ig : igs) {
-        if (!ig.entry.has("canonical") || !ig.entry.get("canonical").getAsString().equals(ig.canonical)) {
+        if (!ig.entry.has("canonical") || !ig.entry.get("canonical").asString().equals(ig.canonical)) {
           ig.entry.remove("canonical");
-          ig.entry.addProperty("canonical", ig.canonical);
+          ig.entry.add("canonical", ig.canonical);
         }
-        if (!ig.entry.has("ci-build") || !ig.entry.get("ci-build").getAsString().equals(ig.cibuild)) {
+        if (!ig.entry.has("ci-build") || !ig.entry.get("ci-build").asString().equals(ig.cibuild)) {
           ig.entry.remove("ci-build");
-          ig.entry.addProperty("ci-build", dropTrailingSlash(ig.cibuild));
+          ig.entry.add("ci-build", dropTrailingSlash(ig.cibuild));
         }      
 
         if (ig.entry.has("editions")) {
@@ -200,7 +197,7 @@ public class IGRegistryMaintainer {
           a.add(makeEdition(p, ig.packageId));
         }
       }
-      TextFile.stringToFile(new GsonBuilder().setPrettyPrinting().create().toJson(json), path);
+      JsonParser.compose(json, new FileOutputStream(path), true);
     }
     for (ImplementationGuideEntry ig : igs) {
       System.out.println(ig.packageId+" ("+ig.canonical+"): "+ig.title+" @ "+ig.cibuild);
@@ -216,31 +213,31 @@ public class IGRegistryMaintainer {
   
   private JsonObject makeEdition(PublicationEntry p, String packageId) {
     JsonObject e = new JsonObject();
-    if (!e.has("name") || !e.get("name").getAsString().equals(p.getName())) {
+    if (!e.has("name") || !e.get("name").asString().equals(p.getName())) {
       e.remove("name");
-      e.addProperty("name", p.getName());
+      e.add("name", p.getName());
     }
-    if (!e.has("ig-version") || !e.get("ig-version").getAsString().equals(p.getName())) {
+    if (!e.has("ig-version") || !e.get("ig-version").asString().equals(p.getName())) {
       e.remove("ig-version");
-      e.addProperty("ig-version", p.getVersion());
+      e.add("ig-version", p.getVersion());
     }
-    if (!e.has("package") || !e.get("package").getAsString().equals(packageId+"#"+p.getVersion())) {
+    if (!e.has("package") || !e.get("package").asString().equals(packageId+"#"+p.getVersion())) {
       e.remove("package");
-      e.addProperty("package", packageId+"#"+p.getVersion());
+      e.add("package", packageId+"#"+p.getVersion());
     }
     if (p.getFhirVersion() != null) {
-      if (!e.has("fhir-version") || e.getAsJsonArray("fhir-version").size() != 1 || !e.getAsJsonArray("fhir-version").get(0).getAsString().equals(p.getName())) {
+      if (!e.has("fhir-version") || e.getJsonArray("fhir-version").size() != 1 || !e.getJsonArray("fhir-version").get(0).asString().equals(p.getName())) {
         e.remove("fhir-version");
         JsonArray a = new JsonArray();
         e.add("fhir-version", a);
-        a.add(new JsonPrimitive(p.getFhirVersion()));
+        a.add(new JsonString(p.getFhirVersion()));
       } 
     } else if(e.has("fhir-version")) {
       e.remove("fhir-version");
     }
-    if (!e.has("url") || !e.get("url").getAsString().equals(p.getPath())) {
+    if (!e.has("url") || !e.get("url").asString().equals(p.getPath())) {
       e.remove("url");
-      e.addProperty("url", dropTrailingSlash(p.getPath()));
+      e.add("url", dropTrailingSlash(p.getPath()));
     }
     return e;
   }
