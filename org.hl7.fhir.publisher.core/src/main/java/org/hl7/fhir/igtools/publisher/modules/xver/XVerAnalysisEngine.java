@@ -1373,9 +1373,9 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
           VSPair vsl = isCoded(source.toSED());
           VSPair vsr = isCoded(target.toSED());
           if (vsl == null) {
-            qaMsg("Rule "+r.getName()+" in group "+grp.getName()+" has a translate operation, but the source element "+source.toSED().toString()+" is not coded in "+map.getUrl(), true);                
+            qaMsg("Rule "+r.getName()+" in group "+grp.getName()+" has a translate operation, but the source element "+source.toSED().toString()+" is not coded in "+map.getUrl(), false);                
           } else if (vsr == null) {
-            qaMsg("Rule "+r.getName()+" in group "+grp.getName()+" has a translate operation, but the target element "+target.toSED().toString()+" is not coded in "+map.getUrl(), true);                
+            qaMsg("Rule "+r.getName()+" in group "+grp.getName()+" has a translate operation, but the target element "+target.toSED().toString()+" is not coded in "+map.getUrl(), false);                
           } else {
             if (!(isResourceType(vsl.getCodes()) || isResourceType(vsr.getCodes()))) {
               ConceptMap cm = conceptMapsByUrl.get(url);
