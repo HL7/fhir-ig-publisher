@@ -182,7 +182,10 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     System.out.println("Done");
   }
 
+  private String processingPath;
+
   public boolean process(String path) throws FHIRException, IOException {
+    processingPath = path;
     return execute(path);
   }
 
@@ -1642,8 +1645,8 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     List<String> issues = new ArrayList<String>();
     if (ConceptMapUtilities.checkReciprocal(left, right, issues, save)) {
       // wipes formatting in files
-      new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream("/Users/grahamegrieve/work/fhir-cross-version/input/"+folder+"/ConceptMap-"+left.getId()+".json"), left);
-      new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream("/Users/grahamegrieve/work/fhir-cross-version/input/"+folder+"/ConceptMap-"+right.getId()+".json"), right);
+      new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(processingPath, "input", folder, "ConceptMap-"+left.getId()+".json")), left);
+      new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(processingPath, "input", folder, "ConceptMap-"+right.getId()+".json")), right);
     }
     if (!issues.isEmpty()) {
       qaMsg("Found issues checking reciprocity of "+left.getId()+" and "+right.getId(), true);
@@ -2002,8 +2005,8 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
               qaMsg("Error between "+cmF.getId()+" and "+cmR.getId()+" maps: "+s, true);
             }
             if (altered) {
-              new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream("/Users/grahamegrieve/work/fhir-cross-version/input/codes/ConceptMap-"+cmR.getId()+".json"), cmR);
-              new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream("/Users/grahamegrieve/work/fhir-cross-version/input/codes/ConceptMap-"+cmF.getId()+".json"), cmF);
+              new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(processingPath, "input", "codes", "ConceptMap-"+cmR.getId()+".json")), cmR);
+              new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(processingPath, "input", "codes", "ConceptMap-"+cmF.getId()+".json")), cmF);
             }
           }
           link.setNextCM(cmF);
@@ -2210,7 +2213,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       Collections.sort(g.getElement(), new ConceptMapUtilities.ConceptMapElementSorter());
     }
     cm.getGroup().removeIf(g -> g.getElement().isEmpty());
-    new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream("/Users/grahamegrieve/work/fhir-cross-version/input/codes/ConceptMap-"+cm.getId()+".json"), cm);
+    new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(processingPath, "input", "codes", "ConceptMap-"+cm.getId()+".json")), cm);
     return cm;
   }
 
