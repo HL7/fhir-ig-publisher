@@ -11170,8 +11170,17 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     ByteArrayOutputStream bsj = new ByteArrayOutputStream();
     org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(context);
     Element element = r.getElement();
+    Element eNN = element;
     jp.compose(element, bsj, OutputStyle.NORMAL, igpkp.getCanonical());
     npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
+    
+    if (module.isNoNarrative()) {
+      // we don't use the narrative in these resources in _includes, so we strip it - it slows Jekyll down greatly 
+      eNN = (Element) element.copy();
+      eNN.removeChild("text");
+      bsj = new ByteArrayOutputStream();
+      jp.compose(eNN, bsj, OutputStyle.PRETTY, igpkp.getCanonical());
+    }
     String path = Utilities.path(tempDir, "_includes", r.fhirType()+"-"+r.getId()+".json");
     TextFile.bytesToFile(bsj.toByteArray(), path);
     String pathEsc = Utilities.path(tempDir, "_includes", r.fhirType()+"-"+r.getId()+".escaped.json");
@@ -11358,10 +11367,13 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     xp.compose(r.getElement(), bs, OutputStyle.NORMAL, null);
     int size = bs.size();
 
-    Element e = r.getElement();    
+    Element e = r.getElement();
     if (SpecialTypeHandler.handlesType(r.fhirType(), context.getVersion())) {
       e = new ObjectConverter(context).convert(r.getResource());
-    } 
+    } else if (module.isNoNarrative() && e.hasChild("text")) {
+      e = (Element) e.copy();
+      e.removeChild("text");
+    }  
 
     if (igpkp.wantGen(r, "xml-html")) {
       long start = System.currentTimeMillis();
@@ -11402,6 +11414,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       fragment(r.fhirType()+"-"+r.getId()+"-ttl-html", rdf.asHtml(size < PRISM_SIZE_LIMIT), f.getOutputNames(), r, vars, "ttl", start, "ttl-html", "Resource");
     }
 
+    e = r.getElement();
+    XhtmlComposer xc = new XhtmlComposer(XhtmlComposer.XML, module.isNoNarrative());
     if (igpkp.wantGen(r, "html")) {
       long start = System.currentTimeMillis();
       XhtmlNode xhtml = getXhtml(f, r);
@@ -11409,7 +11423,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         RenderingContext ctxt = rc.copy(false).setParser(getTypeLoader(f, r));
         List<ProvenanceDetails> entries = loadProvenanceForBundle(igpkp.getLinkFor(r, true), r.getElement(), f);
         xhtml = new HistoryGenerator(ctxt).generateForBundle(entries); 
-        fragment(r.fhirType()+"-"+r.getId()+"-html", new XhtmlComposer(XhtmlComposer.XML).compose(xhtml), f.getOutputNames(), r, vars, null, start, "html", "Resource");
+        fragment(r.fhirType()+"-"+r.getId()+"-html", xc.compose(xhtml), f.getOutputNames(), r, vars, null, start, "html", "Resource");
       } else if (r.fhirType().equals("Binary")) {
         String pfx = "";
         if (r.getExampleUri() != null) {
@@ -11448,7 +11462,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
             }
           }
         }
-        String html = xhtml == null ? "" : new XhtmlComposer(XhtmlComposer.XML).compose(xhtml);
+        String html = xhtml == null ? "" : xc.compose(xhtml);
         fragment(r.fhirType()+"-"+r.getId()+"-html", html, f.getOutputNames(), r, vars, null, start, "html", "Resource");
       }
     }
@@ -11456,7 +11470,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (igpkp.wantGen(r, "history")) {
       long start = System.currentTimeMillis();
       XhtmlNode xhtml = new HistoryGenerator(rc).generate(r);
-      String html = xhtml == null ? "" : new XhtmlComposer(XhtmlComposer.XML).compose(xhtml);
+      String html = xhtml == null ? "" : xc.compose(xhtml);
       fragment(r.fhirType()+"-"+r.getId()+"-history", html, f.getOutputNames(), r, vars, null, start, "history", "Resource");
     }
 
