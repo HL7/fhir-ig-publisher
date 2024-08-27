@@ -46,7 +46,7 @@ public class XSLTransformer {
 
 
     public byte[] transform(byte[] source, byte[] xslt) throws TransformerException {
-        TransformerFactory f = TransformerFactory.newInstance();
+        TransformerFactory f = org.hl7.fhir.utilities.xml.XMLUtil.newXXEProtectedTransformerFactory();
         f.setErrorListener(new MyErrorListener());
         StreamSource xsrc = new StreamSource(new ByteArrayInputStream(xslt));
         Transformer t = f.newTransformer(xsrc);
