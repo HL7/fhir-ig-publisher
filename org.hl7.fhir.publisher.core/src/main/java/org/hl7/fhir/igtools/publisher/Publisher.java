@@ -3285,9 +3285,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }    
     if (!"hl7.fhir.uv.tools".equals(sourceIg.getPackageId()) && !dependsOnTooling(sourceIg.getDependsOn())) {
       if (sourceIg.getDefinition().hasExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency")) {
-        sourceIg.getDefinition().getExtensionByUrl("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency").setValue(new CodeType("hl7.fhir.uv.tools#0.1.0"));      
+        sourceIg.getDefinition().getExtensionByUrl("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency").setValue(new CodeType("hl7.fhir.uv.tools#0.2.0"));      
       } else {
-        sourceIg.getDefinition().addExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency", new CodeType("hl7.fhir.uv.tools#0.1.0"));
+        sourceIg.getDefinition().addExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency", new CodeType("hl7.fhir.uv.tools#0.2.0"));
       }
     }
     
