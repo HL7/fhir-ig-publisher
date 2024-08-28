@@ -13,7 +13,7 @@
     <artifactId>org.hl7.fhir.publisher.core</artifactId>
 
     <properties>
-        <graalvm.version>22.3.5</graalvm.version>
+        <graalvm.version>23.0.5</graalvm.version>
         <jackson_version>2.17.0</jackson_version>
         <info_cqframework_version>3.3.2</info_cqframework_version>
     </properties>
