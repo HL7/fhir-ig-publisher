@@ -51,6 +51,7 @@ import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.renderers.RendererFactory;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.utilities.MarkDownProcessor;
@@ -62,6 +63,7 @@ import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 public class ValueSetRenderer extends CanonicalRenderer {
 
   private ValueSet vs;
+  private static boolean nsFailHasFailed;
 
   public ValueSetRenderer(IWorkerContext context, String corePath, ValueSet vs, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen, String versionToAnnotate) {
     super(context, corePath, vs, null, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate);
@@ -89,7 +91,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
     vsc.setText(null);
     if (vsc.hasCompose()) {
       vsc.setExpansion(null); // we don't want to render an expansion by mistake
-      RendererFactory.factory(vsc, gen).renderOrError(vsc);
+      RendererFactory.factory(vsc, gen).renderOrError(ResourceWrapper.forResource(gen, vsc));
       return "<h3>Logical Definition (CLD)</h3>\r\n" + new XhtmlComposer(XhtmlComposer.HTML).compose(vsc.getText().getDiv());
     } else {
       return "<h3>Logical Definition (CLD)</h3>\r\n<p>No formal definition provided for this ValueSet</p>\r\n";
@@ -98,6 +100,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
   }
 
   public String xref() throws FHIRException {
+    try {
     StringBuilder b = new StringBuilder();
     boolean first = true;
     b.append("\r\n");
@@ -202,6 +205,13 @@ public class ValueSetRenderer extends CanonicalRenderer {
     else
       b.append("</ul>\r\n");
     return b.toString()+changeSummary();
+    } catch (Exception e) {
+      if (!nsFailHasFailed) {
+        e.printStackTrace();
+        nsFailHasFailed  = true;
+      }
+      return " <p>"+Utilities.escapeXml(e.getMessage())+"</p>\r\n";
+    }
   }
 
   private boolean questionnaireUsesValueSet(List<QuestionnaireItemComponent> items, String url) {

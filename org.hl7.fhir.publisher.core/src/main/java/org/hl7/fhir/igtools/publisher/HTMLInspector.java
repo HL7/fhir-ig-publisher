@@ -50,7 +50,6 @@ import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.PathBuilder;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.i18n.I18nConstants;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageHacker;
@@ -62,13 +61,34 @@ import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode.Location;
-import org.hl7.fhir.validation.BaseValidator.BooleanHolder;
-import org.hl7.fhir.validation.instance.utils.ValidationContext;
 import org.hl7.fhir.utilities.xhtml.XhtmlParser;
+import org.hl7.fhir.validation.BaseValidator.BooleanHolder;
 
 public class HTMLInspector {
 
   
+  public class DuplicateAnchorTracker {
+    private Set<String> found = new HashSet<>();
+    private Set<String> duplicates = new HashSet<>();
+
+    public void seeAnchor(String tgt) {
+      if (!found.contains(tgt)) {
+        found.add(tgt);
+      } else {
+        duplicates.add(tgt);
+      }
+    }
+
+    public boolean hasDuplicates() {
+      return !duplicates.isEmpty();
+    }
+
+    public String listDuplicates() {
+      return CommaSeparatedStringBuilder.join(",", Utilities.sorted(duplicates));
+    }
+  }
+
+
   public enum NodeChangeType {
     NONE, SELF, CHILD
   }
@@ -300,8 +320,12 @@ public class HTMLInspector {
         }
         XhtmlNode x = new XhtmlParser().setMustBeWellFormed(strict).parse(new FileInputStream(lf.filename), null);
         referencesValidatorPack = false;
-        if (checkLinks(lf, s, "", x, null, messages, false) != NodeChangeType.NONE) { // returns true if changed
+        DuplicateAnchorTracker dat = new DuplicateAnchorTracker();
+        if (checkLinks(lf, s, "", x, null, messages, false, dat) != NodeChangeType.NONE) { // returns true if changed
           saveFile(lf, x);
+        }
+        if (dat.hasDuplicates()) {
+          messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, s, "The html source has duplicate anchor Ids: "+dat.listDuplicates(), IssueSeverity.WARNING));                      
         }
         if (referencesValidatorPack) {
           if (lf.getHl7State() != null && lf.getHl7State()) {
@@ -619,7 +643,7 @@ public class HTMLInspector {
       listTargets(c, targets);
   }
 
-  private NodeChangeType checkLinks(LoadedFile lf, String s, String path, XhtmlNode x, String uuid, List<ValidationMessage> messages, boolean inPre) throws IOException {
+  private NodeChangeType checkLinks(LoadedFile lf, String s, String path, XhtmlNode x, String uuid, List<ValidationMessage> messages, boolean inPre, DuplicateAnchorTracker dat) throws IOException {
     boolean changed = false;
     if (x.getName() != null) {
       path = path + "/"+ x.getName();
@@ -633,6 +657,9 @@ public class HTMLInspector {
     }
     if ("a".equals(x.getName()) && x.hasAttribute("href")) {
       changed = checkResolveLink(s, x.getLocation(), path, x.getAttribute("href"), x.allText(), messages, uuid);
+    }
+    if ("a".equals(x.getName()) && x.hasAttribute("name")) {
+      dat.seeAnchor(x.getAttribute("name"));
     }
     if ("img".equals(x.getName()) && x.hasAttribute("src")) {
       changed = checkResolveImageLink(s, x.getLocation(), path, x.getAttribute("src"), messages, uuid) || changed;
@@ -650,7 +677,7 @@ public class HTMLInspector {
     boolean nchanged = false;
     boolean nSelfChanged = false;
     for (XhtmlNode c : x.getChildNodes()) { 
-      NodeChangeType ct = checkLinks(lf, s, path, c, nuid, messages, inPre || "pre".equals(x.getName()));
+      NodeChangeType ct = checkLinks(lf, s, path, c, nuid, messages, inPre || "pre".equals(x.getName()), dat);
       if (ct == NodeChangeType.SELF) {
         nSelfChanged = true;
         nchanged = true;
@@ -661,7 +688,7 @@ public class HTMLInspector {
     if (nSelfChanged) {
       XhtmlNode a = new XhtmlNode(NodeType.Element);
       a.setName("a").setAttribute("name", nuid).addText("\u200B");
-      x.getChildNodes().add(0, a);
+      x.addChildNode(0, a);
     } 
     if (changed)
       return NodeChangeType.SELF;

@@ -2,7 +2,6 @@ package org.hl7.fhir.igtools.renderers;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -11,19 +10,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.hl7.fhir.OperationDefinitionParameter;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
-import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.fhirpath.ExpressionNode;
-import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
 import org.hl7.fhir.r5.fhirpath.ExpressionNode.Kind;
+import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeableConcept;
 import org.hl7.fhir.r5.model.Coding;
+import org.hl7.fhir.r5.model.ConceptMap;
+import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
+import org.hl7.fhir.r5.model.DataType;
+import org.hl7.fhir.r5.model.DomainResource;
 import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingAdditionalComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
@@ -34,11 +35,6 @@ import org.hl7.fhir.r5.model.OperationDefinition.OperationDefinitionParameterCom
 import org.hl7.fhir.r5.model.Questionnaire;
 import org.hl7.fhir.r5.model.Questionnaire.QuestionnaireItemComponent;
 import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.model.StructureMap;
-import org.hl7.fhir.r5.model.ConceptMap;
-import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
-import org.hl7.fhir.r5.model.DataType;
-import org.hl7.fhir.r5.model.DomainResource;
 import org.hl7.fhir.r5.model.SearchParameter;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.ExtensionContextType;
@@ -47,7 +43,6 @@ import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.Renderer;
-import org.hl7.fhir.r5.renderers.TerminologyRenderer;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.terminologies.utilities.ValidationResult;
@@ -1028,6 +1023,10 @@ public class CrossViewRenderer extends Renderer {
     } else if (status == StandardsStatus.INFORMATIVE) {
       td.ahWithText("", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Informative", "Informative", null).attribute("class", "informative-flag");
     } else if (status == StandardsStatus.DRAFT) {
+      if (ed.getExperimental()) {
+        td.ahWithText("", Utilities.pathURL(corePath, "canonicalresource-definitions.html") +"#CanonicalResource.experimental", "Experimental", "Experimental", null).attribute("class", "experimental-flag");
+        td.br();
+      } 
       td.ahWithText("", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Draft", "Draft", null).attribute("class", "draft-flag");
     } else { 
       td.ahWithText("", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Trial-Use", "Trial-Use", null).attribute("class", "trial-use-flag");

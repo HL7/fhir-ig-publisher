@@ -33,6 +33,7 @@ import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.Questionnaire;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.QuestionnaireRendererMode;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.utilities.MarkDownProcessor;
@@ -58,7 +59,7 @@ public class QuestionnaireRenderer extends CanonicalRenderer {
   public String render(QuestionnaireRendererMode mode) throws IOException, FHIRFormatError, DefinitionException, FHIRException, EOperationOutcome {
     org.hl7.fhir.r5.renderers.QuestionnaireRenderer qr = new org.hl7.fhir.r5.renderers.QuestionnaireRenderer(gen);
     gen.setQuestionnaireMode(mode);
-    return new XhtmlComposer(XhtmlComposer.HTML).compose(qr.build(q));
+    return new XhtmlComposer(XhtmlComposer.HTML).compose(qr.buildNarrative(ResourceWrapper.forResource(gen.getContextUtilities(), q)));
   }
 
 }

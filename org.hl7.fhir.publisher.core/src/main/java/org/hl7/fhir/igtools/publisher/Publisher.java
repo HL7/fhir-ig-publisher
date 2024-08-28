@@ -40,7 +40,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -69,7 +68,6 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
-import net.sf.saxon.trans.SymbolicName;
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
 import org.apache.commons.exec.ExecuteWatchdog;
@@ -94,7 +92,6 @@ import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.exceptions.PathEngineException;
 import org.hl7.fhir.igtools.publisher.FetchedFile.FetchedBundleType;
 import org.hl7.fhir.igtools.publisher.IFetchFile.FetchState;
-import org.hl7.fhir.igtools.publisher.Publisher.FragmentUseRecord;
 import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
 import org.hl7.fhir.igtools.publisher.comparators.IpsComparator;
 import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
@@ -162,9 +159,9 @@ import org.hl7.fhir.r5.elementmodel.ParserBase.IdRenderingPolicy;
 import org.hl7.fhir.r5.elementmodel.ParserBase.ValidationPolicy;
 import org.hl7.fhir.r5.fhirpath.ExpressionNode;
 import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
-import org.hl7.fhir.r5.fhirpath.TypeDetails;
 import org.hl7.fhir.r5.fhirpath.FHIRPathEngine.IEvaluationContext;
 import org.hl7.fhir.r5.fhirpath.FHIRPathUtilityClasses.FunctionDetails;
+import org.hl7.fhir.r5.fhirpath.TypeDetails;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.RdfParser;
@@ -278,9 +275,6 @@ import org.hl7.fhir.r5.renderers.spreadsheets.CodeSystemSpreadsheetGenerator;
 import org.hl7.fhir.r5.renderers.spreadsheets.ConceptMapSpreadsheetGenerator;
 import org.hl7.fhir.r5.renderers.spreadsheets.StructureDefinitionSpreadsheetGenerator;
 import org.hl7.fhir.r5.renderers.spreadsheets.ValueSetSpreadsheetGenerator;
-import org.hl7.fhir.r5.renderers.utils.BaseWrappers.ResourceWrapper;
-import org.hl7.fhir.r5.renderers.utils.DirectWrappers;
-import org.hl7.fhir.r5.renderers.utils.ElementWrappers;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.ExampleScenarioRendererMode;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.FixedValueFormat;
@@ -291,10 +285,9 @@ import org.hl7.fhir.r5.renderers.utils.RenderingContext.QuestionnaireRendererMod
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.ResourceRendererMode;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.StructureDefinitionRendererMode;
 import org.hl7.fhir.r5.renderers.utils.Resolver.IReferenceResolver;
-import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceContext;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceReferenceKind;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceWithReference;
-import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
+import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.terminologies.TerminologyUtilities;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
@@ -328,21 +321,16 @@ import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.TimeTracker;
 import org.hl7.fhir.utilities.TimeTracker.Session;
-import org.hl7.fhir.utilities.filesystem.CSFile;
-import org.hl7.fhir.utilities.http.HTTPResult;
-import org.hl7.fhir.utilities.http.ManagedWebAccess;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.ZipGenerator;
-import org.hl7.fhir.utilities.i18n.I18nConstants;
-import org.hl7.fhir.utilities.i18n.JsonLangFileProducer;
-import org.hl7.fhir.utilities.i18n.LanguageFileProducer;
+import org.hl7.fhir.utilities.filesystem.CSFile;
+import org.hl7.fhir.utilities.http.HTTPResult;
+import org.hl7.fhir.utilities.http.ManagedWebAccess;
+import org.hl7.fhir.utilities.i18n.*;
 import org.hl7.fhir.utilities.i18n.LanguageFileProducer.TranslationUnit;
-import org.hl7.fhir.utilities.i18n.LanguageTag;
 import org.hl7.fhir.utilities.i18n.subtag.LanguageSubtagRegistry;
 import org.hl7.fhir.utilities.i18n.subtag.LanguageSubtagRegistryLoader;
-import org.hl7.fhir.utilities.i18n.PoGetTextProducer;
-import org.hl7.fhir.utilities.i18n.XLIFFProducer;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonBoolean;
 import org.hl7.fhir.utilities.json.model.JsonElement;
@@ -714,6 +702,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private String destDir;
   private FHIRToolingClient webTxServer;
   private String txServer;
+  private Locale forcedLanguage;
   private String igPack = "";
   private boolean debug;
   private boolean isChild;
@@ -1017,6 +1006,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   public void execute() throws Exception {
+    XhtmlNode.setCheckParaGeneral(true);
+    
     tt = new TimeTracker();
     initialize();
     if (isBuildingTemplate) {
@@ -1418,7 +1409,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     Provenance pv = null;
     try {
       pv = (Provenance) (r == null ? convertFromElement(resource) : r);
-      RendererFactory.factory(pv, rc.setParser(getTypeLoader(null))).render(pv);
+      RendererFactory.factory(pv, rc.setParser(getTypeLoader(null))).renderResource(ResourceWrapper.forResource(rc, pv));
     } catch (Exception e) {
       // nothing, if there's a problem, we'll take it up elsewhere
     }
@@ -1553,7 +1544,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
 
   @Override
-  public ResourceWithReference resolve(RenderingContext context, String url) {
+  public ResourceWithReference resolve(RenderingContext context, String url, String version) {
     if (url == null) {
       return null;
     }
@@ -1564,12 +1555,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         for (FetchedResource r : f.getResources()) {
           if (r.getElement() != null && r.fhirType().equals(parts[0]) && r.getId().equals(parts[1])) {
             String path = igpkp.getLinkFor(r, true);
-            return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, path, new ElementWrappers.ResourceWrapperMetaElement(context, r.getElement()));
+            return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, ResourceWrapper.forResource(context, r.getElement()));
           }
           if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
             if (url.equals(((CanonicalResource) r.getResource()).getUrl())) {
               String path = igpkp.getLinkFor(r, true);
-              return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, path, new DirectWrappers.ResourceWrapperDirect(context, r.getResource()));
+              return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, ResourceWrapper.forResource(context, r.getResource()));
             }
           }
         }
@@ -1582,7 +1573,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               Element res = entry.getNamedChild("resource");
               if (res != null && res.fhirType().equals(parts[0]) && res.hasChild("id") && res.getNamedChildValue("id").equals(parts[1])) {
                 String path = igpkp.getLinkFor(r, true)+"#"+parts[0]+"_"+parts[1];
-                return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, path, new ElementWrappers.ResourceWrapperMetaElement(context, r.getElement()));
+                return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, ResourceWrapper.forResource(context, r.getElement()));
               }
             }
           }
@@ -1598,7 +1589,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
             String fu = entry.getNamedChildValue("fullUrl");
             if (res != null && fu != null && fu.equals(url)) {
               String path = igpkp.getLinkFor(r, true)+"#"+fu.replace(":", "-");
-              return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, path, new ElementWrappers.ResourceWrapperMetaElement(context, r.getElement()));
+              return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, ResourceWrapper.forResource(context, r.getElement()));
             }
           }
         }
@@ -1614,7 +1605,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         path = null;
       }
       if (path != null)
-        return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, path, null);
+        return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, null);
     }
 
     for (FetchedFile f : fileList) {
@@ -1633,7 +1624,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
                       String id = r2.fhirType()+"/"+r2.getId();
                       if (tail.equals(id)) {
                         String path = igpkp.getLinkFor(r2, true);
-                        return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, path, new ElementWrappers.ResourceWrapperMetaElement(context, r2.getElement()));
+                        return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, ResourceWrapper.forResource(context, r2.getElement()));
                       }
                     }
                   }
@@ -1789,8 +1780,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         CodeType code = new CodeType("informative");
         code.addExtension(ToolingExtensions.EXT_FMM_DERIVED, new CanonicalType(parentCanonical));
         res.addExtension(ToolingExtensions.EXT_STANDARDS_STATUS, code);
-      } else if (!status.getValue().equals("informative") && !status.getValue().equals("draft")) {
-        errors.add(new ValidationMessage(Source.Publisher, IssueType.INVALID, res.getResourceType() + " " + r.getId(), "If a resource is not implementable, is marked as experimental or example, the standards status can only be 'informative' or 'draft'.", IssueSeverity.ERROR));
+      } else if (!Utilities.existsInList(status.getValue(), "informative", "draft", "deprecated")) {
+        errors.add(new ValidationMessage(Source.Publisher, IssueType.INVALID, res.getResourceType() + " " + r.getId(), "If a resource is not implementable, is marked as experimental or example, the standards status can only be 'informative', 'draft' or 'deprecated', not '"+status.getValue()+"'.", IssueSeverity.ERROR));
       }
 
     } else {
@@ -2128,25 +2119,28 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               }
               r.getElement().removeChild("text");
             } else {
-              List<String> langs = narrativeLangs();
+              List<Locale> langs = translationLocales();
               logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId());
               if (r.getResource() != null && isConvertableResource(r.getResource().fhirType())) {
                 boolean regen = false;
-                for (String lang : langs) {
-                  RenderingContext lrc = rc.copy().setDefinitionsTarget(igpkp.getDefinitionsName(r));
-                  lrc.setLocale(lang == null ? null : new Locale(lang));
+                for (Locale lang : langs) {
+                boolean first = true;
+                  RenderingContext lrc = rc.copy(false).setDefinitionsTarget(igpkp.getDefinitionsName(r));
+                  lrc.setLocale(lang);
                   lrc.setRules(GenerationRules.VALID_RESOURCE);
                   lrc.setDefinitionsTarget(igpkp.getDefinitionsName(r));
+                  lrc.setSecondaryLang(!first);
+                  first = false;
                   if (r.getResource() instanceof DomainResource && (langs.size() > 1 || !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv()))) {
                     regen = true;
-                    RendererFactory.factory(r.getResource(), lrc).setMultiLangMode(langs.size() > 1).render((DomainResource) r.getResource());
+                    RendererFactory.factory(r.getResource(), lrc).setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, r.getResource()));
                   } else if (r.getResource() instanceof Bundle) {
                     regen = true;
-                    new BundleRenderer(lrc).setMultiLangMode(langs.size() > 1).render((Bundle) r.getResource());
+                    new BundleRenderer(lrc).setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, r.getResource()));
                   } else if (r.getResource() instanceof Parameters) {
                     regen = true;
                     Parameters p = (Parameters) r.getResource();
-                    new ParametersRenderer(lrc, new ResourceContext(null, p)).setMultiLangMode(langs.size() > 1).render(p);
+                    new ParametersRenderer(lrc).setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, p));
                   } else if (r.getResource() instanceof DomainResource) {
                     checkExistingNarrative(f, r, ((DomainResource) r.getResource()).getText().getDiv());
                   }
@@ -2157,24 +2151,28 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
                   r.setElement(e);
                 }
               } else {
-                for (String lang : langs) {
-                  RenderingContext lrc = rc.copy().setParser(getTypeLoader(f,r));
-                  lrc.setLocale(lang == null ? null : new Locale(lang));
+                boolean first = true;
+                for (Locale lang : langs) {
+                  RenderingContext lrc = rc.copy(false).setParser(getTypeLoader(f,r));
+                  lrc.clearAnchors();
+                  lrc.setLocale(lang);
                   lrc.setRules(GenerationRules.VALID_RESOURCE);
+                  lrc.setSecondaryLang(!first);
+                  first = false;
                   if (isDomainResource(r) && (langs.size() > 1|| !hasNarrative(r.getElement()))) {
-                    ResourceWrapper rw = new ElementWrappers.ResourceWrapperMetaElement(lrc, r.getElement());
-                    RendererFactory.factory(rw, lrc).setRcontext(new ResourceContext(null, rw)).setMultiLangMode(langs.size() > 1).render(rw);
+                    ResourceWrapper rw = ResourceWrapper.forResource(lrc, r.getElement());
+                    RendererFactory.factory(rw, lrc).setMultiLangMode(langs.size() > 1).renderResource(rw);
                     otherFilesRun.addAll(lrc.getFiles());
                   } else if (r.fhirType().equals("Bundle")) {
                     lrc.setAddName(true);
                     for (Element e : r.getElement().getChildrenByName("entry")) {
                       Element res = e.getNamedChild("resource");
                       if (res!=null && "http://hl7.org/fhir/StructureDefinition/DomainResource".equals(res.getProperty().getStructure().getBaseDefinition())) {
-                        ResourceWrapper rw = new ElementWrappers.ResourceWrapperMetaElement(lrc, res);
+                        ResourceWrapper rw = ResourceWrapper.forResource(lrc, res);
                         if (hasNarrative(res)) {
-                          RendererFactory.factory(rw, lrc, new ResourceContext(null, r.getElement())).checkNarrative(rw);                        
+                          RendererFactory.factory(rw, lrc).checkNarrative(rw);                        
                         } else {
-                          RendererFactory.factory(rw, lrc, new ResourceContext(null, r.getElement())).setMultiLangMode(langs.size() > 1).render(rw);
+                          RendererFactory.factory(rw, lrc).setMultiLangMode(langs.size() > 1).renderResource(rw);
                         }
                       }
                     }
@@ -2195,16 +2193,69 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     tts.end();
   }
 
-  private List<String> narrativeLangs() {
-    List<String> res = new ArrayList<>();
-    res.add(defaultTranslationLang);
-    for (String s : translationLangs) {
-      if (!res.contains(s)) {
-        res.add(s);
+  private Locale inferDefaultNarrativeLang() {
+    return inferDefaultNarrativeLang(false);
+  }
+
+  private Locale inferDefaultNarrativeLang(final boolean logDecision) {
+    if (logDecision) {
+      logDebugMessage(LogCategory.INIT, "-force-language="+forcedLanguage
+              + " defaultTranslationLang="+defaultTranslationLang
+            + (sourceIg == null ? "" : " sourceIg.language="+sourceIg.getLanguage()
+              + " sourceIg.jurisdiction="+sourceIg.getJurisdictionFirstRep().getCodingFirstRep().getCode())
+      );
+    }
+    if (forcedLanguage != null) {
+      if (logDecision) {
+        logMessage("Using " + forcedLanguage + " as the default narrative language. (-force-language has been set)");
+      }
+      return forcedLanguage;
+    }
+    if (defaultTranslationLang != null) {
+      if (logDecision) {
+        logMessage("Using " + defaultTranslationLang + " as the default narrative language. (i18n-default-lang has been set in Implementation Guide ini)");
+      }
+      return new Locale(defaultTranslationLang);
+    }
+    if (sourceIg != null) {
+      if (sourceIg.hasLanguage()) {
+        if (logDecision) {
+          logMessage("Using " + sourceIg.getLanguage() + " as the default narrative language. (ImplementationGuide.language has been set)");
+        }
+        return new Locale(sourceIg.getLanguage());
+      }
+      if (sourceIg.hasJurisdiction()) {
+        final String jurisdiction = sourceIg.getJurisdictionFirstRep().getCodingFirstRep().getCode();
+        Locale localeFromRegion = RegionToLocaleMapper.getLocaleFromRegion(jurisdiction);
+        if (localeFromRegion != null) {
+          if (logDecision) {
+            logMessage("Using " + localeFromRegion + " as the default narrative language. (inferred from ImplementationGuide.jurisdiction=" + jurisdiction + ")");
+          }
+          return localeFromRegion;
+        }
       }
     }
-    if (res.isEmpty()) {
-      res.add(null);
+    if (logDecision) {
+      logMessage("Using en-US as the default narrative language. (no language information in Implementation Guide or command line");
+    }
+    return new Locale("en", "US");
+  }
+
+  /**
+   * Return a list of locales containing the translation languages for the IG, as well as the inferred default language
+   * of the IG.
+   *
+   * @return translation locales
+   */
+  private List<Locale> translationLocales() {
+    List<Locale> res = new ArrayList<>();
+    res.add(inferDefaultNarrativeLang());
+
+    for (String translationLang : translationLangs) {
+      Locale locale = new Locale(translationLang);
+      if (!res.contains(locale)) {
+        res.add(locale);
+      }
     }
     return res;
   }
@@ -3234,9 +3285,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }    
     if (!"hl7.fhir.uv.tools".equals(sourceIg.getPackageId()) && !dependsOnTooling(sourceIg.getDependsOn())) {
       if (sourceIg.getDefinition().hasExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency")) {
-        sourceIg.getDefinition().getExtensionByUrl("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency").setValue(new CodeType("hl7.fhir.uv.tools#0.1.0"));      
+        sourceIg.getDefinition().getExtensionByUrl("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency").setValue(new CodeType("hl7.fhir.uv.tools#0.2.0"));      
       } else {
-        sourceIg.getDefinition().addExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency", new CodeType("hl7.fhir.uv.tools#0.1.0"));
+        sourceIg.getDefinition().addExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency", new CodeType("hl7.fhir.uv.tools#0.2.0"));
       }
     }
     
@@ -3915,7 +3966,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       String webref = pi.getWebLocation();
       webref = PackageHacker.fixPackageUrl(webref);
 
-      SpecMapManager igm = pi.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion()) : SpecMapManager.createSpecialPackage(pi);
+      SpecMapManager igm = pi.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion()) : SpecMapManager.createSpecialPackage(pi, pcm);
       igm.setName(pi.title());
       igm.setBase(pi.canonical());
       igm.setBase2(PackageHacker.fixPackageUrl(pi.url()));
@@ -3941,9 +3992,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (Utilities.noString(canonical))
       throw new Exception("You must specify a canonical URL for the IG "+name);
     String igver = dep.getVersion();
-    if (Utilities.noString(igver))
-      throw new Exception("You must specify a version for the IG "+packageId+" ("+canonical+")");
-
+    if (Utilities.noString(igver)) {
+      igver = pcm.getLatestVersion(packageId);
+      if (Utilities.noString(igver)) {
+        throw new Exception("The latest version could not be determined, so you must specify a version for the IG "+packageId+" ("+canonical+")");
+      }
+    }
 
     NpmPackage pi = packageId == null ? null : pcm.loadPackageFromCacheOnly(packageId, igver);
     if (pi == null) {
@@ -3998,7 +4052,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     String webref = pi.getWebLocation();
     webref = PackageHacker.fixPackageUrl(webref);
 
-    SpecMapManager igm = pi.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion()) : SpecMapManager.createSpecialPackage(pi);
+    SpecMapManager igm = pi.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion()) : SpecMapManager.createSpecialPackage(pi, pcm);
     igm.setName(name);
     igm.setBase(canonical);
     igm.setBase2(PackageHacker.fixPackageUrl(pi.url()));
@@ -4068,7 +4122,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               SpecMapManager smm = null;
               logDebugMessage(LogCategory.PROGRESS, "Load package dependency "+dep);
               try {
-                smm = dpi.hasFile("other", "spec.internals") ?  new SpecMapManager(TextFile.streamToBytes(dpi.load("other", "spec.internals")), dpi.fhirVersion()) : SpecMapManager.createSpecialPackage(dpi);
+                smm = dpi.hasFile("other", "spec.internals") ?  new SpecMapManager(TextFile.streamToBytes(dpi.load("other", "spec.internals")), dpi.fhirVersion()) : SpecMapManager.createSpecialPackage(dpi, pcm);
                 smm.setName(dpi.name()+"_"+dpi.version());
                 smm.setBase(dpi.canonical());
                 smm.setBase2(PackageHacker.fixPackageUrl(dpi.url()));
@@ -4288,6 +4342,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       publishedIg = sourceIg.copy();
       altMap.get(IG_NAME).getResources().get(0).setResource(publishedIg);
     }
+    inferDefaultNarrativeLang(true);
     dependentIgFinder = new DependentIGFinder(sourceIg.getPackageId());
 
 
@@ -4321,7 +4376,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         throw new Error("The version "+publishedIg.getVersion()+" is not a valid semantic version so cannot be published in the ci-build");
       } else {
         log("The version "+publishedIg.getVersion()+" is not a valid semantic version so cannot be published in the ci-build");
-        igf.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, "ImplementationGuide.version", "The version "+publishedIg.getVersion()+" is not a valid semantic version and will not be acceptible to the ci-build", IssueSeverity.ERROR));
+        igf.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, "ImplementationGuide.version", "The version "+publishedIg.getVersion()+" is not a valid semantic version and will not be acceptible to the ci-build, nor will it be a valid vesion in the NPM package system", IssueSeverity.WARNING));
       }
     }
     String id = npmName;
@@ -4555,7 +4610,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, execTime.getTime(), !publishing);
     execTime = Calendar.getInstance();
 
-    rc = new RenderingContext(context, markdownEngine, ValidationOptions.defaults(), checkAppendSlash(specPath), "", null, ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
+    rc = new RenderingContext(context, markdownEngine, ValidationOptions.defaults(), checkAppendSlash(specPath), "", inferDefaultNarrativeLang(), ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
     rc.setTemplateProvider(templateProvider);
     rc.setResolver(this);    
     rc.setServices(validator.getExternalHostServices());
@@ -4581,6 +4636,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     rc.setDateFormatString(fmtDate);
     rc.setDateTimeFormatString(fmtDateTime);
     rc.setChangeVersion(versionToAnnotate);
+    rc.setShowSummaryTable(false);
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() instanceof CanonicalResource) {
@@ -8555,7 +8611,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
     generateCanonicalSummary();
 
-    CrossViewRenderer cvr = new CrossViewRenderer(igpkp.getCanonical(), altCanonical, context, igpkp.specPath(), rc.copy());
+    CrossViewRenderer cvr = new CrossViewRenderer(igpkp.getCanonical(), altCanonical, context, igpkp.specPath(), rc.copy(false));
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
@@ -9186,7 +9242,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         List<String> ids = new ArrayList<String>();
         for (Identifier id : cr.getIdentifier()) {
           if (id.hasValue()) {
-            ids.add(dr.display(id));
+            ids.add(dr.displayDataType(id));
           }
         }
         if (!ids.isEmpty())
@@ -9216,18 +9272,18 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       if (cr.hasUseContext() && !containedCr) {
         List<String> contexts = new ArrayList<String>();
         for (UsageContext uc : cr.getUseContext()) {
-          String label = dr.display(uc.getCode());
+          String label = dr.displayDataType(uc.getCode());
           if (uc.hasValueCodeableConcept()) {
-            String value = dr.display(uc.getValueCodeableConcept());
+            String value = dr.displayDataType(uc.getValueCodeableConcept());
             if (value!=null) {
               contexts.add(label + ":\u00A0" + value);
             }
           } else if (uc.hasValueQuantity()) {
-            String value = dr.display(uc.getValueQuantity());
+            String value = dr.displayDataType(uc.getValueQuantity());
             if (value!=null)
               contexts.add(label + ":\u00A0" + value);
           } else if (uc.hasValueRange()) {
-            String value = dr.display(uc.getValueRange());
+            String value = dr.displayDataType(uc.getValueRange());
             if (!value.isEmpty())
               contexts.add(label + ":\u00A0" + value);
 
@@ -9246,7 +9302,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
             } else if (reference!=null)
               value = "[" + uc.getValueReference().getReference() + "](" + reference + ")";
             else if (uc.getValueReference().hasIdentifier()) {
-              String idLabel = dr.display(uc.getValueReference().getIdentifier().getType());
+              String idLabel = dr.displayDataType(uc.getValueReference().getIdentifier().getType());
               value = idLabel!=null ? label + ":\u00A0" + uc.getValueReference().getIdentifier().getValue() : uc.getValueReference().getIdentifier().getValue();
             }
             if (value != null)
@@ -9280,19 +9336,13 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               jNode.add("name", displayForCountryCode(cd.getCode()));
               File flagFile = new File(vsCache + "/" + code + ".svg");
               if (!flagFile.exists() && !ignoreFlags.contains(code)) {
-                URL url = new URL("https://restcountries.eu/data/" + code + ".svg");
+                URL url2 = new URL("https://flagcdn.com/" + shortCountryCode.get(code.toUpperCase()).toLowerCase() + ".svg");
                 try {
-                  InputStream in = url.openStream();
+                  InputStream in = url2.openStream();
                   Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
-                } catch (Exception e) {
-                  URL url2 = new URL("https://flagcdn.com/" + shortCountryCode.get(code.toUpperCase()).toLowerCase() + ".svg");
-                  try {
-                    InputStream in = url2.openStream();
-                    Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
-                  } catch (Exception e2) {
-                    ignoreFlags.add(code);
-                    System.out.println("Unable to access " + url + " or " + url2+" ("+e.getMessage()+", "+e2.getMessage()+")");
-                  }
+                } catch (Exception e2) {
+                  ignoreFlags.add(code);
+                  System.out.println("Unable to access " + url2 + " or " + url2+" ("+e2.getMessage()+")");
                 }
               }
               if (flagFile.exists()) {
@@ -9318,7 +9368,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               }
             }
           } else {
-            jNode.add("name", dr.display(cc));
+            jNode.add("name", dr.displayDataType(cc));
           }
         }
       }
@@ -9345,7 +9395,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         StructureDefinition sd = (StructureDefinition)r.getResource();
         if (sd.hasKeyword()) {
           for (Coding coding : sd.getKeyword()) {
-            String value = dr.display(coding);
+            String value = dr.displayDataType(coding);
             if (value != null)
               keywords.add(value);
           }
@@ -11120,8 +11170,17 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     ByteArrayOutputStream bsj = new ByteArrayOutputStream();
     org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(context);
     Element element = r.getElement();
+    Element eNN = element;
     jp.compose(element, bsj, OutputStyle.NORMAL, igpkp.getCanonical());
     npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
+    
+    if (module.isNoNarrative()) {
+      // we don't use the narrative in these resources in _includes, so we strip it - it slows Jekyll down greatly 
+      eNN = (Element) element.copy();
+      eNN.removeChild("text");
+      bsj = new ByteArrayOutputStream();
+      jp.compose(eNN, bsj, OutputStyle.PRETTY, igpkp.getCanonical());
+    }
     String path = Utilities.path(tempDir, "_includes", r.fhirType()+"-"+r.getId()+".json");
     TextFile.bytesToFile(bsj.toByteArray(), path);
     String pathEsc = Utilities.path(tempDir, "_includes", r.fhirType()+"-"+r.getId()+".escaped.json");
@@ -11308,10 +11367,13 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     xp.compose(r.getElement(), bs, OutputStyle.NORMAL, null);
     int size = bs.size();
 
-    Element e = r.getElement();    
+    Element e = r.getElement();
     if (SpecialTypeHandler.handlesType(r.fhirType(), context.getVersion())) {
       e = new ObjectConverter(context).convert(r.getResource());
-    } 
+    } else if (module.isNoNarrative() && e.hasChild("text")) {
+      e = (Element) e.copy();
+      e.removeChild("text");
+    }  
 
     if (igpkp.wantGen(r, "xml-html")) {
       long start = System.currentTimeMillis();
@@ -11352,14 +11414,16 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       fragment(r.fhirType()+"-"+r.getId()+"-ttl-html", rdf.asHtml(size < PRISM_SIZE_LIMIT), f.getOutputNames(), r, vars, "ttl", start, "ttl-html", "Resource");
     }
 
+    e = r.getElement();
+    XhtmlComposer xc = new XhtmlComposer(XhtmlComposer.XML, module.isNoNarrative());
     if (igpkp.wantGen(r, "html")) {
       long start = System.currentTimeMillis();
       XhtmlNode xhtml = getXhtml(f, r);
       if (xhtml == null && HistoryGenerator.allEntriesAreHistoryProvenance(r.getElement())) {
-        RenderingContext ctxt = rc.copy().setParser(getTypeLoader(f, r));
+        RenderingContext ctxt = rc.copy(false).setParser(getTypeLoader(f, r));
         List<ProvenanceDetails> entries = loadProvenanceForBundle(igpkp.getLinkFor(r, true), r.getElement(), f);
         xhtml = new HistoryGenerator(ctxt).generateForBundle(entries); 
-        fragment(r.fhirType()+"-"+r.getId()+"-html", new XhtmlComposer(XhtmlComposer.XML).compose(xhtml), f.getOutputNames(), r, vars, null, start, "html", "Resource");
+        fragment(r.fhirType()+"-"+r.getId()+"-html", xc.compose(xhtml), f.getOutputNames(), r, vars, null, start, "html", "Resource");
       } else if (r.fhirType().equals("Binary")) {
         String pfx = "";
         if (r.getExampleUri() != null) {
@@ -11385,20 +11449,20 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         fragment(r.fhirType()+"-"+r.getId()+"-html", html, f.getOutputNames(), r, vars, null, start, "html", "Resource");
       } else {
         if (xhtml == null) {
-          RenderingContext lrc = rc.copy();
+          RenderingContext lrc = rc.copy(false);
           if (r.getResource() != null && r.getResource() instanceof DomainResource) {
-            xhtml = RendererFactory.factory(r.fhirType(), lrc).build((DomainResource) r.getResource());
+            xhtml = RendererFactory.factory(r.fhirType(), lrc).buildNarrative(ResourceWrapper.forResource(lrc, r.getResource()));
           } else {
-            ResourceWrapper rw = new ElementWrappers.ResourceWrapperMetaElement(lrc, r.getElement()); 
+            ResourceWrapper rw = ResourceWrapper.forResource(lrc, r.getElement()); 
             try {
-              xhtml = RendererFactory.factory(r.fhirType(), lrc).render(rw);
+              xhtml = RendererFactory.factory(r.fhirType(), lrc).buildNarrative(rw);
             } catch (Exception ex) {
               xhtml = new XhtmlNode(NodeType.Element, "div");
               xhtml.para("Error rendering resource: "+ex.getMessage());
             }
           }
         }
-        String html = xhtml == null ? "" : new XhtmlComposer(XhtmlComposer.XML).compose(xhtml);
+        String html = xhtml == null ? "" : xc.compose(xhtml);
         fragment(r.fhirType()+"-"+r.getId()+"-html", html, f.getOutputNames(), r, vars, null, start, "html", "Resource");
       }
     }
@@ -11406,7 +11470,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (igpkp.wantGen(r, "history")) {
       long start = System.currentTimeMillis();
       XhtmlNode xhtml = new HistoryGenerator(rc).generate(r);
-      String html = xhtml == null ? "" : new XhtmlComposer(XhtmlComposer.XML).compose(xhtml);
+      String html = xhtml == null ? "" : xc.compose(xhtml);
       fragment(r.fhirType()+"-"+r.getId()+"-history", html, f.getOutputNames(), r, vars, null, start, "history", "Resource");
     }
 
@@ -11452,7 +11516,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       long start = System.currentTimeMillis();
       XhtmlNode xhtml = getXhtml(f, r, res);
       if (xhtml == null && HistoryGenerator.allEntriesAreHistoryProvenance(r.getElement())) {
-        RenderingContext ctxt = rc.copy().setParser(getTypeLoader(f, r));
+        RenderingContext ctxt = rc.copy(false).setParser(getTypeLoader(f, r));
         List<ProvenanceDetails> entries = loadProvenanceForBundle(igpkp.getLinkFor(r, true), r.getElement(), f);
         xhtml = new HistoryGenerator(ctxt).generateForBundle(entries); 
         fragment(res.fhirType()+"-"+prefixForContained+res.getId()+"-html", new XhtmlComposer(XhtmlComposer.XML).compose(xhtml), f.getOutputNames(), r, vars, prefixForContained, start, "html", "Resource");
@@ -11676,14 +11740,15 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null, start, "expansion", "ValueSet");
       } else {
         ValueSetExpansionOutcome exp = context.expandVS(vs, true, true, true);        
+        
         db.recordExpansion(vs, exp);
         if (exp.getValueset() != null) {
           expansions.add(exp.getValueset());
 
-          RenderingContext lrc = rc.copy();
+          RenderingContext lrc = rc.withUniqueLocalPrefix("x");
           exp.getValueset().setCompose(null);
           exp.getValueset().setText(null);  
-          RendererFactory.factory(exp.getValueset(), lrc).render(exp.getValueset());
+          RendererFactory.factory(exp.getValueset(), lrc).renderResource(ResourceWrapper.forResource(lrc, exp.getValueset()));
           String html = new XhtmlComposer(XhtmlComposer.XML).compose(exp.getValueset().getText().getDiv());
           fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null, start, "expansion", "ValueSet");
           if (ValueSetUtilities.isIncompleteExpansion(exp.getValueset())) {
@@ -11820,9 +11885,14 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
 
     StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, rc, allInvariants, sdMapCache, specPath, versionToAnnotate);
+
     if (igpkp.wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-summary", sdr.summary(), f.getOutputNames(), r, vars, null, start, "summary", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-summary", sdr.summary(false), f.getOutputNames(), r, vars, null, start, "summary", "StructureDefinition");
+    }
+    if (igpkp.wantGen(r, "summary-all")) {
+      long start = System.currentTimeMillis();
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-summary-all", sdr.summary(true), f.getOutputNames(), r, vars, null, start, "summary", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "summary-table")) {
       long start = System.currentTimeMillis();
@@ -11840,58 +11910,74 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       long start = System.currentTimeMillis();
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-ctxts", sdr.contexts(), f.getOutputNames(), r, vars, null, start, "ctxts", "StructureDefinition");
     }
+    if (igpkp.wantGen(r, "experimental-warning")) {
+      long start = System.currentTimeMillis();
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-experimental-warning", sdr.experimentalWarning(), f.getOutputNames(), r, vars, null, start, "experimental-warning", "StructureDefinition");
+    }
 
     if (igpkp.wantGen(r, "diff")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY), f.getOutputNames(), r, vars, null, start, "diff", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, false), f.getOutputNames(), r, vars, null, start, "diff", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff-all", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, true), f.getOutputNames(), r, vars, null, start, "diff", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "snapshot")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot", sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY), f.getOutputNames(), r, vars, null, start, "snapshot", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot", sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, false), f.getOutputNames(), r, vars, null, start, "snapshot", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-all", sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, true), f.getOutputNames(), r, vars, null, start, "snapshot", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "snapshot-by-key")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key", sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY), f.getOutputNames(), r, vars, null, start, "snapshot-by-key", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key", sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, false), f.getOutputNames(), r, vars, null, start, "snapshot-by-key", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key-all", sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, true), f.getOutputNames(), r, vars, null, start, "snapshot-by-key", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "snapshot-by-mustsupport")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport", sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY), f.getOutputNames(), r, vars, null, start, "snapshot-by-mustsupport", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport", sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, false), f.getOutputNames(), r, vars, null, start, "snapshot-by-mustsupport", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport-all", sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, true), f.getOutputNames(), r, vars, null, start, "snapshot-by-mustsupport", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "diff-bindings")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff-bindings", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS), f.getOutputNames(), r, vars, null, start, "diff-bindings", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff-bindings", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, false), f.getOutputNames(), r, vars, null, start, "diff-bindings", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff-bindings-all", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, true), f.getOutputNames(), r, vars, null, start, "diff-bindings", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "snapshot-bindings")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-bindings", sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS), f.getOutputNames(), r, vars, null, start, "snapshot-bindings", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-bindings", sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, false), f.getOutputNames(), r, vars, null, start, "snapshot-bindings", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-bindings-all", sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, true), f.getOutputNames(), r, vars, null, start, "snapshot-bindings", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "snapshot-by-key-bindings")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key-bindings", sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS), f.getOutputNames(), r, vars, null, start, "snapshot-by-key-bindings", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key-bindings", sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, false), f.getOutputNames(), r, vars, null, start, "snapshot-by-key-bindings", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key-bindings-all", sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, true), f.getOutputNames(), r, vars, null, start, "snapshot-by-key-bindings", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "snapshot-by-mustsupport-bindings")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport-bindings", sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS), f.getOutputNames(), r, vars, null, start, "snapshot-by-mustsupport-bindings", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport-bindings", sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, false), f.getOutputNames(), r, vars, null, start, "snapshot-by-mustsupport-bindings", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport-bindings-all", sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, true), f.getOutputNames(), r, vars, null, start, "snapshot-by-mustsupport-bindings", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "diff-obligations")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff-obligations", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS), f.getOutputNames(), r, vars, null, start, "diff-obligations", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff-obligations", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, false), f.getOutputNames(), r, vars, null, start, "diff-obligations", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff-obligations-all", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, true), f.getOutputNames(), r, vars, null, start, "diff-obligations", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "snapshot-obligations")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-obligations", sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS), f.getOutputNames(), r, vars, null, start, "snapshot-obligations", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-obligations", sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, false), f.getOutputNames(), r, vars, null, start, "snapshot-obligations", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-obligations-all", sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, true), f.getOutputNames(), r, vars, null, start, "snapshot-obligations", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "snapshot-by-key-obligations")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key-obligations", sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS), f.getOutputNames(), r, vars, null, start, "snapshot-by-key-obligations", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key-obligations", sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, false), f.getOutputNames(), r, vars, null, start, "snapshot-by-key-obligations", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key-obligations-all", sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, true), f.getOutputNames(), r, vars, null, start, "snapshot-by-key-obligations", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "snapshot-by-mustsupport-obligations")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport-obligations", sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS), f.getOutputNames(), r, vars, null, start, "snapshot-by-mustsupport-obligations", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport-obligations", sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, false), f.getOutputNames(), r, vars, null, start, "snapshot-by-mustsupport-obligations", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport-obligations-all", sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, true), f.getOutputNames(), r, vars, null, start, "snapshot-by-mustsupport-obligations", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "expansion")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-expansion", sdr.expansion(igpkp.getDefinitionsName(r), otherFilesRun), f.getOutputNames(), r, vars, null, start, "expansion", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-expansion", sdr.expansion(igpkp.getDefinitionsName(r), otherFilesRun, "x"), f.getOutputNames(), r, vars, null, start, "expansion", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "grid")) {
       long start = System.currentTimeMillis();
@@ -11997,11 +12083,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-typename", sdr.typeName(), f.getOutputNames(), r, vars, null, start, "-typename", "StructureDefinition");
     if (sd.getDerivation() == TypeDerivationRule.CONSTRAINT && igpkp.wantGen(r, "span")) {
       start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-span", sdr.span(true, igpkp.getCanonical(), otherFilesRun), f.getOutputNames(), r, vars, null, start, "span", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-span", sdr.span(true, igpkp.getCanonical(), otherFilesRun, "sp"), f.getOutputNames(), r, vars, null, start, "span", "StructureDefinition");
     }
     if (sd.getDerivation() == TypeDerivationRule.CONSTRAINT && igpkp.wantGen(r, "spanall")) {
       start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-spanall", sdr.span(true, igpkp.getCanonical(), otherFilesRun), f.getOutputNames(), r, vars, null, start, "spanall", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-spanall", sdr.span(true, igpkp.getCanonical(), otherFilesRun, "spall"), f.getOutputNames(), r, vars, null, start, "spanall", "StructureDefinition");
     }
 
     if (igpkp.wantGen(r, "example-list")) {
@@ -12178,7 +12264,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private void generateOutputsExampleScenario(FetchedFile f, FetchedResource r, ExampleScenario scen, Map<String,String> vars, String prefixForContainer) throws Exception {
-    ExampleScenarioRenderer er = new ExampleScenarioRenderer(context, checkAppendSlash(specPath), scen, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, rc.copy().setDefinitionsTarget(igpkp.getDefinitionsName(r)), versionToAnnotate);
+    ExampleScenarioRenderer er = new ExampleScenarioRenderer(context, checkAppendSlash(specPath), scen, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, rc.copy(false).setDefinitionsTarget(igpkp.getDefinitionsName(r)), versionToAnnotate);
     if (igpkp.wantGen(r, "actor-table")) {
       long start = System.currentTimeMillis();
       fragment("ExampleScenario-"+prefixForContainer+scen.getId()+"-actor-table", er.render(ExampleScenarioRendererMode.ACTORS), f.getOutputNames(), r, vars, null, start, "actor-table", "ExampleScenario");
@@ -12198,7 +12284,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private void generateOutputsQuestionnaire(FetchedFile f, FetchedResource r, Questionnaire q, Map<String,String> vars, String prefixForContainer) throws Exception {
-    QuestionnaireRenderer qr = new QuestionnaireRenderer(context, checkAppendSlash(specPath), q, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, rc.copy().setDefinitionsTarget(igpkp.getDefinitionsName(r)), versionToAnnotate);
+    QuestionnaireRenderer qr = new QuestionnaireRenderer(context, checkAppendSlash(specPath), q, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, rc.copy(false).setDefinitionsTarget(igpkp.getDefinitionsName(r)), versionToAnnotate);
     if (igpkp.wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
       fragment("Questionnaire-"+prefixForContainer+q.getId()+"-summary", qr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary", "Questionnaire");
@@ -12261,7 +12347,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private void generateOutputsQuestionnaireResponse(FetchedFile f, FetchedResource r, Map<String,String> vars, String prefixForContainer) throws Exception {
-    RenderingContext lrc = rc.copy().setParser(getTypeLoader(f, r));
+    RenderingContext lrc = rc.copy(false).setParser(getTypeLoader(f, r));
     String qu = getQuestionnaireURL(r);
     if (qu != null) {
       Questionnaire q = context.fetchResource(Questionnaire.class, qu);
@@ -12315,15 +12401,14 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       // bundles are difficult and complicated. 
       //      if (true) {
       //        RenderingContext lrc = rc.copy().setParser(getTypeLoader(f, r));
-      //        return new BundleRenderer(lrc).render(new ElementWrappers.ResourceWrapperMetaElement(lrc, r.getElement()));
+      //        return new BundleRenderer(lrc).render(ResourceElement.forResource(lrc, r.getElement()));
       //      }
       if (r.getResource() != null && r.getResource() instanceof Bundle) {
-        RenderingContext lrc = rc.copy().setParser(getTypeLoader(f, r));
+        RenderingContext lrc = rc.copy(false).setParser(getTypeLoader(f, r));
         Bundle b = (Bundle) r.getResource();
         BundleRenderer br = new BundleRenderer(lrc);
         if (br.canRender(b)) {
-          br.setRcontext(new ResourceContext(null, b));
-          return br.render(b);
+          return br.buildNarrative(ResourceWrapper.forResource(rc, b));
         }
       }
     }
@@ -12334,11 +12419,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
     if (r.getResource() != null && r.getResource() instanceof Parameters) {
       Parameters p = (Parameters) r.getResource();
-      return new ParametersRenderer(rc, new ResourceContext(null, p)).render(p);
+      return new ParametersRenderer(rc).buildNarrative(ResourceWrapper.forResource(rc, p));
     }
     if (r.fhirType().equals("Parameters")) {
-      RenderingContext lrc = rc.copy().setParser(getTypeLoader(f, r));
-      return new ParametersRenderer(lrc, new ResourceContext(null, r.getElement())).render(new ElementWrappers.ResourceWrapperMetaElement(lrc, r.getElement()));
+      RenderingContext lrc = rc.copy(false).setParser(getTypeLoader(f, r));
+      return new ParametersRenderer(lrc).buildNarrative(ResourceWrapper.forResource(lrc, r.getElement()));
     } else {
       return getHtmlForResource(r.getElement());
     }
@@ -12352,14 +12437,14 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
     if (resource instanceof Bundle) {
       Bundle b = (Bundle) resource;
-      return new BundleRenderer(rc).render(b);
+      return new BundleRenderer(rc).buildNarrative(ResourceWrapper.forResource(rc, b));
     }
     if (resource instanceof Parameters) {
       Parameters p = (Parameters) resource;
-      return new ParametersRenderer(rc, new ResourceContext(null, p)).render(p);
+      return new ParametersRenderer(rc).buildNarrative(ResourceWrapper.forResource(rc, p));
     }
-    RenderingContext lrc = rc.copy().setParser(getTypeLoader(f, r));
-    return RendererFactory.factory(resource, lrc).build(resource);
+    RenderingContext lrc = rc.copy(false).setParser(getTypeLoader(f, r));
+    return RendererFactory.factory(resource, lrc).buildNarrative(ResourceWrapper.forResource(rc, resource));
   }
 
 
@@ -12918,6 +13003,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       }
       self.setTxServer(CliParams.getNamedParam(args, "-tx"));
       self.setPackagesFolder(CliParams.getNamedParam(args, "-packages"));
+
+      if (CliParams.hasNamedParam(args, "-force-language")) {
+        self.setForcedLanguage(CliParams.getNamedParam(args,"-force-language"));
+      }
+
       if (CliParams.hasNamedParam(args, "-watch")) {
         throw new Error("Watch mode (-watch) is no longer supported");
       }
@@ -12975,6 +13065,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (!CliParams.hasNamedParam(args, "-no-exit")) {
       System.exit(exitCode);
     }
+  }
+
+  private void setForcedLanguage(String language) {
+    this.forcedLanguage = new Locale(language);
   }
 
   public static String getAbsoluteConfigFilePath(String configFilePath) throws IOException {
@@ -13419,11 +13513,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       throw new Exception("Building IG '"+path+"' caused an error");
     }
 
-  }
-
-  @Override
-  public String urlForContained(RenderingContext context, String containingType, String containingId, String containedType, String containedId) {
-    return null;
   }
 
   public long getMaxMemory() {

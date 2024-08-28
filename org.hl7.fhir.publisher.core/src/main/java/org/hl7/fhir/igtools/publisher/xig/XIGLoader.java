@@ -2,7 +2,6 @@ package org.hl7.fhir.igtools.publisher.xig;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -56,7 +55,7 @@ public class XIGLoader implements IPackageVisitorProcessor {
 
     SpecMapManager smm = smmList.get(pid);
     if (smm == null) {
-      smm = npm.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.fhirVersion()) : SpecMapManager.createSpecialPackage(npm);
+      smm = npm.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.fhirVersion()) : SpecMapManager.createSpecialPackage(npm, null);
       smm.setName(npm.name());
       smm.setBase(npm.canonical());
       smm.setBase2(PackageHacker.fixPackageUrl(npm.url()));

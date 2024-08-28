@@ -31,4 +31,6 @@ public interface IPublisherModule {
 
   // approve the generation of a fragment - mainly for performance reasons
   boolean approveFragment(boolean value, String code);
+
+  boolean isNoNarrative();
 }

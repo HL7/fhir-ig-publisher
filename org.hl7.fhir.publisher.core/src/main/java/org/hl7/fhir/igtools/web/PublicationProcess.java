@@ -29,6 +29,7 @@ import org.hl7.fhir.utilities.ZipGenerator;
 import org.hl7.fhir.utilities.json.JsonException;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonObject;
+import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageList;
@@ -213,6 +214,17 @@ public class PublicationProcess {
     String version = npm.version();
     if (!check(res, version != null, "Source Package has no version")) {
       return res;
+    }
+    JsonObject json = JsonParser.parseObject(npm.load("package", "package.json"));
+    JsonObject dep = json.getJsonObject("dependencies");
+    if (dep != null) {
+      for (JsonProperty jp : dep.getProperties()) {
+        String ver = jp.getValue().asJsonString().getValue();
+        if ("current".equals(ver) || "dev".equals(ver)) {
+          check(res, false, "Package "+json.asString("name")+"#"+json.asString("version")+" depends on "+jp.getName()+"#"+ver+" which is not allowed (current version check)");
+          return res;
+        }
+      }
     }
 
     // --- Rules for layout depend on publisher ------

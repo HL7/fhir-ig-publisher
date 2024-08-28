@@ -26,7 +26,7 @@ public class XIGNamingSystemHandler extends XIGHandler {
       j.add("kind", ns.getKind().toCode()); 
     }
     if (ns.hasType()) {    
-      j.add("type", new DataRenderer(info.getCtxt()).display(ns.getType()));
+      j.add("type", new DataRenderer(info.getCtxt()).displayDataType(ns.getType()));
       for (Coding t : ns.getType().getCoding()) {
         info.getNspr().add(t.getCode());
       }

@@ -44,6 +44,7 @@ import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.PackageInformation;
 import org.hl7.fhir.r5.model.PrimitiveType;
 import org.hl7.fhir.r5.model.Quantity;
+import org.hl7.fhir.r5.model.SearchParameter;
 import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
@@ -57,7 +58,9 @@ import org.hl7.fhir.r5.profilemodel.PEDefinition;
 import org.hl7.fhir.r5.profilemodel.PEType;
 import org.hl7.fhir.r5.renderers.AdditionalBindingsRenderer;
 import org.hl7.fhir.r5.renderers.DataRenderer;
+import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.StructureDefinitionRendererMode;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities.SystemReference;
@@ -120,6 +123,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   private String specPath;
 
   private org.hl7.fhir.r5.renderers.StructureDefinitionRenderer sdr;
+  private ResourceWrapper resE;
 
   public StructureDefinitionRenderer(IWorkerContext context, String corePath, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants,Map<String, Map<String, ElementDefinition>> mapCache, String specPath, String versionToAnnotate) {
     super(context, corePath, sd, destDir, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate);
@@ -133,9 +137,10 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     sdr.setSdMapCache(sdMapCache);
     sdr.setHostMd(this);
     this.specPath = specPath;
+    this.resE = ResourceWrapper.forResource(gen.getContextUtilities(), sd);
   }
 
-  public String summary() {
+  public String summary(boolean all) {
     try {
       if (sd.hasExtension(ToolingExtensions.EXT_SUMMARY)) {
         return processMarkdown("Profile Summary", (PrimitiveType) sd.getExtensionByUrl(ToolingExtensions.EXT_SUMMARY).getValue());
@@ -198,7 +203,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           }
         }
       }
-      StringBuilder res = new StringBuilder("<a name=\"summary\"> </a>\r\n<p><b>\r\n" + (gen.formatPhrase(RenderingContext.GENERAL_SUMM)) + "\r\n</b></p>\r\n");
+      StringBuilder res = new StringBuilder("<a name=\""+(all ? "a" : "s")+"-summary\"> </a>\r\n<p><b>\r\n" + (gen.formatPhrase(RenderingContext.GENERAL_SUMM)) + "\r\n</b></p>\r\n");      
       if (ToolingExtensions.hasExtension(sd, ToolingExtensions.EXT_SUMMARY)) {
         Extension v = ToolingExtensions.getExtension(sd, ToolingExtensions.EXT_SUMMARY);
         res.append(processMarkdown("Profile.summary", (PrimitiveType) v.getValue()));
@@ -464,25 +469,25 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
   }
 
-  public String diff(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
+  public String diff(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode, boolean all) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
     if (sd.getDifferential().getElement().isEmpty())
       return "";
     else {
       sdr.getContext().setStructureMode(mode);
-      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(defnFile, sd, true, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen, toTabs ? ANCHOR_PREFIX_DIFF : ANCHOR_PREFIX_SNAP));
+      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, true, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? "da" : "d"), toTabs ? ANCHOR_PREFIX_DIFF : ANCHOR_PREFIX_SNAP, resE));
     }
   }
 
-  public String snapshot(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
+  public String snapshot(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode, boolean all) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
     if (sd.getSnapshot().getElement().isEmpty())
       return "";
     else {
       sdr.getContext().setStructureMode(mode);
-      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen, toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP));
+      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? "sa" : null), toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP, resE));
     }
   }
 
-  public String byKey(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
+  public String byKey(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode, boolean all) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
     if (sd.getSnapshot().getElement().isEmpty())
       return "";
     else {
@@ -491,13 +496,13 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       
       sdCopy.getSnapshot().setElement(getKeyElements());
       sdr.getContext().setStructureMode(mode);
-      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, true, gen, toTabs ? ANCHOR_PREFIX_KEY : ANCHOR_PREFIX_SNAP);
+      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(new RenderingStatus(), defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, true, gen.withUniqueLocalPrefix(all ? "ka" :"k"), toTabs ? ANCHOR_PREFIX_KEY : ANCHOR_PREFIX_SNAP, resE);
 
       return composer.compose(table);
     }
   }
 
-  public String byMustSupport(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
+  public String byMustSupport(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode, boolean all) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
     if (sd.getSnapshot().getElement().isEmpty())
       return "";
     else {
@@ -506,7 +511,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       sdr.getContext().setStructureMode(mode);
 
       sdCopy.getSnapshot().setElement(getMustSupportElements());
-      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, true, gen, toTabs ? ANCHOR_PREFIX_MS : ANCHOR_PREFIX_SNAP);
+      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(new RenderingStatus(), defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, true, gen.withUniqueLocalPrefix(all ? "ma" :"m"), toTabs ? ANCHOR_PREFIX_MS : ANCHOR_PREFIX_SNAP, resE);
 
       return composer.compose(table);
     }
@@ -549,7 +554,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       List<ElementDefinition> keyElements = getKeyElements();
 
       sdCopy.getSnapshot().setElement(keyElements);
-      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, true, gen, ANCHOR_PREFIX_KEY);
+      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(new RenderingStatus(), defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, true, gen, ANCHOR_PREFIX_KEY, resE);
 
       return composer.compose(table);
     }
@@ -1102,7 +1107,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
     List<ElementDefinition> elements = elementsForMode(mode);
 
-    sdr.renderDict(sd, elements, t, incProfiledOut, mode, anchorPrefix);
+    sdr.renderDict(new RenderingStatus(), sd, elements, t, incProfiledOut, mode, anchorPrefix, resE);
     
     return new XhtmlComposer(false, false).compose(x.getChildNodes());
   }
@@ -1318,7 +1323,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   private String renderDate(DateTimeType date) {
-    return new DataRenderer(gen).display(date);
+    return new DataRenderer(gen).displayDataType(date);
   }
 
   public String uses() throws Exception {
@@ -1508,8 +1513,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return b.toString();
   }
 
-  public String span(boolean onlyConstraints, String canonical, Set<String> outputTracker) throws IOException, FHIRException {
-    return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateSpanningTable(sd, destDir, onlyConstraints, canonical, outputTracker));
+  public String span(boolean onlyConstraints, String canonical, Set<String> outputTracker, String anchorPrefix) throws IOException, FHIRException {
+    return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateSpanningTable(sd, destDir, onlyConstraints, canonical, outputTracker, anchorPrefix));
   }
 
   public String pseudoJson() throws Exception {
@@ -2027,6 +2032,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     Map<String, String> refs = new HashMap<>();
     Map<String, String> trefs = new HashMap<>();
     Map<String, String> examples = new HashMap<>();
+    Map<String, String> searches = new HashMap<>();
     for (StructureDefinition sdt : context.fetchResourcesByType(StructureDefinition.class)) {
       if (refersToThisSD(sdt.getBaseDefinition())) {
         base.put(sdt.getWebPath(), sdt.present());
@@ -2080,6 +2086,13 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     for (FetchedFile f : files) {
       for (FetchedResource r : f.getResources()) {
         if (!r.fhirType().equals("ImplementationGuide")) {
+          if (r.fhirType().equals("SearchParameter")) {
+            SearchParameter sp = (SearchParameter) r.getResource();
+            String exp = sp.getExpression();
+            if (exp.contains("extension('"+sd.getUrl()+"')")) {
+              searches.put(igp.getLinkFor(r, true), r.getTitle());
+            }
+          }
           if (usesSD(r.getElement())) {
             String p = igp.getLinkFor(r, true);
             if (p != null) {
@@ -2119,12 +2132,18 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (!compliedWith.isEmpty()) {
       b.append(" <li>Comply with this profile " + type + ": " + refList(compliedWith, "compliedWith") + "</li>\r\n");
     }
-    if (!refs.isEmpty())
+    if (!refs.isEmpty()) {
       b.append(" <li>Use this " + type + ": " + refList(refs, "ref") + "</li>\r\n");
-    if (!trefs.isEmpty())
+    }
+    if (!trefs.isEmpty()) {
       b.append(" <li>Refer to this " + type + ": " + refList(trefs, "tref") + "</li>\r\n");
-    if (!examples.isEmpty())
+    }
+    if (!examples.isEmpty()) {
       b.append(" <li>Examples for this " + type + ": " + refList(examples, "ex") + "</li>\r\n");
+    }
+    if (!searches.isEmpty()) {
+      b.append(" <li>Search Parameters using this " + type + ": " + refList(searches, "sp") + "</li>\r\n");
+    }
     if (base.isEmpty() && refs.isEmpty() && trefs.isEmpty() && examples.isEmpty() & invoked.isEmpty() && imposed.isEmpty() && compliedWith.isEmpty()) {
       b.append(" <li>This " + type + " is not used by any profiles in this Implementation Guide</li>\r\n");
     }
@@ -2251,9 +2270,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return b.toString();
   }
 
-  public String expansion(String definitionsName, Set<String> otherFilesRun) throws IOException {
+  public String expansion(String definitionsName, Set<String> otherFilesRun, String anchorPrefix) throws IOException {
     PEBuilder pe = context.getProfiledElementBuilder(PEElementPropertiesPolicy.NONE, true);
-    HierarchicalTableGenerator gen = new HierarchicalTableGenerator(this.gen, destDir, true, true);
+    HierarchicalTableGenerator gen = new HierarchicalTableGenerator(this.gen, destDir, true, true, anchorPrefix);
 
     TableModel model = gen.initNormalTable(corePath, false, true, sd.getId()+"x", true, TableGenerationMode.XHTML);
     XhtmlNode x = null;
@@ -2350,7 +2369,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
 
     // description
-    sdr.generateDescription(gen, row, element.definition(), null, true, context.getSpecUrl(), null, sd, context.getSpecUrl(), destDir, false, false, allInvariants, true, false, false, sdr.getContext());
+    sdr.generateDescription(new RenderingStatus(), gen, row, element.definition(), null, true, context.getSpecUrl(), null, sd, context.getSpecUrl(), destDir, false, false, allInvariants, true, false, false, sdr.getContext(), resE);
 
     if (element.types().size() == 1) {
       PEType t = element.types().get(0);
@@ -2431,5 +2450,16 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   public String compareImposes(StructureDefinition sdi) {
     return "todo";
+  }
+
+  public String experimentalWarning() {
+    if (sd.getExperimental()) {
+      return "<div><div style=\"border: 1px solid maroon; padding: 10px; background-color: #fffbf7; min-height: 160px;\">\r\n"+
+             "<img src=\"assets/images/dragon.png\" width=\"150\" style=\"float:left; mix-blend-mode: multiply; margin-right: 10px;\" title=\"Here Be Dragons!\" height=\"150\"/>\r\n"+
+             "<p><b>This is an experimental extension definition; the committee is seeking implementation feedback, and the " + 
+             "definition or contents of the extension may change in future versions.</b></p></div></div>";
+    } else {
+      return "";
+    }
   }
 }

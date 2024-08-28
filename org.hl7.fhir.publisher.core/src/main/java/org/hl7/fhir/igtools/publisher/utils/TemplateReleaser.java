@@ -541,7 +541,7 @@ public class TemplateReleaser {
   }
 
   private void saveXml(FileOutputStream stream) throws TransformerException, IOException {
-    TransformerFactory factory = TransformerFactory.newInstance();
+    TransformerFactory factory = org.hl7.fhir.utilities.xml.XMLUtil.newXXEProtectedTransformerFactory();
     Transformer transformer = factory.newTransformer();
     Result result = new StreamResult(stream);
     Source source = new DOMSource(rss);

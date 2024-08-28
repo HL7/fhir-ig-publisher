@@ -13,7 +13,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -62,6 +61,8 @@ public class AllGuidesTests {
     pub.execute();
     
     System.out.println("===== Analysis ======================================================================");
+    System.out.println("-- output in "+Utilities.path(FhirSettings.getTestIgsPath(), "actual", id+".json")+" --");
+    
     // to make diff programs easy to run
     IOUtils.copy(new FileInputStream(Utilities.path(FhirSettings.getTestIgsPath(), id, "output", "qa.json")), new FileOutputStream(Utilities.path(FhirSettings.getTestIgsPath(), "actual", id+".json")));
     IOUtils.copy(new FileInputStream(Utilities.path(FhirSettings.getTestIgsPath(), id, "output", "qa.compare.txt")), new FileOutputStream(Utilities.path(FhirSettings.getTestIgsPath(), "actual", id+".txt")));
@@ -173,7 +174,7 @@ public class AllGuidesTests {
     System.out.println(name+": "+usedMemory);
   }
 
-  //---- todo: this class is only run by Grahame, so these ahts are hard-coded
+  //---- todo: this class is only run by Grahame, so these paths are hard-coded
   
   private File syncDateFile() {
     return new File("/Users/grahamegrieve/work/test-igs/date.txt");

@@ -32,7 +32,6 @@ import java.util.Comparator;
 import java.util.List;
 
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.igtools.publisher.SimpleFetcher.FetchedFileSorter;
 import org.hl7.fhir.r5.context.ILoggingService;
 import org.hl7.fhir.r5.context.ILoggingService.LogCategory;
 import org.hl7.fhir.r5.context.IWorkerContext;
@@ -126,7 +125,7 @@ public class SimpleFetcher implements IFetchFile {
   }
 
   private boolean isIgnoredFile(String name) {
-    return name.startsWith(".");
+    return name.startsWith(".") || Utilities.existsInList(Utilities.getFileExtension(name), "ini");
   }
 
   @Override
@@ -429,7 +428,7 @@ public class SimpleFetcher implements IFetchFile {
   }
 
   private void addFile(List<FetchedFile> res, File f, org.hl7.fhir.r5.elementmodel.Element e, String cnt) throws IOException {
-    if (!e.fhirType().equals("ImplementationGuide")) {
+    if (!e.fhirType().equals("ImplementationGuide") && !(f.getName().startsWith("Binary") && !"Binary".equals(e.fhirType()))) {
       addFile(res, f, cnt);
     }
   }

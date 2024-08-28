@@ -49,4 +49,9 @@ public class NullModule implements IPublisherModule {
     return value;
   }
 
+  @Override
+  public boolean isNoNarrative() {
+    return false;
+  }
+
 }
