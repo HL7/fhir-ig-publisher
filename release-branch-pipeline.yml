@@ -23,6 +23,16 @@ steps:
             exit 1
       fi
 
+  # This task checks to ensure there are no snapshot dependencies in the project
+  - task: Maven@3
+    inputs:
+      mavenPomFile: 'pom.xml'
+      options: '-DcheckForSnapshotDependencies'
+      javaHomeOption: 'JDKVersion'
+      jdkVersionOption: '1.11'
+      jdkArchitectureOption: 'x64'
+      publishJUnitResults: false
+      goals: 'enforcer:enforce'
   # This task pulls the <version> value from the pom.xml file, so we can set it to the variable $version
   - task: PowerShell@2
     inputs:
