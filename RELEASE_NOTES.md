@@ -1,0 +1,1 @@
+* Update to stable org.hl7.fhir.core (6.3.23)
