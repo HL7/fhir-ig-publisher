@@ -14,7 +14,7 @@ jobs:
 
         steps:
           # Runs 'mvn install'
-          - task: Maven@3
+          - task: Maven@4
             inputs:
               mavenPomFile: 'pom.xml'
               mavenOptions: '-Xmx3072m'
@@ -26,7 +26,7 @@ jobs:
               goals: 'install'
 
           # Runs 'mvn exec to test that cli runs'
-          - task: Maven@3
+          - task: Maven@4
             inputs:
               mavenPomFile: 'pom.xml'
               mavenOptions: '-Xmx3072m'

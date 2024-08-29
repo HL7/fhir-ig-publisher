@@ -24,7 +24,7 @@ steps:
       fi
 
   # This task checks to ensure there are no snapshot dependencies in the project
-  - task: Maven@3
+  - task: Maven@4
     inputs:
       mavenPomFile: 'pom.xml'
       options: '-DcheckForSnapshotDependencies'
@@ -85,7 +85,7 @@ steps:
     displayName: 'Create .mvn/settings.xml'
 
   # Runs 'mvn package'
-  - task: Maven@3
+  - task: Maven@4
     inputs:
       mavenPomFile: 'pom.xml'
       mavenOptions: '-Xmx3072m'
