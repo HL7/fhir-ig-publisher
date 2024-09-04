@@ -37,9 +37,11 @@ public class JsonXhtmlRenderer implements JsonCreator {
   
   private class LevelInfo {
     private boolean started;
+    private boolean inEllipse;
     private boolean isArr;
     public LevelInfo(boolean isArr) {
       super();
+      this.inEllipse = false;
       this.started = false;
       this.isArr = isArr;
     }
@@ -69,9 +71,9 @@ public class JsonXhtmlRenderer implements JsonCreator {
     if (b == null) {
       b = new StringBuilder();
       if (prism) {
-        b.append("<pre class=\"json\" style=\"white-space: pre; text-wrap: nowrap;\"><code class=\"language-json\" style=\"white-space: pre; text-wrap: nowrap;\">\r\n");
+        b.append("<pre class=\"json\" style=\"white-space: pre; text-wrap: nowrap; width: auto;\"><code class=\"language-json\" style=\"white-space: pre; text-wrap: nowrap;\">");
       } else {
-        b.append("<pre class=\"json\" style=\"white-space: pre; text-wrap: nowrap;\"><code style=\"white-space: pre; text-wrap: nowrap;\">\r\n");
+        b.append("<pre class=\"json\" style=\"white-space: pre; text-wrap: nowrap; width: auto;\"><code style=\"white-space: pre; text-wrap: nowrap;\">");
       }
     }
     commitComments();
@@ -109,11 +111,14 @@ public class JsonXhtmlRenderer implements JsonCreator {
       throw new IOException("Error producing JSON: attempt to use name in an array");
     
     if (levels.get(0).started) {
-      b.append(",\r\n");
+      if (!levels.get(0).inEllipse)
+        b.append(",");
+      b.append("\r\n");
       for (int i = 0; i < levels.size(); i++) 
         b.append(indent);
     } else
       levels.get(0).started = true;
+    levels.get(0).inEllipse = false;
     b.append('"');
     if (href != null)
       b.append("<a href=\""+href+"\">");
@@ -135,11 +140,14 @@ public class JsonXhtmlRenderer implements JsonCreator {
   private void checkInArray() {
     if (levels.size() > 0 && levels.get(0).isArr) {
       if (levels.get(0).started) {
-        b.append(",\r\n");
+        if (!levels.get(0).inEllipse)
+          b.append(",");
+        b.append("\r\n");
         for (int i = 0; i < levels.size(); i++) 
           b.append(indent);
       } else
         levels.get(0).started = true;
+      levels.get(0).inEllipse = false;
     }
   }
 
@@ -219,5 +227,23 @@ public class JsonXhtmlRenderer implements JsonCreator {
     b.append("<a href=\""+Utilities.escapeXml(ref)+"\" style=\"color: Maroon\">&#x1F517;</a> ");
   }
 
-  
+  @Override
+  public void ellipse() {
+    if (levels.get(0).started) {
+      if (!levels.get(0).inEllipse)
+        b.append(",");
+      if (!b.toString().endsWith("\r\n") && !b.toString().endsWith(" "))
+        b.append("\r\n");
+    } else {
+      levels.get(0).started = true;
+      if (!b.toString().endsWith("\r\n") && !b.toString().endsWith(" "))
+        b.append("\r\n");
+    }
+    levels.get(0).inEllipse = true;
+    if (!b.toString().endsWith(" ")) {
+      for (int i = 0; i < levels.size(); i++)
+        b.append(indent);
+    }
+    b.append("...");
+  }
 }
