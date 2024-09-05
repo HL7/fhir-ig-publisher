@@ -11053,11 +11053,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private String processFragment(String arguments, FetchedFile f) throws FHIRException {
     int firstSpace = arguments.indexOf(" ");
     int secondSpace = arguments.indexOf(" ",firstSpace + 1);
-    if (firstSpace == -1 || secondSpace == -1)
+    if (firstSpace == -1)
       throw new FHIRException("Fragment syntax error: syntax must be '[ResourceType]/[id] [syntax] [filters]'.  Found: " + arguments + "\r\n in file " + f.getName());
     String reference = arguments.substring(0, firstSpace);
-    String format = arguments.substring(firstSpace, secondSpace).trim().toLowerCase();
-    String filters = arguments.substring(secondSpace).trim();
+    String format = (secondSpace == -1) ? arguments.substring(firstSpace) : arguments.substring(firstSpace, secondSpace);
+    format = format.trim().toLowerCase();
+    String filters = (secondSpace == -1) ? "" : arguments.substring(secondSpace).trim();
     Pattern refPattern = Pattern.compile("^([A-Z][a-z]+)+\\/([A-Za-z0-9\\-\\.]{1,64})$");
     Matcher refMatcher = refPattern.matcher(reference);
     if (!refMatcher.find())
@@ -11079,6 +11080,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     List<EllipseExceptDetails> excepts = new ArrayList<>();
     EllipseExceptDetails currentExcept = null;
     boolean matches = filterMatcher.find();
+    if (!matches && !filters.isEmpty())
+      throw new FHIRException("Unrecognized filters in fragment: " + filters + " in file " + f.getName());
     while (matches) {
       String filterType = filterMatcher.group(0);
       String filterText = "";
