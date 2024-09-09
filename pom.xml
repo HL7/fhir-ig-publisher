@@ -2,26 +2,10 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <!--
-         A note on versions! This project depends on the org.hl7.fhir.core project
-         and uses its POM file as a base. We do this in order to get consistent import
-         versions of the various things that are pulled in from that project.
-
-         To bump the version of this project (which is versioned independently from
-         org.hl7.fhir.core) just update the <version> tag below.
-
-         If you want to bump the version of the org.hl7.fhir.core project that
-         this project depends on, make sure to do it in both the <parent>
-         tag and the <core_version> tags below.
-    -->
-
-<!--    <parent>-->
-<!--        <groupId>ca.uhn.hapi.fhir</groupId>-->
-<!--        <artifactId>org.hl7.fhir.core</artifactId>-->
-<!--        <version>5.3.14</version>-->
-<!--    </parent>-->
-
-    <version>1.6.21-SNAPSHOT</version> <!-- See the note above -->
+    <groupId>org.hl7.fhir.publisher</groupId>
+    <artifactId>org.hl7.fhir.publisher</artifactId>
+    <version>1.6.23-SNAPSHOT</version>
+    <packaging>pom</packaging>
 
     <properties>
         <core_version>6.3.24-SNAPSHOT</core_version>
@@ -37,11 +21,6 @@
         <maven.compiler.testTarget>11</maven.compiler.testTarget>
         <logback-classic.version>1.2.13</logback-classic.version>
     </properties>
-
-    <groupId>org.hl7.fhir.publisher</groupId>
-    <artifactId>org.hl7.fhir.publisher</artifactId>
-    <version>1.6.23-SNAPSHOT</version>
-    <packaging>pom</packaging>
 
     <name>HL7 FHIR IG Publisher</name>
     <description>A tool to take a set of inputs and create a standard FHIR IG</description>
@@ -81,20 +60,6 @@
         <name>Health Level 7</name>
         <url>http://hl7.org</url>
     </organization>
-    <properties>
-        <core_version>6.3.23</core_version>
-        <maven_surefire_version>3.0.0-M5</maven_surefire_version>
-        <apache_poi_version>5.2.1</apache_poi_version>
-        <okhttp.version>4.11.0</okhttp.version>
-        <junit_jupiter_version>5.7.1</junit_jupiter_version>
-        <maven.compiler.release>11</maven.compiler.release>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
-        <maven.compiler.testRelease>11</maven.compiler.testRelease>
-        <maven.compiler.testSource>11</maven.compiler.testSource>
-        <maven.compiler.testTarget>11</maven.compiler.testTarget>
-        <logback-classic.version>1.2.13</logback-classic.version>
-    </properties>
 
     <modules>
         <module>org.hl7.fhir.publisher.core</module>
