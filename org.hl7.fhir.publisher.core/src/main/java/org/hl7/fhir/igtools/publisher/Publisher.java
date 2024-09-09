@@ -2765,7 +2765,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     Boolean useStatsOptOut = null;
     List<String> extensionDomains = new ArrayList<>();
     tempDir = Utilities.path(rootDir, "temp");
-    tempLangDir = Utilities.path(rootDir, "temp", "lang");
+    tempLangDir = Utilities.path(rootDir, "translations");
     outputDir = Utilities.path(rootDir, "output");
     Map<String, String> expParamMap = new HashMap<>();
     boolean allowExtensibleWarnings = false;
