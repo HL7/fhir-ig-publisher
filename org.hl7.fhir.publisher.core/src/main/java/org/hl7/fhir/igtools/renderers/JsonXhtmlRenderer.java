@@ -37,11 +37,11 @@ public class JsonXhtmlRenderer implements JsonCreator {
   
   private class LevelInfo {
     private boolean started;
-    private boolean inEllipse;
+    private boolean inEllide;
     private boolean isArr;
     public LevelInfo(boolean isArr) {
       super();
-      this.inEllipse = false;
+      this.inEllide = false;
       this.started = false;
       this.isArr = isArr;
     }
@@ -111,14 +111,14 @@ public class JsonXhtmlRenderer implements JsonCreator {
       throw new IOException("Error producing JSON: attempt to use name in an array");
     
     if (levels.get(0).started) {
-      if (!levels.get(0).inEllipse)
+      if (!levels.get(0).inEllide)
         b.append(",");
       b.append("\r\n");
       for (int i = 0; i < levels.size(); i++) 
         b.append(indent);
     } else
       levels.get(0).started = true;
-    levels.get(0).inEllipse = false;
+    levels.get(0).inEllide = false;
     b.append('"');
     if (href != null)
       b.append("<a href=\""+href+"\">");
@@ -140,14 +140,14 @@ public class JsonXhtmlRenderer implements JsonCreator {
   private void checkInArray() {
     if (levels.size() > 0 && levels.get(0).isArr) {
       if (levels.get(0).started) {
-        if (!levels.get(0).inEllipse)
+        if (!levels.get(0).inEllide)
           b.append(",");
         b.append("\r\n");
         for (int i = 0; i < levels.size(); i++) 
           b.append(indent);
       } else
         levels.get(0).started = true;
-      levels.get(0).inEllipse = false;
+      levels.get(0).inEllide = false;
     }
   }
 
@@ -228,9 +228,12 @@ public class JsonXhtmlRenderer implements JsonCreator {
   }
 
   @Override
-  public void ellipse() {
+  public boolean canEllide() { return true; }
+
+  @Override
+  public void ellide() {
     if (levels.get(0).started) {
-      if (!levels.get(0).inEllipse)
+      if (!levels.get(0).inEllide)
         b.append(",");
       if (!b.toString().endsWith("\r\n") && !b.toString().endsWith(" "))
         b.append("\r\n");
@@ -239,7 +242,7 @@ public class JsonXhtmlRenderer implements JsonCreator {
       if (!b.toString().endsWith("\r\n") && !b.toString().endsWith(" "))
         b.append("\r\n");
     }
-    levels.get(0).inEllipse = true;
+    levels.get(0).inEllide = true;
     if (!b.toString().endsWith(" ")) {
       for (int i = 0; i < levels.size(); i++)
         b.append(indent);

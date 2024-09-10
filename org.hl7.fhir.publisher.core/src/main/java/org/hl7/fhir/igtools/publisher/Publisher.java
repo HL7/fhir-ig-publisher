@@ -667,11 +667,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
   }
 
-  public class EllipseExceptDetails {
+  public class EllideExceptDetails {
     private String base = null;
     private String except = null;
 
-    public EllipseExceptDetails(String except) {
+    public EllideExceptDetails(String except) {
       this.except = except;
     }
 
@@ -10636,7 +10636,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
   }
 
-  private String generateResourceFragment(FetchedFile f, FetchedResource r, String fragExpr, String syntax, List<EllipseExceptDetails> excepts, List<String> ellipses) throws FHIRException {
+  private String generateResourceFragment(FetchedFile f, FetchedResource r, String fragExpr, String syntax, List<EllideExceptDetails> excepts, List<String> ellides) throws FHIRException {
     FHIRPathEngine fpe = new FHIRPathEngine(context);
     Base root = r.getElement();
     if (r.getLogicalElement()!=null)
@@ -10663,53 +10663,53 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     Element e = (Element)fragNodes.get(0);
     Element jsonElement = e;
 
-    if (!ellipses.isEmpty() || !excepts.isEmpty()) {
+    if (!ellides.isEmpty() || !excepts.isEmpty()) {
 //        e = e.copy();
-      for (EllipseExceptDetails ellipseExceptDetails : excepts) {
+      for (EllideExceptDetails ellideExceptDetails : excepts) {
         List<Base> baseElements = new ArrayList<Base>();
         baseElements.add(e);
-        String ellipseBaseExpr = null;
-        if (ellipseExceptDetails.hasBase()) {
-          ellipseBaseExpr = ellipseExceptDetails.getBase();
-          baseElements = fpe.evaluate(e, ellipseBaseExpr);
+        String ellideBaseExpr = null;
+        if (ellideExceptDetails.hasBase()) {
+          ellideBaseExpr = ellideExceptDetails.getBase();
+          baseElements = fpe.evaluate(e, ellideBaseExpr);
           if (baseElements.isEmpty()) {
-            f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, fragExpr, "Unable to find matching base elements for ellipseExcept expression " + ellipseBaseExpr + " within fragment path ", IssueSeverity.ERROR));
+            f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, fragExpr, "Unable to find matching base elements for ellideExcept expression " + ellideBaseExpr + " within fragment path ", IssueSeverity.ERROR));
             return "ERROR Expanding Fragment";
           }
         }
 
-        String ellipseExceptExpr = ellipseExceptDetails.getExcept();
+        String ellideExceptExpr = ellideExceptDetails.getExcept();
         boolean foundExclude = false;
-        for (Base ellipseElement: baseElements) {
-          for (Element child: ((Element)ellipseElement).getChildren()) {
-            child.setEllipsed(true);
+        for (Base ellideElement: baseElements) {
+          for (Element child: ((Element)ellideElement).getChildren()) {
+            child.setEllided(true);
           }
-          List<Base> ellipseExceptElements = fpe.evaluate(ellipseElement, ellipseExceptExpr);
-          if (!ellipseExceptElements.isEmpty())
+          List<Base> ellideExceptElements = fpe.evaluate(ellideElement, ellideExceptExpr);
+          if (!ellideExceptElements.isEmpty())
             foundExclude = true;
-          for (Base exclude: ellipseExceptElements) {
-            ((Element)exclude).setEllipsed(false);
+          for (Base exclude: ellideExceptElements) {
+            ((Element)exclude).setEllided(false);
           }
         }
         if (!foundExclude) {
-          f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, fragExpr, "Unable to find matching exclude elements for ellipseExcept expression " + ellipseExceptExpr + (ellipseBaseExpr == null ? "": (" within base" + ellipseBaseExpr)) + " within fragment path ", IssueSeverity.ERROR));
+          f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, fragExpr, "Unable to find matching exclude elements for ellideExcept expression " + ellideExceptExpr + (ellideBaseExpr == null ? "": (" within base" + ellideBaseExpr)) + " within fragment path ", IssueSeverity.ERROR));
           return "ERROR Expanding Fragment";
         }
       }
 
-      for (String ellipseExpr : ellipses) {
-        List<Base> ellipseElements = fpe.evaluate(e, ellipseExpr);
-        if (ellipseElements.isEmpty()) {
-          f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, fragExpr, "Unable to find matching elements for ellipse expression " + ellipseExpr + " within fragment path ", IssueSeverity.ERROR));
+      for (String ellideExpr : ellides) {
+        List<Base> ellideElements = fpe.evaluate(e, ellideExpr);
+        if (ellideElements.isEmpty()) {
+          f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, fragExpr, "Unable to find matching elements for ellide expression " + ellideExpr + " within fragment path ", IssueSeverity.ERROR));
           return "ERROR Expanding Fragment";
         }
-        for (Base ellipseElment: ellipseElements) {
-          ((Element)ellipseElment).setEllipsed(true);
+        for (Base ellideElment: ellideElements) {
+          ((Element)ellideElment).setEllided(true);
         }
       }
 
-      jsonElement = trimEllipsed(e, true);
-      e = trimEllipsed(e, false);
+      jsonElement = trimEllided(e, true);
+      e = trimEllided(e, false);
     }
 
     try {
@@ -10717,7 +10717,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         org.hl7.fhir.r5.elementmodel.XmlParser xp = new org.hl7.fhir.r5.elementmodel.XmlParser(context);
         XmlXHtmlRenderer x = new XmlXHtmlRenderer();
         x.setPrism(true);
-        xp.setEllipseElements(true);
+        xp.setEllideElements(true);
         xp.setLinkResolver(igpkp);
         xp.setShowDecorations(false);
         if (suppressId(f, r)) {
@@ -10732,9 +10732,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(context);
         jp.setLinkResolver(igpkp);
         jp.setAllowComments(true);
-        jp.setEllipseElements(true);
-        if (fragExpr != null || r.getLogicalElement() != null)
-          jp.setSuppressResourceType(true);
+        jp.setEllideElements(true);
+/*        if (fragExpr != null || r.getLogicalElement() != null)
+          jp.setSuppressResourceType(true);*/
         if (suppressId(f, r)) {
           jp.setIdPolicy(IdRenderingPolicy.NotRoot);
         }
@@ -10758,180 +10758,36 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
   }
 
-
-/*  private void generateResourceFragments(FetchedFile f, FetchedResource r, long start) throws Exception {
-    boolean doXml = true;
-    boolean doJson = true;
-    boolean doTurtle = true;
-    if (r.getResEntry().hasExtension("http://hl7.org/fhir/tools/StructureDefinition/implementationguide-resource-format"))
-      switch (r.getResEntry().getExtensionByUrl("http://hl7.org/fhir/tools/StructureDefinition/implementationguide-resource-format").getValueCodeType().toString()) {
-        case "application/json":
-          doXml = false;
-          doTurtle = false;
-          break;
-        case "application/xml":
-          doJson = false;
-          doTurtle = false;
-          break;
-        case "application/turtle":
-          doJson = false;
-          doXml = false;
-          break;
-
-      }
-
-    for (Extension fragExt: r.getResEntry().getExtensionsByUrl("http://hl7.org/fhir/tools/StructureDefinition/implementationguide-resource-fragment")) {
-      String fragId = fragExt.getExtensionString("id");
-      String fragExpr = fragExt.getExtensionString("base");
-      FHIRPathEngine fpe = new FHIRPathEngine(context);
-      Base root = r.getElement();
-      if (r.getLogicalElement()!=null)
-        root = r.getLogicalElement();
-
-      List<Base> fragNodes = new ArrayList<Base>();
-      if (fragExpr == null)
-        fragNodes.add(root);
-      else {
-        try {
-          fragNodes = fpe.evaluate(root, fragExpr);
-        } catch (Exception e) {
-          e.printStackTrace();
-        }
-        if (fragNodes.isEmpty()) {
-          f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, fragExpr, "Unable to resolve expression to fragment within resource", IssueSeverity.ERROR));
-          continue;
-
-        } else if (fragNodes.size() > 1) {
-          f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, fragExpr, "Found multiple occurrences of expression within resource, and only one is allowed when extracting a fragment", IssueSeverity.ERROR));
-          continue;
-        }
-      }
-      Element e = (Element)fragNodes.get(0);
-      Element jsonElement = e;
-
-      if (fragExt.hasExtension("ellipse") || fragExt.hasExtension("ellipseExcept")) {
-//        e = e.copy();
-        for (Extension ellipseExt : fragExt.getExtensionsByUrl("ellipseExcept")) {
-          List<Base> baseElements = new ArrayList<Base>();
-          baseElements.add(e);
-          String ellipseBaseExpr = null;
-          if (ellipseExt.hasExtension("base")) {
-            ellipseBaseExpr = ellipseExt.getExtensionString("base");
-            baseElements = fpe.evaluate(e, ellipseBaseExpr);
-            if (baseElements.isEmpty()) {
-              f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, fragExpr, "Unable to find matching base elements for ellipseExcept expression " + ellipseBaseExpr + " within fragment path ", IssueSeverity.ERROR));
-              continue;
-            }
-          }
-          String ellipseExceptExpr = ellipseExt.getExtensionString("except");
-          boolean foundExclude = false;
-          for (Base ellipseElement: baseElements) {
-            for (Element child: ((Element)ellipseElement).getChildren()) {
-              child.setEllipsed(true);
-            }
-            List<Base> ellipseExceptElements = fpe.evaluate(ellipseElement, ellipseExceptExpr);
-            if (!ellipseExceptElements.isEmpty())
-              foundExclude = true;
-            for (Base exclude: ellipseExceptElements) {
-              ((Element)exclude).setEllipsed(false);
-            }
-          }
-          if (!foundExclude) {
-            f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, fragExpr, "Unable to find matching exclude elements for ellipseExcept expression " + ellipseExceptExpr + (ellipseBaseExpr == null ? "": (" within base" + ellipseBaseExpr)) + " within fragment path ", IssueSeverity.ERROR));
-            continue;
-          }
-        }
-
-        for (Extension ellipseExt : fragExt.getExtensionsByUrl("ellipse")) {
-          String ellipseExpr = ellipseExt.getValueStringType().toString();
-          List<Base> ellipseElements = fpe.evaluate(e, ellipseExpr);
-          if (ellipseElements.isEmpty()) {
-            f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, fragExpr, "Unable to find matching elements for ellipse expression " + ellipseExpr + " within fragment path ", IssueSeverity.ERROR));
-            continue;
-          }
-          for (Base ellipseElment: ellipseElements) {
-            ((Element)ellipseElment).setEllipsed(true);
-          }
-        }
-
-        jsonElement = trimEllipsed(e, true);
-        e = trimEllipsed(e, false);
-      }
-
-      if (doXml && igpkp.wantGen(r, "xml-html")) {
-        org.hl7.fhir.r5.elementmodel.XmlParser xp = new org.hl7.fhir.r5.elementmodel.XmlParser(context);
-        XmlXHtmlRenderer x = new XmlXHtmlRenderer();
-        x.setPrism(true);
-        xp.setEllipseElements(true);
-        xp.setLinkResolver(igpkp);
-        xp.setShowDecorations(false);
-        if (suppressId(f, r)) {
-          xp.setIdPolicy(IdRenderingPolicy.NotRoot);
-        }
-        xp.compose(e, x);
-        fragment(r.fhirType() + "-" + r.getId()+"-"+fragId + "-xml-html", x.toString(), f.getOutputNames(), start, r.fhirType() + "-" + r.getId()+"-"+fragId + "-xml-html", "xml");
-      }
-
-      if (doJson && igpkp.wantGen(r, "json-html")) {
-        JsonXhtmlRenderer j = new JsonXhtmlRenderer();
-        j.setPrism(true);
-        org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(context);
-        jp.setLinkResolver(igpkp);
-        jp.setAllowComments(true);
-        jp.setEllipseElements(true);
-        if (fragExpr!=null || r.getLogicalElement()!=null)
-          jp.setSuppressResourceType(true);
-        if (suppressId(f, r)) {
-          jp.setIdPolicy(IdRenderingPolicy.NotRoot);
-        }
-        jp.compose(jsonElement, j);
-        fragment(r.fhirType() + "-" + r.getId()+"-"+fragId + "-json-html", j.toString(), f.getOutputNames(), start, r.fhirType() + "-" + r.getId()+"-"+fragId + "-json-html", "json");
-      }
-
-      if (doTurtle && igpkp.wantGen(r, "ttl-html")) {
-        org.hl7.fhir.r5.elementmodel.TurtleParser ttl = new org.hl7.fhir.r5.elementmodel.TurtleParser(context);
-        ttl.setLinkResolver(igpkp);
-        Turtle rdf = new Turtle();
-        if (suppressId(f, r)) {
-          ttl.setIdPolicy(IdRenderingPolicy.NotRoot);
-        }
-        ttl.setStyle(OutputStyle.PRETTY);
-        ttl.compose(e, rdf, "");
-        fragment(r.fhirType() + "-" + r.getId()+"-"+fragId + "-ttl-html", rdf.toString(), f.getOutputNames(), start, r.fhirType() + "-" + r.getId()+"-"+fragId + "-ttl-html", "ttl");
-      }
-    }
-  }
-
   /*
-   Recursively removes consecutive ellipsed elements from children of the element
+   Recursively removes consecutive ellided elements from children of the element
    */
-  private Element trimEllipsed(Element e, boolean asJson) {
+  private Element trimEllided(Element e, boolean asJson) {
     Element trimmed = (Element)e.copy();
-    trimEllipse(trimmed, asJson);
+    trimEllide(trimmed, asJson);
     return trimmed;
   }
 
-  private void trimEllipse(Element e, boolean asJson) {
+  private void trimEllide(Element e, boolean asJson) {
     if (!e.hasChildren())
       return;
 
-    boolean inEllipsed = false;
+    boolean inEllided = false;
     for (int i = 0; i < e.getChildren().size();) {
       Element child = e.getChildren().get(i);
-      if (child.isEllipsed()) {
-        if (inEllipsed) {
-          // Check to see if this an ellipsed collection item where the previous item isn't in the collection and the following item is in the collection and isn't ellipsed
-          if (asJson && i > 0 && i < e.getChildren().size()-1 && !e.getChildren().get(i-1).getName().equals(child.getName()) && !e.getChildren().get(i+1).isEllipsed() && e.getChildren().get(i+1).getName().equals(child.getName())) {
+      if (child.isEllided()) {
+        if (inEllided) {
+          // Check to see if this an ellided collection item where the previous item isn't in the collection and the following item is in the collection and isn't ellided
+          if (asJson && i > 0 && i < e.getChildren().size()-1 && !e.getChildren().get(i-1).getName().equals(child.getName()) && !e.getChildren().get(i+1).isEllided() && e.getChildren().get(i+1).getName().equals(child.getName())) {
             // Do nothing
           } else {
             e.getChildren().remove(child);
             continue;
           }
         } else
-          inEllipsed = true;
+          inEllided = true;
       } else {
-        inEllipsed = false;
-        trimEllipse(child, asJson);
+        inEllided = false;
+        trimEllide(child, asJson);
       }
       i++;
     }
@@ -11071,14 +10927,14 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (!format.equals("xml") && !format.equals("json") && !format.equals("ttl"))
       throw new FHIRException("Unrecognized fragment format " + format + " - expecting 'xml', 'json', or 'ttl' in file " + f.getName());
 
-    Pattern filterPattern = Pattern.compile("(BASE:|EXCEPT:|ELLIPSE:)");
+    Pattern filterPattern = Pattern.compile("(BASE:|EXCEPT:|ELLIDE:)");
     Matcher filterMatcher = filterPattern.matcher(filters);
     String remainingFilters = filters;
     String base = null;
-    List<String> ellipses = new ArrayList<>();
+    List<String> ellides = new ArrayList<>();
     List<String> includes = new ArrayList<>();
-    List<EllipseExceptDetails> excepts = new ArrayList<>();
-    EllipseExceptDetails currentExcept = null;
+    List<EllideExceptDetails> excepts = new ArrayList<>();
+    EllideExceptDetails currentExcept = null;
     boolean matches = filterMatcher.find();
     if (!matches && !filters.isEmpty())
       throw new FHIRException("Unrecognized filters in fragment: " + filters + " in file " + f.getName());
@@ -11108,15 +10964,15 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           }
           break;
         case "EXCEPT:":
-          currentExcept = new EllipseExceptDetails(filterText);
+          currentExcept = new EllideExceptDetails(filterText);
           excepts.add(currentExcept);
           break;
-        default: // "ELLIPSE:"
-          ellipses.add(filterText);
+        default: // "ELLIDE:"
+          ellides.add(filterText);
       }
     }
 
-    return generateResourceFragment(f, r, base, format, excepts, ellipses);
+    return generateResourceFragment(f, r, base, format, excepts, ellides);
   }
 
   class StringPair {
