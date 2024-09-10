@@ -50,7 +50,7 @@ public class XmlXHtmlRenderer implements IXMLWriter {
   private List<ElementDecoration> decorations1 = new ArrayList<ElementDecoration>();
   private List<ElementDecoration> decorations2 = new ArrayList<ElementDecoration>();
   private boolean prism;
-  private boolean ellideAttributes;
+  private boolean elideAttributes;
 
   protected boolean condition(boolean bTest, String message) throws IOException {
     if (!bTest)
@@ -191,10 +191,10 @@ public class XmlXHtmlRenderer implements IXMLWriter {
           b.append(Utilities.escapeXml(a.value));
         b.append("&quot;");
       }
-      if (ellideAttributes) {
+      if (elideAttributes) {
         b.append(" ... ");
         col += 5;
-        ellideAttributes = false;
+        elideAttributes = false;
       }
     }
     return col;
@@ -805,15 +805,15 @@ public class XmlXHtmlRenderer implements IXMLWriter {
   }
 
   @Override
-  public boolean canEllide() { return true; }
+  public boolean canElide() { return true; }
 
   @Override
-  public void attributeEllide() {
-    ellideAttributes = true;
+  public void attributeElide() {
+    elideAttributes = true;
   }
 
   @Override
-  public void ellide() throws IOException {
+  public void elide() throws IOException {
     checkInElement();
     if (pendingClose) {
       b.append("&gt;");
