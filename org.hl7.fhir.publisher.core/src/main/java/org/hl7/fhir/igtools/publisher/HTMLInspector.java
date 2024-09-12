@@ -856,19 +856,24 @@ public class HTMLInspector {
       if (rref.startsWith("http://") || rref.startsWith("https://") || rref.startsWith("ftp://") || rref.startsWith("tel:") || rref.startsWith("urn:")) {
         resolved = true;
         if (rref.startsWith(canonical)) {
-          resolved = false;
-          for (FetchedFile f : sources)  {
-            for (FetchedResource r : f.getResources()) {
-              if (r.getResource() != null && r.getResource() instanceof CanonicalResource && rref.equals(((CanonicalResource) r.getResource()).getUrl())) {
-                resolved = true;
-                bh.fail();
-                break;
+          if (rref.equals(canonical)) {
+            resolved = true;
+            bh.fail();
+          } else {
+            resolved = false;
+            for (FetchedFile f : sources)  {
+              for (FetchedResource r : f.getResources()) {
+                if (r.getResource() != null && r.getResource() instanceof CanonicalResource && rref.equals(((CanonicalResource) r.getResource()).getUrl())) {
+                  resolved = true;
+                  bh.fail();
+                  break;
+                }
               }
             }
-          }
-          if ("http://hl7.org.au/fhir".equals(ref)) {
-            // special case because au - wrongly - posts AU Base at http://hl7.org.au/fhir
-            resolved = true;
+            if ("http://hl7.org.au/fhir".equals(ref)) {
+              // special case because au - wrongly - posts AU Base at http://hl7.org.au/fhir
+              resolved = true;
+            }
           }
         } else if (specs != null) {
           for (SpecMapManager spec : specs) {
@@ -963,7 +968,7 @@ public class HTMLInspector {
       InputStream src = c.getInputStream();
       pi = pcm.addPackageToCache(id, ver, src, url);
     }    
-    SpecMapManager sm = new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.getNpm().getJsonObject("dependencies").asString("hl7.fhir.core"));
+    SpecMapManager sm = new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), id, pi.getNpm().getJsonObject("dependencies").asString("hl7.fhir.core"));
     sm.setBase(PackageHacker.fixPackageUrl(url));
     return sm;
   }

@@ -487,6 +487,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   }
 
   private void genServerReport(XhtmlNode x, TerminologyClientContext t) {
+    x.ah(t.getAddress());
     x.para("Use Count: "+t.getUseCount()+". Code Systems used: ");
     Map<String, TerminologyClientContextUseCount> uc = t.getUseCounts();
     List<String> nl = Utilities.sorted(uc.keySet());
@@ -997,12 +998,12 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   
   private final String detailsTemplateTxLink = 
       "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txsrvr.html#$txsrvr$\">$txsrvr$</ta>, see <a href=\"$tx$\">log</a>)</td>\r\n"+
+      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</ta>, see <a href=\"$tx$\">log</a>)</td>\r\n"+
       "   </tr>\r\n";
   
   private final String detailsTemplateTxNoLink = 
       "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txsrvr.html#$txsrvr$\">$txsrvr$</ta>)</td>\r\n"+
+      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</ta>)</td>\r\n"+
       "   </tr>\r\n";
   
   private final String detailsTemplateWithExtraDetails = 
