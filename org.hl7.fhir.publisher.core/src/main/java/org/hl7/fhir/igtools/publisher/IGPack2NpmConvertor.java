@@ -212,7 +212,7 @@ public class IGPack2NpmConvertor {
         }
 
         if (files.containsKey("spec.internals"))
-          loadSpecInternals(ig, files.get("spec.internals"), version, canonical, files);
+          loadSpecInternals(ig,  files.get("spec.internals"), "??", version, canonical, files);
         String destFile = dest != null ? dest : Utilities.path(Utilities.getDirectoryForFile(f.getAbsolutePath()), "package.tgz");
         String url = Utilities.noString(website) ? canonical : website;
         NPMPackageGenerator npm = new NPMPackageGenerator(destFile, canonical, url, PackageType.IG, ig, new Date(), false);
@@ -276,8 +276,8 @@ public class IGPack2NpmConvertor {
     
   }
 
-  private void loadSpecInternals(ImplementationGuide ig, byte[] bs, String version, String canonical, Map<String, byte[]> files) throws Exception {
-    SpecMapManager spm = new SpecMapManager(bs, version);
+  private void loadSpecInternals(ImplementationGuide ig, byte[] bs, String version, String id, String canonical, Map<String, byte[]> files) throws Exception {
+    SpecMapManager spm = new SpecMapManager(bs, id, version);
     ImplementationGuideManifestComponent man = ig.getManifest();
     man.setRendering(spm.getWebUrl(""));
     for (String s : spm.getPathUrls()) {
