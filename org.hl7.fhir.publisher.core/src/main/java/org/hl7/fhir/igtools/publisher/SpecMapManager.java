@@ -46,6 +46,7 @@ import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageHacker;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
 
+
 import net.sourceforge.plantuml.salt.element.WrappedElement;
 
 /**
@@ -79,17 +80,17 @@ public class SpecMapManager {
 
   private String auth;
   private String realm;
-  private String npmId;
+  private String npmVId;
   
   private SpecMapManager() {
     
   }
   
-  public SpecMapManager(String npmName, String igVersion, String toolVersion, String buildId, Calendar genDate, String webUrl) {
+  public SpecMapManager(String npmName, String vid, String igVersion, String toolVersion, String buildId, Calendar genDate, String webUrl) {
     spec = new JsonObject();
     if (npmName != null)
       spec.add("npm-name", npmName);
-    this.npmId = npmName;
+    this.npmVId = vid;
     spec.add("ig-version", igVersion);
     spec.add("tool-version", toolVersion);
     spec.add("tool-build", buildId);
@@ -108,9 +109,9 @@ public class SpecMapManager {
     spec.add("images", images);
   }
 
-  public SpecMapManager(byte[] bytes, String id, String version) throws IOException {
+  public SpecMapManager(byte[] bytes, String vid, String version) throws IOException {
     this.version = version;
-    this.npmId = id;
+    this.npmVId = vid;
     spec = JsonParser.parseObject(bytes);
     paths = spec.getJsonObject("paths");
     pages = spec.getJsonObject("pages");
@@ -135,7 +136,7 @@ public class SpecMapManager {
 
   public static SpecMapManager fromPackage(NpmPackage pi) throws IOException {
     if (pi.hasFile("other", "spec.internals")) {
-      return new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.name(), pi.fhirVersion());      
+      return new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.vid(), pi.fhirVersion());      
     } else {
       return new SpecMapManager();
     }
@@ -444,7 +445,7 @@ public class SpecMapManager {
   }
 
   public static SpecMapManager createSpecialPackage(NpmPackage pi, BasePackageCacheManager pcm) throws FHIRException, IOException {
-    SpecMapManager res = new SpecMapManager(pi.name(), pi.fhirVersion(), ToolsVersion.TOOLS_VERSION_STR, null, null, pi.url());
+    SpecMapManager res = new SpecMapManager(pi.name(), pi.vid(), pi.version(), ToolsVersion.TOOLS_VERSION_STR, null, null, pi.url());
     if (pi.name().equals("us.cdc.phinvads")) {
       res.special = SpecialPackageType.PhinVads;
     } else if (pi.name().equals("us.nlm.vsac")) {
@@ -479,7 +480,7 @@ public class SpecMapManager {
 
   @Override
   public String toString() {
-    return "SpecMapManager " + name+" for "+npmId+"#"+version + ", "+base+" & "+base2;
+    return "SpecMapManager " + name+" for "+npmVId+"#"+version + ", "+base+" & "+base2;
   }
 
   public int getKey() {
@@ -504,6 +505,10 @@ public class SpecMapManager {
 
   public void setRealm(String realm) {
     this.realm = realm;
+  }
+
+  public String getNpmVId() {
+    return npmVId;
   }
 
   

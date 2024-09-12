@@ -1198,7 +1198,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       dependentIgFinder.finish(outputDir, sourceIg.present());
       ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), rootDir, npmName, childPublisher == null? null : childPublisher.npmName,
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator, ipsComparator,
-          new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine, rc).render(publishedIg, true, false, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()),
+          new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine, rc, specMaps).render(publishedIg, true, false, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()),
           new PublicationChecker(repoRoot, historyPage, markdownEngine, findReleaseLabel()).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
           generateDraftDependencies(),
           noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder, context.getTxClientManager());
@@ -3443,7 +3443,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     String pid = VersionUtilities.packageForVersion(v);
     log("Load "+pid);
     NpmPackage npm = pcm.loadPackage(pid);
-    SpecMapManager spm = loadSpecDetails(TextFile.streamToBytes(npm.load("other", "spec.internals")), "convSpec"+v, npm.getWebLocation());
+    SpecMapManager spm = loadSpecDetails(TextFile.streamToBytes(npm.load("other", "spec.internals")), "convSpec"+v, npm, npm.getWebLocation());
     IContextResourceLoader loader = ValidatorUtils.loaderForVersion(npm.fhirVersion(), new PatchLoaderKnowledgeProvider(npm, spm));
     if (loader.getTypes().contains("StructureMap")) {
       loader.getTypes().remove("StructureMap");
@@ -3607,7 +3607,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     String vs = getUTGPackageName();
     if (vs != null) {
       NpmPackage npm = pcm.loadPackage(vs, null);
-      SpecMapManager spm = new SpecMapManager(TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.name(), npm.fhirVersion());
+      SpecMapManager spm = new SpecMapManager(TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.vid(), npm.fhirVersion());
       IContextResourceLoader loader = new PublisherLoader(npm, spm, npm.getWebLocation(), igpkp).makeLoader();
       context.loadFromPackage(npm, loader);
     }
@@ -3909,7 +3909,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     logDebugMessage(LogCategory.INIT, "Load hl7.fhir.core-"+v+" package from "+pi.summary());
     npmList.add(pi);
 
-    SpecMapManager spm = loadSpecDetails(TextFile.streamToBytes(pi.load("other", "spec.internals")), "basespec", specPath);
+    SpecMapManager spm = loadSpecDetails(TextFile.streamToBytes(pi.load("other", "spec.internals")), "basespec", pi, specPath);
     SimpleWorkerContext sp;
     IContextResourceLoader loader = new PublisherLoader(pi, spm, specPath, igpkp).makeLoader();
     sp = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(vsCache).fromPackage(pi, loader, false);
@@ -3966,7 +3966,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       String webref = pi.getWebLocation();
       webref = PackageHacker.fixPackageUrl(webref);
 
-      SpecMapManager igm = pi.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.name(), pi.fhirVersion()) : SpecMapManager.createSpecialPackage(pi, pcm);
+      SpecMapManager igm = pi.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.vid(), pi.fhirVersion()) : SpecMapManager.createSpecialPackage(pi, pcm);
       igm.setName(pi.title());
       igm.setBase(pi.canonical());
       igm.setBase2(PackageHacker.fixPackageUrl(pi.url()));
@@ -4052,7 +4052,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     String webref = pi.getWebLocation();
     webref = PackageHacker.fixPackageUrl(webref);
 
-    SpecMapManager igm = pi.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.name(), pi.fhirVersion()) : SpecMapManager.createSpecialPackage(pi, pcm);
+    SpecMapManager igm = pi.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.vid(), pi.fhirVersion()) : SpecMapManager.createSpecialPackage(pi, pcm);
     igm.setName(name);
     igm.setBase(canonical);
     igm.setBase2(PackageHacker.fixPackageUrl(pi.url()));
@@ -4122,7 +4122,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               SpecMapManager smm = null;
               logDebugMessage(LogCategory.PROGRESS, "Load package dependency "+dep);
               try {
-                smm = dpi.hasFile("other", "spec.internals") ?  new SpecMapManager(TextFile.streamToBytes(dpi.load("other", "spec.internals")), dpi.name(), dpi.fhirVersion()) : SpecMapManager.createSpecialPackage(dpi, pcm);
+                smm = dpi.hasFile("other", "spec.internals") ?  new SpecMapManager(TextFile.streamToBytes(dpi.load("other", "spec.internals")), dpi.vid(), dpi.fhirVersion()) : SpecMapManager.createSpecialPackage(dpi, pcm);
                 smm.setName(dpi.name()+"_"+dpi.version());
                 smm.setBase(dpi.canonical());
                 smm.setBase2(PackageHacker.fixPackageUrl(dpi.url()));
@@ -4193,7 +4193,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     webref = PackageHacker.fixPackageUrl(webref);
 
     String ver = pi.fhirVersion();
-    SpecMapManager igm = new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.name(), ver);
+    SpecMapManager igm = new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.vid(), ver);
     igm.setName(name);
     igm.setBase2(PackageHacker.fixPackageUrl(webref));
     igm.setBase(canonical);
@@ -4303,8 +4303,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     return false;
   }
 
-  public SpecMapManager loadSpecDetails(byte[] bs, String name, String path) throws IOException {
-    SpecMapManager map = new SpecMapManager(bs, name, version);
+  public SpecMapManager loadSpecDetails(byte[] bs, String name, NpmPackage npm, String path) throws IOException {
+    SpecMapManager map = new SpecMapManager(bs, npm.vid(), version);
     map.setBase(PackageHacker.fixPackageUrl(path));
     map.setName(name);
     specMaps.add(map);
@@ -8132,7 +8132,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private File makeSpecFile() throws Exception {
-    SpecMapManager map = new SpecMapManager(npmName, version, Constants.VERSION, Integer.toString(ToolsVersion.TOOLS_VERSION), execTime, igpkp.getCanonical());
+    SpecMapManager map = new SpecMapManager(npmName, npmName+"#"+version, version, Constants.VERSION, Integer.toString(ToolsVersion.TOOLS_VERSION), execTime, igpkp.getCanonical());
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         String u = igpkp.getCanonical()+r.getUrlTail();
@@ -8711,7 +8711,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       start = System.currentTimeMillis();
       fragment("cross-version-analysis-inline", r4tor4b.generate(npmName, true), otherFilesRun, start, "cross-version-analysis-inline", "Cross");      
     }
-    DependencyRenderer depr = new DependencyRenderer(pcm, tempDir, npmName, templateManager, makeDependencies(), context, markdownEngine, rc);
+    DependencyRenderer depr = new DependencyRenderer(pcm, tempDir, npmName, templateManager, makeDependencies(), context, markdownEngine, rc, specMaps);
     start = System.currentTimeMillis();
     trackedFragment("3", "dependency-table", depr.render(publishedIg, false, true, true), otherFilesRun, start, "dependency-table", "Cross");
     start = System.currentTimeMillis();
