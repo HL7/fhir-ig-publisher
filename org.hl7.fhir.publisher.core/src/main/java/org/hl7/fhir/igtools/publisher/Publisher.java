@@ -972,6 +972,14 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private String oidRoot;
   private IniFile oidIni;
 
+  private boolean hintAboutNonMustSupport = false;
+  private boolean anyExtensionsAllowed = false;
+  private boolean checkAggregation = false;
+  private boolean autoLoad = false;
+  private boolean showReferenceMessages = false;
+  private boolean noExperimentalContent = false;
+  private boolean displayWarnings = false;
+
   long last = System.currentTimeMillis();
   private List<String> unknownParams = new ArrayList<>();
 
@@ -1202,6 +1210,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           new PublicationChecker(repoRoot, historyPage, markdownEngine, findReleaseLabel()).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
           generateDraftDependencies(),
           noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder, context.getTxClientManager());
+      val.setValidationFlags(hintAboutNonMustSupport, anyExtensionsAllowed, checkAggregation, autoLoad, showReferenceMessages, noExperimentalContent, displayWarnings);
       tts.end();
       if (isChild()) {
         log("Built. "+tt.report());
@@ -2754,12 +2763,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
     String expParams = null;
     List<String> exemptHtmlPatterns = new ArrayList<>();
-    boolean hintAboutNonMustSupport = false;
-    boolean anyExtensionsAllowed = false;
-    boolean checkAggregation = false;
-    boolean autoLoad = false;
-    boolean showReferenceMessages = false;
-    boolean displayWarnings = false;
 
     copyrightYear = null;
     Boolean useStatsOptOut = null;
@@ -3039,6 +3042,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           brokenLinksError = true;
         else if (p.getValue().equals("show-reference-messages"))
           showReferenceMessages = true;
+        else if (p.getValue().equals("no-experimental-content"))
+          noExperimentalContent = true;
         break;
       case "tabbed-snapshots":
         tabbedSnapshots = p.getValue().equals("true");
@@ -3355,6 +3360,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     pvalidator.setCheckMustSupport(hintAboutNonMustSupport);
     validator.setShowMessagesFromReferences(showReferenceMessages);
     validator.getExtensionDomains().addAll(extensionDomains);
+    validator.setNoExperimentalContent(noExperimentalContent);
     validator.getExtensionDomains().add(ToolingExtensions.EXT_PRIVATE_BASE);
     validationFetcher = new ValidationServices(context, igpkp, sourceIg, fileList, npmList, bundleReferencesResolve, specMaps, module);
     validator.setFetcher(validationFetcher);
