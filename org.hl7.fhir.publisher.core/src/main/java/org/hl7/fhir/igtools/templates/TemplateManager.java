@@ -257,6 +257,7 @@ public class TemplateManager {
         "hl7.davinci.template",
         "hl7.extensions.template",
         "ihe.fhir.template",
+        "cqf.fhir.template",
         "ch.fhir.ig.template")) {
       canExecute = false;
       templateThatCantExecute = template;
