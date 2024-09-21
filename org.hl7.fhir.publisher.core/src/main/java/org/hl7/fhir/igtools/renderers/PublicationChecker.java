@@ -133,6 +133,12 @@ public class PublicationChecker {
       check(messages, false, "Error parsing publication-request.json: "+e.getMessage()+mkError());
       return;
     }    
+    if (pl == null) {
+      check(messages, "true".equals(pr.asString("first")), "This appears to be the first publication, so first must be true"+mkError());
+    } else {
+      check(messages, !"true".equals(pr.asString("first")), "This is not the first publication, so first must not be true"+mkError());
+    }
+
     if (check(messages, pr.has("package-id"), "No package id found in publication request (required for cross-check)"+mkError())) {
       if (check(messages, npm.name().equals(pr.asString("package-id")), "Publication Request is for '"+pr.asString("package-id")+"' but package is "+npm.name()+mkError())) {
         summary.add(new StringPair("package-id", pr.asString("package-id")));
@@ -160,6 +166,16 @@ public class PublicationChecker {
       if ("milestone".equals(pr.asString("mode"))) {
         check(messages,  pr.asString("path").equals(Utilities.pathURL(npm.canonical(), pr.asString("sequence"))) || pr.asString("path").equals(Utilities.pathURL(npm.canonical(), pr.asString("version"))), 
             "Proposed path for this milestone publication should usually be canonical with either sequence or version appended"+mkWarning());        
+        if (pl != null) {
+          for (PackageListEntry e : pl.list()) {
+            String pp = e.path();
+            if (pp!= null && pp.equals(pr.asString("path"))) {
+              check(messages,  
+                  false,
+                  "A version of this IG has already been published at "+pp+mkError());
+            }
+          }
+        }
       } else if (pr.has("version")) {
         check(messages,  
             pr.asString("path").startsWith(Utilities.pathURL(npm.canonical(), pr.asString("version"))+"-") ||
@@ -186,7 +202,7 @@ public class PublicationChecker {
     if (mode == PublicationProcessMode.TECHNICAL_CORRECTION) {
       if (check(messages, pl != null, "Can't publish a technical correction when nothing is published yet."+mkWarning())) {
         PackageListEntry cv = getCurrentPublication(pl);
-        check(messages, cv != null, "TCan't publish a technical correction when there's no current publication."+mkWarning());
+        check(messages, cv != null, "Can't publish a technical correction when there's no current publication."+mkWarning());
       }
     }
     if (check(messages, pr.has("sequence"), "No publication request sequence found (sequence is e.g. R1, and groups all the pre-publications together. if you don't have a lifecycle like that, just use 'Releases' or 'Publications')"+mkError())) {
