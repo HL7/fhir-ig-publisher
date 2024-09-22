@@ -223,7 +223,7 @@ public class IPStatementsRenderer {
     if (system.cs != null) {
       system.desc = system.cs.present();
       if (system.cs.hasCopyright()) {
-        List<XhtmlNode> xl = new XhtmlParser().parseMDFragmentStripParas(markdownEngine.process(system.cs.getCopyright(), "Copyright"));
+        List<XhtmlNode> xl = new XhtmlParser().parseMDFragmentStripParas(markdownEngine.process(fixCopyright(system.cs.getCopyright()), "Copyright"));
         if (xl.size() == 0) {
           return "?";
         } else {
@@ -234,6 +234,14 @@ public class IPStatementsRenderer {
     return null;
   }
   
+  private String fixCopyright(String copyright) {
+    if (copyright.contains("HL7 Terminology")) {
+      return "This material derives from the HL7 Terminology (THO). THO is copyright ©1989+ Health Level Seven International and is made available under the CC0 designation. For more licensing information see: https://terminology.hl7.org/license.html";
+    } else {
+      return copyright;
+    }
+  }
+
   private void listAllCodeSystems(FetchedResource source, Resource resource) {
     if (resource instanceof StructureDefinition) {
       listAllCodeSystemsSD(source, (StructureDefinition) resource);
