@@ -6112,7 +6112,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
                 altered = true;
               } 
               if (Utilities.noString(id)) {
-                throw new Exception("Resource has no id in "+file.getPath()+" and canonical URL ("+url+") does not start with the IG canonical URL ("+prefix+")");
+                if (simplifierMode) {
+                  id = file.getName();
+                  System.out.println("Resource has no id in "+file.getPath()+" and canonical URL ("+url+") does not start with the IG canonical URL ("+prefix+")");
+                } else {
+                  throw new Exception("Resource has no id in "+file.getPath()+" and canonical URL ("+url+") does not start with the IG canonical URL ("+prefix+")");
+                }
               }
             } else {
               id = tail(file.getName());
@@ -7549,7 +7554,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private void generate() throws Exception {
-    Base.setCopyUserData(true); // just keep all the user data when copiying while rendering
+    if (simplifierMode) {
+      return;
+    }
+    Base.setCopyUserData(true); // just keep all the user data when copying while rendering
 
     forceDir(tempDir);
     forceDir(Utilities.path(tempDir, "_includes"));
@@ -8458,6 +8466,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private boolean runTool() throws Exception {
+    if (simplifierMode) {
+      return true;
+    }
     if (generationOff) {
       FileUtils.copyDirectory(new File(tempDir), new File(outputDir));
       return true;
@@ -10708,6 +10719,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private boolean trackFragments = false;
 
   private LanguageUtils langUtils;
+
+  private boolean simplifierMode;
   
   private String processSQLCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();
@@ -12967,28 +12980,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         } else {
           self.setConfigFile(determineActualIG(last, IGBuildMode.MANUAL));
         }
-      } else if (CliParams.hasNamedParam(args, "-simplifier")) {
-        if (!CliParams.hasNamedParam(args, "-destination")) {
-          throw new Exception("A destination folder (-destination) must be provided for the output from processing the simplifier IG");
-        }
-        if (!CliParams.hasNamedParam(args, "-canonical")) {
-          throw new Exception("A canonical URL (-canonical) must be provided in order to process a simplifier IG");
-        }
-        if (!CliParams.hasNamedParam(args, "-npm-name")) {
-          throw new Exception("A package name (-npm-name) must be provided in order to process a simplifier IG");
-        }
-        if (!CliParams.hasNamedParam(args, "-license")) {
-          throw new Exception("A license code (-license) must be provided in order to process a simplifier IG");
-        }
-        List<String> packages = new ArrayList<String>();
-        for (int i = 0; i < args.length; i++) {
-          if (args[i].equals("-dependsOn")) { 
-            packages.add(args[i+1]);
-          }
-        }
-        // create an appropriate ig.json in the specified folder
-        self.setConfigFile(generateIGFromSimplifier(CliParams.getNamedParam(args, "-simplifier"), CliParams.getNamedParam(args, "-destination"), CliParams.getNamedParam(args, "-canonical"), CliParams.getNamedParam(args, "-npm-name"), CliParams.getNamedParam(args, "-license"), packages));
-        self.folderToDelete = Utilities.getDirectoryForFile(self.getConfigFile());
       } else {
         self.setConfigFile(determineActualIG(CliParams.getNamedParam(args, "-ig"), self.mode));
         if (Utilities.noString(self.getConfigFile())) {
@@ -13016,6 +13007,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
       if (CliParams.hasNamedParam(args, "-watch")) {
         throw new Error("Watch mode (-watch) is no longer supported");
+      }
+      if (CliParams.hasNamedParam(args, "-simplifier")) {
+        self.simplifierMode = true;
+        self.generationOff = true;
       }
       self.debug = CliParams.hasNamedParam(args, "-debug");
       self.cacheVersion = CliParams.hasNamedParam(args, "-cacheVersion");
