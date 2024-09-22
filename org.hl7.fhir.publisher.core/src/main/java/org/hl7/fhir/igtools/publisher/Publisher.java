@@ -60,6 +60,8 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -665,7 +667,24 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
   }
 
+  public class ElideExceptDetails {
+    private String base = null;
+    private String except = null;
 
+    public ElideExceptDetails(String except) {
+      this.except = except;
+    }
+
+    public String getBase() {
+      return base;
+    }
+
+    public boolean hasBase() { return base != null; }
+
+    public void setBase(String base) { this.base = base; }
+
+    public String getExcept() { return except; }
+  }
 
   public enum IGBuildMode { MANUAL, AUTOBUILD, WEBSERVER, PUBLICATION }
 
@@ -10496,9 +10515,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           f.getOutputNames().add(dst);
           Utilities.createDirectory(dst);
         } else if (f.getPath().endsWith(".md")) {
-          checkMakeFile(processSQL(db, stripFrontMatter(f.getSource()), f), dst, f.getOutputNames());          
+          checkMakeFile(processCustomLiquid(db, stripFrontMatter(f.getSource()), f), dst, f.getOutputNames());
         } else {
-          checkMakeFile(processSQL(db, f.getSource(), f), dst, f.getOutputNames());
+          checkMakeFile(processCustomLiquid(db, f.getSource(), f), dst, f.getOutputNames());
         }
       } catch (IOException e) {
         log("Exception generating page "+dst+" for "+f.getRelativePath()+" in "+tempDir+": "+e.getMessage());
@@ -10516,7 +10535,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           f.getOutputNames().add(dst);
           Utilities.createDirectory(dst);
         } else
-          checkMakeFile(processSQL(db, new XSLTransformer(debug).transform(f.getSource(), f.getXslt()), f), dst, f.getOutputNames());
+          checkMakeFile(processCustomLiquid(db, new XSLTransformer(debug).transform(f.getSource(), f.getXslt()), f), dst, f.getOutputNames());
       } catch (Exception e) {
         log("Exception generating xslt page "+dst+" for "+f.getRelativePath()+" in "+tempDir+": "+e.getMessage());
       }
@@ -10527,6 +10546,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         Map<String, String> vars = makeVars(r);
         makeTemplates(f, r, vars);
         saveDirectResourceOutputs(f, r, r.getResource(), vars);
+/*        if (r.getResEntry() != null && r.getResEntry().hasExtension("http://hl7.org/fhir/tools/StructureDefinition/implementationguide-resource-fragment")) {
+          generateResourceFragments(f, r, System.currentTimeMillis());
+        }*/
         List<StringPair> clist = new ArrayList<>();
         if (r.getResource() == null) {
           try {
@@ -10631,27 +10653,200 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
   }
 
-  private byte[] processSQL(DBBuilder db, byte[] content, FetchedFile f) {
+  private String generateResourceFragment(FetchedFile f, FetchedResource r, String fragExpr, String syntax, List<ElideExceptDetails> excepts, List<String> elides) throws FHIRException {
+    FHIRPathEngine fpe = new FHIRPathEngine(context);
+    Base root = r.getElement();
+    if (r.getLogicalElement()!=null)
+      root = r.getLogicalElement();
+
+    List<Base> fragNodes = new ArrayList<Base>();
+    if (fragExpr == null)
+      fragNodes.add(root);
+    else {
+      try {
+        fragNodes = fpe.evaluate(root, fragExpr);
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+      if (fragNodes.isEmpty()) {
+        f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, fragExpr, "Unable to resolve expression to fragment within resource", IssueSeverity.ERROR));
+        return "ERROR Expanding Fragment";
+
+      } else if (fragNodes.size() > 1) {
+        f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, fragExpr, "Found multiple occurrences of expression within resource, and only one is allowed when extracting a fragment", IssueSeverity.ERROR));
+        return "ERROR Expanding Fragment";
+      }
+    }
+    Element e = (Element)fragNodes.get(0);
+    Element jsonElement = e;
+
+    if (!elides.isEmpty() || !excepts.isEmpty()) {
+//        e = e.copy();
+      for (ElideExceptDetails elideExceptDetails : excepts) {
+        List<Base> baseElements = new ArrayList<Base>();
+        baseElements.add(e);
+        String elideBaseExpr = null;
+        if (elideExceptDetails.hasBase()) {
+          elideBaseExpr = elideExceptDetails.getBase();
+          baseElements = fpe.evaluate(e, elideBaseExpr);
+          if (baseElements.isEmpty()) {
+            f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, fragExpr, "Unable to find matching base elements for elideExcept expression " + elideBaseExpr + " within fragment path ", IssueSeverity.ERROR));
+            return "ERROR Expanding Fragment";
+          }
+        }
+
+        String elideExceptExpr = elideExceptDetails.getExcept();
+        boolean foundExclude = false;
+        for (Base elideElement: baseElements) {
+          for (Element child: ((Element)elideElement).getChildren()) {
+            child.setElided(true);
+          }
+          List<Base> elideExceptElements = fpe.evaluate(elideElement, elideExceptExpr);
+          if (!elideExceptElements.isEmpty())
+            foundExclude = true;
+          for (Base exclude: elideExceptElements) {
+            ((Element)exclude).setElided(false);
+          }
+        }
+        if (!foundExclude) {
+          f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, fragExpr, "Unable to find matching exclude elements for elideExcept expression " + elideExceptExpr + (elideBaseExpr == null ? "": (" within base" + elideBaseExpr)) + " within fragment path ", IssueSeverity.ERROR));
+          return "ERROR Expanding Fragment";
+        }
+      }
+
+      for (String elideExpr : elides) {
+        List<Base> elideElements = fpe.evaluate(e, elideExpr);
+        if (elideElements.isEmpty()) {
+          f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, fragExpr, "Unable to find matching elements for elide expression " + elideExpr + " within fragment path ", IssueSeverity.ERROR));
+          return "ERROR Expanding Fragment";
+        }
+        for (Base elideElment: elideElements) {
+          ((Element)elideElment).setElided(true);
+        }
+      }
+
+      jsonElement = trimElided(e, true);
+      e = trimElided(e, false);
+    }
+
+    try {
+      if (syntax.equals("xml")) {
+        org.hl7.fhir.r5.elementmodel.XmlParser xp = new org.hl7.fhir.r5.elementmodel.XmlParser(context);
+        XmlXHtmlRenderer x = new XmlXHtmlRenderer();
+        x.setPrism(true);
+        xp.setElideElements(true);
+        xp.setLinkResolver(igpkp);
+        xp.setShowDecorations(false);
+        if (suppressId(f, r)) {
+          xp.setIdPolicy(IdRenderingPolicy.NotRoot);
+        }
+        xp.compose(e, x);
+        return x.toString();
+
+      } else if (syntax.equals("json")) {
+        JsonXhtmlRenderer j = new JsonXhtmlRenderer();
+        j.setPrism(true);
+        org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(context);
+        jp.setLinkResolver(igpkp);
+        jp.setAllowComments(true);
+        jp.setElideElements(true);
+/*        if (fragExpr != null || r.getLogicalElement() != null)
+          jp.setSuppressResourceType(true);*/
+        if (suppressId(f, r)) {
+          jp.setIdPolicy(IdRenderingPolicy.NotRoot);
+        }
+        jp.compose(jsonElement, j);
+        return j.toString();
+
+      } else if (syntax.equals("ttl")) {
+        org.hl7.fhir.r5.elementmodel.TurtleParser ttl = new org.hl7.fhir.r5.elementmodel.TurtleParser(context);
+        ttl.setLinkResolver(igpkp);
+        Turtle rdf = new Turtle();
+        if (suppressId(f, r)) {
+          ttl.setIdPolicy(IdRenderingPolicy.NotRoot);
+        }
+        ttl.setStyle(OutputStyle.PRETTY);
+        ttl.compose(e, rdf, "");
+        return rdf.toString();
+      } else
+        throw new FHIRException("Unrecognized syntax: " + syntax);
+    } catch (Exception except) {
+      throw new FHIRException(except);
+    }
+  }
+
+  /*
+   Recursively removes consecutive elided elements from children of the element
+   */
+  private Element trimElided(Element e, boolean asJson) {
+    Element trimmed = (Element)e.copy();
+    trimElide(trimmed, asJson);
+    return trimmed;
+  }
+
+  private void trimElide(Element e, boolean asJson) {
+    if (!e.hasChildren())
+      return;
+
+    boolean inElided = false;
+    for (int i = 0; i < e.getChildren().size();) {
+      Element child = e.getChildren().get(i);
+      if (child.isElided()) {
+        if (inElided) {
+          // Check to see if this an elided collection item where the previous item isn't in the collection and the following item is in the collection and isn't elided
+          if (asJson && i > 0 && i < e.getChildren().size()-1 && !e.getChildren().get(i-1).getName().equals(child.getName()) && !e.getChildren().get(i+1).isElided() && e.getChildren().get(i+1).getName().equals(child.getName())) {
+            // Do nothing
+          } else {
+            e.getChildren().remove(child);
+            continue;
+          }
+        } else
+          inElided = true;
+      } else {
+        inElided = false;
+        trimElide(child, asJson);
+      }
+      i++;
+    }
+  }
+
+  private byte[] processCustomLiquid(DBBuilder db, byte[] content, FetchedFile f) throws FHIRException {
     if (!Utilities.existsInList(Utilities.getFileExtension(f.getPath()), "html", "md", "xml")) {
       return content;
     }
     try {
       String src = new String(content);
       boolean changed = false;
-      while (db != null && src.contains("{% sql")) {
-        int i = src.indexOf("{% sql");
-        String pfx = src.substring(0, i);
-        src = src.substring(i + 6);
-        i = src.indexOf("%}");
-        String sfx = src.substring(i + 2);
-        String sql = src.substring(0, i);
+      String[] keywords = {"sql", "fragment"};
+      for (String keyword: Arrays.asList(keywords)) {
 
-        if (sql.trim().startsWith("ToData ")) {
-          src = pfx + processSQLData(db, sql.substring(7), f) + sfx;
-        } else {
-          src = pfx + processSQLCommand(db, sql, f) + sfx;
+        while (db != null && src.contains("{% " + keyword)) {
+          int i = src.indexOf("{% " + keyword);
+          String pfx = src.substring(0, i);
+          src = src.substring(i + 3 + keyword.length());
+          i = src.indexOf("%}");
+          if (i == -1)
+            throw new FHIRException("No closing '%}' for '{% '" + keyword + " in " + f.getName());
+          String sfx = src.substring(i + 2);
+          String arguments = src.substring(0, i).trim();
+
+          String substitute = "";
+          switch (keyword) {
+            case "sql":
+              if (arguments.trim().startsWith("ToData ")) {
+                substitute = processSQLData(db, arguments.substring(arguments.indexOf("ToData ") + 7), f);
+              } else {
+                substitute = processSQLCommand(db, arguments, f);
+              }
+              break;
+
+            case "fragment":
+              substitute = processFragment(arguments, f);
+          }
+
+          src = pfx + substitute + sfx;
+          changed = true;
         }
-        changed = true;
       }
       while (src.contains("[[[")) {
         int i = src.indexOf("[[[");
@@ -10728,6 +10923,75 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     int i = sqlIndex++;
     fragment("sql-"+i+"-fragment", output, f.getOutputNames(), start, "sql", "SQL");
     return "{% include sql-"+i+"-fragment.xhtml %}";
+  }
+
+  private String processFragment(String arguments, FetchedFile f) throws FHIRException {
+    int firstSpace = arguments.indexOf(" ");
+    int secondSpace = arguments.indexOf(" ",firstSpace + 1);
+    if (firstSpace == -1)
+      throw new FHIRException("Fragment syntax error: syntax must be '[ResourceType]/[id] [syntax] [filters]'.  Found: " + arguments + "\r\n in file " + f.getName());
+    String reference = arguments.substring(0, firstSpace);
+    String format = (secondSpace == -1) ? arguments.substring(firstSpace) : arguments.substring(firstSpace, secondSpace);
+    format = format.trim().toLowerCase();
+    String filters = (secondSpace == -1) ? "" : arguments.substring(secondSpace).trim();
+    Pattern refPattern = Pattern.compile("^([A-Z][a-z]+)+\\/([A-Za-z0-9\\-\\.]{1,64})$");
+    Matcher refMatcher = refPattern.matcher(reference);
+    if (!refMatcher.find())
+      throw new FHIRException("Fragment syntax error: Referenced instance must be expressed as [ResourceType]/[id].  Found " + reference + " in file " + f.getName());
+    String type = refMatcher.group(1);
+    String id = refMatcher.group(2);
+    FetchedResource r = fetchByResource(type, id);
+    if (r == null)
+      throw new FHIRException(("Unable to find fragment resource " + reference + " pointed to in file " + f.getName()));
+    if (!format.equals("xml") && !format.equals("json") && !format.equals("ttl"))
+      throw new FHIRException("Unrecognized fragment format " + format + " - expecting 'xml', 'json', or 'ttl' in file " + f.getName());
+
+    Pattern filterPattern = Pattern.compile("(BASE:|EXCEPT:|ELIDE:)");
+    Matcher filterMatcher = filterPattern.matcher(filters);
+    String remainingFilters = filters;
+    String base = null;
+    List<String> elides = new ArrayList<>();
+    List<String> includes = new ArrayList<>();
+    List<ElideExceptDetails> excepts = new ArrayList<>();
+    ElideExceptDetails currentExcept = null;
+    boolean matches = filterMatcher.find();
+    if (!matches && !filters.isEmpty())
+      throw new FHIRException("Unrecognized filters in fragment: " + filters + " in file " + f.getName());
+    while (matches) {
+      String filterType = filterMatcher.group(0);
+      String filterText = "";
+      int start = remainingFilters.indexOf(filterType) + filterType.length();
+      matches = filterMatcher.find();
+      if (matches) {
+        String nextTag = filterMatcher.group(0);
+        filterText = remainingFilters.substring(start, remainingFilters.indexOf(nextTag, start)).trim();
+        remainingFilters = remainingFilters.substring(remainingFilters.indexOf(nextTag, start));
+      } else {
+        filterText = remainingFilters.substring(start).trim();
+        remainingFilters = "";
+      }
+      switch (filterType) {
+        case "BASE:":
+          if (currentExcept==null) {
+            if (base != null)
+              throw new FHIRException("Cannot have more than one BASE: declaration in fragment definition - " + filters + " in file " + f.getName());
+            base = filterText;
+          } else {
+            if (currentExcept.hasBase())
+              throw new FHIRException("Cannot have more than one BASE: declaration for an Except - " + filters + " in file " + f.getName());
+            currentExcept.setBase(filterText);
+          }
+          break;
+        case "EXCEPT:":
+          currentExcept = new ElideExceptDetails(filterText);
+          excepts.add(currentExcept);
+          break;
+        default: // "ELIDE:"
+          elides.add(filterText);
+      }
+    }
+
+    return generateResourceFragment(f, r, base, format, excepts, elides);
   }
 
   class StringPair {
