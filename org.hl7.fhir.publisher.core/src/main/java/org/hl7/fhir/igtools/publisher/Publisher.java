@@ -2766,8 +2766,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     // ok, loaded. Now we start loading settings out of the IG
     tool = GenerationTool.Jekyll;
     version = processVersion(sourceIg.getFhirVersion().get(0).asStringValue()); // todo: support multiple versions
-    if (!Utilities.existsInList(version, "5.0.0", "4.3.0", "4.0.1", "3.0.2", "1.0.2", "1.4.0")) {
-      throw new Error("Unable to support version '"+version+"' - must be one of 5.0.0, 4.3.0, 4.0.1, 3.0.2, 1.0.2, or 1.4.0");
+    if (!Utilities.existsInList(version, "5.0.0", "4.3.0", "4.0.1", "3.0.2", "1.0.2", "1.4.0", "6.0.0-ballot2")) {
+      throw new Error("Unable to support version '"+version+"' - must be one of 5.0.0, 4.3.0, 4.0.1, 3.0.2, 1.0.2, 6.0.0-ballot2 or 1.4.0");
     }
 
     if (!VersionUtilities.isSupportedVersion(version)) {
@@ -3647,7 +3647,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     } else if (VersionUtilities.isR5Ver(version)) {
       vs = "hl7.terminology.r5";
     } else if (VersionUtilities.isR6Ver(version)) {
-      vs = "hl7.terminology.r6";
+      vs = "hl7.terminology.r5";
     }
     return vs;
   }
