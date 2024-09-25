@@ -10166,6 +10166,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     ig.add("date", publishedIg.getDateElement().asStringValue());
     ig.add("description", ProfileUtilities.processRelativeUrls(publishedIg.getDescription(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
 
+    ig.add("tx-server", context.getTxClientManager().getMaster().getAddress());
     ig.add("copyright", publishedIg.getCopyright());
     for (Enumeration<FHIRVersion> v : publishedIg.getFhirVersion()) {
       ig.add("fhirVersion", v.asStringValue());
