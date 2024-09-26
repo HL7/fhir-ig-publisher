@@ -4,7 +4,7 @@
 
     <groupId>org.hl7.fhir.publisher</groupId>
     <artifactId>org.hl7.fhir.publisher</artifactId>
-    <version>1.6.28-SNAPSHOT</version>
+    <version>1.6.28</version>
     <packaging>pom</packaging>
 
     <properties>
