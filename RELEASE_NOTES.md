@@ -1,1 +1,0 @@
-Remove spurious logging statement
