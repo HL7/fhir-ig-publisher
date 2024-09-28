@@ -2264,7 +2264,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       }
     }
     if (logDecision) {
-      logMessage("Using en-US as the default narrative language. (no language information in Implementation Guide or command line");
+      logMessage("Using en-US as the default narrative language. (no language information in Implementation Guide or command line)");
     }
     return new Locale("en", "US");
   }
