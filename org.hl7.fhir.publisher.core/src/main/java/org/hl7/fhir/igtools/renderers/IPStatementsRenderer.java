@@ -24,6 +24,8 @@ import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext.RenderingContextLangs;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
@@ -51,15 +53,17 @@ public class IPStatementsRenderer {
   private MarkDownProcessor markdownEngine;
   private Map<String, SystemUsage> systems = new HashMap<>();
   private Map<String, List<SystemUsage>> usages = new HashMap<>();
+  private RenderingContextLangs rcs;
 
   private String packageId;
   
   
-  public IPStatementsRenderer(IWorkerContext ctxt, MarkDownProcessor markdownEngine, String packageId) {
+  public IPStatementsRenderer(IWorkerContext ctxt, MarkDownProcessor markdownEngine, String packageId, RenderingContextLangs rcs) {
     super();
     this.ctxt = ctxt;
     this.markdownEngine = markdownEngine;
     this.packageId = packageId;
+    this.rcs = rcs;
   }
   
   private void seeSystem(String url, FetchedResource source) {
@@ -78,26 +82,27 @@ public class IPStatementsRenderer {
   }
   
 
-  public String genIpStatements(FetchedResource r, boolean example) throws FHIRException, IOException {
+  public String genIpStatements(FetchedResource r, boolean example, String lang) throws FHIRException, IOException {
     listAllCodeSystems(r, r.getElement());
     if (r.getResource() != null) {
       listAllCodeSystems(r, r.getResource());
     }
-    return render((example ? "example" : describeResource(r.getElement())));
+    RenderingContext lrc = rcs.get(lang);
+    return render((example ? "example" : describeResource(r.getElement(), lrc)), lrc);
   }
 
-  private String describeResource(Element element) {
+  private String describeResource(Element element, RenderingContext lrc) {
     String t = element.fhirType();
     if ("StructureDefinition".equals(t)) {
       String s = element.getChildValue("type");
       if ("Extension".equals(s)) {
-        return "extension";
+        return lrc.formatPhrase(RenderingContext.KIND_EXTENSION);
       } else {
         s = element.getChildValue("kind");
         if ("logical".equals(s)) {
-          return "logical model";
+          return lrc.formatPhrase(RenderingContext.KIND_LOGICAL);
         } else {
-          return "profile";
+          return lrc.formatPhrase(RenderingContext.KIND_PROFILE);
         }       
       }
     } else {
@@ -105,7 +110,7 @@ public class IPStatementsRenderer {
     }
   }
 
-  public String genIpStatements(List<FetchedFile> files) throws FHIRException, IOException {
+  public String genIpStatements(List<FetchedFile> files, String lang) throws FHIRException, IOException {
     for (FetchedFile f : files) {
       for (FetchedResource r : f.getResources()) {
         listAllCodeSystems(r, r.getElement());
@@ -115,10 +120,10 @@ public class IPStatementsRenderer {
       }
     }
     
-    return render("publication");
+    return render("publication", rcs.get(lang));
   }
   
-  private String render(String title) throws IOException {
+  private String render(String title, RenderingContext lrc) throws IOException {
     for (SystemUsage su : systems.values()) {
       String stmt = getCopyRightStatement(su);
       if (stmt != null) {
@@ -130,10 +135,10 @@ public class IPStatementsRenderer {
     }
     
     if (usages.size() == 0) {
-      return isHL7Ig() ? "No use of external IP" : "No use of external IP (other than from the FHIR specification)";
+      return lrc.formatPhrase(isHL7Ig() ? RenderingContext.IP_NONE : RenderingContext.IP_NONE_EXT);
     } else {
       StringBuilder b = new StringBuilder();
-      b.append("<p>This "+title+" includes IP covered under the following statements.</p>\r\n<ul>\r\n");
+      b.append("<p>"+lrc.formatPhrase(RenderingContext.IP_INTRO, title)+"</p>\r\n<ul>\r\n");
       int key1 = 0;
       int key2 = 0;
       for (String stmt : Utilities.sorted(usages.keySet())) {
