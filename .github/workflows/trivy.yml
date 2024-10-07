@@ -18,6 +18,10 @@ jobs:
 
       - name: Run static analysis
         uses: aquasecurity/trivy-action@master
+        env:
+          # temporary workaround for rate limiting on github
+          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db
+          TRIVY_JAVA_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-java-db
         with:
           scan-type: 'fs'
           vuln-type: 'library'
