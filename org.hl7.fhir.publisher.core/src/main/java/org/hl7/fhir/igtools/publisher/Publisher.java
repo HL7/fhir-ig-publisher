@@ -2668,6 +2668,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (Utilities.existsInList(parts[1], "fhir") && Utilities.existsInList(parts[2], "cda")) {
       return null;
     }
+    if (Utilities.existsInList(parts[1], "fhir") && Utilities.existsInList(parts[2], "test")) {
+      return null;
+    }
     if (Utilities.existsInList(parts[1], "fhir") && !Utilities.existsInList(parts[1], "nothing-yet")) {
       if (parts[2].equals("uv")) {
         igrealm = "uv";
@@ -10670,9 +10673,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (generationOff) {
       return;
     }
-    if (f.getRelativePath() != null && f.getRelativePath().contains("background")) {
-      DebugUtilities.breakpoint();
-    }
     //    System.out.println("gen2: "+f.getName());
     if (f.getProcessMode() == FetchedFile.PROCESS_NONE) {
       String dst = Utilities.path(tempDir, f.getRelativePath());
@@ -10839,7 +10839,13 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         }
         if (igpkp.wantGen(r, "contained-index")) {
           long start = System.currentTimeMillis();
-          fragment(r.fhirType()+"-"+r.getId()+"-contained-index", genContainedIndex(r, clist), f.getOutputNames(), start, "contained-index", "Resource");
+          if (isNewML()) {
+            for (String l : allLangs()) {
+              fragment(r.fhirType()+"-"+r.getId()+"-contained-index-"+l, genContainedIndex(r, clist, l), f.getOutputNames(), start, "contained-index", "Resource");
+            }
+          } else {
+            fragment(r.fhirType()+"-"+r.getId()+"-contained-index", genContainedIndex(r, clist, null), f.getOutputNames(), start, "contained-index", "Resource");
+          }
         }
       }
     }
@@ -11257,7 +11263,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
   }
 
-  private String genContainedIndex(FetchedResource r, List<StringPair> clist) {
+  private String genContainedIndex(FetchedResource r, List<StringPair> clist, String lang) {
     StringBuilder b = new StringBuilder();
     if (clist.size() > 0) {
       b.append("<ul>\r\n");
@@ -11282,49 +11288,61 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   public boolean generateResourceHtml(FetchedFile f, boolean regen, FetchedResource r, Resource res, Map<String, String> vars, String prefixForContainer, DBBuilder db) {
+    if (isNewML()) {
+      boolean result = true;      
+      for (String l : allLangs()) {
+        result = generateResourceHtmlInner(f, regen, r, res, vars, prefixForContainer, db, rcLangs.get(l), "-"+l) && result;        
+      }
+      return result;
+    } else {
+      return generateResourceHtmlInner(f, regen, r, res, vars, prefixForContainer, db, rc, "");
+    }
+  }
+  
+  public boolean generateResourceHtmlInner(FetchedFile f, boolean regen, FetchedResource r, Resource res, Map<String, String> vars, String prefixForContainer, DBBuilder db, RenderingContext lrc, String langSfx) {
     boolean result = true;
     try {
 
       // now, start generating resource type specific stuff
       switch (res.getResourceType()) {
       case CodeSystem:
-        generateOutputsCodeSystem(f, r, (CodeSystem) res, vars, prefixForContainer);
+        generateOutputsCodeSystem(f, r, (CodeSystem) res, vars, prefixForContainer, lrc, langSfx);
         break;
       case ValueSet:
-        generateOutputsValueSet(f, r, (ValueSet) res, vars, prefixForContainer, db);
+        generateOutputsValueSet(f, r, (ValueSet) res, vars, prefixForContainer, db, lrc, langSfx);
         break;
       case ConceptMap:
-        generateOutputsConceptMap(f, r, (ConceptMap) res, vars, prefixForContainer);
+        generateOutputsConceptMap(f, r, (ConceptMap) res, vars, prefixForContainer, lrc, langSfx);
         break;
 
       case List:
-        generateOutputsList(f, r, (ListResource) res, vars, prefixForContainer);      
+        generateOutputsList(f, r, (ListResource) res, vars, prefixForContainer, lrc, langSfx);      
         break;
 
       case CapabilityStatement:
-        generateOutputsCapabilityStatement(f, r, (CapabilityStatement) res, vars, prefixForContainer);
+        generateOutputsCapabilityStatement(f, r, (CapabilityStatement) res, vars, prefixForContainer, lrc, langSfx);
         break;
       case StructureDefinition:
-        generateOutputsStructureDefinition(f, r, (StructureDefinition) res, vars, regen, prefixForContainer);
+        generateOutputsStructureDefinition(f, r, (StructureDefinition) res, vars, regen, prefixForContainer, lrc, langSfx);
         break;
       case OperationDefinition:
-        generateOutputsOperationDefinition(f, r, (OperationDefinition) res, vars, regen, prefixForContainer);
+        generateOutputsOperationDefinition(f, r, (OperationDefinition) res, vars, regen, prefixForContainer, lrc, langSfx);
         break;
       case StructureMap:
-        generateOutputsStructureMap(f, r, (StructureMap) res, vars, prefixForContainer);
+        generateOutputsStructureMap(f, r, (StructureMap) res, vars, prefixForContainer, lrc, langSfx);
         break;
       case Questionnaire:
-        generateOutputsQuestionnaire(f, r, (Questionnaire) res, vars, prefixForContainer);
+        generateOutputsQuestionnaire(f, r, (Questionnaire) res, vars, prefixForContainer, lrc, langSfx);
         break;
       case Library:
-        generateOutputsLibrary(f, r, (Library) res, vars, prefixForContainer);
+        generateOutputsLibrary(f, r, (Library) res, vars, prefixForContainer, lrc, langSfx);
         break;
       case ExampleScenario:
-        generateOutputsExampleScenario(f, r, (ExampleScenario) res, vars, prefixForContainer);
+        generateOutputsExampleScenario(f, r, (ExampleScenario) res, vars, prefixForContainer, lrc, langSfx);
         break;
       default:
         if (res instanceof CanonicalResource) {
-          generateOutputsCanonical(f, r, (CanonicalResource) res, vars, prefixForContainer);          
+          generateOutputsCanonical(f, r, (CanonicalResource) res, vars, prefixForContainer, lrc, langSfx);          
         }
         // nothing to do...
         result = false;
@@ -11341,19 +11359,19 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
 
-  private void generateOutputsOperationDefinition(FetchedFile f, FetchedResource r, OperationDefinition od, Map<String, String> vars, boolean regen, String prefixForContainer) throws FHIRException, IOException {
-    OperationDefinitionRenderer odr = new OperationDefinitionRenderer(context, checkAppendSlash(specPath), od, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, rc, versionToAnnotate);
+  private void generateOutputsOperationDefinition(FetchedFile f, FetchedResource r, OperationDefinition od, Map<String, String> vars, boolean regen, String prefixForContainer, RenderingContext lrc, String langSfx) throws FHIRException, IOException {
+    OperationDefinitionRenderer odr = new OperationDefinitionRenderer(context, checkAppendSlash(specPath), od, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, lrc, versionToAnnotate);
     if (igpkp.wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
-      fragment("OperationDefinition-"+prefixForContainer+od.getId()+"-summary", odr.summary(), f.getOutputNames(), r, vars, null, start, "summary", "OperationDefinition");
+      fragment("OperationDefinition-"+prefixForContainer+od.getId()+"-summary"+langSfx, odr.summary(), f.getOutputNames(), r, vars, null, start, "summary", "OperationDefinition");
     }
     if (igpkp.wantGen(r, "summary-table")) {
       long start = System.currentTimeMillis();
-      fragment("OperationDefinition-"+prefixForContainer+od.getId()+"-summary-table", odr.summary(), f.getOutputNames(), r, vars, null, start, "summary-table", "OperationDefinition");
+      fragment("OperationDefinition-"+prefixForContainer+od.getId()+"-summary-table"+langSfx, odr.summary(), f.getOutputNames(), r, vars, null, start, "summary-table", "OperationDefinition");
     }
     if (igpkp.wantGen(r, "idempotence")) {
       long start = System.currentTimeMillis();
-      fragment("OperationDefinition-"+prefixForContainer+od.getId()+"-idempotence", odr.idempotence(), f.getOutputNames(), r, vars, null, start, "idempotence", "OperationDefinition");
+      fragment("OperationDefinition-"+prefixForContainer+od.getId()+"-idempotence"+langSfx, odr.idempotence(), f.getOutputNames(), r, vars, null, start, "idempotence", "OperationDefinition");
     }
   }
 
@@ -11438,7 +11456,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
 
-  private void generateOutputsList(FetchedFile f, FetchedResource r, ListResource resource, Map<String, String> vars, String prefixForContainer) throws IOException, FHIRException {
+  private void generateOutputsList(FetchedFile f, FetchedResource r, ListResource resource, Map<String, String> vars, String prefixForContainer, RenderingContext lrc, String langSfx) throws IOException, FHIRException {
     // we have 4 kinds of outputs:
     //  * list: a series of <li><a href="{{link}}">{{name}}</a> {{desc}}</li>
     //  * list-simple: a series of <li><a href="{{link}}">{{name}}]</a></li>
@@ -11948,15 +11966,49 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
 
     e = r.getElement();
+    if (isNewML()) {
+      for (String l : allLangs()) {
+        generateHtml(f, r, vars, rcLangs.get(l), l);
+      }
+    } else {
+      generateHtml(f, r, vars, rc, null);
+    }
+
+    if (igpkp.wantGen(r, "history")) {
+      long start = System.currentTimeMillis();
+      XhtmlComposer xc = new XhtmlComposer(XhtmlComposer.XML, module.isNoNarrative());
+      if (isNewML()) {
+        for (String l : allLangs()) {
+          XhtmlNode xhtml = new HistoryGenerator(rcLangs.get(l)).generate(r);
+          String html = xhtml == null ? "" : xc.compose(xhtml);
+          fragment(r.fhirType()+"-"+r.getId()+"-history"+l, html, f.getOutputNames(), r, vars, null, start, "history", "Resource");        
+        }
+      } else {
+        XhtmlNode xhtml = new HistoryGenerator(rc).generate(r);
+        String html = xhtml == null ? "" : xc.compose(xhtml);
+        fragment(r.fhirType()+"-"+r.getId()+"-history", html, f.getOutputNames(), r, vars, null, start, "history", "Resource");
+      }
+    }
+
+    //  NarrativeGenerator gen = new NarrativeGenerator(null, null, context);
+    //  gen.generate(f.getElement(), false);
+    //  xhtml = getXhtml(f);
+    //  html = xhtml == null ? "" : new XhtmlComposer().compose(xhtml);
+    //  fragment(f.getId()+"-gen-html", html);
+  }
+
+  private void generateHtml(FetchedFile f, FetchedResource r, Map<String, String> vars, RenderingContext lrc,  String lang)
+      throws Exception, UnsupportedEncodingException, IOException, EOperationOutcome {
+    String langSfx = lang == null ? "": "-"+lang;
     XhtmlComposer xc = new XhtmlComposer(XhtmlComposer.XML, module.isNoNarrative());
     if (igpkp.wantGen(r, "html")) {
       long start = System.currentTimeMillis();
-      XhtmlNode xhtml = getXhtml(f, r);
+      XhtmlNode xhtml = (lang == null || lang.equals(r.getElement().getNamedChildValue("language"))) ? null : getXhtml(f, r);
       if (xhtml == null && HistoryGenerator.allEntriesAreHistoryProvenance(r.getElement())) {
-        RenderingContext ctxt = rc.copy(false).setParser(getTypeLoader(f, r));
+        RenderingContext ctxt = lrc.copy(false).setParser(getTypeLoader(f, r));
         List<ProvenanceDetails> entries = loadProvenanceForBundle(igpkp.getLinkFor(r, true), r.getElement(), f);
         xhtml = new HistoryGenerator(ctxt).generateForBundle(entries); 
-        fragment(r.fhirType()+"-"+r.getId()+"-html", xc.compose(xhtml), f.getOutputNames(), r, vars, null, start, "html", "Resource");
+        fragment(r.fhirType()+"-"+r.getId()+"-html"+langSfx, xc.compose(xhtml), f.getOutputNames(), r, vars, null, start, "html", "Resource");
       } else if (r.fhirType().equals("Binary")) {
         String pfx = "";
         if (r.getExampleUri() != null) {
@@ -11979,16 +12031,16 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         for (String fn : br.getFilenames()) {
           otherFilesRun.add(Utilities.path(tempDir, fn));
         }
-        fragment(r.fhirType()+"-"+r.getId()+"-html", html, f.getOutputNames(), r, vars, null, start, "html", "Resource");
+        fragment(r.fhirType()+"-"+r.getId()+"-html"+langSfx, html, f.getOutputNames(), r, vars, null, start, "html", "Resource");
       } else {
         if (xhtml == null) {
-          RenderingContext lrc = rc.copy(false);
+          RenderingContext xlrc = lrc.copy(false);
           if (r.getResource() != null && r.getResource() instanceof DomainResource) {
-            xhtml = RendererFactory.factory(r.fhirType(), lrc).buildNarrative(ResourceWrapper.forResource(lrc, r.getResource()));
+            xhtml = RendererFactory.factory(r.fhirType(), xlrc).buildNarrative(ResourceWrapper.forResource(xlrc, r.getResource()));
           } else {
-            ResourceWrapper rw = ResourceWrapper.forResource(lrc, r.getElement()); 
+            ResourceWrapper rw = ResourceWrapper.forResource(xlrc, r.getElement()); 
             try {
-              xhtml = RendererFactory.factory(r.fhirType(), lrc).buildNarrative(rw);
+              xhtml = RendererFactory.factory(r.fhirType(), xlrc).buildNarrative(rw);
             } catch (Exception ex) {
               xhtml = new XhtmlNode(NodeType.Element, "div");
               xhtml.para("Error rendering resource: "+ex.getMessage());
@@ -11996,22 +12048,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           }
         }
         String html = xhtml == null ? "" : xc.compose(xhtml);
-        fragment(r.fhirType()+"-"+r.getId()+"-html", html, f.getOutputNames(), r, vars, null, start, "html", "Resource");
+        fragment(r.fhirType()+"-"+r.getId()+"-html"+langSfx, html, f.getOutputNames(), r, vars, null, start, "html", "Resource");
       }
     }
-
-    if (igpkp.wantGen(r, "history")) {
-      long start = System.currentTimeMillis();
-      XhtmlNode xhtml = new HistoryGenerator(rc).generate(r);
-      String html = xhtml == null ? "" : xc.compose(xhtml);
-      fragment(r.fhirType()+"-"+r.getId()+"-history", html, f.getOutputNames(), r, vars, null, start, "history", "Resource");
-    }
-
-    //  NarrativeGenerator gen = new NarrativeGenerator(null, null, context);
-    //  gen.generate(f.getElement(), false);
-    //  xhtml = getXhtml(f);
-    //  html = xhtml == null ? "" : new XhtmlComposer().compose(xhtml);
-    //  fragment(f.getId()+"-gen-html", html);
   }
 
   private boolean suppressId(FetchedFile f, FetchedResource r) {
@@ -12215,27 +12254,27 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
    * @throws org.hl7.fhir.exceptions.FHIRException
    * @throws Exception
    */
-  private void generateOutputsCodeSystem(FetchedFile f, FetchedResource fr, CodeSystem cs, Map<String, String> vars, String prefixForContainer) throws Exception {
-    CodeSystemRenderer csr = new CodeSystemRenderer(context, specPath, cs, igpkp, specMaps, pageTargets(), markdownEngine, packge, rc, versionToAnnotate);
+  private void generateOutputsCodeSystem(FetchedFile f, FetchedResource fr, CodeSystem cs, Map<String, String> vars, String prefixForContainer, RenderingContext lrc, String langSfx) throws Exception {
+    CodeSystemRenderer csr = new CodeSystemRenderer(context, specPath, cs, igpkp, specMaps, pageTargets(), markdownEngine, packge, lrc, versionToAnnotate);
     if (igpkp.wantGen(fr, "summary")) {
       long start = System.currentTimeMillis();
-      fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-summary", csr.summaryTable(fr, igpkp.wantGen(fr, "xml"), igpkp.wantGen(fr, "json"), igpkp.wantGen(fr, "ttl"), igpkp.summaryRows()), f.getOutputNames(), fr, vars, null, start, "summary", "CodeSystem");
+      fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-summary"+langSfx, csr.summaryTable(fr, igpkp.wantGen(fr, "xml"), igpkp.wantGen(fr, "json"), igpkp.wantGen(fr, "ttl"), igpkp.summaryRows()), f.getOutputNames(), fr, vars, null, start, "summary", "CodeSystem");
     }
     if (igpkp.wantGen(fr, "summary-table")) {
       long start = System.currentTimeMillis();
-      fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-summary-table", csr.summaryTable(fr, igpkp.wantGen(fr, "xml"), igpkp.wantGen(fr, "json"), igpkp.wantGen(fr, "ttl"), igpkp.summaryRows()), f.getOutputNames(), fr, vars, null, start, "summary-table", "CodeSystem");
+      fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-summary-table"+langSfx, csr.summaryTable(fr, igpkp.wantGen(fr, "xml"), igpkp.wantGen(fr, "json"), igpkp.wantGen(fr, "ttl"), igpkp.summaryRows()), f.getOutputNames(), fr, vars, null, start, "summary-table", "CodeSystem");
     }
     if (igpkp.wantGen(fr, "content")) {
       long start = System.currentTimeMillis();
-      fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-content", csr.content(otherFilesRun), f.getOutputNames(), fr, vars, null, start, "content", "CodeSystem");
+      fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-content"+langSfx, csr.content(otherFilesRun), f.getOutputNames(), fr, vars, null, start, "content", "CodeSystem");
     }
     if (igpkp.wantGen(fr, "xref")) {
       long start = System.currentTimeMillis();
-      fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-xref", csr.xref(), f.getOutputNames(), fr, vars, null, start, "xref", "CodeSystem");
+      fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-xref"+langSfx, csr.xref(), f.getOutputNames(), fr, vars, null, start, "xref", "CodeSystem");
     }
     if (igpkp.wantGen(fr, "changes")) {
       long start = System.currentTimeMillis();
-      fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-changes", csr.changeSummary(), f.getOutputNames(), fr, vars, null, start, "changes", "CodeSystem");
+      fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-changes"+langSfx, csr.changeSummary(), f.getOutputNames(), fr, vars, null, start, "changes", "CodeSystem");
     }
 
     if (igpkp.wantGen(fr, "xlsx")) {
@@ -12260,31 +12299,31 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
    * @throws org.hl7.fhir.exceptions.FHIRException
    * @throws Exception
    */
-  private void generateOutputsValueSet(FetchedFile f, FetchedResource r, ValueSet vs, Map<String, String> vars, String prefixForContainer, DBBuilder db) throws Exception {
-    ValueSetRenderer vsr = new ValueSetRenderer(context, specPath, vs, igpkp, specMaps, pageTargets(), markdownEngine, packge, rc, versionToAnnotate);
+  private void generateOutputsValueSet(FetchedFile f, FetchedResource r, ValueSet vs, Map<String, String> vars, String prefixForContainer, DBBuilder db, RenderingContext lrc, String langSfx) throws Exception {
+    ValueSetRenderer vsr = new ValueSetRenderer(context, specPath, vs, igpkp, specMaps, pageTargets(), markdownEngine, packge, lrc, versionToAnnotate);
     if (igpkp.wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
-      fragment("ValueSet-"+prefixForContainer+vs.getId()+"-summary", vsr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary", "ValueSet");
+      fragment("ValueSet-"+prefixForContainer+vs.getId()+"-summary"+langSfx, vsr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary", "ValueSet");
     }
     if (igpkp.wantGen(r, "summary-table")) {
       long start = System.currentTimeMillis();
-      fragment("ValueSet-"+prefixForContainer+vs.getId()+"-summary-table", vsr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary-table", "ValueSet");
+      fragment("ValueSet-"+prefixForContainer+vs.getId()+"-summary-table"+langSfx, vsr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary-table", "ValueSet");
     }
     if (igpkp.wantGen(r, "cld")) {
       long start = System.currentTimeMillis();
       try {
-        fragment("ValueSet-"+prefixForContainer+vs.getId()+"-cld", vsr.cld(otherFilesRun), f.getOutputNames(), r, vars, null, start, "cld", "ValueSet");
+        fragment("ValueSet-"+prefixForContainer+vs.getId()+"-cld"+langSfx, vsr.cld(otherFilesRun), f.getOutputNames(), r, vars, null, start, "cld", "ValueSet");
       } catch (Exception e) {
         fragmentError(vs.getId()+"-cld", e.getMessage(), null, f.getOutputNames(), start, "cld", "ValueSet");
       }
     }
     if (igpkp.wantGen(r, "xref")) {
       long start = System.currentTimeMillis();
-      fragment("ValueSet-"+prefixForContainer+vs.getId()+"-xref", vsr.xref(), f.getOutputNames(), r, vars, null, start, "xref", "ValueSet");
+      fragment("ValueSet-"+prefixForContainer+vs.getId()+"-xref"+langSfx, vsr.xref(), f.getOutputNames(), r, vars, null, start, "xref", "ValueSet");
     }
     if (igpkp.wantGen(r, "changes")) {
       long start = System.currentTimeMillis();
-      fragment("ValueSet-"+prefixForContainer+vs.getId()+"-changes", vsr.changeSummary(), f.getOutputNames(), r, vars, null, start, "changes", "ValueSet");
+      fragment("ValueSet-"+prefixForContainer+vs.getId()+"-changes"+langSfx, vsr.changeSummary(), f.getOutputNames(), r, vars, null, start, "changes", "ValueSet");
     }
     if (igpkp.wantGen(r, "expansion")) {
       long start = System.currentTimeMillis();
@@ -12298,12 +12337,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         if (exp.getValueset() != null) {
           expansions.add(exp.getValueset());
 
-          RenderingContext lrc = rc.withUniqueLocalPrefix("x");
+          RenderingContext elrc = lrc.withUniqueLocalPrefix("x");
           exp.getValueset().setCompose(null);
           exp.getValueset().setText(null);  
-          RendererFactory.factory(exp.getValueset(), lrc).renderResource(ResourceWrapper.forResource(lrc, exp.getValueset()));
+          RendererFactory.factory(exp.getValueset(), elrc).renderResource(ResourceWrapper.forResource(elrc, exp.getValueset()));
           String html = new XhtmlComposer(XhtmlComposer.XML).compose(exp.getValueset().getText().getDiv());
-          fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null, start, "expansion", "ValueSet");
+          fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion"+langSfx, html, f.getOutputNames(), r, vars, null, start, "expansion", "ValueSet");
           if (ValueSetUtilities.isIncompleteExpansion(exp.getValueset())) {
             f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.INFORMATIONAL, "ValueSet.where(id = '"+vs.getId()+"')", "The value set expansion is too large, and only a subset has been displayed", IssueSeverity.INFORMATION).setTxLink(exp.getTxLink()));
           }
@@ -12311,25 +12350,25 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           if (exp.getError() != null) { 
             if (exp.getError().contains("Unable to provide support")) {
               if (exp.getError().contains("known versions")) {
-                fragmentErrorHtml("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", "No Expansion for this valueset (Unsupported Code System Version<!-- "+Utilities.escapeXml(exp.getAllErrors().toString())+" -->)", "Publication Tooling Error: "+Utilities.escapeXml(exp.getAllErrors().toString()), f.getOutputNames(), start, "expansion", "ValueSet");                
+                fragmentErrorHtml("ValueSet-"+prefixForContainer+vs.getId()+"-expansion"+langSfx, "No Expansion for this valueset (Unsupported Code System Version<!-- "+Utilities.escapeXml(exp.getAllErrors().toString())+" -->)", "Publication Tooling Error: "+Utilities.escapeXml(exp.getAllErrors().toString()), f.getOutputNames(), start, "expansion", "ValueSet");                
               } else {
-                fragmentErrorHtml("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", "No Expansion for this valueset (Unknown Code System<!-- "+Utilities.escapeXml(exp.getAllErrors().toString())+" -->)", "Publication Tooling Error: "+Utilities.escapeXml(exp.getAllErrors().toString()), f.getOutputNames(), start, "expansion", "ValueSet");
+                fragmentErrorHtml("ValueSet-"+prefixForContainer+vs.getId()+"-expansion"+langSfx, "No Expansion for this valueset (Unknown Code System<!-- "+Utilities.escapeXml(exp.getAllErrors().toString())+" -->)", "Publication Tooling Error: "+Utilities.escapeXml(exp.getAllErrors().toString()), f.getOutputNames(), start, "expansion", "ValueSet");
               }
               f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, "ValueSet.where(id = '"+vs.getId()+"')", exp.getError(), IssueSeverity.WARNING).setTxLink(exp.getTxLink()));
               r.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, "ValueSet.where(id = '"+vs.getId()+"')", exp.getError(), IssueSeverity.WARNING).setTxLink(exp.getTxLink()));
             } else if (exp.getError().contains("grammar") || exp.getError().contains("enumerated") ) {
-              fragmentErrorHtml("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", "This value set cannot be expanded because of the way it is defined - it has an infinite number of members<!-- "+Utilities.escapeXml(exp.getAllErrors().toString())+" -->", "Publication Tooling Error: "+Utilities.escapeXml(exp.getAllErrors().toString()), f.getOutputNames(), start, "expansion", "ValueSet");
+              fragmentErrorHtml("ValueSet-"+prefixForContainer+vs.getId()+"-expansion"+langSfx, "This value set cannot be expanded because of the way it is defined - it has an infinite number of members<!-- "+Utilities.escapeXml(exp.getAllErrors().toString())+" -->", "Publication Tooling Error: "+Utilities.escapeXml(exp.getAllErrors().toString()), f.getOutputNames(), start, "expansion", "ValueSet");
               f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, "ValueSet.where(id = '"+vs.getId()+"')", exp.getError(), IssueSeverity.ERROR).setTxLink(exp.getTxLink()));
             } else if (exp.getError().contains("too many") ) {
-              fragmentErrorHtml("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", "This value set cannot be expanded because the terminology server(s) deemed it too costly to do so<!-- "+Utilities.escapeXml(exp.getAllErrors().toString())+" -->", "Publication Tooling Error: "+Utilities.escapeXml(exp.getAllErrors().toString()), f.getOutputNames(), start, "expansion", "ValueSet");
+              fragmentErrorHtml("ValueSet-"+prefixForContainer+vs.getId()+"-expansion"+langSfx, "This value set cannot be expanded because the terminology server(s) deemed it too costly to do so<!-- "+Utilities.escapeXml(exp.getAllErrors().toString())+" -->", "Publication Tooling Error: "+Utilities.escapeXml(exp.getAllErrors().toString()), f.getOutputNames(), start, "expansion", "ValueSet");
               f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, "ValueSet.where(id = '"+vs.getId()+"')", exp.getError(), IssueSeverity.ERROR).setTxLink(exp.getTxLink()));
             } else {
-              fragmentErrorHtml("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", "No Expansion for this valueset (not supported by Publication Tooling<!-- "+Utilities.escapeXml(exp.getAllErrors().toString())+" -->)", "Publication Tooling Error: "+Utilities.escapeXml(exp.getAllErrors().toString()), f.getOutputNames(), start, "expansion", "ValueSet");
+              fragmentErrorHtml("ValueSet-"+prefixForContainer+vs.getId()+"-expansion"+langSfx, "No Expansion for this valueset (not supported by Publication Tooling<!-- "+Utilities.escapeXml(exp.getAllErrors().toString())+" -->)", "Publication Tooling Error: "+Utilities.escapeXml(exp.getAllErrors().toString()), f.getOutputNames(), start, "expansion", "ValueSet");
               f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, "ValueSet.where(id = '"+vs.getId()+"')", exp.getError(), IssueSeverity.ERROR).setTxLink(exp.getTxLink()));
               r.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, "ValueSet.where(id = '"+vs.getId()+"')", exp.getError(), IssueSeverity.ERROR).setTxLink(exp.getTxLink()));
             }
           } else {
-            fragmentError("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", "No Expansion for this valueset (not supported by Publication Tooling)", "Unknown Error", f.getOutputNames(), start, "expansion", "ValueSet");
+            fragmentError("ValueSet-"+prefixForContainer+vs.getId()+"-expansion"+langSfx, "No Expansion for this valueset (not supported by Publication Tooling)", "Unknown Error", f.getOutputNames(), start, "expansion", "ValueSet");
             f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, "ValueSet.where(id = '"+vs.getId()+"')", "Unknown Error expanding ValueSet", IssueSeverity.ERROR).setTxLink(exp.getTxLink()));
             r.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.EXCEPTION, "ValueSet.where(id = '"+vs.getId()+"')", "Unknown Error expanding ValueSet", IssueSeverity.ERROR).setTxLink(exp.getTxLink()));
           }
@@ -12372,27 +12411,27 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
    *   xref
    * @throws IOException
    */
-  private void generateOutputsConceptMap(FetchedFile f, FetchedResource r, ConceptMap cm, Map<String, String> vars, String prefixForContainer) throws IOException, FHIRException {
+  private void generateOutputsConceptMap(FetchedFile f, FetchedResource r, ConceptMap cm, Map<String, String> vars, String prefixForContainer, RenderingContext lrc, String langSfx) throws IOException, FHIRException {
     if (igpkp.wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
-      fragmentError("ConceptMap-"+prefixForContainer+cm.getId()+"-summary", "yet to be done: concept map summary", null, f.getOutputNames(), start, "summary", "ConceptMap");
+      fragmentError("ConceptMap-"+prefixForContainer+cm.getId()+"-summary"+langSfx, "yet to be done: concept map summary", null, f.getOutputNames(), start, "summary", "ConceptMap");
     }
     if (igpkp.wantGen(r, "summary-table")) {
       long start = System.currentTimeMillis();
-      fragmentError("ConceptMap-"+prefixForContainer+cm.getId()+"-summary-table", "yet to be done: concept map summary", null, f.getOutputNames(), start, "summary-table", "ConceptMap");
+      fragmentError("ConceptMap-"+prefixForContainer+cm.getId()+"-summary-table"+langSfx, "yet to be done: concept map summary", null, f.getOutputNames(), start, "summary-table", "ConceptMap");
     }
     if (igpkp.wantGen(r, "content")) {
       long start = System.currentTimeMillis();
-      fragmentError("ConceptMap-"+prefixForContainer+cm.getId()+"-content", "yet to be done: table presentation of the concept map", null, f.getOutputNames(), start, "content", "ConceptMap");
+      fragmentError("ConceptMap-"+prefixForContainer+cm.getId()+"-content"+langSfx, "yet to be done: table presentation of the concept map", null, f.getOutputNames(), start, "content", "ConceptMap");
     }
     if (igpkp.wantGen(r, "xref")) {
       long start = System.currentTimeMillis();
-      fragmentError("ConceptMap-"+prefixForContainer+cm.getId()+"-xref", "yet to be done: list of all places where concept map is used", null, f.getOutputNames(), start, "xref", "ConceptMap");
+      fragmentError("ConceptMap-"+prefixForContainer+cm.getId()+"-xref"+langSfx, "yet to be done: list of all places where concept map is used", null, f.getOutputNames(), start, "xref", "ConceptMap");
     }
     MappingSheetParser p = new MappingSheetParser();
     if (igpkp.wantGen(r, "sheet") && p.isSheet(cm)) {
       long start = System.currentTimeMillis();
-      fragment("ConceptMap-"+prefixForContainer+cm.getId()+"-sheet", p.genSheet(cm), f.getOutputNames(), r, vars, null, start, "sheet", "ConceptMap");
+      fragment("ConceptMap-"+prefixForContainer+cm.getId()+"-sheet+langSfx", p.genSheet(cm), f.getOutputNames(), r, vars, null, start, "sheet", "ConceptMap");
     }
     ConceptMapSpreadsheetGenerator cmg = new ConceptMapSpreadsheetGenerator(context);
     if (igpkp.wantGen(r, "xlsx") && cmg.canGenerate(cm)) {
@@ -12403,7 +12442,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
   }
 
-  private void generateOutputsCapabilityStatement(FetchedFile f, FetchedResource r, CapabilityStatement cpbs, Map<String, String> vars, String prefixForContainer) throws Exception {
+  private void generateOutputsCapabilityStatement(FetchedFile f, FetchedResource r, CapabilityStatement cpbs, Map<String, String> vars, String prefixForContainer, RenderingContext lrc, String langSfx) throws Exception {
     if (igpkp.wantGen(r, "swagger") || igpkp.wantGen(r, "openapi")) {
       Writer oa = null;
       if (openApiTemplate != null) 
@@ -12419,11 +12458,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
   }
 
-  private void generateOutputsStructureDefinition(FetchedFile f, FetchedResource r, StructureDefinition sd, Map<String, String> vars, boolean regen, String prefixForContainer) throws Exception {
+  private void generateOutputsStructureDefinition(FetchedFile f, FetchedResource r, StructureDefinition sd, Map<String, String> vars, boolean regen, String prefixForContainer, RenderingContext lrc, String langSfx) throws Exception {
     // todo : generate shex itself    
     if (igpkp.wantGen(r, "shex")) {
       long start = System.currentTimeMillis();
-      fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-shex", "yet to be done: shex as html", null, f.getOutputNames(), start, "shex", "StructureDefinition");
+      fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-shex"+langSfx, "yet to be done: shex as html", null, f.getOutputNames(), start, "shex", "StructureDefinition");
     }
     
 // todo : generate json schema itself. JSON Schema generator
@@ -12434,248 +12473,248 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     //    }
     if (igpkp.wantGen(r, "json-schema")) {
       long start = System.currentTimeMillis();
-      fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-json-schema", "yet to be done: json schema as html", null, f.getOutputNames(), start, "json-schema", "StructureDefinition");
+      fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-json-schema"+langSfx, "yet to be done: json schema as html", null, f.getOutputNames(), start, "json-schema", "StructureDefinition");
     }
 
-    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, rc, allInvariants, sdMapCache, specPath, versionToAnnotate);
+    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, lrc, allInvariants, sdMapCache, specPath, versionToAnnotate);
 
     if (igpkp.wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-summary", sdr.summary(false), f.getOutputNames(), r, vars, null, start, "summary", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-summary"+langSfx, sdr.summary(false), f.getOutputNames(), r, vars, null, start, "summary", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "summary-all")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-summary-all", sdr.summary(true), f.getOutputNames(), r, vars, null, start, "summary", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-summary-all"+langSfx, sdr.summary(true), f.getOutputNames(), r, vars, null, start, "summary", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "summary-table")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-summary-table", sdr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary-table", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-summary-table"+langSfx, sdr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary-table", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "header")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-header", sdr.header(), f.getOutputNames(), r, vars, null, start, "header", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-header"+langSfx, sdr.header(), f.getOutputNames(), r, vars, null, start, "header", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "uses")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-uses", sdr.uses(), f.getOutputNames(), r, vars, null, start, "uses", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-uses"+langSfx, sdr.uses(), f.getOutputNames(), r, vars, null, start, "uses", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "ctxts")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-ctxts", sdr.contexts(), f.getOutputNames(), r, vars, null, start, "ctxts", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-ctxts"+langSfx, sdr.contexts(), f.getOutputNames(), r, vars, null, start, "ctxts", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "experimental-warning")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-experimental-warning", sdr.experimentalWarning(), f.getOutputNames(), r, vars, null, start, "experimental-warning", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-experimental-warning"+langSfx, sdr.experimentalWarning(), f.getOutputNames(), r, vars, null, start, "experimental-warning", "StructureDefinition");
     }
 
     if (igpkp.wantGen(r, "diff")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, false), f.getOutputNames(), r, vars, null, start, "diff", "StructureDefinition");
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff-all", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, true), f.getOutputNames(), r, vars, null, start, "diff", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff"+langSfx, sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, false), f.getOutputNames(), r, vars, null, start, "diff", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff-all"+langSfx, sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, true), f.getOutputNames(), r, vars, null, start, "diff", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "snapshot")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot", sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, false), f.getOutputNames(), r, vars, null, start, "snapshot", "StructureDefinition");
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-all", sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, true), f.getOutputNames(), r, vars, null, start, "snapshot", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot"+langSfx, sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, false), f.getOutputNames(), r, vars, null, start, "snapshot", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-all"+langSfx, sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, true), f.getOutputNames(), r, vars, null, start, "snapshot", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "snapshot-by-key")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key", sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, false), f.getOutputNames(), r, vars, null, start, "snapshot-by-key", "StructureDefinition");
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key-all", sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, true), f.getOutputNames(), r, vars, null, start, "snapshot-by-key", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key"+langSfx, sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, false), f.getOutputNames(), r, vars, null, start, "snapshot-by-key", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key-all"+langSfx, sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, true), f.getOutputNames(), r, vars, null, start, "snapshot-by-key", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "snapshot-by-mustsupport")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport", sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, false), f.getOutputNames(), r, vars, null, start, "snapshot-by-mustsupport", "StructureDefinition");
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport-all", sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, true), f.getOutputNames(), r, vars, null, start, "snapshot-by-mustsupport", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport"+langSfx, sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, false), f.getOutputNames(), r, vars, null, start, "snapshot-by-mustsupport", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport-all"+langSfx, sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, true), f.getOutputNames(), r, vars, null, start, "snapshot-by-mustsupport", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "diff-bindings")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff-bindings", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, false), f.getOutputNames(), r, vars, null, start, "diff-bindings", "StructureDefinition");
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff-bindings-all", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, true), f.getOutputNames(), r, vars, null, start, "diff-bindings", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff-bindings"+langSfx, sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, false), f.getOutputNames(), r, vars, null, start, "diff-bindings", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff-bindings-all"+langSfx, sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, true), f.getOutputNames(), r, vars, null, start, "diff-bindings", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "snapshot-bindings")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-bindings", sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, false), f.getOutputNames(), r, vars, null, start, "snapshot-bindings", "StructureDefinition");
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-bindings-all", sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, true), f.getOutputNames(), r, vars, null, start, "snapshot-bindings", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-bindings"+langSfx, sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, false), f.getOutputNames(), r, vars, null, start, "snapshot-bindings", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-bindings-all"+langSfx, sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, true), f.getOutputNames(), r, vars, null, start, "snapshot-bindings", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "snapshot-by-key-bindings")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key-bindings", sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, false), f.getOutputNames(), r, vars, null, start, "snapshot-by-key-bindings", "StructureDefinition");
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key-bindings-all", sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, true), f.getOutputNames(), r, vars, null, start, "snapshot-by-key-bindings", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key-bindings"+langSfx, sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, false), f.getOutputNames(), r, vars, null, start, "snapshot-by-key-bindings", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key-bindings-all"+langSfx, sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, true), f.getOutputNames(), r, vars, null, start, "snapshot-by-key-bindings", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "snapshot-by-mustsupport-bindings")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport-bindings", sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, false), f.getOutputNames(), r, vars, null, start, "snapshot-by-mustsupport-bindings", "StructureDefinition");
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport-bindings-all", sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, true), f.getOutputNames(), r, vars, null, start, "snapshot-by-mustsupport-bindings", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport-bindings"+langSfx, sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, false), f.getOutputNames(), r, vars, null, start, "snapshot-by-mustsupport-bindings", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport-bindings-all"+langSfx, sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.BINDINGS, true), f.getOutputNames(), r, vars, null, start, "snapshot-by-mustsupport-bindings", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "diff-obligations")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff-obligations", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, false), f.getOutputNames(), r, vars, null, start, "diff-obligations", "StructureDefinition");
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff-obligations-all", sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, true), f.getOutputNames(), r, vars, null, start, "diff-obligations", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff-obligations"+langSfx, sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, false), f.getOutputNames(), r, vars, null, start, "diff-obligations", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff-obligations-all"+langSfx, sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, true), f.getOutputNames(), r, vars, null, start, "diff-obligations", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "snapshot-obligations")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-obligations", sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, false), f.getOutputNames(), r, vars, null, start, "snapshot-obligations", "StructureDefinition");
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-obligations-all", sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, true), f.getOutputNames(), r, vars, null, start, "snapshot-obligations", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-obligations"+langSfx, sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, false), f.getOutputNames(), r, vars, null, start, "snapshot-obligations", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-obligations-all"+langSfx, sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, true), f.getOutputNames(), r, vars, null, start, "snapshot-obligations", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "snapshot-by-key-obligations")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key-obligations", sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, false), f.getOutputNames(), r, vars, null, start, "snapshot-by-key-obligations", "StructureDefinition");
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key-obligations-all", sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, true), f.getOutputNames(), r, vars, null, start, "snapshot-by-key-obligations", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key-obligations"+langSfx, sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, false), f.getOutputNames(), r, vars, null, start, "snapshot-by-key-obligations", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-key-obligations-all"+langSfx, sdr.byKey(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, true), f.getOutputNames(), r, vars, null, start, "snapshot-by-key-obligations", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "snapshot-by-mustsupport-obligations")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport-obligations", sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, false), f.getOutputNames(), r, vars, null, start, "snapshot-by-mustsupport-obligations", "StructureDefinition");
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport-obligations-all", sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, true), f.getOutputNames(), r, vars, null, start, "snapshot-by-mustsupport-obligations", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport-obligations"+langSfx, sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, false), f.getOutputNames(), r, vars, null, start, "snapshot-by-mustsupport-obligations", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-by-mustsupport-obligations-all"+langSfx, sdr.byMustSupport(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, true), f.getOutputNames(), r, vars, null, start, "snapshot-by-mustsupport-obligations", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "expansion")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-expansion", sdr.expansion(igpkp.getDefinitionsName(r), otherFilesRun, "x"), f.getOutputNames(), r, vars, null, start, "expansion", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-expansion"+langSfx, sdr.expansion(igpkp.getDefinitionsName(r), otherFilesRun, "x"), f.getOutputNames(), r, vars, null, start, "expansion", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "grid")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-grid", sdr.grid(igpkp.getDefinitionsName(r), otherFilesRun), f.getOutputNames(), r, vars, null, start, "grid", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-grid"+langSfx, sdr.grid(igpkp.getDefinitionsName(r), otherFilesRun), f.getOutputNames(), r, vars, null, start, "grid", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "pseudo-xml")) {
       long start = System.currentTimeMillis();
-      fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-pseudo-xml", "yet to be done: Xml template", null, f.getOutputNames(), start, "pseudo-xml", "StructureDefinition");
+      fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-pseudo-xml"+langSfx, "yet to be done: Xml template", null, f.getOutputNames(), start, "pseudo-xml", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "pseudo-json")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-pseudo-json", sdr.pseudoJson(), f.getOutputNames(), r, vars, null, start, "pseudo-json", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-pseudo-json"+langSfx, sdr.pseudoJson(), f.getOutputNames(), r, vars, null, start, "pseudo-json", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "pseudo-ttl")) {
       long start = System.currentTimeMillis();
-      fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-pseudo-ttl", "yet to be done: Turtle template", null, f.getOutputNames(), start, "pseudo-ttl", "StructureDefinition");
+      fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-pseudo-ttl"+langSfx, "yet to be done: Turtle template", null, f.getOutputNames(), start, "pseudo-ttl", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "uml")) {
       long start = System.currentTimeMillis();
-      fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-uml", "yet to be done: UML as SVG", null, f.getOutputNames(), start, "uml", "StructureDefinition");
+      fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-uml"+langSfx, "yet to be done: UML as SVG", null, f.getOutputNames(), start, "uml", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "tx")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx", sdr.tx(includeHeadings, false, false), f.getOutputNames(), r, vars, null, start, "tx", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx"+langSfx, sdr.tx(includeHeadings, false, false), f.getOutputNames(), r, vars, null, start, "tx", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "tx-must-support")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx-must-support", sdr.tx(includeHeadings, true, false), f.getOutputNames(), r, vars, null, start, "tx-must-support", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx-must-support"+langSfx, sdr.tx(includeHeadings, true, false), f.getOutputNames(), r, vars, null, start, "tx-must-support", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "tx-key")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx-key", sdr.tx(includeHeadings, false, true), f.getOutputNames(), r, vars, null, start, "tx-key", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx-key"+langSfx, sdr.tx(includeHeadings, false, true), f.getOutputNames(), r, vars, null, start, "tx-key", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "tx-diff")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx-diff", sdr.txDiff(includeHeadings, false), f.getOutputNames(), r, vars, null, start, "tx-diff", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx-diff"+langSfx, sdr.txDiff(includeHeadings, false), f.getOutputNames(), r, vars, null, start, "tx-diff", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "tx-diff-must-support")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx-diff-must-support", sdr.txDiff(includeHeadings, true), f.getOutputNames(), r, vars, null, start, "tx-diff-must-support", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-tx-diff-must-support"+langSfx, sdr.txDiff(includeHeadings, true), f.getOutputNames(), r, vars, null, start, "tx-diff-must-support", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "inv-diff")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-inv-diff", sdr.invOldMode(includeHeadings, StructureDefinitionRenderer.GEN_MODE_DIFF), f.getOutputNames(), r, vars, null, start, "inv-diff", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-inv-diff"+langSfx, sdr.invOldMode(includeHeadings, StructureDefinitionRenderer.GEN_MODE_DIFF), f.getOutputNames(), r, vars, null, start, "inv-diff", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "inv-key")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-inv-key", sdr.invOldMode(includeHeadings, StructureDefinitionRenderer.GEN_MODE_KEY), f.getOutputNames(), r, vars, null, start, "inv-key", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-inv-key"+langSfx, sdr.invOldMode(includeHeadings, StructureDefinitionRenderer.GEN_MODE_KEY), f.getOutputNames(), r, vars, null, start, "inv-key", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "inv")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-inv", sdr.invOldMode(includeHeadings, StructureDefinitionRenderer.GEN_MODE_SNAP), f.getOutputNames(), r, vars, null, start, "inv", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-inv"+langSfx, sdr.invOldMode(includeHeadings, StructureDefinitionRenderer.GEN_MODE_SNAP), f.getOutputNames(), r, vars, null, start, "inv", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "dict")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-dict", sdr.dict(true, StructureDefinitionRenderer.GEN_MODE_SNAP, StructureDefinitionRenderer.ANCHOR_PREFIX_SNAP), f.getOutputNames(), r, vars, null, start, "dict", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-dict"+langSfx, sdr.dict(true, StructureDefinitionRenderer.GEN_MODE_SNAP, StructureDefinitionRenderer.ANCHOR_PREFIX_SNAP), f.getOutputNames(), r, vars, null, start, "dict", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "dict-diff")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-dict-diff", sdr.dict(true, StructureDefinitionRenderer.GEN_MODE_DIFF, StructureDefinitionRenderer.ANCHOR_PREFIX_DIFF), f.getOutputNames(), r, vars, null, start, "dict-diff", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-dict-diff"+langSfx, sdr.dict(true, StructureDefinitionRenderer.GEN_MODE_DIFF, StructureDefinitionRenderer.ANCHOR_PREFIX_DIFF), f.getOutputNames(), r, vars, null, start, "dict-diff", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "dict-ms")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-dict-ms", sdr.dict(true, StructureDefinitionRenderer.GEN_MODE_MS, StructureDefinitionRenderer.ANCHOR_PREFIX_MS), f.getOutputNames(), r, vars, null, start, "dict-ms", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-dict-ms"+langSfx, sdr.dict(true, StructureDefinitionRenderer.GEN_MODE_MS, StructureDefinitionRenderer.ANCHOR_PREFIX_MS), f.getOutputNames(), r, vars, null, start, "dict-ms", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "dict-key")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-dict-key", sdr.dict(true, StructureDefinitionRenderer.GEN_MODE_KEY, StructureDefinitionRenderer.ANCHOR_PREFIX_KEY), f.getOutputNames(), r, vars, null, start, "dict-key", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-dict-key"+langSfx, sdr.dict(true, StructureDefinitionRenderer.GEN_MODE_KEY, StructureDefinitionRenderer.ANCHOR_PREFIX_KEY), f.getOutputNames(), r, vars, null, start, "dict-key", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "dict-active")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-dict-active", sdr.dict(false, StructureDefinitionRenderer.GEN_MODE_SNAP, StructureDefinitionRenderer.ANCHOR_PREFIX_SNAP), f.getOutputNames(), r, vars, null, start, "dict-active", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-dict-active"+langSfx, sdr.dict(false, StructureDefinitionRenderer.GEN_MODE_SNAP, StructureDefinitionRenderer.ANCHOR_PREFIX_SNAP), f.getOutputNames(), r, vars, null, start, "dict-active", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "crumbs")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-crumbs", sdr.crumbTrail(), f.getOutputNames(), r, vars, null, start, "crumbs", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-crumbs"+langSfx, sdr.crumbTrail(), f.getOutputNames(), r, vars, null, start, "crumbs", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "maps")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps", sdr.mappings(false, false), f.getOutputNames(), r, vars, null, start, "maps", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps"+langSfx, sdr.mappings(false, false), f.getOutputNames(), r, vars, null, start, "maps", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "maps-all")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps-all", sdr.mappings(true, false), f.getOutputNames(), r, vars, null, start, "maps-all", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps-all"+langSfx, sdr.mappings(true, false), f.getOutputNames(), r, vars, null, start, "maps-all", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "maps-diff")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps-diff", sdr.mappings(false, true), f.getOutputNames(), r, vars, null, start, "maps-diff", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps-diff"+langSfx, sdr.mappings(false, true), f.getOutputNames(), r, vars, null, start, "maps-diff", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "maps-diff-all")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps-diff-all", sdr.mappings(true, true), f.getOutputNames(), r, vars, null, start, "maps-diff-all", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps-diff-all"+langSfx, sdr.mappings(true, true), f.getOutputNames(), r, vars, null, start, "maps-diff-all", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "xref")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-sd-xref", sdr.references(), f.getOutputNames(), r, vars, null, start, "xref", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-sd-xref"+langSfx, sdr.references(), f.getOutputNames(), r, vars, null, start, "xref", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "changes")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-sd-changes", sdr.changeSummary(), f.getOutputNames(), r, vars, null, start, "changes", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-sd-changes"+langSfx, sdr.changeSummary(), f.getOutputNames(), r, vars, null, start, "changes", "StructureDefinition");
     }
     long start = System.currentTimeMillis();
-    fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-typename", sdr.typeName(), f.getOutputNames(), r, vars, null, start, "-typename", "StructureDefinition");
+    fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-typename"+langSfx, sdr.typeName(), f.getOutputNames(), r, vars, null, start, "-typename", "StructureDefinition");
     if (sd.getDerivation() == TypeDerivationRule.CONSTRAINT && igpkp.wantGen(r, "span")) {
       start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-span", sdr.span(true, igpkp.getCanonical(), otherFilesRun, "sp"), f.getOutputNames(), r, vars, null, start, "span", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-span"+langSfx, sdr.span(true, igpkp.getCanonical(), otherFilesRun, "sp"), f.getOutputNames(), r, vars, null, start, "span", "StructureDefinition");
     }
     if (sd.getDerivation() == TypeDerivationRule.CONSTRAINT && igpkp.wantGen(r, "spanall")) {
       start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-spanall", sdr.span(true, igpkp.getCanonical(), otherFilesRun, "spall"), f.getOutputNames(), r, vars, null, start, "spanall", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-spanall"+langSfx, sdr.span(true, igpkp.getCanonical(), otherFilesRun, "spall"), f.getOutputNames(), r, vars, null, start, "spanall", "StructureDefinition");
     }
 
     if (igpkp.wantGen(r, "example-list")) {
       start = System.currentTimeMillis();
-      fragment("StructureDefinition-example-list-"+prefixForContainer+sd.getId(), sdr.exampleList(fileList, true), f.getOutputNames(), r, vars, null, start, "example-list", "StructureDefinition");
+      fragment("StructureDefinition-example-list-"+prefixForContainer+sd.getId()+langSfx, sdr.exampleList(fileList, true), f.getOutputNames(), r, vars, null, start, "example-list", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "example-table")) {
       start = System.currentTimeMillis();
-      fragment("StructureDefinition-example-table-"+prefixForContainer+sd.getId(), sdr.exampleTable(fileList, true), f.getOutputNames(), r, vars, null, start, "example-table", "StructureDefinition");;
+      fragment("StructureDefinition-example-table-"+prefixForContainer+sd.getId()+langSfx, sdr.exampleTable(fileList, true), f.getOutputNames(), r, vars, null, start, "example-table", "StructureDefinition");;
     }
     if (igpkp.wantGen(r, "example-list-all")) {
       start = System.currentTimeMillis();
-      fragment("StructureDefinition-example-list-all-"+prefixForContainer+sd.getId(), sdr.exampleList(fileList, false), f.getOutputNames(), r, vars, null, start, "example-list-all", "StructureDefinition");;
+      fragment("StructureDefinition-example-list-all-"+prefixForContainer+sd.getId()+langSfx, sdr.exampleList(fileList, false), f.getOutputNames(), r, vars, null, start, "example-list-all", "StructureDefinition");;
     }
     if (igpkp.wantGen(r, "example-table-all")) {
       start = System.currentTimeMillis();
-      fragment("StructureDefinition-example-table-all-"+prefixForContainer+sd.getId(), sdr.exampleTable(fileList, false), f.getOutputNames(), r, vars, null, start, "example-table-all", "StructureDefinition");;
+      fragment("StructureDefinition-example-table-all-"+prefixForContainer+sd.getId()+langSfx, sdr.exampleTable(fileList, false), f.getOutputNames(), r, vars, null, start, "example-table-all", "StructureDefinition");;
     }
 
     if (igpkp.wantGen(r, "testplan-list")) {
       start = System.currentTimeMillis();
-      fragment("StructureDefinition-testplan-list-"+prefixForContainer+sd.getId(), sdr.testplanList(fileList), f.getOutputNames(), r, vars, null, start, "testplan-list", "StructureDefinition");;
+      fragment("StructureDefinition-testplan-list-"+prefixForContainer+sd.getId()+langSfx, sdr.testplanList(fileList), f.getOutputNames(), r, vars, null, start, "testplan-list", "StructureDefinition");;
     }
     if (igpkp.wantGen(r, "testplan-table")) {
       start = System.currentTimeMillis();
-      fragment("StructureDefinition-testplan-table-"+prefixForContainer+sd.getId(), sdr.testplanTable(fileList), f.getOutputNames(), r, vars, null, start, "testplan-table", "StructureDefinition");;
+      fragment("StructureDefinition-testplan-table-"+prefixForContainer+sd.getId()+langSfx, sdr.testplanTable(fileList), f.getOutputNames(), r, vars, null, start, "testplan-table", "StructureDefinition");;
     }
 
     if (igpkp.wantGen(r, "testscript-list")) {
       start = System.currentTimeMillis();
-      fragment("StructureDefinition-testscript-list-"+prefixForContainer+sd.getId(), sdr.testscriptList(fileList), f.getOutputNames(), r, vars, null, start, "testscript-list", "StructureDefinition");;
+      fragment("StructureDefinition-testscript-list-"+prefixForContainer+sd.getId()+langSfx, sdr.testscriptList(fileList), f.getOutputNames(), r, vars, null, start, "testscript-list", "StructureDefinition");;
     }
     if (igpkp.wantGen(r, "testscript-table")) {
       start = System.currentTimeMillis();
-      fragment("StructureDefinition-testscript-table-"+prefixForContainer+sd.getId(), sdr.testscriptTable(fileList), f.getOutputNames(), r, vars, null, start, "testscript-table", "StructureDefinition");;
+      fragment("StructureDefinition-testscript-table-"+prefixForContainer+sd.getId()+langSfx, sdr.testscriptTable(fileList), f.getOutputNames(), r, vars, null, start, "testscript-table", "StructureDefinition");;
     }
 
     String sdPrefix = newIg ? "StructureDefinition-" : "";
@@ -12697,7 +12736,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       if (sdi != null) {
         start = System.currentTimeMillis();
         String cid = sdi.getUserString("imposes.compare.id");
-        fragment("StructureDefinition-imposes-"+prefixForContainer+sd.getId()+"-"+cid, sdr.compareImposes(sdi), f.getOutputNames(), r, vars, null, start, "imposes", "StructureDefinition");
+        fragment("StructureDefinition-imposes-"+prefixForContainer+sd.getId()+"-"+cid+langSfx, sdr.compareImposes(sdi), f.getOutputNames(), r, vars, null, start, "imposes", "StructureDefinition");
       }
     }
 
@@ -12733,7 +12772,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
     if (igpkp.wantGen(r, "sch"))
       start = System.currentTimeMillis();
-      fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-sch", "yet to be done: schematron as html", null, f.getOutputNames(), start, "sch", "StructureDefinition");
+      fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-sch"+langSfx, "yet to be done: schematron as html", null, f.getOutputNames(), start, "sch", "StructureDefinition");
   }
 
   private void lapsed(String msg) {
@@ -12758,31 +12797,31 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     return s.endsWith("/") ? s : s+"/";
   }
 
-  private void generateOutputsStructureMap(FetchedFile f, FetchedResource r, StructureMap map, Map<String,String> vars, String prefixForContainer) throws Exception {
-    StructureMapRenderer smr = new StructureMapRenderer(context, checkAppendSlash(specPath), map, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, rc, versionToAnnotate);
+  private void generateOutputsStructureMap(FetchedFile f, FetchedResource r, StructureMap map, Map<String,String> vars, String prefixForContainer, RenderingContext lrc, String langSfx) throws Exception {
+    StructureMapRenderer smr = new StructureMapRenderer(context, checkAppendSlash(specPath), map, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, lrc, versionToAnnotate);
     if (igpkp.wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
-      fragment("StructureMap-"+prefixForContainer+map.getId()+"-summary", smr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary", "StructureMap");
+      fragment("StructureMap-"+prefixForContainer+map.getId()+"-summary"+langSfx, smr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary", "StructureMap");
     }
     if (igpkp.wantGen(r, "summary-table")) {
       long start = System.currentTimeMillis();
-      fragment("StructureMap-"+prefixForContainer+map.getId()+"-summary-table", smr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary-table", "StructureMap");
+      fragment("StructureMap-"+prefixForContainer+map.getId()+"-summary-table"+langSfx, smr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary-table", "StructureMap");
     }
     if (igpkp.wantGen(r, "content")) {
       long start = System.currentTimeMillis();
-      fragment("StructureMap-"+prefixForContainer+map.getId()+"-content", smr.content(), f.getOutputNames(), r, vars, null, start, "content", "StructureMap");
+      fragment("StructureMap-"+prefixForContainer+map.getId()+"-content"+langSfx, smr.content(), f.getOutputNames(), r, vars, null, start, "content", "StructureMap");
     }
     if (igpkp.wantGen(r, "profiles")) {
       long start = System.currentTimeMillis();
-      fragment("StructureMap-"+prefixForContainer+map.getId()+"-profiles", smr.profiles(), f.getOutputNames(), r, vars, null, start, "profiles", "StructureMap");
+      fragment("StructureMap-"+prefixForContainer+map.getId()+"-profiles"+langSfx, smr.profiles(), f.getOutputNames(), r, vars, null, start, "profiles", "StructureMap");
     }
     if (igpkp.wantGen(r, "script")) {
       long start = System.currentTimeMillis();
-      fragment("StructureMap-"+prefixForContainer+map.getId()+"-script", smr.script(false), f.getOutputNames(), r, vars, null, start, "script", "StructureMap");
+      fragment("StructureMap-"+prefixForContainer+map.getId()+"-script"+langSfx, smr.script(false), f.getOutputNames(), r, vars, null, start, "script", "StructureMap");
     }
     if (igpkp.wantGen(r, "script-plain")) {
       long start = System.currentTimeMillis();
-      fragment("StructureMap-"+prefixForContainer+map.getId()+"-script-plain", smr.script(true), f.getOutputNames(), r, vars, null, start, "script-plain", "StructureMap");
+      fragment("StructureMap-"+prefixForContainer+map.getId()+"-script-plain"+langSfx, smr.script(true), f.getOutputNames(), r, vars, null, start, "script-plain", "StructureMap");
     }
     // to generate:
     // map file
@@ -12791,19 +12830,19 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   }
 
-  private void generateOutputsCanonical(FetchedFile f, FetchedResource r, CanonicalResource cr, Map<String,String> vars, String prefixForContainer) throws Exception {
-    CanonicalRenderer smr = new CanonicalRenderer(context, checkAppendSlash(specPath), cr, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, rc, versionToAnnotate);
+  private void generateOutputsCanonical(FetchedFile f, FetchedResource r, CanonicalResource cr, Map<String,String> vars, String prefixForContainer, RenderingContext lrc, String langSfx) throws Exception {
+    CanonicalRenderer smr = new CanonicalRenderer(context, checkAppendSlash(specPath), cr, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, lrc, versionToAnnotate);
     if (igpkp.wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
-      fragment(cr.fhirType()+"-"+prefixForContainer+cr.getId()+"-summary", smr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary", "Canonical");
+      fragment(cr.fhirType()+"-"+prefixForContainer+cr.getId()+"-summary"+langSfx, smr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary", "Canonical");
     }
     if (igpkp.wantGen(r, "summary-table")) {
       long start = System.currentTimeMillis();
-      fragment(cr.fhirType()+"-"+prefixForContainer+cr.getId()+"-summary-table", smr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary-table", "Canonical");
+      fragment(cr.fhirType()+"-"+prefixForContainer+cr.getId()+"-summary-table"+langSfx, smr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary-table", "Canonical");
     }
   }
 
-  private void generateOutputsLibrary(FetchedFile f, FetchedResource r, Library lib, Map<String,String> vars, String prefixForContainer) throws Exception {
+  private void generateOutputsLibrary(FetchedFile f, FetchedResource r, Library lib, Map<String,String> vars, String prefixForContainer, RenderingContext lrc, String langSfx) throws Exception {
     int counter = 0;
     for (Attachment att : lib.getContent()) {
       String extension = att.hasContentType() ? MimeType.getExtension(att.getContentType()) : null;
@@ -12816,59 +12855,59 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
   }
 
-  private void generateOutputsExampleScenario(FetchedFile f, FetchedResource r, ExampleScenario scen, Map<String,String> vars, String prefixForContainer) throws Exception {
-    ExampleScenarioRenderer er = new ExampleScenarioRenderer(context, checkAppendSlash(specPath), scen, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, rc.copy(false).setDefinitionsTarget(igpkp.getDefinitionsName(r)), versionToAnnotate);
+  private void generateOutputsExampleScenario(FetchedFile f, FetchedResource r, ExampleScenario scen, Map<String,String> vars, String prefixForContainer, RenderingContext lrc, String langSfx) throws Exception {
+    ExampleScenarioRenderer er = new ExampleScenarioRenderer(context, checkAppendSlash(specPath), scen, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, lrc.copy(false).setDefinitionsTarget(igpkp.getDefinitionsName(r)), versionToAnnotate);
     if (igpkp.wantGen(r, "actor-table")) {
       long start = System.currentTimeMillis();
-      fragment("ExampleScenario-"+prefixForContainer+scen.getId()+"-actor-table", er.render(ExampleScenarioRendererMode.ACTORS), f.getOutputNames(), r, vars, null, start, "actor-table", "ExampleScenario");
+      fragment("ExampleScenario-"+prefixForContainer+scen.getId()+"-actor-table"+langSfx, er.render(ExampleScenarioRendererMode.ACTORS), f.getOutputNames(), r, vars, null, start, "actor-table", "ExampleScenario");
     }
     if (igpkp.wantGen(r, "instance-table")) {
       long start = System.currentTimeMillis();
-      fragment("ExampleScenario-"+prefixForContainer+scen.getId()+"-instance-table", er.render(ExampleScenarioRendererMode.INSTANCES), f.getOutputNames(), r, vars, null, start, "instance-table", "ExampleScenario");
+      fragment("ExampleScenario-"+prefixForContainer+scen.getId()+"-instance-table"+langSfx, er.render(ExampleScenarioRendererMode.INSTANCES), f.getOutputNames(), r, vars, null, start, "instance-table", "ExampleScenario");
     }
     if (igpkp.wantGen(r, "processes")) {
       long start = System.currentTimeMillis();
-      fragment("ExampleScenario-"+prefixForContainer+scen.getId()+"-processes", er.render(ExampleScenarioRendererMode.PROCESSES), f.getOutputNames(), r, vars, null, start, "processes", "ExampleScenario");
+      fragment("ExampleScenario-"+prefixForContainer+scen.getId()+"-processes"+langSfx, er.render(ExampleScenarioRendererMode.PROCESSES), f.getOutputNames(), r, vars, null, start, "processes", "ExampleScenario");
     }
     if (igpkp.wantGen(r, "process-diagram")) {
       long start = System.currentTimeMillis();
-      fragment("ExampleScenario-"+prefixForContainer+scen.getId()+"-process-diagram", er.renderDiagram(), f.getOutputNames(), r, vars, null, start, "process-diagram", "ExampleScenario");
+      fragment("ExampleScenario-"+prefixForContainer+scen.getId()+"-process-diagram"+langSfx, er.renderDiagram(), f.getOutputNames(), r, vars, null, start, "process-diagram", "ExampleScenario");
     }
   }
 
-  private void generateOutputsQuestionnaire(FetchedFile f, FetchedResource r, Questionnaire q, Map<String,String> vars, String prefixForContainer) throws Exception {
-    QuestionnaireRenderer qr = new QuestionnaireRenderer(context, checkAppendSlash(specPath), q, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, rc.copy(false).setDefinitionsTarget(igpkp.getDefinitionsName(r)), versionToAnnotate);
+  private void generateOutputsQuestionnaire(FetchedFile f, FetchedResource r, Questionnaire q, Map<String,String> vars, String prefixForContainer, RenderingContext lrc, String langSfx) throws Exception {
+    QuestionnaireRenderer qr = new QuestionnaireRenderer(context, checkAppendSlash(specPath), q, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, lrc.copy(false).setDefinitionsTarget(igpkp.getDefinitionsName(r)), versionToAnnotate);
     if (igpkp.wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
-      fragment("Questionnaire-"+prefixForContainer+q.getId()+"-summary", qr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary", "Questionnaire");
+      fragment("Questionnaire-"+prefixForContainer+q.getId()+"-summary"+langSfx, qr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary", "Questionnaire");
     }
     if (igpkp.wantGen(r, "summary-table")) {
       long start = System.currentTimeMillis();
-      fragment("Questionnaire-"+prefixForContainer+q.getId()+"-summary-table", qr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary-table", "Questionnaire");
+      fragment("Questionnaire-"+prefixForContainer+q.getId()+"-summary-table"+langSfx, qr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary-table", "Questionnaire");
     }
     if (igpkp.wantGen(r, "tree")) {
       long start = System.currentTimeMillis();
-      fragment("Questionnaire-"+prefixForContainer+q.getId()+"-tree", qr.render(QuestionnaireRendererMode.TREE), f.getOutputNames(), r, vars, null, start, "tree", "Questionnaire");
+      fragment("Questionnaire-"+prefixForContainer+q.getId()+"-tree"+langSfx, qr.render(QuestionnaireRendererMode.TREE), f.getOutputNames(), r, vars, null, start, "tree", "Questionnaire");
     }
     if (igpkp.wantGen(r, "form")) {
       long start = System.currentTimeMillis();
-      fragment("Questionnaire-"+prefixForContainer+q.getId()+"-form", qr.render(QuestionnaireRendererMode.FORM), f.getOutputNames(), r, vars, null, start, "form", "Questionnaire");
+      fragment("Questionnaire-"+prefixForContainer+q.getId()+"-form"+langSfx, qr.render(QuestionnaireRendererMode.FORM), f.getOutputNames(), r, vars, null, start, "form", "Questionnaire");
     }
     if (igpkp.wantGen(r, "links")) {
       long start = System.currentTimeMillis();
-      fragment("Questionnaire-"+prefixForContainer+q.getId()+"-links", qr.render(QuestionnaireRendererMode.LINKS), f.getOutputNames(), r, vars, null, start, "links", "Questionnaire");
+      fragment("Questionnaire-"+prefixForContainer+q.getId()+"-links"+langSfx, qr.render(QuestionnaireRendererMode.LINKS), f.getOutputNames(), r, vars, null, start, "links", "Questionnaire");
     }
     if (igpkp.wantGen(r, "logic")) {
       long start = System.currentTimeMillis();
-      fragment("Questionnaire-"+prefixForContainer+q.getId()+"-logic", qr.render(QuestionnaireRendererMode.LOGIC), f.getOutputNames(), r, vars, null, start, "logic", "Questionnaire");
+      fragment("Questionnaire-"+prefixForContainer+q.getId()+"-logic"+langSfx, qr.render(QuestionnaireRendererMode.LOGIC), f.getOutputNames(), r, vars, null, start, "logic", "Questionnaire");
     }
     if (igpkp.wantGen(r, "dict")) {
       long start = System.currentTimeMillis();
-      fragment("Questionnaire-"+prefixForContainer+q.getId()+"-dict", qr.render(QuestionnaireRendererMode.DEFNS), f.getOutputNames(), r, vars, null, start, "dict", "Questionnaire");
+      fragment("Questionnaire-"+prefixForContainer+q.getId()+"-dict"+langSfx, qr.render(QuestionnaireRendererMode.DEFNS), f.getOutputNames(), r, vars, null, start, "dict", "Questionnaire");
     }
     if (igpkp.wantGen(r, "responses")) {
       long start = System.currentTimeMillis();
-      fragment("Questionnaire-"+prefixForContainer+q.getId()+"-responses", responsesForQuestionnaire(q), f.getOutputNames(), r, vars, null, start, "responses", "Questionnaire");
+      fragment("Questionnaire-"+prefixForContainer+q.getId()+"-responses"+langSfx, responsesForQuestionnaire(q), f.getOutputNames(), r, vars, null, start, "responses", "Questionnaire");
     }
   }
 
