@@ -131,9 +131,6 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
         for (ValueSet vs : engine.getNewValueSets().values()) {
           new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "temp", "xver", "x-extensions", "ValueSet-"+vs.getId()+".json")), vs);
         }
-        for (CodeSystem cs : engine.getNewCodeSystems().values()) {
-          new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "temp", "xver", "x-extensions", "CodeSystem-"+cs.getId()+".json")), cs);
-        }
         genSummaryPages(path);
         genZips(path); 
         new XmlParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "input", "xver-ig.xml")), ig);

@@ -664,8 +664,8 @@ public class R4ToR4BAnalyser {
     new R4ToR4BAnalyser().processPackage(args[0]);
   }
 
-  public SpecMapManager loadSpecDetails(byte[] bs, String version, String specPath) throws IOException {
-    SpecMapManager map = new SpecMapManager(bs, version);
+  public SpecMapManager loadSpecDetails(byte[] bs, String name, String version, String specPath) throws IOException {
+    SpecMapManager map = new SpecMapManager(bs, name, version);
     map.setBase(PackageHacker.fixPackageUrl(specPath));
     return map;
   }
@@ -681,7 +681,7 @@ public class R4ToR4BAnalyser {
     System.out.println("Preparing using "+pid);
     NpmPackage pi = pcm.loadPackage(pid);
     
-    SpecMapManager spm = loadSpecDetails(TextFile.streamToBytes(pi.load("other", "spec.internals")), version, specPath);
+    SpecMapManager spm = loadSpecDetails(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.name(), version, specPath);
     SimpleWorkerContext sp;
     IContextResourceLoader loader = new PublisherLoader(pi, spm, specPath, null).makeLoader();
     sp = new SimpleWorkerContext.SimpleWorkerContextBuilder().fromPackage(pi, loader, true);

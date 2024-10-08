@@ -19,6 +19,7 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.DependencyAnalyser;
 import org.hl7.fhir.igtools.publisher.DependencyAnalyser.ArtifactDependency;
+import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.igtools.templates.TemplateManager;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.CanonicalResource;
@@ -111,9 +112,10 @@ public class DependencyRenderer {
   private IWorkerContext context;
   private MarkDownProcessor mdEngine;
   private RenderingContext rc;
+  private List<SpecMapManager> specMaps;
   
   public DependencyRenderer(BasePackageCacheManager pcm, String dstFolder, String npmName, TemplateManager templateManager,
-      List<DependencyAnalyser.ArtifactDependency> dependencies, IWorkerContext context, MarkDownProcessor mdEngine, RenderingContext rc) {
+      List<DependencyAnalyser.ArtifactDependency> dependencies, IWorkerContext context, MarkDownProcessor mdEngine, RenderingContext rc, List<SpecMapManager> specMaps) {
     super();
     this.pcm = pcm;
     this.dstFolder = dstFolder;
@@ -123,6 +125,7 @@ public class DependencyRenderer {
     this.context = context;
     this.mdEngine = mdEngine;
     this.rc = rc;
+    this.specMaps = specMaps;
   }
 
   public String render(ImplementationGuide ig, boolean QA, boolean details, boolean first) throws FHIRException, IOException {
@@ -144,7 +147,10 @@ public class DependencyRenderer {
     for (ImplementationGuideDependsOnComponent d : ig.getDependsOn()) {
       try {
         NpmPackage p = resolve(d);
-        addPackageRow(gen, row.getSubRows(), p, d.getVersion(), realm, QA, b, ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_IGDEP_COMMENT), hasDesc, processed, listed);
+        boolean dloaded = isLoaded(p);
+        if (QA || dloaded) {
+          addPackageRow(gen, row.getSubRows(), p, d.getVersion(), realm, QA, b, ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_IGDEP_COMMENT), hasDesc, processed, listed, dloaded);
+        }
       } catch (Exception e) {
         e.printStackTrace();
         addErrorRow(gen, row.getSubRows(), d.getPackageId(), d.getVersion(), d.getUri(), null, e.getMessage(), QA, hasDesc);
@@ -202,7 +208,7 @@ public class DependencyRenderer {
     return null;
   }
 
-  private void addPackageRow(HierarchicalTableGenerator gen, List<Row> rows, NpmPackage npm, String originalVersion, String realm, boolean QA, StringBuilder b, String desc, boolean hasDesc, Set<String> processed, Set<String> listed) throws FHIRException, IOException {
+  private void addPackageRow(HierarchicalTableGenerator gen, List<Row> rows, NpmPackage npm, String originalVersion, String realm, boolean QA, StringBuilder b, String desc, boolean hasDesc, Set<String> processed, Set<String> listed, boolean loaded) throws FHIRException, IOException {
     if (!npm.isCore() && (QA || !listed.contains(npm.name()+"#"+npm.version()))) {
       listed.add(npm.name()+"#"+npm.version());
       String idv = npm.name()+"#"+npm.version();
@@ -230,16 +236,19 @@ public class DependencyRenderer {
         }
       }
       Row row = addRow(gen, rows, npm.name(), npm.title(), npm.version(), getVersionState(npm.name(), npm.version(), npm.canonical()), getLatestVersion(npm.name(), npm.canonical()), "current".equals(npm.version()), npm.fhirVersion(), 
-          !VersionUtilities.versionsCompatible(fver, npm.fhirVersion()), npm.canonical(), PackageHacker.fixPackageUrl(npm.getWebLocation()), comment, desc, QA, hasDesc);
+          !VersionUtilities.versionsCompatible(fver, npm.fhirVersion()), npm.canonical(), PackageHacker.fixPackageUrl(npm.getWebLocation()), comment, desc, QA, hasDesc, loaded);
       if (isNew) {
         for (String d : npm.dependencies()) {
-          String id = d.substring(0, d.indexOf("#"));
-          String version = d.substring(d.indexOf("#")+1);
-          try {
-            NpmPackage p = resolve(id, version);
-            addPackageRow(gen, row.getSubRows(), p, d.substring(d.indexOf("#")+1), realm, QA, b, null, hasDesc, processed, listed);
-          } catch (Exception e) {
-            addErrorRow(gen, row.getSubRows(), id, version, null, null, e.getMessage(), QA, hasDesc);
+          boolean dloaded = isLoaded(d);
+          if (QA || dloaded) {
+            String id = d.substring(0, d.indexOf("#"));
+            String version = d.substring(d.indexOf("#")+1);
+            try {
+              NpmPackage p = resolve(id, version);
+              addPackageRow(gen, row.getSubRows(), p, d.substring(d.indexOf("#")+1), realm, QA, b, null, hasDesc, processed, listed, dloaded);
+            } catch (Exception e) {
+              addErrorRow(gen, row.getSubRows(), id, version, null, null, e.getMessage(), QA, hasDesc);
+            }
           }
         }
       }
@@ -311,6 +320,19 @@ public class DependencyRenderer {
     }
   }
 
+
+  private boolean isLoaded(NpmPackage p) {
+    return isLoaded(p.vid());
+  }
+  
+  private boolean isLoaded(String d) {
+    for (SpecMapManager smm : specMaps) {
+      if (smm.getNpmVId().equals(d)) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   private void checkGlobals(NpmPackage npm) throws IOException {
     for (String n : npm.listResources("ImplementationGuide")) {
@@ -434,7 +456,7 @@ public class DependencyRenderer {
     } else if (id.startsWith("hl7") && !id.startsWith("hl7.cda.") && !id.startsWith("hl7.fhir.") && !id.startsWith("hl7.v2.")) {
       comment = "HL7 Packages must have an id that starts with hl7.cda., hl7.fhir., or hl7.v2.";
     }
-    Row row = addRow(gen, model.getRows(), id,  ig.present(), ver, null, null, false, fver, false, canonical, web, comment, null, QA, hasDesc);
+    Row row = addRow(gen, model.getRows(), id,  ig.present(), ver, null, null, false, fver, false, canonical, web, comment, null, QA, hasDesc, true);
     if (QA && comment != null) {
       row.getCells().get(5).addStyle("background-color: #ffcccc");
     }
@@ -442,10 +464,14 @@ public class DependencyRenderer {
     return row;
   }
 
-  private Row addRow(HierarchicalTableGenerator gen, List<Row> rows, String id, String title, String ver, VersionState verState, String latestVer, boolean verError, String fver, boolean fverError, String canonical, String web, String problems, String desc, boolean QA, boolean hasDesc) {
+  private Row addRow(HierarchicalTableGenerator gen, List<Row> rows, String id, String title, String ver, VersionState verState, String latestVer, boolean verError, String fver, boolean fverError, String canonical, String web, String problems, String desc, boolean QA, boolean hasDesc, boolean loaded) {
     Row row = gen.new Row();
     rows.add(row);
-    row.setIcon("icon-fhir-16.png", "NPM Package");
+    if (loaded) {
+      row.setIcon("icon-fhir-16.png", "NPM Package");
+    } else {
+      row.setIcon("icon-fhir-16-grey.png", "NPM Package (not loaded)");
+    }
     if (QA) {
       row.getCells().add(gen.new Cell(null, null, id, null, null));
       Cell c = gen.new Cell(null, null, ver, null, null);
@@ -471,7 +497,7 @@ public class DependencyRenderer {
         }      
       }
     } else {
-      row.getCells().add(gen.new Cell(null, web, title, "Canonical: "+canonical, null));
+      row.getCells().add(gen.new Cell(null, web, makeTitle(title, id), "Canonical: "+canonical, null));
       row.getCells().add(gen.new Cell(null, "https://simplifier.net/packages/"+id+"/"+ver, id+"#"+ver, null, null));
     }
     row.getCells().add(gen.new Cell(null, VersionUtilities.getSpecUrl(fver), VersionUtilities.getNameForVersion(fver), null, null));
@@ -505,6 +531,17 @@ public class DependencyRenderer {
       row.getCells().add(gen.new Cell(null, null, desc, null, null));
     }
     return row;
+  }
+
+  private String makeTitle(String title, String id) {
+    if (title != null) {
+      return title;
+    }
+    switch (id) {
+    case "us.nlm.vsac" : return "VSAC";
+    case "us.cdc.phinvads" : return "PHINVads";
+    default: return id;
+    }
   }
 
   private void addErrorRow(HierarchicalTableGenerator gen, List<Row> rows, String id, String ver, String uri, String web, String message, boolean QA, boolean hasDesc) {

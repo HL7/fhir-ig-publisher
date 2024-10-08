@@ -139,7 +139,7 @@ public class DependentIGFinder {
   private void analyse() {
     try {
       Set<String> plist = getDependentPackages();
-      JsonObject json = JsonParser.parseObjectFromUrl("https://raw.githubusercontent.com/FHIR/ig-registry/master/fhir-ig-list.json");
+      JsonObject json = JsonParser.parseObjectFromUrl("https://fhir.github.io/ig-registry/fhir-ig-list.json");
       
       for (String pid : plist) {
         JsonObject guide = getGuide(json, pid);

@@ -207,7 +207,6 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   private Map<String, String> extMap = new HashMap<>();
   private Set<String> extSet = new HashSet<>();
   private Map<String, ValueSet> newValueSets = new HashMap<>();
-  private Map<String, CodeSystem> newCodeSystems = new HashMap<>();
   private Map<String, String> typeMap = new HashMap<>();
   private List<StructureDefinition> backboneExtensions = new ArrayList<>();
   
@@ -742,18 +741,21 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
           ct.setValue(importValueSet(defns, ivs));
         }
       }
-      CodeSystem cs = defns.fetchResource(CodeSystem.class, inc.hasVersion() ? inc.getSystem()+"|"+inc.getVersion() : inc.getSystem());
-      if (cs != null) {
-        assert cs.hasVersion();
-        if (!inc.hasVersion()) {
-          inc.setVersion(cs.getVersion());
+      if (inc.hasSystem()) {
+        if (isHL7System(inc.getSystem())) {
+          assert !inc.getSystem().contains("|");
+          inc.setSystem(inc.getSystem()+"|"+vs.getVersion());
         }
-        newCodeSystems.put(cs.getVersionedUrl(), cs);
       }
     }    
     newValueSets.put(vurl, vs);
     return vurl;
   }
+
+  private boolean isHL7System(String system) {
+    return system.startsWith("http://hl7.org/fhir");
+  }
+
 
   private void copyBinding(IWorkerContext defns, ElementDefinition edv, ElementDefinitionBindingComponent binding, Set<String> codes) {
     
@@ -3260,10 +3262,6 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
   public Map<String, ValueSet> getNewValueSets() {
     return newValueSets;
-  }
-
-  public Map<String, CodeSystem> getNewCodeSystems() {
-    return newCodeSystems;
   }
 
   public Map<String, String> getTypeMap() {

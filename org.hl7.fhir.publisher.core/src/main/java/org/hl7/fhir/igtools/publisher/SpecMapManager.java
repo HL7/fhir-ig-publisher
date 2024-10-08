@@ -46,6 +46,7 @@ import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageHacker;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
 
+
 import net.sourceforge.plantuml.salt.element.WrappedElement;
 
 /**
@@ -79,15 +80,17 @@ public class SpecMapManager {
 
   private String auth;
   private String realm;
+  private String npmVId;
   
   private SpecMapManager() {
     
   }
   
-  public SpecMapManager(String npmName, String igVersion, String toolVersion, String buildId, Calendar genDate, String webUrl) {
+  public SpecMapManager(String npmName, String vid, String igVersion, String toolVersion, String buildId, Calendar genDate, String webUrl) {
     spec = new JsonObject();
     if (npmName != null)
       spec.add("npm-name", npmName);
+    this.npmVId = vid;
     spec.add("ig-version", igVersion);
     spec.add("tool-version", toolVersion);
     spec.add("tool-build", buildId);
@@ -106,8 +109,9 @@ public class SpecMapManager {
     spec.add("images", images);
   }
 
-  public SpecMapManager(byte[] bytes, String version) throws IOException {
+  public SpecMapManager(byte[] bytes, String vid, String version) throws IOException {
     this.version = version;
+    this.npmVId = vid;
     spec = JsonParser.parseObject(bytes);
     paths = spec.getJsonObject("paths");
     pages = spec.getJsonObject("pages");
@@ -132,7 +136,7 @@ public class SpecMapManager {
 
   public static SpecMapManager fromPackage(NpmPackage pi) throws IOException {
     if (pi.hasFile("other", "spec.internals")) {
-      return new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.fhirVersion());      
+      return new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.vid(), pi.fhirVersion());      
     } else {
       return new SpecMapManager();
     }
@@ -441,20 +445,20 @@ public class SpecMapManager {
   }
 
   public static SpecMapManager createSpecialPackage(NpmPackage pi, BasePackageCacheManager pcm) throws FHIRException, IOException {
-    SpecMapManager res = new SpecMapManager(pi.name(), pi.fhirVersion(), ToolsVersion.TOOLS_VERSION_STR, null, null, pi.url());
+    SpecMapManager res = new SpecMapManager(pi.name(), pi.vid(), pi.version(), ToolsVersion.TOOLS_VERSION_STR, null, null, pi.url());
     if (pi.name().equals("us.cdc.phinvads")) {
       res.special = SpecialPackageType.PhinVads;
     } else if (pi.name().equals("us.nlm.vsac")) {
       res.special = SpecialPackageType.Vsac;
-    } else if (pi.name().equals("hl7.fhir.us.core.3.1.1")) {
-      res.special = SpecialPackageType.FACADE;
-      if (pcm != null) {
-        NpmPackage npm = pcm.loadPackage("hl7.fhir.us.core#3.1.1"); 
-        res.wrapped = new SpecMapManager(TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.fhirVersion());
-        res.wrapped.setName(npm.name());
-        res.wrapped.setBase2(PackageHacker.fixPackageUrl(npm.getWebLocation()));
-        res.wrapped.setBase(npm.canonical());
-      }
+//    } else if (pi.name().equals("hl7.fhir.us.core.3.1.1")) {
+//      res.special = SpecialPackageType.FACADE;
+//      if (pcm != null) {
+//        NpmPackage npm = pcm.loadPackage("hl7.fhir.us.core#3.1.1"); 
+//        res.wrapped = new SpecMapManager(TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.fhirVersion());
+//        res.wrapped.setName(npm.name());
+//        res.wrapped.setBase2(PackageHacker.fixPackageUrl(npm.getWebLocation()));
+//        res.wrapped.setBase(npm.canonical());
+//      }
     } else if (pi.name().equals("fhir.dicom")) {
       res.special = SpecialPackageType.DICOM;
     } else if (pi.name().startsWith("hl7.fhir.") && pi.name().endsWith(".examples") ) {
@@ -476,7 +480,7 @@ public class SpecMapManager {
 
   @Override
   public String toString() {
-    return "SpecMapManager [base=" + base + ", name=" + name + ", pi=" + pi + "]";
+    return "SpecMapManager " + name+" for "+npmVId+"#"+version + ", "+base+" & "+base2;
   }
 
   public int getKey() {
@@ -501,6 +505,10 @@ public class SpecMapManager {
 
   public void setRealm(String realm) {
     this.realm = realm;
+  }
+
+  public String getNpmVId() {
+    return npmVId;
   }
 
   

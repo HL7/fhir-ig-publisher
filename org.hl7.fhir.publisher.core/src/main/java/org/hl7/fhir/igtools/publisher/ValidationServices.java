@@ -72,7 +72,7 @@ import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
-import org.hl7.fhir.validation.instance.BasePolicyAdvisorForFullValidation;
+import org.hl7.fhir.validation.instance.advisor.BasePolicyAdvisorForFullValidation;
 
 public class ValidationServices implements IValidatorResourceFetcher, IValidationPolicyAdvisor {
 

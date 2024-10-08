@@ -50,6 +50,7 @@ public class XmlXHtmlRenderer implements IXMLWriter {
   private List<ElementDecoration> decorations1 = new ArrayList<ElementDecoration>();
   private List<ElementDecoration> decorations2 = new ArrayList<ElementDecoration>();
   private boolean prism;
+  private boolean elideAttributes;
 
   protected boolean condition(boolean bTest, String message) throws IOException {
     if (!bTest)
@@ -81,9 +82,9 @@ public class XmlXHtmlRenderer implements IXMLWriter {
     started = true;
     b = new StringBuilder();
     if (prism) {
-      b.append("<pre class=\"xml\" style=\"white-space: pre; text-wrap: nowrap;\"><code class=\"language-xml\" style=\"white-space: pre; text-wrap: nowrap;\">\r\n");
+      b.append("<pre class=\"xml\" style=\"white-space: pre; text-wrap: nowrap; width: auto;\"><code class=\"language-xml\" style=\"white-space: pre; text-wrap: nowrap;\">");
     } else {
-      b.append("<pre class=\"xml\" style=\"white-space: pre; text-wrap: nowrap;\"><code style=\"white-space: pre; text-wrap: nowrap;\">\r\n");
+      b.append("<pre class=\"xml\" style=\"white-space: pre; text-wrap: nowrap; width: auto;\"><code style=\"white-space: pre; text-wrap: nowrap;\">");
     }
   }
 
@@ -189,6 +190,11 @@ public class XmlXHtmlRenderer implements IXMLWriter {
         if (a.value != null)
           b.append(Utilities.escapeXml(a.value));
         b.append("&quot;");
+      }
+      if (elideAttributes) {
+        b.append(" ... ");
+        col += 5;
+        elideAttributes = false;
       }
     }
     return col;
@@ -798,5 +804,27 @@ public class XmlXHtmlRenderer implements IXMLWriter {
     b.append("<a href=\""+Utilities.escapeXml(ref)+"\" style=\"color: Maroon\">&#x1F517;</a> ");
   }
 
-  
+  @Override
+  public boolean canElide() { return true; }
+
+  @Override
+  public void attributeElide() {
+    elideAttributes = true;
+  }
+
+  @Override
+  public void elide() throws IOException {
+    checkInElement();
+    if (pendingClose) {
+      b.append("&gt;");
+      writeDecorations();
+      writePendingComment();
+      pendingClose = false;
+    }
+    int col = writePretty();
+    col = col + 3;
+    b.append("  ...");
+    attributes = null;
+  }
+
 }

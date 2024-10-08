@@ -296,6 +296,15 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   private String globalCheck;
   private String draftDependencies;
   private TerminologyClientManager txServers;
+
+  boolean hintAboutNonMustSupport = false;
+  boolean anyExtensionsAllowed = false;
+  boolean checkAggregation = false;
+  boolean autoLoad = false;
+  boolean showReferenceMessages = false;
+  boolean noExperimentalContent = false;
+  boolean displayWarnings = false;
+
   
   public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, 
       String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, IpaComparator ipaComparator, IpsComparator ipsComparator,
@@ -335,6 +344,17 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     determineCode();
   }
 
+  public void setValidationFlags(boolean hintAboutNonMustSupport, boolean anyExtensionsAllowed, boolean checkAggregation, boolean autoLoad, boolean showReferenceMessages, boolean noExperimentalContent, boolean displayWarnings) {
+
+    this.hintAboutNonMustSupport = hintAboutNonMustSupport;
+    this.anyExtensionsAllowed = anyExtensionsAllowed;
+    this.checkAggregation = checkAggregation;
+    this.autoLoad = autoLoad;
+    this.showReferenceMessages = showReferenceMessages;
+    this.noExperimentalContent = noExperimentalContent;
+    this.displayWarnings = displayWarnings;
+
+  }
   private void determineCode() {
     if (provider.getCanonical().startsWith("http://hl7.org/fhir")) {
       String[] u = provider.getCanonical().split("\\/");
@@ -487,6 +507,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   }
 
   private void genServerReport(XhtmlNode x, TerminologyClientContext t) {
+    x.ah(t.getAddress());
     x.para("Use Count: "+t.getUseCount()+". Code Systems used: ");
     Map<String, TerminologyClientContextUseCount> uc = t.getUseCounts();
     List<String> nl = Utilities.sorted(uc.keySet());
@@ -925,6 +946,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       " <tr><td>Previous Version Comparison:</td><td> $previousVersion$</td></tr>\r\n"+
       " <tr><td>IPA Comparison:</td><td> $ipaComparison$</td></tr>\r\n"+
       " <tr><td>IPS Comparison:</td><td> $ipsComparison$</td></tr>\r\n"+
+      " <tr><td>Validation Flags:</td><td> $validationFlags$</td></tr>\r\n"+
       "$noNarrative$"+
       "$noValidation$"+
       " <tr><td>Summary:</td><td> errors = $err$, warn = $warn$, info = $info$, broken links = $links$</td></tr>\r\n"+
@@ -997,12 +1019,12 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   
   private final String detailsTemplateTxLink = 
       "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txsrvr.html#$txsrvr$\">$txsrvr$</ta>, see <a href=\"$tx$\">log</a>)</td>\r\n"+
+      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</ta>, see <a href=\"$tx$\">log</a>)</td>\r\n"+
       "   </tr>\r\n";
   
   private final String detailsTemplateTxNoLink = 
       "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txsrvr.html#$txsrvr$\">$txsrvr$</ta>)</td>\r\n"+
+      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</ta>)</td>\r\n"+
       "   </tr>\r\n";
   
   private final String detailsTemplateWithExtraDetails = 
@@ -1089,6 +1111,8 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("ipsComparison", ipsComparator == null ? "n/a" : ipsComparator.checkHtml());
     t.add("noNarrative", genResourceList(noNarratives, "Narratives Suppressed"));
     t.add("noValidation", genResourceList(noValidation, "Validation Suppressed"));
+    t.add("validationFlags", validationFlags());
+    
     if (noGenerate || noValidate) {
       if (noGenerate && noValidate) {
         t.add("warning", "<p style=\"color: maroon; font-weight: bold\">Warning: This IG was generated with both validation and HTML generation off. Many kinds of errors will not be reported.</p>\r\n");        
@@ -1106,6 +1130,20 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     else
       t.add("suppressedmsgssummary", "<a href=\"#suppressed\">"+msgCount+" Suppressed "+Utilities.pluralize("Issue", msgCount)+"</a>\r\n");
     return t.render();
+  }
+
+  private String validationFlags() {
+    CommaSeparatedStringBuilder t = new CommaSeparatedStringBuilder();
+    CommaSeparatedStringBuilder f = new CommaSeparatedStringBuilder();
+    (hintAboutNonMustSupport ? t : f).append("hintAboutNonMustSupport");
+    (anyExtensionsAllowed ? t : f).append("anyExtensionsAllowed");
+    (checkAggregation ? t : f).append("checkAggregation");
+    (autoLoad ? t : f).append("autoLoad");
+    (showReferenceMessages ? t : f).append("showReferenceMessages");
+    (noExperimentalContent ? t : f).append("noExperimentalContent");
+    (displayWarnings ? t : f).append("displayWarnings");
+
+    return "On: "+(t.length() == 0 ? "none" : t.toString())+"; Off: "+(f.length() == 0 ? "" : f.toString());
   }
 
   private String txserverlist() {
