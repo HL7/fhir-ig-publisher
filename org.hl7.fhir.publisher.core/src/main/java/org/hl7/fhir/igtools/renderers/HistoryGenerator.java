@@ -163,7 +163,7 @@ public class HistoryGenerator {
     }
     List<Element> entries = resource.getChildrenByName("entry");
     for (Element be : entries) {
-      if (!"Provenance".equals(be.getNamedChild("resource").fhirType())) {
+      if (!be.hasChild("resource") || !"Provenance".equals(be.getNamedChild("resource").fhirType())) {
         return false;
       }
     }
