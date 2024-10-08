@@ -25,6 +25,7 @@ jobs:
       - bash: |
           pip3 install matplotlib
           pip3 install Requests
+          pip3 install pandas
         displayName: 'Set up python packages'
 
       - task: PythonScript@0
