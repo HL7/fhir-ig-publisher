@@ -36,7 +36,7 @@ jobs:
             displayName: 'fsh-sushi install'
 
           # Runs 'mvn install'
-          - task: Maven@3
+          - task: Maven@4
             displayName: 'Build project'
             inputs:
               mavenPomFile: 'pom.xml'
@@ -55,7 +55,7 @@ jobs:
               targetType: 'inline'
               script: mkdir -p $(Pipeline.Workspace)/target-ig; git clone ${{execTest.gitRepo}} "$(Pipeline.Workspace)/target-ig"
 
-          - task: Maven@3
+          - task: Maven@4
             displayName: 'Run IG Publisher with IG'
             inputs:
               mavenPomFile: 'pom.xml'

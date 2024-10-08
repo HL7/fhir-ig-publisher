@@ -93,7 +93,7 @@ public class PublicationChecker {
         try {
           pl = readPackageList(dst);
         } catch (Exception e) {
-          if (e.getMessage() != null && e.getMessage().contains("404")) {
+          if (exceptionCausedByNotFound(e)) {
             messages.add("<span title=\""+Utilities.escapeXml(e.getMessage())+"\">This IG has never been published</span>"+mkInfo());
           } else {            
             check(messages, false, "Error fetching package-list from "+dst+": "+e.getMessage()+mkError());
@@ -105,6 +105,23 @@ public class PublicationChecker {
         } 
       }
     }
+  }
+
+  protected static boolean exceptionCausedByNotFound(Exception e) {
+    if (e.getMessage() != null) {
+      if (e.getMessage().contains("404") || e.getMessage().contains("Not Found")) {
+        return true;
+      }
+    }
+    if (e.getCause() != null) {
+      Throwable cause = e.getCause();
+      if (cause.getMessage() != null) {
+        if (cause.getMessage().contains("404") || cause.getMessage().contains("Not Found")) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   private void checkPackage(List<String> messages, NpmPackage npm) {
