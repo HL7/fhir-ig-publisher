@@ -63,6 +63,7 @@ import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.terminologies.client.TerminologyClientContext;
 import org.hl7.fhir.r5.terminologies.client.TerminologyClientContext.TerminologyClientContextUseCount;
 import org.hl7.fhir.r5.terminologies.client.TerminologyClientManager;
+import org.hl7.fhir.r5.terminologies.client.TerminologyClientManager.InternalLogEvent;
 import org.hl7.fhir.r5.utils.OperationOutcomeUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
@@ -481,12 +482,24 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
         }
       }
       x.h2().tx("Tx Manager report for '"+txServers.getMonitorServiceURL()+"'");
-      ul = x.ul();
       if (txServers.getInternalLog().isEmpty()) {
+        ul = x.ul();
         ul.li().tx("(No Errors/Reports - all good)");        
       } else {
-        for (String s : txServers.getInternalLog()) {
-          ul.li().tx(s);        
+        XhtmlNode tbl = x.table("grid");
+        XhtmlNode tr = tbl.tr();
+        tr.td().b().tx("Message");
+        tr.td().b().tx("Server");
+        tr.td().b().tx("ValueSet");
+        tr.td().b().tx("Systems");
+        tr.td().b().tx("Choices");
+        for (InternalLogEvent log : txServers.getInternalLog()) {
+          tr = tbl.tr();
+          tr.td().tx(log.getMessage());
+          tr.td().tx(log.getServer());
+          tr.td().tx(log.getVs());
+          tr.td().tx(log.getSystems());
+          tr.td().tx(log.getChoices());
         }        
       }     
       
@@ -1533,6 +1546,8 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   private String getServer(String server) {
     if (txServers.getServerMap().containsKey(server)) {
       return txServers.getServerMap().get(server).getClient().getAddress();
+    } else if (Utilities.noString(server)) {
+      return "server";
     } else {
       return server;
     }

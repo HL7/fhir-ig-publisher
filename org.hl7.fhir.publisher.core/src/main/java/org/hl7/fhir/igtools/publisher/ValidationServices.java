@@ -468,4 +468,14 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
     return new BasePolicyAdvisorForFullValidation(ReferenceValidationPolicy.CHECK_VALID).getImpliedProfilesForResource(validator, appContext, stackPath, 
         definition, structure, resource, valid, msgServices, messages);
   }
+
+  @Override
+  public boolean isSuppressMessageId(String path, String messageId) {
+    return false;
+  }
+
+  @Override
+  public ReferenceValidationPolicy getReferencePolicy() {
+    return ReferenceValidationPolicy.CHECK_VALID;
+  }
 }
