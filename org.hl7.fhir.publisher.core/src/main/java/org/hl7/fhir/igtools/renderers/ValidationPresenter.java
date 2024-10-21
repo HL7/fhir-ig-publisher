@@ -305,13 +305,14 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   boolean showReferenceMessages = false;
   boolean noExperimentalContent = false;
   boolean displayWarnings = false;
+  private List<String> versionProblems;
 
   
   public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, 
       String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, IpaComparator ipaComparator, IpsComparator ipsComparator,
       String dependencies, String csAnalysis, String pubReqCheck, String globalCheck, String copyrightYear, IWorkerContext context,
       Set<String> r5Extensions, List<StructureDefinition> modifierExtensions, String draftDependencies,
-      List<FetchedResource> noNarratives, List<FetchedResource> noValidation, boolean noValidate, boolean noGenerate, DependentIGFinder dependentIgs, TerminologyClientManager txServers) {
+      List<FetchedResource> noNarratives, List<FetchedResource> noValidation, boolean noValidate, boolean noGenerate, DependentIGFinder dependentIgs, TerminologyClientManager txServers, List<String> versionProblems) {
     super();
     this.statedVersion = statedVersion;
     this.igVersion = igVersion;
@@ -341,6 +342,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     this.draftDependencies = draftDependencies;
     this.globalCheck = globalCheck;
     this.txServers = txServers;
+    this.versionProblems = versionProblems;
     ruleDateCutoff = Date.from(LocalDate.now().minusMonths(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
     determineCode();
   }
@@ -733,6 +735,10 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     b.append(genEnd());
     b.append(genStartInternal());
     int id = 0;
+    for (String vp : versionProblems) {
+      b.append(genDetails(vp, id));
+      id++;
+    }
     for (ValidationMessage vm : linkErrors) {
       b.append(genDetails(vm, id));
       id++;
@@ -1032,12 +1038,12 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   
   private final String detailsTemplateTxLink = 
       "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</ta>, see <a href=\"$tx$\">log</a>)</td>\r\n"+
+      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$<ta>, see <a href=\"$tx$\">log</a>)</td>\r\n"+
       "   </tr>\r\n";
   
   private final String detailsTemplateTxNoLink = 
       "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</ta>)</td>\r\n"+
+      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$<ta>)</td>\r\n"+
       "   </tr>\r\n";
   
   private final String detailsTemplateWithExtraDetails = 
@@ -1540,6 +1546,25 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("comment", vm.getComment() == null ? "" : "<br/><br/><span style=\"border: 1px grey solid; border-radius: 5px; background-color: #eeeeee; padding: 3px; margin: 3px \"><i><b>Editor's Comment</b>: "+Utilities.escapeXml(vm.getComment())+"</i></span>");
     t.add("tx", "qa-tx.html#l"+vm.getTxLink());
     t.add("txsrvr", getServer(vm.getServer()));
+    return t.render();
+  }
+
+  private String genDetails(String vp, int id) {
+    String tid = null;
+    tid = detailsTemplate;
+    ST t = template(tid);
+    t.add("path", "");
+    t.add("pathlink", "");      
+    t.add("level", "warning");
+    t.add("color", colorForLevel(IssueSeverity.WARNING, false));
+    t.add("halfcolor", halfColorForLevel(IssueSeverity.WARNING, false));
+    t.add("id", "l"+id);
+    t.add("mid", "");
+    t.add("msg", vp);
+    t.add("msgdetails", vp);
+    t.add("comment", "");
+    t.add("tx", "");
+    t.add("txsrvr", "");
     return t.render();
   }
 
