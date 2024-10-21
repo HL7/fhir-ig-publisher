@@ -1249,7 +1249,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine, rc, specMaps).render(publishedIg, true, false, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()),
           new PublicationChecker(repoRoot, historyPage, markdownEngine, findReleaseLabelString()).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
           generateDraftDependencies(),
-          noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder, context.getTxClientManager());
+          noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder, context.getTxClientManager(), versionProblems);
       val.setValidationFlags(hintAboutNonMustSupport, anyExtensionsAllowed, checkAggregation, autoLoad, showReferenceMessages, noExperimentalContent, displayWarnings);
       tts.end();
       if (isChild()) {
@@ -4131,6 +4131,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     specMaps.add(igm);
     if (!VersionUtilities.versionsCompatible(version, igm.getVersion())) {
       if (!pi.isWarned()) {
+        versionProblems.add("This IG is version "+version+", while the IG '"+pi.name()+"' is from version "+igm.getVersion());
         log("Version mismatch. This IG is version "+version+", while the IG '"+pi.name()+"' is from version "+igm.getVersion()+" (will try to run anyway)");
         pi.setWarned(true);   
       }
@@ -4187,6 +4188,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
             } else {
               if (!VersionUtilities.versionsCompatible(version, pi.fhirVersion())) {
                 if (!pi.isWarned()) {
+                  versionProblems.add("This IG is for FHIR version "+version+", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion());
                   log("Version mismatch. This IG is for FHIR version "+version+", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion()+" (will ignore that and try to run anyway)");
                   pi.setWarned(true);
                 }
@@ -7683,11 +7685,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
     logMessage("Generate Summaries");
 
-    genBasePages();
-
     if (!changeList.isEmpty()) {
       generateSummaryOutputs(db);
     }
+    genBasePages();
     db.closeUp();
     TextFile.bytesToFile(extensionTracker.generate(), Utilities.path(tempDir, "usage-stats.json"));
     try {
@@ -9143,7 +9144,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     JsonArray items = new JsonArray();
     json.add("codeSystems", items);
     
-    b.append("URL,Version,Status,OIDs,Name,Title,Descriptino,Used\r\n");
+    b.append("URL,Version,Status,OIDs,Name,Title,Description,Used\r\n");
     
     for (CodeSystem cs : cslist) {
       
@@ -9195,9 +9196,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       b.append(",");
       b.append(oids.isEmpty() ? "" : "\""+CommaSeparatedStringBuilder.join(",", oids)+"\"");
       b.append(",");
-      b.append(cs.getName());
+      b.append(Utilities.escapeCSV(cs.getName()));
       b.append(",");
-      b.append(cs.getTitle());
+      b.append(Utilities.escapeCSV(cs.getTitle()));
       b.append(",");
       b.append("\""+Utilities.escapeCSV(cs.getDescription())+"\"");
       b.append(",");
@@ -9285,9 +9286,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       b.append(",");
       b.append(oids.isEmpty() ? "" : "\""+CommaSeparatedStringBuilder.join(",", oids)+"\"");
       b.append(",");
-      b.append(vs.getName());
+      b.append(Utilities.escapeCSV(vs.getName()));
       b.append(",");
-      b.append(vs.getTitle());
+      b.append(Utilities.escapeCSV(vs.getTitle()));
       b.append(",");
       b.append("\""+Utilities.escapeCSV(vs.getDescription())+"\"");
       b.append(",");
@@ -11145,6 +11146,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private LanguageUtils langUtils;
 
   private boolean simplifierMode;
+
+  private List<String> versionProblems = new ArrayList<>();
   
   private String processSQLCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();
@@ -12003,7 +12006,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     XhtmlComposer xc = new XhtmlComposer(XhtmlComposer.XML, module.isNoNarrative());
     if (igpkp.wantGen(r, "html")) {
       long start = System.currentTimeMillis();
-      XhtmlNode xhtml = (lang == null || lang.equals(r.getElement().getNamedChildValue("language"))) ? null : getXhtml(f, r);
+      XhtmlNode xhtml = (lang == null || lang.equals(r.getElement().getNamedChildValue("language"))) ? getXhtml(f, r) : null;
       if (xhtml == null && HistoryGenerator.allEntriesAreHistoryProvenance(r.getElement())) {
         RenderingContext ctxt = lrc.copy(false).setParser(getTypeLoader(f, r));
         List<ProvenanceDetails> entries = loadProvenanceForBundle(igpkp.getLinkFor(r, true), r.getElement(), f);
