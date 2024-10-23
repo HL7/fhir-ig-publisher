@@ -58,6 +58,8 @@ public class FetchedResource {
   private boolean isProvenance = false;
   private String nameForErrors;
   private boolean hasTranslations;
+  private String resourceName;
+  private String resourceDescription;
 
   public FetchedResource(String nameForErrors) {
     super();
@@ -325,6 +327,30 @@ public class FetchedResource {
     
     }
     return "application/bin";
+  }
+
+  public String getResourceName() {
+    return resourceName;
+  }
+
+  public void setResourceName(String resourceName) {
+    this.resourceName = resourceName;
+  }
+
+  public String getResourceDescription() {
+    return resourceDescription;
+  }
+
+  public void setResourceDescription(String resourceDescription) {
+    this.resourceDescription = resourceDescription;
+  }
+
+  public String getBestName() {
+    if (resourceName != null && resourceName.contains(" ")) {
+      return resourceName;
+    } else {
+      return resourceDescription;
+    }
   }
   
 }

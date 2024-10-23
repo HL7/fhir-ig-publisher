@@ -308,6 +308,7 @@ import org.hl7.fhir.r5.utils.XVerExtensionManager;
 import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
 import org.hl7.fhir.r5.utils.formats.CSVWriter;
 import org.hl7.fhir.r5.utils.sql.Runner;
+import org.hl7.fhir.r5.utils.sql.StorageJson;
 import org.hl7.fhir.r5.utils.sql.StorageSqlite3;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
@@ -3403,6 +3404,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     validator.setWantCheckSnapshotUnchanged(true);
     validator.setForPublication(true);
     validator.setDisplayWarnings(displayWarnings);
+    cu = new ContextUtilities(context);
 
     pvalidator = new ProfileValidator(context, context.getXVer());
     csvalidator = new CodeSystemValidator(context, context.getXVer());
@@ -4797,6 +4799,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
                   //                System.out.println("change\r\n"+desc+"\r\nto\r\n"+descNew);
                 }
               }
+              // for the database layer later
+              r.setResourceName(rg.getName());
+              r.setResourceDescription(rg.getDescription());
+              
               if (!rg.getIsExample()) {
                 // If the instance declares a profile that's got the same canonical base as this IG, then the resource is an example of that profile
                 Map<String, String> profiles = new HashMap<String, String>();
@@ -4846,8 +4852,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     logDebugMessage(LogCategory.INIT, "Loaded Files: "+fileList.size());
     for (FetchedFile f : fileList) {
       logDebugMessage(LogCategory.INIT, "  "+f.getTitle()+" - "+f.getResources().size()+" Resources");
-      for (FetchedResource r : f.getResources())
-        logDebugMessage(LogCategory.INIT, "    "+r.fhirType()+"/"+r.getId());      
+      for (FetchedResource r : f.getResources()) {
+        logDebugMessage(LogCategory.INIT, "    "+r.fhirType()+"/"+r.getId());
+      }
+      
     }
     extensionTracker.scan(publishedIg);
 
@@ -7640,7 +7648,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     otherFilesRun.add(Utilities.path(outputDir, "package.tgz"));
     otherFilesRun.add(Utilities.path(outputDir, "package.manifest.json"));
     otherFilesRun.add(Utilities.path(tempDir, "package.db"));
-    DBBuilder db = new DBBuilder(Utilities.path(tempDir, "package.db"));
+    DBBuilder db = new DBBuilder(Utilities.path(tempDir, "package.db"), context, rc, cu, fileList);
     copyData();
     for (String rg : regenList) {
       regenerate(rg);
@@ -7663,6 +7671,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       db.finishResources();
     }
 
+    generateViewDefinitions(db);
     templateBeforeGenerate();
 
     logMessage("Generate HTML Outputs");
@@ -8691,7 +8700,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private void generateSummaryOutputs(DBBuilder db) throws Exception {
     log("Generating Summary Outputs");
-    ContextUtilities cu = new ContextUtilities(context);
     generateResourceReferences();
 
     generateCanonicalSummary();
@@ -9046,7 +9054,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(data, true);
     TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "languages.json"));
         
-    generateViewDefinitions(db);
   }
 
   private void genBasePages() throws IOException, Exception {
@@ -9117,11 +9124,18 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         PublisherProvider pprov = new PublisherProvider(context, npmList, fileList, igpkp.getCanonical());
         runner.setProvider(pprov);
         runner.setStorage(new StorageSqlite3(db.getConnection()));
-        JsonObject vd = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(new File(Utilities.path(Utilities.getDirectoryForFile(igName), vdn)));
+        JsonObject vd = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(new File(Utilities.path(Utilities.getDirectoryForFile(configFile), vdn)));
         pprov.inspect(vd);
         runner.execute(vd);
         captureIssues(vdn, runner.getIssues());
-      } catch (Exception e) {
+        
+        StorageJson jstore = new StorageJson();
+        runner.setStorage(jstore);
+        runner.execute(vd);
+        String filename = Utilities.path(tempDir, vd.asString("name")+".json");
+        TextFile.stringToFile(org.hl7.fhir.utilities.json.parser.JsonParser.compose(jstore.getRows(), true), filename);
+        otherFilesRun.add(filename);
+        } catch (Exception e) {
         e.printStackTrace();
         errors.add(new ValidationMessage(Source.Publisher, IssueType.REQUIRED, vdn, "Error Processing ViewDefinition: "+e.getMessage(), IssueSeverity.ERROR));
         captureIssues(vdn, runner.getIssues());
@@ -11148,6 +11162,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private boolean simplifierMode;
 
   private List<String> versionProblems = new ArrayList<>();
+
+  private ContextUtilities cu;
   
   private String processSQLCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();
@@ -14112,6 +14128,5 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     
     return null;
   }
-
 
 }
