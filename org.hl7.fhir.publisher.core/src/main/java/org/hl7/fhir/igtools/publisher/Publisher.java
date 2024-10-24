@@ -6929,6 +6929,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private void generateSnapshot(FetchedFile f, FetchedResource r, StructureDefinition sd, boolean close, ProfileUtilities utils) throws Exception {
     boolean changed = false;
+        
     logDebugMessage(LogCategory.PROGRESS, "Check Snapshot for "+sd.getUrl());
     sd.setFhirVersion(FHIRVersion.fromCode(version));
     List<ValidationMessage> messages = new ArrayList<>();
@@ -6939,6 +6940,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
     if (sd.hasUserData("profileutils.snapshot.generated")) {
       changed = true;
+      // we already tried to generate the snapshot, and maybe there were messages? if there are, 
+      // put them in the right place
+      List<ValidationMessage> vmsgs = (List<ValidationMessage>) sd.getUserData("profileutils.snapshot.generated.messages");
+      if (vmsgs != null && !vmsgs.isEmpty()) {
+        f.getErrors().addAll(vmsgs);
+      }
     } else {
       sd.setSnapshot(null); // make sure its cleared out if it came from elsewhere so that we do actually regenerate it at this point
     }
@@ -11089,6 +11096,16 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           }
 
           src = pfx + substitute + sfx;
+          changed = true;
+        }
+        while (db != null && src.contains("{%! " + keyword)) {
+          int i = src.indexOf("{%! " + keyword);
+          String pfx = src.substring(0, i);
+          src = src.substring(i + 3);
+          i = src.indexOf("%}");
+          String sfx = src.substring(i+2);
+          src = src.substring(0, i);
+          src = pfx + "{% raw %}{%"+src+"%}{% endraw %}"+ sfx;
           changed = true;
         }
       }
