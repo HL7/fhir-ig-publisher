@@ -308,6 +308,7 @@ import org.hl7.fhir.r5.utils.XVerExtensionManager;
 import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
 import org.hl7.fhir.r5.utils.formats.CSVWriter;
 import org.hl7.fhir.r5.utils.sql.Runner;
+import org.hl7.fhir.r5.utils.sql.StorageJson;
 import org.hl7.fhir.r5.utils.sql.StorageSqlite3;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
@@ -1249,7 +1250,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine, rc, specMaps).render(publishedIg, true, false, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()),
           new PublicationChecker(repoRoot, historyPage, markdownEngine, findReleaseLabelString()).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
           generateDraftDependencies(),
-          noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder, context.getTxClientManager());
+          noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder, context.getTxClientManager(), versionProblems);
       val.setValidationFlags(hintAboutNonMustSupport, anyExtensionsAllowed, checkAggregation, autoLoad, showReferenceMessages, noExperimentalContent, displayWarnings);
       tts.end();
       if (isChild()) {
@@ -3403,6 +3404,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     validator.setWantCheckSnapshotUnchanged(true);
     validator.setForPublication(true);
     validator.setDisplayWarnings(displayWarnings);
+    cu = new ContextUtilities(context);
 
     pvalidator = new ProfileValidator(context, context.getXVer());
     csvalidator = new CodeSystemValidator(context, context.getXVer());
@@ -4131,6 +4133,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     specMaps.add(igm);
     if (!VersionUtilities.versionsCompatible(version, igm.getVersion())) {
       if (!pi.isWarned()) {
+        versionProblems.add("This IG is version "+version+", while the IG '"+pi.name()+"' is from version "+igm.getVersion());
         log("Version mismatch. This IG is version "+version+", while the IG '"+pi.name()+"' is from version "+igm.getVersion()+" (will try to run anyway)");
         pi.setWarned(true);   
       }
@@ -4187,6 +4190,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
             } else {
               if (!VersionUtilities.versionsCompatible(version, pi.fhirVersion())) {
                 if (!pi.isWarned()) {
+                  versionProblems.add("This IG is for FHIR version "+version+", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion());
                   log("Version mismatch. This IG is for FHIR version "+version+", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion()+" (will ignore that and try to run anyway)");
                   pi.setWarned(true);
                 }
@@ -4795,6 +4799,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
                   //                System.out.println("change\r\n"+desc+"\r\nto\r\n"+descNew);
                 }
               }
+              // for the database layer later
+              r.setResourceName(rg.getName());
+              r.setResourceDescription(rg.getDescription());
+              
               if (!rg.getIsExample()) {
                 // If the instance declares a profile that's got the same canonical base as this IG, then the resource is an example of that profile
                 Map<String, String> profiles = new HashMap<String, String>();
@@ -4844,8 +4852,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     logDebugMessage(LogCategory.INIT, "Loaded Files: "+fileList.size());
     for (FetchedFile f : fileList) {
       logDebugMessage(LogCategory.INIT, "  "+f.getTitle()+" - "+f.getResources().size()+" Resources");
-      for (FetchedResource r : f.getResources())
-        logDebugMessage(LogCategory.INIT, "    "+r.fhirType()+"/"+r.getId());      
+      for (FetchedResource r : f.getResources()) {
+        logDebugMessage(LogCategory.INIT, "    "+r.fhirType()+"/"+r.getId());
+      }
+      
     }
     extensionTracker.scan(publishedIg);
 
@@ -6919,6 +6929,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private void generateSnapshot(FetchedFile f, FetchedResource r, StructureDefinition sd, boolean close, ProfileUtilities utils) throws Exception {
     boolean changed = false;
+        
     logDebugMessage(LogCategory.PROGRESS, "Check Snapshot for "+sd.getUrl());
     sd.setFhirVersion(FHIRVersion.fromCode(version));
     List<ValidationMessage> messages = new ArrayList<>();
@@ -6929,6 +6940,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
     if (sd.hasUserData("profileutils.snapshot.generated")) {
       changed = true;
+      // we already tried to generate the snapshot, and maybe there were messages? if there are, 
+      // put them in the right place
+      List<ValidationMessage> vmsgs = (List<ValidationMessage>) sd.getUserData("profileutils.snapshot.generated.messages");
+      if (vmsgs != null && !vmsgs.isEmpty()) {
+        f.getErrors().addAll(vmsgs);
+      }
     } else {
       sd.setSnapshot(null); // make sure its cleared out if it came from elsewhere so that we do actually regenerate it at this point
     }
@@ -7638,7 +7655,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     otherFilesRun.add(Utilities.path(outputDir, "package.tgz"));
     otherFilesRun.add(Utilities.path(outputDir, "package.manifest.json"));
     otherFilesRun.add(Utilities.path(tempDir, "package.db"));
-    DBBuilder db = new DBBuilder(Utilities.path(tempDir, "package.db"));
+    DBBuilder db = new DBBuilder(Utilities.path(tempDir, "package.db"), context, rc, cu, fileList);
     copyData();
     for (String rg : regenList) {
       regenerate(rg);
@@ -7661,6 +7678,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       db.finishResources();
     }
 
+    generateViewDefinitions(db);
     templateBeforeGenerate();
 
     logMessage("Generate HTML Outputs");
@@ -7683,11 +7701,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
     logMessage("Generate Summaries");
 
-    genBasePages();
-
     if (!changeList.isEmpty()) {
       generateSummaryOutputs(db);
     }
+    genBasePages();
     db.closeUp();
     TextFile.bytesToFile(extensionTracker.generate(), Utilities.path(tempDir, "usage-stats.json"));
     try {
@@ -8690,7 +8707,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private void generateSummaryOutputs(DBBuilder db) throws Exception {
     log("Generating Summary Outputs");
-    ContextUtilities cu = new ContextUtilities(context);
     generateResourceReferences();
 
     generateCanonicalSummary();
@@ -9045,7 +9061,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(data, true);
     TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "languages.json"));
         
-    generateViewDefinitions(db);
   }
 
   private void genBasePages() throws IOException, Exception {
@@ -9116,11 +9131,18 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         PublisherProvider pprov = new PublisherProvider(context, npmList, fileList, igpkp.getCanonical());
         runner.setProvider(pprov);
         runner.setStorage(new StorageSqlite3(db.getConnection()));
-        JsonObject vd = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(new File(Utilities.path(Utilities.getDirectoryForFile(igName), vdn)));
+        JsonObject vd = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(new File(Utilities.path(Utilities.getDirectoryForFile(configFile), vdn)));
         pprov.inspect(vd);
         runner.execute(vd);
         captureIssues(vdn, runner.getIssues());
-      } catch (Exception e) {
+        
+        StorageJson jstore = new StorageJson();
+        runner.setStorage(jstore);
+        runner.execute(vd);
+        String filename = Utilities.path(tempDir, vd.asString("name")+".json");
+        TextFile.stringToFile(org.hl7.fhir.utilities.json.parser.JsonParser.compose(jstore.getRows(), true), filename);
+        otherFilesRun.add(filename);
+        } catch (Exception e) {
         e.printStackTrace();
         errors.add(new ValidationMessage(Source.Publisher, IssueType.REQUIRED, vdn, "Error Processing ViewDefinition: "+e.getMessage(), IssueSeverity.ERROR));
         captureIssues(vdn, runner.getIssues());
@@ -9143,7 +9165,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     JsonArray items = new JsonArray();
     json.add("codeSystems", items);
     
-    b.append("URL,Version,Status,OIDs,Name,Title,Descriptino,Used\r\n");
+    b.append("URL,Version,Status,OIDs,Name,Title,Description,Used\r\n");
     
     for (CodeSystem cs : cslist) {
       
@@ -9195,9 +9217,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       b.append(",");
       b.append(oids.isEmpty() ? "" : "\""+CommaSeparatedStringBuilder.join(",", oids)+"\"");
       b.append(",");
-      b.append(cs.getName());
+      b.append(Utilities.escapeCSV(cs.getName()));
       b.append(",");
-      b.append(cs.getTitle());
+      b.append(Utilities.escapeCSV(cs.getTitle()));
       b.append(",");
       b.append("\""+Utilities.escapeCSV(cs.getDescription())+"\"");
       b.append(",");
@@ -9285,9 +9307,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       b.append(",");
       b.append(oids.isEmpty() ? "" : "\""+CommaSeparatedStringBuilder.join(",", oids)+"\"");
       b.append(",");
-      b.append(vs.getName());
+      b.append(Utilities.escapeCSV(vs.getName()));
       b.append(",");
-      b.append(vs.getTitle());
+      b.append(Utilities.escapeCSV(vs.getTitle()));
       b.append(",");
       b.append("\""+Utilities.escapeCSV(vs.getDescription())+"\"");
       b.append(",");
@@ -11076,6 +11098,16 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           src = pfx + substitute + sfx;
           changed = true;
         }
+        while (db != null && src.contains("{%! " + keyword)) {
+          int i = src.indexOf("{%! " + keyword);
+          String pfx = src.substring(0, i);
+          src = src.substring(i + 3);
+          i = src.indexOf("%}");
+          String sfx = src.substring(i+2);
+          src = src.substring(0, i);
+          src = pfx + "{% raw %}{%"+src+"%}{% endraw %}"+ sfx;
+          changed = true;
+        }
       }
       while (src.contains("[[[")) {
         int i = src.indexOf("[[[");
@@ -11145,6 +11177,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private LanguageUtils langUtils;
 
   private boolean simplifierMode;
+
+  private List<String> versionProblems = new ArrayList<>();
+
+  private ContextUtilities cu;
   
   private String processSQLCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();
@@ -12003,7 +12039,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     XhtmlComposer xc = new XhtmlComposer(XhtmlComposer.XML, module.isNoNarrative());
     if (igpkp.wantGen(r, "html")) {
       long start = System.currentTimeMillis();
-      XhtmlNode xhtml = (lang == null || lang.equals(r.getElement().getNamedChildValue("language"))) ? null : getXhtml(f, r);
+      XhtmlNode xhtml = (lang == null || lang.equals(r.getElement().getNamedChildValue("language"))) ? getXhtml(f, r) : null;
       if (xhtml == null && HistoryGenerator.allEntriesAreHistoryProvenance(r.getElement())) {
         RenderingContext ctxt = lrc.copy(false).setParser(getTypeLoader(f, r));
         List<ProvenanceDetails> entries = loadProvenanceForBundle(igpkp.getLinkFor(r, true), r.getElement(), f);
@@ -14109,6 +14145,5 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     
     return null;
   }
-
 
 }
