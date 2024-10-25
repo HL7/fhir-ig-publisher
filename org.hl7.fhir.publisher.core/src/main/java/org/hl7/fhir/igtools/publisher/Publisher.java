@@ -10355,7 +10355,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     ig.add("description", ProfileUtilities.processRelativeUrls(publishedIg.getDescription(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
     addTranslationsToJson(ig, "description", publishedIg.getDescriptionElement(), true);
 
-    ig.add("tx-server", context.getTxClientManager().getMaster().getAddress());
+    if (context.getTxClientManager() != null && context.getTxClientManager().getMaster() != null) {
+      ig.add("tx-server", context.getTxClientManager().getMaster().getAddress());
+    }
     ig.add("copyright", publishedIg.getCopyright());
     addTranslationsToJson(ig, "copyright", publishedIg.getCopyrightElement(), true);
 
