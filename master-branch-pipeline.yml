@@ -106,7 +106,7 @@ jobs:
       # Deploy the SNAPSHOT artifact to GitHub packages.
       # This is done for the master branch merges only.
       - task: Maven@4
-        enabled: false
+        #enabled: false
         displayName: 'Deploy to GitHub Packages'
         inputs:
           mavenPomFile: '$(System.DefaultWorkingDirectory)/pom.xml'
