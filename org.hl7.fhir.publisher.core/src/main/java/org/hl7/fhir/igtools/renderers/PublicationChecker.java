@@ -210,6 +210,8 @@ public class PublicationChecker {
         check(messages, npm.version().contains("-"), "This release is not labelled as a milestone or technical correction, so should have a patch version ("+npm.version() +")"+(isHL7(npm) ? mkError() : mkWarning()));
       }
     }
+    check(messages, !"technical-correction".equals(pr.asString("mode")), "Technical Corrections are not currently supported");
+    
     if (check(messages, pr.has("status"), "No publication request status found"+mkError())) {
       if (check(messages, isValidStatus(pr.asString("status")), "Proposed status for this publication is not valid (valid values: release|trial-use|update|preview|ballot|draft|normative+trial-use|normative|informative)"+mkError())) {
         summary.add(new StringPair("status", pr.asString("status")));                        

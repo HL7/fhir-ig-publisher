@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -84,7 +85,7 @@ public class WebSourceProvider {
       String url = Utilities.pathURL(source, path)+"?nocache=" + System.currentTimeMillis();
       System.out.println("Fetch "+ url);
       long t = System.currentTimeMillis();
-      HTTPResult res = ManagedWebAccess.get(url);
+      HTTPResult res = ManagedWebAccess.get(Arrays.asList("web"), url);
       res.checkThrowException();
       TextFile.bytesToFile(res.getContent(), df);
       System.out.println("  ... done ("+stats(res.getContent().length, t)+")");
@@ -111,7 +112,7 @@ public class WebSourceProvider {
       String url = Utilities.pathURL(source, path, "_ig-pub-archive.zip")+"?nocache=" + System.currentTimeMillis();
       System.out.println("Fetch "+ url);
       long t = System.currentTimeMillis();
-      HTTPResult res = ManagedWebAccess.get(url);
+      HTTPResult res = ManagedWebAccess.get(Arrays.asList("web"), url);
       res.checkThrowException();
       folderSources.put(path, res.getContent());
       Utilities.unzip(new ByteArrayInputStream(res.getContent()), df.getAbsolutePath());
@@ -176,7 +177,7 @@ public class WebSourceProvider {
       String url = Utilities.pathURL(source, path)+"?nocache=" + System.currentTimeMillis();
       System.out.println("Fetch "+ url);
       long t = System.currentTimeMillis();
-      HTTPResult res = ManagedWebAccess.get(url);
+      HTTPResult res = ManagedWebAccess.get(Arrays.asList("web"), url);
       if (res.getCode() < 300 && res.getContent().length > 0) {
         TextFile.bytesToFile(res.getContent(), df);
       }

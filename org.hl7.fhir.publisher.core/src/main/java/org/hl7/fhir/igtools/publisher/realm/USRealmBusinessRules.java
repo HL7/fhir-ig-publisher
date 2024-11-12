@@ -3,6 +3,7 @@ package org.hl7.fhir.igtools.publisher.realm;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
@@ -206,7 +207,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
 
   private JsonObject fetchJson(String source) throws IOException {
     try {
-      HTTPResult res = ManagedWebAccess.get(source+"?nocache=" + System.currentTimeMillis());
+      HTTPResult res = ManagedWebAccess.get(Arrays.asList("web"), source+"?nocache=" + System.currentTimeMillis());
       res.checkThrowException();
       return JsonParser.parseObject(res.getContent());
     } catch (IOException e) {

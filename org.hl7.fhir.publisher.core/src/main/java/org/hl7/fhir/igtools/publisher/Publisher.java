@@ -145,6 +145,9 @@ import org.hl7.fhir.igtools.web.PublicationProcess;
 import org.hl7.fhir.igtools.web.PublisherConsoleLogger;
 import org.hl7.fhir.igtools.web.WebSiteArchiveBuilder;
 import org.hl7.fhir.r4.formats.FormatUtilities;
+import org.hl7.fhir.r5.utils.sql.Runner;
+import org.hl7.fhir.r5.utils.sql.StorageJson;
+import org.hl7.fhir.r5.utils.sql.StorageSqlite3;
 import org.hl7.fhir.r5.conformance.ConstraintJavaGenerator;
 import org.hl7.fhir.r5.conformance.R5ExtensionsLoader;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
@@ -307,9 +310,6 @@ import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.XVerExtensionManager;
 import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
 import org.hl7.fhir.r5.utils.formats.CSVWriter;
-import org.hl7.fhir.r5.utils.sql.Runner;
-import org.hl7.fhir.r5.utils.sql.StorageJson;
-import org.hl7.fhir.r5.utils.sql.StorageSqlite3;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.validation.IResourceValidator;
@@ -3033,6 +3033,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           defaultWgm = ToolingExtensions.readStringExtension(sourceIg, ToolingExtensions.EXT_WORKGROUP);
         }
         break;
+      case "log-loaded-resources":
+        if (p.getValue().equals("true")) {
+          logLoading = true;
+        }
       case "generate-version":   
         generateVersions.add(p.getValue());
         break;
@@ -3340,10 +3344,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       sourceIg.getDependsOn().add(0, dep);
     }    
     if (!"hl7.fhir.uv.tools".equals(sourceIg.getPackageId()) && !dependsOnTooling(sourceIg.getDependsOn())) {
+      String toolingPackageId = getToolingPackageName()+"#0.3.0";
       if (sourceIg.getDefinition().hasExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency")) {
-        sourceIg.getDefinition().getExtensionByUrl("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency").setValue(new CodeType("hl7.fhir.uv.tools#0.2.0"));      
+        sourceIg.getDefinition().getExtensionByUrl("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency").setValue(new CodeType(toolingPackageId));      
       } else {
-        sourceIg.getDefinition().addExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency", new CodeType("hl7.fhir.uv.tools#0.2.0"));
+        sourceIg.getDefinition().addExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency", new CodeType(toolingPackageId));
       }
     }
     
@@ -3364,7 +3369,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       i++;
     }
     if (!"hl7.fhir.uv.tools".equals(sourceIg.getPackageId()) && !dependsOnTooling(sourceIg.getDependsOn())) {
-      loadIg("igtools", "hl7.fhir.uv.tools", "0.2.0", "http://hl7.org/fhir/tools/ImplementationGuide/hl7.fhir.uv.tools", i, false);   
+      loadIg("igtools", getToolingPackageName(), "0.3.0", "http://hl7.org/fhir/tools/ImplementationGuide/hl7.fhir.uv.tools", i, false);   
     }
 
     // we're also going to look for packages that can be referred to but aren't dependencies
@@ -3697,6 +3702,20 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       vs = "hl7.terminology.r5";
     } else if (VersionUtilities.isR6Ver(version)) {
       vs = "hl7.terminology.r5";
+    }
+    return vs;
+  }
+  
+  private String getToolingPackageName() throws FHIRException, IOException {
+    String vs = null;
+    if (VersionUtilities.isR3Ver(version)) {
+      vs = "hl7.fhir.uv.tools.r3";
+    } else if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {
+      vs = "hl7.fhir.uv.tools.r4";
+    } else if (VersionUtilities.isR5Ver(version)) {
+      vs = "hl7.fhir.uv.tools.r5";
+    } else if (VersionUtilities.isR6Ver(version)) {
+      vs = "hl7.fhir.uv.tools.r5";
     }
     return vs;
   }
@@ -4131,10 +4150,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     igm.setBase(canonical);
     igm.setBase2(PackageHacker.fixPackageUrl(pi.url()));
     specMaps.add(igm);
-    if (!VersionUtilities.versionsCompatible(version, igm.getVersion())) {
+    if (!VersionUtilities.versionsCompatible(version, pi.fhirVersion())) {
       if (!pi.isWarned()) {
-        versionProblems.add("This IG is version "+version+", while the IG '"+pi.name()+"' is from version "+igm.getVersion());
-        log("Version mismatch. This IG is version "+version+", while the IG '"+pi.name()+"' is from version "+igm.getVersion()+" (will try to run anyway)");
+        versionProblems.add("This IG is version "+version+", while the IG '"+pi.name()+"' is from version "+pi.fhirVersion());
+        log("Version mismatch. This IG is version "+version+", while the IG '"+pi.name()+"' is from version "+pi.fhirVersion()+" (will try to run anyway)");
         pi.setWarned(true);   
       }
     }
@@ -4179,14 +4198,15 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   public void loadFromPackage(String name, String canonical, NpmPackage pi, String webref, SpecMapManager igm, boolean loadDeps) throws IOException {
     if (loadDeps) { // we do not load dependencies for packages the tooling loads on it's own initiative
       for (String dep : pi.dependencies()) {
-        if (!context.hasPackage(dep)) {        
-          String coreVersion = VersionUtilities.getVersionForPackage(dep);
+        if (!context.hasPackage(dep)) {
+          String fdep = fixPackageReference(dep);
+          String coreVersion = VersionUtilities.getVersionForPackage(fdep);
           if (coreVersion != null) {
-            log("Ignore Dependency on Core FHIR "+dep+", from package '"+pi.name()+"#"+pi.version()+"'");
+            log("Ignore Dependency on Core FHIR "+fdep+", from package '"+pi.name()+"#"+pi.version()+"'");
           } else {
-            NpmPackage dpi = pcm.loadPackage(dep);
+            NpmPackage dpi = pcm.loadPackage(fdep);
             if (dpi == null) {
-              logDebugMessage(LogCategory.CONTEXT, "Unable s to find package dependency "+dep+". Will proceed, but likely to be be errors in qa.html etc");
+              logDebugMessage(LogCategory.CONTEXT, "Unable to find package dependency "+fdep+". Will proceed, but likely to be be errors in qa.html etc");
             } else {
               if (!VersionUtilities.versionsCompatible(version, pi.fhirVersion())) {
                 if (!pi.isWarned()) {
@@ -4196,7 +4216,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
                 }
               }
               SpecMapManager smm = null;
-              logDebugMessage(LogCategory.PROGRESS, "Load package dependency "+dep);
+              logDebugMessage(LogCategory.PROGRESS, "Load package dependency "+fdep);
               try {
                 smm = dpi.hasFile("other", "spec.internals") ?  new SpecMapManager(TextFile.streamToBytes(dpi.load("other", "spec.internals")), dpi.vid(), dpi.fhirVersion()) : SpecMapManager.createSpecialPackage(dpi, pcm);
                 smm.setName(dpi.name()+"_"+dpi.version());
@@ -4221,6 +4241,26 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }    
     IContextResourceLoader loader = new PublisherLoader(pi, igm, webref, igpkp).makeLoader();
     context.loadFromPackage(pi, loader);
+  }
+
+private String fixPackageReference(String dep) {
+    String id = dep.substring(0, dep.indexOf("#"));
+    String ver = dep.substring(dep.indexOf("#")+1);
+    if ("hl7.fhir.uv.extensions".equals(id)) {
+       if (VersionUtilities.isR3Ver(version)) {
+        id = "hl7.fhir.uv.extensions.r3";
+      } else if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {
+        id = "hl7.fhir.uv.extensions.r4";
+      } else if (VersionUtilities.isR5Ver(version)) {
+        id = "hl7.fhir.uv.extensions.r5";
+      } 
+      if (ver.endsWith("-cibuild")) {
+        return id+"#"+ver.substring(0, ver.lastIndexOf("-"));
+      } else {
+        return id+"#"+ver;
+      }
+    }
+    return dep;
   }
 
 //  private void loadIg(JsonObject dep, boolean loadDeps) throws Exception {
@@ -4507,11 +4547,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         needToBuild = rchanged || needToBuild;
         if (rchanged) {
           if (res.hasExtension(ToolingExtensions.EXT_BINARY_FORMAT_NEW)) {
-            loadAsBinaryResource(f, f.addResource(f.getName()), res, res.getExtensionString(ToolingExtensions.EXT_BINARY_FORMAT_NEW));
+            loadAsBinaryResource(f, f.addResource(f.getName()), res, res.getExtensionString(ToolingExtensions.EXT_BINARY_FORMAT_NEW), "listed in IG");
           } else if (res.hasExtension(ToolingExtensions.EXT_BINARY_FORMAT_OLD)) {
-            loadAsBinaryResource(f, f.addResource(f.getName()), res, res.getExtensionString(ToolingExtensions.EXT_BINARY_FORMAT_OLD));
+            loadAsBinaryResource(f, f.addResource(f.getName()), res, res.getExtensionString(ToolingExtensions.EXT_BINARY_FORMAT_OLD), "listed in IG");
           } else {
-            loadAsElementModel(f, f.addResource(f.getContentType()), res, false);
+            loadAsElementModel(f, f.addResource(f.getContentType()), res, false, "listed in IG");
           }
           if (res.hasExtension(ToolingExtensions.EXT_BINARY_LOGICAL)) {
             f.setLogical(res.getExtensionString(ToolingExtensions.EXT_BINARY_LOGICAL));
@@ -5361,18 +5401,18 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private boolean loadBundles(boolean needToBuild, FetchedFile igf) throws Exception {
     for (String be : bundles) {
-      needToBuild = loadBundle(be, needToBuild, igf);
+      needToBuild = loadBundle(be, needToBuild, igf, "listed as a bundle");
     }
     return needToBuild;
   }
 
-  private boolean loadBundle(String name, boolean needToBuild, FetchedFile igf) throws Exception {
+  private boolean loadBundle(String name, boolean needToBuild, FetchedFile igf, String cause) throws Exception {
     FetchedFile f = fetcher.fetch(new Reference().setReference("Bundle/"+name), igf);
     boolean changed = noteFile("Bundle/"+name, f);
     if (changed) {
       f.setBundle(new FetchedResource(f.getName()+" (bundle)"));
       f.setBundleType(FetchedBundleType.NATIVE);
-      loadAsElementModel(f, f.getBundle(), null, true);
+      loadAsElementModel(f, f.getBundle(), null, true, cause);
       List<Element> entries = new ArrayList<Element>();
       f.getBundle().getElement().getNamedChildren("entry", entries);
       int i = -1;
@@ -5382,7 +5422,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         if (res == null) {
           f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, "Bundle.element["+i+"]", "All entries must have resources when loading a bundle", IssueSeverity.ERROR));
         } else {
-          checkResourceUnique(res.fhirType()+"/"+res.getIdBase(), name);
+          checkResourceUnique(res.fhirType()+"/"+res.getIdBase(), name, cause);
           FetchedResource r = f.addResource(f.getName()+"["+i+"]");
           r.setElement(res);
           r.setId(res.getIdBase());
@@ -5433,7 +5473,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       ff.start("loadResources");
       try {
         if (!ff.matches(igf) && !isBundle(ff)) {
-          needToBuild = loadResource(needToBuild, ff);
+          needToBuild = loadResource(needToBuild, ff, "scan folder "+Utilities.getDirectoryForFile(ff.getStatedPath()));
         }
       } finally {
         ff.finish("loadResources");      
@@ -5456,11 +5496,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     return false;
   }
 
-  private boolean loadResource(boolean needToBuild, FetchedFile f) throws Exception {
+  private boolean loadResource(boolean needToBuild, FetchedFile f, String cause) throws Exception {
     logDebugMessage(LogCategory.INIT, "load "+f.getPath());
     boolean changed = noteFile(f.getPath(), f);
     if (changed) {
-      loadAsElementModel(f, f.addResource(f.getName()), null, false);
+      loadAsElementModel(f, f.addResource(f.getName()), null, false, cause);
     }
     for (FetchedResource r : f.getResources()) {
       ImplementationGuideDefinitionResourceComponent res = findIGReference(r.fhirType(), r.getId());
@@ -5511,12 +5551,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private boolean loadSpreadsheets(boolean needToBuild, FetchedFile igf) throws Exception {
     Set<String> knownValueSetIds = new HashSet<>();
     for (String s : spreadsheets) {
-      needToBuild = loadSpreadsheet(s, needToBuild, igf, knownValueSetIds);
+      needToBuild = loadSpreadsheet(s, needToBuild, igf, knownValueSetIds, "listed as a spreadsheet");
     }
     return needToBuild;
   }
 
-  private boolean loadSpreadsheet(String name, boolean needToBuild, FetchedFile igf, Set<String> knownValueSetIds) throws Exception {
+  private boolean loadSpreadsheet(String name, boolean needToBuild, FetchedFile igf, Set<String> knownValueSetIds, String cause) throws Exception {
     if (name.startsWith("!"))
       return false;
 
@@ -5530,7 +5570,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       f.setBundleType(FetchedBundleType.SPREADSHEET);
       f.getBundle().setResource(bnd);
       for (BundleEntryComponent b : bnd.getEntry()) {
-        checkResourceUnique(b.getResource().fhirType()+"/"+b.getResource().getIdBase(), name);
+        checkResourceUnique(b.getResource().fhirType()+"/"+b.getResource().getIdBase(), name, cause);
         FetchedResource r = f.addResource(f.getName());
         r.setResource(b.getResource());
         r.setId(b.getResource().getId());
@@ -5545,12 +5585,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     for (String id : f.getValuesetsToLoad().keySet()) {
       if (!knownValueSetIds.contains(id)) {
         String vr = f.getValuesetsToLoad().get(id);
-        checkResourceUnique("ValueSet/"+id, name);
+        checkResourceUnique("ValueSet/"+id, name, cause);
 
         FetchedFile fv = fetcher.fetchFlexible(vr);
         boolean vrchanged = noteFile("sp-ValueSet/"+vr, fv);
         if (vrchanged) {
-          loadAsElementModel(fv, fv.addResource(f.getName()+" (VS)"), null, false);
+          loadAsElementModel(fv, fv.addResource(f.getName()+" (VS)"), null, false, cause);
           checkImplicitResourceIdentity(id, fv);
         }
         knownValueSetIds.add(id);
@@ -5562,7 +5602,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
             fv = fetcher.fetchFlexible(cr);
             crchanged = noteFile("sp-CodeSystem/"+vr, fv);
             if (crchanged) {
-              loadAsElementModel(fv, fv.addResource(f.getName()+" (CS)"), null, false);
+              loadAsElementModel(fv, fv.addResource(f.getName()+" (CS)"), null, false, cause);
               checkImplicitResourceIdentity(id, fv);
             }
           }
@@ -5674,7 +5714,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     loadInfo();
     log("Load Resources");
     for (String s : metadataResourceNames()) { 
-      load(s);
+      load(s, !Utilities.existsInList(s, "Evidence", "EvidenceVariable")); // things that have changed in R6 that aren't internally critical
     }
     log("Load Paths");
     loadPaths();
@@ -6113,7 +6153,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     //  	}
   }
 
-  private void loadAsBinaryResource(FetchedFile file, FetchedResource r, ImplementationGuideDefinitionResourceComponent srcForLoad, String format) throws Exception {
+  private void loadAsBinaryResource(FetchedFile file, FetchedResource r, ImplementationGuideDefinitionResourceComponent srcForLoad, String format, String cause) throws Exception {
     file.getErrors().clear();
     Binary bin = new Binary();
     String id = srcForLoad.getReference().getReference();
@@ -6125,7 +6165,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     bin.setContent(file.getSource());
     bin.setContentType(format);
     Element e = new ObjectConverter(context).convert(bin);
-    checkResourceUnique(e.fhirType()+"/"+e.getIdBase(), file.getPath());        
+    checkResourceUnique(e.fhirType()+"/"+e.getIdBase(), file.getPath(), cause);        
     r.setElement(e).setId(bin.getId());
     r.setResource(bin);
     r.setResEntry(srcForLoad);
@@ -6139,7 +6179,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     srcForLoad.setUserData("loaded.resource", r);
   }
 
-  private void loadAsElementModel(FetchedFile file, FetchedResource r, ImplementationGuideDefinitionResourceComponent srcForLoad, boolean suppressLoading) throws Exception {
+  private void loadAsElementModel(FetchedFile file, FetchedResource r, ImplementationGuideDefinitionResourceComponent srcForLoad, boolean suppressLoading, String cause) throws Exception {
     file.getErrors().clear();
     Element e = null;
 
@@ -6168,7 +6208,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           File f = new File(file.getPath());
           id = f.getName();
           id = id.substring(0, id.indexOf("."));
-          checkResourceUnique("Binary/"+id, file.getPath());
+          checkResourceUnique("Binary/"+id, file.getPath(), cause);
           r.setElement(e).setId(id).setType("Binary");
           igpkp.findConfiguration(file, r);
           binary = true;
@@ -6205,7 +6245,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
             altered = true;
           }
           if (!Utilities.noString(e.getIdBase())) {
-            checkResourceUnique(e.fhirType()+"/"+e.getIdBase(), file.getPath());
+            checkResourceUnique(e.fhirType()+"/"+e.getIdBase(), file.getPath(), cause);
           }
           r.setId(id);
           r.setElement(e);
@@ -6349,7 +6389,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     return res;
   }
 
-  public void checkResourceUnique(String tid, String source) throws Error {
+  public void checkResourceUnique(String tid, String source, String cause) throws Error {
+    if (logLoading) {
+      System.out.println("id: "+tid+", file: "+source+", from "+cause);
+    }
     if (loadedIds.containsKey(tid)) {
       System.out.println("Duplicate Resource in IG: "+tid+". first found in "+loadedIds.get(tid)+", now in "+source);
       duplicateInputResourcesDetected = true;
@@ -6532,7 +6575,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
   }
 
-  private void load(String type) throws Exception {
+  private void load(String type, boolean isMandatory) throws Exception {
     for (FetchedFile f : fileList) {
       f.start("load");
       try {
@@ -6548,7 +6591,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
                 }
                 r.getResource().setUserData("element", r.getElement());
               } catch (Exception e) {
-                throw new Exception("Error parsing "+f.getName()+": "+e.getMessage(), e);
+                if (isMandatory) {
+                  throw new FHIRException("Error parsing "+f.getName()+": "+e.getMessage(), e);
+                  
+                } else {
+                  System.out.println("Error parsing "+f.getName()+": "+e.getMessage()); // , e);
+                }
               }
             }
             if (r.getResource() instanceof CanonicalResource) {
@@ -10776,7 +10824,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               logMessage("This resource should already have been converted, so it is likely invalid. It won't be rendered correctly, and Jekyll is quite likely to fail (depends on the template)");                            
             } else if (Utilities.existsInList(r.fhirType(), new ContextUtilities(context).getCanonicalResourceNames())) {
               logMessage("Unable to convert resource " + r.getTitle() + " for rendering: " + e.getMessage());
-              logMessage("This resource is a canonical resource and won't be rendered correctly, and Jekyll is likely to fail (depends on the template)");              
+              logMessage("This resource is a canonical resource and might not be rendered correctly, and Jekyll may fail (depends on the template)");              
             } else if (r.getElement().hasChildren("contained")) {
               logMessage("Unable to convert resource " + r.getTitle() + " for rendering: " + e.getMessage());
               logMessage("This resource contains other resources that won't be rendered correctly, and Jekyll may fail");
@@ -11183,6 +11231,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private List<String> versionProblems = new ArrayList<>();
 
   private ContextUtilities cu;
+
+  private boolean logLoading;
   
   private String processSQLCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();
@@ -13888,7 +13938,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private static InputStream fetchGithubUrl(String ghUrl) throws IOException {  
-    HTTPResult res = ManagedWebAccess.get(ghUrl+"?nocache=" + System.currentTimeMillis());
+    HTTPResult res = ManagedWebAccess.get(Arrays.asList("web"), ghUrl+"?nocache=" + System.currentTimeMillis());
     res.checkThrowException();
     return new ByteArrayInputStream(res.getContent());
   }
