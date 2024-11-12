@@ -514,7 +514,7 @@ public class DBBuilder {
           psql.setInt(4, ((Integer) pd.getUserData("db.key")).intValue());
         }
         bindString(psql, 5, p.getCode());
-        bindString(psql, 6, p.getValue().primitiveValue());
+        bindString(psql, 6, p.getValue() == null ? p.getValue().primitiveValue() : null);
         psql.executeUpdate();    
         p.setUserData("db.key", lastCPropKey);   
       }
