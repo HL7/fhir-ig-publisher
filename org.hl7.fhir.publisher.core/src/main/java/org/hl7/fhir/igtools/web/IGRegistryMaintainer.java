@@ -74,6 +74,7 @@ public class IGRegistryMaintainer {
     private String cibuild;
     private List<PublicationEntry> releases = new ArrayList<>();
     private List<PublicationEntry> candidates = new ArrayList<>();
+    private List<String> products = new ArrayList<>();
     private JsonObject entry;
     
     public ImplementationGuideEntry(String packageId, String canonical, String title) {
@@ -112,6 +113,10 @@ public class IGRegistryMaintainer {
     public String getCategory() {
       return entry.asString("category");
     }
+
+    public List<String> getProducts() {
+      return products;
+    }
   }
 
   private String path;
@@ -132,6 +137,7 @@ public class IGRegistryMaintainer {
   public ImplementationGuideEntry seeIg(String packageId, String canonical, String title, String category) {
     ImplementationGuideEntry ig = new ImplementationGuideEntry(packageId, canonical, title);
     igs.add(ig);
+    ig.getProducts().add("fhir");
     ig.entry = json.getJsonArray("guides").findByStringProp("npm-name", ig.packageId);
     if (ig.entry == null) {
       ig.entry = new JsonObject();
@@ -143,10 +149,15 @@ public class IGRegistryMaintainer {
       ig.entry.add("authority", getAuthority(ig.canonical));
       ig.entry.add("country", getCountry(ig.canonical));
       ig.entry.add("history", getHistoryPage(ig.canonical));
+      ig.entry.forceArray("product").add("fhir");
       JsonArray a = new JsonArray();
       ig.entry.add("language", a);
       a.add(new JsonString("en"));
-    } 
+    } else {
+      for (String s : ig.entry.forceArray("product").asStrings()) {
+        ig.products.add(s);
+      }
+    }
     if (!ig.entry.has("category") && !Utilities.noString(category)) {
       ig.entry.add("category", category);      
     }
@@ -185,6 +196,10 @@ public class IGRegistryMaintainer {
 
         if (ig.entry.has("editions")) {
           ig.entry.remove("editions");
+        }
+        ig.entry.remove("product");
+        for (String s : ig.products) {
+          ig.entry.forceArray("product").add(s);
         }
         
         JsonArray a = new JsonArray();
