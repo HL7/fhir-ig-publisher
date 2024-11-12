@@ -65,7 +65,7 @@ steps:
           </server>
           <server>
             <id>github-releases</id>
-            <username>markiantorno</username>
+            <username>$(GIT_USER_NAME)</username>
             <password>$(GIT_PACKAGE_PAT)</password>
           </server>
         </servers>
