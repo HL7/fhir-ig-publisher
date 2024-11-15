@@ -8865,6 +8865,8 @@ private String fixPackageReference(String dep) {
     start = System.currentTimeMillis();
     trackedFragment("3", "dependency-table-short", depr.render(publishedIg, false, false, false), otherFilesRun, start, "dependency-table-short", "Cross");
     start = System.currentTimeMillis();
+    trackedFragment("3", "dependency-table-nontech", depr.renderNonTech(publishedIg), otherFilesRun, start, "dependency-table-nontech", "Cross");
+    start = System.currentTimeMillis();
     trackedFragment("4", "globals-table", depr.renderGlobals(), otherFilesRun, start, "globals-table", "Cross");
 
     // now, list the profiles - all the profiles
