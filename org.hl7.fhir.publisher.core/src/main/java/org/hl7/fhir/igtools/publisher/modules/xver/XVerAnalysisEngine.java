@@ -79,6 +79,7 @@ import org.hl7.fhir.r5.terminologies.ConceptMapUtilities;
 import org.hl7.fhir.r5.terminologies.ConceptMapUtilities.TranslatedCode;
 import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
+import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.TextFile;
@@ -250,7 +251,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     checkStructureMaps();
 
     for (ConceptMap cm : conceptMaps.values()) {
-      if (cm.hasUserData("cm.used") && "false".equals(cm.getUserString("cm.used"))) {
+      if (cm.hasUserData(UserDataNames.xver_cm_used) && "false".equals(cm.getUserString(UserDataNames.xver_cm_used))) {
         if (!cm.getId().contains("4to5") && !cm.getId().contains("5to4")) {
           qaMsg("Unused conceptmap: "+cm.getId(), false);
         }        
@@ -282,7 +283,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       for (String s : Utilities.sorted(urls.keySet())) {
         ElementDefinition ed = new ElementDefinition("Extension.extension");
         sd.getDifferential().getElement().add(i, ed);
-        ed.setSliceName(urls.get(s).getUserString("sliceName"));
+        ed.setSliceName(urls.get(s).getUserString(UserDataNames.xver_sliceName));
         ed.addType().setCode("Extension").addProfile(s);
         i++;
       }
@@ -324,7 +325,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     }
     path = path.substring(0, path.lastIndexOf("."));    
     ElementDefinition ed = element.getSd().getDifferential().getElementByPath(path);
-    return (SourcedElementDefinition) ed.getUserData("sed");
+    return (SourcedElementDefinition) ed.getUserData(UserDataNames.xver_sed);
   }
 
   private void populateTypeMap() {
@@ -378,7 +379,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       StructureDefinition sd = new StructureDefinition();
       element.setExtension(sd);
       extensions.add(sd);
-      sd.setUserData("sliceName", element.getEd().getName()+VersionUtilities.getNameForVersion(element.getVer()));
+      sd.setUserData(UserDataNames.xver_sliceName, element.getEd().getName()+VersionUtilities.getNameForVersion(element.getVer()));
       sd.setUrl(element.extensionPath()); 
       String id = generateConciseId("xv-"+VersionUtilities.getNameForVersion(element.getVer()).toLowerCase()+"-"+element.getEd().getPath());
       if (extMap.containsKey(id)) {
@@ -410,7 +411,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       ElementDefinition ed = element.getSd().getDifferential().getElementByPath(thisVersionParent);
       for (String tgtVer : allVersions()) {
         if (element.appliesToVersion(tgtVer)) {
-          List<StructureDefinitionContextComponent> contexts = getParentContextsForVersion((SourcedElementDefinition) ed.getUserData("sed"), ver, tgtVer);
+          List<StructureDefinitionContextComponent> contexts = getParentContextsForVersion((SourcedElementDefinition) ed.getUserData(UserDataNames.xver_sed), ver, tgtVer);
           for (StructureDefinitionContextComponent ctxt : contexts) {           
             sd.addContext(ctxt);
           }
@@ -1217,7 +1218,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
                 if (cm == null) {
                   qaMsg("bed ref '"+url+"' in "+map.getUrl(), true);
                 } else {
-                  cm.setUserData("cm.used", "true");
+                  cm.setUserData(UserDataNames.xver_cm_used, "true");
                 }
               }
             }
@@ -1411,7 +1412,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
                   qaMsg("bad ref '"+url+"' dstVer is "+cmDstVer+" should be "+dstVer + " in "+map.getUrl(), true);
                 } else {
                   checkCM(cm, source.toSED(), target.toSED(), vsl, vsr);
-                  cm.setUserData("cm.used", "true");
+                  cm.setUserData(UserDataNames.xver_cm_used, "true");
                 }
               }
             }
@@ -1710,7 +1711,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
           throw new Error("Error parsing "+f.getAbsolutePath()+": "+e.getMessage(), e);
         }
         if (track) {
-          cm.setUserData("cm.used", "false");
+          cm.setUserData(UserDataNames.xver_cm_used, "false");
         }
         cm.setWebPath("ConceptMap-"+cm.getId()+".html");
         conceptMaps.put(id.toLowerCase(), cm);
@@ -2279,7 +2280,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
   private void checkCM(ConceptMap cm, SourcedElementDefinition se, SourcedElementDefinition de, VSPair s, VSPair d) throws FileNotFoundException, IOException {
-    cm.setUserData("cm.used", "true");
+    cm.setUserData(UserDataNames.xver_cm_used, "true");
     boolean mod = false;
     
     String scopeUri = "http://hl7.org/fhir/"+VersionUtilities.getMajMin(se.getVer())+"/StructureDefinition/"+se.getSd().getName()+"#"+se.getEd().getPath();
@@ -2368,7 +2369,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
                     Coding dc = getCode(dst, tu, tgt.getCode());
                     if (dc == null) {
                       invalid.add(c);
-                      tgt.setUserData("delete", true);
+                      tgt.setUserData(UserDataNames.xver_delete, true);
                     } else {
                       mapped.add(c);
                       unmapped.remove(dc);
@@ -2425,7 +2426,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
             qaMsg("Concept Map "+cm.getId()+" has invalid mappings to "+toString(invalid), true);
             if (dst != null) {
               for (SourceElementComponent e : g.getElement()) {
-                if (e.getTarget().removeIf(t -> t.hasUserData("delete"))) {
+                if (e.getTarget().removeIf(t -> t.hasUserData(UserDataNames.xver_delete))) {
                   mod = true;
                   if (e.getTarget().isEmpty()) {
                     e.setNoMap(true);
@@ -2525,7 +2526,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
 
   private boolean isNotSelectable(Coding c) {
-    return c.hasUserData("abstract");
+    return c.hasUserData(UserDataNames.xver_abstract);
   }
 
   private String removeVersion(String url) {
@@ -2621,7 +2622,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     for (ValueSetExpansionContainsComponent cc : expansion.getContains()) {
       Coding c = new Coding(injectVersionToUri(cc.getSystem(), version), cc.getVersion(), cc.getCode(), cc.getDisplay());
       if (cc.hasAbstract() && cc.getAbstract()) {
-        c.setUserData("abstract", true);
+        c.setUserData(UserDataNames.xver_abstract, true);
       }
       codes.add(c);
     }
@@ -2769,7 +2770,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       for (StructureDefinition sd : sortedSDs(defsNext.fetchResourcesByType(StructureDefinition.class))) {
         if (sd.getKind() == StructureDefinitionKind.COMPLEXTYPE && (!sd.getAbstract() || Utilities.existsInList(sd.getName(), "Quantity")) && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
           for (ElementDefinition ed : sd.getDifferential().getElement()) {
-            if (!ed.hasUserData("sed")) {
+            if (!ed.hasUserData(UserDataNames.xver_sed)) {
               List<ElementDefinitionLink> links = makeEDLinks(ed, MakeLinkMode.OUTWARD);
               terminatingElements.add(makeSED(sd, ed));
             }
@@ -2780,7 +2781,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       for (StructureDefinition sd : sortedSDs(defsNext.fetchResourcesByType(StructureDefinition.class))) {
         if (sd.getKind() == StructureDefinitionKind.RESOURCE && !sd.getAbstract() && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
           for (ElementDefinition ed : sd.getDifferential().getElement()) {   
-            if (!ed.hasUserData("sed")) {
+            if (!ed.hasUserData(UserDataNames.xver_sed)) {
               List<ElementDefinitionLink> links = makeEDLinks(ed, MakeLinkMode.OUTWARD);
               terminatingElements.add(makeSED(sd, ed));
             }
@@ -2833,10 +2834,10 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
   }
 
   public SourcedElementDefinition makeSED(StructureDefinition sd, ElementDefinition ed) {
-    SourcedElementDefinition sed = (SourcedElementDefinition) ed.getUserData("sed");
+    SourcedElementDefinition sed = (SourcedElementDefinition) ed.getUserData(UserDataNames.xver_sed);
     if (sed == null) {
       sed = new SourcedElementDefinition(sd, ed);
-      ed.setUserData("sed", sed);
+      ed.setUserData(UserDataNames.xver_sed, sed);
     }
     return sed;
   }

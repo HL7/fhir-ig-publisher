@@ -29,6 +29,7 @@ import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideGlobalCompon
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
+import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
@@ -282,7 +283,7 @@ public class DependencyRenderer {
         b2.append("\r\n<p><b>Dependencies</b></p>\r\n");
         boolean first = true;
         for (ArtifactDependency ad : dependencies) {
-          String t = ad.getTarget().getUserString("package");
+          String t = ad.getTarget().getUserString(UserDataNames.render_src_package); // todo: this isn't ever set anywhere?
           if (n.equals(t)) {
             if (first) {
               b2.append("<ul>\r\n");

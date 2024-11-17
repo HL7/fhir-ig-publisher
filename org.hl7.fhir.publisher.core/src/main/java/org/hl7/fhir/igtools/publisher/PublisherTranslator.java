@@ -7,6 +7,7 @@ import java.util.List;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.elementmodel.LanguageUtils;
 import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.i18n.JsonLangFileProducer;
 import org.hl7.fhir.utilities.i18n.LanguageFileProducer.TranslationUnit;
@@ -84,7 +85,7 @@ public class PublisherTranslator {
     if (res != null && lu.handlesAsResource(res)) {
 
       List<TranslationUnit> translations = lu.generateTranslations(res, lang);
-      String srcFile = res.hasUserData("source.filename") ? res.getUserString("source.filename") : r.fhirType()+"-"+r.getId();
+      String srcFile = res.hasUserData(UserDataNames.pub_source_filename) ? res.getUserString(UserDataNames.pub_source_filename) : r.fhirType()+"-"+r.getId();
       
       po.produce(srcFile, baseLang, lang, translations, srcFile+".po");
       xliff.produce(srcFile, baseLang, lang, translations, srcFile+".xliff");

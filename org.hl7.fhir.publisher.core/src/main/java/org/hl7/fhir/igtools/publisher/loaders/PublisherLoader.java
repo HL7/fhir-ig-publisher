@@ -17,6 +17,7 @@ import org.hl7.fhir.igtools.publisher.SpecMapManager.SpecialPackageType;
 import org.hl7.fhir.r5.context.IContextResourceLoader;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -107,9 +108,9 @@ public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProv
         }
         r.setWebPath(path);
         if (path.contains("vsac")) {
-          r.setUserData("External.Link", "https://vsac.nlm.nih.gov");
+          r.setUserData(UserDataNames.render_external_link, "https://vsac.nlm.nih.gov");
         }
-        r.setUserData("webroot", pathToSpec);
+        r.setUserData(UserDataNames.render_webroot, pathToSpec);
 //        String v = ((CanonicalResource) r).getVersion();
         return path;
       } 
