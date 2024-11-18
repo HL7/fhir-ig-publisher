@@ -5041,6 +5041,25 @@ private String fixPackageReference(String dep) {
     def.setUserData(UserDataNames.loader_custom_resource, "true");
     def.setWebPath("placeholder.html"); // we'll figure it out later
     context.cacheResource(def); 
+
+    // work around for a sushi limitation 
+    for (ImplementationGuideDefinitionResourceComponent res : publishedIg.getDefinition().getResource()) {
+      if (res.getReference().getReference().startsWith("Binary/")) {
+        if (res.getProfile().size() == 1 && def.getUrl().equals(res.getProfile().get(0).primitiveValue())) {
+          String id = res.getReference().getReference().substring(res.getReference().getReference().indexOf("/")+1);
+          File of = new File(Utilities.path(Utilities.getDirectoryForFile(this.getConfigFile()), "fsh-generated", "resources", "Binary-"+id+".json"));
+          File nf = new File(Utilities.path(Utilities.getDirectoryForFile(this.getConfigFile()), "fsh-generated", "resources", def.getType()+"-"+id+".json"));
+          if (of.exists()) {
+            of.renameTo(nf);
+            JsonObject j = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(nf);
+            j.set("resourceType", def.getType());
+            org.hl7.fhir.utilities.json.parser.JsonParser.compose(j, nf, true);
+          }
+          res.getReference().setReference(def.getType()+res.getReference().getReference().substring(res.getReference().getReference().indexOf("/")));    
+        }
+      }
+    }
+  
     return "loaded";
   }
 
