@@ -479,4 +479,14 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   public ReferenceValidationPolicy getReferencePolicy() {
     return ReferenceValidationPolicy.CHECK_VALID;
   }
+
+  @Override
+  public IValidationPolicyAdvisor getPolicyAdvisor() {
+    return null;
+  }
+
+  @Override
+  public IValidationPolicyAdvisor setPolicyAdvisor(IValidationPolicyAdvisor policyAdvisor) {
+    throw new Error("Not supported");
+  }
 }

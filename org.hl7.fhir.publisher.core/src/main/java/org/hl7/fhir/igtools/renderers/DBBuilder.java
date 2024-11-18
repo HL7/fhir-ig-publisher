@@ -332,7 +332,7 @@ public class DBBuilder {
         bindString(psql, 7, r.getElement().getNamedChildValue("version"));
         bindString(psql, 8, r.getElement().getNamedChildValue("status"));
         bindString(psql, 9, r.getElement().getNamedChildValue("date"));
-        bindString(psql, 10, r.getElement().hasChild("name") && r.getElement().getNamedChild("name").isPrimitive() ? r.getElement().getNamedChildValue("name") : r.getResourceName());
+        bindString(psql, 10, r.getElement().getChildren("name").size() == 1 && r.getElement().getNamedChild("name").isPrimitive() ? r.getElement().getNamedChildValue("name") : r.getResourceName());
         bindString(psql, 11, r.getElement().getNamedChildValue("title"));
         bindString(psql, 12, r.getResourceDescription());
         psql.setBytes(13, json);
