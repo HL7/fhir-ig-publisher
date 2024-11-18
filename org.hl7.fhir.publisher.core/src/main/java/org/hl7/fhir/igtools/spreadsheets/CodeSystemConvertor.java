@@ -33,6 +33,7 @@ import org.hl7.fhir.r5.model.PackageInformation;
 import org.hl7.fhir.r5.model.UsageContext;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
+import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.Utilities;
 
 public class CodeSystemConvertor {
@@ -67,16 +68,16 @@ public class CodeSystemConvertor {
     if (!vs.hasDescription())
       throw new Error("No description vs "+vs.getUrl());
     
-    if (cs.getUserData("conv-vs") != null)
+    if (cs.getUserData(UserDataNames.PUB_CS_CONVERTED) != null)
       throw new Error("This code system has already been converted");
-    cs.setUserData("conv-vs", "done");
-    vs.setUserData("cs", cs);
-    if (vs.hasUserData("filename"))
-      cs.setUserData("filename", vs.getUserString("filename").replace("valueset-", "codesystem-"));
+    cs.setUserData(UserDataNames.PUB_CS_CONVERTED, "done");
+    vs.setUserData(UserDataNames.TX_ASSOCIATED_CODESYSTEM, cs);
+    if (vs.hasUserData(UserDataNames.render_filename))
+      cs.setUserData(UserDataNames.render_filename, vs.getUserString(UserDataNames.render_filename).replace("valueset-", "codesystem-"));
     if (vs.hasWebPath())
       cs.setWebPath(vs.getWebPath().replace("valueset-", "codesystem-"));
-    if (vs.hasUserData("committee"))
-      cs.setUserData("committee", vs.getUserData("committee"));
+    if (vs.hasUserData(UserDataNames.deprecated_committee))
+      cs.setUserData(UserDataNames.deprecated_committee, vs.getUserData(UserDataNames.deprecated_committee));
     cs.setId(vs.getId());
     cs.setVersion(vs.getVersion());
     cs.setName(vs.getName());

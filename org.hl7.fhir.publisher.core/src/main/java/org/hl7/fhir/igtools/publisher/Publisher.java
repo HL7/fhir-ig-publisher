@@ -276,6 +276,7 @@ import org.hl7.fhir.r5.renderers.BundleRenderer;
 import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.ParametersRenderer;
 import org.hl7.fhir.r5.renderers.RendererFactory;
+import org.hl7.fhir.r5.renderers.ResourceRenderer;
 import org.hl7.fhir.r5.renderers.spreadsheets.CodeSystemSpreadsheetGenerator;
 import org.hl7.fhir.r5.renderers.spreadsheets.ConceptMapSpreadsheetGenerator;
 import org.hl7.fhir.r5.renderers.spreadsheets.StructureDefinitionSpreadsheetGenerator;
@@ -307,6 +308,7 @@ import org.hl7.fhir.r5.utils.OperationOutcomeUtilities;
 import org.hl7.fhir.r5.utils.ResourceSorters;
 import org.hl7.fhir.r5.utils.ResourceUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
+import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.r5.utils.XVerExtensionManager;
 import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
 import org.hl7.fhir.r5.utils.formats.CSVWriter;
@@ -314,6 +316,7 @@ import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.validation.IResourceValidator;
 import org.hl7.fhir.r5.utils.validation.IValidationProfileUsageTracker;
+import org.hl7.fhir.r5.utils.validation.ValidatorSession;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.DurationUtil;
 import org.hl7.fhir.utilities.FhirPublication;
@@ -335,6 +338,7 @@ import org.hl7.fhir.utilities.i18n.*;
 import org.hl7.fhir.utilities.i18n.LanguageFileProducer.TranslationUnit;
 import org.hl7.fhir.utilities.i18n.subtag.LanguageSubtagRegistry;
 import org.hl7.fhir.utilities.i18n.subtag.LanguageSubtagRegistryLoader;
+import org.hl7.fhir.utilities.json.JsonException;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonBoolean;
 import org.hl7.fhir.utilities.json.model.JsonElement;
@@ -763,6 +767,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private final List<String> noNarratives = new ArrayList<>();
   private List<FetchedResource> noNarrativeResources = new ArrayList<>();
   private final List<String> noValidate = new ArrayList<>();
+  private final List<String> customResourceFiles = new ArrayList<>();
   private List<FetchedResource> noValidateResources = new ArrayList<>();
 
   private List<String> resourceDirs = new ArrayList<String>();
@@ -1234,6 +1239,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           log("Unhandled Exception: " +ex.toString());
           throw(ex);
         }
+        validatorSession.close();
+      }
+      if (needsRegen) {
+        log("Regenerating Narratives");
+        generateNarratives(true);
       }
       log("Processing Provenance Records");
       processProvenanceDetails();
@@ -2158,87 +2168,104 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     return extensions;
   }
 
-  private void generateNarratives() throws Exception {
+  private void generateNarratives(boolean isRegen) throws Exception {
     Session tts = tt.start("narrative generation");
-    logDebugMessage(LogCategory.PROGRESS, "gen narratives");
+    logDebugMessage(LogCategory.PROGRESS, isRegen ? "regen narratives" : "gen narratives");
     for (FetchedFile f : fileList) {
       f.start("generateNarratives");
       try {
         for (FetchedResource r : f.getResources()) {
-          if (r.getExampleUri()==null || genExampleNarratives) {
-            if (!passesNarrativeFilter(r)) {
-              noNarrativeResources.add(r);
-              logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId()+" suppressed");
-              if (r.getResource() != null && r.getResource() instanceof DomainResource) {
-                ((DomainResource) r.getResource()).setText(null);
-              }
-              r.getElement().removeChild("text");
-            } else {
-              List<Locale> langs = translationLocales();
-              logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId());
-              if (r.getResource() != null && isConvertableResource(r.getResource().fhirType())) {
-                boolean regen = false;
-                for (Locale lang : langs) {
-                boolean first = true;
-                  RenderingContext lrc = rc.copy(false).setDefinitionsTarget(igpkp.getDefinitionsName(r));
-                  lrc.setLocale(lang);
-                  lrc.setRules(GenerationRules.VALID_RESOURCE);
-                  lrc.setDefinitionsTarget(igpkp.getDefinitionsName(r));
-                  lrc.setSecondaryLang(!first);
-                  first = false;
-                  if (r.getResource() instanceof DomainResource && (langs.size() > 1 || !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv()))) {
-                    regen = true;
-                    RendererFactory.factory(r.getResource(), lrc).setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, r.getResource()));
-                  } else if (r.getResource() instanceof Bundle) {
-                    regen = true;
-                    new BundleRenderer(lrc).setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, r.getResource()));
-                  } else if (r.getResource() instanceof Parameters) {
-                    regen = true;
-                    Parameters p = (Parameters) r.getResource();
-                    new ParametersRenderer(lrc).setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, p));
-                  } else if (r.getResource() instanceof DomainResource) {
-                    checkExistingNarrative(f, r, ((DomainResource) r.getResource()).getText().getDiv());
-                  }
+          if (!isRegen || r.isRegenAfterValidation()) {
+            if (r.getExampleUri()==null || genExampleNarratives) {
+              if (!passesNarrativeFilter(r)) {
+                noNarrativeResources.add(r);
+                logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId()+" suppressed");
+                if (r.getResource() != null && r.getResource() instanceof DomainResource) {
+                  ((DomainResource) r.getResource()).setText(null);
                 }
-                if (regen) {
-                  Element e = convertToElement(r, r.getResource());
-                  e.copyUserData(r.getElement());
-                  r.setElement(e);
-                }
+                r.getElement().removeChild("text");
               } else {
-                boolean first = true;
-                for (Locale lang : langs) {
-                  RenderingContext lrc = rc.copy(false).setParser(getTypeLoader(f,r));
-                  lrc.clearAnchors();
-                  lrc.setLocale(lang);
-                  lrc.setRules(GenerationRules.VALID_RESOURCE);
-                  lrc.setSecondaryLang(!first);
-                  first = false;
-                  if (isDomainResource(r) && (langs.size() > 1|| !hasNarrative(r.getElement()))) {
-                    ResourceWrapper rw = ResourceWrapper.forResource(lrc, r.getElement());
-                    RendererFactory.factory(rw, lrc).setMultiLangMode(langs.size() > 1).renderResource(rw);
-                    otherFilesRun.addAll(lrc.getFiles());
-                  } else if (r.fhirType().equals("Bundle")) {
-                    lrc.setAddName(true);
-                    for (Element e : r.getElement().getChildrenByName("entry")) {
-                      Element res = e.getNamedChild("resource");
-                      if (res!=null && "http://hl7.org/fhir/StructureDefinition/DomainResource".equals(res.getProperty().getStructure().getBaseDefinition())) {
-                        ResourceWrapper rw = ResourceWrapper.forResource(lrc, res);
-                        if (hasNarrative(res)) {
-                          RendererFactory.factory(rw, lrc).checkNarrative(rw);                        
-                        } else {
-                          RendererFactory.factory(rw, lrc).setMultiLangMode(langs.size() > 1).renderResource(rw);
+                List<Locale> langs = translationLocales();
+                logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId());
+                if (r.getResource() != null && isConvertableResource(r.getResource().fhirType())) {
+                  boolean regen = false;
+                  for (Locale lang : langs) {
+                    boolean first = true;
+                    RenderingContext lrc = rc.copy(false).setDefinitionsTarget(igpkp.getDefinitionsName(r));
+                    lrc.setLocale(lang);
+                    lrc.setRules(GenerationRules.VALID_RESOURCE);
+                    lrc.setDefinitionsTarget(igpkp.getDefinitionsName(r));
+                    lrc.setSecondaryLang(!first);
+                    first = false;
+                    if (r.getResource() instanceof DomainResource && (langs.size() > 1 || !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv()))) {
+                      regen = true;
+                      ResourceRenderer rr = RendererFactory.factory(r.getResource(), lrc);
+                      if (rr.renderingUsesValidation()) {
+                        r.setRegenAfterValidation(true);
+                        needsRegen = true;
+                      }
+                      rr.setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, r.getResource()));
+                    } else if (r.getResource() instanceof Bundle) {
+                      regen = true;
+                      new BundleRenderer(lrc).setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, r.getResource()));
+                    } else if (r.getResource() instanceof Parameters) {
+                      regen = true;
+                      Parameters p = (Parameters) r.getResource();
+                      new ParametersRenderer(lrc).setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, p));
+                    } else if (r.getResource() instanceof DomainResource) {
+                      checkExistingNarrative(f, r, ((DomainResource) r.getResource()).getText().getDiv());
+                    }
+                  }
+                  if (regen) {
+                    Element e = convertToElement(r, r.getResource());
+                    e.copyUserData(r.getElement());
+                    r.setElement(e);
+                  }
+                } else {
+                  boolean first = true;
+                  for (Locale lang : langs) {
+                    RenderingContext lrc = rc.copy(false).setParser(getTypeLoader(f,r));
+                    lrc.clearAnchors();
+                    lrc.setLocale(lang);
+                    lrc.setRules(GenerationRules.VALID_RESOURCE);
+                    lrc.setSecondaryLang(!first);
+                    first = false;
+                    if (isDomainResource(r) && (isRegen || langs.size() > 1 || !hasNarrative(r.getElement()))) {
+                      ResourceWrapper rw = ResourceWrapper.forResource(lrc, r.getElement());
+                      ResourceRenderer rr = RendererFactory.factory(rw, lrc);
+                      if (rr.renderingUsesValidation()) {
+                        r.setRegenAfterValidation(true);
+                        needsRegen = true;
+                      }
+                      rr.setMultiLangMode(langs.size() > 1).renderResource(rw);
+                      otherFilesRun.addAll(lrc.getFiles());
+                    } else if (r.fhirType().equals("Bundle")) {
+                      lrc.setAddName(true);
+                      for (Element e : r.getElement().getChildrenByName("entry")) {
+                        Element res = e.getNamedChild("resource");
+                        if (res!=null && "http://hl7.org/fhir/StructureDefinition/DomainResource".equals(res.getProperty().getStructure().getBaseDefinition())) {
+                          ResourceWrapper rw = ResourceWrapper.forResource(lrc, res);
+                          ResourceRenderer rr = RendererFactory.factory(rw, lrc);
+                          if (rr.renderingUsesValidation()) {
+                            r.setRegenAfterValidation(true);
+                            needsRegen = true;
+                          }
+                          if (hasNarrative(res)) {
+                            rr.checkNarrative(rw);                        
+                          } else {
+                            rr.setMultiLangMode(langs.size() > 1).renderResource(rw);
+                          }
                         }
                       }
+                    } else if (isDomainResource(r) && hasNarrative(r.getElement())) {
+                      checkExistingNarrative(f, r, r.getElement().getNamedChild("text").getNamedChild("div").getXhtml());
                     }
-                  } else if (isDomainResource(r) && hasNarrative(r.getElement())) {
-                    checkExistingNarrative(f, r, r.getElement().getNamedChild("text").getNamedChild("div").getXhtml());
                   }
                 }
               }
+            } else {
+              logDebugMessage(LogCategory.PROGRESS, "skipped narrative for "+f.getName()+" : "+r.getId());
             }
-          } else {
-            logDebugMessage(LogCategory.PROGRESS, "skipped narrative for "+f.getName()+" : "+r.getId());
           }
         }
       } finally {
@@ -3043,6 +3070,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       case "conversion-version": 
         conversionVersions.add(p.getValue());
         break;
+      case "custom-resource": 
+        customResourceFiles.add(p.getValue());
+        break;
       case "suppressed-ids":
         for (String s1 : p.getValue().split("\\,"))
           suppressedIds.add(s1);
@@ -3325,7 +3355,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
     if (VersionUtilities.isR4Plus(version) && !dependsOnExtensions(sourceIg.getDependsOn()) && !sourceIg.getPackageId().contains("hl7.fhir.uv.extensions")) {
       ImplementationGuideDependsOnComponent dep = new ImplementationGuideDependsOnComponent();
-      dep.setUserData("no-load-deps", "true");
+      dep.setUserData(UserDataNames.pub_no_load_deps, "true");
       dep.setId("hl7ext");
       dep.setPackageId(getExtensionsPackageName());
       dep.setUri("http://hl7.org/fhir/extensions/ImplementationGuide/hl7.fhir.uv.extensions");
@@ -3335,7 +3365,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     } 
     if (!dependsOnUTG(sourceIg.getDependsOn()) && !sourceIg.getPackageId().contains("hl7.terminology")) {
       ImplementationGuideDependsOnComponent dep = new ImplementationGuideDependsOnComponent();
-      dep.setUserData("no-load-deps", "true");
+      dep.setUserData(UserDataNames.pub_no_load_deps, "true");
       dep.setId("hl7tx");
       dep.setPackageId(getUTGPackageName());
       dep.setUri("http://terminology.hl7.org/ImplementationGuide/hl7.terminology");
@@ -3365,7 +3395,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
     int i = 0;
     for (ImplementationGuideDependsOnComponent dep : sourceIg.getDependsOn()) {
-      loadIg(dep, i, !dep.hasUserData("no-load-deps"));
+      loadIg(dep, i, !dep.hasUserData(UserDataNames.pub_no_load_deps));
       i++;
     }
     if (!"hl7.fhir.uv.tools".equals(sourceIg.getPackageId()) && !dependsOnTooling(sourceIg.getDependsOn())) {
@@ -3398,7 +3428,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     generateLoadedSnapshots();
 
     // set up validator;
-    validator = new InstanceValidator(context, new IGPublisherHostServices(), context.getXVer()); // todo: host services for reference resolution....
+    validatorSession = new ValidatorSession();
+    validator = new InstanceValidator(context, new IGPublisherHostServices(), context.getXVer(), validatorSession); // todo: host services for reference resolution....
     validator.setAllowXsiLocation(true);
     validator.setNoBindingMsgSuppressed(true);
     validator.setNoExtensibleWarnings(!allowExtensibleWarnings);
@@ -3411,8 +3442,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     validator.setDisplayWarnings(displayWarnings);
     cu = new ContextUtilities(context);
 
-    pvalidator = new ProfileValidator(context, context.getXVer());
-    csvalidator = new CodeSystemValidator(context, context.getXVer());
+    pvalidator = new ProfileValidator(context, context.getXVer(), validatorSession);
+    csvalidator = new CodeSystemValidator(context, context.getXVer(), validatorSession);
     pvalidator.setCheckAggregation(checkAggregation);
     pvalidator.setCheckMustSupport(hintAboutNonMustSupport);
     validator.setShowMessagesFromReferences(showReferenceMessages);
@@ -3573,9 +3604,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         System.out.println("Exception generating snapshot for "+sd.getUrl()+": "+e.getMessage());        
       }      
     }
-    Element element = (Element) sd.getUserData("element");
+    Element element = (Element) sd.getUserData(UserDataNames.pub_element);
     if (element != null) {
-      element.setUserData("profileutils.snapshot.messages", messages);
+      element.setUserData(UserDataNames.SNAPSHOT_messages, messages);
     }
   }
 
@@ -4517,7 +4548,9 @@ private String fixPackageReference(String dep) {
     fetcher.setRootDir(rootDir);
     loadedIds = new HashMap<>();
     duplicateInputResourcesDetected = false;
-    // load any bundles
+    
+    loadCustomResources();
+    
     if (sourceDir != null || igpkp.isAutoPath())
       needToBuild = loadResources(needToBuild, igf);
     needToBuild = loadSpreadsheets(needToBuild, igf);
@@ -4538,7 +4571,7 @@ private String fixPackageReference(String dep) {
       }
       i++;
       FetchedFile f = null;
-      if (!bndIds.contains(res.getReference().getReference()) && !res.hasUserData("loaded.resource")) { 
+      if (!bndIds.contains(res.getReference().getReference()) && !res.hasUserData(UserDataNames.pub_loaded_resource)) { 
         logDebugMessage(LogCategory.INIT, "Load "+res.getReference());
         f = fetcher.fetch(res.getReference(), igf);
         if (!f.hasTitle() && res.getName() != null)
@@ -4561,7 +4594,7 @@ private String fixPackageReference(String dep) {
       if (res.hasProfile()) {
         if (f != null && f.getResources().size()!=1)
           throw new Exception("Can't have an exampleFor unless the file has exactly one resource");
-        FetchedResource r = res.hasUserData("loaded.resource") ? (FetchedResource) res.getUserData("loaded.resource") : f.getResources().get(0);
+        FetchedResource r = res.hasUserData(UserDataNames.pub_loaded_resource) ? (FetchedResource) res.getUserData(UserDataNames.pub_loaded_resource) : f.getResources().get(0);
         if (r == null)
           throw new Exception("Unable to resolve example canonical " + res.getProfile().get(0).asStringValue());
         examples.add(r);
@@ -4581,7 +4614,7 @@ private String fixPackageReference(String dep) {
           f = fetcher.fetch(res.getReference(), igf);
         }
         if (f != null) {
-          FetchedResource r = res.hasUserData("loaded.resource") ? (FetchedResource) res.getUserData("loaded.resource") : f.getResources().get(0);
+          FetchedResource r = res.hasUserData(UserDataNames.pub_loaded_resource) ? (FetchedResource) res.getUserData(UserDataNames.pub_loaded_resource) : f.getResources().get(0);
           if (r != null) {
             testplans.add(r);
             try {
@@ -4616,7 +4649,7 @@ private String fixPackageReference(String dep) {
           f = fetcher.fetch(res.getReference(), igf);
         }
         if (f != null) {
-          FetchedResource r = res.hasUserData("loaded.resource") ? (FetchedResource) res.getUserData("loaded.resource") : f.getResources().get(0);
+          FetchedResource r = res.hasUserData(UserDataNames.pub_loaded_resource) ? (FetchedResource) res.getUserData(UserDataNames.pub_loaded_resource) : f.getResources().get(0);
           if (r != null) {
             testscripts.add(r);
             try {
@@ -4776,7 +4809,7 @@ private String fixPackageReference(String dep) {
       // sanity check: every specified resource must be loaded, every loaded resource must be specified
       for (ImplementationGuideDefinitionResourceComponent r : publishedIg.getDefinition().getResource()) {
         b.append(r.getReference().getReference());
-        if (!r.hasUserData("loaded.resource")) {
+        if (!r.hasUserData(UserDataNames.pub_loaded_resource)) {
           log("Resource "+r.getReference().getReference()+" not loaded");
           failed = true;
         }
@@ -4898,8 +4931,136 @@ private String fixPackageReference(String dep) {
       
     }
     extensionTracker.scan(publishedIg);
-
+    finishLoadingCustomResources();
     return needToBuild;
+  }
+
+  private void finishLoadingCustomResources() {
+    for (StructureDefinition sd : customResources) {
+      FetchedResource r = findLoadedStructure(sd);
+      if (r == null) {
+        System.out.println("Custom Resource "+sd.getId()+" not loaded normally");
+        System.exit(1); 
+      } else {
+        sd.setWebPath(igpkp.getDefinitionsName(r));
+        // also mark this as a custom resource
+        r.getResource().setUserData(UserDataNames.loader_custom_resource, "true");
+      }
+    }
+  }
+
+  private FetchedResource findLoadedStructure(StructureDefinition sd) {
+    for (var f : fileList) {
+      for (var r : f.getResources()) {
+        if (r.fhirType().equals("StructureDefinition") && r.getId().equals(sd.getId())) {
+          return r;
+        }
+      }
+    }
+    return null;
+  }
+
+  /** 
+   * this has to be called before load, and then load will reload the resource and override;
+   * @throws IOException 
+   * @throws FHIRException 
+   * @throws FileNotFoundException 
+   * 
+   */
+  private void loadCustomResources() throws FileNotFoundException, FHIRException, IOException {
+    for (String s : customResourceFiles) {
+      System.out.print("Load Custom Resource from "+s+":");
+      System.out.println(loadCustomResource(s));
+    }
+  }
+
+  /** 
+   * The point of this routine is to load the source file, and get the definition of the resource into the context
+   * before anything else is loaded. The resource must be loaded normally for processing etc - we'll check that it has been later
+   * @param filename
+   * @throws IOException 
+   * @throws FHIRException 
+   * @throws FileNotFoundException 
+   */
+  private String loadCustomResource(String filename) throws FileNotFoundException, FHIRException, IOException {
+    // we load it as an R5 resource. 
+    StructureDefinition def = null;
+    try {
+      def = (StructureDefinition) org.hl7.fhir.r5.formats.FormatUtilities.loadFile(Utilities.uncheckedPath(Utilities.getDirectoryForFile(configFile), filename));
+    } catch (Exception e) {
+      return "Exception loading: "+e.getMessage();
+    }
+    
+    if (approvedIgsForCustomResources == null) {
+      try {
+        approvedIgsForCustomResources = org.hl7.fhir.utilities.json.parser.JsonParser.parseObjectFromUrl("https://fhir.github.io/ig-registry/igs-approved-for-custom-resource.json");
+      } catch (Exception e) {
+        approvedIgsForCustomResources = new JsonObject();
+        return "Exception checking IG status: "+e.getMessage();
+      }
+    }
+    // checks
+    // we'll validate it properly later. For now, we want to know:
+    // 1. is this IG authorized to define custom resources?
+    if (!approvedIgsForCustomResources.asBoolean(npmName)) {
+      return "This IG is not authorised to define custom resources";
+    }
+    // 2. is this in the namespace of the IG (no flex there)
+    if (!def.getUrl().startsWith(igpkp.getCanonical())) {
+      return "The URL of this definition is not in the proper canonical URL space of the IG ("+igpkp.getCanonical()+")";
+    }
+    // 3. is this based on Resource or DomainResource
+    if (!Utilities.existsInList(def.getBaseDefinition(), 
+        "http://hl7.org/fhir/StructureDefinition/Resource", 
+        "http://hl7.org/fhir/StructureDefinition/DomainResource", 
+        "http://hl7.org/fhir/StructureDefinition/CanonicalResource", 
+        "http://hl7.org/fhir/StructureDefinition/MetadataResource")) {
+      return "The definition must be based on Resource, DomainResource, CanonicalResource, or MetadataResource";
+    }
+//    // 4. is this active? (this is an easy way to turn this off if it stops the IG from building
+//    if (def.getStatus() != PublicationStatus.ACTIVE) {
+//      return "The definition is not active, so ignored";
+//    }
+    // 5. is this a specialization
+    if (def.getDerivation() == TypeDerivationRule.CONSTRAINT) {
+      return "This definition is not a specialization, so ignored";
+    }
+    
+    if (def.getKind() == StructureDefinitionKind.LOGICAL) {
+      def.setKind(StructureDefinitionKind.RESOURCE);
+    }
+    if (def.getKind() != StructureDefinitionKind.RESOURCE) {
+      return "This definition does not describe a resource";
+    }
+    if (def.getType().contains(":/")) {
+      def.setType(tail(def.getType()));
+    }
+    // right, passed all the tests
+    customResourceNames.add(def.getType());
+    customResources.add(def);
+    def.setUserData(UserDataNames.loader_custom_resource, "true");
+    def.setWebPath("placeholder.html"); // we'll figure it out later
+    context.cacheResource(def); 
+
+    // work around for a sushi limitation 
+    for (ImplementationGuideDefinitionResourceComponent res : publishedIg.getDefinition().getResource()) {
+      if (res.getReference().getReference().startsWith("Binary/")) {
+        if (res.getProfile().size() == 1 && def.getUrl().equals(res.getProfile().get(0).primitiveValue())) {
+          String id = res.getReference().getReference().substring(res.getReference().getReference().indexOf("/")+1);
+          File of = new File(Utilities.path(Utilities.getDirectoryForFile(this.getConfigFile()), "fsh-generated", "resources", "Binary-"+id+".json"));
+          File nf = new File(Utilities.path(Utilities.getDirectoryForFile(this.getConfigFile()), "fsh-generated", "resources", def.getType()+"-"+id+".json"));
+          if (of.exists()) {
+            of.renameTo(nf);
+            JsonObject j = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(nf);
+            j.set("resourceType", def.getType());
+            org.hl7.fhir.utilities.json.parser.JsonParser.compose(j, nf, true);
+          }
+          res.getReference().setReference(def.getType()+res.getReference().getReference().substring(res.getReference().getReference().indexOf("/")));    
+        }
+      }
+    }
+  
+    return "loaded";
   }
 
   private boolean loadTranslationSupplements(boolean needToBuild, FetchedFile igf) throws Exception {
@@ -4953,7 +5114,7 @@ private String fixPackageReference(String dep) {
           // ok good to go
           CodeSystem csSrc = makeSupplement(cr, true); // what could be translated
           CodeSystem csDst = makeSupplement(cr, false); // what has been translated
-          csDst.setUserData("source.filename", f.getName().substring(0, f.getName().indexOf(".")));
+          csDst.setUserData(UserDataNames.pub_source_filename, f.getName().substring(0, f.getName().indexOf(".")));
           List<TranslationUnit> list = loadTranslations(f, ext);
           langUtils.fillSupplement(csSrc, csDst, list);
           FetchedResource rr = ff.addResource("CodeSystemSupplement");
@@ -4973,7 +5134,7 @@ private String fixPackageReference(String dep) {
               }
               res.setReference(new Reference().setReference(r.fhirType()+"/"+r.getId()));
             }
-            res.setUserData("loaded.resource", r);
+            res.setUserData(UserDataNames.pub_loaded_resource, r);
             r.setResEntry(res);
           }
           return changed;
@@ -5453,7 +5614,7 @@ private String fixPackageReference(String dep) {
         }
         res.setReference(new Reference().setReference(r.fhirType()+"/"+r.getId()));
       }
-      res.setUserData("loaded.resource", r);
+      res.setUserData(UserDataNames.pub_loaded_resource, r);
       r.setResEntry(res);
       if (r.getResource() instanceof CanonicalResource) {
         CanonicalResource cr = (CanonicalResource)r.getResource();
@@ -5512,7 +5673,7 @@ private String fixPackageReference(String dep) {
           res.setDescription(((CanonicalResource)r.getResource()).getDescription().trim());
         res.setReference(new Reference().setReference(r.fhirType()+"/"+r.getId()));
       }
-      res.setUserData("loaded.resource", r);
+      res.setUserData(UserDataNames.pub_loaded_resource, r);
       r.setResEntry(res);
     }
     return changed || needToBuild;
@@ -5628,7 +5789,7 @@ private String fixPackageReference(String dep) {
         }
         res.setReference(new Reference().setReference(r.fhirType()+"/"+r.getId()));
       }
-      res.setUserData("loaded.resource", r);
+      res.setUserData(UserDataNames.pub_loaded_resource, r);
       r.setResEntry(res);
     }
     return changed || needToBuild;
@@ -5730,7 +5891,7 @@ private String fixPackageReference(String dep) {
       propagateStatus();
     }
     log("Generating Narratives");
-    generateNarratives();
+    generateNarratives(false);
     if (!validationOff) {
       log("Validating Conformance Resources");
       for (String s : metadataResourceNames()) {
@@ -5757,9 +5918,9 @@ private String fixPackageReference(String dep) {
           StructureDefinition sd = (StructureDefinition) r.getResource();
           for (Extension ext : sd.getExtensionsByUrl(ToolingExtensions.EXT_SD_IMPOSE_PROFILE)) {
             StructureDefinition sdi = context.fetchResource(StructureDefinition.class, ext.getValue().primitiveValue());
-            if (sdi != null && !sdi.hasUserData("imposes.compare.id")) {
+            if (sdi != null && !sdi.hasUserData(UserDataNames.pub_imposes_compare_id)) {
               String cid = "c"+Integer.toString(i);
-              sdi.setUserData("imposes.compare.id", cid);
+              sdi.setUserData(UserDataNames.pub_imposes_compare_id, cid);
               i++;
             }
           }
@@ -6032,7 +6193,7 @@ private String fixPackageReference(String dep) {
 
           for (StructureMap map : worklist) {
             StructureMapAnalysis analysis = utils.analyse(null, map);
-            map.setUserData("analysis", analysis);
+            map.setUserData(UserDataNames.pub_analysis, analysis);
             for (StructureDefinition sd : analysis.getProfiles()) {
               FetchedResource nr = new FetchedResource(f.getName()+" (ex transform)");
               nr.setElement(convertToElement(nr, sd));
@@ -6169,14 +6330,14 @@ private String fixPackageReference(String dep) {
     r.setElement(e).setId(bin.getId());
     r.setResource(bin);
     r.setResEntry(srcForLoad);
-    srcForLoad.setUserData("loaded.resource", r);
+    srcForLoad.setUserData(UserDataNames.pub_loaded_resource, r);
     r.setResEntry(srcForLoad);
     if (srcForLoad.hasProfile()) {      
-      r.getElement().setUserData("logical", srcForLoad.getProfile().get(0).getValue());
+      r.getElement().setUserData(UserDataNames.pub_logical, srcForLoad.getProfile().get(0).getValue());
       r.setExampleUri(srcForLoad.getProfile().get(0).getValue());
     }
     igpkp.findConfiguration(file, r);
-    srcForLoad.setUserData("loaded.resource", r);
+    srcForLoad.setUserData(UserDataNames.pub_loaded_resource, r);
   }
 
   private void loadAsElementModel(FetchedFile file, FetchedResource r, ImplementationGuideDefinitionResourceComponent srcForLoad, boolean suppressLoading, String cause) throws Exception {
@@ -6280,10 +6441,10 @@ private String fixPackageReference(String dep) {
           r.setElement(e);
         }
         if (srcForLoad != null) {
-          srcForLoad.setUserData("loaded.resource", r);
+          srcForLoad.setUserData(UserDataNames.pub_loaded_resource, r);
           r.setResEntry(srcForLoad);
           if (srcForLoad.hasProfile()) {
-            r.getElement().setUserData("profile", srcForLoad.getProfile().get(0).getValue());
+            r.getElement().setUserData(UserDataNames.map_profile, srcForLoad.getProfile().get(0).getValue());
             r.getStatedProfiles().add(stripVersion(srcForLoad.getProfile().get(0).getValue()));
           }
         }
@@ -6317,7 +6478,7 @@ private String fixPackageReference(String dep) {
             altered = true;
           }
         }
-        if (!binary && ((altered && r.getResource() != null) || (ver.equals(Constants.VERSION) && r.getResource() == null && context.getResourceNamesAsSet().contains(r.fhirType())))) {
+        if (!binary && !customResourceNames.contains(r.fhirType()) && ((altered && r.getResource() != null) || (ver.equals(Constants.VERSION) && r.getResource() == null && context.getResourceNamesAsSet().contains(r.fhirType())))) {
           r.setResource(new ObjectConverter(context).convert(r.getElement()));
           if (!r.getResource().hasId() && r.getId() != null) {
             r.getResource().setId(r.getId());
@@ -6589,7 +6750,7 @@ private String fixPackageReference(String dep) {
                 } else {
                   r.setResource(parse(f));
                 }
-                r.getResource().setUserData("element", r.getElement());
+                r.getResource().setUserData(UserDataNames.pub_element, r.getElement());
               } catch (Exception e) {
                 if (isMandatory) {
                   throw new FHIRException("Error parsing "+f.getName()+": "+e.getMessage(), e);
@@ -6986,11 +7147,11 @@ private String fixPackageReference(String dep) {
     if (base == null) {
       throw new Exception("Cannot find or generate snapshot for base definition ("+sd.getBaseDefinition()+" from "+sd.getUrl()+")");
     }
-    if (sd.hasUserData("profileutils.snapshot.generated")) {
+    if (sd.hasUserData(UserDataNames.SNAPSHOT_GENERATED)) {
       changed = true;
       // we already tried to generate the snapshot, and maybe there were messages? if there are, 
       // put them in the right place
-      List<ValidationMessage> vmsgs = (List<ValidationMessage>) sd.getUserData("profileutils.snapshot.generated.messages");
+      List<ValidationMessage> vmsgs = (List<ValidationMessage>) sd.getUserData(UserDataNames.SNAPSHOT_GENERATED_MESSAGES);
       if (vmsgs != null && !vmsgs.isEmpty()) {
         f.getErrors().addAll(vmsgs);
       }
@@ -7022,8 +7183,8 @@ private String fixPackageReference(String dep) {
         }
         utils.setDefWebRoot(igpkp.getCanonical());
         try {
-          if (base.getUserString("webroot") != null) {            
-            utils.generateSnapshot(base, sd, sd.getUrl(), base.getUserString("webroot"), sd.getName());
+          if (base.getUserString(UserDataNames.render_webroot) != null) {            
+            utils.generateSnapshot(base, sd, sd.getUrl(), base.getUserString(UserDataNames.render_webroot), sd.getName());
           } else {
             utils.generateSnapshot(base, sd, sd.getUrl(), null, sd.getName());
           }
@@ -7047,7 +7208,7 @@ private String fixPackageReference(String dep) {
     if (changed || (!r.getElement().hasChild("snapshot") && sd.hasSnapshot())) {
       r.setElement(convertToElement(r, sd));
     }
-    r.getElement().setUserData("profileutils.snapshot.errors", messages); 
+    r.getElement().setUserData(UserDataNames.SNAPSHOT_ERRORS, messages); 
     f.getErrors().addAll(messages);
     r.setSnapshotted(true);
     logDebugMessage(LogCategory.CONTEXT, "Context.See "+sd.getUrl());
@@ -7083,10 +7244,10 @@ private String fixPackageReference(String dep) {
   private void validateExpression(FetchedFile f, StructureDefinition sd, FHIRPathEngine fpe, ElementDefinition ed, ElementDefinitionConstraintComponent inv, FetchedResource r) {
     if (inv.hasExpression()) {
       try {
-        ExpressionNode n = (ExpressionNode) inv.getUserData("validator.expression.cache");
+        ExpressionNode n = (ExpressionNode) inv.getUserData(UserDataNames.validator_expression_cache);
         if (n == null) {
           n = fpe.parse(inv.getExpression(), sd.getUrl()+"#"+ed.getId()+" / "+inv.getKey());
-          inv.setUserData("validator.expression.cache", n);
+          inv.setUserData(UserDataNames.validator_expression_cache, n);
         }
         fpe.check(null, sd, ed.getPath(), n);
       } catch (Exception e) {
@@ -7356,7 +7517,7 @@ private String fixPackageReference(String dep) {
 
   private void validate(FetchedFile f, FetchedResource r, List<ValidationMessage> errs, Resource ber) {
     long ts = System.currentTimeMillis();
-    validator.validate(r.getElement(), errs, ber, ber.getUserString("profile"));
+    validator.validate(r.getElement(), errs, ber, ber.getUserString(UserDataNames.map_profile));
     long tf = System.currentTimeMillis();
     if (tf-ts > validationLogTime && validationLogTime > 0) {
       reportLongValidation(f, r, tf-ts);
@@ -7606,8 +7767,8 @@ private String fixPackageReference(String dep) {
 
     Session tts = tt.start("validation");
     List<ValidationMessage> errs = new ArrayList<ValidationMessage>();
-    r.getElement().setUserData("igpub.context.file", file);
-    r.getElement().setUserData("igpub.context.resource", r);
+    r.getElement().setUserData(UserDataNames.pub_context_file, file);
+    r.getElement().setUserData(UserDataNames.pub_context_resource, r);
     validator.setExample(r.isExample());
     if (r.isValidateAsResource()) { 
       Resource res = r.getResource();
@@ -7616,11 +7777,11 @@ private String fixPackageReference(String dep) {
 
         for (BundleEntryComponent be : ((Bundle) res).getEntry()) {
           Resource ber = be.getResource();
-          if (ber.hasUserData("profile")) {
+          if (ber.hasUserData(UserDataNames.map_profile)) {
             validate(file, r, errs, ber);
           }
         }
-      } else if (res.hasUserData("profile")) {
+      } else if (res.hasUserData(UserDataNames.map_profile)) {
         validate(file, r, errs, res);
       }
     } else if (r.getResource() != null && r.getResource() instanceof Binary && file.getLogical() != null && context.hasResource(StructureDefinition.class, file.getLogical())) {
@@ -7634,8 +7795,8 @@ private String fixPackageReference(String dep) {
       validator.setNoCheckAggregation(r.isExample() && ToolingExtensions.readBoolExtension(r.getResEntry(), "http://hl7.org/fhir/tools/StructureDefinition/igpublisher-no-check-aggregation"));
       List<StructureDefinition> profiles = new ArrayList<>();
 
-      if (r.getElement().hasUserData("profile")) {
-        addProfile(profiles, r.getElement().getUserString("profile"), null);
+      if (r.getElement().hasUserData(UserDataNames.map_profile)) {
+        addProfile(profiles, r.getElement().getUserString(UserDataNames.map_profile), null);
       }
       for (String s : r.getProfiles(false)) {
         addProfile(profiles, s, r.fhirType());
@@ -8176,7 +8337,7 @@ private String fixPackageReference(String dep) {
     r.setValidated(true);
     r.setElement(convertToElement(r, bc));
     igpkp.findConfiguration(f, r);
-    bc.setUserData("config", r.getConfig());
+    bc.setUserData(UserDataNames.pub_resource_config, r.getConfig());
     generateNativeOutputs(f, true, null);
     generateHtmlOutputs(f, true, null);
   }
@@ -8711,6 +8872,10 @@ private String fixPackageReference(String dep) {
         vars.putAll(env);
         String path = FhirSettings.getRubyPath()+":"+env.get("PATH");
         vars.put("PATH", path);
+        if (FhirSettings.getGemPath() != null) {
+          vars.put("GEM_PATH", FhirSettings.getGemPath());
+        }
+        System.out.println("r:"+vars.get("RUBY_ROOT"));
         CommandLine commandLine = new CommandLine("bash").addArgument("-c").addArgument(jekyllCommand+" build --destination "+outputDir, false);
         exec.execute(commandLine, vars);
       } else {
@@ -9236,7 +9401,7 @@ private String fixPackageReference(String dep) {
           oidArr.add(s);
         }       
       }
-      Set<Resource> rl = (Set<Resource>) cs.getUserData("xref.used");
+      Set<Resource> rl = (Set<Resource>) cs.getUserData(UserDataNames.pub_xref_used);
       Set<String> links = new HashSet<>();
       if (rl != null) {
         JsonObject uses = new JsonObject();
@@ -9319,7 +9484,7 @@ private String fixPackageReference(String dep) {
         }       
       }
 
-      Set<String> sources = (Set<String>) vs.getUserData("xref.sources");
+      Set<String> sources = (Set<String>) vs.getUserData(UserDataNames.pub_xref_sources);
       if (!oids.isEmpty()) {
         JsonArray srcArr = new JsonArray();
         item.add("sources", srcArr);
@@ -9328,7 +9493,7 @@ private String fixPackageReference(String dep) {
         }       
       }
       
-      Set<Resource> rl = (Set<Resource>) vs.getUserData("xref.used");
+      Set<Resource> rl = (Set<Resource>) vs.getUserData(UserDataNames.pub_xref_used);
       Set<String> links = new HashSet<>();
       if (rl != null) {
         JsonObject uses = new JsonObject();
@@ -10814,7 +10979,7 @@ private String fixPackageReference(String dep) {
           generateResourceFragments(f, r, System.currentTimeMillis());
         }*/
         List<StringPair> clist = new ArrayList<>();
-        if (r.getResource() == null) {
+        if (r.getResource() == null && !r.isCustomResource()) {
           try {
             Resource container = convertFromElement(r.getElement());
             r.setResource(container);
@@ -11233,6 +11398,14 @@ private String fixPackageReference(String dep) {
   private ContextUtilities cu;
 
   private boolean logLoading;
+
+  private JsonObject approvedIgsForCustomResources;
+  private Set<String> customResourceNames = new HashSet<>();
+  private List<StructureDefinition> customResources = new ArrayList<>();
+
+  private boolean needsRegen = false;
+
+  private ValidatorSession validatorSession;
   
   private String processSQLCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();
@@ -11784,8 +11957,25 @@ private String fixPackageReference(String dep) {
     Element element = r.getElement();
     Element eNN = element;
     jp.compose(element, bsj, OutputStyle.NORMAL, igpkp.getCanonical());
-    npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
-    
+    if (!r.isCustomResource()) {
+      npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
+    } else  if ("StructureDefinition".equals(r.fhirType())) {
+      npm.addFile(Category.RESOURCE, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
+      StructureDefinition sdt = (StructureDefinition) r.getResource().copy();
+      sdt.setKind(StructureDefinitionKind.RESOURCE);
+      bsj = new ByteArrayOutputStream();
+      new JsonParser().setOutputStyle(OutputStyle.NORMAL).compose(bsj, sdt);
+      npm.addFile(Category.CUSTOM, "StructureDefinition-"+r.getId()+".json", bsj.toByteArray());      
+    } else {
+      npm.addFile(Category.CUSTOM, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
+      Binary bin = new Binary("application/fhir+json");
+      bin.setId(r.getId());
+      bin.setContent(bsj.toByteArray());
+      bsj = new ByteArrayOutputStream();
+      new JsonParser().setOutputStyle(OutputStyle.NORMAL).compose(bsj, bin);
+      npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, "Binary-"+r.getId()+".json", bsj.toByteArray());
+    }
+      
     if (module.isNoNarrative()) {
       // we don't use the narrative in these resources in _includes, so we strip it - it slows Jekyll down greatly 
       eNN = (Element) element.copy();
@@ -12123,12 +12313,13 @@ private String fixPackageReference(String dep) {
       } else {
         if (xhtml == null) {
           RenderingContext xlrc = lrc.copy(false);
+          ResourceRenderer rr = RendererFactory.factory(r.fhirType(), xlrc);
           if (r.getResource() != null && r.getResource() instanceof DomainResource) {
-            xhtml = RendererFactory.factory(r.fhirType(), xlrc).buildNarrative(ResourceWrapper.forResource(xlrc, r.getResource()));
+            xhtml = rr.buildNarrative(ResourceWrapper.forResource(xlrc, r.getResource()));
           } else {
             ResourceWrapper rw = ResourceWrapper.forResource(xlrc, r.getElement()); 
             try {
-              xhtml = RendererFactory.factory(r.fhirType(), xlrc).buildNarrative(rw);
+              xhtml = rr.buildNarrative(rw);
             } catch (Exception ex) {
               xhtml = new XhtmlNode(NodeType.Element, "div");
               xhtml.para("Error rendering resource: "+ex.getMessage());
@@ -12823,7 +13014,7 @@ private String fixPackageReference(String dep) {
       StructureDefinition sdi = context.fetchResource(StructureDefinition.class, ext.getValue().primitiveValue());
       if (sdi != null) {
         start = System.currentTimeMillis();
-        String cid = sdi.getUserString("imposes.compare.id");
+        String cid = sdi.getUserString(UserDataNames.pub_imposes_compare_id);
         fragment("StructureDefinition-imposes-"+prefixForContainer+sd.getId()+"-"+cid+langSfx, sdr.compareImposes(sdi), f.getOutputNames(), r, vars, null, start, "imposes", "StructureDefinition");
       }
     }
@@ -13068,7 +13259,7 @@ private String fixPackageReference(String dep) {
       return t;
     }
     for (ImplementationGuideDefinitionResourceComponent res : publishedIg.getDefinition().getResource()) {
-      FetchedResource tr = (FetchedResource) res.getUserData("loaded.resource");
+      FetchedResource tr = (FetchedResource) res.getUserData(UserDataNames.pub_loaded_resource);
       if (tr == r) {
         return res.getDescription();
       }
@@ -14149,9 +14340,9 @@ private String fixPackageReference(String dep) {
     if (profile != null && profile.getUrl().startsWith(igpkp.getCanonical())) { // ignore anything we didn't define
       FetchedResource example;
       if (appContext instanceof ValidationContext) {
-        example = (FetchedResource) ((ValidationContext) appContext).getResource().getUserData("igpub.context.resource");
+        example = (FetchedResource) ((ValidationContext) appContext).getResource().getUserData(UserDataNames.pub_context_resource);
       } else {
-        example= (FetchedResource) ((Element) appContext).getUserData("igpub.context.resource");
+        example= (FetchedResource) ((Element) appContext).getUserData(UserDataNames.pub_context_resource);
       }
       if (example != null) {
         FetchedResource source = null;

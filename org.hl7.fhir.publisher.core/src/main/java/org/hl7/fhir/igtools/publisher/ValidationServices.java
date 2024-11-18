@@ -59,6 +59,7 @@ import org.hl7.fhir.r5.model.StructureMap;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.terminologies.ImplicitValueSets;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
+import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.r5.utils.validation.IMessagingServices;
 import org.hl7.fhir.r5.utils.validation.IResourceValidator;
 import org.hl7.fhir.r5.utils.validation.IValidationPolicyAdvisor;
@@ -109,7 +110,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
     String turl = (!Utilities.isAbsoluteUrl(url)) ? Utilities.pathURL(ipg.getCanonical(), url) : url;
     Resource res = context.fetchResource(getResourceType(turl), turl);
     if (res != null) {
-      Element e = (Element)res.getUserData("element");
+      Element e = (Element)res.getUserData(UserDataNames.pub_element);
       if (e!=null)
         return e;
       else
