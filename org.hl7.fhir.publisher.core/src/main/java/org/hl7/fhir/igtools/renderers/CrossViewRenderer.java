@@ -48,6 +48,7 @@ import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.terminologies.utilities.ValidationResult;
 import org.hl7.fhir.r5.utils.ResourceSorters.CanonicalResourceSortByUrl;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
+import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.HL7WorkGroups;
 import org.hl7.fhir.utilities.HL7WorkGroups.HL7WorkGroup;
 import org.hl7.fhir.utilities.StandardsStatus;
@@ -174,7 +175,7 @@ public class CrossViewRenderer extends Renderer {
   private void seeSearchParameter(SearchParameter sp) {
     try {
       ExpressionNode n = fpe.parse(sp.getExpression());
-      sp.getExpressionElement().setUserData("expression", n);
+      sp.getExpressionElement().setUserData(UserDataNames.xver_expression, n);
     } catch (Exception e) {
       // do nothing in this case
     }
@@ -684,7 +685,7 @@ public class CrossViewRenderer extends Renderer {
             if (cs != null)
               sys = cs.getTitle();
           }
-          t.setUserData("desc", sys);
+          t.setUserData(UserDataNames.xver_desc, sys);
           ValidationResult vr = worker.validateCode(ValidationOptions.defaults(), t.getSystem(), t.getVersion(), t.getCode(), null);
           if (vr != null & vr.getDisplay() != null) {
             //          if (Utilities.existsInList(t.getSystem(), "http://loinc.org"))
@@ -1129,7 +1130,7 @@ public class CrossViewRenderer extends Renderer {
     } else {
       List<SearchParameter> list = new ArrayList<>();
       for (SearchParameter sp : searchParams) {
-        ExpressionNode n = (ExpressionNode) sp.getExpressionElement() .getUserData("expression");
+        ExpressionNode n = (ExpressionNode) sp.getExpressionElement() .getUserData(UserDataNames.xver_expression);
         if (n != null && refersToExtension(n, ext.getUrl())) {
           list.add(sp);
         }
@@ -1277,10 +1278,10 @@ public class CrossViewRenderer extends Renderer {
     if (url != null) {
       ValueSet vs = context.getContext().findTxResource(ValueSet.class, url);
       if (vs != null) {
-        if (!vs.hasUserData("xref.used")) {
-          vs.setUserData("xref.used", new HashSet<>());
+        if (!vs.hasUserData(UserDataNames.pub_xref_used)) {
+          vs.setUserData(UserDataNames.pub_xref_used, new HashSet<>());
         }
-        Set<Resource> rl = (Set<Resource>) vs.getUserData("xref.used");
+        Set<Resource> rl = (Set<Resource>) vs.getUserData(UserDataNames.pub_xref_used);
         rl.add(source);
         if (!list.contains(vs)) {
           list.add(vs);
@@ -1405,7 +1406,7 @@ public class CrossViewRenderer extends Renderer {
         td.span(null, "Imports Valueset(s)").tx("V ");
       }
       
-      vs.setUserData("xref.sources", sources);
+      vs.setUserData(UserDataNames.pub_xref_sources, sources);
       td = tr.td();
       for (String s : Utilities.sorted(sources)) {
         td.sep(", ");
@@ -1413,7 +1414,7 @@ public class CrossViewRenderer extends Renderer {
       }
       if (used) {
         td = tr.td();
-        Set<Resource> rl = (Set<Resource>) vs.getUserData("xref.used");
+        Set<Resource> rl = (Set<Resource>) vs.getUserData(UserDataNames.pub_xref_used);
         if (rl != null) {
           if (rl.size() < 10) {
             for (Resource r : rl) {
@@ -1597,10 +1598,10 @@ public class CrossViewRenderer extends Renderer {
     if (url != null) {
       CodeSystem cs = context.getContext().fetchResource(CodeSystem.class, url);
       if (cs != null) {
-        if (!cs.hasUserData("xref.used")) {
-          cs.setUserData("xref.used", new HashSet<>());
+        if (!cs.hasUserData(UserDataNames.pub_xref_used)) {
+          cs.setUserData(UserDataNames.pub_xref_used, new HashSet<>());
         }
-        Set<Resource> rl = (Set<Resource>) cs.getUserData("xref.used");
+        Set<Resource> rl = (Set<Resource>) cs.getUserData(UserDataNames.pub_xref_used);
         rl.add(source);
         if (!list.contains(cs)) {
           list.add(cs);
@@ -1683,7 +1684,7 @@ public class CrossViewRenderer extends Renderer {
       }
       if (used) {
         td = tr.td();
-        Set<Resource> rl = (Set<Resource>) cs.getUserData("xref.used");
+        Set<Resource> rl = (Set<Resource>) cs.getUserData(UserDataNames.pub_xref_used);
         if (rl != null) {
           if (rl.size() < 10) {
             for (Resource r : rl) {

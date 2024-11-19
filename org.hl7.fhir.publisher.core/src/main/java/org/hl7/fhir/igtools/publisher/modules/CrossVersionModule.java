@@ -61,6 +61,7 @@ import org.hl7.fhir.r5.renderers.utils.RenderingContext.GenerationRules;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.ResourceRendererMode;
 import org.hl7.fhir.r5.utils.ResourceSorters;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
+import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
@@ -390,7 +391,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
       for (int i = 0; i < rowCount; i++) {
         rows.add(tbl.tr());
       }
-      ed.setUserData("rows", rows);
+      ed.setUserData(UserDataNames.xver_rows, rows);
       renderElementRow(sd, columns, ed, rowCount, rows);
     }
 
@@ -399,7 +400,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     for (SourcedElementDefinition m : missingChains) {
       StructureDefinitionColumn rootCol = engine.getColumn(columns, m.getSd());
       ElementDefinition prevED = findPreviousElement(m, rootCol.getElements()); // find the anchor that knows which rows we'll be inserting under
-      List<XhtmlNode> rows = (List<XhtmlNode>) prevED.getUserData("rows");
+      List<XhtmlNode> rows = (List<XhtmlNode>) prevED.getUserData(UserDataNames.xver_rows);
       XhtmlNode lastTR = rows.get(rows.size()-1);
       for (StructureDefinitionColumn col : columns) {
         col.clear();
@@ -423,7 +424,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
       for (int i = 0; i < rowCount; i++) {
         rows.add(tbl.tr(lastTR));
       }
-      m.getEd().setUserData("rows", rows);
+      m.getEd().setUserData(UserDataNames.xver_rows, rows);
       renderElementRow(m.getSd(), columns, m.getEd(), rowCount, rows);
     }
 
@@ -438,7 +439,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
             name = VersionUtilities.getNameForVersion(srcscope)+" "+srcscope.substring(srcscope.lastIndexOf("#")+1);
           }
           String tgtscope = link.getNextCM().getTargetScope().primitiveValue();
-          link.getNextCM().setUserData("presentation",
+          link.getNextCM().setUserData(UserDataNames.render_presentation,
               VersionUtilities.getNameForVersion(tgtscope)+" "+tgtscope.substring(tgtscope.lastIndexOf("#")+1));
           maps.add(link.getNextCM());
         }
@@ -510,7 +511,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
 
 
   private void checkForCodeTranslations(List<List<ElementDefinitionLink>> codeChains, ElementDefinitionLink link) {
-    if (link.getPrev().getEd().hasUserData("links."+MakeLinkMode.ORIGIN_CHAIN)) {
+    if (link.getPrev().getEd().hasUserData(UserDataNames.xver_links+"."+MakeLinkMode.ORIGIN_CHAIN)) {
       List<ElementDefinitionLink> originChain = engine.makeEDLinks(link.getPrev().getEd(), MakeLinkMode.ORIGIN_CHAIN);
       boolean mappings = false;
       for (ElementDefinitionLink olink : originChain) {
@@ -635,7 +636,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
 
   private XhtmlNode rendererElementForType(XhtmlNode td, StructureDefinition sdt, ElementDefinition ed, IWorkerContext context, String origName) {
     if (ed.getPath().contains(".")) {
-      SourcedElementDefinition sed = (SourcedElementDefinition) ed.getUserData("sed");
+      SourcedElementDefinition sed = (SourcedElementDefinition) ed.getUserData(UserDataNames.xver_sed);
       if (sed != null) {
         if (sed.getExtension() == null) {
           td.imgT("icon-extension-no.png", "No cross-version extension allowed for this element because "+sed.getStatusReason());

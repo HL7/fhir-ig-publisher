@@ -18,6 +18,7 @@ import org.hl7.fhir.r5.renderers.IMarkdownProcessor;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
+import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -86,7 +87,7 @@ public class BaseRenderer implements IMarkdownProcessor {
 	        if (r.hasWebPath()) {
 	          url = r.getWebPath();
 	        } else {
-	          url = r.getUserData("filename")+".html";
+	          url = r.getUserData(UserDataNames.render_filename)+".html";
 	        }
 	      } 
 	      if (Utilities.noString(url)) {

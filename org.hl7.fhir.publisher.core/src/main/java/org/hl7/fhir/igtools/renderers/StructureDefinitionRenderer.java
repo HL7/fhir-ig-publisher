@@ -67,6 +67,7 @@ import org.hl7.fhir.r5.terminologies.CodeSystemUtilities.SystemReference;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.utils.ElementDefinitionUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
+import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.StandardsStatus;
@@ -282,7 +283,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         if (ed.getPath().endsWith(".extension") && ed.hasSliceName()) {
           slice = ed;
         } else if (ed.getPath().endsWith(".extension.value[x]")) {
-          ed.setUserData("slice", slice);
+          ed.setUserData(UserDataNames.render_extension_slice, slice);
           subs.add(ed);
           slice = null;
         }
@@ -291,7 +292,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       String html = Utilities.stripAllPara(processMarkdown("description", sd.getDescriptionElement()));
       b.append("<p>Complex Extension: "+html+"</p><ul>");
       for (ElementDefinition ed : subs) {
-        ElementDefinition defn = (ElementDefinition) ed.getUserData("slice");
+        ElementDefinition defn = (ElementDefinition) ed.getUserData(UserDataNames.render_extension_slice);
         if (defn != null) {
           b.append("<li>"+(defn.getSliceName())+": "+ed.typeSummary()+": "+Utilities.stripPara(processMarkdown("ext-desc", defn.getDefinition()))+"</li>\r\n");
         }
@@ -305,7 +306,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (!ed.getPath().contains("."))
       return false;
 
-    ElementDefinition match = (ElementDefinition) ed.getUserData(ProfileUtilities.UD_DERIVATION_POINTER);
+    ElementDefinition match = (ElementDefinition) ed.getUserData(UserDataNames.SNAPSHOT_DERIVATION_POINTER);
     if (match == null)
       return true; // really, we shouldn't get here, but this appears to be common in the existing profiles?
     // throw new Error("no matches for "+ed.getPath()+"/"+ed.getName()+" in "+profile.getUrl());
@@ -532,7 +533,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             edCopy.getExample().clear();
           if (!edCopy.getMustSupport()) {
             if (edCopy.getPath().contains(".")) {
-              edCopy.setUserData("render.opaque", true);
+              edCopy.setUserData(UserDataNames.render_opaque, true);
             }
             edCopy.setBinding(null);
             edCopy.getConstraint().clear();
@@ -674,15 +675,15 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         String id = ed.getId();
         if (ed.hasFixed()) {
           hasFixed = true;
-          ed.getBinding().setUserData("tx.value", ed.getFixed());
+          ed.getBinding().setUserData(UserDataNames.render_tx_value, ed.getFixed());
         } else if (ed.hasPattern()) {
           hasFixed = true;
-          ed.getBinding().setUserData("tx.pattern", ed.getPattern());
+          ed.getBinding().setUserData(UserDataNames.render_tx_pattern, ed.getPattern());
         } else {
           // tricky : scan the children for a fixed coding value
           DataType t = findFixedValue(ed, true);
           if (t != null)
-            ed.getBinding().setUserData("tx.value", t);
+            ed.getBinding().setUserData(UserDataNames.render_tx_value, t);
         }
         if (ed.getType().size() == 1 && ed.getType().get(0).getWorkingCode().equals("Extension"))
           id = id + "<br/>" + ed.getType().get(0).getProfile();
@@ -715,15 +716,15 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         String id = ed.getId();
         if (ed.hasFixed()) {
           hasFixed = true;
-          ed.getBinding().setUserData("tx.value", ed.getFixed());
+          ed.getBinding().setUserData(UserDataNames.render_tx_value, ed.getFixed());
         } else if (ed.hasPattern()) {
           hasFixed = true;
-          ed.getBinding().setUserData("tx.pattern", ed.getPattern());
+          ed.getBinding().setUserData(UserDataNames.render_tx_pattern, ed.getPattern());
         } else {
           // tricky : scan the children for a fixed coding value
           DataType t = findFixedValue(ed, false);
           if (t != null)
-            ed.getBinding().setUserData("tx.value", t);
+            ed.getBinding().setUserData(UserDataNames.render_tx_value, t);
         }
         if (ed.getType().size() == 1 && ed.getType().get(0).getWorkingCode().equals("Extension"))
           id = id + "<br/>" + ed.getType().get(0).getProfile();
@@ -773,16 +774,16 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     String link = null;
     if (tx.hasValueSet()) {
       link = txDetails(tx, brd, false);
-    } else if (ed.hasUserData(ProfileUtilities.UD_DERIVATION_POINTER)) {
-      ElementDefinitionBindingComponent txi = ((ElementDefinition) ed.getUserData(ProfileUtilities.UD_DERIVATION_POINTER)).getBinding();
+    } else if (ed.hasUserData(UserDataNames.SNAPSHOT_DERIVATION_POINTER)) {
+      ElementDefinitionBindingComponent txi = ((ElementDefinition) ed.getUserData(UserDataNames.SNAPSHOT_DERIVATION_POINTER)).getBinding();
       link = txDetails(txi, brd, true);
     }
     boolean strengthInh = false;
     BindingStrength strength = null;
     if (tx.hasStrength()) {
       strength = tx.getStrength();
-    } else if (ed.hasUserData(ProfileUtilities.UD_DERIVATION_POINTER)) {
-      ElementDefinitionBindingComponent txi = ((ElementDefinition) ed.getUserData(ProfileUtilities.UD_DERIVATION_POINTER)).getBinding();
+    } else if (ed.hasUserData(UserDataNames.SNAPSHOT_DERIVATION_POINTER)) {
+      ElementDefinitionBindingComponent txi = ((ElementDefinition) ed.getUserData(UserDataNames.SNAPSHOT_DERIVATION_POINTER)).getBinding();
       strength = txi.getStrength();
       strengthInh = true;
     }
@@ -793,11 +794,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       else if (!tx.hasDescription())
         System.out.println("No value set specified at " + url + "#" + path + " (no url)");
     }
-    if (tx.hasUserData("tx.value")) {
-      brd.vss = "Fixed Value: " + summariseValue((DataType) tx.getUserData("tx.value"));
+    if (tx.hasUserData(UserDataNames.render_tx_value)) {
+      brd.vss = "Fixed Value: " + summariseValue((DataType) tx.getUserData(UserDataNames.render_tx_value));
       brd.suffix = null;
-    } else if (tx.hasUserData("tx.pattern")) {
-      brd.vss = "Pattern: " + summariseValue((DataType) tx.getUserData("tx.pattern"));
+    } else if (tx.hasUserData(UserDataNames.render_tx_pattern)) {
+      brd.vss = "Pattern: " + summariseValue((DataType) tx.getUserData(UserDataNames.render_tx_pattern));
       brd.suffix = null;
     }
 
@@ -863,8 +864,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
       } else {
         String p = vs.getWebPath();
-        if (vs.hasUserData("External.Link")) {
-          link = vs.getUserString("External.Link");
+        if (vs.hasUserData(UserDataNames.render_external_link)) {
+          link = vs.getUserString(UserDataNames.render_external_link);
         } else if (vs.hasSourcePackage()) {
           if (VersionUtilities.isCorePackage(vs.getSourcePackage().getId())) {
             link = "the FHIR Standard";
@@ -881,7 +882,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           b.append("<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"" + Utilities.escapeXml(p) + "\">" + Utilities.escapeXml(gen.getTranslated(vs.getNameElement())));
         else
           b.append("<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"" + Utilities.escapeXml(p) + "\">" + Utilities.escapeXml(gen.getTranslated(vs.getNameElement())));
-        if (vs.hasUserData("External.Link")) {
+        if (vs.hasUserData(UserDataNames.render_external_link)) {
           b.append(" <img src=\"external.png\" alt=\".\"/>");
         }
         b.append("</a>");
@@ -1710,7 +1711,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       if (elem.hasBinding() && elem.getBinding().hasValueSet()) {
         ValueSet vs = context.findTxResource(ValueSet.class, elem.getBinding().getValueSet());
         if (vs != null)
-          b.append(" <span style=\"color: navy; opacity: 0.8\"><a href=\"" + corePath + vs.getUserData("filename") + ".html\" style=\"color: navy\">" + Utilities.escapeXml(elem.getShort()) + "</a></span>");
+          b.append(" <span style=\"color: navy; opacity: 0.8\"><a href=\"" + corePath + vs.getUserData(UserDataNames.render_filename) + ".html\" style=\"color: navy\">" + Utilities.escapeXml(elem.getShort()) + "</a></span>");
         else
           b.append(" <span style=\"color: navy; opacity: 0.8\"><a href=\"" + elem.getBinding().getValueSet() + ".html\" style=\"color: navy\">" + Utilities.escapeXml(elem.getShort()) + "</a></span>");
       } else

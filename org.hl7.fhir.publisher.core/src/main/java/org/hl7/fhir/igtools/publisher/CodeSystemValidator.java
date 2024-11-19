@@ -40,6 +40,7 @@ import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
 import org.hl7.fhir.r5.utils.XVerExtensionManager;
+import org.hl7.fhir.r5.utils.validation.ValidatorSession;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.validation.BaseValidator;
@@ -52,8 +53,8 @@ import org.hl7.fhir.validation.BaseValidator;
  */
 public class CodeSystemValidator extends BaseValidator {
 
-  public CodeSystemValidator(IWorkerContext context, XVerExtensionManager xverManager) {
-    super(context, xverManager, false);
+  public CodeSystemValidator(IWorkerContext context, XVerExtensionManager xverManager, ValidatorSession session) {
+    super(context, xverManager, false, session);
   }
 
   public List<ValidationMessage> validate(CodeSystem cs, boolean forBuild) {

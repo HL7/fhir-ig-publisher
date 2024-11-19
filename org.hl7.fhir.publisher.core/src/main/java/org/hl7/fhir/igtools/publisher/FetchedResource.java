@@ -27,6 +27,7 @@ import java.util.List;
 
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
+import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
@@ -60,6 +61,7 @@ public class FetchedResource {
   private boolean hasTranslations;
   private String resourceName;
   private String resourceDescription;
+  private boolean regenAfterValidation;
 
   public FetchedResource(String nameForErrors) {
     super();
@@ -352,5 +354,22 @@ public class FetchedResource {
       return resourceDescription;
     }
   }
+
+  public boolean isRegenAfterValidation() {
+    return regenAfterValidation;
+  }
+
+  public void setRegenAfterValidation(boolean regenAfterValidation) {
+    this.regenAfterValidation = regenAfterValidation;
+  }
+
+  public boolean isCustomResource() {
+    if (getResource() != null) {
+      return getResource().hasUserData(UserDataNames.loader_custom_resource);
+    } else {
+      return getElement().getProperty().getStructure().hasUserData(UserDataNames.loader_custom_resource);
+    }
+  }
+  
   
 }

@@ -103,6 +103,7 @@ import org.hl7.fhir.r5.model.ValueSet.ValueSetComposeComponent;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
+import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
@@ -345,10 +346,10 @@ public class IgSpreadsheetParser {
 
     if (invariants != null) {
       for (ElementDefinitionConstraintComponent inv : invariants.values()) {
-        if (Utilities.noString(inv.getUserString("context")))
+        if (Utilities.noString(inv.getUserString(UserDataNames.pub_excel_inv_context)))
           throw new Exception("Profile "+sd.getId()+" Invariant "+inv.getId()+" has no context");
         else {
-          ElementDefinition ed = findContext(sd, inv.getUserString("context"), "Profile "+sd.getId()+" Invariant "+inv.getId()+" Context");
+          ElementDefinition ed = findContext(sd, inv.getUserString(UserDataNames.pub_excel_inv_context), "Profile "+sd.getId()+" Invariant "+inv.getId()+" Context");
           ed.getConstraint().add(inv);
 //          if (Utilities.noString(inv.getXpath())) {
 //            throw new Exception("Profile "+sd.getId()+" Invariant "+inv.getId()+" ("+inv.getHuman()+") has no XPath statement");
@@ -589,12 +590,12 @@ public class IgSpreadsheetParser {
         if (Utilities.noString(sheet.getColumn(row, "System"))) {
 
           ConceptDefinitionComponent cc = new ConceptDefinitionComponent();
-          cc.setUserData("id", sheet.getColumn(row, "Id"));
+          cc.setUserData(UserDataNames.pub_excel_sheet_id, sheet.getColumn(row, "Id"));
           cc.setCode(sheet.getColumn(row, "Code"));
           if (codes.containsKey(cc.getCode()))
             throw new Exception("Duplicate Code '"+cc.getCode()+"' processing "+vs.getName());
           codes.put(cc.getCode(), cc);
-          codesById.put(cc.getUserString("id"), cc);
+          codesById.put(cc.getUserString(UserDataNames.pub_excel_sheet_id), cc);
           cc.setDisplay(sheet.getColumn(row, "Display"));
           if (sheet.getColumn(row, "Abstract").toUpperCase().equals("Y"))
             CodeSystemUtilities.setNotSelectable(cs, cc);
@@ -603,8 +604,8 @@ public class IgSpreadsheetParser {
           cc.setDefinition(sheet.getColumn(row, "Definition"));
           if (!Utilities.noString(sheet.getColumn(row, "Comment")))
             ToolingExtensions.addCSComment(cc, sheet.getColumn(row, "Comment"));
-//          cc.setUserData("v2", sheet.getColumn(row, "v2"));
-//          cc.setUserData("v3", sheet.getColumn(row, "v3"));
+//          cc.setUserData(!"v2", sheet.getColumn(row, "v2"));
+//          cc.setUserData(!"v3", sheet.getColumn(row, "v3"));
           for (String ct : sheet.columns)
             if (ct.startsWith("Display:") && !Utilities.noString(sheet.getColumn(row, ct)))
               cc.addDesignation().setLanguage(ct.substring(8)).setValue(sheet.getColumn(row, ct));
@@ -687,7 +688,7 @@ public class IgSpreadsheetParser {
 //        inv.setXpath(sheet.getColumn(row, "XPath"));
         if (s.equals("") || result.containsKey(s))
           throw new Exception("duplicate or missing invariant id "+ getLocation(row));
-        inv.setUserData("context", sheet.getColumn(row, "Context"));
+        inv.setUserData(UserDataNames.pub_excel_inv_context, sheet.getColumn(row, "Context"));
         result.put(s, inv);
       }
     }
@@ -780,15 +781,15 @@ public class IgSpreadsheetParser {
     if (!Utilities.noString(uml)) {
       if (uml.contains(";")) {
         String[] parts = uml.split("\\;");
-        e.setUserData("SvgLeft", parts[0]);
-        e.setUserData("SvgTop", parts[1]);
+        e.setUserData(UserDataNames.LAYOUT_SvgLeft, parts[0]);
+        e.setUserData(UserDataNames.LAYOUT_SvgTop, parts[1]);
         if (parts.length > 2)
-          e.setUserData("SvgWidth", parts[2]);
+          e.setUserData(UserDataNames.LAYOUT_SvgWidth, parts[2]);
       } else if (uml.startsWith("break:")) {
-        e.setUserData("UmlBreak", true);
-        e.setUserData("UmlDir", uml.substring(6));
+        e.setUserData(UserDataNames.LAYOUT_UmlBreak, true);
+        e.setUserData(UserDataNames.LAYOUT_UmlDir, uml.substring(6));
       } else {
-        e.setUserData("UmlDir", uml);
+        e.setUserData(UserDataNames.LAYOUT_UmlDir, uml);
       }
     }
     String s = sheet.getColumn(row, "Condition");

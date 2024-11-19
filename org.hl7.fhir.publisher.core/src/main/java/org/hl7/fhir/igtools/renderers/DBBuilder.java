@@ -37,6 +37,7 @@ import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
+import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.Utilities;
@@ -321,47 +322,54 @@ public class DBBuilder {
 
     try {
       if (r.getResource() == null || !(r.getResource() instanceof CanonicalResource)) {
-        PreparedStatement psql = con.prepareStatement("Insert into Resources (key, type, id, web, name, description, json) values (?, ?, ?, ?, ?, ?, ?)");
+        PreparedStatement psql = con.prepareStatement("Insert into Resources (key, type, custom, id, web, url, version, status, date, name, title, description, json) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         psql.setInt(1, ++lastResKey);
         bindString(psql, 2, r.fhirType());
-        bindString(psql, 3, r.getId());
-        bindString(psql, 4, r.getElement().getWebPath());
-        bindString(psql, 5, r.getResourceName());
-        bindString(psql, 6, r.getResourceDescription());
-        psql.setBytes(7, json);
+        psql.setInt(3, r.getElement().getProperty().getStructure().hasUserData(UserDataNames.loader_custom_resource) ? 1 : 0);
+        bindString(psql, 4, r.getId());
+        bindString(psql, 5, r.getElement().getWebPath());
+        bindString(psql, 6, r.getElement().getNamedChildValue("url"));
+        bindString(psql, 7, r.getElement().getNamedChildValue("version"));
+        bindString(psql, 8, r.getElement().getNamedChildValue("status"));
+        bindString(psql, 9, r.getElement().getNamedChildValue("date"));
+        bindString(psql, 10, r.getElement().getChildren("name").size() == 1 && r.getElement().getNamedChild("name").isPrimitive() ? r.getElement().getNamedChildValue("name") : r.getResourceName());
+        bindString(psql, 11, r.getElement().getNamedChildValue("title"));
+        bindString(psql, 12, r.getResourceDescription());
+        psql.setBytes(13, json);
         psql.executeUpdate();   
-        r.getElement().setUserData("db.key", lastResKey);
-        r.getElement().setUserData("Storage.key", lastResKey);
+        r.getElement().setUserData(UserDataNames.db_key, lastResKey);
+        r.getElement().setUserData(UserDataNames.Storage_key, lastResKey);
       } else {
         CanonicalResource cr = (CanonicalResource) r.getResource();
-        PreparedStatement psql = con.prepareStatement("Insert into Resources (key, type, id, web, url, version, status, date, name, title, experimental, realm, description, purpose, copyright, copyrightLabel, json) "+
-            "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        PreparedStatement psql = con.prepareStatement("Insert into Resources (key, type, custom, id, web, url, version, status, date, name, title, experimental, realm, description, purpose, copyright, copyrightLabel, json) "+
+            "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         psql.setInt(1, ++lastResKey);
         bindString(psql, 2,  r.fhirType());
-        bindString(psql, 3,  r.getId());
-        bindString(psql, 4,  cr.getWebPath());
-        bindString(psql, 5,  cr.getUrl());
-        bindString(psql, 6,  cr.getVersion());
-        bindString(psql, 7,  cr.getStatus().toCode());
-        bindString(psql, 8,  cr.getDateElement().primitiveValue());
-        bindString(psql, 9,  cr.getName());
-        bindString(psql, 10,  cr.getTitle());
-        bindString(psql, 11,  cr.getExperimentalElement().primitiveValue());
-        bindString(psql, 12, realm(cr));
-        bindString(psql, 13, cr.getDescription());
-        bindString(psql, 14, cr.getPurpose());
-        bindString(psql, 15, cr.getCopyright());
-        bindString(psql, 16, cr.getCopyrightLabel());
-        psql.setBytes(17, json);
+        psql.setInt(3, r.getElement().getProperty().getStructure().hasUserData(UserDataNames.loader_custom_resource) ? 1 : 0);
+        bindString(psql, 4,  r.getId());
+        bindString(psql, 5,  cr.getWebPath());
+        bindString(psql, 6,  cr.getUrl());
+        bindString(psql, 7,  cr.getVersion());
+        bindString(psql, 8,  cr.getStatus().toCode());
+        bindString(psql, 9,  cr.getDateElement().primitiveValue());
+        bindString(psql, 10,  cr.getName());
+        bindString(psql, 11,  cr.getTitle());
+        bindString(psql, 12,  cr.getExperimentalElement().primitiveValue());
+        bindString(psql, 13, realm(cr));
+        bindString(psql, 14, cr.getDescription());
+        bindString(psql, 15, cr.getPurpose());
+        bindString(psql, 16, cr.getCopyright());
+        bindString(psql, 17, cr.getCopyrightLabel());
+        psql.setBytes(18, json);
         psql.executeUpdate();    
         if (cr instanceof CodeSystem) {
           codesystems.add((CodeSystem) cr);
         } else if (cr instanceof ConceptMap) {
           mappings.add((ConceptMap) cr);
         }
-        cr.setUserData("db.key", lastResKey);
-        cr.setUserData("Storage.key", lastResKey);
-        r.getElement().setUserData("Storage.key", lastResKey);
+        cr.setUserData(UserDataNames.db_key, lastResKey);
+        cr.setUserData(UserDataNames.Storage_key, lastResKey);
+        r.getElement().setUserData(UserDataNames.Storage_key, lastResKey);
       } 
     } catch (SQLException e) {
       errors.add(e.getMessage());
@@ -384,13 +392,13 @@ public class DBBuilder {
       for (CodeSystem cs : codesystems) {
         for (PropertyComponent p : cs.getProperty()) { 
           psql.setInt(1, ++lastPropKey);
-          psql.setInt(2, ((Integer) cs.getUserData("db.key")).intValue());
+          psql.setInt(2, ((Integer) cs.getUserData(UserDataNames.db_key)).intValue());
           bindString(psql, 3, p.getCode());
           bindString(psql, 4, p.getUri());
           bindString(psql, 5, p.getDescription());
           bindString(psql, 6, p.getType().toCode());  
           psql.executeUpdate();     
-          p.setUserData("db.key", lastPropKey);   
+          p.setUserData(UserDataNames.db_key, lastPropKey);   
         }
       }
       psql = con.prepareStatement("Insert into Concepts (Key, ResourceKey, ParentKey,  Code, Display, Definition) "+
@@ -416,7 +424,7 @@ public class DBBuilder {
           for (SourceElementComponent src : grp.getElement()) {
             for (TargetElementComponent tgt : src.getTarget()) {
               psql.setInt(1, ++lastMapKey);
-              psql.setInt(2, ((Integer) cm.getUserData("db.key")).intValue());
+              psql.setInt(2, ((Integer) cm.getUserData(UserDataNames.db_key)).intValue());
               bindString(psql, 3, grp.getSourceElement().baseUrl());
               bindString(psql, 4, grp.getSourceElement().version());
               bindString(psql, 5, src.getCode());
@@ -464,9 +472,9 @@ public class DBBuilder {
 
 
   private void addContains(ValueSet vs, ValueSetExpansionContainsComponent e, PreparedStatement psql) throws SQLException {
-    if (vs.hasUserData("db.key")) {
+    if (vs.hasUserData(UserDataNames.db_key)) {
       psql.setInt(1, ++lastVSKey);
-      psql.setInt(2, ((Integer) vs.getUserData("db.key")).intValue());
+      psql.setInt(2, ((Integer) vs.getUserData(UserDataNames.db_key)).intValue());
       bindString(psql, 3, vs.getUrl());
       bindString(psql, 4, vs.getVersion());
       bindString(psql, 5, e.getSystem());
@@ -481,10 +489,10 @@ public class DBBuilder {
   }
 
   private void addConcepts(CodeSystem cs, List<ConceptDefinitionComponent> list, PreparedStatement psql, int parent) throws SQLException {
-    if (cs.hasUserData("db.key")) {
+    if (cs.hasUserData(UserDataNames.db_key)) {
     for (ConceptDefinitionComponent cd : list) {
       psql.setInt(1, ++lastConceptKey);
-      psql.setInt(2, ((Integer) cs.getUserData("db.key")).intValue());
+      psql.setInt(2, ((Integer) cs.getUserData(UserDataNames.db_key)).intValue());
       if (parent == 0) {
         psql.setNull(3, java.sql.Types.INTEGER);
       } else {
@@ -494,29 +502,29 @@ public class DBBuilder {
       bindString(psql, 5, cd.getDisplay());
       bindString(psql, 6, cd.getDefinition());
       psql.executeUpdate();    
-      cd.setUserData("db.key", lastConceptKey);   
+      cd.setUserData(UserDataNames.db_key, lastConceptKey);   
       addConcepts(cs, cd.getConcept(), psql, lastConceptKey);
     }
     }
   }
 
   private void addConceptProperties(CodeSystem cs, List<ConceptDefinitionComponent> list, PreparedStatement psql) throws SQLException {
-    if (cs.hasUserData("db.key")) {
+    if (cs.hasUserData(UserDataNames.db_key)) {
        for (ConceptDefinitionComponent cd : list) {
       for (ConceptPropertyComponent p : cd.getProperty()) { 
         psql.setInt(1, ++lastCPropKey);
-        psql.setInt(2, ((Integer) cs.getUserData("db.key")).intValue());
-        psql.setInt(3, ((Integer) cd.getUserData("db.key")).intValue());
+        psql.setInt(2, ((Integer) cs.getUserData(UserDataNames.db_key)).intValue());
+        psql.setInt(3, ((Integer) cd.getUserData(UserDataNames.db_key)).intValue());
         PropertyComponent pd = getPropDefn(p.getCode(), cs);
         if (pd == null) {
           psql.setNull(4, java.sql.Types.INTEGER);
         } else {
-          psql.setInt(4, ((Integer) pd.getUserData("db.key")).intValue());
+          psql.setInt(4, ((Integer) pd.getUserData(UserDataNames.db_key)).intValue());
         }
         bindString(psql, 5, p.getCode());
         bindString(psql, 6, p.getValue() == null ? p.getValue().primitiveValue() : null);
         psql.executeUpdate();    
-        p.setUserData("db.key", lastCPropKey);   
+        p.setUserData(UserDataNames.db_key, lastCPropKey);   
       }
       addConceptProperties(cs, cd.getConcept(), psql);
     }
@@ -524,18 +532,18 @@ public class DBBuilder {
   }
 
   private void addConceptDesignations(CodeSystem cs, List<ConceptDefinitionComponent> list, PreparedStatement psql) throws SQLException {
-    if (cs.hasUserData("db.key")) {
+    if (cs.hasUserData(UserDataNames.db_key)) {
       for (ConceptDefinitionComponent cd : list) {
         for (ConceptDefinitionDesignationComponent p : cd.getDesignation()) { 
           psql.setInt(1, ++lastDesgKey);
-          psql.setInt(2, ((Integer) cs.getUserData("db.key")).intValue());
-          psql.setInt(3, ((Integer) cd.getUserData("db.key")).intValue());        
+          psql.setInt(2, ((Integer) cs.getUserData(UserDataNames.db_key)).intValue());
+          psql.setInt(3, ((Integer) cd.getUserData(UserDataNames.db_key)).intValue());        
           bindString(psql, 4, p.getUse().getSystem());
           bindString(psql, 5, p.getUse().getCode());
           bindString(psql, 6, p.getLanguage());
           bindString(psql, 7, p.getValue());
           psql.executeUpdate();    
-          p.setUserData("db.key", lastDesgKey);   
+          p.setUserData(UserDataNames.db_key, lastDesgKey);   
         }
         addConceptDesignations(cs, cd.getConcept(), psql);
       }
@@ -673,6 +681,7 @@ public class DBBuilder {
     stmt.execute("CREATE TABLE Resources (\r\n"+
         "Key             integer NOT NULL,\r\n"+
         "Type            nvarchar NOT NULL,\r\n"+
+        "Custom          integer NOT NULL,\r\n"+
         "Id              nvarchar NOT NULL,\r\n"+
         "Web             nvarchar NOT NULL,\r\n"+
         "Url             nvarchar NULL,\r\n"+
@@ -907,7 +916,7 @@ public class DBBuilder {
                 FetchedResource tgt = null;
                 for (FetchedFile f : files) {
                   for (FetchedResource rf : f.getResources()) {
-                    String key = rf.getElement().getUserString("Storage.key");
+                    String key = rf.getElement().getUserString(UserDataNames.Storage_key);
                     if (s.equals(key)) {
                       tgt = rf;
                     }
@@ -1007,8 +1016,8 @@ public class DBBuilder {
       sql = con.prepareStatement("insert into CodeSystemList (CodeSystemListKey, ViewType, ResourceKey, Url, Version, Status, Name, Title, Description) values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
       sql.setInt(1, lastCLKey);
       sql.setInt(2, viewType);
-      if (cs.hasUserData("db.key")) {
-        sql.setInt(3, (int) cs.getUserData("db.key"));
+      if (cs.hasUserData(UserDataNames.db_key)) {
+        sql.setInt(3, (int) cs.getUserData(UserDataNames.db_key));
       } else {
         sql.setNull(3, java.sql.Types.INTEGER);
       }
@@ -1037,8 +1046,8 @@ public class DBBuilder {
             sql.setInt(1, lastCLKey);
             sql.setString(2, r.fhirType());      
             sql.setString(3, r.getIdBase());
-            if (cs.hasUserData("db.key")) {
-              sql.setInt(4, (int) cs.getUserData("db.key"));
+            if (cs.hasUserData(UserDataNames.db_key)) {
+              sql.setInt(4, (int) cs.getUserData(UserDataNames.db_key));
             } else {
               sql.setNull(4, java.sql.Types.INTEGER);
             }      
@@ -1060,8 +1069,8 @@ public class DBBuilder {
       sql = con.prepareStatement("insert into ValueSetList (ValueSetListKey, ViewType, ResourceKey, Url, Version, Status, Name, Title, Description) values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
       sql.setInt(1, lastVLKey);
       sql.setInt(2, viewType);
-      if (vs.hasUserData("db.key")) {
-        sql.setInt(3, (int) vs.getUserData("db.key"));
+      if (vs.hasUserData(UserDataNames.db_key)) {
+        sql.setInt(3, (int) vs.getUserData(UserDataNames.db_key));
       } else {
         sql.setNull(3, java.sql.Types.INTEGER);
       }
@@ -1101,8 +1110,8 @@ public class DBBuilder {
           sql.setInt(1, lastVLKey);
           sql.setString(2, r.fhirType());      
           sql.setString(3, r.getIdBase());
-          if (vs.hasUserData("db.key")) {
-            sql.setInt(4, (int) vs.getUserData("db.key"));
+          if (vs.hasUserData(UserDataNames.db_key)) {
+            sql.setInt(4, (int) vs.getUserData(UserDataNames.db_key));
           } else {
             sql.setNull(4, java.sql.Types.INTEGER);
           }      
