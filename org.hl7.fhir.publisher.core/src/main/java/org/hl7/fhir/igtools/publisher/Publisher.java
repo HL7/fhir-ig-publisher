@@ -8875,7 +8875,6 @@ private String fixPackageReference(String dep) {
         if (FhirSettings.getGemPath() != null) {
           vars.put("GEM_PATH", FhirSettings.getGemPath());
         }
-        System.out.println("r:"+vars.get("RUBY_ROOT"));
         CommandLine commandLine = new CommandLine("bash").addArgument("-c").addArgument(jekyllCommand+" build --destination "+outputDir, false);
         exec.execute(commandLine, vars);
       } else {
