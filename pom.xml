@@ -11,6 +11,7 @@
         <core_version>6.4.2-SNAPSHOT</core_version>
         <maven_surefire_version>3.0.0-M5</maven_surefire_version>
         <apache_poi_version>5.2.1</apache_poi_version>
+        <lombok_version>1.18.32</lombok_version>
         <okhttp.version>4.11.0</okhttp.version>
         <junit_jupiter_version>5.7.1</junit_jupiter_version>
         <maven.compiler.release>11</maven.compiler.release>
@@ -332,6 +333,13 @@
                     <encoding>UTF-8</encoding>
                     <fork>false</fork>
                     <debug>true</debug>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok_version}</version>
+                        </path>
+                    </annotationProcessorPaths>
                 </configuration>
                 <executions>
                     <!-- Replacing default-compile as it is treated specially by maven -->
