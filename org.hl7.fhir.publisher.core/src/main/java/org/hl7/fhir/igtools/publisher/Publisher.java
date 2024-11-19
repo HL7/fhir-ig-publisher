@@ -2176,97 +2176,97 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       try {
         for (FetchedResource r : f.getResources()) {
           if (!isRegen || r.isRegenAfterValidation()) {
-            if (r.getExampleUri()==null || genExampleNarratives) {
-              if (!passesNarrativeFilter(r)) {
-                noNarrativeResources.add(r);
-                logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId()+" suppressed");
-                if (r.getResource() != null && r.getResource() instanceof DomainResource) {
-                  ((DomainResource) r.getResource()).setText(null);
-                }
-                r.getElement().removeChild("text");
-              } else {
-                List<Locale> langs = translationLocales();
-                logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId());
-                if (r.getResource() != null && isConvertableResource(r.getResource().fhirType())) {
-                  boolean regen = false;
-                  for (Locale lang : langs) {
-                    boolean first = true;
-                    RenderingContext lrc = rc.copy(false).setDefinitionsTarget(igpkp.getDefinitionsName(r));
-                    lrc.setLocale(lang);
-                    lrc.setRules(GenerationRules.VALID_RESOURCE);
-                    lrc.setDefinitionsTarget(igpkp.getDefinitionsName(r));
-                    lrc.setSecondaryLang(!first);
-                    first = false;
-                    if (r.getResource() instanceof DomainResource && (langs.size() > 1 || !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv()))) {
-                      regen = true;
+          if (r.getExampleUri()==null || genExampleNarratives) {
+            if (!passesNarrativeFilter(r)) {
+              noNarrativeResources.add(r);
+              logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId()+" suppressed");
+              if (r.getResource() != null && r.getResource() instanceof DomainResource) {
+                ((DomainResource) r.getResource()).setText(null);
+              }
+              r.getElement().removeChild("text");
+            } else {
+              List<Locale> langs = translationLocales();
+              logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId());
+              if (r.getResource() != null && isConvertableResource(r.getResource().fhirType())) {
+                boolean regen = false;
+                for (Locale lang : langs) {
+                boolean first = true;
+                  RenderingContext lrc = rc.copy(false).setDefinitionsTarget(igpkp.getDefinitionsName(r));
+                  lrc.setLocale(lang);
+                  lrc.setRules(GenerationRules.VALID_RESOURCE);
+                  lrc.setDefinitionsTarget(igpkp.getDefinitionsName(r));
+                  lrc.setSecondaryLang(!first);
+                  first = false;
+                  if (r.getResource() instanceof DomainResource && (langs.size() > 1 || !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv()))) {
+                    regen = true;
                       ResourceRenderer rr = RendererFactory.factory(r.getResource(), lrc);
                       if (rr.renderingUsesValidation()) {
                         r.setRegenAfterValidation(true);
                         needsRegen = true;
                       }
                       rr.setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, r.getResource()));
-                    } else if (r.getResource() instanceof Bundle) {
-                      regen = true;
-                      new BundleRenderer(lrc).setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, r.getResource()));
-                    } else if (r.getResource() instanceof Parameters) {
-                      regen = true;
-                      Parameters p = (Parameters) r.getResource();
-                      new ParametersRenderer(lrc).setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, p));
-                    } else if (r.getResource() instanceof DomainResource) {
-                      checkExistingNarrative(f, r, ((DomainResource) r.getResource()).getText().getDiv());
-                    }
+                  } else if (r.getResource() instanceof Bundle) {
+                    regen = true;
+                    new BundleRenderer(lrc).setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, r.getResource()));
+                  } else if (r.getResource() instanceof Parameters) {
+                    regen = true;
+                    Parameters p = (Parameters) r.getResource();
+                    new ParametersRenderer(lrc).setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, p));
+                  } else if (r.getResource() instanceof DomainResource) {
+                    checkExistingNarrative(f, r, ((DomainResource) r.getResource()).getText().getDiv());
                   }
-                  if (regen) {
-                    Element e = convertToElement(r, r.getResource());
-                    e.copyUserData(r.getElement());
-                    r.setElement(e);
-                  }
-                } else {
-                  boolean first = true;
-                  for (Locale lang : langs) {
-                    RenderingContext lrc = rc.copy(false).setParser(getTypeLoader(f,r));
-                    lrc.clearAnchors();
-                    lrc.setLocale(lang);
-                    lrc.setRules(GenerationRules.VALID_RESOURCE);
-                    lrc.setSecondaryLang(!first);
-                    first = false;
+                }
+                if (regen) {
+                  Element e = convertToElement(r, r.getResource());
+                  e.copyUserData(r.getElement());
+                  r.setElement(e);
+                }
+              } else {
+                boolean first = true;
+                for (Locale lang : langs) {
+                  RenderingContext lrc = rc.copy(false).setParser(getTypeLoader(f,r));
+                  lrc.clearAnchors();
+                  lrc.setLocale(lang);
+                  lrc.setRules(GenerationRules.VALID_RESOURCE);
+                  lrc.setSecondaryLang(!first);
+                  first = false;
                     if (isDomainResource(r) && (isRegen || langs.size() > 1 || !hasNarrative(r.getElement()))) {
-                      ResourceWrapper rw = ResourceWrapper.forResource(lrc, r.getElement());
+                    ResourceWrapper rw = ResourceWrapper.forResource(lrc, r.getElement());
                       ResourceRenderer rr = RendererFactory.factory(rw, lrc);
                       if (rr.renderingUsesValidation()) {
                         r.setRegenAfterValidation(true);
                         needsRegen = true;
                       }
                       rr.setMultiLangMode(langs.size() > 1).renderResource(rw);
-                      otherFilesRun.addAll(lrc.getFiles());
-                    } else if (r.fhirType().equals("Bundle")) {
-                      lrc.setAddName(true);
-                      for (Element e : r.getElement().getChildrenByName("entry")) {
-                        Element res = e.getNamedChild("resource");
-                        if (res!=null && "http://hl7.org/fhir/StructureDefinition/DomainResource".equals(res.getProperty().getStructure().getBaseDefinition())) {
-                          ResourceWrapper rw = ResourceWrapper.forResource(lrc, res);
+                    otherFilesRun.addAll(lrc.getFiles());
+                  } else if (r.fhirType().equals("Bundle")) {
+                    lrc.setAddName(true);
+                    for (Element e : r.getElement().getChildrenByName("entry")) {
+                      Element res = e.getNamedChild("resource");
+                      if (res!=null && "http://hl7.org/fhir/StructureDefinition/DomainResource".equals(res.getProperty().getStructure().getBaseDefinition())) {
+                        ResourceWrapper rw = ResourceWrapper.forResource(lrc, res);
                           ResourceRenderer rr = RendererFactory.factory(rw, lrc);
                           if (rr.renderingUsesValidation()) {
                             r.setRegenAfterValidation(true);
                             needsRegen = true;
                           }
-                          if (hasNarrative(res)) {
+                        if (hasNarrative(res)) {
                             rr.checkNarrative(rw);                        
-                          } else {
+                        } else {
                             rr.setMultiLangMode(langs.size() > 1).renderResource(rw);
-                          }
                         }
                       }
-                    } else if (isDomainResource(r) && hasNarrative(r.getElement())) {
-                      checkExistingNarrative(f, r, r.getElement().getNamedChild("text").getNamedChild("div").getXhtml());
                     }
+                  } else if (isDomainResource(r) && hasNarrative(r.getElement())) {
+                    checkExistingNarrative(f, r, r.getElement().getNamedChild("text").getNamedChild("div").getXhtml());
                   }
                 }
               }
-            } else {
-              logDebugMessage(LogCategory.PROGRESS, "skipped narrative for "+f.getName()+" : "+r.getId());
             }
+          } else {
+            logDebugMessage(LogCategory.PROGRESS, "skipped narrative for "+f.getName()+" : "+r.getId());
           }
+        }
         }
       } finally {
         f.finish("generateNarratives");
@@ -9029,6 +9029,8 @@ private String fixPackageReference(String dep) {
     start = System.currentTimeMillis();
     trackedFragment("3", "dependency-table-short", depr.render(publishedIg, false, false, false), otherFilesRun, start, "dependency-table-short", "Cross");
     start = System.currentTimeMillis();
+    trackedFragment("3", "dependency-table-nontech", depr.renderNonTech(publishedIg), otherFilesRun, start, "dependency-table-nontech", "Cross");
+    start = System.currentTimeMillis();
     trackedFragment("4", "globals-table", depr.renderGlobals(), otherFilesRun, start, "globals-table", "Cross");
 
     // now, list the profiles - all the profiles
@@ -11397,7 +11399,7 @@ private String fixPackageReference(String dep) {
   private ContextUtilities cu;
 
   private boolean logLoading;
-
+  
   private JsonObject approvedIgsForCustomResources;
   private Set<String> customResourceNames = new HashSet<>();
   private List<StructureDefinition> customResources = new ArrayList<>();
@@ -11957,7 +11959,7 @@ private String fixPackageReference(String dep) {
     Element eNN = element;
     jp.compose(element, bsj, OutputStyle.NORMAL, igpkp.getCanonical());
     if (!r.isCustomResource()) {
-      npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
+    npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
     } else  if ("StructureDefinition".equals(r.fhirType())) {
       npm.addFile(Category.RESOURCE, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
       StructureDefinition sdt = (StructureDefinition) r.getResource().copy();
@@ -11974,7 +11976,7 @@ private String fixPackageReference(String dep) {
       new JsonParser().setOutputStyle(OutputStyle.NORMAL).compose(bsj, bin);
       npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, "Binary-"+r.getId()+".json", bsj.toByteArray());
     }
-      
+    
     if (module.isNoNarrative()) {
       // we don't use the narrative in these resources in _includes, so we strip it - it slows Jekyll down greatly 
       eNN = (Element) element.copy();
