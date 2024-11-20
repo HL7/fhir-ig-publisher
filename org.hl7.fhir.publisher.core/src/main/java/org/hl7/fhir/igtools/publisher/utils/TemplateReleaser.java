@@ -601,7 +601,7 @@ public class TemplateReleaser {
 
   private Document loadXml(File file) throws Exception {
     InputStream src = new FileInputStream(file);
-    DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+    DocumentBuilderFactory dbf = XMLUtil.newXXEProtectedDocumentBuilderFactory();
     DocumentBuilder db = dbf.newDocumentBuilder();
     return db.parse(src);
   }

@@ -14312,7 +14312,7 @@ private String fixPackageReference(String dep) {
   private void loadMappingSpaces(byte[] source) throws Exception {
     ByteArrayInputStream is = null;
     try {
-      DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+      DocumentBuilderFactory factory = XMLUtil.newXXEProtectedDocumentBuilderFactory();
       factory.setNamespaceAware(true);
       DocumentBuilder builder = factory.newDocumentBuilder();
       is = new ByteArrayInputStream(source);
