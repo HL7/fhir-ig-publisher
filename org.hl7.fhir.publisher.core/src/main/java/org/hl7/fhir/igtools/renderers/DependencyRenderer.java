@@ -147,11 +147,17 @@ public class DependencyRenderer {
       this.parent = parent;
     }
 
+    public boolean hasReason() {
+      return getReason()!=null;
+    }
+
     public String getReason() {
       if (reason!=null)
-        return reason;
+        return mdEngine.process(reason, "Dependency Reason for " + p.title());
+      else if (parent != null)
+        return "Imported by " + Utilities.escapeXml(parent) + " (and potentially others)";
       else
-        return "Imported by " + parent + " (and potentially others)";
+        return null;
     }
   }
 
@@ -220,7 +226,7 @@ public class DependencyRenderer {
             b.append(newRow + ">");
           b.append("<span class=\"copy-text\" title=\"package: " + verInfo.p.id() + "#" + version + "\"><a style=\"font-size: 11px; font-family: verdana; font-weight: " + (verInfo.direct ? "bold" : "normal") + "\"");
           b.append(" href=\"https://simplifier.net/packages/" + info.p.name() + "/" + version + "\">" + version + "</a><button class=\"btn-copy\" title=\"Click to copy package\" data-clipboard-text=\"" + verInfo.p.id() + "#" + version + "\"/></span>");
-          b.append("</td><td" + (verInfo.direct ? "" : " style=\"font-style: italic;\"") + ">" + Utilities.escapeXml(verInfo.getReason()) + "</td></tr>");
+          b.append("</td><td" + (verInfo.direct ? "" : " style=\"font-style: italic;\"") + ">" + (verInfo.hasReason() ? verInfo.getReason() : "") + "</td></tr>");
 
           first = false;
         }
