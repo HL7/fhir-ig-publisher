@@ -328,12 +328,12 @@ public class DBBuilder {
         psql.setInt(3, r.getElement().getProperty().getStructure().hasUserData(UserDataNames.loader_custom_resource) ? 1 : 0);
         bindString(psql, 4, r.getId());
         bindString(psql, 5, r.getElement().getWebPath());
-        bindString(psql, 6, r.getElement().getNamedChildValue("url"));
-        bindString(psql, 7, r.getElement().getNamedChildValue("version"));
-        bindString(psql, 8, r.getElement().getNamedChildValue("status"));
-        bindString(psql, 9, r.getElement().getNamedChildValue("date"));
-        bindString(psql, 10, r.getElement().getChildren("name").size() == 1 && r.getElement().getNamedChild("name").isPrimitive() ? r.getElement().getNamedChildValue("name") : r.getResourceName());
-        bindString(psql, 11, r.getElement().getNamedChildValue("title"));
+        bindString(psql, 6, getSingleChildValue(r, "url", null));
+        bindString(psql, 7, getSingleChildValue(r, "version", null));
+        bindString(psql, 8, getSingleChildValue(r, "status", null));
+        bindString(psql, 9, getSingleChildValue(r, "date", null));
+        bindString(psql, 10, getSingleChildValue(r, "name", r.getResourceName()));
+        bindString(psql, 11, getSingleChildValue(r, "title", null));
         bindString(psql, 12, r.getResourceDescription());
         psql.setBytes(13, json);
         psql.executeUpdate();   
@@ -378,6 +378,10 @@ public class DBBuilder {
       }
     }
     time(start);
+  }
+
+  private String getSingleChildValue(FetchedResource r, String name, String defaultValue) {
+    return r.getElement().getChildren(name).size() == 1 && r.getElement().getNamedChild(name).isPrimitive() ? r.getElement().getNamedChildValue(name) : defaultValue;
   }
 
   public void finishResources() {

@@ -181,7 +181,7 @@ public class PublicationChecker {
         summary.add(new StringPair("path", pr.asString("path")));                        
       }
       if ("milestone".equals(pr.asString("mode"))) {
-        check(messages,  pr.asString("path").equals(Utilities.pathURL(npm.canonical(), pr.asString("sequence"))) || pr.asString("path").equals(Utilities.pathURL(npm.canonical(), pr.asString("version"))), 
+        check(messages,  pr.asString("path").equals(Utilities.pathURL(npm.canonical(), pr.asString("sequence").replace(" ", ""))) || pr.asString("path").equals(Utilities.pathURL(npm.canonical(), pr.asString("version"))), 
             "Proposed path for this milestone publication should usually be canonical with either sequence or version appended"+mkWarning());        
         if (pl != null) {
           for (PackageListEntry e : pl.list()) {

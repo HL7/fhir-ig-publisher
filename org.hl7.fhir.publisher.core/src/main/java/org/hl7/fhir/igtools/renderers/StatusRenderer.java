@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.renderers;
 
 import java.util.List;
 
+import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.ContactDetail;
 import org.hl7.fhir.r5.model.ContactPoint;
@@ -96,7 +97,23 @@ public class StatusRenderer {
         }
       }
     }
-    public void processSstatus(DomainResource resource) {
+    public void processFmm(Element resource) {
+      if (resource.hasExtension(ToolingExtensions.EXT_FMM_LEVEL)) {
+        setFmm(resource.getExtensionString(ToolingExtensions.EXT_FMM_LEVEL));
+        Element fmm = resource.getExtension(ToolingExtensions.EXT_FMM_LEVEL).getNamedChild("value");
+        if (fmm.hasExtension(ToolingExtensions.EXT_FMM_SUPPORT))
+          setFmmSupport(fmm.getExtensionString(ToolingExtensions.EXT_FMM_SUPPORT));
+        else if (fmm.hasExtension(ToolingExtensions.EXT_FMM_DERIVED)) {
+          List<Element> derivations = fmm.getExtensions(ToolingExtensions.EXT_FMM_DERIVED);
+          String s = "Inherited from ";
+          for (Element ex: derivations) {
+            s += ", " + ex.primitiveValue();
+          }
+          setFmmSupport(s);
+        }
+      }
+    }
+    public void processSStatus(DomainResource resource) {
       if (ToolingExtensions.hasExtension(resource, ToolingExtensions.EXT_STANDARDS_STATUS)) {
         setSstatus(ToolingExtensions.readStringExtension(resource, ToolingExtensions.EXT_STANDARDS_STATUS));
         StringType sstatus = resource.getExtensionByUrl(ToolingExtensions.EXT_STANDARDS_STATUS).getValueStringType();
@@ -112,6 +129,23 @@ public class StatusRenderer {
         }
       }
     }
+    
+    public void processSStatus(Element resource) {
+      if (resource.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
+        setSstatus(resource.getExtensionString(ToolingExtensions.EXT_STANDARDS_STATUS));
+        Element sstatus = resource.getExtension(ToolingExtensions.EXT_STANDARDS_STATUS).getNamedChild("value");
+        if (sstatus.hasExtension(ToolingExtensions.EXT_FMM_SUPPORT))
+          setFmmSupport(sstatus.getExtensionString(ToolingExtensions.EXT_FMM_SUPPORT));
+        else if (sstatus.hasExtension(ToolingExtensions.EXT_FMM_DERIVED)) {
+          List<Element> derivations = sstatus.getExtensions(ToolingExtensions.EXT_FMM_DERIVED);
+          String s = "Inherited from ";
+          for (Element ex: derivations) {
+            s += ", " + ex.primitiveValue();
+          }
+          setFmmSupport(s);
+        }
+      }
+    }
   }
 
   public static ResourceStatusInformation analyse(DomainResource resource) {
@@ -120,7 +154,19 @@ public class StatusRenderer {
     info.setOwner(readOwner(resource));
     info.setOwnerLink(readOwnerLink(resource));
     info.setStatus(readStatus(resource));
-    info.processSstatus(resource);
+    info.processSStatus(resource);
+    info.setNormVersion(readNormativeVersion(resource));
+    info.setColorClass(getColor(info));
+    return info;
+  }
+
+  public static ResourceStatusInformation analyse(Element resource) {
+    ResourceStatusInformation info = new ResourceStatusInformation();
+    info.processFmm(resource);
+    info.setOwner(readOwner(resource));
+    info.setOwnerLink(readOwnerLink(resource));
+    info.setStatus(readStatus(resource));
+    info.processSStatus(resource);
     info.setNormVersion(readNormativeVersion(resource));
     info.setColorClass(getColor(info));
     return info;
@@ -160,6 +206,10 @@ public class StatusRenderer {
     return ToolingExtensions.readStringExtension(resource, ToolingExtensions.EXT_NORMATIVE_VERSION);
   }
 
+  private static String readNormativeVersion(Element resource) {
+    return resource.getExtensionString(ToolingExtensions.EXT_NORMATIVE_VERSION);
+  }
+
 
   private static String readStatus(DomainResource resource) {
     if (resource instanceof CanonicalResource) {
@@ -167,7 +217,10 @@ public class StatusRenderer {
     }
     return null;
   }
-
+  
+  private static String readStatus(Element resource) {
+    return resource.getNamedChildValue("status");
+  }
 
   private static String readOwnerLink(DomainResource resource) {
     if (resource instanceof CanonicalResource) {
@@ -182,12 +235,26 @@ public class StatusRenderer {
     return null;
   }
 
+  private static String readOwnerLink(Element resource) {
+    for (Element cd : resource.getChildren("contact")) {
+      for (Element cp : cd.getChildren("telecom")) {
+        if ("url".equals(cp.getNamedChildValue("system"))) {
+          return cp.getNamedChildValue("value");
+        }
+      }
+    }
+    return null;
+  }
 
   private static String readOwner(DomainResource resource) {
     if (resource instanceof CanonicalResource) {
       return ((CanonicalResource) resource).hasPublisher() ? ((CanonicalResource) resource).getPublisher() : null;
     }
     return null;
+  }
+
+  private static String readOwner(Element resource) {
+    return resource.hasChild("publisher") ? resource.getNamedChildValue("publisher") : null;
   }
 
 

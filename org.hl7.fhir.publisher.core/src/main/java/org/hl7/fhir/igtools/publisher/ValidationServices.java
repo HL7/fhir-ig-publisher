@@ -107,6 +107,9 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   public Element fetch(IResourceValidator validator, Object appContext, String url) throws FHIRException, IOException {
     if (url == null)
       return null;
+    if (url.contains("/_history/")) {
+      url = url.substring(0, url.indexOf("/_history"));
+    }
     String turl = (!Utilities.isAbsoluteUrl(url)) ? Utilities.pathURL(ipg.getCanonical(), url) : url;
     Resource res = context.fetchResource(getResourceType(turl), turl);
     if (res != null) {
