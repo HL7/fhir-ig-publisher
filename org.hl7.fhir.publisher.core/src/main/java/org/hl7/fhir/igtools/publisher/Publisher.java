@@ -9212,6 +9212,8 @@ private String fixPackageReference(String dep) {
         }
         if (r.getResource() != null) {
           populateResourceEntry(r, item, null);
+        } else if (r.isCustomResource()) {
+          populateCustomResourceEntry(r, item, null);          
         }
         JsonArray contained = null;
         // contained resources get added twice - once as sub-entries under the resource that contains them, and once as an entry in their own right, for their own rendering 
@@ -9272,7 +9274,233 @@ private String fixPackageReference(String dep) {
 
     json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(data, true);
     TextFile.stringToFile(json, Utilities.path(tempDir, "_data", "languages.json"));
-        
+  }
+
+  private void populateCustomResourceEntry(FetchedResource r, JsonObject item, Object object) {
+    Element e = r.getElement();
+//      item.add("layout-type", "canonical");
+    if (e.getChildren("url").size() == 1) {
+      item.add("url", e.getNamedChildValue("url"));
+    }
+      if (e.hasChildren("identifier")) {
+        List<String> ids = new ArrayList<String>();
+        for (Element id : e.getChildren("identifier")) {
+          if (id.hasChild("value")) {
+            ids.add(dr.displayDataType(ResourceWrapper.forType(cu, id)));
+          }
+        }
+        if (!ids.isEmpty()) {
+          item.add("identifiers", String.join(", ", ids));
+        }
+      }
+      if (e.getChildren("version").size() == 1) {
+        item.add("version", e.getNamedChildValue("version"));
+      }
+      if (e.getChildren("name").size() == 1) {
+        item.add("name", e.getNamedChildValue("name"));
+      }
+      if (e.getChildren("title").size() == 1) {
+        item.add("title", e.getNamedChildValue("title"));
+//        addTranslationsToJson(item, "title", e.getNamedChild("title"), false);
+      }
+      if (e.getChildren("experimental").size() == 1) {
+        item.add("experimental", e.getNamedChildValue("experimental"));
+      }
+      if (e.getChildren("date").size() == 1) {
+        item.add("date", e.getNamedChildValue("date"));
+      }
+      if (e.getChildren("description").size() == 1) {
+        item.add("description", ProfileUtilities.processRelativeUrls(e.getNamedChildValue("description"), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
+//        addTranslationsToJson(item, "description", e.getNamedChild("description"), false);
+      }
+
+//      if (cr.hasUseContext() && !containedCr) {
+//        List<String> contexts = new ArrayList<String>();
+//        for (UsageContext uc : cr.getUseContext()) {
+//          String label = dr.displayDataType(uc.getCode());
+//          if (uc.hasValueCodeableConcept()) {
+//            String value = dr.displayDataType(uc.getValueCodeableConcept());
+//            if (value!=null) {
+//              contexts.add(label + ":\u00A0" + value);
+//            }
+//          } else if (uc.hasValueQuantity()) {
+//            String value = dr.displayDataType(uc.getValueQuantity());
+//            if (value!=null)
+//              contexts.add(label + ":\u00A0" + value);
+//          } else if (uc.hasValueRange()) {
+//            String value = dr.displayDataType(uc.getValueRange());
+//            if (!value.isEmpty())
+//              contexts.add(label + ":\u00A0" + value);
+//
+//          } else if (uc.hasValueReference()) {
+//            String value = null;
+//            String reference = null;
+//            if (uc.getValueReference().hasReference()) {
+//              reference = uc.getValueReference().getReference().contains(":") ? "" : igpkp.getCanonical() + "/";
+//              reference += uc.getValueReference().getReference();
+//            }
+//            if (uc.getValueReference().hasDisplay()) {
+//              if (reference != null)
+//                value = "[" + uc.getValueReference().getDisplay() + "](" + reference + ")";
+//              else
+//                value = uc.getValueReference().getDisplay();
+//            } else if (reference!=null)
+//              value = "[" + uc.getValueReference().getReference() + "](" + reference + ")";
+//            else if (uc.getValueReference().hasIdentifier()) {
+//              String idLabel = dr.displayDataType(uc.getValueReference().getIdentifier().getType());
+//              value = idLabel!=null ? label + ":\u00A0" + uc.getValueReference().getIdentifier().getValue() : uc.getValueReference().getIdentifier().getValue();
+//            }
+//            if (value != null)
+//              contexts.add(value);
+//          } else if (uc.hasValue()) {
+//            throw new FHIRException("Unsupported type for UsageContext.value - " + uc.getValue().fhirType());
+//          }
+//        }
+//        if (!contexts.isEmpty())
+//          item.add("contexts", String.join(", ", contexts));              
+//      }
+//      if (cr.hasJurisdiction() && !containedCr) {
+//        File flagDir = new File(tempDir + "/assets/images");
+//        if (!flagDir.exists())
+//          flagDir.mkdirs();
+//        JsonArray jNodes = new JsonArray();
+//        item.add("jurisdictions", jNodes);
+//        ValueSet jvs = context.fetchResource(ValueSet.class, "http://hl7.org/fhir/ValueSet/jurisdiction");
+//        for (CodeableConcept cc : cr.getJurisdiction()) {
+//          JsonObject jNode = new JsonObject();
+//          jNodes.add(jNode);
+//          ValidationResult vr = jvs==null ? null : context.validateCode(new ValidationOptions(FhirPublication.R5, "en-US"),  cc, jvs);
+//          if (vr != null && vr.asCoding()!=null) {
+//            Coding cd = vr.asCoding();
+//            jNode.add("code", cd.getCode());
+//            if (cd.getSystem().equals("http://unstats.un.org/unsd/methods/m49/m49.htm") && cd.getCode().equals("001")) {
+//              jNode.add("name", "International");
+//              jNode.add("flag", "001");
+//            } else if (cd.getSystem().equals("urn:iso:std:iso:3166")) {
+//              String code = translateCountryCode(cd.getCode()).toLowerCase();
+//              jNode.add("name", displayForCountryCode(cd.getCode()));
+//              File flagFile = new File(vsCache + "/" + code + ".svg");
+//              if (!flagFile.exists() && !ignoreFlags.contains(code)) {
+//                URL url2 = new URL("https://flagcdn.com/" + shortCountryCode.get(code.toUpperCase()).toLowerCase() + ".svg");
+//                try {
+//                  InputStream in = url2.openStream();
+//                  Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
+//                } catch (Exception e2) {
+//                  ignoreFlags.add(code);
+//                  System.out.println("Unable to access " + url2 + " or " + url2+" ("+e2.getMessage()+")");
+//                }
+//              }
+//              if (flagFile.exists()) {
+//                FileUtils.copyFileToDirectory(flagFile, flagDir);
+//                jNode.add("flag", code);
+//              }
+//            } else if (cd.getSystem().equals("urn:iso:std:iso:3166:-2")) {
+//              String code = cd.getCode();
+//              String[] codeParts = cd.getCode().split("-");
+//              jNode.add("name", displayForStateCode(cd.getCode()) + " (" + displayForCountryCode(codeParts[0]) + ")");
+//              File flagFile = new File(vsCache + "/" + code + ".svg");
+//              if (!flagFile.exists()) {
+//                URL url = new URL("http://flags.ox3.in/svg/" + codeParts[0].toLowerCase() + "/" + codeParts[1].toLowerCase() + ".svg");
+//                try (InputStream in = url.openStream()) {
+//                  Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
+//                } catch (Exception e) {
+//                  // If we can't find the file, that's ok.
+//                }
+//              }
+//              if (flagFile.exists()) {
+//                FileUtils.copyFileToDirectory(flagFile, flagDir);
+//                jNode.add("flag", code);
+//              }
+//            }
+//          } else {
+//            jNode.add("name", dr.displayDataType(cc));
+//          }
+//        }
+//      }
+
+      if (e.getChildren("purpose").size() == 1) {
+        item.add("purpose", ProfileUtilities.processRelativeUrls(e.getNamedChildValue("purpose"), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
+//        addTranslationsToJson(item, "purpose", e.getNamedChild("purpose"), false);
+      }
+      if (e.getChildren("status").size() == 1) {
+        item.add("status", e.getNamedChildValue("status"));
+      }
+      if (e.getChildren("copyright").size() == 1) {
+        item.add("copyright", ProfileUtilities.processRelativeUrls(e.getNamedChildValue("copyright"), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
+//        addTranslationsToJson(item, "description", e.getNamedChild("description"), false);
+      }
+
+//      if (pcr!=null && pcr.hasExtension(ToolingExtensions.EXT_FMM_LEVEL)) {
+//        IntegerType fmm = pcr.getExtensionByUrl(ToolingExtensions.EXT_FMM_LEVEL).getValueIntegerType();
+//        item.add("fmm", fmm.asStringValue());
+//        if (fmm.hasExtension(ToolingExtensions.EXT_FMM_DERIVED)) {
+//          String derivedFrom = "FMM derived from: ";
+//          for (Extension ext: fmm.getExtensionsByUrl(ToolingExtensions.EXT_FMM_DERIVED)) {
+//            derivedFrom += "\r\n" + ext.getValueCanonicalType().asStringValue();                  
+//          }
+//          item.add("fmmSource", derivedFrom);
+//        }
+//      }
+//      List<String> keywords = new ArrayList<String>();
+//      if (r.getResource() instanceof StructureDefinition) {
+//        StructureDefinition sd = (StructureDefinition)r.getResource();
+//        if (sd.hasKeyword()) {
+//          for (Coding coding : sd.getKeyword()) {
+//            String value = dr.displayDataType(coding);
+//            if (value != null)
+//              keywords.add(value);
+//          }
+//        }
+//      } else if (r.getResource() instanceof CodeSystem) {
+//        CodeSystem cs = (CodeSystem)r.getResource();
+//        for (Extension e : cs.getExtensionsByUrl(ToolingExtensions.EXT_CS_KEYWORD)) {
+//          keywords.add(e.getValueStringType().asStringValue());
+//        }
+//      } else if (r.getResource() instanceof ValueSet) {
+//        ValueSet vs = (ValueSet)r.getResource();
+//        for (Extension e : vs.getExtensionsByUrl(ToolingExtensions.EXT_VS_KEYWORD)) {
+//          keywords.add(e.getValueStringType().asStringValue());
+//        }
+//      }
+//      if (!keywords.isEmpty())
+//        item.add("keywords", String.join(", ", keywords));              
+//    
+//
+      org.hl7.fhir.igtools.renderers.StatusRenderer.ResourceStatusInformation info = StatusRenderer.analyse(e);
+      JsonObject jo = new JsonObject();
+      if (info.getColorClass() != null) {
+        jo.add("class", info.getColorClass());
+      }
+      if (info.getOwner() != null) {
+        jo.add("owner", info.getOwner());
+      }
+      if (info.getOwnerLink() != null) {
+        jo.add("link", info.getOwnerLink());
+      }
+      if (info.getSstatus() != null) {
+        jo.add("standards-status", info.getSstatus());
+      } else if (sourceIg.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
+        jo.add("standards-status","informative");
+      }
+      if (info.getSstatusSupport() != null) {
+        jo.add("standards-status-support", info.getSstatusSupport());
+      }
+      if (info.getNormVersion() != null) {
+        item.add("normativeVersion", info.getNormVersion());
+      }
+      if (info.getFmm() != null) {
+        jo.add("fmm", info.getFmm());
+      }
+      if (info.getSstatusSupport() != null) {
+        jo.add("fmm-support", info.getFmmSupport());
+      }
+      if (info.getStatus() != null && !jo.has("status")) {
+        jo.add("status", info.getStatus());
+      }
+      if (!jo.getProperties().isEmpty()) {
+        item.set("status", jo);
+      }
+  
   }
 
   private void genBasePages() throws IOException, Exception {
@@ -9556,6 +9784,7 @@ private String fixPackageReference(String dep) {
 
   public void populateResourceEntry(FetchedResource r, JsonObject item, ContainedResourceDetails crd) throws Exception {
     if (r.getResource() instanceof CanonicalResource || (crd!= null && crd.getCanonical() != null)) {
+//      item.add("layout-type", "canonical");
       boolean containedCr = crd != null && crd.getCanonical() != null;
       CanonicalResource cr = containedCr ? crd.getCanonical() : (CanonicalResource) r.getResource();
       CanonicalResource pcr = r.getResource() instanceof CanonicalResource ? (CanonicalResource) r.getResource() : null;

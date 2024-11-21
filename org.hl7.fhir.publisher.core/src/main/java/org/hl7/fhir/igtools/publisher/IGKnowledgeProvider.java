@@ -399,7 +399,18 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   public void findConfiguration(FetchedFile f, FetchedResource r) {
     if (template != null) {
       JsonObject cfg = null;
-      if (r.isExample()) {
+      if (r.isCanonical(context)) {
+        if (r.isExample()) {
+          cfg = defaultConfig.getJsonObject("example:canonical");
+        }
+        if (cfg == null) {
+          cfg = defaultConfig.getJsonObject(r.fhirType()+":canonical");
+        }
+        if (cfg == null) {
+          cfg = defaultConfig.getJsonObject("Any:canonical");
+        }
+      }
+      if (cfg == null && r.isExample()) {
         cfg = defaultConfig.getJsonObject("example");
       }        
       if (cfg == null && r.fhirType().equals("StructureDefinition")) {
