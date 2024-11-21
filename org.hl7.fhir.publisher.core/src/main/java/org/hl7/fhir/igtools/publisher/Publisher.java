@@ -11341,6 +11341,8 @@ private String fixPackageReference(String dep) {
     } catch (Exception e) {
       if (debug) {
         e.printStackTrace();
+      } else {
+        System.out.println("Error processing custom liquid: " + e.getMessage());
       }
       return content;
     }
