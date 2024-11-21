@@ -1,0 +1,1 @@
+* validator: fix pattern discriminator validation rule
