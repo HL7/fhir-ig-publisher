@@ -4968,6 +4968,16 @@ private String fixPackageReference(String dep) {
    * 
    */
   private void loadCustomResources() throws FileNotFoundException, FHIRException, IOException {
+    // scan existing load for custom resources 
+    for (StructureDefinition sd : context.fetchResourcesByType(StructureDefinition.class)) {
+      if (sd.getKind() == StructureDefinitionKind.RESOURCE && sd.getDerivation() == TypeDerivationRule.SPECIALIZATION) {
+        String scope = sd.getUrl().substring(0, sd.getUrl().lastIndexOf("/"));
+        if (!"http://hl7.org/fhir/StructureDefinition".equals(scope)) {
+          customResourceNames.add(sd.getTypeTail());
+        }
+      }
+    }
+    // look for new custom resources in this IG
     for (String s : customResourceFiles) {
       System.out.print("Load Custom Resource from "+s+":");
       System.out.println(loadCustomResource(s));
@@ -8943,7 +8953,7 @@ private String fixPackageReference(String dep) {
         types.add(sd.getType());
         long start = System.currentTimeMillis();
         String src = msr.render(sd);
-        fragment("maps-"+sd.getType(), src, otherFilesRun, start, "maps", "Cross");
+        fragment("maps-"+sd.getTypeTail(), src, otherFilesRun, start, "maps", "Cross");
       }
     }
     long start = System.currentTimeMillis();
@@ -10836,6 +10846,7 @@ private String fixPackageReference(String dep) {
     for (StructureDefinition sd : context.fetchResourcesByType(StructureDefinition.class)) {
       if (sd.getDerivation() == TypeDerivationRule.SPECIALIZATION && sd.getKind() == StructureDefinitionKind.RESOURCE) {
         resourceTypes.add(sd.getType());
+        resourceTypes.add(sd.getTypeTail());
       }
     }
     for (String rt : resourceTypes) {
@@ -11576,7 +11587,12 @@ private String fixPackageReference(String dep) {
   }
 
   private String processRefTag(DBBuilder db, String src, FetchedFile f) {
-    if (Utilities.isAbsoluteUrl(src)) {
+    if (Utilities.existsInList(src, "$ver")) {
+      switch (src) {
+      case "$ver": return businessVersion;
+      }
+    } else if (Utilities.isAbsoluteUrl(src)) {
+    
       try {
         CanonicalResource cr = (CanonicalResource) context.fetchResource(Resource.class, src);
         if (cr != null && cr.hasWebPath()) {
@@ -13761,12 +13777,11 @@ private String fixPackageReference(String dep) {
     int exitCode = 0;
 
     org.hl7.fhir.utilities.FileFormat.checkCharsetAndWarnIfNotUTF8(System.out);
-
+    NpmPackage.setLoadCustomResources(true);  
+    
     if (CliParams.hasNamedParam(args, FHIR_SETTINGS_PARAM)) {
       FhirSettings.setExplicitFilePath(CliParams.getNamedParam(args, FHIR_SETTINGS_PARAM));
     }
-
-
     
     if (CliParams.hasNamedParam(args, "-gui")) {
       runGUI(args);
