@@ -2090,7 +2090,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           if (r.fhirType().equals("SearchParameter")) {
             SearchParameter sp = (SearchParameter) r.getResource();
             String exp = sp.getExpression();
-            if (exp.contains("extension('"+sd.getUrl()+"')")) {
+            if (exp != null && exp.contains("extension('"+sd.getUrl()+"')")) {
               searches.put(igp.getLinkFor(r, true), r.getTitle());
             }
           }
