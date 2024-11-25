@@ -488,6 +488,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
         ul = x.ul();
         ul.li().tx("(No Errors/Reports - all good)");        
       } else {
+        x.para().b().tx("Decisions");
         XhtmlNode tbl = x.table("grid");
         XhtmlNode tr = tbl.tr();
         tr.td().b().tx("Message");
@@ -495,14 +496,46 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
         tr.td().b().tx("ValueSet");
         tr.td().b().tx("Systems");
         tr.td().b().tx("Choices");
+        boolean isErr = false;
+        Set<String> contexts = new HashSet<>();
         for (InternalLogEvent log : txServers.getInternalLog()) {
+          if (!log.isError()) {
+            tr = tbl.tr();
+            tr.td().tx(log.getMessage());
+            tr.td().tx(log.getServer());
+            tr.td().tx(log.getVs());
+            tr.td().tx(log.getSystems());
+            tr.td().tx(log.getChoices());
+          } else {
+            isErr = true;
+            contexts.add(log.getContext());
+          }
+        }
+        if (isErr) {
+          x.para().b().tx("Errors");
+          tbl = x.table("grid");
           tr = tbl.tr();
-          tr.td().tx(log.getMessage());
-          tr.td().tx(log.getServer());
-          tr.td().tx(log.getVs());
-          tr.td().tx(log.getSystems());
-          tr.td().tx(log.getChoices());
-        }        
+          tr.td().b().tx("URL");
+          tr.td().b().tx("Message");
+          for (String c : Utilities.sorted(contexts)) {
+            tr = tbl.tr();
+            tr.td().tx(c);
+            List<InternalLogEvent> list = new ArrayList<TerminologyClientManager.InternalLogEvent>();
+            for (InternalLogEvent log : txServers.getInternalLog()) {
+              if (log.isError() && c.equals(log.getContext())) {
+                list.add(log);
+              }
+            }
+            if (list.size() == 1) {
+              tr.td().style("background-color: #ffe3e3").span().attribute("title",list.get(0).getRequest()).tx(list.get(0).getMessage());              
+            } else {
+              ul = tr.td().style("background-color: #ffe3e3").ul();
+              for (InternalLogEvent log : list) {
+                ul.li().span().attribute("title", log.getRequest()).tx(log.getMessage());
+              }
+            }
+          }
+        }
       }     
       
       TerminologyClientContext master = txServers.getServerList().get(0);
