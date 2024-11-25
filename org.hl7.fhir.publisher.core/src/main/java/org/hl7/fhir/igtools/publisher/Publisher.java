@@ -5042,6 +5042,7 @@ private String fixPackageReference(String dep) {
     if (def.getKind() != StructureDefinitionKind.RESOURCE) {
       return "This definition does not describe a resource";
     }
+    String ot = def.getType();
     if (def.getType().contains(":/")) {
       def.setType(tail(def.getType()));
     }
@@ -5055,10 +5056,26 @@ private String fixPackageReference(String dep) {
     // work around for a sushi limitation 
     for (ImplementationGuideDefinitionResourceComponent res : publishedIg.getDefinition().getResource()) {
       if (res.getReference().getReference().startsWith("Binary/")) {
-        if (res.getProfile().size() == 1 && def.getUrl().equals(res.getProfile().get(0).primitiveValue())) {
-          String id = res.getReference().getReference().substring(res.getReference().getReference().indexOf("/")+1);
-          File of = new File(Utilities.path(Utilities.getDirectoryForFile(this.getConfigFile()), "fsh-generated", "resources", "Binary-"+id+".json"));
-          File nf = new File(Utilities.path(Utilities.getDirectoryForFile(this.getConfigFile()), "fsh-generated", "resources", def.getType()+"-"+id+".json"));
+        String id = res.getReference().getReference().substring(res.getReference().getReference().indexOf("/")+1);
+        File of = new File(Utilities.path(Utilities.getDirectoryForFile(this.getConfigFile()), "fsh-generated", "resources", "Binary-"+id+".json"));
+        File nf = new File(Utilities.path(Utilities.getDirectoryForFile(this.getConfigFile()), "fsh-generated", "resources", def.getType()+"-"+id+".json"));
+
+        boolean read = false;
+        boolean matches = res.getProfile().size() == 1 && (def.getUrl().equals(res.getProfile().get(0).primitiveValue()));
+        if (!matches) {
+          try {
+            JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(of);
+            String rt = json.asString("resourceType");
+            read = true;
+            matches = ot.equals(rt);
+          } catch (Exception e) {
+            // nothing here
+          }
+        }
+        if (!matches && !read) {          
+          // try xml?
+        }
+        if (matches) {
           if (of.exists()) {
             of.renameTo(nf);
             JsonObject j = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(nf);
