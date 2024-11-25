@@ -490,6 +490,6 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
 
   @Override
   public IValidationPolicyAdvisor setPolicyAdvisor(IValidationPolicyAdvisor policyAdvisor) {
-    throw new Error("Not supported");
+    throw new Error("Not supported"); // !
   }
 }
