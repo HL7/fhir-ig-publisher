@@ -810,6 +810,17 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (brd.suffix != null) {
       b.append(brd.suffix);
     }
+    if (tx.hasValueSet()) {
+      b.append("<div><code>"+Utilities.escapeXml(tx.getValueSet())+"</code><button title=\"Click to copy URL\" class=\"btn-copy\" data-clipboard-text=\""+Utilities.escapeXml(tx.getValueSet())+"\"></button></div>");
+      if (link != null) {
+        if (Utilities.isAbsoluteUrlLinkable(link)) {
+          b.append("<div>from <a href=\""+Utilities.escapeXml(link)+"\">"+Utilities.escapeXml(link)+"</a></div>");
+        } else {
+          b.append("<div>from "+Utilities.escapeXml(link)+"</div>");
+        }
+      }
+    } else {
+    }
     AdditionalBindingsRenderer abr = new AdditionalBindingsRenderer(igp, corePath, sd, path, gen, this, sdr);
     if (tx.hasExtension(ToolingExtensions.EXT_MAX_VALUESET)) {
       abr.seeMaxBinding(ToolingExtensions.getExtension(tx, ToolingExtensions.EXT_MAX_VALUESET));
@@ -825,17 +836,6 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       x.setAttribute("class", "grid");
       abr.render(x.getChildNodes(), true);
       b.append(new XhtmlComposer(true, true).compose(x));
-    }
-    if (tx.hasValueSet()) { 
-      b.append("<div><code>"+Utilities.escapeXml(tx.getValueSet())+"</code><button title=\"Click to copy URL\" class=\"btn-copy\" data-clipboard-text=\""+Utilities.escapeXml(tx.getValueSet())+"\"></button></div>");
-      if (link != null) {
-        if (Utilities.isAbsoluteUrlLinkable(link)) {
-          b.append("<div>from <a href=\""+Utilities.escapeXml(link)+"\">"+Utilities.escapeXml(link)+"</a></div>");  
-        } else {
-          b.append("<div>from "+Utilities.escapeXml(link)+"</div>");  
-        }
-      }
-    } else {
     }
     b.append("</td>");
     b.append("</tr>\r\n");
