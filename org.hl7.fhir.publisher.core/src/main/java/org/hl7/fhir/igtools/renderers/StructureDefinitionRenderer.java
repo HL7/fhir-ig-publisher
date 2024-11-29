@@ -2,6 +2,7 @@ package org.hl7.fhir.igtools.renderers;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -109,6 +110,16 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   public static final String ANCHOR_PREFIX_MS = "ms_";
   public static final String ANCHOR_PREFIX_KEY = "key_";
 
+  private static List<String> SIGNIFICANT_EXTENSIONS = new ArrayList<String>(Arrays.asList(new String[]
+          {"http://hl7.org/fhir/StructureDefinition/elementdefinition-allowedUnits",
+                  "http://hl7.org/fhir/StructureDefinition/elementdefinition-bestPractice",
+                  "http://hl7.org/fhir/StructureDefinition/elementdefinition-graphConstraint",
+                  "http://hl7.org/fhir/StructureDefinition/elementdefinition-maxDecimalPlaces",
+                  "http://hl7.org/fhir/StructureDefinition/elementdefinition-maxSize",
+                  "http://hl7.org/fhir/StructureDefinition/elementdefinition-mimeType",
+                  "http://hl7.org/fhir/StructureDefinition/elementdefinition-minLength",
+                  "http://hl7.org/fhir/StructureDefinition/elementdefinition-obligation"}
+  ));
   ProfileUtilities utils;
   private StructureDefinition sd;
   private String destDir;
@@ -624,12 +635,14 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   protected List<ElementDefinition> getKeyElements() {
     if (keyElements==null) {
+      boolean keyEligible = sd.getDerivation().equals(TypeDerivationRule.CONSTRAINT) && !sd.getKind().equals(StructureDefinitionKind.LOGICAL);
       keyElements = new ArrayList<ElementDefinition>();
       Map<String, ElementDefinition> mustSupport = getMustSupport();
       Set<ElementDefinition> keyElementsSet = new HashSet<ElementDefinition>();
-      scanForKeyElements(keyElementsSet, mustSupport, sd.getSnapshot().getElement(), sd.getSnapshot().getElementFirstRep(), null);
+      if (keyEligible)
+        scanForKeyElements(keyElementsSet, mustSupport, sd.getSnapshot().getElement(), sd.getSnapshot().getElementFirstRep(), null);
       for (ElementDefinition ed : sd.getSnapshot().getElement()) {
-        if (keyElementsSet.contains(ed)) {
+        if (!keyEligible || keyElementsSet.contains(ed)) {
           ElementDefinition edCopy = ed.copy();
           edCopy.copyUserData(ed);
           keyElements.add(edCopy);
@@ -653,10 +666,95 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       //  - it's a slice (which means it's a constraint on the core) or declares slicing not implicit in the core spec (i.e. extension/modifierExtension)
       //  - it appears in the differential
       //  - the max cardinality has been constrained from the base max cardinality
-      if (mustSupport.containsKey(child.getId()) || child.getMin()!=0 || (child.hasCondition() && child.getCondition().size()>1) || child.getIsModifier() || (child.hasSlicing() && !child.getPath().endsWith(".extension") && !child.getPath().endsWith(".modifierExtension")) || child.hasSliceName() || getDifferential().containsKey(child.getId()) || !child.getMax().equals(child.getBase().getMax())) {
+      //  - the min cardinality has been constrained from the base min cardinality
+      //  - it has a vocabulary binding or additional binding that is required, extensible, minimum, maximum, or current binding that differs from the base resource.
+      //  - it has a fixed value, pattern value, minValue, maxValue, maxLength, mustHaveValue, valueAlternatives
+      //  - it has any of the following extensions: allowedUnits, bestPractice, graphConstraint, maxDecimalPlaces, maxSize, mimeType, minLength, obligation,
+
+      List<String> urls = extensionUrls(child.getExtension());
+      urls.retainAll(SIGNIFICANT_EXTENSIONS);
+      boolean bindingChanged = false;
+      String basePath = child.getBase().getPath();
+      StructureDefinition baseType = context.fetchResource(StructureDefinition.class, "http://hl7.org/fhir/StructureDefinition/" + basePath.substring(0, basePath.indexOf(".")));
+      ElementDefinition baseElement = null;
+      for (ElementDefinition e: baseType.getSnapshot().getElement()) {
+        if (e.getPath().equals(basePath)) {
+          baseElement = e;
+          break;
+        }
+      }
+      if (baseElement==null) {
+        baseElement = baseElement;
+        //This shouldn't have happened
+      } else {
+        if (!baseElement.hasBinding())
+          bindingChanged = true;
+        else {
+          ElementDefinitionBindingComponent baseBinding = baseElement.getBinding();
+          ElementDefinitionBindingComponent binding = child.getBinding();
+          if (binding.hasValueSet() && (binding.getStrength().equals(BindingStrength.REQUIRED) || binding.getStrength().equals(BindingStrength.EXTENSIBLE))) {
+            if (!baseBinding.hasStrength() || !binding.getStrength().toCode().equals(baseBinding.getStrength().toCode()))
+              bindingChanged = true;
+            else if (!baseBinding.hasValueSet() || !baseBinding.getValueSet().equals(binding.getValueSet()))
+              bindingChanged = true;
+          }
+          String additionalBindings = getAdditional(binding.getAdditional());
+          String baseAdditionalBindings = getAdditional(binding.getAdditional());
+          if (!additionalBindings.equals(baseAdditionalBindings))
+            bindingChanged = true;
+        }
+      }
+      if (child.hasBinding()) {
+        if (baseType.hasSnapshot()) {
+          for (ElementDefinition e : baseType.getSnapshot().getElement()) {
+            if (e.getPath().equals(basePath)) {
+              baseElement = e;
+              break;
+            }
+          }
+        }
+      }
+      boolean oldMS = mustSupport.containsKey(child.getId()) ||
+              child.getMin()!=0 ||
+              (child.hasCondition() && child.getCondition().size()>1) ||
+              child.getIsModifier() ||
+              (child.hasSlicing() && !child.getPath().endsWith(".extension") && !child.getPath().endsWith(".modifierExtension")) ||
+              child.hasSliceName() ||
+              getDifferential().containsKey(child.getId()) ||
+              !child.getMax().equals(child.getBase().getMax());
+      boolean newMS = child.getMin()!=child.getBase().getMin() ||
+              child.hasFixed() ||
+              child.hasPattern() ||
+              child.hasMinValue() && (baseElement==null || !baseElement.hasMinValue() || !child.getMinValue().toString().equals(baseElement.getMinValue().toString())) ||
+              child.hasMaxValue() && (baseElement==null || !baseElement.hasMaxValue() || !child.getMaxValue().toString().equals(baseElement.getMaxValue().toString())) ||
+              child.hasMaxLength() && (baseElement==null || !baseElement.hasMaxLength() || child.getMaxLength()!=baseElement.getMaxLength()) ||
+              child.hasMustHaveValue() ||
+              child.hasValueAlternatives() ||
+              !urls.isEmpty();
+      if ( oldMS || newMS) {
         scanForKeyElements(keyElements ,mustSupport, elements, child, baseModelUrl);
       }
     }
+  }
+
+  private String getAdditional(List<ElementDefinition.ElementDefinitionBindingAdditionalComponent> additionalBindings) {
+    String bindings = "";
+    for (ElementDefinition.ElementDefinitionBindingAdditionalComponent additional: additionalBindings) {
+      if (additional.getPurpose().equals(ElementDefinition.AdditionalBindingPurposeVS.REQUIRED) ||
+              additional.getPurpose().equals(ElementDefinition.AdditionalBindingPurposeVS.EXTENSIBLE) ||
+              additional.getPurpose().equals(ElementDefinition.AdditionalBindingPurposeVS.REQUIRED))
+        bindings += additional.getPurpose().getDisplay()+":" + additional.getValueSet()+";";
+    }
+    return bindings;
+  }
+
+  private List<String> extensionUrls(List<Extension> extensions) {
+    List<String> urls = new ArrayList<String>();
+    for (Extension e: extensions) {
+      if (!urls.contains(e.getUrl()))
+        urls.add(e.getUrl());
+    }
+    return urls;
   }
 
   public String grid(String defnFile, Set<String> outputTracker) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
