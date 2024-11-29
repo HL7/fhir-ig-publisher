@@ -11685,7 +11685,7 @@ private String fixPackageReference(String dep) {
     String format = (secondSpace == -1) ? arguments.substring(firstSpace) : arguments.substring(firstSpace, secondSpace);
     format = format.trim().toLowerCase();
     String filters = (secondSpace == -1) ? "" : arguments.substring(secondSpace).trim();
-    Pattern refPattern = Pattern.compile("^([A-Z][a-z]+)+\\/([A-Za-z0-9\\-\\.]{1,64})$");
+    Pattern refPattern = Pattern.compile("^([A-Za-z]+)\\/([A-Za-z0-9\\-\\.]{1,64})$");
     Matcher refMatcher = refPattern.matcher(reference);
     if (!refMatcher.find())
       throw new FHIRException("Fragment syntax error: Referenced instance must be expressed as [ResourceType]/[id].  Found " + reference + " in file " + f.getName());
