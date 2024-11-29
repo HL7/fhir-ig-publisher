@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_14_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
@@ -29,7 +31,6 @@ import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideGlobalCompon
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
-import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
@@ -114,6 +115,7 @@ public class DependencyRenderer {
   private MarkDownProcessor mdEngine;
   private RenderingContext rc;
   private List<SpecMapManager> specMaps;
+  private Map<String, PackageInfo> packagesByName;
   
   public DependencyRenderer(BasePackageCacheManager pcm, String dstFolder, String npmName, TemplateManager templateManager,
       List<DependencyAnalyser.ArtifactDependency> dependencies, IWorkerContext context, MarkDownProcessor mdEngine, RenderingContext rc, List<SpecMapManager> specMaps) {
@@ -129,10 +131,159 @@ public class DependencyRenderer {
     this.specMaps = specMaps;
   }
 
+  private class PackageVersionInfo {
+    private NpmPackage p;
+    @Getter
+    @Setter
+    private boolean direct;
+    @Getter
+    @Setter
+    private String reason;
+    private String parent;
+    public PackageVersionInfo(NpmPackage p, boolean direct, String reason, String parent) {
+      this.p = p;
+      this.direct = direct;
+      this.reason = reason;
+      this.parent = parent;
+    }
+
+    public boolean hasReason() {
+      return getReason()!=null;
+    }
+
+    public String getReason() {
+      if (reason!=null)
+        return mdEngine.process(reason, "Dependency Reason for " + p.title());
+      else if (parent != null)
+        return "Imported by " + Utilities.escapeXml(parent) + " (and potentially others)";
+      else
+        return null;
+    }
+  }
+
+  private class PackageInfo {
+    private NpmPackage p;
+    private boolean direct;
+    private Map<String, PackageVersionInfo> versions = new HashMap<String, PackageVersionInfo>();
+    public PackageInfo(NpmPackage p, String reason, boolean direct, String parent) {
+      this.p = p;
+      this.direct = direct;
+      versions = new HashMap<String, PackageVersionInfo>();
+      PackageVersionInfo v = new PackageVersionInfo(p, direct, reason, parent);
+      versions.put(p.version(), v);
+    }
+
+    // Returns true if the version wasn't already present
+    protected boolean addVersion (NpmPackage p, String reason, boolean direct, String parent) {
+      if (versions.containsKey(p.version())) {
+        if (direct) {
+          this.direct = direct;
+          PackageVersionInfo v = versions.get(p.version());
+          v.setDirect(direct);
+          v.setReason(reason);
+        }
+        return false;
+      }
+      this.direct = this.direct || direct;
+      PackageVersionInfo v = new PackageVersionInfo(p, direct, reason, parent);
+      versions.put(p.version(), v);
+      return true;
+    }
+  }
+
+  public String renderNonTech(ImplementationGuide ig) throws FHIRException, IOException {
+    packagesByName = new HashMap<String, PackageInfo>();
+    for (ImplementationGuideDependsOnComponent d : ig.getDependsOn()) {
+      NpmPackage p = resolve(d);
+      boolean dloaded = isLoaded(p);
+      if (dloaded) {
+        addPackage(p, d.hasReason() ? d.getReason() : ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_IGDEP_COMMENT), true);
+      }
+    }
+
+    if (packagesByName.isEmpty())
+      return "";
+    else {
+      StringBuilder b = new StringBuilder();
+      b.append("<table style=\"border: 1px #F0F0F0 solid;\"><thead><tr style=\"border: 1px #F0F0F0 solid; font-size: 11px; font-family: verdana; vertical-align: top;\"><th><b>Implementation Guide</b></th><th><b>Version(s)</b></th><th><b>Reason</b></th></tr></thead><tbody>");
+      List<String> names = new ArrayList<String>(packagesByName.keySet());
+      Collections.sort(names);
+      int lineCount = 1;
+      for (String name: names) {
+        PackageInfo info = packagesByName.get(name);
+        String newRow = "<tr style=\"font-size: 11px; font-family: verdana; vertical-align: top; background-color: " + ((lineCount % 2 == 0) ? "#F7F7F7" : "white") + "\"><td";
+        b.append(newRow);
+        if (info.versions.size()!=1)
+          b.append(" rowspan=\"" + info.versions.size() + "\"");
+        b.append("><span class=\"copy-text\" title=\"canonical: " + info.p.canonical() + "\"><a style=\"font-size: 11px; font-family: verdana; font-weight:" + (info.direct ? "bold" : "normal") + "\"");
+        b.append(" href=\"" + info.p.url() + "\">" + Utilities.escapeXml(name) + "</a><button class=\"btn-copy\" title=\"Click to copy URL\" data-clipboard-text=\"" + info.p.canonical() + "\"/></span></td><td>");
+        boolean first = true;
+        List<String> versions = new ArrayList<String>(info.versions.keySet());
+        Collections.sort(versions, Collections.reverseOrder());
+        for (String version: versions) {
+          PackageVersionInfo verInfo = info.versions.get(version);
+          if (!first)
+            b.append(newRow + ">");
+          b.append("<span class=\"copy-text\" title=\"package: " + verInfo.p.id() + "#" + version + "\"><a style=\"font-size: 11px; font-family: verdana; font-weight: " + (verInfo.direct ? "bold" : "normal") + "\"");
+          b.append(" href=\"https://simplifier.net/packages/" + info.p.name() + "/" + version + "\">" + version + "</a><button class=\"btn-copy\" title=\"Click to copy package\" data-clipboard-text=\"" + verInfo.p.id() + "#" + version + "\"/></span>");
+          b.append("</td><td" + (verInfo.direct ? "" : " style=\"font-style: italic;\"") + ">" + (verInfo.hasReason() ? verInfo.getReason() : "") + "</td></tr>");
+
+          first = false;
+        }
+        lineCount++;
+        first = true;
+      }
+      b.append("</tbody></table>");
+
+      return b.toString();
+    }
+  }
+
+  private void addPackage(NpmPackage p, String reason, boolean direct) {
+    addPackage(p, reason, direct, null);
+  }
+  private void addPackage(NpmPackage p, String reason, boolean direct, String parent) {
+    PackageInfo packageInfo;
+    String title;
+    if (p.getNpm().has("title"))
+      title = p.title();
+    else if (p.name().endsWith(".vsac"))
+      title = "Value Set Authority Center (VSAC)";
+    else if (p.name().endsWith(".phinvads"))
+      title = "Public Health Information Network Vocabulary Access and Distribution System (PHIN VADS)";
+    else
+      title = p.name();
+    if (title.contains("Wrapper)"))
+      title = title.substring(0, title.indexOf("(")).trim();
+    if (title.endsWith("Implementation Guide"))
+      title = title.substring(0, title.length()-20).trim();
+    if (packagesByName.containsKey(title)) {
+      packageInfo = packagesByName.get(title);
+      if (!packageInfo.addVersion(p, reason, direct, parent))
+        return;
+    } else {
+      packageInfo = new PackageInfo(p, reason, direct, parent);
+      packagesByName.put(title, packageInfo);
+    }
+
+    for (String d: p.dependencies()) {
+      if (isLoaded(d)) {
+        String id = d.substring(0, d.indexOf("#"));
+        String version = d.substring(d.indexOf("#") + 1);
+        try {
+          NpmPackage dp = resolve(id, version);
+          addPackage(dp, null, false, title);
+        } catch (Exception e) {
+          // Do nothing - this'll be dealt with elsewhere
+        }
+      }
+    }
+  }
+
   public String render(ImplementationGuide ig, boolean QA, boolean details, boolean first) throws FHIRException, IOException {
     boolean hasDesc = false;
     for (ImplementationGuideDependsOnComponent d : ig.getDependsOn()) {
-      hasDesc = hasDesc || d.hasExtension(ToolingExtensions.EXT_IGDEP_COMMENT);
+      hasDesc = hasDesc || d.hasExtension(ToolingExtensions.EXT_IGDEP_COMMENT) || d.hasReason();
     }
     
     HierarchicalTableGenerator gen = new HierarchicalTableGenerator(rc, dstFolder, true, true, "dep");
@@ -150,7 +301,7 @@ public class DependencyRenderer {
         NpmPackage p = resolve(d);
         boolean dloaded = isLoaded(p);
         if (QA || dloaded) {
-          addPackageRow(gen, row.getSubRows(), p, d.getVersion(), realm, QA, b, ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_IGDEP_COMMENT), hasDesc, processed, listed, dloaded);
+          addPackageRow(gen, row.getSubRows(), p, d.getVersion(), realm, QA, b, d.hasReason() ? d.getReason() : ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_IGDEP_COMMENT), hasDesc, processed, listed, dloaded);
         }
       } catch (Exception e) {
         e.printStackTrace();
@@ -283,7 +434,7 @@ public class DependencyRenderer {
         b2.append("\r\n<p><b>Dependencies</b></p>\r\n");
         boolean first = true;
         for (ArtifactDependency ad : dependencies) {
-          String t = ad.getTarget().getUserString(UserDataNames.render_src_package); // todo: this isn't ever set anywhere?
+          String t = ad.getTarget().getUserString("package");
           if (n.equals(t)) {
             if (first) {
               b2.append("<ul>\r\n");
