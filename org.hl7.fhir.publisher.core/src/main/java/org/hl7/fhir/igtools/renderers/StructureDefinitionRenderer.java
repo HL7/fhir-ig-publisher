@@ -2436,6 +2436,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       } else if (comp.getChangedDefinitions() == ChangeAnalysisState.Changed) {
         b.append("<li>One or more text definitions, invariants or bindings have changed</li>\r\n");          
       }
+    } else if (comp == null) {
+      b.append("<li>New Content</li>\r\n");
     } else {
       b.append("<li>No changes</li>\r\n");
     }

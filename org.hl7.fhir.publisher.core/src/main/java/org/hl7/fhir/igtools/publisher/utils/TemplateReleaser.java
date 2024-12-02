@@ -233,9 +233,9 @@ public class TemplateReleaser {
     for (String id : Utilities.sorted(currentVersions.keySet())) {
       tr = tbl.tr();
       PackageList pl = new PackageList(JsonParser.parseObject(new File(Utilities.path(path, id, "package-list.json"))));
-      tr.td().ah("http://fhir.org/templates/"+id).tx(pl.pid());
+      tr.td().ah(id).tx(pl.pid());
       tr.td().tx(pl.title());
-      tr.td().ah("http://fhir.org/templates/"+id+"/"+pl.current().version()+"/package.tgz").tx(pl.current().version());
+      tr.td().ah(id+"/"+pl.current().version()+"/package.tgz").tx(pl.current().version());
       tr.td().tx(pl.current().date());
     }
     String s = INDEX_TEMPLATE.replace("{{index}}", new XhtmlComposer(false, false).compose(tbl));

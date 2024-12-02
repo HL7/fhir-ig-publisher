@@ -276,6 +276,8 @@ public class ValueSetRenderer extends CanonicalRenderer {
       } else {
         b.append("<li>No changes</li>\r\n");
       }
+    } else {
+      b.append("<li>New Content</li>\r\n");
     }
   }
 }
