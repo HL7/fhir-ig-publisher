@@ -91,7 +91,6 @@ import org.hl7.fhir.convertors.txClient.TerminologyClientFactory;
 import org.hl7.fhir.exceptions.DefinitionException;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
-import org.hl7.fhir.exceptions.PathEngineException;
 import org.hl7.fhir.igtools.publisher.FetchedFile.FetchedBundleType;
 import org.hl7.fhir.igtools.publisher.IFetchFile.FetchState;
 import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
@@ -164,9 +163,6 @@ import org.hl7.fhir.r5.elementmodel.ParserBase.IdRenderingPolicy;
 import org.hl7.fhir.r5.elementmodel.ParserBase.ValidationPolicy;
 import org.hl7.fhir.r5.fhirpath.ExpressionNode;
 import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
-import org.hl7.fhir.r5.fhirpath.FHIRPathEngine.IEvaluationContext;
-import org.hl7.fhir.r5.fhirpath.FHIRPathUtilityClasses.FunctionDetails;
-import org.hl7.fhir.r5.fhirpath.TypeDetails;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.RdfParser;
@@ -317,7 +313,6 @@ import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
 import org.hl7.fhir.r5.utils.formats.CSVWriter;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
-import org.hl7.fhir.r5.utils.validation.IResourceValidator;
 import org.hl7.fhir.r5.utils.validation.IValidationProfileUsageTracker;
 import org.hl7.fhir.r5.utils.validation.ValidatorSession;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
@@ -537,85 +532,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       return version;
     }
 
-  }
-
-  public class IGPublisherHostServices implements IEvaluationContext {
-
-    @Override
-    public List<Base> resolveConstant(FHIRPathEngine engine, Object appContext, String name, boolean beforeContext, boolean explicitConstant) throws PathEngineException {
-      return new ArrayList<>();
-    }
-
-    @Override
-    public TypeDetails resolveConstantType(FHIRPathEngine engine, Object appContext, String name, boolean explicitConstant) throws PathEngineException {
-      return null; // whatever it is, we don't know about it.
-    }
-
-    @Override
-    public boolean paramIsType(String name, int index) {
-      return false;
-    }
-    
-    @Override
-    public boolean log(String argument, List<Base> focus) {
-      return false;
-    }
-
-    @Override
-    public FunctionDetails resolveFunction(FHIRPathEngine engine, String functionName) {
-      throw new NotImplementedException("Not done yet (IGPublisherHostServices.resolveFunction)");
-    }
-
-    @Override
-    public TypeDetails checkFunction(FHIRPathEngine engine, Object appContext, String functionName, TypeDetails focus, List<TypeDetails> parameters) throws PathEngineException {
-      throw new NotImplementedException("Not done yet (IGPublisherHostServices.checkFunction)");
-    }
-
-    @Override
-    public List<Base> executeFunction(FHIRPathEngine engine, Object appContext, List<Base> focus, String functionName, List<List<Base>> parameters) {
-      throw new NotImplementedException("Not done yet (IGPublisherHostServices.executeFunction)");
-    }
-
-    @Override
-    public Base resolveReference(FHIRPathEngine engine, Object appContext, String url, Base refContext) {
-      if (Utilities.isAbsoluteUrl(url)) {
-        if (url.startsWith(igpkp.getCanonical())) {
-          url = url.substring(igpkp.getCanonical().length());
-          if (url.startsWith("/")) {
-            url = url.substring(1);
-          }
-        } else
-          return null;;
-      }
-      for (FetchedFile f : fileList) {
-        for (FetchedResource r : f.getResources()) {
-          if (r.getElement() != null && url.equals(r.fhirType()+"/"+r.getId())) {
-            return r.getElement();
-          }
-        }
-      }
-      return null;
-    }
-
-    @Override
-    public boolean conformsToProfile(FHIRPathEngine engine, Object appContext, Base item, String url) throws FHIRException {
-      IResourceValidator val = context.newValidator();
-      List<ValidationMessage> valerrors = new ArrayList<ValidationMessage>();
-      if (item instanceof Resource) {
-        val.validate(appContext, valerrors, (Resource) item, url);
-        boolean ok = true;
-        for (ValidationMessage v : valerrors) {
-          ok = ok && v.getLevel().isError();
-        }
-        return ok;
-      }
-      throw new NotImplementedException("Not done yet (IGPublisherHostServices.conformsToProfile), when item is element");
-    }
-
-    @Override
-    public ValueSet resolveValueSet(FHIRPathEngine engine, Object appContext, String url) {
-      throw new NotImplementedException("Not done yet (IGPublisherHostServices.resolveValueSet)"); // cause I don't know when we 'd need to do this
-    }
   }
 
   public class TypeParserR2 implements ITypeParser {
@@ -2845,6 +2761,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     copyrightYear = null;
     Boolean useStatsOptOut = null;
     List<String> extensionDomains = new ArrayList<>();
+    List<String> factories = new ArrayList<>();
     tempDir = Utilities.path(rootDir, "temp");
     tempLangDir = Utilities.path(rootDir, "translations");
     outputDir = Utilities.path(rootDir, "output");
@@ -3173,6 +3090,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       case "viewDefinition":
         viewDefinitions.add(p.getValue());
         break;
+      case "test-data-factory":
+        factories.add(p.getValue());
+        break;
       case "fixed-value-format":
         fixedFormat = FixedValueFormat.fromCode(p.getValue());
         break;
@@ -3432,7 +3352,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
     // set up validator;
     validatorSession = new ValidatorSession();
-    validator = new InstanceValidator(context, new IGPublisherHostServices(), context.getXVer(), validatorSession); // todo: host services for reference resolution....
+    validator = new InstanceValidator(context, new IGPublisherHostServices(igpkp, fileList, context, new DateTimeType(execTime)), context.getXVer(), validatorSession); // todo: host services for reference resolution....
     validator.setAllowXsiLocation(true);
     validator.setNoBindingMsgSuppressed(true);
     validator.setNoExtensibleWarnings(!allowExtensibleWarnings);
@@ -3506,6 +3426,14 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     else
       extensionTracker.setoptIn(!ini.getBooleanProperty("IG", "usage-stats-opt-out"));
 
+    if (!factories.isEmpty()) {
+      LiquidEngine liquid = new LiquidEngine(context, validator.getExternalHostServices());
+      for (String f : factories) {
+        TestDataFactory tdf = new TestDataFactory(Utilities.getDirectoryForFile(configFile), f, liquid);
+        log("Execute Test Data Factory '"+tdf.getName()+"'");
+        tdf.execute();
+      }
+    }
     log("Initialization complete");
   }
 
