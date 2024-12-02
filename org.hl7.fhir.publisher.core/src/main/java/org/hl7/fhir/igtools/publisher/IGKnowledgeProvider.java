@@ -448,12 +448,13 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       bc.setWebPath(r.fhirType()+"/"+r.getId()+".html");
     r.getElement().setWebPath(bc.getWebPath());
     for (Resource cont : bc.getContained()) {
-      if (base != null) 
+      if (base != null)  {
         cont.setWebPath(doReplacements(base, r, cont, null, null, bc.getId()+"_"));
-      else if (pathPattern != null)
+      } else if (pathPattern != null) {
         cont.setWebPath(pathPattern.replace("[type]", r.fhirType()).replace("[id]", bc.getId()+"_"+cont.getId()));
-      else
+      } else {
         cont.setWebPath(r.fhirType()+"/"+bc.getId()+"_"+r.getId()+".html");
+      }
     }
   }
 
