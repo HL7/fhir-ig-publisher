@@ -299,6 +299,8 @@ import org.hl7.fhir.r5.terminologies.TerminologyUtilities;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
 import org.hl7.fhir.r5.terminologies.utilities.ValidationResult;
+import org.hl7.fhir.r5.test.utils.TestingUtilities;
+import org.hl7.fhir.r5.utils.BaseJsonWrapper;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.r5.utils.LiquidEngine;
 import org.hl7.fhir.r5.utils.MappingSheetParser;
@@ -310,6 +312,7 @@ import org.hl7.fhir.r5.utils.ResourceUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.r5.utils.XVerExtensionManager;
+import org.hl7.fhir.r5.utils.LiquidEngine.LiquidDocument;
 import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
 import org.hl7.fhir.r5.utils.formats.CSVWriter;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
@@ -7630,12 +7633,12 @@ private String fixPackageReference(String dep) {
             if (oids.isEmpty()) {
               if (Utilities.existsInList(r.getResource().fhirType(), "CodeSystem", "ValueSet")) {
                 if (forHL7orFHIR()) {
-                  f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "This resource must have an OID assigned to cater for possible use with OID based terminology systems e.g. CDA usage"+oidHint, IssueSeverity.ERROR));
+                  f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "The resource "+r.fhirType()+"/"+r.getId()+" must have an OID assigned to cater for possible use with OID based terminology systems e.g. CDA usage"+oidHint, IssueSeverity.ERROR));
                 } else {
-                  f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "This resource should have an OID assigned to cater for possible use with OID based terminology systems e.g. CDA usage"+oidHint, IssueSeverity.WARNING));                
+                  f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "The resource "+r.fhirType()+"/"+r.getId()+" should have an OID assigned to cater for possible use with OID based terminology systems e.g. CDA usage"+oidHint, IssueSeverity.WARNING));                
                 }
               } else {
-                f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "This resource could usefully have an OID assigned"+oidHint, IssueSeverity.INFORMATION));
+                f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "The resource "+r.fhirType()+"/"+r.getId()+" could usefully have an OID assigned"+oidHint, IssueSeverity.INFORMATION));
               }
             } else {
               for (String oid : oids) {
@@ -10867,7 +10870,9 @@ private String fixPackageReference(String dep) {
       }
     }
     for (String rt : resourceTypes) {
-      generateResourceReferences(rt);
+      if (!rt.contains(":")) {
+        generateResourceReferences(rt);
+      }
     }
     generateProfiles();
     generateExtensions();
@@ -11539,7 +11544,7 @@ private String fixPackageReference(String dep) {
     try {
       String src = new String(content);
       boolean changed = false;
-      String[] keywords = {"sql", "fragment"};
+      String[] keywords = {"sql", "fragment", "json"};
       for (String keyword: Arrays.asList(keywords)) {
 
         while (db != null && src.contains("{% " + keyword)) {
@@ -11564,6 +11569,14 @@ private String fixPackageReference(String dep) {
 
             case "fragment":
               substitute = processFragment(arguments, f);
+              break;
+              
+            case "json":
+              substitute = processJson(arguments, f);
+              break;
+              
+            default:
+              throw new FHIRException("Internal Error - unkonwn keyword "+keyword);
           }
 
           src = pfx + substitute + sfx;
@@ -11676,6 +11689,29 @@ private String fixPackageReference(String dep) {
     return "{% include sql-"+i+"-fragment.xhtml %}";
   }
 
+  private String processJson(String arguments, FetchedFile f) throws FHIRException, IOException {
+    long start = System.currentTimeMillis();
+    String cnt = null;
+    try {    
+      String args = arguments.trim();
+      File src = new File(Utilities.path(Utilities.getDirectoryForFile(configFile), args.substring(0, args.indexOf(" ")).trim()));
+      File tsrc = new File(Utilities.path(Utilities.getDirectoryForFile(configFile), args.substring(args.indexOf(" ")+1).trim()));
+
+      JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(src);
+      LiquidEngine liquid = new LiquidEngine(context, rc.getServices());
+      LiquidDocument template = liquid.parse(TextFile.fileToString(tsrc), tsrc.getAbsolutePath());
+      BaseJsonWrapper base = new BaseJsonWrapper(json);
+      cnt = liquid.evaluate(template, base, this).trim();
+    } catch (Exception e) {
+      XhtmlNode p = new XhtmlNode(NodeType.Element, "p");
+      p.tx(e.getMessage());
+      cnt = new XhtmlComposer(false, true).compose(p);
+    }
+    int i = sqlIndex++;
+    fragment("json-"+i+"-fragment", "\r\n"+cnt, f.getOutputNames(), start, "json", "page");
+    return "{% include json-"+i+"-fragment.xhtml %}";
+  }
+  
   private String processFragment(String arguments, FetchedFile f) throws FHIRException {
     int firstSpace = arguments.indexOf(" ");
     int secondSpace = arguments.indexOf(" ",firstSpace + 1);

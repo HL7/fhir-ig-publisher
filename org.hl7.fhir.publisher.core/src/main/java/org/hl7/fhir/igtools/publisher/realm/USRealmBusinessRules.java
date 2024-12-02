@@ -240,6 +240,8 @@ public class USRealmBusinessRules extends RealmBusinessRules {
       cr.getTemplates().put("Profile", new String(context.getBinaryForKey("template-comparison-Profile.html")));
       cr.getTemplates().put("Profile-Union", new String(context.getBinaryForKey("template-comparison-Profile-Union.html")));
       cr.getTemplates().put("Profile-Intersection", new String(context.getBinaryForKey("template-comparison-Profile-Intersection.html")));
+      cr.getTemplates().put("CodeSystem-Union", new String(context.getBinaryForKey("template-comparison-CodeSystem-Union.html")));
+      cr.getTemplates().put("CodeSystem-Intersection", new String(context.getBinaryForKey("template-comparison-CodeSystem-Intersection.html")));
       cr.getTemplates().put("CapabilityStatement", new String(context.getBinaryForKey("template-comparison-CapabilityStatement.html")));
       cr.getTemplates().put("Index", new String(context.getBinaryForKey("template-comparison-index.html")));
       cr.setPreamble(renderProblems());
