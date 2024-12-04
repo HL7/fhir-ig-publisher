@@ -97,7 +97,7 @@ import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
 import org.hl7.fhir.igtools.publisher.comparators.IpsComparator;
 import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
 import org.hl7.fhir.igtools.publisher.loaders.AdjunctFileLoader;
-import org.hl7.fhir.igtools.publisher.loaders.LibraryLoader;
+import org.hl7.fhir.igtools.publisher.loaders.CqlResourceLoader;
 import org.hl7.fhir.igtools.publisher.loaders.PatchLoaderKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.loaders.PublisherLoader;
 import org.hl7.fhir.igtools.publisher.modules.CrossVersionModule;
@@ -4476,7 +4476,7 @@ private String fixPackageReference(String dep) {
     packageInfo = new PackageInformation(publishedIg.getPackageId(), publishedIg.getVersion(), context.getVersion(), new Date(), publishedIg.getName(), igpkp.getCanonical(), targetOutput); 
 
     // Cql Compile
-    cql = new CqlSubSystem(npmList, binaryPaths, new LibraryLoader(version), this, context.getUcumService(), publishedIg.getPackageId(), igpkp.getCanonical());
+    cql = new CqlSubSystem(npmList, binaryPaths, new CqlResourceLoader(version), this, context.getUcumService(), publishedIg.getPackageId(), igpkp.getCanonical());
     if (binaryPaths.size() > 0) {
       cql.execute();
     }
