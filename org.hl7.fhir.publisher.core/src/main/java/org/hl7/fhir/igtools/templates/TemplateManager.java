@@ -251,6 +251,7 @@ public class TemplateManager {
         "hl7.be.fhir.template",
         "hl7.cda.template",
         "hl7.davinci.template",
+        "hl7.sdc.template",
         "openhie.fhir.template",
         "who.fhir.template",
         "who.template.root",
