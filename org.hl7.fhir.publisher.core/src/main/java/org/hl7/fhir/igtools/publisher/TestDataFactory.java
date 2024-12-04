@@ -3,13 +3,23 @@ package org.hl7.fhir.igtools.publisher;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.r5.utils.BaseCSVWrapper;
-import org.hl7.fhir.r5.utils.LiquidEngine;
-import org.hl7.fhir.r5.utils.LiquidEngine.LiquidDocument;
+import org.hl7.fhir.r5.fhirpath.ExpressionNode.CollectionStatus;
+import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
+import org.hl7.fhir.r5.fhirpath.FHIRPathEngine.IEvaluationContext.FunctionDefinition;
+import org.hl7.fhir.r5.fhirpath.FHIRPathUtilityClasses.FunctionDetails;
+import org.hl7.fhir.r5.fhirpath.TypeDetails;
+import org.hl7.fhir.r5.liquid.BaseCSVWrapper;
+import org.hl7.fhir.r5.liquid.LiquidEngine;
+import org.hl7.fhir.r5.liquid.LiquidEngine.LiquidDocument;
+import org.hl7.fhir.r5.model.Base;
+import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.utilities.CSVReader;
+import org.hl7.fhir.utilities.FhirPublication;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
@@ -19,6 +29,81 @@ import org.hl7.fhir.utilities.json.parser.JsonParser;
 
 public class TestDataFactory {
 
+  public static class DataTable extends Base {
+    List<String> columns = new ArrayList<String>();
+    List<List<String>> rows = new ArrayList<List<String>>();
+    
+    @Override
+    public String fhirType() {
+      return "DataTable";
+    }
+    @Override
+    public String getIdBase() {
+      return null;
+    }
+    @Override
+    public void setIdBase(String value) {
+      throw new Error("Readonly");
+    }
+    @Override
+    public Base copy() {
+      return this;
+    }
+    
+    @Override
+    public FhirPublication getFHIRPublicationVersion() {
+      return FhirPublication.R5;
+    }
+
+    public String cell(int row, String col) {
+      if (row >= 0 && row < rows.size()) {
+        List<String> r = rows.get(row);
+        int c = -1;
+        if (Utilities.isInteger(col)) {
+          c = Utilities.parseInt(col, -1);
+        } else {
+          c = columns.indexOf(col);
+        }
+        if (c > -1 && c  < r.size()) {
+          return r.get(c);
+        }
+      }
+      return null;
+    }
+  }
+    
+  public static class DataLookupFunction extends FunctionDefinition {
+
+    @Override
+    public String name() {
+      return "cell";
+    }
+
+    @Override
+    public FunctionDetails details() {
+      return new FunctionDetails("Lookup a data element", 2, 2);
+    }
+
+    @Override
+    public TypeDetails check(FHIRPathEngine engine, Object appContext, TypeDetails focus, List<TypeDetails> parameters) {
+      return new TypeDetails(CollectionStatus.SINGLETON, "string");
+    }
+
+    @Override
+    public List<Base> execute(FHIRPathEngine engine, Object appContext, List<Base> focus, List<List<Base>> parameters) {
+      int row = Utilities.parseInt(parameters.get(0).get(0).primitiveValue(), 0);
+      String col = parameters.get(1).get(0).primitiveValue();
+      DataTable dt = (DataTable) focus.get(0);
+      
+      List<Base> res = new ArrayList<Base>();
+      String s = dt.cell(row, col);
+      if (!Utilities.noString(s)) {
+        res.add(new StringType(s));
+      }
+      return res;
+    }
+    
+  }
   private String rootFolder;
   private LiquidEngine liquid;
   private IniFile ini;
@@ -37,18 +122,22 @@ public class TestDataFactory {
   public void execute() throws FHIRException, IOException {
     try {
     LiquidDocument template = liquid.parse(TextFile.fileToString(Utilities.path(rootFolder, ini.getStringProperty("factory", "liquid"))), "liquid");
-    List<String> columns = new ArrayList<String>();
-    List<List<String>> rows = new ArrayList<List<String>>();
-    loadData(columns, rows, Utilities.path(rootFolder, ini.getStringProperty("factory", "data")));
+    DataTable dt = loadData(Utilities.path(rootFolder, ini.getStringProperty("factory", "data")));
+    liquid.getVars().clear();
+    if (ini.hasSection("tables")) {
+      for (String n : ini.getPropertyNames("tables")) {
+        liquid.getVars().put(n, loadData(Utilities.path(rootFolder, ini.getStringProperty("tables", n))));
+      }
+    }
     String format = ini.getStringProperty("factory", "format");
     if ("bundle".equals(ini.getStringProperty("factory", "mode"))) {
-      byte[] data = runBundle(template, columns, rows, format);
+      byte[] data = runBundle(template, dt.columns, dt.rows, format);
       TextFile.bytesToFile(data, Utilities.path(rootFolder, ini.getStringProperty("factory", "output"), ini.getStringProperty("factory", "filename")));
     } else {
-      for (List<String> row : rows) { 
-        byte[] data = runInstance(template, columns, row, format);
+      for (List<String> row : dt.rows) { 
+        byte[] data = runInstance(template, dt.columns, row, format);
         TextFile.bytesToFile(data, Utilities.path(rootFolder, ini.getStringProperty("factory", "output"), 
-            getFileName(ini.getStringProperty("factory", "filename"), columns, row)));
+            getFileName(ini.getStringProperty("factory", "filename"), dt.columns, row)));
       }
     }
     } catch (Exception e) {
@@ -88,13 +177,14 @@ public class TestDataFactory {
     }
   }
 
-  private void loadData(List<String> columns, List<List<String>> rows, String path) throws FHIRException, IOException {
+  private DataTable loadData(String path) throws FHIRException, IOException {
+    DataTable dt = new DataTable();
     CSVReader csv = new CSVReader(new FileInputStream(path));
-    columns.add("counter");
+    dt.columns.add("counter");
     for (String n : csv.parseLine()) {
-      columns.add(n);
+      dt.columns.add(n);
     }
-    int t = columns.size();
+    int t = dt.columns.size();
     int c = 0;
     while (csv.ready()) {
       c++;
@@ -109,8 +199,8 @@ public class TestDataFactory {
       while (values.size() > t) {
         values.remove(values.size()-1);
       }
-      rows.add(values);
+      dt.rows.add(values);
     }
-    
+    return dt;
   }
 }
