@@ -232,17 +232,7 @@ public class IpaComparator {
           }
           Utilities.createDirectory(Utilities.path(dstDir, "ipa-comparison-v"+vi.version));
           ComparisonRenderer cr = new ComparisonRenderer(vi.context, context, Utilities.path(dstDir, "ipa-comparison-v"+vi.version), session);
-          cr.getTemplates().put("CodeSystem", new String(context.getBinaryForKey("template-comparison-CodeSystem.html")));
-          cr.getTemplates().put("CodeSystem-Union", new String(context.getBinaryForKey("template-comparison-CodeSystem-Union.html")));
-          cr.getTemplates().put("CodeSystem-Intersection", new String(context.getBinaryForKey("template-comparison-CodeSystem-Intersection.html")));
-          cr.getTemplates().put("ValueSet", new String(context.getBinaryForKey("template-comparison-ValueSet.html")));
-          cr.getTemplates().put("ValueSet-Union", new String(context.getBinaryForKey("template-comparison-ValueSet-Union.html")));
-          cr.getTemplates().put("ValueSet-Intersection", new String(context.getBinaryForKey("template-comparison-ValueSet-Intersection.html")));
-          cr.getTemplates().put("Profile", new String(context.getBinaryForKey("template-comparison-Profile.html")));
-          cr.getTemplates().put("Profile-Union", new String(context.getBinaryForKey("template-comparison-Profile-Union.html")));
-          cr.getTemplates().put("Profile-Intersection", new String(context.getBinaryForKey("template-comparison-Profile-Intersection.html")));
-          cr.getTemplates().put("CapabilityStatement", new String(context.getBinaryForKey("template-comparison-CapabilityStatement.html")));
-          cr.getTemplates().put("Index", new String(context.getBinaryForKey("template-comparison-index.html")));
+          cr.loadTemplates(context);
           cr.render("Version "+vi.version, "Current Build");
         } catch (Throwable e) {
           errMsg = "Current Version Comparison failed: "+e.getMessage();

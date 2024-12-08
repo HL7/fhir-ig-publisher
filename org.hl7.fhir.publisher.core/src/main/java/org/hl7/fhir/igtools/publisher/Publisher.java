@@ -144,9 +144,6 @@ import org.hl7.fhir.igtools.web.PublicationProcess;
 import org.hl7.fhir.igtools.web.PublisherConsoleLogger;
 import org.hl7.fhir.igtools.web.WebSiteArchiveBuilder;
 import org.hl7.fhir.r4.formats.FormatUtilities;
-import org.hl7.fhir.r5.utils.sql.Runner;
-import org.hl7.fhir.r5.utils.sql.StorageJson;
-import org.hl7.fhir.r5.utils.sql.StorageSqlite3;
 import org.hl7.fhir.r5.conformance.ConstraintJavaGenerator;
 import org.hl7.fhir.r5.conformance.R5ExtensionsLoader;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
@@ -164,13 +161,13 @@ import org.hl7.fhir.r5.elementmodel.ParserBase.ValidationPolicy;
 import org.hl7.fhir.r5.fhirpath.ExpressionNode;
 import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
+import org.hl7.fhir.r5.formats.JsonParser;
+import org.hl7.fhir.r5.formats.RdfParser;
+import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.liquid.BaseJsonWrapper;
 import org.hl7.fhir.r5.liquid.GlobalObject.GlobalObjectRandomFunction;
 import org.hl7.fhir.r5.liquid.LiquidEngine;
 import org.hl7.fhir.r5.liquid.LiquidEngine.LiquidDocument;
-import org.hl7.fhir.r5.formats.JsonParser;
-import org.hl7.fhir.r5.formats.RdfParser;
-import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.model.ActivityDefinition;
 import org.hl7.fhir.r5.model.ActorDefinition;
 import org.hl7.fhir.r5.model.Attachment;
@@ -299,7 +296,6 @@ import org.hl7.fhir.r5.terminologies.TerminologyUtilities;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
 import org.hl7.fhir.r5.terminologies.utilities.ValidationResult;
-import org.hl7.fhir.r5.test.utils.TestingUtilities;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.r5.utils.MappingSheetParser;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
@@ -312,6 +308,9 @@ import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.r5.utils.XVerExtensionManager;
 import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
 import org.hl7.fhir.r5.utils.formats.CSVWriter;
+import org.hl7.fhir.r5.utils.sql.Runner;
+import org.hl7.fhir.r5.utils.sql.StorageJson;
+import org.hl7.fhir.r5.utils.sql.StorageSqlite3;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.validation.IValidationProfileUsageTracker;
@@ -333,11 +332,17 @@ import org.hl7.fhir.utilities.ZipGenerator;
 import org.hl7.fhir.utilities.filesystem.CSFile;
 import org.hl7.fhir.utilities.http.HTTPResult;
 import org.hl7.fhir.utilities.http.ManagedWebAccess;
-import org.hl7.fhir.utilities.i18n.*;
+import org.hl7.fhir.utilities.i18n.I18nConstants;
+import org.hl7.fhir.utilities.i18n.JsonLangFileProducer;
+import org.hl7.fhir.utilities.i18n.LanguageFileProducer;
 import org.hl7.fhir.utilities.i18n.LanguageFileProducer.TranslationUnit;
+import org.hl7.fhir.utilities.i18n.LanguageTag;
+import org.hl7.fhir.utilities.i18n.PoGetTextProducer;
+import org.hl7.fhir.utilities.i18n.RegionToLocaleMapper;
+import org.hl7.fhir.utilities.i18n.RenderingI18nContext;
+import org.hl7.fhir.utilities.i18n.XLIFFProducer;
 import org.hl7.fhir.utilities.i18n.subtag.LanguageSubtagRegistry;
 import org.hl7.fhir.utilities.i18n.subtag.LanguageSubtagRegistryLoader;
-import org.hl7.fhir.utilities.json.JsonException;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonBoolean;
 import org.hl7.fhir.utilities.json.model.JsonElement;
@@ -1175,12 +1180,20 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       generate();
       clean();
       dependentIgFinder.finish(outputDir, sourceIg.present());
+      List<FetchedResource> fragments = new ArrayList<>(); 
+      for (var f : fileList) {
+        for (var r : f.getResources()) {
+          if (r.getResource() != null && r.getResource() instanceof CodeSystem && ((CodeSystem) r.getResource()).getContent() == CodeSystemContentMode.FRAGMENT) {
+            fragments.add(r);
+          }
+        }
+      }
       ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), rootDir, npmName, childPublisher == null? null : childPublisher.npmName,
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator, ipsComparator,
           new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine, rc, specMaps).render(publishedIg, true, false, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()),
           new PublicationChecker(repoRoot, historyPage, markdownEngine, findReleaseLabelString()).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
           generateDraftDependencies(),
-          noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder, context.getTxClientManager(), versionProblems);
+          noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder, context.getTxClientManager(), versionProblems, fragments);
       val.setValidationFlags(hintAboutNonMustSupport, anyExtensionsAllowed, checkAggregation, autoLoad, showReferenceMessages, noExperimentalContent, displayWarnings);
       tts.end();
       if (isChild()) {
@@ -1583,13 +1596,22 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
     for (SpecMapManager sp : specMaps) {
       String fp = Utilities.isAbsoluteUrl(url) ? url : sp.getBase()+"/"+url;
+      
       String path;
       try {
         path = sp.getPath(fp, null, null, null);
       } catch (Exception e) {
         path = null;
       }
+      
+      
+      // hack around an error in the R5 specmap file 
+      if (path != null && sp.isCore() && path.startsWith("http://terminology.hl7.org")) {
+        path = null;
+      }
+      
       if (path != null)
+      
         return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, null);
     }
 
@@ -7211,7 +7233,7 @@ private String fixPackageReference(String dep) {
           n = fpe.parse(inv.getExpression(), sd.getUrl()+"#"+ed.getId()+" / "+inv.getKey());
           inv.setUserData(UserDataNames.validator_expression_cache, n);
         }
-        fpe.check(null, sd, ed.getPath(), n);
+        fpe.check(null, "Resource", sd, ed.getPath(), n);
       } catch (Exception e) {
         f.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, "StructureDefinition.where(url = '"+sd.getUrl()+"').snapshot.element.where('path = '"+ed.getPath()+"').constraint.where(key = '"+inv.getKey()+"')", e.getMessage(), IssueSeverity.ERROR));
         r.getErrors().add(new ValidationMessage(Source.ProfileValidator, IssueType.INVALID, "StructureDefinition.where(url = '"+sd.getUrl()+"').snapshot.element.where('path = '"+ed.getPath()+"').constraint.where(key = '"+inv.getKey()+"')", e.getMessage(), IssueSeverity.ERROR));

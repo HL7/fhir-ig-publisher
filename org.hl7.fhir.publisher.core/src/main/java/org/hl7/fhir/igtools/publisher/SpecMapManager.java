@@ -43,11 +43,7 @@ import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.BasePackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
-import org.hl7.fhir.utilities.npm.PackageHacker;
 import org.hl7.fhir.utilities.npm.ToolsVersion;
-
-
-import net.sourceforge.plantuml.salt.element.WrappedElement;
 
 /**
  * TODO: should we call versionless references ok? not sure....
@@ -509,6 +505,10 @@ public class SpecMapManager {
 
   public String getNpmVId() {
     return npmVId;
+  }
+
+  public boolean isCore() {
+    return "hl7.fhir.core".equals(getNpmName());
   }
 
   
