@@ -1394,7 +1394,7 @@ public class IgSpreadsheetParser {
           if (!sp.hasProcessingMode())
             throw new Exception("Search Param "+sd.getId()+"/"+n+" has no expression usage "+ getLocation(row));
           FHIRPathEngine engine = new FHIRPathEngine(context);
-          engine.check(null, sd.getType(), sd.getType(), sp.getExpression());
+          engine.check(null, "Resource",  sd.getType(), sd.getType(), sp.getExpression());
           bundle.addEntry().setResource(sp).setFullUrl(sp.getUrl());
         }
       }
