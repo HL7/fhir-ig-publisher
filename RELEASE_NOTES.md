@@ -1,7 +1,6 @@
 * Loader: Fix problem not finding current version of extensions pack for non-R5 versions
 * Loader: New release of pubpack
 * Loader: extend CQLSubsystem to cover Measure, PlanDefinition, ActivityDefinition
-* Loader: extend CQLSubsystem to cover Measure, PlanDefinition, ActivityDefinition
 * Loader: fix missing union and intersection for CodeSystem and ValueSet comparisons
 * Loader: Work around flaw in R5 specmaps claiming to have paths for terminology URLs it does not
 * Loader:fix custom resources with profiles
