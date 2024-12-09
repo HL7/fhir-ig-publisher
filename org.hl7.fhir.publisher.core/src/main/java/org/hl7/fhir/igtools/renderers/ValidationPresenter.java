@@ -306,13 +306,15 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   boolean noExperimentalContent = false;
   boolean displayWarnings = false;
   private List<String> versionProblems;
+  private List<FetchedResource> fragments;
 
   
   public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, 
       String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, IpaComparator ipaComparator, IpsComparator ipsComparator,
       String dependencies, String csAnalysis, String pubReqCheck, String globalCheck, String copyrightYear, IWorkerContext context,
       Set<String> r5Extensions, List<StructureDefinition> modifierExtensions, String draftDependencies,
-      List<FetchedResource> noNarratives, List<FetchedResource> noValidation, boolean noValidate, boolean noGenerate, DependentIGFinder dependentIgs, TerminologyClientManager txServers, List<String> versionProblems) {
+      List<FetchedResource> noNarratives, List<FetchedResource> noValidation, boolean noValidate, boolean noGenerate, DependentIGFinder dependentIgs, 
+      TerminologyClientManager txServers, List<String> versionProblems, List<FetchedResource> fragments) {
     super();
     this.statedVersion = statedVersion;
     this.igVersion = igVersion;
@@ -343,6 +345,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     this.globalCheck = globalCheck;
     this.txServers = txServers;
     this.versionProblems = versionProblems;
+    this.fragments = fragments;
     ruleDateCutoff = Date.from(LocalDate.now().minusMonths(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
     determineCode();
   }
@@ -1001,6 +1004,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       " <tr><td>Validation Flags:</td><td> $validationFlags$</td></tr>\r\n"+
       "$noNarrative$"+
       "$noValidation$"+
+      "$fragments$"+
       " <tr><td>Summary:</td><td> errors = $err$, warn = $warn$, info = $info$, broken links = $links$</td></tr>\r\n"+
       "</table>\r\n"+
       " <table class=\"grid\">\r\n"+
@@ -1163,6 +1167,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("ipsComparison", ipsComparator == null ? "n/a" : ipsComparator.checkHtml());
     t.add("noNarrative", genResourceList(noNarratives, "Narratives Suppressed"));
     t.add("noValidation", genResourceList(noValidation, "Validation Suppressed"));
+    t.add("fragments", genResourceList(noValidation, "CodeSystem Fragments"));
     t.add("validationFlags", validationFlags());
     
     if (noGenerate || noValidate) {
@@ -1576,7 +1581,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("mid", vm.getMessageId());
     t.add("msg", (isNewRule(vm) ? "<img style=\"vertical-align: text-bottom\" src=\"new.png\" height=\"16px\" width=\"36px\" alt=\"New Rule: \"> " : "")+ vm.getHtml());
     t.add("msgdetails", vm.isSlicingHint() ? vm.getSliceHtml() : vm.getHtml());
-    t.add("comment", vm.getComment() == null ? "" : "<br/><br/><span style=\"border: 1px grey solid; border-radius: 5px; background-color: #eeeeee; padding: 3px; margin: 3px \"><i><b>Editor's Comment</b>: "+Utilities.escapeXml(vm.getComment())+"</i></span>");
+    t.add("comment", vm.getComment() == null ? "" : "<br/><br/><span style=\"display: block; border: 1px grey solid; border-radius: 5px; background-color: #eeeeee; padding: 3px; margin: 3px \"><i><b>Editor's Comment</b>: "+Utilities.escapeXml(vm.getComment())+"</i></span>");
     t.add("tx", "qa-tx.html#l"+vm.getTxLink());
     t.add("txsrvr", getServer(vm.getServer()));
     return t.render();
