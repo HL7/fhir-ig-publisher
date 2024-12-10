@@ -13789,11 +13789,11 @@ private String fixPackageReference(String dep) {
 
     org.hl7.fhir.utilities.FileFormat.checkCharsetAndWarnIfNotUTF8(System.out);
     NpmPackage.setLoadCustomResources(true);  
-    ManagedWebAccess.loadFromFHIRSettings();
-    
     if (CliParams.hasNamedParam(args, FHIR_SETTINGS_PARAM)) {
       FhirSettings.setExplicitFilePath(CliParams.getNamedParam(args, FHIR_SETTINGS_PARAM));
     }
+    ManagedWebAccess.loadFromFHIRSettings();
+    
     
     if (CliParams.hasNamedParam(args, "-gui")) {
       runGUI(args);
