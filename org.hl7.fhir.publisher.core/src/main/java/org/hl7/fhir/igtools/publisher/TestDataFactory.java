@@ -168,7 +168,6 @@ public class TestDataFactory {
   private byte[] runBundle(LiquidDocument template, List<String> columns, List<List<String>> rows, String format) throws JsonException, IOException {
     BaseCSVWrapper base = BaseCSVWrapper.forRows(columns, rows);
     String cnt = liquid.evaluate(template, base, this).trim();
-    TextFile.stringToFile(cnt, "/Users/grahamegrieve/temp/liquid.out.json");
     if ("json".equals(format)) {
       JsonObject j = JsonParser.parseObject(cnt, true);
       return JsonParser.composeBytes(j, true);
