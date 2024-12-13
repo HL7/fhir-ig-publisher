@@ -1195,9 +1195,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), rootDir, npmName, childPublisher == null? null : childPublisher.npmName,
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator, ipsComparator,
           new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine, rc, specMaps).render(publishedIg, true, false, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()),
-          new PublicationChecker(repoRoot, historyPage, markdownEngine, findReleaseLabelString()).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
+          new PublicationChecker(repoRoot, historyPage, markdownEngine, findReleaseLabelString(), publishedIg).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
+          noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder, context.getTxClientManager(), versionProblems, fragments);
           generateDraftDependencies(), noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder, context.getTxClientManager(), 
-          versionProblems, fragments, makeLangInfo());
       val.setValidationFlags(hintAboutNonMustSupport, anyExtensionsAllowed, checkAggregation, autoLoad, showReferenceMessages, noExperimentalContent, displayWarnings);
       tts.end();
       if (isChild()) {

@@ -4272,5 +4272,23 @@
       "time" : 787419,
       "memory" : 1700742608
     }
+  },
+  "1.8.2" : {
+    "sync-date" : "2024-06-30",
+    "date" : "2024-12-13",
+    "hl7.fhir.template.ig" : {
+      "errors" : 0,
+      "warnings" : 0,
+      "hints" : 0,
+      "time" : 710,
+      "memory" : 16035808
+    },
+    "hl7.cda.uv.core" : {
+      "errors" : 0,
+      "warnings" : 148,
+      "hints" : 0,
+      "time" : 126365,
+      "memory" : 1856145808
+    }
   }
 }

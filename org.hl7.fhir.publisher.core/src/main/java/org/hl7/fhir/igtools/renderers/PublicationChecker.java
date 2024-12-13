@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Set;
 
 import org.hl7.fhir.igtools.web.PublicationProcess.PublicationProcessMode;
+import org.hl7.fhir.r5.model.ImplementationGuide;
+import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.StringPair;
@@ -28,13 +30,15 @@ public class PublicationChecker {
   private String historyPage;
   private MarkDownProcessor mdEngine;
   private String releaseLabel;
+  private ImplementationGuide ig;
 
-  public PublicationChecker(String folder, String historyPage, MarkDownProcessor markdownEngine, String releaseLabel) {
+  public PublicationChecker(String folder, String historyPage, MarkDownProcessor markdownEngine, String releaseLabel, ImplementationGuide ig) {
     super();
     this.folder = folder;
     this.historyPage = historyPage;
     this.mdEngine = markdownEngine;
     this.releaseLabel = releaseLabel;
+    this.ig = ig;
   }
   
   /**
@@ -50,6 +54,7 @@ public class PublicationChecker {
     List<String> messages = new ArrayList<>();
     List<StringPair> summary = new ArrayList<>();
     checkFolder(messages, summary);
+    checkIg(messages, summary);
     StringBuilder bs = new StringBuilder();
     if (summary.size() > 0) {
       bs.append("<table class=\"grid\">\r\n");
@@ -76,6 +81,16 @@ public class PublicationChecker {
       }
       b.append("</ul>\r\n");
       return bs.toString()+b.toString();
+    }
+  }
+
+  private void checkIg(List<String> messages, List<StringPair> summary) {
+    for (ImplementationGuideDependsOnComponent dep : ig.getDependsOn()) {
+      if (dep.getVersion() == null) {
+        messages.add("Dependency on "+dep.getPackageId()+" has no version"+mkError());
+      } else if ("current".equals(dep.getVersion())) {
+        messages.add("Dependency on "+dep.getPackageId()+" is to the <code>current</code> version - not allowed"+mkError());        
+      }
     }
   }
 
