@@ -10,9 +10,11 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -136,15 +138,14 @@ public class TemplateReleaser {
   }
 
   private void release(String source, String dest) throws Exception {
+    System.out.println("Source: "+source);
+    System.out.println("Destination: "+dest);
     SimpleDateFormat df = new SimpleDateFormat(RSS_DATE, new Locale("en", "US"));
     checkDest(dest);
     Map<String, String> currentPublishedVersions = scanForCurrentVersions(dest);
-    System.out.println("Current Published Versions");
-    for (String s : currentPublishedVersions.keySet()) {
-      System.out.println(" * "+s+"#"+currentPublishedVersions.get(s));
-    }
     Map<String, String> currentVersions = scanForCurrentVersions(source);
-    List<VersionDecision> versionsList = analyseVersions(source, currentVersions, currentPublishedVersions);
+    summary(currentPublishedVersions, currentVersions);
+    List<VersionDecision> versionsList = analyseVersions(source, currentVersions, currentPublishedVersions, dest);
     System.out.println("Actions to take");
     for (VersionDecision vd : versionsList) {
       System.out.println(" * "+vd.summary());
@@ -203,6 +204,24 @@ public class TemplateReleaser {
   }
 
   
+  private void summary(Map<String, String> currentPublishedVersions, Map<String, String> currentVersions) {
+    // TODO Auto-generated method stub
+
+    Set<String> all = new HashSet<>();
+    all.addAll(currentPublishedVersions.keySet());
+    all.addAll(currentVersions.keySet());
+    System.out.println("Package Summary");
+    int l = 0;
+    for (String s : all) {
+      l = Integer.max(l, s.length());
+    }
+    for (String s: Utilities.sorted(all)) {
+      String v = currentPublishedVersions.containsKey(s) ? currentPublishedVersions.get(s) : "--";
+      String nv = currentVersions.containsKey(s) ? currentVersions.get(s) : "--";
+      System.out.println("  "+Utilities.padRight(s, ' ', l)+"  "+Utilities.padRight(v, ' ', 10)+"  "+Utilities.padRight(nv, ' ', 10));      
+    }
+  }
+
   private void buildIndexPage(Map<String, String> currentVersions, String path) throws JsonException, IOException {
     XhtmlNode tbl = new XhtmlNode(NodeType.Element, "table");
     tbl.attribute("class", "grid");
@@ -214,9 +233,9 @@ public class TemplateReleaser {
     for (String id : Utilities.sorted(currentVersions.keySet())) {
       tr = tbl.tr();
       PackageList pl = new PackageList(JsonParser.parseObject(new File(Utilities.path(path, id, "package-list.json"))));
-      tr.td().ah("http://fhir.org/templates/"+id).tx(pl.pid());
+      tr.td().ah(id).tx(pl.pid());
       tr.td().tx(pl.title());
-      tr.td().ah("http://fhir.org/templates/"+id+"/"+pl.current().version()+"/package.tgz").tx(pl.current().version());
+      tr.td().ah(id+"/"+pl.current().version()+"/package.tgz").tx(pl.current().version());
       tr.td().tx(pl.current().date());
     }
     String s = INDEX_TEMPLATE.replace("{{index}}", new XhtmlComposer(false, false).compose(tbl));
@@ -299,22 +318,24 @@ public class TemplateReleaser {
     TextFile.stringToFile(pl.toJson(), Utilities.path(source, vd.getId(), "package-list.json"));
   }
 
-  private List<VersionDecision> analyseVersions(String source, Map<String, String> newList, Map<String, String> oldList) throws Exception {
+  private List<VersionDecision> analyseVersions(String source, Map<String, String> newList, Map<String, String> oldList, String dest) throws Exception {
     List<VersionDecision> res = new ArrayList<TemplateReleaser.VersionDecision>();
     for (String s : oldList.keySet()) {
-      if (!newList.containsKey(s)) {
-        throw new Exception("Existing template "+s+" not found in release set ("+newList.keySet()+")");
-      }
-      VersionDecision vd = new VersionDecision();
-      res.add(vd);
-      vd.setId(s);
-      String v = oldList.get(s);
-      String nv = newList.get(s);
-      vd.setCurrentVersion(v);
-      vd.setType(checkVersionChangeType(v, nv));
-      vd.setExplicit(vd.getType() != VersionChangeType.NONE);
-      if (vd.isExplicit()) {
-        vd.setNewVersion(nv);
+      if (!s.equals("fhir.ca.template")) {
+        if (!newList.containsKey(s)) {
+          throw new Exception("Existing template "+s+" not found in release set ("+newList.keySet()+")");
+        }
+        VersionDecision vd = new VersionDecision();
+        res.add(vd);
+        vd.setId(s);
+        String v = oldList.get(s);
+        String nv = newList.get(s);
+        vd.setCurrentVersion(v);
+        vd.setType(checkVersionChangeType(v, nv));
+        vd.setExplicit(vd.getType() != VersionChangeType.NONE);
+        if (vd.isExplicit()) {
+          vd.setNewVersion(nv);
+        }
       }
     }
     for (String s : newList.keySet()) {
@@ -339,10 +360,25 @@ public class TemplateReleaser {
       any = any || vd.type != VersionChangeType.NONE;
     }
     if (!any) {
-      throw new Exception("Nothing found to release - Cannot Proceed");
+      System.out.println("Nothing found to release - updating History pages");
+      updateHistoryPages(dest, oldList);
+      System.out.println("Done");
+      System.exit(0);
     }
     
     return res;
+  }
+
+  private void updateHistoryPages(String dest, Map<String, String> oldList) throws IOException {
+    for (String s : oldList.keySet()) {
+      String folder = Utilities.path(dest, s);
+      // create history page 
+      JsonObject jh = JsonParser.parseObjectFromFile(Utilities.path(folder, "package-list.json"));
+      String history = TextFile.fileToString(Utilities.path(dest, "history.template")).replace("\r\n", "\n");
+      history = history.replace("{{id}}", s);
+      history = history.replace("{{pl}}", JsonParser.compose(jh, false).replace('\'', '`'));
+      TextFile.stringToFile(history, Utilities.path(folder, "history.html"));
+    }
   }
 
   private String getNewVersion(VersionChangeType t, String v) {
@@ -565,7 +601,7 @@ public class TemplateReleaser {
 
   private Document loadXml(File file) throws Exception {
     InputStream src = new FileInputStream(file);
-    DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+    DocumentBuilderFactory dbf = XMLUtil.newXXEProtectedDocumentBuilderFactory();
     DocumentBuilder db = dbf.newDocumentBuilder();
     return db.parse(src);
   }

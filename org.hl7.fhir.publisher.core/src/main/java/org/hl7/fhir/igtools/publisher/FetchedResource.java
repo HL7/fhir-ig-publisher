@@ -25,9 +25,12 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
+import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
+import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 
@@ -58,6 +61,9 @@ public class FetchedResource {
   private boolean isProvenance = false;
   private String nameForErrors;
   private boolean hasTranslations;
+  private String resourceName;
+  private String resourceDescription;
+  private boolean regenAfterValidation;
 
   public FetchedResource(String nameForErrors) {
     super();
@@ -326,5 +332,57 @@ public class FetchedResource {
     }
     return "application/bin";
   }
+
+  public String getResourceName() {
+    return resourceName;
+  }
+
+  public void setResourceName(String resourceName) {
+    this.resourceName = resourceName;
+  }
+
+  public String getResourceDescription() {
+    return resourceDescription;
+  }
+
+  public void setResourceDescription(String resourceDescription) {
+    this.resourceDescription = resourceDescription;
+  }
+
+  public String getBestName() {
+    if (resourceName != null && resourceName.contains(" ")) {
+      return resourceName;
+    } else {
+      return resourceDescription;
+    }
+  }
+
+  public boolean isRegenAfterValidation() {
+    return regenAfterValidation;
+  }
+
+  public void setRegenAfterValidation(boolean regenAfterValidation) {
+    this.regenAfterValidation = regenAfterValidation;
+  }
+
+  public boolean isCustomResource() {
+    if (getResource() != null) {
+      return getResource().hasUserData(UserDataNames.loader_custom_resource);
+    } else {
+      return getElement().getProperty().getStructure().hasUserData(UserDataNames.loader_custom_resource);
+    }
+  }
+
+  public boolean isCanonical(IWorkerContext context) {
+    StructureDefinition sd = getElement().getProperty().getStructure();
+    while (sd != null) {
+      if ("CanonicalResource".equals(sd.getType())) {
+        return true;
+      }
+      sd = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition());
+    }
+    return false;
+  }
+  
   
 }

@@ -47,6 +47,7 @@ import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.ValueSet;
+import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.r5.utils.XVerExtensionManager;
 import org.hl7.fhir.utilities.LoincLinker;
 import org.hl7.fhir.utilities.Utilities;
@@ -398,7 +399,18 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   public void findConfiguration(FetchedFile f, FetchedResource r) {
     if (template != null) {
       JsonObject cfg = null;
-      if (r.isExample()) {
+      if (r.isCanonical(context)) {
+        if (r.isExample()) {
+          cfg = defaultConfig.getJsonObject("example:canonical");
+        }
+        if (cfg == null) {
+          cfg = defaultConfig.getJsonObject(r.fhirType()+":canonical");
+        }
+        if (cfg == null) {
+          cfg = defaultConfig.getJsonObject("Any:canonical");
+        }
+      }
+      if (cfg == null && r.isExample()) {
         cfg = defaultConfig.getJsonObject("example");
       }        
       if (cfg == null && r.fhirType().equals("StructureDefinition")) {
@@ -426,7 +438,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     if (r.getConfig() == null)
       findConfiguration(f, r);
     JsonObject e = r.getConfig();
-    bc.setUserData("config", e);
+    bc.setUserData(UserDataNames.pub_resource_config, e);
     String base = getProperty(r,  "base");
     if (base != null) 
       bc.setWebPath(doReplacements(base, r, null, null));
@@ -436,12 +448,13 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
       bc.setWebPath(r.fhirType()+"/"+r.getId()+".html");
     r.getElement().setWebPath(bc.getWebPath());
     for (Resource cont : bc.getContained()) {
-      if (base != null) 
+      if (base != null)  {
         cont.setWebPath(doReplacements(base, r, cont, null, null, bc.getId()+"_"));
-      else if (pathPattern != null)
+      } else if (pathPattern != null) {
         cont.setWebPath(pathPattern.replace("[type]", r.fhirType()).replace("[id]", bc.getId()+"_"+cont.getId()));
-      else
+      } else {
         cont.setWebPath(r.fhirType()+"/"+bc.getId()+"_"+r.getId()+".html");
+      }
     }
   }
 
@@ -449,7 +462,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     if (r.getConfig() == null)
       findConfiguration(f, r);
     JsonObject e = r.getConfig();
-    res.setUserData("config", e);
+    res.setUserData(UserDataNames.pub_resource_config, e);
     String base = getProperty(r,  "base");
     if (base != null) 
       res.setWebPath(doReplacements(base, r, null, null));
@@ -586,7 +599,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
         br.url = vs.getWebPath();
         br.display = vs.getName(); 
         br.uri = vs.getVersionedUrl();
-        br.external = vs.hasUserData("External.Link");
+        br.external = vs.hasUserData(UserDataNames.render_external_link);
       }
     } else { 
       if (ref.startsWith("http://hl7.org/fhir/ValueSet/")) {
@@ -595,7 +608,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
           br.url = vs.getWebPath();
           br.display = vs.getName(); 
           br.uri = vs.getUrl();
-          br.external = vs.hasUserData("External.Link");
+          br.external = vs.hasUserData(UserDataNames.render_external_link);
         } else {
           String nvref = ref;
           if (nvref.contains("|")) {
@@ -641,7 +654,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
             br.display = vs.getName(); 
           }
           br.uri = vs.getUrl();
-          br.external = vs.hasUserData("External.Link");
+          br.external = vs.hasUserData(UserDataNames.render_external_link);
         } else if (ref.startsWith("http://cts.nlm.nih.gov/fhir/ValueSet/")) {          
           String oid = ref.substring("http://cts.nlm.nih.gov/fhir/ValueSet/".length());
           br.url = "https://vsac.nlm.nih.gov/valueset/"+oid+"/expansion";  

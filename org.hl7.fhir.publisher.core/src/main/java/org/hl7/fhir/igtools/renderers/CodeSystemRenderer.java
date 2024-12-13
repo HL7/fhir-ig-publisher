@@ -185,6 +185,8 @@ public class CodeSystemRenderer extends CanonicalRenderer {
         b.append("<li>One or more text definitions/displays have changed</li>\r\n");          
       }
 
+    } else if (comp == null) {
+      b.append("<li>New Content</li>\r\n");
     } else {
       b.append("<li>No changes</li>\r\n");
     }

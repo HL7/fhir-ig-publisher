@@ -4,9 +4,12 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.hl7.fhir.igtools.web.PublicationProcess.PublicationProcessMode;
+import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.StringPair;
 import org.hl7.fhir.utilities.TextFile;
@@ -181,7 +184,7 @@ public class PublicationChecker {
         summary.add(new StringPair("path", pr.asString("path")));                        
       }
       if ("milestone".equals(pr.asString("mode"))) {
-        check(messages,  pr.asString("path").equals(Utilities.pathURL(npm.canonical(), pr.asString("sequence"))) || pr.asString("path").equals(Utilities.pathURL(npm.canonical(), pr.asString("version"))), 
+        check(messages,  pr.asString("path").equals(Utilities.pathURL(npm.canonical(), pr.asString("sequence").replace(" ", ""))) || pr.asString("path").equals(Utilities.pathURL(npm.canonical(), pr.asString("version"))), 
             "Proposed path for this milestone publication should usually be canonical with either sequence or version appended"+mkWarning());        
         if (pl != null) {
           for (PackageListEntry e : pl.list()) {
@@ -210,6 +213,8 @@ public class PublicationChecker {
         check(messages, npm.version().contains("-"), "This release is not labelled as a milestone or technical correction, so should have a patch version ("+npm.version() +")"+(isHL7(npm) ? mkError() : mkWarning()));
       }
     }
+    check(messages, !"technical-correction".equals(pr.asString("mode")), "Technical Corrections are not currently supported");
+    
     if (check(messages, pr.has("status"), "No publication request status found"+mkError())) {
       if (check(messages, isValidStatus(pr.asString("status")), "Proposed status for this publication is not valid (valid values: release|trial-use|update|preview|ballot|draft|normative+trial-use|normative|informative)"+mkError())) {
         summary.add(new StringPair("status", pr.asString("status")));                        
@@ -232,8 +237,19 @@ public class PublicationChecker {
           PackageListEntry ls = getLastVersionForSequence(pl, pr.asString("sequence"));
           check(messages, ls == null || !ls.current(), "The sequence '"+seq+"' has already been closed with a current publication, and a new sequence '"+seq+"' started - is going back to '"+pr.asString("sequence")+"' really what's intended?"+mkWarning());
         }        
+        String cs = pl.current() == null ? null : pl.current().sequence();
+        Set<String> sl = new HashSet<>();
+        for (PackageListEntry ple : pl.list()) {
+          if (ple.sequence() != null) {
+            sl.add("'"+ple.sequence()+"'");
+          }
+        }  
+        sl.remove(cs);
+        summary.add(new StringPair("Sequence (Group)", pr.asString("sequence")+" (current: "+(cs == null ? "n/a" : "'"+cs+"'")+
+            ", others = "+(sl.isEmpty() ? "n/a" : CommaSeparatedStringBuilder.join(",", Utilities.sorted(sl)))+")"));        
+      } else {
+        summary.add(new StringPair("Sequence (Group)", pr.asString("sequence")));
       }
-      summary.add(new StringPair("sequence", pr.asString("sequence")));                        
     }
 
     if (check(messages, pr.has("desc") || pr.has("descmd") , "No publication request description found"+mkError())) {

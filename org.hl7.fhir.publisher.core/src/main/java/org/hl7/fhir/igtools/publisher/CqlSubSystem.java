@@ -58,16 +58,31 @@ import org.hl7.elm_modelinfo.r1.ModelInfo;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.r5.context.ILoggingService;
+import org.hl7.fhir.r5.model.ActivityDefinition;
 import org.hl7.fhir.r5.model.DataRequirement;
 import org.hl7.fhir.r5.model.Enumerations;
 import org.hl7.fhir.r5.model.Library;
+import org.hl7.fhir.r5.model.Measure;
 import org.hl7.fhir.r5.model.ParameterDefinition;
+import org.hl7.fhir.r5.model.PlanDefinition;
 import org.hl7.fhir.r5.model.RelatedArtifact;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 
+/**
+ * What this system does
+ * 
+ * Library:
+ * 
+ * Measure:
+ * 
+ * PlanDefinition:
+ * 
+ * ActivityDefinition:
+ * 
+ */
 public class CqlSubSystem {
 
   /** 
@@ -184,11 +199,14 @@ public class CqlSubSystem {
 
   /**
    * The Implementation Guide build supports multiple versions. This code runs as R5 code.
-   * The library reader loads the library from the NpmPackage and returns an R5 library,
+   * The library reader loads the library etc from the NpmPackage and returns an R5 library etc,
    * irrespective of what version the IG is 
    */
-  public interface ILibraryReader {
+  public interface ICqlResourceReader {
     public Library readLibrary(InputStream stream) throws FHIRFormatError, IOException; 
+    public Measure readMeasure(InputStream stream) throws FHIRFormatError, IOException; 
+    public PlanDefinition readPlanDefinition(InputStream stream) throws FHIRFormatError, IOException; 
+    public ActivityDefinition readActivityDefinition(InputStream stream) throws FHIRFormatError, IOException; 
   }
   
   /**
@@ -210,7 +228,7 @@ public class CqlSubSystem {
   /**
    * Version indepedent reader
    */
-  private ILibraryReader reader;
+  private ICqlResourceReader reader;
 
   /**
    * use this to write to the standard IG log
@@ -244,7 +262,7 @@ public class CqlSubSystem {
 
   private NamespaceInfo namespaceInfo;
 
-  public CqlSubSystem(List<NpmPackage> packages, List<String> folders, ILibraryReader reader, ILoggingService logger, UcumService ucumService, String packageId, String canonicalBase) {
+  public CqlSubSystem(List<NpmPackage> packages, List<String> folders, ICqlResourceReader reader, ILoggingService logger, UcumService ucumService, String packageId, String canonicalBase) {
     super();
     this.packages = packages;
     this.folders = folders;

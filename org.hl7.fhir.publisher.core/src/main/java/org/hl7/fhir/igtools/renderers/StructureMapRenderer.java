@@ -36,6 +36,7 @@ import org.hl7.fhir.r5.renderers.RendererFactory;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
+import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.utilities.MarkDownProcessor;
@@ -58,7 +59,7 @@ public class StructureMapRenderer extends CanonicalRenderer {
     this.map = map;
     this.destDir = destDir;
     utils = new StructureMapUtilities(context, null, igp);
-    analysis = (StructureMapAnalysis) map.getUserData("analysis");
+    analysis = (StructureMapAnalysis) map.getUserData(UserDataNames.pub_analysis);
   }
 
   @Override
@@ -96,7 +97,7 @@ public class StructureMapRenderer extends CanonicalRenderer {
       } catch (FHIRException e) {
         return "Error in Map: "+e.getMessage();  
       }
-      map.setUserData("analysis", analysis);
+      map.setUserData(UserDataNames.pub_analysis, analysis);
     }      
     XhtmlNode summary = analysis.getSummary();
     return summary == null ? "" : new XhtmlComposer(XhtmlComposer.HTML).compose(summary);        

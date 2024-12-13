@@ -3,6 +3,7 @@ package org.hl7.fhir.igtools.publisher.realm;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
@@ -206,7 +207,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
 
   private JsonObject fetchJson(String source) throws IOException {
     try {
-      HTTPResult res = ManagedWebAccess.get(source+"?nocache=" + System.currentTimeMillis());
+      HTTPResult res = ManagedWebAccess.get(Arrays.asList("web"), source+"?nocache=" + System.currentTimeMillis());
       res.checkThrowException();
       return JsonParser.parseObject(res.getContent());
     } catch (IOException e) {
@@ -234,13 +235,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
       }
       Utilities.createDirectory(Utilities.path(dstDir, "us-core-comparisons"));
       ComparisonRenderer cr = new ComparisonRenderer(context, context, Utilities.path(dstDir, "us-core-comparisons"), session);
-      cr.getTemplates().put("CodeSystem", new String(context.getBinaryForKey("template-comparison-CodeSystem.html")));
-      cr.getTemplates().put("ValueSet", new String(context.getBinaryForKey("template-comparison-ValueSet.html")));
-      cr.getTemplates().put("Profile", new String(context.getBinaryForKey("template-comparison-Profile.html")));
-      cr.getTemplates().put("Profile-Union", new String(context.getBinaryForKey("template-comparison-Profile-Union.html")));
-      cr.getTemplates().put("Profile-Intersection", new String(context.getBinaryForKey("template-comparison-Profile-Intersection.html")));
-      cr.getTemplates().put("CapabilityStatement", new String(context.getBinaryForKey("template-comparison-CapabilityStatement.html")));
-      cr.getTemplates().put("Index", new String(context.getBinaryForKey("template-comparison-index.html")));
+      cr.loadTemplates(context);
       cr.setPreamble(renderProblems());
       cr.render("US Realm", "Current Build");
       System.out.println("US Core Comparisons Finished");

@@ -63,6 +63,7 @@ import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.terminologies.client.TerminologyClientContext;
 import org.hl7.fhir.r5.terminologies.client.TerminologyClientContext.TerminologyClientContextUseCount;
 import org.hl7.fhir.r5.terminologies.client.TerminologyClientManager;
+import org.hl7.fhir.r5.terminologies.client.TerminologyClientManager.InternalLogEvent;
 import org.hl7.fhir.r5.utils.OperationOutcomeUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
@@ -304,13 +305,16 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   boolean showReferenceMessages = false;
   boolean noExperimentalContent = false;
   boolean displayWarnings = false;
+  private List<String> versionProblems;
+  private List<FetchedResource> fragments;
 
   
   public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, 
       String toolsVersion, String currentToolsVersion, RealmBusinessRules realm, PreviousVersionComparator previousVersionComparator, IpaComparator ipaComparator, IpsComparator ipsComparator,
       String dependencies, String csAnalysis, String pubReqCheck, String globalCheck, String copyrightYear, IWorkerContext context,
       Set<String> r5Extensions, List<StructureDefinition> modifierExtensions, String draftDependencies,
-      List<FetchedResource> noNarratives, List<FetchedResource> noValidation, boolean noValidate, boolean noGenerate, DependentIGFinder dependentIgs, TerminologyClientManager txServers) {
+      List<FetchedResource> noNarratives, List<FetchedResource> noValidation, boolean noValidate, boolean noGenerate, DependentIGFinder dependentIgs, 
+      TerminologyClientManager txServers, List<String> versionProblems, List<FetchedResource> fragments) {
     super();
     this.statedVersion = statedVersion;
     this.igVersion = igVersion;
@@ -340,6 +344,8 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     this.draftDependencies = draftDependencies;
     this.globalCheck = globalCheck;
     this.txServers = txServers;
+    this.versionProblems = versionProblems;
+    this.fragments = fragments;
     ruleDateCutoff = Date.from(LocalDate.now().minusMonths(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
     determineCode();
   }
@@ -481,13 +487,58 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
         }
       }
       x.h2().tx("Tx Manager report for '"+txServers.getMonitorServiceURL()+"'");
-      ul = x.ul();
       if (txServers.getInternalLog().isEmpty()) {
+        ul = x.ul();
         ul.li().tx("(No Errors/Reports - all good)");        
       } else {
-        for (String s : txServers.getInternalLog()) {
-          ul.li().tx(s);        
-        }        
+        x.para().b().tx("Decisions");
+        XhtmlNode tbl = x.table("grid");
+        XhtmlNode tr = tbl.tr();
+        tr.td().b().tx("Message");
+        tr.td().b().tx("Server");
+        tr.td().b().tx("ValueSet");
+        tr.td().b().tx("Systems");
+        tr.td().b().tx("Choices");
+        boolean isErr = false;
+        Set<String> contexts = new HashSet<>();
+        for (InternalLogEvent log : txServers.getInternalLog()) {
+          if (!log.isError()) {
+            tr = tbl.tr();
+            tr.td().tx(log.getMessage());
+            tr.td().tx(log.getServer());
+            tr.td().tx(log.getVs());
+            tr.td().tx(log.getSystems());
+            tr.td().tx(log.getChoices());
+          } else {
+            isErr = true;
+            contexts.add(log.getContext());
+          }
+        }
+        if (isErr) {
+          x.para().b().tx("Errors");
+          tbl = x.table("grid");
+          tr = tbl.tr();
+          tr.td().b().tx("URL");
+          tr.td().b().tx("Message");
+          for (String c : Utilities.sorted(contexts)) {
+            tr = tbl.tr();
+            tr.td().tx(c);
+            List<InternalLogEvent> list = new ArrayList<TerminologyClientManager.InternalLogEvent>();
+            for (InternalLogEvent log : txServers.getInternalLog()) {
+              if (log.isError() && c.equals(log.getContext())) {
+                list.add(log);
+              }
+            }
+            if (list.size() == 1) {
+              tr.td().style("background-color: #ffe3e3").span().attribute("title",list.get(0).getRequest()).tx(list.get(0).getMessage());              
+            } else {
+              ul = tr.td().style("background-color: #ffe3e3").ul();
+              for (InternalLogEvent log : list) {
+                ul.li().span().attribute("title", log.getRequest()).tx(log.getMessage());
+              }
+            }
+          }
+        }
       }     
       
       TerminologyClientContext master = txServers.getServerList().get(0);
@@ -720,6 +771,10 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     b.append(genEnd());
     b.append(genStartInternal());
     int id = 0;
+    for (String vp : versionProblems) {
+      b.append(genDetails(vp, id));
+      id++;
+    }
     for (ValidationMessage vm : linkErrors) {
       b.append(genDetails(vm, id));
       id++;
@@ -949,6 +1004,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       " <tr><td>Validation Flags:</td><td> $validationFlags$</td></tr>\r\n"+
       "$noNarrative$"+
       "$noValidation$"+
+      "$fragments$"+
       " <tr><td>Summary:</td><td> errors = $err$, warn = $warn$, info = $info$, broken links = $links$</td></tr>\r\n"+
       "</table>\r\n"+
       " <table class=\"grid\">\r\n"+
@@ -1019,12 +1075,12 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   
   private final String detailsTemplateTxLink = 
       "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</ta>, see <a href=\"$tx$\">log</a>)</td>\r\n"+
+      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$<ta>, see <a href=\"$tx$\">log</a>)</td>\r\n"+
       "   </tr>\r\n";
   
   private final String detailsTemplateTxNoLink = 
       "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</ta>)</td>\r\n"+
+      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$<ta>)</td>\r\n"+
       "   </tr>\r\n";
   
   private final String detailsTemplateWithExtraDetails = 
@@ -1111,6 +1167,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("ipsComparison", ipsComparator == null ? "n/a" : ipsComparator.checkHtml());
     t.add("noNarrative", genResourceList(noNarratives, "Narratives Suppressed"));
     t.add("noValidation", genResourceList(noValidation, "Validation Suppressed"));
+    t.add("fragments", genResourceList(noValidation, "CodeSystem Fragments"));
     t.add("validationFlags", validationFlags());
     
     if (noGenerate || noValidate) {
@@ -1524,15 +1581,36 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("mid", vm.getMessageId());
     t.add("msg", (isNewRule(vm) ? "<img style=\"vertical-align: text-bottom\" src=\"new.png\" height=\"16px\" width=\"36px\" alt=\"New Rule: \"> " : "")+ vm.getHtml());
     t.add("msgdetails", vm.isSlicingHint() ? vm.getSliceHtml() : vm.getHtml());
-    t.add("comment", vm.getComment() == null ? "" : "<br/><br/><span style=\"border: 1px grey solid; border-radius: 5px; background-color: #eeeeee; padding: 3px; margin: 3px \"><i><b>Editor's Comment</b>: "+Utilities.escapeXml(vm.getComment())+"</i></span>");
+    t.add("comment", vm.getComment() == null ? "" : "<br/><br/><span style=\"display: block; border: 1px grey solid; border-radius: 5px; background-color: #eeeeee; padding: 3px; margin: 3px \"><i><b>Editor's Comment</b>: "+Utilities.escapeXml(vm.getComment())+"</i></span>");
     t.add("tx", "qa-tx.html#l"+vm.getTxLink());
     t.add("txsrvr", getServer(vm.getServer()));
+    return t.render();
+  }
+
+  private String genDetails(String vp, int id) {
+    String tid = null;
+    tid = detailsTemplate;
+    ST t = template(tid);
+    t.add("path", "");
+    t.add("pathlink", "");      
+    t.add("level", "warning");
+    t.add("color", colorForLevel(IssueSeverity.WARNING, false));
+    t.add("halfcolor", halfColorForLevel(IssueSeverity.WARNING, false));
+    t.add("id", "l"+id);
+    t.add("mid", "");
+    t.add("msg", vp);
+    t.add("msgdetails", vp);
+    t.add("comment", "");
+    t.add("tx", "");
+    t.add("txsrvr", "");
     return t.render();
   }
 
   private String getServer(String server) {
     if (txServers.getServerMap().containsKey(server)) {
       return txServers.getServerMap().get(server).getClient().getAddress();
+    } else if (Utilities.noString(server)) {
+      return "server";
     } else {
       return server;
     }

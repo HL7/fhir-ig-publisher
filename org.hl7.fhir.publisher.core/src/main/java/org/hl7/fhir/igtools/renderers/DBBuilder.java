@@ -16,12 +16,15 @@ import java.util.Set;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
+import org.hl7.fhir.r5.context.ContextUtilities;
+import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionDesignationComponent;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptPropertyComponent;
 import org.hl7.fhir.r5.model.CodeSystem.PropertyComponent;
+import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ConceptMap;
 import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
 import org.hl7.fhir.r5.model.ConceptMap.SourceElementComponent;
@@ -29,7 +32,12 @@ import org.hl7.fhir.r5.model.ConceptMap.TargetElementComponent;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
+import org.hl7.fhir.r5.renderers.DataRenderer;
+import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
+import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.Utilities;
@@ -44,27 +52,212 @@ import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
 public class DBBuilder {
-  private boolean debug = true;
+
+  public enum SQLControlColumnType { 
+    Auto, Link, Text, Markdown, Url, Coding, Canonical, Resource;
+
+    public static SQLControlColumnType fromCode(String type) {
+      if (Utilities.noString(type)) {
+        return Auto;
+      }
+      switch (type) {
+      case "auto" : return Auto;
+      case "link" : return Link;
+      case "text" : return Text;
+      case "markdown" : return Markdown;
+      case "url" : return Url;
+      case "coding" : return Coding;
+      case "canonical" : return Canonical; 
+      case "resource" : return Resource; 
+      }
+      throw new FHIRException("Unknown column type '"+type+"'");
+
+    } 
+  }
   
-  public enum RenderingType {
-    AutoDetect, None, String, Markdown;
+  public class SQLControlColumn {
+    private SQLControlColumnType type;
+    private String title;
+    private String source;
+    private int sourceIndex;
+    private String target;
+    private int targetIndex;
+    private String system;
+    private int systemIndex;
+    private String display;
+    private int displayIndex;
+    private String version;
+    private int versionIndex;
+    
+    public SQLControlColumnType getType() {
+      return type;
+    }
+    public void setType(SQLControlColumnType type) {
+      this.type = type;
+    }
+    public String getTitle() {
+      return title;
+    }
+    public void setTitle(String title) {
+      this.title = title;
+    }
+    public String getSource() {
+      return source;
+    }
+    public void setSource(String source) {
+      this.source = source;
+    }
+    public int getSourceIndex() {
+      return sourceIndex;
+    }
+    public void setSourceIndex(int sourceIndex) {
+      this.sourceIndex = sourceIndex;
+    }
+    public String getTarget() {
+      return target;
+    }
+    public void setTarget(String target) {
+      this.target = target;
+    }
+    public int getTargetIndex() {
+      return targetIndex;
+    }
+    public void setTargetIndex(int targetIndex) {
+      this.targetIndex = targetIndex;
+    }
+    public String getSystem() {
+      return system;
+    }
+    public void setSystem(String system) {
+      this.system = system;
+    }
+    public int getSystemIndex() {
+      return systemIndex;
+    }
+    public void setSystemIndex(int systemIndex) {
+      this.systemIndex = systemIndex;
+    }
+    public String getDisplay() {
+      return display;
+    }
+    public void setDisplay(String display) {
+      this.display = display;
+    }
+    public int getDisplayIndex() {
+      return displayIndex;
+    }
+    public void setDisplayIndex(int displayIndex) {
+      this.displayIndex = displayIndex;
+    }
+    public String getVersion() {
+      return version;
+    }
+    public void setVersion(String version) {
+      this.version = version;
+    }
+    public int getVersionIndex() {
+      return versionIndex;
+    }
+    public void setVersionIndex(int versionIndex) {
+      this.versionIndex = versionIndex;
+    }
+    
   }
 
-  public class RenderingRule {
-    private RenderingType type;
-    private int linkCol;
-    private int linksCol;
-    protected RenderingRule(RenderingType type) {
-      super();
-      this.type = type;
+  public class SQLControl {
+    private String query;
+    private String clss;
+    private boolean titles;
+    private List<SQLControlColumn> columns = new ArrayList<>();
+    public String getQuery() {
+      return query;
+    }
+    public void setQuery(String query) {
+      this.query = query;
+    }
+    public String getClss() {
+      return clss;
+    }
+    public void setClss(String clss) {
+      this.clss = clss;
+    }
+    public boolean isTitles() {
+      return titles;
+    }
+    public void setTitles(boolean titles) {
+      this.titles = titles;
+    }
+    public List<SQLControlColumn> getColumns() {
+      return columns;
+    }
+    public void checkResultSet(ResultSetMetaData rsmd) throws SQLException {
+      if (columns.isEmpty()) {
+        for (int i = 1; i <= rsmd.getColumnCount(); i++) {
+          SQLControlColumn col = new SQLControlColumn();
+          col.setType(SQLControlColumnType.Auto);
+          col.setTitle(rsmd.getColumnName(i));     
+          col.setSourceIndex(i);
+          columns.add(col);
+        }
+      } else {
+        for (SQLControlColumn col : columns) {
+          col.sourceIndex = getColByName(rsmd, col.source);
+          if (col.sourceIndex == 0) {
+            throw new FHIRException("Unable to find column "+col.source+" in sql query result set");              
+          }
+          if (col.target != null) {
+            col.targetIndex = getColByName(rsmd, col.target);
+          }
+          if (col.system != null) {
+            col.systemIndex = getColByName(rsmd, col.system);
+          }
+          if (col.display != null) {
+            col.displayIndex = getColByName(rsmd, col.display);
+          }
+          if (col.version != null) {
+            col.versionIndex = getColByName(rsmd, col.version);
+          }
+        }
+      } 
+    }
+    private int getColByName(ResultSetMetaData rsmd, String source) throws SQLException {
+      for (int i = 1; i <= rsmd.getColumnCount(); i++) {
+        if (source.equals(rsmd.getColumnName(i))) {
+          return i;
+        }
+      }
+      return 0;
     }
   }
 
+  private boolean debug = true;
+  
+//  public enum RenderingType {
+//    AutoDetect, None, String, Markdown, Url, Coding;
+//  }
+//
+//  public class RenderingRule {
+//    private RenderingType type;
+//    private int linkSource;
+//    private int linksCol;
+//    private int displayCol;
+//    private int displaySource;
+//    private String system;
+//    protected RenderingRule(RenderingType type) {
+//      super();
+//      this.type = type;
+//    }
+//  }
+
+  private IWorkerContext context;
+  private RenderingContext rc;
+  private ContextUtilities cu;
   private Connection con;
   private Set<String> errors = new HashSet<>();
   private MarkDownProcessor md = new MarkDownProcessor(Dialect.COMMON_MARK);
   private List<CodeSystem> codesystems = new ArrayList<>();
   private List<ConceptMap> mappings = new ArrayList<>();
+  private List<FetchedFile> files;
   private int lastMDKey;
   private int lastResKey;
   private int lastPropKey;
@@ -82,7 +275,11 @@ public class DBBuilder {
     cumulativeTime = cumulativeTime + (System.currentTimeMillis() - start);
   }
   
-  public DBBuilder(String path) {
+  public DBBuilder(String path, IWorkerContext context, RenderingContext rc, ContextUtilities cu, List<FetchedFile> files) {
+    this.context = context;
+    this.rc = rc;
+    this.cu = cu;
+    this.files = files;
     long start = System.currentTimeMillis();
     try {
       con = connect(path);
@@ -125,42 +322,54 @@ public class DBBuilder {
 
     try {
       if (r.getResource() == null || !(r.getResource() instanceof CanonicalResource)) {
-        PreparedStatement psql = con.prepareStatement("Insert into Resources (key, type, id, json, web) values (?, ?, ?, ?, ?)");
+        PreparedStatement psql = con.prepareStatement("Insert into Resources (key, type, custom, id, web, url, version, status, date, name, title, description, json) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         psql.setInt(1, ++lastResKey);
         bindString(psql, 2, r.fhirType());
-        bindString(psql, 3, r.getId());
-        bindString(psql, 4, r.getLocalRef());
-        psql.setBytes(5, json);
+        psql.setInt(3, r.getElement().getProperty().getStructure().hasUserData(UserDataNames.loader_custom_resource) ? 1 : 0);
+        bindString(psql, 4, r.getId());
+        bindString(psql, 5, r.getElement().getWebPath());
+        bindString(psql, 6, getSingleChildValue(r, "url", null));
+        bindString(psql, 7, getSingleChildValue(r, "version", null));
+        bindString(psql, 8, getSingleChildValue(r, "status", null));
+        bindString(psql, 9, getSingleChildValue(r, "date", null));
+        bindString(psql, 10, getSingleChildValue(r, "name", r.getResourceName()));
+        bindString(psql, 11, getSingleChildValue(r, "title", null));
+        bindString(psql, 12, r.getResourceDescription());
+        psql.setBytes(13, json);
         psql.executeUpdate();   
-        r.getElement().setUserData("db.key", lastResKey);
+        r.getElement().setUserData(UserDataNames.db_key, lastResKey);
+        r.getElement().setUserData(UserDataNames.Storage_key, lastResKey);
       } else {
         CanonicalResource cr = (CanonicalResource) r.getResource();
-        PreparedStatement psql = con.prepareStatement("Insert into Resources (key, type, id, web, url, version, status, date, name, title, experimental, realm, description, purpose, copyright, copyrightLabel, json) "+
-            "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        PreparedStatement psql = con.prepareStatement("Insert into Resources (key, type, custom, id, web, url, version, status, date, name, title, experimental, realm, description, purpose, copyright, copyrightLabel, json) "+
+            "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         psql.setInt(1, ++lastResKey);
         bindString(psql, 2,  r.fhirType());
-        bindString(psql, 3,  r.getId());
-        bindString(psql, 4,  cr.getWebPath());
-        bindString(psql, 5,  cr.getUrl());
-        bindString(psql, 6,  cr.getVersion());
-        bindString(psql, 7,  cr.getStatus().toCode());
-        bindString(psql, 8,  cr.getDateElement().primitiveValue());
-        bindString(psql, 9,  cr.getName());
-        bindString(psql, 10,  cr.getTitle());
-        bindString(psql, 11,  cr.getExperimentalElement().primitiveValue());
-        bindString(psql, 12, realm(cr));
-        bindString(psql, 13, cr.getDescription());
-        bindString(psql, 14, cr.getPurpose());
-        bindString(psql, 15, cr.getCopyright());
-        bindString(psql, 16, cr.getCopyrightLabel());
-        psql.setBytes(17, json);
+        psql.setInt(3, r.getElement().getProperty().getStructure().hasUserData(UserDataNames.loader_custom_resource) ? 1 : 0);
+        bindString(psql, 4,  r.getId());
+        bindString(psql, 5,  cr.getWebPath());
+        bindString(psql, 6,  cr.getUrl());
+        bindString(psql, 7,  cr.getVersion());
+        bindString(psql, 8,  cr.getStatus().toCode());
+        bindString(psql, 9,  cr.getDateElement().primitiveValue());
+        bindString(psql, 10,  cr.getName());
+        bindString(psql, 11,  cr.getTitle());
+        bindString(psql, 12,  cr.getExperimentalElement().primitiveValue());
+        bindString(psql, 13, realm(cr));
+        bindString(psql, 14, cr.getDescription());
+        bindString(psql, 15, cr.getPurpose());
+        bindString(psql, 16, cr.getCopyright());
+        bindString(psql, 17, cr.getCopyrightLabel());
+        psql.setBytes(18, json);
         psql.executeUpdate();    
         if (cr instanceof CodeSystem) {
           codesystems.add((CodeSystem) cr);
         } else if (cr instanceof ConceptMap) {
           mappings.add((ConceptMap) cr);
         }
-        cr.setUserData("db.key", lastResKey);
+        cr.setUserData(UserDataNames.db_key, lastResKey);
+        cr.setUserData(UserDataNames.Storage_key, lastResKey);
+        r.getElement().setUserData(UserDataNames.Storage_key, lastResKey);
       } 
     } catch (SQLException e) {
       errors.add(e.getMessage());
@@ -169,6 +378,10 @@ public class DBBuilder {
       }
     }
     time(start);
+  }
+
+  private String getSingleChildValue(FetchedResource r, String name, String defaultValue) {
+    return r.getElement().getChildren(name).size() == 1 && r.getElement().getNamedChild(name).isPrimitive() ? r.getElement().getNamedChildValue(name) : defaultValue;
   }
 
   public void finishResources() {
@@ -183,13 +396,13 @@ public class DBBuilder {
       for (CodeSystem cs : codesystems) {
         for (PropertyComponent p : cs.getProperty()) { 
           psql.setInt(1, ++lastPropKey);
-          psql.setInt(2, ((Integer) cs.getUserData("db.key")).intValue());
+          psql.setInt(2, ((Integer) cs.getUserData(UserDataNames.db_key)).intValue());
           bindString(psql, 3, p.getCode());
           bindString(psql, 4, p.getUri());
           bindString(psql, 5, p.getDescription());
           bindString(psql, 6, p.getType().toCode());  
           psql.executeUpdate();     
-          p.setUserData("db.key", lastPropKey);   
+          p.setUserData(UserDataNames.db_key, lastPropKey);   
         }
       }
       psql = con.prepareStatement("Insert into Concepts (Key, ResourceKey, ParentKey,  Code, Display, Definition) "+
@@ -215,7 +428,7 @@ public class DBBuilder {
           for (SourceElementComponent src : grp.getElement()) {
             for (TargetElementComponent tgt : src.getTarget()) {
               psql.setInt(1, ++lastMapKey);
-              psql.setInt(2, ((Integer) cm.getUserData("db.key")).intValue());
+              psql.setInt(2, ((Integer) cm.getUserData(UserDataNames.db_key)).intValue());
               bindString(psql, 3, grp.getSourceElement().baseUrl());
               bindString(psql, 4, grp.getSourceElement().version());
               bindString(psql, 5, src.getCode());
@@ -263,9 +476,9 @@ public class DBBuilder {
 
 
   private void addContains(ValueSet vs, ValueSetExpansionContainsComponent e, PreparedStatement psql) throws SQLException {
-    if (vs.hasUserData("db.key")) {
+    if (vs.hasUserData(UserDataNames.db_key)) {
       psql.setInt(1, ++lastVSKey);
-      psql.setInt(2, ((Integer) vs.getUserData("db.key")).intValue());
+      psql.setInt(2, ((Integer) vs.getUserData(UserDataNames.db_key)).intValue());
       bindString(psql, 3, vs.getUrl());
       bindString(psql, 4, vs.getVersion());
       bindString(psql, 5, e.getSystem());
@@ -280,10 +493,10 @@ public class DBBuilder {
   }
 
   private void addConcepts(CodeSystem cs, List<ConceptDefinitionComponent> list, PreparedStatement psql, int parent) throws SQLException {
-    if (cs.hasUserData("db.key")) {
+    if (cs.hasUserData(UserDataNames.db_key)) {
     for (ConceptDefinitionComponent cd : list) {
       psql.setInt(1, ++lastConceptKey);
-      psql.setInt(2, ((Integer) cs.getUserData("db.key")).intValue());
+      psql.setInt(2, ((Integer) cs.getUserData(UserDataNames.db_key)).intValue());
       if (parent == 0) {
         psql.setNull(3, java.sql.Types.INTEGER);
       } else {
@@ -293,29 +506,29 @@ public class DBBuilder {
       bindString(psql, 5, cd.getDisplay());
       bindString(psql, 6, cd.getDefinition());
       psql.executeUpdate();    
-      cd.setUserData("db.key", lastConceptKey);   
+      cd.setUserData(UserDataNames.db_key, lastConceptKey);   
       addConcepts(cs, cd.getConcept(), psql, lastConceptKey);
     }
     }
   }
 
   private void addConceptProperties(CodeSystem cs, List<ConceptDefinitionComponent> list, PreparedStatement psql) throws SQLException {
-    if (cs.hasUserData("db.key")) {
+    if (cs.hasUserData(UserDataNames.db_key)) {
        for (ConceptDefinitionComponent cd : list) {
       for (ConceptPropertyComponent p : cd.getProperty()) { 
         psql.setInt(1, ++lastCPropKey);
-        psql.setInt(2, ((Integer) cs.getUserData("db.key")).intValue());
-        psql.setInt(3, ((Integer) cd.getUserData("db.key")).intValue());
+        psql.setInt(2, ((Integer) cs.getUserData(UserDataNames.db_key)).intValue());
+        psql.setInt(3, ((Integer) cd.getUserData(UserDataNames.db_key)).intValue());
         PropertyComponent pd = getPropDefn(p.getCode(), cs);
         if (pd == null) {
           psql.setNull(4, java.sql.Types.INTEGER);
         } else {
-          psql.setInt(4, ((Integer) pd.getUserData("db.key")).intValue());
+          psql.setInt(4, ((Integer) pd.getUserData(UserDataNames.db_key)).intValue());
         }
         bindString(psql, 5, p.getCode());
-        bindString(psql, 6, p.getValue().primitiveValue());
+        bindString(psql, 6, p.getValue() == null ? p.getValue().primitiveValue() : null);
         psql.executeUpdate();    
-        p.setUserData("db.key", lastCPropKey);   
+        p.setUserData(UserDataNames.db_key, lastCPropKey);   
       }
       addConceptProperties(cs, cd.getConcept(), psql);
     }
@@ -323,18 +536,18 @@ public class DBBuilder {
   }
 
   private void addConceptDesignations(CodeSystem cs, List<ConceptDefinitionComponent> list, PreparedStatement psql) throws SQLException {
-    if (cs.hasUserData("db.key")) {
+    if (cs.hasUserData(UserDataNames.db_key)) {
       for (ConceptDefinitionComponent cd : list) {
         for (ConceptDefinitionDesignationComponent p : cd.getDesignation()) { 
           psql.setInt(1, ++lastDesgKey);
-          psql.setInt(2, ((Integer) cs.getUserData("db.key")).intValue());
-          psql.setInt(3, ((Integer) cd.getUserData("db.key")).intValue());        
+          psql.setInt(2, ((Integer) cs.getUserData(UserDataNames.db_key)).intValue());
+          psql.setInt(3, ((Integer) cd.getUserData(UserDataNames.db_key)).intValue());        
           bindString(psql, 4, p.getUse().getSystem());
           bindString(psql, 5, p.getUse().getCode());
           bindString(psql, 6, p.getLanguage());
           bindString(psql, 7, p.getValue());
           psql.executeUpdate();    
-          p.setUserData("db.key", lastDesgKey);   
+          p.setUserData(UserDataNames.db_key, lastDesgKey);   
         }
         addConceptDesignations(cs, cd.getConcept(), psql);
       }
@@ -472,6 +685,7 @@ public class DBBuilder {
     stmt.execute("CREATE TABLE Resources (\r\n"+
         "Key             integer NOT NULL,\r\n"+
         "Type            nvarchar NOT NULL,\r\n"+
+        "Custom          integer NOT NULL,\r\n"+
         "Id              nvarchar NOT NULL,\r\n"+
         "Web             nvarchar NOT NULL,\r\n"+
         "Url             nvarchar NULL,\r\n"+
@@ -566,66 +780,163 @@ public class DBBuilder {
         throw new IllegalArgumentException("Param sql cannot be null.");
       }
 
-      sql = sql.trim();
-
-      String clss = "grid";
-      List<RenderingRule> rules = new ArrayList<>();
-      if (sql.startsWith("fmt:")) {
-        String fmt = sql.substring(0, sql.indexOf(" " ));
-        sql = sql.substring(fmt.length()).trim();
-        clss = readFormatRules(rules, fmt);
-      }
-      for (int i = 0; i < rules.size(); i++) {
-        RenderingRule rule = rules.get(i);
-        if (rule.linksCol != 0 && rule.linksCol <= rules.size()) {
-          rules.get(rule.linksCol -1).linkCol = i+1;
+      SQLControl ctrl = new SQLControl();
+      if (sql.startsWith("{")) {
+        JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(sql);
+        ctrl.setQuery(json.asString("query"));
+        if (json.has("class")) {
+          ctrl.setClss(json.asString("class"));
+        } else {
+          ctrl.setClss("grid");      
         }
+        if (json.has("titles")) {
+          ctrl.setTitles(json.asBoolean("titles"));
+        } else {
+          ctrl.setTitles(true);      
+        }
+        for (JsonObject colj : json.forceArray("columns").asJsonObjects()) {
+          SQLControlColumn col = new SQLControlColumn();
+          ctrl.getColumns().add(col);
+          if (colj.has("type")) {
+            col.setType(SQLControlColumnType.fromCode(colj.asString("type")));
+          } else {
+            col.setType(SQLControlColumnType.Auto);
+          }
+          col.setTitle(colj.asString("title"));
+          if (colj.has("source")) {
+            col.setSource(colj.asString("source"));
+          } else {
+            col.setSource(colj.asString("title"));
+          }
+          if (colj.has("title")) {
+            col.setTitle(colj.asString("title"));
+          } else {
+            col.setTitle(colj.asString("source"));
+          }
+          if (col.getSource() == null) {
+            throw new FHIRException("A source column is required");
+          }
+          col.setTarget(colj.asString("target"));
+          col.setSystem(colj.asString("system"));
+          col.setDisplay(colj.asString("display"));
+          col.setVersion(colj.asString("version"));      
+        }
+      } else {
+        ctrl.setQuery(sql);
+        ctrl.setClss("grid");
+        ctrl.setTitles(true);
       }
+      
       Statement stmt = con.createStatement();
-      ResultSet rs = stmt.executeQuery(sql);
+      ResultSet rs = stmt.executeQuery(ctrl.getQuery());
       ResultSetMetaData rsmd = rs.getMetaData();
-      XhtmlNode tbl = new XhtmlNode(NodeType.Element, "table").attribute("class", clss);
-
+      ctrl.checkResultSet(rsmd);
+      
+      XhtmlNode tbl = new XhtmlNode(NodeType.Element, "table").attribute("class", ctrl.getClss());
       XhtmlNode tr = tbl.tr();
-      for (int i = 1; i <= rsmd.getColumnCount(); i++) {
-        RenderingRule rule = i > rules.size() ? new RenderingRule(RenderingType.AutoDetect) : rules.get(i-1);
-        if (rule.type != RenderingType.None) {
-          tr.td().style("background-color: #eeeeee").tx(rsmd.getColumnName(i));
+      if (ctrl.isTitles()) {
+        for (SQLControlColumn col : ctrl.getColumns()) {
+          tr.td().style("background-color: #eeeeee").tx(col.getTitle());          
         }
       }
 
       while (rs.next()) {
         tr = tbl.tr();
-        for (int i = 1; i <= rsmd.getColumnCount(); i++) {
-          RenderingRule rule = i > rules.size() ? new RenderingRule(RenderingType.AutoDetect) : rules.get(i-1);
-          String s = rs.getString(i);
-          switch (rule.type) {
-          case AutoDetect:
-            if (Utilities.isAbsoluteUrlLinkable(s)) {
-              tr.td().ah(s).tx(s);
-            } else if (md.isProbablyMarkdown(s, true)) {
-              tr.td().markdown(s, "sql");
-            } else if (rule.linkCol > 0) {
-              tr.td().ah(rs.getString(rule.linkCol)).tx(s);
-            } else {
-              tr.td().tx(s);
+        for (SQLControlColumn col : ctrl.getColumns()) {    
+          XhtmlNode td = tr.td();
+          String s = rs.getString(col.getSourceIndex()); 
+          if (!Utilities.noString(s)) {
+            switch (col.getType()) {
+            case Auto: 
+              Resource r = context.fetchResource(Resource.class, s);
+              if (r != null && r instanceof CanonicalResource && r.hasWebPath()) {
+                String d = ((CanonicalResource) r).present();
+                if (Utilities.noString(d)) {
+                  d = r.getId();
+                }
+                td.ah(s).tx(d);
+              } else if (Utilities.isAbsoluteUrlLinkable(s)) {
+                td.ah(s).tx(s);
+              } else if (md.isProbablyMarkdown(s, true)) {
+                td.markdown(s, "sql");
+              } else {
+                td.tx(s);
+              }
+              break;
+            case Canonical:
+              r = context.fetchResource(Resource.class, s);
+              if (r != null && r instanceof CanonicalResource && r.hasWebPath()) {
+                String d = ((CanonicalResource) r).present();
+                if (Utilities.noString(d)) {
+                  d = r.getId();
+                }
+                td.ah(s).tx(d);
+              } else {
+                td.ah(s).tx(s);
+              } 
+              break;
+            case Link:
+              String t = s;
+              if (col.getTargetIndex() > 0) {
+                t = rs.getString(col.getTargetIndex());
+              }
+              td.ah(t).tx(s);
+              break;
+            case Coding:
+              Coding c = new Coding();
+              c.setCode(s);
+              if (col.getSystemIndex() > 0) {
+                c.setSystem(rs.getString(col.getSystemIndex()));
+              } else {
+                c.setSystem(col.getSystem());              
+              }
+              if (col.getDisplayIndex() > 0) {
+                c.setDisplay(rs.getString(col.getDisplayIndex()));
+              }
+              if (col.getVersionIndex() > 0) {
+                c.setVersion(rs.getString(col.getVersionIndex()));
+              }
+              new DataRenderer(rc).renderDataType(new RenderingStatus(), td, ResourceWrapper.forType(cu, c));
+              break;
+            case Markdown:
+              td.markdown(s, "sql");
+              break;
+            case Url:
+              td.ah(s).tx(s);
+              break;
+            case Text:
+              td.tx(s);
+              break;
+            case Resource:
+              r = context.fetchResource(Resource.class, s);
+              if (r != null && r instanceof CanonicalResource && r.hasWebPath()) {
+                String d = ((CanonicalResource) r).present();
+                if (Utilities.noString(d)) {
+                  d = r.getId();
+                }
+                td.ah(s).tx(d);
+              } else {
+                // it's not a canonical, in which case we'll decide it's a file name, and find the resource that points to, and then find it's name if we can have on
+                FetchedResource tgt = null;
+                for (FetchedFile f : files) {
+                  for (FetchedResource rf : f.getResources()) {
+                    String key = rf.getElement().getUserString(UserDataNames.Storage_key);
+                    if (s.equals(key)) {
+                      tgt = rf;
+                    }
+                  }
+                }
+                if (tgt != null) {
+                  td.ah(tgt.getElement().getWebPath()).tx(tgt.getBestName());
+                } else {
+                  td.ah(s).tx(s);
+                }
+              }
+              break;
+            default:
+              td.tx(s);
+              break;
             }
-            break;
-          case Markdown:
-            tr.td().markdown(s, "sql");
-            break;
-          case None:
-            break;
-          case String:
-            if (rule.linkCol > 0) {
-              tr.td().ah(rs.getString(rule.linkCol)).tx(s);
-            } else {
-              tr.td().tx(s);
-            }
-            break;
-          default:
-            tr.td().tx(s);
-            break;
           }
         }
       }
@@ -680,34 +991,6 @@ public class DBBuilder {
     return jsonArray.toString();
   }
 
-  private String readFormatRules(List<RenderingRule> rules, String fmt) {
-    // fmt:clss(;col) 
-    // where col is one of:
-    //   a = autodetect - default
-    //   s = string - don't autodetect
-    //   md = it's markdown
-    //   l:x = it's a link for column x
-    //
-    String[] p = fmt.substring(4).split("\\;");
-    for (int i = 1; i < p.length; i++) {
-      RenderingRule rule = null;
-      if (Utilities.noString(p[i]) || "a".equals(p[i])) {
-        rule = new RenderingRule(RenderingType.AutoDetect);
-      } else if ("md".equals(p[i])) {
-        rule = new RenderingRule(RenderingType.Markdown);
-      } else if ("s".equals(p[i])) {
-        rule = new RenderingRule(RenderingType.String);
-      } else if (p[i].startsWith("l:")) {
-        rule = new RenderingRule(RenderingType.None);
-        rule.linksCol = Integer.parseInt(p[i].substring(2));
-      } else {
-        throw new FHIRException("Unable to read fmt "+fmt+" at index "+i);
-      }
-      rules.add(rule);
-    }
-    return Utilities.noString(p[0]) ? "grid" : p[0];
-  }
-
   public void closeUp() {
     long start = System.currentTimeMillis();
     if (con != null) {
@@ -737,8 +1020,8 @@ public class DBBuilder {
       sql = con.prepareStatement("insert into CodeSystemList (CodeSystemListKey, ViewType, ResourceKey, Url, Version, Status, Name, Title, Description) values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
       sql.setInt(1, lastCLKey);
       sql.setInt(2, viewType);
-      if (cs.hasUserData("db.key")) {
-        sql.setInt(3, (int) cs.getUserData("db.key"));
+      if (cs.hasUserData(UserDataNames.db_key)) {
+        sql.setInt(3, (int) cs.getUserData(UserDataNames.db_key));
       } else {
         sql.setNull(3, java.sql.Types.INTEGER);
       }
@@ -767,8 +1050,8 @@ public class DBBuilder {
             sql.setInt(1, lastCLKey);
             sql.setString(2, r.fhirType());      
             sql.setString(3, r.getIdBase());
-            if (cs.hasUserData("db.key")) {
-              sql.setInt(4, (int) cs.getUserData("db.key"));
+            if (cs.hasUserData(UserDataNames.db_key)) {
+              sql.setInt(4, (int) cs.getUserData(UserDataNames.db_key));
             } else {
               sql.setNull(4, java.sql.Types.INTEGER);
             }      
@@ -790,8 +1073,8 @@ public class DBBuilder {
       sql = con.prepareStatement("insert into ValueSetList (ValueSetListKey, ViewType, ResourceKey, Url, Version, Status, Name, Title, Description) values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
       sql.setInt(1, lastVLKey);
       sql.setInt(2, viewType);
-      if (vs.hasUserData("db.key")) {
-        sql.setInt(3, (int) vs.getUserData("db.key"));
+      if (vs.hasUserData(UserDataNames.db_key)) {
+        sql.setInt(3, (int) vs.getUserData(UserDataNames.db_key));
       } else {
         sql.setNull(3, java.sql.Types.INTEGER);
       }
@@ -831,8 +1114,8 @@ public class DBBuilder {
           sql.setInt(1, lastVLKey);
           sql.setString(2, r.fhirType());      
           sql.setString(3, r.getIdBase());
-          if (vs.hasUserData("db.key")) {
-            sql.setInt(4, (int) vs.getUserData("db.key"));
+          if (vs.hasUserData(UserDataNames.db_key)) {
+            sql.setInt(4, (int) vs.getUserData(UserDataNames.db_key));
           } else {
             sql.setNull(4, java.sql.Types.INTEGER);
           }      

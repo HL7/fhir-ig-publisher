@@ -28,6 +28,7 @@ import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.RenderingContextLangs;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.i18n.I18nConstants;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.utilities.xhtml.XhtmlParser;
@@ -216,14 +217,12 @@ public class IPStatementsRenderer {
   
   private String getCopyRightStatement(SystemUsage system) throws IOException {
     if ("http://snomed.info/sct".equals(system.system)) {
-      system.desc = "SNOMED Clinical Terms® (SNOMED CT®)";
-      return "This material contains content that is copyright of SNOMED International. Implementers of these specifications must have the appropriate SNOMED CT Affiliate license - "+
-       "for more information contact <a href=\"https://www.snomed.org/get-snomed\">https://www.snomed.org/get-snomed</a> or <a href=\"mailto:info@snomed.org\">info@snomed.org</a>.";
+      system.desc = ctxt.formatMessage(I18nConstants.HTA_SCT_DESC);
+      return ctxt.formatMessage(I18nConstants.HTA_SCT_MESSAGE);
     }
     if ("http://loinc.org".equals(system.system)) {
-      system.desc = "LOINC";
-      return "This material contains content from <a href=\"http://loinc.org\">LOINC</a>. LOINC is copyright © 1995-2020, Regenstrief Institute, Inc. and the Logical Observation Identifiers Names and Codes (LOINC) "+
-         "Committee and is available at no cost under the <a href=\"http://loinc.org/license\">license</a>. LOINC® is a registered United States trademark of Regenstrief Institute, Inc.";
+      system.desc = ctxt.formatMessage(I18nConstants.HTA_LOINC_DESC);
+      return ctxt.formatMessage(I18nConstants.HTA_LOINC_MESSAGE);
     }
     if (system.cs != null) {
       system.desc = system.cs.present();

@@ -54,6 +54,7 @@ import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
+import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -80,7 +81,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
   }
 
   public String cld(Set<String> outputTracker) throws EOperationOutcome, FHIRException, IOException, org.hl7.fhir.exceptions.FHIRException  {
-    if (vs.hasText() && !vs.getText().hasUserData("renderer.generated") && vs.getText().hasDiv()) {
+    if (vs.hasText() && !vs.getText().hasUserData(UserDataNames.renderer_is_generated) && vs.getText().hasDiv()) {
       for (XhtmlNode n : vs.getText().getDiv().getChildNodes()) {
         if ("div".equals(n.getName()) && "cld".equals(n.getAttribute("id"))) {
           return "<h3>Definition</h3>\r\n" + new XhtmlComposer(XhtmlComposer.HTML).compose(n);
@@ -275,6 +276,8 @@ public class ValueSetRenderer extends CanonicalRenderer {
       } else {
         b.append("<li>No changes</li>\r\n");
       }
+    } else {
+      b.append("<li>New Content</li>\r\n");
     }
   }
 }

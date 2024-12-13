@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.model.Base;
 import org.hl7.fhir.r5.model.Bundle;
@@ -87,7 +88,7 @@ public class MappingServices implements ITransformerServices {
   }
 
   @Override
-  public Base createType(Object appInfo, String name) throws FHIRException {
+  public Base createType(Object appInfo, String name, ProfileUtilities utils) throws FHIRException {
     return ResourceFactory.createResourceOrType(name);
   }
 
