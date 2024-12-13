@@ -47,6 +47,8 @@ import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
 import org.hl7.fhir.igtools.publisher.comparators.IpsComparator;
 import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
 import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
+import org.hl7.fhir.igtools.renderers.ValidationPresenter.IGLanguageInformation;
+import org.hl7.fhir.igtools.renderers.ValidationPresenter.LanguagePopulationPolicy;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
@@ -79,6 +81,75 @@ import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.stringtemplate.v4.ST;
 
 public class ValidationPresenter implements Comparator<FetchedFile> {
+
+  public enum LanguagePopulationPolicy {
+    NONE, IG, OTHERS, ALL;
+    
+    public static LanguagePopulationPolicy fromCode(String code) {
+      if (code != null) {
+        code = code.toLowerCase();
+        switch (code) {
+        case "all-ig": return OTHERS;
+        case "ig-realm": return IG;
+        case "all-realm": return ALL;
+        }
+      }
+      return null;
+    }
+  }
+
+  public static class {
+    private LanguagePopulationPolicy policy;
+    private String igResourceLanguage;
+    private int total;
+    private int withLang;
+    private List<String> igLangs;
+    
+    public void seeResource(boolean hasLang) {
+       total++;
+       if (hasLang) {
+         withLang++;
+       }
+    }
+
+    public LanguagePopulationPolicy getPolicy() {
+      return policy;
+    }
+
+    public void setPolicy(LanguagePopulationPolicy policy) {
+      this.policy = policy;
+    }
+
+    public String getIgResourceLanguage() {
+      return igResourceLanguage;
+    }
+
+    public void setIgResourceLanguage(String igResourceLanguage) {
+      this.igResourceLanguage = igResourceLanguage;
+    }
+
+    public List<String> getIgLangs() {
+      return igLangs;
+    }
+
+    public void setIgLangs(List<String> igLangs) {
+      this.igLangs = igLangs;
+    }
+
+    public String generate() {
+      if (policy == LanguagePopulationPolicy.NONE && igResourceLanguage == null && igLangs.isEmpty() && withLang == 0) {
+        return "This IG has no language information";
+      } else {
+        CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder(". ");
+        b.append("Stated Languages: "+(igLangs.isEmpty() ? "n/a" : CommaSeparatedStringBuilder.join(",", igLangs)));
+        b.append("IG Resource Lang: "+(igResourceLanguage == null ? "n/a" : igResourceLanguage));
+        b.append(String.format("%d of %d (%d%%) of resources have a language", withLang, total, (withLang * 100) / total));
+        b.append("<a href=\"https://build.fhir.org/ig/FHIR/fhir-tools-ig/CodeSystem-ig-parameters.html#ig-parameters-resource-language-policy\">Population Policy</a>: "+policy.toString());
+        return b.toString();
+      }
+    }
+    
+  }
 
   private class ProfileSignpostBuilder {
 
@@ -307,6 +378,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   boolean displayWarnings = false;
   private List<String> versionProblems;
   private List<FetchedResource> fragments;
+  private IGLanguageInformation langinfo;
 
   
   public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, 
@@ -314,7 +386,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       String dependencies, String csAnalysis, String pubReqCheck, String globalCheck, String copyrightYear, IWorkerContext context,
       Set<String> r5Extensions, List<StructureDefinition> modifierExtensions, String draftDependencies,
       List<FetchedResource> noNarratives, List<FetchedResource> noValidation, boolean noValidate, boolean noGenerate, DependentIGFinder dependentIgs, 
-      TerminologyClientManager txServers, List<String> versionProblems, List<FetchedResource> fragments) {
+      TerminologyClientManager txServers, List<String> versionProblems, List<FetchedResource> fragments, IGLanguageInformation langinfo) {
     super();
     this.statedVersion = statedVersion;
     this.igVersion = igVersion;
@@ -346,6 +418,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     this.txServers = txServers;
     this.versionProblems = versionProblems;
     this.fragments = fragments;
+    this.langinfo = langinfo;
     ruleDateCutoff = Date.from(LocalDate.now().minusMonths(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
     determineCode();
   }
@@ -988,6 +1061,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       " <tr><td>Publisher Version:</td><td>$versionCheck$</td></tr>\r\n"+
       " <tr><td>Publication Code:</td><td>$igcode$<span style=\"color: maroon; font-weight: bold\"> $igcodeerror$</span>. PackageId = $packageId$, Canonical = $canonical$</td></tr>\r\n"+
       " <tr><td>Realm Check for $realm$:</td><td><span style=\"color: maroon; font-weight: bold\">$igrealmerror$</span>$realmCheck$</td></tr>\r\n"+
+      " <tr><td>Language Info:</td><td>$langInfo$</td></tr>\r\n"+
       " <tr><td>Publication Request:</td><td>$pubReqCheck$</td></tr>\r\n"+
       " <tr><td>Supressed Messages:</td><td>$suppressedmsgssummary$</td></tr>\r\n"+
       " <tr><td>Dependency Checks:</td><td>$dependencyCheck$</td></tr>\r\n"+
@@ -1168,6 +1242,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("noNarrative", genResourceList(noNarratives, "Narratives Suppressed"));
     t.add("noValidation", genResourceList(noValidation, "Validation Suppressed"));
     t.add("fragments", genResourceList(noValidation, "CodeSystem Fragments"));
+    t.add("langInfo", langinfo.generate());
     t.add("validationFlags", validationFlags());
     
     if (noGenerate || noValidate) {
