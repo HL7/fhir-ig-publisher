@@ -127,6 +127,8 @@ import org.hl7.fhir.igtools.renderers.StatusRenderer;
 import org.hl7.fhir.igtools.renderers.StructureDefinitionRenderer;
 import org.hl7.fhir.igtools.renderers.StructureMapRenderer;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter;
+import org.hl7.fhir.igtools.renderers.ValidationPresenter.IGLanguageInformation;
+import org.hl7.fhir.igtools.renderers.ValidationPresenter.LanguagePopulationPolicy;
 import org.hl7.fhir.igtools.renderers.ValueSetRenderer;
 import org.hl7.fhir.igtools.renderers.XmlXHtmlRenderer;
 import org.hl7.fhir.igtools.spreadsheets.IgSpreadsheetParser;
@@ -1154,6 +1156,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       tts.end();
 
       tts = tt.start("generate");
+      log("Checking Language");
+      checkLanguage();
       log("Processing Conformance Resources");
       loadConformance();
       if (!validationOff) {
@@ -1192,8 +1196,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator, ipsComparator,
           new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine, rc, specMaps).render(publishedIg, true, false, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()),
           new PublicationChecker(repoRoot, historyPage, markdownEngine, findReleaseLabelString()).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
-          generateDraftDependencies(),
-          noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder, context.getTxClientManager(), versionProblems, fragments);
+          generateDraftDependencies(), noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder, context.getTxClientManager(), 
+          versionProblems, fragments, makeLangInfo());
       val.setValidationFlags(hintAboutNonMustSupport, anyExtensionsAllowed, checkAggregation, autoLoad, showReferenceMessages, noExperimentalContent, displayWarnings);
       tts.end();
       if (isChild()) {
@@ -1214,6 +1218,19 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       }
       throw e;
     }
+  }
+
+  private IGLanguageInformation makeLangInfo() {
+    IGLanguageInformation info = new IGLanguageInformation();
+    info.setIgResourceLanguage(publishedIg.getLanguage());
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        info.seeResource(r.getElement().hasChild("language")) ;
+      }
+    }
+    info.setPolicy(langPolicy );
+    info.setIgLangs(new ArrayList<String>());
+    return info;
   }
 
   private StringType findReleaseLabel() {
@@ -3148,6 +3165,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           sourceIg.getIdentifier().add(new Identifier().setSystem("urn:ietf:rfc:3986").setValue("urn:oid:"+oidRoot));
         }
         break;
+      case "resource-language-policy":
+        langPolicy = LanguagePopulationPolicy.fromCode(p.getValue());       
+        if (langPolicy == null) {
+          throw new Error("resource-language-policy value of '"+p.getValue()+"' not understood");
+        }
+        break;
       default: 
         if (!template.isParameter(pc)) {
           unknownParams.add(pc+"="+p.getValue());
@@ -3156,6 +3179,18 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       count++;
     }
 
+    if (langPolicy == LanguagePopulationPolicy.IG || langPolicy == LanguagePopulationPolicy.ALL) {
+      if (sourceIg.hasJurisdiction()) {
+        Locale localeFromRegion = ResourceUtilities.getLocale(sourceIg);
+        if (localeFromRegion != null) {
+          sourceIg.setLanguage(localeFromRegion.toString());
+        } else {
+          throw new Error("Unable to determine locale from jurisdiction (as requested by policy)");
+        }
+      } else { 
+        sourceIg.setLanguage("en");
+      }
+    }
     if (ini.hasProperty("IG", "jekyll-timeout")) { //todo: consider adding this to ImplementationGuideDefinitionParameterComponent
       jekyllTimeout = ini.getLongProperty("IG", "jekyll-timeout") * 1000;
     }
@@ -6720,6 +6755,23 @@ private String fixPackageReference(String dep) {
     }
   }
 
+  private void checkLanguage() {
+    if ((langPolicy == LanguagePopulationPolicy.ALL || langPolicy == LanguagePopulationPolicy.OTHERS)) {
+      for (FetchedFile f : fileList) {
+        for (FetchedResource r : f.getResources()) {
+          logDebugMessage(LogCategory.PROGRESS, "process language in res: "+r.fhirType()+"/"+r.getId());
+          if (!sourceIg.hasLanguage()) {
+            if (r.getElement().hasChild("language")) {
+              r.getElement().removeChild("language");
+            }
+          } else {
+            r.getElement().setChildValue("language", sourceIg.getLanguage());
+          }
+        }
+      }
+    }
+  }
+  
   private void load(String type, boolean isMandatory) throws Exception {
     for (FetchedFile f : fileList) {
       f.start("load");
@@ -6873,6 +6925,16 @@ private String fixPackageReference(String dep) {
                 altered = true;
               }
               if (altered) {
+                if ((langPolicy == LanguagePopulationPolicy.ALL || langPolicy == LanguagePopulationPolicy.OTHERS)) {
+                  if (!sourceIg.hasLanguage()) {
+                    if (r.getElement().hasChild("language")) {
+                      bc.setLanguage(null);
+                    }
+                  } else {
+                    bc.setLanguage(sourceIg.getLanguage());
+                  }
+                }
+                
                 if (Utilities.existsInList(r.fhirType(), "GraphDefinition")) {
                   f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.PROCESSING, bc.fhirType()+".where(url = '"+bc.getUrl()+"')", 
                       "The resource needed to modified during loading to apply common headers "+b.toString()+" but this isn't possible for the type "+r.fhirType()+" because version conversion isn't working completely",
@@ -11638,6 +11700,7 @@ private String fixPackageReference(String dep) {
   private boolean needsRegen = false;
 
   private ValidatorSession validatorSession;
+  private LanguagePopulationPolicy langPolicy = LanguagePopulationPolicy.NONE;
   
   private String processSQLCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();
