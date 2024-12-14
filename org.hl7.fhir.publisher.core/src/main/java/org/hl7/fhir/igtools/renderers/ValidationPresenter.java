@@ -98,7 +98,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     }
   }
 
-  public static class {
+  public static class IGLanguageInformation {
     private LanguagePopulationPolicy policy;
     private String igResourceLanguage;
     private int total;
