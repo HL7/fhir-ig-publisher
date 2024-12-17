@@ -1,7 +1,7 @@
 * Security fix: Bump ucum to 1.0.9 (for XXE prevention)
 * Loader: R2/R2B IGs no longer supported
 * Loader: Switch priority order of package servers (packages2.fhir.org is not rate limited)
-* Loader: add language processing features
+* Loader: add language processing features (see IG parameter resource-language-policy)
 * Version Conversion: Fix issue with value set version conversion on contains.property (Check for both "value" and "value[x]")
 * Multi-Language Support: Improvements to translation file generation (better path, eliminate duplicates)
 * Npm Packages: Add support for languages to npm package and package list
