@@ -38,8 +38,11 @@ import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
+import org.hl7.fhir.r5.model.NamingSystem.NamingSystemUniqueIdComponent;
+import org.hl7.fhir.r5.model.NamingSystem;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
+import org.hl7.fhir.r5.renderers.NamingSystemRenderer;
 import org.hl7.fhir.r5.renderers.RendererFactory;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
@@ -48,7 +51,9 @@ import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
+import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
 public class CodeSystemRenderer extends CanonicalRenderer {
 
@@ -143,6 +148,54 @@ public class CodeSystemRenderer extends CanonicalRenderer {
     return b.toString()+changeSummary();
   }
 
+
+  public String nsInfo() throws FHIRException {
+    List<NamingSystem> nsl = null;
+    for (NamingSystem t : context.fetchResourcesByType(NamingSystem.class)) {
+      if (isNSforCS(t)) {
+        nsl.add(t);
+      }
+    }
+    if (nsl.isEmpty()) {
+      return "";
+    } else {
+      NamingSystemRenderer nsr = new NamingSystemRenderer(gen);      
+      XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+      nsr.renderList(x, nsl);
+    }
+
+    StringBuilder b = new StringBuilder();
+    boolean first = true;
+    b.append("\r\n");
+    List<String> vsurls = new ArrayList<String>();
+    for (ValueSet vs : context.fetchResourcesByType(ValueSet.class)) {
+        vsurls.add(vs.getUrl());
+    }
+    Collections.sort(vsurls);
+
+    Set<String> processed = new HashSet<String>();
+    for (String url : vsurls) {
+      ValueSet vc = context.findTxResource(ValueSet.class, url);
+      for (ConceptSetComponent ed : vc.getCompose().getInclude())
+        first = addLink(b, first, vc, ed, processed);
+      for (ConceptSetComponent ed : vc.getCompose().getExclude())
+        first = addLink(b, first, vc, ed, processed);
+    }
+    if (first)
+      b.append("<ul><li>"+(gen.formatPhrase(RenderingContext.CODE_SYS_CODE_NOT_HERE))+"</li></ul>\r\n");
+    else
+      b.append("</ul>\r\n");    
+    return b.toString()+changeSummary();
+  }
+
+  private boolean isNSforCS(NamingSystem t) {
+    for (NamingSystemUniqueIdComponent ui : t.getUniqueId()) {
+      if (ui.hasValue() && ui.getValue().equals(cs.getUrl())) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   private boolean addLink(StringBuilder b, boolean first, ValueSet vc, ConceptSetComponent ed, Set<String> processed) {
     if (ed.hasSystem() && ed.getSystem().equals(cs.getUrl())) {
