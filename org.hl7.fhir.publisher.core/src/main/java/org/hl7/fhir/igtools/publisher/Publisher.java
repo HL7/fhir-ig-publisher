@@ -236,6 +236,7 @@ import org.hl7.fhir.r5.model.MessageDefinition.MessageDefinitionAllowedResponseC
 import org.hl7.fhir.r5.model.MessageDefinition.MessageDefinitionFocusComponent;
 import org.hl7.fhir.r5.model.OperationDefinition;
 import org.hl7.fhir.r5.model.OperationDefinition.OperationDefinitionParameterComponent;
+import org.hl7.fhir.r5.model.Parameters.ParametersParameterComponent;
 import org.hl7.fhir.r5.model.OperationOutcome;
 import org.hl7.fhir.r5.model.PackageInformation;
 import org.hl7.fhir.r5.model.Parameters;
@@ -1192,6 +1193,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           }
         }
       }
+      checkForSnomedVersion();
       ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), rootDir, npmName, childPublisher == null? null : childPublisher.npmName,
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator, ipsComparator,
           new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine, rc, specMaps).render(publishedIg, true, false, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()),
@@ -1220,6 +1222,22 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
   }
 
+  private void checkForSnomedVersion() {
+    if (!"uv".equals(igrealm) && context.getCodeSystemsUsed().contains("http://snomed.info/sct")) {
+      boolean ok = false;
+      for (ParametersParameterComponent p : context.getExpansionParameters().getParameter()) {
+        if ("system-version".equals(p.getName()) && p.hasValuePrimitive() && p.getValue().primitiveValue().startsWith("http://snomed.info/sct")) {
+          ok = true;
+        }
+      }
+      if (!ok) {        
+        errors.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "IG", "The IG is not for the international realm, and it uses SNOMED CT, so it should fix the SCT edition in the expansion parameters", IssueSeverity.WARNING));
+      }
+    }
+
+  }
+  
+  
   private IGLanguageInformation makeLangInfo() {
     IGLanguageInformation info = new IGLanguageInformation();
     info.setIgResourceLanguage(publishedIg.getLanguage());
@@ -2624,7 +2642,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       initializeTemplate();
     else {
       // initializeFromJson();
-      throw new Error("Old style JSON configuration is no longer supported");
+      throw new Error("Old style JSON configuration is no longer supported. If you see this, then ig.ini wasn't found in '"+rootDir+"'");
     }
     expectedJurisdiction = checkForJurisdiction();
     if (context != null) {
@@ -2781,8 +2799,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     checkOutcomes(messages);
     // ok, loaded. Now we start loading settings out of the IG
     version = processVersion(sourceIg.getFhirVersion().get(0).asStringValue()); // todo: support multiple versions
-    if (!Utilities.existsInList(version, "5.0.0", "4.3.0", "4.0.1", "3.0.2", "1.0.2", "1.4.0", "6.0.0-ballot2")) {
-      throw new Error("Unable to support version '"+version+"' - must be one of 5.0.0, 4.3.0, 4.0.1, 3.0.2, 1.0.2, 6.0.0-ballot2 or 1.4.0");
+    if (VersionUtilities.isR2Ver(version) || VersionUtilities.isR2Ver(version)) {
+      throw new Error("As of the end of 2024, the FHIR  R2 (version "+version+") is no longer supported by the IG Publisher");
+    }
+    if (!Utilities.existsInList(version, "5.0.0", "4.3.0", "4.0.1", "3.0.2", "6.0.0-ballot2")) {
+      throw new Error("Unable to support version '"+version+"' - must be one of 5.0.0, 4.3.0, 4.0.1, 3.0.2 or 6.0.0-ballot2");
     }
 
     if (!VersionUtilities.isSupportedVersion(version)) {
@@ -3998,7 +4019,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     NpmPackage pi = null;
 
     String v = version;
-
+    
     if (Utilities.noString(igPack)) {
       System.out.println("Core Package "+VersionUtilities.packageForVersion(v)+"#"+v);
       pi = pcm.loadPackage(VersionUtilities.packageForVersion(v), v);
@@ -12869,6 +12890,10 @@ private String fixPackageReference(String dep) {
     if (igpkp.wantGen(fr, "xref")) {
       long start = System.currentTimeMillis();
       fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-xref"+langSfx, csr.xref(), f.getOutputNames(), fr, vars, null, start, "xref", "CodeSystem");
+    }
+    if (igpkp.wantGen(fr, "nsinfo")) {
+      long start = System.currentTimeMillis();
+      fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-nsinfo"+langSfx, csr.nsInfo(), f.getOutputNames(), fr, vars, null, start, "nsinfo", "CodeSystem");
     }
     if (igpkp.wantGen(fr, "changes")) {
       long start = System.currentTimeMillis();
