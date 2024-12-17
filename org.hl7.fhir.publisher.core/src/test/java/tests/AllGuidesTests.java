@@ -20,6 +20,7 @@ import javax.management.MBeanServer;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.apache.commons.io.IOUtils;
+import org.hl7.fhir.igtools.publisher.IGVersionUtil;
 import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.publisher.Publisher.CacheOption;
 import org.hl7.fhir.utilities.TextFile;
@@ -40,6 +41,11 @@ import org.xml.sax.SAXException;
 @EnabledIf("igsPathExists")
 public class AllGuidesTests {
 
+
+  private static String toMB(long maxMemory) {
+    return Long.toString(maxMemory / (1024*1024));
+  }
+  
   private void testIg(String id, String path) throws Exception {
     writeMem("Starting memory");
     if (!igsPathExists()) {
@@ -54,6 +60,10 @@ public class AllGuidesTests {
     System.out.println("=======================================================================================");
     String p = (path == null ? Utilities.path(FhirSettings.getTestIgsPath(), id) : Utilities.path(FhirSettings.getTestIgsPath(), id, path));
     System.out.println("Publish IG "+ p);
+    
+    System.out.println("Detected Java version: " + System.getProperty("java.version")+" from "+System.getProperty("java.home")+" on "+System.getProperty("os.name")+"/"+System.getProperty("os.arch")+" ("+System.getProperty("sun.arch.data.model")+"bit). "+toMB(Runtime.getRuntime().maxMemory())+"MB available");
+    System.out.println("dir = "+System.getProperty("user.dir")+", path = "+System.getenv("PATH"));
+    
     Publisher pub = new Publisher();
     pub.setConfigFile(p);
     pub.setTxServer(FhirSettings.getTxFhirDevelopment());
