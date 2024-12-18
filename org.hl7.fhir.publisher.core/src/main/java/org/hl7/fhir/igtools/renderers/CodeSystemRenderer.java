@@ -150,7 +150,7 @@ public class CodeSystemRenderer extends CanonicalRenderer {
 
 
   public String nsInfo() throws FHIRException {
-    List<NamingSystem> nsl = null;
+    List<NamingSystem> nsl = new ArrayList<>();
     for (NamingSystem t : context.fetchResourcesByType(NamingSystem.class)) {
       if (isNSforCS(t)) {
         nsl.add(t);
