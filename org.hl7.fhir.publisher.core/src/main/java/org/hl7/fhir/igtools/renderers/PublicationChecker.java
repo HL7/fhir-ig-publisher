@@ -255,11 +255,10 @@ public class PublicationChecker {
         String cs = pl.current() == null ? null : pl.current().sequence();
         Set<String> sl = new HashSet<>();
         for (PackageListEntry ple : pl.list()) {
-          if (ple.sequence() != null) {
+          if (ple.sequence() != null && !Utilities.existsInList(ple.sequence(), cs, "ci-build")) {
             sl.add("'"+ple.sequence()+"'");
           }
         }  
-        sl.remove(cs);
         summary.add(new StringPair("Sequence (Group)", pr.asString("sequence")+" (current: "+(cs == null ? "n/a" : "'"+cs+"'")+
             ", others = "+(sl.isEmpty() ? "n/a" : CommaSeparatedStringBuilder.join(",", Utilities.sorted(sl)))+")"));        
       } else {
