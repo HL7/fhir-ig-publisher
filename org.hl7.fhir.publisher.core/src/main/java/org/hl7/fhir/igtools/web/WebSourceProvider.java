@@ -78,6 +78,7 @@ public class WebSourceProvider {
   
   public void needFile(String path) throws IOException {
     File df = new File(Utilities.path(destination, path));
+    Utilities.createDirectory(Utilities.getDirectoryForFile(df.getAbsolutePath()));
     if (df.exists()) {
       df.delete();
     }
