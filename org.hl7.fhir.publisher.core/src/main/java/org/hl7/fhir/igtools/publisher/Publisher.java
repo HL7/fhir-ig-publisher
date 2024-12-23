@@ -167,6 +167,7 @@ import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.RdfParser;
 import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.liquid.BaseJsonWrapper;
+import org.hl7.fhir.r5.liquid.BaseTableWrapper;
 import org.hl7.fhir.r5.liquid.GlobalObject.GlobalObjectRandomFunction;
 import org.hl7.fhir.r5.liquid.LiquidEngine;
 import org.hl7.fhir.r5.liquid.LiquidEngine.LiquidDocument;
@@ -236,10 +237,10 @@ import org.hl7.fhir.r5.model.MessageDefinition.MessageDefinitionAllowedResponseC
 import org.hl7.fhir.r5.model.MessageDefinition.MessageDefinitionFocusComponent;
 import org.hl7.fhir.r5.model.OperationDefinition;
 import org.hl7.fhir.r5.model.OperationDefinition.OperationDefinitionParameterComponent;
-import org.hl7.fhir.r5.model.Parameters.ParametersParameterComponent;
 import org.hl7.fhir.r5.model.OperationOutcome;
 import org.hl7.fhir.r5.model.PackageInformation;
 import org.hl7.fhir.r5.model.Parameters;
+import org.hl7.fhir.r5.model.Parameters.ParametersParameterComponent;
 import org.hl7.fhir.r5.model.PlanDefinition;
 import org.hl7.fhir.r5.model.PlanDefinition.PlanDefinitionActionComponent;
 import org.hl7.fhir.r5.model.PrimitiveType;
@@ -299,6 +300,7 @@ import org.hl7.fhir.r5.terminologies.TerminologyUtilities;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
 import org.hl7.fhir.r5.terminologies.utilities.ValidationResult;
+import org.hl7.fhir.r5.testfactory.TestDataFactory;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.r5.utils.MappingSheetParser;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
@@ -2822,7 +2824,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     copyrightYear = null;
     Boolean useStatsOptOut = null;
     List<String> extensionDomains = new ArrayList<>();
-    List<String> factories = new ArrayList<>();
+    testDataFactories = new ArrayList<>();
     tempDir = Utilities.path(rootDir, "temp");
     tempLangDir = Utilities.path(rootDir, "translations");
     outputDir = Utilities.path(rootDir, "output");
@@ -3151,8 +3153,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       case "viewDefinition":
         viewDefinitions.add(p.getValue());
         break;
-      case "test-data-factory":
-        factories.add(p.getValue());
+      case "test-data-factories":
+        testDataFactories.add(p.getValue());
         break;
       case "fixed-value-format":
         fixedFormat = FixedValueFormat.fromCode(p.getValue());
@@ -3433,7 +3435,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     validatorSession = new ValidatorSession();
     IGPublisherHostServices hs = new IGPublisherHostServices(igpkp, fileList, context, new DateTimeType(execTime), new StringType(igpkp.specPath()));
     hs.registerFunction(new GlobalObjectRandomFunction());
-    hs.registerFunction(new TestDataFactory.DataLookupFunction());
+    hs.registerFunction(new BaseTableWrapper.TableColumnFunction());
+    hs.registerFunction(new BaseTableWrapper.TableDateColumnFunction());
+    hs.registerFunction(new TestDataFactory.CellLookupFunction());
+    hs.registerFunction(new TestDataFactory.TableLookupFunction());
     validator = new InstanceValidator(context, hs, context.getXVer(), validatorSession); // todo: host services for reference resolution....
     validator.setAllowXsiLocation(true);
     validator.setNoBindingMsgSuppressed(true);
@@ -3508,15 +3513,29 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     else
       extensionTracker.setoptIn(!ini.getBooleanProperty("IG", "usage-stats-opt-out"));
 
-    if (!factories.isEmpty()) {
-      LiquidEngine liquid = new LiquidEngine(context, validator.getExternalHostServices());
-      for (String f : factories) {
-        TestDataFactory tdf = new TestDataFactory(Utilities.getDirectoryForFile(configFile), f, liquid);
-        log("Execute Test Data Factory '"+tdf.getName()+"'");
+    log("Initialization complete");
+  }
+
+  private void processFactories(List<String> factories) throws IOException {    
+    LiquidEngine liquid = new LiquidEngine(context, validator.getExternalHostServices());
+    for (String f : factories) {
+      String rootFolder = Utilities.getDirectoryForFile(configFile);
+      File path = new File(Utilities.path(rootFolder, f));
+      if (!path.exists()) {
+        throw new FHIRException("factory source '"+f+"' not found");
+      }
+      File log = new File(Utilities.path(Utilities.getDirectoryForFile(path.getAbsolutePath()), "log"));
+      if (!log.exists()) {
+        Utilities.createDirectory(log.getAbsolutePath());
+      }
+      
+      JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(path);
+      for (JsonObject fact : json.forceArray("factories").asJsonObjects()) {
+        TestDataFactory tdf = new TestDataFactory(context, fact, liquid, validator.getFHIRPathEngine(), igpkp.getCanonical(), rootFolder, log.getAbsolutePath());
+        log("Execute Test Data Factory '"+tdf.getName()+"'. Log in "+tdf.statedLog());
         tdf.execute();
       }
     }
-    log("Initialization complete");
   }
 
   private List<String> allLangs() {
@@ -4570,6 +4589,9 @@ private String fixPackageReference(String dep) {
     needToBuild = loadMappings(needToBuild, igf);
     needToBuild = loadBundles(needToBuild, igf);
     needToBuild = loadTranslationSupplements(needToBuild, igf);
+
+    // todo: more loading after test factories?
+    
     int i = 0;
     Set<String> resLinks = new HashSet<>();
     for (ImplementationGuideDefinitionResourceComponent res : publishedIg.getDefinition().getResource()) {
@@ -7977,6 +7999,11 @@ private String fixPackageReference(String dep) {
     }
     logMessage("Generate Summaries");
 
+
+    if (!testDataFactories.isEmpty()) {
+      processFactories(testDataFactories);
+    }
+    
     if (!changeList.isEmpty()) {
       generateSummaryOutputs(db);
     }
@@ -11723,6 +11750,8 @@ private String fixPackageReference(String dep) {
 
   private ValidatorSession validatorSession;
   private LanguagePopulationPolicy langPolicy = LanguagePopulationPolicy.NONE;
+
+  private List<String> testDataFactories;
   
   private String processSQLCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();
