@@ -12,8 +12,6 @@
 
     <artifactId>org.hl7.fhir.publisher.cli</artifactId>
 
-
-
     <dependencies>
         <dependency>
             <groupId>org.hl7.fhir.publisher</groupId>

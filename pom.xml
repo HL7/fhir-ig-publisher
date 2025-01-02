@@ -20,7 +20,7 @@
         <maven.compiler.testRelease>11</maven.compiler.testRelease>
         <maven.compiler.testSource>11</maven.compiler.testSource>
         <maven.compiler.testTarget>11</maven.compiler.testTarget>
-        <logback-classic.version>1.5.13</logback-classic.version>
+        <logback-classic.version>1.5.15</logback-classic.version>
     </properties>
 
     <name>HL7 FHIR IG Publisher</name>
