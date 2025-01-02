@@ -167,6 +167,7 @@ import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.RdfParser;
 import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.liquid.BaseJsonWrapper;
+import org.hl7.fhir.r5.liquid.BaseTableWrapper;
 import org.hl7.fhir.r5.liquid.GlobalObject.GlobalObjectRandomFunction;
 import org.hl7.fhir.r5.liquid.LiquidEngine;
 import org.hl7.fhir.r5.liquid.LiquidEngine.LiquidDocument;
@@ -239,6 +240,7 @@ import org.hl7.fhir.r5.model.OperationDefinition.OperationDefinitionParameterCom
 import org.hl7.fhir.r5.model.OperationOutcome;
 import org.hl7.fhir.r5.model.PackageInformation;
 import org.hl7.fhir.r5.model.Parameters;
+import org.hl7.fhir.r5.model.Parameters.ParametersParameterComponent;
 import org.hl7.fhir.r5.model.PlanDefinition;
 import org.hl7.fhir.r5.model.PlanDefinition.PlanDefinitionActionComponent;
 import org.hl7.fhir.r5.model.PrimitiveType;
@@ -298,6 +300,7 @@ import org.hl7.fhir.r5.terminologies.TerminologyUtilities;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
 import org.hl7.fhir.r5.terminologies.utilities.ValidationResult;
+import org.hl7.fhir.r5.testfactory.TestDataFactory;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.r5.utils.MappingSheetParser;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
@@ -1192,6 +1195,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           }
         }
       }
+      checkForSnomedVersion();
       ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), rootDir, npmName, childPublisher == null? null : childPublisher.npmName,
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator, ipsComparator,
           new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine, rc, specMaps).render(publishedIg, true, false, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()),
@@ -1220,6 +1224,22 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
   }
 
+  private void checkForSnomedVersion() {
+    if (!"uv".equals(igrealm) && context.getCodeSystemsUsed().contains("http://snomed.info/sct")) {
+      boolean ok = false;
+      for (ParametersParameterComponent p : context.getExpansionParameters().getParameter()) {
+        if ("system-version".equals(p.getName()) && p.hasValuePrimitive() && p.getValue().primitiveValue().startsWith("http://snomed.info/sct")) {
+          ok = true;
+        }
+      }
+      if (!ok) {        
+        errors.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "IG", "The IG is not for the international realm, and it uses SNOMED CT, so it should fix the SCT edition in the expansion parameters", IssueSeverity.WARNING));
+      }
+    }
+
+  }
+  
+  
   private IGLanguageInformation makeLangInfo() {
     IGLanguageInformation info = new IGLanguageInformation();
     info.setIgResourceLanguage(publishedIg.getLanguage());
@@ -2624,7 +2644,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       initializeTemplate();
     else {
       // initializeFromJson();
-      throw new Error("Old style JSON configuration is no longer supported");
+      throw new Error("Old style JSON configuration is no longer supported. If you see this, then ig.ini wasn't found in '"+rootDir+"'");
     }
     expectedJurisdiction = checkForJurisdiction();
     if (context != null) {
@@ -2781,8 +2801,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     checkOutcomes(messages);
     // ok, loaded. Now we start loading settings out of the IG
     version = processVersion(sourceIg.getFhirVersion().get(0).asStringValue()); // todo: support multiple versions
-    if (!Utilities.existsInList(version, "5.0.0", "4.3.0", "4.0.1", "3.0.2", "1.0.2", "1.4.0", "6.0.0-ballot2")) {
-      throw new Error("Unable to support version '"+version+"' - must be one of 5.0.0, 4.3.0, 4.0.1, 3.0.2, 1.0.2, 6.0.0-ballot2 or 1.4.0");
+    if (VersionUtilities.isR2Ver(version) || VersionUtilities.isR2Ver(version)) {
+      throw new Error("As of the end of 2024, the FHIR  R2 (version "+version+") is no longer supported by the IG Publisher");
+    }
+    if (!Utilities.existsInList(version, "5.0.0", "4.3.0", "4.0.1", "3.0.2", "6.0.0-ballot2")) {
+      throw new Error("Unable to support version '"+version+"' - must be one of 5.0.0, 4.3.0, 4.0.1, 3.0.2 or 6.0.0-ballot2");
     }
 
     if (!VersionUtilities.isSupportedVersion(version)) {
@@ -2801,7 +2824,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     copyrightYear = null;
     Boolean useStatsOptOut = null;
     List<String> extensionDomains = new ArrayList<>();
-    List<String> factories = new ArrayList<>();
+    testDataFactories = new ArrayList<>();
     tempDir = Utilities.path(rootDir, "temp");
     tempLangDir = Utilities.path(rootDir, "translations");
     outputDir = Utilities.path(rootDir, "output");
@@ -3130,8 +3153,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       case "viewDefinition":
         viewDefinitions.add(p.getValue());
         break;
-      case "test-data-factory":
-        factories.add(p.getValue());
+      case "test-data-factories":
+        testDataFactories.add(p.getValue());
         break;
       case "fixed-value-format":
         fixedFormat = FixedValueFormat.fromCode(p.getValue());
@@ -3412,7 +3435,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     validatorSession = new ValidatorSession();
     IGPublisherHostServices hs = new IGPublisherHostServices(igpkp, fileList, context, new DateTimeType(execTime), new StringType(igpkp.specPath()));
     hs.registerFunction(new GlobalObjectRandomFunction());
-    hs.registerFunction(new TestDataFactory.DataLookupFunction());
+    hs.registerFunction(new BaseTableWrapper.TableColumnFunction());
+    hs.registerFunction(new BaseTableWrapper.TableDateColumnFunction());
+    hs.registerFunction(new TestDataFactory.CellLookupFunction());
+    hs.registerFunction(new TestDataFactory.TableLookupFunction());
     validator = new InstanceValidator(context, hs, context.getXVer(), validatorSession); // todo: host services for reference resolution....
     validator.setAllowXsiLocation(true);
     validator.setNoBindingMsgSuppressed(true);
@@ -3487,15 +3513,29 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     else
       extensionTracker.setoptIn(!ini.getBooleanProperty("IG", "usage-stats-opt-out"));
 
-    if (!factories.isEmpty()) {
-      LiquidEngine liquid = new LiquidEngine(context, validator.getExternalHostServices());
-      for (String f : factories) {
-        TestDataFactory tdf = new TestDataFactory(Utilities.getDirectoryForFile(configFile), f, liquid);
-        log("Execute Test Data Factory '"+tdf.getName()+"'");
+    log("Initialization complete");
+  }
+
+  private void processFactories(List<String> factories) throws IOException {    
+    LiquidEngine liquid = new LiquidEngine(context, validator.getExternalHostServices());
+    for (String f : factories) {
+      String rootFolder = Utilities.getDirectoryForFile(configFile);
+      File path = new File(Utilities.path(rootFolder, f));
+      if (!path.exists()) {
+        throw new FHIRException("factory source '"+f+"' not found");
+      }
+      File log = new File(Utilities.path(Utilities.getDirectoryForFile(path.getAbsolutePath()), "log"));
+      if (!log.exists()) {
+        Utilities.createDirectory(log.getAbsolutePath());
+      }
+      
+      JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(path);
+      for (JsonObject fact : json.forceArray("factories").asJsonObjects()) {
+        TestDataFactory tdf = new TestDataFactory(context, fact, liquid, validator.getFHIRPathEngine(), igpkp.getCanonical(), rootFolder, log.getAbsolutePath());
+        log("Execute Test Data Factory '"+tdf.getName()+"'. Log in "+tdf.statedLog());
         tdf.execute();
       }
     }
-    log("Initialization complete");
   }
 
   private List<String> allLangs() {
@@ -3998,7 +4038,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     NpmPackage pi = null;
 
     String v = version;
-
+    
     if (Utilities.noString(igPack)) {
       System.out.println("Core Package "+VersionUtilities.packageForVersion(v)+"#"+v);
       pi = pcm.loadPackage(VersionUtilities.packageForVersion(v), v);
@@ -4549,6 +4589,9 @@ private String fixPackageReference(String dep) {
     needToBuild = loadMappings(needToBuild, igf);
     needToBuild = loadBundles(needToBuild, igf);
     needToBuild = loadTranslationSupplements(needToBuild, igf);
+
+    // todo: more loading after test factories?
+    
     int i = 0;
     Set<String> resLinks = new HashSet<>();
     for (ImplementationGuideDefinitionResourceComponent res : publishedIg.getDefinition().getResource()) {
@@ -7956,6 +7999,11 @@ private String fixPackageReference(String dep) {
     }
     logMessage("Generate Summaries");
 
+
+    if (!testDataFactories.isEmpty()) {
+      processFactories(testDataFactories);
+    }
+    
     if (!changeList.isEmpty()) {
       generateSummaryOutputs(db);
     }
@@ -11702,6 +11750,8 @@ private String fixPackageReference(String dep) {
 
   private ValidatorSession validatorSession;
   private LanguagePopulationPolicy langPolicy = LanguagePopulationPolicy.NONE;
+
+  private List<String> testDataFactories;
   
   private String processSQLCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();
@@ -12869,6 +12919,10 @@ private String fixPackageReference(String dep) {
     if (igpkp.wantGen(fr, "xref")) {
       long start = System.currentTimeMillis();
       fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-xref"+langSfx, csr.xref(), f.getOutputNames(), fr, vars, null, start, "xref", "CodeSystem");
+    }
+    if (igpkp.wantGen(fr, "nsinfo")) {
+      long start = System.currentTimeMillis();
+      fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-nsinfo"+langSfx, csr.nsInfo(), f.getOutputNames(), fr, vars, null, start, "nsinfo", "CodeSystem");
     }
     if (igpkp.wantGen(fr, "changes")) {
       long start = System.currentTimeMillis();
