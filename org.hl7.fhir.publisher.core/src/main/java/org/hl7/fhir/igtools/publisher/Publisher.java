@@ -13905,8 +13905,12 @@ private String fixPackageReference(String dep) {
   public static void main(String[] args) throws Exception {
     int exitCode = 0;
 
+    // Prevents SLF4J(I) from printing unnecessary info to the console.
+    System.setProperty("slf4j.internal.verbosity", "WARN");
+
     org.hl7.fhir.utilities.FileFormat.checkCharsetAndWarnIfNotUTF8(System.out);
-    NpmPackage.setLoadCustomResources(true);  
+
+    NpmPackage.setLoadCustomResources(true);
     if (CliParams.hasNamedParam(args, FHIR_SETTINGS_PARAM)) {
       FhirSettings.setExplicitFilePath(CliParams.getNamedParam(args, FHIR_SETTINGS_PARAM));
     }
