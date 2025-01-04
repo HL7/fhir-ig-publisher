@@ -12,8 +12,6 @@
 
     <artifactId>org.hl7.fhir.publisher.cli</artifactId>
 
-
-
     <dependencies>
         <dependency>
             <groupId>org.hl7.fhir.publisher</groupId>
@@ -123,6 +121,31 @@
                             <mainClass>org.hl7.fhir.igtools.publisher.Publisher</mainClass>
                         </manifest>
                     </archive>
+                </configuration>
+                <executions>
+                    <!--
+                    Make an empty javadoc jar
+
+                    org.hl7.fhir.publisher.core contains all the necessary javadoc, and javadoc will attempt to make
+                    javadoc for all dependencies included in this jar.
+                    -->
+                    <execution>
+                        <id>empty-javadoc-jar</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                        <configuration>
+                            <classifier>javadoc</classifier>
+                            <classesDirectory>${basedir}/javadoc</classesDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+            <artifactId>maven-javadoc-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
                 </configuration>
             </plugin>
             <plugin>
