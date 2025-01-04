@@ -34,14 +34,28 @@ public class GitUtilities {
 
 	public static String getGitStatus(File gitDir) {
 	  if (!gitDir.exists()) {
-		return "";
+	    return "";
 	  }
 	  try {
-		String[] cmd = { "git", "branch", "--show-current" };
-		return execAndReturnString(cmd, new String[]{}, gitDir);
+      String[] cmd = { "git", "branch", "--show-current" };
+	    return execAndReturnString(cmd, new String[]{}, gitDir);
 	  } catch (Exception e) {
-		System.out.println("Warning @ Unable to read the git branch: " + e.getMessage().replace("fatal: ", "") );
-		return "";
+	    System.out.println("Warning @ Unable to read the git branch: " + e.getMessage().replace("fatal: ", "") );
+	    return "";
 	  }
 	}
+
+  public static String getGitSource(File gitDir) {
+    if (!gitDir.exists()) {
+      return "";
+    }
+    try {
+      String[] cmd = { "git", "remote", "get-url", "origin" };
+      return execAndReturnString(cmd, new String[]{}, gitDir);
+    } catch (Exception e) {
+      System.out.println("Warning @ Unable to read the git source: " + e.getMessage().replace("fatal: ", "") );
+      return "";
+    }
+  }
+  
 }
