@@ -5708,11 +5708,11 @@ private String fixPackageReference(String dep) {
   private boolean isBundle(FetchedFile ff) {
     File f = new File(ff.getName());
     String n = f.getName();
-    if (n.contains(".")) {
-      n = n.substring(0, n.indexOf("."));
+    if (n.endsWith(".json") || n.endsWith(".xml")) {
+      n = n.substring(0, n.lastIndexOf("."));
     }
     for (String s : bundles) {
-      if (n.equals("bundle-"+s)) {
+      if (n.equals("bundle-"+s) || n.equals("Bundle-"+s) ) {
         return true;
       }
     }
@@ -6617,10 +6617,10 @@ private String fixPackageReference(String dep) {
       System.out.println("id: "+tid+", file: "+source+", from "+cause);
     }
     if (loadedIds.containsKey(tid)) {
-      System.out.println("Duplicate Resource in IG: "+tid+". first found in "+loadedIds.get(tid)+", now in "+source);
+      System.out.println("Duplicate Resource in IG: "+tid+". first found in "+loadedIds.get(tid)+", now in "+source+" ("+cause+")");
       duplicateInputResourcesDetected = true;
     }
-    loadedIds.put(tid, source);
+    loadedIds.put(tid, source+" ("+cause+")");
   }
 
   private ImplementationGuideDefinitionResourceComponent findIGReference(String type, String id) {
@@ -10797,6 +10797,11 @@ private String fixPackageReference(String dep) {
     
     if (repoSource != null) {
       data.add("repoSource", gh());
+    } else {
+      String git= getGitSource();
+      if (git != null) {
+        data.add("repoSource", git);
+      }
     }
     data.add("genDate", genTime());
     data.add("genDay", genDate());
@@ -10925,6 +10930,11 @@ private String fixPackageReference(String dep) {
   private String getGitStatus() throws IOException {
     File gitDir = new File(Utilities.getDirectoryForFile(configFile));
     return GitUtilities.getGitStatus(gitDir);
+  }
+  
+  private String getGitSource() throws IOException {
+    File gitDir = new File(Utilities.getDirectoryForFile(configFile));
+    return GitUtilities.getGitSource(gitDir);
   }
 
   private void generateResourceReferences() throws Exception {
@@ -13159,6 +13169,11 @@ private String fixPackageReference(String dep) {
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-experimental-warning"+langSfx, sdr.experimentalWarning(), f.getOutputNames(), r, vars, null, start, "experimental-warning", "StructureDefinition");
     }
 
+    if (igpkp.wantGen(r, "eview")) {
+      long start = System.currentTimeMillis();
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-eview"+langSfx, sdr.eview(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, false), f.getOutputNames(), r, vars, null, start, "eview", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-eview-all"+langSfx, sdr.eview(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, true), f.getOutputNames(), r, vars, null, start, "eview", "StructureDefinition");
+    }
     if (igpkp.wantGen(r, "diff")) {
       long start = System.currentTimeMillis();
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff"+langSfx, sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, false), f.getOutputNames(), r, vars, null, start, "diff", "StructureDefinition");
