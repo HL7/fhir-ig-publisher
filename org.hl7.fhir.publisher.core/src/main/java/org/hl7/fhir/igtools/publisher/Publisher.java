@@ -11309,7 +11309,6 @@ private String fixPackageReference(String dep) {
       saveFileOutputs(f);
       for (FetchedResource r : f.getResources()) {
         logDebugMessage(LogCategory.PROGRESS, "Produce outputs for "+r.fhirType()+"/"+r.getId());
-        logMessage("Generate HTML Outputs for "+r.fhirType()+"/"+r.getId());
         Map<String, String> vars = makeVars(r);
         makeTemplates(f, r, vars);
         saveDirectResourceOutputs(f, r, r.getResource(), vars);
