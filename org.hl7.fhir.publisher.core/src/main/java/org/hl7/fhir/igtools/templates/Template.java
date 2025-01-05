@@ -87,6 +87,7 @@ public class Template {
   private String templateReason;
   private Set<String> summaryRows = new HashSet<>();
   private Set<String> templateParams = new HashSet<>();
+  private boolean wantLog;
   
   /** unpack the template into /template 
    * 
@@ -96,11 +97,12 @@ public class Template {
    * 
    * @throws IOException - only if the path is incorrect or the disk runs out of space
    */
-  public Template(String rootDir, boolean canExecute, String templateThatCantExecute, String templateReason) throws IOException {
+  public Template(String rootDir, boolean canExecute, String templateThatCantExecute, String templateReason, boolean wantLog) throws IOException {
     root = rootDir;
     this.canExecute = canExecute;
     this.templateThatCantExecute = templateThatCantExecute;
     this.templateReason = templateReason;
+    this.wantLog = wantLog;
 
     templateDir = Utilities.path(rootDir, "template");
 
@@ -126,7 +128,11 @@ public class Template {
       DefaultLogger consoleLogger = new DefaultLogger();
       consoleLogger.setErrorPrintStream(System.err);
       consoleLogger.setOutputPrintStream(System.out);
-      consoleLogger.setMessageOutputLevel(Project.MSG_INFO);
+      if (wantLog) {        
+        consoleLogger.setMessageOutputLevel(Project.MSG_INFO);
+      } else {
+        consoleLogger.setMessageOutputLevel(Project.MSG_ERR);        
+      }
       antProject.addBuildListener(consoleLogger);
       antProject.setBasedir(root);
       antProject.setProperty("ig.root", root);

@@ -2783,8 +2783,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     } catch (Exception e) {
       throw new Exception("Error Parsing File "+igName+": "+e.getMessage(), e);
     }
-    template = templateManager.loadTemplate(templateName, rootDir, sourceIg.getPackageId(), mode == IGBuildMode.AUTOBUILD);
-
+    template = templateManager.loadTemplate(templateName, rootDir, sourceIg.getPackageId(), mode == IGBuildMode.AUTOBUILD, logOptions.contains("template"));
     if (template.hasExtraTemplates()) {
       processExtraTemplates(template.getExtraTemplates());
     }
@@ -5410,7 +5409,7 @@ private String fixPackageReference(String dep) {
       if (debug) {
         waitForInput("before OnGenerate");
       }
-      logMessage("Run Template ");
+      logMessage("Run Template");
       Session tts = tt.start("template");
       List<String> newFileList = new ArrayList<String>();
       checkOutcomes(template.beforeGenerateEvent(publishedIg, tempDir, otherFilesRun, newFileList));
@@ -5438,7 +5437,7 @@ private String fixPackageReference(String dep) {
         loadIgPages(publishedIg.getDefinition().getPage(), igPages);
       }
       tts.end();
-      logMessage("Template Done");
+      logDebugMessage(LogCategory.PROGRESS, "Template Done");
       if (debug) {
         waitForInput("after OnGenerate");
       }
