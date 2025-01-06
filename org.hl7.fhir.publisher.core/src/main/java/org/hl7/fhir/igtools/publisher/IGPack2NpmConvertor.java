@@ -216,9 +216,7 @@ public class IGPack2NpmConvertor {
         String destFile = dest != null ? dest : Utilities.path(Utilities.getDirectoryForFile(f.getAbsolutePath()), "package.tgz");
         String url = Utilities.noString(website) ? canonical : website;
         NPMPackageGenerator npm = new NPMPackageGenerator(destFile, canonical, url, PackageType.IG, ig, new Date(), false);
-        ByteArrayOutputStream bs = new ByteArrayOutputStream();
-        new JsonParser().setOutputStyle(OutputStyle.NORMAL).compose(bs, ig);
-        npm.addFile(Category.OTHER, "ig-r4.jsonX", bs.toByteArray());
+        
 
         npm.addFile(Category.RESOURCE, "ImplementationGuide-"+ig.getId()+".json", compose(ig, version));
 

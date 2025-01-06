@@ -5697,9 +5697,10 @@ private String fixPackageReference(String dep) {
   }
 
   private boolean loadArchetype(FetchedFile f, String cause) throws Exception {
-    ProcessedArchetype pa = new ArchetypeImporter(context, igpkp.getCanonical()).importArchetype(f.getSource(), f.getName()); 
+    ProcessedArchetype pa = new ArchetypeImporter(context, igpkp.getCanonical()).importArchetype(f.getSource(), new File(f.getStatedPath()).getName());
     Bundle bnd = pa.getBnd();
-    pa.getSd().setUserData(UserDataNames.archetype, pa.getSource());
+    pa.getSd().setUserData(UserDataNames.archetypeSource, pa.getSource());
+    pa.getSd().setUserData(UserDataNames.archetypeName, pa.getSourceName());
     
     f.setBundle(new FetchedResource(f.getName()+" (bundle)"));
     f.setBundleType(FetchedBundleType.NATIVE);
@@ -8415,11 +8416,7 @@ private String fixPackageReference(String dep) {
     }
     r.setResource(publishedIg);
     r.setElement(convertToElement(r, publishedIg));
-
-    ByteArrayOutputStream bs = new ByteArrayOutputStream();
-    new org.hl7.fhir.r4.formats.JsonParser().compose(bs, VersionConvertorFactory_40_50.convertResource(publishedIg));
-    npm.addFile(Category.OTHER, "ig-r4.jsonX", bs.toByteArray());
-
+    
     for (ImplementationGuideDefinitionResourceComponent res : publishedIg.getDefinition().getResource()) {
       FetchedResource rt = null;
       for (FetchedFile tf : fileList) {
@@ -12411,7 +12408,10 @@ private String fixPackageReference(String dep) {
     Element eNN = element;
     jp.compose(element, bsj, OutputStyle.NORMAL, igpkp.getCanonical());
     if (!r.isCustomResource()) {
-    npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
+      npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
+      if (r.getResource() != null && r.getResource().hasUserData(UserDataNames.archetypeSource)) {
+        npm.addFile(Category.ADL, r.getResource().getUserString(UserDataNames.archetypeName), r.getResource().getUserString(UserDataNames.archetypeSource).getBytes(StandardCharsets.UTF_8));
+      }
     } else  if ("StructureDefinition".equals(r.fhirType())) {
       npm.addFile(Category.RESOURCE, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
       StructureDefinition sdt = (StructureDefinition) r.getResource().copy();
@@ -13248,7 +13248,7 @@ private String fixPackageReference(String dep) {
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-eview"+langSfx, sdr.eview(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, false), f.getOutputNames(), r, vars, null, start, "eview", "StructureDefinition");
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-eview-all"+langSfx, sdr.eview(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, true), f.getOutputNames(), r, vars, null, start, "eview", "StructureDefinition");
     }
-    if (igpkp.wantGen(r, "adl") && sd.hasUserData(UserDataNames.archetype)) {
+    if (igpkp.wantGen(r, "adl") && sd.hasUserData(UserDataNames.archetypeSource)) {
       long start = System.currentTimeMillis();
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-adl"+langSfx, sdr.adl(), f.getOutputNames(), r, vars, null, start, "adl", "StructureDefinition");
     }

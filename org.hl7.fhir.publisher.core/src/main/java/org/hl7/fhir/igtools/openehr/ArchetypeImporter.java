@@ -79,15 +79,21 @@ public class ArchetypeImporter {
     private StructureDefinition sd;
     private Bundle bnd;
     private String source;
-    protected ProcessedArchetype(String source,  Archetype archetype, Bundle bnd, StructureDefinition sd) {
+    private String sourceName;
+    
+    protected ProcessedArchetype(String source,String sourceName, Archetype archetype, Bundle bnd, StructureDefinition sd) {
       super();
       this.source = source;
+      this.sourceName = sourceName;
       this.archetype = archetype;
       this.sd = sd;
       this.bnd = bnd;
     }
     public String getSource() {
       return source;
+    }
+    public String getSourceName() {
+      return sourceName;
     }
     public Archetype getArchetype() {
       return archetype;
@@ -216,7 +222,7 @@ public class ArchetypeImporter {
     List<ElementDefinition> defns = sd.getDifferential().getElement();
     processDefinition(defns, null, defn, baseType, null, baseType, defn.getNodeId());
     
-    return new ProcessedArchetype(new String(cnt), archetype, bnd, sd);
+    return new ProcessedArchetype(new String(cnt), name, archetype, bnd, sd);
   }
 
   private Archetype load20(InputStream stream) throws ADLParseException, IOException {
