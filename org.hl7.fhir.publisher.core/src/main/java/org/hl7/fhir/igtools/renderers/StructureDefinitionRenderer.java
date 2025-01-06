@@ -2567,4 +2567,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return "";
     }
   }
+
+  public String adl() {
+    return "<pre><code>"+Utilities.escapeXml(sd.getUserString(UserDataNames.archetypeSource))+"</code></pre>";
+  }
 }
