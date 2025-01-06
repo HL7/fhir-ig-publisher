@@ -32,12 +32,14 @@ import java.util.Comparator;
 import java.util.List;
 
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.igtools.openehr.ArchetypeImporter;
 import org.hl7.fhir.r5.context.ILoggingService;
 import org.hl7.fhir.r5.context.ILoggingService.LogCategory;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.FmlParser;
 import org.hl7.fhir.r5.elementmodel.ValidatedFragment;
 import org.hl7.fhir.r5.formats.FormatUtilities;
+import org.hl7.fhir.r5.model.Bundle;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.DataType;
 import org.hl7.fhir.r5.model.Reference;
@@ -59,6 +61,7 @@ public class SimpleFetcher implements IFetchFile {
 
   private static final String[] EXTENSIONS = new String[] {".xml", ".json", ".map", ".fml", ".phinvads"};
   private IGKnowledgeProvider pkp;
+  private IWorkerContext context;
   private List<String> resourceDirs;
   private ILoggingService log;
   private String rootDir;
@@ -79,6 +82,14 @@ public class SimpleFetcher implements IFetchFile {
   @Override
   public void setPkp(IGKnowledgeProvider pkp) {
     this.pkp = pkp;
+  }
+
+  public IWorkerContext getContext() {
+    return context;
+  }
+
+  public void setContext(IWorkerContext context) {
+    this.context = context;
   }
 
   public String getRootDir() {
@@ -124,7 +135,7 @@ public class SimpleFetcher implements IFetchFile {
     return ff;
   }
 
-  private boolean isIgnoredFile(String name) {
+  public static boolean isIgnoredFile(String name) {
     return name.startsWith(".") || Utilities.existsInList(Utilities.getFileExtension(name), "ini");
   }
 
@@ -351,7 +362,7 @@ public class SimpleFetcher implements IFetchFile {
                     }
                   }
                 }
-              if (!ok && !Utilities.existsInList(ext, "xml", "ttl", "html", "txt", "fml")) {
+              if (!ok && !Utilities.existsInList(ext, "xml", "ttl", "html", "txt", "fml", "adl")) {
                 try {
                   List<ValidatedFragment> el = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parse(new FileInputStream(fn));
                   if (el.size() == 1) {
@@ -370,7 +381,7 @@ public class SimpleFetcher implements IFetchFile {
                   }
                 }
               }
-              if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt", "fml")) {
+              if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt", "fml", "adl")) {
                 try {
                   org.hl7.fhir.r5.elementmodel.Element e = new org.hl7.fhir.r5.elementmodel.TurtleParser(context).parseSingle(new FileInputStream(fn), null);
                   addFile(res, f, e, "application/fhir+turtle");
@@ -388,13 +399,30 @@ public class SimpleFetcher implements IFetchFile {
                   }
                 }
               }              
-              if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt")) {
+              if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt", "adl")) {
                 try {
                   if (fp==null) {
                     fp = new FmlParser(context);
                   }
                   org.hl7.fhir.r5.elementmodel.Element e  = fp.parse(new FileInputStream(f)).get(0).getElement();
                   addFile(res, f, e, "fml");
+                  count++;
+                  ok = true;
+                } catch (Exception e) {
+                  if (!f.getName().startsWith("Binary-")) { // we don't notify here because Binary is special. 
+                    if (report) {
+                      log.logMessage("ADL Error loading "+f+": "+e.getMessage());
+                      if (debug) {
+                        e.printStackTrace();
+                      }
+                    }
+                  }
+                }
+              }            
+              if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt", "ttl")) {
+                try {
+                  new ArchetypeImporter(context, pkp.getCanonical()).checkArchetype(new FileInputStream(f), f.getName());
+                  addFile(res, f, null, "adl");
                   count++;
                   ok = true;
                 } catch (Exception e) {
@@ -421,14 +449,14 @@ public class SimpleFetcher implements IFetchFile {
   private List<String> fixedFileTypes() {
     return Utilities.strings(
         // known file types we have parsers for
-        "json", "ttl", "html", "txt", "fml", 
+        "json", "ttl", "html", "txt", "fml", "adl",
         
         // known files types to not even try parsing
         "jpg", "png", "gif", "mp3", "mp4", "pfd", "doc", "docx", "ppt", "pptx", "svg");
   }
 
   private void addFile(List<FetchedFile> res, File f, org.hl7.fhir.r5.elementmodel.Element e, String cnt) throws IOException {
-    if (!e.fhirType().equals("ImplementationGuide") && !(f.getName().startsWith("Binary") && !"Binary".equals(e.fhirType()))) {
+    if (( e == null || !e.fhirType().equals("ImplementationGuide")) && !(f.getName().startsWith("Binary") && !"Binary".equals(e.fhirType()))) {
       addFile(res, f, cnt);
     }
   }

@@ -91,6 +91,8 @@ import org.hl7.fhir.convertors.txClient.TerminologyClientFactory;
 import org.hl7.fhir.exceptions.DefinitionException;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
+import org.hl7.fhir.igtools.openehr.ArchetypeImporter;
+import org.hl7.fhir.igtools.openehr.ArchetypeImporter.ProcessedArchetype;
 import org.hl7.fhir.igtools.publisher.FetchedFile.FetchedBundleType;
 import org.hl7.fhir.igtools.publisher.IFetchFile.FetchState;
 import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
@@ -704,6 +706,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private List<String> pagesDirs = new ArrayList<String>();
   private List<String> testDirs = new ArrayList<String>();
   private List<String> dataDirs = new ArrayList<String>();
+  private List<String> otherDirs = new ArrayList<String>();
   private String tempDir;
   private String tempLangDir;
   private String outputDir;
@@ -2783,8 +2786,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     } catch (Exception e) {
       throw new Exception("Error Parsing File "+igName+": "+e.getMessage(), e);
     }
-    template = templateManager.loadTemplate(templateName, rootDir, sourceIg.getPackageId(), mode == IGBuildMode.AUTOBUILD);
-
+    template = templateManager.loadTemplate(templateName, rootDir, sourceIg.getPackageId(), mode == IGBuildMode.AUTOBUILD, logOptions.contains("template"));
     if (template.hasExtraTemplates()) {
       processExtraTemplates(template.getExtraTemplates());
     }
@@ -2877,6 +2879,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         break;
       case "path-data":     
         dataDirs.add(Utilities.path(rootDir, p.getValue()));
+        break;
+      case "path-other":     
+        otherDirs.add(Utilities.path(rootDir, p.getValue()));
         break;
       case "copyrightyear":     
         copyrightYear = p.getValue();
@@ -3355,6 +3360,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       igpkp.setAutoPath(true);
     }
     fetcher.setPkp(igpkp);
+    fetcher.setContext(context);
     template.loadSummaryRows(igpkp.summaryRows());
 
     if (VersionUtilities.isR4Plus(version) && !dependsOnExtensions(sourceIg.getDependsOn()) && !sourceIg.getPackageId().contains("hl7.fhir.uv.extensions")) {
@@ -5410,7 +5416,7 @@ private String fixPackageReference(String dep) {
       if (debug) {
         waitForInput("before OnGenerate");
       }
-      logMessage("Run Template ");
+      logMessage("Run Template");
       Session tts = tt.start("template");
       List<String> newFileList = new ArrayList<String>();
       checkOutcomes(template.beforeGenerateEvent(publishedIg, tempDir, otherFilesRun, newFileList));
@@ -5438,7 +5444,7 @@ private String fixPackageReference(String dep) {
         loadIgPages(publishedIg.getDefinition().getPage(), igPages);
       }
       tts.end();
-      logMessage("Template Done");
+      logDebugMessage(LogCategory.PROGRESS, "Template Done");
       if (debug) {
         waitForInput("after OnGenerate");
       }
@@ -5690,16 +5696,74 @@ private String fixPackageReference(String dep) {
     return changed || needToBuild;
   }
 
+  private boolean loadArchetype(FetchedFile f, String cause) throws Exception {
+    ProcessedArchetype pa = new ArchetypeImporter(context, igpkp.getCanonical()).importArchetype(f.getSource(), new File(f.getStatedPath()).getName());
+    Bundle bnd = pa.getBnd();
+    pa.getSd().setUserData(UserDataNames.archetypeSource, pa.getSource());
+    pa.getSd().setUserData(UserDataNames.archetypeName, pa.getSourceName());
+    
+    f.setBundle(new FetchedResource(f.getName()+" (bundle)"));
+    f.setBundleType(FetchedBundleType.NATIVE);
+
+    boolean changed = noteFile("Bundle/"+bnd.getIdBase(), f);
+    int i = -1;
+    for (BundleEntryComponent be : bnd.getEntry()) { 
+      i++;
+      Resource res = be.getResource();
+      Element e = new ObjectConverter(context).convert(res);
+      checkResourceUnique(res.fhirType()+"/"+res.getIdBase(), f.getName(), cause);
+      FetchedResource r = f.addResource(f.getName()+"["+i+"]");
+      r.setElement(e);
+      r.setResource(res);
+      r.setId(res.getIdBase());
+
+      r.setTitle(r.getElement().getChildValue("name"));
+      igpkp.findConfiguration(f, r);
+    }
+    for (FetchedResource r : f.getResources()) {
+      bndIds.add(r.fhirType()+"/"+r.getId());
+      ImplementationGuideDefinitionResourceComponent res = findIGReference(r.fhirType(), r.getId());
+      if (res == null) {
+        res = publishedIg.getDefinition().addResource();
+        if (!res.hasName())
+          if (r.hasTitle())
+            res.setName(r.getTitle());
+          else
+            res.setName(r.getId());
+        if (!res.hasDescription() && r.getElement().hasChild("description")) {
+          res.setDescription(r.getElement().getChildValue("description").trim());
+        }
+        res.setReference(new Reference().setReference(r.fhirType()+"/"+r.getId()));
+      }
+      res.setUserData(UserDataNames.pub_loaded_resource, r);
+      r.setResEntry(res);
+      if (r.getResource() instanceof CanonicalResource) {
+        CanonicalResource cr = (CanonicalResource)r.getResource();
+        if (!canonicalResources.containsKey(cr.getUrl())) {
+          canonicalResources.put(cr.getUrl(), r);
+          if (cr.hasVersion())
+            canonicalResources.put(cr.getUrl()+"#"+cr.getVersion(), r);
+        }
+      }
+    }
+    return changed;
+  }
+
   private boolean loadResources(boolean needToBuild, FetchedFile igf) throws Exception { // igf is not currently used, but it was about relative references? 
     List<FetchedFile> resources = fetcher.scan(sourceDir, context, igpkp.isAutoPath());
     for (FetchedFile ff : resources) {
       ff.start("loadResources");
-      try {
-        if (!ff.matches(igf) && !isBundle(ff)) {
-          needToBuild = loadResource(needToBuild, ff, "scan folder "+Utilities.getDirectoryForFile(ff.getStatedPath()));
+      if (ff.getContentType().equals("adl")) {
+        loadArchetype(ff, "scan folder "+Utilities.getDirectoryForFile(ff.getStatedPath()));
+        needToBuild = true;
+      } else {
+        try {
+          if (!ff.matches(igf) && !isBundle(ff)) {
+            needToBuild = loadResource(needToBuild, ff, "scan folder "+Utilities.getDirectoryForFile(ff.getStatedPath()));
+          }
+        } finally {
+          ff.finish("loadResources");      
         }
-      } finally {
-        ff.finish("loadResources");      
       }
     }
     return needToBuild;
@@ -5708,11 +5772,11 @@ private String fixPackageReference(String dep) {
   private boolean isBundle(FetchedFile ff) {
     File f = new File(ff.getName());
     String n = f.getName();
-    if (n.contains(".")) {
-      n = n.substring(0, n.indexOf("."));
+    if (n.endsWith(".json") || n.endsWith(".xml")) {
+      n = n.substring(0, n.lastIndexOf("."));
     }
     for (String s : bundles) {
-      if (n.equals("bundle-"+s)) {
+      if (n.equals("bundle-"+s) || n.equals("Bundle-"+s) ) {
         return true;
       }
     }
@@ -6617,10 +6681,10 @@ private String fixPackageReference(String dep) {
       System.out.println("id: "+tid+", file: "+source+", from "+cause);
     }
     if (loadedIds.containsKey(tid)) {
-      System.out.println("Duplicate Resource in IG: "+tid+". first found in "+loadedIds.get(tid)+", now in "+source);
+      System.out.println("Duplicate Resource in IG: "+tid+". first found in "+loadedIds.get(tid)+", now in "+source+" ("+cause+")");
       duplicateInputResourcesDetected = true;
     }
-    loadedIds.put(tid, source);
+    loadedIds.put(tid, source+" ("+cause+")");
   }
 
   private ImplementationGuideDefinitionResourceComponent findIGReference(String type, String id) {
@@ -6631,7 +6695,7 @@ private String fixPackageReference(String dep) {
     }
     return null;
   }
-
+  
   private Element loadFromMap(FetchedFile file) throws Exception {
     if (!VersionUtilities.isR4Plus(context.getVersion())) {
       throw new Error("Loading Map Files is not supported for version "+VersionUtilities.getNameForVersion(context.getVersion()));
@@ -8084,6 +8148,18 @@ private String fixPackageReference(String dep) {
         for (String t : testDirs) {
           addTestDir(new File(t), t);
         }
+        for (String n : otherDirs) {
+          File f = new File(n);
+          if (f.exists()) {
+            for (File ff : f.listFiles()) {
+              if (!SimpleFetcher.isIgnoredFile(f.getName())) {
+                npm.addFile(Category.OTHER, ff.getName(), TextFile.fileToBytes(ff.getAbsolutePath()));
+              }              
+            }
+          } else {
+            logMessage("Other Directory not found: "+n);                
+          }
+        }
         npm.finish();
         if (r4tor4b.canBeR4() && r4tor4b.canBeR4B()) {
           try {
@@ -8340,11 +8416,7 @@ private String fixPackageReference(String dep) {
     }
     r.setResource(publishedIg);
     r.setElement(convertToElement(r, publishedIg));
-
-    ByteArrayOutputStream bs = new ByteArrayOutputStream();
-    new org.hl7.fhir.r4.formats.JsonParser().compose(bs, VersionConvertorFactory_40_50.convertResource(publishedIg));
-    npm.addFile(Category.OTHER, "ig-r4.jsonX", bs.toByteArray());
-
+    
     for (ImplementationGuideDefinitionResourceComponent res : publishedIg.getDefinition().getResource()) {
       FetchedResource rt = null;
       for (FetchedFile tf : fileList) {
@@ -10797,6 +10869,11 @@ private String fixPackageReference(String dep) {
     
     if (repoSource != null) {
       data.add("repoSource", gh());
+    } else {
+      String git= getGitSource();
+      if (git != null) {
+        data.add("repoSource", git);
+      }
     }
     data.add("genDate", genTime());
     data.add("genDay", genDate());
@@ -10925,6 +11002,11 @@ private String fixPackageReference(String dep) {
   private String getGitStatus() throws IOException {
     File gitDir = new File(Utilities.getDirectoryForFile(configFile));
     return GitUtilities.getGitStatus(gitDir);
+  }
+  
+  private String getGitSource() throws IOException {
+    File gitDir = new File(Utilities.getDirectoryForFile(configFile));
+    return GitUtilities.getGitSource(gitDir);
   }
 
   private void generateResourceReferences() throws Exception {
@@ -11299,7 +11381,6 @@ private String fixPackageReference(String dep) {
       saveFileOutputs(f);
       for (FetchedResource r : f.getResources()) {
         logDebugMessage(LogCategory.PROGRESS, "Produce outputs for "+r.fhirType()+"/"+r.getId());
-        logMessage("Generate HTML Outputs for "+r.fhirType()+"/"+r.getId());
         Map<String, String> vars = makeVars(r);
         makeTemplates(f, r, vars);
         saveDirectResourceOutputs(f, r, r.getResource(), vars);
@@ -12327,7 +12408,10 @@ private String fixPackageReference(String dep) {
     Element eNN = element;
     jp.compose(element, bsj, OutputStyle.NORMAL, igpkp.getCanonical());
     if (!r.isCustomResource()) {
-    npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
+      npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
+      if (r.getResource() != null && r.getResource().hasUserData(UserDataNames.archetypeSource)) {
+        npm.addFile(Category.ADL, r.getResource().getUserString(UserDataNames.archetypeName), r.getResource().getUserString(UserDataNames.archetypeSource).getBytes(StandardCharsets.UTF_8));
+      }
     } else  if ("StructureDefinition".equals(r.fhirType())) {
       npm.addFile(Category.RESOURCE, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
       StructureDefinition sdt = (StructureDefinition) r.getResource().copy();
@@ -13159,6 +13243,15 @@ private String fixPackageReference(String dep) {
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-experimental-warning"+langSfx, sdr.experimentalWarning(), f.getOutputNames(), r, vars, null, start, "experimental-warning", "StructureDefinition");
     }
 
+    if (igpkp.wantGen(r, "eview")) {
+      long start = System.currentTimeMillis();
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-eview"+langSfx, sdr.eview(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, false), f.getOutputNames(), r, vars, null, start, "eview", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-eview-all"+langSfx, sdr.eview(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, true), f.getOutputNames(), r, vars, null, start, "eview", "StructureDefinition");
+    }
+    if (igpkp.wantGen(r, "adl") && sd.hasUserData(UserDataNames.archetypeSource)) {
+      long start = System.currentTimeMillis();
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-adl"+langSfx, sdr.adl(), f.getOutputNames(), r, vars, null, start, "adl", "StructureDefinition");
+    }
     if (igpkp.wantGen(r, "diff")) {
       long start = System.currentTimeMillis();
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-diff"+langSfx, sdr.diff(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, false), f.getOutputNames(), r, vars, null, start, "diff", "StructureDefinition");
@@ -13905,8 +13998,12 @@ private String fixPackageReference(String dep) {
   public static void main(String[] args) throws Exception {
     int exitCode = 0;
 
+    // Prevents SLF4J(I) from printing unnecessary info to the console.
+    System.setProperty("slf4j.internal.verbosity", "WARN");
+
     org.hl7.fhir.utilities.FileFormat.checkCharsetAndWarnIfNotUTF8(System.out);
-    NpmPackage.setLoadCustomResources(true);  
+
+    NpmPackage.setLoadCustomResources(true);
     if (CliParams.hasNamedParam(args, FHIR_SETTINGS_PARAM)) {
       FhirSettings.setExplicitFilePath(CliParams.getNamedParam(args, FHIR_SETTINGS_PARAM));
     }

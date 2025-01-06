@@ -1,5 +1,5 @@
-<configuration scan="true" scanPeriod="30 seconds">
-
+<configuration>
+	<!-- Core logback config -->
 	<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
 		<filter class="ch.qos.logback.classic.filter.ThresholdFilter">
 			<level>INFO</level>
@@ -12,5 +12,7 @@
 	<root level="info">
 		<appender-ref ref="STDOUT" />
 	</root>
+
+	<statusListener class="ch.qos.logback.core.status.NopStatusListener" />
 
 </configuration>

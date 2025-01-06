@@ -490,6 +490,10 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
   }
 
+  public String eview(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode, boolean all) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
+   return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.buildElementTable(new RenderingStatus(), defnFile, sd, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? "da" : "d"), toTabs ? ANCHOR_PREFIX_DIFF : ANCHOR_PREFIX_SNAP, resE));
+  }
+
   public String snapshot(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode, boolean all) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
     if (sd.getSnapshot().getElement().isEmpty())
       return "";
@@ -886,7 +890,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       strengthInh = true;
     }
 
-    if (brd.vsn.equals("?ext")) {
+    if ("?ext".equals(brd.vsn)) {
       if (tx.getValueSet() != null)
         System.out.println("Value set '"+tx.getValueSet()+"' at " + url + "#" + path + " not found");
       else if (!tx.hasDescription())
@@ -2562,5 +2566,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     } else {
       return "";
     }
+  }
+
+  public String adl() {
+    return "<pre><code>"+Utilities.escapeXml(sd.getUserString(UserDataNames.archetypeSource))+"</code></pre>";
   }
 }

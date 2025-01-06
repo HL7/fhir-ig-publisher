@@ -62,7 +62,7 @@ public class TemplateManager {
     this.logger = logger;
   }
 
-  public Template loadTemplate(String template, String rootFolder, String packageId, boolean autoMode) throws FHIRException, IOException {
+  public Template loadTemplate(String template, String rootFolder, String packageId, boolean autoMode, boolean wantLog) throws FHIRException, IOException {
     this.autoMode = autoMode;
     String templateDir = Utilities.path(rootFolder, "template");
     boolean inPlace = template.equals("#template");
@@ -84,7 +84,7 @@ public class TemplateManager {
     if (!canExecute) {
       logger.logMessage("IG template '"+templateThatCantExecute+"' is not trusted.  No scripts will be executed");
     }
-    return new Template(rootFolder, canExecute, templateThatCantExecute, templateReason);
+    return new Template(rootFolder, canExecute, templateThatCantExecute, templateReason, wantLog);
   }
 
   private void installTemplate(String template, String rootFolder, String templateDir, List<String> scriptIds, ArrayList<String> loadedIds, int level) throws FHIRException, IOException {
