@@ -16,7 +16,9 @@ import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.igtools.publisher.SpecMapManager.SpecialPackageType;
 import org.hl7.fhir.r5.context.IContextResourceLoader;
 import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.r5.model.DomainResource;
 import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
@@ -105,6 +107,12 @@ public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProv
           path = igpkp.doReplacements(p, r, null, null);            
         } else {
           path = pathToSpec+"/"+ igpkp.doReplacements(p, r, null, null);
+        }
+        if (r instanceof DomainResource) {
+          DomainResource dr = (DomainResource) r;
+          if (dr.hasExtension(ToolingExtensions.EXT_WEB_SOURCE)) {
+            path = ToolingExtensions.readStringExtension(dr, ToolingExtensions.EXT_WEB_SOURCE);
+          }
         }
         r.setWebPath(path);
         if (path.contains("vsac")) {

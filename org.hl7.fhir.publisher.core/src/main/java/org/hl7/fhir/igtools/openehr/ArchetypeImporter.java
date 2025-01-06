@@ -11,6 +11,7 @@ import java.util.Map;
 
 import javax.xml.parsers.ParserConfigurationException;
 
+import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.Bundle;
 import org.hl7.fhir.r5.model.Bundle.BundleType;
@@ -36,6 +37,7 @@ import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
+import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.xml.XMLUtil;
 import org.openehr.referencemodels.BuiltinReferenceModels;
@@ -72,23 +74,89 @@ public class ArchetypeImporter {
   private StructureDefinition sd;
   private Bundle bnd; 
   
-  protected ArchetypeImporter(IWorkerContext context, String canonicalBase) throws ParserConfigurationException, SAXException, IOException {
+  public static class ProcessedArchetype {
+    private Archetype archetype;
+    private StructureDefinition sd;
+    private Bundle bnd;
+    private String source;
+    protected ProcessedArchetype(String source,  Archetype archetype, Bundle bnd, StructureDefinition sd) {
+      super();
+      this.source = source;
+      this.archetype = archetype;
+      this.sd = sd;
+      this.bnd = bnd;
+    }
+    public String getSource() {
+      return source;
+    }
+    public Archetype getArchetype() {
+      return archetype;
+    }
+    public StructureDefinition getSd() {
+      return sd;
+    }
+    public Bundle getBnd() {
+      return bnd;
+    } 
+    
+  }
+  public ArchetypeImporter(IWorkerContext context, String canonicalBase) throws ParserConfigurationException, SAXException, IOException {
     super();
     this.context = context;
     this.canonicalBase = canonicalBase;
     // todo: check openehr-base is loaded, and if it's not, load it 
     // todo: load this from the context.binaries
-    terminology = XMLUtil.parseFileToDom("/Users/grahamegrieve/Downloads/openehr_terminology.xml").getDocumentElement();
+    byte[] tf = context.getBinaryForKey("openehr_terminology.xml");
+    if (tf == null) {
+      // hack temp workaround
+      tf = TextFile.fileToBytes("/Users/grahamegrieve/Downloads/openehr_terminology.xml");
+    }
+    terminology = XMLUtil.parseToDom(tf).getDocumentElement();
   }
 
-  public Bundle importArchetype(byte[] content, boolean adl14) throws ParserConfigurationException, SAXException, IOException, ADLParseException {
-    return importArchetype(new ByteArrayInputStream(content), adl14);
+
+  public void checkArchetype(byte[] content, String name) throws ParserConfigurationException, SAXException, IOException, ADLParseException {
+    checkArchetype(new ByteArrayInputStream(content), name);
   }
 
-  public Bundle importArchetype(InputStream stream, boolean adl14) throws ParserConfigurationException, SAXException, IOException, ADLParseException {
+  public void checkArchetype(InputStream stream, String name) throws ParserConfigurationException, SAXException, IOException, ADLParseException {
+    byte[] cnt = TextFile.streamToBytes(stream);
+    try {
+      archetype = load20(new ByteArrayInputStream(cnt));
+    } catch (Exception e20) {
+      try {
+        archetype = load14(new ByteArrayInputStream(cnt));
+      } catch (Exception e14) {
+        if (e20.getMessage().equals(e14.getMessage())) {
+          throw new FHIRException("Error reading "+name+": "+e20.getMessage(), e20);
+        } else {
+          throw new FHIRException("Error reading "+name+". ADL 1.4: "+e14.getMessage()+"; ADL 2: "+e20.getMessage(), e20);          
+        }
+      }
+    }
+  }
+  
+  public ProcessedArchetype importArchetype(byte[] content, String name) throws ParserConfigurationException, SAXException, IOException, ADLParseException {
+    return importArchetype(new ByteArrayInputStream(content), name);
+  }
+
+  public ProcessedArchetype importArchetype(InputStream stream, String name) throws ParserConfigurationException, SAXException, IOException, ADLParseException {
     atMap.clear();
-    
-    archetype = adl14 ? load14(stream) : load20(stream);
+
+    byte[] cnt = TextFile.streamToBytes(stream);
+    try {
+      archetype = load20(new ByteArrayInputStream(cnt));
+    } catch (Exception e20) {
+      try {
+        archetype = load14(new ByteArrayInputStream(cnt));
+      } catch (Exception e14) {
+        if (e20.getMessage().equals(e14.getMessage())) {
+          throw new FHIRException("Error reading "+name+": "+e20.getMessage(), e20);
+        } else {
+          throw new FHIRException("Error reading "+name+". ADL 1.4: "+e14.getMessage()+"; ADL 2: "+e20.getMessage(), e20);          
+        }
+      }
+    }
 
     bnd = new Bundle();
     bnd.setType(BundleType.COLLECTION);
@@ -148,7 +216,7 @@ public class ArchetypeImporter {
     List<ElementDefinition> defns = sd.getDifferential().getElement();
     processDefinition(defns, null, defn, baseType, null, baseType, defn.getNodeId());
     
-    return bnd;
+    return new ProcessedArchetype(new String(cnt), archetype, bnd, sd);
   }
 
   private Archetype load20(InputStream stream) throws ADLParseException, IOException {
