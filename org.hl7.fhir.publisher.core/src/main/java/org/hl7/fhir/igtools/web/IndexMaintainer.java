@@ -156,7 +156,7 @@ public class IndexMaintainer {
   }
   private String generateSummary() throws IOException {
     XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
-    XhtmlNode tbl = div.table("grid");
+    XhtmlNode tbl = div.table("grid", false);
     XhtmlNode tr = tbl.tr();
     tr.td().b().tx("IG");
     tr.td().b().tx("Details");
@@ -200,7 +200,7 @@ public class IndexMaintainer {
 
   private String generateByDate() throws IOException {
     XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
-    XhtmlNode tbl = div.table("grid");
+    XhtmlNode tbl = div.table("grid", false);
     XhtmlNode tr = tbl.tr();
     tr.td().b().tx("IG");
     tr.td().b().tx("Name");

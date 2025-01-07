@@ -40,6 +40,7 @@ import javax.annotation.Nonnull;
 
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.Publisher.FragmentUseRecord;
+import org.hl7.fhir.igtools.publisher.Publisher.LinkedSpecification;
 import org.hl7.fhir.igtools.publisher.SpecMapManager.SpecialPackageType;
 import org.hl7.fhir.igtools.publisher.modules.IPublisherModule;
 import org.hl7.fhir.r5.context.ILoggingService;
@@ -199,7 +200,7 @@ public class HTMLInspector {
   private String rootFolder;
   private String altRootFolder;
   private List<SpecMapManager> specs;
-  private List<SpecMapManager> linkSpecs;
+  private List<LinkedSpecification> linkSpecs;
   private Map<String, LoadedFile> cache = new HashMap<String, LoadedFile>();
   private int iteration = 0;
   private List<StringPair> otherlinks = new ArrayList<StringPair>();
@@ -226,7 +227,7 @@ public class HTMLInspector {
   private Map<String, ValidationMessage> jsmsgs = new HashMap<>();
   private Map<String, FragmentUseRecord> fragmentUses = new HashMap<>();
 
-  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<SpecMapManager> linkSpecs, ILoggingService log, String canonical, String packageId, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, FragmentUseRecord> fragmentUses) {
+  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log, String canonical, String packageId, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, FragmentUseRecord> fragmentUses) {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
     this.linkSpecs = linkSpecs;
@@ -805,12 +806,12 @@ public class HTMLInspector {
       }
     }
     if (!resolved && linkSpecs != null){
-      for (SpecMapManager spec : linkSpecs) {
-        if (!resolved && spec.getBase() != null) {
-          resolved = resolved || spec.getBase().equals(rref) || (spec.getBase()).equals(rref+"/") || (spec.getBase()+"/").equals(rref)|| spec.hasTarget(rref) || Utilities.existsInList(rref, Utilities.pathURL(spec.getBase(), "history.html"));
+      for (LinkedSpecification spec : linkSpecs) {
+        if (!resolved && spec.getSpm().getBase() != null) {
+          resolved = resolved || spec.getSpm().getBase().equals(rref) || (spec.getSpm().getBase()).equals(rref+"/") || (spec.getSpm().getBase()+"/").equals(rref)|| spec.getSpm().hasTarget(rref) || Utilities.existsInList(rref, Utilities.pathURL(spec.getSpm().getBase(), "history.html"));
         }
-        if (!resolved && spec.getBase2() != null) {
-          resolved = spec.getBase2().equals(rref) || (spec.getBase2()).equals(rref+"/"); 
+        if (!resolved && spec.getSpm().getBase2() != null) {
+          resolved = spec.getSpm().getBase2().equals(rref) || (spec.getSpm().getBase2()).equals(rref+"/"); 
         }
       }
     }

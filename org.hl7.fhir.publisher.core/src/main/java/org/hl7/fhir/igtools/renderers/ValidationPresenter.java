@@ -565,7 +565,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
         ul.li().tx("(No Errors/Reports - all good)");        
       } else {
         x.para().b().tx("Decisions");
-        XhtmlNode tbl = x.table("grid");
+        XhtmlNode tbl = x.table("grid", false);
         XhtmlNode tr = tbl.tr();
         tr.td().b().tx("Message");
         tr.td().b().tx("Server");
@@ -589,7 +589,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
         }
         if (isErr) {
           x.para().b().tx("Errors");
-          tbl = x.table("grid");
+          tbl = x.table("grid", false);
           tr = tbl.tr();
           tr.td().b().tx("URL");
           tr.td().b().tx("Message");
@@ -657,7 +657,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       XhtmlNode ul = x.ul();
       ul.li().tx("(None)");
     } else {        
-      XhtmlNode tbl = x.table("grid");
+      XhtmlNode tbl = x.table("grid", false);
       XhtmlNode tr = tbl.tr();
       tr.th().b().tx("System");
       tr.th().b().tx("#Exp.");

@@ -191,7 +191,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     }
     XhtmlNode body = new XhtmlNode(NodeType.Element, "div");  
     body.h1().tx(sd.getTitle());
-    var tbl = body.table("grid");
+    var tbl = body.table("grid", false);
     var tr = tbl.tr();
     tr.td().b().tx("URL");
     tr.td().tx(sd.getUrl());
@@ -336,7 +336,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     XhtmlNode body = new XhtmlNode(NodeType.Element, "div");  
     body.h1().tx(sd.getName());
     body.para().tx("FHIR Cross-version Mappings for "+sd.getType()+" based on the R5 structure");
-    XhtmlNode tbl = body.table("grid");
+    XhtmlNode tbl = body.table("grid", false);
     XhtmlNode tr = tbl.tr();
 
     // we're going to generate a table with a column for each target structure definition in the chains that terminate in the provided sd

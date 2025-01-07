@@ -1206,7 +1206,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     var p = x.para();
     p.tx("Guidance on how to interpret the contents of this table can be found ");
     p.ah("https://build.fhir.org/ig/FHIR/ig-guidance//readingIgs.html#data-dictionaries").tx("here");
-    XhtmlNode t = x.table("dict");
+    XhtmlNode t = x.table("dict", false);
 
     List<ElementDefinition> elements = elementsForMode(mode);
 
@@ -2570,5 +2570,87 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   public String adl() {
     return "<pre><code>"+Utilities.escapeXml(sd.getUserString(UserDataNames.archetypeSource))+"</code></pre>";
+  }
+
+  public String useContext() throws IOException {
+    XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
+    if (sd.getContext().isEmpty()) {
+      div.para().tx("This extension does not specify which elements it should be used on");
+    } else {
+      div.para().tx("This extension may be used on the following element(s):");
+      var ul = div.ul();
+      for (StructureDefinitionContextComponent c : sd.getContext()) {
+        var li = ul.li();
+        switch (c.getType()) {
+        case ELEMENT:
+          li.tx("Element ID: ");
+          String tn = c.getExpression();
+          if (tn.contains(".")) {
+            tn = tn.substring(0, tn.indexOf("."));
+          }
+          StructureDefinition t = context.fetchTypeDefinition(tn);
+          var code = li.code();
+          if (t != null && t.hasWebPath()) {
+            code.ah(t.getWebPath()).tx(c.getExpression());
+          } else {
+            code.tx(c.getExpression());
+          }
+          break;
+        case EXTENSION:
+          li.tx("Extension: ");
+          t = context.fetchResource(StructureDefinition.class, c.getExpression());
+          if (t != null && t.hasWebPath()) {
+            li.ah(t.getWebPath()).tx(t.present());
+          } else {
+            li.code().tx(c.getExpression());
+          }
+          break;
+        case FHIRPATH:
+          li.ah(Utilities.pathURL(context.getSpecUrl(), "fhirpath.html")).tx("Path");
+          li.tx(": ");
+          li.tx(c.getExpression());
+          break;
+        default:
+          li.tx("??: ");
+          li.tx(c.getExpression());
+          break;
+        }
+      }
+    }
+    if (sd.hasContextInvariant()) {
+      if (sd.getContextInvariant().size() == 1) {
+        div.para().tx("In addition, the extension can only be used when this FHIRPath expression is true:");
+        div.para().code().tx(sd.getContextInvariant().get(0).asStringValue());
+      } else {
+        div.para().tx("In addition, the extension can only be used when these FHIRPath expressions are true:");
+        var ul = div.ul();
+        for (StringType sv : sd.getContextInvariant()) {
+          ul.li().code().tx(sv.asStringValue());
+        }
+      }
+    }
+    if (sd.hasExtension(ToolingExtensions.EXT_EARLIEST_FHIR_VERSION) || sd.hasExtension(ToolingExtensions.EXT_LATEST_FHIR_VERSION)) {
+      var p = div.para();
+      if (!sd.hasExtension(ToolingExtensions.EXT_EARLIEST_FHIR_VERSION)) {
+        p.tx("This extension is defined for use with FHIR versions up to ");
+        linkToVersion(p, ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_LATEST_FHIR_VERSION));                
+      } else if (!sd.hasExtension(ToolingExtensions.EXT_LATEST_FHIR_VERSION)) {
+        p.tx("This extension is defined for use with FHIR version ");
+        linkToVersion(p, ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_EARLIEST_FHIR_VERSION));
+        p.tx(" and after");        
+      } else {
+        p.tx("This extension is defined for use with FHIR versions ");
+        linkToVersion(p, ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_EARLIEST_FHIR_VERSION));
+        p.tx(" to ");
+        linkToVersion(p, ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_LATEST_FHIR_VERSION));        
+      }
+      p.tx(".");        
+    }
+    return new XhtmlComposer(false, true).compose(div.getChildNodes());
+  }
+
+  private void linkToVersion(XhtmlNode p, String version) {
+    String url = VersionUtilities.getSpecUrl(version);
+    p.ahOrNot(url).b().tx(VersionUtilities.getNameForVersion(version));    
   }
 }
