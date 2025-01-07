@@ -33,6 +33,7 @@ import java.util.Locale;
 import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.r5.context.IContextResourceLoader;
 import org.hl7.fhir.r5.model.Constants;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.Utilities;
@@ -77,6 +78,7 @@ public class SpecMapManager {
   private String auth;
   private String realm;
   private String npmVId;
+  private IContextResourceLoader loader;
   
   private SpecMapManager() {
     
@@ -459,7 +461,7 @@ public class SpecMapManager {
       res.special = SpecialPackageType.DICOM;
     } else if (pi.name().startsWith("hl7.fhir.") && pi.name().endsWith(".examples") ) {
       res.special = SpecialPackageType.Examples;
-    } else {
+    } else if (!pi.name().startsWith("hl7.fhir.us.core.v")) {
       res.special = SpecialPackageType.Simplifier;  
     }
     res.pi = pi;
@@ -509,6 +511,22 @@ public class SpecMapManager {
 
   public boolean isCore() {
     return "hl7.fhir.core".equals(getNpmName());
+  }
+
+  public NpmPackage getNpm() {
+    return pi;
+  }
+
+  public void setNpm(NpmPackage pi) {
+    this.pi = pi;
+  }
+
+  public IContextResourceLoader getLoader() {
+    return loader;
+  }
+
+  public void setLoader(IContextResourceLoader loader) {
+    this.loader = loader;
   }
 
   

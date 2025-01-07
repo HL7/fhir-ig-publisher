@@ -1599,7 +1599,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
 
   @Override
-  public ResourceWithReference resolve(RenderingContext context, String url, String version) {
+  public ResourceWithReference resolve(RenderingContext context, String url, String version) throws IOException {
     if (url == null) {
       return null;
     }
@@ -1667,9 +1667,24 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         path = null;
       }
       
-      if (path != null)
-      
-        return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, null);
+      if (path != null) {
+        InputStream s = null;
+        if (sp.getNpm() != null && fp.contains("/") && sp.getLoader() != null) {
+          String[] pl = fp.split("\\/");
+          String rt = pl[pl.length-2];
+          String id = pl[pl.length-1]; 
+          s = sp.getNpm().loadExampleResource(rt, id);
+        }
+        if (s == null) {
+          return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, null);
+        } else {
+          IContextResourceLoader loader = sp.getLoader();
+          Resource res = loader.loadResource(s, true);
+          res.setWebPath(path);
+          return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, ResourceWrapper.forResource(context, res));
+          
+        }
+      }
     }
 
     for (FetchedFile f : fileList) {
@@ -4235,6 +4250,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     igm.setName(name);
     igm.setBase(canonical);
     igm.setBase2(PackageHacker.fixPackageUrl(pi.url()));
+    igm.setNpm(pi);
     specMaps.add(igm);
     if (!VersionUtilities.versionsCompatible(version, pi.fhirVersion())) {
       if (!pi.isWarned()) {
@@ -4244,7 +4260,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       }
     }
 
-    loadFromPackage(name, canonical, pi, webref, igm, loadDeps);
+    igm.setLoader(loadFromPackage(name, canonical, pi, webref, igm, loadDeps));
   }
 
   private boolean isValidIGToken(String tail) {
@@ -4281,7 +4297,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
 
 
-  public void loadFromPackage(String name, String canonical, NpmPackage pi, String webref, SpecMapManager igm, boolean loadDeps) throws IOException {
+  public IContextResourceLoader loadFromPackage(String name, String canonical, NpmPackage pi, String webref, SpecMapManager igm, boolean loadDeps) throws IOException {
     if (loadDeps) { // we do not load dependencies for packages the tooling loads on it's own initiative
       for (String dep : pi.dependencies()) {
         if (!context.hasPackage(dep)) {
@@ -4308,6 +4324,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
                 smm.setName(dpi.name()+"_"+dpi.version());
                 smm.setBase(dpi.canonical());
                 smm.setBase2(PackageHacker.fixPackageUrl(dpi.url()));
+                smm.setNpm(pi);
                 specMaps.add(smm);
               } catch (Exception e) {
                 if (!"hl7.fhir.core".equals(dpi.name())) {
@@ -4316,7 +4333,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               }
 
               try {
-                loadFromPackage(dpi.title(), dpi.canonical(), dpi, PackageHacker.fixPackageUrl(dpi.getWebLocation()), smm, true);
+                smm.setLoader(loadFromPackage(dpi.title(), dpi.canonical(), dpi, PackageHacker.fixPackageUrl(dpi.getWebLocation()), smm, true));
               } catch (Exception e) {
                 throw new IOException("Error loading "+dpi.name()+"#"+dpi.version()+": "+e.getMessage(), e);                
               }
@@ -4327,6 +4344,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }    
     IContextResourceLoader loader = new PublisherLoader(pi, igm, webref, igpkp).makeLoader();
     context.loadFromPackage(pi, loader);
+    return loader;
   }
 
 private String fixPackageReference(String dep) {
@@ -4826,6 +4844,7 @@ private String fixPackageReference(String dep) {
     rc.addLink(KnownLinkType.SELF, targetOutput);
     rc.setFixedFormat(fixedFormat);
     rc.setResolveLinkResolver(this);
+    rc.setDebug(debug);
     module.defineTypeMap(rc.getTypeMap());
     if (publishedIg.hasJurisdiction()) {
       Locale locale = null;

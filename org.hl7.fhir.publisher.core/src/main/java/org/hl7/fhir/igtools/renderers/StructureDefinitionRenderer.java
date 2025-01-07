@@ -2611,7 +2611,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           li.tx(c.getExpression());
           break;
         default:
-          li.tx("??: ");
+          li.tx("?type?: ");
           li.tx(c.getExpression());
           break;
         }
@@ -2632,14 +2632,14 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (sd.hasExtension(ToolingExtensions.EXT_EARLIEST_FHIR_VERSION) || sd.hasExtension(ToolingExtensions.EXT_LATEST_FHIR_VERSION)) {
       var p = div.para();
       if (!sd.hasExtension(ToolingExtensions.EXT_EARLIEST_FHIR_VERSION)) {
-        p.tx("This extension is defined for use with FHIR versions up to ");
+        p.tx("This extension is allowed for use with FHIR versions up to ");
         linkToVersion(p, ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_LATEST_FHIR_VERSION));                
       } else if (!sd.hasExtension(ToolingExtensions.EXT_LATEST_FHIR_VERSION)) {
-        p.tx("This extension is defined for use with FHIR version ");
+        p.tx("This extension is allowed for use with FHIR version ");
         linkToVersion(p, ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_EARLIEST_FHIR_VERSION));
         p.tx(" and after");        
       } else {
-        p.tx("This extension is defined for use with FHIR versions ");
+        p.tx("This extension is allowed for use with FHIR versions ");
         linkToVersion(p, ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_EARLIEST_FHIR_VERSION));
         p.tx(" to ");
         linkToVersion(p, ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_LATEST_FHIR_VERSION));        
