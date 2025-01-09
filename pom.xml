@@ -306,7 +306,7 @@
           <version>1.2023.9</version>
         </dependency>
 
-        <!-- openEHR library -->
+        <!-- openEHR library --> <!-- full dependency
         <dependency>
             <groupId>com.nedap.healthcare.archie</groupId>
             <artifactId>aom</artifactId>

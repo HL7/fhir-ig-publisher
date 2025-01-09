@@ -892,7 +892,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
     if ("?ext".equals(brd.vsn)) {
       if (tx.getValueSet() != null)
-        System.out.println("Value set '"+tx.getValueSet()+"' at " + url + "#" + path + " not found");
+         System.out.println("Value set '"+tx.getValueSet()+"' at " + url + "#" + path + " not found");
       else if (!tx.hasDescription())
         System.out.println("No value set specified at " + url + "#" + path + " (no url)");
     }
