@@ -2615,6 +2615,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           li.tx(c.getExpression());
           break;
         }
+        if (c.hasExtension(ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE)) {
+          li.tx(" (");
+          renderVersionRange(c.getExtensionByUrl(ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE), li);
+          li.tx(")");        
+        }
       }
     }
     if (sd.hasContextInvariant()) {
@@ -2629,24 +2634,29 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
       }
     }
-    if (sd.hasExtension(ToolingExtensions.EXT_EARLIEST_FHIR_VERSION) || sd.hasExtension(ToolingExtensions.EXT_LATEST_FHIR_VERSION)) {
+    if (sd.hasExtension(ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE)) {
       var p = div.para();
-      if (!sd.hasExtension(ToolingExtensions.EXT_EARLIEST_FHIR_VERSION)) {
-        p.tx("This extension is allowed for use with FHIR versions up to ");
-        linkToVersion(p, ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_LATEST_FHIR_VERSION));                
-      } else if (!sd.hasExtension(ToolingExtensions.EXT_LATEST_FHIR_VERSION)) {
-        p.tx("This extension is allowed for use with FHIR version ");
-        linkToVersion(p, ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_EARLIEST_FHIR_VERSION));
-        p.tx(" and after");        
-      } else {
-        p.tx("This extension is allowed for use with FHIR versions ");
-        linkToVersion(p, ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_EARLIEST_FHIR_VERSION));
-        p.tx(" to ");
-        linkToVersion(p, ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_LATEST_FHIR_VERSION));        
-      }
+      p.tx("This extension is allowed for use with "); 
+      renderVersionRange(sd.getExtensionByUrl(ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE), p);
       p.tx(".");        
     }
     return new XhtmlComposer(false, true).compose(div.getChildNodes());
+  }
+
+  public void renderVersionRange(Extension ext, XhtmlNode li) {
+    if (!ext.hasExtension(ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_START)) {
+      li.tx("FHIR versions up to ");
+      linkToVersion(li, ToolingExtensions.readStringExtension(ext, ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_END));                
+    } else if (!ext.hasExtension(ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_END)) {
+      li.tx("FHIR versions ");
+      linkToVersion(li, ToolingExtensions.readStringExtension(ext, ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_START));
+      li.tx(" and after");        
+    } else {
+      li.tx("FHIR versions ");
+      linkToVersion(li, ToolingExtensions.readStringExtension(ext, ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_START));
+      li.tx(" to ");
+      linkToVersion(li, ToolingExtensions.readStringExtension(ext, ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_END));        
+    }
   }
 
   private void linkToVersion(XhtmlNode p, String version) {

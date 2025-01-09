@@ -1138,7 +1138,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
 
   private final String detailsTemplate = 
       "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b>$path$</b></td><td><b>$level$</b></td><td title=\"$mid$\"><b>$msg$</b>$comment$</td>\r\n"+
+      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ <span style=\"font-size: 8px; font-color: silver\">$mid$</span></td>\r\n"+
       "   </tr>\r\n";
   
   private final String groupDetailsTemplate = 
