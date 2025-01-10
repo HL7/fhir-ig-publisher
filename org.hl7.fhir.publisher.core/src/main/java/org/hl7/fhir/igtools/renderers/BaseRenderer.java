@@ -13,13 +13,17 @@ import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
 import org.hl7.fhir.r5.model.PrimitiveType;
 import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.r5.model.ResourceFactory;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.renderers.IMarkdownProcessor;
+import org.hl7.fhir.r5.renderers.RendererFactory;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceWithReference;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.MarkDownProcessor;
+import org.hl7.fhir.utilities.StringPair;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 
@@ -53,75 +57,113 @@ public class BaseRenderer implements IMarkdownProcessor {
     return processMarkdown(location, text);
   }
   
-  public String processMarkdown(String location, String text) throws FHIRException {
-	  try {
-	    if (text == null) {
-	      return "";
-	    }
-	    // 1. custom FHIR extensions
-	    text = text.replace("||", "\r\n\r\n");
-	    while (text.contains("[[[")) {
-	      String left = text.substring(0, text.indexOf("[[["));
-	      String linkText = text.substring(text.indexOf("[[[")+3, text.indexOf("]]]"));
-	      String right = text.substring(text.indexOf("]]]")+3);
-	      String url = null;
-	      url = gen.getNamedLinks().get(url);
-	      if (url == null) {
-	        url = getBySpecMap(linkText);
-	      }
-	      String[] parts = linkText.split("\\#");
-	      
+  public String preProcessMarkdown(String location, String text) throws Exception {
+    if (text == null) {
+      return "";
+    }
+    // 1. custom FHIR extensions
+    text = text.replace("||", "\r\n\r\n");
+    while (text.contains("[[[")) {
+      String left = text.substring(0, text.indexOf("[[["));
+      String linkText = text.substring(text.indexOf("[[[")+3, text.indexOf("]]]")).trim();
+      String right = text.substring(text.indexOf("]]]")+3);
+      String url = null;
 
-	      if (url == null) {
-	        Resource r = context.fetchResource(Resource.class, parts[0]);
-	        if (r == null) {
-	          // well, that failed; we'll try to interpret that as a link to a path in FHIR
-	          String rt = parts[0].contains(".") ? parts[0].substring(parts[0].indexOf(".")) : parts[0];
-	          StructureDefinition sd = context.fetchTypeDefinition(rt);
-	          if (sd != null && sd.getSnapshot().getElementByPath(parts[0]) != null) {
-	            r = sd;
-	          }
-	        }
-	        if (r == null)
-	          throw new Error("Unable to find definition for '"+parts[0]+"'");
-	        if (r.hasWebPath()) {
-	          url = r.getWebPath();
-	        } else {
-	          url = r.getUserData(UserDataNames.render_filename)+".html";
-	        }
-	      } 
-	      if (Utilities.noString(url)) {
-	        String[] paths = parts[0].split("\\.");
-	        StructureDefinition p = new ProfileUtilities(context, null, null).getProfile(null, paths[0]);
-	        if (p != null) {
-	          if (p.getWebPath() == null)
-	            url = paths[0].toLowerCase();
-	          else
-	            url = p.getWebPath();
-	          if (paths.length > 1) {
-	            url = url.replace(".html", "-definitions.html#"+parts[0]);
-	          }
-	        } else {
-	          throw new Exception("Unresolved logical URL '"+linkText+"' in markdown");
-	        }
-	      }
-	      text = left+"["+linkText+"]("+url+")"+right;
-	    }
-	    // 2. if prefix <> "", then check whether we need to insert the prefix
-	    if (!Utilities.noString(prefix)) {
-	      int i = text.length() - 3;
-	      while (i > 0) {
-	        if (text.substring(i, i+2).equals("](") && i+7 <= text.length()) {
-	          // The following can go horribly wrong if i+7 > text.length(), thus the check on i+7 above and the Throwable catch around the whole method just in case. 
-	          if (!text.substring(i, i+7).equals("](http:") && !text.substring(i, i+8).equals("](https:") && !text.substring(i, i+3).equals("](.")) { 
-	            text = text.substring(0, i)+"]("+corePath+text.substring(i+2);
-	          }
-	        }
-	        i--;
-	      }
-	    }
-	    text = ProfileUtilities.processRelativeUrls(text, "", corePath, context.getResourceNames(), specmaps.get(0).listTargets(), allTargets, false);
-	    // 3. markdown
+      String display = linkText;
+      StringPair pp = gen.getNamedLinks().get(linkText);
+      if (pp != null) {
+        url = pp.getName();
+        display = pp.getValue();
+      }
+      if (url == null) {
+        pp = getBySpecMap(linkText);
+        if (pp != null) {
+          url = pp.getName();
+          if (pp.getValue() != null) {
+            display = pp.getValue();
+          }
+        }
+      }
+      String[] parts = linkText.split("\\#");
+      
+
+      if (url == null) {
+        Resource r = context.fetchResource(Resource.class, parts[0]);
+        if (r == null && Utilities.isAbsoluteUrl(parts[0])) {
+          ResourceWithReference rr = gen.getResolver().resolve(gen, parts[0], null);
+          if (rr != null) {
+            if (rr.getResource() != null) {
+              display = RendererFactory.factory(rr.getResource(), gen).buildSummary(rr.getResource());
+            }
+            url = rr.getWebPath();
+          }
+        }
+        if (r == null && Utilities.isAbsoluteUrl(parts[0])) {
+          r = gen.findLinkableResource(Resource.class, parts[0]);
+        }
+        if (r == null) {
+          // well, that failed; we'll try to interpret that as a link to a path in FHIR
+          String rt = parts[0].contains(".") ? parts[0].substring(0, parts[0].indexOf(".")) : parts[0];
+          StructureDefinition sd = context.fetchTypeDefinition(rt);
+          if (sd != null && sd.getSnapshot().getElementByPath(parts[0]) != null) {
+            r = sd;
+          }
+        } 
+        if (r == null) {
+          url = null;
+        } else {
+          if (r.hasWebPath()) {
+            url = r.getWebPath();
+          } else {
+            url = r.getUserData(UserDataNames.render_filename)+".html";
+          }
+          if (r instanceof CanonicalResource ) {
+            display = ((CanonicalResource) r).present();
+          }
+        }
+      } 
+      if (Utilities.noString(url)) {
+        String[] paths = parts[0].split("\\.");
+        StructureDefinition p = new ProfileUtilities(context, null, null).getProfile(null, paths[0]);
+        if (p != null) {
+          if (p.getWebPath() == null)
+            url = paths[0].toLowerCase();
+          else
+            url = p.getWebPath();
+          if (paths.length > 1) {
+            url = url.replace(".html", "-definitions.html#"+parts[0]);
+          }
+          text = left+"["+display+"]("+url+")"+right;
+        } else {
+          text = left+"`"+display+"`"+right;
+        }
+      } else {
+        text = left+"["+display+"]("+url+")"+right;
+      }
+    }
+    // 2. if prefix <> "", then check whether we need to insert the prefix
+    if (!Utilities.noString(prefix)) {
+      int i = text.length() - 3;
+      while (i > 0) {
+        if (text.substring(i, i+2).equals("](") && i+7 <= text.length()) {
+          // The following can go horribly wrong if i+7 > text.length(), thus the check on i+7 above and the Throwable catch around the whole method just in case. 
+          if (!text.substring(i, i+7).equals("](http:") && !text.substring(i, i+8).equals("](https:") && !text.substring(i, i+3).equals("](.")) { 
+            text = text.substring(0, i)+"]("+corePath+text.substring(i+2);
+          }
+        }
+        i--;
+      }
+    }
+    text = ProfileUtilities.processRelativeUrls(text, "", corePath, context.getResourceNames(), specmaps.get(0).listTargets(), allTargets, false);
+    // 3. markdown
+    return text;
+  }
+  public String processMarkdown(String location, String text) throws FHIRException {
+    if (text == null) {
+      return "";
+    }
+	  try {
+	    text = preProcessMarkdown(location, text);
 	    String s = markdownEngine.process(text, location);
 	    return s;
 	  } catch (Throwable e) {
@@ -129,15 +171,15 @@ public class BaseRenderer implements IMarkdownProcessor {
 	  }
   }
 
-  private String getBySpecMap(String linkText) throws Exception {
+  private StringPair getBySpecMap(String linkText) throws Exception {
     for (SpecMapManager map : specmaps) {
       String url = map.getPage(linkText);
       if (url != null)
-        return Utilities.pathURL(map.getBase(), url);
+        return new StringPair(Utilities.pathURL(map.getBase(), url), null);
     }      
     CanonicalResource cr = (CanonicalResource) context.fetchResource(Resource.class, linkText);
     if (cr != null && cr.hasWebPath()) {
-      return cr.getWebPath();
+      return new StringPair(cr.getWebPath(), cr.present());
     }
     return null;
   }
