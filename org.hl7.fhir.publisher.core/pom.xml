@@ -16,7 +16,7 @@
         <!-- GraalVM uses the JDK numbering scheme. These should always be LTS versions (17, 21, etc). -->
         <graalvm.version>21.3.12</graalvm.version>
         <jackson_version>2.17.0</jackson_version>
-        <info_cqframework_version>3.3.2</info_cqframework_version>
+        <info_cqframework_version>3.20.0</info_cqframework_version>
     </properties>
 
     <dependencies>
@@ -69,11 +69,12 @@
             <artifactId>quick</artifactId>
             <version>${info_cqframework_version}</version>
         </dependency>
-        <dependency>
+        <!-- 3.20.0 does not seem to have a qdm? Should be able to do this, but not critical for now -->
+        <!--dependency>
             <groupId>info.cqframework</groupId>
             <artifactId>qdm</artifactId>
             <version>${info_cqframework_version}</version>
-        </dependency>
+        </dependency-->
         <dependency>
             <groupId>commons-beanutils</groupId>
             <artifactId>commons-beanutils</artifactId>
@@ -81,26 +82,19 @@
         </dependency>
         <!-- JAXB-API, used by CQL-to-ELM translator, but no longer loaded by default -->
         <!-- Latest version of translator puts these dependencies in the model-jaxb and elm-jaxb modules -->
-        <!--dependency>
-            <groupId>com.sun.xml.bind</groupId>
-            <artifactId>jaxb-impl</artifactId>
-            <version>2.4.0-b180830.0438</version>
+        <!-- 3.20.0 bumped jakarta.xml.bind to 4.0.1, but jackson 2.17.0 still has a dependency on activation 1.2.2,
+        it looks like that is keeping the bind-api to 2.3.3, which I think is keeping these dependencies out, even
+         though they are declared in the model project. Re-declaring these two dependencies here fixes the issue... -->
+        <dependency>
+            <groupId>org.glassfish.jaxb</groupId>
+            <artifactId>jaxb-runtime</artifactId>
+            <version>4.0.3</version>
         </dependency>
         <dependency>
-            <groupId>com.sun.xml.bind</groupId>
-            <artifactId>jaxb-core</artifactId>
-            <version>2.3.0.1</version>
+            <groupId>org.eclipse.persistence</groupId>
+            <artifactId>org.eclipse.persistence.moxy</artifactId>
+            <version>4.0.2</version>
         </dependency>
-        <dependency>
-            <groupId>javax.xml.bind</groupId>
-            <artifactId>jaxb-api</artifactId>
-            <version>2.3.1</version>
-        </dependency>
-        <dependency>
-            <groupId>com.sun.activation</groupId>
-            <artifactId>javax.activation</artifactId>
-            <version>1.2.0</version>
-        </dependency-->
         <!-- Jackson FasterXML -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
