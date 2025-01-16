@@ -13154,9 +13154,9 @@ private String fixPackageReference(String dep) {
 
   private void fragmentErrorHtml(String name, String error, String overlay, Set<String> outputTracker, long start, String code, String context) throws IOException, FHIRException {
     if (Utilities.noString(overlay)) {
-      fragment(name, "<p style=\"border: maroon 1px solid; background-color: #FFCCCC; font-weight: bold; padding: 8px\">"+error+"</p>\r\n", outputTracker, start, code, context);
+      fragment(name, "<p style=\"border: maroon 1px solid; background-color: #FFCCCC; font-weight: bold; padding: 8px\" title=\""+Utilities.escapeXml(error)+"\">"+error+"</p>\r\n", outputTracker, start, code, context);
     } else {
-      fragment(name, "<p style=\"border: maroon 1px solid; background-color: #FFCCCC; font-weight: bold; padding: 8px\">"+error+"</p>\r\n", outputTracker, start, code, context);
+      fragment(name, "<p style=\"border: maroon 1px solid; background-color: #FFCCCC; font-weight: bold; padding: 8px\" title=\""+Utilities.escapeXml(error)+"\">"+error+"</p>\r\n", outputTracker, start, code, context);
     }
   }
   
