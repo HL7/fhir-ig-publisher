@@ -64,16 +64,19 @@ public class IGReleaseUpdater {
 
     public static ServerType fromCode(String st) {
       st = st.toLowerCase();
-      if (st.equals("asp-old"))
+      if (st.equals("asp-old")) {
         return ServerType.ASP1;
-      else if (st.equals("asp-new"))
+      } else if (st.equals("asp-new")) {
         return ServerType.ASP2;
-      else if (st.equals("apache"))
+      } else if (st.equals("apache")) {
         return ServerType.APACHE;
-      else if (st.equals("litespeed"))
+      } else if (st.equals("nginx")) {
+        return ServerType.APACHE;
+      } else if (st.equals("litespeed")) {
         return ServerType.LITESPEED;
-      else 
+      } else { 
         throw new Error("-server-type "+st+" not known - use ASP or Apache");
+      }
     }
   }
 

@@ -331,6 +331,7 @@ import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.MimeType;
 import org.hl7.fhir.utilities.StandardsStatus;
+import org.hl7.fhir.utilities.StringPair;
 import org.hl7.fhir.utilities.TextFile;
 import org.hl7.fhir.utilities.TimeTracker;
 import org.hl7.fhir.utilities.TimeTracker.Session;
@@ -4865,7 +4866,9 @@ private String fixPackageReference(String dep) {
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() instanceof CanonicalResource) {
           CanonicalResource cr = (CanonicalResource) r.getResource();
-          rc.getNamedLinks().put(cr.getName(), cr.getWebPath());
+          rc.getNamedLinks().put(cr.getName(), new StringPair(cr.getWebPath(), cr.present()));
+          rc.getNamedLinks().put(cr.getUrl(), new StringPair(cr.getWebPath(), cr.present()));
+          rc.getNamedLinks().put(cr.getVersionedUrl(), new StringPair(cr.getWebPath(), cr.present()));
         }
       }
     }
@@ -11971,25 +11974,6 @@ private String fixPackageReference(String dep) {
     return generateResourceFragment(f, r, base, format, excepts, elides);
   }
 
-  class StringPair {
-    private String name;
-    private String value;
-
-    public StringPair(String name, String value) {
-      super();
-      this.name = name;
-      this.value = value;
-    }
-
-    public String getName() {
-      return name;
-    }
-
-    public String getValue() {
-      return value;
-    }
-  }
-
   private String processSQLData(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();
 
@@ -13170,9 +13154,9 @@ private String fixPackageReference(String dep) {
 
   private void fragmentErrorHtml(String name, String error, String overlay, Set<String> outputTracker, long start, String code, String context) throws IOException, FHIRException {
     if (Utilities.noString(overlay)) {
-      fragment(name, "<p style=\"border: maroon 1px solid; background-color: #FFCCCC; font-weight: bold; padding: 8px\">"+error+"</p>\r\n", outputTracker, start, code, context);
+      fragment(name, "<p style=\"border: maroon 1px solid; background-color: #FFCCCC; font-weight: bold; padding: 8px\" title=\""+Utilities.escapeXml(error)+"\">"+error+"</p>\r\n", outputTracker, start, code, context);
     } else {
-      fragment(name, "<p style=\"border: maroon 1px solid; background-color: #FFCCCC; font-weight: bold; padding: 8px\">"+error+"</p>\r\n", outputTracker, start, code, context);
+      fragment(name, "<p style=\"border: maroon 1px solid; background-color: #FFCCCC; font-weight: bold; padding: 8px\" title=\""+Utilities.escapeXml(error)+"\">"+error+"</p>\r\n", outputTracker, start, code, context);
     }
   }
   
@@ -14903,7 +14887,8 @@ private String fixPackageReference(String dep) {
   public <T extends Resource> T findLinkableResource(Class<T> class_, String uri) throws IOException {
     for (LinkedSpecification spec : linkSpecMaps) {
       String name = class_.getSimpleName();
-      for (PackageResourceInformation pri : spec.getNpm().listIndexedResources(name)) {
+      List<String> names = "Resource".equals(name) ? Utilities.strings("StructureDefinition", "ValueSet", "CodeSystem", "OperationDefinition") : Utilities.strings(name);
+      for (PackageResourceInformation pri : spec.getNpm().listIndexedResources(names)) {
         boolean match = false;
         if (uri.contains("|")) {
           match = uri.equals(pri.getUrl()+"|"+pri.getVersion());

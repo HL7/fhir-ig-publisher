@@ -892,7 +892,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
     if ("?ext".equals(brd.vsn)) {
       if (tx.getValueSet() != null)
-        System.out.println("Value set '"+tx.getValueSet()+"' at " + url + "#" + path + " not found");
+         System.out.println("Value set '"+tx.getValueSet()+"' at " + url + "#" + path + " not found");
       else if (!tx.hasDescription())
         System.out.println("No value set specified at " + url + "#" + path + " (no url)");
     }
@@ -2574,6 +2574,21 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   public String useContext() throws IOException {
     XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
+    if ("deprecated".equals(ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_STANDARDS_STATUS))) {
+      XhtmlNode ddiv = div.div("background-color: #ffe6e6; border: 1px solid black; border-radius: 10px; padding: 10px");
+      ddiv.para().b().tx("This extension is deprecated and should no longer be used");
+      Extension ext = sd.getExtensionByUrl(ToolingExtensions.EXT_STANDARDS_STATUS);
+      ext = ext == null || !ext.hasValue() ? null : ext.getValue().getExtensionByUrl(ToolingExtensions.EXT_STANDARDS_STATUS_REASON);
+      if (ext != null && ext.hasValue()) {
+        String md = ext.getValue().primitiveValue();
+        try {
+          md = preProcessMarkdown("Standards-Status-Reason", md);
+          ddiv.markdown(md, "Standards-Status-Reason");
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+      }
+    }
     if (sd.getContext().isEmpty()) {
       div.para().tx("This extension does not specify which elements it should be used on");
     } else {
