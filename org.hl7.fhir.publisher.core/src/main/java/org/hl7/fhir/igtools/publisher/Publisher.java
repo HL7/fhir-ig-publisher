@@ -4239,8 +4239,23 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private void loadIGPackage(String name, String canonical, String packageId, String igver, NpmPackage pi, boolean loadDeps)
       throws IOException {
-    if (pi != null)
+    if (pi != null) {
       npmList.add(pi);
+      if (loadDeps) {
+        for (String dep : pi.dependencies()) {
+          if (!context.hasPackage(dep)) {
+            String fdep = fixPackageReference(dep);
+            String coreVersion = VersionUtilities.getVersionForPackage(fdep);
+            if (coreVersion != null) {
+              log("Ignore Dependency on Core FHIR " + fdep + ", from package '" + pi.name() + "#" + pi.version() + "'");
+            } else {
+              NpmPackage dpi = pcm.loadPackage(fdep);
+              npmList.add(dpi);
+            }
+          }
+        }
+      }
+    }
     logDebugMessage(LogCategory.INIT, "Load "+name+" ("+canonical+") from "+packageId+"#"+igver);
 
 
