@@ -5,6 +5,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.MalformedURLException;
+import java.net.URL;
 
 public class GitUtilities {
 
@@ -45,13 +47,27 @@ public class GitUtilities {
 	  }
 	}
 
+
+
   public static String getGitSource(File gitDir) {
     if (!gitDir.exists()) {
       return "";
     }
     try {
       String[] cmd = { "git", "remote", "get-url", "origin" };
-      return execAndReturnString(cmd, new String[]{}, gitDir);
+		String url = execAndReturnString(cmd, new String[]{}, gitDir);
+		try {
+			URL newUrl = new URL(url);
+			if (newUrl.getUserInfo() != null) {
+				System.out.println("Warning @ Git URL contains user information. Please check your git remote origin URL.");
+				return "";
+			}
+
+		} catch (MalformedURLException e) {
+			System.out.println("Warning @ Git URL is not a valid URl. Please check your git remote origin URL.");
+			return "";
+		}
+		return url;
     } catch (Exception e) {
       System.out.println("Warning @ Unable to read the git source: " + e.getMessage().replace("fatal: ", "") );
       return "";

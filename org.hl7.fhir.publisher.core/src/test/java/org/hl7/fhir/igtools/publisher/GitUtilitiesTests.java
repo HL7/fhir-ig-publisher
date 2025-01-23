@@ -1,5 +1,6 @@
 package org.hl7.fhir.igtools.publisher;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.hl7.fhir.igtools.publisher.GitUtilities.execAndReturnString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -11,23 +12,25 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import org.junit.jupiter.api.BeforeAll;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+
+import javax.annotation.Nonnull;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class GitUtilitiesTests {
 
-	File normalBranchDirectory;
-	File worktreeBranchDirectory;
-	@BeforeAll
-	public void beforeAll() throws IOException, InterruptedException {
+	public static final String VALID_URL = "https://github.com/FHIR/fhir-core-examples.git";
+	public static final String USERNAME_AND_TOKEN_URL = "https://username:token@github.com/FHIR/fhir-core-examples.git";
+	public static final String NORMAL_BRANCH = "normal-branch";
+	public static final String WORKTREE_BRANCH = "branch-a";
+
+	public File initiateGitDirectory() throws IOException, InterruptedException {
 		File gitRoot = Files.createTempDirectory("testGitDirectory").toFile();
 
-		normalBranchDirectory = Path.of(gitRoot.getAbsolutePath(),"normal-branch").toFile();
+		File normalBranchDirectory = getGitBranchDirectory(gitRoot, NORMAL_BRANCH);
 		normalBranchDirectory.mkdir();
-
-		Path worktreeBranchPath = Path.of(gitRoot.getAbsolutePath(), "branch-a");
 
 		System.out.println(execAndReturnString(new String[]{"git", "init"}, null, normalBranchDirectory));
 
@@ -36,7 +39,7 @@ public class GitUtilitiesTests {
 
 		System.out.println(execAndReturnString(new String[]{"git", "config", "user.name", "\"guyincognito\""}, null, normalBranchDirectory));
 
-		File dummyFile = Path.of(normalBranchDirectory.getAbsolutePath().toString(), "dummy.txt").toFile();
+		File dummyFile = getGitBranchDirectory(normalBranchDirectory, "dummy.txt");
 		dummyFile.createNewFile();
 
 		BufferedWriter writer = new BufferedWriter(new FileWriter(dummyFile));
@@ -46,28 +49,69 @@ public class GitUtilitiesTests {
 
 		System.out.println(execAndReturnString(new String[]{"git", "add", "--all"},null, normalBranchDirectory));
 		System.out.println(execAndReturnString(new String[]{"git", "commit", "-m", "test"},null, normalBranchDirectory));
-		System.out.println(execAndReturnString(new String[]{"git", "branch", "branch-a"}, null, normalBranchDirectory));
+		System.out.println(execAndReturnString(new String[]{"git", "branch", WORKTREE_BRANCH}, null, normalBranchDirectory));
 
 		System.out.println(execAndReturnString(new String[]{"git", "checkout", "-b", "branch-b"}, null, normalBranchDirectory));
-
-		System.out.println(execAndReturnString(new String[]{"git", "worktree", "add", worktreeBranchPath.toString(), "branch-a"}, null, normalBranchDirectory));
-
-		worktreeBranchDirectory = worktreeBranchPath.toFile();
+		return gitRoot;
 	}
+
+	private static @NotNull File getGitBranchDirectory(File gitRoot, String branchName) {
+		return Path.of(gitRoot.getAbsolutePath(), branchName).toFile();
+	}
+
+	private static @Nonnull File createWorktree(File gitRoot) throws IOException, InterruptedException {
+		Path worktreeBranchPath = Path.of(gitRoot.getAbsolutePath(), WORKTREE_BRANCH);
+		System.out.println(execAndReturnString(new String[]{"git", "worktree", "add", worktreeBranchPath.toString(), WORKTREE_BRANCH}, null, getGitBranchDirectory(gitRoot, NORMAL_BRANCH)));
+		return worktreeBranchPath.toFile();
+	}
+
+
+
+	private static void createOriginURL(File gitRoot, String urlString) throws IOException, InterruptedException {
+		System.out.println(execAndReturnString(new String[]{"git", "remote", "add", "origin", urlString }, null, getGitBranchDirectory(gitRoot, NORMAL_BRANCH)));
+	}
+
 	@Test
-	public void testGetGitStatus() {
+	public void testGetGitStatus() throws IOException, InterruptedException {
+		File gitRoot = initiateGitDirectory();
+		File normalBranchDirectory = getGitBranchDirectory(gitRoot, NORMAL_BRANCH);
 		String output = GitUtilities.getGitStatus(normalBranchDirectory);
 		assertEquals("branch-b", output.trim());
 	}
 
 	@Test
-	public void testGetGitWorktreeStatus() {
+	public void testGetGitWorktreeStatus() throws IOException, InterruptedException {
+		File gitRoot = initiateGitDirectory();
+		File worktreeBranchDirectory = createWorktree(gitRoot);
 		String output = GitUtilities.getGitStatus(worktreeBranchDirectory);
-		assertEquals("branch-a", output.trim());
+		assertEquals(WORKTREE_BRANCH, output.trim());
 	}
 	@Test
 	public void testGitStatusWhenNotGitDirectory() throws IOException {
 		String output = GitUtilities.getGitStatus(Files.createTempDirectory("emptyNonGitDirectory").toFile());
 		assertTrue(output.length() == 0);
+	}
+
+	@Test void testGetGitSource() throws IOException, InterruptedException {
+		File gitRoot = initiateGitDirectory();
+		createOriginURL(gitRoot, VALID_URL);
+		String url = GitUtilities.getGitSource(getGitBranchDirectory(gitRoot, NORMAL_BRANCH));
+		assertThat(url).isEqualTo(VALID_URL);
+	}
+
+	@Test
+	public void dontAllowInvalidGitSource() throws IOException, InterruptedException {
+		File gitRoot = initiateGitDirectory();
+		createOriginURL(gitRoot, "blah-blah-yackety-schmakety");
+		String url = GitUtilities.getGitSource(getGitBranchDirectory(gitRoot, NORMAL_BRANCH));
+		assertThat(url).isEmpty();
+	}
+
+	@Test
+	public void dontAllowUserInfoInGitSource() throws IOException, InterruptedException {
+		File gitRoot = initiateGitDirectory();
+		createOriginURL(gitRoot, USERNAME_AND_TOKEN_URL);
+		String url = GitUtilities.getGitSource(getGitBranchDirectory(gitRoot, NORMAL_BRANCH));
+		assertThat(url).isEmpty();
 	}
 }
