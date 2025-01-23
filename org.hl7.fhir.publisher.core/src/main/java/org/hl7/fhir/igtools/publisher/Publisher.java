@@ -34,6 +34,7 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.InvocationTargetException;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
@@ -844,6 +845,14 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private String packagesFolder;
   private String targetOutput;
   private String repoSource;
+
+  private void setRepoSource(final String repoSource) {
+    if (repoSource == null) {
+      return;
+    }
+    this.repoSource = GitUtilities.getURLIfNoUserInfo(repoSource, "-repo CLI parameter");
+  }
+
   private String targetOutputNested;
 
   private String folderToDelete;
@@ -14251,7 +14260,7 @@ private String fixPackageReference(String dep) {
       if (CliParams.hasNamedParam(args, "-auto-ig-build")) {
         self.setMode(IGBuildMode.AUTOBUILD);
         self.targetOutput = CliParams.getNamedParam(args, "-target");
-        self.repoSource = CliParams.getNamedParam(args, "-repo");
+        self.setRepoSource( CliParams.getNamedParam(args, "-repo"));
       }
 
       if (CliParams.hasNamedParam(args, "-no-narrative")) {

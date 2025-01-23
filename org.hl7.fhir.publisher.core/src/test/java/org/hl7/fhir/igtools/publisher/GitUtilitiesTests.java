@@ -15,6 +15,8 @@ import java.nio.file.Path;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import javax.annotation.Nonnull;
 
@@ -92,26 +94,25 @@ public class GitUtilitiesTests {
 		assertTrue(output.length() == 0);
 	}
 
-	@Test void testGetGitSource() throws IOException, InterruptedException {
+	@ParameterizedTest
+	@CsvSource(value= {
+			VALID_URL+","+VALID_URL,
+			"whwehwhasdlksdjsdf,''",
+			USERNAME_AND_TOKEN_URL+",''"})
+	void testGetGitSource(String url, String expected) throws IOException, InterruptedException {
 		File gitRoot = initiateGitDirectory();
-		createOriginURL(gitRoot, VALID_URL);
-		String url = GitUtilities.getGitSource(getGitBranchDirectory(gitRoot, NORMAL_BRANCH));
-		assertThat(url).isEqualTo(VALID_URL);
+		createOriginURL(gitRoot, url);
+		String actual = GitUtilities.getGitSource(getGitBranchDirectory(gitRoot, NORMAL_BRANCH));
+		assertThat(actual).isEqualTo(expected);
 	}
 
-	@Test
-	public void dontAllowInvalidGitSource() throws IOException, InterruptedException {
-		File gitRoot = initiateGitDirectory();
-		createOriginURL(gitRoot, "blah-blah-yackety-schmakety");
-		String url = GitUtilities.getGitSource(getGitBranchDirectory(gitRoot, NORMAL_BRANCH));
-		assertThat(url).isEmpty();
-	}
-
-	@Test
-	public void dontAllowUserInfoInGitSource() throws IOException, InterruptedException {
-		File gitRoot = initiateGitDirectory();
-		createOriginURL(gitRoot, USERNAME_AND_TOKEN_URL);
-		String url = GitUtilities.getGitSource(getGitBranchDirectory(gitRoot, NORMAL_BRANCH));
-		assertThat(url).isEmpty();
+	@ParameterizedTest
+	@CsvSource(value= {
+			VALID_URL+","+VALID_URL,
+			"whwehwhasdlksdjsdf,NULL",
+			USERNAME_AND_TOKEN_URL+",NULL"}, nullValues={"NULL"})
+	public void getURLIfNoUserInfo(String url, String expected) {
+		String result = GitUtilities.getURLIfNoUserInfo(url, "test");
+		assertThat(result).isEqualTo(expected);
 	}
 }

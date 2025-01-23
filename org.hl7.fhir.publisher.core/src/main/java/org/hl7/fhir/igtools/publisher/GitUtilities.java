@@ -1,5 +1,7 @@
 package org.hl7.fhir.igtools.publisher;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -54,24 +56,39 @@ public class GitUtilities {
       return "";
     }
     try {
-      String[] cmd = { "git", "remote", "get-url", "origin" };
-		String url = execAndReturnString(cmd, new String[]{}, gitDir);
-		try {
-			URL newUrl = new URL(url);
-			if (newUrl.getUserInfo() != null) {
-				System.out.println("Warning @ Git URL contains user information. Please check your git remote origin URL.");
-				return "";
-			}
-
-		} catch (MalformedURLException e) {
-			System.out.println("Warning @ Git URL is not a valid URl. Please check your git remote origin URL.");
-			return "";
-		}
-		return url;
-    } catch (Exception e) {
+     final String[] cmd = { "git", "remote", "get-url", "origin" };
+		final String url = execAndReturnString(cmd, new String[]{}, gitDir);
+		final String noUserInfoUrl = getURLIfNoUserInfo(url, "git remote origin url");
+		return noUserInfoUrl == null ? "" : noUserInfoUrl;
+	} catch (Exception e) {
       System.out.println("Warning @ Unable to read the git source: " + e.getMessage().replace("fatal: ", "") );
       return "";
     }
   }
-  
+
+	/**
+	 * Return the URL if it is a valid URL that does not contain user information. Otherwise return null.
+	 * <p/>
+	 * This will also send log info to console reporting the reason for null returns.
+	 *
+	 * @param url The URL
+	 * @param urlSource A string representing the source of the URL to be output
+	 * @return A valid URL that does not contain user information, or null.
+	 */
+	protected static String getURLIfNoUserInfo(final String url, final String urlSource) {
+		try {
+			URL newUrl = new URL(url);
+			boolean result = newUrl.getUserInfo() != null;
+			if (result) {
+				System.out.println("Warning @ Git URL contains user information. Source: " + urlSource);
+				return null;
+			}
+
+		} catch (MalformedURLException e) {
+			System.out.println("Warning @ Git URL is not a valid URl. Source: " + urlSource);
+			return null;
+		}
+		return url;
+	}
+
 }
