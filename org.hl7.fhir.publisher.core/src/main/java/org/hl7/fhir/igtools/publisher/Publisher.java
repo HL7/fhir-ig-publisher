@@ -10904,9 +10904,19 @@ private String fixPackageReference(String dep) {
     data.add("toolingVersion", Constants.VERSION);
     data.add("toolingRevision", ToolsVersion.TOOLS_VERSION_STR);
     data.add("toolingVersionFull", Constants.VERSION+" ("+ToolsVersion.TOOLS_VERSION_STR+")");
+
+    data.add("genDate", genTime());
+    data.add("genDay", genDate());
+    if (db != null) {
+      for (JsonProperty p : data.getProperties()) {
+        db.metadata(p.getName(), p.getValue().asString());
+      }
+      db.metadata("gitstatus", getGitStatus());
+    }
+
     data.add("totalFiles", fileList.size());
     data.add("processedFiles", changeList.size());
-    
+
     if (repoSource != null) {
       data.add("repoSource", gh());
     } else {
@@ -10915,13 +10925,7 @@ private String fixPackageReference(String dep) {
         data.add("repoSource", git);
       }
     }
-    data.add("genDate", genTime());
-    data.add("genDay", genDate());
-    if (db != null) {
-      for (JsonProperty p : data.getProperties()) {
-        db.metadata(p.getName(), p.getValue().asString());
-      }
-    }
+
     JsonArray rt = data.forceArray("resourceTypes");
     List<String> rtl = context.getResourceNames();
     for (String s : rtl) {
@@ -10947,9 +10951,7 @@ private String fixPackageReference(String dep) {
     ig.add("experimental", publishedIg.getExperimental());
     ig.add("publisher", publishedIg.getPublisher());    
     addTranslationsToJson(ig, "publisher", publishedIg.getPublisherElement(), false);
-    if (db != null) {
-      db.metadata("gitstatus", getGitStatus());
-    }
+
     if (previousVersionComparator != null && previousVersionComparator.hasLast() && !targetUrl().startsWith("file:")) {
       JsonObject diff = new JsonObject();
       data.add("diff", diff);
