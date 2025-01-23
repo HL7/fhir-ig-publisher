@@ -98,7 +98,7 @@ public class GitUtilitiesTests {
 	@CsvSource(value= {
 			VALID_URL+","+VALID_URL,
 			"whwehwhasdlksdjsdf,''",
-			USERNAME_AND_TOKEN_URL+",''"})
+			USERNAME_AND_TOKEN_URL+","+ VALID_URL})
 	void testGetGitSource(String url, String expected) throws IOException, InterruptedException {
 		File gitRoot = initiateGitDirectory();
 		createOriginURL(gitRoot, url);
@@ -110,9 +110,9 @@ public class GitUtilitiesTests {
 	@CsvSource(value= {
 			VALID_URL+","+VALID_URL,
 			"whwehwhasdlksdjsdf,NULL",
-			USERNAME_AND_TOKEN_URL+",NULL"}, nullValues={"NULL"})
+			USERNAME_AND_TOKEN_URL+","+VALID_URL}, nullValues={"NULL"})
 	public void getURLIfNoUserInfo(String url, String expected) {
-		String result = GitUtilities.getURLIfNoUserInfo(url, "test");
+		String result = GitUtilities.getURLWithNoUserInfo(url, "test");
 		assertThat(result).isEqualTo(expected);
 	}
 }

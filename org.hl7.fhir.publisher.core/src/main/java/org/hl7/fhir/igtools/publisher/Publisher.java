@@ -34,7 +34,6 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.InvocationTargetException;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
@@ -850,7 +849,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (repoSource == null) {
       return;
     }
-    this.repoSource = GitUtilities.getURLIfNoUserInfo(repoSource, "-repo CLI parameter");
+    this.repoSource = GitUtilities.getURLWithNoUserInfo(repoSource, "-repo CLI parameter");
   }
 
   private String targetOutputNested;

@@ -1,7 +1,5 @@
 package org.hl7.fhir.igtools.publisher;
 
-import org.jetbrains.annotations.NotNull;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -58,7 +56,7 @@ public class GitUtilities {
     try {
      final String[] cmd = { "git", "remote", "get-url", "origin" };
 		final String url = execAndReturnString(cmd, new String[]{}, gitDir);
-		final String noUserInfoUrl = getURLIfNoUserInfo(url, "git remote origin url");
+		final String noUserInfoUrl = getURLWithNoUserInfo(url, "git remote origin url");
 		return noUserInfoUrl == null ? "" : noUserInfoUrl;
 	} catch (Exception e) {
       System.out.println("Warning @ Unable to read the git source: " + e.getMessage().replace("fatal: ", "") );
@@ -75,13 +73,12 @@ public class GitUtilities {
 	 * @param urlSource A string representing the source of the URL to be output
 	 * @return A valid URL that does not contain user information, or null.
 	 */
-	protected static String getURLIfNoUserInfo(final String url, final String urlSource) {
+	protected static String getURLWithNoUserInfo(final String url, final String urlSource) {
 		try {
 			URL newUrl = new URL(url);
-			boolean result = newUrl.getUserInfo() != null;
-			if (result) {
-				System.out.println("Warning @ Git URL contains user information. Source: " + urlSource);
-				return null;
+            if (newUrl.getUserInfo() != null) {
+				System.out.println("Info @ Removing user info from GIT URL. Source: " + urlSource);
+				return new URL(newUrl.getProtocol(), newUrl.getHost(), newUrl.getPort(), newUrl.getFile()).toString();
 			}
 
 		} catch (MalformedURLException e) {
