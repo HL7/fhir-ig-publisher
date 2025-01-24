@@ -1,0 +1,1 @@
+* BugFix: Remove GitHub credentials from repo source urls in json and db files.
