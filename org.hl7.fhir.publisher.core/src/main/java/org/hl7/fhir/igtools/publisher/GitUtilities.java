@@ -65,13 +65,14 @@ public class GitUtilities {
   }
 
 	/**
-	 * Return the URL if it is a valid URL that does not contain user information. Otherwise return null.
+	 * Return the URL with no user information.
 	 * <p/>
-	 * This will also send log info to console reporting the reason for null returns.
+	 * This will also send log info to console that reports user information removal, as well as a malformed URL
+	 * resulting in a null return.
 	 *
 	 * @param url The URL
-	 * @param urlSource A string representing the source of the URL to be output
-	 * @return A valid URL that does not contain user information, or null.
+	 * @param urlSource A string representing the source of the URL to be output (CLI param, git remote, etc.)
+	 * @return A valid URL that does not contain user information or null if the url param was malformed.
 	 */
 	protected static String getURLWithNoUserInfo(final String url, final String urlSource) {
 		try {
@@ -80,12 +81,11 @@ public class GitUtilities {
 				System.out.println("Info @ Removing user info from GIT URL. Source: " + urlSource);
 				return new URL(newUrl.getProtocol(), newUrl.getHost(), newUrl.getPort(), newUrl.getFile()).toString();
 			}
-
+			return url;
 		} catch (MalformedURLException e) {
 			System.out.println("Warning @ Git URL is not a valid URl. Source: " + urlSource);
 			return null;
 		}
-		return url;
 	}
 
 }

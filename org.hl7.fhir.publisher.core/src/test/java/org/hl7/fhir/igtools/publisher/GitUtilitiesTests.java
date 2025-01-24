@@ -111,7 +111,7 @@ public class GitUtilitiesTests {
 			VALID_URL+","+VALID_URL,
 			"whwehwhasdlksdjsdf,NULL",
 			USERNAME_AND_TOKEN_URL+","+VALID_URL}, nullValues={"NULL"})
-	public void getURLIfNoUserInfo(String url, String expected) {
+	public void testGetURLWithNoUserInfo(String url, String expected) {
 		String result = GitUtilities.getURLWithNoUserInfo(url, "test");
 		assertThat(result).isEqualTo(expected);
 	}
