@@ -4319,6 +4319,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
             if (dpi == null) {
               logDebugMessage(LogCategory.CONTEXT, "Unable to find package dependency "+fdep+". Will proceed, but likely to be be errors in qa.html etc");
             } else {
+              npmList.add(dpi);
               if (!VersionUtilities.versionsCompatible(version, pi.fhirVersion())) {
                 if (!pi.isWarned()) {
                   versionProblems.add("This IG is for FHIR version "+version+", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion());
@@ -4568,7 +4569,8 @@ private String fixPackageReference(String dep) {
       publishedIg = sourceIg.copy();
       altMap.get(IG_NAME).getResources().get(0).setResource(publishedIg);
     }
-    inferDefaultNarrativeLang(true);
+    Locale locale = inferDefaultNarrativeLang(true);
+    context.setLocale(locale);
     dependentIgFinder = new DependentIGFinder(sourceIg.getPackageId());
 
 
@@ -4841,7 +4843,7 @@ private String fixPackageReference(String dep) {
     npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, execTime.getTime(), !publishing);
     execTime = Calendar.getInstance();
 
-    rc = new RenderingContext(context, markdownEngine, ValidationOptions.defaults(), checkAppendSlash(specPath), "", inferDefaultNarrativeLang(), ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
+    rc = new RenderingContext(context, markdownEngine, ValidationOptions.defaults(), checkAppendSlash(specPath), "", locale, ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
     rc.setTemplateProvider(templateProvider);
     rc.setResolver(this);    
     rc.setServices(validator.getExternalHostServices());
@@ -4855,17 +4857,6 @@ private String fixPackageReference(String dep) {
     rc.setResolveLinkResolver(this);
     rc.setDebug(debug);
     module.defineTypeMap(rc.getTypeMap());
-    if (publishedIg.hasJurisdiction()) {
-      Locale locale = null;
-      try {
-        locale = ResourceUtilities.getLocale(publishedIg);
-      } catch (Exception e) {
-        log("Error setting locale for jurisdiction: "+e.getMessage());
-      }
-      if (locale != null) {
-        rc.setLocale(locale);
-      }
-    }
     rc.setDateFormatString(fmtDate);
     rc.setDateTimeFormatString(fmtDateTime);
     rc.setChangeVersion(versionToAnnotate);
