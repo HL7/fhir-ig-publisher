@@ -844,6 +844,14 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private String packagesFolder;
   private String targetOutput;
   private String repoSource;
+
+  private void setRepoSource(final String repoSource) {
+    if (repoSource == null) {
+      return;
+    }
+    this.repoSource = GitUtilities.getURLWithNoUserInfo(repoSource, "-repo CLI parameter");
+  }
+
   private String targetOutputNested;
 
   private String folderToDelete;
@@ -3244,7 +3252,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       if (sourceIg.hasJurisdiction()) {
         Locale localeFromRegion = ResourceUtilities.getLocale(sourceIg);
         if (localeFromRegion != null) {
-          sourceIg.setLanguage(localeFromRegion.toString());
+          sourceIg.setLanguage(localeFromRegion.toLanguageTag());
         } else {
           throw new Error("Unable to determine locale from jurisdiction (as requested by policy)");
         }
@@ -4311,6 +4319,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
             if (dpi == null) {
               logDebugMessage(LogCategory.CONTEXT, "Unable to find package dependency "+fdep+". Will proceed, but likely to be be errors in qa.html etc");
             } else {
+              npmList.add(dpi);
               if (!VersionUtilities.versionsCompatible(version, pi.fhirVersion())) {
                 if (!pi.isWarned()) {
                   versionProblems.add("This IG is for FHIR version "+version+", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion());
@@ -4560,7 +4569,8 @@ private String fixPackageReference(String dep) {
       publishedIg = sourceIg.copy();
       altMap.get(IG_NAME).getResources().get(0).setResource(publishedIg);
     }
-    inferDefaultNarrativeLang(true);
+    Locale locale = inferDefaultNarrativeLang(true);
+    context.setLocale(locale);
     dependentIgFinder = new DependentIGFinder(sourceIg.getPackageId());
 
 
@@ -4833,7 +4843,7 @@ private String fixPackageReference(String dep) {
     npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, execTime.getTime(), !publishing);
     execTime = Calendar.getInstance();
 
-    rc = new RenderingContext(context, markdownEngine, ValidationOptions.defaults(), checkAppendSlash(specPath), "", inferDefaultNarrativeLang(), ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
+    rc = new RenderingContext(context, markdownEngine, ValidationOptions.defaults(), checkAppendSlash(specPath), "", locale, ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
     rc.setTemplateProvider(templateProvider);
     rc.setResolver(this);    
     rc.setServices(validator.getExternalHostServices());
@@ -4847,17 +4857,6 @@ private String fixPackageReference(String dep) {
     rc.setResolveLinkResolver(this);
     rc.setDebug(debug);
     module.defineTypeMap(rc.getTypeMap());
-    if (publishedIg.hasJurisdiction()) {
-      Locale locale = null;
-      try {
-        locale = ResourceUtilities.getLocale(publishedIg);
-      } catch (Exception e) {
-        log("Error setting locale for jurisdiction: "+e.getMessage());
-      }
-      if (locale != null) {
-        rc.setLocale(locale);
-      }
-    }
     rc.setDateFormatString(fmtDate);
     rc.setDateTimeFormatString(fmtDateTime);
     rc.setChangeVersion(versionToAnnotate);
@@ -10904,9 +10903,19 @@ private String fixPackageReference(String dep) {
     data.add("toolingVersion", Constants.VERSION);
     data.add("toolingRevision", ToolsVersion.TOOLS_VERSION_STR);
     data.add("toolingVersionFull", Constants.VERSION+" ("+ToolsVersion.TOOLS_VERSION_STR+")");
+
+    data.add("genDate", genTime());
+    data.add("genDay", genDate());
+    if (db != null) {
+      for (JsonProperty p : data.getProperties()) {
+        db.metadata(p.getName(), p.getValue().asString());
+      }
+      db.metadata("gitstatus", getGitStatus());
+    }
+
     data.add("totalFiles", fileList.size());
     data.add("processedFiles", changeList.size());
-    
+
     if (repoSource != null) {
       data.add("repoSource", gh());
     } else {
@@ -10915,13 +10924,7 @@ private String fixPackageReference(String dep) {
         data.add("repoSource", git);
       }
     }
-    data.add("genDate", genTime());
-    data.add("genDay", genDate());
-    if (db != null) {
-      for (JsonProperty p : data.getProperties()) {
-        db.metadata(p.getName(), p.getValue().asString());
-      }
-    }
+
     JsonArray rt = data.forceArray("resourceTypes");
     List<String> rtl = context.getResourceNames();
     for (String s : rtl) {
@@ -10947,9 +10950,7 @@ private String fixPackageReference(String dep) {
     ig.add("experimental", publishedIg.getExperimental());
     ig.add("publisher", publishedIg.getPublisher());    
     addTranslationsToJson(ig, "publisher", publishedIg.getPublisherElement(), false);
-    if (db != null) {
-      db.metadata("gitstatus", getGitStatus());
-    }
+
     if (previousVersionComparator != null && previousVersionComparator.hasLast() && !targetUrl().startsWith("file:")) {
       JsonObject diff = new JsonObject();
       data.add("diff", diff);
@@ -14251,7 +14252,7 @@ private String fixPackageReference(String dep) {
       if (CliParams.hasNamedParam(args, "-auto-ig-build")) {
         self.setMode(IGBuildMode.AUTOBUILD);
         self.targetOutput = CliParams.getNamedParam(args, "-target");
-        self.repoSource = CliParams.getNamedParam(args, "-repo");
+        self.setRepoSource( CliParams.getNamedParam(args, "-repo"));
       }
 
       if (CliParams.hasNamedParam(args, "-no-narrative")) {

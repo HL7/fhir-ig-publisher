@@ -67,6 +67,7 @@ public class PublicationProcess {
    */
 
   public enum PublicationProcessMode {
+    CREATION,
     WORKING,
     MILESTONE,
     TECHNICAL_CORRECTION;
@@ -81,6 +82,9 @@ public class PublicationProcess {
       }
       if ("milestone".equals(s)) {
         return MILESTONE;
+      }
+      if ("creation".equals(s)) {
+        return CREATION;
       }
       if ("technical-correction".equals(s)) {
         return TECHNICAL_CORRECTION;
@@ -120,8 +124,7 @@ public class PublicationProcess {
       System.out.println(s);
       System.out.println("---------------");
       System.out.println("Publication Run: publish "+source+" to "+web);
-      boolean manualCheck = "true".equals(getNamedParam(args, "-manual-check"));
-      List<ValidationMessage> res = publishInner(source, web, date, registrySource, history, templatesSrc, temp, logger, args, manualCheck);
+      List<ValidationMessage> res = publishInner(source, web, date, registrySource, history, templatesSrc, temp, logger, args);
       if (res.size() == 0) {
         System.out.println("Success");
       } else {
@@ -150,7 +153,7 @@ public class PublicationProcess {
     return Long.toString(maxMemory / (1024*1024));
   }
 
-  public List<ValidationMessage> publishInner(String source, String web, String date, String registrySource, String history, String templateSrc, String temp, PublisherConsoleLogger logger, String[] args, boolean manualCheck) throws Exception {
+  public List<ValidationMessage> publishInner(String source, String web, String date, String registrySource, String history, String templateSrc, String temp, PublisherConsoleLogger logger, String[] args) throws Exception {
     List<ValidationMessage> res = new ArrayList<>();
 
     if (temp == null) {
@@ -168,7 +171,7 @@ public class PublicationProcess {
     File fRoot = checkDirectory(workingRoot, res, "Working Web Folder");
     WebSourceProvider src = new WebSourceProvider(workingRoot, web);
     if (getNamedParam(args, "-upload-server") != null) {
-      src.configureUpload(getNamedParam(args, "-upload-server"), getNamedParam(args, "-upload-path"), getNamedParam(args, "-upload-user"), getNamedParam(args, "-upload-password"));
+      throw new Error("Uploading files by FTP is no longer supported");
     }
 
     checkDirectory(Utilities.path(workingRoot, "ig-build-zips"), res, "Destination Zip Folder", true);
@@ -215,17 +218,6 @@ public class PublicationProcess {
     if (!check(res, version != null, "Source Package has no version")) {
       return res;
     }
-    JsonObject json = JsonParser.parseObject(npm.load("package", "package.json"));
-    JsonObject dep = json.getJsonObject("dependencies");
-    if (dep != null) {
-      for (JsonProperty jp : dep.getProperties()) {
-        String ver = jp.getValue().asJsonString().getValue();
-        if ("current".equals(ver) || "dev".equals(ver)) {
-          check(res, false, "Package "+json.asString("name")+"#"+json.asString("version")+" depends on "+jp.getName()+"#"+ver+" which is not allowed (current version check)");
-          return res;
-        }
-      }
-    }
 
     // --- Rules for layout depend on publisher ------
     boolean help = true;
@@ -241,7 +233,7 @@ public class PublicationProcess {
           String destination = Utilities.path(workingRoot, calcByRule(rules.str("destination"), p));
           help = false;
           publishInner2(source, web, date, registrySource, history, templateSrc, temp, logger, args,
-              manualCheck, destination, workingRoot, res, src, id, canonical, version, npm, pubSetup, qa,
+              destination, workingRoot, res, src, id, canonical, version, npm, pubSetup, qa,
               fSource, fOutput, fRoot, fRegistry, fHistory, runNumber);
         }        
       }
@@ -286,7 +278,7 @@ public class PublicationProcess {
 
 
   public List<ValidationMessage> publishInner2(String source, String web, String date, String registrySource, String history, String templateSrc, String temp, 
-      PublisherConsoleLogger logger, String[] args, boolean manualCheck, String destination, String workingRoot, List<ValidationMessage> res, WebSourceProvider src,
+      PublisherConsoleLogger logger, String[] args, String destination, String workingRoot, List<ValidationMessage> res, WebSourceProvider src,
       String id, String canonical, String version, NpmPackage npm, JsonObject pubSetup, JsonObject qa, 
       File fSource, File fOutput, File fRoot, File fRegistry, File fHistory, int runNumber) throws Exception {
     System.out.println("Relative directory for IG is '"+destination.substring(workingRoot.length())+"'");
@@ -308,6 +300,20 @@ public class PublicationProcess {
     JsonObject prSrc = JsonParser.parseObject(loadFile("Source publication request", Utilities.path(source, "publication-request.json")));
 
     PublicationProcessMode mode = PublicationProcessMode.fromCode(prSrc.asString("mode"));
+
+    if (mode != PublicationProcessMode.CREATION) {
+      JsonObject json = JsonParser.parseObject(npm.load("package", "package.json"));
+      JsonObject dep = json.getJsonObject("dependencies");
+      if (dep != null) {
+        for (JsonProperty jp : dep.getProperties()) {
+          String ver = jp.getValue().asJsonString().getValue();
+          if ("current".equals(ver) || "dev".equals(ver)) {
+            check(res, false, "Package "+json.asString("name")+"#"+json.asString("version")+" depends on "+jp.getName()+"#"+ver+" which is not allowed (current version check)");
+            return res;
+          }
+        }
+      }
+    }
     boolean first = prSrc.asBoolean("first"); 
     src.needOptionalFile(Utilities.noString(relDest) ? "package-list.json" : Utilities.path(relDest,"package-list.json"));
     if (first) {
@@ -403,7 +409,7 @@ public class PublicationProcess {
     // well, we've run out of things to test... time to actually try...
     if (res.size() == 0) {
       doPublish(fSource, fOutput, qa, destination, destVer, pathVer, fRoot, pubSetup, pl, prSrc, fRegistry, npm, mode, date, fHistory, temp, logger, 
-          pubSetup.getJsonObject("website").asString("url"), src, sft, relDest, templateSrc, first, indexes, Calendar.getInstance(), getComputerName(), IGVersionUtil.getVersionString(), gitSrcId(source), Integer.toString(runNumber), tcName, manualCheck,
+          pubSetup.getJsonObject("website").asString("url"), src, sft, relDest, templateSrc, first, indexes, Calendar.getInstance(), getComputerName(), IGVersionUtil.getVersionString(), gitSrcId(source), Integer.toString(runNumber), tcName,
           workingRoot);
     }        
     return res;    
@@ -476,133 +482,116 @@ public class PublicationProcess {
 
   private void doPublish(File fSource, File fOutput, JsonObject qa, String destination, String destVer, String pathVer, File fRoot, JsonObject pubSetup, PackageList pl, JsonObject prSrc, File fRegistry, NpmPackage npm, 
       PublicationProcessMode mode, String date, File history, String tempDir, PublisherConsoleLogger logger, String url, WebSourceProvider src, File sft, String relDest, String templateSrc, boolean first, Map<String, IndexMaintainer> indexes,
-      Calendar genDate, String username, String version, String gitSrcId, String runNumber, String tcName, boolean manualCheck, String workingRoot) throws Exception {
+      Calendar genDate, String username, String version, String gitSrcId, String runNumber, String tcName, String workingRoot) throws Exception {
     // ok. all our tests have passed.
     // 1. do the publication build(s)
-    System.out.println("All checks passed. Do the publication build from "+fSource.getAbsolutePath()+" and publish to "+destination);        
-
-    // create a temporary copy and build in that:
-    File temp = cloneToTemp(tempDir, fSource, npm.name()+"#"+npm.version());
-    File tempM = null; 
-    System.out.println("Build IG at "+fSource.getAbsolutePath()+": final copy suitable for publication (in "+temp.getAbsolutePath()+")");        
-    runBuild(qa, temp.getAbsolutePath(), new String[] {"-ig", temp.getAbsolutePath(), "-resetTx", "-publish", pathVer, "-no-exit"});
-
-    if (mode != PublicationProcessMode.WORKING) {
-      tempM = cloneToTemp(tempDir, temp, npm.name()+"#"+npm.version()+"-milestone");
-      System.out.println("Build IG at "+fSource.getAbsolutePath()+": final copy suitable for publication (in "+tempM.getAbsolutePath()+") (milestone build)");        
-      runBuild(qa, tempM.getAbsolutePath(), new String[] {"-ig", tempM.getAbsolutePath(), "-publish", pathVer, "-milestone", "-no-exit"});      
-    }
-
-    // 2. make a copy of what we built
-    System.out.println("Keep a copy of the build directory at "+Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".zip"));    
-
-    // 2.1. Delete the ".git" subfolder
-    File gitFolder = new File(temp, ".git");
-    if (gitFolder.exists()) {
-        FileUtils.deleteDirectory(gitFolder);
-    }
-
-    zipFolder(temp, Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".zip"));
-
-    System.out.println("");        
-    System.out.println("ok. All checks passed. Publish v"+npm.version()+" to "+destVer);        
-
-    // 3. create the folder {root}/{realm}/{code}/{subdir}
-    System.out.println("Copy the IG to "+destVer);    
-    Utilities.createDirectory(destVer);
-    FileUtils.copyDirectory(new File(Utilities.path(temp.getAbsolutePath(), "output")), new File(destVer));
-    List<String> subPackages = loadSubPackageList(Utilities.path(temp.getAbsolutePath(), "output", "sub-package-list.json"));
-
-    // now, update the package list 
-    System.out.println("Update "+Utilities.path(destination, "package-list.json"));    
-    PackageListEntry plVer = updatePackageList(pl, fSource.getAbsolutePath(), prSrc, pathVer,  Utilities.path(destination, "package-list.json"), mode, date, npm.fhirVersion(), Utilities.pathURL(pubSetup.asString("url"), tcName), subPackages);
-    updatePublishBox(pl, plVer, destVer, pathVer, destination, fRoot.getAbsolutePath(), false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url);
-    
     List<String> existingFiles = new ArrayList<>();
-    if (mode != PublicationProcessMode.WORKING) {
-      String igSrc = Utilities.path(tempM.getAbsolutePath(), "output");
-      if (mode == PublicationProcessMode.TECHNICAL_CORRECTION) {
-        System.out.println("This is a technical correction - publish v"+npm.version()+" to "+destination+" but archive first");
-        produceArchive(destVer, Utilities.path(igSrc,tcName));
-      } else {
-        System.out.println("This is a milestone release - publish v"+npm.version()+" to "+destination);
+    if (mode == PublicationProcessMode.CREATION) {
+      System.out.println("All checks passed. Create an empty history at "+destination);              
+    } else {
+      System.out.println("All checks passed. Do the publication build from "+fSource.getAbsolutePath()+" and publish to "+destination);        
+
+      // create a temporary copy and build in that:
+      File temp = cloneToTemp(tempDir, fSource, npm.name()+"#"+npm.version());
+      File tempM = null; 
+      System.out.println("Build IG at "+fSource.getAbsolutePath()+": final copy suitable for publication (in "+temp.getAbsolutePath()+")");        
+      runBuild(qa, temp.getAbsolutePath(), new String[] {"-ig", temp.getAbsolutePath(), "-resetTx", "-publish", pathVer, "-no-exit"});
+
+      if (mode != PublicationProcessMode.WORKING) {
+        tempM = cloneToTemp(tempDir, temp, npm.name()+"#"+npm.version()+"-milestone");
+        System.out.println("Build IG at "+fSource.getAbsolutePath()+": final copy suitable for publication (in "+tempM.getAbsolutePath()+") (milestone build)");        
+        runBuild(qa, tempM.getAbsolutePath(), new String[] {"-ig", tempM.getAbsolutePath(), "-publish", pathVer, "-milestone", "-no-exit"});      
       }
-      
-      List<String> ignoreList = new ArrayList<>();
-      ignoreList.add(destVer);
-      // get the current content from the source
-      for (PackageListEntry v : pl.versions()) {
-        if (v != plVer) {
-          String path = v.determineLocalPath(url, fRoot.getAbsolutePath());
-          if (path != null) {
-            String relPath = Utilities.getRelativePath(fRoot.getAbsolutePath(), path);
-            ignoreList.add(path);
-            src.needFolder(relPath, false);
+
+      // 2. make a copy of what we built
+      System.out.println("Keep a copy of the build directory at "+Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".zip"));    
+
+      // 2.1. Delete the ".git" subfolder
+      File gitFolder = new File(temp, ".git");
+      if (gitFolder.exists()) {
+        FileUtils.deleteDirectory(gitFolder);
+      }
+
+      zipFolder(temp, Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".zip"));
+
+      System.out.println("");        
+      System.out.println("ok. All checks passed. Publish v"+npm.version()+" to "+destVer);        
+
+      // 3. create the folder {root}/{realm}/{code}/{subdir}
+      System.out.println("Copy the IG to "+destVer);    
+      Utilities.createDirectory(destVer);
+      FileUtils.copyDirectory(new File(Utilities.path(temp.getAbsolutePath(), "output")), new File(destVer));
+      List<String> subPackages = loadSubPackageList(Utilities.path(temp.getAbsolutePath(), "output", "sub-package-list.json"));
+      // now, update the package list 
+      System.out.println("Update "+Utilities.path(destination, "package-list.json"));    
+      PackageListEntry plVer = updatePackageList(pl, fSource.getAbsolutePath(), prSrc, pathVer,  Utilities.path(destination, "package-list.json"), mode, date, npm.fhirVersion(), Utilities.pathURL(pubSetup.asString("url"), tcName), subPackages);
+      updatePublishBox(pl, plVer, destVer, pathVer, destination, fRoot.getAbsolutePath(), false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url);
+
+
+     
+      if (mode != PublicationProcessMode.WORKING) {
+        String igSrc = Utilities.path(tempM.getAbsolutePath(), "output");
+        if (mode == PublicationProcessMode.TECHNICAL_CORRECTION) {
+          System.out.println("This is a technical correction - publish v"+npm.version()+" to "+destination+" but archive first");
+          produceArchive(destVer, Utilities.path(igSrc,tcName));
+        } else {
+          System.out.println("This is a milestone release - publish v"+npm.version()+" to "+destination);
+        }
+
+        List<String> ignoreList = new ArrayList<>();
+        ignoreList.add(destVer);
+        // get the current content from the source
+        for (PackageListEntry v : pl.versions()) {
+          if (v != plVer) {
+            String path = v.determineLocalPath(url, fRoot.getAbsolutePath());
+            if (path != null) {
+              String relPath = Utilities.getRelativePath(fRoot.getAbsolutePath(), path);
+              ignoreList.add(path);
+              src.needFolder(relPath, false);
+            }
           }
         }
-      }
-      // we do this first in the output so we can get a proper diff
-      updatePublishBox(pl, plVer, igSrc, pathVer, igSrc, fRoot.getAbsolutePath(), true, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url);
-      
-      System.out.println("Check for Files to delete");        
-      List<String> newFiles = Utilities.listAllFiles(igSrc, null);
-      List<String> historyFiles = Utilities.listAllFiles(history.getAbsolutePath(), null);
-      existingFiles = Utilities.listAllFiles(destination, ignoreList);
-      existingFiles.removeAll(newFiles);
-      existingFiles.removeAll(historyFiles);
-      existingFiles.remove("package-list.json");
-      existingFiles.removeIf(s -> s.endsWith("web.config"));
-      for (String s : existingFiles) {
-        new File(Utilities.path(destination, s)).delete();
-      }
-      System.out.println("  ... "+existingFiles.size()+" files");        
-      System.out.println("Copy to new IG to "+destination);        
-      FileUtils.copyDirectory(new File(Utilities.path(tempM.getAbsolutePath(), "output")), new File(destination));
-      if (src.isWeb()) {
-        new WebSiteArchiveBuilder().buildArchives(new File(destination), fRoot.getAbsolutePath(), url);
-      }
-    } else {
-      if (src.isWeb()) {
-        new WebSiteArchiveBuilder().buildArchive(destVer, new ArrayList<>());
-      }
-      src.cleanFolder(relDest);
-    }
-    NpmPackage npmB = NpmPackage.fromPackage(new FileInputStream(Utilities.path(destVer, "package.tgz")));
-    updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("package"), false, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(genDate), username, version, gitSrcId, runNumber);
-    updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("publication"), true, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(genDate), username, version, gitSrcId, runNumber);
-    new PackageRegistryBuilder(workingRoot).update(destination.substring(workingRoot.length()+1), pl);
+        // we do this first in the output so we can get a proper diff
+        updatePublishBox(pl, plVer, igSrc, pathVer, igSrc, fRoot.getAbsolutePath(), true, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url);
 
-    new HistoryPageUpdater().updateHistoryPage(history.getAbsolutePath(), destination, templateSrc, !first); 
-
-    IndexMaintainer ndx = getIndexForIg(indexes, npmB.id());
-    if (ndx != null) {
-      src.needFile(Utilities.changeFileExt(ndx.path(), ".json"));      
-      ndx.loadJson();
-      ndx.updateForPublication(pl, plVer, mode != PublicationProcessMode.WORKING);
-      ndx.buildJson();
-      ndx.execute();
-    }
-    
-    boolean go;
-    if (manualCheck) {
-      System.out.println("The build is complete, and ready to be applied. Check the output at "+fRoot.getAbsolutePath());
-      System.out.println("Do you wish to continue? (Y/N)");
-      int r = System.in.read();
-      go = r == 'y' || r == 'Y';
-    } else {
-      System.out.println("Build is complete. "+src.verb()+" from "+ fRoot.getAbsolutePath());
-      go = true;
-    }
-    if (go) {
+        System.out.println("Check for Files to delete");        
+        List<String> newFiles = Utilities.listAllFiles(igSrc, null);
+        List<String> historyFiles = Utilities.listAllFiles(history.getAbsolutePath(), null);
+        existingFiles = Utilities.listAllFiles(destination, ignoreList);
+        existingFiles.removeAll(newFiles);
+        existingFiles.removeAll(historyFiles);
+        existingFiles.remove("package-list.json");
+        existingFiles.removeIf(s -> s.endsWith("web.config"));
+        for (String s : existingFiles) {
+          new File(Utilities.path(destination, s)).delete();
+        }
+        System.out.println("  ... "+existingFiles.size()+" files");        
+        System.out.println("Copy to new IG to "+destination);        
+        FileUtils.copyDirectory(new File(Utilities.path(tempM.getAbsolutePath(), "output")), new File(destination));      
+      } else {
+        src.cleanFolder(relDest);
+      }
+      NpmPackage npmB = NpmPackage.fromPackage(new FileInputStream(Utilities.path(destVer, "package.tgz")));
+      updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("package"), false, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(genDate), username, version, gitSrcId, runNumber);
+      updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("publication"), true, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(genDate), username, version, gitSrcId, runNumber);
+      new PackageRegistryBuilder(workingRoot).update(destination.substring(workingRoot.length()+1), pl);
+      IndexMaintainer ndx = getIndexForIg(indexes, npmB.id());
+      if (ndx != null) {
+        src.needFile(Utilities.changeFileExt(ndx.path(), ".json"));      
+        ndx.loadJson();
+        ndx.updateForPublication(pl, plVer, mode != PublicationProcessMode.WORKING);
+        ndx.buildJson();
+        ndx.execute();
+      }
       updateRegistry(fRegistry, pl, plVer, npmB);
-      logger.stop();
-      FileUtils.copyFile(new File(logger.getFilename()), new File(Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".log")));
-      src.finish(relDest, existingFiles);
-      System.out.println("Finished Publishing. "+src.instructions(existingFiles.size()));
-    } else {
-      System.out.println("No!");
-      System.out.print("Changes not applied. Finished");
+      System.out.println("Build is complete. "+src.verb()+" from "+ fRoot.getAbsolutePath());
     }
+    new HistoryPageUpdater().updateHistoryPage(history.getAbsolutePath(), destination, templateSrc, !first); 
+    
+    logger.stop();
+    FileUtils.copyFile(new File(logger.getFilename()), new File(Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".log")));
+    src.finish(relDest, existingFiles);
+    System.out.println("Finished Publishing. "+src.instructions(existingFiles.size()));
     exitCode = 0;
   }
 
