@@ -28,7 +28,7 @@ import javax.xml.transform.stream.StreamResult;
 
 import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.utilities.FhirPublication;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.JsonException;
@@ -192,7 +192,7 @@ public class TemplateReleaser {
       }
       Element lbd = XMLUtil.getNamedChild(channel, "lastBuildDate");
       lbd.setTextContent(df.format(new Date()));
-      File bak = new File(Utilities.changeFileExt(xml.getAbsolutePath(),  ".bak"));
+      File bak = new File(FileUtilities.changeFileExt(xml.getAbsolutePath(),  ".bak"));
       if (bak.exists())
         bak.delete();
       xml.renameTo(bak);
@@ -239,7 +239,7 @@ public class TemplateReleaser {
       tr.td().tx(pl.current().date());
     }
     String s = INDEX_TEMPLATE.replace("{{index}}", new XhtmlComposer(false, false).compose(tbl));
-    TextFile.stringToFile(s, Utilities.path(path, "index.html"));
+    FileUtilities.stringToFile(s, Utilities.path(path, "index.html"));
   }
 
   private void build(String source, VersionDecision vd, List<VersionDecision> versions) throws Exception {
@@ -270,7 +270,7 @@ public class TemplateReleaser {
       }
     }
     String jcnt = JsonParser.compose(npm, true);
-    TextFile.stringToFile(jcnt, Utilities.path(source, vd.getId(), "package", "package.json"));
+    FileUtilities.stringToFile(jcnt, Utilities.path(source, vd.getId(), "package", "package.json"));
   }
 
   private void resetVersions(String source, VersionDecision vd, List<VersionDecision> versionsList) throws FileNotFoundException, IOException {
@@ -286,7 +286,7 @@ public class TemplateReleaser {
         d.add(s, "current");
       }
       String jcnt = JsonParser.compose(npm, true);
-      TextFile.stringToFile(jcnt, Utilities.path(source, vd.getId(), "package", "package.json"));
+      FileUtilities.stringToFile(jcnt, Utilities.path(source, vd.getId(), "package", "package.json"));
     }
   }
 
@@ -303,7 +303,7 @@ public class TemplateReleaser {
     if (!ok) {
       throw new Error("unable to find version "+vd.getNewVersion()+" in pacjage list");
     }
-    TextFile.stringToFile(pl.toJson(), Utilities.path(source, vd.getId(), "package-list.json"));
+    FileUtilities.stringToFile(pl.toJson(), Utilities.path(source, vd.getId(), "package-list.json"));
   }
 
   private void updatePackageList(String source, VersionDecision vd) throws FileNotFoundException, IOException {
@@ -315,7 +315,7 @@ public class TemplateReleaser {
     e.describe("Upgrade for dependency on "+vd.implicitSource, null, null);
     e.setDate("XXXX-XX-XX");
     e.setCurrent(true);
-    TextFile.stringToFile(pl.toJson(), Utilities.path(source, vd.getId(), "package-list.json"));
+    FileUtilities.stringToFile(pl.toJson(), Utilities.path(source, vd.getId(), "package-list.json"));
   }
 
   private List<VersionDecision> analyseVersions(String source, Map<String, String> newList, Map<String, String> oldList, String dest) throws Exception {
@@ -374,10 +374,10 @@ public class TemplateReleaser {
       String folder = Utilities.path(dest, s);
       // create history page 
       JsonObject jh = JsonParser.parseObjectFromFile(Utilities.path(folder, "package-list.json"));
-      String history = TextFile.fileToString(Utilities.path(dest, "history.template")).replace("\r\n", "\n");
+      String history = FileUtilities.fileToString(Utilities.path(dest, "history.template")).replace("\r\n", "\n");
       history = history.replace("{{id}}", s);
       history = history.replace("{{pl}}", JsonParser.compose(jh, false).replace('\'', '`'));
-      TextFile.stringToFile(history, Utilities.path(folder, "history.html"));
+      FileUtilities.stringToFile(history, Utilities.path(folder, "history.html"));
     }
   }
 
@@ -429,7 +429,7 @@ public class TemplateReleaser {
   }
 
   private List<String> listDependencies(String source, String id) throws Exception {
-    JsonObject npm = JsonParser.parseObject(TextFile.fileToString(Utilities.path(source, id, "package", "package.json")));
+    JsonObject npm = JsonParser.parseObject(FileUtilities.fileToString(Utilities.path(source, id, "package", "package.json")));
     List<String> res = new ArrayList<String>();
     if (npm.has("dependencies")) {
       for (JsonProperty s : npm.getJsonObject("dependencies").getProperties()) {
@@ -542,17 +542,17 @@ public class TemplateReleaser {
         jf.renameTo(xf);
       }
       // copy files
-      Utilities.createDirectory(dst.getAbsolutePath());
-      Utilities.copyDirectory(Utilities.path(source, vd.getId(), "output"), Utilities.path(dest, npm.name(), npm.version()), null);
-      Utilities.copyDirectory(Utilities.path(source, vd.getId(), "output"), Utilities.path(dest, npm.name()), null);
-      Utilities.copyFile(Utilities.path(source, vd.getId(), "package-list.json"), Utilities.path(dest, npm.name(), "package-list.json"));
+      FileUtilities.createDirectory(dst.getAbsolutePath());
+      FileUtilities.copyDirectory(Utilities.path(source, vd.getId(), "output"), Utilities.path(dest, npm.name(), npm.version()), null);
+      FileUtilities.copyDirectory(Utilities.path(source, vd.getId(), "output"), Utilities.path(dest, npm.name()), null);
+      FileUtilities.copyFile(Utilities.path(source, vd.getId(), "package-list.json"), Utilities.path(dest, npm.name(), "package-list.json"));
 
       // create history page 
       JsonObject jh = JsonParser.parseObjectFromFile(Utilities.path(source, vd.getId(), "package-list.json"));
-      String history = TextFile.fileToString(Utilities.path(dest, "history.template"));
+      String history = FileUtilities.fileToString(Utilities.path(dest, "history.template"));
       history = history.replace("{{id}}", vd.getId());
       history = history.replace("{{pl}}", JsonParser.compose(jh, false));
-      TextFile.stringToFile(history, Utilities.path(dest, vd.getId(), "history.html"));
+      FileUtilities.stringToFile(history, Utilities.path(dest, vd.getId(), "history.html"));
       
       // update rss feed      
       Element item = rss.createElement("item");

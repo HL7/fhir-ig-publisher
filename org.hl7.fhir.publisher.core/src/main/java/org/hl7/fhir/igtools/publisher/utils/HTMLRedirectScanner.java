@@ -4,7 +4,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 
 public class HTMLRedirectScanner {
 
@@ -19,7 +19,7 @@ public class HTMLRedirectScanner {
       if (f.isDirectory()) {
         scan(f);
       } else if (f.getName().endsWith(".html")) {
-        String src = TextFile.fileToString(f);
+        String src = FileUtilities.fileToString(f);
         if (src.contains("This page is a redirect to")) {
           System.out.println("Delete "+f.getAbsolutePath());
           f.delete();

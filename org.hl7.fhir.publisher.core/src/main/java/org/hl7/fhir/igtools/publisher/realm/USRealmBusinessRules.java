@@ -27,6 +27,7 @@ import org.hl7.fhir.r5.model.Parameters.ParametersParameterComponent;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.http.HTTPResult;
@@ -233,7 +234,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
 //        System.out.println("US Core Comparison: compare "+c.local+" to "+c.uscore);
         session.compare(c.uscore, c.local);      
       }
-      Utilities.createDirectory(Utilities.path(dstDir, "us-core-comparisons"));
+      FileUtilities.createDirectory(Utilities.path(dstDir, "us-core-comparisons"));
       ComparisonRenderer cr = new ComparisonRenderer(context, context, Utilities.path(dstDir, "us-core-comparisons"), session);
       cr.loadTemplates(context);
       cr.setPreamble(renderProblems());

@@ -14,7 +14,7 @@ import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnCom
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.StringPair;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -277,7 +277,7 @@ public class PublicationChecker {
       if (md.startsWith("@")) {
         File mdFile = new File(Utilities.path(folder, md.substring(1)));
         if (check(messages, mdFile.exists(), "descmd references the file "+md.substring(1)+" but it doesn't exist")) {
-          md = TextFile.fileToString(mdFile);
+          md = FileUtilities.fileToString(mdFile);
         }
       }
       check(messages, !md.contains("'"), "descmd cannot contain a '"+mkError());

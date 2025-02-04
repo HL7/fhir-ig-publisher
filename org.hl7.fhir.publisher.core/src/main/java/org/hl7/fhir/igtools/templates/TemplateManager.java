@@ -34,7 +34,7 @@ import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.context.ILoggingService;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonElement;
@@ -67,8 +67,8 @@ public class TemplateManager {
     String templateDir = Utilities.path(rootFolder, "template");
     boolean inPlace = template.equals("#template");
     if (!inPlace) {
-      Utilities.createDirectory(templateDir);
-      Utilities.clearDirectory(templateDir);
+      FileUtilities.createDirectory(templateDir);
+      FileUtilities.clearDirectory(templateDir);
     };
     List<String> scriptTemplates = new ArrayList<String>();
     
@@ -121,7 +121,7 @@ public class TemplateManager {
       try {
         config = JsonParser.parseObject(npm.load(Utilities.path("package", "$root"), "config.json"));
       } catch (Exception e) {
-        TextFile.streamToFile(npm.load(Utilities.path("package", "$root"), "config.json"), Utilities.path("[tmp]", npm.name()+"#"+npm.version()+"$config.json"));
+        FileUtilities.streamToFile(npm.load(Utilities.path("package", "$root"), "config.json"), Utilities.path("[tmp]", npm.name()+"#"+npm.version()+"$config.json"));
         throw new FHIRException("Error parsing "+npm.name()+"#"+npm.version()+"#"+Utilities.path("package", "$root", "config.json")+": "+e.getMessage(), e);
       }
       configs.add(config);
@@ -154,7 +154,7 @@ public class TemplateManager {
     // if we have't already found that it's considered a script, we'll look through the content
     if (scriptReason == null) {
       for (String fn : files) {
-        String n = Utilities.getRelativePath(templateDir, fn);
+        String n = FileUtilities.getRelativePath(templateDir, fn);
         if (!Utilities.existsInList(n.toLowerCase(), "license", "readme")) {
           String s = extension(n);
           if (antScripts.contains(n)) {
@@ -183,7 +183,7 @@ public class TemplateManager {
       }
       String configString = JsonParser.compose(config, true);
       String configPath = Utilities.path(templateDir, "config.json");
-      TextFile.stringToFile(configString, configPath);
+      FileUtilities.stringToFile(configString, configPath);
     }
   }
   

@@ -8,7 +8,7 @@ import java.util.List;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.utilities.IniFile;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.ZipGenerator;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -55,7 +55,7 @@ public class WebSiteArchiveBuilder {
       if (f.exists()) {
         return dir;
       }
-      dir = Utilities.getDirectoryForFile(folder);
+      dir = FileUtilities.getDirectoryForFile(folder);
     }
     throw new IOException("Unable to find publish.ini from "+folder);
   }
@@ -156,7 +156,7 @@ public class WebSiteArchiveBuilder {
         if (f.isDirectory()) {
           c = c + addFolderToZip(zip, f, offset, new ArrayList<>()); // no exemptions in sub-directories 
         } else if (!f.getName().equals(ARCHIVE_FILE_NAME)) {
-          zip.addBytes(f.getAbsolutePath().substring(offset), TextFile.fileToBytes(f), false);
+          zip.addBytes(f.getAbsolutePath().substring(offset), FileUtilities.fileToBytes(f), false);
           c++;
         }
       }

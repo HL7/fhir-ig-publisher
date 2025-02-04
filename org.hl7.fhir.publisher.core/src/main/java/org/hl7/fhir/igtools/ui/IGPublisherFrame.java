@@ -51,6 +51,7 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.publisher.Publisher.CacheOption;
 import org.hl7.fhir.r5.context.ILoggingService;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.settings.FhirSettings;
@@ -408,7 +409,7 @@ public class IGPublisherFrame extends javax.swing.JFrame {
     igFileChooser.setFileFilter(new FileNameExtensionFilter("IG ini file or IG Directory", "ini"));
     igFileChooser.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
     if (igNameComboBox.getSelectedItem() != null)
-      igFileChooser.setCurrentDirectory(new File(Utilities.getDirectoryForFile((String) igNameComboBox.getSelectedItem())));
+      igFileChooser.setCurrentDirectory(new File(FileUtilities.getDirectoryForFile((String) igNameComboBox.getSelectedItem())));
     if (igFileChooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
 
 
@@ -558,7 +559,7 @@ public class IGPublisherFrame extends javax.swing.JFrame {
   }
 
   private String folder() throws IOException {
-    return Utilities.getDirectoryForFile((String) igNameComboBox.getSelectedItem());
+    return FileUtilities.getDirectoryForFile((String) igNameComboBox.getSelectedItem());
   }
   
   protected void btnQAClick(ActionEvent evt) {
@@ -586,7 +587,7 @@ public class IGPublisherFrame extends javax.swing.JFrame {
   
   protected void btnGetHelpClick(ActionEvent evt) {
     try {
-      String text = Publisher.buildReport((String) igNameComboBox.getSelectedItem(), null, fullLog.toString(), qa == null ? null : Utilities.changeFileExt(qa, ".txt"), FhirSettings.getTxFhirProduction());
+      String text = Publisher.buildReport((String) igNameComboBox.getSelectedItem(), null, fullLog.toString(), qa == null ? null : FileUtilities.changeFileExt(qa, ".txt"), FhirSettings.getTxFhirProduction());
       StringSelection stringSelection = new StringSelection(text);
       Clipboard clpbrd = Toolkit.getDefaultToolkit().getSystemClipboard();
       clpbrd.setContents(stringSelection, null);
