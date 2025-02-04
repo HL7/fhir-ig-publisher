@@ -7,7 +7,7 @@ import java.util.List;
 
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 
 public class HL7OrgFhirFixerForExtensions {
@@ -39,12 +39,12 @@ public class HL7OrgFhirFixerForExtensions {
           f.delete();
         }
         if (f.getName().equals("web.config")) {
-          String s = TextFile.fileToString(f);
+          String s = FileUtilities.fileToString(f);
           String url = s.substring(s.indexOf("destination=")+13);
           url = url.substring(0, url.indexOf("\""));
           String rf = genRedirect(url.replace("http://hl7.org/fhir", ""));
           String dst = Utilities.path(ff, "index.php");
-          TextFile.stringToFile(rf, dst);
+          FileUtilities.stringToFile(rf, dst);
           f.delete();          
         }
       }

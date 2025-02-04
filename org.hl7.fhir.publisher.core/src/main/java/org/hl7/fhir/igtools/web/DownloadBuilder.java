@@ -5,7 +5,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.List;
 
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.ZipGenerator;
 
@@ -111,7 +111,7 @@ public class DownloadBuilder {
         "</body>\n" + 
         "</html>\n" + 
         "";
-    return TextFile.stringToBytes(html);
+    return FileUtilities.stringToBytes(html);
   }
 
   private void addBytes(String absolutePath, byte[] content) throws IOException {
@@ -161,11 +161,11 @@ public class DownloadBuilder {
               counter = 0;
               System.out.print("  ");
             }
-            String html = TextFile.fileToString(f);
+            String html = FileUtilities.fileToString(f);
             html = fixLinks(html, level);
-            addBytes(f.getAbsolutePath(), TextFile.stringToBytes(html));
+            addBytes(f.getAbsolutePath(), FileUtilities.stringToBytes(html));
           } else if (!Utilities.existsInList(ext, DO_NOT_DOWNLOAD)) {
-            addBytes(f.getAbsolutePath(), TextFile.fileToBytes(f));
+            addBytes(f.getAbsolutePath(), FileUtilities.fileToBytes(f));
           }
         }
       }

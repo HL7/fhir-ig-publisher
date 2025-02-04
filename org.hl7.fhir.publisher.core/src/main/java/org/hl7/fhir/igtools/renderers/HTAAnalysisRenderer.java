@@ -15,7 +15,7 @@ import org.hl7.fhir.r5.model.ConceptMap;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.utilities.MarkDownProcessor;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 
 public class HTAAnalysisRenderer {
@@ -177,7 +177,7 @@ public class HTAAnalysisRenderer {
       String cnt = TEMPLATE;
       cnt = cnt.replace("$title$", Utilities.escapeXml(title));
       cnt = cnt.replace("$analysis$", b.toString());
-      TextFile.stringToFile(cnt, Utilities.path(outputDir, "qa-hta.html"));
+      FileUtilities.stringToFile(cnt, Utilities.path(outputDir, "qa-hta.html"));
 
       if (errs + warnings + suggestions == 0) {
         return "<a href=\"qa-hta.html\">All OK</a>";

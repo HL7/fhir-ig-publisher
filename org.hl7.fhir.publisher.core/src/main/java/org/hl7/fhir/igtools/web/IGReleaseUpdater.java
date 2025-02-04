@@ -44,7 +44,7 @@ import org.hl7.fhir.r5.model.CodeableConcept;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.utilities.IniFile;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.model.JsonArray;
@@ -212,7 +212,7 @@ public class IGReleaseUpdater {
           updateStatement(folder, folders, ignoreList, json, root, errs, root, canonical, folder, canonical.equals("http://hl7.org/fhir"), true, list, updateStatements, pl.milestones());
         }
         if (save)
-          TextFile.stringToFile(JsonParser.compose(json, true), f);
+          FileUtilities.stringToFile(JsonParser.compose(json, true), f);
         new HistoryPageUpdater().updateHistoryPage(historySource, folder, templateSrc, false);
       }
         
@@ -252,7 +252,7 @@ public class IGReleaseUpdater {
     File f = new File(Utilities.path(focus, name));
     if (!f.exists() || f.isDirectory()) {
       if (f.exists()) {
-        Utilities.clearDirectory(f.getAbsolutePath());
+        FileUtilities.clearDirectory(f.getAbsolutePath());
       }
 
       if (!src.isDirectory()) {
@@ -374,7 +374,7 @@ public class IGReleaseUpdater {
     checkFileExists(vf, isCore ? "fhir-spec.zip" : "full-ig.zip");
     
     if (sft != null) {
-      String html = TextFile.fileToString(sft);
+      String html = FileUtilities.fileToString(sft);
       html = fixParameter(html, "title", ig.asString("title"));
       html = fixParameter(html, "id", ig.asString("package-id"));
       html = fixParameter(html, "version", isCurrent ? "All Versions" : version.asString("version"));
@@ -384,7 +384,7 @@ public class IGReleaseUpdater {
       html = fixParameter(html, "note", isCurrent ? "this search searches all versions of the "+ig.asString("title")+", including balloted versions. You can also search specific versions" :
         "this search searches version "+version.asString("version")+" of the "+ig.asString("title")+". You can also search other versions, or all versions at once");
       html = fixParameter(html, "prefix", "");            
-      TextFile.stringToFile(html, Utilities.path(vf, "searchform.html"));          
+      FileUtilities.stringToFile(html, Utilities.path(vf, "searchform.html"));          
     }
 
     return vc;

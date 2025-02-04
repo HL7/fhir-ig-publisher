@@ -14,7 +14,7 @@ import java.util.Set;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.r4.model.CanonicalType;
 import org.hl7.fhir.r4.model.ValueSet.ConceptSetComponent;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -535,7 +535,7 @@ public class DependentIGFinder {
     t.add("details2", details2);
     t.add("errors", String.join("\r\n", errors));
     
-    TextFile.stringToFile(t.render(), Utilities.path(path, "qa-dep.html"));
+    FileUtilities.stringToFile(t.render(), Utilities.path(path, "qa-dep.html"));
   }
 
   public void addCodeSystem(String url, String title, String link) {

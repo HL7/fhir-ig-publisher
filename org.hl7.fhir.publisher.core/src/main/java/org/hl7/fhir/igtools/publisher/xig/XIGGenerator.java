@@ -14,6 +14,7 @@ import org.hl7.fhir.convertors.analytics.PackageVisitor;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.xml.sax.SAXException;
@@ -36,7 +37,7 @@ public class XIGGenerator {
     super();
     this.target = target;
     this.cache = cache;
-    Utilities.createDirectory(cache);
+    FileUtilities.createDirectory(cache);
     pcm = new FilesystemPackageCacheManager.Builder().build();
     String ds = new SimpleDateFormat("dd MMM yyyy", new Locale("en", "US")).format(Calendar.getInstance().getTime());
     String dl = new SimpleDateFormat("yyyy-MM-dd'T'hh:mm:ssZ", new Locale("en", "US")).format(Calendar.getInstance().getTime());

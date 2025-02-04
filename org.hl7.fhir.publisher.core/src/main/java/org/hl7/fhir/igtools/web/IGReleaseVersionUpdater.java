@@ -28,7 +28,7 @@ import java.util.List;
 
 import org.apache.commons.io.FileUtils;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
@@ -94,7 +94,7 @@ public class IGReleaseVersionUpdater {
       }
       
       if (f.getName().endsWith(".html") || f.getName().endsWith(".htm")) {
-        String src = TextFile.fileToString(f);
+        String src = FileUtilities.fileToString(f);
         String srcl = src.toLowerCase();
         if (srcl.contains("http-equiv=\"refresh\"") || srcl.contains("<html><p>not generated in this build</p></html>")) {
           continue;
@@ -143,7 +143,7 @@ public class IGReleaseVersionUpdater {
           }
           src = src.substring(0, b+l) + fixForLevel(updatedFragment, level)+addPageVersions(f, milestones)+src.substring(e);
           if (!src.equals(o)) {
-            TextFile.stringToFile(src, f);
+            FileUtilities.stringToFile(src, f);
             countUpdated++;
           }
           countTotal++;
@@ -153,11 +153,11 @@ public class IGReleaseVersionUpdater {
   }
 
   private String addPageVersions(File f, List<PackageListEntry> milestones) throws IOException {
-    String relpath = Utilities.getRelativePath(folder, f.getAbsolutePath()); 
+    String relpath = FileUtilities.getRelativePath(folder, f.getAbsolutePath()); 
     CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder(" ");
     int i = 0;
     for (PackageListEntry t : milestones) {
-      String base = Utilities.path(rootFolder, Utilities.getRelativePath(rootUrl, t.path()));
+      String base = Utilities.path(rootFolder, FileUtilities.getRelativePath(rootUrl, t.path()));
       File fv = Utilities.pathFile(base, relpath);
       if (fv.exists()) {
         i++;
@@ -208,24 +208,24 @@ public class IGReleaseVersionUpdater {
       if (f.isDirectory()) {
         checkXmlJsonClones(f);
       } else if (f.getName().endsWith(".json")) {
-        String src = TextFile.fileToString(f);
+        String src = FileUtilities.fileToString(f);
         if (src.contains("\"resourceType\"")) {
           clonedTotal++;
-          checkUpdate(f, src, Utilities.changeFileExt(f.getAbsolutePath(), ".json1"));
-          checkUpdate(f, src, Utilities.changeFileExt(f.getAbsolutePath(), ".json2"));
+          checkUpdate(f, src, FileUtilities.changeFileExt(f.getAbsolutePath(), ".json1"));
+          checkUpdate(f, src, FileUtilities.changeFileExt(f.getAbsolutePath(), ".json2"));
         } else {
-          checkDeleteFile(Utilities.changeFileExt(f.getAbsolutePath(), ".json1"));
-          checkDeleteFile(Utilities.changeFileExt(f.getAbsolutePath(), ".json2"));
+          checkDeleteFile(FileUtilities.changeFileExt(f.getAbsolutePath(), ".json1"));
+          checkDeleteFile(FileUtilities.changeFileExt(f.getAbsolutePath(), ".json2"));
         }
       } else if (f.getName().endsWith(".xml")) {
         clonedTotal++;
-        String src = TextFile.fileToString(f);
+        String src = FileUtilities.fileToString(f);
         if (src.contains("xmlns=\"http://hl7.org/fhir\"")) {
-          checkUpdate(f, src, Utilities.changeFileExt(f.getAbsolutePath(), ".xml1"));
-          checkUpdate(f, src, Utilities.changeFileExt(f.getAbsolutePath(), ".xml2"));
+          checkUpdate(f, src, FileUtilities.changeFileExt(f.getAbsolutePath(), ".xml1"));
+          checkUpdate(f, src, FileUtilities.changeFileExt(f.getAbsolutePath(), ".xml2"));
         } else {
-          checkDeleteFile(Utilities.changeFileExt(f.getAbsolutePath(), ".xml1"));
-          checkDeleteFile(Utilities.changeFileExt(f.getAbsolutePath(), ".xml2"));          
+          checkDeleteFile(FileUtilities.changeFileExt(f.getAbsolutePath(), ".xml1"));
+          checkDeleteFile(FileUtilities.changeFileExt(f.getAbsolutePath(), ".xml2"));          
         }
       }
     }

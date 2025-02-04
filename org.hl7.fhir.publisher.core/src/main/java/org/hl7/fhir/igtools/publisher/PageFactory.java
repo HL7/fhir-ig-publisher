@@ -15,7 +15,7 @@ import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.ImplementationGuide.GuidePageGeneration;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionPageComponent;
 import org.hl7.fhir.r5.model.UrlType;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.JsonException;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -162,7 +162,7 @@ public class PageFactory {
   }
   
   private void execute(String item, String repoSource, ImplementationGuide ig) throws FileNotFoundException, IOException {
-    String source = TextFile.fileToString(Utilities.path(repoSource, sourceFile()));
+    String source = FileUtilities.fileToString(Utilities.path(repoSource, sourceFile()));
     for (String n : variables()) {
       String v = variableValue(n, item);
       doDebug("   "+n+" --> "+v);
@@ -170,7 +170,7 @@ public class PageFactory {
     }
     String fn = generatedFileName(item);
     doDebug("  save to "+fn);
-    TextFile.stringToFile(source, Utilities.path(dir, "_includes", fn));
+    FileUtilities.stringToFile(source, Utilities.path(dir, "_includes", fn));
     ImplementationGuideDefinitionPageComponent page = getParentPage(ig.getDefinition().getPage());
     ImplementationGuideDefinitionPageComponent subPage = page.addPage();
     subPage.setSource(new UrlType(statedFileName(item)));
@@ -208,8 +208,8 @@ public class PageFactory {
   private void checks(String repoSource, ImplementationGuide ig) throws IOException {
     checkFileExists("source-file", Utilities.path(repoSource, sourceFile()));
     checkFileExists("page folder", dir);
-    Utilities.clearDirectory(dir);
-    Utilities.createDirectory(Utilities.path(dir, "_includes"));
+    FileUtilities.clearDirectory(dir);
+    FileUtilities.createDirectory(Utilities.path(dir, "_includes"));
   }
 
   private void checkFileExists(String purpose, String path) {

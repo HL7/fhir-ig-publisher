@@ -69,7 +69,7 @@ import org.hl7.fhir.r5.utils.validation.constants.BindingKind;
 import org.hl7.fhir.r5.utils.validation.constants.ContainedReferenceValidationPolicy;
 import org.hl7.fhir.r5.utils.validation.constants.ReferenceValidationPolicy;
 import org.hl7.fhir.utilities.SIDUtilities;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -397,7 +397,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   public byte[] fetchRaw(IResourceValidator validator, String source) throws MalformedURLException, IOException {
     URL url = new URL(source);
     URLConnection c = url.openConnection();
-    return TextFile.streamToBytes(c.getInputStream());
+    return FileUtilities.streamToBytes(c.getInputStream());
   }
 
   @Override

@@ -27,7 +27,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -126,7 +126,7 @@ public class IGRegistryMaintainer {
   public IGRegistryMaintainer(String path) throws FileNotFoundException, IOException {
     this.path = path;
     if (path != null) {
-      json = JsonParser.parseObject(TextFile.fileToString(path));
+      json = JsonParser.parseObject(FileUtilities.fileToString(path));
     }
   }
 
