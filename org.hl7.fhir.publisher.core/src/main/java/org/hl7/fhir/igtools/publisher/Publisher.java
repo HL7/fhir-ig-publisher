@@ -3264,7 +3264,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       if (sourceIg.hasJurisdiction()) {
         Locale localeFromRegion = ResourceUtilities.getLocale(sourceIg);
         if (localeFromRegion != null) {
-          sourceIg.setLanguage(localeFromRegion.toString());
+          sourceIg.setLanguage(localeFromRegion.toLanguageTag());
         } else {
           throw new Error("Unable to determine locale from jurisdiction (as requested by policy)");
         }
