@@ -95,6 +95,8 @@ jobs:
 
 - job: xig_step_3
   dependsOn: xig_step_2
+  pool:
+    vmImage: 'macOS-latest'
   timeoutInMinutes: 360
   steps:
     - task: Bash@3
@@ -118,7 +120,7 @@ jobs:
       displayName: 'Run publisher with xig param step 3'
       inputs:
         targetType: 'inline'
-        script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FOLDER)/$(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 3'
+        script: 'java -Xmx13G -jar ./publisher.jar -xig $(XIG_DB_FOLDER)/$(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 3'
 
     - task: PublishPipelineArtifact@1
       inputs:
