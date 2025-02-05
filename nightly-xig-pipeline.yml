@@ -95,6 +95,7 @@ jobs:
 
 - job: xig_step_3
   dependsOn: xig_step_2
+  timeoutInMinutes: 360
   steps:
     - task: Bash@3
       displayName: 'Download latest publisher'
