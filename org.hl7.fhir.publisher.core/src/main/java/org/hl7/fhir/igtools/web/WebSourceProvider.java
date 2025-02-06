@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import org.hl7.fhir.utilities.CompressionUtilities;
 import org.hl7.fhir.utilities.FTPClient;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
@@ -115,7 +116,7 @@ public class WebSourceProvider {
     try (ZipInputStream zis = new ZipInputStream(inputStream)) {
       ZipEntry zipEntry = zis.getNextEntry();
       while (zipEntry != null) {
-        Path newPath = Utilities.zipSlipProtect(Utilities.makeOSSafe(zipEntry.getName()), target);
+        Path newPath = CompressionUtilities.zipSlipProtect(CompressionUtilities.makeOSSafe(zipEntry.getName()), target);
         if (Files.exists(newPath)) {
           Files.delete(newPath);
         }
