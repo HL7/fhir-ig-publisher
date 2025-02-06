@@ -5,7 +5,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 
 import org.hl7.fhir.utilities.IniFile;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonElement;
@@ -46,7 +46,7 @@ public class HistoryPageUpdater {
     scrubApostrophes(json);
     String jsonv = JsonParser.compose(json, false);
 
-    String html = TextFile.fileToString(Utilities.path(sourceRepo, "history.template"));
+    String html = FileUtilities.fileToString(Utilities.path(sourceRepo, "history.template"));
     html = html.replace("$header$", loadTemplate(templateSrc, "header.template"));
     html = html.replace("$preamble$", loadTemplate(templateSrc, "preamble.template"));
     html = html.replace("$postamble$", loadTemplate(templateSrc, "postamble.template"));
@@ -54,18 +54,18 @@ public class HistoryPageUpdater {
     html = fixParameter(html, "id", json.asString("package-id"));
     html = fixParameter(html, "json", jsonv);
     File tgt = new File(Utilities.path(folder, "directory.html"));
-    if (tgt.exists() && TextFile.fileToString(tgt).contains("<div id=\"history-data\"></div>")) {
-      TextFile.stringToFile(html, Utilities.path(folder, "directory.html"));      
+    if (tgt.exists() && FileUtilities.fileToString(tgt).contains("<div id=\"history-data\"></div>")) {
+      FileUtilities.stringToFile(html, Utilities.path(folder, "directory.html"));      
     } else {
-      TextFile.stringToFile(html, Utilities.path(folder, "history.html"));
+      FileUtilities.stringToFile(html, Utilities.path(folder, "history.html"));
     }
 
     if (delta) {
 // don't want to do this ....      new File(Utilities.path(folder, "index.html")).delete();
     } else {
-      String index = new File(Utilities.path(folder, "index.html")).exists() ? TextFile.fileToString(Utilities.path(folder, "index.html")) : "XXXXX";
+      String index = new File(Utilities.path(folder, "index.html")).exists() ? FileUtilities.fileToString(Utilities.path(folder, "index.html")) : "XXXXX";
       if (index.contains("XXXX")) {
-        html = TextFile.fileToString(Utilities.path(sourceRepo, "index.html"));
+        html = FileUtilities.fileToString(Utilities.path(sourceRepo, "index.html"));
         html = html.replace("XXXX", "");
         html = html.replace("$header$", loadTemplate(templateSrc, "header.template"));
         html = html.replace("$preamble$", loadTemplate(templateSrc, "preamble.template"));
@@ -74,7 +74,7 @@ public class HistoryPageUpdater {
         html = fixParameter(html, "title", json.asString("title"));
         html = fixParameter(html, "id", json.asString("package-id"));
         html = fixParameter(html, "json", jsonv);
-        TextFile.stringToFile(html, Utilities.path(folder, "index.html"));      
+        FileUtilities.stringToFile(html, Utilities.path(folder, "index.html"));      
       }
     }
   }
@@ -90,7 +90,7 @@ public class HistoryPageUpdater {
   private String loadTemplate(String folder, String filename) throws FileNotFoundException, IOException {
     File f = new File(Utilities.path(folder, filename));
     if (f.exists()) {
-      return TextFile.fileToString(f);
+      return FileUtilities.fileToString(f);
     } else {
       throw new Error("Not found: "+f.getAbsolutePath());
     }
@@ -104,10 +104,10 @@ public class HistoryPageUpdater {
         File tgt = new File(Utilities.path(folder, s));
         if ("overwrite".equals(ini.getStringProperty("files", s)) || !tgt.exists()) {
           if (src.isDirectory()) {
-            Utilities.createDirectory(tgt.getAbsolutePath());
-            Utilities.copyDirectory(src.getAbsolutePath(), tgt.getAbsolutePath(), null);
+            FileUtilities.createDirectory(tgt.getAbsolutePath());
+            FileUtilities.copyDirectory(src.getAbsolutePath(), tgt.getAbsolutePath(), null);
           } else {
-            Utilities.copyFile(src, tgt);
+            FileUtilities.copyFile(src, tgt);
           }
         }
       }

@@ -892,7 +892,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
     if ("?ext".equals(brd.vsn)) {
       if (tx.getValueSet() != null)
-        System.out.println("Value set '"+tx.getValueSet()+"' at " + url + "#" + path + " not found");
+         System.out.println("Value set '"+tx.getValueSet()+"' at " + url + "#" + path + " not found");
       else if (!tx.hasDescription())
         System.out.println("No value set specified at " + url + "#" + path + " (no url)");
     }
@@ -1206,7 +1206,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     var p = x.para();
     p.tx("Guidance on how to interpret the contents of this table can be found ");
     p.ah("https://build.fhir.org/ig/FHIR/ig-guidance//readingIgs.html#data-dictionaries").tx("here");
-    XhtmlNode t = x.table("dict");
+    XhtmlNode t = x.table("dict", false);
 
     List<ElementDefinition> elements = elementsForMode(mode);
 
@@ -2570,5 +2570,112 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   public String adl() {
     return "<pre><code>"+Utilities.escapeXml(sd.getUserString(UserDataNames.archetypeSource))+"</code></pre>";
+  }
+
+  public String useContext() throws IOException {
+    XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
+    if ("deprecated".equals(ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_STANDARDS_STATUS))) {
+      XhtmlNode ddiv = div.div("background-color: #ffe6e6; border: 1px solid black; border-radius: 10px; padding: 10px");
+      ddiv.para().b().tx("This extension is deprecated and should no longer be used");
+      Extension ext = sd.getExtensionByUrl(ToolingExtensions.EXT_STANDARDS_STATUS);
+      ext = ext == null || !ext.hasValue() ? null : ext.getValue().getExtensionByUrl(ToolingExtensions.EXT_STANDARDS_STATUS_REASON);
+      if (ext != null && ext.hasValue()) {
+        String md = ext.getValue().primitiveValue();
+        try {
+          md = preProcessMarkdown("Standards-Status-Reason", md);
+          ddiv.markdown(md, "Standards-Status-Reason");
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+      }
+    }
+    if (sd.getContext().isEmpty()) {
+      div.para().tx("This extension does not specify which elements it should be used on");
+    } else {
+      div.para().tx("This extension may be used on the following element(s):");
+      var ul = div.ul();
+      for (StructureDefinitionContextComponent c : sd.getContext()) {
+        var li = ul.li();
+        switch (c.getType()) {
+        case ELEMENT:
+          li.tx("Element ID: ");
+          String tn = c.getExpression();
+          if (tn.contains(".")) {
+            tn = tn.substring(0, tn.indexOf("."));
+          }
+          StructureDefinition t = context.fetchTypeDefinition(tn);
+          var code = li.code();
+          if (t != null && t.hasWebPath()) {
+            code.ah(t.getWebPath()).tx(c.getExpression());
+          } else {
+            code.tx(c.getExpression());
+          }
+          break;
+        case EXTENSION:
+          li.tx("Extension: ");
+          t = context.fetchResource(StructureDefinition.class, c.getExpression());
+          if (t != null && t.hasWebPath()) {
+            li.ah(t.getWebPath()).tx(t.present());
+          } else {
+            li.code().tx(c.getExpression());
+          }
+          break;
+        case FHIRPATH:
+          li.ah(Utilities.pathURL(context.getSpecUrl(), "fhirpath.html")).tx("Path");
+          li.tx(": ");
+          li.tx(c.getExpression());
+          break;
+        default:
+          li.tx("?type?: ");
+          li.tx(c.getExpression());
+          break;
+        }
+        if (c.hasExtension(ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE)) {
+          li.tx(" (");
+          renderVersionRange(c.getExtensionByUrl(ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE), li);
+          li.tx(")");        
+        }
+      }
+    }
+    if (sd.hasContextInvariant()) {
+      if (sd.getContextInvariant().size() == 1) {
+        div.para().tx("In addition, the extension can only be used when this FHIRPath expression is true:");
+        div.para().code().tx(sd.getContextInvariant().get(0).asStringValue());
+      } else {
+        div.para().tx("In addition, the extension can only be used when these FHIRPath expressions are true:");
+        var ul = div.ul();
+        for (StringType sv : sd.getContextInvariant()) {
+          ul.li().code().tx(sv.asStringValue());
+        }
+      }
+    }
+    if (sd.hasExtension(ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE)) {
+      var p = div.para();
+      p.tx("This extension is allowed for use with "); 
+      renderVersionRange(sd.getExtensionByUrl(ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE), p);
+      p.tx(".");        
+    }
+    return new XhtmlComposer(false, true).compose(div.getChildNodes());
+  }
+
+  public void renderVersionRange(Extension ext, XhtmlNode li) {
+    if (!ext.hasExtension(ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_START)) {
+      li.tx("FHIR versions up to ");
+      linkToVersion(li, ToolingExtensions.readStringExtension(ext, ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_END));                
+    } else if (!ext.hasExtension(ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_END)) {
+      li.tx("FHIR versions ");
+      linkToVersion(li, ToolingExtensions.readStringExtension(ext, ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_START));
+      li.tx(" and after");        
+    } else {
+      li.tx("FHIR versions ");
+      linkToVersion(li, ToolingExtensions.readStringExtension(ext, ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_START));
+      li.tx(" to ");
+      linkToVersion(li, ToolingExtensions.readStringExtension(ext, ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_END));        
+    }
+  }
+
+  private void linkToVersion(XhtmlNode p, String version) {
+    String url = VersionUtilities.getSpecUrl(version);
+    p.ahOrNot(url).b().tx(VersionUtilities.getNameForVersion(version));    
   }
 }

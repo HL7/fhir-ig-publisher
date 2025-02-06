@@ -15,7 +15,7 @@ import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.ImplementationGuide.SPDXLicense;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator.Category;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -152,11 +152,11 @@ public class IGPackageChecker {
     NPMPackageGenerator npm = new NPMPackageGenerator(file, canonical, vpath, PackageType.IG, ig, date, fhirversions, true);
     for (File f : new File(folder).listFiles()) {
       if (f.getName().endsWith(".openapi.json")) {
-        byte[] src = TextFile.fileToBytes(f.getAbsolutePath());
+        byte[] src = FileUtilities.fileToBytes(f.getAbsolutePath());
         npm.addFile(Category.OPENAPI, f.getName(), src);
       } else if (f.getName().endsWith(".json")) {
-        byte[] src = TextFile.fileToBytes(f.getAbsolutePath());
-        String s = TextFile.bytesToString(src);
+        byte[] src = FileUtilities.fileToBytes(f.getAbsolutePath());
+        String s = FileUtilities.bytesToString(src);
         if (s.contains("\"resourceType\"")) {
           JsonObject json = JsonParser.parseObject(s);
           if (json.has("resourceType") && json.has("id") && json.get("id").isJsonPrimitive()) {
@@ -167,11 +167,11 @@ public class IGPackageChecker {
         }
       }
       if (f.getName().endsWith(".sch")) {
-        byte[] src = TextFile.fileToBytes(f.getAbsolutePath());
+        byte[] src = FileUtilities.fileToBytes(f.getAbsolutePath());
         npm.addFile(Category.SCHEMATRON, f.getName(), src);
       }
       if (f.getName().equals("spec.internals")) {
-        byte[] src = TextFile.fileToBytes(f.getAbsolutePath());
+        byte[] src = FileUtilities.fileToBytes(f.getAbsolutePath());
         npm.addFile(Category.OTHER, f.getName(), src);
       }
     }

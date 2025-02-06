@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.JsonException;
 import org.hl7.fhir.utilities.json.model.JsonArray;
@@ -101,11 +101,11 @@ public class IndexMaintainer {
   public void execute() throws IOException {
     String tbl = generateSummary();
     String tblDate = generateByDate();
-    String src = TextFile.fileToString(template);
+    String src = FileUtilities.fileToString(template);
     src = src.replace("{{name}}", name);
     src = src.replace("{{tbl.summary}}", tbl);
     src = src.replace("{{tbl.date}}", tblDate);
-    TextFile.stringToFile(src, dest);
+    FileUtilities.stringToFile(src, dest);
   }
 
   public void buildJson() throws IOException {
@@ -128,12 +128,12 @@ public class IndexMaintainer {
       o.set("verLatest", ig.verLatest);
     }
     String src = JsonParser.compose(json, true);
-    TextFile.stringToFile(src, Utilities.changeFileExt(dest, ".json"));
+    FileUtilities.stringToFile(src, FileUtilities.changeFileExt(dest, ".json"));
   }
 
   public void loadJson() throws JsonException, IOException, ParseException {
     igs.clear();
-    JsonObject json = JsonParser.parseObjectFromFile(Utilities.changeFileExt(dest, ".json"));
+    JsonObject json = JsonParser.parseObjectFromFile(FileUtilities.changeFileExt(dest, ".json"));
     for (JsonObject o : json.getJsonObjects("igs")) {
       IGIndexInformation ig = new IGIndexInformation(o.asString("id"));
 
@@ -156,7 +156,7 @@ public class IndexMaintainer {
   }
   private String generateSummary() throws IOException {
     XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
-    XhtmlNode tbl = div.table("grid");
+    XhtmlNode tbl = div.table("grid", false);
     XhtmlNode tr = tbl.tr();
     tr.td().b().tx("IG");
     tr.td().b().tx("Details");
@@ -200,7 +200,7 @@ public class IndexMaintainer {
 
   private String generateByDate() throws IOException {
     XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
-    XhtmlNode tbl = div.table("grid");
+    XhtmlNode tbl = div.table("grid", false);
     XhtmlNode tr = tbl.tr();
     tr.td().b().tx("IG");
     tr.td().b().tx("Name");

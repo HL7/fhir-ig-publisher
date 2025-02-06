@@ -13,7 +13,7 @@ import org.hl7.fhir.r5.context.IContextResourceLoader;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -83,8 +83,8 @@ public class PackagCanonicalClashDetector {
     list.get(0).resource.setDate(null);
     list.get(1).resource.setMeta(null);
     list.get(1).resource.setDate(null);
-    TextFile.bytesToFile(new JsonParser().composeBytes(list.get(0).resource), fn0);
-    TextFile.bytesToFile(new JsonParser().composeBytes(list.get(1).resource), fn1);
+    FileUtilities.bytesToFile(new JsonParser().composeBytes(list.get(0).resource), fn0);
+    FileUtilities.bytesToFile(new JsonParser().composeBytes(list.get(1).resource), fn1);
     String diff = TestingUtilities.checkJsonIsSame(fn0, fn1);
     if (diff != null) {
       System.out.println(s+": "+diff);

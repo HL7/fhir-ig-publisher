@@ -8,7 +8,7 @@ import java.util.List;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.utilities.IniFile;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 
 public class TemplateChanger {
@@ -67,21 +67,21 @@ public class TemplateChanger {
     check(ini.hasProperty("template", "head"), "The file "+iniF.getAbsolutePath()+" does not contain a head template");
     thf = new File(Utilities.path(folder, ini.getStringProperty("template", "head")));
     check(thf.exists(), "The head template file "+thf+" does not exist");
-    th = TextFile.fileToString(thf);
+    th = FileUtilities.fileToString(thf);
     check(thb != null, "The file "+iniF.getAbsolutePath()+" does not contain a template head-begin marker");
     check(the != null, "The file "+iniF.getAbsolutePath()+" does not contain a template head-end marker");
     
     check(ini.hasProperty("template", "top"), "The file "+iniF.getAbsolutePath()+" does not contain a top template");
     ttf = new File(Utilities.path(folder, ini.getStringProperty("template", "top")));
     check(ttf.exists(), "The top template file "+ttf+" does not exist");
-    tt = TextFile.fileToString(ttf);
+    tt = FileUtilities.fileToString(ttf);
     check(ttb != null, "The file "+iniF.getAbsolutePath()+" does not contain a template top-begin marker");
     check(tte != null, "The file "+iniF.getAbsolutePath()+" does not contain a template top-end marker");
 
     check(ini.hasProperty("template", "bottom"), "The file "+iniF.getAbsolutePath()+" does not contain a bottom template");
     tbf = new File(Utilities.path(folder, ini.getStringProperty("template", "bottom")));
     check(tbf.exists(), "The bottom template file "+tbf+" does not exist");
-    tb = TextFile.fileToString(tbf);
+    tb = FileUtilities.fileToString(tbf);
     check(tbb != null, "The file "+iniF.getAbsolutePath()+" does not contain a template bottom-begin marker");
     check(tbe != null, "The file "+iniF.getAbsolutePath()+" does not contain a template bottom-end marker");
        
@@ -115,13 +115,13 @@ public class TemplateChanger {
         if (i % 100 == 0) {
           System.out.print(".");          
         }
-        String cnt = TextFile.fileToString(f);
+        String cnt = FileUtilities.fileToString(f);
          if (hasSeps(cnt, thb, the) && hasSeps(cnt, ttb, tte) && hasSeps(cnt, tbb, tbe)) {
            fixed.add(f);
            cnt = replaceSeps(cnt, prep(th, path), thb, the);
            cnt = replaceSeps(cnt, prep(tt, path), ttb, tte);
            cnt = replaceSeps(cnt, prep(tb, path), tbb, tbe);
-           TextFile.stringToFile(cnt, f);
+           FileUtilities.stringToFile(cnt, f);
          } else {
            notFixed.add(f);
          }

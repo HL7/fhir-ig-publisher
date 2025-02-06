@@ -795,7 +795,7 @@ public class CrossViewRenderer extends Renderer {
     } else {
       kind = "data type";
     }
-    var tbl = x.table("list");
+    var tbl = x.table("list", false);
     var tr = tbl.tr();
     var td = tr.td();
     td.b().tx("Identity");
@@ -1318,7 +1318,7 @@ public class CrossViewRenderer extends Renderer {
 
     XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
     Collections.sort(vslist, new CanonicalResourceSortByUrl());
-    var tbl = x.table("grid");
+    var tbl = x.table("grid", false);
     var tr = tbl.tr();
     tr.th().tx("URL");
     if (versions) {
@@ -1613,7 +1613,7 @@ public class CrossViewRenderer extends Renderer {
   public String renderCSList(String versionToAnnotate, List<CodeSystem> cslist, boolean versions, boolean used) throws IOException {
     XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
     Collections.sort(cslist, new CanonicalResourceSortByUrl());
-    var tbl = x.table("grid");
+    var tbl = x.table("grid", false);
     var tr = tbl.tr();
     tr.th().tx("URL");
     if (versions) {

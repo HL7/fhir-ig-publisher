@@ -29,7 +29,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
@@ -179,8 +179,8 @@ public class IGReleaseRedirectionBuilder {
               String litPath = Utilities.path(folder, p)+".html";
               if (!new File(litPath+".xml").exists() && !new File(litPath+".json").exists()) { 
                 litPath = Utilities.path(folder, tail(map.get(s)));
-              } File file = new File(Utilities.changeFileExt(litPath, ".xml"));
-              if (file.exists() && new File(Utilities.changeFileExt(litPath, ".json")).exists()) {
+              } File file = new File(FileUtilities.changeFileExt(litPath, ".xml"));
+              if (file.exists() && new File(FileUtilities.changeFileExt(litPath, ".json")).exists()) {
                 createAspRedirect(path, map.get(s), Utilities.pathURL(vpath, head(file.getName())));
               }
             }
@@ -237,12 +237,12 @@ public class IGReleaseRedirectionBuilder {
       String asp = b.toString();
       File f = new File(Utilities.path(folder, "cr"+rt.toLowerCase()+".asp"));
       if (f.exists()) {
-        String aspc = TextFile.fileToString(f);
+        String aspc = FileUtilities.fileToString(f);
         if (aspc.equals(asp))
           return;
       }
       countUpdated++;
-      TextFile.stringToFile(b.toString(), f);    
+      FileUtilities.stringToFile(b.toString(), f);    
     }    
   }
 
@@ -263,12 +263,12 @@ public class IGReleaseRedirectionBuilder {
     String wc = b.toString();
     File f = new File(Utilities.path(folder, "web.config"));
     if (f.exists()) {
-      String wcc = TextFile.fileToString(f);
+      String wcc = FileUtilities.fileToString(f);
       if (wcc.equals(wc))
         return;
     }
     countUpdated++;
-    TextFile.stringToFile(b.toString(),f);    
+    FileUtilities.stringToFile(b.toString(),f);    
   }
 
   private String rulePrefix() {
@@ -300,8 +300,8 @@ public class IGReleaseRedirectionBuilder {
           String litPath = Utilities.path(folder, p)+".html";
           if (!new File(litPath+".xml").exists() && !new File(litPath+".json").exists()) 
             litPath = Utilities.path(folder, tail(map.get(s)));
-          File file = new File(Utilities.changeFileExt(litPath, ".xml"));
-          if (file.exists() && new File(Utilities.changeFileExt(litPath, ".json")).exists()) {
+          File file = new File(FileUtilities.changeFileExt(litPath, ".xml"));
+          if (file.exists() && new File(FileUtilities.changeFileExt(litPath, ".json")).exists()) {
             createAspRedirect(path, map.get(s), Utilities.pathURL(vpath, head(file.getName())));
           }
         }
@@ -322,8 +322,8 @@ public class IGReleaseRedirectionBuilder {
         String litPath = Utilities.path(folder, p)+".html";
         if (!new File(litPath+".xml").exists() && !new File(litPath+".json").exists()) 
           litPath = Utilities.path(folder, tail(map.get(s)));
-        File file = new File(Utilities.changeFileExt(litPath, ".xml"));
-        if (file.exists() && new File(Utilities.changeFileExt(litPath, ".json")).exists()) {
+        File file = new File(FileUtilities.changeFileExt(litPath, ".xml"));
+        if (file.exists() && new File(FileUtilities.changeFileExt(litPath, ".json")).exists()) {
           createLitespeedRedirect(path, map.get(s), Utilities.pathURL(vpath, head(file.getName())));
         }
       }
@@ -342,10 +342,10 @@ public class IGReleaseRedirectionBuilder {
     String t = PHP_TEMPLATE;
     t = t.replace("{{html}}", urlHtml);
     t = t.replace("{{literal}}", urlSrc);
-    Utilities.createDirectory(Utilities.getDirectoryForFile(path));
+    FileUtilities.createDirectory(FileUtilities.getDirectoryForFile(path));
     countTotal++;
-    if (!new File(path).exists() || !TextFile.fileToString(path).equals(t)) {
-      TextFile.stringToFile(t, path);
+    if (!new File(path).exists() || !FileUtilities.fileToString(path).equals(t)) {
+      FileUtilities.stringToFile(t, path);
       countUpdated++;
     }
   }
@@ -354,10 +354,10 @@ public class IGReleaseRedirectionBuilder {
     String t = ASP_TEMPLATE;
     t = t.replace("{{html}}", urlHtml);
     t = t.replace("{{literal}}", urlSrc);
-    Utilities.createDirectory(Utilities.getDirectoryForFile(path));
+    FileUtilities.createDirectory(FileUtilities.getDirectoryForFile(path));
     countTotal++;
-    if (!new File(path).exists() || !TextFile.fileToString(path).equals(t)) {
-      TextFile.stringToFile(t, path);
+    if (!new File(path).exists() || !FileUtilities.fileToString(path).equals(t)) {
+      FileUtilities.stringToFile(t, path);
       countUpdated++;
     }
   }
@@ -366,10 +366,10 @@ public class IGReleaseRedirectionBuilder {
     String t = PHP_TEMPLATE;
     t = t.replace("{{html}}", urlHtml);
     t = t.replace("{{literal}}", urlSrc);
-    Utilities.createDirectory(Utilities.getDirectoryForFile(path));
+    FileUtilities.createDirectory(FileUtilities.getDirectoryForFile(path));
     countTotal++;
-    if (!new File(path).exists() || !TextFile.fileToString(path).equals(t)) {
-      TextFile.stringToFile(t, path);
+    if (!new File(path).exists() || !FileUtilities.fileToString(path).equals(t)) {
+      FileUtilities.stringToFile(t, path);
       countUpdated++;
     }
   }
@@ -407,10 +407,10 @@ public class IGReleaseRedirectionBuilder {
 
   private void scanAdditionalFiles(Map<String, String> res) throws IOException {
     for (File f : new File(folder).listFiles()) {
-      if (f.getName().endsWith(".json") && !f.getName().endsWith(".canonical.json") && new File(Utilities.changeFileExt(f.getAbsolutePath(), ".xml")).exists() && new File(Utilities.changeFileExt(f.getAbsolutePath(), ".html")).exists()) {
+      if (f.getName().endsWith(".json") && !f.getName().endsWith(".canonical.json") && new File(FileUtilities.changeFileExt(f.getAbsolutePath(), ".xml")).exists() && new File(FileUtilities.changeFileExt(f.getAbsolutePath(), ".html")).exists()) {
         JsonObject obj = JsonParser.parseObject(f);
         if (obj.has("resourceType") && obj.has("id")) {
-          res.put(obj.asString("resourceType")+"/"+obj.asString("id"), Utilities.pathURL(vpath, Utilities.changeFileExt(f.getName(), ".html")));
+          res.put(obj.asString("resourceType")+"/"+obj.asString("id"), Utilities.pathURL(vpath, FileUtilities.changeFileExt(f.getName(), ".html")));
         }
       }
     }

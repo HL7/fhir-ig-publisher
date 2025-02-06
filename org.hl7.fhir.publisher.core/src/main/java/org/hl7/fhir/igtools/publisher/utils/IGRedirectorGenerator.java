@@ -24,7 +24,7 @@ package org.hl7.fhir.igtools.publisher.utils;
 import java.io.File;
 import java.io.IOException;
 
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 
 public class IGRedirectorGenerator {
@@ -58,7 +58,7 @@ public class IGRedirectorGenerator {
    * @throws IOException 
    */
   public void generateRedirects(String src, String dest, String relativeLocation) throws IOException {
-    Utilities.clearDirectory(dest);
+    FileUtilities.clearDirectory(dest);
     total = 0;
     processFiles(new File(src), new File(dest), relativeLocation);
     System.out.println("Created "+total+" redirects for "+src+" in "+dest);
@@ -67,7 +67,7 @@ public class IGRedirectorGenerator {
   private void processFiles(File src, File dest, String relativeLocation) throws IOException {
     for (File f : src.listFiles()) {
       if (f.isDirectory()) {
-        File nd = Utilities.createDirectory(Utilities.path(dest.getAbsolutePath(), f.getName()));
+        File nd = FileUtilities.createDirectory(Utilities.path(dest.getAbsolutePath(), f.getName()));
         processFiles(f, nd, "../"+relativeLocation+"/"+f.getName());
       } else if (f.getName().endsWith(".html")) {
         genRedirect(dest, f.getName(), relativeLocation);
@@ -83,7 +83,7 @@ public class IGRedirectorGenerator {
         "</script>\r\n"+
         "<title>Page Redirection</title></head><body>If you are not redirected automatically, follow this <a href='{{url}}'>link to Resource Index</a>.</body></html>\r\n";
     redirect = redirect.replace("{{url}}", relativeLocation+"/"+name);
-    TextFile.stringToFile(redirect, Utilities.path(dest.getAbsolutePath(), name));
+    FileUtilities.stringToFile(redirect, Utilities.path(dest.getAbsolutePath(), name));
     total++;
   }
   

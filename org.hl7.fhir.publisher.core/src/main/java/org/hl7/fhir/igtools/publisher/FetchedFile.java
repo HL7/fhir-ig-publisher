@@ -74,6 +74,7 @@ public class FetchedFile {
   private String statedPath;  
   private String logical;
   private List<ProcessingReport> processes = new ArrayList<>();
+  private boolean loaded;
   
   public FetchedFile(String statedPath) {
     super();
@@ -287,6 +288,12 @@ public class FetchedFile {
   
   public long getSize() {
     return size;
+  }
+  public boolean isLoaded() {
+    return loaded;
+  }
+  public void setLoaded(boolean loaded) {
+    this.loaded = loaded;
   }
 
 }

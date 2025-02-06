@@ -23,7 +23,7 @@ import org.apache.commons.io.IOUtils;
 import org.hl7.fhir.igtools.publisher.IGVersionUtil;
 import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.publisher.Publisher.CacheOption;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -93,7 +93,7 @@ public class AllGuidesTests {
 
     JsonObject stats = JsonParser.parseObject(statsFile);
     JsonObject ver = stats.forceObject(version);
-    ver.set("sync-date", TextFile.fileToString(syncDateFile()).trim());
+    ver.set("sync-date", FileUtilities.fileToString(syncDateFile()).trim());
     ver.set("date", new SimpleDateFormat("yyyy-MM-dd").format(new Date()));
     JsonObject si = ver.forceObject(id);
     si.set("errors", cErr);
@@ -135,7 +135,7 @@ public class AllGuidesTests {
       }
       b.append("\r\n");
     }
-    TextFile.stringToFile(b.toString(), Utilities.changeFileExt(statsFile.getAbsolutePath(), ".csv"));
+    FileUtilities.stringToFile(b.toString(), FileUtilities.changeFileExt(statsFile.getAbsolutePath(), ".csv"));
     
     
     Assertions.assertTrue(cErr <= pErr, "Error count has increased from "+pErr+" to "+cErr);

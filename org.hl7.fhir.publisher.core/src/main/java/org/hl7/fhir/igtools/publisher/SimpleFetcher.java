@@ -45,7 +45,7 @@ import org.hl7.fhir.r5.model.DataType;
 import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.UriType;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 
 public class SimpleFetcher implements IFetchFile {
@@ -230,7 +230,7 @@ public class SimpleFetcher implements IFetchFile {
         throw new Exception("Bad Source Reference '"+s+"' - should have the format [Type]/[id] where id is a valid FHIR id type");
       String fn = pkp.getSourceFor(type+"/"+id);
       List<String> dirs = new ArrayList<>();
-      dirs.add(Utilities.getDirectoryForFile(src.getPath()));
+      dirs.add(FileUtilities.getDirectoryForFile(src.getPath()));
       dirs.addAll(resourceDirs);
       
       if (Utilities.noString(fn)) {
@@ -263,7 +263,7 @@ public class SimpleFetcher implements IFetchFile {
       return fetch(fn); 
     } else if (source instanceof UriType) {
       UriType s = (UriType) source;
-      String fn = Utilities.path(Utilities.getDirectoryForFile(src.getPath()), s.getValueAsString());
+      String fn = Utilities.path(FileUtilities.getDirectoryForFile(src.getPath()), s.getValueAsString());
       return fetch(fn); 
     } else {
       throw new Exception("Unknown source reference type for implementation guide");
@@ -497,7 +497,7 @@ public class SimpleFetcher implements IFetchFile {
 
   @Override
   public String pathForFile(String path) throws IOException {
-    return Utilities.getDirectoryForFile(path);
+    return FileUtilities.getDirectoryForFile(path);
   }
 
   @Override
@@ -507,7 +507,7 @@ public class SimpleFetcher implements IFetchFile {
 
   @Override
   public String openAsString(String filename) throws IOException {
-    return TextFile.fileToString(filename);
+    return FileUtilities.fileToString(filename);
   }
 
   @Override

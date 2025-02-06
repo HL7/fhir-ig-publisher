@@ -31,7 +31,7 @@ import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.utilities.FhirPublication;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonElement;
@@ -130,7 +130,7 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
       }
     }
     System.out.println("");
-    Utilities.createDirectory(target);
+    FileUtilities.createDirectory(target);
     fillDirectory(pcm, target);
     StringBuilder b = new StringBuilder();
     b.append("<p><b>Views</b></p>\r\n");
@@ -163,7 +163,7 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
     NpmPackage npm = pcm.loadPackage(CommonPackages.ID_PUBPACK);
     for (String s : npm.list("other")) {
       InputStream f = npm.load("other", s);
-      TextFile.streamToFile(f, Utilities.path(target, s));
+      FileUtilities.streamToFile(f, Utilities.path(target, s));
     }
   }
 
@@ -311,7 +311,7 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
 
   private void genPage(String title, String content, String fn) throws IOException {
     String cnt = HEADER.replace("$title$", title)+content+FOOTER.replace("$date$", date);
-    TextFile.stringToFile(cnt, fn);
+    FileUtilities.stringToFile(cnt, fn);
   }
 
 

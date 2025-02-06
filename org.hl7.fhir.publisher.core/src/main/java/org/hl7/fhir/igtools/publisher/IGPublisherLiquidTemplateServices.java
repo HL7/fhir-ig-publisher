@@ -30,7 +30,7 @@ import java.util.Map;
 import org.hl7.fhir.r5.model.DomainResource;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.ILiquidTemplateProvider;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 
 public class IGPublisherLiquidTemplateServices implements ILiquidTemplateProvider {
 
@@ -48,10 +48,10 @@ public class IGPublisherLiquidTemplateServices implements ILiquidTemplateProvide
       if (f.getName().endsWith(".liquid")) {
         String fn = f.getName();
         fn = fn.substring(0, fn.indexOf("."));
-        templates.put(fn.toLowerCase(), TextFile.fileToString(f));
+        templates.put(fn.toLowerCase(), FileUtilities.fileToString(f));
       } else if (f.getName().endsWith(".html")) {
         String fn = f.getName();
-        templates.put(fn, TextFile.fileToString(f));
+        templates.put(fn, FileUtilities.fileToString(f));
       } 
     }
   }

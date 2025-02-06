@@ -4,11 +4,11 @@
 
     <groupId>org.hl7.fhir.publisher</groupId>
     <artifactId>org.hl7.fhir.publisher</artifactId>
-    <version>1.8.7-SNAPSHOT</version>
+    <version>1.8.11-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <properties>
-        <core_version>6.5.5-SNAPSHOT</core_version>
+        <core_version>6.5.8-SNAPSHOT</core_version>
         <maven_surefire_version>3.0.0-M5</maven_surefire_version>
         <apache_poi_version>5.2.1</apache_poi_version>
         <lombok_version>1.18.32</lombok_version>
@@ -21,6 +21,7 @@
         <maven.compiler.testSource>11</maven.compiler.testSource>
         <maven.compiler.testTarget>11</maven.compiler.testTarget>
         <logback-classic.version>1.5.15</logback-classic.version>
+        <nedap-healthcare-archie.version>3.12.0</nedap-healthcare-archie.version>
     </properties>
 
     <name>HL7 FHIR IG Publisher</name>
@@ -305,13 +306,17 @@
           <version>1.2023.9</version>
         </dependency>
 
-        <!-- openEHR library -->
         <dependency>
             <groupId>com.nedap.healthcare.archie</groupId>
-            <artifactId>archie-all</artifactId>
-            <version>3.12.0</version>
+            <artifactId>aom</artifactId>
+            <version>${nedap-healthcare-archie.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>com.nedap.healthcare.archie</groupId>
+            <artifactId>referencemodels</artifactId>
+            <version>${nedap-healthcare-archie.version}</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -351,12 +356,11 @@
                     </annotationProcessorPaths>
                 </configuration>
                 <executions>
-                    <!-- Replacing default-compile as it is treated specially by maven -->
                     <execution>
                         <id>default-compile</id>
                         <phase>none</phase>
                     </execution>
-                    <!-- Replacing default-testCompile as it is treated specially by maven -->
+
                     <execution>
                         <id>default-testCompile</id>
                         <phase>none</phase>

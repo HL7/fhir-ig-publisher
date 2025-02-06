@@ -69,7 +69,7 @@ import org.hl7.fhir.r5.terminologies.client.TerminologyClientManager.InternalLog
 import org.hl7.fhir.r5.utils.OperationOutcomeUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.i18n.I18nConstants;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
@@ -526,7 +526,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
         }
       }
     }
-    FileOutputStream s = new FileOutputStream(Utilities.changeFileExt(path, ".xml"));
+    FileOutputStream s = new FileOutputStream(FileUtilities.changeFileExt(path, ".xml"));
     new XmlParser().compose(s, validationBundle, true);
     s.close();
 
@@ -565,7 +565,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
         ul.li().tx("(No Errors/Reports - all good)");        
       } else {
         x.para().b().tx("Decisions");
-        XhtmlNode tbl = x.table("grid");
+        XhtmlNode tbl = x.table("grid", false);
         XhtmlNode tr = tbl.tr();
         tr.td().b().tx("Message");
         tr.td().b().tx("Server");
@@ -589,7 +589,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
         }
         if (isErr) {
           x.para().b().tx("Errors");
-          tbl = x.table("grid");
+          tbl = x.table("grid", false);
           tr = tbl.tr();
           tr.td().b().tx("URL");
           tr.td().b().tx("Message");
@@ -627,7 +627,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     }
     
     String page = genTxServersHeader(title)+new XhtmlComposer(false, true).compose(x.getChildNodes())+genTxServerFooter(title);
-    TextFile.stringToFile(page, Utilities.path(Utilities.getDirectoryForFile(path), "qa-txservers.html"));    
+    FileUtilities.stringToFile(page, Utilities.path(FileUtilities.getDirectoryForFile(path), "qa-txservers.html"));    
   }
 
   private void genServerReport(XhtmlNode x, TerminologyClientContext t) {
@@ -657,7 +657,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       XhtmlNode ul = x.ul();
       ul.li().tx("(None)");
     } else {        
-      XhtmlNode tbl = x.table("grid");
+      XhtmlNode tbl = x.table("grid", false);
       XhtmlNode tr = tbl.tr();
       tr.th().b().tx("System");
       tr.th().b().tx("#Exp.");
@@ -782,7 +782,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     b.append("err = " + err + ", warn = " + warn + ", info = " + info + "\n");
     b.append("IG Publisher Version: " + toolsVersion);
 
-    TextFile.stringToFile(b.toString(), Utilities.changeFileExt(path, "-eslintcompact.txt"));
+    FileUtilities.stringToFile(b.toString(), FileUtilities.changeFileExt(path, "-eslintcompact.txt"));
   }
 
   public void genQAText(String title, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, List<ValidationMessage> linkErrors)
@@ -805,7 +805,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       b.append(genEndTxt());
     }    
     b.append(genFooterTxt(title));
-    TextFile.stringToFile(b.toString(), Utilities.changeFileExt(path, ".txt"));
+    FileUtilities.stringToFile(b.toString(), FileUtilities.changeFileExt(path, ".txt"));
   }
 
   public void genQATextForCompare(String title, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, List<ValidationMessage> linkErrors)
@@ -828,7 +828,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       b.append(genEndTxt());
     }    
     b.append(genFooterTxt(title));
-    TextFile.stringToFile(b.toString(), Utilities.changeFileExt(path, ".compare.txt"));
+    FileUtilities.stringToFile(b.toString(), FileUtilities.changeFileExt(path, ".compare.txt"));
   }
 
   public List<FetchedFile> genQAHtml(String title, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, List<ValidationMessage> linkErrors, boolean allIssues) throws IOException {
@@ -885,7 +885,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       }
     }
     b.append(genFooter(title));
-    TextFile.stringToFile(b.toString(), allIssues ? path : Utilities.changeFileExt(path, ".min.html"));
+    FileUtilities.stringToFile(b.toString(), allIssues ? path : FileUtilities.changeFileExt(path, ".min.html"));
     return files;
   }
 
@@ -981,7 +981,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     Set<String> msgs = new HashSet<>();
     for (ValidationMessage message : messages) {
       boolean passesFilter = true;
-      if (canSuppressErrors || !message.getLevel().isError()) {
+      if ((canSuppressErrors || !message.getLevel().isError()) && (!"HTML_PARSING_FAILED".equals(message.getMessageId()))) {
         if (suppressedMessages.contains(message.getDisplay(), message) || suppressedMessages.contains(message.getMessage(), message) ||
               suppressedMessages.contains(message.getHtml(), message) || suppressedMessages.contains(message.getMessageId(), message) || 
               suppressedMessages.contains(message.getInvId(), message)) {
@@ -1025,6 +1025,10 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       "  <style>\r\n"+
       "    span.flip  { background-color: #4CAF50; color: white; border: solid 1px #a6d8a8; padding: 2px }\r\n"+
       "    span.toggle  { background-color: #e6f2ff; color: black; border: solid 1px #0056b3; padding: 2px; font-size: 10px }\r\n"+
+      "    button { padding: 0px 8px; font-size: 12px; cursor: pointer; border-radius: 2px; border: 1px solid #ccc; background-color: #f0f0f0 }\r\n"+
+      "    button:hover { background-color: #e0e0e0; }\r\n"+
+      "    .code-value { display: inline; }\r\n"+
+      "    .code-hidden { display: none; }\r\n"+
       "    span.toggle  { font-size: 10px }\r\n"+
       "  </style>\r\n"+
       "  <script>\r\n"+
@@ -1048,6 +1052,12 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       "      } else {\r\n"+
       "        div.style.display = 'none';\r\n"+
       "        span.innerHTML = 'Show Validation Information';\r\n"+
+      "      }\r\n"+
+      "    }\r\n"+
+      "    function toggleCodes() {\r\n"+
+      "      const codes = document.getElementsByClassName('code-value');\r\n"+
+      "      for (let code of codes) {\r\n"+
+      "        code.classList.toggle('code-hidden');\r\n"+
       "      }\r\n"+
       "    }\r\n"+
       "  </script>\r\n"+
@@ -1079,7 +1089,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       "$noNarrative$"+
       "$noValidation$"+
       "$fragments$"+
-      " <tr><td>Summary:</td><td> errors = $err$, warn = $warn$, info = $info$, broken links = $links$</td></tr>\r\n"+
+      " <tr><td>Summary:</td><td> errors = $err$, warn = $warn$, info = $info$, broken links = $links$.  <button onclick=\"toggleCodes()\">Show Message Ids</button></td></tr>\r\n"+
       "</table>\r\n"+
       " <table class=\"grid\">\r\n"+
       "   <tr>\r\n"+
@@ -1138,7 +1148,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
 
   private final String detailsTemplate = 
       "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b>$path$</b></td><td><b>$level$</b></td><td title=\"$mid$\"><b>$msg$</b>$comment$</td>\r\n"+
+      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>\r\n"+
       "   </tr>\r\n";
   
   private final String groupDetailsTemplate = 
@@ -1149,22 +1159,22 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   
   private final String detailsTemplateTxLink = 
       "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$<ta>, see <a href=\"$tx$\">log</a>)</td>\r\n"+
+      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</a>, see <a href=\"$tx$\">log</a>) <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>\r\n"+
       "   </tr>\r\n";
   
   private final String detailsTemplateTxNoLink = 
       "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$<ta>)</td>\r\n"+
+      "     <td><b>$path$</b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ (from <a href=\"qa-txservers.html#$txsrvr$\">$txsrvr$</a>) <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>\r\n"+
       "   </tr>\r\n";
   
   private final String detailsTemplateWithExtraDetails = 
       "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b><a href=\"$pathlink$\">$path$</a></b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ <span id=\"s$id$\" class=\"flip\" onclick=\"flip('$id$')\">Show Reasoning</span><div id=\"$id$\" style=\"display: none\"><p>&nbsp;</p>$msgdetails$</div></td>\r\n"+
+      "     <td><b><a href=\"$pathlink$\">$path$</a></b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ <span id=\"s$id$\" class=\"flip\" onclick=\"flip('$id$')\">Show Reasoning</span><div id=\"$id$\" style=\"display: none\"><p>&nbsp;</p>$msgdetails$</div> <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>\r\n"+
       "   </tr>\r\n";
       
   private final String detailsTemplateWithLink = 
       "   <tr style=\"background-color: $color$\">\r\n"+
-      "     <td><b><a href=\"$pathlink$\">$path$</a></b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$</td>\r\n"+
+      "     <td><b><a href=\"$pathlink$\">$path$</a></b></td><td><b>$level$</b></td><td><b>$msg$</b>$comment$ <span class=\"code-value code-hidden\" style=\"font-size: 8px; color: navy\">$mid$</span></td>\r\n"+
       "   </tr>\r\n";
   
   private final String footerTemplate = 
@@ -1478,10 +1488,11 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("errcount", ec);
     t.add("warningcount", warningCount(list));
     t.add("infocount", infoCount(list));
-    if ("0".equals(ec))
+    if ("0".equals(ec)) {
       t.add("color", "#EFFFEF");
-    else
+    } else {
       t.add("color", colorForLevel(IssueSeverity.ERROR, false));
+    }
       
     return t.render();
   }
@@ -1496,10 +1507,11 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("errcount", ec);
     t.add("warningcount", warningCount(uniqueErrors));
     t.add("infocount", infoCount(uniqueErrors));
-    if ("0".equals(ec))
+    if ("0".equals(ec)) {
       t.add("color", "#EFFFEF");
-    else
+    } else {
       t.add("color", colorForLevel(IssueSeverity.ERROR, false));
+    }
       
     return t.render();
   }
@@ -1612,7 +1624,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("path", "n/a");
     t.add("xlink", "");
     t.add("signposts", "");      
-    t.add("vsumm", "");            
+    t.add("vsumm", "");         
     return t.render();
   }
 
@@ -1653,6 +1665,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       t.add("path", "");
       t.add("pathlink", "");      
     }
+
     t.add("level", vm.isSlicingHint() ? "Slicing Information" : vm.isSignpost() ? "Process Info" : vm.getLevel().toCode());
     t.add("color", colorForLevel(vm.getLevel(), vm.isSignpost()));
     t.add("halfcolor", halfColorForLevel(vm.getLevel(), vm.isSignpost()));
@@ -1682,6 +1695,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("comment", "");
     t.add("tx", "");
     t.add("txsrvr", "");
+
     return t.render();
   }
 

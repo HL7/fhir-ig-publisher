@@ -66,7 +66,7 @@ import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.StandardsStatus;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.ZipGenerator;
@@ -112,7 +112,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
         
         cu = new ContextUtilities(engine.getVdr5());
         engine.logProgress("Generating fragments");
-        Utilities.createDirectory(Utilities.path(path, "temp", "xver-qa"));
+        FileUtilities.createDirectory(Utilities.path(path, "temp", "xver-qa"));
         genChainsHtml(path, "cross-version-chains-all", false, false);
         genChainsHtml(path, "cross-version-chains-valid", true, false);
         genChainsHtml(path, "cross-version-chains-min", true, true);
@@ -124,7 +124,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
         }
 
         engine.logProgress("Generating extensions");
-        Utilities.createDirectory(Utilities.path(path, "temp", "xver", "x-extensions"));
+        FileUtilities.createDirectory(Utilities.path(path, "temp", "xver", "x-extensions"));
         for (StructureDefinition sd : engine.getExtensions()) {
           new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(path, "temp", "xver", "x-extensions", "StructureDefinition-"+sd.getId()+".json")), sd);
           genExtensionPage(path, sd);
@@ -173,7 +173,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
   }
 
   private void cleanup(String path) throws IOException {
-    Utilities.clearDirectory(Utilities.path(path, "input", "extensions"));
+    FileUtilities.clearDirectory(Utilities.path(path, "input", "extensions"));
     File dir = new File(Utilities.path(path, "temp", "xver-qa"));
     if (dir.exists()) {
       for (File f : dir.listFiles()) {
@@ -191,7 +191,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     }
     XhtmlNode body = new XhtmlNode(NodeType.Element, "div");  
     body.h1().tx(sd.getTitle());
-    var tbl = body.table("grid");
+    var tbl = body.table("grid", false);
     var tr = tbl.tr();
     tr.td().b().tx("URL");
     tr.td().tx(sd.getUrl());
@@ -228,7 +228,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     body.hr();
     
     body.pre().tx(new JsonParser().setOutputStyle(OutputStyle.PRETTY).composeString(sd));
-    TextFile.stringToFile(new XhtmlComposer(false, true).compose(wrapPage(body, sd.getName())), fn);
+    FileUtilities.stringToFile(new XhtmlComposer(false, true).compose(wrapPage(body, sd.getName())), fn);
   }
 
   private void renderVersionRange(XhtmlNode x, Extension ext) {
@@ -278,8 +278,8 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
         }
       }
     }
-    TextFile.stringToFile(new XhtmlComposer(false, true).compose(body), Utilities.path(path, "input", "includes", filename+".xhtml"));
-    TextFile.stringToFile(new XhtmlComposer(false, true).compose(wrapPage(body, "FHIR Cross Version Extensions")), Utilities.path(path, "temp", "xver-qa", filename+".html"));
+    FileUtilities.stringToFile(new XhtmlComposer(false, true).compose(body), Utilities.path(path, "input", "includes", filename+".xhtml"));
+    FileUtilities.stringToFile(new XhtmlComposer(false, true).compose(wrapPage(body, "FHIR Cross Version Extensions")), Utilities.path(path, "temp", "xver-qa", filename+".html"));
   }
 
 
@@ -336,7 +336,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     XhtmlNode body = new XhtmlNode(NodeType.Element, "div");  
     body.h1().tx(sd.getName());
     body.para().tx("FHIR Cross-version Mappings for "+sd.getType()+" based on the R5 structure");
-    XhtmlNode tbl = body.table("grid");
+    XhtmlNode tbl = body.table("grid", false);
     XhtmlNode tr = tbl.tr();
 
     // we're going to generate a table with a column for each target structure definition in the chains that terminate in the provided sd
@@ -448,15 +448,15 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
       body.add(ConceptMapRenderer.renderMultipleMaps(name, maps, engine, new MultiRowRenderingContext(MultiConceptMapType.CODED, RenderMultiRowSortPolicy.UNSORTED, links)));
     }
 
-    TextFile.stringToFile(new XhtmlComposer(false, true).compose(body), Utilities.path(path, "input", "includes", "cross-version-"+sd.getName()+".xhtml"));
-    TextFile.stringToFile("{% include cross-version-"+sd.getName()+".xhtml %}\r\n", Utilities.path(path, "input", "pagecontent", "cross-version-"+sd.getName()+".md"));
+    FileUtilities.stringToFile(new XhtmlComposer(false, true).compose(body), Utilities.path(path, "input", "includes", "cross-version-"+sd.getName()+".xhtml"));
+    FileUtilities.stringToFile("{% include cross-version-"+sd.getName()+".xhtml %}\r\n", Utilities.path(path, "input", "pagecontent", "cross-version-"+sd.getName()+".md"));
     ImplementationGuideDefinitionPageComponent p = page.addPage();
     p.setSource(new UrlType("cross-version-"+sd.getName()+".md"));
     p.setName("cross-version-"+sd.getName()+".html");
     p.setTitle("Cross-Version summary for "+sd.getName());
     p.setGeneration(GuidePageGeneration.MARKDOWN);
     ToolingExtensions.setStandardsStatus(p, StandardsStatus.INFORMATIVE, null);
-    TextFile.stringToFile(new XhtmlComposer(false, true).compose(wrapPage(body, sd.getName())), Utilities.path(path, "temp", "xver-qa", "cross-version-"+sd.getName()+".html"));
+    FileUtilities.stringToFile(new XhtmlComposer(false, true).compose(wrapPage(body, sd.getName())), Utilities.path(path, "temp", "xver-qa", "cross-version-"+sd.getName()+".html"));
   }
 
 
@@ -619,8 +619,8 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     maps.add(engine.cm("resources-4bto5"));
     XhtmlNode page = ConceptMapRenderer.renderMultipleMaps("R2 Resources", maps, engine, new MultiRowRenderingContext(MultiConceptMapType.SUMMARY, RenderMultiRowSortPolicy.FIRST_COL, "resources"));
 
-    TextFile.stringToFile(new XhtmlComposer(false, true).compose(page), Utilities.path(path, "input", "includes", "cross-version-resources.xhtml"));
-    TextFile.stringToFile(new XhtmlComposer(false, true).compose(wrapPage(page, "Resource Map")), Utilities.path(path, "temp", "xver-qa", "cross-version-resources.html"));
+    FileUtilities.stringToFile(new XhtmlComposer(false, true).compose(page), Utilities.path(path, "input", "includes", "cross-version-resources.xhtml"));
+    FileUtilities.stringToFile(new XhtmlComposer(false, true).compose(wrapPage(page, "Resource Map")), Utilities.path(path, "temp", "xver-qa", "cross-version-resources.html"));
 
     maps = new ArrayList<>();
     maps.add(engine.cm("types-2to3"));
@@ -629,8 +629,8 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     maps.add(engine.cm("types-4bto5"));
     page = ConceptMapRenderer.renderMultipleMaps("R2 DataTypes", maps, engine, new MultiRowRenderingContext(MultiConceptMapType.SUMMARY, RenderMultiRowSortPolicy.FIRST_COL, "types"));
 
-    TextFile.stringToFile(new XhtmlComposer(false, true).compose(page), Utilities.path(path, "input", "includes", "cross-version-types.xhtml"));
-    TextFile.stringToFile(new XhtmlComposer(false, true).compose(wrapPage(page, "Type Map")), Utilities.path(path, "temp", "xver-qa", "cross-version-types.html"));
+    FileUtilities.stringToFile(new XhtmlComposer(false, true).compose(page), Utilities.path(path, "input", "includes", "cross-version-types.xhtml"));
+    FileUtilities.stringToFile(new XhtmlComposer(false, true).compose(wrapPage(page, "Type Map")), Utilities.path(path, "temp", "xver-qa", "cross-version-types.html"));
 
   }
 

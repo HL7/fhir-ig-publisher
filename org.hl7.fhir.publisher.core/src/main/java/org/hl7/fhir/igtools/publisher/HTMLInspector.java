@@ -40,6 +40,7 @@ import javax.annotation.Nonnull;
 
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.Publisher.FragmentUseRecord;
+import org.hl7.fhir.igtools.publisher.Publisher.LinkedSpecification;
 import org.hl7.fhir.igtools.publisher.SpecMapManager.SpecialPackageType;
 import org.hl7.fhir.igtools.publisher.modules.IPublisherModule;
 import org.hl7.fhir.r5.context.ILoggingService;
@@ -48,7 +49,7 @@ import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.PathBuilder;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -199,7 +200,7 @@ public class HTMLInspector {
   private String rootFolder;
   private String altRootFolder;
   private List<SpecMapManager> specs;
-  private List<SpecMapManager> linkSpecs;
+  private List<LinkedSpecification> linkSpecs;
   private Map<String, LoadedFile> cache = new HashMap<String, LoadedFile>();
   private int iteration = 0;
   private List<StringPair> otherlinks = new ArrayList<StringPair>();
@@ -226,7 +227,7 @@ public class HTMLInspector {
   private Map<String, ValidationMessage> jsmsgs = new HashMap<>();
   private Map<String, FragmentUseRecord> fragmentUses = new HashMap<>();
 
-  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<SpecMapManager> linkSpecs, ILoggingService log, String canonical, String packageId, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, FragmentUseRecord> fragmentUses) {
+  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log, String canonical, String packageId, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, FragmentUseRecord> fragmentUses) {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
     this.linkSpecs = linkSpecs;
@@ -312,11 +313,11 @@ public class HTMLInspector {
           first = false;
         }
       }
-      checkFragmentIds(TextFile.fileToString(lf.filename));
+      checkFragmentIds(FileUtilities.fileToString(lf.filename));
       
       if (lf.isHasXhtml()) {
         if (fragmentUses != null) {
-          checkFragmentMarkers(TextFile.fileToString(lf.getFilename()));
+          checkFragmentMarkers(FileUtilities.fileToString(lf.getFilename()));
         }
         XhtmlNode x = new XhtmlParser().setMustBeWellFormed(strict).parse(new FileInputStream(lf.filename), null);
         referencesValidatorPack = false;
@@ -510,17 +511,18 @@ public class HTMLInspector {
     } catch (FHIRFormatError | IOException e) {
       x = null;
       if (htmlName || !(e.getMessage().startsWith("Unable to Parse HTML - does not start with tag.") || e.getMessage().startsWith("Malformed XHTML"))) {
-    	  messages.add(new ValidationMessage(Source.LinkChecker, IssueType.STRUCTURE, s, e.getMessage(), IssueSeverity.ERROR).setLocationLink(makeLocal(f.getAbsolutePath())));
+    	  messages.add(new ValidationMessage(Source.LinkChecker, IssueType.STRUCTURE, s, e.getMessage(), IssueSeverity.ERROR).setLocationLink(makeLocal(f.getAbsolutePath())).setMessageId("HTML_PARSING_FAILED"));
+    	  missingPublishBox = true;
       }
     }
     if (x != null) {
       String src;
       try {
-        src = TextFile.fileToString(f);
+        src = FileUtilities.fileToString(f);
         hl7State = src.contains(RELEASE_HTML_MARKER);
         if (hl7State) {
           src = src.replace(RELEASE_HTML_MARKER, START_HTML_MARKER + statusText+END_HTML_MARKER);
-          TextFile.stringToFile(src, f);
+          FileUtilities.stringToFile(src, f);
         }
         x = new XhtmlParser().setMustBeWellFormed(strict).parse(new FileInputStream(f), null);
       } catch (Exception e1) {
@@ -744,7 +746,7 @@ public class HTMLInspector {
     links++;
     String rref = Utilities.URLDecode(ref);
     if ((rref.startsWith("http:") || rref.startsWith("https:") ) && (rref.endsWith(".sch") || rref.endsWith(".xsd") || rref.endsWith(".shex"))) { // work around for the fact that spec.internals does not track all these minor things 
-      rref = Utilities.changeFileExt(ref, ".html");
+      rref = FileUtilities.changeFileExt(ref, ".html");
     }
     if (rref.contains("validator.pack")) {
       referencesValidatorPack = true;
@@ -805,12 +807,12 @@ public class HTMLInspector {
       }
     }
     if (!resolved && linkSpecs != null){
-      for (SpecMapManager spec : linkSpecs) {
-        if (!resolved && spec.getBase() != null) {
-          resolved = resolved || spec.getBase().equals(rref) || (spec.getBase()).equals(rref+"/") || (spec.getBase()+"/").equals(rref)|| spec.hasTarget(rref) || Utilities.existsInList(rref, Utilities.pathURL(spec.getBase(), "history.html"));
+      for (LinkedSpecification spec : linkSpecs) {
+        if (!resolved && spec.getSpm().getBase() != null) {
+          resolved = resolved || spec.getSpm().getBase().equals(rref) || (spec.getSpm().getBase()).equals(rref+"/") || (spec.getSpm().getBase()+"/").equals(rref)|| spec.getSpm().hasTarget(rref) || Utilities.existsInList(rref, Utilities.pathURL(spec.getSpm().getBase(), "history.html"));
         }
-        if (!resolved && spec.getBase2() != null) {
-          resolved = spec.getBase2().equals(rref) || (spec.getBase2()).equals(rref+"/"); 
+        if (!resolved && spec.getSpm().getBase2() != null) {
+          resolved = spec.getSpm().getBase2().equals(rref) || (spec.getSpm().getBase2()).equals(rref+"/"); 
         }
       }
     }
@@ -822,7 +824,7 @@ public class HTMLInspector {
           resolved = true;
         }
       } else if (!resolved && !Utilities.isAbsoluteUrl(ref) && !rref.startsWith("#") && filename != null) {
-        String fref =  buildRef(Utilities.getDirectoryForFile(filename), ref);
+        String fref =  buildRef(FileUtilities.getDirectoryForFile(filename), ref);
         if (fref.equals(Utilities.path(rootFolder, "qa.html"))) {
           resolved = true;
         }
@@ -906,7 +908,7 @@ public class HTMLInspector {
           }
         } else {
           try {
-            String folder = Utilities.getDirectoryForFile(filename);
+            String folder = FileUtilities.getDirectoryForFile(filename);
             String f = folder == null ? (altRootFolder != null && filename.startsWith(altRootFolder) ? altRootFolder : rootFolder) : folder;
             page = PathBuilder.getPathBuilder().withRequiredTarget(rootFolder).buildPath(f, page.replace("/", File.separator));
           } catch (java.nio.file.InvalidPathException e) {
@@ -1017,7 +1019,7 @@ public class HTMLInspector {
           }
         }
       } else if (!ref.contains("#")) { 
-        String page = Utilities.path(filename == null ? rootFolder : Utilities.getDirectoryForFile(filename), ref.replace("/", File.separator));
+        String page = Utilities.path(filename == null ? rootFolder : FileUtilities.getDirectoryForFile(filename), ref.replace("/", File.separator));
         LoadedFile f = cache.get(page);
         resolved = f != null;
       }

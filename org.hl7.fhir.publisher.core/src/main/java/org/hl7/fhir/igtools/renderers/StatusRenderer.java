@@ -260,7 +260,7 @@ public class StatusRenderer {
 
   public static String render(String src, ResourceStatusInformation info, RenderingContext rc) {
     StringBuilder b = new StringBuilder();
-    b.append("<table class=\"");
+    b.append("<table role=\"presentation\" class=\"");
     b.append(info.getColorClass());
     b.append("\"><tr>");
     String pub = rc.formatPhrase(RenderingContext.MATURITY_PUBLISHER, Utilities.escapeXml(info.getOwner()));
