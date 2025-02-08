@@ -324,17 +324,20 @@ import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.validation.IValidationProfileUsageTracker;
 import org.hl7.fhir.r5.utils.validation.ValidatorSession;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
+import org.hl7.fhir.utilities.CompressionUtilities;
 import org.hl7.fhir.utilities.DurationUtil;
 import org.hl7.fhir.utilities.FhirPublication;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.MimeType;
+import org.hl7.fhir.utilities.OIDUtilities;
 import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.StringPair;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.TimeTracker;
 import org.hl7.fhir.utilities.TimeTracker.Session;
+import org.hl7.fhir.utilities.UUIDUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.ZipGenerator;
@@ -3227,7 +3230,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         break;
       case "auto-oid-root":
         oidRoot = p.getValue(); 
-        if (!Utilities.isValidOID(oidRoot)) {
+        if (!OIDUtilities.isValidOID(oidRoot)) {
           throw new Error("Invalid oid found in assign-missing-oids-root: "+oidRoot);
         }
         oidIni = new IniFile(oidIniLocation());
@@ -4049,11 +4052,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       if (entry.isDirectory()) {
         continue;
       }
-      String n = Utilities.makeOSSafe(entry.getName());
+      String n = CompressionUtilities.makeOSSafe(entry.getName());
       String filename = Utilities.path(zipTargetDirectory, n);
       String dir = FileUtilities.getDirectoryForFile(filename);
 
-      Utilities.zipSlipProtect(n, Path.of(dir));
+      CompressionUtilities.zipSlipProtect(n, Path.of(dir));
       FileUtilities.createDirectory(dir);
 
       FileOutputStream output = new FileOutputStream(filename);
@@ -4194,7 +4197,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     String name = dep.getId();
     if (!dep.hasId()) {
       logMessage("Dependency '"+idForDep(dep)+"' has no id, so can't be referred to in markdown in the IG");
-      name = "u"+Utilities.makeUuidLC().replace("-", "");
+      name = "u"+UUIDUtilities.makeUuidLC().replace("-", "");
     }
     if (!isValidIGToken(name))
       throw new Exception("IG Name must be a valid token ("+name+")");
@@ -6207,7 +6210,11 @@ private String fixPackageReference(String dep) {
           if (r.fhirType().equals("StructureDefinition")) {
             logDebugMessage(LogCategory.PROGRESS, "process profile: "+r.getId());
             StructureDefinition sd = (StructureDefinition) r.getResource();
-            f.getErrors().addAll(pvalidator.validate(sd, false));
+            if (sd == null) {
+              f.getErrors().add(new ValidationMessage(Source.ProfileValidator,IssueType.INVALID, "StructureDefinition", "Unable to validate - Profile not loaded", IssueSeverity.ERROR));
+            } else {
+              f.getErrors().addAll(pvalidator.validate(sd, false));
+            }
             checkJurisdiction(f, (CanonicalResource) r.getResource(), IssueSeverity.ERROR, "must");
           } else if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
             checkJurisdiction(f, (CanonicalResource) r.getResource(), IssueSeverity.WARNING, "should");
@@ -14653,7 +14660,7 @@ private String fixPackageReference(String dep) {
 
     String ghUrl = "https://github.com/"+org+"/"+repo+"/archive/refs/heads/"+branch+".zip";
     InputStream zip = fetchGithubUrl(ghUrl);
-    Utilities.unzip(zip, Paths.get(f.getAbsolutePath()));
+    CompressionUtilities.unzip(zip, Paths.get(f.getAbsolutePath()));
     for (File fd : f.listFiles()) {
       if (fd.isDirectory()) {
         return fd.getAbsolutePath();        

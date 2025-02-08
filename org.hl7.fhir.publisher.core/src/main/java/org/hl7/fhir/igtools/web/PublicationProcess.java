@@ -300,8 +300,10 @@ public class PublicationProcess {
         for (JsonProperty jp : dep.getProperties()) {
           String ver = jp.getValue().asJsonString().getValue();
           if ("current".equals(ver) || "dev".equals(ver)) {
-            check(res, false, "Package "+json.asString("name")+"#"+json.asString("version")+" depends on "+jp.getName()+"#"+ver+" which is not allowed (current version check)");
-            return res;
+            if (!prSrc.asBoolean("allow-current-dependencies")) {
+              check(res, false, "Package "+json.asString("name")+"#"+json.asString("version")+" depends on "+jp.getName()+"#"+ver+" which is not allowed (current version check)");
+              return res;
+            }
           }
         }
       }
@@ -310,21 +312,28 @@ public class PublicationProcess {
     src.needOptionalFile(Utilities.noString(relDest) ? "package-list.json" : Utilities.path(relDest,"package-list.json"));
     if (first) {
       if (new File(Utilities.path(destination, "package-list.json")).exists()) {
-        check(res, false, "Package List already exists, but the publication request says this is the first publication");
-      } else {
-        boolean ok = true;
-        ok = check(res, !Utilities.noString(prSrc.asString("category")), "No category in the publication request") && ok;
-        ok = check(res, !Utilities.noString(prSrc.asString("title")), "No title in the publication request") && ok;
-        ok = check(res, !Utilities.noString(prSrc.asString("introduction")), "No introduction in the publication request") && ok;
-        ok = check(res, !Utilities.noString(prSrc.asString("ci-build")), "No ci-build in the publication request") && ok;
-        if (!ok) {
+        PackageList pl = PackageList.fromFile(Utilities.path(destination, "package-list.json"));
+        if (pl.versions().size() > ((pl.ciBuild() == null) ? 0 : 1)) {
+          check(res, false, "Package List already exists, but the publication request says this is the first publication");
           return res;
         }
-        PackageList pl = new PackageList();
-        pl.init(npm.name(), npm.canonical(), prSrc.asString("title"), prSrc.asString("category"), prSrc.asString("introduction"));
-        pl.addCIBuild("current", prSrc.asString("ci-build"), "Continuous Integration Build (latest in version control) - Content subject to frequent changes",  "ci-build");
-        FileUtilities.stringToFile(pl.toJson(), Utilities.path(destination, "package-list.json"));
-      }      
+      } 
+      boolean ok = true;
+      ok = check(res, !Utilities.noString(prSrc.asString("category")), "No category in the publication request") && ok;
+      ok = check(res, !Utilities.noString(prSrc.asString("title")), "No title in the publication request") && ok;
+      ok = check(res, !Utilities.noString(prSrc.asString("introduction")), "No introduction in the publication request") && ok;
+      ok = check(res, !Utilities.noString(prSrc.asString("ci-build")), "No ci-build in the publication request") && ok;
+      if (!ok) {
+        return res;
+      }
+      PackageList pl = new PackageList();
+      pl.init(npm.name(), npm.canonical(), prSrc.asString("title"), prSrc.asString("category"), prSrc.asString("introduction"));
+      pl.addCIBuild("current", prSrc.asString("ci-build"), "Continuous Integration Build (latest in version control) - Content subject to frequent changes",  "ci-build");
+      if ("current-only".equals(prSrc.asString("publish-pattern"))) {
+        pl.setCurrentOnly(true);
+      }
+      FileUtilities.stringToFile(pl.toJson(), Utilities.path(destination, "package-list.json"));
+           
     }
     if (!check(res, new File(Utilities.path(destination, "package-list.json")).exists(), "Destination '"+destination+"' does not contain a package-list.json - cannot proceed")) {
       return res;
@@ -515,15 +524,17 @@ public class PublicationProcess {
       // 3. create the folder {root}/{realm}/{code}/{subdir}
       System.out.println("Copy the IG to "+destVer);    
       FileUtilities.createDirectory(destVer);
-      FileUtils.copyDirectory(new File(Utilities.path(temp.getAbsolutePath(), "output")), new File(destVer));
+      if (pl.isCurrentOnly()) {
+        FileUtilities.copyFile(new File(Utilities.path(temp.getAbsolutePath(), "output", "package.tgz")), new File(Utilities.path(destVer, "package.tgz")));
+      } else {
+        FileUtils.copyDirectory(new File(Utilities.path(temp.getAbsolutePath(), "output")), new File(destVer));
+      }
       List<String> subPackages = loadSubPackageList(Utilities.path(temp.getAbsolutePath(), "output", "sub-package-list.json"));
       // now, update the package list 
       System.out.println("Update "+Utilities.path(destination, "package-list.json"));    
       PackageListEntry plVer = updatePackageList(pl, fSource.getAbsolutePath(), prSrc, pathVer,  Utilities.path(destination, "package-list.json"), mode, date, npm.fhirVersion(), Utilities.pathURL(pubSetup.asString("url"), tcName), subPackages);
       updatePublishBox(pl, plVer, destVer, pathVer, destination, fRoot.getAbsolutePath(), false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url);
 
-
-     
       if (mode != PublicationProcessMode.WORKING) {
         String igSrc = Utilities.path(tempM.getAbsolutePath(), "output");
         if (mode == PublicationProcessMode.TECHNICAL_CORRECTION) {

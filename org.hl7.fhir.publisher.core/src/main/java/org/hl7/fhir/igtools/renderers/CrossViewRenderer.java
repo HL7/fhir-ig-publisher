@@ -51,6 +51,7 @@ import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.HL7WorkGroups;
 import org.hl7.fhir.utilities.HL7WorkGroups.HL7WorkGroup;
+import org.hl7.fhir.utilities.OIDUtilities;
 import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.validation.ValidationOptions;
@@ -976,7 +977,7 @@ public class CrossViewRenderer extends Renderer {
       }
       l = l + (ec.hasExpression() ? ec.getExpression().length() : 0);
       if (ec.getType() == ExtensionContextType.ELEMENT) {
-        String ref = Utilities.oidRoot(ec.getExpression());
+        String ref = OIDUtilities.oidRoot(ec.getExpression());
         if (ref.startsWith("@"))
           ref = ref.substring(1);
         if (ref.contains(".")) {
