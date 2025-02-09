@@ -4633,7 +4633,7 @@ private String fixPackageReference(String dep) {
     loadBundles(igf);
     loadTranslationSupplements(igf);
 
-    loadConformance1();
+    loadConformance1(true);
     for (String s : resourceFactoryDirs) {
       FileUtilities.clearDirectory(s);
     }
@@ -4641,7 +4641,7 @@ private String fixPackageReference(String dep) {
       processFactories(testDataFactories);
     }
     loadResources2(igf);
-    loadConformance1();
+    loadConformance1(false);
     
     int i = 0;
     Set<String> resLinks = new HashSet<>();
@@ -4795,7 +4795,7 @@ private String fixPackageReference(String dep) {
     if (duplicateInputResourcesDetected) {
       throw new Error("Unable to continue because duplicate input resources were identified");
     }
-
+    loadConformance1(false);
     for (PageFactory pf : pageFactories) {
       pf.execute(rootDir, publishedIg);
     }
@@ -6036,15 +6036,23 @@ private String fixPackageReference(String dep) {
     return res;
   }
 
-  private void loadConformance1() throws Exception {
-    log("Process Loaded Resources");
-    for (String s : metadataResourceNames()) { 
-      load(s, !Utilities.existsInList(s, "Evidence", "EvidenceVariable")); // things that have changed in R6 that aren't internally critical
-    }  
-    log("Generating Snapshots");
-    generateSnapshots();
+  private void loadConformance1(boolean first) throws Exception {
+    boolean any = false;
     for (FetchedFile f : fileList) {
-      f.setLoaded(true);
+      if (!f.isLoaded()) {
+        any = true;
+      }
+    }
+    if (any) {
+      log("Process "+(first ? "": "Additional ")+"Loaded Resources");
+      for (String s : metadataResourceNames()) { 
+        load(s, !Utilities.existsInList(s, "Evidence", "EvidenceVariable")); // things that have changed in R6 that aren't internally critical
+      }  
+      log("Generating Snapshots");
+      generateSnapshots();
+      for (FetchedFile f : fileList) {
+        f.setLoaded(true);
+      }
     }
   }
 
@@ -6199,15 +6207,17 @@ private String fixPackageReference(String dep) {
               f.getErrors().add(new ValidationMessage(Source.ProfileValidator,IssueType.INVALID, "StructureDefinition", "Unable to validate - Profile not loaded", IssueSeverity.ERROR));
             } else {
               f.getErrors().addAll(pvalidator.validate(sd, false));
+              checkJurisdiction(f, (CanonicalResource) r.getResource(), IssueSeverity.ERROR, "must");
             }
-            checkJurisdiction(f, (CanonicalResource) r.getResource(), IssueSeverity.ERROR, "must");
           } else if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
             checkJurisdiction(f, (CanonicalResource) r.getResource(), IssueSeverity.WARNING, "should");
           }
           if (r.fhirType().equals("CodeSystem")) {
             logDebugMessage(LogCategory.PROGRESS, "process CodeSystem: "+r.getId());
             CodeSystem cs = (CodeSystem) r.getResource();
-            f.getErrors().addAll(csvalidator.validate(cs, false));
+            if (cs != null) {
+              f.getErrors().addAll(csvalidator.validate(cs, false));
+            }
           }
         }
       } finally {
@@ -7307,13 +7317,17 @@ private String fixPackageReference(String dep) {
       utils.setNewSlicingProcessing(true);
     }
 
-    logDebugMessage(LogCategory.PROGRESS, "Generate Snapshots");
+    boolean first = true;
     for (FetchedFile f : fileList) {
       if (!f.isLoaded()) {
         f.start("generateSnapshots");
         try {
           for (FetchedResource r : f.getResources()) {
             if (r.getResource() instanceof StructureDefinition) {
+              if (first) {
+                logDebugMessage(LogCategory.PROGRESS, "Generate Snapshots");
+                first = false;
+              }
               if (r.getResEntry() != null) {
                 ToolingExtensions.setStringExtension(r.getResEntry(), ToolingExtensions.EXT_IGP_RESOURCE_INFO, r.fhirType()+":"+IGKnowledgeProvider.getSDType(r));
               }
