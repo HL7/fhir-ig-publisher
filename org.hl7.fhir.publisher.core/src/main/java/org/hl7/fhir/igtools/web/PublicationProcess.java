@@ -185,6 +185,11 @@ public class PublicationProcess {
     JsonObject pubSetup = JsonParser.parseObject(fPubIni);
     String url = pubSetup.getJsonObject("website").asString("url");
 
+    src.needOptionalFile("publish-counter.json");
+    if (!check(res, !new File(Utilities.path(workingRoot, "publish-counter.json")).exists(), "Found a publish-counter.json file. This indicates that the source folder is not correctly set up")) {
+      return res;
+    }
+
     src.needOptionalFile("package-registry.json");
     if (!check(res, new File(Utilities.path(workingRoot, "package-registry.json")).exists(), "There is no package-registry.json file. Create one by running the publisher -generate-package-registry {folder} (where folder contains the entire website)")) {
       return res;
