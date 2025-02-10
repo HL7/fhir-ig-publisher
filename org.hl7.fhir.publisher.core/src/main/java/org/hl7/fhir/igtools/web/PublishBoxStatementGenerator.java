@@ -26,7 +26,7 @@ public class PublishBoxStatementGenerator {
       p1 = p1 + ". ";      
     }
     
-    String p2 = root == null ? "" : version == root ? "This is the current published version"+(currentPublication ? "" : " in its permanent home (it will always be available at this URL)") :
+    String p2 = root == null ? "No current official version has been published yet" : version == root ? "This is the current published version"+(currentPublication ? "" : " in its permanent home (it will always be available at this URL)") :
       VersionUtilities.compareVersions(root.version(), version.version()) > 0 ?
           "The current version which supersedes this version is <a no-external=\"true\" href=\""+(root.path().startsWith(canonical) ? canonical : root.path())+"{{fn}}\">"+root.version()+"</a>" :
           "This version is a pre-release. The current official version is <a no-external=\"true\" href=\""+(root.path().startsWith(canonical) ? canonical : root.path())+"{{fn}}\">"+root.version()+"</a>";

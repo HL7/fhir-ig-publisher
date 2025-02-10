@@ -184,7 +184,11 @@ public class PublicationProcess {
     }
     JsonObject pubSetup = JsonParser.parseObject(fPubIni);
     String url = pubSetup.getJsonObject("website").asString("url");
-
+    if (!check(res, pubSetup.getJsonObject("website").has("clone-xml-json"), "publish-setup.json does not have a '$.website.clone-xml-json' property - consult the FHIR Product Director")) {
+      return res;
+    }
+    boolean jsonXmlClones = pubSetup.getJsonObject("website").asBoolean("clone-xml-json");
+    
     src.needOptionalFile("publish-counter.json");
     if (!check(res, !new File(Utilities.path(workingRoot, "publish-counter.json")).exists(), "Found a publish-counter.json file. This indicates that the source folder is not correctly set up")) {
       return res;
@@ -231,7 +235,7 @@ public class PublicationProcess {
           help = false;
           publishInner2(source, web, date, registrySource, history, templateSrc, temp, logger, args,
               destination, workingRoot, res, src, id, canonical, version, npm, pubSetup, qa,
-              fSource, fOutput, fRoot, fRegistry, fHistory);
+              fSource, fOutput, fRoot, fRegistry, fHistory, jsonXmlClones);
         }        
       }
     }
@@ -277,7 +281,7 @@ public class PublicationProcess {
   public List<ValidationMessage> publishInner2(String source, String web, String date, String registrySource, String history, String templateSrc, String temp, 
       PublisherConsoleLogger logger, String[] args, String destination, String workingRoot, List<ValidationMessage> res, WebSourceProvider src,
       String id, String canonical, String version, NpmPackage npm, JsonObject pubSetup, JsonObject qa, 
-      File fSource, File fOutput, File fRoot, File fRegistry, File fHistory) throws Exception {
+      File fSource, File fOutput, File fRoot, File fRegistry, File fHistory, boolean jsonXmlClones) throws Exception {
     System.out.println("Relative directory for IG is '"+destination.substring(workingRoot.length())+"'");
     String relDest = FileUtilities.getRelativePath(workingRoot, destination);
     FileUtilities.createDirectory(destination);
@@ -419,7 +423,7 @@ public class PublicationProcess {
     if (res.size() == 0) {
       doPublish(fSource, fOutput, qa, destination, destVer, pathVer, fRoot, pubSetup, pl, prSrc, fRegistry, npm, mode, date, fHistory, temp, logger, 
           pubSetup.getJsonObject("website").asString("url"), src, sft, relDest, templateSrc, first, indexes, Calendar.getInstance(), getComputerName(), IGVersionUtil.getVersionString(), gitSrcId(source), tcName,
-          workingRoot);
+          workingRoot, jsonXmlClones);
     }        
     return res;    
   }
@@ -491,7 +495,7 @@ public class PublicationProcess {
 
   private void doPublish(File fSource, File fOutput, JsonObject qa, String destination, String destVer, String pathVer, File fRoot, JsonObject pubSetup, PackageList pl, JsonObject prSrc, File fRegistry, NpmPackage npm, 
       PublicationProcessMode mode, String date, File history, String tempDir, PublisherConsoleLogger logger, String url, WebSourceProvider src, File sft, String relDest, String templateSrc, boolean first, Map<String, IndexMaintainer> indexes,
-      Calendar genDate, String username, String version, String gitSrcId, String tcName, String workingRoot) throws Exception {
+      Calendar genDate, String username, String version, String gitSrcId, String tcName, String workingRoot, boolean jsonXmlClones) throws Exception {
     // ok. all our tests have passed.
     // 1. do the publication build(s)
     List<String> existingFiles = new ArrayList<>();
@@ -537,7 +541,7 @@ public class PublicationProcess {
       // now, update the package list 
       System.out.println("Update "+Utilities.path(destination, "package-list.json"));    
       PackageListEntry plVer = updatePackageList(pl, fSource.getAbsolutePath(), prSrc, pathVer,  Utilities.path(destination, "package-list.json"), mode, date, npm.fhirVersion(), Utilities.pathURL(pubSetup.asString("url"), tcName), subPackages);
-      updatePublishBox(pl, plVer, destVer, pathVer, destination, fRoot.getAbsolutePath(), false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url);
+      updatePublishBox(pl, plVer, destVer, pathVer, destination, fRoot.getAbsolutePath(), false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url, jsonXmlClones);
 
       if (mode != PublicationProcessMode.WORKING) {
         String igSrc = Utilities.path(tempM.getAbsolutePath(), "output");
@@ -558,11 +562,19 @@ public class PublicationProcess {
               String relPath = FileUtilities.getRelativePath(fRoot.getAbsolutePath(), path);
               ignoreList.add(path);
               src.needFolder(relPath, false);
+              if (!v.cibuild() && !v.current()) {
+                String pv = v.path();
+                String vCode = pv.substring(pv.lastIndexOf("/")+1);
+                String dv = Utilities.path(destination, vCode);
+                System.out.println("Update publish box for version "+v.version()+" @ "+v.path());
+                updatePublishBox(pl, v, dv, pv, destination, fRoot.getAbsolutePath(), false, null, null, null, url, jsonXmlClones);
+              }
             }
           }
         }
+
         // we do this first in the output so we can get a proper diff
-        updatePublishBox(pl, plVer, igSrc, pathVer, igSrc, fRoot.getAbsolutePath(), true, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url);
+        updatePublishBox(pl, plVer, igSrc, pathVer, igSrc, fRoot.getAbsolutePath(), true, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url, jsonXmlClones);
 
         System.out.println("Check for Files to delete");        
         List<String> newFiles = FileUtilities.listAllFiles(igSrc, null);
@@ -761,34 +773,38 @@ public class PublicationProcess {
     return sdf.format(date);
   }
 
-  private void updatePublishBox(PackageList pl, PackageListEntry plVer, String destVer, String pathVer, String destination, String rootFolder, boolean current, ServerType serverType, File sft, List<String> ignoreList, String url) throws FileNotFoundException, IOException {
+  private void updatePublishBox(PackageList pl, PackageListEntry plVer, String destVer, String pathVer, String destination, String rootFolder, boolean current, ServerType serverType, File sft, List<String> ignoreList, String url, boolean jsonXmlClones) throws FileNotFoundException, IOException {
     IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(destVer, url, rootFolder, ignoreList, null, plVer.json(), destination);
     String fragment = PublishBoxStatementGenerator.genFragment(pl, plVer, pl.current(), pl.canonical(), current, false);
     System.out.println("Publish Box Statement: "+fragment);
     igvu.updateStatement(fragment, current ? 0 : 1, pl.milestones());
     System.out.println("  .. "+igvu.getCountTotal()+" files checked, "+igvu.getCountUpdated()+" updated");
-    
-    igvu.checkXmlJsonClones(destVer);
-    System.out.println("  .. "+igvu.getClonedTotal()+" clones checked, "+igvu.getClonedCount()+" updated");
-    IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(destVer, pl.canonical(), plVer.path(), rootFolder);
-    if (serverType == ServerType.APACHE) {
-      rb.buildApacheRedirections();
-    } else if (serverType == ServerType.ASP2) {
-      rb.buildNewAspRedirections(false, false);
-    } else if (serverType == ServerType.ASP1) {
-      rb.buildOldAspRedirections();
-    } else if (serverType == ServerType.LITESPEED) {
-      rb.buildLitespeedRedirections();
-    } else if (!pl.canonical().contains("hl7.org/fhir")) {
-      rb.buildApacheRedirections();
-    } else {
-      rb.buildOldAspRedirections();
+
+    if (jsonXmlClones) {
+      igvu.checkXmlJsonClones(destVer);
+      System.out.println("  .. "+igvu.getClonedTotal()+" clones checked, "+igvu.getClonedCount()+" updated");
     }
-    System.out.println("  .. "+rb.getCountTotal()+" redirections ("+rb.getCountUpdated()+" created/updated)");
+    if (serverType != null) {
+      IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(destVer, pl.canonical(), plVer.path(), rootFolder);
+      if (serverType == ServerType.APACHE) {
+        rb.buildApacheRedirections();
+      } else if (serverType == ServerType.ASP2) {
+        rb.buildNewAspRedirections(false, false);
+      } else if (serverType == ServerType.ASP1) {
+        rb.buildOldAspRedirections();
+      } else if (serverType == ServerType.LITESPEED) {
+        rb.buildLitespeedRedirections();
+      } else if (!pl.canonical().contains("hl7.org/fhir")) {
+        rb.buildApacheRedirections();
+      } else {
+        rb.buildOldAspRedirections();
+      }
+      System.out.println("  .. "+rb.getCountTotal()+" redirections ("+rb.getCountUpdated()+" created/updated)");
+      if (!current && serverType == ServerType.ASP2) {
+        new VersionRedirectorGenerator(destination).execute(plVer.version(), plVer.path());
+      }
+    }
     new DownloadBuilder(destVer, pl.canonical(), current ?  pl.canonical() : plVer.path(), ignoreList).execute();
-    if (!current && serverType == ServerType.ASP2) {
-      new VersionRedirectorGenerator(destination).execute(plVer.version(), plVer.path());
-    }
 
     
     if (sft != null) {
