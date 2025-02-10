@@ -516,10 +516,9 @@ public class PublicationProcess {
       System.out.println("Keep a copy of the build directory at "+Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".zip"));    
 
       // 2.1. Delete the ".git" subfolder
-      File gitFolder = new File(temp, ".git");
-      if (gitFolder.exists()) {
-        FileUtils.deleteDirectory(gitFolder);
-      }
+      delTempFolder(temp, ".git");
+      delTempFolder(temp, "temp");
+      delTempFolder(temp, "template");
 
       zipFolder(temp, Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".zip"));
 
@@ -604,6 +603,13 @@ public class PublicationProcess {
     src.finish(relDest, existingFiles);
     System.out.println("Finished Publishing. "+src.instructions(existingFiles.size()));
     exitCode = 0;
+  }
+
+  public void delTempFolder(File temp, String s) throws IOException {
+    File gitFolder = new File(temp, s);
+    if (gitFolder.exists()) {
+      FileUtils.deleteDirectory(gitFolder);
+    }
   }
 
   private List<String> loadSubPackageList(String path) throws JsonException, IOException {
