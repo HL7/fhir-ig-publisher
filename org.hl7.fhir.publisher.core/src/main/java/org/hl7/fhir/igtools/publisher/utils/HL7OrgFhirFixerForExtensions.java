@@ -18,7 +18,7 @@ public class HL7OrgFhirFixerForExtensions {
     new HL7OrgFhirFixerForExtensions().execute(folderRoot, folderExt);
   }
 
-  private void execute(File folderRoot, File folderExt) throws IOException {
+  void execute(File folderRoot, File folderExt) throws IOException {
 
     scanForEmptyFolders(folderRoot);
   }
