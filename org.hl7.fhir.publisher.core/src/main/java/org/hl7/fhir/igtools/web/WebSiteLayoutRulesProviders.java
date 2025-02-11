@@ -135,7 +135,7 @@ public class WebSiteLayoutRulesProviders {
       if ("eu".equals(parts[1])) {
         ok = check(res, Utilities.existsInList(parts[2], "fhir"), "Package Id '"+id+"' is not valid: must start with hl7.eu.fhir.[code]") && ok;         
       } else {
-        ok = check(res, Utilities.existsInList(parts[1], "fhir", "xprod", "cda", "ehr"), "Package Id '"+id+"' is not valid: must start with hl7.fhir.[realm].[code], hl7.cda.[realm].[code], hl7.ehr.[realm].[code] or hl7.xprod.[realm].[code]") && ok; 
+        ok = check(res, Utilities.existsInList(parts[1], "fhir", "xprod", "cda", "ehr"), "Package Id '"+id+"' is not valid: must start with hl7.fhir.[realm].[code], hl7.cda.[realm].[code], hl7.ehrs.[realm].[code] or hl7.xprod.[realm].[code]") && ok; 
       }
       return ok;
     }
