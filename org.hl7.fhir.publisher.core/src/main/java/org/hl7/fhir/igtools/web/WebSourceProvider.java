@@ -16,8 +16,9 @@ import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import org.hl7.fhir.utilities.CompressionUtilities;
 import org.hl7.fhir.utilities.FTPClient;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.http.HTTPResult;
 import org.hl7.fhir.utilities.http.ManagedWebAccess;
@@ -30,8 +31,8 @@ public class WebSourceProvider {
     public int compare(String o1, String o2) {
       try {
         String f1;
-        f1 = Utilities.getDirectoryForFile(o1);
-        String f2 = Utilities.getDirectoryForFile(o2);
+        f1 = FileUtilities.getDirectoryForFile(o1);
+        String f2 = FileUtilities.getDirectoryForFile(o2);
         if (f1 == null && f2 == null) {
           return o1.compareToIgnoreCase(o2);
         }
@@ -53,50 +54,25 @@ public class WebSourceProvider {
   
   private String destination;
   private String source;
-  private boolean web;
   private Map<String, byte[]> folderSources = new HashMap<>();
-  private boolean upload = false;
-  private String uploadServer;
-  private String uploadPath;
-  private String uploadUser;
-  private String uploadPword;
 
   public WebSourceProvider(String destination, String source) {
     super();
     this.destination = destination;
     this.source = source;
-    web = Utilities.startsWithInList(source, "http://", "https://");
-  }
-
-  public void configureUpload(String server, String path, String user, String pword) {
-    upload = true;
-    uploadServer = server;
-    uploadPath = path;
-    uploadUser = user;
-    uploadPword = pword;
   }
   
   public void needFile(String path) throws IOException {
     File df = new File(Utilities.path(destination, path));
-    Utilities.createDirectory(Utilities.getDirectoryForFile(df.getAbsolutePath()));
+    FileUtilities.createDirectory(FileUtilities.getDirectoryForFile(df.getAbsolutePath()));
     if (df.exists()) {
       df.delete();
     }
-    if (web) {
-      String url = Utilities.pathURL(source, path)+"?nocache=" + System.currentTimeMillis();
-      System.out.println("Fetch "+ url);
-      long t = System.currentTimeMillis();
-      HTTPResult res = ManagedWebAccess.get(Arrays.asList("web"), url);
-      res.checkThrowException();
-      TextFile.bytesToFile(res.getContent(), df);
-      System.out.println("  ... done ("+stats(res.getContent().length, t)+")");
-    } else {
-      File sf = new File(Utilities.path(source, path));
-      if (!sf.exists()) {
-        throw new Error("Error: Attempt to copy "+sf.getAbsolutePath()+" but it doesn't exist");
-      }
-      Utilities.copyFile(sf, df);
+    File sf = new File(Utilities.path(source, path));
+    if (!sf.exists()) {
+      throw new Error("Error: Attempt to copy "+sf.getAbsolutePath()+" but it doesn't exist");
     }
+    FileUtilities.copyFile(sf, df);
   }
 
   public void needFolder(String path, boolean clear) throws IOException {
@@ -105,29 +81,20 @@ public class WebSourceProvider {
       df.delete();
     }
     if (!df.exists()) {
-      Utilities.createDirectory(df.getAbsolutePath());
+      FileUtilities.createDirectory(df.getAbsolutePath());
     } else if (clear) {
-      Utilities.clearDirectory(df.getAbsolutePath());
+      FileUtilities.clearDirectory(df.getAbsolutePath());
     }
-    if (web) {
-      String url = Utilities.pathURL(source, path, "_ig-pub-archive.zip")+"?nocache=" + System.currentTimeMillis();
-      System.out.println("Fetch "+ url);
-      long t = System.currentTimeMillis();
-      HTTPResult res = ManagedWebAccess.get(Arrays.asList("web"), url);
-      res.checkThrowException();
-      folderSources.put(path, res.getContent());
-      Utilities.unzip(new ByteArrayInputStream(res.getContent()), df.getAbsolutePath());
-      System.out.println("  ... done ("+stats(res.getContent().length, t)+")");
-    } else {
-      File sf = new File(Utilities.path(source, path));
-      if (!sf.exists()) {
-        throw new Error("Error: Attempt to copy from "+sf.getAbsolutePath()+" but it doesn't exist");
-      }
-      if (!sf.isDirectory()) {
-        throw new Error("Error: Attempt to copy from "+sf.getAbsolutePath()+" but it isn't a folder");
-      }
-      Utilities.copyDirectory(sf.getAbsolutePath(), df.getAbsolutePath(), null);
+    
+    File sf = new File(Utilities.path(source, path));
+    if (!sf.exists()) {
+      throw new Error("Error: Attempt to copy from "+sf.getAbsolutePath()+" but it doesn't exist");
     }
+    if (!sf.isDirectory()) {
+      throw new Error("Error: Attempt to copy from "+sf.getAbsolutePath()+" but it isn't a folder");
+    }
+    FileUtilities.copyDirectory(sf.getAbsolutePath(), df.getAbsolutePath(), null);
+    
   }
 
   private String stats(long length, long t) {
@@ -142,24 +109,14 @@ public class WebSourceProvider {
   public void cleanFolder(String path) throws IOException {
     File df = new File(path == null ? destination : Utilities.path(destination, path));
 
-    if (web) {      
-      Path target = Path.of(df.getAbsolutePath());
-      byte[] buf = folderSources.get(path);
-      if (buf != null) {
-        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buf);
-        cleanZipTargets(target, byteArrayInputStream);
-        Utilities.deleteEmptyFolders(df);
-      }
-    } else {
-      // do nothing?
-    }
+    // do nothing?
   }
 
   protected static void cleanZipTargets(Path target, InputStream inputStream) throws IOException {
     try (ZipInputStream zis = new ZipInputStream(inputStream)) {
       ZipEntry zipEntry = zis.getNextEntry();
       while (zipEntry != null) {
-        Path newPath = Utilities.zipSlipProtect(Utilities.makeOSSafe(zipEntry.getName()), target);
+        Path newPath = CompressionUtilities.zipSlipProtect(CompressionUtilities.makeOSSafe(zipEntry.getName()), target);
         if (Files.exists(newPath)) {
           Files.delete(newPath);
         }
@@ -174,121 +131,20 @@ public class WebSourceProvider {
     if (df.exists()) {
       df.delete();
     }
-    if (web) {
-      String url = Utilities.pathURL(source, path)+"?nocache=" + System.currentTimeMillis();
-      System.out.println("Fetch "+ url);
-      long t = System.currentTimeMillis();
-      HTTPResult res = ManagedWebAccess.get(Arrays.asList("web"), url);
-      if (res.getCode() < 300 && res.getContent().length > 0) {
-        TextFile.bytesToFile(res.getContent(), df);
-      }
-      System.out.println("  ... done ("+stats(res.getContent().length, t)+")");
-    } else {
-      File sf = new File(Utilities.path(source, path));
-      if (sf.exists()) {
-        Utilities.copyFile(sf, df);
-      }
-    }
+
+    File sf = new File(Utilities.path(source, path));
+    if (sf.exists()) {
+      FileUtilities.copyFile(sf, df);
+    }    
   }
 
   public void finish(String existingFilesBase, List<String> existingFiles) throws IOException {
-    if (web) {
-      StringBuilder b = new StringBuilder();
-      for (String s : existingFiles) {
-        b.append(existingFilesBase == null ? s : Utilities.path(existingFilesBase, s)); 
-        b.append("\r\n");
-      }
-      TextFile.stringToFile(b.toString(), deleteFileName());
-      // for now, it must be done manually
-      if (upload) {
-        List<String> filesToUpload = Utilities.listAllFiles(destination, null);
-        Collections.sort(filesToUpload, new UploadSorter()); // more specific files first
-        System.out.println("Ready to upload changes. "+filesToUpload.size()+" files to upload, "+existingFiles.size()+" files to delete");
-        int t = filesToUpload.size()+existingFiles.size();
-        System.out.println("Connect to "+uploadServer);
-        FTPClient ftp = new FTPClient(uploadServer, uploadPath, uploadUser, uploadPword);
-        ftp.connect();
-        int lineLength = 0;
-        int count = 0;
-        long start = System.currentTimeMillis();
-        if (!existingFiles.isEmpty()) {
-          System.out.print("Deleting");
-          for (String s : existingFiles) {
-            count++;
-            lineLength = doProgressNote(s, count, start, existingFiles.size(), lineLength);
-            ftp.delete(existingFilesBase == null ? s : Utilities.path(existingFilesBase, s));
-          }
-        }
-        System.out.println("Uploading");
-        int failCount = 0;
-        count = 0;
-        start = System.currentTimeMillis();
-        lineLength = 0;
-        for (String s : filesToUpload) {
-          count++;
-          lineLength = doProgressNote(s, count, start, filesToUpload.size(), lineLength);
-                    
-          if (!s.contains(":")) { // hack around a bug that should be fixed elsewhere
-            try {
-              String fn = Utilities.path(destination, s);
-              ftp.upload(fn, s);
-              failCount = 0;
-            } catch (Exception e) {
-              System.out.println("");
-              System.out.println("Error uploading file '"+s+"': "+e.getMessage()+". Trying again");
-              try {
-                ftp.upload(Utilities.path(destination, s), s);
-                failCount = 0;
-              } catch (Exception e2) {
-                try {
-                  System.out.println("Reconnecting after second error: "+e.getMessage());
-                  ftp = new FTPClient(uploadServer, uploadPath, uploadUser, uploadPword);
-                  ftp.connect();
-                  ftp.upload(Utilities.path(destination, s), s);
-                } catch (Exception e3) {
-                  failCount++;
-                  System.out.println("");
-                  System.out.println("Error uploading file '"+s+"': "+e2.getMessage());
-                  System.out.println("Need to manually copy '"+Utilities.path(destination, s)+"' to '"+s);
-                  if (failCount >= 10) {
-                    throw new Error("Too many sequential errors copying files (10). Stopping.");
-                  }
-                }
-              }
-            }
-          }   
-        }
-      }
-      System.out.println("");
-      System.out.println("Upload finished");
-    } else {
-      System.out.println("Applying changes to website source at "+source);
-      for (String s : existingFiles) {
-        new File(Utilities.path(s, existingFilesBase, s)).delete();
-      }
-      Utilities.copyDirectory(destination, source, null);
-      System.out.println("  ... done");
+    System.out.println("Applying changes to website source at "+source);
+    for (String s : existingFiles) {
+      new File(Utilities.path(s, existingFilesBase, s)).delete();
     }
-  }
-
-  private int doProgressNote(String file, int count, long start, int size, int length) throws IOException {
-    System.out.print(Utilities.padLeft("", '\b', length));
-    String note;
-    
-    int pct = ((count * 50) / size);
-    String pc = "["+Utilities.padRight(Utilities.padLeft("",  '#', pct), ' ', 50)+"]";
-    long secondsDone = (System.currentTimeMillis() - start) / 1000;
-    if (count == 0 || secondsDone == 0) {
-      note = pc;
-    } else {
-      float rate = (count * 60) / secondsDone;    
-      long secondsToGo = ((secondsDone * size) / count) - secondsDone;
-      Duration d = Duration.ofSeconds(secondsToGo);
-      note = pc+ "("+rate+" files/min, ~"+Utilities.describeDuration(d)+" to go) "+Utilities.getDirectoryForFile(file)+"         ";
-    }
-    System.out.print(note);
-    System.out.flush();
-    return note.length();
+    FileUtilities.copyDirectory(destination, source, null);
+    System.out.println("  ... done");
   }
 
   private String deleteFileName() throws IOException {
@@ -296,27 +152,10 @@ public class WebSourceProvider {
   }
 
   public String instructions(int fc) throws IOException {
-    if (web) {
-      if (upload) {
-        return "The web site source at ftp://"+uploadServer+"/"+uploadPath+" has been updated";
-      } else {
-        if (fc > 0) {
-          return "Upload all the files in "+destination+" to "+source+" using your preferred file copy method. Note that there is "+fc+" files to be deleted on the website (see "+deleteFileName()+")"; 
-
-        } else {
-          return "Upload all the files in "+destination+" to "+source+" using your preferred file copy method"; 
-        }
-      }
-    } else {
-      return "The web site source in "+source+" has been updated";
-    }
-  }
-
-  public boolean isWeb() {
-    return web;
+    return "The web site source in "+source+" has been updated";
   }
 
   public String verb() {
-    return web ? "Upload" : "Copy";
+    return "Copy";
   }
 }

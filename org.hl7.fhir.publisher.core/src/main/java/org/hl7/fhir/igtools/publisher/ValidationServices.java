@@ -64,11 +64,12 @@ import org.hl7.fhir.r5.utils.validation.IMessagingServices;
 import org.hl7.fhir.r5.utils.validation.IResourceValidator;
 import org.hl7.fhir.r5.utils.validation.IValidationPolicyAdvisor;
 import org.hl7.fhir.r5.utils.validation.IValidatorResourceFetcher;
+import org.hl7.fhir.r5.utils.validation.IValidationPolicyAdvisor.SpecialValidationAction;
 import org.hl7.fhir.r5.utils.validation.constants.BindingKind;
 import org.hl7.fhir.r5.utils.validation.constants.ContainedReferenceValidationPolicy;
 import org.hl7.fhir.r5.utils.validation.constants.ReferenceValidationPolicy;
 import org.hl7.fhir.utilities.SIDUtilities;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
@@ -396,7 +397,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   public byte[] fetchRaw(IResourceValidator validator, String source) throws MalformedURLException, IOException {
     URL url = new URL(source);
     URLConnection c = url.openConnection();
-    return TextFile.streamToBytes(c.getInputStream());
+    return FileUtilities.streamToBytes(c.getInputStream());
   }
 
   @Override
@@ -491,5 +492,11 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   @Override
   public IValidationPolicyAdvisor setPolicyAdvisor(IValidationPolicyAdvisor policyAdvisor) {
     throw new Error("Not supported"); // !
+  }
+
+  @Override
+  public SpecialValidationAction policyForSpecialValidation(IResourceValidator validator, Object appContext, SpecialValidationRule rule, String stackPath, Element resource, Element element) {
+    return SpecialValidationAction.CHECK_RULE;
+
   }
 }

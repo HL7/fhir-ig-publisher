@@ -19,7 +19,7 @@ import org.hl7.fhir.r5.model.Property;
 import org.hl7.fhir.r5.model.RelatedArtifact.RelatedArtifactType;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.utilities.NamedItemList;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
@@ -192,7 +192,7 @@ public class AdjunctFileLoader {
       if (f.exists()) {
         Attachment att = new Attachment();
         att.setContentType(determineContentType(Utilities.getFileExtension(fn)));
-        att.setData(TextFile.fileToBytes(f));
+        att.setData(FileUtilities.fileToBytes(f));
         att.setUrl(f.getAbsolutePath());
         return att;
       }

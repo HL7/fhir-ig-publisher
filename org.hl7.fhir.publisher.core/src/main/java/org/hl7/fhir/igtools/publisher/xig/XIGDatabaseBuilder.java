@@ -54,7 +54,7 @@ import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
 import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionParameterComponent;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -378,7 +378,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
     try {
       String pid = context.getPid();
       NpmPackage npm = context.getNpm();
-      SpecMapManager smm = npm.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.name(), npm.fhirVersion()) : SpecMapManager.createSpecialPackage(npm, null);
+      SpecMapManager smm = npm.hasFile("other", "spec.internals") ?  new SpecMapManager( FileUtilities.streamToBytes(npm.load("other", "spec.internals")), npm.name(), npm.fhirVersion()) : SpecMapManager.createSpecialPackage(npm, null);
       pckKey++;
       smm.setName(npm.name());
       smm.setBase(npm.canonical());

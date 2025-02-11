@@ -82,7 +82,7 @@ import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
@@ -823,9 +823,9 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         if (file.id != null && !file.id.equals(file.nid)) {
           new File(file.filename).delete();
           file.filename = file.filename.replace(file.id, file.nid);
-          TextFile.stringToFile(file.source, file.filename);
+          FileUtilities.stringToFile(file.source, file.filename);
         } else {
-          TextFile.stringToFile(file.source, file.filename);
+          FileUtilities.stringToFile(file.source, file.filename);
         }
       }
     }
@@ -902,7 +902,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
         if (f.isDirectory()) {
           loadAllFiles(files,  f);
         } else {
-          String source = TextFile.fileToString(f); 
+          String source = FileUtilities.fileToString(f); 
           CanonicalResource cr = null;
           try {
             if (f.getName().endsWith(".fml")) {
@@ -1792,7 +1792,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
       if (f.getName().endsWith(".fml")) {
         StructureMap map = null;
         try {
-          map = new StructureMapUtilities(ctxt).parse(TextFile.fileToString(f), f.getName());
+          map = new StructureMapUtilities(ctxt).parse(FileUtilities.fileToString(f), f.getName());
         } catch (Exception e) {
           qaMsg("Error parsing "+f.getAbsolutePath()+": "+e.getMessage(), true);
         }

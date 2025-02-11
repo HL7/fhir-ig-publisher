@@ -44,7 +44,7 @@ import org.hl7.fhir.r5.model.CodeableConcept;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.utilities.IniFile;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.model.JsonArray;
@@ -64,16 +64,19 @@ public class IGReleaseUpdater {
 
     public static ServerType fromCode(String st) {
       st = st.toLowerCase();
-      if (st.equals("asp-old"))
+      if (st.equals("asp-old")) {
         return ServerType.ASP1;
-      else if (st.equals("asp-new"))
+      } else if (st.equals("asp-new")) {
         return ServerType.ASP2;
-      else if (st.equals("apache"))
+      } else if (st.equals("apache")) {
         return ServerType.APACHE;
-      else if (st.equals("litespeed"))
+      } else if (st.equals("nginx")) {
+        return ServerType.APACHE;
+      } else if (st.equals("litespeed")) {
         return ServerType.LITESPEED;
-      else 
+      } else { 
         throw new Error("-server-type "+st+" not known - use ASP or Apache");
+      }
     }
   }
 
@@ -209,7 +212,7 @@ public class IGReleaseUpdater {
           updateStatement(folder, folders, ignoreList, json, root, errs, root, canonical, folder, canonical.equals("http://hl7.org/fhir"), true, list, updateStatements, pl.milestones());
         }
         if (save)
-          TextFile.stringToFile(JsonParser.compose(json, true), f);
+          FileUtilities.stringToFile(JsonParser.compose(json, true), f);
         new HistoryPageUpdater().updateHistoryPage(historySource, folder, templateSrc, false);
       }
         
@@ -249,7 +252,7 @@ public class IGReleaseUpdater {
     File f = new File(Utilities.path(focus, name));
     if (!f.exists() || f.isDirectory()) {
       if (f.exists()) {
-        Utilities.clearDirectory(f.getAbsolutePath());
+        FileUtilities.clearDirectory(f.getAbsolutePath());
       }
 
       if (!src.isDirectory()) {
@@ -371,7 +374,7 @@ public class IGReleaseUpdater {
     checkFileExists(vf, isCore ? "fhir-spec.zip" : "full-ig.zip");
     
     if (sft != null) {
-      String html = TextFile.fileToString(sft);
+      String html = FileUtilities.fileToString(sft);
       html = fixParameter(html, "title", ig.asString("title"));
       html = fixParameter(html, "id", ig.asString("package-id"));
       html = fixParameter(html, "version", isCurrent ? "All Versions" : version.asString("version"));
@@ -381,7 +384,7 @@ public class IGReleaseUpdater {
       html = fixParameter(html, "note", isCurrent ? "this search searches all versions of the "+ig.asString("title")+", including balloted versions. You can also search specific versions" :
         "this search searches version "+version.asString("version")+" of the "+ig.asString("title")+". You can also search other versions, or all versions at once");
       html = fixParameter(html, "prefix", "");            
-      TextFile.stringToFile(html, Utilities.path(vf, "searchform.html"));          
+      FileUtilities.stringToFile(html, Utilities.path(vf, "searchform.html"));          
     }
 
     return vc;
@@ -533,7 +536,17 @@ public class IGReleaseUpdater {
     } else {
       p1 = p1 + ". ";      
     }
-    String p2 = root == null ? "" : version == root ? "This is the current published version"+(currentPublication ? "" : " in its permanent home (it will always be available at this URL)") : "The current version which supersedes this version is <a no-external=\"true\" href=\""+(root.asString("path").startsWith(canonical) ? canonical : root.asString("path"))+"{{fn}}\">"+root.asString("version")+"</a>";
+
+    if (true) {
+      throw new Error("this needs testing");
+    }
+    
+    String p2 = root == null ? "" : version == root ? 
+        "This is the current published version"+(currentPublication ? "" : " in its permanent home (it will always be available at this URL)") :
+         VersionUtilities.compareVersions(root.asString("version"), version.asString("version")) > 0 ?
+             "The current version which supersedes this version is <a no-external=\"true\" href=\""+(root.asString("path").startsWith(canonical) ? canonical : root.asString("path"))+"{{fn}}\">"+root.asString("version")+"</a>":
+             "This version is a pre-release. The current official version is <a no-external=\"true\" href=\""+(root.asString("path").startsWith(canonical) ? canonical : root.asString("path"))+"{{fn}}\">"+root.asString("version")+"</a>";
+    
     String p3;
     if (canonical.equals("http://hl7.org/fhir"))
       p3 = " For a full list of available versions, see the <a no-external=\"true\" href=\""+canonical+"/directory.html\">Directory of published versions</a>";

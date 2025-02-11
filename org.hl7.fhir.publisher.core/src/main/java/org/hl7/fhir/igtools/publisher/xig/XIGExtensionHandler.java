@@ -17,7 +17,7 @@ import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
 import org.hl7.fhir.r5.terminologies.JurisdictionUtilities;
 import org.hl7.fhir.r5.utils.ResourceSorters.CanonicalResourceSortByUrl;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 
@@ -79,7 +79,7 @@ public class XIGExtensionHandler {
         }
       }
       b1.append("</table>\r\n"+footer());
-      TextFile.stringToFile(b1.toString(), Utilities.path(target, "extension-summary-"+g.toLowerCase()+".html"));
+      FileUtilities.stringToFile(b1.toString(), Utilities.path(target, "extension-summary-"+g.toLowerCase()+".html"));
       entries.add("<li><a href=\"extension-summary-"+g.toLowerCase()+".html\">"+g+"</a>: "+urls.size()+" extensions</li>\r\n");
       p.println("");
     }
@@ -90,7 +90,7 @@ public class XIGExtensionHandler {
     }
     b.append("</ul>\r\n");
     b.append("</table>\r\n"+footer());
-    TextFile.stringToFile(b.toString(), Utilities.path(target, "extension-summary-analysis.html"));
+    FileUtilities.stringToFile(b.toString(), Utilities.path(target, "extension-summary-analysis.html"));
   }
 
   private String uses(String url) {

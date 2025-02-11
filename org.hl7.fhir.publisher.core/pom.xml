@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.hl7.fhir.publisher</groupId>
         <artifactId>org.hl7.fhir.publisher</artifactId>
-        <version>1.8.8-SNAPSHOT</version>
+        <version>1.8.13-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -14,7 +14,7 @@
 
     <properties>
         <!-- GraalVM uses the JDK numbering scheme. These should always be LTS versions (17, 21, etc). -->
-        <graalvm.version>21.3.12</graalvm.version>
+        <graalvm.version>21.3.13</graalvm.version>
         <jackson_version>2.17.0</jackson_version>
         <info_cqframework_version>3.20.0</info_cqframework_version>
     </properties>

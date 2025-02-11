@@ -25,7 +25,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 
 public class TabDelimitedSpreadSheet {
@@ -53,7 +53,7 @@ public class TabDelimitedSpreadSheet {
 
   public void close() throws Exception {
     if (wantSave)
-      TextFile.stringToFile(cnt.toString(), filename);
+      FileUtilities.stringToFile(cnt.toString(), filename);
   }
 
   public void column(String v) throws Exception {

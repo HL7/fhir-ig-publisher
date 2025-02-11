@@ -58,6 +58,7 @@ import org.hl7.fhir.r5.model.ImplementationGuide.SPDXLicense;
 import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator.Category;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
@@ -213,7 +214,7 @@ public class IGPack2NpmConvertor {
 
         if (files.containsKey("spec.internals"))
           loadSpecInternals(ig,  files.get("spec.internals"), "??", version, canonical, files);
-        String destFile = dest != null ? dest : Utilities.path(Utilities.getDirectoryForFile(f.getAbsolutePath()), "package.tgz");
+        String destFile = dest != null ? dest : Utilities.path(FileUtilities.getDirectoryForFile(f.getAbsolutePath()), "package.tgz");
         String url = Utilities.noString(website) ? canonical : website;
         NPMPackageGenerator npm = new NPMPackageGenerator(destFile, canonical, url, PackageType.IG, ig, new Date(), false);
         
