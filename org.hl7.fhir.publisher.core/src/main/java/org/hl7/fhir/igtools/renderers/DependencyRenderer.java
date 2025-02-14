@@ -605,8 +605,8 @@ public class DependencyRenderer {
     String comment = null;
     if (!id.equals(npmName)) {
       comment = "Expected Package Id is "+npmName;
-    } else if (id.startsWith("hl7") && !id.startsWith("hl7.cda.") && !id.startsWith("hl7.fhir.") && !id.startsWith("hl7.v2.")) {
-      comment = "HL7 Packages must have an id that starts with hl7.cda., hl7.fhir., or hl7.v2.";
+    } else if (id.startsWith("hl7") && !id.startsWith("hl7.cda.") && !id.startsWith("hl7.fhir.") && !id.startsWith("hl7.v2.") && !id.startsWith("hl7.ehrs.")) {
+      comment = "HL7 Packages must have an id that starts with hl7.cda., hl7.fhir., hl7.v2., or hl7.ehrs.";
     }
     Row row = addRow(gen, model.getRows(), id,  ig.present(), ver, null, null, false, fver, false, canonical, web, comment, null, QA, hasDesc, true);
     if (QA && comment != null) {

@@ -33,6 +33,7 @@ import org.hl7.fhir.r5.utils.GuideParameterCode;
 import org.hl7.fhir.r5.utils.IGHelper;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.FhirPublication;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonArray;
@@ -77,14 +78,14 @@ public class ConfigFileConverter {
   public void convert(String configFile, IWorkerContext context, FilesystemPackageCacheManager pcm) throws Exception {
     JsonObject configuration = org.hl7.fhir.utilities.json.parser.JsonParser.parseObjectFromFile(configFile);
     if (configuration.has("redirect")) { // redirect to support auto-build for complex projects with IG folder in subdirectory
-      String redirectFile = Utilities.path(Utilities.getDirectoryForFile(configFile), configuration.asString("redirect"));
+      String redirectFile = Utilities.path(FileUtilities.getDirectoryForFile(configFile), configuration.asString("redirect"));
       configFile = redirectFile;
       configuration = org.hl7.fhir.utilities.json.parser.JsonParser.parseObjectFromFile(redirectFile);
     }
     String version = ostr(configuration, "version");
     if (Utilities.noString(version))
       version = Constants.VERSION;
-    String rootDir = Utilities.getDirectoryForFile(configFile);
+    String rootDir = FileUtilities.getDirectoryForFile(configFile);
     if (Utilities.noString(rootDir))
       rootDir = getCurentDirectory();
     // We need the root to be expressed as a full path.  getDirectoryForFile will do that in general, but not in Eclipse
@@ -147,7 +148,7 @@ public class ConfigFileConverter {
     String sct = str(configuration, "sct-edition", "http://snomed.info/sct/900000000000207008");
     p.addParameter("system-version", "http://snomed.info/sct|" + sct);
     p.addParameter("activeOnly", "true".equals(ostr(configuration, "no-inactive-codes")));
-    new JsonParser().compose(new FileOutputStream(Utilities.path(Utilities.getDirectoryForFile(igName), "ig-expansion-parameters.json")), ig);
+    new JsonParser().compose(new FileOutputStream(Utilities.path(FileUtilities.getDirectoryForFile(igName), "ig-expansion-parameters.json")), ig);
     p = new Parameters();
     p.addParameter("broken-links", "true".equals(ostr(configuration, "broken-links")));
     p.addParameter("check-aggregation", "true".equals(ostr(configuration, "check-aggregation")));
@@ -163,7 +164,7 @@ public class ConfigFileConverter {
       for (JsonElement e : (JsonArray) paths.get("special-urls"))
         p.addParameter("special-url", e.asJsonPrimitive().asString());
     }
-    new JsonParser().compose(new FileOutputStream(Utilities.path(Utilities.getDirectoryForFile(igName), "ig-validation-parameters.json")), ig);
+    new JsonParser().compose(new FileOutputStream(Utilities.path(FileUtilities.getDirectoryForFile(igName), "ig-validation-parameters.json")), ig);
     if (paths.get("spreadsheets") instanceof JsonArray) {
       for (JsonElement e : (JsonArray) paths.get("spreadsheets"))
         ig.addExtension(ToolingExtensions.EXT_IGP_SPREADSHEET, new StringType(e.asJsonPrimitive().asString()));
@@ -238,9 +239,9 @@ public class ConfigFileConverter {
       }
     }
 
-    String newfile = Utilities.path(Utilities.getDirectoryForFile(igName), "ig-new.json");
+    String newfile = Utilities.path(FileUtilities.getDirectoryForFile(igName), "ig-new.json");
     new JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(newfile), ig);
-    newfile = Utilities.path(Utilities.getDirectoryForFile(igName), "ig-new.xml");
+    newfile = Utilities.path(FileUtilities.getDirectoryForFile(igName), "ig-new.xml");
     new XmlParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(newfile), ig);
     IniFile ini = new IniFile(Utilities.path(rootDir, "ig.ini"));
     ini.setStringProperty("IG", "ig", newfile.substring(rootDir.length() + 1), null);

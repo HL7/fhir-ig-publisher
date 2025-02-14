@@ -2,7 +2,7 @@ package org.hl7.fhir.igtools.web;
 
 import java.io.IOException;
 
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 
@@ -25,9 +25,9 @@ public class VersionRedirectorGenerator {
   private void executeVer(String version, String path) throws IOException {
     if (!path.endsWith("/"+version)) {
       String vp = Utilities.path(folder, version);
-      Utilities.createDirectory(vp);
+      FileUtilities.createDirectory(vp);
       String wc = makeWebConfig(path);
-      TextFile.stringToFile(wc, Utilities.path(vp, "web.config"));
+      FileUtilities.stringToFile(wc, Utilities.path(vp, "web.config"));
     }
   }
 

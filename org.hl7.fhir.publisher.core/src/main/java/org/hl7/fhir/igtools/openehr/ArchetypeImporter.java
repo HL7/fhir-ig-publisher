@@ -37,7 +37,7 @@ import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.xml.XMLUtil;
 import org.openehr.referencemodels.BuiltinReferenceModels;
@@ -115,7 +115,7 @@ public class ArchetypeImporter {
     byte[] tf = context.getBinaryForKey("openehr_terminology.xml");
     if (tf == null) {
       // hack temp workaround
-      tf = TextFile.fileToBytes("/Users/grahamegrieve/Downloads/openehr_terminology.xml");
+      tf = FileUtilities.fileToBytes("/Users/grahamegrieve/Downloads/openehr_terminology.xml");
     }
     terminology = XMLUtil.parseToDom(tf).getDocumentElement();
   }
@@ -126,7 +126,7 @@ public class ArchetypeImporter {
   }
 
   public void checkArchetype(InputStream stream, String name) throws ParserConfigurationException, SAXException, IOException, ADLParseException {
-    byte[] cnt = TextFile.streamToBytes(stream);
+    byte[] cnt = FileUtilities.streamToBytes(stream);
     try {
       archetype = load20(new ByteArrayInputStream(cnt));
     } catch (Exception e20) {
@@ -149,7 +149,7 @@ public class ArchetypeImporter {
   public ProcessedArchetype importArchetype(InputStream stream, String name) throws ParserConfigurationException, SAXException, IOException, ADLParseException {
     atMap.clear();
 
-    byte[] cnt = TextFile.streamToBytes(stream);
+    byte[] cnt = FileUtilities.streamToBytes(stream);
     try {
       archetype = load20(new ByteArrayInputStream(cnt));
     } catch (Exception e20) {

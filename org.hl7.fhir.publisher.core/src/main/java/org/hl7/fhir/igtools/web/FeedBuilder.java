@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.JsonUtilities;
@@ -160,11 +160,11 @@ public class FeedBuilder {
     Collections.sort(pubs, new PublicationSorter());
     if (packageFile != null) {
       System.out.println("Save Package feed to "+packageFile);
-      TextFile.stringToFile(buildFeed(pubs, orgName, thisUrl, true), packageFile);
+      FileUtilities.stringToFile(buildFeed(pubs, orgName, thisUrl, true), packageFile);
     }
     if (publicationFile != null) {
       System.out.println("Save publication feed to "+publicationFile);
-      TextFile.stringToFile(buildFeed(pubs, orgName, thisUrl, false), publicationFile);
+      FileUtilities.stringToFile(buildFeed(pubs, orgName, thisUrl, false), publicationFile);
     }
     Set<String> statusCodes = new HashSet<>();
     for (Publication pub : pubs) {
@@ -290,8 +290,8 @@ public class FeedBuilder {
 
   private void loadPackageList(File f, List<Publication> pubs, String rootUrl, String rootFolder) throws JsonSyntaxException, FileNotFoundException, IOException, ParseException {
     System.out.println("Load from "+f.getAbsolutePath());
-    String folder = Utilities.getDirectoryForFile(f.getAbsolutePath());    
-    JsonObject json = (JsonObject) new JsonParser().parse(TextFile.fileToString(f)); // use gson parser to preseve property order
+    String folder = FileUtilities.getDirectoryForFile(f.getAbsolutePath());    
+    JsonObject json = (JsonObject) new JsonParser().parse(FileUtilities.fileToString(f)); // use gson parser to preseve property order
     String packageId = JsonUtilities.str(json, "package-id");
     String title = JsonUtilities.str(json, "title");
     String canonical = JsonUtilities.str(json, "canonical");

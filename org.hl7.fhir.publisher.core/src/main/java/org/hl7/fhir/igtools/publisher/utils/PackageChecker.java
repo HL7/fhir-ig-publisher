@@ -6,6 +6,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -38,7 +39,7 @@ public class PackageChecker {
             save = true;
           }
           if (save) {
-            f.renameTo(new File(Utilities.changeFileExt(f.getAbsolutePath(), ".tgz-old")));
+            f.renameTo(new File(FileUtilities.changeFileExt(f.getAbsolutePath(), ".tgz-old")));
             pck.save(new FileOutputStream(f));
           }
         }
@@ -88,7 +89,7 @@ public class PackageChecker {
         }
       }
     } else {
-      String parent = Utilities.getDirectoryForFile(folder.getAbsolutePath());
+      String parent = FileUtilities.getDirectoryForFile(folder.getAbsolutePath());
       String name = folder.getName();
       plf = new File(Utilities.path(parent, "package-list.json"));
       if (plf.exists()) {

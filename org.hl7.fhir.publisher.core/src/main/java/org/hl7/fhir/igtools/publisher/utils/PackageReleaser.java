@@ -36,7 +36,7 @@ import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.utilities.FhirPublication;
 import org.hl7.fhir.utilities.IniFile;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -64,14 +64,14 @@ public class PackageReleaser {
     @Override
     public byte[] load(File f) {
       try {
-        byte[] cnt = TextFile.fileToBytes(f);
+        byte[] cnt = FileUtilities.fileToBytes(f);
         if (!f.getName().endsWith(".json")) {
           return cnt;
         }
         JsonObject json = JsonParser.parseObject(f);
         byte[] cntp = JsonParser.composeBytes(json, true);
         if (cntp != cnt) {
-          TextFile.bytesToFile(cntp, f);
+          FileUtilities.bytesToFile(cntp, f);
         }
         cnt = JsonParser.composeBytes(json, false);
         if (json.has("resourceType")) {
@@ -275,7 +275,7 @@ public class PackageReleaser {
         }
         Element lbd = XMLUtil.getNamedChild(channel, "lastBuildDate");
         lbd.setTextContent(df.format(new Date()));
-        File bak = new File(Utilities.changeFileExt(xml.getAbsolutePath(),  ".bak"));
+        File bak = new File(FileUtilities.changeFileExt(xml.getAbsolutePath(),  ".bak"));
         if (bak.exists())
           bak.delete();
         xml.renameTo(bak);
@@ -293,7 +293,7 @@ public class PackageReleaser {
       String date = v.date();
       b.append("<li><a href=\""+ver+"/package.tgz\">"+ver+"</a>: "+Utilities.escapeJson(desc)+" ("+date+")</li>\r\n");
     }    
-    String source = TextFile.fileToString(file);
+    String source = FileUtilities.fileToString(file);
     int i = source.indexOf("id=\"releases-list\">");
     if (i < 0) {
       throw new Error("Version insertion point Not found in "+file.getAbsolutePath());      
@@ -303,7 +303,7 @@ public class PackageReleaser {
     i = source.indexOf("</ul>");
     source = source.substring(i);
     source = pfx + b.toString()+source;
-    TextFile.stringToFile(source, file);
+    FileUtilities.stringToFile(source, file);
   }
   
   
@@ -336,8 +336,8 @@ public class PackageReleaser {
     if (id.contains("dicom")) {
       String src = Utilities.path(path, version, "package.tgz");
       String dst = Utilities.path(path, "output", "package.tgz");
-      Utilities.createDirectory(Utilities.path(path, "output"));
-      Utilities.copyFile(src,  dst);
+      FileUtilities.createDirectory(Utilities.path(path, "output"));
+      FileUtilities.copyFile(src,  dst);
       return;
     }
     try {
@@ -352,12 +352,12 @@ public class PackageReleaser {
         makeR4Structures(path, v);
       }
       // now, actully make the tgz file
-      Utilities.clearDirectory(Utilities.path(path, "output"));
+      FileUtilities.clearDirectory(Utilities.path(path, "output"));
       new File(Utilities.path(path, "output")).delete();
 
       NpmPackage npm = NpmPackage.fromFolder(path);
       npm.loadAllFiles(makeLoader(npm.fhirVersion()));
-      Utilities.createDirectory(Utilities.path(path, "output"));
+      FileUtilities.createDirectory(Utilities.path(path, "output"));
       npm.save(new FileOutputStream(Utilities.path(path, "output", "package.tgz")));
     } catch (Throwable e) {
       throw new IOException("Error processing "+path+": "+e.getMessage(), e);
@@ -480,7 +480,7 @@ public class PackageReleaser {
     } else if ("3.0".equals(ver)) {
       org.hl7.fhir.dstu3.model.Resource r;
       if (f.getName().endsWith(".map")) {
-        r = new org.hl7.fhir.dstu3.utils.StructureMapUtilities(r3).parse(TextFile.fileToString(f));
+        r = new org.hl7.fhir.dstu3.utils.StructureMapUtilities(r3).parse(FileUtilities.fileToString(f));
       } else if (f.getName().endsWith(".xml")) {
         r = new org.hl7.fhir.dstu3.formats.XmlParser().parse(new FileInputStream(f));
       } else { // if (f.getName().endsWith(".json")) {
@@ -490,7 +490,7 @@ public class PackageReleaser {
     } else if ("4.0".equals(ver)) {
       org.hl7.fhir.r4.model.Resource r;
       if (f.getName().endsWith(".map")) {
-        r = new org.hl7.fhir.r4.utils.StructureMapUtilities(r4).parse(TextFile.fileToString(f), f.getName());
+        r = new org.hl7.fhir.r4.utils.StructureMapUtilities(r4).parse(FileUtilities.fileToString(f), f.getName());
       } else if (f.getName().endsWith(".xml")) {
         r = new org.hl7.fhir.r4.formats.XmlParser().parse(new FileInputStream(f));
       } else { // if (f.getName().endsWith(".json")) {
@@ -521,7 +521,7 @@ public class PackageReleaser {
       }
     }
     String jcnt = JsonParser.compose(npm, true);
-    TextFile.stringToFile(jcnt, Utilities.path(source, vd.getId(), "package", "package.json"));
+    FileUtilities.stringToFile(jcnt, Utilities.path(source, vd.getId(), "package", "package.json"));
   }
 
   private void resetVersions(String source, VersionDecision vd, List<VersionDecision> versionsList) throws FileNotFoundException, IOException {
@@ -537,7 +537,7 @@ public class PackageReleaser {
         d.add(s, VersionUtilities.getCurrentVersion(npm.getStrings("fhirVersions").get(0)));
       }
       String jcnt = JsonParser.compose(npm, true);
-      TextFile.stringToFile(jcnt, Utilities.path(source, vd.getId(), "package", "package.json"));
+      FileUtilities.stringToFile(jcnt, Utilities.path(source, vd.getId(), "package", "package.json"));
     }
   }
 
@@ -554,7 +554,7 @@ public class PackageReleaser {
     if (!ok) {
       throw new Error("unable to find version "+vd.getNewVersion()+" in pacjage list");
     }
-    TextFile.stringToFile(pl.toJson(), Utilities.path(source, vd.getId(), "package-list.json"));
+    FileUtilities.stringToFile(pl.toJson(), Utilities.path(source, vd.getId(), "package-list.json"));
   }
 
   private void updatePackageList(String source, VersionDecision vd) throws FileNotFoundException, IOException {
@@ -566,7 +566,7 @@ public class PackageReleaser {
     e.describe("Upgrade for dependency on "+vd.implicitSource, null, null);
     e.setCurrent(true);
     e.setDate("XXXX-XX-XX");
-    TextFile.stringToFile(pl.toJson(), Utilities.path(source, vd.getId(), "package-list.json"));
+    FileUtilities.stringToFile(pl.toJson(), Utilities.path(source, vd.getId(), "package-list.json"));
   }
 
   private List<VersionDecision> analyseVersions(String source, Map<String, String> newList, Map<String, String> oldList) throws Exception {
@@ -674,7 +674,7 @@ public class PackageReleaser {
   }
 
   private List<String> listDependencies(String source, String id) throws Exception {
-    JsonObject npm = JsonParser.parseObject(TextFile.fileToString(Utilities.path(source, id, "package", "package.json")));
+    JsonObject npm = JsonParser.parseObject(FileUtilities.fileToString(Utilities.path(source, id, "package", "package.json")));
     List<String> res = new ArrayList<String>();
     if (npm.has("dependencies")) {
       for (String s : npm.getJsonObject("dependencies").getNames()) {
@@ -780,10 +780,10 @@ public class PackageReleaser {
         jf.renameTo(xf);
       }
       // copy files
-      Utilities.createDirectory(dst.getAbsolutePath());
-      Utilities.copyDirectory(Utilities.path(source, vd.getId(), "output"), Utilities.path(dest, npm.name(), npm.version()), null);
-      Utilities.copyDirectory(Utilities.path(source, vd.getId(), "output"), Utilities.path(dest, npm.name()), null);
-      Utilities.copyFile(Utilities.path(source, vd.getId(), "package-list.json"), Utilities.path(dest, npm.name(), "package-list.json"));
+      FileUtilities.createDirectory(dst.getAbsolutePath());
+      FileUtilities.copyDirectory(Utilities.path(source, vd.getId(), "output"), Utilities.path(dest, npm.name(), npm.version()), null);
+      FileUtilities.copyDirectory(Utilities.path(source, vd.getId(), "output"), Utilities.path(dest, npm.name()), null);
+      FileUtilities.copyFile(Utilities.path(source, vd.getId(), "package-list.json"), Utilities.path(dest, npm.name(), "package-list.json"));
       
       // update the index.html
       File file = new File(Utilities.path(dest, npm.name(), "index.html"));

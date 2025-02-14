@@ -38,7 +38,7 @@ import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.model.JsonArray;
@@ -425,11 +425,11 @@ public class R4ToR4BAnalyser {
 
   public void clonePackage(String pid, String filename) throws IOException {
     if (VersionUtilities.isR4Ver(context.getVersion())) {
-      genSameVersionPackage(pid, filename, Utilities.changeFileExt(filename, ".r4.tgz"), true, "4.0.0", "r4");
-      genOtherVersionPackage(pid, filename, Utilities.changeFileExt(filename, ".r4b.tgz"), "hl7.fhir.r4b.core", "4.3.0", "r4b", "4.0.0", VersionUtilities.getSpecUrl("4.0"), VersionUtilities.getSpecUrl("4.3"));
+      genSameVersionPackage(pid, filename, FileUtilities.changeFileExt(filename, ".r4.tgz"), true, "4.0.0", "r4");
+      genOtherVersionPackage(pid, filename, FileUtilities.changeFileExt(filename, ".r4b.tgz"), "hl7.fhir.r4b.core", "4.3.0", "r4b", "4.0.0", VersionUtilities.getSpecUrl("4.0"), VersionUtilities.getSpecUrl("4.3"));
     } else if (VersionUtilities.isR4BVer(context.getVersion())) {
-      genSameVersionPackage(pid, filename, Utilities.changeFileExt(filename, ".r4b.tgz"), false, "4.3.0", "r4b");
-      genOtherVersionPackage(pid, filename, Utilities.changeFileExt(filename, ".r4.tgz"), "hl7.fhir.r4.core", "4.0.0", "r4", "4.3.0", VersionUtilities.getSpecUrl("4.3"), VersionUtilities.getSpecUrl("4.0"));
+      genSameVersionPackage(pid, filename, FileUtilities.changeFileExt(filename, ".r4b.tgz"), false, "4.3.0", "r4b");
+      genOtherVersionPackage(pid, filename, FileUtilities.changeFileExt(filename, ".r4.tgz"), "hl7.fhir.r4.core", "4.0.0", "r4", "4.3.0", VersionUtilities.getSpecUrl("4.3"), VersionUtilities.getSpecUrl("4.0"));
     } else {
       throw new Error("Should not happen");
     }
@@ -679,7 +679,7 @@ public class R4ToR4BAnalyser {
     System.out.println("Preparing using "+pid);
     NpmPackage pi = pcm.loadPackage(pid);
     
-    SpecMapManager spm = loadSpecDetails(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.name(), version, specPath);
+    SpecMapManager spm = loadSpecDetails(FileUtilities.streamToBytes(pi.load("other", "spec.internals")), pi.name(), version, specPath);
     SimpleWorkerContext sp;
     IContextResourceLoader loader = new PublisherLoader(pi, spm, specPath, null).makeLoader();
     sp = new SimpleWorkerContext.SimpleWorkerContextBuilder().fromPackage(pi, loader, true);

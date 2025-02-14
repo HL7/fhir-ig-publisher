@@ -4,7 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 
 public class LineLengthChecker {
 
@@ -27,7 +27,7 @@ public class LineLengthChecker {
       } else if (f.length() > 0) {
         total++;
         int length = 0;
-        String source = TextFile.fileToString(f);
+        String source = FileUtilities.fileToString(f);
         for (String line : source.split("\\R")) {
           int l = line.length();
           if (l > length) {

@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
@@ -51,7 +52,7 @@ public class IGReleaseVersionDeleter {
       if (!igs.contains(rn) && !hist.contains(rn) && !rn.endsWith(".template")) {
           System.out.println("Delete "+rn);
           if (f.isDirectory())
-            Utilities.clearDirectory(f.getAbsolutePath());
+            FileUtilities.clearDirectory(f.getAbsolutePath());
           f.delete();
           i++;
       }

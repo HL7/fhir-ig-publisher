@@ -1,6 +1,7 @@
 package org.hl7.fhir.igtools.publisher.utils;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -8,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonElement;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -23,59 +24,35 @@ public class HL7OrgFhirFixer {
   }
 
   private void execute(int rootLen, File folder, boolean root) throws IOException {
-    boolean isSpec = isSpec(folder);
-    if (isSpec) {
-      System.out.print("Found Spec at "+folder.getAbsolutePath());
-      processSpec(rootLen, folder);
-    }    
-    boolean isEmpty = true;
     for (File f : folder.listFiles()) {
       if (f.isDirectory()) {
-        isEmpty = false;
         execute(rootLen, f, false);
-      } else if (f.getName().endsWith(".asp")) {
+      } else if (Utilities.existsInList(Utilities.getFileExtension(f.getName()), "json1", "json2", "xml1", "xml2")) {
         f.delete();
+      } else if ("index.php".equals(f.getName())) { 
+        //fixIndexPhp(f);   
+      }
+    }
+  }
+
+  private void fixIndexPhp(File f) throws FileNotFoundException, IOException {
+    StringBuilder b = new StringBuilder();
+    boolean del = false;
+    for (String line : FileUtilities.fileToLines(f)) {
+      if (del) {
+        del = false;
+      } else if (line.contains("'application/fhir+json'") || line.contains("'application/json+fhir'") || line.contains("'application/xml+fhir'")) {
+        // omit  
+        del = true;
+      } else if (line.contains("'application/fhir+xml'")) {
+        b.append(line.replace("application/fhir+xml", "xml")+"\r\n");
+      } else if (line.contains("'json'")) {
+        b.append(line.replace("elseif", "if")+"\r\n");
       } else {
-        isEmpty = false;
+        b.append(line.replace(".xml1'", ".xml'")+"\r\n");
       }
     }
-    if (isEmpty) {
-      folder.delete();
-    }
-  }
-
-  private boolean isSpec(File folder) throws IOException {
-    if (new File(Utilities.path(folder.getAbsolutePath(), "package.tgz")).exists()) {
-      return true;
-    }
-    if (new File(Utilities.path(folder.getAbsolutePath(), "patient.html")).exists()) {
-      return true;
-    }
-    if (new File(Utilities.path(folder.getAbsolutePath(), "patient.htm")).exists()) {
-      return true;
-    }
-    return false;
-  }
-
-  private void processSpec(int rootLen, File folder) throws IOException {
-    Map<String, Map<String, String>> list = new HashMap<>();
-    
-    scanFolder(rootLen, folder, list);
-
-    int size = 0;
-    for (String t : list.keySet()) {
-      size += list.get(t).size();
-      String tf = Utilities.noString(t) ? folder.getAbsolutePath() : Utilities.path(folder.getAbsolutePath(), t);
-      Utilities.createDirectoryNC(tf);
-      Map<String, String> map = list.get(t);
-      for (String id : map.keySet()) {
-        String idf = Utilities.path(tf, id);
-        Utilities.createDirectoryNC(idf);
-        String rf = Utilities.path(idf, "index.php");
-        TextFile.stringToFile(genRedirect(map.get(id)), rf);
-      }
-    }
-    System.out.println(" "+size+" resources");
+    FileUtilities.stringToFile(b.toString(), f);
   }
 
   private String genRedirect(String url) {
@@ -115,9 +92,9 @@ public class HL7OrgFhirFixer {
       } else if (f.getName().endsWith(".asp")) {
         f.delete();
       } else if (f.isDirectory()) {
-        if (!isSpec(folder)) {
-          scanFolder(rootLen, f, list);
-        }
+//        if (!isSpec(folder)) {
+//          scanFolder(rootLen, f, list);
+//        }
       } else if (f.getName().endsWith(".json") && !f.getName().contains(".canonical.")) {
         try {
           JsonElement je = JsonParser.parse(f);

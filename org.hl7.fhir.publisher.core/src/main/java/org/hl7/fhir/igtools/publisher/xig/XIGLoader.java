@@ -29,7 +29,7 @@ import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.JsonException;
@@ -55,7 +55,7 @@ public class XIGLoader implements IPackageVisitorProcessor {
 
     SpecMapManager smm = smmList.get(pid);
     if (smm == null) {
-      smm = npm.hasFile("other", "spec.internals") ?  new SpecMapManager( TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.name(), npm.fhirVersion()) : SpecMapManager.createSpecialPackage(npm, null);
+      smm = npm.hasFile("other", "spec.internals") ?  new SpecMapManager( FileUtilities.streamToBytes(npm.load("other", "spec.internals")), npm.name(), npm.fhirVersion()) : SpecMapManager.createSpecialPackage(npm, null);
       smm.setName(npm.name());
       smm.setBase(npm.canonical());
       smm.setBase2(PackageHacker.fixPackageUrl(npm.url()));

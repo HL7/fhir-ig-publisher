@@ -69,7 +69,7 @@ import org.hl7.fhir.r5.terminologies.client.TerminologyClientManager.InternalLog
 import org.hl7.fhir.r5.utils.OperationOutcomeUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.i18n.I18nConstants;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
@@ -526,7 +526,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
         }
       }
     }
-    FileOutputStream s = new FileOutputStream(Utilities.changeFileExt(path, ".xml"));
+    FileOutputStream s = new FileOutputStream(FileUtilities.changeFileExt(path, ".xml"));
     new XmlParser().compose(s, validationBundle, true);
     s.close();
 
@@ -627,7 +627,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     }
     
     String page = genTxServersHeader(title)+new XhtmlComposer(false, true).compose(x.getChildNodes())+genTxServerFooter(title);
-    TextFile.stringToFile(page, Utilities.path(Utilities.getDirectoryForFile(path), "qa-txservers.html"));    
+    FileUtilities.stringToFile(page, Utilities.path(FileUtilities.getDirectoryForFile(path), "qa-txservers.html"));    
   }
 
   private void genServerReport(XhtmlNode x, TerminologyClientContext t) {
@@ -782,7 +782,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     b.append("err = " + err + ", warn = " + warn + ", info = " + info + "\n");
     b.append("IG Publisher Version: " + toolsVersion);
 
-    TextFile.stringToFile(b.toString(), Utilities.changeFileExt(path, "-eslintcompact.txt"));
+    FileUtilities.stringToFile(b.toString(), FileUtilities.changeFileExt(path, "-eslintcompact.txt"));
   }
 
   public void genQAText(String title, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, List<ValidationMessage> linkErrors)
@@ -805,7 +805,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       b.append(genEndTxt());
     }    
     b.append(genFooterTxt(title));
-    TextFile.stringToFile(b.toString(), Utilities.changeFileExt(path, ".txt"));
+    FileUtilities.stringToFile(b.toString(), FileUtilities.changeFileExt(path, ".txt"));
   }
 
   public void genQATextForCompare(String title, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, List<ValidationMessage> linkErrors)
@@ -828,7 +828,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       b.append(genEndTxt());
     }    
     b.append(genFooterTxt(title));
-    TextFile.stringToFile(b.toString(), Utilities.changeFileExt(path, ".compare.txt"));
+    FileUtilities.stringToFile(b.toString(), FileUtilities.changeFileExt(path, ".compare.txt"));
   }
 
   public List<FetchedFile> genQAHtml(String title, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, List<ValidationMessage> linkErrors, boolean allIssues) throws IOException {
@@ -885,7 +885,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       }
     }
     b.append(genFooter(title));
-    TextFile.stringToFile(b.toString(), allIssues ? path : Utilities.changeFileExt(path, ".min.html"));
+    FileUtilities.stringToFile(b.toString(), allIssues ? path : FileUtilities.changeFileExt(path, ".min.html"));
     return files;
   }
 

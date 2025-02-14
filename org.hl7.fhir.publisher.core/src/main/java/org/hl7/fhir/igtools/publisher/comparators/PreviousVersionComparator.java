@@ -26,6 +26,7 @@ import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.Resource;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
@@ -260,7 +261,7 @@ public class PreviousVersionComparator {
 //            System.out.println("Version Comparison: compare "+vi.version+" to current for "+c.getUrl());
             session.compare(c.left, c.right);      
           }
-          Utilities.createDirectory(Utilities.path(dstDir, "comparison-v"+vi.version));
+          FileUtilities.createDirectory(Utilities.path(dstDir, "comparison-v"+vi.version));
           ComparisonRenderer cr = new ComparisonRenderer(vi.context, context, Utilities.path(dstDir, "comparison-v"+vi.version), session);
           cr.loadTemplates(context);
           cr.render("Version "+vi.version, "Current Build");

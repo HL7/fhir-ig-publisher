@@ -16,8 +16,9 @@ import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import org.hl7.fhir.utilities.CompressionUtilities;
 import org.hl7.fhir.utilities.FTPClient;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.http.HTTPResult;
 import org.hl7.fhir.utilities.http.ManagedWebAccess;
@@ -30,8 +31,8 @@ public class WebSourceProvider {
     public int compare(String o1, String o2) {
       try {
         String f1;
-        f1 = Utilities.getDirectoryForFile(o1);
-        String f2 = Utilities.getDirectoryForFile(o2);
+        f1 = FileUtilities.getDirectoryForFile(o1);
+        String f2 = FileUtilities.getDirectoryForFile(o2);
         if (f1 == null && f2 == null) {
           return o1.compareToIgnoreCase(o2);
         }
@@ -63,7 +64,7 @@ public class WebSourceProvider {
   
   public void needFile(String path) throws IOException {
     File df = new File(Utilities.path(destination, path));
-    Utilities.createDirectory(Utilities.getDirectoryForFile(df.getAbsolutePath()));
+    FileUtilities.createDirectory(FileUtilities.getDirectoryForFile(df.getAbsolutePath()));
     if (df.exists()) {
       df.delete();
     }
@@ -71,7 +72,7 @@ public class WebSourceProvider {
     if (!sf.exists()) {
       throw new Error("Error: Attempt to copy "+sf.getAbsolutePath()+" but it doesn't exist");
     }
-    Utilities.copyFile(sf, df);
+    FileUtilities.copyFile(sf, df);
   }
 
   public void needFolder(String path, boolean clear) throws IOException {
@@ -80,9 +81,9 @@ public class WebSourceProvider {
       df.delete();
     }
     if (!df.exists()) {
-      Utilities.createDirectory(df.getAbsolutePath());
+      FileUtilities.createDirectory(df.getAbsolutePath());
     } else if (clear) {
-      Utilities.clearDirectory(df.getAbsolutePath());
+      FileUtilities.clearDirectory(df.getAbsolutePath());
     }
     
     File sf = new File(Utilities.path(source, path));
@@ -92,7 +93,7 @@ public class WebSourceProvider {
     if (!sf.isDirectory()) {
       throw new Error("Error: Attempt to copy from "+sf.getAbsolutePath()+" but it isn't a folder");
     }
-    Utilities.copyDirectory(sf.getAbsolutePath(), df.getAbsolutePath(), null);
+    FileUtilities.copyDirectory(sf.getAbsolutePath(), df.getAbsolutePath(), null);
     
   }
 
@@ -115,7 +116,7 @@ public class WebSourceProvider {
     try (ZipInputStream zis = new ZipInputStream(inputStream)) {
       ZipEntry zipEntry = zis.getNextEntry();
       while (zipEntry != null) {
-        Path newPath = Utilities.zipSlipProtect(Utilities.makeOSSafe(zipEntry.getName()), target);
+        Path newPath = CompressionUtilities.zipSlipProtect(CompressionUtilities.makeOSSafe(zipEntry.getName()), target);
         if (Files.exists(newPath)) {
           Files.delete(newPath);
         }
@@ -133,7 +134,7 @@ public class WebSourceProvider {
 
     File sf = new File(Utilities.path(source, path));
     if (sf.exists()) {
-      Utilities.copyFile(sf, df);
+      FileUtilities.copyFile(sf, df);
     }    
   }
 
@@ -142,7 +143,7 @@ public class WebSourceProvider {
     for (String s : existingFiles) {
       new File(Utilities.path(s, existingFilesBase, s)).delete();
     }
-    Utilities.copyDirectory(destination, source, null);
+    FileUtilities.copyDirectory(destination, source, null);
     System.out.println("  ... done");
   }
 

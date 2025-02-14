@@ -8,6 +8,7 @@ import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.elementmodel.LanguageUtils;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.utils.UserDataNames;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.i18n.JsonLangFileProducer;
 import org.hl7.fhir.utilities.i18n.LanguageFileProducer.TranslationUnit;
@@ -36,21 +37,21 @@ public class PublisherTranslator {
   }
 
   public void start(String dst) throws IOException {
-    Utilities.createDirectory(dst);
+    FileUtilities.createDirectory(dst);
     
     if (translationLangs.size() > 1) {
       for (String l : translationLangs) {
         if (baseLang == null || !baseLang.equals(l)) {
-          Utilities.createDirectory(Utilities.path(dst, l, "po"));
-          Utilities.createDirectory(Utilities.path(dst, l, "xliff"));
-          Utilities.createDirectory(Utilities.path(dst, l, "json"));
+          FileUtilities.createDirectory(Utilities.path(dst, l, "po"));
+          FileUtilities.createDirectory(Utilities.path(dst, l, "xliff"));
+          FileUtilities.createDirectory(Utilities.path(dst, l, "json"));
           
         }
       }
     } else {
-      Utilities.createDirectory(Utilities.path(dst, "po"));
-      Utilities.createDirectory(Utilities.path(dst, "xliff"));
-      Utilities.createDirectory(Utilities.path(dst, "json"));
+      FileUtilities.createDirectory(Utilities.path(dst, "po"));
+      FileUtilities.createDirectory(Utilities.path(dst, "xliff"));
+      FileUtilities.createDirectory(Utilities.path(dst, "json"));
     }
 
     po = new PoGetTextProducer(dst, "po", translationLangs.size() > 1);

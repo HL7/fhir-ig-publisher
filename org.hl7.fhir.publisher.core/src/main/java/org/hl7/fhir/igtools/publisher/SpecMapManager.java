@@ -35,7 +35,7 @@ import java.util.Set;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.context.IContextResourceLoader;
 import org.hl7.fhir.r5.model.Constants;
-import org.hl7.fhir.utilities.TextFile;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -134,7 +134,7 @@ public class SpecMapManager {
 
   public static SpecMapManager fromPackage(NpmPackage pi) throws IOException {
     if (pi.hasFile("other", "spec.internals")) {
-      return new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.vid(), pi.fhirVersion());      
+      return new SpecMapManager(FileUtilities.streamToBytes(pi.load("other", "spec.internals")), pi.vid(), pi.fhirVersion());      
     } else {
       return new SpecMapManager();
     }
@@ -147,7 +147,7 @@ public class SpecMapManager {
 
   public void save(String filename) throws IOException {
     String json = JsonParser.compose(spec, true);
-    TextFile.stringToFile(json, filename);    
+    FileUtilities.stringToFile(json, filename);    
   }
 
   public String getVersion() throws FHIRException {
