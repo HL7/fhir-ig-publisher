@@ -54,6 +54,7 @@
             <!--
             Build a fatjar containing all dependencies
             -->
+            <!--
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
@@ -66,14 +67,10 @@
                             <goal>unpack-dependencies</goal>
                         </goals>
                         <configuration>
-                            <!-- exclude the following:
-                                Signature files that will be flagged as inconsistent:
-                                  META-INF/*.SF,META-INF/*.DSA,META-INF/*.RSA
-                                A module-info from org.graalvm.truffle (imported by org.graalvm.js) that is compiled for Java 17
-                                  META-INF/versions/17/module-info.class
-                           -->
-                            <excludes>META-INF/*.SF,META-INF/*.DSA,META-INF/*.RSA,META-INF/versions/17/module-info.class</excludes>
+
+                            <excludes>META-INF/*.SF,META-INF/*.DSA,META-INF/*.RSA,META-INF/versions/17/module-info.class,META-INF/services/org.hl7.cql.model.ModelInfoProvider</excludes>
                             <outputDirectory>${project.build.directory}/classes</outputDirectory>
+
                             <overWriteReleases>false</overWriteReleases>
                             <overWriteSnapshots>true</overWriteSnapshots>
                             <excludeScope>test</excludeScope>
@@ -82,12 +79,14 @@
                     </execution>
                 </executions>
             </plugin>
+-->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>3.4.1</version>
                 <executions>
                     <execution>
+                        <phase>package</phase>
                         <goals>
                             <goal>shade</goal>
                         </goals>
@@ -95,13 +94,22 @@
                             <shadedArtifactAttached>true</shadedArtifactAttached>
                             <shadedClassifierName>unshaded</shadedClassifierName>
                             <transformers>
+                                <!--
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                    <resource>META-INF/services/org.hl7.cql.model.ModelInfoProvider</resource>
+                                </transformer>-->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>org.hl7.fhir.igtools.publisher.Publisher</mainClass>
                                 </transformer>
                             </transformers>
-                            <minimizeJar>true</minimizeJar>
+                            <artifactSet>
+                                <includes>
+                                    <include>**:**</include>
+                                </includes>
+                            </artifactSet>
+                            <!--<minimizeJar>true</minimizeJar>-->
                             <filters>
                                 <filter>
                                     <artifact>*:*</artifact>
@@ -111,6 +119,14 @@
                                         <exclude>META-INF/*.RSA</exclude>
                                     </excludes>
                                 </filter>
+                                <!--
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/services/org.hl7.cql.model.ModelInfoProvider</exclude>
+                                    </excludes>
+                                </filter>
+                                -->
                             </filters>
                         </configuration>
                     </execution>
