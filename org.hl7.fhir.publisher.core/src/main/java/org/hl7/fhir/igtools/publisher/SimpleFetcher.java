@@ -33,22 +33,26 @@ import java.util.List;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.openehr.ArchetypeImporter;
+import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.ILoggingService;
 import org.hl7.fhir.r5.context.ILoggingService.LogCategory;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.FmlParser;
+import org.hl7.fhir.r5.elementmodel.JsonParser.ILogicalModelResolver;
 import org.hl7.fhir.r5.elementmodel.ValidatedFragment;
 import org.hl7.fhir.r5.formats.FormatUtilities;
-import org.hl7.fhir.r5.model.Bundle;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.DataType;
+import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.UriType;
+import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.json.model.JsonObject;
 
-public class SimpleFetcher implements IFetchFile {
+public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
 
   public class FetchedFileSorter implements Comparator<FetchedFile> {
 
@@ -364,7 +368,7 @@ public class SimpleFetcher implements IFetchFile {
                 }
               if (!ok && !Utilities.existsInList(ext, "xml", "ttl", "html", "txt", "fml", "adl")) {
                 try {
-                  List<ValidatedFragment> el = new org.hl7.fhir.r5.elementmodel.JsonParser(context).parse(new FileInputStream(fn));
+                  List<ValidatedFragment> el = new org.hl7.fhir.r5.elementmodel.JsonParser(context).setLogicalModelResolver(this).parse(new FileInputStream(fn));
                   if (el.size() == 1) {
                     addFile(res, f, el.get(0).getElement(), "application/fhir+json");
                     count++;
@@ -541,6 +545,35 @@ public class SimpleFetcher implements IFetchFile {
 
   public void setReport(boolean report) {
     this.report = report;
+  }
+
+  @Override
+  public StructureDefinition resolve(JsonObject object) {
+    if (object.has("resourceType")) {
+      return null;
+    }
+    ProfileUtilities pu = new ProfileUtilities(context, null, pkp);
+    for (StructureDefinition sd : context.fetchResourcesByType(StructureDefinition.class)) {
+      if (ToolingExtensions.readBoolExtension(sd, org.hl7.fhir.r5.utils.ToolingExtensions.EXT_LOGICAL_TARGET) &&
+          ToolingExtensions.readBoolExtension(sd, org.hl7.fhir.r5.utils.ToolingExtensions.EXT_SUPPRESS_RESOURCE_TYPE)) {
+        // well, it's a candidate. 
+        List<ElementDefinition> rootProps = pu.getChildList(sd, sd.getSnapshot().getElementFirstRep());
+        if (rootProps.size() > 0) {
+          boolean all = true;
+          boolean any = false;
+          for (ElementDefinition ed : rootProps) {
+            if (ed.isRequired()) {
+              any = true;
+              all = all && object.has(ed.getName());
+            }
+          }
+          if (any && all) {
+            return sd;
+          }
+        }
+      }
+    }
+    return null;
   }
 
    
