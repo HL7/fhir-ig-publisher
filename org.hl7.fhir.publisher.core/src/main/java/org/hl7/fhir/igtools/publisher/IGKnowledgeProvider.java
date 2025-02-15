@@ -662,7 +662,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
           br.uri = ref;
           br.external = true;
         } else if (Utilities.isAbsoluteUrlLinkable(ref) && (!ref.startsWith("http://hl7.org") || !ref.startsWith("http://terminology.hl7.org"))) {
-          br.url = Utilities.encodeUri(ref);  
+          br.url = ref;  
           br.display = ref;
         } else if (vs == null) {
           br.url = null;
