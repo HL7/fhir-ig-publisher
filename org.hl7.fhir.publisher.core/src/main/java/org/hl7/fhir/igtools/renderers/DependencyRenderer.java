@@ -288,6 +288,7 @@ public class DependencyRenderer {
     
     HierarchicalTableGenerator gen = new HierarchicalTableGenerator(rc, dstFolder, true, true, "dep");
     TableModel model = createTable(gen, QA, hasDesc);
+  
     
     String realm = determineRealmForIg(ig.getPackageId());
     Set<String> processed = new HashSet<>();
@@ -719,7 +720,7 @@ public class DependencyRenderer {
   }
 
   private TableModel createTable(HierarchicalTableGenerator gen, boolean QA, boolean hasDesc) {
-    TableModel model = gen.new TableModel("dep", false);
+    TableModel model = gen.new TableModel("dep", true);
     
     model.setAlternating(true);
     if (!QA) {
