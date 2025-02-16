@@ -8,7 +8,7 @@
     <packaging>pom</packaging>
 
     <properties>
-        <core_version>6.5.8</core_version>
+        <core_version>6.5.9-SNAPSHOT</core_version>
         <maven_surefire_version>3.0.0-M5</maven_surefire_version>
         <apache_poi_version>5.2.1</apache_poi_version>
         <lombok_version>1.18.32</lombok_version>
@@ -21,7 +21,7 @@
         <maven.compiler.testSource>11</maven.compiler.testSource>
         <maven.compiler.testTarget>11</maven.compiler.testTarget>
         <logback-classic.version>1.5.15</logback-classic.version>
-        <nedap-healthcare-archie.version>3.12.0</nedap-healthcare-archie.version>
+        <nedap-healthcare-archie.version>3.13.1</nedap-healthcare-archie.version>
     </properties>
 
     <name>HL7 FHIR IG Publisher</name>

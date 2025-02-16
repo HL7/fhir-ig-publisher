@@ -146,7 +146,6 @@ import org.hl7.fhir.igtools.web.IGWebSiteMaintainer;
 import org.hl7.fhir.igtools.web.PackageRegistryBuilder;
 import org.hl7.fhir.igtools.web.PublicationProcess;
 import org.hl7.fhir.igtools.web.PublisherConsoleLogger;
-import org.hl7.fhir.igtools.web.WebSiteArchiveBuilder;
 import org.hl7.fhir.r4.formats.FormatUtilities;
 import org.hl7.fhir.r5.conformance.ConstraintJavaGenerator;
 import org.hl7.fhir.r5.conformance.R5ExtensionsLoader;
@@ -3817,17 +3816,17 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
   
   private String getToolingPackageName() throws FHIRException, IOException {
-    String vs = null;
+    String pn = null;
     if (VersionUtilities.isR3Ver(version)) {
-      vs = "hl7.fhir.uv.tools.r3";
+      pn = "hl7.fhir.uv.tools.r3";
     } else if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {
-      vs = "hl7.fhir.uv.tools.r4";
+      pn = "hl7.fhir.uv.tools.r4";
     } else if (VersionUtilities.isR5Ver(version)) {
-      vs = "hl7.fhir.uv.tools.r5";
+      pn = "hl7.fhir.uv.tools.r5";
     } else if (VersionUtilities.isR6Ver(version)) {
-      vs = "hl7.fhir.uv.tools.r5";
+      pn = "hl7.fhir.uv.tools.r5";
     }
-    return vs;
+    return pn;
   }
 
   private String getExtensionsPackageName() throws FHIRException, IOException {
@@ -6168,7 +6167,11 @@ private String fixPackageReference(String dep) {
       try {
         for (FetchedResource r : f.getResources()) {
           if (r.getResEntry() != null) {
-            ToolingExtensions.setStringExtension(r.getResEntry(), ToolingExtensions.EXT_IGP_RESOURCE_INFO, r.fhirType());
+            if (r.getResource() instanceof StructureDefinition) {
+              ToolingExtensions.setStringExtension(r.getResEntry(), ToolingExtensions.EXT_IGP_RESOURCE_INFO, r.fhirType()+":"+IGKnowledgeProvider.getSDType(r));
+            } else {
+              ToolingExtensions.setStringExtension(r.getResEntry(), ToolingExtensions.EXT_IGP_RESOURCE_INFO, r.fhirType()); 
+            }
           }
         }
       } finally {
@@ -6556,13 +6559,29 @@ private String fixPackageReference(String dep) {
         boolean altered = false;
         boolean binary = false;
         if (!context.getResourceNamesAsSet().contains(e.fhirType())) {
-          File f = new File(file.getPath());
-          id = f.getName();
-          id = id.substring(0, id.indexOf("."));
-          checkResourceUnique("Binary/"+id, file.getPath(), cause);
-          r.setElement(e).setId(id).setType("Binary");
-          igpkp.findConfiguration(file, r);
-          binary = true;
+          if (ToolingExtensions.readBoolExtension(e.getProperty().getStructure(), ToolingExtensions.EXT_LOAD_AS_RESOURCE)) {
+            String type = e.getProperty().getStructure().getTypeName();
+            id = e.getIdBase();
+            if (id == null) {
+              id = Utilities.makeId(e.getStatedResourceId());
+            }
+            if (id == null) {
+              id = new File(file.getPath()).getName();
+              id = Utilities.makeId(id.substring(0, id.lastIndexOf(".")));
+            }            
+            checkResourceUnique(type+"/"+id, file.getPath(), cause);
+            r.setElement(e).setId(id).setType(type);
+            igpkp.findConfiguration(file, r);
+            binary = false;
+          } else {
+            id = new File(file.getPath()).getName();
+            id = Utilities.makeId(id.substring(0, id.lastIndexOf(".")));
+            // are we going to treat it as binary, or something else? 
+            checkResourceUnique("Binary/"+id, file.getPath(), cause);
+            r.setElement(e).setId(id).setType("Binary");
+            igpkp.findConfiguration(file, r);
+            binary = true;
+          }
         } else {
           id = e.getChildValue("id");
 
@@ -6793,6 +6812,7 @@ private String fixPackageReference(String dep) {
     org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(context);
     jp.setupValidation(ValidationPolicy.EVERYTHING);
     jp.setAllowComments(true);
+    jp.setLogicalModelResolver(fetcher);
     return jp.parseSingle(new ByteArrayInputStream(file.getSource()), file.getErrors());
   }
 
@@ -8133,6 +8153,16 @@ private String fixPackageReference(String dep) {
         f.finish("generate2");      
       }
     }
+    
+    logMessage("Generate Spreadsheets");
+    for (FetchedFile f : changeList) {
+      f.start("generate2");
+      try {
+        generateSpreadsheets(f, false, db);
+      } finally {
+        f.finish("generate2");      
+      }
+    }
     if (allProfilesCsv != null) {
       allProfilesCsv.dump();
     }
@@ -8141,6 +8171,7 @@ private String fixPackageReference(String dep) {
       String path = Utilities.path(tempDir, "all-profiles.xlsx");
       allProfilesXlsx.finish(new FileOutputStream(path));
       otherFilesRun.add(Utilities.path(tempDir, "all-profiles.xlsx"));
+      allProfilesXlsx.dump();
     }
     logMessage("Generate Summaries");
 
@@ -11467,9 +11498,9 @@ private String fixPackageReference(String dep) {
         Map<String, String> vars = makeVars(r);
         makeTemplates(f, r, vars);
         saveDirectResourceOutputs(f, r, r.getResource(), vars);
-/*        if (r.getResEntry() != null && r.getResEntry().hasExtension("http://hl7.org/fhir/tools/StructureDefinition/implementationguide-resource-fragment")) {
-          generateResourceFragments(f, r, System.currentTimeMillis());
-        }*/
+///*        if (r.getResEntry() != null && r.getResEntry().hasExtension("http://hl7.org/fhir/tools/StructureDefinition/implementationguide-resource-fragment")) {
+//          generateResourceFragments(f, r, System.currentTimeMillis());
+//        }*/
         List<StringPair> clist = new ArrayList<>();
         if (r.getResource() == null && !r.isCustomResource()) {
           try {
@@ -11575,6 +11606,24 @@ private String fixPackageReference(String dep) {
           } else {
             fragment(r.fhirType()+"-"+r.getId()+"-contained-index", genContainedIndex(r, clist, null), f.getOutputNames(), start, "contained-index", "Resource");
           }
+        }
+      }
+    }
+  }
+  private void generateSpreadsheets(FetchedFile f, boolean regen, DBBuilder db) throws Exception {
+    if (generationOff) {
+      return;
+    }
+    //    System.out.println("gen2: "+f.getName());
+    if (f.getProcessMode() == FetchedFile.PROCESS_NONE) {
+      // nothing
+    } else if (f.getProcessMode() == FetchedFile.PROCESS_XSLT) {
+      // nothing
+    } else {
+      for (FetchedResource r : f.getResources()) {
+        Map<String, String> vars = makeVars(r);
+        if (r.getResource() != null) {
+          generateResourceSpreadsheets(f, regen, r, r.getResource(), vars, "", db);
         }
       }
     }
@@ -12063,7 +12112,7 @@ private String fixPackageReference(String dep) {
     }
     return src.getBytes(StandardCharsets.UTF_8);
   }
-
+  
   public boolean generateResourceHtml(FetchedFile f, boolean regen, FetchedResource r, Resource res, Map<String, String> vars, String prefixForContainer, DBBuilder db) {
     if (isNewML()) {
       boolean result = true;      
@@ -12121,6 +12170,65 @@ private String fixPackageReference(String dep) {
         if (res instanceof CanonicalResource) {
           generateOutputsCanonical(f, r, (CanonicalResource) res, vars, prefixForContainer, lrc, langSfx);          
         }
+        // nothing to do...
+        result = false;
+      }
+    } catch (Exception e) {
+      log("Exception generating resource "+f.getName()+"::"+r.fhirType()+"/"+r.getId()+(!Utilities.noString(prefixForContainer) ? "#"+res.getId() : "")+": "+e.getMessage());
+      f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, r.fhirType(), "Error Rendering Resource: "+e.getMessage(), IssueSeverity.ERROR));
+      e.printStackTrace();
+      for (StackTraceElement m : e.getStackTrace()) {
+        log("   "+m.toString());
+      }
+    }
+    return result;
+  }
+
+  public boolean generateResourceSpreadsheets(FetchedFile f, boolean regen, FetchedResource r, Resource res, Map<String, String> vars, String prefixForContainer, DBBuilder db) {
+    boolean result = true;
+    try {
+
+      // now, start generating resource type specific stuff
+      switch (res.getResourceType()) {
+//      case CodeSystem:
+//        generateOutputsCodeSystem(f, r, (CodeSystem) res, vars, prefixForContainer, lrc, langSfx);
+//        break;
+//      case ValueSet:
+//        generateOutputsValueSet(f, r, (ValueSet) res, vars, prefixForContainer, db, lrc, langSfx);
+//        break;
+//      case ConceptMap:
+//        generateOutputsConceptMap(f, r, (ConceptMap) res, vars, prefixForContainer, lrc, langSfx);
+//        break;
+//
+//      case List:
+//        generateOutputsList(f, r, (ListResource) res, vars, prefixForContainer, lrc, langSfx);      
+//        break;
+//
+//      case CapabilityStatement:
+//        generateOutputsCapabilityStatement(f, r, (CapabilityStatement) res, vars, prefixForContainer, lrc, langSfx);
+//        break;
+      case StructureDefinition:
+        generateSpreadsheetsStructureDefinition(f, r, (StructureDefinition) res, vars, regen, prefixForContainer);
+        break;
+//      case OperationDefinition:
+//        generateOutputsOperationDefinition(f, r, (OperationDefinition) res, vars, regen, prefixForContainer, lrc, langSfx);
+//        break;
+//      case StructureMap:
+//        generateOutputsStructureMap(f, r, (StructureMap) res, vars, prefixForContainer, lrc, langSfx);
+//        break;
+//      case Questionnaire:
+//        generateOutputsQuestionnaire(f, r, (Questionnaire) res, vars, prefixForContainer, lrc, langSfx);
+//        break;
+//      case Library:
+//        generateOutputsLibrary(f, r, (Library) res, vars, prefixForContainer, lrc, langSfx);
+//        break;
+//      case ExampleScenario:
+//        generateOutputsExampleScenario(f, r, (ExampleScenario) res, vars, prefixForContainer, lrc, langSfx);
+//        break;
+      default:
+//        if (res instanceof CanonicalResource) {
+//          generateOutputsCanonical(f, r, (CanonicalResource) res, vars, prefixForContainer, lrc, langSfx);          
+//        }
         // nothing to do...
         result = false;
       }
@@ -12474,7 +12582,7 @@ private String fixPackageReference(String dep) {
     Element eNN = element;
     jp.compose(element, bsj, OutputStyle.NORMAL, igpkp.getCanonical());
     if (!r.isCustomResource()) {
-      npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
+      npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsj.toByteArray());
       if (r.getResource() != null && r.getResource().hasUserData(UserDataNames.archetypeSource)) {
         npm.addFile(Category.ADL, r.getResource().getUserString(UserDataNames.archetypeName), r.getResource().getUserString(UserDataNames.archetypeSource).getBytes(StandardCharsets.UTF_8));
       }
@@ -12709,7 +12817,6 @@ private String fixPackageReference(String dep) {
     if (igpkp.wantGen(r, "ttl")) {
         genWrapper(null, r, template, igpkp.getProperty(r, "format"), f.getOutputNames(), vars, "ttl", "", false);
     }
-
     org.hl7.fhir.r5.elementmodel.XmlParser xp = new org.hl7.fhir.r5.elementmodel.XmlParser(context);
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
     xp.compose(r.getElement(), bs, OutputStyle.NORMAL, null);
@@ -13260,6 +13367,46 @@ private String fixPackageReference(String dep) {
     }
   }
 
+  private void generateSpreadsheetsStructureDefinition(FetchedFile f, FetchedResource r, StructureDefinition sd, Map<String, String> vars, boolean regen, String prefixForContainer) throws Exception {
+    String sdPrefix = newIg ? "StructureDefinition-" : "";
+    if (igpkp.wantGen(r, "csv")) {
+      String path = Utilities.path(tempDir, sdPrefix + r.getId()+".csv");
+      f.getOutputNames().add(path);
+      ProfileUtilities pu = new ProfileUtilities(context, errors, igpkp);
+      pu.generateCsv(new FileOutputStream(path), sd, true);
+      if (allProfilesCsv == null) {
+        allProfilesCsv = new CSVWriter(new FileOutputStream(Utilities.path(tempDir, "all-profiles.csv")), true);
+        otherFilesRun.add(Utilities.path(tempDir, "all-profiles.csv"));
+
+      }
+      pu.addToCSV(allProfilesCsv, sd);
+    }
+    if (igpkp.wantGen(r, "xlsx")) {
+      lapsed(null);
+      String path = Utilities.path(tempDir, sdPrefix + r.getId()+".xlsx");
+      f.getOutputNames().add(path);
+      StructureDefinitionSpreadsheetGenerator sdg = new StructureDefinitionSpreadsheetGenerator(context, true, anyMustSupport(sd));
+      sdg.renderStructureDefinition(sd, false);
+      sdg.finish(new FileOutputStream(path));
+      lapsed("xslx");
+      if (allProfilesXlsx == null) {
+        allProfilesXlsx  = new StructureDefinitionSpreadsheetGenerator(context, true, false);
+      }
+      allProfilesXlsx.renderStructureDefinition(sd, true);
+      lapsed("all-xslx");
+    }
+
+    if (!regen && sd.getKind() != StructureDefinitionKind.LOGICAL &&  igpkp.wantGen(r, "sch")) {
+      String path = Utilities.path(tempDir, sdPrefix + r.getId()+".sch");
+      f.getOutputNames().add(path);
+      new ProfileUtilities(context, errors, igpkp).generateSchematrons(new FileOutputStream(path), sd);
+      npm.addFile(Category.SCHEMATRON, sdPrefix + r.getId()+".sch", FileUtilities.fileToBytes(Utilities.path(tempDir, sdPrefix + r.getId()+".sch")));
+    }
+//    if (igpkp.wantGen(r, "sch"))
+//      start = System.currentTimeMillis();
+//    fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-sch"+langSfx, "yet to be done: schematron as html", null, f.getOutputNames(), start, "sch", "StructureDefinition");
+  }
+  
   private void generateOutputsStructureDefinition(FetchedFile f, FetchedResource r, StructureDefinition sd, Map<String, String> vars, boolean regen, String prefixForContainer, RenderingContext lrc, String langSfx) throws Exception {
     // todo : generate shex itself    
     if (igpkp.wantGen(r, "shex")) {
@@ -13532,20 +13679,6 @@ private String fixPackageReference(String dep) {
       fragment("StructureDefinition-testscript-table-"+prefixForContainer+sd.getId()+langSfx, sdr.testscriptTable(fileList), f.getOutputNames(), r, vars, null, start, "testscript-table", "StructureDefinition");;
     }
 
-    String sdPrefix = newIg ? "StructureDefinition-" : "";
-    if (igpkp.wantGen(r, "csv")) {
-      String path = Utilities.path(tempDir, sdPrefix + r.getId()+".csv");
-      f.getOutputNames().add(path);
-      ProfileUtilities pu = new ProfileUtilities(context, errors, igpkp);
-      pu.generateCsv(new FileOutputStream(path), sd, true);
-      if (allProfilesCsv == null) {
-        allProfilesCsv = new CSVWriter(new FileOutputStream(Utilities.path(tempDir, "all-profiles.csv")), true);
-        otherFilesRun.add(Utilities.path(tempDir, "all-profiles.csv"));
-
-      }
-      pu.addToCSV(allProfilesCsv, sd);
-    }
-    
     for (Extension ext : sd.getExtensionsByUrl(ToolingExtensions.EXT_SD_IMPOSE_PROFILE)) {
       StructureDefinition sdi = context.fetchResource(StructureDefinition.class, ext.getValue().primitiveValue());
       if (sdi != null) {
@@ -13564,30 +13697,6 @@ private String fixPackageReference(String dep) {
       }
     }
 
-    if (igpkp.wantGen(r, "xlsx")) {
-      lapsed(null);
-      String path = Utilities.path(tempDir, sdPrefix + r.getId()+".xlsx");
-      f.getOutputNames().add(path);
-      StructureDefinitionSpreadsheetGenerator sdg = new StructureDefinitionSpreadsheetGenerator(context, true, anyMustSupport(sd));
-      sdg.renderStructureDefinition(sd, false);
-      sdg.finish(new FileOutputStream(path));
-      lapsed("xslx");
-      if (allProfilesXlsx == null) {
-        allProfilesXlsx  = new StructureDefinitionSpreadsheetGenerator(context, true, false);
-      }
-      allProfilesXlsx.renderStructureDefinition(sd, true);
-      lapsed("all-xslx");
-    }
-
-    if (!regen && sd.getKind() != StructureDefinitionKind.LOGICAL &&  igpkp.wantGen(r, "sch")) {
-      String path = Utilities.path(tempDir, sdPrefix + r.getId()+".sch");
-      f.getOutputNames().add(path);
-      new ProfileUtilities(context, errors, igpkp).generateSchematrons(new FileOutputStream(path), sd);
-      npm.addFile(Category.SCHEMATRON, sdPrefix + r.getId()+".sch", FileUtilities.fileToBytes(Utilities.path(tempDir, sdPrefix + r.getId()+".sch")));
-    }
-    if (igpkp.wantGen(r, "sch"))
-      start = System.currentTimeMillis();
-      fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-sch"+langSfx, "yet to be done: schematron as html", null, f.getOutputNames(), start, "sch", "StructureDefinition");
   }
 
   private void lapsed(String msg) {
@@ -14189,9 +14298,9 @@ private String fixPackageReference(String dep) {
       IGReleaseVersionDeleter deleter = new IGReleaseVersionDeleter();
       deleter.clear(f.getAbsolutePath(), fh.getAbsolutePath());
     } else if (CliParams.hasNamedParam(args, "-go-publish")) {
-      new PublicationProcess().publish(CliParams.getNamedParam(args, "-source"), CliParams.getNamedParam(args, "-web"), CliParams.getNamedParam(args, "-date"),  CliParams.getNamedParam(args, "-registry"), CliParams.getNamedParam(args, "-history"), CliParams.getNamedParam(args, "-templates"), CliParams.getNamedParam(args, "-temp"), args);
-    } else if (CliParams.hasNamedParam(args, "-generate-archives")) {
-      new WebSiteArchiveBuilder().start(CliParams.getNamedParam(args, "-generate-archives"));
+      new PublicationProcess().publish(CliParams.getNamedParam(args, "-source"), CliParams.getNamedParam(args, "-web"), CliParams.getNamedParam(args, "-date"),  
+          CliParams.getNamedParam(args, "-registry"), CliParams.getNamedParam(args, "-history"), CliParams.getNamedParam(args, "-templates"), 
+          CliParams.getNamedParam(args, "-temp"), CliParams.getNamedParam(args, "-zips"), args);
     } else if (CliParams.hasNamedParam(args, "-generate-package-registry")) {
       new PackageRegistryBuilder(CliParams.getNamedParam(args, "-generate-package-registry")).build();
     } else if (CliParams.hasNamedParam(args, "-xig")) {

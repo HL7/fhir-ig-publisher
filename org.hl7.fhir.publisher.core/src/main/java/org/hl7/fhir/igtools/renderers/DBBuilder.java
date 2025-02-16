@@ -541,9 +541,14 @@ public class DBBuilder {
         for (ConceptDefinitionDesignationComponent p : cd.getDesignation()) { 
           psql.setInt(1, ++lastDesgKey);
           psql.setInt(2, ((Integer) cs.getUserData(UserDataNames.db_key)).intValue());
-          psql.setInt(3, ((Integer) cd.getUserData(UserDataNames.db_key)).intValue());        
-          bindString(psql, 4, p.getUse().getSystem());
-          bindString(psql, 5, p.getUse().getCode());
+          psql.setInt(3, ((Integer) cd.getUserData(UserDataNames.db_key)).intValue());  
+          if (p.hasUse()) {
+            bindString(psql, 4, p.getUse().getSystem());
+            bindString(psql, 5, p.getUse().getCode());
+          } else {
+            bindString(psql, 4, null);
+            bindString(psql, 5, null);            
+          }
           bindString(psql, 6, p.getLanguage());
           bindString(psql, 7, p.getValue());
           psql.executeUpdate();    
@@ -1109,19 +1114,23 @@ public class DBBuilder {
       }
 
       if (rl != null) {
+        Set<String> ids = new HashSet<>();
         sql = con.prepareStatement("insert into ValueSetListRefs (ValueSetListKey, Type, Id, ResourceKey, Title, Web) values (?, ?, ?, ?, ?, ?)");      
         for (Resource r : rl) {
-          sql.setInt(1, lastVLKey);
-          sql.setString(2, r.fhirType());      
-          sql.setString(3, r.getIdBase());
-          if (vs.hasUserData(UserDataNames.db_key)) {
-            sql.setInt(4, (int) vs.getUserData(UserDataNames.db_key));
-          } else {
-            sql.setNull(4, java.sql.Types.INTEGER);
-          }      
-          sql.setString(5, r instanceof CanonicalResource ? ((CanonicalResource) r).present() : r.fhirType()+"/"+r.getIdBase());
-          sql.setString(6, r.getWebPath());
-          sql.execute();
+          if (!ids.contains(r.getIdBase())) {
+            ids.add(r.getIdBase());
+            sql.setInt(1, lastVLKey);
+            sql.setString(2, r.fhirType());      
+            sql.setString(3, r.getIdBase());
+            if (vs.hasUserData(UserDataNames.db_key)) {
+              sql.setInt(4, (int) vs.getUserData(UserDataNames.db_key));
+            } else {
+              sql.setNull(4, java.sql.Types.INTEGER);
+            }      
+            sql.setString(5, r instanceof CanonicalResource ? ((CanonicalResource) r).present() : r.fhirType()+"/"+r.getIdBase());
+            sql.setString(6, r.getWebPath());
+            sql.execute();
+          }
         }
       }
     } catch (SQLException e) {

@@ -110,7 +110,7 @@ public class PublicationProcess {
    * @param destination - the root folder of the local copy of files for the web site to which the IG is being published. 
    * @throws Exception 
    */
-  public void publish(String source, String web, String date, String registrySource, String history, String templatesSrc, String temp, String[] args) throws Exception {
+  public void publish(String source, String web, String date, String registrySource, String history, String templatesSrc, String temp, String igBuildZipParam, String[] args) throws Exception {
     PublisherConsoleLogger logger = new PublisherConsoleLogger();
     logger.start(Utilities.path("[tmp]", "publication-process.log"));
     try {
@@ -124,7 +124,7 @@ public class PublicationProcess {
       System.out.println(s);
       System.out.println("---------------");
       System.out.println("Publication Run: publish "+source+" to "+web);
-      List<ValidationMessage> res = publishInner(source, web, date, registrySource, history, templatesSrc, temp, logger, args);
+      List<ValidationMessage> res = publishInner(source, web, date, registrySource, history, templatesSrc, temp, igBuildZipParam, logger, args);
       if (res.size() == 0) {
         System.out.println("Success");
       } else {
@@ -153,7 +153,7 @@ public class PublicationProcess {
     return Long.toString(maxMemory / (1024*1024));
   }
 
-  public List<ValidationMessage> publishInner(String source, String web, String date, String registrySource, String history, String templateSrc, String temp, PublisherConsoleLogger logger, String[] args) throws Exception {
+  public List<ValidationMessage> publishInner(String source, String web, String date, String registrySource, String history, String templateSrc, String temp, String igBuildZipParam, PublisherConsoleLogger logger, String[] args) throws Exception {
     List<ValidationMessage> res = new ArrayList<>();
 
     if (temp == null) {
@@ -174,7 +174,8 @@ public class PublicationProcess {
       throw new Error("Uploading files by FTP is no longer supported");
     }
 
-    checkDirectory(Utilities.path(workingRoot, "ig-build-zips"), res, "Destination Zip Folder", true);
+    File igBuildZipDir = new File(igBuildZipParam == null ? Utilities.path(workingRoot, "ig-build-zips") : igBuildZipParam); 
+    checkDirectory(igBuildZipDir.getAbsolutePath(), res, "Destination Zip Folder", true);
     File fRegistry = checkFile(registrySource, res, "Registry");
     File fHistory = checkDirectory(history, res, "History Template");
     src.needFile("publish-setup.json");
@@ -235,7 +236,7 @@ public class PublicationProcess {
           help = false;
           publishInner2(source, web, date, registrySource, history, templateSrc, temp, logger, args,
               destination, workingRoot, res, src, id, canonical, version, npm, pubSetup, qa,
-              fSource, fOutput, fRoot, fRegistry, fHistory, jsonXmlClones);
+              fSource, fOutput, fRoot, fRegistry, fHistory, jsonXmlClones, igBuildZipDir);
         }        
       }
     }
@@ -281,7 +282,7 @@ public class PublicationProcess {
   public List<ValidationMessage> publishInner2(String source, String web, String date, String registrySource, String history, String templateSrc, String temp, 
       PublisherConsoleLogger logger, String[] args, String destination, String workingRoot, List<ValidationMessage> res, WebSourceProvider src,
       String id, String canonical, String version, NpmPackage npm, JsonObject pubSetup, JsonObject qa, 
-      File fSource, File fOutput, File fRoot, File fRegistry, File fHistory, boolean jsonXmlClones) throws Exception {
+      File fSource, File fOutput, File fRoot, File fRegistry, File fHistory, boolean jsonXmlClones, File igBuildZipDir) throws Exception {
     System.out.println("Relative directory for IG is '"+destination.substring(workingRoot.length())+"'");
     String relDest = FileUtilities.getRelativePath(workingRoot, destination);
     FileUtilities.createDirectory(destination);
@@ -422,8 +423,8 @@ public class PublicationProcess {
     // well, we've run out of things to test... time to actually try...
     if (res.size() == 0) {
       doPublish(fSource, fOutput, qa, destination, destVer, pathVer, fRoot, pubSetup, pl, prSrc, fRegistry, npm, mode, date, fHistory, temp, logger, 
-          pubSetup.getJsonObject("website").asString("url"), src, sft, relDest, templateSrc, first, indexes, Calendar.getInstance(), getComputerName(), IGVersionUtil.getVersionString(), gitSrcId(source), tcName,
-          workingRoot, jsonXmlClones);
+          pubSetup.getJsonObject("website").asString("url"), src, sft, relDest, templateSrc, first, indexes, Calendar.getInstance(), getComputerName(), 
+          IGVersionUtil.getVersionString(), gitSrcId(source), tcName, workingRoot, jsonXmlClones, igBuildZipDir);
     }        
     return res;    
   }
@@ -495,7 +496,7 @@ public class PublicationProcess {
 
   private void doPublish(File fSource, File fOutput, JsonObject qa, String destination, String destVer, String pathVer, File fRoot, JsonObject pubSetup, PackageList pl, JsonObject prSrc, File fRegistry, NpmPackage npm, 
       PublicationProcessMode mode, String date, File history, String tempDir, PublisherConsoleLogger logger, String url, WebSourceProvider src, File sft, String relDest, String templateSrc, boolean first, Map<String, IndexMaintainer> indexes,
-      Calendar genDate, String username, String version, String gitSrcId, String tcName, String workingRoot, boolean jsonXmlClones) throws Exception {
+      Calendar genDate, String username, String version, String gitSrcId, String tcName, String workingRoot, boolean jsonXmlClones, File igBuildZipDir) throws Exception {
     // ok. all our tests have passed.
     // 1. do the publication build(s)
     List<String> existingFiles = new ArrayList<>();
@@ -517,14 +518,14 @@ public class PublicationProcess {
       }
 
       // 2. make a copy of what we built
-      System.out.println("Keep a copy of the build directory at "+Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".zip"));    
+      System.out.println("Keep a copy of the build directory at "+Utilities.path(igBuildZipDir, npm.name()+"#"+npm.version()+".zip"));    
 
       // 2.1. Delete the ".git" subfolder
       delTempFolder(temp, ".git");
       delTempFolder(temp, "temp");
       delTempFolder(temp, "template");
 
-      zipFolder(temp, Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".zip"));
+      zipFolder(temp, Utilities.path(igBuildZipDir, npm.name()+"#"+npm.version()+".zip"));
 
       System.out.println("");        
       System.out.println("ok. All checks passed. Publish v"+npm.version()+" to "+destVer);        
@@ -611,7 +612,7 @@ public class PublicationProcess {
     new HistoryPageUpdater().updateHistoryPage(history.getAbsolutePath(), destination, templateSrc, !first); 
     
     logger.stop();
-    FileUtils.copyFile(new File(logger.getFilename()), new File(Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".log")));
+    FileUtils.copyFile(new File(logger.getFilename()), new File(Utilities.path(igBuildZipDir, npm.name()+"#"+npm.version()+".log")));
     src.finish(relDest, existingFiles);
     System.out.println("Finished Publishing. "+src.instructions(existingFiles.size()));
     exitCode = 0;
