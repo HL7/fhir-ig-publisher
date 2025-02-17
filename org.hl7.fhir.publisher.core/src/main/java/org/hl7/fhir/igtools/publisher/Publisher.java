@@ -2332,7 +2332,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       }
     }
     if (logDecision) {
-      logMessage("Using en-US as the default narrative language. (no language information in Implementation Guide or command line)");
+      logMessage("Using en-US as the default narrative language. (no language information in Implementation Guide)");
     }
     return new Locale("en", "US");
   }
@@ -7401,7 +7401,7 @@ private String fixPackageReference(String dep) {
     if (base == null) {
       throw new Exception("Cannot find or generate snapshot for base definition ("+sd.getBaseDefinition()+" from "+sd.getUrl()+")");
     }
-    if (sd.hasUserData(UserDataNames.SNAPSHOT_GENERATED)) {
+    if (sd.isGeneratedSnapshot()) {
       changed = true;
       // we already tried to generate the snapshot, and maybe there were messages? if there are, 
       // put them in the right place
