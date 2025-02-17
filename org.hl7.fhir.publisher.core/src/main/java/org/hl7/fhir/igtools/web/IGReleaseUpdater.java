@@ -60,7 +60,7 @@ import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
 public class IGReleaseUpdater {
 
   public enum ServerType {
-    APACHE, ASP1, ASP2, LITESPEED;
+    APACHE, ASP1, ASP2, LITESPEED, CLOUD;
 
     public static ServerType fromCode(String st) {
       st = st.toLowerCase();
@@ -74,6 +74,8 @@ public class IGReleaseUpdater {
         return ServerType.APACHE;
       } else if (st.equals("litespeed")) {
         return ServerType.LITESPEED;
+      } else if (st.equals("cloud")) {
+        return ServerType.CLOUD;
       } else { 
         throw new Error("-server-type "+st+" not known - use ASP or Apache");
       }
@@ -344,6 +346,8 @@ public class IGReleaseUpdater {
     IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(vf, canonical, version.asString("path"), rootFolder);
     if (serverType == ServerType.APACHE) {
       rb.buildApacheRedirections();
+    } else if (serverType == ServerType.CLOUD) {
+      rb.buildCloudRedirections();
     } else if (serverType == ServerType.ASP2) {
       rb.buildNewAspRedirections(isCore, isCore && vf.equals(rootFolder));
     } else if (serverType == ServerType.ASP1) {
