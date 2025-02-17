@@ -614,8 +614,77 @@ public class PublicationProcess {
     logger.stop();
     FileUtils.copyFile(new File(logger.getFilename()), new File(Utilities.path(igBuildZipDir, npm.name()+"#"+npm.version()+".log")));
     src.finish(relDest, existingFiles);
+    String anonuncement = buildAnnouncement(pubSetup, prSrc, npm, destination, destVer, pathVer, mode, url, relDest, version, tcName);
+    FileUtilities.stringToFile(anonuncement, Utilities.path(igBuildZipDir, npm.name()+"#"+npm.version()+"-announcement.txt"));
     System.out.println("Finished Publishing. "+src.instructions(existingFiles.size()));
     exitCode = 0;
+  }
+
+  private String buildAnnouncement(JsonObject pubSetup, JsonObject prSrc, NpmPackage npm, String destination, String destVer, String pathVer, PublicationProcessMode mode, String url, String relDest, String version, String tcName) {
+    String st = null;
+    switch (prSrc.asString("status")) {
+    case "release":
+      st = "Release";
+      break;
+    case "trial-use":
+      st = "STU";
+      break;
+    case "update":
+      st = "Update";
+      break;
+    case "preview":
+      st = "Preview";
+      break;
+    case "ballot":
+      st = "Ballot";
+      break;
+    case "draft":
+      st = "Draft";
+      break;
+    case "normative+trial-use":
+      st = "Mixed Normative+STU";
+      break;
+    case "normative":
+      st = "Normative";
+      break;
+    case "informative":
+      st = "Informative";
+      break;
+    default:
+      st = "Unknown";
+      break;
+    }
+    
+    StringBuilder b = new StringBuilder();
+    switch (mode) {
+    case CREATION: 
+      b.append("New Publication Action: ");
+      break;
+    case MILESTONE:
+      b.append("New "+st+" Publication Available: ");
+      break;
+    case TECHNICAL_CORRECTION:
+      b.append("New Technical Correction: ");
+      break;
+    case WORKING:
+      b.append("New "+st+" Version Available: ");
+      break;
+    default:
+      b.append("New "+st+" Publication: ");
+      break;
+    }
+    b.append(npm.title());
+    b.append(": "+npm.name());
+    b.append("#");
+    b.append(npm.version());
+    b.append(" @ ");
+    b.append(pathVer);
+    b.append("\r\n\r\n");
+    b.append(prSrc.has("descmd") ? prSrc.asString("descmd") : prSrc.asString("descmd"));
+        
+    System.out.println("Announcement");
+    System.out.println(b.toString());
+    return b.toString();        
   }
 
   public void delTempFolder(File temp, String s) throws IOException {
