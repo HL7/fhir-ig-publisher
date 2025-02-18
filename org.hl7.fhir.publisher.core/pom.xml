@@ -15,7 +15,7 @@
     <properties>
         <!-- GraalVM uses the JDK numbering scheme. These should always be LTS versions (17, 21, etc). -->
         <graalvm.version>21.3.13</graalvm.version>
-        <info_cqframework_version>3.21.0</info_cqframework_version>
+        <info_cqframework_version>3.22.0</info_cqframework_version>
     </properties>
 
     <dependencies>
