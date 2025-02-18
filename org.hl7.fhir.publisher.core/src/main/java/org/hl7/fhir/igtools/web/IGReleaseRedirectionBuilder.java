@@ -90,6 +90,32 @@ public class IGReleaseRedirectionBuilder {
       "?>\r\n"+
       "    \r\n"+
       "You should not be seeing this page. If you do, PHP has failed badly.\r\n";
+
+  private static final String HTML_TEMPLATE = "<?php\r\n"+
+      "function Redirect($url)\r\n"+
+      "{\r\n"+
+      "  header('Location: ' . $url, true, 302);\r\n"+
+      "  exit();\r\n"+
+      "}\r\n"+
+      "\r\n"+
+      "$accept = $_SERVER['HTTP_ACCEPT'];\r\n"+
+      "if (strpos($accept, 'application/json+fhir') !== false)\r\n"+
+      "  Redirect('{{literal}}.json2');\r\n"+
+      "elseif (strpos($accept, 'application/fhir+json') !== false)\r\n"+
+      "  Redirect('{{literal}}.json1');\r\n"+
+      "elseif (strpos($accept, 'json') !== false)\r\n"+
+      "  Redirect('{{literal}}.json');\r\n"+
+      "elseif (strpos($accept, 'application/xml+fhir') !== false)\r\n"+
+      "  Redirect('{{literal}}.xml2');\r\n"+
+      "elseif (strpos($accept, 'application/fhir+xml') !== false)\r\n"+
+      "  Redirect('{{literal}}.xml1');\r\n"+
+      "elseif (strpos($accept, 'html') !== false)\r\n"+
+      "  Redirect('{{html}}');\r\n"+
+      "else \r\n"+
+      "  Redirect('{{literal}}.xml');\r\n"+
+      "?>\r\n"+
+      "    \r\n"+
+      "You should not be seeing this page. If you do, PHP has failed badly.\r\n";
   
   private static final String WC_START_ROOT = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + 
       "<configuration>\n" + 
@@ -150,6 +176,21 @@ public class IGReleaseRedirectionBuilder {
           String litPath = Utilities.path(folder, p);
           if (new File(litPath+".xml").exists() && new File(litPath+".json").exists()) 
             createPhpRedirect(path, map.get(s), Utilities.pathURL(vpath, p));
+        }
+      }
+    }
+  }
+  
+  public void buildCloudRedirections() throws IOException {    
+    Map<String, String> map = createMap(false);
+    if (map != null) {
+      for (String s : map.keySet()) {
+        if (!s.contains(":")) {
+          String path = Utilities.path(folder, s, "index.html");
+          String p = s.replace("/", "-");
+          String litPath = Utilities.path(folder, p);
+          if (new File(litPath+".xml").exists() && new File(litPath+".json").exists()) 
+            createHtmlRedirect(path, map.get(s), Utilities.pathURL(vpath, p));
         }
       }
     }
@@ -364,6 +405,18 @@ public class IGReleaseRedirectionBuilder {
 
   private void createPhpRedirect(String path, String urlHtml, String urlSrc) throws IOException {
     String t = PHP_TEMPLATE;
+    t = t.replace("{{html}}", urlHtml);
+    t = t.replace("{{literal}}", urlSrc);
+    FileUtilities.createDirectory(FileUtilities.getDirectoryForFile(path));
+    countTotal++;
+    if (!new File(path).exists() || !FileUtilities.fileToString(path).equals(t)) {
+      FileUtilities.stringToFile(t, path);
+      countUpdated++;
+    }
+  }
+  
+  private void createHtmlRedirect(String path, String urlHtml, String urlSrc) throws IOException {
+    String t = HTML_TEMPLATE;
     t = t.replace("{{html}}", urlHtml);
     t = t.replace("{{literal}}", urlSrc);
     FileUtilities.createDirectory(FileUtilities.getDirectoryForFile(path));
