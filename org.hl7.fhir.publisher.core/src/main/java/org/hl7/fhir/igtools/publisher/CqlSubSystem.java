@@ -73,19 +73,19 @@ import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 
 /**
  * What this system does
- * 
+ *
  * Library:
- * 
+ *
  * Measure:
- * 
+ *
  * PlanDefinition:
- * 
+ *
  * ActivityDefinition:
- * 
+ *
  */
 public class CqlSubSystem {
 
-  /** 
+  /**
    * information about a cql file
    */
   public class CqlSourceFileInformation {
@@ -150,7 +150,7 @@ public class CqlSubSystem {
             }
           }
         } catch (IOException e) {
-          logger.logDebugMessage(ILoggingService.LogCategory.PROGRESS, String.format("Exceptions occurred attempting to load npm library source for %s", identifier.toString()));
+          logger.logMessage(String.format("Exceptions occurred attempting to load npm library source for %s", identifier.toString()));
         }
       }
 
@@ -189,7 +189,7 @@ public class CqlSubSystem {
             }
           }
         } catch (IOException e) {
-          logger.logDebugMessage(ILoggingService.LogCategory.PROGRESS, String.format("Exceptions occurred attempting to load npm library for model %s", modelIdentifier.toString()));
+          logger.logMessage(String.format("Exceptions occurred attempting to load npm library for model %s", modelIdentifier.toString()));
         }
       }
 
@@ -200,31 +200,31 @@ public class CqlSubSystem {
   /**
    * The Implementation Guide build supports multiple versions. This code runs as R5 code.
    * The library reader loads the library etc from the NpmPackage and returns an R5 library etc,
-   * irrespective of what version the IG is 
+   * irrespective of what version the IG is
    */
   public interface ICqlResourceReader {
-    public Library readLibrary(InputStream stream) throws FHIRFormatError, IOException; 
-    public Measure readMeasure(InputStream stream) throws FHIRFormatError, IOException; 
-    public PlanDefinition readPlanDefinition(InputStream stream) throws FHIRFormatError, IOException; 
-    public ActivityDefinition readActivityDefinition(InputStream stream) throws FHIRFormatError, IOException; 
+    public Library readLibrary(InputStream stream) throws FHIRFormatError, IOException;
+    public Measure readMeasure(InputStream stream) throws FHIRFormatError, IOException;
+    public PlanDefinition readPlanDefinition(InputStream stream) throws FHIRFormatError, IOException;
+    public ActivityDefinition readActivityDefinition(InputStream stream) throws FHIRFormatError, IOException;
   }
-  
+
   /**
-   * all the NPM packages this IG depends on (including base). 
-   * This list is in a maintained order such that you can just 
-   * do for (NpmPackage p : packages) and that will resolve the 
+   * all the NPM packages this IG depends on (including base).
+   * This list is in a maintained order such that you can just
+   * do for (NpmPackage p : packages) and that will resolve the
    * library in the right order
-   *   
+   *
    */
   private List<NpmPackage> packages;
-  
+
   /**
    * All the file paths cql files might be found in (absolute local file paths)
-   * 
+   *
    * will be at least one error
    */
-  private List<String> folders; 
-  
+  private List<String> folders;
+
   /**
    * Version indepedent reader
    */
@@ -275,12 +275,12 @@ public class CqlSubSystem {
       this.namespaceInfo = new NamespaceInfo(packageId, canonicalBase);
     }
   }
-  
+
   /**
-   * Do the compile. Do not return any exceptions related to content; only thros exceptions for infrastructural issues 
-   * 
+   * Do the compile. Do not return any exceptions related to content; only thros exceptions for infrastructural issues
+   *
    * note that it's not an error if there's no .cql files - this is called without checking for their existence
-   *  
+   *
    * Any exception will stop the build cold.
    */
   public void execute() throws FHIRException {
@@ -288,13 +288,13 @@ public class CqlSubSystem {
       logger.logMessage("Translating CQL source");
       fileMap = new HashMap<>();
 
-       // foreach folder
+      // foreach folder
       for (String folder : folders) {
         translateFolder(folder);
       }
     }
     catch (Exception E) {
-      logger.logDebugMessage(ILoggingService.LogCategory.PROGRESS, String.format("Errors occurred attempting to translate CQL content: %s", E.getMessage()));
+      logger.logMessage(String.format("Errors occurred attempting to translate CQL content: %s", E.getMessage()));
     }
   }
 
@@ -311,7 +311,7 @@ public class CqlSubSystem {
     if (!fileMap.containsKey(filename)) {
       for (Map.Entry<String, CqlSourceFileInformation> entry: fileMap.entrySet()) {
         if (filename.equalsIgnoreCase(entry.getKey())) {
-          logger.logDebugMessage(ILoggingService.LogCategory.PROGRESS, String.format("File with a similar name but different casing was found. File found: '%s'", entry.getKey()));
+          logger.logMessage(String.format("File with a similar name but different casing was found. File found: '%s'", entry.getKey()));
         }
       }
       return null;
@@ -346,7 +346,7 @@ public class CqlSubSystem {
    * @param folder
    * @return
    */
-    private CqlTranslatorOptions getTranslatorOptions(String folder) {
+  private CqlTranslatorOptions getTranslatorOptions(String folder) {
     String optionsFileName = folder + File.separator + "cql-options.json";
     CqlTranslatorOptions options = null;
     File file = new File(optionsFileName);
@@ -432,13 +432,21 @@ public class CqlSubSystem {
 
   private void loadNamespaces(LibraryManager libraryManager) {
     if (namespaceInfo != null) {
-      libraryManager.getNamespaceManager().addNamespace(namespaceInfo);
+      libraryManager.getNamespaceManager().ensureNamespaceRegistered(namespaceInfo);
     }
 
     for (NpmPackage p : packages) {
       if (p.name() != null && !p.name().isEmpty() && p.canonical() != null && !p.canonical().isEmpty()) {
         NamespaceInfo ni = new NamespaceInfo(p.name(), p.canonical());
-        libraryManager.getNamespaceManager().addNamespace(ni);
+        if (libraryManager.getNamespaceManager().resolveNamespaceUri(ni.getName()) != null) {
+          logger.logMessage(String.format("Skipped loading namespace info for name %s because it is already registered", ni.getName()));
+        }
+        else if (libraryManager.getNamespaceManager().getNamespaceInfoFromUri(ni.getUri()) != null) {
+          logger.logMessage(String.format("Skipped loading namespace infor for uri %s because it is already registered", ni.getUri()));
+        }
+        else {
+          libraryManager.getNamespaceManager().ensureNamespaceRegistered(ni);
+        }
       }
     }
   }
@@ -557,7 +565,8 @@ public class CqlSubSystem {
         // System model info is an implicit dependency, do not report
         if (!def.getLocalIdentifier().equals("System")) {
           // FHIR model info included from the translator is implicit, do not report
-          if (!(def.getLocalIdentifier().equals("FHIR") && def.getUri() != null && def.getUri().equals("http://hl7.org/fhir"))) {
+          if (!((def.getLocalIdentifier().equals("FHIR") || def.getLocalIdentifier().equals("USCore") || def.getLocalIdentifier().equals("QICore"))
+                  && def.getUri() != null && def.getUri().equals("http://hl7.org/fhir"))) {
             result.add(toRelatedArtifact(def));
           }
         }
@@ -569,7 +578,7 @@ public class CqlSubSystem {
       for (IncludeDef def : library.getIncludes().getDef()) {
         // System library is an implicit dependency, do not report
         if (!def.getLocalIdentifier().equals("System")) {
-          // FHIR Helpers included from the translator is impicit, do not report
+          // FHIR Helpers included from the translator is implicit, do not report
           if (!(def.getPath().equals("http://hl7.org/fhir/FHIRHelpers"))) {
             result.add(toRelatedArtifact(def));
           }
