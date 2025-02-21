@@ -7493,10 +7493,6 @@ private String fixPackageReference(String dep) {
   private void checkForCoreDependenciesCS(NPMPackageGenerator npm, SimpleWorkerContext tctxt, CodeSystem cs, NpmPackage tnpm) throws IOException {
     if (isCoreResource(cs)) {
       if (!inTargetCore(tnpm, cs)) {
-        if ("concept-map-relationship".equals(cs.getId())) {
-          DebugUtilities.breakpoint();
-        }
-
         if (!npm.hasFile(Category.RESOURCE, cs.fhirType()+"-"+cs.getIdBase()+".json")) {
           npm.addFile(Category.RESOURCE, cs.fhirType()+"-"+cs.getIdBase()+".json", convVersion(cs, tctxt.getVersion()));
         }
@@ -8280,15 +8276,11 @@ private String fixPackageReference(String dep) {
     generateViewDefinitions(db);
     templateBeforeGenerate();
 
-//    long mem = DebugUtilities.getMemory();
     logMessage("Generate HTML Outputs");
     for (FetchedFile f : changeList) {
-//      long nmem = DebugUtilities.getMemory();
       f.start("generate2");
       try {
         generateHtmlOutputs(f, false, db);
-//        long m = DebugUtilities.getMemory();
-//        System.out.println("mem: "+(m-mem)+" / "+(m - nmem)+" for "+f.getName());
       } finally {
         f.finish("generate2");      
       }
