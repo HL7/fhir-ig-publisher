@@ -216,7 +216,7 @@ public class IGPack2NpmConvertor {
           loadSpecInternals(ig,  files.get("spec.internals"), "??", version, canonical, files);
         String destFile = dest != null ? dest : Utilities.path(FileUtilities.getDirectoryForFile(f.getAbsolutePath()), "package.tgz");
         String url = Utilities.noString(website) ? canonical : website;
-        NPMPackageGenerator npm = new NPMPackageGenerator(destFile, canonical, url, PackageType.IG, ig, new Date(), false);
+        NPMPackageGenerator npm = new NPMPackageGenerator(ig.getPackageId(), destFile, canonical, url, PackageType.IG, ig, new Date(), false);
         
 
         npm.addFile(Category.RESOURCE, "ImplementationGuide-"+ig.getId()+".json", compose(ig, version));

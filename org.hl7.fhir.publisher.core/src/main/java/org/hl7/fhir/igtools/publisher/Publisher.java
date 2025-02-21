@@ -80,13 +80,18 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
+import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_30_50;
+import org.hl7.fhir.convertors.context.ContextResourceLoaderFactory;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_10_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_14_30;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_14_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_43_50;
+import org.hl7.fhir.convertors.loaders.loaderR5.NullLoaderKnowledgeProviderR5;
 import org.hl7.fhir.convertors.misc.NpmPackageVersionConverter;
+import org.hl7.fhir.convertors.misc.ProfileVersionAdaptor;
+import org.hl7.fhir.convertors.misc.ProfileVersionAdaptor.ConversionMessage;
 import org.hl7.fhir.convertors.txClient.TerminologyClientFactory;
 import org.hl7.fhir.exceptions.DefinitionException;
 import org.hl7.fhir.exceptions.FHIRException;
@@ -94,6 +99,7 @@ import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.openehr.ArchetypeImporter;
 import org.hl7.fhir.igtools.openehr.ArchetypeImporter.ProcessedArchetype;
 import org.hl7.fhir.igtools.publisher.FetchedFile.FetchedBundleType;
+import org.hl7.fhir.igtools.publisher.FetchedResource.AlternativeVersionResource;
 import org.hl7.fhir.igtools.publisher.IFetchFile.FetchState;
 import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
 import org.hl7.fhir.igtools.publisher.comparators.IpsComparator;
@@ -211,6 +217,7 @@ import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
 import org.hl7.fhir.r5.model.Enumeration;
 import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
 import org.hl7.fhir.r5.model.Enumerations.FHIRVersion;
+import org.hl7.fhir.r5.model.Enumerations.FHIRVersionEnumFactory;
 import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
 import org.hl7.fhir.r5.model.ExampleScenario;
 import org.hl7.fhir.r5.model.Extension;
@@ -820,7 +827,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private String npmName;
 
   private NPMPackageGenerator npm;
-
+  private Map<String, NPMPackageGenerator> vnpms = new HashMap<String, NPMPackageGenerator>();
+  
   private FilesystemPackageCacheManager pcm;
 
   private TemplateManager templateManager;
@@ -4837,7 +4845,11 @@ private String fixPackageReference(String dep) {
       if (!dep.hasPackageId()) 
         throw new FHIRException("Unknown package id for "+dep.getUri());
     }
-    npm = new NPMPackageGenerator(Utilities.path(outputDir, "package.tgz"), igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, execTime.getTime(), !publishing);
+    npm = new NPMPackageGenerator(publishedIg.getPackageId(), Utilities.path(outputDir, "package.tgz"), igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, execTime.getTime(), !publishing);
+    for (String v : generateVersions) {
+      vnpms.put(v, new NPMPackageGenerator(publishedIg.getPackageId()+"."+v, Utilities.path(outputDir, publishedIg.getPackageId()+"."+v+".tgz"), 
+          igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, execTime.getTime(), !publishing, VersionUtilities.versionFromCode(v)));
+    }
     execTime = Calendar.getInstance();
 
     rc = new RenderingContext(context, markdownEngine, ValidationOptions.defaults(), checkAppendSlash(specPath), "", locale, ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
@@ -6067,6 +6079,8 @@ private String fixPackageReference(String dep) {
 
     log("Check R4 / R4B");
     checkR4R4B();
+    generateOtherVersions();
+    
     log("Assign Comparison Ids");
     assignComparisonIds();
     if (isPropagateStatus) {
@@ -7390,6 +7404,128 @@ private String fixPackageReference(String dep) {
     }
   }
 
+  private void generateOtherVersions() throws Exception {
+    for (String v : generateVersions) {
+      String version = VersionUtilities.versionFromCode(v);
+      if (!VersionUtilities.versionsMatch(version, context.getVersion())) {
+        logDebugMessage(LogCategory.PROGRESS, "Generate Other Version: "+version);
+
+        NpmPackage targetNpm = pcm.loadPackage(VersionUtilities.packageForVersion(version));
+        IContextResourceLoader loader = ContextResourceLoaderFactory.makeLoader(targetNpm.fhirVersion(), new NullLoaderKnowledgeProviderR5());
+        SimpleWorkerContext tctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().fromPackage(targetNpm, loader, true);
+        ProfileVersionAdaptor pva = new ProfileVersionAdaptor(context, tctxt);
+
+        for (FetchedFile f : fileList) {
+          f.start("generateOtherVersions");
+          try {
+            for (FetchedResource r : f.getResources()) {
+              if (r.getResource() instanceof StructureDefinition) {
+                generateOtherVersion(r, pva, version, (StructureDefinition) r.getResource());
+              } 
+            }
+          } finally {
+            f.finish("generateOtherVersions");      
+          }
+        }
+        
+        for (FetchedFile f: fileList) {
+          f.start("generateOtherVersions");
+          try {
+            for (FetchedResource r : f.getResources()) {
+              if (r.getResource() != null) {
+                checkForCoreDependencies(vnpms.get(v), tctxt, r.getResource(), targetNpm);
+              }  
+            }
+          } finally {
+            f.finish("generateOtherVersions");      
+          }
+        }
+      }
+    }
+  }
+
+  private void checkForCoreDependencies(NPMPackageGenerator npm, SimpleWorkerContext tctxt, Resource res, NpmPackage tnpm) throws IOException {
+    if (res instanceof StructureDefinition) {
+      checkForCoreDependenciesSD(npm, tctxt, (StructureDefinition) res, tnpm);
+    }
+    if (res instanceof ValueSet) {
+      checkForCoreDependenciesVS(npm, tctxt, (ValueSet) res, tnpm);
+    }   
+  }
+
+
+  private void checkForCoreDependenciesSD(NPMPackageGenerator npm, SimpleWorkerContext tctxt, StructureDefinition sd, NpmPackage tnpm) throws IOException {
+    for (ElementDefinition ed : sd.getSnapshot().getElement()) {
+      if (ed.hasBinding() && ed.getBinding().hasValueSet()) {
+        ValueSet vs = context.fetchResource(ValueSet.class, ed.getBinding().getValueSet());
+        if (vs != null) {
+          checkForCoreDependenciesVS(npm, tctxt, vs, tnpm);
+        }
+      }
+    }
+  }
+
+  private void checkForCoreDependenciesVS(NPMPackageGenerator npm, SimpleWorkerContext tctxt, ValueSet valueSet, NpmPackage tnpm) throws IOException {
+
+    if (isCoreResource(valueSet)) {
+      if (!inTargetCore(tnpm, valueSet)) {
+        if (!npm.hasFile(Category.RESOURCE, valueSet.fhirType()+"-"+valueSet.getIdBase()+".json")) {
+          npm.addFile(Category.RESOURCE, valueSet.fhirType()+"-"+valueSet.getIdBase()+".json", convVersion(valueSet, tctxt.getVersion()));
+        }
+      }
+    }
+    for (ConceptSetComponent inc : valueSet.getCompose().getInclude()) {
+      for (CanonicalType c : inc.getValueSet()) {
+        ValueSet vs = context.fetchResource(ValueSet.class, c.getValue());
+        if (vs != null) {
+          checkForCoreDependenciesVS(npm, tctxt, vs, tnpm);
+        }
+      }
+      if (inc.hasSystem()) {
+        CodeSystem cs = context.fetchResource(CodeSystem.class, inc.getSystem(), inc.getVersion());
+        if (cs != null) {
+          checkForCoreDependenciesCS(npm, tctxt, cs, tnpm);
+        }
+      }
+    }    
+  }
+
+  private void checkForCoreDependenciesCS(NPMPackageGenerator npm, SimpleWorkerContext tctxt, CodeSystem cs, NpmPackage tnpm) throws IOException {
+    if (isCoreResource(cs)) {
+      if (!inTargetCore(tnpm, cs)) {
+        if ("concept-map-relationship".equals(cs.getId())) {
+          DebugUtilities.breakpoint();
+        }
+
+        if (!npm.hasFile(Category.RESOURCE, cs.fhirType()+"-"+cs.getIdBase()+".json")) {
+          npm.addFile(Category.RESOURCE, cs.fhirType()+"-"+cs.getIdBase()+".json", convVersion(cs, tctxt.getVersion()));
+        }
+      }
+    }
+  }
+
+  private boolean inTargetCore(NpmPackage tnpm, CanonicalResource cr) throws IOException {
+    boolean res = tnpm.hasCanonical(cr.getUrl());
+    return res;
+  }
+
+  private boolean isCoreResource(CanonicalResource cr) {
+    return cr.hasSourcePackage() && Utilities.existsInList(cr.getSourcePackage().getId(), "hl7.fhir.r5.core", "hl7.fhir.r4.core");
+  }
+
+
+  private void generateOtherVersion(FetchedResource r, ProfileVersionAdaptor pva, String v, StructureDefinition resource) throws FileNotFoundException, IOException {
+    List<ConversionMessage> log = new ArrayList<>();
+    try {
+      StructureDefinition sd = pva.convert(resource, log);
+      r.getOtherVersions().put(v, new AlternativeVersionResource(log, sd));
+    } catch (Exception e) {
+      System.out.println("Error converting "+r.getId()+" to "+v+": "+e.getMessage());
+      log.add(new ConversionMessage(e.getMessage(), true));
+      r.getOtherVersions().put(v, new AlternativeVersionResource(log, null));      
+    }
+  }
+
   private void generateSnapshot(FetchedFile f, FetchedResource r, StructureDefinition sd, boolean close, ProfileUtilities utils) throws Exception {
     boolean changed = false;
         
@@ -8144,11 +8280,15 @@ private String fixPackageReference(String dep) {
     generateViewDefinitions(db);
     templateBeforeGenerate();
 
+//    long mem = DebugUtilities.getMemory();
     logMessage("Generate HTML Outputs");
     for (FetchedFile f : changeList) {
+//      long nmem = DebugUtilities.getMemory();
       f.start("generate2");
       try {
         generateHtmlOutputs(f, false, db);
+//        long m = DebugUtilities.getMemory();
+//        System.out.println("mem: "+(m-mem)+" / "+(m - nmem)+" for "+f.getName());
       } finally {
         f.finish("generate2");      
       }
@@ -8254,9 +8394,9 @@ private String fixPackageReference(String dep) {
 
       if (!changeList.isEmpty()) {
         File df = makeSpecFile();
-        npm.addFile(Category.OTHER, "spec.internals", FileUtilities.fileToBytes(df.getAbsolutePath()));
-        npm.addFile(Category.OTHER, "validation-summary.json", validationSummaryJson());
-        npm.addFile(Category.OTHER, "validation-oo.json", validationSummaryOO());
+        addFileToNpm(Category.OTHER, "spec.internals", FileUtilities.fileToBytes(df.getAbsolutePath()));
+        addFileToNpm(Category.OTHER, "validation-summary.json", validationSummaryJson());
+        addFileToNpm(Category.OTHER, "validation-oo.json", validationSummaryOO());
         for (String t : testDirs) {
           addTestDir(new File(t), t);
         }
@@ -8265,7 +8405,7 @@ private String fixPackageReference(String dep) {
           if (f.exists()) {
             for (File ff : f.listFiles()) {
               if (!SimpleFetcher.isIgnoredFile(f.getName())) {
-                npm.addFile(Category.OTHER, ff.getName(), FileUtilities.fileToBytes(ff.getAbsolutePath()));
+                addFileToNpm(Category.OTHER, ff.getName(), FileUtilities.fileToBytes(ff.getAbsolutePath()));
               }              
             }
           } else {
@@ -8273,6 +8413,9 @@ private String fixPackageReference(String dep) {
           }
         }
         npm.finish();
+        for (NPMPackageGenerator vnpm : vnpms.values()) {
+          vnpm.finish();
+        }
         if (r4tor4b.canBeR4() && r4tor4b.canBeR4B()) {
           try {
             r4tor4b.clonePackage(npmName, npm.filename());
@@ -8296,7 +8439,7 @@ private String fixPackageReference(String dep) {
         JsonArray json = new JsonArray();
         for (String s : generateVersions) {
           json.add(s);
-          generatePackageVersion(npm.filename(), s);
+          //generatePackageVersion(npm.filename(), s);
         }
         FileUtilities.bytesToFile(org.hl7.fhir.utilities.json.parser.JsonParser.composeBytes(json), Utilities.path(outputDir, "sub-package-list.json"));
         generateZips(df);
@@ -8362,6 +8505,20 @@ private String fixPackageReference(String dep) {
     }
   }
 
+  private void addFileToNpm(Category other, String name, byte[] cnt) throws IOException {
+    npm.addFile(other, name, cnt);
+    for (NPMPackageGenerator vnpm : vnpms.values()) {
+      vnpm.addFile(other, name, cnt);      
+    }
+  }
+
+  private void addFileToNpm(String other, String name, byte[] cnt) throws IOException {
+    npm.addFile(other, name, cnt);
+    for (NPMPackageGenerator vnpm : vnpms.values()) {
+      vnpm.addFile(other, name, cnt);      
+    }
+  }
+
   private void generateFragmentUsage() throws IOException {
     log("Generate fragment-usage-analysis.csv");
     StringBuilder b = new StringBuilder();
@@ -8401,7 +8558,7 @@ private String fixPackageReference(String dep) {
       if (f.isDirectory()) {
         addTestDir(f, t);        
       } else {
-        npm.addFile("tests/"+FileUtilities.getRelativePath(t, dir.getAbsolutePath()), f.getName(), FileUtilities.fileToBytes(f));        
+        addFileToNpm("tests/"+FileUtilities.getRelativePath(t, dir.getAbsolutePath()), f.getName(), FileUtilities.fileToBytes(f));  
       }
     }
   }
@@ -8493,7 +8650,7 @@ private String fixPackageReference(String dep) {
   }
 
   private void generatePackageVersion(String filename, String ver) throws IOException {
-    NpmPackageVersionConverter self = new NpmPackageVersionConverter(filename, Utilities.path(FileUtilities.getDirectoryForFile(filename), publishedIg.getPackageId()+"."+ver+".tgz"), ver, publishedIg.getPackageId()+"."+ver);
+    NpmPackageVersionConverter self = new NpmPackageVersionConverter(filename, Utilities.path(FileUtilities.getDirectoryForFile(filename), publishedIg.getPackageId()+"."+ver+".tgz"), ver, publishedIg.getPackageId()+"."+ver, context);
     self.execute();
     for (String s : self.getErrors()) {
       errors.add(new ValidationMessage(Source.Publisher, IssueType.EXCEPTION, "ImplementationGuide", "Error creating "+ver+" package: "+s, IssueSeverity.ERROR));
@@ -12583,24 +12740,32 @@ private String fixPackageReference(String dep) {
     jp.compose(element, bsj, OutputStyle.NORMAL, igpkp.getCanonical());
     if (!r.isCustomResource()) {
       npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsj.toByteArray());
-      if (r.getResource() != null && r.getResource().hasUserData(UserDataNames.archetypeSource)) {
-        npm.addFile(Category.ADL, r.getResource().getUserString(UserDataNames.archetypeName), r.getResource().getUserString(UserDataNames.archetypeSource).getBytes(StandardCharsets.UTF_8));
+      for (String v : generateVersions) {
+        Resource res = r.hasOtherVersions() && r.getOtherVersions().containsKey(v) ? r.getOtherVersions().get(v).getSd() : r.getResource();
+        if (res != null) {
+          vnpms.get(v).addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", convVersion(res.copy(), v));
+        }
       }
+      if (r.getResource() != null && r.getResource().hasUserData(UserDataNames.archetypeSource)) {
+        addFileToNpm(Category.ADL, r.getResource().getUserString(UserDataNames.archetypeName), r.getResource().getUserString(UserDataNames.archetypeSource).getBytes(StandardCharsets.UTF_8));
+      }
+      
     } else  if ("StructureDefinition".equals(r.fhirType())) {
-      npm.addFile(Category.RESOURCE, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
+      // GG 20-Feb 2025 - how can you ever get to here? 
+      addFileToNpm(Category.RESOURCE, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
       StructureDefinition sdt = (StructureDefinition) r.getResource().copy();
       sdt.setKind(StructureDefinitionKind.RESOURCE);
       bsj = new ByteArrayOutputStream();
       new JsonParser().setOutputStyle(OutputStyle.NORMAL).compose(bsj, sdt);
-      npm.addFile(Category.CUSTOM, "StructureDefinition-"+r.getId()+".json", bsj.toByteArray());      
+      addFileToNpm(Category.CUSTOM, "StructureDefinition-"+r.getId()+".json", bsj.toByteArray());      
     } else {
-      npm.addFile(Category.CUSTOM, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
+      addFileToNpm(Category.CUSTOM, element.fhirType()+"-"+r.getId()+".json", bsj.toByteArray());
       Binary bin = new Binary("application/fhir+json");
       bin.setId(r.getId());
       bin.setContent(bsj.toByteArray());
       bsj = new ByteArrayOutputStream();
       new JsonParser().setOutputStyle(OutputStyle.NORMAL).compose(bsj, bin);
-      npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, "Binary-"+r.getId()+".json", bsj.toByteArray());
+      addFileToNpm(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, "Binary-"+r.getId()+".json", bsj.toByteArray());
     }
     
     if (module.isNoNarrative()) {
@@ -12626,6 +12791,38 @@ private String fixPackageReference(String dep) {
     return bsj.toByteArray();
   }
 
+  private byte[] convVersion(Resource res, String v) throws FHIRException, IOException {
+    String version = v.startsWith("r") ? VersionUtilities.versionFromCode(v) : v;
+//    checkForCoreDependencies(res);
+    convertResourceR5(res, v);
+    if (VersionUtilities.isR2Ver(version)) {
+      return new org.hl7.fhir.dstu2.formats.JsonParser().composeBytes(VersionConvertorFactory_10_50.convertResource(res));
+    } else if (VersionUtilities.isR2BVer(version)) {
+      return new org.hl7.fhir.dstu2016may.formats.JsonParser().composeBytes(VersionConvertorFactory_14_50.convertResource(res));
+    } else if (VersionUtilities.isR3Ver(version)) {
+      return new org.hl7.fhir.dstu3.formats.JsonParser().composeBytes(VersionConvertorFactory_30_50.convertResource(res, new BaseAdvisor_30_50(false)));
+    } else if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {
+      return new org.hl7.fhir.r4.formats.JsonParser().composeBytes(VersionConvertorFactory_40_50.convertResource(res));
+    } else if (VersionUtilities.isR5Plus(version)) {
+      return new org.hl7.fhir.r5.formats.JsonParser().composeBytes(res);
+    } else {
+      throw new Error("Unknown version "+version);
+    }
+  }
+
+  private void convertResourceR5(Resource res, String v) {
+    if (res instanceof ImplementationGuide) {
+      ImplementationGuide ig = (ImplementationGuide) res;
+      ig.getFhirVersion().clear();
+      ig.getFhirVersion().add(new Enumeration<>(new FHIRVersionEnumFactory(), version));
+      ig.setPackageId(publishedIg.getPackageId()+"."+v);
+    }
+    if (res instanceof StructureDefinition) {
+      StructureDefinition sd = (StructureDefinition) res;
+      sd.setFhirVersion(FHIRVersion.fromCode(version));
+    }
+  }
+  
   private void saveNativeResourceOutputFormats(FetchedFile f, FetchedResource r, Element element, String suffix, String lang) throws IOException, FileNotFoundException {
     String path;
     if (igpkp.wantGen(r, "xml") || forHL7orFHIR()) {
@@ -13363,7 +13560,7 @@ private String fixPackageReference(String dep) {
       new OpenApiGenerator(context, cpbs, oa).generate(displ, "http://spdx.org/licenses/"+lic+".html");
       oa.commit();
       otherFilesRun.add(Utilities.path(tempDir, cpbs.getId()+ ".openapi.json"));
-      npm.addFile(Category.OPENAPI, cpbs.getId()+ ".openapi.json", FileUtilities.fileToBytes(Utilities.path(tempDir, cpbs.getId()+ ".openapi.json")));
+      addFileToNpm(Category.OPENAPI, cpbs.getId()+ ".openapi.json", FileUtilities.fileToBytes(Utilities.path(tempDir, cpbs.getId()+ ".openapi.json")));
     }
   }
 
@@ -13400,7 +13597,7 @@ private String fixPackageReference(String dep) {
       String path = Utilities.path(tempDir, sdPrefix + r.getId()+".sch");
       f.getOutputNames().add(path);
       new ProfileUtilities(context, errors, igpkp).generateSchematrons(new FileOutputStream(path), sd);
-      npm.addFile(Category.SCHEMATRON, sdPrefix + r.getId()+".sch", FileUtilities.fileToBytes(Utilities.path(tempDir, sdPrefix + r.getId()+".sch")));
+      addFileToNpm(Category.SCHEMATRON, sdPrefix + r.getId()+".sch", FileUtilities.fileToBytes(Utilities.path(tempDir, sdPrefix + r.getId()+".sch")));
     }
 //    if (igpkp.wantGen(r, "sch"))
 //      start = System.currentTimeMillis();
@@ -13679,6 +13876,11 @@ private String fixPackageReference(String dep) {
       fragment("StructureDefinition-testscript-table-"+prefixForContainer+sd.getId()+langSfx, sdr.testscriptTable(fileList), f.getOutputNames(), r, vars, null, start, "testscript-table", "StructureDefinition");;
     }
 
+    if (igpkp.wantGen(r, "other-versions")) {
+      start = System.currentTimeMillis();
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-other-versions"+langSfx, sdr.otherVersions(f.getOutputNames(), r), f.getOutputNames(), r, vars, null, start, "other-versions", "StructureDefinition");;
+    }
+    
     for (Extension ext : sd.getExtensionsByUrl(ToolingExtensions.EXT_SD_IMPOSE_PROFILE)) {
       StructureDefinition sdi = context.fetchResource(StructureDefinition.class, ext.getValue().primitiveValue());
       if (sdi != null) {
