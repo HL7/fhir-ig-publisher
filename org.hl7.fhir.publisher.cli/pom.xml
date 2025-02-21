@@ -5,7 +5,7 @@
     <parent>
         <artifactId>org.hl7.fhir.publisher</artifactId>
         <groupId>org.hl7.fhir.publisher</groupId>
-        <version>1.8.13</version>
+        <version>1.8.14-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -51,51 +51,25 @@
                     </execution>
                 </executions>
             </plugin>
-            <!--
-            Build a fatjar containing all dependencies
-            -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-dependency-plugin</artifactId>
-                <version>3.1.2</version>
-                <executions>
-                    <execution>
-                        <id>unpack-dependencies</id>
-                        <phase>process-classes</phase>
-                        <goals>
-                            <goal>unpack-dependencies</goal>
-                        </goals>
-                        <configuration>
-                            <!-- exclude the following:
-                                Signature files that will be flagged as inconsistent:
-                                  META-INF/*.SF,META-INF/*.DSA,META-INF/*.RSA
-                                A module-info from org.graalvm.truffle (imported by org.graalvm.js) that is compiled for Java 17
-                                  META-INF/versions/17/module-info.class
-                           -->
-                            <excludes>META-INF/*.SF,META-INF/*.DSA,META-INF/*.RSA,META-INF/versions/17/module-info.class</excludes>
-                            <outputDirectory>${project.build.directory}/classes</outputDirectory>
-                            <overWriteReleases>false</overWriteReleases>
-                            <overWriteSnapshots>true</overWriteSnapshots>
-                            <excludeScope>test</excludeScope>
-                            <includeScope>compile</includeScope>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>3.4.1</version>
                 <executions>
                     <execution>
+                        <phase>package</phase>
                         <goals>
                             <goal>shade</goal>
                         </goals>
                         <configuration>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>org.hl7.fhir.igtools.publisher.Publisher</mainClass>
+                                </transformer>
                             </transformers>
-                            <minimizeJar>true</minimizeJar>
                             <filters>
                                 <filter>
                                     <artifact>*:*</artifact>
