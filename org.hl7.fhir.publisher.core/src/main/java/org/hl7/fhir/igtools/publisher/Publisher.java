@@ -10312,48 +10312,52 @@ private String fixPackageReference(String dep) {
           jNodes.add(jNode);
           ValidationResult vr = jvs==null ? null : context.validateCode(new ValidationOptions(FhirPublication.R5, "en-US"),  cc, jvs);
           if (vr != null && vr.asCoding()!=null) {
-            Coding cd = vr.asCoding();
-            jNode.add("code", cd.getCode());
-            if (cd.getSystem().equals("http://unstats.un.org/unsd/methods/m49/m49.htm") && cd.getCode().equals("001")) {
-              jNode.add("name", "International");
-              jNode.add("flag", "001");
-            } else if (cd.getSystem().equals("urn:iso:std:iso:3166")) {
-              String code = translateCountryCode(cd.getCode()).toLowerCase();
-              jNode.add("name", displayForCountryCode(cd.getCode()));
-              File flagFile = new File(vsCache + "/" + code + ".svg");
-              if (!flagFile.exists() && !ignoreFlags.contains(code)) {
-                URL url2 = new URL("https://flagcdn.com/" + shortCountryCode.get(code.toUpperCase()).toLowerCase() + ".svg");
-                try {
-                  InputStream in = url2.openStream();
-                  Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
-                } catch (Exception e2) {
-                  ignoreFlags.add(code);
-                  System.out.println("Unable to access " + url2 + " or " + url2+" ("+e2.getMessage()+")");
+            try {
+              Coding cd = vr.asCoding();
+              jNode.add("code", cd.getCode());
+              if (cd.getSystem().equals("http://unstats.un.org/unsd/methods/m49/m49.htm") && cd.getCode().equals("001")) {
+                jNode.add("name", "International");
+                jNode.add("flag", "001");
+              } else if (cd.getSystem().equals("urn:iso:std:iso:3166")) {
+                String code = translateCountryCode(cd.getCode()).toLowerCase();
+                jNode.add("name", displayForCountryCode(cd.getCode()));
+                File flagFile = new File(vsCache + "/" + code + ".svg");
+                if (!flagFile.exists() && !ignoreFlags.contains(code)) {
+                  URL url2 = new URL("https://flagcdn.com/" + shortCountryCode.get(code.toUpperCase()).toLowerCase() + ".svg");
+                  try {
+                    InputStream in = url2.openStream();
+                    Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
+                  } catch (Exception e2) {
+                    ignoreFlags.add(code);
+                    System.out.println("Unable to access " + url2 + " or " + url2 + " (" + e2.getMessage() + ")");
+                  }
+                }
+                if (flagFile.exists()) {
+                  FileUtils.copyFileToDirectory(flagFile, flagDir);
+                  jNode.add("flag", code);
+                }
+              } else if (cd.getSystem().equals("urn:iso:std:iso:3166:-2")) {
+                String code = cd.getCode();
+                String[] codeParts = cd.getCode().split("-");
+                jNode.add("name", displayForStateCode(cd.getCode()) + " (" + displayForCountryCode(codeParts[0]) + ")");
+                File flagFile = new File(vsCache + "/" + code + ".svg");
+                if (!flagFile.exists()) {
+                  URL url = new URL("http://flags.ox3.in/svg/" + codeParts[0].toLowerCase() + "/" + codeParts[1].toLowerCase() + ".svg");
+                  try (InputStream in = url.openStream()) {
+                    Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
+                  } catch (Exception e) {
+                    // If we can't find the file, that's ok.
+                  }
+                }
+                if (flagFile.exists()) {
+                  FileUtils.copyFileToDirectory(flagFile, flagDir);
+                  jNode.add("flag", code);
                 }
               }
-              if (flagFile.exists()) {
-                FileUtils.copyFileToDirectory(flagFile, flagDir);
-                jNode.add("flag", code);
-              }
-            } else if (cd.getSystem().equals("urn:iso:std:iso:3166:-2")) {
-              String code = cd.getCode();
-              String[] codeParts = cd.getCode().split("-");
-              jNode.add("name", displayForStateCode(cd.getCode()) + " (" + displayForCountryCode(codeParts[0]) + ")");
-              File flagFile = new File(vsCache + "/" + code + ".svg");
-              if (!flagFile.exists()) {
-                URL url = new URL("http://flags.ox3.in/svg/" + codeParts[0].toLowerCase() + "/" + codeParts[1].toLowerCase() + ".svg");
-                try (InputStream in = url.openStream()) {
-                  Files.copy(in, Paths.get(flagFile.getAbsolutePath()));
-                } catch (Exception e) {
-                  // If we can't find the file, that's ok.
-                }
-              }
-              if (flagFile.exists()) {
-                FileUtils.copyFileToDirectory(flagFile, flagDir);
-                jNode.add("flag", code);
-              }
+            } catch (Exception e) {
+              System.out.println("ERROR: Unable to populate flag information");
             }
-          } else {
+          } else{
             jNode.add("name", dr.displayDataType(cc));
           }
         }
@@ -10496,46 +10500,54 @@ private String fixPackageReference(String dep) {
       throw new Exception("Error expanding ISO country-code & state value sets");
     }
     for (ValueSetExpansionContainsComponent c: char3Expand.getValueset().getExpansion().getContains()) {
-      countryCodeForName.put(c.getDisplay(), c.getCode());
-      countryNameForCode.put(c.getCode(), c.getDisplay());      
+      if (!c.hasDisplay())
+        System.out.println("No display value for 3-character country code " + c.getCode());
+      else {
+        countryCodeForName.put(c.getDisplay(), c.getCode());
+        countryNameForCode.put(c.getCode(), c.getDisplay());
+      }
     }
     for (ValueSetExpansionContainsComponent c: char2Expand.getValueset().getExpansion().getContains()) {
-      String code = countryCodeForName.get(c.getDisplay());
-      if (code==null) {
-        switch (c.getDisplay()) {
-        case "Åland Islands":
-          code = countryCodeForName.get("Eland Islands");
-          break;
-        case "Côte d''Ivoire":
-          code = countryCodeForName.get("Ctte d'Ivoire");
-          break;
-        case "Curaçao":
-          code = "Curagao";
-          break;
-        case "Korea, Democratic People''s Republic of":
-          code = "Korea, Democratic People's Republic of";
-          break;
-        case "Lao People''s Democratic Republic":
-          code = "Lao People's Democratic Republic";
-          break;
-        case "Réunion":
-          code = "Riunion";
-          break;
-        case "Saint Barthélemy":
-          code = countryCodeForName.get("Saint Barthilemy");
-          break;              
-        case "United Kingdom of Great Britain and Northern Ireland":
-          code = countryCodeForName.get("United Kingdom");
-          break;
-        case "Virgin Islands,":
-          code = countryCodeForName.get("Virgin Islands, U.S.");
-          break;
-        default:
-          throw new Exception("Unable to find 3-character code having same country code as ISO 2-char code " + c.getCode() + " - " + c.getDisplay());
+      if (!c.hasDisplay())
+        System.out.println("No display value for 2-character country code " + c.getCode());
+      else {
+        String code = countryCodeForName.get(c.getDisplay());
+        if (code==null) {
+          switch (c.getDisplay()) {
+            case "Åland Islands":
+              code = countryCodeForName.get("Eland Islands");
+              break;
+            case "Côte d''Ivoire":
+              code = countryCodeForName.get("Ctte d'Ivoire");
+              break;
+            case "Curaçao":
+              code = "Curagao";
+              break;
+            case "Korea, Democratic People''s Republic of":
+              code = "Korea, Democratic People's Republic of";
+              break;
+            case "Lao People''s Democratic Republic":
+              code = "Lao People's Democratic Republic";
+              break;
+            case "Réunion":
+              code = "Riunion";
+              break;
+            case "Saint Barthélemy":
+              code = countryCodeForName.get("Saint Barthilemy");
+              break;
+            case "United Kingdom of Great Britain and Northern Ireland":
+              code = countryCodeForName.get("United Kingdom");
+              break;
+            case "Virgin Islands,":
+              code = countryCodeForName.get("Virgin Islands, U.S.");
+              break;
+            default:
+              throw new Exception("Unable to find 3-character code having same country code as ISO 2-char code " + c.getCode() + " - " + c.getDisplay());
+          }
         }
+        countryCodeFor2Letter.put(c.getCode(), code);
+        shortCountryCode.put(code, c.getCode());
       }
-      countryCodeFor2Letter.put(c.getCode(), code);
-      shortCountryCode.put(code, c.getCode());
     }
     for (ValueSetExpansionContainsComponent c: numExpand.getValueset().getExpansion().getContains()) {
       String code = countryCodeForName.get(c.getDisplay());
