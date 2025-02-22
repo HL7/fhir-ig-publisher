@@ -501,10 +501,10 @@ public class HTMLInspector {
     File f = new File(s);
     Boolean hl7State = null;
     XhtmlNode x = null;
-    boolean htmlName = f.getName().endsWith(".html") || f.getName().endsWith(".xhtml");
+    boolean htmlName = f.getName().endsWith(".html") || f.getName().endsWith(".xhtml") || f.getName().endsWith(".svg");
     try {
       x = new XhtmlParser().setMustBeWellFormed(strict).parse(new FileInputStream(f), null);
-      if (x.getElement("html")==null && !htmlName) {
+      if (x.getElement("html")==null && x.getElement("svg")==null && !htmlName) {
         // We don't want resources being treated as HTML.  We'll check the HTML of the narrative in the page representation
         x = null;
       }
@@ -531,6 +531,9 @@ public class HTMLInspector {
     }
     LoadedFile lf = new LoadedFile(s, getPath(s, base), f.lastModified(), iteration, hl7State, findExemptionComment(x) || Utilities.existsInList(f.getName(), "searchform.html"), x != null);
     cache.put(s, lf);
+    if (x != null && x.getElement("svg") != null) {
+      lf.exempt = true;
+    }
     if (x != null) {
       checkHtmlStructure(s, x, messages);
       listTargets(x, lf.getTargets());
@@ -594,8 +597,12 @@ public class HTMLInspector {
       return false;
     }
     for (XhtmlNode c : x.getChildNodes()) {
-      if (c.getNodeType() == NodeType.Comment && x.getContent() != null && x.getContent().trim().equals("frameset content"))
+      if (c.getNodeType() == NodeType.Comment && x.getContent() != null && x.getContent().trim().equals("frameset content")) {
         return true;
+      }
+      if (c.getNodeType() == NodeType.Comment && x.getContent() != null && x.getContent().trim().equals("no-publish-box-ok")) {
+        return true;
+      }
     }
     return false;
   }
@@ -624,14 +631,18 @@ public class HTMLInspector {
   private void checkHtmlStructure(String s, XhtmlNode x, List<ValidationMessage> messages) {
     if (x.getNodeType() == NodeType.Document)
       x = x.getFirstElement();
-    if (!"html".equals(x.getName()) && !"div".equals(x.getName()))
+    if (!"html".equals(x.getName()) && !"div".equals(x.getName()) && !"svg".equals(x.getName())) {
       messages.add(new ValidationMessage(Source.Publisher, IssueType.STRUCTURE, s, "Root node must be 'html' or 'div', but is "+x.getName(), IssueSeverity.ERROR));
+    }
     // We support div as well because with HTML 5, referenced files might just start with <div>
     // todo: check secure?
     
   }
 
   private void listTargets(XhtmlNode x, Set<String> targets) {
+    if ("svg".equals(x.getName())) {
+      return;
+    }
     if ("a".equals(x.getName()) && x.hasAttribute("name"))
       targets.add(x.getAttribute("name"));
     if (x.hasAttribute("id"))
@@ -641,8 +652,9 @@ public class HTMLInspector {
         targets.add(urlify(x.allText()));
       }
     }
-    for (XhtmlNode c : x.getChildNodes())
+    for (XhtmlNode c : x.getChildNodes()) {
       listTargets(c, targets);
+    }
   }
 
   private NodeChangeType checkLinks(LoadedFile lf, String s, String path, XhtmlNode x, String uuid, List<ValidationMessage> messages, boolean inPre, DuplicateAnchorTracker dat) throws IOException {
@@ -717,11 +729,11 @@ public class HTMLInspector {
       } else {
         ValidationMessage vm;
         if (isCIBuild) {
-          vm = new ValidationMessage(Source.Publisher, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> tag in the file '"+filename+"' containing the javascript '"+subset(x.allText())+"'... is illegal - put the script in a  .js file in a trusted template", IssueSeverity.FATAL);
+          vm = new ValidationMessage(Source.Publisher, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> tag in the file '"+filename+"' containing the javascript '"+subset(x.allText())+"'... is illegal - put the script in a  .js file in a trusted template (if it is justified and needed)", IssueSeverity.FATAL);
         } else if (forHL7) {
-          vm =  new ValidationMessage(Source.Publisher, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> containing the javascript '"+subset(x.allText())+"'... is illegal and not allowed on the HL7 cibuild - put the script in a  .js file in a trusted template", IssueSeverity.ERROR);
+          vm =  new ValidationMessage(Source.Publisher, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> containing the javascript '"+subset(x.allText())+"'... is illegal and not allowed on the HL7 ci-build - put the script in a  .js file in a trusted template (if it is justified and needed)", IssueSeverity.ERROR);
         } else {
-          vm =  new ValidationMessage(Source.Publisher, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> containing the javascript '"+subset(x.allText())+"'... is illegal and not allowed on the HL7 cibuild - need to put the script in a  .js file in a trusted template if this IG is to build on the HL7 cibuild", IssueSeverity.WARNING);
+          vm =  new ValidationMessage(Source.Publisher, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> containing the javascript '"+subset(x.allText())+"'... is illegal and not allowed on the HL7 ci-build - need to put the script in a  .js file in a trusted template if this IG is to build on the HL7 ci-build (if it is justified and needed)", IssueSeverity.WARNING);
         }
         messages.add(vm);
         jsmsgs.put(js, vm);

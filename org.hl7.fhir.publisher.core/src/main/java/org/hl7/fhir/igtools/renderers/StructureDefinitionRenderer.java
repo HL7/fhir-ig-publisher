@@ -11,10 +11,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.hl7.fhir.convertors.misc.ProfileVersionAdaptor.ConversionMessage;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
+import org.hl7.fhir.igtools.publisher.FetchedResource.AlternativeVersionResource;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.CanonicalResourceComparison;
@@ -26,6 +28,9 @@ import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CanonicalType;
+import org.hl7.fhir.r5.model.CapabilityStatement;
+import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestComponent;
+import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceComponent;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeableConcept;
 import org.hl7.fhir.r5.model.Coding;
@@ -2136,6 +2141,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     Map<String, String> trefs = new HashMap<>();
     Map<String, String> examples = new HashMap<>();
     Map<String, String> searches = new HashMap<>();
+    Map<String, String> capStmts = new HashMap<>();
     for (StructureDefinition sdt : context.fetchResourcesByType(StructureDefinition.class)) {
       if (refersToThisSD(sdt.getBaseDefinition())) {
         base.put(sdt.getWebPath(), sdt.present());
@@ -2172,6 +2178,30 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
       }
     }
+
+    for (FetchedFile f : files) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getResource() != null && r.getResource() instanceof CapabilityStatement) {
+          CapabilityStatement cst = (CapabilityStatement) r.getResource();
+          for (CapabilityStatementRestComponent rest : cst.getRest()) {
+            for (CapabilityStatementRestResourceComponent res : rest.getResource()) {
+              boolean inc = false;
+              if (refersToThisSD(res.getProfile())) {
+                inc = true;
+              } else for (CanonicalType c : res.getSupportedProfile()) {
+                if (refersToThisSD(c.getValue())) {
+                  inc = true;
+                } 
+              }
+              if (inc) {
+                capStmts.put(cst.getWebPath(), cst.present());
+              }
+            }
+          }
+        }
+      }
+    }
+    
     if (VersionUtilities.isR5Plus(context.getVersion())) {
       if (usages == null) {
         FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager.Builder().build();
@@ -2246,6 +2276,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
     if (!searches.isEmpty()) {
       b.append(" <li>Search Parameters using this " + type + ": " + refList(searches, "sp") + "</li>\r\n");
+    }
+    if (!capStmts.isEmpty()) {
+      b.append(" <li>CapabilityStatements using this " + type + ": " + refList(capStmts, "cst") + "</li>\r\n");
     }
     if (base.isEmpty() && refs.isEmpty() && trefs.isEmpty() && examples.isEmpty() & invoked.isEmpty() && imposed.isEmpty() && compliedWith.isEmpty()) {
       b.append(" <li>This " + type + " is not used by any profiles in this Implementation Guide</li>\r\n");
@@ -2678,4 +2711,36 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     String url = VersionUtilities.getSpecUrl(version);
     p.ahOrNot(url).b().tx(VersionUtilities.getNameForVersion(version));    
   }
+
+  public String otherVersions(Set<String> outputTracker, FetchedResource resource) throws IOException {
+    if (!resource.hasOtherVersions()) {
+      return "";
+    } else {
+      XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+      for (String v : Utilities.sortedReverse(resource.getOtherVersions().keySet())) {
+        AlternativeVersionResource sdv = resource.getOtherVersions().get(v);
+        x.h3().tx(VersionUtilities.getNameForVersion(v));
+        if (sdv.getSd() == null) {
+          x.para().tx("The extension is not used in "+VersionUtilities.getNameForVersion(v).toUpperCase());
+          XhtmlNode ul = x.ul(); 
+          for (ConversionMessage msg : sdv.getLog()) {
+            ul.li().style(msg.isError() ? "color: maroon" : "color: black").tx(msg.getMessage());
+          }
+        } else if (sdv.getLog().isEmpty()) {
+          x.para().tx("The extension is unchanged in "+VersionUtilities.getNameForVersion(v).toUpperCase());
+        } else {
+          x.para().tx("The extension is represented a little differently in "+VersionUtilities.getNameForVersion(v).toUpperCase()+": ");
+          XhtmlNode ul = x.ul();
+          for (ConversionMessage msg : sdv.getLog()) {
+            ul.li().style(msg.isError() ? "color: maroon" : "color: black").tx(msg.getMessage());
+          }
+          sdr.getContext().setStructureMode(StructureDefinitionRendererMode.SUMMARY);
+          x.add(sdr.generateTable(new RenderingStatus(), null, sdv.getSd(), true, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, 
+              outputTracker, false, gen.withUniqueLocalPrefix(VersionUtilities.getNameForVersion(v)), ANCHOR_PREFIX_SNAP, resE));
+        }
+      }
+      return new XhtmlComposer(false, true).compose(x.getChildNodes());
+    }
+  }
+  
 }

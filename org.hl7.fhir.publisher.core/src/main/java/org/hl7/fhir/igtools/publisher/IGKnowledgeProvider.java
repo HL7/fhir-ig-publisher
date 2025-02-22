@@ -619,8 +619,8 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
             br.display = ref.substring(29);
             br.url = vsr;
           } else {
-            br.display = ref.substring(29);
-            br.url = ref.substring(29)+".html";
+            br.display = ref.substring(29)+" (??)";
+            br.url = null;
             brokenLinkMessage(path, ref, false);
           }
         }
