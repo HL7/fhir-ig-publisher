@@ -31,6 +31,7 @@ import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
+import org.hl7.fhir.igtools.publisher.RelatedIG;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.CanonicalResourceComparison;
 import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.ChangeAnalysisState;
@@ -66,8 +67,8 @@ public class ValueSetRenderer extends CanonicalRenderer {
   private ValueSet vs;
   private static boolean nsFailHasFailed;
 
-  public ValueSetRenderer(IWorkerContext context, String corePath, ValueSet vs, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen, String versionToAnnotate) {
-    super(context, corePath, vs, null, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate);
+  public ValueSetRenderer(IWorkerContext context, String corePath, ValueSet vs, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen, String versionToAnnotate, List<RelatedIG> relatedIgs) {
+    super(context, corePath, vs, null, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate, relatedIgs);
     this.vs = vs; 
   }
 
@@ -105,93 +106,21 @@ public class ValueSetRenderer extends CanonicalRenderer {
     StringBuilder b = new StringBuilder();
     boolean first = true;
     b.append("\r\n");
-    if (vs.hasUrl()) {
-      Set<String> sdurls = new HashSet<String>();
-      Set<String> vsurls = new HashSet<String>();
-      Set<String> pdurls = new HashSet<String>();
-      Set<String> qurls = new HashSet<String>();
-      for (CanonicalResource sd : context.fetchResourcesByType(CanonicalResource.class)) {
-        if (sd instanceof StructureDefinition)
-          sdurls.add(sd.getUrl());
-        if (sd instanceof ValueSet)
-          vsurls.add(sd.getUrl());
-        if (sd instanceof PlanDefinition)
-          pdurls.add(sd.getUrl());
-        if (sd instanceof Questionnaire && sd.hasUrl())
-          qurls.add(sd.getUrl());
+    if (vs.hasUrl()) {      
+      for (CanonicalResource cr : scanAllResources(ValueSet.class, "ValueSet")) {
+        first = checkReferencesVS(b, first, (ValueSet) cr);
       }
 
-      for (String url : sorted(vsurls)) {
-        ValueSet vc = context.findTxResource(ValueSet.class, url);
-        for (ConceptSetComponent t : vc.getCompose().getInclude()) {
-          for (UriType ed : t.getValueSet()) {
-            if (ed.getValueAsString().equals(vs.getUrl())) {
-              if (first) {
-                first = false;
-                b.append("<ul>\r\n");
-              }
-              b.append(" <li>"+ (gen.formatPhrase(RenderingContext.VALUE_SET_INCLUDED_INTO)+" ")+"<a href=\""+vc.getWebPath()+"\">"+Utilities.escapeXml(gen.getTranslated(vc.getNameElement()))+"</a></li>\r\n");
-              break;
-            }
-          }
-        }
-        for (ConceptSetComponent t : vc.getCompose().getExclude()) {
-          for (UriType ed : t.getValueSet()) {
-            if (ed.getValueAsString().equals(vs.getUrl())) {
-              if (first) {
-                first = false;
-                b.append("<ul>\r\n");
-              }
-              b.append(" <li>"+ (gen.formatPhrase(RenderingContext.VALUE_SET_EXCLUDED_FROM)+" ")+"<a href=\""+vc.getWebPath()+"\">"+Utilities.escapeXml(gen.getTranslated(vc.getNameElement()))+"</a></li>\r\n");
-              break;
-            }
-          }
-        }
-      }
-      for (String url : sorted(sdurls)) {
-        StructureDefinition sd = context.fetchResourceRaw(StructureDefinition.class, url);
-        if (sd != null) {
-          for (ElementDefinition ed : sd.getDifferential().getElement()) {
-            if (ed.hasBinding() && ed.getBinding().hasValueSet()) {
-              if ((ed.getBinding().hasValueSet() && ed.getBinding().getValueSet().equals(vs.getUrl()))) {
-                if (first) {
-                  first = false;
-                  b.append("<ul>\r\n");
-                }
-                String path = sd.getWebPath();
-                if (path == null) {
-                  System.out.println("No path for "+sd.getUrl());
-                } else {
-                  b.append(" <li><a href=\""+path+"\">"+Utilities.escapeXml(sd.present())+"</a></li>\r\n");
-                }
-                break;
-              }
-            }
-          }
-        }
+      for (CanonicalResource cr : scanAllResources(StructureDefinition.class, "StructureDefinition")) {
+        first = checkReferencesVS(b, first, (StructureDefinition) cr);
       }
 
-      for (String url : sorted(qurls)) {
-        Questionnaire q = context.fetchResource(Questionnaire.class, url);
-        if (q != null) {
-          if (questionnaireUsesValueSet(q.getItem(), vs.getUrl())) {
-            if (first) {
-              first = false;
-              b.append("<ul>\r\n");
-            }
-            String path = q.getWebPath();
-            if (path == null) {
-              System.out.println("No path for "+q.getUrl());
-            } else {
-              b.append(" <li><a href=\""+path+"\">"+Utilities.escapeXml(q.present())+"</a></li>\r\n");
-            }
-            break;
-          }
-        }
+      for (CanonicalResource cr : scanAllResources(Questionnaire.class, "Questionnaire")) {
+        first = checkReferencesVS(b, first, (Questionnaire) cr);
       }
 
-      for (String u : sorted(pdurls)) {
-        PlanDefinition pd = context.fetchResource(PlanDefinition.class, u);
+      for (CanonicalResource cr : scanAllResources(PlanDefinition.class, "PlanDefinition")) {
+        PlanDefinition pd = (PlanDefinition) cr;
         if (referencesValueSet(pd)) {
           if (first) {
             first = false;
@@ -213,6 +142,75 @@ public class ValueSetRenderer extends CanonicalRenderer {
       }
       return " <p>"+Utilities.escapeXml(e.getMessage())+"</p>\r\n";
     }
+  }
+
+  public boolean checkReferencesVS(StringBuilder b, boolean first, Questionnaire q) {
+    if (q != null) {
+      if (questionnaireUsesValueSet(q.getItem(), vs.getUrl())) {
+        if (first) {
+          first = false;
+          b.append("<ul>\r\n");
+        }
+        String path = q.getWebPath();
+        if (path == null) {
+          System.out.println("No path for "+q.getUrl());
+        } else {
+          b.append(" <li><a href=\""+path+"\">"+Utilities.escapeXml(q.present())+"</a></li>\r\n");
+        }
+      }
+    }
+    return first;
+  }
+
+  public boolean checkReferencesVS(StringBuilder b, boolean first, ValueSet vc) {
+    for (ConceptSetComponent t : vc.getCompose().getInclude()) {
+      for (UriType ed : t.getValueSet()) {
+        if (ed.getValueAsString().equals(vs.getUrl())) {
+          if (first) {
+            first = false;
+            b.append("<ul>\r\n");
+          }
+          b.append(" <li>"+ (gen.formatPhrase(RenderingContext.VALUE_SET_INCLUDED_INTO)+" ")+"<a href=\""+vc.getWebPath()+"\">"+Utilities.escapeXml(gen.getTranslated(vc.getNameElement()))+"</a></li>\r\n");
+          break;
+        }
+      }
+    }
+    for (ConceptSetComponent t : vc.getCompose().getExclude()) {
+      for (UriType ed : t.getValueSet()) {
+        if (ed.getValueAsString().equals(vs.getUrl())) {
+          if (first) {
+            first = false;
+            b.append("<ul>\r\n");
+          }
+          b.append(" <li>"+ (gen.formatPhrase(RenderingContext.VALUE_SET_EXCLUDED_FROM)+" ")+"<a href=\""+vc.getWebPath()+"\">"+Utilities.escapeXml(gen.getTranslated(vc.getNameElement()))+"</a></li>\r\n");
+          break;
+        }
+      }
+    }
+    return first;
+  }
+
+  public boolean checkReferencesVS(StringBuilder b, boolean first, StructureDefinition sd) {
+    if (sd != null) {
+      for (ElementDefinition ed : sd.getDifferential().getElement()) {
+        if (ed.hasBinding() && ed.getBinding().hasValueSet()) {
+          if ((ed.getBinding().hasValueSet() && ed.getBinding().getValueSet().equals(vs.getUrl()))) {
+            if (first) {
+              first = false;
+              b.append("<ul>\r\n");
+            }
+            String path = sd.getWebPath();
+            if (path == null) {
+              System.out.println("No path for "+sd.getUrl());
+            } else {
+              b.append(" <li><a href=\""+path+"\">"+Utilities.escapeXml(sd.present())+"</a></li>\r\n");
+            }
+            break;
+          }
+        }
+      }
+    }
+    return first;
   }
 
   private boolean questionnaireUsesValueSet(List<QuestionnaireItemComponent> items, String url) {
