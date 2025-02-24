@@ -5,6 +5,7 @@ import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
+import org.hl7.fhir.igtools.publisher.RelatedIG;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
@@ -24,8 +25,8 @@ public class OperationDefinitionRenderer extends CanonicalRenderer {
   private String destDir;
   private List<FetchedFile> files;
 
-  public OperationDefinitionRenderer(IWorkerContext context, String corePath, OperationDefinition od, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, String versionToAnnotate) {
-    super(context, corePath, od, destDir, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate);
+  public OperationDefinitionRenderer(IWorkerContext context, String corePath, OperationDefinition od, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, String versionToAnnotate, List<RelatedIG> relatedIgs) {
+    super(context, corePath, od, destDir, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate, relatedIgs);
     this.od = od;
     this.destDir = destDir;
     utils = new ProfileUtilities(context, null, igp);

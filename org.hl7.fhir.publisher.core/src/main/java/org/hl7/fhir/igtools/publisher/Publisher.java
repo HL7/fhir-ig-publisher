@@ -101,6 +101,8 @@ import org.hl7.fhir.igtools.openehr.ArchetypeImporter.ProcessedArchetype;
 import org.hl7.fhir.igtools.publisher.FetchedFile.FetchedBundleType;
 import org.hl7.fhir.igtools.publisher.FetchedResource.AlternativeVersionResource;
 import org.hl7.fhir.igtools.publisher.IFetchFile.FetchState;
+import org.hl7.fhir.igtools.publisher.RelatedIG.RelatedIGLoadingMode;
+import org.hl7.fhir.igtools.publisher.RelatedIG.RelatedIGRole;
 import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
 import org.hl7.fhir.igtools.publisher.comparators.IpsComparator;
 import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
@@ -981,6 +983,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private boolean noExperimentalContent = false;
   private boolean displayWarnings = false;
   private boolean newMultiLangTemplateFormat = false;
+  private List<RelatedIG> relatedIGs = new ArrayList<>();
 
   long last = System.currentTimeMillis();
   private List<String> unknownParams = new ArrayList<>();
@@ -1229,7 +1232,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine, rc, specMaps).render(publishedIg, true, false, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()),
           new PublicationChecker(repoRoot, historyPage, markdownEngine, findReleaseLabelString(), publishedIg).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
           generateDraftDependencies(), noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder, context.getTxClientManager(), 
-          versionProblems, fragments, makeLangInfo());
+          versionProblems, fragments, makeLangInfo(), relatedIGs);
       val.setValidationFlags(hintAboutNonMustSupport, anyExtensionsAllowed, checkAggregation, autoLoad, showReferenceMessages, noExperimentalContent, displayWarnings);
       tts.end();
       if (isChild()) {
@@ -2870,6 +2873,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     tempDir = Utilities.path(rootDir, "temp");
     tempLangDir = Utilities.path(rootDir, "translations");
     outputDir = Utilities.path(rootDir, "output");
+    List<String> relatedIGParams = new ArrayList<>();
+    
     Map<String, String> expParamMap = new HashMap<>();
     boolean allowExtensibleWarnings = false;
     List<String> conversionVersions = new ArrayList<>();
@@ -3106,6 +3111,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         break;
       case "custom-resource": 
         customResourceFiles.add(p.getValue());
+        break;
+      case "related-ig":   
+        relatedIGParams.add(p.getValue());
         break;
       case "suppressed-ids":
         for (String s1 : p.getValue().split("\\,"))
@@ -3440,7 +3448,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       }
     }
     
-    inspector = new HTMLInspector(outputDir, specMaps, linkSpecMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), trackedFragments, fileList, module, mode == IGBuildMode.AUTOBUILD || mode == IGBuildMode.WEBSERVER, trackFragments ? fragmentUses : null);
+    inspector = new HTMLInspector(outputDir, specMaps, linkSpecMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), trackedFragments, fileList, module, mode == IGBuildMode.AUTOBUILD || mode == IGBuildMode.WEBSERVER, trackFragments ? fragmentUses : null, relatedIGs);
     inspector.getManual().add("full-ig.zip");
     if (historyPage != null) {
       inspector.getManual().add(historyPage);
@@ -3465,6 +3473,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       loadLinkIg(ext.getValue().primitiveValue());
     }
 
+    for (String s : relatedIGParams) {
+      loadRelatedIg(s);
+    }
 
     if (!VersionUtilities.isR5Plus(context.getVersion())) {
       System.out.println("Load R5 Specials");
@@ -3568,6 +3579,32 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       extensionTracker.setoptIn(!ini.getBooleanProperty("IG", "usage-stats-opt-out"));
 
     log("Initialization complete");
+  }
+
+  private void loadRelatedIg(String s) throws FHIRException, IOException {
+    String role = s.substring(0, s.indexOf(":"));
+    s = s.substring(s.indexOf(":")+1);
+    
+    String code = s.substring(0, s.indexOf("="));
+    String id =  s.substring(s.indexOf("=")+1);
+    
+    NpmPackage npm;
+    try {
+      npm = pcm.loadPackage(id+"#dev");
+    } catch (Exception e) {
+      String msg = e.getMessage();
+      if (msg.contains("(")) {
+        msg = msg.substring(0, msg.indexOf("("));
+      }
+      relatedIGs.add(new RelatedIG(code, id, RelatedIGRole.fromCode(role), msg));
+      return;
+    } 
+
+    if (Utilities.startsWithInList(npm.getWebLocation(), "http://", "https://")) {
+      relatedIGs.add(new RelatedIG(code, id, RelatedIGLoadingMode.CIBUILD, RelatedIGRole.fromCode(role), npm));
+    } else {
+      relatedIGs.add(new RelatedIG(code, id, RelatedIGLoadingMode.LOCAL, RelatedIGRole.fromCode(role), npm));
+    }
   }
 
   private void processFactories(List<String> factories) throws IOException {    
@@ -4845,10 +4882,10 @@ private String fixPackageReference(String dep) {
       if (!dep.hasPackageId()) 
         throw new FHIRException("Unknown package id for "+dep.getUri());
     }
-    npm = new NPMPackageGenerator(publishedIg.getPackageId(), Utilities.path(outputDir, "package.tgz"), igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, execTime.getTime(), !publishing);
+    npm = new NPMPackageGenerator(publishedIg.getPackageId(), Utilities.path(outputDir, "package.tgz"), igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, execTime.getTime(), relatedIgMap(), !publishing);
     for (String v : generateVersions) {
       vnpms.put(v, new NPMPackageGenerator(publishedIg.getPackageId()+"."+v, Utilities.path(outputDir, publishedIg.getPackageId()+"."+v+".tgz"), 
-          igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, execTime.getTime(), !publishing, VersionUtilities.versionFromCode(v)));
+          igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, execTime.getTime(), relatedIgMap(), !publishing, VersionUtilities.versionFromCode(v)));
     }
     execTime = Calendar.getInstance();
 
@@ -5025,6 +5062,20 @@ private String fixPackageReference(String dep) {
     extensionTracker.scan(publishedIg);
     finishLoadingCustomResources();
   }
+
+  private Map<String, String> relatedIgMap() {
+    if (relatedIGs.isEmpty()) {
+      return null;
+    }
+    Map<String, String> map = new HashMap<>();
+    for (RelatedIG ig : relatedIGs) {
+      if (ig.getVersion() != null) {
+        map.put(ig.getId(), ig.getVersion());
+      }
+    }
+    return map;
+  }
+  
 
   private void finishLoadingCustomResources() {
     for (StructureDefinition sd : customResources) {
@@ -8342,6 +8393,9 @@ private String fixPackageReference(String dep) {
       f.trim();
     }
     context.unload();
+    for (RelatedIG ig : relatedIGs) {
+      ig.dump();
+    }
     System.gc();
     printMemUsage();
 
@@ -9440,25 +9494,20 @@ private String fixPackageReference(String dep) {
     start = System.currentTimeMillis();
     trackedFragment("1", "ip-statements", new IPStatementsRenderer(context, markdownEngine, sourceIg.getPackageId(), rcLangs).genIpStatements(fileList, null), otherFilesRun, start, "ip-statements", "Cross");
     if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {
-      start = System.currentTimeMillis();
-      trackedFragment("2", "cross-version-analysis", r4tor4b.generate(npmName, false), otherFilesRun, start, "cross-version-analysis", "Cross");
-      start = System.currentTimeMillis();
-      trackedFragment("2", "cross-version-analysis-inline", r4tor4b.generate(npmName, true), otherFilesRun, start, "cross-version-analysis-inline", "Cross");
+      trackedFragment("2", "cross-version-analysis", r4tor4b.generate(npmName, false), otherFilesRun, System.currentTimeMillis(), "cross-version-analysis", "Cross");
+      trackedFragment("2", "cross-version-analysis-inline", r4tor4b.generate(npmName, true), otherFilesRun, System.currentTimeMillis(), "cross-version-analysis-inline", "Cross");
     } else {
-      start = System.currentTimeMillis();
-      fragment("cross-version-analysis", r4tor4b.generate(npmName, false), otherFilesRun, start, "cross-version-analysis", "Cross");      
-      start = System.currentTimeMillis();
-      fragment("cross-version-analysis-inline", r4tor4b.generate(npmName, true), otherFilesRun, start, "cross-version-analysis-inline", "Cross");      
+      fragment("cross-version-analysis", r4tor4b.generate(npmName, false), otherFilesRun, System.currentTimeMillis(), "cross-version-analysis", "Cross");      
+      fragment("cross-version-analysis-inline", r4tor4b.generate(npmName, true), otherFilesRun, System.currentTimeMillis(), "cross-version-analysis-inline", "Cross");      
     }
     DependencyRenderer depr = new DependencyRenderer(pcm, tempDir, npmName, templateManager, makeDependencies(), context, markdownEngine, rc, specMaps);
-    start = System.currentTimeMillis();
-    trackedFragment("3", "dependency-table", depr.render(publishedIg, false, true, true), otherFilesRun, start, "dependency-table", "Cross");
-    start = System.currentTimeMillis();
-    trackedFragment("3", "dependency-table-short", depr.render(publishedIg, false, false, false), otherFilesRun, start, "dependency-table-short", "Cross");
-    start = System.currentTimeMillis();
-    trackedFragment("3", "dependency-table-nontech", depr.renderNonTech(publishedIg), otherFilesRun, start, "dependency-table-nontech", "Cross");
-    start = System.currentTimeMillis();
-    trackedFragment("4", "globals-table", depr.renderGlobals(), otherFilesRun, start, "globals-table", "Cross");
+    trackedFragment("3", "dependency-table", depr.render(publishedIg, false, true, true), otherFilesRun, System.currentTimeMillis(), "dependency-table", "Cross");
+    trackedFragment("3", "dependency-table-short", depr.render(publishedIg, false, false, false), otherFilesRun, System.currentTimeMillis(), "dependency-table-short", "Cross");
+    trackedFragment("3", "dependency-table-nontech", depr.renderNonTech(publishedIg), otherFilesRun, System.currentTimeMillis(), "dependency-table-nontech", "Cross");
+    trackedFragment("4", "globals-table", depr.renderGlobals(), otherFilesRun, System.currentTimeMillis(), "globals-table", "Cross");
+    
+    fragment("related-igs-list", relatedIgsList(), otherFilesRun, System.currentTimeMillis(), "related-igs-list", "Cross");
+    fragment("related-igs-table", relatedIgsTable(), otherFilesRun, System.currentTimeMillis(), "related-igs-table", "Cross");
 
     // now, list the profiles - all the profiles
     int i = 0;
@@ -9703,6 +9752,59 @@ private String fixPackageReference(String dep) {
 
     json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(data, true);
     FileUtilities.stringToFile(json, Utilities.path(tempDir, "_data", "languages.json"));
+  }
+
+  private String relatedIgsList() throws IOException {
+    Map<RelatedIGRole, List<RelatedIG>> roles = new HashMap<>();
+    for (RelatedIG ig : relatedIGs) {
+      if (!roles.containsKey(ig.getRole())) {
+        roles.put(ig.getRole(), new ArrayList<>());
+      }
+      roles.get(ig.getRole()).add(ig);
+    }
+    XhtmlNode x = new XhtmlNode(NodeType.Element);
+    XhtmlNode ul = x.ul();
+    for (RelatedIGRole r : roles.keySet()) {
+      XhtmlNode li = ul.li();
+      li.tx(r.toDisplay(roles.get(r).size() > 1));
+      boolean first = true;
+      for (RelatedIG ig : roles.get(r)) {
+        if (first) {
+          li.tx(": ");
+          first = false;
+        } else {
+          li.tx(", ");          
+        }
+        li.ahOrNot(ig.getWebLocation()).tx(ig.getId());
+        if (ig.getTitle() != null) {
+          li.tx(" (");          
+          li.tx(ig.getTitle());          
+          li.tx("}");                    
+        }        
+      }      
+    }
+    return new XhtmlComposer(false, true).compose(ul);
+  }
+
+  private String relatedIgsTable() throws IOException {
+    if (relatedIGs.isEmpty()) {
+      return "";
+    }
+    XhtmlNode x = new XhtmlNode(NodeType.Element);
+    XhtmlNode tbl = x.table("grid");
+    XhtmlNode tr = tbl.tr();
+    tr.th().b().tx("ID");
+    tr.th().b().tx("Title");
+    tr.th().b().tx("Role");
+    tr.th().b().tx("Version");
+    for (RelatedIG ig : relatedIGs) {
+      tr = tbl.tr();
+      tr.td().ahOrNot(ig.getWebLocation()).tx(ig.getId());
+      tr.td().tx(ig.getTitle());
+      tr.td().tx(ig.getRoleCode());
+      tr.td().tx(ig.getNpm() == null ? "??" : ig.getNpm().version());
+    }
+    return new XhtmlComposer(false, true).compose(tbl);
   }
 
   private void populateCustomResourceEntry(FetchedResource r, JsonObject item, Object object) {
@@ -11266,6 +11368,18 @@ private String fixPackageReference(String dep) {
     }
     String json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(data, true);
     FileUtilities.stringToFile(json, Utilities.path(tempDir, "_data", "fhir.json"));
+    JsonObject related = new JsonObject();
+    for (RelatedIG rig : relatedIGs) {
+      JsonObject o = new JsonObject();
+      related.add(rig.getCode(), o);
+      o.add("id", rig.getId());
+      o.add("link", rig.getWebLocation());
+      o.add("canonical", rig.getCanonical());
+      o.add("title", rig.getTitle());
+      o.add("version", rig.getVersion());
+    }
+    json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(related, true);
+    FileUtilities.stringToFile(json, Utilities.path(tempDir, "_data", "related.json"));
   }
 
   public String workingVersion() {
@@ -12093,6 +12207,11 @@ private String fixPackageReference(String dep) {
         // nothing
       }
     }
+    for (RelatedIG rig : relatedIGs) {
+      if (rig.getId().equals(src) && rig.getWebLocation() != null) { 
+        return "<a href=\""+rig.getWebLocation()+"\">"+Utilities.escapeXml(rig.getTitle())+"</a>";
+      }
+    }
     // use [[~[ so we don't get stuck in a loop
     return "[[~["+src+"]]]";
   }
@@ -12406,7 +12525,7 @@ private String fixPackageReference(String dep) {
 
 
   private void generateOutputsOperationDefinition(FetchedFile f, FetchedResource r, OperationDefinition od, Map<String, String> vars, boolean regen, String prefixForContainer, RenderingContext lrc, String langSfx) throws FHIRException, IOException {
-    OperationDefinitionRenderer odr = new OperationDefinitionRenderer(context, checkAppendSlash(specPath), od, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, lrc, versionToAnnotate);
+    OperationDefinitionRenderer odr = new OperationDefinitionRenderer(context, checkAppendSlash(specPath), od, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, lrc, versionToAnnotate, relatedIGs);
     if (igpkp.wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
       fragment("OperationDefinition-"+prefixForContainer+od.getId()+"-summary"+langSfx, odr.summary(), f.getOutputNames(), r, vars, null, start, "summary", "OperationDefinition");
@@ -13361,7 +13480,7 @@ private String fixPackageReference(String dep) {
    * @throws Exception
    */
   private void generateOutputsCodeSystem(FetchedFile f, FetchedResource fr, CodeSystem cs, Map<String, String> vars, String prefixForContainer, RenderingContext lrc, String langSfx) throws Exception {
-    CodeSystemRenderer csr = new CodeSystemRenderer(context, specPath, cs, igpkp, specMaps, pageTargets(), markdownEngine, packge, lrc, versionToAnnotate);
+    CodeSystemRenderer csr = new CodeSystemRenderer(context, specPath, cs, igpkp, specMaps, pageTargets(), markdownEngine, packge, lrc, versionToAnnotate, relatedIGs);
     if (igpkp.wantGen(fr, "summary")) {
       long start = System.currentTimeMillis();
       fragment("CodeSystem-"+prefixForContainer+cs.getId()+"-summary"+langSfx, csr.summaryTable(fr, igpkp.wantGen(fr, "xml"), igpkp.wantGen(fr, "json"), igpkp.wantGen(fr, "ttl"), igpkp.summaryRows()), f.getOutputNames(), fr, vars, null, start, "summary", "CodeSystem");
@@ -13410,7 +13529,7 @@ private String fixPackageReference(String dep) {
    * @throws Exception
    */
   private void generateOutputsValueSet(FetchedFile f, FetchedResource r, ValueSet vs, Map<String, String> vars, String prefixForContainer, DBBuilder db, RenderingContext lrc, String langSfx) throws Exception {
-    ValueSetRenderer vsr = new ValueSetRenderer(context, specPath, vs, igpkp, specMaps, pageTargets(), markdownEngine, packge, lrc, versionToAnnotate);
+    ValueSetRenderer vsr = new ValueSetRenderer(context, specPath, vs, igpkp, specMaps, pageTargets(), markdownEngine, packge, lrc, versionToAnnotate, relatedIGs);
     if (igpkp.wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
       fragment("ValueSet-"+prefixForContainer+vs.getId()+"-summary"+langSfx, vsr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary", "ValueSet");
@@ -13626,7 +13745,7 @@ private String fixPackageReference(String dep) {
       fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-json-schema"+langSfx, "yet to be done: json schema as html", null, f.getOutputNames(), start, "json-schema", "StructureDefinition");
     }
 
-    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, lrc, allInvariants, sdMapCache, specPath, versionToAnnotate);
+    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, lrc, allInvariants, sdMapCache, specPath, versionToAnnotate, relatedIGs);
 
     if (igpkp.wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
@@ -13928,7 +14047,7 @@ private String fixPackageReference(String dep) {
   }
 
   private void generateOutputsStructureMap(FetchedFile f, FetchedResource r, StructureMap map, Map<String,String> vars, String prefixForContainer, RenderingContext lrc, String langSfx) throws Exception {
-    StructureMapRenderer smr = new StructureMapRenderer(context, checkAppendSlash(specPath), map, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, lrc, versionToAnnotate);
+    StructureMapRenderer smr = new StructureMapRenderer(context, checkAppendSlash(specPath), map, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, lrc, versionToAnnotate, relatedIGs);
     if (igpkp.wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
       fragment("StructureMap-"+prefixForContainer+map.getId()+"-summary"+langSfx, smr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary", "StructureMap");
@@ -13961,7 +14080,7 @@ private String fixPackageReference(String dep) {
   }
 
   private void generateOutputsCanonical(FetchedFile f, FetchedResource r, CanonicalResource cr, Map<String,String> vars, String prefixForContainer, RenderingContext lrc, String langSfx) throws Exception {
-    CanonicalRenderer smr = new CanonicalRenderer(context, checkAppendSlash(specPath), cr, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, lrc, versionToAnnotate);
+    CanonicalRenderer smr = new CanonicalRenderer(context, checkAppendSlash(specPath), cr, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, lrc, versionToAnnotate, relatedIGs);
     if (igpkp.wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
       fragment(cr.fhirType()+"-"+prefixForContainer+cr.getId()+"-summary"+langSfx, smr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary", "Canonical");
@@ -13986,7 +14105,7 @@ private String fixPackageReference(String dep) {
   }
 
   private void generateOutputsExampleScenario(FetchedFile f, FetchedResource r, ExampleScenario scen, Map<String,String> vars, String prefixForContainer, RenderingContext lrc, String langSfx) throws Exception {
-    ExampleScenarioRenderer er = new ExampleScenarioRenderer(context, checkAppendSlash(specPath), scen, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, lrc.copy(false).setDefinitionsTarget(igpkp.getDefinitionsName(r)), versionToAnnotate);
+    ExampleScenarioRenderer er = new ExampleScenarioRenderer(context, checkAppendSlash(specPath), scen, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, lrc.copy(false).setDefinitionsTarget(igpkp.getDefinitionsName(r)), versionToAnnotate, relatedIGs);
     if (igpkp.wantGen(r, "actor-table")) {
       long start = System.currentTimeMillis();
       fragment("ExampleScenario-"+prefixForContainer+scen.getId()+"-actor-table"+langSfx, er.render(ExampleScenarioRendererMode.ACTORS), f.getOutputNames(), r, vars, null, start, "actor-table", "ExampleScenario");
@@ -14006,7 +14125,7 @@ private String fixPackageReference(String dep) {
   }
 
   private void generateOutputsQuestionnaire(FetchedFile f, FetchedResource r, Questionnaire q, Map<String,String> vars, String prefixForContainer, RenderingContext lrc, String langSfx) throws Exception {
-    QuestionnaireRenderer qr = new QuestionnaireRenderer(context, checkAppendSlash(specPath), q, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, lrc.copy(false).setDefinitionsTarget(igpkp.getDefinitionsName(r)), versionToAnnotate);
+    QuestionnaireRenderer qr = new QuestionnaireRenderer(context, checkAppendSlash(specPath), q, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, lrc.copy(false).setDefinitionsTarget(igpkp.getDefinitionsName(r)), versionToAnnotate, relatedIGs);
     if (igpkp.wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
       fragment("Questionnaire-"+prefixForContainer+q.getId()+"-summary"+langSfx, qr.summaryTable(r, igpkp.wantGen(r, "xml"), igpkp.wantGen(r, "json"), igpkp.wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary", "Questionnaire");

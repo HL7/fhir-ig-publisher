@@ -30,6 +30,7 @@ import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
+import org.hl7.fhir.igtools.publisher.RelatedIG;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.CanonicalResourceComparison;
 import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.ChangeAnalysisState;
@@ -59,8 +60,8 @@ public class CodeSystemRenderer extends CanonicalRenderer {
 
   private CodeSystem cs;
 
-  public CodeSystemRenderer(IWorkerContext context, String corePath, CodeSystem cs, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen, String versionToAnnotate) {
-    super(context, corePath, cs, null, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate);
+  public CodeSystemRenderer(IWorkerContext context, String corePath, CodeSystem cs, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen, String versionToAnnotate, List<RelatedIG> relatedIgs) {
+    super(context, corePath, cs, null, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate, relatedIgs);
     this.cs = cs;
   }
 
@@ -127,15 +128,10 @@ public class CodeSystemRenderer extends CanonicalRenderer {
     StringBuilder b = new StringBuilder();
     boolean first = true;
     b.append("\r\n");
-    List<String> vsurls = new ArrayList<String>();
-    for (ValueSet vs : context.fetchResourcesByType(ValueSet.class)) {
-        vsurls.add(vs.getUrl());
-    }
-    Collections.sort(vsurls);
 
     Set<String> processed = new HashSet<String>();
-    for (String url : vsurls) {
-      ValueSet vc = context.findTxResource(ValueSet.class, url);
+    for (CanonicalResource cr : scanAllResources(ValueSet.class, "ValueSet")) {
+      ValueSet vc = (ValueSet) cr;
       for (ConceptSetComponent ed : vc.getCompose().getInclude())
         first = addLink(b, first, vc, ed, processed);
       for (ConceptSetComponent ed : vc.getCompose().getExclude())

@@ -29,6 +29,7 @@ import org.hl7.fhir.exceptions.DefinitionException;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
+import org.hl7.fhir.igtools.publisher.RelatedIG;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.Questionnaire;
@@ -46,8 +47,8 @@ public class QuestionnaireRenderer extends CanonicalRenderer {
   private Questionnaire q;
   private String destDir;
 
-  public QuestionnaireRenderer(IWorkerContext context, String corePath, Questionnaire q, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen, String versionToAnnotate) {
-    super(context, corePath, q, destDir, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate);
+  public QuestionnaireRenderer(IWorkerContext context, String corePath, Questionnaire q, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen, String versionToAnnotate, List<RelatedIG> relatedIgs) {
+    super(context, corePath, q, destDir, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate, relatedIgs);
     this.q = q;
     this.destDir = destDir;
   }

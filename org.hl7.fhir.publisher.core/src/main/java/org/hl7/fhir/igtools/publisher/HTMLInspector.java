@@ -48,6 +48,7 @@ import org.hl7.fhir.r5.context.ILoggingService.LogCategory;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
+import org.hl7.fhir.utilities.DebugUtilities;
 import org.hl7.fhir.utilities.PathBuilder;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
@@ -226,8 +227,9 @@ public class HTMLInspector {
   private boolean isCIBuild;
   private Map<String, ValidationMessage> jsmsgs = new HashMap<>();
   private Map<String, FragmentUseRecord> fragmentUses = new HashMap<>();
+  private List<RelatedIG> relatedIGs;
 
-  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log, String canonical, String packageId, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, FragmentUseRecord> fragmentUses) {
+  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log, String canonical, String packageId, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, FragmentUseRecord> fragmentUses, List<RelatedIG> relatedIGs) {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
     this.linkSpecs = linkSpecs;
@@ -239,6 +241,7 @@ public class HTMLInspector {
     this.module = module;
     this.isCIBuild = isCIBuild;
     this.fragmentUses = fragmentUses;
+    this.relatedIGs = relatedIGs;
     requirePublishBox = Utilities.startsWithInList(packageId, "hl7."); 
   }
 
@@ -829,7 +832,17 @@ public class HTMLInspector {
       }
     }
     
-    
+    if (!resolved) {
+      for (RelatedIG ig : relatedIGs) {
+        if (ig.getWebLocation() != null && rref.startsWith(ig.getWebLocation())) {
+          String tref = rref.substring(ig.getWebLocation().length());
+          if (tref.startsWith("/")) {
+            tref = tref.substring(1);
+            resolved = resolved || ig.getSpm().getBase().equals(rref) || (ig.getSpm().getBase()).equals(rref+"/") || (ig.getSpm().getBase()+"/").equals(rref)|| ig.getSpm().hasTarget(rref) || Utilities.existsInList(rref, Utilities.pathURL(ig.getSpm().getBase(), "history.html"));
+          }
+        }
+      }
+    }
     if (!resolved) {
       if (Utilities.isAbsoluteFileName(ref)) {
         if (new File(ref).exists()) {

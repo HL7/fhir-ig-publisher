@@ -27,6 +27,7 @@ import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
+import org.hl7.fhir.igtools.publisher.RelatedIG;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.StructureDefinition;
@@ -54,8 +55,8 @@ public class StructureMapRenderer extends CanonicalRenderer {
   private StructureMapAnalysis analysis;
   private String destDir;
 
-  public StructureMapRenderer(IWorkerContext context, String corePath, StructureMap map, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen, String versionToAnnotate) {
-    super(context, corePath, map, destDir, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate);
+  public StructureMapRenderer(IWorkerContext context, String corePath, StructureMap map, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen, String versionToAnnotate, List<RelatedIG> relatedIgs) {
+    super(context, corePath, map, destDir, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate, relatedIgs);
     this.map = map;
     this.destDir = destDir;
     utils = new StructureMapUtilities(context, null, igp);

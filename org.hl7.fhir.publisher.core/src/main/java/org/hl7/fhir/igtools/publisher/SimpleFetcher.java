@@ -423,7 +423,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
                   }
                 }
               }            
-              if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt", "ttl")) {
+              if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt", "ttl") && context.hasPackage("openehr.base", null)) {
                 try {
                   new ArchetypeImporter(context, pkp.getCanonical()).checkArchetype(new FileInputStream(f), f.getName());
                   addFile(res, f, null, "adl");
@@ -432,7 +432,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
                 } catch (Exception e) {
                   if (!f.getName().startsWith("Binary-")) { // we don't notify here because Binary is special. 
                     if (report) {
-                      log.logMessage("Error loading "+f+" as FML: "+e.getMessage());
+                      log.logMessage("Error loading "+f+" as an Archetype: "+e.getMessage());
                       if (debug) {
                         e.printStackTrace();
                       }
