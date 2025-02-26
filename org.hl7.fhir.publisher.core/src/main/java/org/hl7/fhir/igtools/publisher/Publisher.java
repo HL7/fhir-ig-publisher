@@ -4958,6 +4958,8 @@ private String fixPackageReference(String dep) {
               } else if (!rg.hasName()) {
                 if (r.getElement().hasChild("title")) {
                   rg.setName(r.getElement().getChildValue("title"));
+                } else if (r.getElement().hasChild("name") && r.getElement().getNamedChild("name").isPrimitive()) {
+                  rg.setName(r.getElement().getChildValue("name"));
                 } else if ("Bundle".equals(r.getElement().getName())) {
                   // If the resource is a document Bundle, get the title from the Composition
                   List<Element> entryList = r.getElement().getChildren("entry");
@@ -5901,10 +5903,12 @@ private String fixPackageReference(String dep) {
       ImplementationGuideDefinitionResourceComponent res = findIGReference(r.fhirType(), r.getId());
       if (res == null) {
         res = publishedIg.getDefinition().addResource();
-        if (!res.hasName())
+        if (!res.hasName()) {
           res.setName(r.getTitle());
-        if (!res.hasDescription())
-          res.setDescription(((CanonicalResource)r.getResource()).getDescription().trim());
+        }
+        if (!res.hasDescription()) {
+          res.setDescription(((CanonicalResource) r.getResource()).getDescription().trim());
+        }
         res.setReference(new Reference().setReference(r.fhirType()+"/"+r.getId()));
       }
       res.setUserData(UserDataNames.pub_loaded_resource, r);
