@@ -226,3 +226,11 @@ FHIR-us-pq-cmc
 .vscode/
 
 shell-scripts/update-web-site.txt
+
+org.hl7.fhir.publisher.cli/.checkstyle
+
+org.hl7.fhir.publisher.core/.checkstyle
+
+shell-scripts/go-publish-fhir.txt
+
+*.command
