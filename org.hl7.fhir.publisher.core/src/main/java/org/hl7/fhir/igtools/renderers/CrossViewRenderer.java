@@ -1348,7 +1348,7 @@ public class CrossViewRenderer extends Renderer {
       td.br();
       renderStatus(vs.getTitleElement(), td).tx(vs.getTitle());
       td = tr.td();
-      renderStatus(vs.getStatusElement(), td).tx(vs.getStatus().toCode());
+      renderStatus(vs.getStatusElement(), td).tx(vs.getStatus() == null ? "null" : vs.getStatus().toCode());
       if (vs.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
         td.tx(" / ");
         Extension ext = vs.getExtensionByUrl(ToolingExtensions.EXT_STANDARDS_STATUS);
