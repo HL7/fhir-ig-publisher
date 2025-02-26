@@ -510,6 +510,7 @@ public class HTMLInspector {
       if (htmlName || !(e.getMessage().startsWith("Unable to Parse HTML - does not start with tag.") || e.getMessage().startsWith("Malformed XHTML"))) {
     	  messages.add(new ValidationMessage(Source.LinkChecker, IssueType.STRUCTURE, s, e.getMessage(), IssueSeverity.ERROR).setLocationLink(makeLocal(f.getAbsolutePath())).setMessageId("HTML_PARSING_FAILED"));
     	  missingPublishBox = true;
+    	  missingPublishBoxList.add(f.getName());
       }
     }
     if (x != null) {
