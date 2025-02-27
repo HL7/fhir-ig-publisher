@@ -259,6 +259,7 @@ public class TemplateManager {
         "hl7.extensions.template",
         "ihe.fhir.template",
         "cqf.fhir.template",
+        "ans.fr.template",
         "ch.fhir.ig.template")) {
       canExecute = false;
       templateThatCantExecute = template;
