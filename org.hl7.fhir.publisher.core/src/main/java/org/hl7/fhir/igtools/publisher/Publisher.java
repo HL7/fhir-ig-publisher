@@ -127,6 +127,7 @@ import org.hl7.fhir.igtools.renderers.ExampleScenarioRenderer;
 import org.hl7.fhir.igtools.renderers.HTAAnalysisRenderer;
 import org.hl7.fhir.igtools.renderers.HistoryGenerator;
 import org.hl7.fhir.igtools.renderers.IPStatementsRenderer;
+import org.hl7.fhir.igtools.renderers.IPViewRenderer;
 import org.hl7.fhir.igtools.renderers.JsonXhtmlRenderer;
 import org.hl7.fhir.igtools.renderers.MappingSummaryRenderer;
 import org.hl7.fhir.igtools.renderers.OperationDefinitionRenderer;
@@ -1215,6 +1216,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         processTranslationOutputs();
       }
       log("Generating Outputs in "+outputDir);
+      Map<String, String> uncsList = scanForUnattributedCodeSystems();
       generate();
       clean();
       dependentIgFinder.finish(outputDir, sourceIg.present());
@@ -1234,6 +1236,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           generateDraftDependencies(), noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder, context.getTxClientManager(), 
           versionProblems, fragments, makeLangInfo(), relatedIGs);
       val.setValidationFlags(hintAboutNonMustSupport, anyExtensionsAllowed, checkAggregation, autoLoad, showReferenceMessages, noExperimentalContent, displayWarnings);
+      FileUtilities.stringToFile(new IPViewRenderer(uncsList, inspector.getExternalReferences(), inspector.getImageRefs(), inspector.getCopyrights(), context).execute(), Utilities.path(outputDir, "qa-ipreview.html"));
       tts.end();
       if (isChild()) {
         log("Built. "+tt.report());
@@ -1255,6 +1258,35 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
   }
 
+  private Map<String, String> scanForUnattributedCodeSystems() {
+    Map<String, String> list = new HashMap<>();
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        String link = igpkp.getLinkFor(r, true);
+        r.setPath(link);
+        scanForUnattributedCodeSystems(list, link, r.getElement());
+      }
+    }
+    return list;
+  }
+
+  private void scanForUnattributedCodeSystems(Map<String, String> list, String link, Element e) {
+    if ("Coding.system".equals(e.getProperty().getDefinition().getBase().getPath())) {
+      String url = e.primitiveValue();
+      if (url != null && !url.contains("example.org/") && !url.contains("acme.") && !url.contains("hl7.org")) {
+        CodeSystem cs = context.fetchCodeSystem(url);
+        if (cs == null || !cs.hasCopyright()) {
+          list.put(url, link);
+        }
+      }
+    }
+    if (e.hasChildren()) {
+      for (Element c : e.getChildren()) {
+        scanForUnattributedCodeSystems(list, link, c);
+      }
+    }    
+  }
+  
   private void checkForSnomedVersion() {
     if (!"uv".equals(igrealm) && context.getCodeSystemsUsed().contains("http://snomed.info/sct")) {
       boolean ok = false;
@@ -3456,6 +3488,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
     inspector.getManual().add("qa.html");
     inspector.getManual().add("qa-tx.html");
+    inspector.getManual().add("qa-ipreview.html");
     inspector.getExemptHtmlPatterns().addAll(exemptHtmlPatterns);
     inspector.setPcm(pcm);
 

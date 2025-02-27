@@ -62,7 +62,37 @@ import org.hl7.fhir.validation.BaseValidator.BooleanHolder;
 
 public class HTMLInspector {
 
-  
+
+
+
+  public enum ExternalReferenceType { FILE, WEB, IMG }
+
+  public class ExternalReference {
+    private ExternalReferenceType type;
+    private String url;
+    private XhtmlNode xhtml;
+    private String source;
+    public ExternalReference(ExternalReferenceType type, String url, XhtmlNode xhtml, String source) {
+      super();
+      this.type = type; 
+      this.url = url;
+      this.xhtml = xhtml;
+      this.source = source;
+    }
+    public String getUrl() {
+      return url;
+    }
+    public XhtmlNode getXhtml() {
+      return xhtml;
+    }
+    public ExternalReferenceType getType() {
+      return type;
+    }
+    public String getSource() {
+      return source;
+    }
+  }
+
   public class DuplicateAnchorTracker {
     private Set<String> found = new HashSet<>();
     private Set<String> duplicates = new HashSet<>();
@@ -100,18 +130,18 @@ public class HTMLInspector {
     }
   }
 
-//  public class HtmlSanitizerObserver implements HtmlChangeListener<HtmlChangeListenerContext> {
-//
-//    @Override
-//    public void discardedAttributes(HtmlChangeListenerContext ctxt, String elementName, String... attributeNames) {
-//      ctxt.messages.add(new ValidationMessage(Source.Publisher, IssueType.STRUCTURE, ctxt.source, "the element "+elementName+" attributes failed security testing", IssueSeverity.ERROR));
-//    }
-//
-//    @Override
-//    public void discardedTag(HtmlChangeListenerContext ctxt, String elementName) {
-//      ctxt.messages.add(new ValidationMessage(Source.Publisher, IssueType.STRUCTURE, ctxt.source, "the element "+elementName+" failed security testing", IssueSeverity.ERROR));
-//    }
-//  }
+  //  public class HtmlSanitizerObserver implements HtmlChangeListener<HtmlChangeListenerContext> {
+  //
+  //    @Override
+  //    public void discardedAttributes(HtmlChangeListenerContext ctxt, String elementName, String... attributeNames) {
+  //      ctxt.messages.add(new ValidationMessage(Source.Publisher, IssueType.STRUCTURE, ctxt.source, "the element "+elementName+" attributes failed security testing", IssueSeverity.ERROR));
+  //    }
+  //
+  //    @Override
+  //    public void discardedTag(HtmlChangeListenerContext ctxt, String elementName) {
+  //      ctxt.messages.add(new ValidationMessage(Source.Publisher, IssueType.STRUCTURE, ctxt.source, "the element "+elementName+" failed security testing", IssueSeverity.ERROR));
+  //    }
+  //  }
 
   public class StringPair {
     private String source;
@@ -182,7 +212,7 @@ public class HTMLInspector {
       id++;
       return Integer.toString(id );
     }
-    
+
   }
 
   private static final String RELEASE_HTML_MARKER = "<!--ReleaseHeader--><p id=\"publish-box\">Publish Box goes here</p><!--EndReleaseHeader-->";
@@ -222,6 +252,9 @@ public class HTMLInspector {
   private Map<String, ValidationMessage> jsmsgs = new HashMap<>();
   private Map<String, FragmentUseRecord> fragmentUses = new HashMap<>();
   private List<RelatedIG> relatedIGs;
+  private List<ExternalReference> externalReferences = new ArrayList<>(); 
+  private Map<String, XhtmlNode> imageRefs = new HashMap<>();
+  private Map<String, String> copyrights = new HashMap<>();
 
   public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log, String canonical, String packageId, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, FragmentUseRecord> fragmentUses, List<RelatedIG> relatedIGs) {
     this.rootFolder = rootFolder.replace("/", File.separator);
@@ -242,7 +275,7 @@ public class HTMLInspector {
   public void setAltRootFolder(String altRootFolder) throws IOException {
     this.altRootFolder = Utilities.path(rootFolder, altRootFolder.replace("/", File.separator));
   }
-  
+
   public List<ValidationMessage> check(String statusText) throws IOException {  
     this.statusText = statusText;
     iteration ++;
@@ -275,7 +308,7 @@ public class HTMLInspector {
     log.logDebugMessage(LogCategory.HTML, "Checking Resources");
     for (FetchedFile f : sources) {
       for (FetchedResource r : f.getResources()) {
-        checkNarrativeLinks(f, r);
+        checkNarrativeLinks(f, r, Utilities.path(rootFolder, r.getPath()));
       }
     }
     log.logDebugMessage(LogCategory.HTML, "Checking Files");
@@ -299,11 +332,11 @@ public class HTMLInspector {
         if (check && !lf.isExempt()) {
           if (requirePublishBox) {
             messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, s, "The html source does not contain the publish box" 
-              + (first ? " "+RELEASE_HTML_MARKER+" (see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations)" : ""), IssueSeverity.ERROR));
+                + (first ? " "+RELEASE_HTML_MARKER+" (see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations)" : ""), IssueSeverity.ERROR));
           } else if (first) {
             messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, s, "The html source does not contain the publish box; this is recommended for publishing support",
                 "The html source does not contain the publish box; this is recommended for publishing support  (see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations). Note that this is mandatory for HL7 specifications, and on the ci-build, but in other cases it's still recommended (this is only reported once, but applies for all pages)", IssueSeverity.INFORMATION));            
-            
+
           }
           missingPublishBox = true;
           missingPublishBoxList.add(s.substring(rootFolder.length()+1));
@@ -311,7 +344,7 @@ public class HTMLInspector {
         }
       }
       checkFragmentIds(FileUtilities.fileToString(lf.filename));
-      
+
       if (lf.isHasXhtml()) {
         if (fragmentUses != null) {
           checkFragmentMarkers(FileUtilities.fileToString(lf.getFilename()));
@@ -319,7 +352,7 @@ public class HTMLInspector {
         XhtmlNode x = new XhtmlParser().setMustBeWellFormed(strict).parse(new FileInputStream(lf.filename), null);
         referencesValidatorPack = false;
         DuplicateAnchorTracker dat = new DuplicateAnchorTracker();
-        if (checkLinks(lf, s, "", x, null, messages, false, dat) != NodeChangeType.NONE) { // returns true if changed
+        if (checkLinks(lf, s, "", x, null, messages, false, dat, null) != NodeChangeType.NONE) { // returns true if changed
           saveFile(lf, x);
         }
         if (dat.hasDuplicates()) {
@@ -340,15 +373,15 @@ public class HTMLInspector {
       i++;
     }
     System.out.println();
- 
+
     log.logDebugMessage(LogCategory.HTML, "Checking Other Links");
     // check other links:
     for (StringPair sp : otherlinks) {
-      checkResolveLink(sp.source, null, null, sp.link, sp.text, messages, null);
+      checkResolveLink(sp.source, null, null, sp.link, sp.text, messages, null, new XhtmlNode(NodeType.Element, "p").tx(sp.text), null);
     }
-    
+
     log.logDebugMessage(LogCategory.HTML, "Done checking");
-    
+
     for (String s : trackedFragments.keySet()) {
       if (!foundFragments.contains(s)) {
         if (trackedFragments.get(s).size() > 1) {
@@ -356,7 +389,7 @@ public class HTMLInspector {
               "An HTML fragment from the set "+trackedFragments.get(s)+" is not included anywhere in the produced implementation guide", IssueSeverity.WARNING));
         } else {
           messages.add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, s, "The HTML fragment '"+trackedFragments.get(s).get(0)+"' is not included anywhere in the produced implementation guide",
-            "The HTML fragment '"+trackedFragments.get(s).get(0)+"' is not included anywhere in the produced implementation guide", IssueSeverity.WARNING));
+              "The HTML fragment '"+trackedFragments.get(s).get(0)+"' is not included anywhere in the produced implementation guide", IssueSeverity.WARNING));
         }
       }
     }
@@ -377,7 +410,7 @@ public class HTMLInspector {
     }
   }
 
-  private void checkNarrativeLinks(FetchedFile f, FetchedResource r) throws IOException {
+  private void checkNarrativeLinks(FetchedFile f, FetchedResource r, String filename) throws IOException {
     Element t = r.getElement().getNamedChild("text");
     if (t != null) {
       t = t.getNamedChild("div");
@@ -385,18 +418,18 @@ public class HTMLInspector {
     if (t != null) {
       XhtmlNode x = t.getXhtml();
       if (x != null) {
-        checkReferences(f.getErrors(), r.fhirType()+".text.div", "div", x);
-        checkImgSources(f.getErrors(), r.fhirType()+".text.div", "div", x);
+        checkReferences(f.getErrors(), r.fhirType()+".text.div", "div", x, filename, null);
+        checkImgSources(f.getErrors(), r.fhirType()+".text.div", "div", x, filename);
       }
     }
   }
 
-  private boolean checkReferences(List<ValidationMessage> errors, String path, String xpath, XhtmlNode node) throws IOException {
+  private boolean checkReferences(List<ValidationMessage> errors, String path, String xpath, XhtmlNode node, String filename, XhtmlNode parent) throws IOException {
     boolean ok = true;
     if (node.getNodeType() == NodeType.Element & "a".equals(node.getName()) && node.getAttribute("href") != null) {
       String href = node.getAttribute("href");
       BooleanHolder bh = new BooleanHolder();
-      if (!href.startsWith("#") && !isKnownTarget(href, bh)) {
+      if (!href.startsWith("#") && !isKnownTarget(href, bh, node, filename, parent)) {
         String msg = "Hyperlink '"+href+"' at '"+xpath+"' for '"+node.allText()+"' does not resolve";
         errors.add(new ValidationMessage(Source.Publisher, IssueType.INVALID, path, msg, msg, IssueSeverity.ERROR).setRuleDate("2024-02-08"));
       } else if (!bh.ok()) {
@@ -406,32 +439,32 @@ public class HTMLInspector {
     }
     if (node.hasChildren()) {
       for (XhtmlNode child : node.getChildNodes()) {
-        checkReferences(errors, path, xpath+"/"+child.getName(), child);
+        checkReferences(errors, path, xpath+"/"+child.getName(), child, filename, node);
       }        
     }
     return ok;
   }
 
-  private boolean checkImgSources(List<ValidationMessage> errors, String path, String xpath, XhtmlNode node) throws IOException {
+  private boolean checkImgSources(List<ValidationMessage> errors, String path, String xpath, XhtmlNode node, String filename) throws IOException {
     boolean ok = true;
     if (node.getNodeType() == NodeType.Element & "img".equals(node.getName()) && node.getAttribute("src") != null) {
       String src = node.getAttribute("src");
-      if (!src.startsWith("#") && !checkImgSourceExists(null, src)) {
+      if (!src.startsWith("#") && !checkImgSourceExists(filename, src, node)) {
         String msg = "Img Source '"+src+"' at '"+xpath+(node.hasAttribute("alt") ? "' for '"+node.getAttribute("alt")+"'" : "")+" does not resolve";
         errors.add(new ValidationMessage(Source.Publisher, IssueType.INVALID, path, msg, msg, IssueSeverity.ERROR).setRuleDate("2024-02-08"));
       }
     }
     if (node.hasChildren()) {
       for (XhtmlNode child : node.getChildNodes()) {
-        checkImgSources(errors, path, xpath+"/"+child.getName(), child);
+        checkImgSources(errors, path, xpath+"/"+child.getName(), child, filename);
       }        
     }
     return ok;
   }
 
-  
-  private boolean isKnownTarget(String target, BooleanHolder bh) throws IOException {
-    return checkTarget(null, target, target, new StringBuilder(), bh);
+
+  private boolean isKnownTarget(String target, BooleanHolder bh, XhtmlNode x, String filename, XhtmlNode parent) throws IOException {
+    return checkTarget(filename, target, target, new StringBuilder(), bh, x, parent);
   }
 
   private boolean isKnownImgTarget(String target) {
@@ -508,9 +541,9 @@ public class HTMLInspector {
     } catch (FHIRFormatError | IOException e) {
       x = null;
       if (htmlName || !(e.getMessage().startsWith("Unable to Parse HTML - does not start with tag.") || e.getMessage().startsWith("Malformed XHTML"))) {
-    	  messages.add(new ValidationMessage(Source.LinkChecker, IssueType.STRUCTURE, s, e.getMessage(), IssueSeverity.ERROR).setLocationLink(makeLocal(f.getAbsolutePath())).setMessageId("HTML_PARSING_FAILED"));
-    	  missingPublishBox = true;
-    	  missingPublishBoxList.add(f.getName());
+        messages.add(new ValidationMessage(Source.LinkChecker, IssueType.STRUCTURE, s, e.getMessage(), IssueSeverity.ERROR).setLocationLink(makeLocal(f.getAbsolutePath())).setMessageId("HTML_PARSING_FAILED"));
+        missingPublishBox = true;
+        missingPublishBoxList.add(f.getName());
       }
     }
     if (x != null) {
@@ -539,27 +572,27 @@ public class HTMLInspector {
         checkTemplatePoints(x, messages, s);
       }
     }
-    
+
     // ok, now check for XSS safety:
     // this is presently disabled; it's not clear whether oWasp is worth trying out for the purpose we are seeking (XSS safety)
-    
-//    
-//    HtmlPolicyBuilder pp = new HtmlPolicyBuilder();
-//    pp
-//      .allowStandardUrlProtocols().allowAttributes("title").globally() 
-//      .allowElements("html", "head", "meta", "title", "body", "span", "link", "nav", "button")
-//      .allowAttributes("xmlns", "xml:lang", "lang", "charset", "name", "content", "id", "class", "href", "rel", "sizes", "no-external", "target", "data-target", "data-toggle", "type", "colspan").globally();
-//    
-//    PolicyFactory policy = Sanitizers.FORMATTING.and(Sanitizers.LINKS).and(Sanitizers.BLOCKS).and(Sanitizers.IMAGES).and(Sanitizers.STYLES).and(Sanitizers.TABLES).and(pp.toFactory());
-//    
-//    String source;
-//    try {
-//      source = TextFile.fileToString(s);
-//      HtmlChangeListenerContext ctxt = new HtmlChangeListenerContext(messages, s);
-//      String sanitized = policy.sanitize(source, new HtmlSanitizerObserver(), ctxt);
-//    } catch (IOException e) {
-//      messages.add(new ValidationMessage(Source.Publisher, IssueType.STRUCTURE, s, "failed security testing: "+e.getMessage(), IssueSeverity.ERROR));
-//    } 
+
+    //    
+    //    HtmlPolicyBuilder pp = new HtmlPolicyBuilder();
+    //    pp
+    //      .allowStandardUrlProtocols().allowAttributes("title").globally() 
+    //      .allowElements("html", "head", "meta", "title", "body", "span", "link", "nav", "button")
+    //      .allowAttributes("xmlns", "xml:lang", "lang", "charset", "name", "content", "id", "class", "href", "rel", "sizes", "no-external", "target", "data-target", "data-toggle", "type", "colspan").globally();
+    //    
+    //    PolicyFactory policy = Sanitizers.FORMATTING.and(Sanitizers.LINKS).and(Sanitizers.BLOCKS).and(Sanitizers.IMAGES).and(Sanitizers.STYLES).and(Sanitizers.TABLES).and(pp.toFactory());
+    //    
+    //    String source;
+    //    try {
+    //      source = TextFile.fileToString(s);
+    //      HtmlChangeListenerContext ctxt = new HtmlChangeListenerContext(messages, s);
+    //      String sanitized = policy.sanitize(source, new HtmlSanitizerObserver(), ctxt);
+    //    } catch (IOException e) {
+    //      messages.add(new ValidationMessage(Source.Publisher, IssueType.STRUCTURE, s, "failed security testing: "+e.getMessage(), IssueSeverity.ERROR));
+    //    } 
   }
 
   private String getPath(String s, String base) {
@@ -634,7 +667,7 @@ public class HTMLInspector {
     }
     // We support div as well because with HTML 5, referenced files might just start with <div>
     // todo: check secure?
-    
+
   }
 
   private void listTargets(XhtmlNode x, Set<String> targets) {
@@ -655,7 +688,7 @@ public class HTMLInspector {
     }
   }
 
-  private NodeChangeType checkLinks(LoadedFile lf, String s, String path, XhtmlNode x, String uuid, List<ValidationMessage> messages, boolean inPre, DuplicateAnchorTracker dat) throws IOException {
+  private NodeChangeType checkLinks(LoadedFile lf, String s, String path, XhtmlNode x, String uuid, List<ValidationMessage> messages, boolean inPre, DuplicateAnchorTracker dat, XhtmlNode parent) throws IOException {
     boolean changed = false;
     if (x.getName() != null) {
       path = path + "/"+ x.getName();
@@ -664,20 +697,26 @@ public class HTMLInspector {
         referencesValidatorPack = true;
       }
     }
+    if (x.getNodeType() == NodeType.Text) {
+      String tx = x.allText();
+      if (tx.contains("©") || tx.contains("®")) {
+        copyrights.put(parent == null ? tx : parent.allText(), lf.filename);
+      }
+    }
     if ("title".equals(x.getName()) && Utilities.noString(x.allText())) {
       x.addText("?html-link?");
     }
     if ("a".equals(x.getName()) && x.hasAttribute("href")) {
-      changed = checkResolveLink(s, x.getLocation(), path, x.getAttribute("href"), x.allText(), messages, uuid);
+      changed = checkResolveLink(s, x.getLocation(), path, x.getAttribute("href"), x.allText(), messages, uuid, x, parent);
     }
     if ("a".equals(x.getName()) && x.hasAttribute("name")) {
       dat.seeAnchor(x.getAttribute("name"));
     }
     if ("img".equals(x.getName()) && x.hasAttribute("src")) {
-      changed = checkResolveImageLink(s, x.getLocation(), path, x.getAttribute("src"), messages, uuid) || changed;
+      changed = checkResolveImageLink(s, x.getLocation(), path, x.getAttribute("src"), messages, uuid, x) || changed;
     }
     if ("area".equals(x.getName()) && x.hasAttribute("href")) {
-      changed = checkResolveLink(s, x.getLocation(), path, x.getAttribute("href"), x.getAttribute("coords"), messages, uuid) || changed;
+      changed = checkResolveLink(s, x.getLocation(), path, x.getAttribute("href"), x.getAttribute("coords"), messages, uuid, x, parent) || changed;
     }
     if ("link".equals(x.getName())) {
       changed = checkLinkElement(s, x.getLocation(), path, x.getAttribute("href"), messages, uuid) || changed;
@@ -689,7 +728,7 @@ public class HTMLInspector {
     boolean nchanged = false;
     boolean nSelfChanged = false;
     for (XhtmlNode c : x.getChildNodes()) { 
-      NodeChangeType ct = checkLinks(lf, s, path, c, nuid, messages, inPre || "pre".equals(x.getName()), dat);
+      NodeChangeType ct = checkLinks(lf, s, path, c, nuid, messages, inPre || "pre".equals(x.getName()), dat, x);
       if (ct == NodeChangeType.SELF) {
         nSelfChanged = true;
         nchanged = true;
@@ -752,7 +791,7 @@ public class HTMLInspector {
       return false;
   }
 
-  private boolean checkResolveLink(String filename, Location loc, String path, String ref, String text, List<ValidationMessage> messages, String uuid) throws IOException {
+  private boolean checkResolveLink(String filename, Location loc, String path, String ref, String text, List<ValidationMessage> messages, String uuid, XhtmlNode x, XhtmlNode parent) throws IOException {
     links++;
     String rref = Utilities.URLDecode(ref);
     if ((rref.startsWith("http:") || rref.startsWith("https:") ) && (rref.endsWith(".sch") || rref.endsWith(".xsd") || rref.endsWith(".shex"))) { // work around for the fact that spec.internals does not track all these minor things 
@@ -764,7 +803,7 @@ public class HTMLInspector {
 
     StringBuilder tgtList = new StringBuilder();
     BooleanHolder bh = new BooleanHolder();
-    boolean resolved = checkTarget(filename, ref, rref, tgtList, bh);
+    boolean resolved = checkTarget(filename, ref, rref, tgtList, bh, x, parent);
     if (!resolved) {
       if (text == null)
         text = "";
@@ -780,14 +819,14 @@ public class HTMLInspector {
     }
   }
 
-  private boolean checkTarget(String filename, String ref, String rref, StringBuilder tgtList, BooleanHolder bh) throws IOException {
+  private boolean checkTarget(String filename, String ref, String rref, StringBuilder tgtList, BooleanHolder bh, XhtmlNode x, XhtmlNode parent) throws IOException {
     if (rref.startsWith("./")) {
       rref = rref.substring(2);
     }
     if (rref.endsWith("/")) {
       rref = rref.substring(0, rref.length()-1);
     }
-    
+
     if (ref.startsWith("data:")) {
       return true;
     }
@@ -806,9 +845,9 @@ public class HTMLInspector {
       for (SpecMapManager spec : specs) {
         if (!resolved && spec.getBase() != null) {
           resolved = resolved || spec.getBase().equals(rref) || (spec.getBase()).equals(rref+"/") || (spec.getBase()+"/").equals(rref)|| spec.hasTarget(rref) || 
-            Utilities.existsInList(rref, Utilities.pathURL(spec.getBase(), "definitions.json.zip"), 
-                Utilities.pathURL(spec.getBase(), "full-ig.zip"), Utilities.pathURL(spec.getBase(), "definitions.xml.zip"), 
-                Utilities.pathURL(spec.getBase(), "package.tgz"), Utilities.pathURL(spec.getBase(), "history.html"));
+              Utilities.existsInList(rref, Utilities.pathURL(spec.getBase(), "definitions.json.zip"), 
+                  Utilities.pathURL(spec.getBase(), "full-ig.zip"), Utilities.pathURL(spec.getBase(), "definitions.xml.zip"), 
+                  Utilities.pathURL(spec.getBase(), "package.tgz"), Utilities.pathURL(spec.getBase(), "history.html"));
         }
         if (!resolved && spec.getBase2() != null) {
           resolved = spec.getBase2().equals(rref) || (spec.getBase2()).equals(rref+"/") || 
@@ -826,7 +865,7 @@ public class HTMLInspector {
         }
       }
     }
-    
+
     if (!resolved) {
       for (RelatedIG ig : relatedIGs) {
         if (ig.getWebLocation() != null && rref.startsWith(ig.getWebLocation())) {
@@ -841,6 +880,7 @@ public class HTMLInspector {
     if (!resolved) {
       if (Utilities.isAbsoluteFileName(ref)) {
         if (new File(ref).exists()) {
+          addExternalReference(ExternalReferenceType.FILE, ref, parent == null ? x : parent, filename);
           resolved = true;
         }
       } else if (!resolved && !Utilities.isAbsoluteUrl(ref) && !rref.startsWith("#") && filename != null) {
@@ -851,32 +891,33 @@ public class HTMLInspector {
       }
     }
     // special case end-points that are always valid:
-     if (!resolved)
+    if (!resolved)
       resolved = Utilities.existsInList(ref, "http://hl7.org/fhir/fhir-spec.zip", "http://hl7.org/fhir/R4/fhir-spec.zip", "http://hl7.org/fhir/STU3/fhir-spec.zip", "http://hl7.org/fhir/DSTU2/fhir-spec.zip", 
           "http://hl7.org/fhir-issues", "http://hl7.org/registry") || 
-          matchesTarget(ref, "http://hl7.org", "http://hl7.org/fhir/DSTU2", "http://hl7.org/fhir/STU3", "http://hl7.org/fhir/R4", "http://hl7.org/fhir/smart-app-launch", "http://hl7.org/fhir/validator");
+      matchesTarget(ref, "http://hl7.org", "http://hl7.org/fhir/DSTU2", "http://hl7.org/fhir/STU3", "http://hl7.org/fhir/R4", "http://hl7.org/fhir/smart-app-launch", "http://hl7.org/fhir/validator");
 
-     if (!resolved) { // updated table documentation
-       if (ref.startsWith("https://build.fhir.org/ig/FHIR/ig-guidance/readingIgs.html")) {
-         resolved = true;
-       }
-     }
-     // a local file may have been created by some poorly tracked process, so we'll consider that as a possible
-     if (!resolved && !Utilities.isAbsoluteUrl(rref) && !rref.contains("..") && filename != null) { // .. is security check. Maybe there's some ways it could be valid, but we're not interested for now
-       String fname = buildRef(new File(filename).getParent(), rref);
-       if (new File(fname).exists()) {
-         resolved = true;
-       }
-     }
-     
-     // external terminology resources 
-     if (!resolved) {
-       resolved = Utilities.startsWithInList(ref, "http://cts.nlm.nih.gov/fhir"); 
-     }
-    
+    if (!resolved) { // updated table documentation
+      if (ref.startsWith("https://build.fhir.org/ig/FHIR/ig-guidance/readingIgs.html")) {
+        resolved = true;
+      }
+    }
+    // a local file may have been created by some poorly tracked process, so we'll consider that as a possible
+    if (!resolved && !Utilities.isAbsoluteUrl(rref) && !rref.contains("..") && filename != null) { // .. is security check. Maybe there's some ways it could be valid, but we're not interested for now
+      String fname = buildRef(new File(filename).getParent(), rref);
+      if (new File(fname).exists()) {
+        resolved = true;
+      }
+    }
+
+    // external terminology resources 
+    if (!resolved) {
+      resolved = Utilities.startsWithInList(ref, "http://cts.nlm.nih.gov/fhir"); 
+    }
+
     if (!resolved) {
       if (rref.startsWith("http://") || rref.startsWith("https://") || rref.startsWith("ftp://") || rref.startsWith("tel:") || rref.startsWith("urn:")) {
         resolved = true;
+        addExternalReference(ExternalReferenceType.WEB, ref, parent == null ? x : parent, filename);
         if (rref.startsWith(canonical)) {
           if (rref.equals(canonical)) {
             resolved = true;
@@ -961,6 +1002,23 @@ public class HTMLInspector {
     return resolved;
   }
 
+  private void addExternalReference(ExternalReferenceType type, String ref, XhtmlNode x, String source) {
+    if (ref.contains("hl7.org") || ref.contains("simplifier.net") || ref.contains("fhir.org") || ref.contains("loinc.org") || ref.contains("vsac.nlm.nih.gov") ||
+        ref.contains("snomed.org") || ref.contains("iana.org") || ref.contains("ietf.org") || ref.contains("w3.org") || ref.endsWith(".gov") || ref.contains(".gov/")) {
+      return;
+    }
+    for (ExternalReference exr : externalReferences) {
+      if (exr.getType() == type && exr.getUrl().equals(ref) && x.allText().equals(exr.getXhtml().allText())) {
+        return;
+      }
+    }
+    externalReferences.add(new ExternalReference(type, ref, x, stripLeadSlash(source.replace(rootFolder, ""))));
+  }
+
+  private String stripLeadSlash(String s) {
+    return s.startsWith("/") || s.startsWith("\\") ? s.substring(1) : s;
+  }
+
   @Nonnull
   private String buildRef(String refParentPath, String ref) throws IOException {
     // #TODO This logic should be in Utilities.path
@@ -981,19 +1039,19 @@ public class HTMLInspector {
     return false;
   }
 
-//  private SpecMapManager loadSpecMap(String id, String ver, String url) throws IOException {
-//    NpmPackage pi = pcm.loadPackageFromCacheOnly(id, ver);
-//    if (pi == null) {
-//      System.out.println("Fetch "+id+" package from "+url);
-//      URL url1 = new URL(Utilities.pathURL(url, "package.tgz")+"?nocache=" + System.currentTimeMillis());
-//      URLConnection c = url1.openConnection();
-//      InputStream src = c.getInputStream();
-//      pi = pcm.addPackageToCache(id, ver, src, url);
-//    }    
-//    SpecMapManager sm = new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), id, pi.getNpm().getJsonObject("dependencies").asString("hl7.fhir.core"));
-//    sm.setBase(PackageHacker.fixPackageUrl(url));
-//    return sm;
-//  }
+  //  private SpecMapManager loadSpecMap(String id, String ver, String url) throws IOException {
+  //    NpmPackage pi = pcm.loadPackageFromCacheOnly(id, ver);
+  //    if (pi == null) {
+  //      System.out.println("Fetch "+id+" package from "+url);
+  //      URL url1 = new URL(Utilities.pathURL(url, "package.tgz")+"?nocache=" + System.currentTimeMillis());
+  //      URLConnection c = url1.openConnection();
+  //      InputStream src = c.getInputStream();
+  //      pi = pcm.addPackageToCache(id, ver, src, url);
+  //    }    
+  //    SpecMapManager sm = new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), id, pi.getNpm().getJsonObject("dependencies").asString("hl7.fhir.core"));
+  //    sm.setBase(PackageHacker.fixPackageUrl(url));
+  //    return sm;
+  //  }
 
   private String makeLocal(String filename) {
     if (filename.startsWith(rootFolder))
@@ -1001,9 +1059,9 @@ public class HTMLInspector {
     return filename;
   }
 
-  private boolean checkResolveImageLink(String filename, Location loc, String path, String ref, List<ValidationMessage> messages, String uuid) throws IOException {
+  private boolean checkResolveImageLink(String filename, Location loc, String path, String ref, List<ValidationMessage> messages, String uuid, XhtmlNode src) throws IOException {
     links++;
-    boolean resolved = checkImgSourceExists(filename, ref);
+    boolean resolved = checkImgSourceExists(filename, ref, src);
     if (resolved)
       return false;
     else {
@@ -1012,7 +1070,7 @@ public class HTMLInspector {
     } 
   }
 
-  private boolean checkImgSourceExists(String filename, String ref) throws IOException {
+  private boolean checkImgSourceExists(String filename, String ref, XhtmlNode src) throws IOException {
     boolean resolved = false;
     if (ref.startsWith("data:"))
       resolved = true;
@@ -1027,7 +1085,7 @@ public class HTMLInspector {
       }
     }
     if (!resolved) {
-      ;resolved = Utilities.existsInList(ref, "http://hl7.org/fhir/assets-hist/images/fhir-logo-www.png", "http://hl7.org/fhir/assets-hist/images/hl7-logo-n.png"); 
+      resolved = Utilities.existsInList(ref, "http://hl7.org/fhir/assets-hist/images/fhir-logo-www.png", "http://hl7.org/fhir/assets-hist/images/hl7-logo-n.png"); 
     }
     if (!resolved) {
       if (ref.startsWith("http://") || ref.startsWith("https://")) {
@@ -1044,12 +1102,20 @@ public class HTMLInspector {
         resolved = f != null;
       }
     }
+    if (resolved) {
+      if (!Utilities.startsWithInList(ref, "icon_", "icon-", "tbl_", "data:", "cc0.png", "external.png", "assets/images/") && !ref.contains("hl7.org"))
+        if (ref.startsWith("http://") || ref.startsWith("https://")) {
+          addExternalReference(ExternalReferenceType.IMG, ref, src, filename);
+        } else {
+         imageRefs.put(ref, src);
+        }
+    }
     return resolved;
   }
 
   public void addLinkToCheck(String source, String link, String text) {
     otherlinks.add(new StringPair(source, link, text));
-    
+
   }
 
   public int total() {
@@ -1139,5 +1205,17 @@ public class HTMLInspector {
     String s = b.toString().trim();
     return s;
   }
-  
+
+  public List<ExternalReference> getExternalReferences() {
+    return externalReferences;
+  }
+
+  public Map<String, String> getCopyrights() {
+    return copyrights;
+  }
+
+  public Map<String, XhtmlNode> getImageRefs() {
+    return imageRefs;
+  }
+
 }
