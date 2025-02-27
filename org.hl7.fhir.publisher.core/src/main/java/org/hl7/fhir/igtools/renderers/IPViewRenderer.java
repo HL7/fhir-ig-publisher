@@ -50,7 +50,7 @@ public class IPViewRenderer {
       XhtmlNode li = ul.li();
       li.tx(s);
       li.tx(" (");
-      li.ah(Utilities.encodeUri(copyrights.get(s))).tx("src");
+      li.ah(copyrights.get(s)).tx("src");
       li.tx(")");      
     }
     body.h2().tx("External References");

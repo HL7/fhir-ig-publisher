@@ -1067,7 +1067,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       "</head>\r\n"+
       "<body style=\"margin: 20px; background-color: #ffffff\">\r\n"+
       " <h1>Validation Results for $title$</h1>\r\n"+
-      " <p>Generated $time$, FHIR version $version$ for $packageId$#$igversion$ (canonical = <a href=\"$canonical$\">$canonical$</a> (<a href=\"$canonical$/history.html\">history</a>)). See <a href=\"$otherFilePath$\">$otherFileName$</a></p>\r\n"+
+      " <p>Generated $time$, FHIR version $version$ for $packageId$#$igversion$ (canonical = <a href=\"$canonical$\">$canonical$</a> (<a href=\"$canonical$/history.html\">history</a>)). See <a href=\"$otherFilePath$\">$otherFileName$</a> &amp; <a href=\"qa-ipreview.html\">IP</a></p>\r\n"+
       "$warning$"+
       "<table class=\"grid\">"+
       " <tr><td colspan=2><b>Quality Checks</b></td></tr>\r\n"+

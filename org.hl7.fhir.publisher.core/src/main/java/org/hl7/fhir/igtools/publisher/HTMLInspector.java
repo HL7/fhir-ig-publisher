@@ -700,7 +700,7 @@ public class HTMLInspector {
     if (x.getNodeType() == NodeType.Text) {
       String tx = x.allText();
       if (tx.contains("©") || tx.contains("®")) {
-        copyrights.put(parent == null ? tx : parent.allText(), lf.filename);
+        copyrights.put(parent == null ? tx : parent.allText(), FileUtilities.getRelativePath(rootFolder, lf.filename));
       }
     }
     if ("title".equals(x.getName()) && Utilities.noString(x.allText())) {
