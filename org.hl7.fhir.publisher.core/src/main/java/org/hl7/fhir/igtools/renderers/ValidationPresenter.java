@@ -795,7 +795,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     b.append(genSummaryRowTxtInternal(linkErrors));
     files = sorted(files);
     for (FetchedFile f : files) 
-      b.append(genSummaryRowTxt(f));
+      b.append(genSummaryRowTxt(f, false));
     b.append(genEnd());
     b.append(genStartTxtInternal());
     for (ValidationMessage vm : linkErrors)
@@ -818,7 +818,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     b.append(genSummaryRowTxtInternal(linkErrors));
     files = sorted(files);
     for (FetchedFile f : files) 
-      b.append(genSummaryRowTxt(f));
+      b.append(genSummaryRowTxt(f, true));
     b.append(genEnd());
     b.append(genStartTxtInternal());
     for (ValidationMessage vm : linkErrors)
@@ -841,7 +841,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     files = sorted(files);
     for (FetchedFile f : files) {
       if (allIssues || hasIssues(f, filteredMessages)) {
-        b.append(genSummaryRow(f, filteredMessages));
+        b.append(genSummaryRow(f, filteredMessages, false));
       }
     }
     b.append(genEnd());
@@ -1537,12 +1537,12 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     return t.render();
   }
 
-  private String genSummaryRow(FetchedFile f, SuppressedMessageInformation filteredMessages) {
+  private String genSummaryRow(FetchedFile f, SuppressedMessageInformation filteredMessages, boolean makeRelative) {
     ST t = template(summaryTemplate);
     t.add("link", makelink(f));
     List<ValidationMessage> uniqueErrors = filterMessages(f.getErrors(), false, filteredMessages);
     
-    t.add("filename", f.getName());
+    t.add("filename", getRelativeFileName(f, makeRelative));
     String ec = errCount(uniqueErrors);
     t.add("errcount", ec);
     t.add("warningcount", warningCount(uniqueErrors));
@@ -1556,15 +1556,19 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     return t.render();
   }
 
-  private String genSummaryRowTxt(FetchedFile f) {
+  private String genSummaryRowTxt(FetchedFile f, boolean makeRelative) {
     ST t = template(summaryTemplateText);
-    t.add("filename", f.getName());
+    t.add("filename", getRelativeFileName(f, makeRelative));
     String ec = errCount(f.getErrors());
     t.add("errcount", ec);
     t.add("warningcount", warningCount(f.getErrors()));
     t.add("infocount", infoCount(f.getErrors()));
       
     return t.render();
+  }
+
+  private String getRelativeFileName(FetchedFile f, boolean makeRelative) {
+    return makeRelative ? f.getName().replace(root + "/", "") : f.getName();
   }
 
   private String genSummaryRowTxtInternal(List<ValidationMessage> linkErrors) {
