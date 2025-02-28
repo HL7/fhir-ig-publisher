@@ -13603,7 +13603,7 @@ private String fixPackageReference(String dep) {
         if (exp.getValueset() != null) {
           expansions.add(exp.getValueset());
 
-          RenderingContext elrc = lrc.withUniqueLocalPrefix("x");
+          RenderingContext elrc = lrc.withUniqueLocalPrefix("x").withMode(ResourceRendererMode.END_USER);
           exp.getValueset().setCompose(null);
           exp.getValueset().setText(null);  
           RendererFactory.factory(exp.getValueset(), elrc).renderResource(ResourceWrapper.forResource(elrc, exp.getValueset()));
