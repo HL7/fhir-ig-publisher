@@ -174,7 +174,7 @@ git push || { echo "Failed to push changes"; exit 1; }
 # git pull on the web site 
 
 echo "Update the actual web site"
-ssh git@18.221.0.73    "cd /var/www/html/fhir; git pull; exit;"
+ssh git@3.142.231.50    "cd /var/www/html/fhir; git pull; exit;"
 
 echo "Pushing to IG registry..."
 cd $IG_REGISTRY || exit 1
