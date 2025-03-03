@@ -30,6 +30,7 @@ import java.util.Map;
 import org.hl7.fhir.convertors.misc.ProfileVersionAdaptor.ConversionMessage;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
+import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureDefinition;
@@ -42,17 +43,17 @@ public class FetchedResource {
 
   public static class AlternativeVersionResource {
     List<ConversionMessage> log;
-    StructureDefinition sd;
-    protected AlternativeVersionResource(List<ConversionMessage> log, StructureDefinition sd) {
+    CanonicalResource cr;
+    protected AlternativeVersionResource(List<ConversionMessage> log, CanonicalResource cr) {
       super();
       this.log = log;
-      this.sd = sd;
+      this.cr = cr;
     }
     public List<ConversionMessage> getLog() {
       return log;
     }
-    public StructureDefinition getSd() {
-      return sd;
+    public CanonicalResource getResource() {
+      return cr;
     }
   }
 
