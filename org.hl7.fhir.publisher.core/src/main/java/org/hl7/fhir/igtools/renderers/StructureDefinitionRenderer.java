@@ -2738,25 +2738,27 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     } else {
       XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
       for (String v : Utilities.sortedReverse(resource.getOtherVersions().keySet())) {
-        AlternativeVersionResource sdv = resource.getOtherVersions().get(v);
-        x.h3().tx(VersionUtilities.getNameForVersion(v));
-        if (sdv.getSd() == null) {
-          x.para().tx("The extension is not used in "+VersionUtilities.getNameForVersion(v).toUpperCase());
-          XhtmlNode ul = x.ul(); 
-          for (ConversionMessage msg : sdv.getLog()) {
-            ul.li().style(msg.isError() ? "color: maroon" : "color: black").tx(msg.getMessage());
+        if (v.contains("-StructureDefinition")) {
+          AlternativeVersionResource sdv = resource.getOtherVersions().get(v);
+          x.h3().tx(VersionUtilities.getNameForVersion(v));
+          if (sdv.getResource() == null) {
+            x.para().tx("The extension is not used in "+VersionUtilities.getNameForVersion(v).toUpperCase());
+            XhtmlNode ul = x.ul(); 
+            for (ConversionMessage msg : sdv.getLog()) {
+              ul.li().style(msg.isError() ? "color: maroon" : "color: black").tx(msg.getMessage());
+            }
+          } else if (sdv.getLog().isEmpty()) {
+            x.para().tx("The extension is unchanged in "+VersionUtilities.getNameForVersion(v).toUpperCase());
+          } else {
+            x.para().tx("The extension is represented a little differently in "+VersionUtilities.getNameForVersion(v).toUpperCase()+": ");
+            XhtmlNode ul = x.ul();
+            for (ConversionMessage msg : sdv.getLog()) {
+              ul.li().style(msg.isError() ? "color: maroon" : "color: black").tx(msg.getMessage());
+            }
+            sdr.getContext().setStructureMode(StructureDefinitionRendererMode.SUMMARY);
+            x.add(sdr.generateTable(new RenderingStatus(), null, (StructureDefinition) sdv.getResource(), true, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, 
+                outputTracker, false, gen.withUniqueLocalPrefix(VersionUtilities.getNameForVersion(v)), ANCHOR_PREFIX_SNAP, resE));
           }
-        } else if (sdv.getLog().isEmpty()) {
-          x.para().tx("The extension is unchanged in "+VersionUtilities.getNameForVersion(v).toUpperCase());
-        } else {
-          x.para().tx("The extension is represented a little differently in "+VersionUtilities.getNameForVersion(v).toUpperCase()+": ");
-          XhtmlNode ul = x.ul();
-          for (ConversionMessage msg : sdv.getLog()) {
-            ul.li().style(msg.isError() ? "color: maroon" : "color: black").tx(msg.getMessage());
-          }
-          sdr.getContext().setStructureMode(StructureDefinitionRendererMode.SUMMARY);
-          x.add(sdr.generateTable(new RenderingStatus(), null, sdv.getSd(), true, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, 
-              outputTracker, false, gen.withUniqueLocalPrefix(VersionUtilities.getNameForVersion(v)), ANCHOR_PREFIX_SNAP, resE));
         }
       }
       return new XhtmlComposer(false, true).compose(x.getChildNodes());

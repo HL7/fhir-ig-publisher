@@ -4917,8 +4917,10 @@ private String fixPackageReference(String dep) {
     }
     npm = new NPMPackageGenerator(publishedIg.getPackageId(), Utilities.path(outputDir, "package.tgz"), igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, execTime.getTime(), relatedIgMap(), !publishing);
     for (String v : generateVersions) {
+      ImplementationGuide vig = publishedIg.copy();
+      checkIgDeps(vig, v);
       vnpms.put(v, new NPMPackageGenerator(publishedIg.getPackageId()+"."+v, Utilities.path(outputDir, publishedIg.getPackageId()+"."+v+".tgz"), 
-          igpkp.getCanonical(), targetUrl(), PackageType.IG,  publishedIg, execTime.getTime(), relatedIgMap(), !publishing, VersionUtilities.versionFromCode(v)));
+          igpkp.getCanonical(), targetUrl(), PackageType.IG,  vig, execTime.getTime(), relatedIgMap(), !publishing, VersionUtilities.versionFromCode(v)));
     }
     execTime = Calendar.getInstance();
 
@@ -5096,6 +5098,18 @@ private String fixPackageReference(String dep) {
     }
     extensionTracker.scan(publishedIg);
     finishLoadingCustomResources();
+  }
+
+  private void checkIgDeps(ImplementationGuide vig, String ver) {
+    if ("r4b".equals(ver)) {
+      ver = "r4";
+    }
+    String ov = VersionUtilities.getNameForVersion(context.getVersion()).toLowerCase();
+    for (ImplementationGuideDependsOnComponent dep : vig.getDependsOn()) {
+      if (dep.getPackageId().endsWith("."+ov) ) {
+        dep.setPackageId(dep.getPackageId().replace("."+ov, "."+ver));
+      }
+    }
   }
 
   private Map<String, String> relatedIgMap() {
@@ -7510,6 +7524,9 @@ private String fixPackageReference(String dep) {
               if (r.getResource() instanceof StructureDefinition) {
                 generateOtherVersion(r, pva, version, (StructureDefinition) r.getResource());
               } 
+              if (r.getResource() instanceof SearchParameter) {
+                generateOtherVersion(r, pva, version, (SearchParameter) r.getResource());
+              } 
             }
           } finally {
             f.finish("generateOtherVersions");      
@@ -7602,11 +7619,23 @@ private String fixPackageReference(String dep) {
     List<ConversionMessage> log = new ArrayList<>();
     try {
       StructureDefinition sd = pva.convert(resource, log);
-      r.getOtherVersions().put(v, new AlternativeVersionResource(log, sd));
+      r.getOtherVersions().put(v+"-StructureDefinition", new AlternativeVersionResource(log, sd));
     } catch (Exception e) {
       System.out.println("Error converting "+r.getId()+" to "+v+": "+e.getMessage());
       log.add(new ConversionMessage(e.getMessage(), true));
-      r.getOtherVersions().put(v, new AlternativeVersionResource(log, null));      
+      r.getOtherVersions().put(v+"-StructureDefinition", new AlternativeVersionResource(log, null));      
+    }
+  }
+  
+  private void generateOtherVersion(FetchedResource r, ProfileVersionAdaptor pva, String v, SearchParameter resource) throws FileNotFoundException, IOException {
+    List<ConversionMessage> log = new ArrayList<>();
+    try {
+      SearchParameter sp = pva.convert(resource, log);
+      r.getOtherVersions().put(v+"-SearchParameter", new AlternativeVersionResource(log, sp));
+    } catch (Exception e) {
+      System.out.println("Error converting "+r.getId()+" to "+v+": "+e.getMessage());
+      log.add(new ConversionMessage(e.getMessage(), true));
+      r.getOtherVersions().put(v+"-SearchParameter", new AlternativeVersionResource(log, null));      
     }
   }
 
@@ -12901,9 +12930,10 @@ private String fixPackageReference(String dep) {
     if (!r.isCustomResource()) {
       npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsj.toByteArray());
       for (String v : generateVersions) {
-        Resource res = r.hasOtherVersions() && r.getOtherVersions().containsKey(v) ? r.getOtherVersions().get(v).getSd() : r.getResource();
+        String ver = VersionUtilities.versionFromCode(v);
+        Resource res = r.hasOtherVersions() && r.getOtherVersions().containsKey(ver+"-"+r.fhirType()) ? r.getOtherVersions().get(ver+"-"+r.fhirType()).getResource() : r.getResource();
         if (res != null) {
-          vnpms.get(v).addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", convVersion(res.copy(), v));
+          vnpms.get(v).addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", convVersion(res.copy(), ver));
         }
       }
       if (r.getResource() != null && r.getResource().hasUserData(UserDataNames.archetypeSource)) {
@@ -12979,7 +13009,7 @@ private String fixPackageReference(String dep) {
     }
     if (res instanceof StructureDefinition) {
       StructureDefinition sd = (StructureDefinition) res;
-      sd.setFhirVersion(FHIRVersion.fromCode(version));
+      sd.setFhirVersion(FHIRVersion.fromCode(v));
     }
   }
   
