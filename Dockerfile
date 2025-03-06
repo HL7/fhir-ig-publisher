@@ -1,4 +1,5 @@
 FROM maven:3.6.3-jdk-11 AS build
+HEALTHCHECK CMD "java -jar /app/org.hl7.fhir.publisher.cli.jar"
 WORKDIR /build
 COPY lib ./lib
 COPY pom.xml ./pom.xml
