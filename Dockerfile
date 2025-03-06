@@ -9,7 +9,17 @@ COPY . .
 RUN mvn install -Dmaven.test.skip=true
 
 FROM eclipse-temurin:11
-WORKDIR /usr/src/app
+WORKDIR /app
+
+USER root
+
+ENV APPLICATION_USER=igpublisher
+RUN adduser $APPLICATION_USER
+
+RUN chown -R $APPLICATION_USER /app
+
+RUN mkdir /home/$APPLICATION_USER/.fhir
+RUN chown -R $APPLICATION_USER /home/$APPLICATION_USER/.fhir
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends git ruby-full build-essential zlib1g-dev && \
@@ -17,5 +27,6 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* && \
     gem install jekyll
 
-COPY --from=build /build/org.hl7.fhir.publisher.cli/target/org.hl7.fhir.publisher.cli-*-SNAPSHOT.jar /usr/src/app/org.hl7.fhir.publisher.cli.jar
-ENTRYPOINT ["java", "-jar", "/usr/src/app/org.hl7.fhir.publisher.cli.jar"]
+USER $APPLICATION_USER
+COPY --from=build /build/org.hl7.fhir.publisher.cli/target/org.hl7.fhir.publisher.cli-*-SNAPSHOT.jar /app/org.hl7.fhir.publisher.cli.jar
+ENTRYPOINT ["java", "-jar", "/app/org.hl7.fhir.publisher.cli.jar"]
