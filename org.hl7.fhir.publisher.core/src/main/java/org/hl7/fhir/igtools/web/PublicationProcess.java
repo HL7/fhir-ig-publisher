@@ -415,6 +415,7 @@ public class PublicationProcess {
     String tcPath = null;
     PackageListEntry tcVer = null;
     if (mode == PublicationProcessMode.TECHNICAL_CORRECTION) {
+      checkFile(Utilities.path(templateSrc, "tech-correction.template.html"), res, "Technical Correction Template");
       if (pl.current() == null) {
         throw new Error("Cannot perform a technical correction when the spec hasn't yet been published");        
       }
