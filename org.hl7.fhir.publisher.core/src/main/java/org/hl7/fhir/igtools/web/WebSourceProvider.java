@@ -126,6 +126,13 @@ public class WebSourceProvider {
     }
   }
 
+  public void needOptionalFolder(String path, boolean clear) throws IOException {
+    File sf = new File(Utilities.path(source, path));
+    if (sf.exists()) {
+      needFolder(path, false);
+    }    
+  }
+
   public void needOptionalFile(String path) throws IOException {
     File df = new File(Utilities.path(destination, path));
     if (df.exists()) {
