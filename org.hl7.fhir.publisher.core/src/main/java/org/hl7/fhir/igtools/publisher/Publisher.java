@@ -92,6 +92,7 @@ import org.hl7.fhir.convertors.loaders.loaderR5.NullLoaderKnowledgeProviderR5;
 import org.hl7.fhir.convertors.misc.NpmPackageVersionConverter;
 import org.hl7.fhir.convertors.misc.ProfileVersionAdaptor;
 import org.hl7.fhir.convertors.misc.ProfileVersionAdaptor.ConversionMessage;
+import org.hl7.fhir.convertors.misc.ProfileVersionAdaptor.ConversionMessageStatus;
 import org.hl7.fhir.convertors.txClient.TerminologyClientFactory;
 import org.hl7.fhir.exceptions.DefinitionException;
 import org.hl7.fhir.exceptions.FHIRException;
@@ -333,6 +334,7 @@ import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.validation.IValidationProfileUsageTracker;
 import org.hl7.fhir.r5.utils.validation.ValidatorSession;
 import org.hl7.fhir.utilities.*;
+import org.hl7.fhir.utilities.Logger.LogMessageType;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.TimeTracker.Session;
 import org.hl7.fhir.utilities.filesystem.CSFile;
@@ -1172,7 +1174,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           f.println("<a name=\"l"+id+"\"> </a><h3>"+id+"</h3>");
           f.println("<pre>");
         } else {
-          f.println(s);
+          f.println(s.replace("<", "&lt;"));
         }
       }
       //f.print(tx);
@@ -7575,6 +7577,7 @@ private String fixPackageReference(String dep) {
     if (isCoreResource(valueSet)) {
       if (!inTargetCore(tnpm, valueSet)) {
         if (!npm.hasFile(Category.RESOURCE, valueSet.fhirType()+"-"+valueSet.getIdBase()+".json")) {
+          noteOtherVersionAddedFile(tctxt.getVersion(), "ValueSet", valueSet.getIdBase());
           npm.addFile(Category.RESOURCE, valueSet.fhirType()+"-"+valueSet.getIdBase()+".json", convVersion(valueSet, tctxt.getVersion()));
         }
       }
@@ -7599,10 +7602,20 @@ private String fixPackageReference(String dep) {
     if (isCoreResource(cs)) {
       if (!inTargetCore(tnpm, cs)) {
         if (!npm.hasFile(Category.RESOURCE, cs.fhirType()+"-"+cs.getIdBase()+".json")) {
+          noteOtherVersionAddedFile(tctxt.getVersion(), "CodeSystem", cs.getIdBase());
           npm.addFile(Category.RESOURCE, cs.fhirType()+"-"+cs.getIdBase()+".json", convVersion(cs, tctxt.getVersion()));
         }
       }
     }
+  }
+
+  private void noteOtherVersionAddedFile(String ver, String type, String id) {
+    Set<String> ids = otherVersionAddedResources.get(ver+"-"+type);
+    if (ids == null) {
+      ids = new HashSet<String>();
+      otherVersionAddedResources .put(ver+"-"+type, ids);
+    }
+    ids.add(id);  
   }
 
   private boolean inTargetCore(NpmPackage tnpm, CanonicalResource cr) throws IOException {
@@ -7622,7 +7635,7 @@ private String fixPackageReference(String dep) {
       r.getOtherVersions().put(v+"-StructureDefinition", new AlternativeVersionResource(log, sd));
     } catch (Exception e) {
       System.out.println("Error converting "+r.getId()+" to "+v+": "+e.getMessage());
-      log.add(new ConversionMessage(e.getMessage(), true));
+      log.add(new ConversionMessage(e.getMessage(), ConversionMessageStatus.ERROR));
       r.getOtherVersions().put(v+"-StructureDefinition", new AlternativeVersionResource(log, null));      
     }
   }
@@ -7634,7 +7647,7 @@ private String fixPackageReference(String dep) {
       r.getOtherVersions().put(v+"-SearchParameter", new AlternativeVersionResource(log, sp));
     } catch (Exception e) {
       System.out.println("Error converting "+r.getId()+" to "+v+": "+e.getMessage());
-      log.add(new ConversionMessage(e.getMessage(), true));
+      log.add(new ConversionMessage(e.getMessage(), ConversionMessageStatus.ERROR));
       r.getOtherVersions().put(v+"-SearchParameter", new AlternativeVersionResource(log, null));      
     }
   }
@@ -8603,8 +8616,8 @@ private String fixPackageReference(String dep) {
       if (brokenLinksError && linkmsgs.size() > 0) {
         throw new Error("Halting build because broken links have been found, and these are disallowed in the IG control file");
       }
-      if (mode == IGBuildMode.AUTOBUILD && inspector.isMissingPublishBox()) {
-        throw new FHIRException("The auto-build infrastructure does not publish IGs that contain HTML pages without the publish-box present ("+inspector.getMissingPublishboxSummary()+"). For further information, see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations");
+      if (mode == IGBuildMode.AUTOBUILD && !inspector.getPublishBoxOK()) {
+        throw new FHIRException("The auto-build infrastructure does not publish IGs unless the publish-box is present ("+inspector.getPublishboxParsingSummary()+"). For further information, see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations");
       }
       generateFragmentUsage();
       log("Build final .zip");
@@ -9557,6 +9570,11 @@ private String fixPackageReference(String dep) {
     fragment("codesystem-ref-all-list", cvr.renderCSList(versionToAnnotate, cslist, cvr.needVersionReferences(vslist, publishedIg.getVersion()), true), otherFilesRun, start, "codesystem-ref-all-list", "Cross");      
     saveCSList("codesystem-ref-all-list", cslist, db, 3);
 
+    for (String v : generateVersions) {
+      for (String n : context.getResourceNames()) {
+        fragment("version-"+v+"-summary-"+n, generateVersionSummary(v, n), otherFilesRun, start, "version-"+v+"-summary-"+n, "Cross");
+      }      
+    }
     start = System.currentTimeMillis();
     trackedFragment("1", "ip-statements", new IPStatementsRenderer(context, markdownEngine, sourceIg.getPackageId(), rcLangs).genIpStatements(fileList, null), otherFilesRun, start, "ip-statements", "Cross");
     if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {
@@ -9818,6 +9836,81 @@ private String fixPackageReference(String dep) {
 
     json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(data, true);
     FileUtilities.stringToFile(json, Utilities.path(tempDir, "_data", "languages.json"));
+  }
+
+  private String generateVersionSummary(String v, String n) throws IOException {
+
+    String ver = VersionUtilities.versionFromCode(v);
+    
+    XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
+    div.h3().tx("Summary: "+n+" resources in "+v.toUpperCase());
+    XhtmlNode tbl = null;
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (n.equals(r.fhirType())) {
+          if (r.getOtherVersions().get(ver+"-"+n) != null && !r.getOtherVersions().get(ver+"-"+n).log.isEmpty()) {
+            if (tbl == null) {
+              tbl = div.table("grid");
+              XhtmlNode tr = tbl.tr();
+              tr.th().tx("Resource"); 
+              tr.th().tx("Action"); 
+              tr.th().tx("Notes"); 
+            }
+            XhtmlNode tr = tbl.tr();
+
+            tr.td().tx(r.getId());
+            AlternativeVersionResource vv = r.getOtherVersions().get(ver+"-"+n);
+            if (vv == null) {
+              tr.td().tx("Unchanged"); 
+              tr.td().tx(""); 
+            } else {
+              if (vv.getResource() == null) {
+                tr.td().tx("Removed");               
+              } else if (vv.getLog().isEmpty()) {
+                tr.td().tx("Unchanged"); 
+              } else {
+                tr.td().tx("Changed"); 
+              }
+              XhtmlNode ul = tr.td().ul();
+              for (ConversionMessage msg : vv.getLog()) {
+                switch (msg.getStatus()) {
+                case ERROR:
+                  ul.li().span().style("padding: 4px; color: maroon").tx(msg.getMessage());
+                  break;
+                case NOTE:
+                  //                ul.li().span().style("padding: 4px; background-color: #fadbcf").tx(msg.getMessage());
+                  break;
+                case WARNING:
+                default:
+                  ul.li().tx(msg.getMessage());
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    Set<String> ids = otherVersionAddedResources.get(ver+"-"+n);
+    if (ids != null) {
+      for (String id : ids) {
+        if (tbl == null) {
+          tbl = div.table("grid");
+          XhtmlNode tr = tbl.tr();
+          tr.th().tx("Resource"); 
+          tr.th().tx("Action"); 
+          tr.th().tx("Notes"); 
+        }
+        XhtmlNode tr = tbl.tr();
+        tr.td().tx(id);
+        tr.td().tx("Added"); 
+        tr.td().tx("Not present in "+v); 
+      } 
+    }
+    
+    if (tbl == null) {
+      div.tx("No resources found");
+    }
+    return new XhtmlComposer(false, true).compose(div.getChildNodes());
   }
 
   private String relatedIgsList() throws IOException {
@@ -12313,6 +12406,8 @@ private String fixPackageReference(String dep) {
   private List<String> testDataFactories;
 
   private Map<String, String> factoryProfileMap = new HashMap<>();
+
+  private Map<String, Set<String>> otherVersionAddedResources= new HashMap<>();
   
   private String processSQLCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();
@@ -13309,7 +13404,7 @@ private String fixPackageReference(String dep) {
           }          
         }
         String html = null;
-        BinaryRenderer br = new BinaryRenderer(tempDir);
+        BinaryRenderer br = new BinaryRenderer(tempDir, template.getScriptMappings());
         if (r.getResource() instanceof Binary) {
           html = pfx+br.display((Binary) r.getResource());
         } else if (r.getElement().fhirType().equals("Binary")) {
@@ -13625,6 +13720,7 @@ private String fixPackageReference(String dep) {
       long start = System.currentTimeMillis();
       if (vs.getStatus() == PublicationStatus.RETIRED) {
         String html = "<p style=\"color: maroon\">Expansions are not generated for retired value sets</p>";
+        
         fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null, start, "expansion", "ValueSet");
       } else {
         ValueSetExpansionOutcome exp = context.expandVS(vs, true, true, true);        
@@ -14596,7 +14692,8 @@ private String fixPackageReference(String dep) {
         s = s + " "+removePassword(args, i);
       }      
       System.out.println(s);
-      FilesystemPackageCacheManager pcm = CliParams.hasNamedParam(args, "system")
+      System.out.println("character encoding = "+java.nio.charset.Charset.defaultCharset()+" / "+System.getProperty("file.encoding"));
+            FilesystemPackageCacheManager pcm = CliParams.hasNamedParam(args, "system")
               ? new FilesystemPackageCacheManager.Builder().withSystemCacheFolder().build()
               : new FilesystemPackageCacheManager.Builder().build();
       System.out.println("Cache = "+pcm.getFolder());
@@ -14788,6 +14885,8 @@ private String fixPackageReference(String dep) {
         s = s + " "+removePassword(args, i);
       }      
       self.logMessage(s);
+      self.logMessage("Character encoding = "+java.nio.charset.Charset.defaultCharset()+" / "+System.getProperty("file.encoding"));
+
       //      self.logMessage("=== Environment variables =====");
       //      for (String e : System.getenv().keySet()) {
       //        self.logMessage("  "+e+": "+System.getenv().get(e));
