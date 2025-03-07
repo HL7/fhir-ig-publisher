@@ -88,6 +88,7 @@ public class Template {
   private Set<String> summaryRows = new HashSet<>();
   private Set<String> templateParams = new HashSet<>();
   private boolean wantLog;
+  private Map<String, String> scriptMappings = new HashMap<>();
   
   /** unpack the template into /template 
    * 
@@ -147,6 +148,9 @@ public class Template {
           templateParams.add(j.asString());                  
         }
       }
+    }
+    for (JsonProperty p : configuration.forceObject("script-mappings").getProperties()) {
+      scriptMappings.put(p.getName(), p.getValue().asString());                  
     }
     if (configuration.has("defaults")) {
       defaults = (JsonObject)configuration.get("defaults");
@@ -428,6 +432,10 @@ public class Template {
 
   public boolean isParameter(String pc) {
     return templateParams.contains(pc) || (templateParams.isEmpty() && Utilities.existsInList(pc, "releaselabel", "shownav", "excludettl", "jira-code", "fmm-definition", "excludelogbinaryformat"));
+  }
+
+  public Map<String, String> getScriptMappings() {
+    return scriptMappings ;
   }
 
   

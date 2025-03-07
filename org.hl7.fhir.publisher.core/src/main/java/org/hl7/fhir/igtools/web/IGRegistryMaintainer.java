@@ -155,7 +155,9 @@ public class IGRegistryMaintainer {
       a.add(new JsonString("en"));
     } else {
       for (String s : ig.entry.forceArray("product").asStrings()) {
-        ig.products.add(s);
+        if (!ig.products.contains(s)) {
+          ig.products.add(s);
+        }
       }
     }
     if (!ig.entry.has("category") && !Utilities.noString(category)) {

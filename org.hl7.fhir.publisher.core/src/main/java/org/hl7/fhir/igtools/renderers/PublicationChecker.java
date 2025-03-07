@@ -198,6 +198,14 @@ public class PublicationChecker {
       if (check(messages, pr.asString("path").startsWith(npm.canonical()) && !pr.asString("path").equals(npm.canonical()), "Proposed path for this publication does not start with the canonical URL ("+pr.asString("path")+" vs "+npm.canonical() +")"+mkError())) {
         summary.add(new StringPair("path", pr.asString("path")));                        
       }
+      boolean exists = false;
+      for (PackageListEntry v : pl.versions()) {
+        if (v.path().equals(pr.asString("path"))) {
+          exists = true;
+        }
+      }
+      check(messages,  !exists, "A publication already exists at "+pr.asString("path")+mkError());        
+
       if ("milestone".equals(pr.asString("mode"))) {
         check(messages,  pr.asString("path").equals(Utilities.pathURL(npm.canonical(), pr.asString("sequence").replace(" ", ""))) || pr.asString("path").equals(Utilities.pathURL(npm.canonical(), pr.asString("version"))), 
             "Proposed path for this milestone publication should usually be canonical with either sequence or version appended"+mkWarning());        
@@ -228,7 +236,6 @@ public class PublicationChecker {
         check(messages, npm.version().contains("-"), "This release is not labelled as a milestone or technical correction, so should have a patch version ("+npm.version() +")"+(isHL7(npm) ? mkError() : mkWarning()));
       }
     }
-    check(messages, !"technical-correction".equals(pr.asString("mode")), "Technical Corrections are not currently supported");
     
     if (check(messages, pr.has("status"), "No publication request status found"+mkError())) {
       if (check(messages, isValidStatus(pr.asString("status")), "Proposed status for this publication is not valid (valid values: release|trial-use|update|preview|ballot|draft|normative+trial-use|normative|informative)"+mkError())) {

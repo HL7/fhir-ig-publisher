@@ -2745,7 +2745,17 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             x.para().tx("The extension is not used in "+VersionUtilities.getNameForVersion(v).toUpperCase());
             XhtmlNode ul = x.ul(); 
             for (ConversionMessage msg : sdv.getLog()) {
-              ul.li().style(msg.isError() ? "color: maroon" : "color: black").tx(msg.getMessage());
+              switch (msg.getStatus()) {
+              case ERROR:
+                ul.li().span().style("padding: 4px; color: maroon").tx(msg.getMessage());
+                break;
+              case NOTE:
+                ul.li().span().style("padding: 4px; background-color: #fadbcf").tx(msg.getMessage());
+                break;
+              case WARNING:
+              default:
+                ul.li().tx(msg.getMessage());
+              }
             }
           } else if (sdv.getLog().isEmpty()) {
             x.para().tx("The extension is unchanged in "+VersionUtilities.getNameForVersion(v).toUpperCase());
@@ -2753,7 +2763,17 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             x.para().tx("The extension is represented a little differently in "+VersionUtilities.getNameForVersion(v).toUpperCase()+": ");
             XhtmlNode ul = x.ul();
             for (ConversionMessage msg : sdv.getLog()) {
-              ul.li().style(msg.isError() ? "color: maroon" : "color: black").tx(msg.getMessage());
+              switch (msg.getStatus()) {
+              case ERROR:
+                ul.li().span().style("padding: 4px; color: maroon").tx(msg.getMessage());
+                break;
+              case NOTE:
+                ul.li().span().style("padding: 4px; background-color: #fadbcf").tx(msg.getMessage());
+                break;
+              case WARNING:
+              default:
+                ul.li().tx(msg.getMessage());
+              }
             }
             sdr.getContext().setStructureMode(StructureDefinitionRendererMode.SUMMARY);
             x.add(sdr.generateTable(new RenderingStatus(), null, (StructureDefinition) sdv.getResource(), true, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, 
