@@ -62,9 +62,6 @@ import org.hl7.fhir.validation.BaseValidator.BooleanHolder;
 
 public class HTMLInspector {
 
-
-
-
   public enum ExternalReferenceType { FILE, WEB, IMG }
 
   public class ExternalReference {
@@ -240,8 +237,8 @@ public class HTMLInspector {
 
   private String statusText;
   private List<String> exemptHtmlPatterns = new ArrayList<>();
-  private boolean missingPublishBox;
-  private List<String> missingPublishBoxList = new ArrayList<>();
+  private List<String> parseProblems = new ArrayList<>();
+  private List<String> publishBoxProblems = new ArrayList<>();
   private Set<String> exceptions = new HashSet<>();
   private boolean referencesValidatorPack;
   private Map<String, List<String>> trackedFragments;
@@ -338,8 +335,7 @@ public class HTMLInspector {
                 "The html source does not contain the publish box; this is recommended for publishing support  (see note at http://wiki.hl7.org/index.php?title=FHIR_Implementation_Guide_Publishing_Requirements#HL7_HTML_Standards_considerations). Note that this is mandatory for HL7 specifications, and on the ci-build, but in other cases it's still recommended (this is only reported once, but applies for all pages)", IssueSeverity.INFORMATION));            
 
           }
-          missingPublishBox = true;
-          missingPublishBoxList.add(s.substring(rootFolder.length()+1));
+          publishBoxProblems.add(s.substring(rootFolder.length()+1));
           first = false;
         }
       }
@@ -542,8 +538,7 @@ public class HTMLInspector {
       x = null;
       if (htmlName || !(e.getMessage().startsWith("Unable to Parse HTML - does not start with tag.") || e.getMessage().startsWith("Malformed XHTML"))) {
         messages.add(new ValidationMessage(Source.LinkChecker, IssueType.STRUCTURE, s, e.getMessage(), IssueSeverity.ERROR).setLocationLink(makeLocal(f.getAbsolutePath())).setMessageId("HTML_PARSING_FAILED"));
-        missingPublishBox = true;
-        missingPublishBoxList.add(f.getName());
+        parseProblems.add(f.getName());
       }
     }
     if (x != null) {
@@ -1162,26 +1157,37 @@ public class HTMLInspector {
     return exemptHtmlPatterns;
   }
 
-  public boolean isMissingPublishBox() {
-    return missingPublishBox;
+  public boolean getPublishBoxOK() {
+    return parseProblems.isEmpty();
   }
 
   public Set<String> getExceptions() {
     return exceptions;
   }
 
-  public String getMissingPublishboxSummary() {
-    CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
-    for (int i = 0; i < missingPublishBoxList.size() && i < 10; i++) {
-      b.append(missingPublishBoxList.get(i));
-    }    
-    if (missingPublishBoxList.size() > 10) {
-      return b.toString()+" + "+Integer.toString(missingPublishBoxList.size()-10)+" other files";
+  public String getPublishboxParsingSummary() {
+    if (parseProblems.isEmpty() && publishBoxProblems.isEmpty()) {
+      return "No Problems";
+    } else if (parseProblems.isEmpty()) {
+      return "Missing Publish Box: "+summarise(publishBoxProblems);
+    } else if (publishBoxProblems.isEmpty()) {
+      return "Unable to Parse: "+summarise(parseProblems);      
     } else {
-      return b.toString();
+      return "No Publish Box: "+summarise(publishBoxProblems)+" and unable to Parse: "+summarise(parseProblems);      
     }
   }
 
+  private String summarise(List<String> list) {
+    CommaSeparatedStringBuilder b1 = new CommaSeparatedStringBuilder();
+    for (int i = 0; i < list.size() && i < 10; i++) {
+      b1.append(list.get(i));
+    }    
+    if (list.size() > 10) {
+      return b1.toString()+" + "+Integer.toString(list.size()-10)+" other files";
+    } else {
+      return b1.toString();
+    }
+  }
 
   // adapted from anchor.min, which is used to generate these things on the flt 
   private String urlify(String a) {
