@@ -42,13 +42,13 @@ You can find detailed instructions on setting up this project in your IDE [here]
 
 This project uses [Apache Maven][Link-Maven] to build. To build:
 
-```
+```shell
 mvn install
 ```
 
 To skip unit tests:
 
-```
+```shell
 mvn -Dmaven.test.skip install
 ```
 
@@ -60,6 +60,32 @@ In addition, two common publishing tasks that can be accomplished using the fhir
 
 * [Publishing Packages](https://hl7.github.io/docs/ig_publisher/publishing-packages)
 * [Publishing Templates](https://hl7.github.io/docs/ig_publisher/publishing-templates)
+
+## Docker
+
+A Dockerfile exists for packaging the IG Publisher and its pre-requisite software as a Docker image.
+
+To build the Docker image from within the project directory:
+
+```shell
+docker build -t fhir-ig-publisher:test .
+```
+
+You can use `docker run` to run the built docker image. Arguments in the Docker run command will be passed to the 
+IG Publisher CLI. If you include the --rm parameter, the container by the run command generated will be removed after 
+the command has been executed. If you wish to debug the container after a run, exclude this parameter.
+
+```shell
+docker run --rm fhir-ig-publisher:test
+```
+
+*Note: you will have to mount local files and directories in order for them to be accessed by the Docker container.*
+
+```shell
+docker run --mount type=bind,src=/path/to/an/ig-directory,dst=/usr/src/ig --rm fhir-ig-publisher:test -ig /usr/src/ig
+```
+
+
 
 ## Releases
 
