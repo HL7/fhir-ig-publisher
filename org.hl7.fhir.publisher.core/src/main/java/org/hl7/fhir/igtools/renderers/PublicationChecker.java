@@ -199,12 +199,14 @@ public class PublicationChecker {
         summary.add(new StringPair("path", pr.asString("path")));                        
       }
       boolean exists = false;
-      for (PackageListEntry v : pl.versions()) {
-        if (v.path().equals(pr.asString("path"))) {
-          exists = true;
+      if (pl != null) {
+        for (PackageListEntry v : pl.versions()) {
+          if (v.path().equals(pr.asString("path"))) {
+            exists = true;
+          }
         }
+        check(messages,  !exists, "A publication already exists at "+pr.asString("path")+mkError());
       }
-      check(messages,  !exists, "A publication already exists at "+pr.asString("path")+mkError());        
 
       if ("milestone".equals(pr.asString("mode"))) {
         check(messages,  pr.asString("path").equals(Utilities.pathURL(npm.canonical(), pr.asString("sequence").replace(" ", ""))) || pr.asString("path").equals(Utilities.pathURL(npm.canonical(), pr.asString("version"))), 
