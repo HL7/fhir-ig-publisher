@@ -1,14 +1,14 @@
-    <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.hl7.fhir.publisher</groupId>
     <artifactId>org.hl7.fhir.publisher</artifactId>
-    <version>1.8.12-SNAPSHOT</version>
+    <version>1.8.21-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <properties>
-        <core_version>6.5.8</core_version>
+        <core_version>6.5.15</core_version>
         <maven_surefire_version>3.0.0-M5</maven_surefire_version>
         <apache_poi_version>5.2.1</apache_poi_version>
         <lombok_version>1.18.32</lombok_version>
@@ -21,7 +21,8 @@
         <maven.compiler.testSource>11</maven.compiler.testSource>
         <maven.compiler.testTarget>11</maven.compiler.testTarget>
         <logback-classic.version>1.5.15</logback-classic.version>
-        <nedap-healthcare-archie.version>3.12.0</nedap-healthcare-archie.version>
+        <jackson_version>2.17.0</jackson_version>
+        <nedap-healthcare-archie.version>3.13.1</nedap-healthcare-archie.version>
     </properties>
 
     <name>HL7 FHIR IG Publisher</name>
@@ -74,6 +75,51 @@
                 <groupId>org.apache.ant</groupId>
                 <artifactId>ant</artifactId>
                 <version>1.10.12</version>
+            </dependency>
+            <dependency>
+                <groupId>jakarta.xml.bind</groupId>
+                <artifactId>jakarta.xml.bind-api</artifactId>
+                <version>4.0.1</version>
+            </dependency>
+            <dependency>
+                <groupId>jakarta.activation</groupId>
+                <artifactId>jakarta.activation-api</artifactId>
+                <version>2.1.3</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-annotations</artifactId>
+                <version>${jackson_version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-core</artifactId>
+                <version>${jackson_version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>${jackson_version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.module</groupId>
+                <artifactId>jackson-module-jaxb-annotations</artifactId>
+                <version>${jackson_version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.datatype</groupId>
+                <artifactId>jackson-datatype-jsr310</artifactId>
+                <version>${jackson_version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.glassfish.jaxb</groupId>
+                <artifactId>jaxb-runtime</artifactId>
+                <version>4.0.3</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>33.3.1-jre</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -184,7 +230,7 @@
             <optional>true</optional>
         </dependency>
 
-		<!-- Apache POI -->
+        <!-- Apache POI -->
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi</artifactId>
@@ -301,9 +347,9 @@
         </dependency>
         <!-- plantuml -->
         <dependency>
-          <groupId>net.sourceforge.plantuml</groupId>
-          <artifactId>plantuml-mit</artifactId>
-          <version>1.2023.9</version>
+            <groupId>net.sourceforge.plantuml</groupId>
+            <artifactId>plantuml-mit</artifactId>
+            <version>1.2023.9</version>
         </dependency>
 
         <dependency>
@@ -325,7 +371,7 @@
                 <plugin>
                     <groupId>org.owasp</groupId>
                     <artifactId>dependency-check-maven</artifactId>
-                    <version>11.1.1</version>
+                    <version>12.1.0</version>
                     <configuration>
                         <nvdApiKeyEnvironmentVariable>NVD_API_KEY</nvdApiKeyEnvironmentVariable>
                         <suppressionFiles>
@@ -496,12 +542,12 @@
                                     <goal>sign</goal>
                                 </goals>
                                 <configuration>
-					<keyname>${gpg.keyname}</keyname>
-					<passphraseServerId>${gpg.keyname}</passphraseServerId>
-					<gpgArguments>
-					    <arg>--pinentry-mode</arg>
-					    <arg>loopback</arg>
-					</gpgArguments>
+                                    <keyname>${gpg.keyname}</keyname>
+                                    <passphraseServerId>${gpg.keyname}</passphraseServerId>
+                                    <gpgArguments>
+                                        <arg>--pinentry-mode</arg>
+                                        <arg>loopback</arg>
+                                    </gpgArguments>
                                 </configuration>
                             </execution>
                         </executions>
@@ -552,12 +598,12 @@
                                     <goal>sign</goal>
                                 </goals>
                                 <configuration>
-					<keyname>${gpg.keyname}</keyname>
-					<passphraseServerId>${gpg.keyname}</passphraseServerId>
-					<gpgArguments>
-					    <arg>--pinentry-mode</arg>
-					    <arg>loopback</arg>
-					</gpgArguments>
+                                    <keyname>${gpg.keyname}</keyname>
+                                    <passphraseServerId>${gpg.keyname}</passphraseServerId>
+                                    <gpgArguments>
+                                        <arg>--pinentry-mode</arg>
+                                        <arg>loopback</arg>
+                                    </gpgArguments>
                                 </configuration>
                             </execution>
                         </executions>

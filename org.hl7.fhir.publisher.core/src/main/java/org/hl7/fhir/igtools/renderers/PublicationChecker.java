@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.hl7.fhir.igtools.publisher.RelatedIG;
 import org.hl7.fhir.igtools.web.PublicationProcess.PublicationProcessMode;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
@@ -19,6 +20,7 @@ import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
+import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.npm.PackageList;
 import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
@@ -31,14 +33,17 @@ public class PublicationChecker {
   private MarkDownProcessor mdEngine;
   private String releaseLabel;
   private ImplementationGuide ig;
+  private List<RelatedIG> relatedIgs;
+  private FilesystemPackageCacheManager pcm;
 
-  public PublicationChecker(String folder, String historyPage, MarkDownProcessor markdownEngine, String releaseLabel, ImplementationGuide ig) {
+  public PublicationChecker(String folder, String historyPage, MarkDownProcessor markdownEngine, String releaseLabel, ImplementationGuide ig, List<RelatedIG> relatedIgs) {
     super();
     this.folder = folder;
     this.historyPage = historyPage;
     this.mdEngine = markdownEngine;
     this.releaseLabel = releaseLabel;
     this.ig = ig;
+    this.relatedIgs = relatedIgs;
   }
   
   /**
@@ -53,8 +58,12 @@ public class PublicationChecker {
   public String check() throws IOException {
     List<String> messages = new ArrayList<>();
     List<StringPair> summary = new ArrayList<>();
-    checkFolder(messages, summary);
+    JsonObject pr = checkFolder(messages, summary);
     checkIg(messages, summary);
+    if (pr != null) {
+      checkRelatedIgs(pr, messages, summary);
+    }
+    
     StringBuilder bs = new StringBuilder();
     if (summary.size() > 0) {
       bs.append("<table class=\"grid\">\r\n");
@@ -84,6 +93,55 @@ public class PublicationChecker {
     }
   }
 
+  private void checkRelatedIgs(JsonObject pr, List<String> messages, List<StringPair> summary) throws IOException {
+    if (relatedIgs.isEmpty()) {
+      summary.add(new StringPair("RelatedIgs", "(None Found)"));
+    } else {
+      CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
+      for (RelatedIG rig : relatedIgs) {
+        String rigV = pr.forceObject("related").asString(rig.getCode());
+        if (rigV == null) {
+          messages.add("No specified Publication version for relatedIG "+rig.getCode()+mkError());
+          b.append(rig.getCode()+"=ERROR");
+        } else {
+          if (pcm == null) {
+            pcm = new FilesystemPackageCacheManager.Builder().build();
+          }
+          NpmPackage npm;
+          try {
+            npm = pcm.loadPackage(rig.getId(), rigV);
+          } catch (Exception e) {
+            if (!e.getMessage().toLowerCase().contains("not found")) {
+              messages.add("Error looking for "+rig.getId()+"#"+rigV+" for relatedIG  "+rig.getCode()+": "+e.getMessage()+mkError());              
+            }
+            npm = null;
+          }
+          if (npm == null) {
+            // now, the tricky bit: determining where it will be located.
+            try {
+              npm = pcm.loadPackage(rig.getId(), "current");
+              JsonObject json = JsonParser.parseObject(npm.load("other", "publication-request.json"));
+              String location = json.asString("path");
+              String version = json.asString("version");
+              if (rigV.equals(version)) {
+                b.append(rig.getCode()+"="+rigV+" (Yet to be published at '"+location+"')");
+              } else {
+                b.append(rig.getCode()+"="+rigV+" (Not published, and the proposed publication is a different version: "+version+" instead of "+rigV+")");
+                messages.add("The proposed publication for relatedIG  "+rig.getCode()+" is a different version: "+version+" instead of "+rigV+mkError());              
+              }
+            } catch (Exception e) {
+              messages.add("Error looking for "+rig.getId()+"#current for relatedIG  "+rig.getCode()+": "+e.getMessage()+mkError());              
+              b.append(rig.getCode()+"="+rigV+" (Yet to be published, and cannot determine location)");                          
+            }
+          } else {
+            b.append(rig.getCode()+"="+rigV+" (Already published at "+npm.getWebLocation()+")");
+          }
+        }
+      }
+      summary.add(new StringPair("RelatedIgs", b.toString()));
+    }    
+  }
+
   private void checkIg(List<String> messages, List<StringPair> summary) {
     for (ImplementationGuideDependsOnComponent dep : ig.getDependsOn()) {
       if (dep.getVersion() == null) {
@@ -94,7 +152,7 @@ public class PublicationChecker {
     }
   }
 
-  private void checkFolder(List<String> messages, List<StringPair> summary) throws IOException {
+  private JsonObject checkFolder(List<String> messages, List<StringPair> summary) throws IOException {
     check(messages, !exists("package-list.json"), "The file package-list.json should not exist in the root folder"+mkError());
     check(messages, !exists("output", "package-list.json"), "The file package-list.json should not exist in generated output"+mkError());
     if (check(messages, exists("output", "package.tgz"), "No output package found - can't check publication details"+mkWarning())) {
@@ -119,10 +177,11 @@ public class PublicationChecker {
         }
         checkExistingPublication(messages, npm, pl);
         if (check(messages, exists("publication-request.json"), "No publication request found"+mkInfo())) {
-          checkPublicationRequest(messages, npm, pl, summary);
+          return checkPublicationRequest(messages, npm, pl, summary);
         } 
       }
     }
+    return null;
   }
 
   protected static boolean exceptionCausedByNotFound(Exception e) {
@@ -160,13 +219,13 @@ public class PublicationChecker {
     }  
   }
 
-  private void checkPublicationRequest(List<String> messages, NpmPackage npm, PackageList pl, List<StringPair> summary) throws IOException {
+  private JsonObject checkPublicationRequest(List<String> messages, NpmPackage npm, PackageList pl, List<StringPair> summary) throws IOException {
     JsonObject pr = null;
     try {
       pr = JsonParser.parseObjectFromFile(Utilities.path(folder, "publication-request.json"));
     } catch (Exception e) {
       check(messages, false, "Error parsing publication-request.json: "+e.getMessage()+mkError());
-      return;
+      return null;
     }    
     if (pl == null) {
       check(messages, "true".equals(pr.asString("first")), "This appears to be the first publication, so first must be true"+mkError());
@@ -188,7 +247,7 @@ public class PublicationChecker {
         PackageListEntry plv = getVersionObject(v, pl);
         if (!check(messages, plv == null, "Publication Request is for version v"+v+" which is already published"+mkError())) {
           summary.clear();
-          return;          
+          return pr;          
         }
         String cv = getLatestVersion(pl);
         check(messages, cv == null || VersionUtilities.isThisOrLater(cv, v), "Proposed version v"+v+" is older than already published version v"+cv+mkError());
@@ -198,6 +257,16 @@ public class PublicationChecker {
       if (check(messages, pr.asString("path").startsWith(npm.canonical()) && !pr.asString("path").equals(npm.canonical()), "Proposed path for this publication does not start with the canonical URL ("+pr.asString("path")+" vs "+npm.canonical() +")"+mkError())) {
         summary.add(new StringPair("path", pr.asString("path")));                        
       }
+      boolean exists = false;
+      if (pl != null) {
+        for (PackageListEntry v : pl.versions()) {
+          if (v.path().equals(pr.asString("path"))) {
+            exists = true;
+          }
+        }
+        check(messages,  !exists, "A publication already exists at "+pr.asString("path")+mkError());
+      }
+
       if ("milestone".equals(pr.asString("mode"))) {
         check(messages,  pr.asString("path").equals(Utilities.pathURL(npm.canonical(), pr.asString("sequence").replace(" ", ""))) || pr.asString("path").equals(Utilities.pathURL(npm.canonical(), pr.asString("version"))), 
             "Proposed path for this milestone publication should usually be canonical with either sequence or version appended"+mkWarning());        
@@ -228,7 +297,6 @@ public class PublicationChecker {
         check(messages, npm.version().contains("-"), "This release is not labelled as a milestone or technical correction, so should have a patch version ("+npm.version() +")"+(isHL7(npm) ? mkError() : mkWarning()));
       }
     }
-    check(messages, !"technical-correction".equals(pr.asString("mode")), "Technical Corrections are not currently supported");
     
     if (check(messages, pr.has("status"), "No publication request status found"+mkError())) {
       if (check(messages, isValidStatus(pr.asString("status")), "Proposed status for this publication is not valid (valid values: release|trial-use|update|preview|ballot|draft|normative+trial-use|normative|informative)"+mkError())) {
@@ -314,7 +382,7 @@ public class PublicationChecker {
     }
     check(messages, !pr.has("date"), "Cannot specify a date of publication in the request"+mkError());
     check(messages, !pr.has("canonical"), "Cannot specify a canonical in the request"+mkError());
-    
+    return pr;
   }
 
   private boolean isHL7(NpmPackage npm) {

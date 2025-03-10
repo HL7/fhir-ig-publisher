@@ -1,12 +1,16 @@
 package org.hl7.fhir.igtools.renderers;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
+import org.hl7.fhir.igtools.publisher.RelatedIG;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
+import org.hl7.fhir.r5.comparison.CanonicalResourceComparer;
+import org.hl7.fhir.r5.conformance.R5ExtensionsLoader.CanonicalResourceSortByUrl;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.ContactDetail;
@@ -14,6 +18,7 @@ import org.hl7.fhir.r5.model.ContactPoint;
 import org.hl7.fhir.r5.model.ContactPoint.ContactPointSystem;
 import org.hl7.fhir.r5.model.DateTimeType;
 import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
+import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
@@ -21,6 +26,7 @@ import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.validation.instance.utils.CanonicalTypeSorter;
 
 public class CanonicalRenderer extends BaseRenderer {
 
@@ -28,12 +34,14 @@ public class CanonicalRenderer extends BaseRenderer {
   private CanonicalResource cr;
   private String destDir;
   protected String versionToAnnotate;
+  protected List<RelatedIG> relatedIgs;
 
-  public CanonicalRenderer(IWorkerContext context, String corePath, CanonicalResource cr, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen, String versionToAnnotate) {
+  public CanonicalRenderer(IWorkerContext context, String corePath, CanonicalResource cr, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, RenderingContext gen, String versionToAnnotate, List<RelatedIG> relatedIgs) {
     super(context, corePath, igp, maps, allTargets, markdownEngine, packge, gen);
     this.cr = cr;
     this.destDir = destDir;
     this.versionToAnnotate = versionToAnnotate;
+    this.relatedIgs = relatedIgs;
   }
 
   public String summaryTable(FetchedResource r, boolean xml, boolean json, boolean ttl, Set<String> rows) throws Exception {
@@ -255,4 +263,20 @@ public class CanonicalRenderer extends BaseRenderer {
   protected void changeSummaryDetails(StringBuilder b) {
     b.append("<ul><li>Not done yet</li></ul>\r\n");    
   }
+  
+
+  protected List<CanonicalResource> scanAllResources(Class<? extends CanonicalResource> class1, String className) {
+    List<CanonicalResource> list = new ArrayList<>();
+    if (class1 != null) {
+      list.addAll(context.fetchResourcesByType(class1));
+    }
+    for (RelatedIG ig : relatedIgs) {
+      for (Resource res : ig.load(className)) {
+        list.add((CanonicalResource) res);
+      }
+    }
+    Collections.sort(list, new org.hl7.fhir.r5.utils.ResourceSorters.CanonicalResourceSortByUrl());
+    return list;
+  }
+  
 }

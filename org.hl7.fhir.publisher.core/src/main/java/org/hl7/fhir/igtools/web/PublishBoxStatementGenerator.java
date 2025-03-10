@@ -26,10 +26,16 @@ public class PublishBoxStatementGenerator {
       p1 = p1 + ". ";      
     }
     
-    String p2 = root == null ? "" : version == root ? "This is the current published version"+(currentPublication ? "" : " in its permanent home (it will always be available at this URL)") :
-      VersionUtilities.compareVersions(root.version(), version.version()) > 0 ?
-          "The current version which supersedes this version is <a no-external=\"true\" href=\""+(root.path().startsWith(canonical) ? canonical : root.path())+"{{fn}}\">"+root.version()+"</a>" :
-          "This version is a pre-release. The current official version is <a no-external=\"true\" href=\""+(root.path().startsWith(canonical) ? canonical : root.path())+"{{fn}}\">"+root.version()+"</a>";
+    String p2 = null;
+    if (root == null) {
+      p2 = "No current official version has been published yet";
+    } else if (version == root) {
+      p2 = "This is the current published version"+(currentPublication ? "" : " in its permanent home (it will always be available at this URL)");
+    } else if (VersionUtilities.compareVersions(root.version(), version.version()) > 0) {
+      p2 = "The current version which supersedes this version is <a no-external=\"true\" href=\""+(root.path().startsWith(canonical) ? canonical : root.path())+"{{fn}}\">"+root.version()+"</a>";
+    } else {
+      p2 = "This version is a pre-release. The current official version is <a no-external=\"true\" href=\""+(root.path().startsWith(canonical) ? canonical : root.path())+"{{fn}}\">"+root.version()+"</a>";
+    }
     String p3;
     if (canonical.equals("http://hl7.org/fhir"))
       p3 = " For a full list of available versions, see the <a no-external=\"true\" href=\""+canonical+"/directory.html\">Directory of published versions</a>";
@@ -128,6 +134,8 @@ public class PublishBoxStatementGenerator {
       return decorate(sequence+" - Normative");
     else if ("informative".equals(status))
       return decorate(sequence+" - Informative");
+    else if ("corrected".equals(status))
+      return decorate(sequence+" - Replaced");
     else 
       throw new Error("unknown status "+status);
   }

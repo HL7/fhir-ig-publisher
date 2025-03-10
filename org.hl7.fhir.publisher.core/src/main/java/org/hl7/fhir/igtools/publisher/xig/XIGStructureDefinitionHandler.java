@@ -290,7 +290,7 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
     } else {
       boolean binding = false;
       boolean cardinality = false;
-      boolean invariants = false;
+      boolean constraints = false;
       boolean fixed = false;
       boolean doco = false;
       boolean slicing = false;
@@ -299,7 +299,7 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
         doco = doco || (ed.hasDefinition() || ed.hasComment());
         binding = binding || ed.hasBinding();
         cardinality = cardinality || ed.hasMin() || ed.hasMax();
-        invariants = invariants || ed.hasConstraint();
+        constraints = constraints || ed.hasConstraint();
         fixed = fixed || ed.hasPattern() || ed.hasFixed();
         slicing = slicing || ed.hasSlicing() || ed.hasSliceName();
         mustSupport = mustSupport || ed.getMustSupport();
@@ -311,8 +311,8 @@ public class XIGStructureDefinitionHandler extends XIGHandler {
       if (cardinality) {
         s = s +" <span style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: black; background-color: #b7e8f7\" title=\"Cardinality\">C</span>";
       }
-      if (invariants) {
-        s = s +" <span style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: black; background-color: #fdf4f4\" title=\"invariants\">I</span>";
+      if (constraints) {
+        s = s +" <span style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: black; background-color: #fdf4f4\" title=\"constraints\">I</span>";
       }
       if (fixed) {
         s = s +" <span style=\"padding-left: 3px; padding-right: 3px; border: 1px maroon solid; font-weight: bold; color: black; background-color: #fcfccc\" title=\"Fixed\">F</span>";

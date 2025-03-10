@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.model.Enumerations.FHIRVersion;
@@ -149,7 +150,7 @@ public class IGPackageChecker {
     } else {
       fhirversions.add(fhirversion);
     }
-    NPMPackageGenerator npm = new NPMPackageGenerator(file, canonical, vpath, PackageType.IG, ig, date, fhirversions, true);
+    NPMPackageGenerator npm = new NPMPackageGenerator(file, canonical, vpath, PackageType.IG, ig, date, fhirversions, null, true);
     for (File f : new File(folder).listFiles()) {
       if (f.getName().endsWith(".openapi.json")) {
         byte[] src = FileUtilities.fileToBytes(f.getAbsolutePath());

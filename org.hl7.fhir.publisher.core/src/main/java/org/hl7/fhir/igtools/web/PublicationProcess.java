@@ -110,7 +110,7 @@ public class PublicationProcess {
    * @param destination - the root folder of the local copy of files for the web site to which the IG is being published. 
    * @throws Exception 
    */
-  public void publish(String source, String web, String date, String registrySource, String history, String templatesSrc, String temp, String[] args) throws Exception {
+  public void publish(String source, String web, String date, String registrySource, String history, String templatesSrc, String temp, String igBuildZipParam, String[] args) throws Exception {
     PublisherConsoleLogger logger = new PublisherConsoleLogger();
     logger.start(Utilities.path("[tmp]", "publication-process.log"));
     try {
@@ -124,7 +124,7 @@ public class PublicationProcess {
       System.out.println(s);
       System.out.println("---------------");
       System.out.println("Publication Run: publish "+source+" to "+web);
-      List<ValidationMessage> res = publishInner(source, web, date, registrySource, history, templatesSrc, temp, logger, args);
+      List<ValidationMessage> res = publishInner(source, web, date, registrySource, history, templatesSrc, temp, igBuildZipParam, logger, args);
       if (res.size() == 0) {
         System.out.println("Success");
       } else {
@@ -153,11 +153,18 @@ public class PublicationProcess {
     return Long.toString(maxMemory / (1024*1024));
   }
 
-  public List<ValidationMessage> publishInner(String source, String web, String date, String registrySource, String history, String templateSrc, String temp, PublisherConsoleLogger logger, String[] args) throws Exception {
+  public List<ValidationMessage> publishInner(String source, String web, String date, String registrySource, String history, String templateSrc, String temp, String igBuildZipParam, PublisherConsoleLogger logger, String[] args) throws Exception {
     List<ValidationMessage> res = new ArrayList<>();
 
     if (temp == null) {
       temp = "[tmp]";
+    }
+    File sf = new File(source);
+    if (sf.exists() && !sf.isDirectory() && sf.getName().endsWith(".json")) {
+      JsonObject pr = JsonParser.parseObject(sf);
+      if ("withdrawal".equals(pr.asString("mode"))) {
+        return null; // publishWithdrawal(pr, web, );
+      }
     }
     // check the wider context
     File fSource = checkDirectory(source, res, "Source");
@@ -174,7 +181,8 @@ public class PublicationProcess {
       throw new Error("Uploading files by FTP is no longer supported");
     }
 
-    checkDirectory(Utilities.path(workingRoot, "ig-build-zips"), res, "Destination Zip Folder", true);
+    File igBuildZipDir = new File(igBuildZipParam == null ? Utilities.path(workingRoot, "ig-build-zips") : igBuildZipParam); 
+    checkDirectory(igBuildZipDir.getAbsolutePath(), res, "Destination Zip Folder", true);
     File fRegistry = checkFile(registrySource, res, "Registry");
     File fHistory = checkDirectory(history, res, "History Template");
     src.needFile("publish-setup.json");
@@ -184,7 +192,11 @@ public class PublicationProcess {
     }
     JsonObject pubSetup = JsonParser.parseObject(fPubIni);
     String url = pubSetup.getJsonObject("website").asString("url");
-
+    if (!check(res, pubSetup.getJsonObject("website").has("clone-xml-json"), "publish-setup.json does not have a '$.website.clone-xml-json' property - consult the FHIR Product Director")) {
+      return res;
+    }
+    boolean jsonXmlClones = pubSetup.getJsonObject("website").asBoolean("clone-xml-json");
+    
     src.needOptionalFile("publish-counter.json");
     if (!check(res, !new File(Utilities.path(workingRoot, "publish-counter.json")).exists(), "Found a publish-counter.json file. This indicates that the source folder is not correctly set up")) {
       return res;
@@ -231,7 +243,7 @@ public class PublicationProcess {
           help = false;
           publishInner2(source, web, date, registrySource, history, templateSrc, temp, logger, args,
               destination, workingRoot, res, src, id, canonical, version, npm, pubSetup, qa,
-              fSource, fOutput, fRoot, fRegistry, fHistory);
+              fSource, fOutput, fRoot, fRegistry, fHistory, jsonXmlClones, igBuildZipDir);
         }        
       }
     }
@@ -277,7 +289,7 @@ public class PublicationProcess {
   public List<ValidationMessage> publishInner2(String source, String web, String date, String registrySource, String history, String templateSrc, String temp, 
       PublisherConsoleLogger logger, String[] args, String destination, String workingRoot, List<ValidationMessage> res, WebSourceProvider src,
       String id, String canonical, String version, NpmPackage npm, JsonObject pubSetup, JsonObject qa, 
-      File fSource, File fOutput, File fRoot, File fRegistry, File fHistory) throws Exception {
+      File fSource, File fOutput, File fRoot, File fRegistry, File fHistory, boolean jsonXmlClones, File igBuildZipDir) throws Exception {
     System.out.println("Relative directory for IG is '"+destination.substring(workingRoot.length())+"'");
     String relDest = FileUtilities.getRelativePath(workingRoot, destination);
     FileUtilities.createDirectory(destination);
@@ -371,6 +383,8 @@ public class PublicationProcess {
     check(res, npm.fhirVersion().equals(qa.asString("version")), "Generated IG has wrong FHIR version "+qa.asString("version"));
     check(res, qa.asString("url").startsWith(canonical) || qa.asString("url").startsWith(npm.canonical()), "Generated IG has wrong Canonical "+qa.asString("url"));
     
+    src.needOptionalFolder(vCode, false);
+    
     String destVer = Utilities.path(destination, vCode);
     if (!check(res, new File(destination).exists(), "Destination '"+destVer+"' not found - must be set up manually for first publication")) {
       return res;
@@ -398,14 +412,21 @@ public class PublicationProcess {
       }
     }
     String tcName = null;
+    String tcPath = null;
+    PackageListEntry tcVer = null;
     if (mode == PublicationProcessMode.TECHNICAL_CORRECTION) {
+      checkFile(Utilities.path(templateSrc, "tech-correction.template.html"), res, "Technical Correction Template");
       if (pl.current() == null) {
         throw new Error("Cannot perform a technical correction when the spec hasn't yet been published");        
       }
-      if (pl.current().version().equals(prSrc.asString("version"))) {
+      tcVer = pl.current();
+      if (tcVer.version().equals(prSrc.asString("version"))) {
         throw new Error("Technical correction must have a different version to the currently published version ("+pl.current().version()+")");        
       }
-      tcName = pl.pid()+"#"+pl.current().version()+".zip";
+      tcName = pl.pid()+"-"+tcVer.version()+".zip";
+      tcPath = tcVer.determineLocalPath(pubSetup.getJsonObject("website").asString("url"), destination);
+      String tcRelPath = FileUtilities.getRelativePath(destination, tcPath); 
+      src.needFolder(tcRelPath, false);
     }
     
     // we always need the current folder, if there is one
@@ -418,8 +439,8 @@ public class PublicationProcess {
     // well, we've run out of things to test... time to actually try...
     if (res.size() == 0) {
       doPublish(fSource, fOutput, qa, destination, destVer, pathVer, fRoot, pubSetup, pl, prSrc, fRegistry, npm, mode, date, fHistory, temp, logger, 
-          pubSetup.getJsonObject("website").asString("url"), src, sft, relDest, templateSrc, first, indexes, Calendar.getInstance(), getComputerName(), IGVersionUtil.getVersionString(), gitSrcId(source), tcName,
-          workingRoot);
+          pubSetup.getJsonObject("website").asString("url"), src, sft, relDest, templateSrc, first, indexes, Calendar.getInstance(), getComputerName(), 
+          IGVersionUtil.getVersionString(), gitSrcId(source), tcName, tcPath, tcVer, workingRoot, jsonXmlClones, igBuildZipDir);
     }        
     return res;    
   }
@@ -491,7 +512,7 @@ public class PublicationProcess {
 
   private void doPublish(File fSource, File fOutput, JsonObject qa, String destination, String destVer, String pathVer, File fRoot, JsonObject pubSetup, PackageList pl, JsonObject prSrc, File fRegistry, NpmPackage npm, 
       PublicationProcessMode mode, String date, File history, String tempDir, PublisherConsoleLogger logger, String url, WebSourceProvider src, File sft, String relDest, String templateSrc, boolean first, Map<String, IndexMaintainer> indexes,
-      Calendar genDate, String username, String version, String gitSrcId, String tcName, String workingRoot) throws Exception {
+      Calendar genDate, String username, String version, String gitSrcId, String tcName, String tcPath, PackageListEntry tcVer, String workingRoot, boolean jsonXmlClones, File igBuildZipDir) throws Exception {
     // ok. all our tests have passed.
     // 1. do the publication build(s)
     List<String> existingFiles = new ArrayList<>();
@@ -513,15 +534,14 @@ public class PublicationProcess {
       }
 
       // 2. make a copy of what we built
-      System.out.println("Keep a copy of the build directory at "+Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".zip"));    
+      System.out.println("Keep a copy of the build directory at "+Utilities.path(igBuildZipDir, npm.name()+"#"+npm.version()+".zip"));    
 
       // 2.1. Delete the ".git" subfolder
-      File gitFolder = new File(temp, ".git");
-      if (gitFolder.exists()) {
-        FileUtils.deleteDirectory(gitFolder);
-      }
+      delTempFolder(temp, ".git");
+      delTempFolder(temp, "temp");
+      delTempFolder(temp, "template");
 
-      zipFolder(temp, Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".zip"));
+      zipFolder(temp, Utilities.path(igBuildZipDir, npm.name()+"#"+npm.version()+".zip"));
 
       System.out.println("");        
       System.out.println("ok. All checks passed. Publish v"+npm.version()+" to "+destVer);        
@@ -538,17 +558,19 @@ public class PublicationProcess {
       // now, update the package list 
       System.out.println("Update "+Utilities.path(destination, "package-list.json"));    
       PackageListEntry plVer = updatePackageList(pl, fSource.getAbsolutePath(), prSrc, pathVer,  Utilities.path(destination, "package-list.json"), mode, date, npm.fhirVersion(), Utilities.pathURL(pubSetup.asString("url"), tcName), subPackages);
-      updatePublishBox(pl, plVer, destVer, pathVer, destination, fRoot.getAbsolutePath(), false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url);
+      updatePublishBox(pl, plVer, destVer, pathVer, destination, fRoot.getAbsolutePath(), false, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url, jsonXmlClones);
 
       if (mode != PublicationProcessMode.WORKING) {
         String igSrc = Utilities.path(tempM.getAbsolutePath(), "output");
         if (mode == PublicationProcessMode.TECHNICAL_CORRECTION) {
-          System.out.println("This is a technical correction - publish v"+npm.version()+" to "+destination+" but archive first");
-          produceArchive(destVer, Utilities.path(igSrc,tcName));
+          
+          System.out.println("This is a technical correction - publish v"+npm.version()+" to "+destination+" but archive to "+tcName+" first");
+          produceArchive(tcPath, Utilities.path(igSrc,tcName));
         } else {
           System.out.println("This is a milestone release - publish v"+npm.version()+" to "+destination);
         }
 
+        
         List<String> ignoreList = new ArrayList<>();
         ignoreList.add(destVer);
         // get the current content from the source
@@ -559,11 +581,37 @@ public class PublicationProcess {
               String relPath = FileUtilities.getRelativePath(fRoot.getAbsolutePath(), path);
               ignoreList.add(path);
               src.needFolder(relPath, false);
+              if (!v.cibuild() && !v.current()) {
+                String pv = v.path();
+                String vCode = pv.substring(pv.lastIndexOf("/")+1);
+                String dv = Utilities.path(destination, vCode);
+                System.out.println("Update publish box for version "+v.version()+" @ "+v.path());
+                updatePublishBox(pl, v, dv, pv, destination, fRoot.getAbsolutePath(), false, null, null, null, url, jsonXmlClones);
+              }
             }
           }
         }
+        if (mode == PublicationProcessMode.TECHNICAL_CORRECTION) {
+          // replace every html file in the /version specific subfolder with a notice indicating that this version has been technically corrected, and a link to the same page in the new version
+          String tcTemplate = FileUtilities.fileToString(Utilities.path(templateSrc, "tech-correction.template.html"));
+          for (File f : new File(tcPath).listFiles()) {
+            if (f.getName().endsWith(".html")) {
+              boolean found = new File(Utilities.path(destVer, f.getName())).exists();
+              String cnt = tcTemplate.replace("[%title%]", pl.title());
+              if (!found) {
+                cnt = cnt.replace("[%tc-link%]", "removed");              
+              } else {
+                cnt = cnt.replace("[%tc-link%]", "replaced by <a href=\""+Utilities.pathURL(pathVer, f.getName())+"\">this new page</a>");
+              }
+              FileUtilities.stringToFile(cnt, f);
+            }
+          }
+          String vCode = tcPath.substring(tcPath.lastIndexOf("/")+1);
+          String dv = Utilities.path(destination, vCode);
+          updatePublishBox(pl, tcVer, dv, tcPath, destination, fRoot.getAbsolutePath(), false, null, null, null, url, jsonXmlClones);
+        }
         // we do this first in the output so we can get a proper diff
-        updatePublishBox(pl, plVer, igSrc, pathVer, igSrc, fRoot.getAbsolutePath(), true, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url);
+        updatePublishBox(pl, plVer, igSrc, pathVer, igSrc, fRoot.getAbsolutePath(), true, ServerType.fromCode(pubSetup.getJsonObject("website").asString("server")), sft, null, url, jsonXmlClones);
 
         System.out.println("Check for Files to delete");        
         List<String> newFiles = FileUtilities.listAllFiles(igSrc, null);
@@ -572,13 +620,16 @@ public class PublicationProcess {
         existingFiles.removeAll(newFiles);
         existingFiles.removeAll(historyFiles);
         existingFiles.remove("package-list.json");
+        existingFiles.remove("package-registry.json");
+        existingFiles.remove("publish-setup.json");
         existingFiles.removeIf(s -> s.endsWith("web.config"));
         for (String s : existingFiles) {
           new File(Utilities.path(destination, s)).delete();
         }
         System.out.println("  ... "+existingFiles.size()+" files");        
-        System.out.println("Copy to new IG to "+destination);        
-        FileUtils.copyDirectory(new File(Utilities.path(tempM.getAbsolutePath(), "output")), new File(destination));      
+        System.out.println("Copy to new IG "+destination);        
+        FileUtils.copyDirectory(new File(Utilities.path(tempM.getAbsolutePath(), "output")), new File(destination));  
+
       } else {
         src.cleanFolder(relDest);
       }
@@ -600,10 +651,86 @@ public class PublicationProcess {
     new HistoryPageUpdater().updateHistoryPage(history.getAbsolutePath(), destination, templateSrc, !first); 
     
     logger.stop();
-    FileUtils.copyFile(new File(logger.getFilename()), new File(Utilities.path(fRoot.getAbsolutePath(), "ig-build-zips", npm.name()+"#"+npm.version()+".log")));
+    FileUtils.copyFile(new File(logger.getFilename()), new File(Utilities.path(igBuildZipDir, npm.name()+"#"+npm.version()+".log")));
     src.finish(relDest, existingFiles);
+    String anonuncement = buildAnnouncement(pubSetup, prSrc, npm, destination, destVer, pathVer, mode, url, relDest, version, tcName);
+    FileUtilities.stringToFile(anonuncement, Utilities.path(igBuildZipDir, npm.name()+"#"+npm.version()+"-announcement.txt"));
     System.out.println("Finished Publishing. "+src.instructions(existingFiles.size()));
     exitCode = 0;
+  }
+
+  private String buildAnnouncement(JsonObject pubSetup, JsonObject prSrc, NpmPackage npm, String destination, String destVer, String pathVer, PublicationProcessMode mode, String url, String relDest, String version, String tcName) {
+    String st = null;
+    switch (prSrc.asString("status")) {
+    case "release":
+      st = "Release";
+      break;
+    case "trial-use":
+      st = "STU";
+      break;
+    case "update":
+      st = "Update";
+      break;
+    case "preview":
+      st = "Preview";
+      break;
+    case "ballot":
+      st = "Ballot";
+      break;
+    case "draft":
+      st = "Draft";
+      break;
+    case "normative+trial-use":
+      st = "Mixed Normative+STU";
+      break;
+    case "normative":
+      st = "Normative";
+      break;
+    case "informative":
+      st = "Informative";
+      break;
+    default:
+      st = "Unknown";
+      break;
+    }
+    
+    StringBuilder b = new StringBuilder();
+    switch (mode) {
+    case CREATION: 
+      b.append("New Publication Action: ");
+      break;
+    case MILESTONE:
+      b.append("New "+st+" Publication Available: ");
+      break;
+    case TECHNICAL_CORRECTION:
+      b.append("New Technical Correction: ");
+      break;
+    case WORKING:
+      b.append("New "+st+" Version Available: ");
+      break;
+    default:
+      b.append("New "+st+" Publication: ");
+      break;
+    }
+    b.append(npm.title());
+    b.append(": "+npm.name());
+    b.append("#");
+    b.append(npm.version());
+    b.append(" @ ");
+    b.append(pathVer);
+    b.append("\r\n\r\n");
+    b.append(prSrc.has("descmd") ? prSrc.asString("descmd") : prSrc.asString("descmd"));
+        
+    System.out.println("Announcement");
+    System.out.println(b.toString());
+    return b.toString();        
+  }
+
+  public void delTempFolder(File temp, String s) throws IOException {
+    File gitFolder = new File(temp, s);
+    if (gitFolder.exists()) {
+      FileUtils.deleteDirectory(gitFolder);
+    }
   }
 
   private List<String> loadSubPackageList(String path) throws JsonException, IOException {
@@ -715,7 +842,7 @@ public class PublicationProcess {
       XMLUtil.addTextTag(xml, nitem, "fhir:version", plVer.fhirVersion(), 6);
       XMLUtil.addTextTag(xml, nitem, "fhir:kind", npm.getNpm().asString("type"), 6);
       XMLUtil.addTextTag(xml, nitem, "pubDate", presentDate(npm.dateAsDate()), 6);
-      XMLUtil.addTextTag(xml, nitem, "fhir:details", "Publication run at "+genDate+" by "+username+" using v"+version+" source id "+gitSrcId, null, 6);
+      XMLUtil.addTextTag(xml, nitem, "fhir:details", "Publication run at "+genDate+" by "+username+" using "+version+" source id "+gitSrcId, null, 6);
       nitem.appendChild(xml.createTextNode("\n    "));
       
       Element dt = XMLUtil.getNamedChild(channel, "lastBuildDate");
@@ -743,7 +870,7 @@ public class PublicationProcess {
     b.append("      <fhir:version>"+plVer.fhirVersion()+"</fhir:version>\r\n");
     b.append("      <fhir:kind>"+npm.getNpm().asString("type")+"</fhir:kind>\r\n");
     b.append("      <pubDate>"+presentDate(npm.dateAsDate())+"</pubDate>\r\n");
-    b.append("      <fhir:details>Publication run at "+genDate+" by "+username+" using v"+version+" source id "+gitSrcId+"</fhir:details>\r\n");
+    b.append("      <fhir:details>Publication run at "+genDate+" by "+username+" using "+version+" source id "+gitSrcId+"</fhir:details>\r\n");
     b.append("    </item>\r\n");
     
     return b.toString();
@@ -755,34 +882,38 @@ public class PublicationProcess {
     return sdf.format(date);
   }
 
-  private void updatePublishBox(PackageList pl, PackageListEntry plVer, String destVer, String pathVer, String destination, String rootFolder, boolean current, ServerType serverType, File sft, List<String> ignoreList, String url) throws FileNotFoundException, IOException {
+  private void updatePublishBox(PackageList pl, PackageListEntry plVer, String destVer, String pathVer, String destination, String rootFolder, boolean current, ServerType serverType, File sft, List<String> ignoreList, String url, boolean jsonXmlClones) throws FileNotFoundException, IOException {
     IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(destVer, url, rootFolder, ignoreList, null, plVer.json(), destination);
     String fragment = PublishBoxStatementGenerator.genFragment(pl, plVer, pl.current(), pl.canonical(), current, false);
     System.out.println("Publish Box Statement: "+fragment);
     igvu.updateStatement(fragment, current ? 0 : 1, pl.milestones());
     System.out.println("  .. "+igvu.getCountTotal()+" files checked, "+igvu.getCountUpdated()+" updated");
-    
-    igvu.checkXmlJsonClones(destVer);
-    System.out.println("  .. "+igvu.getClonedTotal()+" clones checked, "+igvu.getClonedCount()+" updated");
-    IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(destVer, pl.canonical(), plVer.path(), rootFolder);
-    if (serverType == ServerType.APACHE) {
-      rb.buildApacheRedirections();
-    } else if (serverType == ServerType.ASP2) {
-      rb.buildNewAspRedirections(false, false);
-    } else if (serverType == ServerType.ASP1) {
-      rb.buildOldAspRedirections();
-    } else if (serverType == ServerType.LITESPEED) {
-      rb.buildLitespeedRedirections();
-    } else if (!pl.canonical().contains("hl7.org/fhir")) {
-      rb.buildApacheRedirections();
-    } else {
-      rb.buildOldAspRedirections();
+
+    if (jsonXmlClones) {
+      igvu.checkXmlJsonClones(destVer);
+      System.out.println("  .. "+igvu.getClonedTotal()+" clones checked, "+igvu.getClonedCount()+" updated");
     }
-    System.out.println("  .. "+rb.getCountTotal()+" redirections ("+rb.getCountUpdated()+" created/updated)");
+    if (serverType != null) {
+      IGReleaseRedirectionBuilder rb = new IGReleaseRedirectionBuilder(destVer, pl.canonical(), plVer.path(), rootFolder);
+      if (serverType == ServerType.APACHE) {
+        rb.buildApacheRedirections();
+      } else if (serverType == ServerType.ASP2) {
+        rb.buildNewAspRedirections(false, false);
+      } else if (serverType == ServerType.ASP1) {
+        rb.buildOldAspRedirections();
+      } else if (serverType == ServerType.LITESPEED) {
+        rb.buildLitespeedRedirections();
+      } else if (!pl.canonical().contains("hl7.org/fhir")) {
+        rb.buildApacheRedirections();
+      } else {
+        rb.buildOldAspRedirections();
+      }
+      System.out.println("  .. "+rb.getCountTotal()+" redirections ("+rb.getCountUpdated()+" created/updated)");
+      if (!current && serverType == ServerType.ASP2) {
+        new VersionRedirectorGenerator(destination).execute(plVer.version(), plVer.path());
+      }
+    }
     new DownloadBuilder(destVer, pl.canonical(), current ?  pl.canonical() : plVer.path(), ignoreList).execute();
-    if (!current && serverType == ServerType.ASP2) {
-      new VersionRedirectorGenerator(destination).execute(plVer.version(), plVer.path());
-    }
 
     
     if (sft != null) {
@@ -857,24 +988,30 @@ public class PublicationProcess {
       SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
       date = sdf.format(new Date());      
     }
-    PackageListEntry nv = null;
+    PackageListEntry tnv = null;
     
     if (mode == PublicationProcessMode.TECHNICAL_CORRECTION) {
-      nv = pl.current();
-      nv.update(prSrc.asString("version"), webpath,  prSrc.asString("status"), prSrc.asString("sequence"), FhirPublication.fromCode(fhirVersion), tcPath, date);
-    } else {
-      if (mode != PublicationProcessMode.WORKING) {
-        for (PackageListEntry e : pl.versions()) {
-          e.setCurrent(false);
-        }
-      }
-      nv = pl.newVersion(prSrc.asString("version"), webpath,  prSrc.asString("status"), prSrc.asString("sequence"), FhirPublication.fromCode(fhirVersion));
-
-      nv.setDate(date);
-      if (mode != PublicationProcessMode.WORKING) {
-        nv.setCurrent(true);
+      tnv = pl.current();
+      tnv.setStatus("corrected");
+    }
+    if (mode != PublicationProcessMode.WORKING) {
+      for (PackageListEntry e : pl.versions()) {
+        e.setCurrent(false);
       }
     }
+    PackageListEntry nv = pl.newVersion(prSrc.asString("version"), webpath,  prSrc.asString("status"), prSrc.asString("sequence"), FhirPublication.fromCode(fhirVersion));
+
+    nv.setDate(date);
+    if (mode != PublicationProcessMode.WORKING) {
+      nv.setCurrent(true);
+    }
+
+    if (mode == PublicationProcessMode.TECHNICAL_CORRECTION) {
+      nv.takeCorrections(tnv);
+      nv.addTC(tnv.version(), tcPath, date);
+    }
+
+    
     String md = null;
     if (prSrc.has("descmd")) {
       md = prSrc.asString("descmd");

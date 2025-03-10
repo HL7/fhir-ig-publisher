@@ -11,11 +11,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.hl7.fhir.convertors.misc.ProfileVersionAdaptor.ConversionMessage;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
+import org.hl7.fhir.igtools.publisher.FetchedResource.AlternativeVersionResource;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
+import org.hl7.fhir.igtools.publisher.RelatedIG;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.CanonicalResourceComparison;
 import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.ChangeAnalysisState;
@@ -26,6 +29,9 @@ import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CanonicalType;
+import org.hl7.fhir.r5.model.CapabilityStatement;
+import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestComponent;
+import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceComponent;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeableConcept;
 import org.hl7.fhir.r5.model.Coding;
@@ -45,6 +51,7 @@ import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.PackageInformation;
 import org.hl7.fhir.r5.model.PrimitiveType;
 import org.hl7.fhir.r5.model.Quantity;
+import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.SearchParameter;
 import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.r5.model.StructureDefinition;
@@ -137,8 +144,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   private org.hl7.fhir.r5.renderers.StructureDefinitionRenderer sdr;
   private ResourceWrapper resE;
 
-  public StructureDefinitionRenderer(IWorkerContext context, String corePath, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants,Map<String, Map<String, ElementDefinition>> mapCache, String specPath, String versionToAnnotate) {
-    super(context, corePath, sd, destDir, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate);
+  public StructureDefinitionRenderer(IWorkerContext context, String corePath, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants,Map<String, Map<String, ElementDefinition>> mapCache, String specPath, String versionToAnnotate, List<RelatedIG> relatedIgs) {
+    super(context, corePath, sd, destDir, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate, relatedIgs);
     this.sd = sd;
     this.destDir = destDir;
     utils = new ProfileUtilities(context, null, igp);
@@ -1431,14 +1438,15 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   public String uses() throws Exception {
     StringBuilder b = new StringBuilder();
-    List<StructureDefinition> derived = findDerived();
+    List<CanonicalResource> crl = scanAllResources(StructureDefinition.class, "StructureDefinition");
+    List<StructureDefinition> derived = findDerived(crl);
     if (!derived.isEmpty()) {
       b.append("<p>\r\n");
       b.append(gen.formatPhrase(RenderingContext.STRUC_DEF_DERIVED_PROFILE) + " ");
       listResources(b, derived);
       b.append("</p>\r\n");
     }
-    List<StructureDefinition> users = findUses();
+    List<StructureDefinition> users = findUses(crl);
     if (!users.isEmpty()) {
       b.append("<p>\r\n");
       b.append(gen.formatPhrase(RenderingContext.STRUC_DEF_REFER_PROFILE)+" ");
@@ -1449,9 +1457,10 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
 
-  private List<StructureDefinition> findDerived() {
+  private List<StructureDefinition> findDerived(List<CanonicalResource> crl) {
     List<StructureDefinition> res = new ArrayList<>();
-    for (StructureDefinition t : context.fetchResourcesByType(StructureDefinition.class)) {
+    for (CanonicalResource cr : crl) {
+      StructureDefinition t = (StructureDefinition) cr;
       if (refersToThisSD(t.getBaseDefinition())) {
         res.add(t);
       }
@@ -1459,9 +1468,10 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return res;
   }
 
-  private List<StructureDefinition> findUses() {
+  private List<StructureDefinition> findUses(List<CanonicalResource> crl) {
     List<StructureDefinition> res = new ArrayList<>();
-    for (StructureDefinition t : context.fetchResourcesByType(StructureDefinition.class)) {
+    for (CanonicalResource cr : crl) {
+      StructureDefinition t = (StructureDefinition) cr;
       boolean uses = false;
       for (ElementDefinition ed : t.getDifferential().getElement()) {
         for (TypeRefComponent u : ed.getType()) {
@@ -1476,7 +1486,6 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
     return res;
   }
-
 
   public String exampleList(List<FetchedFile> fileList, boolean statedOnly) {
     StringBuilder b = new StringBuilder();
@@ -2136,7 +2145,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     Map<String, String> trefs = new HashMap<>();
     Map<String, String> examples = new HashMap<>();
     Map<String, String> searches = new HashMap<>();
-    for (StructureDefinition sdt : context.fetchResourcesByType(StructureDefinition.class)) {
+    Map<String, String> capStmts = new HashMap<>();
+    for (CanonicalResource cr : scanAllResources(StructureDefinition.class, "StructureDefinition")) {
+      StructureDefinition sdt = (StructureDefinition) cr;
       if (refersToThisSD(sdt.getBaseDefinition())) {
         base.put(sdt.getWebPath(), sdt.present());
       }
@@ -2172,6 +2183,20 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
       }
     }
+
+    for (FetchedFile f : files) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getResource() != null && r.getResource() instanceof CapabilityStatement) {
+          CapabilityStatement cst = (CapabilityStatement) r.getResource();
+          scanCapStmt(capStmts, cst);
+        }
+      }
+    }
+    for (CanonicalResource cr : scanAllResources(null, "StructureDefinition")) {
+      CapabilityStatement cst = (CapabilityStatement) cr;
+      scanCapStmt(capStmts, cst);
+    }
+    
     if (VersionUtilities.isR5Plus(context.getVersion())) {
       if (usages == null) {
         FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager.Builder().build();
@@ -2205,6 +2230,13 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             }
           }
         }
+      }
+    }
+    for (RelatedIG ig : relatedIgs) {
+      for (Element r : ig.loadE(context, sd.getType())) {
+        if (usesSD(r)) {
+          examples.put(r.getWebPath(), r.getUserString(UserDataNames.renderer_title));
+        }        
       }
     }
 
@@ -2247,11 +2279,32 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (!searches.isEmpty()) {
       b.append(" <li>Search Parameters using this " + type + ": " + refList(searches, "sp") + "</li>\r\n");
     }
+    if (!capStmts.isEmpty()) {
+      b.append(" <li>CapabilityStatements using this " + type + ": " + refList(capStmts, "cst") + "</li>\r\n");
+    }
     if (base.isEmpty() && refs.isEmpty() && trefs.isEmpty() && examples.isEmpty() & invoked.isEmpty() && imposed.isEmpty() && compliedWith.isEmpty()) {
       b.append(" <li>This " + type + " is not used by any profiles in this Implementation Guide</li>\r\n");
     }
     b.append("</ul>\r\n");
     return b.toString()+changeSummary();
+  }
+
+  public void scanCapStmt(Map<String, String> capStmts, CapabilityStatement cst) {
+    for (CapabilityStatementRestComponent rest : cst.getRest()) {
+      for (CapabilityStatementRestResourceComponent res : rest.getResource()) {
+        boolean inc = false;
+        if (refersToThisSD(res.getProfile())) {
+          inc = true;
+        } else for (CanonicalType c : res.getSupportedProfile()) {
+          if (refersToThisSD(c.getValue())) {
+            inc = true;
+          } 
+        }
+        if (inc) {
+          capStmts.put(cst.getWebPath(), cst.present());
+        }
+      }
+    }
   }
 
   private boolean refersToThisSD(String url) {
@@ -2678,4 +2731,58 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     String url = VersionUtilities.getSpecUrl(version);
     p.ahOrNot(url).b().tx(VersionUtilities.getNameForVersion(version));    
   }
+
+  public String otherVersions(Set<String> outputTracker, FetchedResource resource) throws IOException {
+    if (!resource.hasOtherVersions()) {
+      return "";
+    } else {
+      XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+      for (String v : Utilities.sortedReverse(resource.getOtherVersions().keySet())) {
+        if (v.contains("-StructureDefinition")) {
+          AlternativeVersionResource sdv = resource.getOtherVersions().get(v);
+          x.h3().tx(VersionUtilities.getNameForVersion(v));
+          if (sdv.getResource() == null) {
+            x.para().tx("The extension is not used in "+VersionUtilities.getNameForVersion(v).toUpperCase());
+            XhtmlNode ul = x.ul(); 
+            for (ConversionMessage msg : sdv.getLog()) {
+              switch (msg.getStatus()) {
+              case ERROR:
+                ul.li().span().style("padding: 4px; color: maroon").tx(msg.getMessage());
+                break;
+              case NOTE:
+                ul.li().span().style("padding: 4px; background-color: #fadbcf").tx(msg.getMessage());
+                break;
+              case WARNING:
+              default:
+                ul.li().tx(msg.getMessage());
+              }
+            }
+          } else if (sdv.getLog().isEmpty()) {
+            x.para().tx("The extension is unchanged in "+VersionUtilities.getNameForVersion(v).toUpperCase());
+          } else {
+            x.para().tx("The extension is represented a little differently in "+VersionUtilities.getNameForVersion(v).toUpperCase()+": ");
+            XhtmlNode ul = x.ul();
+            for (ConversionMessage msg : sdv.getLog()) {
+              switch (msg.getStatus()) {
+              case ERROR:
+                ul.li().span().style("padding: 4px; color: maroon").tx(msg.getMessage());
+                break;
+              case NOTE:
+                ul.li().span().style("padding: 4px; background-color: #fadbcf").tx(msg.getMessage());
+                break;
+              case WARNING:
+              default:
+                ul.li().tx(msg.getMessage());
+              }
+            }
+            sdr.getContext().setStructureMode(StructureDefinitionRendererMode.SUMMARY);
+            x.add(sdr.generateTable(new RenderingStatus(), null, (StructureDefinition) sdv.getResource(), true, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, 
+                outputTracker, false, gen.withUniqueLocalPrefix(VersionUtilities.getNameForVersion(v)), ANCHOR_PREFIX_SNAP, resE));
+          }
+        }
+      }
+      return new XhtmlComposer(false, true).compose(x.getChildNodes());
+    }
+  }
+  
 }

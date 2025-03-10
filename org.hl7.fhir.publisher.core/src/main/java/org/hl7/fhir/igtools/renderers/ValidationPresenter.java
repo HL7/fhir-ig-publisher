@@ -41,6 +41,7 @@ import org.hl7.fhir.igtools.publisher.DependentIGFinder;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
+import org.hl7.fhir.igtools.publisher.RelatedIG;
 import org.hl7.fhir.igtools.publisher.SuppressedMessageInformation;
 import org.hl7.fhir.igtools.publisher.SuppressedMessageInformation.SuppressedMessage;
 import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
@@ -379,6 +380,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   private List<String> versionProblems;
   private List<FetchedResource> fragments;
   private IGLanguageInformation langinfo;
+  private List<RelatedIG> relatedIGs;
 
   
   public ValidationPresenter(String statedVersion, String igVersion, IGKnowledgeProvider provider, IGKnowledgeProvider altProvider, String root, String packageId, String altPackageId, 
@@ -386,7 +388,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       String dependencies, String csAnalysis, String pubReqCheck, String globalCheck, String copyrightYear, IWorkerContext context,
       Set<String> r5Extensions, List<StructureDefinition> modifierExtensions, String draftDependencies,
       List<FetchedResource> noNarratives, List<FetchedResource> noValidation, boolean noValidate, boolean noGenerate, DependentIGFinder dependentIgs, 
-      TerminologyClientManager txServers, List<String> versionProblems, List<FetchedResource> fragments, IGLanguageInformation langinfo) {
+      TerminologyClientManager txServers, List<String> versionProblems, List<FetchedResource> fragments, IGLanguageInformation langinfo, List<RelatedIG> relatedIGs) {
     super();
     this.statedVersion = statedVersion;
     this.igVersion = igVersion;
@@ -419,6 +421,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     this.versionProblems = versionProblems;
     this.fragments = fragments;
     this.langinfo = langinfo;
+    this.relatedIGs = relatedIGs;
     ruleDateCutoff = Date.from(LocalDate.now().minusMonths(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
     determineCode();
   }
@@ -1064,7 +1067,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       "</head>\r\n"+
       "<body style=\"margin: 20px; background-color: #ffffff\">\r\n"+
       " <h1>Validation Results for $title$</h1>\r\n"+
-      " <p>Generated $time$, FHIR version $version$ for $packageId$#$igversion$ (canonical = <a href=\"$canonical$\">$canonical$</a> (<a href=\"$canonical$/history.html\">history</a>)). See <a href=\"$otherFilePath$\">$otherFileName$</a></p>\r\n"+
+      " <p>Generated $time$, FHIR version $version$ for $packageId$#$igversion$ (canonical = <a href=\"$canonical$\">$canonical$</a> (<a href=\"$canonical$/history.html\">history</a>)). See <a href=\"$otherFilePath$\">$otherFileName$</a> &amp; <a href=\"qa-ipreview.html\">IP</a></p>\r\n"+
       "$warning$"+
       "<table class=\"grid\">"+
       " <tr><td colspan=2><b>Quality Checks</b></td></tr>\r\n"+
@@ -1075,6 +1078,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       " <tr><td>Publication Request:</td><td>$pubReqCheck$</td></tr>\r\n"+
       " <tr><td>Supressed Messages:</td><td>$suppressedmsgssummary$</td></tr>\r\n"+
       " <tr><td>Dependency Checks:</td><td>$dependencyCheck$</td></tr>\r\n"+
+      " <tr><td>Related IGs:</td><td>$relatedIgs$</td></tr>\r\n"+
       " <tr><td>Dependent IGs:</td><td><a href=\"qa-dep.html\">$dependentIgs$</a></td></tr>\r\n"+
       " <tr><td>Global Profiles:</td><td>$globalCheck$</td></tr>\r\n"+
       " <tr><td>Terminology Server(s):</td><td>$txserverlist$ (<a href=\"qa-txservers.html\">details</a>)</td></tr>\r\n"+
@@ -1240,7 +1244,8 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("txserverlist", txserverlist());
     t.add("dependencyCheck", dependencies);
     t.add("draftDependencies", draftDependencies);
-    t.add("dependentIgs", dependentIgs.getCountDesc());
+    t.add("relatedIgs", relatedIgs());
+    t.add("dependentIgs", dependentIgs.getCountDesc());    
     t.add("csAnalysis", csAnalysis);
     t.add("r5usage", genR5());
     t.add("modifiers", genModifiers());
@@ -1272,6 +1277,41 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     else
       t.add("suppressedmsgssummary", "<a href=\"#suppressed\">"+msgCount+" Suppressed "+Utilities.pluralize("Issue", msgCount)+"</a>\r\n");
     return t.render();
+  }
+
+  private String relatedIgs() {
+    if (relatedIGs.isEmpty()) {
+      return "n/a";
+    }
+    XhtmlNode x = new XhtmlNode(NodeType.Element);
+    XhtmlNode tbl = x.table("grid");
+    XhtmlNode tr = tbl.tr();
+    tr.th().b().tx("code");
+    tr.th().b().tx("ID");
+    tr.th().b().tx("Role");
+    tr.th().b().tx("Version");
+    tr.th().b().tx("Source");
+    tr.th().b().tx("Location");
+    tr.th().b().tx("Link Count");
+    for (RelatedIG ig : relatedIGs) {
+      tr = tbl.tr();
+      tr.td().tx(ig.getCode());
+      tr.td().tx(ig.getId());
+      tr.td().tx(ig.getRoleCode());
+      if (ig.getNpm() != null) {
+        tr.td().tx(ig.getNpm().version());        
+      } else {
+        tr.td().span().style("color: maroon").tx(ig.getMessage());        
+      }
+      tr.td().tx(ig.getMode().toCode());
+      tr.td().tx(ig.getWebLocation());
+      tr.td().tx(ig.getLinkCount());      
+    }
+    try {
+      return new XhtmlComposer(false, true).compose(tbl);
+    } catch (IOException e) {
+      return e.getMessage();
+    }
   }
 
   private String validationFlags() {

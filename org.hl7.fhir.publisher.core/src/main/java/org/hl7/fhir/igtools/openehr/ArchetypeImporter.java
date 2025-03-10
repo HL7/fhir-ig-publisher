@@ -104,8 +104,8 @@ public class ArchetypeImporter {
     public Bundle getBnd() {
       return bnd;
     } 
-    
   }
+  
   public ArchetypeImporter(IWorkerContext context, String canonicalBase) throws ParserConfigurationException, SAXException, IOException {
     super();
     this.context = context;

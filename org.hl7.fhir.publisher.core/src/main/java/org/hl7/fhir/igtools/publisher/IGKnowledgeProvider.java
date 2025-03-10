@@ -619,8 +619,8 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
             br.display = ref.substring(29);
             br.url = vsr;
           } else {
-            br.display = ref.substring(29);
-            br.url = ref.substring(29)+".html";
+            br.display = ref.substring(29)+" (??)";
+            br.url = null;
             brokenLinkMessage(path, ref, false);
           }
         }
@@ -662,7 +662,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
           br.uri = ref;
           br.external = true;
         } else if (Utilities.isAbsoluteUrlLinkable(ref) && (!ref.startsWith("http://hl7.org") || !ref.startsWith("http://terminology.hl7.org"))) {
-          br.url = Utilities.encodeUri(ref);  
+          br.url = ref;  
           br.display = ref;
         } else if (vs == null) {
           br.url = null;

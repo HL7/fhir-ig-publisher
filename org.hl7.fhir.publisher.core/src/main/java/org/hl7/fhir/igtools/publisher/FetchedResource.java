@@ -22,20 +22,41 @@ package org.hl7.fhir.igtools.publisher;
 
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 
+import org.hl7.fhir.convertors.misc.ProfileVersionAdaptor.ConversionMessage;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
+import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
-import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureDefinition;
+import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 
 
 public class FetchedResource {
+
+  public static class AlternativeVersionResource {
+    List<ConversionMessage> log;
+    CanonicalResource cr;
+    protected AlternativeVersionResource(List<ConversionMessage> log, CanonicalResource cr) {
+      super();
+      this.log = log;
+      this.cr = cr;
+    }
+    public List<ConversionMessage> getLog() {
+      return log;
+    }
+    public CanonicalResource getResource() {
+      return cr;
+    }
+  }
+
   private String id;
   private String title;
   private String type;
@@ -64,6 +85,7 @@ public class FetchedResource {
   private String resourceName;
   private String resourceDescription;
   private boolean regenAfterValidation;
+  private Map<String, AlternativeVersionResource> otherVersions;
 
   public FetchedResource(String nameForErrors) {
     super();
@@ -383,6 +405,17 @@ public class FetchedResource {
     }
     return false;
   }
-  
+
+  public Map<String, AlternativeVersionResource> getOtherVersions() {
+    if (otherVersions == null) {
+      otherVersions = new HashMap<String, FetchedResource.AlternativeVersionResource>();
+    }
+    return otherVersions;
+  }
+
+  public boolean hasOtherVersions() {
+    return otherVersions != null && !otherVersions.isEmpty();
+  }
+
   
 }
