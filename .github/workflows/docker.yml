@@ -1,0 +1,27 @@
+# This workflow will build the Java project with Maven and peform IntelliJ smoke tests
+# For more information see: https://help.github.com/actions/language-and-framework-guides/building-and-testing-java-with-maven
+
+name: Docker Build
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout project
+      uses: actions/checkout@v4
+    - name: Build (no push)
+      uses: docker/build-push-action@v6
+      with:
+        push: false
+        tags: user/app:latest
+        build-args: |
+          BUILDKIT_CONTEXT_KEEP_GIT_DIR=true
