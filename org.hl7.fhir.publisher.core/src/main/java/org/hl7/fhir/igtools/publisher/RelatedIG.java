@@ -92,6 +92,7 @@ public class RelatedIG {
   private Map<String, List<Element>> elements = new HashMap<>();
   private String message;
   private ImplementationGuide ig;
+  private String webLocation;
   
   protected RelatedIG(String code, String id, RelatedIGLoadingMode mode, RelatedIGRole role, NpmPackage npm) {
     super();
@@ -100,7 +101,25 @@ public class RelatedIG {
     this.npm = npm;
     this.code = code;
     this.role = role;
-    this.message = null; 
+    this.message = null;
+    this.webLocation = npm.getWebLocation();
+    load();
+  }
+  
+  protected RelatedIG(String code, String id, RelatedIGLoadingMode mode, RelatedIGRole role, NpmPackage npm, String location) {
+    super();
+    this.id = id;
+    this.mode = mode;
+    this.npm = npm;
+    this.code = code;
+    this.role = role;
+    this.message = null;
+    this.webLocation = location;
+    load();
+  }
+
+  
+  private void load() {
     
     try {
       IContextResourceLoader loader = ContextResourceLoaderFactory.makeLoader(npm.fhirVersion(), new NullLoaderKnowledgeProviderR5());
@@ -118,9 +137,8 @@ public class RelatedIG {
     } catch (Exception e) {
       // nothing?
     }    
-  }
 
-  
+  }
   public RelatedIG(String code, String id, RelatedIGRole role, String message) {
     super();
     this.id = id;
@@ -150,7 +168,7 @@ public class RelatedIG {
   }
 
   public String getWebLocation() {
-    return npm == null ? null : npm.getWebLocation();
+    return webLocation;
   }
 
   public NpmPackage getNpm() {

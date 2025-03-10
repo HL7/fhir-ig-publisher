@@ -451,7 +451,7 @@ import lombok.Setter;
 
 public class Publisher implements ILoggingService, IReferenceResolver, IValidationProfileUsageTracker, IResourceLinkResolver {
 
-  private static final String TOOLING_IG_CURRENT_RELEASE = "0.4.0";
+  private static final String TOOLING_IG_CURRENT_RELEASE = "0.3.0";
 
   public class FragmentUseRecord {
 
@@ -3637,11 +3637,64 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       return;
     } 
 
-    if (Utilities.startsWithInList(npm.getWebLocation(), "http://", "https://")) {
+    if (mode == IGBuildMode.PUBLICATION) {
+      relatedIGs.add(new RelatedIG(code, id, RelatedIGLoadingMode.WEB, RelatedIGRole.fromCode(role), npm, determineLocation(id)));      
+    } else if (Utilities.startsWithInList(npm.getWebLocation(), "http://", "https://")) {
       relatedIGs.add(new RelatedIG(code, id, RelatedIGLoadingMode.CIBUILD, RelatedIGRole.fromCode(role), npm));
     } else {
       relatedIGs.add(new RelatedIG(code, id, RelatedIGLoadingMode.LOCAL, RelatedIGRole.fromCode(role), npm));
     }
+  }
+
+  private String determineLocation(String id) {
+    // to determine the location of this IG in publication mode, we have to figure out what version we are publishing against 
+    // this is in the publication request 
+    // then, we need to look the package 
+    // if it's already published, we use that location 
+    // if it's to be published, we find #current, extract that publication request, and use that path (check version)
+    // otherwise, bang
+    throw new Error("Publishing related IGs is not done yet");
+//    
+//    String rigV = pr.forceObject("related").asString(rig.getCode());
+//    if (rigV == null) {
+//      messages.add("No specified Publication version for relatedIG "+rig.getCode()+mkError());
+//      b.append(rig.getCode()+"=ERROR");
+//    } else {
+//      if (pcm == null) {
+//        pcm = new FilesystemPackageCacheManager.Builder().build();
+//      }
+//      NpmPackage npm;
+//      try {
+//        npm = pcm.loadPackage(rig.getId(), rigV);
+//      } catch (Exception e) {
+//        if (!e.getMessage().toLowerCase().contains("not found")) {
+//          messages.add("Error looking for "+rig.getId()+"#"+rigV+" for relatedIG  "+rig.getCode()+": "+e.getMessage()+mkError());              
+//        }
+//        npm = null;
+//      }
+//      if (npm == null) {
+//        // now, the tricky bit: determining where it will be located.
+//        try {
+//          npm = pcm.loadPackage(rig.getId(), "current");
+//          JsonObject json = JsonParser.parseObject(npm.load("other", "publication-request.json"));
+//          String location = json.asString("path");
+//          String version = json.asString("version");
+//          if (rigV.equals(version)) {
+//            b.append(rig.getCode()+"="+rigV+" (Yet to be published at '"+location+"')");
+//          } else {
+//            b.append(rig.getCode()+"="+rigV+" (Not published, and the proposed publication is a different version: "+version+" instead of "+rigV+")");
+//            messages.add("The proposed publication for relatedIG  "+rig.getCode()+" is a different version: "+version+" instead of "+rigV+mkError());              
+//          }
+//        } catch (Exception e) {
+//          messages.add("Error looking for "+rig.getId()+"#current for relatedIG  "+rig.getCode()+": "+e.getMessage()+mkError());              
+//          b.append(rig.getCode()+"="+rigV+" (Yet to be published, and cannot determine location)");                          
+//        }
+//      } else {
+//        b.append(rig.getCode()+"="+rigV+" (Already published at "+npm.getWebLocation()+")");
+//      }
+//    }
+//  }
+//  summary.add(new StringPair("RelatedIgs", b.toString()));
   }
 
   private void processFactories(List<String> factories) throws IOException {    
