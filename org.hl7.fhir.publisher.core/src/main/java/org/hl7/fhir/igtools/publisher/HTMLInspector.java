@@ -868,6 +868,8 @@ public class HTMLInspector {
           if (tref.startsWith("/")) {
             tref = tref.substring(1);
             resolved = resolved || ig.getSpm().getBase().equals(rref) || (ig.getSpm().getBase()).equals(rref+"/") || (ig.getSpm().getBase()+"/").equals(rref)|| ig.getSpm().hasTarget(rref) || Utilities.existsInList(rref, Utilities.pathURL(ig.getSpm().getBase(), "history.html"));
+          } else {
+            resolved = resolved || "".equals(tref);
           }
         }
       }

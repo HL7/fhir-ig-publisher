@@ -451,6 +451,8 @@ import lombok.Setter;
 
 public class Publisher implements ILoggingService, IReferenceResolver, IValidationProfileUsageTracker, IResourceLinkResolver {
 
+  private static final String TOOLING_IG_CURRENT_RELEASE = "0.4.0";
+
   public class FragmentUseRecord {
 
     private int count;
@@ -1234,7 +1236,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), rootDir, npmName, childPublisher == null? null : childPublisher.npmName,
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator, ipsComparator,
           new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine, rc, specMaps).render(publishedIg, true, false, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()),
-          new PublicationChecker(repoRoot, historyPage, markdownEngine, findReleaseLabelString(), publishedIg).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
+          new PublicationChecker(repoRoot, historyPage, markdownEngine, findReleaseLabelString(), publishedIg, relatedIGs).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
           generateDraftDependencies(), noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder, context.getTxClientManager(), 
           versionProblems, fragments, makeLangInfo(), relatedIGs);
       val.setValidationFlags(hintAboutNonMustSupport, anyExtensionsAllowed, checkAggregation, autoLoad, showReferenceMessages, noExperimentalContent, displayWarnings);
@@ -3474,7 +3476,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       sourceIg.getDependsOn().add(0, dep);
     }    
     if (!"hl7.fhir.uv.tools".equals(sourceIg.getPackageId()) && !dependsOnTooling(sourceIg.getDependsOn())) {
-      String toolingPackageId = getToolingPackageName()+"#0.3.0";
+      String toolingPackageId = getToolingPackageName()+"#"+TOOLING_IG_CURRENT_RELEASE;
       if (sourceIg.getDefinition().hasExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency")) {
         sourceIg.getDefinition().getExtensionByUrl("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency").setValue(new CodeType(toolingPackageId));      
       } else {
@@ -3500,7 +3502,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       i++;
     }
     if (!"hl7.fhir.uv.tools".equals(sourceIg.getPackageId()) && !dependsOnTooling(sourceIg.getDependsOn())) {
-      loadIg("igtools", getToolingPackageName(), "0.3.0", "http://hl7.org/fhir/tools/ImplementationGuide/hl7.fhir.uv.tools", i, false);   
+      loadIg("igtools", getToolingPackageName(), TOOLING_IG_CURRENT_RELEASE, "http://hl7.org/fhir/tools/ImplementationGuide/hl7.fhir.uv.tools", i, false);   
     }
 
     // we're also going to look for packages that can be referred to but aren't dependencies
@@ -8537,6 +8539,10 @@ private String fixPackageReference(String dep) {
             logMessage("Other Directory not found: "+n);                
           }
         }
+        File pr = new File(Utilities.path(FileUtilities.getDirectoryForFile(configFile), "publication-request.json")); 
+        if (mode != IGBuildMode.PUBLICATION && pr.exists()) {
+          addFileToNpm(Category.OTHER, "publication-request.json", FileUtilities.fileToBytes(pr));          
+        }
         npm.finish();
         for (NPMPackageGenerator vnpm : vnpms.values()) {
           vnpm.finish();
@@ -11533,6 +11539,7 @@ private String fixPackageReference(String dep) {
       related.add(rig.getCode(), o);
       o.add("id", rig.getId());
       o.add("link", rig.getWebLocation());
+      o.add("homepage", rig.getWebLocation().startsWith("file:") ? Utilities.pathURL(rig.getWebLocation(), "index.html") : rig.getWebLocation());
       o.add("canonical", rig.getCanonical());
       o.add("title", rig.getTitle());
       o.add("version", rig.getVersion());
