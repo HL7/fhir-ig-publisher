@@ -11,7 +11,9 @@ import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
+import org.hl7.fhir.utilities.xhtml.XhtmlDocument;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
+import org.hl7.fhir.utilities.xhtml.XhtmlParser;
 
 public class IPViewRenderer {
 
@@ -20,15 +22,19 @@ public class IPViewRenderer {
   private Map<String, String> copyrights;
   private Map<String, XhtmlNode> images;
   private IWorkerContext context;
+  private String ipFragment;
+  private String igFragPage;
   
   
-  public IPViewRenderer(Map<String, String> csList, List<ExternalReference> references, Map<String, XhtmlNode> images, Map<String, String> copyrights, IWorkerContext context) {
+  public IPViewRenderer(Map<String, String> csList, List<ExternalReference> references, Map<String, XhtmlNode> images, Map<String, String> copyrights, String ipFragment, String igFragPage, IWorkerContext context) {
     super();
     this.csList = csList;
     this.references = references;
     this.images = images;    
     this.copyrights = copyrights;
     this.context = context;
+    this.ipFragment = ipFragment;
+    this.igFragPage = igFragPage;
   }
 
 
@@ -44,14 +50,27 @@ public class IPViewRenderer {
     for (String s : Utilities.sorted(csList.keySet())) {
       ul.li().ah(csList.get(s)).code().tx(s);
     }
+    body.h2().tx("Copyright Fragment");
+    if (igFragPage == null) {
+      body.para().style("color: maroon").b().tx("This fragment is not visible to the reader");
+    } else {
+      var p = body.para();
+      p.tx("This fragment is available on ");
+      p.ah(igFragPage).tx(igFragPage);
+    }
+    XhtmlDocument cf = new XhtmlParser().parse("<div>"+ipFragment+"</div>", "div");
+    body.addChildNodes(cf.getChildNodes());    
+
     body.h2().tx("Copyright and Registered Trademark Uses");
     ul = body.ul();
     for (String s : Utilities.sorted(copyrights.keySet())) {
-      XhtmlNode li = ul.li();
-      li.tx(s);
-      li.tx(" (");
-      li.ah(copyrights.get(s)).tx("src");
-      li.tx(")");      
+      if (!isRendering(s)) {
+        XhtmlNode li = ul.li();
+        li.tx(s);
+        li.tx(" (");
+        li.ah(copyrights.get(s)).tx("src");
+        li.tx(")");      
+      }
     }
     body.h2().tx("External References");
     XhtmlNode tbl = body.table("grid");
@@ -85,6 +104,20 @@ public class IPViewRenderer {
 //      }
     }
     return new XhtmlComposer(false, true).compose(doc);
+  }
+
+
+  private boolean isRendering(String s) {
+    if (s.contains("xmlns=\"http://hl7.org/fhir\"")) {
+      return true;
+    }
+    if (s.contains("<http://www.w3.org/2001/XMLSchema#>")) {
+      return true;
+    }
+    if (s.contains("\"resourceType\" : \"")) {
+      return true;
+    }
+    return false;
   }
 
 

@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Stack;
 
 import javax.annotation.Nonnull;
 
@@ -243,6 +244,7 @@ public class HTMLInspector {
   private boolean referencesValidatorPack;
   private Map<String, List<String>> trackedFragments;
   private Set<String> foundFragments = new HashSet<>();
+  private Map<String, String> visibleFragments = new HashMap<>();
   private List<FetchedFile> sources;
   private IPublisherModule module;
   private boolean isCIBuild;
@@ -348,6 +350,8 @@ public class HTMLInspector {
         XhtmlNode x = new XhtmlParser().setMustBeWellFormed(strict).parse(new FileInputStream(lf.filename), null);
         referencesValidatorPack = false;
         DuplicateAnchorTracker dat = new DuplicateAnchorTracker();
+        Stack<XhtmlNode> stack = new Stack<XhtmlNode>();
+        checkVisibleFragments(lf.path, stack, x);
         if (checkLinks(lf, s, "", x, null, messages, false, dat, null) != NodeChangeType.NONE) { // returns true if changed
           saveFile(lf, x);
         }
@@ -390,6 +394,36 @@ public class HTMLInspector {
       }
     }
     return messages;
+  }
+
+  private void checkVisibleFragments(String pageName, Stack<XhtmlNode> stack, XhtmlNode x) {
+    if (x.getNodeType() == NodeType.Comment) {
+     String s = x.getContent();
+     if (s != null && s.startsWith("$$")) {
+       if (isVisible(stack)) {
+         visibleFragments.put(s.replace("$", ""), pageName);
+       }
+     }
+    } else {
+      stack.push(x);
+      for (XhtmlNode child : x.getChildNodes()) {
+        checkVisibleFragments(pageName, stack, child);
+      }
+      stack.pop();
+    }    
+  }
+
+  private boolean isVisible(Stack<XhtmlNode> stack) {
+    for (XhtmlNode x : stack) {
+      String style = x.getAttribute("style");
+      if (style != null) {
+        style = style.replace(" ", "");
+        if (style.contains("display:none")) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   private void checkFragmentMarkers(String s) {
@@ -693,8 +727,8 @@ public class HTMLInspector {
       }
     }
     if (x.getNodeType() == NodeType.Text) {
-      String tx = x.allText();
-      if (tx.contains("©") || tx.contains("®")) {
+      String tx = x.allText().toUpperCase();
+      if (tx.contains("©") || tx.contains("®") || tx.contains("(R)") || tx.contains("(TM)") || tx.contains("(C)") ) {
         copyrights.put(parent == null ? tx : parent.allText(), FileUtilities.getRelativePath(rootFolder, lf.filename));
       }
     }
@@ -1224,6 +1258,10 @@ public class HTMLInspector {
 
   public Map<String, XhtmlNode> getImageRefs() {
     return imageRefs;
+  }
+
+  public Map<String, String> getVisibleFragments() {
+    return visibleFragments;
   }
 
 }
