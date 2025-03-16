@@ -424,8 +424,8 @@ public class PublicationProcess {
         throw new Error("Technical correction must have a different version to the currently published version ("+pl.current().version()+")");        
       }
       tcName = pl.pid()+"-"+tcVer.version()+".zip";
-      tcPath = tcVer.determineLocalPath(pubSetup.getJsonObject("website").asString("url"), destination);
-      String tcRelPath = FileUtilities.getRelativePath(destination, tcPath); 
+      tcPath = tcVer.determineLocalPath(pubSetup.getJsonObject("website").asString("url"), workingRoot);
+      String tcRelPath = FileUtilities.getRelativePath(workingRoot, tcPath); 
       src.needFolder(tcRelPath, false);
     }
     
@@ -971,7 +971,7 @@ public class PublicationProcess {
     if (tempDir == null) {
       tempDir = "[tmp]";
     }
-    String dest = Utilities.path(tempDir, name);
+    String dest = Utilities.path(tempDir, "ig-builds", name);
     System.out.println("Prepare Build space in "+dest);        
     File fDest = new File(dest);
     if (!fDest.exists()) {
