@@ -450,6 +450,9 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
       if (r instanceof CanonicalResource) {
         
         CanonicalResource cr = (CanonicalResource) r;
+        if (cr.getUrl().contains("terminology.hl7.org") && cr.getSourcePackage().isCore()) {
+          continue;
+        }
         if (cr instanceof CodeSystem) {
           CodeSystem cs = (CodeSystem) cr;
           if (cs.getContent() == CodeSystemContentMode.NOTPRESENT) {
