@@ -351,6 +351,7 @@ import org.hl7.fhir.utilities.i18n.RenderingI18nContext;
 import org.hl7.fhir.utilities.i18n.XLIFFProducer;
 import org.hl7.fhir.utilities.i18n.subtag.LanguageSubtagRegistry;
 import org.hl7.fhir.utilities.i18n.subtag.LanguageSubtagRegistryLoader;
+import org.hl7.fhir.utilities.json.JsonException;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonBoolean;
 import org.hl7.fhir.utilities.json.model.JsonElement;
@@ -381,6 +382,7 @@ import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.utilities.xhtml.XhtmlParser;
 import org.hl7.fhir.utilities.xml.XMLUtil;
 import org.hl7.fhir.utilities.xml.XmlEscaper;
+import org.hl7.fhir.validation.ValidatorSettings;
 import org.hl7.fhir.validation.ValidatorUtils;
 import org.hl7.fhir.validation.instance.InstanceValidator;
 import org.hl7.fhir.validation.instance.utils.ValidationContext;
@@ -451,7 +453,7 @@ import lombok.Setter;
 
 public class Publisher implements ILoggingService, IReferenceResolver, IValidationProfileUsageTracker, IResourceLinkResolver {
 
-  private static final String TOOLING_IG_CURRENT_RELEASE = "0.3.0";
+  private static final String TOOLING_IG_CURRENT_RELEASE = "0.4.1";
 
   public class FragmentUseRecord {
 
@@ -997,7 +999,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private static PublisherConsoleLogger consoleLogger;
   private IPublisherModule module;
-
+  private boolean milestoneBuild;
+  
   private class PreProcessInfo {
     private String xsltName;
     private byte[] xslt;
@@ -1240,7 +1243,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           generateDraftDependencies(), noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder, context.getTxClientManager(), 
           versionProblems, fragments, makeLangInfo(), relatedIGs);
       val.setValidationFlags(hintAboutNonMustSupport, anyExtensionsAllowed, checkAggregation, autoLoad, showReferenceMessages, noExperimentalContent, displayWarnings);
-      FileUtilities.stringToFile(new IPViewRenderer(uncsList, inspector.getExternalReferences(), inspector.getImageRefs(), inspector.getCopyrights(), context).execute(), Utilities.path(outputDir, "qa-ipreview.html"));
+      FileUtilities.stringToFile(new IPViewRenderer(uncsList, inspector.getExternalReferences(), inspector.getImageRefs(), inspector.getCopyrights(),
+          ipStmt, inspector.getVisibleFragments().get("1"), context).execute(), Utilities.path(outputDir, "qa-ipreview.html"));
       tts.end();
       if (isChild()) {
         log("Built. "+tt.report());
@@ -3541,7 +3545,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     hs.registerFunction(new BaseTableWrapper.TableDateColumnFunction());
     hs.registerFunction(new TestDataFactory.CellLookupFunction());
     hs.registerFunction(new TestDataFactory.TableLookupFunction());
-    validator = new InstanceValidator(context, hs, context.getXVer(), validatorSession); // todo: host services for reference resolution....
+    validator = new InstanceValidator(context, hs, context.getXVer(), validatorSession, new ValidatorSettings()); // todo: host services for reference resolution....
     validator.setAllowXsiLocation(true);
     validator.setNoBindingMsgSuppressed(true);
     validator.setNoExtensibleWarnings(!allowExtensibleWarnings);
@@ -3551,11 +3555,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     validator.setCrumbTrails(true);
     validator.setWantCheckSnapshotUnchanged(true);
     validator.setForPublication(true);
-    validator.setDisplayWarnings(displayWarnings);
+    validator.getSettings().setDisplayWarningMode(displayWarnings);
     cu = new ContextUtilities(context);
 
-    pvalidator = new ProfileValidator(context, context.getXVer(), validatorSession);
-    csvalidator = new CodeSystemValidator(context, context.getXVer(), validatorSession);
+    pvalidator = new ProfileValidator(context, validator.getSettings(), context.getXVer(), validatorSession);
+    csvalidator = new CodeSystemValidator(context, validator.getSettings(), context.getXVer(), validatorSession);
     pvalidator.setCheckAggregation(checkAggregation);
     pvalidator.setCheckMustSupport(hintAboutNonMustSupport);
     validator.setShowMessagesFromReferences(showReferenceMessages);
@@ -3638,7 +3642,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     } 
 
     if (mode == IGBuildMode.PUBLICATION) {
-      relatedIGs.add(new RelatedIG(code, id, RelatedIGLoadingMode.WEB, RelatedIGRole.fromCode(role), npm, determineLocation(id)));      
+      relatedIGs.add(new RelatedIG(code, id, RelatedIGLoadingMode.WEB, RelatedIGRole.fromCode(role), npm, determineLocation(code, id)));      
     } else if (Utilities.startsWithInList(npm.getWebLocation(), "http://", "https://")) {
       relatedIGs.add(new RelatedIG(code, id, RelatedIGLoadingMode.CIBUILD, RelatedIGRole.fromCode(role), npm));
     } else {
@@ -3646,55 +3650,53 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
   }
 
-  private String determineLocation(String id) {
+  private String determineLocation(String code, String id) throws JsonException, IOException {
     // to determine the location of this IG in publication mode, we have to figure out what version we are publishing against 
     // this is in the publication request 
     // then, we need to look the package 
     // if it's already published, we use that location 
     // if it's to be published, we find #current, extract that publication request, and use that path (check version)
     // otherwise, bang
-    throw new Error("Publishing related IGs is not done yet");
-//    
-//    String rigV = pr.forceObject("related").asString(rig.getCode());
-//    if (rigV == null) {
-//      messages.add("No specified Publication version for relatedIG "+rig.getCode()+mkError());
-//      b.append(rig.getCode()+"=ERROR");
-//    } else {
-//      if (pcm == null) {
-//        pcm = new FilesystemPackageCacheManager.Builder().build();
-//      }
-//      NpmPackage npm;
-//      try {
-//        npm = pcm.loadPackage(rig.getId(), rigV);
-//      } catch (Exception e) {
-//        if (!e.getMessage().toLowerCase().contains("not found")) {
-//          messages.add("Error looking for "+rig.getId()+"#"+rigV+" for relatedIG  "+rig.getCode()+": "+e.getMessage()+mkError());              
-//        }
-//        npm = null;
-//      }
-//      if (npm == null) {
-//        // now, the tricky bit: determining where it will be located.
-//        try {
-//          npm = pcm.loadPackage(rig.getId(), "current");
-//          JsonObject json = JsonParser.parseObject(npm.load("other", "publication-request.json"));
-//          String location = json.asString("path");
-//          String version = json.asString("version");
-//          if (rigV.equals(version)) {
-//            b.append(rig.getCode()+"="+rigV+" (Yet to be published at '"+location+"')");
-//          } else {
-//            b.append(rig.getCode()+"="+rigV+" (Not published, and the proposed publication is a different version: "+version+" instead of "+rigV+")");
-//            messages.add("The proposed publication for relatedIG  "+rig.getCode()+" is a different version: "+version+" instead of "+rigV+mkError());              
-//          }
-//        } catch (Exception e) {
-//          messages.add("Error looking for "+rig.getId()+"#current for relatedIG  "+rig.getCode()+": "+e.getMessage()+mkError());              
-//          b.append(rig.getCode()+"="+rigV+" (Yet to be published, and cannot determine location)");                          
-//        }
-//      } else {
-//        b.append(rig.getCode()+"="+rigV+" (Already published at "+npm.getWebLocation()+")");
-//      }
-//    }
-//  }
-//  summary.add(new StringPair("RelatedIgs", b.toString()));
+    JsonObject pr = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(new File(Utilities.path(FileUtilities.getDirectoryForFile(configFile), "publication-request.json")));
+    String rigV = pr.forceObject("related").asString(code);
+    if (rigV == null) {
+      throw new FHIRException("No specified Publication version for relatedIG "+code);
+    }
+    NpmPackage npm;
+    try {
+      npm = pcm.loadPackage(id, rigV);
+    } catch (Exception e) {
+      if (!e.getMessage().toLowerCase().contains("not found")) {
+        throw new FHIRException("Error looking for "+id+"#"+rigV+" for relatedIG  "+code+": "+e.getMessage());              
+      }
+      npm = null;
+    }
+    if (npm != null) {
+      if (isMilestoneBuild()) {
+        return npm.canonical();
+      } else {
+        return npm.getWebLocation();
+      }
+    }
+    JsonObject json = null;
+    try {
+      npm = pcm.loadPackage(id, "current");
+      json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(npm.load("other", "publication-request.json"));
+    } catch (Exception e) {
+      throw new FHIRException("Error looking for publication request in  "+id+"#current for relatedIG  "+code+": "+e.getMessage());        
+    }
+    String location = json.asString("path");
+    String canonical = npm.canonical();
+    String version = json.asString("version");
+    String mode = json.asString("mode");
+    if (!rigV.equals(version)) {
+      throw new FHIRException("The proposed publication for relatedIG  "+code+" is a different version: "+version+" instead of "+rigV);
+    }
+    if ("milestone".equals(mode) && isMilestoneBuild()) {
+      return canonical;
+    } else {
+      return location;
+    }
   }
 
   private void processFactories(List<String> factories) throws IOException {    
@@ -3712,7 +3714,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       
       JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(path);
       for (JsonObject fact : json.forceArray("factories").asJsonObjects()) {
-        TestDataFactory tdf = new TestDataFactory(context, fact, liquid, validator.getFHIRPathEngine(), igpkp.getCanonical(), rootFolder, log.getAbsolutePath(), factoryProfileMap );
+        TestDataFactory tdf = new TestDataFactory(context, fact, liquid, validator.getFHIRPathEngine(), igpkp.getCanonical(), rootFolder, log.getAbsolutePath(), factoryProfileMap, context.getLocale());
         log("Execute Test Data Factory '"+tdf.getName()+"'. Log in "+tdf.statedLog());
         tdf.execute();
       }
@@ -9635,7 +9637,8 @@ private String fixPackageReference(String dep) {
       }      
     }
     start = System.currentTimeMillis();
-    trackedFragment("1", "ip-statements", new IPStatementsRenderer(context, markdownEngine, sourceIg.getPackageId(), rcLangs).genIpStatements(fileList, null), otherFilesRun, start, "ip-statements", "Cross");
+    ipStmt = new IPStatementsRenderer(context, markdownEngine, sourceIg.getPackageId(), rcLangs).genIpStatements(fileList, null);
+    trackedFragment("1", "ip-statements", ipStmt, otherFilesRun, start, "ip-statements", "Cross");
     if (VersionUtilities.isR4Ver(version) || VersionUtilities.isR4BVer(version)) {
       trackedFragment("2", "cross-version-analysis", r4tor4b.generate(npmName, false), otherFilesRun, System.currentTimeMillis(), "cross-version-analysis", "Cross");
       trackedFragment("2", "cross-version-analysis-inline", r4tor4b.generate(npmName, true), otherFilesRun, System.currentTimeMillis(), "cross-version-analysis-inline", "Cross");
@@ -12468,6 +12471,8 @@ private String fixPackageReference(String dep) {
   private Map<String, String> factoryProfileMap = new HashMap<>();
 
   private Map<String, Set<String>> otherVersionAddedResources= new HashMap<>();
+
+  private String ipStmt;
   
   private String processSQLCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();
@@ -13137,6 +13142,9 @@ private String fixPackageReference(String dep) {
   }
 
   private byte[] convVersion(Resource res, String v) throws FHIRException, IOException {
+    if (res.hasWebPath() && (res instanceof DomainResource)) {
+      ToolingExtensions.setUrlExtension((DomainResource) res, ToolingExtensions.EXT_WEB_SOURCE, res.getWebPath());
+    }
     String version = v.startsWith("r") ? VersionUtilities.versionFromCode(v) : v;
 //    checkForCoreDependencies(res);
     convertResourceR5(res, v);
@@ -14973,6 +14981,9 @@ private String fixPackageReference(String dep) {
       if (CliParams.hasNamedParam(args, "-trackFragments")) {
         self.trackFragments = true;
       }
+      if (CliParams.hasNamedParam(args, "-milestone")) {
+        self.setMilestoneBuild(true);
+      }
       
       if (FhirSettings.isProhibitNetworkAccess()) {
         System.out.println("Running without network access - output may not be correct unless cache contents are correct");        
@@ -15611,6 +15622,14 @@ private String fixPackageReference(String dep) {
       }
     }
     return null;
+  }
+
+  public boolean isMilestoneBuild() {
+    return milestoneBuild;
+  }
+
+  public void setMilestoneBuild(boolean milestoneBuild) {
+    this.milestoneBuild = milestoneBuild;
   }
 
 }
