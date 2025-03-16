@@ -36,6 +36,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import javax.annotation.Nonnull;
+
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
@@ -44,6 +46,7 @@ import org.hl7.fhir.r5.utils.validation.ValidatorSession;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.validation.BaseValidator;
+import org.hl7.fhir.validation.ValidatorSettings;
 
 /**
  * This is defunct, I think? All this checking happens in the main code system validator?
@@ -53,8 +56,8 @@ import org.hl7.fhir.validation.BaseValidator;
  */
 public class CodeSystemValidator extends BaseValidator {
 
-  public CodeSystemValidator(IWorkerContext context, XVerExtensionManager xverManager, ValidatorSession session) {
-    super(context, xverManager, false, session);
+  public CodeSystemValidator(IWorkerContext context, @Nonnull ValidatorSettings settings, XVerExtensionManager xverManager, ValidatorSession session) {
+    super(context, settings, xverManager, session);
   }
 
   public List<ValidationMessage> validate(CodeSystem cs, boolean forBuild) {
