@@ -25,6 +25,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -1707,7 +1708,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("halfcolor", halfColorForLevel(vm.getLevel(), vm.isSignpost()));
     t.add("id", "l"+id);
     t.add("mid", vm.getMessageId());
-    t.add("msg", (isNewRule(vm) ? "<img style=\"vertical-align: text-bottom\" src=\"new.png\" height=\"16px\" width=\"36px\" alt=\"New Rule: \"> " : "")+ vm.getHtml());
+    t.add("msg", (isNewRule(vm) ? "<img style=\"vertical-align: text-bottom\" src=\"new.png\" height=\"16px\" width=\"36px\" alt=\"New Rule as of "+date(vm)+": \"> " : "")+ vm.getHtml());
     t.add("msgdetails", vm.isSlicingHint() ? vm.getSliceHtml() : vm.getHtml());
     t.add("comment", vm.getComment() == null ? "" : "<br/><br/><span style=\"display: block; border: 1px grey solid; border-radius: 5px; background-color: #eeeeee; padding: 3px; margin: 3px \"><i><b>Editor's Comment</b>: "+Utilities.escapeXml(vm.getComment())+"</i></span>");
     t.add("tx", "qa-tx.html#l"+vm.getTxLink());
@@ -1757,6 +1758,10 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     return vm.getRuleDate() != null && !vm.getRuleDate().before(ruleDateCutoff);
   }
 
+  private String date(ValidationMessage vm) {
+    return vm.getRuleDate() != null  ? new SimpleDateFormat("YYYY-MM-DD").format(vm.getRuleDate()) : "????";
+  }
+  
   private String stripId(String loc) {
     if (loc.contains(": ")) {
       return loc.substring(loc.indexOf(": ")+2);
