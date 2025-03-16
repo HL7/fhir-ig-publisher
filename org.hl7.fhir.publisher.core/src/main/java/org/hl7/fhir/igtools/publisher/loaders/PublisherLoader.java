@@ -80,7 +80,8 @@ public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProv
 
   private String getIgPath(Resource r) {
     if (r instanceof CanonicalResource) {
-      String u = ((CanonicalResource) r).getUrl();
+      CanonicalResource cr = (CanonicalResource) r;
+      String u = cr.getUrl();
       if (u != null) {
         if (u.contains("|")) {
           u = u.substring(0, u.indexOf("|"));
@@ -96,6 +97,9 @@ public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProv
           if (spm.getSpecial() != null) {
             // these weird packages don't always have paths
             return null;
+          }
+          if (cr.hasExtension(ToolingExtensions.EXT_WEB_SOURCE)) {
+            return ToolingExtensions.readStringExtension(cr, ToolingExtensions.EXT_WEB_SOURCE);
           }
           throw new FHIRException("Internal error in IG "+npm.name()+"#"+npm.version()+" map: No identity found for "+u);
         }
