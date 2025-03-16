@@ -118,7 +118,7 @@ public class PublishBoxStatementGenerator {
       return decorate(sequence);
     else if ("release".equals(status))
       return "Release";
-    else if ("preview".equals(status))
+    else if ("preview".equals(status) || "qa-preview".equals(status))
       return "QA Preview";
     else if ("ballot".equals(status))
       return decorate(sequence)+" Ballot "+ballotCount(ig, sequence, version);
