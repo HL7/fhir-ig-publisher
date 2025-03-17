@@ -102,6 +102,8 @@ import org.hl7.fhir.igtools.openehr.ArchetypeImporter.ProcessedArchetype;
 import org.hl7.fhir.igtools.publisher.FetchedFile.FetchedBundleType;
 import org.hl7.fhir.igtools.publisher.FetchedResource.AlternativeVersionResource;
 import org.hl7.fhir.igtools.publisher.IFetchFile.FetchState;
+import org.hl7.fhir.igtools.publisher.Publisher.CanonicalVisitor;
+import org.hl7.fhir.igtools.publisher.Publisher.PinningPolicy;
 import org.hl7.fhir.igtools.publisher.RelatedIG.RelatedIGLoadingMode;
 import org.hl7.fhir.igtools.publisher.RelatedIG.RelatedIGRole;
 import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
@@ -314,6 +316,8 @@ import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
 import org.hl7.fhir.r5.terminologies.utilities.ValidationResult;
 import org.hl7.fhir.r5.testfactory.TestDataFactory;
+import org.hl7.fhir.r5.utils.DataTypeVisitor;
+import org.hl7.fhir.r5.utils.DataTypeVisitor.IDatatypeVisitor;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.r5.utils.MappingSheetParser;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
@@ -452,6 +456,8 @@ import lombok.Setter;
  */
 
 public class Publisher implements ILoggingService, IReferenceResolver, IValidationProfileUsageTracker, IResourceLinkResolver {
+
+   public enum PinningPolicy {NO_CHANGE, FIX, WHEN_MULTIPLE_CHOICES }
 
   private static final String TOOLING_IG_CURRENT_RELEASE = "0.4.1";
 
@@ -1252,7 +1258,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         processTxLog(Utilities.path(destDir != null ? destDir : outputDir, "qa-tx.html"));
         log("Built. "+tt.report());
         log("Generating QA");
-        log("Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages));
+        log("Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages, pinSummary()));
       }
       recordOutcome(null, val);
       log("Finished. Max Memory Used = "+Utilities.describeSize(maxMemory)+logSummary());
@@ -1263,6 +1269,15 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         ex.printStackTrace();
       }
       throw e;
+    }
+  }
+
+  private Object pinSummary() {
+    switch (pinningPolicy) {
+    case FIX: return ""+pinCount+" (all)";
+    case NO_CHANGE: return "n/a";
+    case WHEN_MULTIPLE_CHOICES: return ""+pinCount+" (when multiples)";
+    default: return "??";    
     }
   }
 
@@ -3295,6 +3310,21 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         break;
       case "profile-test-cases": 
         profileTestCases.add(p.getValue());
+      case "pin-canonicals":
+        switch (p.getValue()) {
+        case "pin-none":
+          pinningPolicy = PinningPolicy.NO_CHANGE;
+          break;
+        case "pin-all": 
+          pinningPolicy = PinningPolicy.FIX;
+          break;
+        case "pin-multiples":
+          pinningPolicy = PinningPolicy.WHEN_MULTIPLE_CHOICES;
+          break;
+        default:
+          throw new FHIRException("Unknown value for 'pin-canonicals' of '"+p.getValue()+"'");
+        }
+        break;
       default: 
         if (!template.isParameter(pc)) {
           unknownParams.add(pc+"="+p.getValue());
@@ -7213,7 +7243,11 @@ private String fixPackageReference(String dep) {
           b.append("version="+defaultBusinessVersion);
           bc.setVersion(defaultBusinessVersion);
         }
-        
+        if (!(bc instanceof StructureDefinition)) { 
+          // can't do structure definitions yet, because snapshots aren't generated, and not all are registered.
+          // do it later when generating snapshots
+          altered = checkCanonicalsForVersions(f, bc, false) || altered;
+        }
         if (!r.isExample()) {
           if (wgm != null) {
             if (!bc.hasExtension(ToolingExtensions.EXT_WORKGROUP)) {
@@ -7357,6 +7391,78 @@ private String fixPackageReference(String dep) {
           }
         }
       }
+    }
+  }
+
+  public class CanonicalVisitor<T> implements IDatatypeVisitor {
+    private FetchedFile f;
+    private boolean snapshotMode;
+    
+    public CanonicalVisitor(FetchedFile f, boolean snapshotMode) {
+      super();
+      this.f = f;
+      this.snapshotMode = snapshotMode;
+    }
+
+    @Override
+    public Class classT() {
+      return CanonicalType.class;
+    }
+
+    @Override
+    public boolean visit(String path, DataType node) {
+      CanonicalType ct = (CanonicalType) node;
+      String url = ct.asStringValue();
+      if (url.contains("|")) {
+        return false;
+      }
+      CanonicalResource tgt = (CanonicalResource) context.fetchResource(Resource.class, url);
+      if (tgt == null) {
+        return false;
+      }
+      if (!tgt.hasVersion()) {
+        return false;
+      }
+      if (pinningPolicy == PinningPolicy.FIX) {
+        if (!snapshotMode) {
+          pinCount++;
+          f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.PROCESSING, path, "Pinned the version of "+url+" to "+tgt.getVersion(),
+              IssueSeverity.INFORMATION).setMessageId(PublisherMessageIds.PIN_VERSION));
+        }
+        ct.setValue(url+"|"+tgt.getVersion());
+        return true;
+      } else {
+        Map<String, String> lst = validationFetcher.fetchCanonicalResourceVersionMap(null, null, url);
+        if (lst.size() < 2) {
+          return false;
+        } else {
+          if (!snapshotMode) {
+            pinCount++;
+            f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.PROCESSING, path, "Pinned the version of "+url+" to "+tgt.getVersion()+" from choices of "+stringify(",", lst), 
+              IssueSeverity.INFORMATION).setMessageId(PublisherMessageIds.PIN_VERSION));
+          }
+          ct.setValue(url+"|"+tgt.getVersion());
+          return true;
+        }
+      }
+    }
+
+    private String stringify(String string, Map<String, String> lst) {
+      CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
+      for (String s : Utilities.sorted(lst.keySet())) {
+        b.append(s+" ("+lst.get(s)+")");     
+      }
+      return b.toString();
+    }
+  }
+    
+  private boolean checkCanonicalsForVersions(FetchedFile f, CanonicalResource bc, boolean snapshotMode) {
+    if (pinningPolicy == PinningPolicy.NO_CHANGE) {
+      return false;     
+    } else {
+      DataTypeVisitor dv = new DataTypeVisitor();
+      dv.visit(bc, new CanonicalVisitor<CanonicalType>(f, snapshotMode));
+      return dv.isAnyTrue();
     }
   }
 
@@ -7535,6 +7641,7 @@ private String fixPackageReference(String dep) {
                   throw new Exception("Error generating snapshot for "+f.getTitle()+(f.getResources().size() > 0 ? "("+r.getId()+")" : "")+": "+e.getMessage(), e);
                 }
               }
+              checkCanonicalsForVersions(f, sd, false);
               if ("Extension".equals(sd.getType()) && sd.getSnapshot().getElementFirstRep().getIsModifier()) {
                 modifierExtensions.add(sd);
               }
@@ -7711,7 +7818,7 @@ private String fixPackageReference(String dep) {
 
   private void generateSnapshot(FetchedFile f, FetchedResource r, StructureDefinition sd, boolean close, ProfileUtilities utils) throws Exception {
     boolean changed = false;
-        
+
     logDebugMessage(LogCategory.PROGRESS, "Check Snapshot for "+sd.getUrl());
     sd.setFhirVersion(FHIRVersion.fromCode(version));
     List<ValidationMessage> messages = new ArrayList<>();
@@ -12473,6 +12580,10 @@ private String fixPackageReference(String dep) {
   private Map<String, Set<String>> otherVersionAddedResources= new HashMap<>();
 
   private String ipStmt;
+
+  private PinningPolicy pinningPolicy = PinningPolicy.NO_CHANGE;
+
+  private int pinCount;
   
   private String processSQLCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();

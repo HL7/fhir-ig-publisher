@@ -476,7 +476,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     return list;
   }
   
-  public String generate(String title, List<ValidationMessage> allErrors, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages) throws IOException {
+  public String generate(String title, List<ValidationMessage> allErrors, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, Object pinned) throws IOException {
     
     for (FetchedFile f : files) {
       for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages)) {
@@ -503,8 +503,8 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       }
     }
     
-    files = genQAHtml(title, files, path, filteredMessages, linkErrors, true);
-    files = genQAHtml(title, files, path, filteredMessages, linkErrors, false);
+    files = genQAHtml(title, files, path, filteredMessages, linkErrors, true, pinned);
+    files = genQAHtml(title, files, path, filteredMessages, linkErrors, false, pinned);
 
     Bundle validationBundle = new Bundle().setType(Bundle.BundleType.COLLECTION);
     OperationOutcome oo = new OperationOutcome();
@@ -835,9 +835,9 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     FileUtilities.stringToFile(b.toString(), FileUtilities.changeFileExt(path, ".compare.txt"));
   }
 
-  public List<FetchedFile> genQAHtml(String title, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, List<ValidationMessage> linkErrors, boolean allIssues) throws IOException {
+  public List<FetchedFile> genQAHtml(String title, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, List<ValidationMessage> linkErrors, boolean allIssues, Object pinned) throws IOException {
     StringBuilder b = new StringBuilder();
-    b.append(genHeader(title, err, warn, info, link, filteredMessages.count(), allIssues, path));
+    b.append(genHeader(title, err, warn, info, link, filteredMessages.count(), allIssues, path, pinned));
     b.append(genSummaryRowInteral(linkErrors));
     files = sorted(files);
     for (FetchedFile f : files) {
@@ -1094,7 +1094,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       "$noNarrative$"+
       "$noValidation$"+
       "$fragments$"+
-      " <tr><td>Summary:</td><td> errors = $err$, warn = $warn$, info = $info$, broken links = $links$.  <button onclick=\"toggleCodes()\">Show Message Ids</button></td></tr>\r\n"+
+      " <tr><td>Summary:</td><td> errors = $err$, warn = $warn$, info = $info$, broken links = $links$, pinned = $pinned$.  <button onclick=\"toggleCodes()\">Show Message Ids</button></td></tr>\r\n"+
       "</table>\r\n"+
       " <table class=\"grid\">\r\n"+
       "   <tr>\r\n"+
@@ -1215,12 +1215,12 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   private String genDate = new Date().toString();
   private int suppressedInfo;
   private int suppressedWarnings;
-
+  
   private ST template(String t) {
     return new ST(t, '$', '$');
   }
 
-  private String genHeader(String title, int err, int warn, int info, int links, int msgCount, boolean allIssues, String path) {
+  private String genHeader(String title, int err, int warn, int info, int links, int msgCount, boolean allIssues, String path, Object pinned) {
     ST t = template(headerTemplate);
     t.add("version", statedVersion);
     t.add("igversion", igVersion);
@@ -1232,6 +1232,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("warn", Integer.toString(warn));
     t.add("info", Integer.toString(info));
     t.add("links", Integer.toString(links));
+    t.add("pinned", pinned);
     t.add("packageId", packageId);
     t.add("canonical", provider.getCanonical());
     t.add("copyrightYearCheck", checkCopyRightYear());

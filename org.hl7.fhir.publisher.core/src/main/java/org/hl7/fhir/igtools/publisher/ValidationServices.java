@@ -28,9 +28,11 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 import org.hl7.fhir.exceptions.FHIRException;
@@ -464,6 +466,32 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
           }
         } else {
           res.add(cr.hasVersion() ? cr.getVersion() : "{{unversioned}}");
+        }
+      }
+    }
+    return res;
+  }
+
+  public Map<String, String> fetchCanonicalResourceVersionMap(IResourceValidator validator, Object appContext, String url) {
+    Map<String, String> res = new HashMap<>();
+    for (Resource r : context.fetchResourcesByUrl(Resource.class, url)) {
+      if (r instanceof CanonicalResource) {
+        
+        CanonicalResource cr = (CanonicalResource) r;
+        if (cr.getUrl().contains("terminology.hl7.org") && cr.getSourcePackage().isCore()) {
+          continue;
+        }
+        if (cr instanceof CodeSystem) {
+          CodeSystem cs = (CodeSystem) cr;
+          if (cs.getContent() == CodeSystemContentMode.NOTPRESENT) {
+            if (!context.isServerSideSystem(cs.getUrl())) {
+              // ?? res.add(cr.hasVersion() ? cr.getVersion() : "{{unversioned}}");                          
+            }
+          } else {
+            res.put(cr.hasVersion() ? cr.getVersion() : "{{unversioned}}", cr.getSourcePackage().getVID());            
+          }
+        } else {
+          res.put(cr.hasVersion() ? cr.getVersion() : "{{unversioned}}", cr.getSourcePackage().getVID());
         }
       }
     }
