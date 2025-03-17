@@ -1,6 +1,7 @@
 * Loader: look for web source extension in loaded resources
 * Loader: Don't consider terminology resources in core when looking at version clashes
 * Loader: Don't wrongly set experimental when updating CodeSystem and ValueSet status
+* Loader: Allow pinning canonical versions when publishing
 * SnapshotGenerator: handle version specific references in targets when generating snapshots
 * Validator: Better detect CodeSystem supplement misuse
 * Validator: Add message id to some messages for policy advisor framework
