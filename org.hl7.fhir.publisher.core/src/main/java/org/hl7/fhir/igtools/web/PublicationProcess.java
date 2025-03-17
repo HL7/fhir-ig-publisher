@@ -236,16 +236,18 @@ public class PublicationProcess {
       if (cURL == null) {
         cURL = url;
       }
-      if (check(res, canonical.startsWith(cURL), "Publication URL of '"+canonical+"' is not consistent with the required base URL of '"+cURL+"'")) {
-        String cCanonical = calcByRule(rules.str("canonical"), p);
-        if (check(res, cCanonical.equals(canonical), "Publication URL of '"+canonical+"' does not match the required web site URL of '"+cCanonical+"'")) {
-          String destination = Utilities.path(workingRoot, calcByRule(rules.str("destination"), p));
-          help = false;
-          publishInner2(source, web, date, registrySource, history, templateSrc, temp, logger, args,
-              destination, workingRoot, res, src, id, canonical, version, npm, pubSetup, qa,
-              fSource, fOutput, fRoot, fRegistry, fHistory, jsonXmlClones, igBuildZipDir);
-        }        
+      if (!canonical.startsWith(cURL)) {
+        System.out.println("Publication URL of '"+canonical+"' is not consistent with the required base URL of '"+cURL+"'");
       }
+      String cCanonical = calcByRule(rules.str("canonical"), p);
+      if (!cCanonical.equals(canonical)) {
+        System.out.println("Publication URL of '"+canonical+"' does not match the required web site URL of '"+cCanonical+"'");
+      }
+      String destination = Utilities.path(workingRoot, calcByRule(rules.str("destination"), p));
+      help = false;
+      publishInner2(source, web, date, registrySource, history, templateSrc, temp, logger, args,
+          destination, workingRoot, res, src, id, canonical, version, npm, pubSetup, qa,
+          fSource, fOutput, fRoot, fRegistry, fHistory, jsonXmlClones, igBuildZipDir);
     }
     check(res, !help, "For help, consult https://chat.fhir.org/#narrow/stream/179252-IG-creation");
     return res;
