@@ -283,7 +283,9 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     if ("Extension".equals(sd.getType())) {
       return "extension";
     }
-//    if (sd.getKind() == StructureDefinitionKind.LOGICAL)
+    if (sd.getKind() == StructureDefinitionKind.LOGICAL) {
+      return "logical";
+    }
     return sd.getKind().toCode() + (sd.getAbstract() ? ":abstract" : "");    
   }
   
