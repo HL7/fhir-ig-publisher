@@ -313,6 +313,7 @@ import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceWithReference;
 import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.terminologies.TerminologyUtilities;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
+import org.hl7.fhir.r5.terminologies.client.TerminologyClientContext;
 import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
 import org.hl7.fhir.r5.terminologies.utilities.ValidationResult;
 import org.hl7.fhir.r5.testfactory.TestDataFactory;
@@ -8850,8 +8851,9 @@ private String fixPackageReference(String dep) {
     for (File f : dir.listFiles()) {
       if (f.isDirectory()) {
         addTestDir(f, t);        
-      } else {
-        addFileToNpm("tests/"+FileUtilities.getRelativePath(t, dir.getAbsolutePath()), f.getName(), FileUtilities.fileToBytes(f));  
+      } else if (!f.getName().equals(".DS_Store")) { 
+        String s = FileUtilities.getRelativePath(t, dir.getAbsolutePath());
+        addFileToNpm(Utilities.noString(s) ?  "tests" : Utilities.path("tests", s), f.getName(), FileUtilities.fileToBytes(f));  
       }
     }
   }
@@ -13907,7 +13909,6 @@ private String fixPackageReference(String dep) {
         db.recordExpansion(vs, exp);
         if (exp.getValueset() != null) {
           expansions.add(exp.getValueset());
-
           RenderingContext elrc = lrc.withUniqueLocalPrefix("x").withMode(ResourceRendererMode.END_USER);
           exp.getValueset().setCompose(null);
           exp.getValueset().setText(null);  
@@ -15212,11 +15213,18 @@ private String fixPackageReference(String dep) {
       if (CliParams.hasNamedParam(args, PACKAGE_CACHE_FOLDER_PARAM)) {
         self.setPackageCacheFolder(CliParams.getNamedParam(args, PACKAGE_CACHE_FOLDER_PARAM));
       }
+      if (CliParams.hasNamedParam(args, "-authorise-non-conformant-tx-servers")) {
+        TerminologyClientContext.setAllowNonConformantServers(true);
+      }      
+      TerminologyClientContext.setCanAllowNonConformantServers(true);
       try {
         self.execute();
         if (CliParams.hasNamedParam(args, "-no-errors")) {
           exitCode = self.countErrs(self.errors) > 0 ? 1 : 0;
         }
+      } catch (ENoDump e) {
+        self.log("Publishing Content Failed: "+e.getMessage());
+        self.log("");        
       } catch (Exception e) {
         exitCode = 1;
         self.log("Publishing Content Failed: "+e.getMessage());
