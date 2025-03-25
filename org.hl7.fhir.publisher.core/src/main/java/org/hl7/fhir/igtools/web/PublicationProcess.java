@@ -21,8 +21,13 @@ import org.hl7.fhir.igtools.publisher.PastProcessHackerUtilities;
 import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.web.IGRegistryMaintainer.ImplementationGuideEntry;
 import org.hl7.fhir.igtools.web.IGReleaseUpdater.ServerType;
+import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.r5.model.ImplementationGuide;
+import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.utilities.FhirPublication;
 import org.hl7.fhir.utilities.FileUtilities;
+import org.hl7.fhir.utilities.MarkDownProcessor;
+import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.ZipGenerator;
@@ -32,6 +37,7 @@ import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.npm.PackageGenerator.PackageType;
 import org.hl7.fhir.utilities.npm.PackageList;
 import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
@@ -70,7 +76,8 @@ public class PublicationProcess {
     CREATION,
     WORKING,
     MILESTONE,
-    TECHNICAL_CORRECTION;
+    TECHNICAL_CORRECTION,
+    WITHDRAWAL;
 
     public static PublicationProcessMode fromCode(String s) {
       if (Utilities.noString(s)) {
@@ -89,6 +96,9 @@ public class PublicationProcess {
       if ("technical-correction".equals(s)) {
         return TECHNICAL_CORRECTION;
       }
+      if ("withdrawal".equals(s)) {
+        return WITHDRAWAL;
+      }
       throw new Error("Unknown publication process mode '"+s+"'");
     }
     
@@ -97,6 +107,7 @@ public class PublicationProcess {
       case MILESTONE: return "milestone";
       case TECHNICAL_CORRECTION:return "technical-correction";
       case WORKING:return "working release";
+      case WITHDRAWAL : return "withdrawal";
       default:return "??";
       }
     }
@@ -114,6 +125,14 @@ public class PublicationProcess {
     PublisherConsoleLogger logger = new PublisherConsoleLogger();
     logger.start(Utilities.path("[tmp]", "publication-process.log"));
     try {
+      Date dd = new Date(); 
+      SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+      if (Utilities.noString(date)) {
+        date = sdf.format(dd);
+      } else {
+        dd = sdf.parse(date);
+      }
+      
       System.out.println("FHIR IG Publisher "+IGVersionUtil.getVersionString());
       System.out.println("Detected Java version: " + System.getProperty("java.version")+" from "+System.getProperty("java.home")+" on "+System.getProperty("os.arch")+" ("+System.getProperty("sun.arch.data.model")+"bit). "+toMB(Runtime.getRuntime().maxMemory())+"MB available");
       System.out.println("dir = "+System.getProperty("user.dir")+", path = "+System.getenv("PATH"));
@@ -124,7 +143,7 @@ public class PublicationProcess {
       System.out.println(s);
       System.out.println("---------------");
       System.out.println("Publication Run: publish "+source+" to "+web);
-      List<ValidationMessage> res = publishInner(source, web, date, registrySource, history, templatesSrc, temp, igBuildZipParam, logger, args);
+      List<ValidationMessage> res = publishInner(source, web, date, dd, registrySource, history, templatesSrc, temp, igBuildZipParam, logger, args);
       if (res.size() == 0) {
         System.out.println("Success");
       } else {
@@ -153,7 +172,7 @@ public class PublicationProcess {
     return Long.toString(maxMemory / (1024*1024));
   }
 
-  public List<ValidationMessage> publishInner(String source, String web, String date, String registrySource, String history, String templateSrc, String temp, String igBuildZipParam, PublisherConsoleLogger logger, String[] args) throws Exception {
+  public List<ValidationMessage> publishInner(String source, String web, String date, Date dd, String registrySource, String history, String templateSrc, String temp, String igBuildZipParam, PublisherConsoleLogger logger, String[] args) throws Exception {
     List<ValidationMessage> res = new ArrayList<>();
 
     if (temp == null) {
@@ -207,28 +226,19 @@ public class PublicationProcess {
       return res;
     }
 
-    // check the output
-    File fOutput = checkDirectory(Utilities.path(source, "output"), res, "Publication Source");
-    File fQA = checkFile(Utilities.path(source, "output", "qa.json"), res, "Publication QA info");
-    if (res.size() > 0) {
-      return res;
-    }
-    JsonObject qa = JsonParser.parseObject(loadFile("Source QA file", fQA.getAbsolutePath()));
 
-    // now: is the IG itself ready for publication
-    NpmPackage npm = NpmPackage.fromPackage(loadFile("Source package", Utilities.path(source, "output", "package.tgz")));
-    String id = npm.name();
+    if (!check(res, !(new File(Utilities.path(source, "package-list.json")).exists()), "Source '"+source+"' contains a package-list.json - must not exist")) {
+      return res;
+    }            
+    if (!check(res, new File(Utilities.path(source, "publication-request.json")).exists(), "Source '"+source+"' does not contain a publication-request.json - consult documentation to see how to set it up")) {
+      return res;
+    }            
+
+    JsonObject prSrc = JsonParser.parseObject(loadFile("Source publication request", Utilities.path(source, "publication-request.json")));
+    PublicationProcessMode mode = PublicationProcessMode.fromCode(prSrc.asString("mode"));
+    String id = prSrc.asString("package-id");
     String[] p = id.split("\\.");
-    String canonical = PastProcessHackerUtilities.actualUrl(npm.canonical());
-    if (!check(res, canonical != null, "canonical URL not found")) {
-      return res;
-    }
-    String version = npm.version();
-    if (!check(res, version != null, "Source Package has no version")) {
-      return res;
-    }
-
-    // --- Rules for layout depend on publisher ------
+    
     boolean help = true;
     JsonObject rules = getPublishingRules(pubSetup, id, p);
     if (check(res, rules != null, "This website does not have an entry in the layout rules in "+fPubIni.getAbsolutePath()+" to publish the IG with Package Id '"+id+"'")) {
@@ -236,24 +246,52 @@ public class PublicationProcess {
       if (cURL == null) {
         cURL = url;
       }
-      if (!canonical.startsWith(cURL)) {
-        System.out.println("Publication URL of '"+canonical+"' is not consistent with the required base URL of '"+cURL+"'");
-      }
-      String cCanonical = calcByRule(rules.str("canonical"), p);
-      if (!cCanonical.equals(canonical)) {
-        System.out.println("Publication URL of '"+canonical+"' does not match the required web site URL of '"+cCanonical+"'");
-      }
       String destination = Utilities.path(workingRoot, calcByRule(rules.str("destination"), p));
       help = false;
-      publishInner2(source, web, date, registrySource, history, templateSrc, temp, logger, args,
-          destination, workingRoot, res, src, id, canonical, version, npm, pubSetup, qa,
-          fSource, fOutput, fRoot, fRegistry, fHistory, jsonXmlClones, igBuildZipDir);
+      if (mode == PublicationProcessMode.WITHDRAWAL) {
+        processWithdrawal(source, web, url, date, dd, registrySource, history, templateSrc, temp, logger, args,
+            destination, workingRoot, res, src, id, pubSetup, fSource, fRoot, fRegistry, fHistory, 
+            jsonXmlClones, igBuildZipDir, prSrc, mode);
+      } else {
+        // check the output
+        File fOutput = checkDirectory(Utilities.path(source, "output"), res, "Publication Source");
+        File fQA = checkFile(Utilities.path(source, "output", "qa.json"), res, "Publication QA info");
+        if (res.size() > 0) {
+          return res;
+        }
+        JsonObject qa = JsonParser.parseObject(loadFile("Source QA file", fQA.getAbsolutePath()));
+
+        // now: is the IG itself ready for publication
+        NpmPackage npm = NpmPackage.fromPackage(loadFile("Source package", Utilities.path(source, "output", "package.tgz")));
+        String npmid = npm.name();
+
+        check(res, npmid.equals(id), "Source publication has the wrong package id: "+npmid+" (should be "+id+")");
+        String canonical = PastProcessHackerUtilities.actualUrl(npm.canonical());
+        if (!check(res, canonical != null, "canonical URL not found")) {
+          return res;
+        }
+        String version = npm.version();
+        if (!check(res, version != null, "Source Package has no version")) {
+          return res;
+        }
+
+        if (!canonical.startsWith(cURL)) {
+          System.out.println("Publication URL of '"+canonical+"' is not consistent with the required base URL of '"+cURL+"'");
+        }
+        String cCanonical = calcByRule(rules.str("canonical"), p);
+        if (!cCanonical.equals(canonical)) {
+          System.out.println("Publication URL of '"+canonical+"' does not match the required web site URL of '"+cCanonical+"'");
+        }
+
+        publishInner2(source, web, date, dd, registrySource, history, templateSrc, temp, logger, args,
+            destination, workingRoot, res, src, id, canonical, version, npm, pubSetup, qa,
+            fSource, fOutput, fRoot, fRegistry, fHistory, jsonXmlClones, igBuildZipDir, prSrc, mode);
+      }
     }
     check(res, !help, "For help, consult https://chat.fhir.org/#narrow/stream/179252-IG-creation");
     return res;
   }
       
-
   private JsonObject getPublishingRules(JsonObject pubSetup, String id, String[] p) {
     for (JsonObject lr : pubSetup.getJsonObjects("layout-rules")) {
       String[] pr = lr.asString("npm").split("\\.");
@@ -288,10 +326,10 @@ public class PublicationProcess {
   }
 
 
-  public List<ValidationMessage> publishInner2(String source, String web, String date, String registrySource, String history, String templateSrc, String temp, 
+  public List<ValidationMessage> publishInner2(String source, String web, String date, Date dd, String registrySource, String history, String templateSrc, String temp, 
       PublisherConsoleLogger logger, String[] args, String destination, String workingRoot, List<ValidationMessage> res, WebSourceProvider src,
       String id, String canonical, String version, NpmPackage npm, JsonObject pubSetup, JsonObject qa, 
-      File fSource, File fOutput, File fRoot, File fRegistry, File fHistory, boolean jsonXmlClones, File igBuildZipDir) throws Exception {
+      File fSource, File fOutput, File fRoot, File fRegistry, File fHistory, boolean jsonXmlClones, File igBuildZipDir, JsonObject prSrc, PublicationProcessMode mode) throws Exception {
     System.out.println("Relative directory for IG is '"+destination.substring(workingRoot.length())+"'");
     String relDest = FileUtilities.getRelativePath(workingRoot, destination);
     FileUtilities.createDirectory(destination);
@@ -300,17 +338,6 @@ public class PublicationProcess {
     System.out.println(" Source IG: "+npm.name()+"#"+npm.version()+" : "+npm.canonical()+" ("+VersionUtilities.getNameForVersion(npm.fhirVersion())+") from "+source); 
     
     // ----------------------------------------------
-
-    if (!check(res, !(new File(Utilities.path(source, "package-list.json")).exists()), "Source '"+source+"' contains a package-list.json - must not exist")) {
-      return res;
-    }            
-    if (!check(res, new File(Utilities.path(source, "publication-request.json")).exists(), "Source '"+source+"' does not contain a publication-request.json - consult documentation to see how to set it up")) {
-      return res;
-    }            
-    
-    JsonObject prSrc = JsonParser.parseObject(loadFile("Source publication request", Utilities.path(source, "publication-request.json")));
-
-    PublicationProcessMode mode = PublicationProcessMode.fromCode(prSrc.asString("mode"));
 
     if (mode != PublicationProcessMode.CREATION) {
       JsonObject json = JsonParser.parseObject(npm.load("package", "package.json"));
@@ -362,7 +389,6 @@ public class PublicationProcess {
     if (pl.isCurrentOnly()) {
       mode = PublicationProcessMode.MILESTONE;
     }
-    check(res, id.equals(prSrc.asString("package-id")), "Source publication request has the wrong package id: "+prSrc.asString("package-id")+" (should be "+id+")");
     check(res, id.equals(pl.pid()), "Published Package List has the wrong package id: "+pl.pid()+" (should be "+id+")");
     check(res, canonical.equals(pl.canonical()), "Package List has the wrong canonical: "+pl.canonical()+" (should be "+canonical+")");
     check(res, pl.category() != null, "No Entry found in dest package-list 'category'");
@@ -441,7 +467,7 @@ public class PublicationProcess {
     // well, we've run out of things to test... time to actually try...
     if (res.size() == 0) {
       doPublish(fSource, fOutput, qa, destination, destVer, pathVer, fRoot, pubSetup, pl, prSrc, fRegistry, npm, mode, date, fHistory, temp, logger, 
-          pubSetup.getJsonObject("website").asString("url"), src, sft, relDest, templateSrc, first, indexes, Calendar.getInstance(), getComputerName(), 
+          pubSetup.getJsonObject("website").asString("url"), src, sft, relDest, templateSrc, first, indexes, dd, getComputerName(), 
           IGVersionUtil.getVersionString(), gitSrcId(source), tcName, tcPath, tcVer, workingRoot, jsonXmlClones, igBuildZipDir);
     }        
     return res;    
@@ -514,7 +540,7 @@ public class PublicationProcess {
 
   private void doPublish(File fSource, File fOutput, JsonObject qa, String destination, String destVer, String pathVer, File fRoot, JsonObject pubSetup, PackageList pl, JsonObject prSrc, File fRegistry, NpmPackage npm, 
       PublicationProcessMode mode, String date, File history, String tempDir, PublisherConsoleLogger logger, String url, WebSourceProvider src, File sft, String relDest, String templateSrc, boolean first, Map<String, IndexMaintainer> indexes,
-      Calendar genDate, String username, String version, String gitSrcId, String tcName, String tcPath, PackageListEntry tcVer, String workingRoot, boolean jsonXmlClones, File igBuildZipDir) throws Exception {
+      Date genDate, String username, String version, String gitSrcId, String tcName, String tcPath, PackageListEntry tcVer, String workingRoot, boolean jsonXmlClones, File igBuildZipDir) throws Exception {
     // ok. all our tests have passed.
     // 1. do the publication build(s)
     List<String> existingFiles = new ArrayList<>();
@@ -769,8 +795,8 @@ public class PublicationProcess {
     return c;
   }
 
-  private String genDateS(Calendar genDate) {
-    return new SimpleDateFormat("dd/MM/yyyy", new Locale("en", "US")).format(genDate.getTime());
+  private String genDateS(Date genDate) {
+    return new SimpleDateFormat("dd/MM/yyyy", new Locale("en", "US")).format(genDate);
   }
 
   private String tail(String path) {
@@ -787,7 +813,9 @@ public class PublicationProcess {
     
     boolean hasRelease = false;
     if (reg != null) {
-      if (plVer.status().equals("release") || plVer.status().equals("trial-use") || plVer.status().equals("update")) {
+      if (plVer.status().equals("withdrawn")) {
+        reg.withdraw(rc, plVer);
+      } if (plVer.status().equals("release") || plVer.status().equals("trial-use") || plVer.status().equals("update")) {
         reg.seeRelease(rc, plVer.status().equals("update") ? "STU Update" : plVer.sequence(), plVer.version(), plVer.fhirVersion(), plVer.path());
         hasRelease = true;
       } else if (!hasRelease && VersionUtilities.packageForVersion(plVer.fhirVersion()) != null) {
@@ -844,7 +872,7 @@ public class PublicationProcess {
       XMLUtil.addTextTag(xml, nitem, "fhir:version", plVer.fhirVersion(), 6);
       XMLUtil.addTextTag(xml, nitem, "fhir:kind", npm.getNpm().asString("type"), 6);
       XMLUtil.addTextTag(xml, nitem, "pubDate", presentDate(npm.dateAsDate()), 6);
-      XMLUtil.addTextTag(xml, nitem, "fhir:details", "Publication run at "+genDate+" by "+username+" using "+version+" source id "+gitSrcId, null, 6);
+      XMLUtil.addTextTag(xml, nitem, "fhir:details", "Publication run at "+genDate+" by "+username+" using "+version+(gitSrcId != null ? " source id "+gitSrcId : ""), null, 6);
       nitem.appendChild(xml.createTextNode("\n    "));
       
       Element dt = XMLUtil.getNamedChild(channel, "lastBuildDate");
@@ -1027,8 +1055,10 @@ public class PublicationProcess {
     }    
     nv.describe(prSrc.asString("desc"), md, prSrc.asString("changes"));
     nv.clearSubPackages();
+    if (subPackages != null) {
     for (String s : subPackages) {
       nv.addSubPackage(s);
+    }
     }
 
     pl.save(filepath);
@@ -1086,4 +1116,178 @@ public class PublicationProcess {
   }
 
 
+  private List<ValidationMessage> processWithdrawal(String source, String web, String url, String date, Date dd, String registrySource, String history,
+      String templateSrc, String temp, PublisherConsoleLogger logger, String[] args, String destination,
+      String workingRoot, List<ValidationMessage> res, WebSourceProvider src, String id, JsonObject pubSetup,
+      File fSource, File fRoot, File fRegistry, File fHistory, boolean jsonXmlClones, File igBuildZipDir,
+      JsonObject prSrc, PublicationProcessMode mode) throws Exception {
+    System.out.println("Relative directory for IG is '"+destination.substring(workingRoot.length())+"'");
+    String relDest = FileUtilities.getRelativePath(workingRoot, destination);
+    FileUtilities.createDirectory(destination);
+
+    System.out.println("===== Web Publication Run Details ===============================");
+    System.out.println(" Withdrawal: "+id+" from "+source);
+    
+    src.needOptionalFile(Utilities.noString(relDest) ? "package-list.json" : Utilities.path(relDest,"package-list.json"));
+
+    String plpath = Utilities.path(destination, "package-list.json");
+    if (!check(res, new File(plpath).exists(), "Destination '"+destination+"' does not contain a package-list.json - cannot proceed")) {
+      return res;
+    }
+    PackageList pl = PackageList.fromFile(plpath);
+    check(res, id.equals(pl.pid()), "Published Package List has the wrong package id: "+pl.pid()+" (should be "+id+")");
+
+    PackageListEntry curr = pl.current();
+    PackageListEntry last = pl.latest();
+    String currentVersion = curr == null ? last.version() : curr.version();
+    String version = VersionUtilities.getNoPatch(currentVersion)+"-withdrawal";
+    String sequence = curr == null ? last.sequence() : curr.sequence();
+    String destVer = Utilities.path(destination, version);
+    File destVerF = new File(destVer);
+
+    src.needOptionalFolder(Utilities.path(relDest, version), false);
+    
+    check(res, pl.findByVersion(version) == null, "Expected withdrawal version '"+version+"' already exists");
+    check(res, !prSrc.has("version") || version.equals(prSrc.asString("version")), "Publication Request specifies version '"+prSrc.asString("version")+"' but withdrawal version is '"+version+"'");
+    check(res, !Utilities.noString(prSrc.asString("desc")), "Publication Request has no desc value");
+    check(res, !Utilities.noString(prSrc.asString("descmd")), "Publication Request has no descmd value");
+    check(res, !prSrc.has("sequence") || sequence.equals(prSrc.asString("sequence")), "Publication Request specifies sequence '"+prSrc.asString("sequence")+"' but withdrawal sequence is '"+sequence+"'");
+    check(res, "withdrawn".equals(prSrc.asString("status")), "Publication Request status must be 'withdrawn' not '"+prSrc.asString("status")+"'");
+    check(res, !destVerF.exists(), "There is already a folder at "+destVer);
+    checkFile(Utilities.path(templateSrc, "withdrawal.template.html"), res, "Withdrawal Template");
+    checkDirectory(Utilities.path(templateSrc, "withdrawal.assets"), res, "Withdrawal assets");
+    if (!res.isEmpty()) {
+      return res;
+    }
+
+    List<String> ignoreList = new ArrayList<>();
+    ignoreList.add(destVer);
+    // get the current content from the source
+    for (PackageListEntry v : pl.versions()) {
+      if (v != curr) {
+        String path = v.determineLocalPath(url, fRoot.getAbsolutePath());
+        if (path != null) {
+          String relPath = FileUtilities.getRelativePath(fRoot.getAbsolutePath(), path);
+          ignoreList.add(path);
+          src.needFolder(relPath, false);
+        }
+      }
+    }
+    
+    prSrc.set("sequence", sequence);
+    prSrc.set("version", version);
+    
+    String fhirVer = curr == null ? last.fhirVersion() : curr.fhirVersion();
+    String vurl = Utilities.pathURL(url, relDest, version);
+    byte[] npm = makeWithdrawalPackage(id, version, pl.canonical(), vurl, prSrc.asString("desc"), fhirVer, dd);
+
+    FileUtilities.createDirectory(destVer);
+    FileUtilities.bytesToFile(npm, Utilities.path(destVer, "package.tgz"));
+
+    String withdrawalPage = makeWithdrawalPage(pl, prSrc, templateSrc, version);
+    
+    if (curr != null) {
+      curr.setStatus("withdrawn");
+      for (File f : new File(destination).listFiles()) {
+        if (f.getName().endsWith(".html")) {
+          FileUtilities.stringToFile(withdrawalPage, f);
+        }
+      }
+      throw new Error("not supported yet");
+    } else {
+      FileUtilities.copyDirectory(Utilities.path(templateSrc, "withdrawal.assets"), Utilities.path(destination), null);
+    }
+    FileUtilities.stringToFile(withdrawalPage, Utilities.path(destination, "index.html"));
+    FileUtilities.copyDirectory(Utilities.path(templateSrc, "withdrawal.assets"), Utilities.path(destVer), null);
+    FileUtilities.stringToFile(withdrawalPage, Utilities.path(destVer, "index.html"));
+    
+    PackageListEntry plVer = updatePackageList(pl, source, prSrc, vurl, plpath, mode, date, fhirVer, null, null);
+    for (PackageListEntry v : pl.versions()) {
+      if (!v.cibuild()) {
+        String pv = v.path();
+        String vCode = pv.substring(pv.lastIndexOf("/")+1);
+        String dv = Utilities.path(destination, vCode);
+        System.out.println("Update publish box for version "+v.version()+" @ "+v.path());
+        updatePublishBox(pl, v, dv, pv, destination, fRoot.getAbsolutePath(), false, null, null, null, url, false);
+      }
+    }
+    updatePublishBox(pl, plVer, destination, url, destination, fRoot.getAbsolutePath(), true, null, null, null, url, false);
+    
+    String username = getComputerName();
+
+    NpmPackage npmB = NpmPackage.fromPackage(new FileInputStream(Utilities.path(destVer, "package.tgz")));
+    updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("package"), false, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(dd), username, version, null);
+    updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("publication"), true, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(dd), username, version, null);
+    new PackageRegistryBuilder(workingRoot).update(destination.substring(workingRoot.length()+1), pl);
+    new HistoryPageUpdater().updateHistoryPage(history, destination, templateSrc, false);
+
+    Map<String, IndexMaintainer> indexes = new HashMap<>();
+    if (pubSetup.has("indexes")) {
+      JsonObject ndxs = pubSetup.getJsonObject("indexes");
+      for (String realm : ndxs.getNames()) {
+        JsonObject ndx = ndxs.getJsonObject(realm);
+        indexes.put(realm, new IndexMaintainer(realm, ndx.asString("title"), ndx.asString("source"), Utilities.path(fRoot.getAbsolutePath(), ndx.asString("source")), Utilities.path(templateSrc, pubSetup.getJsonObject("website").asString("index-template"))));        
+      }
+    }
+    IndexMaintainer ndx = getIndexForIg(indexes, npmB.id());
+    if (ndx != null) {
+      src.needFile(FileUtilities.changeFileExt(ndx.path(), ".json"));      
+      ndx.loadJson();
+      ndx.updateForPublication(pl, plVer, mode != PublicationProcessMode.WORKING);
+      ndx.buildJson();
+      ndx.execute();
+    }
+    updateRegistry(fRegistry, pl, plVer, npmB);
+    System.out.println("Build is complete. "+src.verb()+" from "+ fRoot.getAbsolutePath());
+    
+    logger.stop();
+    FileUtils.copyFile(new File(logger.getFilename()), new File(Utilities.path(igBuildZipDir, npmB.name()+"#"+npmB.version()+".log")));
+    src.finish(relDest, null);
+    String anonuncement = buildAnnouncement(pubSetup, prSrc, npmB, destination, destVer, vurl, mode, url, relDest, version, null);
+    FileUtilities.stringToFile(anonuncement, Utilities.path(igBuildZipDir, npmB.name()+"#"+npmB.version()+"-announcement.txt"));
+    System.out.println("Finished Publishing. "+src.instructions(0));
+    exitCode = 0;
+    return res;
+  }
+
+  private String makeWithdrawalPage(PackageList pl, JsonObject prSrc, String templateSrc, String version) throws FileNotFoundException, IOException {
+    String tcTemplate = FileUtilities.fileToString(Utilities.path(templateSrc, "withdrawal.template.html"));
+    String cnt = tcTemplate.replace("[%title%]", pl.title());
+    cnt = cnt.replace("[%ver%]", version);
+    cnt = cnt.replace("[%id%]", pl.pid());
+    if (prSrc.has("replacement")) {
+      cnt = cnt.replace("[%repl-link%]", "<p>This specification is replaced by <a href=\""+prSrc.asString("replacement")+"\">a new specification</a></p>");
+    } else {
+      cnt = cnt.replace("[%repl-link%]", "");
+    }
+    if (prSrc.has("descmd")) {
+      MarkDownProcessor md = new MarkDownProcessor(Dialect.COMMON_MARK);
+      String d = md.process(prSrc.asString("descmd"), "publication-request.json#descmd");
+      cnt = cnt.replace("[%desc%]", d);      
+      
+    } else {
+      cnt = cnt.replace("[%desc%]", "<p>"+Utilities.escapeXml(prSrc.asString("desc"))+"</a>");      
+    }
+    return cnt;
+  }
+
+
+  private byte[] makeWithdrawalPackage(String id, String version, String canonical, String url, String desc, String fhirVer, Date date) throws IOException {
+    String path = Utilities.path("[tmp]", "withdrawal.tgz");
+    NPMPackageGenerator gen = new NPMPackageGenerator(id, path, canonical, url, PackageType.IG, new ImplementationGuide(), date, null, false, fhirVer);
+    gen.getPackageJ().add("description", desc);
+    gen.finish();
+    return FileUtilities.fileToBytes(path);
+ 
+  }
+/**
+ * ok updated list for withdrawal:
+
+create a new entry in the package-list.json file saying that the previous publication has been withdrawn
+replaces all the html files in the root copy of the specification with a redirect to withdrawal-notice.html
+withdrawal-notice.html says why it's been withdrawn, and maybe directs users to an alternate specification
+all the publish boxes get updated to note that the spec is withdrawn, with a reference to the withdrawl-notice.html file
+publish an empty package.tgz file with an IG in it that has updated status and description / title etc saying withdrawn and no other contents
+the version of the package is (patch+1)-withdrawn e.g. 1.0.2 will be replaced by 1.0.3-withdrawn
+ */
 }

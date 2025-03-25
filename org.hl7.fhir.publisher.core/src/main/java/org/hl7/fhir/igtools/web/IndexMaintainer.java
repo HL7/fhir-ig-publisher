@@ -41,6 +41,7 @@ public class IndexMaintainer {
     private String refLatest;
     private String fvLatest;
     private String verLatest;
+    private boolean withdrawn;
     
     public IGIndexInformation(String id) {
       this.id = id;
@@ -170,6 +171,8 @@ public class IndexMaintainer {
       tr = tbl.tr();
       if (ig.dateMilestone == null) {
         tr.backgroundColor("#fffce0");
+      } else if (ig.withdrawn) {
+        tr.backgroundColor("#eeeeee");        
       } else if (ig.dateMilestone.isBefore(ig.dateLatest)) {
         tr.backgroundColor("#ffebeb");
       }
@@ -178,13 +181,19 @@ public class IndexMaintainer {
       td.b().tx(ig.name);
       td.br();
       td.markdown(ig.descMD, "Description for "+ig.name);
-      td = tr.td();
-      if (ig.refMilestone != null) {
-        release(td, ig.dateMilestone, ig.verMilestone, ig.refMilestone, ig.fvMilestone);
-      }
-      td = tr.td();
-      if (ig.dateMilestone == null || ig.dateMilestone.isBefore(ig.dateLatest)) {
-        release(td, ig.dateLatest, ig.verLatest, ig.refLatest, ig.fvLatest);
+      if (ig.withdrawn) {        
+        td = tr.td();
+        td.colspan(2);
+        td.b().tx("Withdrawn");
+      } else {
+        td = tr.td();
+        if (ig.refMilestone != null) {
+          release(td, ig.dateMilestone, ig.verMilestone, ig.refMilestone, ig.fvMilestone);
+        }
+        td = tr.td();
+        if (ig.dateMilestone == null || ig.dateMilestone.isBefore(ig.dateLatest)) {
+          release(td, ig.dateLatest, ig.verLatest, ig.refLatest, ig.fvLatest);
+        }
       }
     }
     return new XhtmlComposer(false).compose(div);
@@ -216,7 +225,12 @@ public class IndexMaintainer {
       tr = tbl.tr();
       tr.td().ah(ig.code()+"/history.html").tx(ig.code());
       tr.td().tx(ig.name);
-      if (ig.dateMilestone == null || ig.dateMilestone.isBefore(ig.dateLatest)) {
+      if (ig.withdrawn) {
+        tr.backgroundColor("#eeeeee");
+        tr.td().colspan(2).tx("Withdrawn");
+        tr.td().tx(fmtDateFUll(ig.dateLatest));      
+        tr.td().tx(Utilities.describeDuration(Duration.between(ig.dateLatest, Instant.now())));                
+      } else if (ig.dateMilestone == null || ig.dateMilestone.isBefore(ig.dateLatest)) {
         tr.td().tx(ig.verLatest);
         tr.td().tx("Candidate");
         tr.td().tx(fmtDateFUll(ig.dateLatest));      
@@ -293,11 +307,13 @@ public class IndexMaintainer {
       ig.refLatest = plVer.path();
       ig.fvLatest = plVer.version();
       ig.verLatest = plVer.version();
+      ig.withdrawn = plVer.status().equals("withdrawn");
     } else if (ig.dateLatest == null || ig.dateLatest.isBefore(plVer.instant())) {
       ig.dateLatest = plVer.instant();
       ig.refLatest = plVer.path();
       ig.fvLatest = plVer.fhirVersion();
       ig.verLatest = plVer.version();
+      ig.withdrawn = plVer.status().equals("withdrawn");
     }
   }
 

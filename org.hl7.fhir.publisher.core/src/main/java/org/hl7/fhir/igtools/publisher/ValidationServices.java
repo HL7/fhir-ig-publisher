@@ -487,11 +487,11 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
             if (!context.isServerSideSystem(cs.getUrl())) {
               // ?? res.add(cr.hasVersion() ? cr.getVersion() : "{{unversioned}}");                          
             }
-          } else {
-            res.put(cr.hasVersion() ? cr.getVersion() : "{{unversioned}}", cr.getSourcePackage().getVID());            
+          } else {  
+            res.put(cr.hasVersion() ? cr.getVersion() : "{{unversioned}}", cr.hasSourcePackage() ? cr.getSourcePackage().getVID() : null);            
           }
         } else {
-          res.put(cr.hasVersion() ? cr.getVersion() : "{{unversioned}}", cr.getSourcePackage().getVID());
+          res.put(cr.hasVersion() ? cr.getVersion() : "{{unversioned}}", cr.hasSourcePackage() ? cr.getSourcePackage().getVID() : null);
         }
       }
     }

@@ -33,6 +33,7 @@ import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonString;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
+import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
 
 public class IGRegistryMaintainer {
 
@@ -72,6 +73,8 @@ public class IGRegistryMaintainer {
     private String canonical;
     private String title;
     private String cibuild;
+    private boolean withdrawn;
+    private String withDrawalDate;
     private List<PublicationEntry> releases = new ArrayList<>();
     private List<PublicationEntry> candidates = new ArrayList<>();
     private List<String> products = new ArrayList<>();
@@ -174,6 +177,11 @@ public class IGRegistryMaintainer {
     ig.cibuild = removeTrailingSlash(path);
   }
 
+  public void withdraw(ImplementationGuideEntry ig, String name, String version, String fhirVersion, String path) {
+    ig.releases.clear();
+    ig.withdrawn = true;
+  }
+  
   public void seeRelease(ImplementationGuideEntry ig, String name, String version, String fhirVersion, String path) {
     PublicationEntry p = new PublicationEntry(name, version, fhirVersion, path);
     ig.releases.add(p);
@@ -202,6 +210,16 @@ public class IGRegistryMaintainer {
         ig.entry.remove("product");
         for (String s : ig.products) {
           ig.entry.forceArray("product").add(s);
+        }
+        if (ig.withdrawn) {
+          ig.entry.set("withdrawn", true);          
+        } else if (ig.entry.has("withdrawn")) {
+          ig.entry.remove("withdrawn");
+        }
+        if (ig.withDrawalDate != null) {
+          ig.entry.set("withDrawalDate", ig.withDrawalDate);          
+        } else if (ig.entry.has("withDrawalDate")) {
+          ig.entry.remove("withDrawalDate");
         }
         
         JsonArray a = new JsonArray();
@@ -285,6 +303,11 @@ public class IGRegistryMaintainer {
 
   public String getPath() {
     return path;
+  }
+
+  public void withdraw(ImplementationGuideEntry rc, PackageListEntry plVer) {
+    rc.withdrawn = true;
+    rc.withDrawalDate = plVer.date();
   }
 
 }

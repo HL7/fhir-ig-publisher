@@ -147,8 +147,10 @@ public class WebSourceProvider {
 
   public void finish(String existingFilesBase, List<String> existingFiles) throws IOException {
     System.out.println("Applying changes to website source at "+source);
-    for (String s : existingFiles) {
-      new File(Utilities.path(s, existingFilesBase, s)).delete();
+    if (existingFiles != null) {
+      for (String s : existingFiles) {
+        new File(Utilities.path(s, existingFilesBase, s)).delete();
+      }
     }
     FileUtilities.copyDirectory(destination, source, null);
     System.out.println("  ... done");
