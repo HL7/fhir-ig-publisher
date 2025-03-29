@@ -872,7 +872,7 @@ public class PublicationProcess {
       XMLUtil.addTextTag(xml, nitem, "fhir:version", plVer.fhirVersion(), 6);
       XMLUtil.addTextTag(xml, nitem, "fhir:kind", npm.getNpm().asString("type"), 6);
       XMLUtil.addTextTag(xml, nitem, "pubDate", presentDate(npm.dateAsDate()), 6);
-      XMLUtil.addTextTag(xml, nitem, "fhir:details", "Publication run at "+genDate+" by "+username+" using "+version+(gitSrcId != null ? " source id "+gitSrcId : ""), null, 6);
+      XMLUtil.addTextTag(xml, nitem, "fhir:details", "Publication run at "+genDate+" by "+username+" using "+version+(gitSrcId != null ? " source id "+gitSrcId : ""), 6);
       nitem.appendChild(xml.createTextNode("\n    "));
       
       Element dt = XMLUtil.getNamedChild(channel, "lastBuildDate");

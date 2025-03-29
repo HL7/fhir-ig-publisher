@@ -40,6 +40,7 @@ import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.web.IGRegistryMaintainer.ImplementationGuideEntry;
+import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CodeableConcept;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ImplementationGuide;
@@ -330,7 +331,9 @@ public class IGReleaseUpdater {
     boolean vc = false;
     IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(vf, url, rootFolder, ignoreList, ignoreListOuter, version, folder);
     if (updateStatements) {
-      String fragment = genFragment(ig, version, root, canonical, ignoreList != null, isCore);
+      PackageList pl = new PackageList(ig);
+      PackageListEntry pv = pl.findByVersion(version.asString("version"));
+      String fragment = PublishBoxStatementGenerator.genFragment(pl, pv, pl.current(), canonical, pv == pl.current(), false);
       System.out.println("  "+vf+": "+fragment);
       igvu.updateStatement(fragment, ignoreList != null ? 0 : 1, milestones);
       System.out.println("  .. "+igvu.getCountTotal()+" files checked, "+igvu.getCountUpdated()+" updated");
@@ -521,157 +524,6 @@ public class IGReleaseUpdater {
 
   }
 
-  /**
-   * The fragment of HTML this generates has 3 parts 
-   * 
-   * 1. statement of what this is 
-   * 2. reference to current version
-   * 3. reference to list of published versions
-   * 
-   * @param version
-   * @param root
-   * @param canonical
-   * @return
-   */
-  private String genFragment(JsonObject ig, JsonObject version, JsonObject root, String canonical, boolean currentPublication, boolean isCore) {
-    String p1 = ig.asString("title")+" (v"+version.asString("version")+": "+state(ig, version)+")";
-    if (!isCore) {
-      p1 = p1 + (version.has("fhirversion") ? (isCDA(canonical) ? " generated with " : " based on ")+"<a no-external=\"true\" href=\"http://hl7.org/fhir/"+getPath(version.asString("fhirversion", "fhir-version"))+"\">FHIR (HL7® FHIR® Standard) "+fhirRef(version.asString("fhirversion"))+"</a>" : "")+". ";
-    } else {
-      p1 = p1 + ". ";      
-    }
-
-    if (true) {
-      throw new Error("this needs testing");
-    }
-    
-    String p2 = root == null ? "" : version == root ? 
-        "This is the current published version"+(currentPublication ? "" : " in its permanent home (it will always be available at this URL)") :
-         VersionUtilities.compareVersions(root.asString("version"), version.asString("version")) > 0 ?
-             "The current version which supersedes this version is <a no-external=\"true\" href=\""+(root.asString("path").startsWith(canonical) ? canonical : root.asString("path"))+"{{fn}}\">"+root.asString("version")+"</a>":
-             "This version is a pre-release. The current official version is <a no-external=\"true\" href=\""+(root.asString("path").startsWith(canonical) ? canonical : root.asString("path"))+"{{fn}}\">"+root.asString("version")+"</a>";
-    
-    String p3;
-    if (canonical.equals("http://hl7.org/fhir"))
-      p3 = " For a full list of available versions, see the <a no-external=\"true\" href=\""+canonical+"/directory.html\">Directory of published versions</a>";
-    else
-      p3 = " For a full list of available versions, see the <a no-external=\"true\" href=\""+canonical+"/history.html\">Directory of published versions</a>";
-    return "This page is part of the "+p1+p2+". "+p3;
-  }
-
-  private boolean isCDA(String canonical) {
-    return canonical.startsWith("http://hl7.org/cda");
-  }
-
-  private String getPath(String v) {
-    if ("5.0.0".equals(v))
-      return "R5";
-    if ("4.0.1".equals(v))
-      return "R4";
-    if ("4.0.0".equals(v))
-      return "R4";
-    if ("3.5a.0".equals(v))
-      return "2018Dec";
-    if ("3.5.0".equals(v))
-      return "2018Sep";
-    if ("3.3.0".equals(v))
-      return "2018May";
-    if ("3.2.0".equals(v))
-      return "2018Jan";
-    if ("3.0.0".equals(v))
-      return "STU3";
-    if ("3.0.1".equals(v))
-      return "STU3";
-    if ("3.0.2".equals(v))
-      return "STU3";
-    if ("1.8.0".equals(v))
-      return "2017Jan";
-    if ("1.6.0".equals(v))
-      return "2016Sep";
-    if ("1.4.0".equals(v))
-      return "2016May";
-    if ("1.1.0".equals(v))
-      return "2015Dec";
-    if ("1.0.2".equals(v))
-      return "DSTU2";
-    if ("1.0.0".equals(v))
-      return "2015Sep";
-    if ("0.5.0".equals(v))
-      return "2015May";
-    if ("0.4.0".equals(v))
-      return "2015Jan";
-    if ("0.0.82".equals(v))
-      return "DSTU1";
-    if ("0.11".equals(v))
-      return "2013Sep";
-    if ("0.06".equals(v))
-      return "2013Jan";
-    if ("0.05".equals(v))
-      return "2012Sep";
-    if ("0.01".equals(v))
-      return "2012May";
-    if ("current".equals(v))
-      return "2011Aug";
-    return v;
-  }
-
-  private String fhirRef(String v) {
-    if (VersionUtilities.isR2Ver(v))
-      return "R2";
-    if (VersionUtilities.isR3Ver(v))
-      return "R3";
-    if (VersionUtilities.isR4Ver(v))
-      return "R4";    
-    return "v"+v;
-  }
-
-  private String state(JsonObject ig, JsonObject version) {
-    String status = version.asString("status");
-    String sequence = version.asString("sequence");
-    if ("trial-use".equals(status))
-      return decorate(sequence);
-    else if ("release".equals(status))
-      return "Release";
-    else if ("preview".equals(status))
-      return "QA Preview";
-    else if ("ballot".equals(status))
-      return decorate(sequence)+" Ballot "+ballotCount(ig, sequence, version);
-    else if ("public-comment".equals(status))
-      return decorate(sequence)+" Public Comment";
-    else if ("draft".equals(status))
-      return decorate(sequence)+" Draft";
-    else if ("update".equals(status))
-      return decorate(sequence)+" Update";
-    else if ("normative+trial-use".equals(status))
-      return decorate(sequence+" - Mixed Normative and STU");
-    else if ("normative".equals(status))
-      return decorate(sequence+" - Normative");
-    else if ("informative".equals(status))
-      return decorate(sequence+" - Informative");
-    else 
-      throw new Error("unknown status "+status);
-  }
-
-  private String decorate(String sequence) {
-    sequence = sequence.replace("Normative", "<a no-external=\"true\" href=\"https://confluence.hl7.org/display/HL7/HL7+Balloting\" title=\"Normative Standard\">Normative</a>");
-    if (sequence.contains("DSTU"))
-      return sequence.replace("DSTU", "<a no-external=\"true\" href=\"https://confluence.hl7.org/display/HL7/HL7+Balloting\" title=\"Draft Standard for Trial-Use\">DSTU</a>");
-    else
-      return sequence.replace("STU", "<a no-external=\"true\" href=\"https://confluence.hl7.org/display/HL7/HL7+Balloting\" title=\"Standard for Trial-Use\">STU</a>");
-  }
-
-  private String ballotCount(JsonObject ig, String sequence, JsonObject version) {
-    int c = 1;
-    JsonArray list = ig.getJsonArray("list");
-    for (int i = list.size() - 1; i >= 0; i--) {
-      JsonObject o = (JsonObject) list.get(i);
-      if (o == version)
-        return Integer.toString(c);
-      if (sequence.equals(o.asString("sequence")) && "ballot".equals(version.asString("status")))
-        c++;
-    }
-    return "1";
-  }
 
   public static void main(String[] args) throws Exception {
     new IGReleaseUpdater(args[0], args[1], args[2], null, ServerType.ASP2, null, null, true, args[3]).check(null, false, true, args[4]);

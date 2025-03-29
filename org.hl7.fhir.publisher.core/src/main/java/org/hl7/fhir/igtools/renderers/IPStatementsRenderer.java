@@ -158,7 +158,7 @@ public class IPStatementsRenderer {
             b.append(Utilities.escapeXml(t.desc));
           } else if (t.cs.hasWebPath()) {
             b.append("<a href=\"");
-            b.append(t.cs.getWebPath());
+            b.append(Utilities.escapeXml(t.cs.getWebPath()));
             b.append("\">");
             b.append(Utilities.escapeXml(t.desc));
             b.append("</a>");
@@ -194,7 +194,7 @@ public class IPStatementsRenderer {
             if (links.get(s) == null) {
               b.append(Utilities.escapeXml(s));
             } else {
-              b.append("<a href=\""+links.get(s)+"\">"+Utilities.escapeXml(s)+"</a>");
+              b.append("<a href=\""+Utilities.escapeXml(links.get(s))+"\">"+Utilities.escapeXml(s)+"</a>");
             }
           }
           if (closeSpan) {

@@ -282,6 +282,7 @@ public class PublicationChecker {
         }
       } else if (pr.has("version")) {
         check(messages,  
+            pr.asString("path").equals(Utilities.pathURL(npm.canonical(), pr.asString("version"))) ||
             pr.asString("path").startsWith(Utilities.pathURL(npm.canonical(), pr.asString("version"))+"-") ||
             pr.asString("path").startsWith(Utilities.pathURL(npm.canonical(), pr.asString("sequence"))+"-"),
             "Proposed path for this publication should usually be the canonical with the version or sequence appended and then some kind of label (typically '-snapshot')"+mkWarning());
@@ -315,7 +316,8 @@ public class PublicationChecker {
         String seq = getCurrentSequence(pl);
         if (pr.asString("sequence").equals(seq)) {
           PackageListEntry lv = getLastVersionForSequence(pl, seq); 
-          check(messages, mode != PublicationProcessMode.WORKING || lv.current(), "This release is labelled as a working release in the sequence '"+seq+"'. This is an unexpected workflow - check that the sequence really is correct."+mkWarning());
+          check(messages, mode != PublicationProcessMode.WORKING || lv.current() || Utilities.existsInList(lv.status(), "ballot", "draft"),
+              "This release is labelled as a working release in the sequence '"+seq+"'. This is an unexpected workflow - check that the sequence really is correct."+mkWarning());
         } else if (check(messages, mode != PublicationProcessMode.TECHNICAL_CORRECTION, "Technical Corrections must happen in the scope of the current sequence ('"+seq+"', not '"+pr.asString("sequence")+"'."+mkWarning())) {
           PackageListEntry ls = getLastVersionForSequence(pl, pr.asString("sequence"));
           check(messages, ls == null || !ls.current(), "The sequence '"+seq+"' has already been closed with a current publication, and a new sequence '"+seq+"' started - is going back to '"+pr.asString("sequence")+"' really what's intended?"+mkWarning());

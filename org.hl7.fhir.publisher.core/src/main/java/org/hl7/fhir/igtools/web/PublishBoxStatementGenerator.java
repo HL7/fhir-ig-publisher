@@ -1,5 +1,6 @@
 package org.hl7.fhir.igtools.web;
 
+import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.npm.PackageList;
 import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
@@ -131,9 +132,14 @@ public class PublishBoxStatementGenerator {
       return "Release";
     else if ("preview".equals(status) || "qa-preview".equals(status))
       return "QA Preview";
-    else if ("ballot".equals(status))
-      return decorate(sequence)+" Ballot "+ballotCount(ig, sequence, version);
-    else if ("public-comment".equals(status))
+    else if ("ballot".equals(status)) {
+      String bc = ballotCount(ig, sequence, version);
+      if (Utilities.noString(bc)) {
+        return decorate(sequence+" Ballot");
+      } else {
+        return decorate(sequence)+" Ballot "+bc;
+      }
+    } else if ("public-comment".equals(status))
       return decorate(sequence)+" Public Comment";
     else if ("draft".equals(status))
       return decorate(sequence)+" Draft";
@@ -165,10 +171,15 @@ public class PublishBoxStatementGenerator {
     int c = 1;
     for (int i = ig.list().size() - 1; i >= 0; i--) {
       PackageListEntry o = ig.list().get(i);
-      if (o == version)
-        return Integer.toString(c);
-      if (sequence.equals(o.sequence()) && "ballot".equals(version.status()))
+      if (o == version) {
+        return c == 0 ? "" : Integer.toString(c);
+      }
+      if (Utilities.existsInListNC(o.status(), "trial-use", "normative")) {
+        c = 0;
+      }
+      if (sequence.equals(o.sequence()) && "ballot".equals(o.status())) {
         c++;
+      }
     }
     return "1";
   }

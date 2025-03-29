@@ -9472,9 +9472,11 @@ private String fixPackageReference(String dep) {
       f.start("generateExampleZip");
       try {
         for (FetchedResource r : f.getResources()) {
-          String fn = Utilities.path(outputDir, r.fhirType()+"-"+r.getId()+"."+fmt.getExtension());
-          if (new File(fn).exists()) {
-            files.add(fn);
+          if (r.isExample()) {
+            String fn = Utilities.path(outputDir, r.fhirType()+"-"+r.getId()+"."+fmt.getExtension());
+            if (new File(fn).exists()) {
+              files.add(fn);
+            }
           }
         }
       } finally {
