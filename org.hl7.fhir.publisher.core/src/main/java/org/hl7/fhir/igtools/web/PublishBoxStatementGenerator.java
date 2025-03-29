@@ -1,6 +1,5 @@
 package org.hl7.fhir.igtools.web;
 
-import org.hl7.fhir.utilities.DebugUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.npm.PackageList;
@@ -169,9 +168,6 @@ public class PublishBoxStatementGenerator {
   }
 
   private static String ballotCount(PackageList ig, String sequence, PackageListEntry version) {
-    if ("ihe.iti.mcsd".equals(ig.pid())) {
-      DebugUtilities.breakpoint();
-    }
     int c = 1;
     for (int i = ig.list().size() - 1; i >= 0; i--) {
       PackageListEntry o = ig.list().get(i);
