@@ -1,6 +1,4 @@
 <configuration>
-	<statusListener class="ch.qos.logback.core.status.NopStatusListener" />
-	<!-- CLI logback config -->
 	<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
 		<encoder>
 			<pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%file:%line] %msg%n</pattern>
