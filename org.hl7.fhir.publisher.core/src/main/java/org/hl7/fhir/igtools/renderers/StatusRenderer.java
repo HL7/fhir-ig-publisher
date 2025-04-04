@@ -177,22 +177,25 @@ public class StatusRenderer {
   }
   
   public static String getColor(String status, String sStatus, String fmm) {
-    if (sStatus != null)
-      switch (sStatus) {
-        case "Draft": return "colsd";
-        case "Trial-Use": return "0".equals(fmm) ? "colsd" : "colstu"; 
-        case "Normative": return "colsn";
-        case "Informative": return "colsi";
-        case "Deprecated": return "colsdp";
-        case "External": return "colse";
+    if (sStatus != null) {
+      switch (sStatus.toLowerCase()) {
+        case "draft": return "colsd";
+        case "trial-use": return "0".equals(fmm) ? "colsd" : "colstu"; 
+        case "normative": return "colsn";
+        case "informative": return "colsi";
+        case "deprecated": return "colsdp";
+        case "external": return "colse";
       }
-    if (fmm != null)
+    }
+    if (fmm != null) {
       return "0".equals(fmm) ? "colsd" : "colstu";
-    if (status != null)
-      switch (status) {
-        case "Draft": return "colsd";
-        case "Retired": return "colsdp"; 
+    }
+    if (status != null) {
+      switch (status.toLowerCase()) {
+        case "draft": return "colsd";
+        case "retired": return "colsdp"; 
       }
+    }
     return "colsi";
   }
 

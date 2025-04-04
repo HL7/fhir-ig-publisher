@@ -44,6 +44,7 @@ import org.hl7.fhir.r5.elementmodel.Manager.FhirFormat;
 import org.hl7.fhir.r5.elementmodel.ObjectConverter;
 import org.hl7.fhir.r5.model.ActorDefinition;
 import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
@@ -267,7 +268,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   }
 
   @Override
-  public boolean resolveURL(IResourceValidator validator, Object appContext, String path, String url, String type, boolean canonical) throws IOException {
+  public boolean resolveURL(IResourceValidator validator, Object appContext, String path, String url, String type, boolean canonical, List<CanonicalType> targets) throws IOException {
     String u = url;
     String v = null;
     if (url.contains("|")) {
@@ -341,21 +342,52 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
         return true;
       }
     }    
-    
-    if (u.startsWith("http://hl7.org/fhir")) {
-      if (org.hl7.fhir.r5.utils.BuildExtensions.allConsts().contains(u)) {
+
+    if (org.hl7.fhir.r5.utils.BuildExtensions.allConsts().contains(u)) {
+      return true;
+    }
+    try {
+      Resource res = context.fetchResourceWithException(Resource.class, url);
+      if (res != null) {
         return true;
       }
-      try {
-        return context.fetchResourceWithException(Resource.class, url) != null;
-      } catch (FHIRException e) {
-        return false;
-      }
-    // todo: what to do here?
+    } catch (FHIRException e) {
     }
-    return true;
+    if (canonical) {
+      if (targetsHas(targets, "CodeSystem")) {
+        CodeSystem cs = context.findTxResource(CodeSystem.class, url);
+        if (cs != null) {
+          return true;
+        }
+      }      
+      if (targetsHas(targets, "ValueSet")) {
+        ValueSet vs = context.findTxResource(ValueSet.class, url);
+        if (vs != null) {
+          return true;
+        }
+      }
+    }
+    if (path.endsWith(".system")) {
+      CodeSystem cs = context.findTxResource(CodeSystem.class, url);
+      if (cs != null) {
+        return true;
+      }      
+    }
+    return false;
   }
   
+
+  private boolean targetsHas(List<CanonicalType> targets, String name) {
+    if (targets == null) {
+      return false;
+    }
+    for (CanonicalType ct : targets) {
+      if (ct.getValue() != null && ct.getValue().contains(name)) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   private boolean urlMatches(String mask, String url) {
     return url.length() > mask.length() && url.startsWith(mask.substring(0, mask.indexOf("*"))) && url.endsWith(mask.substring(mask.indexOf("*") + 1));
@@ -475,10 +507,9 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   public Map<String, String> fetchCanonicalResourceVersionMap(IResourceValidator validator, Object appContext, String url) {
     Map<String, String> res = new HashMap<>();
     for (Resource r : context.fetchResourcesByUrl(Resource.class, url)) {
-      if (r instanceof CanonicalResource) {
-        
+      if (r instanceof CanonicalResource) {        
         CanonicalResource cr = (CanonicalResource) r;
-        if (cr.getUrl().contains("terminology.hl7.org") && cr.getSourcePackage().isCore()) {
+        if (cr.getUrl().contains("terminology.hl7.org") && cr.hasSourcePackage() && cr.getSourcePackage().isCore()) {
           continue;
         }
         if (cr instanceof CodeSystem) {
