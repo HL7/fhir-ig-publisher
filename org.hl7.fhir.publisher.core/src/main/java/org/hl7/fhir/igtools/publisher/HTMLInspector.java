@@ -610,7 +610,7 @@ public class HTMLInspector {
     //    pp
     //      .allowStandardUrlProtocols().allowAttributes("title").globally() 
     //      .allowElements("html", "head", "meta", "title", "body", "span", "link", "nav", "button")
-    //      .allowAttributes("xmlns", "xml:lang", "lang", "charset", "name", "content", "id", "class", "href", "rel", "sizes", "no-external", "target", "data-target", "data-toggle", "type", "colspan").globally();
+    //      .allowAttributes("xmlns", "xml:lang", "lang", "charset", "name", "content", "id", "class", "href", "rel", "sizes", "data-no-external", "target", "data-target", "data-toggle", "type", "colspan").globally();
     //    
     //    PolicyFactory policy = Sanitizers.FORMATTING.and(Sanitizers.LINKS).and(Sanitizers.BLOCKS).and(Sanitizers.IMAGES).and(Sanitizers.STYLES).and(Sanitizers.TABLES).and(pp.toFactory());
     //    
