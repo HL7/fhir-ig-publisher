@@ -44,7 +44,7 @@ public class HistoryPageUpdater {
 
     JsonObject json = JsonParser.parseObjectFromFile(Utilities.path(folder, "package-list.json"));
     scrubApostrophes(json);
-    String jsonv = JsonParser.compose(json, false);
+    String jsonv = JsonParser.compose(json, false).replace("\\t", "  ");
 
     String html = FileUtilities.fileToString(Utilities.path(sourceRepo, "history.template"));
     html = html.replace("$header$", loadTemplate(templateSrc, "header.template"));

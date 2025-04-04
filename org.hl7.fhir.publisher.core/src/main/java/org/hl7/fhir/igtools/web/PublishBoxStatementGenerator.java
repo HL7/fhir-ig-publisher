@@ -24,12 +24,12 @@ public class PublishBoxStatementGenerator {
     if ("withdrawn".equals(version.status())) {
       p1 = ig.title()+" Withdrawal notice (v"+version.version()+": "+state(ig, version)+").";
       p2 = "";
-      p3 = " For a full list of versions prior to withdrawal, see the <a no-external=\"true\" href=\""+canonical+"/history.html\">Directory of published versions</a>";
+      p3 = " For a full list of versions prior to withdrawal, see the <a data-no-external=\"true\" href=\""+canonical+"/history.html\">Directory of published versions</a>";
       return "This page is the "+p1+" "+p3;
     } else {
       p1 = ig.title()+" (v"+version.version()+": "+state(ig, version)+")";
       if (!isCore) {
-        p1 = p1 + (version.fhirVersion() != null ? (isCDA(canonical) ? " generated with " : " based on ")+"<a no-external=\"true\" href=\"http://hl7.org/fhir/"+getPath(version.fhirVersion())+"\">FHIR (HL7® FHIR® Standard) "+fhirRef(version.fhirVersion())+"</a>" : "")+". ";
+        p1 = p1 + (version.fhirVersion() != null ? (isCDA(canonical) ? " generated with " : " based on ")+"<a data-no-external=\"true\" href=\"http://hl7.org/fhir/"+getPath(version.fhirVersion())+"\">FHIR (HL7® FHIR® Standard) "+fhirRef(version.fhirVersion())+"</a>" : "")+". ";
       } else {
         p1 = p1 + ". ";      
       }
@@ -39,18 +39,18 @@ public class PublishBoxStatementGenerator {
       } else if (version == root) {
         p2 = "This is the current published version"+(currentPublication ? "" : " in its permanent home (it will always be available at this URL)");
       } else if ("withdrawn".equals(root.status())){
-        p2 = "This specification was withdrawn after the publication of this version: see <a no-external=\"true\" href=\""+(root.path().startsWith(canonical) ? canonical : root.path())+"{{fn}}\">Withdrawal Notice</a>";
+        p2 = "This specification was withdrawn after the publication of this version: see <a data-no-external=\"true\" href=\""+(root.path().startsWith(canonical) ? canonical : root.path())+"{{fn}}\">Withdrawal Notice</a>";
       } else if (VersionUtilities.compareVersions(root.version(), version.version()) > 0) {
-        p2 = "The current version which supersedes this version is <a no-external=\"true\" href=\""+(root.path().startsWith(canonical) ? canonical : root.path())+"{{fn}}\">"+root.version()+"</a>";
+        p2 = "The current version which supersedes this version is <a data-no-external=\"true\" href=\""+(root.path().startsWith(canonical) ? canonical : root.path())+"{{fn}}\">"+root.version()+"</a>";
       } else {
-        p2 = "This version is a pre-release. The current official version is <a no-external=\"true\" href=\""+(root.path().startsWith(canonical) ? canonical : root.path())+"{{fn}}\">"+root.version()+"</a>";
+        p2 = "This version is a pre-release. The current official version is <a data-no-external=\"true\" href=\""+(root.path().startsWith(canonical) ? canonical : root.path())+"{{fn}}\">"+root.version()+"</a>";
       }
       if (canonical.equals("http://hl7.org/fhir")) {
-        p3 = " For a full list of available versions, see the <a no-external=\"true\" href=\""+canonical+"/directory.html\">Directory of published versions</a>";
-      } else if ("withdrawn".equals(root.status())) {
-        p3 = " For a full list of versions prior to withdrawal, see the <a no-external=\"true\" href=\""+canonical+"/history.html\">Directory of published versions</a>";
+        p3 = " For a full list of available versions, see the <a data-no-external=\"true\" href=\""+canonical+"/directory.html\">Directory of published versions</a>";
+      } else if (root != null && "withdrawn".equals(root.status())) {
+        p3 = " For a full list of versions prior to withdrawal, see the <a data-no-external=\"true\" href=\""+canonical+"/history.html\">Directory of published versions</a>";
       } else {
-        p3 = " For a full list of available versions, see the <a no-external=\"true\" href=\""+canonical+"/history.html\">Directory of published versions</a>";
+        p3 = " For a full list of available versions, see the <a data-no-external=\"true\" href=\""+canonical+"/history.html\">Directory of published versions</a>";
       }
       return "This page is part of the "+p1+p2+". "+p3;
     }
@@ -160,11 +160,11 @@ public class PublishBoxStatementGenerator {
   }
 
   private static String decorate(String sequence) {
-    sequence = sequence.replace("Normative", "<a no-external=\"true\" href=\"https://confluence.hl7.org/display/HL7/HL7+Balloting\" title=\"Normative Standard\">Normative</a>");
+    sequence = sequence.replace("Normative", "<a data-no-external=\"true\" href=\"https://confluence.hl7.org/display/HL7/HL7+Balloting\" title=\"Normative Standard\">Normative</a>");
     if (sequence.contains("DSTU"))
-      return sequence.replace("DSTU", "<a no-external=\"true\" href=\"https://confluence.hl7.org/display/HL7/HL7+Balloting\" title=\"Draft Standard for Trial-Use\">DSTU</a>");
+      return sequence.replace("DSTU", "<a data-no-external=\"true\" href=\"https://confluence.hl7.org/display/HL7/HL7+Balloting\" title=\"Draft Standard for Trial-Use\">DSTU</a>");
     else
-      return sequence.replace("STU", "<a no-external=\"true\" href=\"https://confluence.hl7.org/display/HL7/HL7+Balloting\" title=\"Standard for Trial-Use\">STU</a>");
+      return sequence.replace("STU", "<a data-no-external=\"true\" href=\"https://confluence.hl7.org/display/HL7/HL7+Balloting\" title=\"Standard for Trial-Use\">STU</a>");
   }
 
   private static String ballotCount(PackageList ig, String sequence, PackageListEntry version) {

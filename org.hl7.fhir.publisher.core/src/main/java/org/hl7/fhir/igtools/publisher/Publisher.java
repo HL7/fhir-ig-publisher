@@ -1982,8 +1982,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           Extension e = new Extension(ToolingExtensions.EXT_STANDARDS_STATUS, code);
           code.addExtension(ToolingExtensions.EXT_FMM_DERIVED, new CanonicalType(parentCanonical));
           res.addExtension(e);
-          if (code.getCode().equals("normative")) {
-            res.addExtension(new Extension(ToolingExtensions.EXT_NORMATIVE_VERSION, new StringType(parentNormVersion)));
+          if (code.getCode().equals("normative") && !Utilities.noString(parentNormVersion)) {
+            res.addExtension(new Extension(ToolingExtensions.EXT_NORMATIVE_VERSION, new CodeType(parentNormVersion)));
             statusNormVersion = parentNormVersion;
           }
         } else {
@@ -9817,7 +9817,8 @@ private String fixPackageReference(String dep) {
           addTranslationsToJson(item, "copyright", sd.getCopyrightElement(), false); 
           item.add("description", ProfileUtilities.processRelativeUrls(sd.getDescription(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
           addTranslationsToJson(item, "description", publishedIg.getDescriptionElement(), true);
-
+          item.add("obligations", ProfileUtilities.hasObligations(sd));
+          
           if (sd.hasContext()) {
             JsonArray contexts = new JsonArray();
             item.add("contexts", contexts);
