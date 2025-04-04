@@ -2378,14 +2378,14 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       if (logDecision) {
         logMessage("Using " + defaultTranslationLang + " as the default narrative language. (i18n-default-lang has been set in Implementation Guide ini)");
       }
-      return new Locale(defaultTranslationLang);
+      return Locale.forLanguageTag(defaultTranslationLang);
     }
     if (sourceIg != null) {
       if (sourceIg.hasLanguage()) {
         if (logDecision) {
           logMessage("Using " + sourceIg.getLanguage() + " as the default narrative language. (ImplementationGuide.language has been set)");
         }
-        return new Locale(sourceIg.getLanguage());
+        return Locale.forLanguageTag(sourceIg.getLanguage());
       }
       if (sourceIg.hasJurisdiction()) {
         final String jurisdiction = sourceIg.getJurisdictionFirstRep().getCodingFirstRep().getCode();
@@ -2415,7 +2415,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     res.add(inferDefaultNarrativeLang());
 
     for (String translationLang : translationLangs) {
-      Locale locale = new Locale(translationLang);
+      Locale locale = Locale.forLanguageTag(translationLang);
       if (!res.contains(locale)) {
         res.add(locale);
       }
@@ -5045,7 +5045,7 @@ private String fixPackageReference(String dep) {
     rcLangs = new RenderingContextLangs(rc);
     for (String l : allLangs()) {
       RenderingContext lrc = rc.copy(false);
-      lrc.setLocale(new Locale(l));
+      lrc.setLocale(Locale.forLanguageTag(l));
       rcLangs.seeLang(l, lrc);
     }
     realmRules = makeRealmBusinessRules();
@@ -15259,7 +15259,7 @@ private String fixPackageReference(String dep) {
   }
 
   private void setForcedLanguage(String language) {
-    this.forcedLanguage = new Locale(language);
+    this.forcedLanguage = Locale.forLanguageTag(language);
   }
 
   public static String getAbsoluteConfigFilePath(String configFilePath) throws IOException {
