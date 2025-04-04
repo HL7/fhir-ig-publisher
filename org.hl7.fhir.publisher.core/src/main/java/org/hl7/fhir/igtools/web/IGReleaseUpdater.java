@@ -499,7 +499,7 @@ public class IGReleaseUpdater {
   private String searchLinks(boolean root, JsonObject focus, String canonical, JsonArray list) {
     StringBuilder b = new StringBuilder();
     if (!root) {
-      b.append(" <li><a no-external=\"true\" href=\""+canonical+"/searchform.html\">All Versions</a></li>\r\n");
+      b.append(" <li><a data-no-external=\"true\" href=\""+canonical+"/searchform.html\">All Versions</a></li>\r\n");
     }
     for (JsonElement n : list) {
       JsonObject o = (JsonObject) n;
@@ -510,7 +510,7 @@ public class IGReleaseUpdater {
         if (o == focus && !root) {
           b.append(" <li>"+o.asString("sequence")+" "+Utilities.titleize(o.asString("status"))+" (v"+v+", "+summariseDate(date)+") (this version)</li>\r\n");
         } else {
-          b.append(" <li><a no-external=\"true\" href=\""+path+"/searchform.html\">"+o.asString("sequence")+" "+Utilities.titleize(o.asString("status"))+" (v"+v+", "+summariseDate(date)+")</a></li>\r\n");
+          b.append(" <li><a data-no-external=\"true\" href=\""+path+"/searchform.html\">"+o.asString("sequence")+" "+Utilities.titleize(o.asString("status"))+" (v"+v+", "+summariseDate(date)+")</a></li>\r\n");
         }
       }
     }

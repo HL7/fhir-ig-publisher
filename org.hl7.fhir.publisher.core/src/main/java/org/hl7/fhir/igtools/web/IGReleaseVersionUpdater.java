@@ -165,7 +165,7 @@ public class IGReleaseVersionUpdater {
           b.append("<b>"+Utilities.escapeXml(t.name())+"</b>");
         } else {
           String link = Utilities.pathURL(t.path(), relpath);
-          b.append("<a no-external=\"true\" href=\""+link+"\">"+Utilities.escapeXml(t.name())+"</a>");
+          b.append("<a data-no-external=\"true\" href=\""+link+"\">"+Utilities.escapeXml(t.name())+"</a>");
         }
       }
     }
