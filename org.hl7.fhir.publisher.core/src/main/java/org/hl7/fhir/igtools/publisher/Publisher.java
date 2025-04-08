@@ -1173,29 +1173,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     return page.replace("{{npm}}", templateInfo.asString("name"));
   }
 
-  private void processTxLog(String path) throws FileNotFoundException, IOException {
-    if (txLog != null && new File(txLog).exists()) {
-      String tx = FileUtilities.fileToString(txLog);
-      PrintStream f = new PrintStream(new FileOutputStream(path));
-      String title = "Terminology Server Log";
-      f.println("<html><head><title>"+title+"</title></head><body><h2>"+title+"</h2><pre>");
-      for (String s : tx.split("\\r?\\n|\\r")) {
-        if (s.startsWith("---") && s.endsWith("---")) {
-          f.println("</pre><hr/>");
-          String id = s.replace("-", "").trim();
-          f.println("<a name=\"l"+id+"\"> </a><h3>"+id+"</h3>");
-          f.println("<pre>");
-        } else {
-          f.println(s.replace("<", "&lt;"));
-        }
-      }
-      //f.print(tx);
-      f.println("</pre></head></html>");
-      f.close();
-    }
-  }
-
-
   public void createIg() throws Exception, IOException, EOperationOutcome, FHIRException {
     try {
       TimeTracker.Session tts = tt.start("loading");
@@ -1256,7 +1233,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       if (isChild()) {
         log("Built. "+tt.report());
       } else {
-        processTxLog(Utilities.path(destDir != null ? destDir : outputDir, "qa-tx.html"));
         log("Built. "+tt.report());
         log("Generating QA");
         log("Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages, pinSummary()));
@@ -3466,7 +3442,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     for (String n : expParamMap.values())
       context.getExpansionParameters().addParameter(n, expParamMap.get(n));
 
-    txLog = FileUtilities.createTempFile("fhir-ig-", ".log").getAbsolutePath();
+    txLog = FileUtilities.createTempFile("fhir-ig-", ".html").getAbsolutePath();
     System.out.println("Running Terminology Log: "+txLog);
     if (mode != IGBuildMode.WEBSERVER) {
       if (txServer == null || !txServer.contains(":")) {
