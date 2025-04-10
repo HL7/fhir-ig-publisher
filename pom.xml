@@ -10,7 +10,7 @@
     <properties>
         <core_version>6.5.18</core_version>
         <maven_surefire_version>3.0.0-M5</maven_surefire_version>
-        <apache_poi_version>5.2.1</apache_poi_version>
+        <apache_poi_version>5.4.0</apache_poi_version>
         <lombok_version>1.18.32</lombok_version>
         <okhttp.version>4.11.0</okhttp.version>
         <junit_jupiter_version>5.7.1</junit_jupiter_version>
