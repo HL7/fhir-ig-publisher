@@ -379,6 +379,7 @@ import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
+import org.hl7.fhir.utilities.validation.ValidationOptions.R5BundleRelativeReferencePolicy;
 import org.hl7.fhir.utilities.validation.ValidationOptions;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
 import org.hl7.fhir.utilities.xhtml.NodeType;
@@ -460,7 +461,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
    public enum PinningPolicy {NO_CHANGE, FIX, WHEN_MULTIPLE_CHOICES }
 
-  private static final String TOOLING_IG_CURRENT_RELEASE = "0.4.1";
+   private static final String TOOLING_IG_CURRENT_RELEASE = "0.5.0";
 
   public class FragmentUseRecord {
 
@@ -2906,6 +2907,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     tempLangDir = Utilities.path(rootDir, "translations");
     outputDir = Utilities.path(rootDir, "output");
     List<String> relatedIGParams = new ArrayList<>();
+    R5BundleRelativeReferencePolicy r5BundleRelativeReferencePolicy = R5BundleRelativeReferencePolicy.DEFAULT;
     
     Map<String, String> expParamMap = new HashMap<>();
     boolean allowExtensibleWarnings = false;
@@ -3302,6 +3304,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           throw new FHIRException("Unknown value for 'pin-canonicals' of '"+p.getValue()+"'");
         }
         break;
+      case "r5-bundle-relative-reference-policy" : 
+        r5BundleRelativeReferencePolicy = R5BundleRelativeReferencePolicy.fromCode(p.getValue());
       default: 
         if (!template.isParameter(pc)) {
           unknownParams.add(pc+"="+p.getValue());
@@ -3577,6 +3581,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     validator.setFetcher(validationFetcher);
     validator.setPolicyAdvisor(validationFetcher);
     validator.setTracker(this);
+    validator.getSettings().setR5BundleRelativeReferencePolicy(r5BundleRelativeReferencePolicy);
+    
     for (String s : context.getBinaryKeysAsSet()) {
       if (needFile(s)) {
         if (makeQA)
@@ -7400,6 +7406,9 @@ private String fixPackageReference(String dep) {
       if (!tgt.hasVersion()) {
         return false;
       }
+      if (Utilities.startsWithInList(path, "ImplementationGuide.dependsOn")) {
+        return false;
+      }
       if (pinningPolicy == PinningPolicy.FIX) {
         if (!snapshotMode) {
           pinCount++;
@@ -7436,11 +7445,13 @@ private String fixPackageReference(String dep) {
   private boolean checkCanonicalsForVersions(FetchedFile f, CanonicalResource bc, boolean snapshotMode) {
     if (pinningPolicy == PinningPolicy.NO_CHANGE) {
       return false;     
+//    } else if ("ImplementationGuide".equals(bc.fhirType())) {
+//      return false;
     } else {
       DataTypeVisitor dv = new DataTypeVisitor();
       dv.visit(bc, new CanonicalVisitor<CanonicalType>(f, snapshotMode));
       return dv.isAnyTrue();
-    }
+    } 
   }
 
   private String getOid(String type, String id) {
@@ -7866,6 +7877,7 @@ private String fixPackageReference(String dep) {
       r.setElement(convertToElement(r, sd));
     }
     r.getElement().setUserData(UserDataNames.SNAPSHOT_ERRORS, messages); 
+    r.getElement().setUserData(UserDataNames.SNAPSHOT_DETAILS, sd.getSnapshot());
     f.getErrors().addAll(messages);
     r.setSnapshotted(true);
     logDebugMessage(LogCategory.CONTEXT, "Context.See "+sd.getUrl());
@@ -8203,14 +8215,18 @@ private String fixPackageReference(String dep) {
       try {
         for (FetchedResource r : f.getResources()) {
           if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
-            String url = ((CanonicalResource) r.getResource()).getUrl(); 
+            CanonicalResource cr = (CanonicalResource) r.getResource();
+            String url = cr.getUrl(); 
             if (url != null) {
               if (urls.containsKey(url)) {
                 FetchedResource rs = urls.get(url);
-                FetchedFile fs = findFileForResource(rs);
-                boolean local = url.startsWith(igpkp.getCanonical());
-                f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "The URL '"+url+"' has already been used by "+rs.getId()+" in "+fs.getName(), local ? IssueSeverity.ERROR : IssueSeverity.WARNING));
-                fs.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "The URL '"+url+"' is also used by "+r.getId()+" in "+f.getName(), local ? IssueSeverity.ERROR : IssueSeverity.WARNING));
+                CanonicalResource crs = (CanonicalResource) rs.getResource();
+                if (!(crs.getStatus() == PublicationStatus.RETIRED || cr.getStatus() == PublicationStatus.RETIRED)) {  
+                  FetchedFile fs = findFileForResource(rs);
+                  boolean local = url.startsWith(igpkp.getCanonical());
+                  f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "The URL '"+url+"' has already been used by "+rs.getId()+" in "+fs.getName(), local ? IssueSeverity.ERROR : IssueSeverity.WARNING));
+                  fs.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "Resource", "The URL '"+url+"' is also used by "+r.getId()+" in "+f.getName(), local ? IssueSeverity.ERROR : IssueSeverity.WARNING));
+                }
               } else {
                 urls.put(url, r);
               }
@@ -9718,6 +9734,8 @@ private String fixPackageReference(String dep) {
     fragment("codesystem-ref-all-list", cvr.renderCSList(versionToAnnotate, cslist, cvr.needVersionReferences(vslist, publishedIg.getVersion()), true), otherFilesRun, start, "codesystem-ref-all-list", "Cross");      
     saveCSList("codesystem-ref-all-list", cslist, db, 3);
 
+    fragment("obligation-summary", cvr.renderObligationSummary(), otherFilesRun, System.currentTimeMillis(), "obligation-summary", "Cross");      
+
     for (String v : generateVersions) {
       for (String n : context.getResourceNames()) {
         fragment("version-"+v+"-summary-"+n, generateVersionSummary(v, n), otherFilesRun, start, "version-"+v+"-summary-"+n, "Cross");
@@ -9889,7 +9907,6 @@ private String fixPackageReference(String dep) {
           addTranslationsToJson(item, "copyright", q.getCopyrightElement(), false); 
           item.add("description", ProfileUtilities.processRelativeUrls(q.getDescription(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
           addTranslationsToJson(item, "description", q.getDescriptionElement(), true);           
-
           i++;
         }
       }
@@ -9911,6 +9928,15 @@ private String fixPackageReference(String dep) {
         item.add("index", i);
         item.add("source", f.getStatedPath());
         item.add("sourceTail", tailPI(f.getStatedPath()));
+        if (f.hasAdditionalPaths()) {
+          JsonArray adp = item.forceArray("additional-paths");
+          for (String s : f.getAdditionalPaths()) {
+            JsonObject p = new JsonObject();
+            adp.add(p);
+            p.add("source", s);
+            p.add("sourceTail", tailPI(s));          
+          }
+        }
         path = null;
         if (r.getPath() != null) {
           path = r.getPath();
@@ -13185,7 +13211,16 @@ private String fixPackageReference(String dep) {
         String ver = VersionUtilities.versionFromCode(v);
         Resource res = r.hasOtherVersions() && r.getOtherVersions().containsKey(ver+"-"+r.fhirType()) ? r.getOtherVersions().get(ver+"-"+r.fhirType()).getResource() : r.getResource();
         if (res != null) {
-          vnpms.get(v).addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", convVersion(res.copy(), ver));
+          byte[] resVer = null;
+          try {
+            resVer = convVersion(res.copy(), ver);
+          } catch (Exception e) {
+            System.out.println("Unable to convert "+res.fhirType()+"/"+res.getId()+" to "+ver+": "+e.getMessage());
+            resVer = null;
+          }
+          if (resVer != null) {
+            vnpms.get(v).addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", resVer);
+          }
         }
       }
       if (r.getResource() != null && r.getResource().hasUserData(UserDataNames.archetypeSource)) {
@@ -13882,7 +13917,7 @@ private String fixPackageReference(String dep) {
         String html = "<p style=\"color: maroon\">Expansions are not generated for retired value sets</p>";
         
         fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null, start, "expansion", "ValueSet");
-      } else {
+      } else {        
         ValueSetExpansionOutcome exp = context.expandVS(vs, true, true, true);        
         
         db.recordExpansion(vs, exp);
@@ -13894,6 +13929,10 @@ private String fixPackageReference(String dep) {
           RendererFactory.factory(exp.getValueset(), elrc).renderResource(ResourceWrapper.forResource(elrc, exp.getValueset()));
           String html = new XhtmlComposer(XhtmlComposer.XML).compose(exp.getValueset().getText().getDiv());
           fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion"+langSfx, html, f.getOutputNames(), r, vars, null, start, "expansion", "ValueSet");
+          elrc = elrc.withOids(true);
+          XhtmlNode node = RendererFactory.factory(exp.getValueset(), elrc).buildNarrative(ResourceWrapper.forResource(elrc, exp.getValueset()));
+          html = new XhtmlComposer(XhtmlComposer.XML).compose(node);
+          fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion-oids"+langSfx, html, f.getOutputNames(), r, vars, null, start, "expansion", "ValueSet");
           if (ValueSetUtilities.isIncompleteExpansion(exp.getValueset())) {
             f.getErrors().add(new ValidationMessage(Source.TerminologyEngine, IssueType.INFORMATIONAL, "ValueSet.where(id = '"+vs.getId()+"')", "The value set expansion is too large, and only a subset has been displayed", IssueSeverity.INFORMATION).setTxLink(exp.getTxLink()));
           }
@@ -14156,6 +14195,11 @@ private String fixPackageReference(String dep) {
       long start = System.currentTimeMillis();
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-obligations"+langSfx, sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, false), f.getOutputNames(), r, vars, null, start, "snapshot-obligations", "StructureDefinition");
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-snapshot-obligations-all"+langSfx, sdr.snapshot(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, true), f.getOutputNames(), r, vars, null, start, "snapshot-obligations", "StructureDefinition");
+    }
+    if (igpkp.wantGen(r, "obligations")) {
+      long start = System.currentTimeMillis();
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-obligations"+langSfx, sdr.obligations(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, false), f.getOutputNames(), r, vars, null, start, "diff-obligations", "StructureDefinition");
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-obligations-all"+langSfx, sdr.obligations(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.OBLIGATIONS, true), f.getOutputNames(), r, vars, null, start, "diff-obligations", "StructureDefinition");
     }
     if (igpkp.wantGen(r, "snapshot-by-key-obligations")) {
       long start = System.currentTimeMillis();
@@ -14676,6 +14720,7 @@ private String fixPackageReference(String dep) {
   private String pageWrap(String content, String title) {
     return "<html>\r\n"+
         "<head>\r\n"+
+        "  <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"/>\r\n"+
         "  <title>"+title+"</title>\r\n"+
         "  <link rel=\"stylesheet\" href=\"fhir.css\"/>\r\n"+
         "</head>\r\n"+
