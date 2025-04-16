@@ -66,8 +66,6 @@ public class AdjunctFileLoader {
     public Attachment getAttachment() {
       return attachment;
     }
-  
-    
   }
   
   
@@ -86,6 +84,7 @@ public class AdjunctFileLoader {
       if (fn != null) {
         Attachment a;
         try {
+          f.addAdditionalPath(fn);
           a = loadFile(fn);
           res = true;
           att.getAttachment().setId(null);
