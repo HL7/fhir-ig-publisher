@@ -72,6 +72,7 @@ public class FetchedFile {
   private int processMode;
   private Set<String> outputNames = new HashSet<String>();
   private String statedPath;  
+  private List<String> additionalPaths;  
   private String logical;
   private List<ProcessingReport> processes = new ArrayList<>();
   private boolean loaded;
@@ -294,6 +295,18 @@ public class FetchedFile {
   }
   public void setLoaded(boolean loaded) {
     this.loaded = loaded;
+  }
+  public boolean hasAdditionalPaths() {
+    return additionalPaths != null && !additionalPaths.isEmpty();
+  }
+  public List<String> getAdditionalPaths() {
+    return additionalPaths;
+  }
+  public void addAdditionalPath(String additionalPath) {
+    if (additionalPaths == null) {
+      additionalPaths = new ArrayList<String>();
+    }
+    this.additionalPaths.add(additionalPath);
   }
 
 }
