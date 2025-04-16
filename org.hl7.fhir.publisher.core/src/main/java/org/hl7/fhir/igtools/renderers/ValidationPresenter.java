@@ -1684,7 +1684,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   
   private String genDetails(ValidationMessage vm, int id) {
     String tid = null;
-    if (vm.isSlicingHint()) {
+    if (vm.isSlicingHint() || vm.hasSliceInfo()) {
       tid = detailsTemplateWithExtraDetails;
     } else if (vm.getLocationLink() != null) {
       tid = detailsTemplateWithLink;
@@ -1710,11 +1710,34 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     t.add("id", "l"+id);
     t.add("mid", vm.getMessageId());
     t.add("msg", (isNewRule(vm) ? "<img style=\"vertical-align: text-bottom\" src=\"new.png\" height=\"16px\" width=\"36px\" alt=\"New Rule as of "+date(vm)+": \"> " : "")+ vm.getHtml());
-    t.add("msgdetails", vm.isSlicingHint() ? vm.getSliceHtml() : vm.getHtml());
+    if (!vm.hasSliceInfo()) {      
+      t.add("msgdetails",  vm.getHtml());
+    } else if (Utilities.noString(vm.getSliceHtml())) {
+      t.add("msgdetails", genSliceInfo(vm.getSliceInfo()));
+    } else {
+      t.add("msgdetails", vm.getSliceHtml());
+      
+    }
     t.add("comment", vm.getComment() == null ? "" : "<br/><br/><span style=\"display: block; border: 1px grey solid; border-radius: 5px; background-color: #eeeeee; padding: 3px; margin: 3px \"><i><b>Editor's Comment</b>: "+Utilities.escapeXml(vm.getComment())+"</i></span>");
     t.add("tx", "qa-tx.html#l"+vm.getTxLink());
     t.add("txsrvr", getServer(vm.getServer()));
     return t.render();
+  }
+
+  private Object genSliceInfo(List<ValidationMessage> sliceInfo) {
+    StringBuilder b = new StringBuilder();
+    b.append("<table class=\"grid\">");
+    for (ValidationMessage vm : sliceInfo) {
+      b.append("<tr><td>");
+      b.append(Utilities.escapeXml(vm.getLocation()));
+      b.append("</td><td>");
+      b.append(vm.getLevel().toCode());
+      b.append("</td><td>");
+      b.append(Utilities.escapeXml(vm.getMessage()));
+      b.append("</td></tr>");
+    }
+    b.append("</table>");
+    return b.toString();
   }
 
   private String genDetails(String vp, int id) {
