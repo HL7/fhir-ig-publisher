@@ -1754,6 +1754,9 @@ public class CrossViewRenderer extends Renderer {
   }
 
   private void presentActor(XhtmlNode tr, ActorInfo ai, ProfileActorObligationsAnalysis actor, CodeSystem cs) {
+    if (actor == null) {
+      return;
+    }
     boolean first = true;
     for (String code : Utilities.sorted(ai.getCommonObligations())) {
       XhtmlNode td = tr.td();
@@ -1773,7 +1776,7 @@ public class CrossViewRenderer extends Renderer {
       for (String c : actor.getObligations()) {
         if (!ai.getCommonObligations().contains(c)) {
           td.sep(", ");
-          td.ah("https://hl7.org/fhir/extensions/CodeSystem-obligation.html#obligation-"+c.replace(":", ".58"), title(cs, c)).tx(c);
+          td.ah("https://hl7.org/fhir/extensions/CodeSystem-obligation.html#obligation-"+Utilities.nmtokenize(c), title(cs, c)).tx(c);
         }
       }
     }
