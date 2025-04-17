@@ -12,13 +12,19 @@ import java.util.Set;
 
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
+import org.hl7.fhir.igtools.renderers.utils.ObligationsAnalysis;
+import org.hl7.fhir.igtools.renderers.utils.ObligationsAnalysis.ActorInfo;
+import org.hl7.fhir.igtools.renderers.utils.ObligationsAnalysis.ProfileActorObligationsAnalysis;
+import org.hl7.fhir.igtools.renderers.utils.ObligationsAnalysis.ProfileObligationsAnalysis;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.fhirpath.ExpressionNode;
 import org.hl7.fhir.r5.fhirpath.ExpressionNode.Kind;
 import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
+import org.hl7.fhir.r5.model.ActorDefinition;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.CodeSystem;
+import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
 import org.hl7.fhir.r5.model.CodeableConcept;
 import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ConceptMap;
@@ -60,6 +66,8 @@ import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
 public class CrossViewRenderer extends Renderer {
+
+  private static final String HARD_BORDER = "border-left: 2px solid silver";
 
   public class UsedType {
     public UsedType(String name, boolean ms) {
@@ -122,6 +130,7 @@ public class CrossViewRenderer extends Renderer {
   private List<ExtensionDefinition> extList = new ArrayList<>();
   private Map<String, List<ExtensionDefinition>> extMap = new HashMap<>();
   public List<StructureDefinition> allExtensions = new ArrayList<>();
+  public List<StructureDefinition> allProfiles = new ArrayList<>();
 
   public List<String> baseEffectiveTypes = new ArrayList<>();
   public List<String> baseTypes = new ArrayList<>();
@@ -129,6 +138,7 @@ public class CrossViewRenderer extends Renderer {
   public String corePath;
   private FHIRPathEngine fpe;
   private List<SearchParameter> searchParams = new ArrayList<>();
+  private OIDUtilities oids = new OIDUtilities();
 
   public CrossViewRenderer(String canonical, String canonical2, IWorkerContext context, String corePath, RenderingContext rc) {
     super(rc);
@@ -172,7 +182,7 @@ public class CrossViewRenderer extends Renderer {
       seeSearchParameter((SearchParameter) res);
     }
   }
-  
+
   private void seeSearchParameter(SearchParameter sp) {
     try {
       ExpressionNode n = fpe.parse(sp.getExpression());
@@ -184,6 +194,7 @@ public class CrossViewRenderer extends Renderer {
   }
 
   public void seeStructureDefinition(StructureDefinition sd) {
+    allProfiles.add(sd);
     if ("Extension".equals(sd.getType())) {
       seeExtensionDefinition(sd);
     }
@@ -389,7 +400,7 @@ public class CrossViewRenderer extends Renderer {
     } else if (canonical2 != null && sd.getUrl().startsWith(canonical2+"/StructureDefinition/")) {
       code = sd.getUrl().substring(canonical2.length()+21);
     } else {
-     //  System.out.println("extension url doesn't follow canonical pattern: "+sd.getUrl()+"/StructureDefinition, so omitted from extension summary");
+      //  System.out.println("extension url doesn't follow canonical pattern: "+sd.getUrl()+"/StructureDefinition, so omitted from extension summary");
       return;
     }
     ExtensionDefinition exd = new ExtensionDefinition();
@@ -717,7 +728,7 @@ public class CrossViewRenderer extends Renderer {
     for (StructureDefinitionContextComponent ec : sd.getContext()) {
       set.addAll(getExtensionContext(ec));
     }
-    
+
     if (set.size() == 0) {
       set.add("none");
     } else if (set.size() > 1) {
@@ -789,7 +800,7 @@ public class CrossViewRenderer extends Renderer {
 
   private String buildExtensionTable(String type, List<ExtensionDefinition> definitions) throws Exception {
     XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
-    
+
     String kind;
     if (Utilities.existsInList(type, worker.getResourceNames())) {
       kind = "resource";
@@ -842,7 +853,7 @@ public class CrossViewRenderer extends Renderer {
           t = worker.fetchResource(StructureDefinition.class, t.getBaseDefinition());
         }
       }
-      
+
       if (Utilities.existsInList(type, worker.getResourceNames())) {
         tbl.tr().td().colspan(5).b().tx("Extensions defined for many resources including the "+type+" resource");
         map = new HashMap<>();
@@ -901,7 +912,7 @@ public class CrossViewRenderer extends Renderer {
 
     return new XhtmlComposer(false, false).compose(x.getChildNodes());
   }
-  
+
   private boolean refersToThisType(String type, ExtensionDefinition sd) {
     String url = "http://hl7.org/fhir/StructureDefinition/"+type;
     for (ElementDefinition ed : sd.source.getSnapshot().getElement()) {
@@ -922,7 +933,7 @@ public class CrossViewRenderer extends Renderer {
     for (String t : ancestors) {
       urls.add("http://hl7.org/fhir/StructureDefinition/"+t);
     }
-    
+
     for (ElementDefinition ed : sd.source.getSnapshot().getElement()) {
       for (TypeRefComponent t : ed.getType()) {
         for (CanonicalType u : t.getTargetProfile()) {
@@ -977,7 +988,7 @@ public class CrossViewRenderer extends Renderer {
       }
       l = l + (ec.hasExpression() ? ec.getExpression().length() : 0);
       if (ec.getType() == ExtensionContextType.ELEMENT) {
-        String ref = OIDUtilities.oidRoot(ec.getExpression());
+        String ref = oids.oidRoot(ec.getExpression());
         if (ref.startsWith("@"))
           ref = ref.substring(1);
         if (ref.contains(".")) {
@@ -1004,7 +1015,7 @@ public class CrossViewRenderer extends Renderer {
         throw new Error("Not done yet");
       }
     }
-    
+
     String wg = ToolingExtensions.readStringExtension(ed, ToolingExtensions.EXT_WORKGROUP);
     if (wg == null) {
       tr.td();
@@ -1159,7 +1170,7 @@ public class CrossViewRenderer extends Renderer {
     }
     return false;
   }
-  
+
 
   public List<ValueSet> buildUsedValueSetList(boolean all, List<FetchedFile> fileList) throws IOException {
     List<ValueSet> vslist = new ArrayList<>();
@@ -1171,7 +1182,7 @@ public class CrossViewRenderer extends Renderer {
       }
     }  
     return vslist;
-//    return renderVSList(versionToAnnotate, x, vslist, true, true);
+    //    return renderVSList(versionToAnnotate, x, vslist, true, true);
   }
 
   private void findValueSetReferences(List<ValueSet> vslist, Resource resource, boolean all) {
@@ -1290,10 +1301,10 @@ public class CrossViewRenderer extends Renderer {
       }
     }
   }
-  
+
   public List<ValueSet> buildDefinedValueSetList(List<FetchedFile> fileList) throws IOException {
     List<ValueSet> vslist = new ArrayList<>();
-    
+
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.fhirType().equals("ValueSet")) {
@@ -1303,7 +1314,7 @@ public class CrossViewRenderer extends Renderer {
       }
     }  
     return vslist;
-//    return renderVSList(versionToAnnotate, x, vslist, versions, false);
+    //    return renderVSList(versionToAnnotate, x, vslist, versions, false);
   }
 
   public boolean needVersionReferences(List<? extends CanonicalResource> list, String thisVersion) throws IOException {
@@ -1313,7 +1324,7 @@ public class CrossViewRenderer extends Renderer {
     }
     return versions;
   }
-  
+
   public String renderVSList(String versionToAnnotate, List<ValueSet> vslist, boolean versions, boolean used)
       throws IOException {
 
@@ -1365,7 +1376,7 @@ public class CrossViewRenderer extends Renderer {
         renderStatus(vs.getExperimentalElement(), td).tx("experimental");
       }
       td = tr.td();
-      
+
       if (vs.getCompose().hasLockedDate()) {
         renderStatus(vs.getCompose().getLockedDateElement(), td).tx("Locked-Date");
         td.tx(" ");
@@ -1406,7 +1417,7 @@ public class CrossViewRenderer extends Renderer {
       if (v) {
         td.span(null, "Imports Valueset(s)").tx("V ");
       }
-      
+
       vs.setUserData(UserDataNames.pub_xref_sources, sources);
       td = tr.td();
       for (String s : Utilities.sorted(sources)) {
@@ -1429,12 +1440,12 @@ public class CrossViewRenderer extends Renderer {
           }
         }
       }
-      
+
       if (versionToAnnotate != null) {
         renderStatusSummary(context, vs, tr.td(), versionToAnnotate, "url", "name", "title", "version", "status", "experimental");
       }
     }
-    
+
     return new XhtmlComposer(false, false).compose(x.getChildNodes());
   }
 
@@ -1471,7 +1482,7 @@ public class CrossViewRenderer extends Renderer {
       }
     }  
     return cslist;
-//    return renderCSList(versionToAnnotate, x, cslist, versions, false);
+    //    return renderCSList(versionToAnnotate, x, cslist, versions, false);
   }
 
 
@@ -1486,7 +1497,7 @@ public class CrossViewRenderer extends Renderer {
       }
     }  
     return cslist;
-//    return renderCSList(versionToAnnotate, x, cslist, true, true);
+    //    return renderCSList(versionToAnnotate, x, cslist, true, true);
   }
 
   private void findCodeSystemReferences(List<CodeSystem> cslist, Resource resource, boolean all) {
@@ -1588,7 +1599,7 @@ public class CrossViewRenderer extends Renderer {
       }
     }    
   }
-  
+
   private void resolveCSFromVS(List<CodeSystem> list, DataType ref, boolean all, Resource resource) {
     if (ref != null && ref.isPrimitive()) {
       resolveCSFromVS(list, ref.primitiveValue(), all, resource);
@@ -1610,7 +1621,7 @@ public class CrossViewRenderer extends Renderer {
       }
     }
   }
-  
+
   public String renderCSList(String versionToAnnotate, List<CodeSystem> cslist, boolean versions, boolean used) throws IOException {
     XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
     Collections.sort(cslist, new CanonicalResourceSortByUrl());
@@ -1675,7 +1686,7 @@ public class CrossViewRenderer extends Renderer {
         renderStatus(cs.getVersionNeededElement(), td).tx("version-needed");
         td.tx(" ");
       }
-      
+
       td = tr.td();
       td.tx(CodeSystemUtilities.countCodes(cs));
       if (cs.hasContent()) {
@@ -1704,9 +1715,113 @@ public class CrossViewRenderer extends Renderer {
         renderStatusSummary(context, cs, tr.td(), versionToAnnotate, "url", "name", "title", "version", "status", "experimental", "hierarchyMeaning", "versionNeeded", "compositional");
       }
     }
-    
+
     return new XhtmlComposer(false, false).compose(x.getChildNodes());
   }
 
-  
+
+  public String renderObligationSummary() throws IOException {
+    CodeSystem cs = context.getContext().fetchCodeSystem("http://hl7.org/fhir/CodeSystem/obligation");    
+    ObligationsAnalysis oa = ObligationsAnalysis.build(allProfiles);
+    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+    XhtmlNode tbl = x.table("grid");
+    XhtmlNode tr = tbl.tr();
+    tr.th().tx("Obligations");
+    XhtmlNode tr2 = tbl.tr();
+    tr2.td();
+    if (oa.hasNullActor()) {
+      actorHeader(tr, tr2, oa, null, cs);
+    }
+    List<String> actors = Utilities.sorted(oa.getActors().keySet());
+    for (String a : actors) {
+      actorHeader(tr, tr2, oa, a, cs);
+    }
+    
+    for (StructureDefinition sd : allProfiles) {
+      ProfileObligationsAnalysis p = oa.getProfile(sd);
+      if (p != null) {
+        tr = tbl.tr();
+        tr.td().ah(sd.getWebPath()).tx(sd.present());
+        if (oa.hasNullActor()) {
+          presentActor(tr, oa.getActors().get(null), p.actor(null), cs);
+        }
+        for (String a : actors) {
+          presentActor(tr, oa.getActors().get(a), p.actor(a), cs);
+        }
+      }
+    }
+    return new XhtmlComposer(false, false).compose(x.getChildNodes());
+  }
+
+  private void presentActor(XhtmlNode tr, ActorInfo ai, ProfileActorObligationsAnalysis actor, CodeSystem cs) {
+    if (actor == null) {
+      return;
+    }
+    boolean first = true;
+    for (String code : Utilities.sorted(ai.getCommonObligations())) {
+      XhtmlNode td = tr.td();
+      if (first) {
+        td.style(HARD_BORDER);
+        first = false;
+      }
+      if (actor.getObligations().contains(code)) {
+        td.img("mustsupport.png", "Yes");
+      }
+    }
+    if (ai.hasOthers()) {
+      XhtmlNode td = tr.td();
+      if (first) {
+        td.style(HARD_BORDER);
+      }
+      for (String c : actor.getObligations()) {
+        if (!ai.getCommonObligations().contains(c)) {
+          td.sep(", ");
+          td.ah("https://hl7.org/fhir/extensions/CodeSystem-obligation.html#obligation-"+Utilities.nmtokenize(c), title(cs, c)).tx(c);
+        }
+      }
+    }
+      
+  }
+
+  private void actorHeader(XhtmlNode tr, XhtmlNode tr2, ObligationsAnalysis oa, String a, CodeSystem cs) {
+    ActorInfo ai = oa.getActors().get(a);
+    if (a == null) {
+      tr.th().colspan(ai.colspan()).style(HARD_BORDER).tx("All Actors");
+    } else {
+      ActorDefinition ad = context.getContext().fetchResource(ActorDefinition.class, a);
+      if (ad == null) {
+        tr.th().colspan(ai.colspan()).style(HARD_BORDER).code().tx(a);        
+      } else {
+        tr.th().colspan(ai.colspan()).style(HARD_BORDER).ah(ad.getWebPath()).tx(ad.present());        
+      }
+    }
+    boolean first = true;
+    for (String s : Utilities.sorted(ai.getCommonObligations())) {
+      XhtmlNode td = tr2.td();
+      if (first) {
+        td.style(HARD_BORDER);
+        first = false;
+      }
+      td.ah("https://hl7.org/fhir/extensions/CodeSystem-obligation.html#obligation-"+s.replace(":", ".58"), title(cs, s)).tx(s.replace(":", ":\u200B"));
+    }
+    if (ai.hasOthers()) {
+      XhtmlNode td = tr2.td();
+      if (first) {
+        td.style(HARD_BORDER);
+      }
+      td.tx("Others");
+    }
+  }
+
+  private String title(CodeSystem cs, String s) {
+    if (cs == null) {
+      return null;
+    }
+    ConceptDefinitionComponent d = CodeSystemUtilities.getCode(cs, s);
+    if (d == null) {
+      return null;
+    }
+    return d.getDefinition();
+  }
+
 }

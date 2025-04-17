@@ -510,6 +510,15 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
   }
 
+  public String obligations(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode, boolean all) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
+    if (sd.getSnapshot().getElement().isEmpty())
+      return "";
+    else {
+      sdr.getContext().setStructureMode(mode);
+      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? "sa" : null), toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP, resE));
+    }
+  }
+
   public String byKey(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode, boolean all) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
     if (sd.getSnapshot().getElement().isEmpty())
       return "";

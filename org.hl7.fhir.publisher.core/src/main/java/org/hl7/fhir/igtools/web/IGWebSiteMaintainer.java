@@ -94,7 +94,7 @@ public class IGWebSiteMaintainer {
     for (String s : igs) {
       System.out.println(" - "+s);
     }
-    if ((filter == null )&&(!skipPrompt)) {
+    if ((filter == null) &&(!skipPrompt)) {
       System.out.print("Enter y to continue: ");    
       int r = System.in.read();
       if (r != 'y')
