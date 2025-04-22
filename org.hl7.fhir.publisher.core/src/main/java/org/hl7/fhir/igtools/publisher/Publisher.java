@@ -31,7 +31,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
@@ -102,8 +101,7 @@ import org.hl7.fhir.igtools.openehr.ArchetypeImporter.ProcessedArchetype;
 import org.hl7.fhir.igtools.publisher.FetchedFile.FetchedBundleType;
 import org.hl7.fhir.igtools.publisher.FetchedResource.AlternativeVersionResource;
 import org.hl7.fhir.igtools.publisher.IFetchFile.FetchState;
-import org.hl7.fhir.igtools.publisher.Publisher.CanonicalVisitor;
-import org.hl7.fhir.igtools.publisher.Publisher.PinningPolicy;
+import org.hl7.fhir.igtools.publisher.Publisher.UMLGenerationMode;
 import org.hl7.fhir.igtools.publisher.RelatedIG.RelatedIGLoadingMode;
 import org.hl7.fhir.igtools.publisher.RelatedIG.RelatedIGRole;
 import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
@@ -288,6 +286,7 @@ import org.hl7.fhir.r5.openapi.OpenApiGenerator;
 import org.hl7.fhir.r5.openapi.Writer;
 import org.hl7.fhir.r5.renderers.BinaryRenderer;
 import org.hl7.fhir.r5.renderers.BundleRenderer;
+import org.hl7.fhir.r5.renderers.ClassDiagramRenderer;
 import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.ParametersRenderer;
 import org.hl7.fhir.r5.renderers.RendererFactory;
@@ -338,10 +337,25 @@ import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.validation.IValidationProfileUsageTracker;
 import org.hl7.fhir.r5.utils.validation.ValidatorSession;
-import org.hl7.fhir.utilities.*;
-import org.hl7.fhir.utilities.Logger.LogMessageType;
+import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
+import org.hl7.fhir.utilities.CompressionUtilities;
+import org.hl7.fhir.utilities.DurationUtil;
+import org.hl7.fhir.utilities.ENoDump;
+import org.hl7.fhir.utilities.FhirPublication;
+import org.hl7.fhir.utilities.FileUtilities;
+import org.hl7.fhir.utilities.IniFile;
+import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
+import org.hl7.fhir.utilities.MimeType;
+import org.hl7.fhir.utilities.OIDUtilities;
+import org.hl7.fhir.utilities.StandardsStatus;
+import org.hl7.fhir.utilities.StringPair;
+import org.hl7.fhir.utilities.TimeTracker;
 import org.hl7.fhir.utilities.TimeTracker.Session;
+import org.hl7.fhir.utilities.UUIDUtilities;
+import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.ZipGenerator;
 import org.hl7.fhir.utilities.filesystem.CSFile;
 import org.hl7.fhir.utilities.http.HTTPResult;
 import org.hl7.fhir.utilities.http.ManagedWebAccess;
@@ -379,8 +393,8 @@ import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
-import org.hl7.fhir.utilities.validation.ValidationOptions.R5BundleRelativeReferencePolicy;
 import org.hl7.fhir.utilities.validation.ValidationOptions;
+import org.hl7.fhir.utilities.validation.ValidationOptions.R5BundleRelativeReferencePolicy;
 import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
@@ -459,7 +473,29 @@ import lombok.Setter;
 
 public class Publisher implements ILoggingService, IReferenceResolver, IValidationProfileUsageTracker, IResourceLinkResolver {
 
-   public enum PinningPolicy {NO_CHANGE, FIX, WHEN_MULTIPLE_CHOICES }
+   public enum UMLGenerationMode {
+    NONE, SOURCED, ALL;
+
+    public static UMLGenerationMode fromCode(String value) {
+      if (Utilities.noString(value)) {
+        return NONE;
+      } else switch (value.toLowerCase()) {
+      case "none" :
+        return NONE;
+      case "source":
+      case "sourced":
+        return SOURCED;
+      case "all" : 
+      case "always" : 
+        return ALL;
+      default:
+        throw new FHIRException("Unknown UML generation mode `"+value+"`");
+      }
+    }
+  }
+
+
+  public enum PinningPolicy {NO_CHANGE, FIX, WHEN_MULTIPLE_CHOICES }
 
    private static final String TOOLING_IG_CURRENT_RELEASE = "0.5.0";
 
@@ -2882,8 +2918,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (VersionUtilities.isR2Ver(version) || VersionUtilities.isR2Ver(version)) {
       throw new Error("As of the end of 2024, the FHIR  R2 (version "+version+") is no longer supported by the IG Publisher");
     }
-    if (!Utilities.existsInList(version, "5.0.0", "4.3.0", "4.0.1", "3.0.2", "6.0.0-ballot2")) {
-      throw new Error("Unable to support version '"+version+"' - must be one of 5.0.0, 4.3.0, 4.0.1, 3.0.2 or 6.0.0-ballot2");
+    if (!Utilities.existsInList(version, "5.0.0", "4.3.0", "4.0.1", "3.0.2", "6.0.0-ballot3")) {
+      throw new Error("Unable to support version '"+version+"' - must be one of 5.0.0, 4.3.0, 4.0.1, 3.0.2 or 6.0.0-ballot3");
     }
 
     if (!VersionUtilities.isSupportedVersion(version)) {
@@ -3303,6 +3339,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         default:
           throw new FHIRException("Unknown value for 'pin-canonicals' of '"+p.getValue()+"'");
         }
+        break;
+      case "generate-uml":   
+        generateUml = UMLGenerationMode.fromCode(p.getValue());
         break;
       case "r5-bundle-relative-reference-policy" : 
         r5BundleRelativeReferencePolicy = R5BundleRelativeReferencePolicy.fromCode(p.getValue());
@@ -9780,6 +9819,7 @@ private String fixPackageReference(String dep) {
           item.add("url", sd.getUrl());
           item.add("name", sd.getName());
           item.add("title", sd.present());
+          item.add("uml", r.isUmlGenerated());
           addTranslationsToJson(item, "title", sd.getTitleElement(), false); 
           item.add("path", sd.getWebPath());
           if (sd.hasKind()) {
@@ -12435,7 +12475,7 @@ private String fixPackageReference(String dep) {
     try {
       String src = new String(content);
       boolean changed = false;
-      String[] keywords = {"sql", "fragment", "json"};
+      String[] keywords = {"sql", "fragment", "json", "class-diagram"};
       for (String keyword: Arrays.asList(keywords)) {
 
         while (db != null && src.contains("{% " + keyword)) {
@@ -12464,6 +12504,10 @@ private String fixPackageReference(String dep) {
               
             case "json":
               substitute = processJson(arguments, f);
+              break;
+
+            case "class-diagram":
+              substitute = processClassDiagram(arguments, f);
               break;
               
             default:
@@ -12506,6 +12550,16 @@ private String fixPackageReference(String dep) {
         System.out.println("Error processing custom liquid: " + e.getMessage());
       }
       return content;
+    }
+  }
+
+  private String processClassDiagram(String arguments, FetchedFile f) {
+    try {
+      JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(arguments);
+      return new ClassDiagramRenderer(Utilities.path(rootDir, "input", "diagrams"), Utilities.path(rootDir, "temp", "diagrams"), json.asString("id"), json.asString("prefix"), rc).buildClassDiagram(json);
+    } catch (Exception e) {
+      e.printStackTrace();
+      return "<p style=\"color: maroon\"><b>"+Utilities.escapeXml(e.getMessage())+"</b></p>";      
     }
   }
 
@@ -12591,6 +12645,8 @@ private String fixPackageReference(String dep) {
   private PinningPolicy pinningPolicy = PinningPolicy.NO_CHANGE;
 
   private int pinCount;
+
+  private UMLGenerationMode generateUml = UMLGenerationMode.ALL;
   
   private String processSQLCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();
@@ -14231,9 +14287,34 @@ private String fixPackageReference(String dep) {
       long start = System.currentTimeMillis();
       fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-pseudo-ttl"+langSfx, "yet to be done: Turtle template", null, f.getOutputNames(), start, "pseudo-ttl", "StructureDefinition");
     }
-    if (igpkp.wantGen(r, "uml")) {
+    if (generateUml != UMLGenerationMode.NONE) {
       long start = System.currentTimeMillis();
-      fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-uml"+langSfx, "yet to be done: UML as SVG", null, f.getOutputNames(), start, "uml", "StructureDefinition");
+      try {
+        ClassDiagramRenderer cdr = new ClassDiagramRenderer(Utilities.path(rootDir, "input", "diagrams"), Utilities.path(rootDir, "temp", "diagrams"), sd.getId(), null, rc);
+        String src = sd.getDerivation() == TypeDerivationRule.SPECIALIZATION ? cdr.buildClassDiagram(sd) : cdr.buildConstraintDiagram(sd);
+        if (generateUml == UMLGenerationMode.ALL || cdr.hasSource()) {
+          r.setUmlGenerated(true);
+        } else {
+          src = "";
+        }
+        fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-uml"+langSfx, src, f.getOutputNames(), r, vars, null, start, "uml", "StructureDefinition");
+      } catch (Exception e) {
+        e.printStackTrace();
+        fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-uml"+langSfx, e.getMessage(), null, f.getOutputNames(), start, "uml", "StructureDefinition");          
+      }
+      try {
+        ClassDiagramRenderer cdr = new ClassDiagramRenderer(Utilities.path(rootDir, "input", "diagrams"), Utilities.path(rootDir, "temp", "diagrams"), sd.getId(), "all-", rc);
+        String src = sd.getDerivation() == TypeDerivationRule.SPECIALIZATION ? cdr.buildClassDiagram(sd) : cdr.buildConstraintDiagram(sd);
+        if (generateUml == UMLGenerationMode.ALL || cdr.hasSource()) {
+          r.setUmlGenerated(true);
+        } else {
+          src = "";
+        }
+        fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-uml-all"+langSfx, src, f.getOutputNames(), r, vars, null, start, "uml-all", "StructureDefinition");
+      } catch (Exception e) {
+        e.printStackTrace();
+        fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-uml-all"+langSfx, e.getMessage(), null, f.getOutputNames(), start, "uml-all", "StructureDefinition");          
+      }
     }
     if (igpkp.wantGen(r, "tx")) {
       long start = System.currentTimeMillis();
@@ -14369,7 +14450,7 @@ private String fixPackageReference(String dep) {
       start = System.currentTimeMillis();
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-other-versions"+langSfx, sdr.otherVersions(f.getOutputNames(), r), f.getOutputNames(), r, vars, null, start, "other-versions", "StructureDefinition");;
     }
-    
+        
     for (Extension ext : sd.getExtensionsByUrl(ToolingExtensions.EXT_SD_IMPOSE_PROFILE)) {
       StructureDefinition sdi = context.fetchResource(StructureDefinition.class, ext.getValue().primitiveValue());
       if (sdi != null) {

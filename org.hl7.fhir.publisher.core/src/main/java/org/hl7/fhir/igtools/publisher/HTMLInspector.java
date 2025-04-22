@@ -1123,8 +1123,11 @@ public class HTMLInspector {
         resolved = true;
         if (specs != null) {
           for (SpecMapManager spec : specs) {
-            if (ref.startsWith(spec.getBase()))
-              resolved = false;
+            if (spec.getBase() != null) {
+              if (ref.startsWith(spec.getBase())) {
+                resolved = false;
+              }
+            }
           }
         }
       } else if (!ref.contains("#")) { 
