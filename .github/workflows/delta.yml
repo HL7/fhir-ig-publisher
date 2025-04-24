@@ -4,7 +4,7 @@ on:
       - master
 
 jobs:
-  build_from_branch:
+  build_publisher_branch:
 
     runs-on: ubuntu-latest
 
@@ -22,9 +22,24 @@ jobs:
     - name: Build with Maven
       run: mvn clean install -Dmaven.test.skip=true
     - name: Cache Publisher JAR
-      id: cache-primes
+      id: cache-publisher-jar
       uses: actions/cache@v4
       with:
         path: org.hl7.fhir.publisher.cli/target/org.hl7.fhir.publisher.cli-**-SNAPSHOT.jar
         key: ig-publisher-branch
         
+  run_publisher:
+    needs: build_publisher_branch
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout IG
+      uses: actions/checkout@v4
+      with: 
+        repository: HL7/ig-template-base
+    - name: Publisher JAR from cache
+      id: publisher-jar-from-cache
+      uses: actions/cache@v4
+      with:
+        path: ig-publisher.jar
+        key: ig-publisher-branch
