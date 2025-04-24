@@ -41,5 +41,5 @@ jobs:
       id: publisher-jar-from-cache
       uses: actions/cache@v4
       with:
-        path: ig-publisher.jar
+        path: org.hl7.fhir.publisher.cli/target/org.hl7.fhir.publisher.cli-**-SNAPSHOT.jar
         key: ig-publisher-branch
