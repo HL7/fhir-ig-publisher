@@ -12,7 +12,7 @@ jobs:
     - name: Checkout project
       uses: actions/checkout@v4
       with:
-        repository: https://github.com/HL7/fhir-ig-publisher
+        repository: HL7/fhir-ig-publisher
         ref: ${{ github.sha }}
         
         
