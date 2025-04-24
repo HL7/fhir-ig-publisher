@@ -40,6 +40,16 @@ jobs:
       with:
         java-version: 11
         distribution: zulu
+    - uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.3'
+        bundler-cache: true
+    - name: install jekyll
+      run: |
+        gem install jekyll bundler
+    - name: install sushi
+      run: |
+        npm install -g fsh-sushi
     - name: Checkout IG
       uses: actions/checkout@v4
       with: 
