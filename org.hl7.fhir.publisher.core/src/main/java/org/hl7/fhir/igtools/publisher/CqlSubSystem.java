@@ -928,7 +928,10 @@ public class CqlSubSystem {
 
   private CompiledLibrary resolveLibrary(String localLibraryName, CompiledLibrary library, LibraryManager libraryManager) {
     IncludeDef includeDef = library.resolveIncludeRef(localLibraryName);
-    return resolveLibrary(libraryManager, new VersionedIdentifier().withId(includeDef.getPath()).withVersion(includeDef.getVersion()));
+    return resolveLibrary(libraryManager, new VersionedIdentifier()
+            .withId(NamespaceManager.getNamePart(includeDef.getPath()))
+            .withSystem(NamespaceManager.getUriPart(includeDef.getPath()))
+            .withVersion(includeDef.getVersion()));
   }
 
   private CompiledLibrary resolveLibrary(LibraryManager libraryManager, VersionedIdentifier libraryIdentifier) {
