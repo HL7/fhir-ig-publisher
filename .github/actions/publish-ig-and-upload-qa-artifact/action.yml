@@ -45,6 +45,7 @@ runs:
       uses: actions/checkout@v4
       with:
         repository: ${{ inputs.repo }}
+        path: ${{ github.workspace }}/ig
     - name: Publisher JAR from cache
       id: publisher-jar-from-cache
       uses: actions/cache@v4
@@ -53,10 +54,10 @@ runs:
         key: ig-publisher-${{ inputs.ref }}
     - name: Run Publisher
       id: run-publisher
-      run: java -jar ig-publisher.jar -ig .
+      run: java -jar ig-publisher.jar -ig ${{ github.workspace }}/ig
       shell: bash
     - name: Upload QA compare artifact
       uses: actions/upload-artifact@v4
       with:
         name: qa-${{ env.REPO_KEY }}-${{ inputs.ref }}
-        path: output/qa.compare.txt
+        path: ${{ github.workspace }}/ig/output/qa.compare.txt

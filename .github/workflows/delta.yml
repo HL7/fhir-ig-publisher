@@ -38,7 +38,7 @@ jobs:
       with:
         sparse-checkout: |
           .github
-    - name: Build and Cache IG Publisher
+    - name: Publish IG and create QA artifact
       uses: ./.github/actions/publish-ig-and-upload-qa-artifact
       with:
         ref: ${{ matrix.ref }}
