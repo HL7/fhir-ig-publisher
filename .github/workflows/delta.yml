@@ -4,8 +4,8 @@ on:
       - master
 
 jobs:
-  - id: build-publisher-branch
-    name: Build IG Publisher from Branch
+  - name: Build IG Publisher from Branch
+    id: build-publisher-branch
     runs-on: ubuntu-latest
 
     steps:
@@ -30,7 +30,8 @@ jobs:
         path: ig-publisher.jar
         key: ig-publisher-branch
         
-  run_publisher:
+  - name: Run IG Publisher Branch
+    id: run-ig-publisher-branch
     needs: build-publisher-branch
     runs-on: ubuntu-latest
 
