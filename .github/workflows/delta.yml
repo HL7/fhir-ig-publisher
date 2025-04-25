@@ -74,5 +74,5 @@ jobs:
     - name: Upload QA compare artifact
       uses: actions/upload-artifact@v4
       with: 
-        name: qa-${matrix.repo/\//_}-${{matrix.ref}}
+        name: qa-${{matrix.repo/\//_}}-${{matrix.ref}}
         path: output/qa.compare.txt
