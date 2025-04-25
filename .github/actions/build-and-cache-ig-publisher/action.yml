@@ -22,6 +22,7 @@ runs:
         ref: ${{ inputs.ref }}
     - name: Build with Maven
       run: mvn clean install -Dmaven.test.skip=true
+      shell: bash
     - name: Move JAR to project root
       run: mv org.hl7.fhir.publisher.cli/target/org.hl7.fhir.publisher.cli-**-SNAPSHOT.jar ig-publisher.jar
       shell: bash
