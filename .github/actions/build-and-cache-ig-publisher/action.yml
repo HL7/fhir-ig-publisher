@@ -17,10 +17,10 @@ runs:
         distribution: zulu
     - name: Checkout project
       uses: actions/checkout@v4
-      path: ${{ runner.workspace }}/ig-publisher-cli-build
       with:
         repository: HL7/fhir-ig-publisher
         ref: ${{ inputs.ref }}
+        path: ${{ runner.workspace }}/ig-publisher-cli-build
     - name: Build with Maven
       run: mvn clean install -Dmaven.test.skip=true
       shell: bash
