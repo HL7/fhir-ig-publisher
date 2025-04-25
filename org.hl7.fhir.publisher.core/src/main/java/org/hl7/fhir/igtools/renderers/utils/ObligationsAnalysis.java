@@ -124,7 +124,7 @@ public class ObligationsAnalysis {
             }
           }
         }
-        if (c > profiles.size() / 2) {
+        if (c > profiles.size() / 3) {
           ai.commonObligations.add(code);
         }
       }
