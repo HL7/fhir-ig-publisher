@@ -2,7 +2,7 @@ on:
   pull_request:
     branches:
       - master
-
+    
 jobs:
   build-ig-publisher-jars:
     name: Build IG Publisher JARs
@@ -42,7 +42,7 @@ jobs:
     strategy:
       matrix:
         ref: [master, "${{ github.sha }}" ]
-        repo: [ HL7/ig-template-base ]
+        repo: [ HL7/ig-template-base, FHIR/ig-guidance ]
     steps:
     - name: set repo key
       # This is a hacky way to generate a repo key without '/' characters, so an artifact 
@@ -94,7 +94,7 @@ jobs:
 
     strategy:
       matrix:
-        repo: [ HL7/ig-template-base ]
+        repo: [ HL7/ig-template-base, FHIR/ig-guidance ]
     steps:
     - name: set repo key
       # This is a hacky way to generate a repo key without '/' characters, so an artifact 
