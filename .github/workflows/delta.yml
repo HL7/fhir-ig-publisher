@@ -45,7 +45,9 @@ jobs:
     steps:
     - name: set repo key
       run: |
-          echo "REPO_KEY=${${{matrix.repo}}//\//_}" >> $GITHUB_ENV
+          ENV_REPO_KEY=${{matrix.repo}}
+          echo $ENV_REPO_KEY
+          echo "REPO_KEY=${ENV_REPO_KEY//\//_}" >> $GITHUB_ENV
     - name: check repo key
       run: |
           echo ${{env.REPO_KEY}}
