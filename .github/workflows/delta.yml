@@ -13,6 +13,8 @@ jobs:
         ref: [master, "${{ github.sha }}" ]
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
       - name: Assemble Reports
         uses: ./.github/actions/build-and-cache-ig-publisher
         with:
