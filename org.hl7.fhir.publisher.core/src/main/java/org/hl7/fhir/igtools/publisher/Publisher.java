@@ -1257,6 +1257,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         }
       }
       checkForSnomedVersion();
+      FileUtilities.copyFile(txLog, Utilities.path(rootDir, "output", "qa-tx.html"));
       ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), rootDir, npmName, childPublisher == null? null : childPublisher.npmName,
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator, ipsComparator,
           new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine, rc, specMaps).render(publishedIg, true, false, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()),
@@ -2740,11 +2741,13 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (configFile != null) {
       File fsh = new File(Utilities.path(focusDir(), "fsh"));
       if (fsh.exists() && fsh.isDirectory() && !noSushi) {
+        prescanSushiConfig(focusDir());
         new FSHRunner(this).runFsh(new File(FileUtilities.getDirectoryForFile(fsh.getAbsolutePath())), mode);
         isSushi = true;
       } else {
         File fsh2 = new File(Utilities.path(focusDir(), "input", "fsh"));
         if (fsh2.exists() && fsh2.isDirectory() && !noSushi) {
+          prescanSushiConfig(focusDir());
           new FSHRunner(this).runFsh(new File(FileUtilities.getDirectoryForFile(fsh.getAbsolutePath())), mode);
           isSushi = true;
         }
@@ -2765,6 +2768,67 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (context != null) {
       r4tor4b.setContext(context);
     }
+  }
+
+  private void prescanSushiConfig(String dir) throws IOException {
+    // resolve packages for Sushi in advance
+    File sc = new File(Utilities.path(dir, "sushi-config.yaml"));
+    if (sc.exists()) {
+      List<String> lines = Files.readAllLines(sc.toPath());
+      boolean indeps = false;
+      String pid = null;
+      for (String line : lines) {
+        if (!line.startsWith(" ") && "dependencies:".equals(line.trim())) {
+          indeps = true;
+        } else if (indeps && !line.trim().startsWith("#")) {
+          int indent = Utilities.startCharCount(line, ' ');
+          switch (indent) {
+          case 2:
+            String t = line.trim();
+            if (t.contains(":")) {
+              String name = t.substring(0, t.indexOf(":")).trim();
+              String value = t.substring(t.indexOf(":")+1).trim();
+              if (Utilities.noString(value)) {
+                pid = name;
+              } else {
+                installPackage(name, value);
+              }              
+            }
+            break;
+          case 4:
+            t = line.trim();
+            if (t.contains(":")) {
+              String name = t.substring(0, t.indexOf(":")).trim();
+              String value = t.substring(t.indexOf(":")+1).trim();
+              if ("version".equals(name)) {
+                if (pid != null) {
+                  installPackage(pid, value);
+                }
+                pid = null;
+              }              
+            }
+            break;
+          case 0:
+            indeps = false;
+          default:
+            // ignore this line
+          }
+        }
+      }
+    }
+  }
+
+  private void installPackage(String id, String ver) {
+    try {
+      if (!pcm.packageExists(id, ver)) {
+        log("Found dependency on "+id+"#"+ver+" in Sushi config. Pre-installing");
+        pcm.loadPackage(id, ver);
+      }
+    } catch (FHIRException | IOException e) {
+      log("Unable to install "+id+"#"+ver+": "+e.getMessage());
+      log("Trying to go on");
+    }
+    
   }
 
   @Nonnull
@@ -12472,8 +12536,8 @@ private String fixPackageReference(String dep) {
     if (!Utilities.existsInList(Utilities.getFileExtension(f.getPath()), "html", "md", "xml")) {
       return content;
     }
+    String src = new String(content);
     try {
-      String src = new String(content);
       boolean changed = false;
       String[] keywords = {"sql", "fragment", "json", "class-diagram"};
       for (String keyword: Arrays.asList(keywords)) {
@@ -12489,7 +12553,8 @@ private String fixPackageReference(String dep) {
           String arguments = src.substring(0, i).trim();
 
           String substitute = "";
-          switch (keyword) {
+          try {
+            switch (keyword) {
             case "sql":
               if (arguments.trim().startsWith("ToData ")) {
                 substitute = processSQLData(db, arguments.substring(arguments.indexOf("ToData ") + 7), f);
@@ -12501,7 +12566,7 @@ private String fixPackageReference(String dep) {
             case "fragment":
               substitute = processFragment(arguments, f);
               break;
-              
+
             case "json":
               substitute = processJson(arguments, f);
               break;
@@ -12509,9 +12574,17 @@ private String fixPackageReference(String dep) {
             case "class-diagram":
               substitute = processClassDiagram(arguments, f);
               break;
-              
+
             default:
               throw new FHIRException("Internal Error - unkonwn keyword "+keyword);
+            }
+          } catch (Exception e) {
+            if (debug) {
+              e.printStackTrace();
+            } else {
+              System.out.println("Error processing custom liquid in "+f.getName()+": " + e.getMessage());
+            }
+            substitute = "<p>Error processing command: "+Utilities.escapeXml(e.getMessage());
           }
 
           src = pfx + substitute + sfx;
@@ -12547,7 +12620,7 @@ private String fixPackageReference(String dep) {
       if (debug) {
         e.printStackTrace();
       } else {
-        System.out.println("Error processing custom liquid: " + e.getMessage());
+        System.out.println("Error processing custom liquid in "+f.getName()+": " + e.getMessage());
       }
       return content;
     }
@@ -12646,7 +12719,7 @@ private String fixPackageReference(String dep) {
 
   private int pinCount;
 
-  private UMLGenerationMode generateUml = UMLGenerationMode.ALL;
+  private UMLGenerationMode generateUml = UMLGenerationMode.NONE;
   
   private String processSQLCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();
@@ -13973,7 +14046,7 @@ private String fixPackageReference(String dep) {
         String html = "<p style=\"color: maroon\">Expansions are not generated for retired value sets</p>";
         
         fragment("ValueSet-"+prefixForContainer+vs.getId()+"-expansion", html, f.getOutputNames(), r, vars, null, start, "expansion", "ValueSet");
-      } else {        
+      } else {           
         ValueSetExpansionOutcome exp = context.expandVS(vs, true, true, true);        
         
         db.recordExpansion(vs, exp);
@@ -15829,7 +15902,7 @@ private String fixPackageReference(String dep) {
   public <T extends Resource> T findLinkableResource(Class<T> class_, String uri) throws IOException {
     for (LinkedSpecification spec : linkSpecMaps) {
       String name = class_.getSimpleName();
-      List<String> names = "Resource".equals(name) ? Utilities.strings("StructureDefinition", "ValueSet", "CodeSystem", "OperationDefinition") : Utilities.strings(name);
+      Set<String> names = "Resource".equals(name) ? Utilities.stringSet("StructureDefinition", "ValueSet", "CodeSystem", "OperationDefinition") : Utilities.stringSet(name);
       for (PackageResourceInformation pri : spec.getNpm().listIndexedResources(names)) {
         boolean match = false;
         if (uri.contains("|")) {
