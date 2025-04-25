@@ -3002,8 +3002,8 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     return ctxt;
   }
 
-  private List<String> loadTypes() {
-    List<String> types = new ArrayList<String>();
+  private Set<String> loadTypes() {
+    Set<String> types = new HashSet<String>();
     types.add("StructureDefinition");
     types.add("ValueSet");
     types.add("CodeSystem");
