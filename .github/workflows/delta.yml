@@ -91,10 +91,10 @@ jobs:
     name: Diff generated QA artifacts
     needs: generate-qa-artifacts
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
         repo: [ HL7/ig-template-base, FHIR/ig-guidance ]
+      fail-fast: false
     steps:
     - name: set repo key
       # This is a hacky way to generate a repo key without '/' characters, so an artifact 
