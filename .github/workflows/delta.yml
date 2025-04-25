@@ -15,8 +15,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        sparse-checkout: |
-          .github
+        with:
+          sparse-checkout: |
+            .github
       - name: Build and Cache IG Publisher
         uses: ./.github/actions/build-and-cache-ig-publisher
         with:
