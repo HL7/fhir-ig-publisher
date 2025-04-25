@@ -4,9 +4,13 @@ on:
       - master
 
 jobs:
-  - name: Build IG Publisher from Branch
-    id: build-publisher-branch
+  build-ig-publisher-jars:
+    name: Build IG Publisher JARs
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        ref: [master, "${{ github.sha }}" ]
 
     steps:
     - name: Set up JDK 11
@@ -18,7 +22,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: HL7/fhir-ig-publisher
-        ref: ${{ github.sha }}
+        ref: ${{ matrix.ref }}
     - name: Build with Maven
       run: mvn clean install -Dmaven.test.skip=true
     - name: Move JAR to project root
@@ -28,12 +32,15 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ig-publisher.jar
-        key: ig-publisher-branch
-        
-  - name: Run IG Publisher Branch
-    id: run-ig-publisher-branch
-    needs: build-publisher-branch
+        key: ig-publisher-${{matrix.ref}}
+  run-ig-publisher-branch:  
+    name: Run IG Publisher Branch
+    needs: build-ig-publisher-jars
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        ref: [master, "${{ github.sha }}" ]
 
     steps:
     - name: Set up JDK 11
@@ -60,12 +67,12 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ig-publisher.jar
-        key: ig-publisher-branch
+        key: ig-publisher-${{matrix.ref}}
     - name: Run Publisher
       id: run-publisher
       run: java -jar ig-publisher.jar -ig .
     - name: Upload QA compare artifact
       uses: actions/upload-artifact@v4
       with: 
-        name: qa-branch
+        name: qa-${{matrix.ref}}
         path: output/qa.compare.txt
