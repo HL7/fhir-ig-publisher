@@ -1,0 +1,62 @@
+name: "Publish IG and upload QA artifact"
+description: "Publishes an IG from a GitHub repo using a cached IG publisher JAR and uploads the QA artifact"
+inputs:
+  ref:
+    description: "The GitHub ref for the IG publisher JAR"
+    required: false
+    default: "master"
+  repo:
+    description: "The GitHub repo for the IG"
+    required: true
+
+runs:
+  using: "composite"
+
+  steps:
+    - name: set repo key
+      # This is a hacky way to generate a repo key without '/' characters, so an artifact
+      # key can be generated.
+      run: |
+        ENV_REPO_KEY=${{ inputs.repo }}
+        echo "REPO_KEY=${ENV_REPO_KEY//\//_}" >> $GITHUB_ENV
+      shell: bash
+    - name: check repo key
+      run: |
+        echo ${{env.REPO_KEY}}
+      shell: bash
+    - name: Set up JDK 11
+      uses: actions/setup-java@v3
+      with:
+        java-version: 11
+        distribution: zulu
+    - uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.3'
+        bundler-cache: true
+    - name: install jekyll
+      run: |
+        gem install jekyll bundler
+      shell: bash
+    - name: install sushi
+      run: |
+        npm install -g fsh-sushi
+      shell: bash
+    - name: Checkout IG
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ inputs.repo }}
+    - name: Publisher JAR from cache
+      id: publisher-jar-from-cache
+      uses: actions/cache@v4
+      with:
+        path: ig-publisher.jar
+        key: ig-publisher-${{ inputs.ref }}
+    - name: Run Publisher
+      id: run-publisher
+      run: java -jar ig-publisher.jar -ig .
+      shell: bash
+    - name: Upload QA compare artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: qa-${{ env.REPO_KEY }}-${{ inputs.ref }}
+        path: output/qa.compare.txt
