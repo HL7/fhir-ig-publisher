@@ -33,7 +33,8 @@ jobs:
       with:
         path: ig-publisher.jar
         key: ig-publisher-${{matrix.ref}}
-  run-ig-publisher-branch:  
+
+  generate-qa-artifacts:  
     name: Run IG Publisher Branch
     needs: build-ig-publisher-jars
     runs-on: ubuntu-latest
@@ -44,9 +45,10 @@ jobs:
         repo: [ HL7/ig-template-base ]
     steps:
     - name: set repo key
+      # This is a hacky way to generate a repo key without '/' characters, so an artifact 
+      # key can be generated.
       run: |
           ENV_REPO_KEY=${{matrix.repo}}
-          echo $ENV_REPO_KEY
           echo "REPO_KEY=${ENV_REPO_KEY//\//_}" >> $GITHUB_ENV
     - name: check repo key
       run: |
@@ -84,3 +86,25 @@ jobs:
       with: 
         name: qa-${{env.REPO_KEY}}-${{matrix.ref}}
         path: output/qa.compare.txt
+
+  diff-generated-qa-artifacts:  
+    name: Diff generated QA artifacts
+    needs: generate-qa-artifacts
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        repo: [ HL7/ig-template-base ]
+    steps:
+    - name: set repo key
+      # This is a hacky way to generate a repo key without '/' characters, so an artifact 
+      # key can be generated.
+      run: |
+          ENV_REPO_KEY=${{matrix.repo}}
+          echo "REPO_KEY=${ENV_REPO_KEY//\//_}" >> $GITHUB_ENV
+    - name : Download 
+      uses: actions/download-artifact@v4
+      with:
+        name: qa-${{env.REPO_KEY}}-${{ github.sha }}
+        path: qa.compare.branch.txt
+    
