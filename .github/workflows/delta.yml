@@ -63,3 +63,8 @@ jobs:
     - name: Run Publisher
       id: run-publisher
       run: java -jar ig-publisher.jar -ig .
+    - name: Upload QA compare artifact
+      uses: actions/upload-artifact@v2
+      with: 
+        name: qa-branch
+        path: output/qa.compare.txt
