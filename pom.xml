@@ -11,6 +11,7 @@
         <core_version>6.5.20-SNAPSHOT</core_version>
         <maven_surefire_version>3.0.0-M5</maven_surefire_version>
         <apache_poi_version>5.4.1</apache_poi_version>
+        <commons_io_version>2.17.0</commons_io_version>
         <lombok_version>1.18.32</lombok_version>
         <okhttp.version>4.11.0</okhttp.version>
         <junit_jupiter_version>5.7.1</junit_jupiter_version>
@@ -75,6 +76,11 @@
                 <groupId>org.apache.ant</groupId>
                 <artifactId>ant</artifactId>
                 <version>1.10.12</version>
+            </dependency>
+            <dependency>
+                <groupId>commons-io</groupId>
+                <artifactId>commons-io</artifactId>
+                <version>${commons_io_version}</version>
             </dependency>
             <dependency>
                 <groupId>jakarta.xml.bind</groupId>
