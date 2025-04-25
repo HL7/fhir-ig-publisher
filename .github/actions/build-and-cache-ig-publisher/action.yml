@@ -17,14 +17,16 @@ runs:
         distribution: zulu
     - name: Checkout project
       uses: actions/checkout@v4
+      path: ${{ runner.workspace }}/ig-publisher-cli-build
       with:
         repository: HL7/fhir-ig-publisher
         ref: ${{ inputs.ref }}
     - name: Build with Maven
       run: mvn clean install -Dmaven.test.skip=true
       shell: bash
+      working-directory: ${{ runner.workspace }}/ig-publisher-cli-build
     - name: Move JAR to project root
-      run: mv org.hl7.fhir.publisher.cli/target/org.hl7.fhir.publisher.cli-**-SNAPSHOT.jar ig-publisher.jar
+      run: mv ${{ runner.workspace }}/ig-publisher-cli-build/org.hl7.fhir.publisher.cli/target/org.hl7.fhir.publisher.cli-**-SNAPSHOT.jar ig-publisher.jar
       shell: bash
     - name: Cache Publisher JAR
       id: cache-publisher-jar
