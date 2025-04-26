@@ -25,6 +25,7 @@ import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.ChangeAnalysisState;
 import org.hl7.fhir.r5.comparison.VersionComparisonAnnotation;
 import org.hl7.fhir.r5.conformance.profile.BindingResolution;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
+import org.hl7.fhir.r5.conformance.profile.SnapshotGenerationPreProcessor;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.model.CanonicalResource;
@@ -1122,7 +1123,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   public List<ElementDefinition> elementsForMode(int genMode) {
     switch (genMode) {
     case GEN_MODE_DIFF:
-      return sdr.supplementMissingDiffElements(sd);
+      return new SnapshotGenerationPreProcessor(gen.getProfileUtilities()).supplementMissingDiffElements(sd);
     case GEN_MODE_KEY:
       return getKeyElements();
     case GEN_MODE_MS:

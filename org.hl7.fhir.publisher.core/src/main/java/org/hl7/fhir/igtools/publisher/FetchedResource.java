@@ -86,6 +86,7 @@ public class FetchedResource {
   private String resourceDescription;
   private boolean regenAfterValidation;
   private Map<String, AlternativeVersionResource> otherVersions;
+  private boolean umlGenerated;
 
   public FetchedResource(String nameForErrors) {
     super();
@@ -415,6 +416,14 @@ public class FetchedResource {
 
   public boolean hasOtherVersions() {
     return otherVersions != null && !otherVersions.isEmpty();
+  }
+
+  public boolean isUmlGenerated() {
+    return umlGenerated;
+  }
+
+  public void setUmlGenerated(boolean umlGenerated) {
+    this.umlGenerated = umlGenerated;
   }
 
   

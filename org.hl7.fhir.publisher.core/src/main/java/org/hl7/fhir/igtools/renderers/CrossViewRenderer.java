@@ -1755,6 +1755,12 @@ public class CrossViewRenderer extends Renderer {
 
   private void presentActor(XhtmlNode tr, ActorInfo ai, ProfileActorObligationsAnalysis actor, CodeSystem cs) {
     if (actor == null) {
+      for (String code : Utilities.sorted(ai.getCommonObligations())) {
+        tr.td();
+      }
+      if (ai.hasOthers()) {
+        tr.td();
+      }
       return;
     }
     boolean first = true;
@@ -1790,7 +1796,7 @@ public class CrossViewRenderer extends Renderer {
     } else {
       ActorDefinition ad = context.getContext().fetchResource(ActorDefinition.class, a);
       if (ad == null) {
-        tr.th().colspan(ai.colspan()).style(HARD_BORDER).code().tx(a);        
+        tr.th().colspan(ai.colspan()).style(HARD_BORDER).span(null, a).code().tx(tail(a));        
       } else {
         tr.th().colspan(ai.colspan()).style(HARD_BORDER).ah(ad.getWebPath()).tx(ad.present());        
       }
@@ -1811,6 +1817,10 @@ public class CrossViewRenderer extends Renderer {
       }
       td.tx("Others");
     }
+  }
+
+  private String tail(String url) {
+    return url.contains("/") ? url.substring(url.lastIndexOf("/")+1) : url;
   }
 
   private String title(CodeSystem cs, String s) {

@@ -1,7 +1,7 @@
 package org.hl7.fhir.igtools.publisher.loaders;
 
 import java.io.IOException;
-import java.util.List;
+import java.util.Set;
 
 import org.hl7.fhir.convertors.loaders.loaderR5.ILoaderKnowledgeProviderR5;
 import org.hl7.fhir.convertors.loaders.loaderR5.R2016MayToR5Loader;
@@ -14,6 +14,7 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.igtools.publisher.SpecMapManager.SpecialPackageType;
+import org.hl7.fhir.igtools.publisher.SpecialTypeHandler;
 import org.hl7.fhir.r5.context.IContextResourceLoader;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.DomainResource;
@@ -37,11 +38,16 @@ public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProv
 
   public IContextResourceLoader makeLoader() {
     // there's no penalty for listing resources that don't exist, so we just all the relevant possibilities for all versions 
-    List<String> types = Utilities.strings("CodeSystem", "ValueSet", "ConceptMap", "NamingSystem",
+    Set<String> types = Utilities.stringSet("CodeSystem", "ValueSet", "ConceptMap", "NamingSystem",
                                    "StructureDefinition", "StructureMap", 
                                    "SearchParameter", "OperationDefinition", "CapabilityStatement", "Conformance",
                                    "Questionnaire", "ImplementationGuide",
                                    "Measure");
+    if (VersionUtilities.isR4BVer(npm.fhirVersion())) {
+      types.addAll(SpecialTypeHandler.SPECIAL_TYPES_4B);
+    } else {
+      types.addAll(SpecialTypeHandler.SPECIAL_TYPES_OTHER);
+    }
     if (VersionUtilities.isR2Ver(npm.fhirVersion())) {
       return new R2ToR5Loader(types, this);
     } else if (VersionUtilities.isR2BVer(npm.fhirVersion())) {
