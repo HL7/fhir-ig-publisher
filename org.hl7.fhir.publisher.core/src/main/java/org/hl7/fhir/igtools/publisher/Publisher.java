@@ -148,7 +148,7 @@ import org.hl7.fhir.igtools.spreadsheets.MappingSpace;
 import org.hl7.fhir.igtools.spreadsheets.ObservationSummarySpreadsheetGenerator;
 import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.igtools.templates.TemplateManager;
-import org.hl7.fhir.igtools.ui.GraphicalPublisher;
+import org.hl7.fhir.igtools.ui.Launcher;
 import org.hl7.fhir.igtools.web.HistoryPageUpdater;
 import org.hl7.fhir.igtools.web.IGRegistryMaintainer;
 import org.hl7.fhir.igtools.web.IGReleaseVersionDeleter;
@@ -14908,11 +14908,6 @@ private String fixPackageReference(String dep) {
     return configFile;
   }
 
-  private static void runGUI(String[] args) throws InterruptedException, InvocationTargetException {
-
-    GraphicalPublisher.launchUI(args);
-  }
-
   public void setTxServer(String s) {
     if (!Utilities.noString(s))
       txServer = s;
@@ -15036,8 +15031,7 @@ private String fixPackageReference(String dep) {
     
     
     if (CliParams.hasNamedParam(args, "-gui")) {
-      runGUI(args);
-      // Returning here ends the main thread but leaves the GUI running
+      Launcher.main(args);
       return; 
     } else if (CliParams.hasNamedParam(args, "-v")){
       System.out.println(IGVersionUtil.getVersion());
@@ -15927,6 +15921,40 @@ private String fixPackageReference(String dep) {
 
   public void setMilestoneBuild(boolean milestoneBuild) {
     this.milestoneBuild = milestoneBuild;
+  }
+
+  public static void runDirectly(String folderPath, String txServer, boolean noGeneration, boolean noValidation, boolean noNetwork, boolean trackFragmentUsage, boolean clearTermCache, boolean noSushi2, boolean wantDebug, boolean nonConformantTxServers) throws Exception {
+    Publisher self = new Publisher();
+    self.logMessage("FHIR IG Publisher "+IGVersionUtil.getVersionString());
+    self.logMessage("Detected Java version: " + System.getProperty("java.version")+" from "+System.getProperty("java.home")+" on "+System.getProperty("os.name")+"/"+System.getProperty("os.arch")+" ("+System.getProperty("sun.arch.data.model")+"bit). "+toMB(Runtime.getRuntime().maxMemory())+"MB available");
+    self.logMessage("Start Clock @ "+nowAsString(self.execTime)+" ("+nowAsDate(self.execTime)+")");
+    self.logMessage("");
+    if (noValidation) {
+      self.validationOff = noValidation;
+      System.out.println("Running without generation to shorten the run time (editor process only)");
+    }
+    if (noGeneration) {
+      self.generationOff = noGeneration;
+      System.out.println("Running without generation to shorten the run time (editor process only)");
+    }
+    self.setTxServer(txServer);
+    self.setConfigFile(determineActualIG(folderPath, IGBuildMode.MANUAL));
+
+    self.debug = wantDebug;
+
+    if (clearTermCache) {
+      self.setCacheOption(CacheOption.CLEAR_ALL);
+    } else {
+      self.setCacheOption(CacheOption.LEAVE);
+    }
+    if (noSushi2) {
+      self.noSushi = true;
+    }
+    if (nonConformantTxServers) {
+      TerminologyClientContext.setAllowNonConformantServers(true);
+      TerminologyClientContext.setCanAllowNonConformantServers(true);
+    }      
+    self.execute();
   }
 
 }

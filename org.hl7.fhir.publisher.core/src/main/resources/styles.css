@@ -1,0 +1,76 @@
+.root {
+    -fx-font-family: "Segoe UI", Arial, sans-serif;
+    -fx-background-color: #f5f5f5;
+    -fx-font-size: 12px;
+}
+
+.label {
+    -fx-font-weight: bold;
+}
+
+.button {
+    -fx-background-color: #4a6da7;
+    -fx-text-fill: white;
+    -fx-padding: 6px 12px;
+    -fx-cursor: hand;
+    -fx-background-radius: 4px;
+}
+
+.button:hover {
+    -fx-background-color: #3c5a8c;
+}
+
+.run-button {
+    -fx-background-color: #28a745;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-padding: 10px 15px;
+    -fx-font-size: 14px;
+}
+
+.run-button:hover {
+    -fx-background-color: #218838;
+}
+
+.cancel-button {
+    -fx-background-color: #dc3545;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+}
+
+.cancel-button:hover {
+    -fx-background-color: #c82333;
+}
+
+.text-area {
+    -fx-font-family: "Consolas", "Monaco", "Courier New", monospace;
+    -fx-font-size: 12px;
+}
+
+.inactive-log {
+    -fx-control-inner-background: #f8f8f8;
+    -fx-opacity: 0.8;
+}
+
+.active-log {
+    -fx-control-inner-background: white;
+    -fx-opacity: 1.0;
+}
+
+.combo-box {
+    -fx-background-color: white;
+    -fx-border-color: #cccccc;
+    -fx-border-radius: 4px;
+}
+
+.text-field {
+    -fx-background-color: white;
+    -fx-border-color: #cccccc;
+    -fx-border-radius: 4px;
+    -fx-padding: 5px;
+}
+
+.titled-pane > .title {
+    -fx-background-color: #e9ecef;
+    -fx-font-weight: bold;
+}
