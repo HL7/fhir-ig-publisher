@@ -23,10 +23,6 @@ runs:
         ENV_REPO_KEY=${{ inputs.repo }}
         echo "REPO_KEY=${ENV_REPO_KEY//\//_}" >> $GITHUB_ENV
       shell: bash
-    - name: check repo key
-      run: |
-        echo ${{env.REPO_KEY}}
-      shell: bash
     - name: Download actual QA artifact
       uses: actions/download-artifact@v4
       with:
