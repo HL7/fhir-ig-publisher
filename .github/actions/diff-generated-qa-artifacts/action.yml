@@ -26,6 +26,7 @@ runs:
     - name: check repo key
       run: |
         echo ${{env.REPO_KEY}}
+      shell: bash
     - name: Download actual QA artifact
       uses: actions/download-artifact@v4
       with:
@@ -39,3 +40,4 @@ runs:
     - name: Diff QA artifacts
       run: |
         diff -bur qa.compare.actual.txt qa.compare.expected.txt
+      shell: bash
