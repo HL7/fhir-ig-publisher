@@ -26,7 +26,7 @@ jobs:
 
     strategy:
       matrix:
-        ref: [master, "${{ github.sha }}" ]
+        ref: [master, "${{ github.head_ref }}" ]
 
     steps:
       - name: Checkout repository
@@ -46,7 +46,7 @@ jobs:
 
     strategy:
       matrix:
-        ref: [master, "${{ github.sha }}" ]
+        ref: [master, "${{ github.head_ref }}" ]
         repo: ${{ fromJson(needs.load-ig-list.outputs.igs) }}
     steps:
     - name: Checkout repository
@@ -84,6 +84,6 @@ jobs:
         uses: ./.github/actions/diff-generated-qa-artifacts
         with:
           expected-ref: master
-          actual-ref: ${{ github.sha }}
+          actual-ref: ${{ github.head_ref }}
           repo: ${{ matrix.repo }}
     
