@@ -1,4 +1,17 @@
  [
-   "HL7/ig-template-fhir"
+    "HL7/US-Core-R4",
+    "HL7/case-reporting,",
+    "HL7/fhir-ips",
+    "HL7/sdc",
+    "IHE/ITI.MHD",
+    "HL7/ig-template-base",
+    "HL7/ig-template-hl7",
+    "hl7au/au-fhir-base",
+    "HL7/ig-template-fhir",
+    "FHIR/ig-guidance",
+    "FHIR/sample-ig",
+    "FHIR/fhir-tools-ig",
+    "HL7/fhir-extensions",
+    "HL7/CDA-core-sd"
  ]
 
