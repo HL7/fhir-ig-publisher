@@ -92,6 +92,6 @@ jobs:
         uses: ./.github/actions/diff-generated-qa-artifacts
         with:
           expected-ref: master
-          actual-ref: ${{ github.ref }}
+          actual-ref: ${{ github.sha }}
           repo: ${{ matrix.repo }}
     
