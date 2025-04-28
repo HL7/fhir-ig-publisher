@@ -88,7 +88,6 @@ jobs:
         with:
           sparse-checkout: |
            .github
-             - name: Publish IG and create QA artifact
       - name: Diff Generated QA Artifacts
         uses: ./.github/actions/diff-generated-qa-artifacts
         with:
