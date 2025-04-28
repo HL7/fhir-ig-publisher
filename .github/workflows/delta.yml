@@ -28,7 +28,7 @@ jobs:
           # echo "::set-output name=json::$content"
           echo "JSON<<EOF" >> $GITHUB_OUTPUT
           # here we can place the command that will generate multi-line text
-          # content=`cat ./.github/workflows/igs.json`
+          content=`cat ./.github/workflows/igs.json`
           echo ${content} >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
           # echo "json=$content" >> $GITHUB_OUTPUT
