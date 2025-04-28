@@ -2,8 +2,27 @@ on:
   pull_request:
     branches:
       - master
-    
+
 jobs:
+  load-ig-repositories:
+    name: Load IG repositories
+    runs-on: ubuntu-latest
+    outputs:
+      ig-repositories-json: ${{ steps.load-ig-repositories-json.outputs.json }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+         sparse-checkout: |
+          .github
+      - name: Load IG repositories JSON
+        id: load-ig-repositories-json
+        run: |
+          content=`cat ./.github/actions/ig-repositories.json`
+          echo "test=${content}" >> "$GITHUB_OUTPUT"
+        shell: bash
+
   build-ig-publisher-jars:
     name: Build IG Publisher JARs
     runs-on: ubuntu-latest
@@ -25,7 +44,7 @@ jobs:
 
   generate-qa-artifacts:  
     name: Generate QA artifacts
-    needs: build-ig-publisher-jars
+    needs: [load-ig-repositories, build-ig-publisher-jars]
     runs-on: ubuntu-latest
 
     strategy:
@@ -38,6 +57,11 @@ jobs:
       with:
         sparse-checkout: |
           .github
+    - name: test-output
+      run: |
+        echo "test-output"
+        echo "${{ needs.load-ig-repositories.outputs.ig-repositories-json }}"
+        shell: bash
     - name: Publish IG and create QA artifact
       uses: ./.github/actions/publish-ig-and-upload-qa-artifact
       with:
