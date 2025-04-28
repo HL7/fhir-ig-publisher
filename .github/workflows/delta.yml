@@ -25,7 +25,7 @@ jobs:
           # content="${content//$'\n'/'%0A'}"
           # content="${content//$'\r'/'%0D'}"
           # end of optional handling for multi line json
-          echo "::set-output name=ig-repositories-json::$content"
+          echo "::set-output name=json::$content"
         shell: bash
 
   build-ig-publisher-jars:
