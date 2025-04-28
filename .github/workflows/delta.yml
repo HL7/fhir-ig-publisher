@@ -8,7 +8,7 @@ jobs:
     name: Load IG repositories
     runs-on: ubuntu-latest
     outputs:
-      igs: ${{ steps.load-ig-list-json.outputs.json }}
+      igs: ${{ steps.load-ig-list-json.outputs.igs }}
 
     steps:
       - name: Checkout repository
@@ -17,6 +17,7 @@ jobs:
          sparse-checkout: |
           .github
       - name: Load IG repositories JSON
+        id: load-ig-list-json
         uses: ./.github/actions/load-ig-list-json
 
   build-ig-publisher-jars:
