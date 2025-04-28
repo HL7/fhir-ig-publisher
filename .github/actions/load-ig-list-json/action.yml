@@ -6,7 +6,9 @@ inputs:
     required: false
     default: "./.github/workflows/igs.json"
 outputs:
-  igs: ${{ steps.load-ig-list-json.outputs.json }}
+  igs:
+    description: "A JSON array containing the IGs"
+    value: ${{ steps.load-ig-list-json.outputs.json }}
 
 runs:
   using: "composite"
