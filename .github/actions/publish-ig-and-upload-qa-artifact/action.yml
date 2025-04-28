@@ -8,6 +8,10 @@ inputs:
   repo:
     description: "The GitHub repo for the IG"
     required: true
+  memory:
+    description: "The Java Memory (-Xmx) for running the IG Publisher"
+    required: false
+    default: "10G"
 
 runs:
   using: "composite"
@@ -50,7 +54,7 @@ runs:
         key: ig-publisher-${{ inputs.ref }}
     - name: Run Publisher
       id: run-publisher
-      run: java -jar ig-publisher.jar -ig ${{ github.workspace }}/ig
+      run: java -Xmx${{ inputs.memory }} -jar ig-publisher.jar -ig ${{ github.workspace }}/ig
       shell: bash
     - name: Upload QA compare artifact
       uses: actions/upload-artifact@v4
