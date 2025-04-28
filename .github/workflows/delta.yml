@@ -81,25 +81,18 @@ jobs:
       matrix:
         repo: ${{ fromJson(needs.load-ig-list.outputs.ig-repositories-json) }}
       fail-fast: false
+
     steps:
-    - name: set repo key
-      # This is a hacky way to generate a repo key without '/' characters, so an artifact 
-      # key can be generated.
-      run: |
-          ENV_REPO_KEY=${{matrix.repo}}
-          echo "REPO_KEY=${ENV_REPO_KEY//\//_}" >> $GITHUB_ENV
-    - name : Download branch QA artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: qa-${{env.REPO_KEY}}-${{ github.sha }}
-        path: qa.compare.branch.txt
-    - name : Download master QA artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: qa-${{env.REPO_KEY}}-master
-        path: qa.compare.master.txt
-    - name: Diff QA artifacts
-      run: |
-        diff -bur qa.compare.master.txt qa.compare.branch.txt
-    
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+           .github
+             - name: Publish IG and create QA artifact
+      - name: Diff Generated QA Artifacts
+        uses: ./.github/actions/diff-generated-qa-artifacts
+        with:
+          expected-ref: master
+          actual-ref: ${{ github.ref }}
+          repo: ${{ matrix.repo }}
     
