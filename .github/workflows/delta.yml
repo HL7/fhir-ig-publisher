@@ -66,7 +66,7 @@ jobs:
       run: |
         echo "test-output"
         echo "${{ needs.load-ig-repositories.outputs.ig-repositories-json }}"
-        shell: bash
+      shell: bash
     - name: Publish IG and create QA artifact
       uses: ./.github/actions/publish-ig-and-upload-qa-artifact
       with:
