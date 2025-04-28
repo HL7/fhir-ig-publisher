@@ -1,6 +1,6 @@
  [
     "HL7/US-Core-R4",
-    "HL7/case-reporting,",
+    "HL7/case-reporting",
     "HL7/fhir-ips",
     "HL7/sdc",
     "IHE/ITI.MHD",
