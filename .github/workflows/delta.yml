@@ -19,19 +19,12 @@ jobs:
       - name: Load IG repositories JSON
         id: load-ig-list-json
         run: |
-          # content=`cat ./.github/workflows/igs.json`
-          # the following lines are only required for multi line json
-          #content="${content//'%'/'%25'}"
-          #content="${content//$'\n'/'%0A'}"
-          #content="${content//$'\r'/'%0D'}"
-          # end of optional handling for multi line json
-          # echo "::set-output name=json::$content"
+          # the following lines are required for loading multi line json
           echo "JSON<<EOF" >> $GITHUB_OUTPUT
-          # here we can place the command that will generate multi-line text
+          # here we can place the command that will generate multi-line json
           content=`cat ./.github/workflows/igs.json`
           echo ${content} >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-          # echo "json=$content" >> $GITHUB_OUTPUT
         shell: bash
 
   build-ig-publisher-jars:
