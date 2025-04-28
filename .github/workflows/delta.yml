@@ -4,11 +4,11 @@ on:
       - master
 
 jobs:
-  load-ig-repositories:
+  load-ig-list:
     name: Load IG repositories
     runs-on: ubuntu-latest
     outputs:
-      ig-repositories-json: ${{ steps.load-ig-repositories-json.outputs.json }}
+      ig-repositories-json: ${{ steps.load-ig-list-json.outputs.json }}
 
     steps:
       - name: Checkout repository
@@ -17,7 +17,7 @@ jobs:
          sparse-checkout: |
           .github
       - name: Load IG repositories JSON
-        id: load-ig-repositories-json
+        id: load-ig-list-json
         run: |
           content=`cat ./.github/workflows/ig-repositories.json`
           # the following lines are only required for multi line json
@@ -49,13 +49,13 @@ jobs:
 
   generate-qa-artifacts:  
     name: Generate QA artifacts
-    needs: [load-ig-repositories, build-ig-publisher-jars]
+    needs: [load-ig-list, build-ig-publisher-jars]
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
         ref: [master, "${{ github.sha }}" ]
-        repo: ${{ fromJson(needs.load-ig-repositories.outputs.ig-repositories-json) }}
+        repo: ${{ fromJson(needs.load-ig-list.outputs.ig-repositories-json) }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -65,7 +65,7 @@ jobs:
     - name: test-output
       run: |
         echo "test-output"
-        echo "${{ needs.load-ig-repositories.outputs.ig-repositories-json }}"
+        echo "${{ needs.load-ig-list.outputs.ig-repositories-json }}"
       shell: bash
     - name: Publish IG and create QA artifact
       uses: ./.github/actions/publish-ig-and-upload-qa-artifact
@@ -79,7 +79,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        repo: ${{ fromJson(needs.load-ig-repositories.outputs.ig-repositories-json) }}
+        repo: ${{ fromJson(needs.load-ig-list.outputs.ig-repositories-json) }}
       fail-fast: false
     steps:
     - name: set repo key
