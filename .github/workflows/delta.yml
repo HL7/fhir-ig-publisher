@@ -55,7 +55,6 @@ jobs:
     strategy:
       matrix:
         ref: [master, "${{ github.sha }}" ]
-        #repo: [ HL7/ig-template-base, FHIR/ig-guidance ]
         repo: ${{ fromJson(needs.load-ig-repositories.outputs.ig-repositories-json) }}
     steps:
     - name: Checkout repository
@@ -80,7 +79,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        repo: [ HL7/ig-template-base, FHIR/ig-guidance ]
+        repo: ${{ fromJson(needs.load-ig-repositories.outputs.ig-repositories-json) }}
       fail-fast: false
     steps:
     - name: set repo key
