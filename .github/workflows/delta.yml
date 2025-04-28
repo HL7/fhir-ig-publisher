@@ -19,7 +19,7 @@ jobs:
       - name: Load IG repositories JSON
         id: load-ig-repositories-json
         run: |
-          content=`cat ./.github/actions/ig-repositories.json`
+          content=`cat ./.github/workflows/ig-repositories.json`
           echo "test=${content}" >> "$GITHUB_OUTPUT"
         shell: bash
 
