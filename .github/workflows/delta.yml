@@ -75,7 +75,7 @@ jobs:
 
   diff-generated-qa-artifacts:  
     name: Diff generated QA artifacts
-    needs: generate-qa-artifacts
+    needs: [load-ig-list, generate-qa-artifacts]
     runs-on: ubuntu-latest
     strategy:
       matrix:
