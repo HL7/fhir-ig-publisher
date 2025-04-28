@@ -1,1 +1,5 @@
-{ "repositories": [ "HL7/ig-template-base", "FHIR/ig-guidance"] }
+ [
+    "HL7/ig-template-base",
+    "FHIR/ig-guidance"
+ ]
+
