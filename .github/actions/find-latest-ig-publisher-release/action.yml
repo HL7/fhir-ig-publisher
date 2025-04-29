@@ -1,0 +1,22 @@
+name: "Find latest IG publisher release"
+description: "Finds the tag of the latest IG publisher release"
+outputs:
+  ref:
+    description: "The tag for the latest release"
+    value: ${{ steps.set-latest-release-tag.outputs.tag }}
+
+runs:
+  using: "composite"
+  steps:
+      - name: Export LATEST_TAG
+        run: |
+          echo "LATEST_TAG=$(curl -qsSL \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "${{ github.api_url }}/repos/${{ github.repository }}/releases/latest" \
+          | jq -r .tag_name)" >> $GITHUB_ENV
+
+      - name: set
+        id:  set-latest-release-tag
+        run: echo "tag=${{ env.LATEST_TAG }} >> "$GITHUB_OUTPUT"

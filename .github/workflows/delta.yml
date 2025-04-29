@@ -6,6 +6,22 @@ on:
       - master
 
 jobs:
+
+  find-latest-release-ref:
+    name: Find latest IG publisher release ref
+    runs-on: ubuntu-latest
+    outputs:
+      ref: ${{ steps.find-latest-release-ref.ref }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github
+      - name: Find latest IG publisher release
+        id: find-latest-release-ref
+        uses: ./.github/actions/find-latest-ig-publisher-release
+
   load-ig-list:
     name: Load IG repositories
     runs-on: ubuntu-latest
@@ -22,28 +38,14 @@ jobs:
         id: load-ig-list-json
         uses: ./.github/actions/load-ig-list-json
 
-  find-current-release-tag:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Export LATEST_TAG
-      run: |
-        echo "LATEST_TAG=$(curl -qsSL \
-          -H "Accept: application/vnd.github+json" \
-          -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-          -H "X-GitHub-Api-Version: 2022-11-28" \
-          "${{ github.api_url }}/repos/${{ github.repository }}/releases/latest" \
-        | jq -r .tag_name)" >> $GITHUB_ENV
-
-    - name: Do something when the current tag is the latest tag
-      run: echo ${{ env.LATEST_TAG }}
-
   build-ig-publisher-jars:
     name: Build IG Publisher JARs
     runs-on: ubuntu-latest
+    needs: [ find-latest-release-ref ]
 
     strategy:
       matrix:
-        ref: [master, "${{ github.head_ref }}" ]
+        ref: [master, "${{ needs.find-latest-release-ref.outputs.ref }}" ]
 
     steps:
       - name: Checkout repository
@@ -58,12 +60,12 @@ jobs:
 
   generate-and-cache-qa:  
     name: Generate and cache QA
-    needs: [load-ig-list, build-ig-publisher-jars]
+    needs: [find-latest-release-ref, load-ig-list, build-ig-publisher-jars]
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        ref: [master, "${{ github.head_ref }}" ]
+        ref: [master, "${{ needs.find-latest-release-ref.outputs.ref }}" ]
         repo: ${{ fromJson(needs.load-ig-list.outputs.igs) }}
     steps:
     - name: Checkout repository
@@ -79,7 +81,7 @@ jobs:
 
   diff-cached-qa:  
     name: Verify QA is the same
-    needs: [load-ig-list, generate-and-cache-qa]
+    needs: [ find-latest-release-ref, load-ig-list, generate-and-cache-qa]
     runs-on: ubuntu-latest
     continue-on-error: true
     strategy:
@@ -96,8 +98,8 @@ jobs:
       - name: Verify QA is the same
         uses: ./.github/actions/diff-cached-qa
         with:
-          expected-ref: master
-          actual-ref: ${{ github.head_ref }}
+          expected-ref: ${{ needs.find-latest-release-ref.outputs.ref }}
+          actual-ref: master
           repo: ${{ matrix.repo }}
 
   upload-all-igs-artifact:
