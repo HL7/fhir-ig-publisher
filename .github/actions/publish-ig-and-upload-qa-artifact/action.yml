@@ -69,8 +69,9 @@ runs:
       run: |
         echo "TARGET_DIRECTORY=${{ github.workspace }}/${{ inputs.ig }}" >> $GITHUB_ENV
       shell: bash
+    # Sparse checkout the IG from this repo and checkout the contents of the .github directory so workflows can be
+    # completed
     - name: Sparse Checkout IG from this repo
-      description: "Sparse checkout the IG from this repo and checkout the contents of the .github directory so workflows can be completed"
       if: inputs.source-type == 'local'
       uses: actions/checkout@v4
       with:
