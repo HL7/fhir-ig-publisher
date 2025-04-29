@@ -1,5 +1,9 @@
 name: "Find latest IG publisher release"
 description: "Finds the tag of the latest IG publisher release"
+inputs:
+  github-token:
+    description: "A valid github token for accessing the GitHub API"
+    required: true
 outputs:
   ref:
     description: "The tag for the latest release"
@@ -12,7 +16,7 @@ runs:
         run: |
           echo "LATEST_TAG=$(curl -qsSL \
             -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Authorization: Bearer ${{ inputs.github-token }}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "${{ github.api_url }}/repos/${{ github.repository }}/releases/latest" \
           | jq -r .tag_name)" >> $GITHUB_ENV

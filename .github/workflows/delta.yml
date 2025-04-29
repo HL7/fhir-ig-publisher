@@ -21,6 +21,8 @@ jobs:
       - name: Find latest IG publisher release
         id: find-latest-release-ref
         uses: ./.github/actions/find-latest-ig-publisher-release
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
   load-ig-list:
     name: Load IG repositories
