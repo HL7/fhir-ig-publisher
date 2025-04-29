@@ -1,7 +1,5 @@
 name: QA Delta
-
-on:
-  workflow_dispatch:
+on: workflow_dispatch
 
 jobs:
 
