@@ -11,7 +11,7 @@ jobs:
     name: Find latest IG publisher release ref
     runs-on: ubuntu-latest
     outputs:
-      ref: ${{ steps.find-latest-release-ref.ref }}
+      ref: ${{ steps.find-latest-release-ref.outputs.ref }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
