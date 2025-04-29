@@ -24,15 +24,15 @@ runs:
         echo "REPO_KEY=${ENV_REPO_KEY//\//_}" >> $GITHUB_ENV
       shell: bash
     - name: Download actual QA artifact
-      uses: actions/download-artifact@v4
+      uses: actions/cache@v4
       with:
-        name: ${{env.REPO_KEY}}-${{ inputs.actual-ref }}-qa
-        path: qa.compare.actual.txt
+        key: ${{ env.REPO_KEY }}-${{ inputs.actual-ref }}-${{github.run_id}}
+        path: ${{ github.workspace }}/qa.compare.${{ inputs.actual-ref }}.txt
     - name: Download expected QA artifact
-      uses: actions/download-artifact@v4
+      uses: actions/cache@v4
       with:
-        name: ${{env.REPO_KEY}}-${{ inputs.expected-ref}}-qa
-        path: qa.compare.expected.txt
+        key: ${{ env.REPO_KEY }}-${{ inputs.expected-ref }}-${{github.run_id}}
+        path: ${{ github.workspace }}/qa.compare.${{ inputs.expected-ref }}.txt
     - name: ls debug
       # FIXME remove this debug step
       run: |
@@ -41,9 +41,9 @@ runs:
     - name: cat debug
         # FIXME remove this debug step
       run: |
-        cat qa.compare.actual.txt
+        cat ${{ github.workspace }}/qa.compare.${{ inputs.expected-ref }}.txt
       shell: bash
     - name: Diff QA artifacts
       run: |
-        diff -bur qa.compare.actual.txt qa.compare.expected.txt
+        diff -bur ${{ github.workspace }}/qa.compare.${{ inputs.expected-ref }}.txt ${{ github.workspace }}/qa.compare.${{ inputs.actual-ref }}.txt
       shell: bash

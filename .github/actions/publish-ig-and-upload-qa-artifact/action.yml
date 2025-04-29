@@ -99,8 +99,8 @@ runs:
     - name: Move JAR to project root
       run: mv ${{ env.TARGET_DIRECTORY }}/output/qa.compare.txt ${{ github.workspace }}/qa.compare.${{ inputs.ref }}.txt
       shell: bash
-    - name: Upload QA compare artifact
-      uses: actions/upload-artifact@v4
+    - name: Cache QA compare
+      uses: actions/cache@v4
       with:
-        name: ${{ env.REPO_KEY }}-${{ inputs.ref }}-qa
+        key: ${{ env.REPO_KEY }}-${{ inputs.ref }}-${{github.run_id}}
         path: ${{ github.workspace }}/qa.compare.${{ inputs.ref }}.txt
