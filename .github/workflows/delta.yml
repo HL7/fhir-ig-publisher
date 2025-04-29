@@ -39,8 +39,8 @@ jobs:
         with:
           ref: ${{ matrix.ref }}
 
-  generate-qa-artifacts:  
-    name: Generate QA artifacts
+  generate-and-cache-qa:  
+    name: Generate and cache QA
     needs: [load-ig-list, build-ig-publisher-jars]
     runs-on: ubuntu-latest
 
@@ -55,14 +55,14 @@ jobs:
         sparse-checkout: |
           .github
     - name: Publish IG and create QA artifact
-      uses: ./.github/actions/publish-ig-and-upload-qa-artifact
+      uses: ./.github/actions/publish-ig-and-cache-qa
       with:
         ref: ${{ matrix.ref }}
         ig: ${{ matrix.repo }}
 
-  diff-generated-qa-artifacts:  
-    name: Diff generated QA artifacts
-    needs: [load-ig-list, generate-qa-artifacts]
+  diff-cached-qa:  
+    name: Diff generated QA
+    needs: [load-ig-list, generate-and-cache-qa]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -76,7 +76,7 @@ jobs:
           sparse-checkout: |
            .github
       - name: Diff Generated QA Artifacts
-        uses: ./.github/actions/diff-generated-qa-artifacts
+        uses: ./.github/actions/diff-cached-qa
         with:
           expected-ref: master
           actual-ref: ${{ github.head_ref }}

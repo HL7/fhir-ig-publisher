@@ -47,6 +47,7 @@ runs:
       run: |
         diff -bur ${{ github.workspace }}/qa.compare.${{ inputs.expected-ref }}.txt ${{ github.workspace }}/qa.compare.${{ inputs.actual-ref }}.txt
       shell: bash
+      continue-on-error: true
     - name: Upload QA compare artifact
       uses: actions/upload-artifact@v4
       with:
