@@ -63,7 +63,7 @@ jobs:
       uses: ./.github/actions/publish-ig-and-upload-qa-artifact
       with:
         ref: ${{ matrix.ref }}
-        repo: ${{ matrix.repo }}
+        ig: ${{ matrix.repo }}
 
   diff-generated-qa-artifacts:  
     name: Diff generated QA artifacts

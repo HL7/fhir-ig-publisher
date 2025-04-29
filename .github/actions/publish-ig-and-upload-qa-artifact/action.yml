@@ -5,9 +5,16 @@ inputs:
     description: "The GitHub ref for the IG publisher JAR"
     required: false
     default: "master"
-  repo:
-    description: "The GitHub repo for the IG"
+  ig:
+    description: "The IG. This can be a local directory rooted in the current repository, or a GitHub repository."
     required: true
+  source-type:
+    type: choice
+    description: "The type of source for the IG. This can "
+    options:
+      - local
+      - github
+    default: github
   memory:
     description: "The Java Memory (-Xmx) for running the IG Publisher"
     required: false
@@ -21,7 +28,7 @@ runs:
       # This is a hacky way to generate a repo key without '/' characters, so an artifact
       # key can be generated.
       run: |
-        ENV_REPO_KEY=${{ inputs.repo }}
+        ENV_REPO_KEY=${{ inputs.ig }}
         echo "REPO_KEY=${ENV_REPO_KEY//\//_}" >> $GITHUB_ENV
       shell: bash
     - name: Set up JDK 11
@@ -41,11 +48,34 @@ runs:
       run: |
         npm install -g fsh-sushi
       shell: bash
+
+    # If this is a GitHub repo, set the target directory to /ig and checkout the repo there.
+    - name: set target directory
+      if: inputs.source-type == 'github'
+      run: |
+        echo "TARGET_DIRECTORY=${{ github.workspace }}/ig" >> $GITHUB_ENV
+      shell: bash
     - name: Checkout IG
+      if: inputs.source-type == 'github'
       uses: actions/checkout@v4
       with:
-        repository: ${{ inputs.repo }}
-        path: ${{ github.workspace }}/ig
+        repository: ${{ inputs.ig }}
+        path: ${{ env.TARGET_DIRECTORY }}
+
+    # If this is a local repo, set the target directory to its location in the root of this workspace.
+    - name: set target directory
+      if: inputs.source-type == 'local'
+      run: |
+        echo "TARGET_DIRECTORY=${{ github.workspace }}/${{ inputs.ig }}" >> $GITHUB_ENV
+      shell: bash
+
+    # FIXME: Echo the target directory to the output for debugging
+    - name: set target directory
+      if: inputs.source-type == 'local'
+      run: |
+        echo ${{ env.TARGET_DIRECTORY }}
+      shell: bash
+
     - name: Publisher JAR from cache
       id: publisher-jar-from-cache
       uses: actions/cache@v4
@@ -54,10 +84,10 @@ runs:
         key: ig-publisher-${{ inputs.ref }}
     - name: Run Publisher
       id: run-publisher
-      run: java -Xmx${{ inputs.memory }} -jar ig-publisher.jar -ig ${{ github.workspace }}/ig
+      run: java -Xmx${{ inputs.memory }} -jar ig-publisher.jar -ig ${{ env.TARGET_DIRECTORY }}
       shell: bash
     - name: Upload QA compare artifact
       uses: actions/upload-artifact@v4
       with:
         name: qa-${{ env.REPO_KEY }}-${{ inputs.ref }}
-        path: ${{ github.workspace }}/ig/output/qa.compare.txt
+        path: ${{ env.TARGET_DIRECTORY }}/output/qa.compare.txt

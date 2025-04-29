@@ -26,7 +26,7 @@ runs:
     - name: Download actual QA artifact
       uses: actions/download-artifact@v4
       with:
-        name: qa-${{env.REPO_KEY}}-${{ inputs.actual-ref}}
+        name: qa-${{env.REPO_KEY}}-${{ inputs.actual-ref }}
         path: qa.compare.actual.txt
     - name: Download expected QA artifact
       uses: actions/download-artifact@v4
