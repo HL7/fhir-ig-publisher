@@ -99,5 +99,5 @@ runs:
     - name: Upload QA compare artifact
       uses: actions/upload-artifact@v4
       with:
-        name: qa-${{ env.REPO_KEY }}-${{ inputs.ref }}
+        name: ${{ env.REPO_KEY }}-${{ inputs.ref }}-qa
         path: ${{ env.TARGET_DIRECTORY }}/output/qa.compare.txt
