@@ -61,7 +61,7 @@ jobs:
         ig: ${{ matrix.repo }}
 
   diff-cached-qa:  
-    name: Diff generated QA
+    name: Verify QA is the same
     needs: [load-ig-list, generate-and-cache-qa]
     runs-on: ubuntu-latest
     strategy:
@@ -75,7 +75,7 @@ jobs:
         with:
           sparse-checkout: |
            .github
-      - name: Diff Generated QA Artifacts
+      - name: Verify QA is the same
         uses: ./.github/actions/diff-cached-qa
         with:
           expected-ref: master
