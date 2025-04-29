@@ -83,4 +83,12 @@ jobs:
           expected-ref: master
           actual-ref: ${{ github.head_ref }}
           repo: ${{ matrix.repo }}
-    
+
+  upload-all-igs-artifact:
+    name: Upload all QA artifacts as a single all-IGs artifact
+    needs: [ diff-cached-qa ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+      - name: Display structure of downloaded files
+        run: ls -R
