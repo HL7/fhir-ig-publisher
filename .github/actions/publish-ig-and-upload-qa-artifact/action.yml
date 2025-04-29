@@ -55,19 +55,28 @@ runs:
       run: |
         echo "TARGET_DIRECTORY=${{ github.workspace }}/ig" >> $GITHUB_ENV
       shell: bash
-    - name: Checkout IG
+    - name: Checkout IG from a GitHub repo
       if: inputs.source-type == 'github'
       uses: actions/checkout@v4
       with:
         repository: ${{ inputs.ig }}
         path: ${{ env.TARGET_DIRECTORY }}
 
-    # If this is a local repo, set the target directory to its location in the root of this workspace.
+    # If this is a local repo, set the target directory to its location in the root of this workspace and do a sparse
+    # checkout of its contents.
     - name: set target directory
       if: inputs.source-type == 'local'
       run: |
         echo "TARGET_DIRECTORY=${{ github.workspace }}/${{ inputs.ig }}" >> $GITHUB_ENV
       shell: bash
+    - name: Sparse Checkout IG from this repo
+      description: "Sparse checkout the IG from this repo and checkout the contents of the .github directory so workflows can be completed"
+      if: inputs.source-type == 'local'
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: |
+          .github
+          ${{ inputs.ig }}
 
     # FIXME: Echo the target directory to the output for debugging
     - name: echo target directory
