@@ -23,12 +23,12 @@ runs:
         ENV_REPO_KEY=${{ inputs.repo }}
         echo "REPO_KEY=${ENV_REPO_KEY//\//_}" >> $GITHUB_ENV
       shell: bash
-    - name: Download actual QA artifact
+    - name: Load actual QA artifact from cache
       uses: actions/cache@v4
       with:
         key: ${{ env.REPO_KEY }}-${{ inputs.actual-ref }}-${{github.run_id}}
         path: ${{ github.workspace }}/qa.compare.${{ inputs.actual-ref }}.txt
-    - name: Download expected QA artifact
+    - name: Load expected QA artifact from cache
       uses: actions/cache@v4
       with:
         key: ${{ env.REPO_KEY }}-${{ inputs.expected-ref }}-${{github.run_id}}
@@ -43,7 +43,14 @@ runs:
       run: |
         cat ${{ github.workspace }}/qa.compare.${{ inputs.expected-ref }}.txt
       shell: bash
-    - name: Diff QA artifacts
+    - name: Diff QA
       run: |
         diff -bur ${{ github.workspace }}/qa.compare.${{ inputs.expected-ref }}.txt ${{ github.workspace }}/qa.compare.${{ inputs.actual-ref }}.txt
       shell: bash
+    - name: Upload QA compare artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.REPO_KEY }}
+        path: |
+          ${{ github.workspace }}/qa.compare.${{ inputs.expected-ref }}.txt
+          ${{ github.workspace }}/qa.compare.${{ inputs.actual-ref }}.txt
