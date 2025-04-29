@@ -20,7 +20,8 @@ runs:
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "${{ github.api_url }}/repos/${{ github.repository }}/releases/latest" \
           | jq -r .tag_name)" >> $GITHUB_ENV
-
+        shell: bash
       - name: set
         id:  set-latest-release-tag
         run: echo "tag=${{ env.LATEST_TAG }} >> "$GITHUB_OUTPUT"
+        shell: bash
