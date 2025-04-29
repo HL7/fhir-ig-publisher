@@ -23,6 +23,7 @@ jobs:
         uses: ./.github/actions/load-ig-list-json
 
   find-current-release-tag:
+    runs-on: ubuntu-latest
     steps:
     - name: Export LATEST_TAG
       run: |
