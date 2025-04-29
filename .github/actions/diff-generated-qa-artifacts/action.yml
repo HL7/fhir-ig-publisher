@@ -33,6 +33,16 @@ runs:
       with:
         name: ${{env.REPO_KEY}}-${{ inputs.expected-ref}}-qa
         path: qa.compare.expected.txt
+    - name: ls debug
+      # FIXME remove this debug step
+      run: |
+        ls -al
+      shell: bash
+    - name: cat debug
+        # FIXME remove this debug step
+      run: |
+        cat qa.compare.actual.txt
+      shell: bash
     - name: Diff QA artifacts
       run: |
         diff -bur qa.compare.actual.txt qa.compare.expected.txt
