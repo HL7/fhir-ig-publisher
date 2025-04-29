@@ -25,8 +25,14 @@ runs:
       run: mvn clean install -Dmaven.test.skip=true
       shell: bash
       working-directory: ${{ github.workspace }}/ig-publisher-cli-build
+    - name: Delete sources jar
+      run: rm ${{ github.workspace }}/ig-publisher-cli-build/org.hl7.fhir.publisher.cli/target/org.hl7.fhir.publisher.cli-**-sources.jar
+      shell: bash
+    - name: Delete javadoc jar
+      run: rm ${{ github.workspace }}/ig-publisher-cli-build/org.hl7.fhir.publisher.cli/target/org.hl7.fhir.publisher.cli-**-javadoc.jar
+      shell: bash
     - name: Move JAR to project root
-      run: mv ${{ github.workspace }}/ig-publisher-cli-build/org.hl7.fhir.publisher.cli/target/org.hl7.fhir.publisher.cli-**-SNAPSHOT.jar ig-publisher.jar
+      run: mv ${{ github.workspace }}/ig-publisher-cli-build/org.hl7.fhir.publisher.cli/target/org.hl7.fhir.publisher.cli-**.jar ig-publisher.jar
       shell: bash
     - name: Cache Publisher JAR
       id: cache-publisher-jar
