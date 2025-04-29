@@ -54,11 +54,6 @@ jobs:
       with:
         sparse-checkout: |
           .github
-    - name: test-output
-      run: |
-        echo "test-output"
-        echo "${{ needs.load-ig-list.outputs.igs }}"
-      shell: bash
     - name: Publish IG and create QA artifact
       uses: ./.github/actions/publish-ig-and-upload-qa-artifact
       with:

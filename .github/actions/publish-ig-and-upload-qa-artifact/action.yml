@@ -70,7 +70,7 @@ runs:
       shell: bash
 
     # FIXME: Echo the target directory to the output for debugging
-    - name: set target directory
+    - name: echo target directory
       if: inputs.source-type == 'local'
       run: |
         echo ${{ env.TARGET_DIRECTORY }}
