@@ -22,6 +22,20 @@ jobs:
         id: load-ig-list-json
         uses: ./.github/actions/load-ig-list-json
 
+  find-current-release-tag:
+    steps:
+    - name: Export LATEST_TAG
+      run: |
+        echo "LATEST_TAG=$(curl -qsSL \
+          -H "Accept: application/vnd.github+json" \
+          -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          "${{ github.api_url }}/repos/${{ github.repository }}/releases/latest" \
+        | jq -r .tag_name)" >> $GITHUB_ENV
+
+    - name: Do something when the current tag is the latest tag
+      run: echo ${{ env.LATEST_TAG }}
+
   build-ig-publisher-jars:
     name: Build IG Publisher JARs
     runs-on: ubuntu-latest
