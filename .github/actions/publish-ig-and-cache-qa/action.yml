@@ -1,4 +1,4 @@
-name: "Publish IG and upload QA artifact"
+name: "Publish IG and cache QA"
 description: "Publishes an IG from a GitHub repo using a cached IG publisher JAR and uploads the QA artifact"
 inputs:
   ref:
