@@ -96,8 +96,11 @@ runs:
       id: run-publisher
       run: java -Xmx${{ inputs.memory }} -jar ig-publisher.jar -ig ${{ env.TARGET_DIRECTORY }}
       shell: bash
+    - name: Move JAR to project root
+      run: mv ${{ env.TARGET_DIRECTORY }}/output/qa.compare.txt qa.compare.${{ inputs.ref }}.txt
+      shell: bash
     - name: Upload QA compare artifact
       uses: actions/upload-artifact@v4
       with:
         name: ${{ env.REPO_KEY }}-${{ inputs.ref }}-qa
-        path: ${{ env.TARGET_DIRECTORY }}/output/qa.compare.txt
+        path: qa.compare.${{ inputs.ref }}.txt
