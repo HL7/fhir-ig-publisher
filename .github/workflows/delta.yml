@@ -66,7 +66,7 @@ jobs:
     name: Verify QA is the same
     needs: [load-ig-list, generate-and-cache-qa]
     runs-on: ubuntu-latest
-    allow-failure: true
+    continue-on-error: true
     strategy:
       matrix:
         repo: ${{ fromJson(needs.load-ig-list.outputs.igs) }}
