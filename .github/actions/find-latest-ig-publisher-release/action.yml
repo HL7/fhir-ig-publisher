@@ -23,5 +23,5 @@ runs:
         shell: bash
       - name: set
         id:  set-latest-release-tag
-        run: echo "tag=${{ env.LATEST_TAG }} >> "$GITHUB_OUTPUT"
+        run: echo "tag=${{ env.LATEST_TAG }}" >> "$GITHUB_OUTPUT"
         shell: bash
