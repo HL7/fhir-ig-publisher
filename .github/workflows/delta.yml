@@ -1,3 +1,5 @@
+name: QA Delta
+
 on:
   pull_request:
     branches:
