@@ -1287,7 +1287,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
   }
 
-  private Object pinSummary() {
+  private String pinSummary() {
     switch (pinningPolicy) {
     case FIX: return ""+pinCount+" (all)";
     case NO_CHANGE: return "n/a";
@@ -8863,7 +8863,7 @@ private String fixPackageReference(String dep) {
       List<ValidationMessage> linkmsgs = generationOff ? new ArrayList<ValidationMessage>() : inspector.check(statusMessage);
       int bl = 0;
       int lf = 0;
-      for (ValidationMessage m : ValidationPresenter.filterMessages(linkmsgs, true, suppressedMessages)) {
+      for (ValidationMessage m : ValidationPresenter.filterMessages(null, linkmsgs, true, suppressedMessages)) {
         if (m.getLevel() == IssueSeverity.ERROR) {
           if (m.getType() == IssueType.NOTFOUND) {
             bl++;
