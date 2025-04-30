@@ -1,8 +1,12 @@
 name: QA Delta
 on:
-  pull_request:
-    branches:
-      - master
+  workflow_dispatch:
+    inputs:
+      actual-ref:
+        description: 'Commit SHA'
+        required: false
+        default: 'master'
+        type: string
 
 jobs:
   find-latest-release-ref:
@@ -45,7 +49,7 @@ jobs:
 
     strategy:
       matrix:
-        ref: [master, "${{ needs.find-latest-release-ref.outputs.ref }}" ]
+        ref: ["${{ inputs.actual-ref }}", "${{ needs.find-latest-release-ref.outputs.ref }}" ]
 
     steps:
       - name: Checkout repository
@@ -65,7 +69,7 @@ jobs:
 
     strategy:
       matrix:
-        ref: [master, "${{ needs.find-latest-release-ref.outputs.ref }}" ]
+        ref: ["${{ inputs.actual-ref }}", "${{ needs.find-latest-release-ref.outputs.ref }}" ]
         repo: ${{ fromJson(needs.load-ig-list.outputs.igs) }}
     steps:
     - name: Checkout repository
@@ -99,7 +103,7 @@ jobs:
         uses: ./.github/actions/diff-cached-qa
         with:
           expected-ref: ${{ needs.find-latest-release-ref.outputs.ref }}
-          actual-ref: master
+          actual-ref: "${{ inputs.actual-ref }}"
           repo: ${{ matrix.repo }}
 
   upload-all-igs-artifact:
@@ -115,5 +119,5 @@ jobs:
       - uses: ./.github/actions/upload-all-igs-artifact
         with:
           expected-ref: ${{ needs.find-latest-release-ref.outputs.ref }}
-          actual-ref: master
+          actual-ref: "${{ inputs.actual-ref }}"
 
