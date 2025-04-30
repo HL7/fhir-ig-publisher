@@ -5,7 +5,6 @@ on:
       - master
 
 jobs:
-
   find-latest-release-ref:
     name: Find latest IG publisher release ref
     runs-on: ubuntu-latest
@@ -108,11 +107,9 @@ jobs:
     needs: [ diff-cached-qa ]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
-      - name: Display structure of downloaded files
-        run: ls -R
-      - uses: actions/upload-artifact@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          name: all-igs
-          path: ${{ github.workspace }}
-
+          sparse-checkout: |
+            .github
+      - uses: ./.github/actions/upload-all-igs-artifact

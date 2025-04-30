@@ -1,0 +1,13 @@
+name: "Upload all IGs artifact"
+description: "Loads all IG QA artifacts and uploads them as an an artifact structured for directory diffing"
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/download-artifact@v4
+    - name: Display structure of downloaded files
+      run: ls -R
+    - uses: actions/upload-artifact@v4
+      with:
+        name: all-igs
+        path: ${{ github.workspace }}
