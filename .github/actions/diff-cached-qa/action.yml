@@ -4,7 +4,6 @@ inputs:
   expected-ref:
     description: "The GitHub ref for the IG publisher JAR with expected results"
     required: true
-    default: "master"
   actual-ref:
     description: "The GitHub ref for the IG publisher JAR with expected results"
     required: true

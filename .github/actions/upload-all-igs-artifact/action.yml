@@ -1,5 +1,12 @@
 name: "Upload all IGs artifact"
 description: "Loads all IG QA artifacts and uploads them as an an artifact structured for directory diffing"
+inputs:
+  expected-ref:
+    description: "The GitHub ref for the IG publisher JAR with expected results"
+    required: true
+  actual-ref:
+    description: "The GitHub ref for the IG publisher JAR with expected results"
+    required: true
 
 runs:
   using: "composite"
@@ -7,8 +14,23 @@ runs:
     - uses: actions/download-artifact@v4
       with:
         path: ${{ github.workspace }}/artifacts
+    #FIXME remove this debug step
     - name: Display structure of downloaded files
       run: ls -R ./artifacts
+      shell: bash
+    - name: Restructure all IGs for directory diff
+      run: |
+        mkdir -p ./all-igs/${{ inputs.expected-ref }}
+        mkdir -p ./all-igs/${{ inputs.actual-ref }}
+        for d in ./artifacts/*; do
+         IG_NAME=$(basename $d)
+         echo $IG_NAME
+         cp $d/qa.compare.${{ inputs.actual-ref }}.txt ./all-igs/${{ inputs.actual-ref }}/$IG_NAME.qa.compare.txt
+         cp $d/qa.compare.${{ inputs.expected-ref }}.txt ./all-igs/${{ inputs.expected-ref }}/$IG_NAME.qa.compare.txt
+        done
+    #FIXME remove this debug step
+    - name: Display structure of all-igs
+      run: ls -R ./all-igs
       shell: bash
     - uses: actions/upload-artifact@v4
       with:

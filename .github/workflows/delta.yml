@@ -113,3 +113,6 @@ jobs:
           sparse-checkout: |
             .github
       - uses: ./.github/actions/upload-all-igs-artifact
+        with:
+          expected-ref: ${{ needs.find-latest-release-ref.outputs.ref }}
+          actual-ref: master
