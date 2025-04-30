@@ -32,16 +32,6 @@ runs:
       with:
         key: ${{ env.REPO_KEY }}-${{ inputs.expected-ref }}-${{github.run_id}}
         path: ${{ github.workspace }}/qa.compare.${{ inputs.expected-ref }}.txt
-    - name: ls debug
-      # FIXME remove this debug step
-      run: |
-        ls -al
-      shell: bash
-    - name: cat debug
-        # FIXME remove this debug step
-      run: |
-        cat ${{ github.workspace }}/qa.compare.${{ inputs.expected-ref }}.txt
-      shell: bash
     - name: Upload QA compare artifact
       uses: actions/upload-artifact@v4
       with:

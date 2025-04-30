@@ -14,7 +14,6 @@ runs:
     - uses: actions/download-artifact@v4
       with:
         path: ${{ github.workspace }}/artifacts
-    #FIXME remove this debug step
     - name: Restructure all IGs for directory diff
       run: |
         mkdir -p ./all-igs/${{ inputs.expected-ref }}
@@ -25,10 +24,6 @@ runs:
          cp $d/qa.compare.${{ inputs.actual-ref }}.txt ./all-igs/${{ inputs.actual-ref }}/$IG_NAME.qa.compare.txt
          cp $d/qa.compare.${{ inputs.expected-ref }}.txt ./all-igs/${{ inputs.expected-ref }}/$IG_NAME.qa.compare.txt
         done
-      shell: bash
-    #FIXME remove this debug step
-    - name: Display structure of all-igs
-      run: ls -R ./all-igs
       shell: bash
     - uses: actions/upload-artifact@v4
       with:

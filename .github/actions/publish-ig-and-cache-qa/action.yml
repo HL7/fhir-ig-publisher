@@ -78,14 +78,6 @@ runs:
         sparse-checkout: |
           .github
           ${{ inputs.ig }}
-
-    # FIXME: Echo the target directory to the output for debugging
-    - name: echo target directory
-      if: inputs.source-type == 'local'
-      run: |
-        echo ${{ env.TARGET_DIRECTORY }}
-      shell: bash
-
     - name: Publisher JAR from cache
       id: publisher-jar-from-cache
       uses: actions/cache@v4
