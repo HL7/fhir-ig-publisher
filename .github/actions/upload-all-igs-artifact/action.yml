@@ -15,9 +15,6 @@ runs:
       with:
         path: ${{ github.workspace }}/artifacts
     #FIXME remove this debug step
-    - name: Display structure of downloaded files
-      run: ls -R ./artifacts
-      shell: bash
     - name: Restructure all IGs for directory diff
       run: |
         mkdir -p ./all-igs/${{ inputs.expected-ref }}
@@ -36,4 +33,4 @@ runs:
     - uses: actions/upload-artifact@v4
       with:
         name: all-igs
-        path: ${{ github.workspace }}
+        path: ${{ github.workspace }}/all-igs
