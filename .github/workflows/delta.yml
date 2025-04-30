@@ -116,3 +116,4 @@ jobs:
         with:
           expected-ref: ${{ needs.find-latest-release-ref.outputs.ref }}
           actual-ref: master
+
