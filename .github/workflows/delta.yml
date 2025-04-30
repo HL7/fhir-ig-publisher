@@ -104,7 +104,7 @@ jobs:
 
   upload-all-igs-artifact:
     name: Upload all QA artifacts as a single all-IGs artifact
-    needs: [ diff-cached-qa ]
+    needs: [ find-latest-release-ref, diff-cached-qa ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
