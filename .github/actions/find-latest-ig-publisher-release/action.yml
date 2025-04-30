@@ -18,7 +18,7 @@ runs:
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ inputs.github-token }}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            "${{ github.api_url }}/repos/${{ github.repository }}/releases/latest" \
+            "${{ github.api_url }}/repos/HL7/fhir-ig-publisher/releases/latest" \
           | jq -r .tag_name)" >> $GITHUB_ENV
         shell: bash
       - name: set
