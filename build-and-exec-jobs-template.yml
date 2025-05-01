@@ -16,9 +16,9 @@ jobs:
         steps:
 
           - task: UseRubyVersion@0
-            condition: ne( variables['Agent.OS'], 'Windows_NT' )
+            # condition: ne( variables['Agent.OS'], 'Windows_NT' )
             inputs:
-              versionSpec: '>= 3.0'
+              versionSpec: '>= 3.3'
 
           - script : |
               ridk enable
