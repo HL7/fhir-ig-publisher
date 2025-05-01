@@ -1,0 +1,26 @@
+name: "Load IG List"
+description: "Loads a JSON file containing a list of IGs. IGs can be directories in the current repository or other GitHub repositories."
+inputs:
+  path:
+    description: "The path to the JSON file containing the list of IGs"
+    required: false
+    default: "./.github/workflows/igs.json"
+outputs:
+  igs:
+    description: "A JSON array containing the IGs"
+    value: ${{ steps.load-ig-list-json.outputs.json }}
+
+runs:
+  using: "composite"
+
+  steps:
+    - name: Load IG repositories JSON
+      id: load-ig-list-json
+      run: |
+        # the following lines are required for loading multi line json
+        echo "JSON<<EOF" >> $GITHUB_OUTPUT
+        # here we can place the command that will generate multi-line json
+        content=`cat ./.github/workflows/igs.json`
+        echo ${content} >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+      shell: bash

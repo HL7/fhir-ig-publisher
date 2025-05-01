@@ -1,0 +1,42 @@
+name: "Build IG Publisher and cache JAR"
+description: "Builds the IG publisher from a particular GitHub ref (branch name, tag, or commit hash)"
+inputs:
+  ref:
+    description: "The GitHub ref to build the IG publisher from"
+    required: false
+    default: "master"
+
+runs:
+  using: "composite"
+
+  steps:
+    - name: Set up JDK 11
+      uses: actions/setup-java@v3
+      with:
+        java-version: 11
+        distribution: zulu
+    - name: Checkout project
+      uses: actions/checkout@v4
+      with:
+        repository: HL7/fhir-ig-publisher
+        ref: ${{ inputs.ref }}
+        path: ${{ github.workspace }}/ig-publisher-cli-build
+    - name: Build with Maven
+      run: mvn clean install -Dmaven.test.skip=true
+      shell: bash
+      working-directory: ${{ github.workspace }}/ig-publisher-cli-build
+    - name: Delete sources jar
+      run: rm ${{ github.workspace }}/ig-publisher-cli-build/org.hl7.fhir.publisher.cli/target/org.hl7.fhir.publisher.cli-**-sources.jar
+      shell: bash
+    - name: Delete javadoc jar
+      run: rm ${{ github.workspace }}/ig-publisher-cli-build/org.hl7.fhir.publisher.cli/target/org.hl7.fhir.publisher.cli-**-javadoc.jar
+      shell: bash
+    - name: Move JAR to project root
+      run: mv ${{ github.workspace }}/ig-publisher-cli-build/org.hl7.fhir.publisher.cli/target/org.hl7.fhir.publisher.cli-**.jar ig-publisher.jar
+      shell: bash
+    - name: Cache Publisher JAR
+      id: cache-publisher-jar
+      uses: actions/cache@v4
+      with:
+        path: ig-publisher.jar
+        key: ig-publisher-${{ inputs.ref }}
