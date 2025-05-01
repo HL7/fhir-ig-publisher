@@ -23,7 +23,7 @@ jobs:
           - script : |
               winget install -e --id RubyInstallerTeam.RubyWithDevKit
             condition: eq( variables['Agent.OS'], 'Windows_NT' )
-            displayName: 'ridk for ruby install'
+            displayName: 'winget for ruby install'
 
           - script: |
               gem install jekyll bundler
