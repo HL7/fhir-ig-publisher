@@ -16,11 +16,12 @@ jobs:
         steps:
 
           - task: UseRubyVersion@0
+            condition: ne( variables['Agent.OS'], 'Windows_NT' )
             inputs:
               versionSpec: '>= 3.0'
 
           - script : |
-              ridk install 3
+              winget install -e --id RubyInstallerTeam.RubyWithDevKit
             condition: eq( variables['Agent.OS'], 'Windows_NT' )
             displayName: 'ridk for ruby install'
 
