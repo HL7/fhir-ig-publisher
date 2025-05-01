@@ -21,7 +21,7 @@ jobs:
               versionSpec: '>= 3.0'
 
           - script : |
-              winget install -e --id RubyInstallerTeam.RubyWithDevKit
+              ridk install 3
             condition: eq( variables['Agent.OS'], 'Windows_NT' )
             displayName: 'ridk for ruby install'
 
