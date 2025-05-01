@@ -22,15 +22,16 @@ jobs:
 
           - script : |
               ridk enable
-              ridk install 3.3
+              ridk install 3
             condition: eq( variables['Agent.OS'], 'Windows_NT' )
             displayName: 'winget for ruby install'
 
           - script: |
-              gem install jekyll bundler
+              gem install bundler
               bundle init
               bundle update --bundler
               bundle install --retry=3 --jobs=4
+              gem install jekyll
             displayName: 'jekyll install'
 
           - script: |
