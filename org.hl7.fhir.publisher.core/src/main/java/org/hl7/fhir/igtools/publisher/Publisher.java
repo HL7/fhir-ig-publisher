@@ -4367,7 +4367,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     SpecMapManager spm = loadSpecDetails(FileUtilities.streamToBytes(pi.load("other", "spec.internals")), "basespec", pi, specPath);
     SimpleWorkerContext sp;
     IContextResourceLoader loader = new PublisherLoader(pi, spm, specPath, igpkp).makeLoader();
-    sp = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(vsCache).fromPackage(pi, loader, false);
+    sp = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(vsCache).withLocale(new Locale("en")).fromPackage(pi, loader, false);
     sp.loadBinariesFromFolder(pi);
     sp.setForPublication(true);
     if (!version.equals(Constants.VERSION)) {
