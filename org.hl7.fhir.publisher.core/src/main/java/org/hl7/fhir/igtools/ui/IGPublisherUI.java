@@ -35,6 +35,27 @@ public class IGPublisherUI extends Application {
     private static final String PREF_OPT_DEBUG = "optDebug";
     private static final String PREF_OPT_ALLOW_NONCONF_TX = "optAllowNonConformantTx";
     
+    // Command line parameter names
+    private static final String CMD_TERM_SERVER = "-tx";
+    private static final String CMD_NO_NARRATIVE = "-noNarrative";
+    private static final String CMD_NARRATIVE = "-narrative";
+    private static final String CMD_NO_VALIDATION = "-noValidation";
+    private static final String CMD_VALIDATION = "-validation";
+    private static final String CMD_NO_NETWORK = "-noNetwork";
+    private static final String CMD_NETWORK = "-network";
+    private static final String CMD_TRACK_FRAGMENT = "-trackFragments";
+    private static final String CMD_NO_TRACK_FRAGMENT = "-noTrackFragments";
+    private static final String CMD_CLEAR_TERM_CACHE = "-clearTxCache";
+    private static final String CMD_NO_CLEAR_TERM_CACHE = "-noClearTxCache";
+    private static final String CMD_NO_SUSHI = "-noSushi";
+    private static final String CMD_SUSHI = "-sushi";
+    private static final String CMD_DEBUG = "-debug";
+    private static final String CMD_NO_DEBUG = "-noDebug";
+    private static final String CMD_ALLOW_NONCONF_TX = "-allowNonConformantTx";
+    private static final String CMD_NO_ALLOW_NONCONF_TX = "-noAllowNonConformantTx";
+    private static final String CMD_AUTO_RUN = "-autoRun";
+    private static final String CMD_HELP = "-help";
+    
     // Max number of recent folders to remember
     private static final int MAX_RECENT_FOLDERS = 10;
     
@@ -63,6 +84,7 @@ public class IGPublisherUI extends Application {
     private ExecutorService executorService;
     private String[] cmdArgs;
     private boolean wasCanceled;
+    private boolean autoRun = false;
 
     public static void main(String[] args) {
         launch(args);
@@ -189,16 +211,144 @@ public class IGPublisherUI extends Application {
             executorService.shutdown();
         });
         
+        // Process command line arguments before showing the window
+        processCommandLineArgs();
+        
         primaryStage.show();
         
-        // Check if a folder parameter was provided
-        if (cmdArgs.length > 0) {
-            File folder = new File(cmdArgs[0]);
-            if (folder.isDirectory()) {
-                folderComboBox.setValue(folder.getAbsolutePath());
-                Platform.runLater(this::runIGPublisher);
+        // Auto-run if specified
+        if (autoRun) {
+            Platform.runLater(this::runIGPublisher);
+        }
+    }
+
+    /**
+     * Process command line arguments to override saved preferences
+     */
+    private void processCommandLineArgs() {
+        if (cmdArgs.length == 0) {
+            return;
+        }
+        
+        String folderPath = null;
+        
+        // First check for help parameter
+        for (String arg : cmdArgs) {
+            if (CMD_HELP.equals(arg)) {
+                showHelp();
+                // Exit after showing help
+                System.exit(0);
             }
         }
+        
+        // Process parameters
+        for (int i = 0; i < cmdArgs.length; i++) {
+            String arg = cmdArgs[i];
+            
+            // First parameter without a dash is assumed to be the folder path
+            if (!arg.startsWith("-") && folderPath == null) {
+                folderPath = arg;
+                continue;
+            }
+            
+            // Process known parameters
+            switch (arg) {
+                case CMD_TERM_SERVER:
+                    if (i + 1 < cmdArgs.length && !cmdArgs[i + 1].startsWith("-")) {
+                        terminologyServerField.setText(cmdArgs[i + 1]);
+                        i++; // Skip the next argument as it's the value
+                    }
+                    break;
+                case CMD_NO_NARRATIVE:
+                    noNarrativeCheckBox.setSelected(true);
+                    break;
+                case CMD_NARRATIVE:
+                    noNarrativeCheckBox.setSelected(false);
+                    break;
+                case CMD_NO_VALIDATION:
+                    noValidationCheckBox.setSelected(true);
+                    break;
+                case CMD_VALIDATION:
+                    noValidationCheckBox.setSelected(false);
+                    break;
+                case CMD_NO_NETWORK:
+                    noNetworkCheckBox.setSelected(true);
+                    break;
+                case CMD_NETWORK:
+                    noNetworkCheckBox.setSelected(false);
+                    break;
+                case CMD_TRACK_FRAGMENT:
+                    trackFragmentCheckBox.setSelected(true);
+                    break;
+                case CMD_NO_TRACK_FRAGMENT:
+                    trackFragmentCheckBox.setSelected(false);
+                    break;
+                case CMD_CLEAR_TERM_CACHE:
+                    clearTermCacheCheckBox.setSelected(true);
+                    break;
+                case CMD_NO_CLEAR_TERM_CACHE:
+                    clearTermCacheCheckBox.setSelected(false);
+                    break;
+                case CMD_NO_SUSHI:
+                    noSushiCheckBox.setSelected(true);
+                    break;
+                case CMD_SUSHI:
+                    noSushiCheckBox.setSelected(false);
+                    break;
+                case CMD_DEBUG:
+                    debugCheckBox.setSelected(true);
+                    break;
+                case CMD_NO_DEBUG:
+                    debugCheckBox.setSelected(false);
+                    break;
+                case CMD_ALLOW_NONCONF_TX:
+                    allowNonConformantTxCheckBox.setSelected(true);
+                    break;
+                case CMD_NO_ALLOW_NONCONF_TX:
+                    allowNonConformantTxCheckBox.setSelected(false);
+                    break;
+                case CMD_AUTO_RUN:
+                    autoRun = true;
+                    break;
+            }
+        }
+        
+        // Set folder if provided
+        if (folderPath != null) {
+            File folder = new File(folderPath);
+            if (folder.isDirectory()) {
+                folderComboBox.setValue(folderPath);
+            }
+        }
+    }
+
+    /**
+     * Display command line help information
+     */
+    private void showHelp() {
+        System.out.println("IG Publisher UI Command Line Parameters");
+        System.out.println("=======================================");
+        System.out.println();
+        System.out.println("Usage: java -jar igpublisher-ui.jar [folder] [options]");
+        System.out.println();
+        System.out.println("Parameters:");
+        System.out.println("  [folder]                      IG folder path");
+        System.out.println("  -tx <server-url>              Set terminology server URL");
+        System.out.println("  -noNarrative | -narrative     Enable/disable narrative generation");
+        System.out.println("  -noValidation | -validation   Enable/disable validation");
+        System.out.println("  -noNetwork | -network         Enable/disable network access");
+        System.out.println("  -trackFragments | -noTrackFragments  Enable/disable fragment tracking");
+        System.out.println("  -clearTxCache | -noClearTxCache     Clear/keep terminology cache");
+        System.out.println("  -noSushi | -sushi             Disable/enable SUSHI");
+        System.out.println("  -debug | -noDebug             Enable/disable debug mode");
+        System.out.println("  -allowNonConformantTx | -noAllowNonConformantTx");
+        System.out.println("                                Allow/disallow non-conformant terminology servers");
+        System.out.println("  -autoRun                      Automatically run the publisher after starting");
+        System.out.println("  -help                         Display this help message");
+        System.out.println();
+        System.out.println("Examples:");
+        System.out.println("  java -jar igpublisher-ui.jar C:\\path\\to\\ig -noValidation -tx http://tx.fhir.org/r4");
+        System.out.println("  java -jar igpublisher-ui.jar -noSushi -autoRun");
     }
 
     private TitledPane createOptionsPane() {
