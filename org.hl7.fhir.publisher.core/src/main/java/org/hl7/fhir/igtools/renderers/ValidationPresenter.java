@@ -476,10 +476,9 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     return list;
   }
   
-  public String generate(String title, List<ValidationMessage> allErrors, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, Object pinned) throws IOException {
-    
+  public String generate(String title, List<ValidationMessage> allErrors, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, String pinned) throws IOException {
     for (FetchedFile f : files) {
-      for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages)) {
+      for (ValidationMessage vm : filterMessages(f, f.getErrors(), false, filteredMessages)) {
         if (vm.getLevel().equals(ValidationMessage.IssueSeverity.FATAL)||vm.getLevel().equals(ValidationMessage.IssueSeverity.ERROR))
           err++;
         else if (vm.getLevel().equals(ValidationMessage.IssueSeverity.WARNING))
@@ -490,7 +489,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       }
     }
     
-    List<ValidationMessage> linkErrors = filterMessages(allErrors, true, filteredMessages); 
+    List<ValidationMessage> linkErrors = filterMessages(null, allErrors, true, filteredMessages); 
     for (ValidationMessage vm : linkErrors) {
       if (vm.getSource() == Source.LinkChecker) {
         link++;
@@ -525,7 +524,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
         oo = new OperationOutcome();
         validationBundle.addEntry(new BundleEntryComponent().setResource(oo));
         ToolingExtensions.addStringExtension(oo, ToolingExtensions.EXT_OO_FILE, f.getName());
-        for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages)) {
+        for (ValidationMessage vm : filterMessages(f, f.getErrors(), false, filteredMessages)) {
           oo.getIssue().add(OperationOutcomeUtilities.convertToIssue(vm, oo));
         }
       }
@@ -762,7 +761,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     }
 
     for (FetchedFile f : files) {
-      for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages)) {
+      for (ValidationMessage vm : filterMessages(f, f.getErrors(), false, filteredMessages)) {
         String eslintSeverity = vm.getLevel().getDisplay();
         if (eslintSeverity.equals("Information"))
           eslintSeverity = "Info";
@@ -804,7 +803,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     b.append(genEndTxt());
     for (FetchedFile f : files) {
       b.append(genStartTxt(f));
-      for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages))
+      for (ValidationMessage vm : filterMessages(f, f.getErrors(), false, filteredMessages))
         b.append(vm.getDisplay() + "\r\n");
       b.append(genEndTxt());
     }    
@@ -827,7 +826,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     b.append(genEndTxt());
     for (FetchedFile f : files) {
       b.append(genStartTxt(f));
-      for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages))
+      for (ValidationMessage vm : filterMessages(f, f.getErrors(), false, filteredMessages))
         b.append(vm.getDisplay() + "\r\n");
       b.append(genEndTxt());
     }    
@@ -839,7 +838,9 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     StringBuilder b = new StringBuilder();
     b.append(genHeader(title, err, warn, info, link, filteredMessages.count(), allIssues, path, pinned));
     b.append(genSummaryRowInteral(linkErrors));
+
     files = sorted(files);
+
     for (FetchedFile f : files) {
       if (allIssues || hasIssues(f, filteredMessages)) {
         b.append(genSummaryRow(f, filteredMessages));
@@ -857,6 +858,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       id++;
     }
     b.append(genEnd());
+
     int i = 0;
     for (FetchedFile f : files) {
       if (allIssues || hasIssues(f, filteredMessages)) {
@@ -866,13 +868,14 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
           b.append(startTemplateErrors);
         else
           b.append(startTemplateNoErrors);
-        for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages)) {
+        for (ValidationMessage vm : filterMessages(f, f.getErrors(), false, filteredMessages)) {
           b.append(genDetails(vm, id));
           id++;
         }
         b.append(genEnd());
       }
     }    
+
     b.append(genSuppressedMessages(filteredMessages));
     b.append("<a name=\"sorted\"> </a>\r\n<p><b>Errors sorted by type</b></p>\r\n");
     for (String n : messageIdNames()) {
@@ -896,7 +899,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
 
 
   private boolean countNonSignpostMessages(FetchedFile f, SuppressedMessageInformation filteredMessages) {
-    List<ValidationMessage> uniqueErrors = filterMessages(f.getErrors(), false, filteredMessages);
+    List<ValidationMessage> uniqueErrors = filterMessages(f, f.getErrors(), false, filteredMessages);
     for (ValidationMessage vm : uniqueErrors) {
       if (!vm.isSignpost()) {
         return true;
@@ -906,7 +909,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   }
 
   private boolean hasIssues(FetchedFile f, SuppressedMessageInformation filteredMessages) {
-    List<ValidationMessage> uniqueErrors = filterMessages(f.getErrors(), false, filteredMessages);
+    List<ValidationMessage> uniqueErrors = filterMessages(f, f.getErrors(), false, filteredMessages);
     for (ValidationMessage vm : uniqueErrors) {
       if (vm.getLevel() != IssueSeverity.INFORMATION) {
         return true;
@@ -916,7 +919,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   }
 
   private void getMatchingMessages(FetchedFile f, String n, List<FiledValidationMessage> fvml, SuppressedMessageInformation filteredMessages) {
-    for (ValidationMessage vm : filterMessages(f.getErrors(), false, filteredMessages)) {
+    for (ValidationMessage vm : filterMessages(f, f.getErrors(), false, filteredMessages)) {
       if (n.equals(vm.getMessageId()) && !vm.isSignpost()) {
         fvml.add(new FiledValidationMessage(f, vm));
       }
@@ -980,7 +983,10 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   }
 
 
-  public static List<ValidationMessage> filterMessages(List<ValidationMessage> messages, boolean canSuppressErrors, SuppressedMessageInformation suppressedMessages) {
+  public static List<ValidationMessage> filterMessages(FetchedFile f, List<ValidationMessage> messages, boolean canSuppressErrors, SuppressedMessageInformation suppressedMessages) {
+    if (f != null && f.getFilteredMessages() != null) {
+      return f.getFilteredMessages();
+    }
     List<ValidationMessage> passList = new ArrayList<ValidationMessage>();
     Set<String> msgs = new HashSet<>();
     for (ValidationMessage message : messages) {
@@ -1014,6 +1020,9 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
         msgs.add(message.getLocation()+"|"+message.getMessage());        
       } else {
       }
+    }
+    if (f != null) {
+      f.setFilteredMessages(passList);
     }
     return passList;
   }
@@ -1542,7 +1551,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   private String genSummaryRow(FetchedFile f, SuppressedMessageInformation filteredMessages) {
     ST t = template(summaryTemplate);
     t.add("link", makelink(f));
-    List<ValidationMessage> uniqueErrors = filterMessages(f.getErrors(), false, filteredMessages);
+    List<ValidationMessage> uniqueErrors = filterMessages(f, f.getErrors(), false, filteredMessages);
     
     t.add("filename", f.getName());
     String ec = errCount(uniqueErrors);

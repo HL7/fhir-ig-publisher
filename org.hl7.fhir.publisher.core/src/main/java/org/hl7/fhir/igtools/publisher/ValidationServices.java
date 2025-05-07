@@ -324,9 +324,9 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
         nsFailHasFailed  = true;
       }
     }
-    
+
+    String base = url.contains("#") ? url.substring(0, url.indexOf("#")) : url;
     for (SpecMapManager sp : specMaps) {
-      String base = url.contains("#") ? url.substring(0, url.indexOf("#")) : url;
       if (sp.hasTarget(base)) {
         return true;
       }
@@ -397,6 +397,9 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   private boolean hasURL(NamingSystem ns, String url) {
     for (NamingSystemUniqueIdComponent uid : ns.getUniqueId()) {
       if (uid.getType() == NamingSystemIdentifierType.URI && uid.hasValue() && uid.getValue().equals(url)) {
+        return true;
+      }
+      if (uid.getType() == NamingSystemIdentifierType.OID && uid.hasValue() && ("urn:oid:"+uid.getValue()).equals(url)) {
         return true;
       }
     }

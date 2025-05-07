@@ -76,6 +76,7 @@ public class FetchedFile {
   private String logical;
   private List<ProcessingReport> processes = new ArrayList<>();
   private boolean loaded;
+  private List<ValidationMessage> filteredMessages;
   
   public FetchedFile(String statedPath) {
     super();
@@ -154,6 +155,12 @@ public class FetchedFile {
   }
   public List<ValidationMessage> getErrors() {
     return errors;
+  }
+  public List<ValidationMessage> getFilteredMessages() {
+    return filteredMessages;
+  }
+  public void setFilteredMessages(List<ValidationMessage> filteredMessages) {
+    this.filteredMessages = filteredMessages;
   }
   public FetchedResource getBundle() {
     return bundle;

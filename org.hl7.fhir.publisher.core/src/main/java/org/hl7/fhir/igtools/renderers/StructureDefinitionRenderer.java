@@ -82,6 +82,7 @@ import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.StandardsStatus;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.i18n.RenderingI18nContext;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
@@ -294,7 +295,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   private String extensionSummary() {
     if (ProfileUtilities.isSimpleExtension(sd)) {
       ElementDefinition value = sd.getSnapshot().getElementByPath("Extension.value");      
-      return "<p>Simple Extension of type "+value.typeSummary()+": "+Utilities.stripPara(processMarkdown("ext-desc", sd.getDescriptionElement()))+"</p>";
+      return "<p>"+
+          gen.formatPhrase(RenderingI18nContext.SDR_EXTENSION_SUMMARY, value.typeSummary(), Utilities.stripPara(processMarkdown("ext-desc", sd.getDescriptionElement())))+
+          "</p>";
     } else {
       List<ElementDefinition> subs = new ArrayList<>();
       ElementDefinition slice = null;
