@@ -12,6 +12,7 @@ import java.util.concurrent.Executors;
 import java.util.prefs.Preferences;
 
 import org.hl7.fhir.igtools.publisher.Publisher;
+import org.hl7.fhir.utilities.settings.FhirSettings;
 
 public class IGPublisherUI extends JFrame {
     // Preferences keys
@@ -598,7 +599,7 @@ public class IGPublisherUI extends JFrame {
                 // Call the Publisher directly
                 Publisher.runDirectly(
                     folderPath,
-                    termServer.isEmpty() ? null : termServer,
+                    termServer.isEmpty() ? FhirSettings.getTxFhirProduction() : termServer,
                     noNarrative,
                     noValidation,
                     noNetwork,
