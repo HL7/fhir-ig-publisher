@@ -1,20 +1,11 @@
 package org.hl7.fhir.igtools.ui;
 
-import javafx.application.Application;
-import javafx.application.Platform;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
-import javafx.geometry.Insets;
-import javafx.scene.Scene;
-import javafx.scene.control.*;
-import javafx.scene.layout.*;
-import javafx.stage.DirectoryChooser;
-import javafx.stage.Stage;
+import javax.swing.*;
+import javax.swing.border.*;
+import java.awt.*;
+import java.awt.event.*;
 import java.io.*;
-import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
+import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -22,7 +13,7 @@ import java.util.prefs.Preferences;
 
 import org.hl7.fhir.igtools.publisher.Publisher;
 
-public class IGPublisherUI extends Application {
+public class IGPublisherUI extends JFrame {
     // Preferences keys
     private static final String PREF_RECENT_FOLDERS = "recentFolders";
     private static final String PREF_TERMINOLOGY_SERVER = "terminologyServer";
@@ -60,22 +51,22 @@ public class IGPublisherUI extends Application {
     private static final int MAX_RECENT_FOLDERS = 10;
     
     // UI Components
-    private ComboBox<String> folderComboBox;
-    private TextField terminologyServerField;
-    private CheckBox noNarrativeCheckBox;
-    private CheckBox noValidationCheckBox;
-    private CheckBox noNetworkCheckBox;
-    private CheckBox trackFragmentCheckBox;
-    private CheckBox clearTermCacheCheckBox;
-    private CheckBox noSushiCheckBox;
-    private CheckBox debugCheckBox;
-    private CheckBox allowNonConformantTxCheckBox;
-    private TextArea logTextArea;
-    private Button runButton;
-    private Button cancelButton;
-    private Button copyLogButton;
-    private Button clearLogButton;
-    private Button saveLogButton;
+    private JComboBox<String> folderComboBox;
+    private JTextField terminologyServerField;
+    private JCheckBox noNarrativeCheckBox;
+    private JCheckBox noValidationCheckBox;
+    private JCheckBox noNetworkCheckBox;
+    private JCheckBox trackFragmentCheckBox;
+    private JCheckBox clearTermCacheCheckBox;
+    private JCheckBox noSushiCheckBox;
+    private JCheckBox debugCheckBox;
+    private JCheckBox allowNonConformantTxCheckBox;
+    private JTextArea logTextArea;
+    private JButton runButton;
+    private JButton cancelButton;
+    private JButton copyLogButton;
+    private JButton clearLogButton;
+    private JButton saveLogButton;
     
     // Other fields
     private Preferences prefs;
@@ -87,141 +78,211 @@ public class IGPublisherUI extends Application {
     private boolean autoRun = false;
 
     public static void main(String[] args) {
-        launch(args);
+        SwingUtilities.invokeLater(() -> {
+            IGPublisherUI ui = new IGPublisherUI(args);
+            ui.setVisible(true);
+        });
     }
 
-    @Override
-    public void init() {
+    public IGPublisherUI(String[] args) {
+        // Initialize fields
         prefs = Preferences.userNodeForPackage(IGPublisherUI.class);
         executorService = Executors.newFixedThreadPool(2);
-        cmdArgs = getParameters().getRaw().toArray(new String[0]);
-    }
-
-    @Override
-    public void start(Stage primaryStage) {
-        primaryStage.setTitle("IG Publisher UI");
-        primaryStage.setMinWidth(800);
-        primaryStage.setMinHeight(700);
+        cmdArgs = args;
         
-        // Create the UI components
-        VBox mainLayout = new VBox(10);
-        mainLayout.setPadding(new Insets(15));
-        mainLayout.setFillWidth(true);
-        VBox.setVgrow(mainLayout, Priority.ALWAYS);
+        // Set up the frame
+        setTitle("IG Publisher UI");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setMinimumSize(new Dimension(800, 700));
         
-        // Folder selection
-        HBox folderBox = new HBox(10);
-        folderBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-        folderBox.setFillHeight(true);
-        Label folderLabel = new Label("IG Folder:");
-        folderLabel.setMinWidth(120);
+        // Create the main panel with a vertical layout
+        JPanel mainPanel = new JPanel();
+        mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
         
-        folderComboBox = new ComboBox<>();
-        folderComboBox.setEditable(true);
-        HBox.setHgrow(folderComboBox, Priority.ALWAYS);
-        folderComboBox.setMaxWidth(Double.MAX_VALUE);
-        loadRecentFolders();
+        // Create and add components
+        mainPanel.add(createFolderPanel());
+        mainPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+        mainPanel.add(createTerminologyServerPanel());
+        mainPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+        mainPanel.add(createOptionsPanel());
+        mainPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+        mainPanel.add(createRunButtonsPanel());
+        mainPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+        mainPanel.add(createLogPanel());
         
-        Button chooseFolderButton = new Button("Browse...");
-        chooseFolderButton.setOnAction(e -> chooseFolder(primaryStage));
+        // Add the main panel to the frame
+        setContentPane(mainPanel);
         
-        folderBox.getChildren().addAll(folderLabel, folderComboBox, chooseFolderButton);
-        
-        // Terminology server
-        HBox termServerBox = new HBox(10);
-        termServerBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-        Label termServerLabel = new Label("Terminology Server:");
-        termServerLabel.setMinWidth(120);
-        
-        terminologyServerField = new TextField();
-        HBox.setHgrow(terminologyServerField, Priority.ALWAYS);
-        terminologyServerField.setMaxWidth(Double.MAX_VALUE);
-        terminologyServerField.setText(prefs.get(PREF_TERMINOLOGY_SERVER, ""));
-        
-        termServerBox.getChildren().addAll(termServerLabel, terminologyServerField);
-        
-        // Options checkboxes
-        TitledPane optionsPane = createOptionsPane();
-        
-        // Run and Cancel buttons
-        HBox runButtonsBox = new HBox(10);
-        runButtonsBox.setAlignment(javafx.geometry.Pos.CENTER_RIGHT);
-        
-        runButton = new Button("Run IG Publisher");
-        runButton.setPrefWidth(180);
-        runButton.getStyleClass().add("run-button");
-        runButton.setOnAction(e -> runIGPublisher());
-        
-        cancelButton = new Button("Cancel");
-        cancelButton.setPrefWidth(100);
-        cancelButton.getStyleClass().add("cancel-button");
-        cancelButton.setDisable(true);
-        cancelButton.setOnAction(e -> cancelIGPublisher());
-        
-        runButtonsBox.getChildren().addAll(cancelButton, runButton);
-        HBox.setHgrow(runButtonsBox, Priority.ALWAYS);
-        
-        // Log area
-        Label logLabel = new Label("Output Log:");
-        logTextArea = new TextArea();
-        logTextArea.setEditable(false);
-        logTextArea.setPrefHeight(400);
-        logTextArea.setStyle("-fx-font-family: 'Consolas', 'Courier New', monospace;");
-        logTextArea.getStyleClass().add("inactive-log"); // Initial state is inactive
-        VBox.setVgrow(logTextArea, Priority.ALWAYS); // Make log area grow when window resizes
-        
-        // Log buttons
-        HBox logButtonsBox = new HBox(10);
-        logButtonsBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-        copyLogButton = new Button("Copy Log");
-        copyLogButton.setOnAction(e -> copyLogToClipboard());
-        
-        clearLogButton = new Button("Clear Log");
-        clearLogButton.setOnAction(e -> logTextArea.clear());
-        
-        saveLogButton = new Button("Save Log");
-        saveLogButton.setOnAction(e -> saveLogToFile(primaryStage));
-        
-        logButtonsBox.getChildren().addAll(copyLogButton, clearLogButton, saveLogButton);
-        
-        // Add all components to the main layout
-        mainLayout.getChildren().addAll(
-                folderBox, 
-                termServerBox, 
-                optionsPane,
-                runButtonsBox,
-                logLabel, 
-                logTextArea, 
-                logButtonsBox
-        );
-        
-        // Set up the scene
-        Scene scene = new Scene(mainLayout);
-        URL cssResource = getClass().getResource("/styles.css");
-        if (cssResource != null) {
-            scene.getStylesheets().add(cssResource.toExternalForm());
-        }
-        primaryStage.setScene(scene);
-        
-        // Handle window close
-        primaryStage.setOnCloseRequest(e -> {
-            if (currentProcess != null) {
-                currentProcess.destroy();
-            }
-            executorService.shutdown();
-        });
-        
-        // Process command line arguments before showing the window
+        // Process command line args
         processCommandLineArgs();
         
-        primaryStage.show();
+        // Pack the frame
+        pack();
+        setLocationRelativeTo(null); // Center on screen
+        
+        // Add window listener for cleanup
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                if (currentProcess != null) {
+                    currentProcess.destroy();
+                }
+                executorService.shutdown();
+            }
+        });
         
         // Auto-run if specified
         if (autoRun) {
-            Platform.runLater(this::runIGPublisher);
+            SwingUtilities.invokeLater(this::runIGPublisher);
         }
     }
-
+    
+    /**
+     * Create the folder selection panel
+     */
+    private JPanel createFolderPanel() {
+        JPanel panel = new JPanel(new BorderLayout(10, 0));
+        
+        JLabel folderLabel = new JLabel("IG Folder:");
+        folderLabel.setPreferredSize(new Dimension(120, 25));
+        panel.add(folderLabel, BorderLayout.WEST);
+        
+        folderComboBox = new JComboBox<>();
+        folderComboBox.setEditable(true);
+        loadRecentFolders();
+        panel.add(folderComboBox, BorderLayout.CENTER);
+        
+        JButton chooseFolderButton = new JButton("Browse...");
+        chooseFolderButton.addActionListener(e -> chooseFolder());
+        panel.add(chooseFolderButton, BorderLayout.EAST);
+        
+        return panel;
+    }
+    
+    /**
+     * Create the terminology server panel
+     */
+    private JPanel createTerminologyServerPanel() {
+        JPanel panel = new JPanel(new BorderLayout(10, 0));
+        
+        JLabel termServerLabel = new JLabel("Terminology Server:");
+        termServerLabel.setPreferredSize(new Dimension(120, 25));
+        panel.add(termServerLabel, BorderLayout.WEST);
+        
+        terminologyServerField = new JTextField();
+        terminologyServerField.setText(prefs.get(PREF_TERMINOLOGY_SERVER, ""));
+        panel.add(terminologyServerField, BorderLayout.CENTER);
+        
+        return panel;
+    }
+    
+    /**
+     * Create the options panel with all checkboxes
+     */
+    private JPanel createOptionsPanel() {
+        JPanel outerPanel = new JPanel(new BorderLayout());
+        outerPanel.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(), "Options", TitledBorder.DEFAULT_JUSTIFICATION, TitledBorder.DEFAULT_POSITION));
+        
+        JPanel panel = new JPanel(new GridLayout(0, 3, 20, 10)); // 0 rows means as many as needed
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        noNarrativeCheckBox = new JCheckBox("No Narrative");
+        noNarrativeCheckBox.setSelected(prefs.getBoolean(PREF_OPT_NO_NARRATIVE, false));
+        panel.add(noNarrativeCheckBox);
+        
+        noValidationCheckBox = new JCheckBox("No Validation");
+        noValidationCheckBox.setSelected(prefs.getBoolean(PREF_OPT_NO_VALIDATION, false));
+        panel.add(noValidationCheckBox);
+        
+        noNetworkCheckBox = new JCheckBox("No Network");
+        noNetworkCheckBox.setSelected(prefs.getBoolean(PREF_OPT_NO_NETWORK, false));
+        panel.add(noNetworkCheckBox);
+        
+        trackFragmentCheckBox = new JCheckBox("Track Fragment Usage");
+        trackFragmentCheckBox.setSelected(prefs.getBoolean(PREF_OPT_TRACK_FRAGMENT, false));
+        panel.add(trackFragmentCheckBox);
+        
+        clearTermCacheCheckBox = new JCheckBox("Clear Terminology Cache");
+        clearTermCacheCheckBox.setSelected(prefs.getBoolean(PREF_OPT_CLEAR_TERM_CACHE, false));
+        panel.add(clearTermCacheCheckBox);
+        
+        noSushiCheckBox = new JCheckBox("No Sushi");
+        noSushiCheckBox.setSelected(prefs.getBoolean(PREF_OPT_NO_SUSHI, false));
+        panel.add(noSushiCheckBox);
+        
+        debugCheckBox = new JCheckBox("Debug");
+        debugCheckBox.setSelected(prefs.getBoolean(PREF_OPT_DEBUG, false));
+        panel.add(debugCheckBox);
+        
+        allowNonConformantTxCheckBox = new JCheckBox("Allow Non-conformant Terminology Servers");
+        allowNonConformantTxCheckBox.setSelected(prefs.getBoolean(PREF_OPT_ALLOW_NONCONF_TX, false));
+        panel.add(allowNonConformantTxCheckBox);
+        
+        outerPanel.add(panel, BorderLayout.CENTER);
+        
+        return outerPanel;
+    }
+    
+    /**
+     * Create the panel with run/cancel buttons
+     */
+    private JPanel createRunButtonsPanel() {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        
+        runButton = new JButton("Run IG Publisher");
+        runButton.setPreferredSize(new Dimension(180, 30));
+        runButton.addActionListener(e -> runIGPublisher());
+        
+        cancelButton = new JButton("Cancel");
+        cancelButton.setPreferredSize(new Dimension(100, 30));
+        cancelButton.setEnabled(false);
+        cancelButton.addActionListener(e -> cancelIGPublisher());
+        
+        panel.add(cancelButton);
+        panel.add(runButton);
+        
+        return panel;
+    }
+    
+    /**
+     * Create the log panel with text area and buttons
+     */
+    private JPanel createLogPanel() {
+        JPanel panel = new JPanel(new BorderLayout(0, 10));
+        
+        // Log label
+        JLabel logLabel = new JLabel("Output Log:");
+        panel.add(logLabel, BorderLayout.NORTH);
+        
+        // Log text area in a scroll pane
+        logTextArea = new JTextArea();
+        logTextArea.setEditable(false);
+        logTextArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        JScrollPane scrollPane = new JScrollPane(logTextArea);
+        scrollPane.setPreferredSize(new Dimension(750, 400));
+        panel.add(scrollPane, BorderLayout.CENTER);
+        
+        // Log buttons
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        
+        copyLogButton = new JButton("Copy Log");
+        copyLogButton.addActionListener(e -> copyLogToClipboard());
+        buttonPanel.add(copyLogButton);
+        
+        clearLogButton = new JButton("Clear Log");
+        clearLogButton.addActionListener(e -> logTextArea.setText(""));
+        buttonPanel.add(clearLogButton);
+        
+        saveLogButton = new JButton("Save Log");
+        saveLogButton.addActionListener(e -> saveLogToFile());
+        buttonPanel.add(saveLogButton);
+        
+        panel.add(buttonPanel, BorderLayout.SOUTH);
+        
+        return panel;
+    }
+    
     /**
      * Process command line arguments to override saved preferences
      */
@@ -317,11 +378,11 @@ public class IGPublisherUI extends Application {
         if (folderPath != null) {
             File folder = new File(folderPath);
             if (folder.isDirectory()) {
-                folderComboBox.setValue(folderPath);
+                folderComboBox.setSelectedItem(folderPath);
             }
         }
     }
-
+    
     /**
      * Display command line help information
      */
@@ -350,126 +411,79 @@ public class IGPublisherUI extends Application {
         System.out.println("  java -jar igpublisher-ui.jar C:\\path\\to\\ig -noValidation -tx http://tx.fhir.org/r4");
         System.out.println("  java -jar igpublisher-ui.jar -noSushi -autoRun");
     }
-
-    private TitledPane createOptionsPane() {
-        FlowPane optionsPane = new FlowPane();
-        optionsPane.setHgap(20);
-        optionsPane.setVgap(10);
-        optionsPane.setPadding(new Insets(10));
-        optionsPane.setPrefWrapLength(700); // Helps control wrapping behavior
-        
-        noNarrativeCheckBox = new CheckBox("No Narrative");
-        noNarrativeCheckBox.setMinWidth(150);
-        noNarrativeCheckBox.setSelected(prefs.getBoolean(PREF_OPT_NO_NARRATIVE, false));
-        
-        noValidationCheckBox = new CheckBox("No Validation");
-        noValidationCheckBox.setMinWidth(150);
-        noValidationCheckBox.setSelected(prefs.getBoolean(PREF_OPT_NO_VALIDATION, false));
-        
-        noNetworkCheckBox = new CheckBox("No Network");
-        noNetworkCheckBox.setMinWidth(150);
-        noNetworkCheckBox.setSelected(prefs.getBoolean(PREF_OPT_NO_NETWORK, false));
-        
-        trackFragmentCheckBox = new CheckBox("Track Fragment Usage");
-        trackFragmentCheckBox.setMinWidth(180);
-        trackFragmentCheckBox.setSelected(prefs.getBoolean(PREF_OPT_TRACK_FRAGMENT, false));
-        
-        clearTermCacheCheckBox = new CheckBox("Clear Terminology Cache");
-        clearTermCacheCheckBox.setMinWidth(180);
-        clearTermCacheCheckBox.setSelected(prefs.getBoolean(PREF_OPT_CLEAR_TERM_CACHE, false));
-        
-        noSushiCheckBox = new CheckBox("No Sushi");
-        noSushiCheckBox.setMinWidth(150);
-        noSushiCheckBox.setSelected(prefs.getBoolean(PREF_OPT_NO_SUSHI, false));
-        
-        debugCheckBox = new CheckBox("Debug");
-        debugCheckBox.setMinWidth(150);
-        debugCheckBox.setSelected(prefs.getBoolean(PREF_OPT_DEBUG, false));
-        
-        allowNonConformantTxCheckBox = new CheckBox("Allow Non-conformant Terminology Servers");
-        allowNonConformantTxCheckBox.setMinWidth(280);
-        allowNonConformantTxCheckBox.setSelected(prefs.getBoolean(PREF_OPT_ALLOW_NONCONF_TX, false));
-        
-        // Add all checkboxes to the flow pane so they can flow across the available space
-        optionsPane.getChildren().addAll(
-            noNarrativeCheckBox,
-            noValidationCheckBox,
-            noNetworkCheckBox,
-            trackFragmentCheckBox,
-            clearTermCacheCheckBox,
-            noSushiCheckBox,
-            debugCheckBox,
-            allowNonConformantTxCheckBox
-        );
-        
-        TitledPane titledOptionsPane = new TitledPane("Options", optionsPane);
-        titledOptionsPane.setCollapsible(true);
-        titledOptionsPane.setExpanded(true);
-        
-        return titledOptionsPane;
-    }
-
-    private void chooseFolder(Stage stage) {
-        DirectoryChooser directoryChooser = new DirectoryChooser();
-        directoryChooser.setTitle("Select IG Folder");
+    
+    /**
+     * Open folder chooser dialog
+     */
+    private void chooseFolder() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Select IG Folder");
+        fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
         
         // Set initial directory if available
-        String currentFolder = folderComboBox.getValue();
+        String currentFolder = (String) folderComboBox.getSelectedItem();
         if (currentFolder != null && !currentFolder.isEmpty()) {
             File currentDir = new File(currentFolder);
             if (currentDir.exists()) {
-                directoryChooser.setInitialDirectory(currentDir);
+                fileChooser.setCurrentDirectory(currentDir);
             }
         }
         
-        File selectedDirectory = directoryChooser.showDialog(stage);
-        if (selectedDirectory != null) {
-            String folderPath = selectedDirectory.getAbsolutePath();
-            folderComboBox.setValue(folderPath);
+        int result = fileChooser.showOpenDialog(this);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            String folderPath = fileChooser.getSelectedFile().getAbsolutePath();
+            folderComboBox.setSelectedItem(folderPath);
             addRecentFolder(folderPath);
         }
     }
-
+    
+    /**
+     * Load recent folders from preferences
+     */
     private void loadRecentFolders() {
         String foldersStr = prefs.get(PREF_RECENT_FOLDERS, "");
         if (!foldersStr.isEmpty()) {
             String[] folders = foldersStr.split("\\|");
-            ObservableList<String> folderList = FXCollections.observableArrayList(folders);
-            folderComboBox.setItems(folderList);
-            if (!folderList.isEmpty()) {
-                folderComboBox.setValue(folderList.get(0));
+            DefaultComboBoxModel<String> model = new DefaultComboBoxModel<>(folders);
+            folderComboBox.setModel(model);
+            if (folders.length > 0) {
+                folderComboBox.setSelectedItem(folders[0]);
             }
         }
     }
-
+    
+    /**
+     * Add a folder to recent folders list
+     */
     private void addRecentFolder(String folder) {
-        ObservableList<String> items = folderComboBox.getItems();
+        DefaultComboBoxModel<String> model = (DefaultComboBoxModel<String>) folderComboBox.getModel();
         
         // Remove if already exists
-        items.remove(folder);
+        model.removeElement(folder);
         
         // Add to the top
-        items.add(0, folder);
+        model.insertElementAt(folder, 0);
+        folderComboBox.setSelectedItem(folder);
         
         // Limit size
-        if (items.size() > MAX_RECENT_FOLDERS) {
-            items = FXCollections.observableArrayList(items.subList(0, MAX_RECENT_FOLDERS));
-            folderComboBox.setItems(items);
+        while (model.getSize() > MAX_RECENT_FOLDERS) {
+            model.removeElementAt(model.getSize() - 1);
         }
         
         // Save to preferences
         StringBuilder foldersStr = new StringBuilder();
-        for (String item : items) {
+        for (int i = 0; i < model.getSize(); i++) {
             if (foldersStr.length() > 0) {
                 foldersStr.append("|");
             }
-            foldersStr.append(item);
+            foldersStr.append(model.getElementAt(i));
         }
         prefs.put(PREF_RECENT_FOLDERS, foldersStr.toString());
-        
-        folderComboBox.setValue(folder);
     }
-
+    
+    /**
+     * Save current settings to preferences
+     */
     private void savePreferences() {
         prefs.put(PREF_TERMINOLOGY_SERVER, terminologyServerField.getText());
         prefs.putBoolean(PREF_OPT_NO_NARRATIVE, noNarrativeCheckBox.isSelected());
@@ -481,9 +495,12 @@ public class IGPublisherUI extends Application {
         prefs.putBoolean(PREF_OPT_DEBUG, debugCheckBox.isSelected());
         prefs.putBoolean(PREF_OPT_ALLOW_NONCONF_TX, allowNonConformantTxCheckBox.isSelected());
     }
-
+    
+    /**
+     * Run the IG Publisher
+     */
     private void runIGPublisher() {
-        String folderPath = folderComboBox.getValue();
+        String folderPath = (String) folderComboBox.getSelectedItem();
         if (folderPath == null || folderPath.isEmpty()) {
             showErrorDialog("Please select an IG folder first.");
             return;
@@ -499,14 +516,15 @@ public class IGPublisherUI extends Application {
         addRecentFolder(folderPath);
         savePreferences();
         
-        // Update button states and log appearance
-        runButton.setDisable(true);
-        cancelButton.setDisable(false);
-        logTextArea.getStyleClass().remove("inactive-log");
-        logTextArea.getStyleClass().add("active-log");
+        // Update button states
+        runButton.setEnabled(false);
+        cancelButton.setEnabled(true);
+        
+        // Set log area appearance for active state
+        logTextArea.setBackground(new Color(240, 240, 240));
         
         // Clear log
-        logTextArea.clear();
+        logTextArea.setText("");
         
         // Collect parameters
         boolean noNarrative = noNarrativeCheckBox.isSelected();
@@ -532,7 +550,7 @@ public class IGPublisherUI extends Application {
         commandStr.append("- Debug: ").append(debug).append("\n");
         commandStr.append("- Allow Non-conformant Terminology Servers: ").append(allowNonConformantTx).append("\n\n");
         
-        logTextArea.appendText(commandStr.toString());
+        logTextArea.append(commandStr.toString());
         
         // Create a custom output stream that redirects to the TextArea
         OutputStream customOutputStream = new OutputStream() {
@@ -544,7 +562,7 @@ public class IGPublisherUI extends Application {
                 if (c == '\n') {
                     // End of line, update the TextArea
                     final String line = lineBuffer.toString();
-                    Platform.runLater(() -> logTextArea.appendText(line + "\n"));
+                    SwingUtilities.invokeLater(() -> logTextArea.append(line + "\n"));
                     lineBuffer = new StringBuilder();
                 } else {
                     lineBuffer.append(c);
@@ -555,7 +573,7 @@ public class IGPublisherUI extends Application {
             public void flush() {
                 if (lineBuffer.length() > 0) {
                     final String line = lineBuffer.toString();
-                    Platform.runLater(() -> logTextArea.appendText(line));
+                    SwingUtilities.invokeLater(() -> logTextArea.append(line));
                     lineBuffer = new StringBuilder();
                 }
             }
@@ -577,7 +595,7 @@ public class IGPublisherUI extends Application {
                 System.setOut(customPrintStream);
                 System.setErr(customPrintStream);
                 
-                // Call the Publisher directly - adding the new parameter
+                // Call the Publisher directly
                 Publisher.runDirectly(
                     folderPath,
                     termServer.isEmpty() ? null : termServer,
@@ -592,14 +610,13 @@ public class IGPublisherUI extends Application {
                 );
                 
                 // Success message
-                Platform.runLater(() -> {
-                    logTextArea.appendText("\nIG Publisher completed successfully.\n");
-                    runButton.setDisable(false);
-                    cancelButton.setDisable(true);
+                SwingUtilities.invokeLater(() -> {
+                    logTextArea.append("\nIG Publisher completed successfully.\n");
+                    runButton.setEnabled(true);
+                    cancelButton.setEnabled(false);
                     
                     // Change log appearance back to inactive
-                    logTextArea.getStyleClass().remove("active-log");
-                    logTextArea.getStyleClass().add("inactive-log");
+                    logTextArea.setBackground(UIManager.getColor("TextArea.background"));
                 });
                             
             } catch (Exception e) {
@@ -609,20 +626,19 @@ public class IGPublisherUI extends Application {
                     e.printStackTrace(new PrintWriter(sw));
                     final String stackTrace = sw.toString();
                     
-                    Platform.runLater(() -> {
-                        logTextArea.appendText("\nIG Publisher encountered an error: " + e.getMessage() + "\n");
-                        logTextArea.appendText(stackTrace);
+                    SwingUtilities.invokeLater(() -> {
+                        logTextArea.append("\nIG Publisher encountered an error: " + e.getMessage() + "\n");
+                        logTextArea.append(stackTrace);
                         
                         // Only show error dialog if not canceled
                         if (!wasCanceled) {
                             showErrorDialogWithOutput("IG Publisher Error", e.getMessage() + "\n\n" + stackTrace);
                         }
-                        runButton.setDisable(false);
-                        cancelButton.setDisable(true);
+                        runButton.setEnabled(true);
+                        cancelButton.setEnabled(false);
                         
                         // Change log appearance back to inactive
-                        logTextArea.getStyleClass().remove("active-log");
-                        logTextArea.getStyleClass().add("inactive-log");
+                        logTextArea.setBackground(UIManager.getColor("TextArea.background"));
                     });
                 }
             } finally {
@@ -639,100 +655,121 @@ public class IGPublisherUI extends Application {
         publisherThread.start();
     }
     
+    /**
+     * Cancel the running IG Publisher process
+     */
     private void cancelIGPublisher() {
         if (currentThread != null && currentThread.isAlive()) {
             // Set the canceled flag so we don't show error dialog
-            logTextArea.appendText("\nCanceling IG Publisher operation...\n");
+            logTextArea.append("\nCanceling IG Publisher operation...\n");
             
             wasCanceled = true;
             // Interrupt the thread
             currentThread.interrupt();
             
             // Reset the UI state
-            runButton.setDisable(false);
-            cancelButton.setDisable(true);
+            runButton.setEnabled(true);
+            cancelButton.setEnabled(false);
             
             // Change log appearance back to inactive
-            logTextArea.getStyleClass().remove("active-log");
-            logTextArea.getStyleClass().add("inactive-log");
+            logTextArea.setBackground(UIManager.getColor("TextArea.background"));
             
             // Reset thread reference
             currentThread = null;
         }
     }
-
+    
+    /**
+     * Copy log contents to clipboard
+     */
     private void copyLogToClipboard() {
         String logText = logTextArea.getText();
         if (logText != null && !logText.isEmpty()) {
-            javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
-            javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
-            content.putString(logText);
-            clipboard.setContent(content);
+            logTextArea.selectAll();
+            logTextArea.copy();
+            logTextArea.select(0, 0); // Deselect
         }
     }
-
-    private void saveLogToFile(Stage stage) {
+    
+    /**
+     * Save log to a file
+     */
+    private void saveLogToFile() {
         String logText = logTextArea.getText();
         if (logText == null || logText.isEmpty()) {
             return;
         }
         
-        javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
-        fileChooser.setTitle("Save Log File");
-        fileChooser.getExtensionFilters().add(
-                new javafx.stage.FileChooser.ExtensionFilter("Log Files", "*.log", "*.txt")
-        );
-        fileChooser.setInitialFileName("igpublisher.log");
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Save Log File");
+        fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
+            "Log Files (*.log, *.txt)", "log", "txt"));
+        fileChooser.setSelectedFile(new File("igpublisher.log"));
         
-        File file = fileChooser.showSaveDialog(stage);
-        if (file != null) {
+        int result = fileChooser.showSaveDialog(this);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            File file = fileChooser.getSelectedFile();
             try {
                 Files.writeString(
-                        Paths.get(file.getAbsolutePath()),
-                        logText,
-                        StandardOpenOption.CREATE,
-                        StandardOpenOption.TRUNCATE_EXISTING
+                    Paths.get(file.getAbsolutePath()),
+                    logText,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING
                 );
             } catch (IOException e) {
                 showErrorDialog("Error saving log: " + e.getMessage());
             }
         }
     }
-
+    
+    /**
+     * Show a simple error dialog
+     */
     private void showErrorDialog(String message) {
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle("Error");
-        alert.setHeaderText(null);
-        alert.setContentText(message);
-        alert.showAndWait();
+        JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
     }
 
+    /**
+     * Show an error dialog with detailed output
+     */
     private void showErrorDialogWithOutput(String title, String content) {
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle("Error");
-        alert.setHeaderText(title);
+        // Create a dialog with expandable details
+        JDialog dialog = new JDialog(this, "Error", true);
+        dialog.setLayout(new BorderLayout());
+        dialog.setSize(700, 400);
+        dialog.setLocationRelativeTo(this);
         
-        // Create expandable content
-        TextArea textArea = new TextArea(content);
+        // Add the error message at the top
+        JLabel errorLabel = new JLabel("<html><b>" + title + "</b></html>");
+        errorLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        dialog.add(errorLabel, BorderLayout.NORTH);
+        
+        // Add the details in a scrollable text area
+        JTextArea textArea = new JTextArea(content);
         textArea.setEditable(false);
-        textArea.setWrapText(true);
-        textArea.setPrefHeight(300);
-        textArea.setPrefWidth(600);
+        textArea.setWrapStyleWord(true);
+        textArea.setLineWrap(true);
+        JScrollPane scrollPane = new JScrollPane(textArea);
+        dialog.add(scrollPane, BorderLayout.CENTER);
         
-        // Add copy button
-        Button copyButton = new Button("Copy to Clipboard");
-        copyButton.setOnAction(e -> {
-            javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
-            javafx.scene.input.ClipboardContent clipContent = new javafx.scene.input.ClipboardContent();
-            clipContent.putString(content);
-            clipboard.setContent(clipContent);
+        // Add buttons at the bottom
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        
+        JButton copyButton = new JButton("Copy to Clipboard");
+        copyButton.addActionListener(e -> {
+            textArea.selectAll();
+            textArea.copy();
+            textArea.select(0, 0); // Deselect
         });
+        buttonPanel.add(copyButton);
         
-        VBox vbox = new VBox(10, textArea, copyButton);
+        JButton closeButton = new JButton("Close");
+        closeButton.addActionListener(e -> dialog.dispose());
+        buttonPanel.add(closeButton);
         
-        alert.getDialogPane().setExpandableContent(vbox);
-        alert.getDialogPane().setExpanded(true);
+        dialog.add(buttonPanel, BorderLayout.SOUTH);
         
-        alert.showAndWait();
+        // Show the dialog
+        dialog.setVisible(true);
     }
 }
