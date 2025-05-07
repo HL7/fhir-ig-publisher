@@ -148,7 +148,7 @@ import org.hl7.fhir.igtools.spreadsheets.MappingSpace;
 import org.hl7.fhir.igtools.spreadsheets.ObservationSummarySpreadsheetGenerator;
 import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.igtools.templates.TemplateManager;
-import org.hl7.fhir.igtools.ui.Launcher;
+import org.hl7.fhir.igtools.ui.IGPublisherUI;
 import org.hl7.fhir.igtools.web.HistoryPageUpdater;
 import org.hl7.fhir.igtools.web.IGRegistryMaintainer;
 import org.hl7.fhir.igtools.web.IGReleaseVersionDeleter;
@@ -15031,7 +15031,7 @@ private String fixPackageReference(String dep) {
     
     
     if (CliParams.hasNamedParam(args, "-gui")) {
-      Launcher.main(args);
+      IGPublisherUI.main(args);
       return; 
     } else if (CliParams.hasNamedParam(args, "-v")){
       System.out.println(IGVersionUtil.getVersion());
