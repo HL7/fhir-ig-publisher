@@ -1,0 +1,123 @@
+name: QA Delta
+on:
+  workflow_dispatch:
+    inputs:
+      actual-ref:
+        description: 'Commit SHA'
+        required: false
+        default: 'master'
+        type: string
+
+jobs:
+  find-latest-release-ref:
+    name: Find latest IG publisher release ref
+    runs-on: ubuntu-latest
+    outputs:
+      ref: ${{ steps.find-latest-release-ref.outputs.ref }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github
+      - name: Find latest IG publisher release
+        id: find-latest-release-ref
+        uses: ./.github/actions/find-latest-ig-publisher-release
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  load-ig-list:
+    name: Load IG repositories
+    runs-on: ubuntu-latest
+    outputs:
+      igs: ${{ steps.load-ig-list-json.outputs.igs }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+         sparse-checkout: |
+          .github
+      - name: Load IG repositories JSON
+        id: load-ig-list-json
+        uses: ./.github/actions/load-ig-list-json
+
+  build-ig-publisher-jars:
+    name: Build IG Publisher JARs
+    runs-on: ubuntu-latest
+    needs: [ find-latest-release-ref ]
+
+    strategy:
+      matrix:
+        ref: ["${{ inputs.actual-ref }}", "${{ needs.find-latest-release-ref.outputs.ref }}" ]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github
+      - name: Build and Cache IG Publisher
+        uses: ./.github/actions/build-and-cache-ig-publisher
+        with:
+          ref: ${{ matrix.ref }}
+
+  generate-and-cache-qa:  
+    name: Generate and cache QA
+    needs: [find-latest-release-ref, load-ig-list, build-ig-publisher-jars]
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        ref: ["${{ inputs.actual-ref }}", "${{ needs.find-latest-release-ref.outputs.ref }}" ]
+        repo: ${{ fromJson(needs.load-ig-list.outputs.igs) }}
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        sparse-checkout: |
+          .github
+    - name: Publish IG and create QA artifact
+      uses: ./.github/actions/publish-ig-and-cache-qa
+      with:
+        ref: ${{ matrix.ref }}
+        ig: ${{ matrix.repo }}
+
+  diff-cached-qa:  
+    name: Verify QA is the same
+    needs: [ find-latest-release-ref, load-ig-list, generate-and-cache-qa]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      matrix:
+        repo: ${{ fromJson(needs.load-ig-list.outputs.igs) }}
+      fail-fast: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+           .github
+      - name: Verify QA is the same
+        uses: ./.github/actions/diff-cached-qa
+        with:
+          expected-ref: ${{ needs.find-latest-release-ref.outputs.ref }}
+          actual-ref: "${{ inputs.actual-ref }}"
+          repo: ${{ matrix.repo }}
+
+  upload-all-igs-artifact:
+    name: Upload all QA artifacts as a single all-IGs artifact
+    needs: [ find-latest-release-ref, diff-cached-qa ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github
+      - uses: ./.github/actions/upload-all-igs-artifact
+        with:
+          expected-ref: ${{ needs.find-latest-release-ref.outputs.ref }}
+          actual-ref: "${{ inputs.actual-ref }}"
+
