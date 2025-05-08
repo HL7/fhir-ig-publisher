@@ -17,6 +17,7 @@
 * Validator: Fix: recheck invariant with deviating severity
 * Validator: find OIDs as NamingSystem OIDs
 * Validator: Fix NPE validating OperationDefinitions with profiles
+* Validator: fix for Implicit LOINC ValueSet Generation Off-by-one Error
 * Version Comparison: fix code system comparison to not alter code system being compared
 * Renderer: generate https: links for images and package references (not http:)
 * Renderer: fix NPE rendering codesystem links
