@@ -6797,6 +6797,7 @@ private String fixPackageReference(String dep) {
       relativeNames.put(file.getRelativePath(), file);
     changeList.add(file);
     //  	}
+    System.out.println("Loaded Page File "+file.getPath()+" for "+file.getRelativePath());
   }
 
   private void loadAsBinaryResource(FetchedFile file, FetchedResource r, ImplementationGuideDefinitionResourceComponent srcForLoad, String format, String cause) throws Exception {
