@@ -6797,7 +6797,6 @@ private String fixPackageReference(String dep) {
       relativeNames.put(file.getRelativePath(), file);
     changeList.add(file);
     //  	}
-    System.out.println("Loaded Page File "+file.getPath()+" for "+file.getRelativePath());
   }
 
   private void loadAsBinaryResource(FetchedFile file, FetchedResource r, ImplementationGuideDefinitionResourceComponent srcForLoad, String format, String cause) throws Exception {
@@ -13899,6 +13898,13 @@ private String fixPackageReference(String dep) {
   private void genWrapperInner(FetchedFile ff, FetchedResource r, String template, String outputName, Set<String> outputTracker, Map<String, String> vars, String format, String extension, boolean recordPath, String lang) throws FileNotFoundException, IOException, FHIRException {
 
     template = fetcher.openAsString(Utilities.path(fetcher.pathForFile(configFile), template));
+    if (lang != null) {
+      if (vars == null) {
+        vars = new HashMap<String, String>();
+      }
+      vars.put("lang", lang);
+    }
+    
     template = igpkp.doReplacements(template, r, vars, format);
 
     outputName = determineOutputName(outputName, r, vars, format, extension);
