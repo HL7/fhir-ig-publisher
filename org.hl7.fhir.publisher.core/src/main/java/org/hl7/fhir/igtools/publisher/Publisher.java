@@ -3564,6 +3564,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       context.connectToTSServer(new TerminologyClientFactory(version), webTxServer.getAddress(), "fhir/publisher", txLog, true);
     }
 
+    newMultiLangTemplateFormat = template.config().asBoolean("multilanguage-format");  
     loadPubPack();
     igpkp = new IGKnowledgeProvider(context, checkAppendSlash(specPath), determineCanonical(sourceIg.getUrl(), "ImplementationGuide.url"), template.config(), errors, VersionUtilities.isR2Ver(version), template, listedURLExemptions, altCanonical, fileList, module);
     if (autoLoad) {
@@ -15282,6 +15283,7 @@ private String fixPackageReference(String dep) {
         System.out.println("Running without generation to shorten the run time (editor process only)");
       }
       
+      // deprecated
       if (CliParams.hasNamedParam(args, "-new-template-format")) {
         self.newMultiLangTemplateFormat = true;
         System.out.println("Using new style template format for multi-lang IGs");
@@ -15835,7 +15837,6 @@ private String fixPackageReference(String dep) {
       throw new Exception("Error processing mappingSpaces.details: "+e.getMessage(), e);
     }
   }
-
 
   @Override
   public void recordProfileUsage(StructureDefinition profile, Object appContext, Element element) {
