@@ -972,7 +972,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
         suppressedInfo += m.getUseCountHint();
         suppressedWarnings += m.getUseCountWarning();
         found = true;
-        b.append(" <li>"+Utilities.escapeXml(m.getMessageRaw())+" <span style=\"color: "+(m.getUseCount() == 0 ? "maroon" : "navy")+"\">("+m.getUseCount()+" uses)<span></li>\r\n");
+        b.append(" <li>"+Utilities.escapeXml(m.getMessageRaw())+" <span style=\"color: "+(m.getUseCount() == 0 ? "maroon" : "navy")+"\">("+m.getUseCount()+" uses)</span></li>\r\n");
       }
       b.append("</ul>\r\n");
     }
@@ -1035,6 +1035,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       "<head>\r\n"+
       "  <title>$title$ : Validation Results</title>\r\n"+
       "  <link href=\"fhir.css\" rel=\"stylesheet\"/>\r\n"+
+      "  <meta charset=\"utf-8\"/>\r\n"+
       "  <style>\r\n"+
       "    span.flip  { background-color: #4CAF50; color: white; border: solid 1px #a6d8a8; padding: 2px }\r\n"+
       "    span.toggle  { background-color: #e6f2ff; color: black; border: solid 1px #0056b3; padding: 2px; font-size: 10px }\r\n"+
@@ -1116,6 +1117,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       "<head>\r\n"+
       "  <title>$title$ : Terminology Server Report</title>\r\n"+
       "  <link href=\"fhir.css\" rel=\"stylesheet\"/>\r\n"+
+      "  <meta charset=\"utf-8\"/>\r\n"+
       "  <style>\r\n"+
       "    span.flip  { background-color: #4CAF50; color: white; border: solid 1px #a6d8a8; padding: 2px }\r\n"+
       "    span.toggle  { background-color: #e6f2ff; color: black; border: solid 1px #0056b3; padding: 2px; font-size: 10px }\r\n"+
