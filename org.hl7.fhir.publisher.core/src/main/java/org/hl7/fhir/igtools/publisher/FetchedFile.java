@@ -77,10 +77,18 @@ public class FetchedFile {
   private List<ProcessingReport> processes = new ArrayList<>();
   private boolean loaded;
   private List<ValidationMessage> filteredMessages;
+  private String loadPath;
   
   public FetchedFile(String statedPath) {
     super();
     this.statedPath = statedPath;
+    this.loadPath = statedPath;
+  }
+  
+  public FetchedFile(String statedPath, String loadPath) {
+    super();
+    this.statedPath = statedPath;
+    this.loadPath = loadPath;
   }
   public String getPath() {
     return path;
@@ -314,6 +322,12 @@ public class FetchedFile {
       additionalPaths = new ArrayList<String>();
     }
     this.additionalPaths.add(additionalPath);
+  }
+  public String getLoadPath() {
+    return loadPath;
+  }
+  public void setLoadPath(String loadPath) {
+    this.loadPath = loadPath;
   }
 
 }

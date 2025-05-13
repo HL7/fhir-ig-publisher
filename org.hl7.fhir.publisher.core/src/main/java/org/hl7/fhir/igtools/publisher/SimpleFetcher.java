@@ -111,7 +111,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
     File f = new File(path);
     if (!f.exists())
       throw new Exception("Unable to find file "+path);
-    FetchedFile ff = new FetchedFile(path);
+    FetchedFile ff = new FetchedFile(path, getPathFromInput(path));
     ff.setPath(f.getCanonicalPath());
     ff.setName(f.isDirectory() ? path : fileTitle(path));
     ff.setTime(f.lastModified());
@@ -353,7 +353,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
               if (!Utilities.existsInList(ext, fixedFileTypes()))
                 try {
                   org.hl7.fhir.r5.elementmodel.Element e = new org.hl7.fhir.r5.elementmodel.XmlParser(context).parseSingle(new FileInputStream(f), null);
-                  addFile(res, f, e, "application/fhir+xml");
+                  addFileForElement(res, f, e, "application/fhir+xml");
                   count++;
                   ok = true;
                 } catch (Exception e) {
@@ -370,7 +370,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
                 try {
                   List<ValidatedFragment> el = new org.hl7.fhir.r5.elementmodel.JsonParser(context).setLogicalModelResolver(this).parse(new FileInputStream(fn));
                   if (el.size() == 1) {
-                    addFile(res, f, el.get(0).getElement(), "application/fhir+json");
+                    addFileForElement(res, f, el.get(0).getElement(), "application/fhir+json");
                     count++;
                     ok = true;
                   }
@@ -388,7 +388,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
               if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt", "fml", "adl")) {
                 try {
                   org.hl7.fhir.r5.elementmodel.Element e = new org.hl7.fhir.r5.elementmodel.TurtleParser(context).parseSingle(new FileInputStream(fn), null);
-                  addFile(res, f, e, "application/fhir+turtle");
+                  addFileForElement(res, f, e, "application/fhir+turtle");
                   count++;
                   ok = true;
                 } catch (Exception e) {
@@ -409,7 +409,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
                     fp = new FmlParser(context);
                   }
                   org.hl7.fhir.r5.elementmodel.Element e  = fp.parse(new FileInputStream(f)).get(0).getElement();
-                  addFile(res, f, e, "fml");
+                  addFileForElement(res, f, e, "fml");
                   count++;
                   ok = true;
                 } catch (Exception e) {
@@ -426,7 +426,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
               if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt", "ttl") && context.hasPackage("openehr.base", null)) {
                 try {
                   new ArchetypeImporter(context, pkp.getCanonical()).checkArchetype(new FileInputStream(f), f.getName());
-                  addFile(res, f, null, "adl");
+                  addFileForElement(res, f, null, "adl");
                   count++;
                   ok = true;
                 } catch (Exception e) {
@@ -459,14 +459,14 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
         "jpg", "png", "gif", "mp3", "mp4", "pfd", "doc", "docx", "ppt", "pptx", "svg");
   }
 
-  private void addFile(List<FetchedFile> res, File f, org.hl7.fhir.r5.elementmodel.Element e, String cnt) throws IOException {
+  private void addFileForElement(List<FetchedFile> res, File f, org.hl7.fhir.r5.elementmodel.Element e, String cnt) throws IOException {
     if (( e == null || !e.fhirType().equals("ImplementationGuide")) && !(f.getName().startsWith("Binary") && !"Binary".equals(e.fhirType()))) {
       addFile(res, f, cnt);
     }
   }
   
   private void addFile(List<FetchedFile> res, File f, String cnt) throws IOException {
-    FetchedFile ff = new FetchedFile(new File(rootDir).toURI().relativize(f.toURI()).getPath());
+    FetchedFile ff = new FetchedFile(new File(rootDir).toURI().relativize(f.toURI()).getPath(), getPathFromInput(f.getAbsolutePath()));
     ff.setPath(f.getCanonicalPath());
     ff.setName(fileTitle(f.getCanonicalPath()));
     ff.setTime(f.lastModified());
@@ -478,6 +478,18 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
     ff.setSource(b);
     ss.close();
     res.add(ff);    
+  }
+
+  private String getPathFromInput(String p) throws IOException {
+    if (rootDir == null) {
+      return p;
+    }
+    String inputPath = Utilities.path(rootDir, "input");
+    if (p.startsWith(inputPath)) {
+      return FileUtilities.getRelativePath(inputPath, p);
+    } else {
+      return new File(p).getName();
+    }
   }
 
   public ILoggingService getLogger() {

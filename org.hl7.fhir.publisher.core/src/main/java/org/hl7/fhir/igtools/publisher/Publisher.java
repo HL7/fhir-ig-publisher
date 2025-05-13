@@ -12347,21 +12347,23 @@ private String fixPackageReference(String dep) {
 
   private byte[] loadTranslationSource(FetchedFile f, String l) throws IOException, FileNotFoundException {
     byte[] src;
+    System.out.println(f.getLoadPath());
     if (defaultTranslationLang.equals(l)) {
       src = f.getSource();
     } else {
       File ff = null;
       for (String ts : translationSources) {
-        File t = new File(Utilities.path(ts, f.getRelativePath()));
-        if (t.exists()) {
-          ff = t;
+        if (Utilities.endsWithInList(ts, "/"+l, "\\"+l, "-"+l)) {
+          File t = new File(Utilities.path(rootDir, ts, f.getLoadPath()));
+          if (t.exists()) {
+            ff = t;
+          }
         }
       }
       if (ff != null) {
         src = FileUtilities.fileToBytes(ff);
       } else {
-        src = Bytes.concat("<p>There is no translation for this page, so the base language content is shown.</p>".getBytes(StandardCharsets.UTF_8), 
-            f.getSource());
+        src = f.getSource();
       }
     }
     return src;
