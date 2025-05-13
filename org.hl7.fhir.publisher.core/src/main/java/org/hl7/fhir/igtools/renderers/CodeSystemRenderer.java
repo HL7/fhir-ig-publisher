@@ -111,9 +111,6 @@ public class CodeSystemRenderer extends CanonicalRenderer {
   }
 
   public String content(Set<String> outputTracker) throws EOperationOutcome, FHIRException, IOException, org.hl7.fhir.exceptions.FHIRException  {
-    //    if (cs.hasText() && cs.getText().hasDiv())
-    //      return new XhtmlComposer().compose(cs.getText().getDiv());
-    //    else {
     CodeSystem csc = cs.copy();
 
     csc.setId(cs.getId()); // because that's not copied

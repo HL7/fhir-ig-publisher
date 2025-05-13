@@ -31,6 +31,8 @@ import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_40;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
 import org.hl7.fhir.dstu2.model.StructureDefinition;
+import org.hl7.fhir.dstu3.formats.IParser.OutputStyle;
+import org.hl7.fhir.dstu3.model.ImplementationGuide;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.r5.model.Resource;
@@ -520,8 +522,29 @@ public class PackageReleaser {
         }
       }
     }
+    String version = npm.getJsonArray("fhirVersions").get(0).asString();
     String jcnt = JsonParser.compose(npm, true);
     FileUtilities.stringToFile(jcnt, Utilities.path(source, vd.getId(), "package", "package.json"));
+    switch (VersionUtilities.getMajMin(version)) {
+      case "1.0":
+        throw new Error("R2 is no longer supported processing "+Utilities.path(source, vd.getId()));
+      case "3.0" : 
+        org.hl7.fhir.dstu3.model.ImplementationGuide ig3 = (ImplementationGuide) new org.hl7.fhir.dstu3.formats.JsonParser().parse(new FileInputStream(Utilities.path(source, vd.getId(), "package", "ImplementationGuide-"+vd.getId()+".json")));
+        ig3.setVersion(vd.getNewVersion());
+        new org.hl7.fhir.dstu3.formats.JsonParser().setOutputStyle(OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(source, vd.getId(), "package", "ImplementationGuide-"+vd.getId()+".json")), ig3);
+        break;
+      case "4.0" : 
+      case "4.3" : 
+        org.hl7.fhir.r4.model.ImplementationGuide ig4 = (org.hl7.fhir.r4.model.ImplementationGuide) new org.hl7.fhir.r4.formats.JsonParser().parse(new FileInputStream(Utilities.path(source, vd.getId(), "package", "ImplementationGuide-"+vd.getId()+".json")));
+        ig4.setVersion(vd.getNewVersion());
+        new org.hl7.fhir.r4.formats.JsonParser().setOutputStyle(org.hl7.fhir.r4.formats.IParser.OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(source, vd.getId(), "package", "ImplementationGuide-"+vd.getId()+".json")), ig4);
+        break;
+      default: 
+        org.hl7.fhir.r5.model.ImplementationGuide ig5 = (org.hl7.fhir.r5.model.ImplementationGuide) new org.hl7.fhir.r5.formats.JsonParser().parse(new FileInputStream(Utilities.path(source, vd.getId(), "package", "ImplementationGuide-"+vd.getId()+".json")));
+        ig5.setVersion(vd.getNewVersion());
+        new org.hl7.fhir.r5.formats.JsonParser().setOutputStyle(org.hl7.fhir.r5.formats.IParser.OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(source, vd.getId(), "package", "ImplementationGuide-"+vd.getId()+".json")), ig5);
+        break;        
+    }
   }
 
   private void resetVersions(String source, VersionDecision vd, List<VersionDecision> versionsList) throws FileNotFoundException, IOException {
@@ -707,7 +730,7 @@ public class PackageReleaser {
 
   private void scanForCurrentVersions(Map<String, String> res, File folder) throws IOException {
     for (File f : folder.listFiles()) {
-      if (f.isDirectory()) {
+      if (f.isDirectory() && !f.getName().contains(".r2")) {
         scanForCurrentVersions(res, f);
       } else if (f.getName().equals("package-list.json")) {
         PackageList pl = PackageList.fromFile(f);
