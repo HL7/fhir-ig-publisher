@@ -12160,7 +12160,7 @@ private String fixPackageReference(String dep) {
         } else {
           if (isNewML() && !f.getStatedPath().contains("template")) {
             for (String l : allLangs()) {
-              if (f.getRelativePath().startsWith("_includes/")) {
+              if (f.getRelativePath().startsWith("_includes"+File.separator)) {
                 dst = Utilities.path(tempDir, addLangSuffixToFilename(f.getRelativePath(), l));                
               } else {
                 dst = Utilities.path(tempDir, l, f.getRelativePath());                
@@ -12193,7 +12193,7 @@ private String fixPackageReference(String dep) {
         } else {
           if (isNewML() && !f.getStatedPath().contains("template")) {
             for (String l : allLangs()) {
-              if (f.getRelativePath().startsWith("_includes/")) {
+              if (f.getRelativePath().startsWith("_includes"+File.separator)) {
                 dst = Utilities.path(tempDir, addLangSuffixToFilename(f.getRelativePath(), l));                
               } else {
                 dst = Utilities.path(tempDir, l, f.getRelativePath());                
