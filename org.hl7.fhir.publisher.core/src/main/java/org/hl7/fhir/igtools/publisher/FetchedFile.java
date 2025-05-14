@@ -78,6 +78,7 @@ public class FetchedFile {
   private boolean loaded;
   private List<ValidationMessage> filteredMessages;
   private String loadPath;
+  private Map<String, Boolean> translations = new HashMap<>();
   
   public FetchedFile(String statedPath) {
     super();
@@ -328,6 +329,19 @@ public class FetchedFile {
   }
   public void setLoadPath(String loadPath) {
     this.loadPath = loadPath;
+  }
+
+  public void setTranslation(String l, boolean ok) {
+    translations .put(l, ok);
+    
+  }
+
+  public boolean getTranslated(String l) {
+    if (translations.containsKey(l) && translations.get(l)) {
+      return true;
+    } else {
+      return false;
+    }
   }
 
 }
