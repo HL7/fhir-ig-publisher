@@ -11246,7 +11246,6 @@ private String fixPackageReference(String dep) {
         throw new Exception("Template based HTML file " + p + " is missing source file " + sourceName);
       }
       FetchedFile f = relativeNames.get(sourcePath);
-      String s = "---\r\n---\r\n{% include " + template + "%}";
       if (isNewML()) {
         String targetPath = Utilities.path(tempDir, p);
         if (f==null) { // toc.xml
@@ -11255,6 +11254,7 @@ private String fixPackageReference(String dep) {
           checkMakeFile(makeLangRedirect(p), targetPath, f.getOutputNames());
         }
         for (String l : allLangs()) {
+          String s = "---\r\n---\r\n{% include " + template + " lang='"+l+"'%}";
           targetPath = Utilities.path(tempDir, l, p);
           FileUtilities.stringToFile(s, targetPath);
           if (f==null) { // toc.xml
@@ -11264,6 +11264,7 @@ private String fixPackageReference(String dep) {
           }
         }        
       } else {
+        String s = "---\r\n---\r\n{% include " + template + "%}";
         String targetPath = Utilities.path(tempDir, p);
         FileUtilities.stringToFile(s, targetPath);
         if (f==null) { // toc.xml
@@ -11317,7 +11318,7 @@ private String fixPackageReference(String dep) {
     }
   }
 
-  private void addPageData(JsonObject pages, ImplementationGuideDefinitionPageComponent page, String label, String breadcrumb, Map<String, String> breadcrumbs) throws FHIRException {
+  private void addPageData(JsonObject pages, ImplementationGuideDefinitionPageComponent page, String label, String breadcrumb, Map<String, String> breadcrumbs) throws FHIRException, IOException {
     if (!page.hasName()) {
       errors.add(new ValidationMessage(Source.Publisher, IssueType.REQUIRED, "Base IG resource", "The page \""+page.getTitle()+"\" is missing a name/source element", IssueSeverity.ERROR));
     } else {
@@ -11333,17 +11334,17 @@ private String fixPackageReference(String dep) {
     return map;
   }
 
-  private void addPageData(JsonObject pages, ImplementationGuideDefinitionPageComponent page, String source, String title, Map<String, String> titles, String label, String breadcrumb, Map<String, String> breadcrumbs) throws FHIRException {
+  private void addPageData(JsonObject pages, ImplementationGuideDefinitionPageComponent page, String source, String title, Map<String, String> titles, String label, String breadcrumb, Map<String, String> breadcrumbs) throws FHIRException, IOException {
     FetchedResource r = resources.get(source);
     if (r==null) {
       String fmm = ToolingExtensions.readStringExtension(page, ToolingExtensions.EXT_FMM_LEVEL);
       String status = ToolingExtensions.readStringExtension(page, ToolingExtensions.EXT_STANDARDS_STATUS);
       String normVersion = ToolingExtensions.readStringExtension(page, ToolingExtensions.EXT_NORMATIVE_VERSION);
-      addPageDataRow(pages, source, title, titles, label + (page.hasPage() ? ".0" : ""), fmm, status, normVersion, breadcrumb + breadCrumbForPage(page, false), addToBreadcrumbs(breadcrumbs, page, false), null, null, null);
+      addPageDataRow(pages, source, title, titles, label + (page.hasPage() ? ".0" : ""), fmm, status, normVersion, breadcrumb + breadCrumbForPage(page, false), addToBreadcrumbs(breadcrumbs, page, false), null, null, null, page);
     } else {
       Map<String, String> vars = makeVars(r);
       String outputName = determineOutputName(igpkp.getProperty(r, "base"), r, vars, null, "");
-      addPageDataRow(pages, outputName, title, titles, label, breadcrumb + breadCrumbForPage(page, false), breadcrumbs, r.getStatedExamples(), r.getFoundTestPlans(), r.getFoundTestScripts());
+      addPageDataRow(pages, outputName, title, titles, label, breadcrumb + breadCrumbForPage(page, false), breadcrumbs, r.getStatedExamples(), r.getFoundTestPlans(), r.getFoundTestScripts(), page);
       //      addPageDataRow(pages, source, title, label, breadcrumb + breadCrumbForPage(page, false), r.getStatedExamples());
       for (String templateName: extraTemplateList) {
         if (r.getConfig() !=null && r.getConfig().get("template-"+templateName)!=null && !r.getConfig().get("template-"+templateName).asString().isEmpty()) {
@@ -11353,7 +11354,7 @@ private String fixPackageReference(String dep) {
               String formatTemplateDesc = templateDesc.replace("FMT", format.toUpperCase());
               if (igpkp.wantGen(r, format)) {
                 outputName = determineOutputName(igpkp.getProperty(r, "format"), r, vars, format, "");
-                addPageDataRow(pages, outputName, page.getTitle() + " - " + formatTemplateDesc, titles, label, breadcrumb + breadCrumbForPage(page, false), addToBreadcrumbs(breadcrumbs, page, false), null, null, null);
+                addPageDataRow(pages, outputName, page.getTitle() + " - " + formatTemplateDesc, titles, label, breadcrumb + breadCrumbForPage(page, false), addToBreadcrumbs(breadcrumbs, page, false), null, null, null, page);
               }
             }
           } else if (page.hasGeneration() && page.getGeneration().equals(GuidePageGeneration.GENERATED) /*page.getKind().equals(ImplementationGuide.GuidePageKind.RESOURCE) */) {
@@ -11368,7 +11369,7 @@ private String fixPackageReference(String dep) {
               if (outputName==null)
                 throw new FHIRException("Error in publisher template.  Unable to find file-path property " + templateName + " for resource type " + r.fhirType() + " when property template-" + templateName + " is defined.");
               outputName = igpkp.doReplacements(outputName, r, vars, "");
-              addPageDataRow(pages, outputName, page.getTitle() + " - " + templateDesc, titles, label, breadcrumb + breadCrumbForPage(page, false), addToBreadcrumbs(breadcrumbs, page, false), null, null, null);
+              addPageDataRow(pages, outputName, page.getTitle() + " - " + templateDesc, titles, label, breadcrumb + breadCrumbForPage(page, false), addToBreadcrumbs(breadcrumbs, page, false), null, null, null, page);
             }
           }          
         }
@@ -11398,11 +11399,11 @@ private String fixPackageReference(String dep) {
 
   }
 
-  private void addPageDataRow(JsonObject pages, String url, String title, Map<String, String> titles, String label, String breadcrumb, Map<String, String> breadcrumbs, Set<FetchedResource> examples, Set<FetchedResource> testplans, Set<FetchedResource> testscripts) throws FHIRException {
-    addPageDataRow(pages, url, title, titles, label, null, null, null, breadcrumb, breadcrumbs, examples, testplans, testscripts);
+  private void addPageDataRow(JsonObject pages, String url, String title, Map<String, String> titles, String label, String breadcrumb, Map<String, String> breadcrumbs, Set<FetchedResource> examples, Set<FetchedResource> testplans, Set<FetchedResource> testscripts, ImplementationGuideDefinitionPageComponent page) throws FHIRException, IOException {
+    addPageDataRow(pages, url, title, titles, label, null, null, null, breadcrumb, breadcrumbs, examples, testplans, testscripts, page);
   }
 
-  private void addPageDataRow(JsonObject pages, String url, String title, Map<String, String> titles, String label, String fmm, String status, String normVersion, String breadcrumb, Map<String, String> breadcrumbs, Set<FetchedResource> examples, Set<FetchedResource> testplans, Set<FetchedResource> testscripts) throws FHIRException {
+  private void addPageDataRow(JsonObject pages, String url, String title, Map<String, String> titles, String label, String fmm, String status, String normVersion, String breadcrumb, Map<String, String> breadcrumbs, Set<FetchedResource> examples, Set<FetchedResource> testplans, Set<FetchedResource> testscripts, ImplementationGuideDefinitionPageComponent page) throws FHIRException, IOException {
     JsonObject jsonPage = new JsonObject();
     registerPageFile(pages, url, jsonPage);
     jsonPage.add("title", title);
@@ -11498,9 +11499,9 @@ private String fixPackageReference(String dep) {
 
       TreeSet<ImplementationGuideDefinitionPageComponent> examplePages = new TreeSet<ImplementationGuideDefinitionPageComponent>(new ImplementationGuideDefinitionPageComponentComparator());
       for (FetchedResource exampleResource: examples) {
-        ImplementationGuideDefinitionPageComponent page = pageForFetchedResource(exampleResource);
-        if (page!=null)
-          examplePages.add(page);
+        ImplementationGuideDefinitionPageComponent page2 = pageForFetchedResource(exampleResource);
+        if (page2!=null)
+          examplePages.add(page2);
         // else
         //   throw new Error("Unable to find page for resource "+ exampleResource.getId());
       }
@@ -11518,9 +11519,9 @@ private String fixPackageReference(String dep) {
 
       TreeSet<ImplementationGuideDefinitionPageComponent> testplanPages = new TreeSet<ImplementationGuideDefinitionPageComponent>(new ImplementationGuideDefinitionPageComponentComparator());
       for (FetchedResource testplanResource: testplans) {
-        ImplementationGuideDefinitionPageComponent page = pageForFetchedResource(testplanResource);
-        if (page!=null)
-          testplanPages.add(page);
+        ImplementationGuideDefinitionPageComponent page2 = pageForFetchedResource(testplanResource);
+        if (page2!=null)
+          testplanPages.add(page2);
       }
       for (ImplementationGuideDefinitionPageComponent testplanPage : testplanPages) {
         JsonObject testplanItem = new JsonObject();
@@ -11536,15 +11537,34 @@ private String fixPackageReference(String dep) {
 
       TreeSet<ImplementationGuideDefinitionPageComponent> testscriptPages = new TreeSet<ImplementationGuideDefinitionPageComponent>(new ImplementationGuideDefinitionPageComponentComparator());
       for (FetchedResource testscriptResource: testscripts) {
-        ImplementationGuideDefinitionPageComponent page = pageForFetchedResource(testscriptResource);
-        if (page!=null)
-          testscriptPages.add(page);
+        ImplementationGuideDefinitionPageComponent page2 = pageForFetchedResource(testscriptResource);
+        if (page2!=null)
+          testscriptPages.add(page2);
       }
       for (ImplementationGuideDefinitionPageComponent testscriptPage : testscriptPages) {
         JsonObject testscriptItem = new JsonObject();
         testscriptArray.add(testscriptItem);
         testscriptItem.add("url", testscriptPage.getName());
         testscriptItem.add("title", testscriptPage.getTitle());
+      }
+    }
+    
+    if (isNewML()) {
+      String p = page.getName();
+      String sourceName = null;
+      if (htmlTemplate != null && page.getGeneration() == GuidePageGeneration.HTML  && !relativeNames.keySet().contains(p) && p != null && p.endsWith(".html")) {
+        sourceName = p.substring(0, p.indexOf(".html")) + ".xml";
+      } else if (mdTemplate != null && page.getGeneration() == GuidePageGeneration.MARKDOWN  && !relativeNames.keySet().contains(p) && p != null && p.endsWith(".html")) {
+        sourceName = p.substring(0, p.indexOf(".html")) + ".md";
+      }
+      if (sourceName!=null) {
+        String sourcePath = Utilities.path("_includes", sourceName);
+        FetchedFile f = relativeNames.get(sourcePath);
+        if (f != null) {
+          for (String l : allLangs()) {
+            jsonPage.forceObject("translated").add(l, defaultTranslationLang.equals(l) || f.getTranslated(l));
+          }
+        }
       }
     }
   }
@@ -12357,6 +12377,8 @@ private String fixPackageReference(String dep) {
           File t = new File(Utilities.path(rootDir, ts, f.getLoadPath()));
           if (t.exists()) {
             ff = t;
+            f.setTranslation(l, true);
+            break;
           }
         }
       }
