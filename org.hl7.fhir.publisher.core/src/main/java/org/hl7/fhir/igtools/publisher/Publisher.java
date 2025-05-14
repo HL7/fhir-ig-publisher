@@ -11246,7 +11246,6 @@ private String fixPackageReference(String dep) {
         throw new Exception("Template based HTML file " + p + " is missing source file " + sourceName);
       }
       FetchedFile f = relativeNames.get(sourcePath);
-      String s = "---\r\n---\r\n{% include " + template + "%}";
       if (isNewML()) {
         String targetPath = Utilities.path(tempDir, p);
         if (f==null) { // toc.xml
@@ -11255,6 +11254,7 @@ private String fixPackageReference(String dep) {
           checkMakeFile(makeLangRedirect(p), targetPath, f.getOutputNames());
         }
         for (String l : allLangs()) {
+          String s = "---\r\n---\r\n{% include " + template + " lang='" + l + "' %}";
           targetPath = Utilities.path(tempDir, l, p);
           FileUtilities.stringToFile(s, targetPath);
           if (f==null) { // toc.xml
@@ -11264,6 +11264,7 @@ private String fixPackageReference(String dep) {
           }
         }        
       } else {
+        String s = "---\r\n---\r\n{% include " + template + " %}";
         String targetPath = Utilities.path(tempDir, p);
         FileUtilities.stringToFile(s, targetPath);
         if (f==null) { // toc.xml
