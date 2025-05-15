@@ -54,17 +54,17 @@ public class IPStatementsRenderer {
   private MarkDownProcessor markdownEngine;
   private Map<String, SystemUsage> systems = new HashMap<>();
   private Map<String, List<SystemUsage>> usages = new HashMap<>();
-  private RenderingContextLangs rcs;
+  private RenderingContext rc;
 
   private String packageId;
   
   
-  public IPStatementsRenderer(IWorkerContext ctxt, MarkDownProcessor markdownEngine, String packageId, RenderingContextLangs rcs) {
+  public IPStatementsRenderer(IWorkerContext ctxt, MarkDownProcessor markdownEngine, String packageId, RenderingContext rc) {
     super();
     this.ctxt = ctxt;
     this.markdownEngine = markdownEngine;
     this.packageId = packageId;
-    this.rcs = rcs;
+    this.rc = rc;
   }
   
   private void seeSystem(String url, FetchedResource source) {
@@ -88,8 +88,7 @@ public class IPStatementsRenderer {
     if (r.getResource() != null) {
       listAllCodeSystems(r, r.getResource());
     }
-    RenderingContext lrc = rcs.get(lang);
-    return render((example ? "example" : describeResource(r.getElement(), lrc)), lrc);
+    return render((example ? "example" : describeResource(r.getElement(), rc)));
   }
 
   private String describeResource(Element element, RenderingContext lrc) {
@@ -121,10 +120,10 @@ public class IPStatementsRenderer {
       }
     }
     
-    return render("publication", rcs.get(lang));
+    return render("publication");
   }
   
-  private String render(String title, RenderingContext lrc) throws IOException {
+  private String render(String title) throws IOException {
     for (SystemUsage su : systems.values()) {
       String stmt = getCopyRightStatement(su);
       if (stmt != null) {
@@ -136,10 +135,10 @@ public class IPStatementsRenderer {
     }
     
     if (usages.size() == 0) {
-      return lrc.formatPhrase(isHL7Ig() ? RenderingContext.IP_NONE : RenderingContext.IP_NONE_EXT);
+      return rc.formatPhrase(isHL7Ig() ? RenderingContext.IP_NONE : RenderingContext.IP_NONE_EXT);
     } else {
       StringBuilder b = new StringBuilder();
-      b.append("<p>"+lrc.formatPhrase(RenderingContext.IP_INTRO, title)+"</p>\r\n<ul>\r\n");
+      b.append("<p>"+rc.formatPhrase(RenderingContext.IP_INTRO, title)+"</p>\r\n<ul>\r\n");
       int key1 = 0;
       int key2 = 0;
       for (String stmt : Utilities.sorted(usages.keySet())) {
