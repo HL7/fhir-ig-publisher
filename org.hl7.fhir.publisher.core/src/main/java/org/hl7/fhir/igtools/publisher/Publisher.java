@@ -4794,8 +4794,8 @@ private String fixPackageReference(String dep) {
     specMaps.add(map);
     return map;
   }
-
-
+  
+  
   private void load() throws Exception {
     validationFetcher.initOtherUrls();
     fileList.clear();
@@ -4820,6 +4820,15 @@ private String fixPackageReference(String dep) {
     context.setLocale(locale);
     dependentIgFinder = new DependentIGFinder(sourceIg.getPackageId());
 
+    for (ImplementationGuideDependsOnComponent dep : publishedIg.getDependsOn()) {
+      if (dep.hasPackageId() && dep.getPackageId().contains("@npm:")) {
+        if (!dep.hasId()) {
+          dep.setId(dep.getPackageId().substring(0, dep.getPackageId().indexOf("@npm:")));
+        }
+        dep.setPackageId(dep.getPackageId().substring(dep.getPackageId().indexOf("@npm:")+5));
+        dep.getPackageIdElement().setUserData(UserDataNames.IG_DEP_ALIASED, true); 
+      }
+    }
 
     loadMappingSpaces(context.getBinaryForKey("mappingSpaces.details"));
     validationFetcher.getMappingUrls().addAll(mappingSpaces.keySet());
@@ -11601,12 +11610,20 @@ private String fixPackageReference(String dep) {
 
   private void createToc(ImplementationGuideDefinitionPageComponent insertPage, String insertAfterName, String insertOffset) throws IOException, FHIRException {
     String s = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><div style=\"col-12\"><table style=\"border:0px;font-size:11px;font-family:verdana;vertical-align:top;\" cellpadding=\"0\" border=\"0\" cellspacing=\"0\"><tbody>";
-    s = s + createTocPage(publishedIg.getDefinition().getPage(), insertPage, insertAfterName, insertOffset, null, "", "0", false, "", 0);
+    s = s + createTocPage(publishedIg.getDefinition().getPage(), insertPage, insertAfterName, insertOffset, null, "", "0", false, "", 0, null);
     s = s + "</tbody></table></div>";
     FileUtilities.stringToFile(s, Utilities.path(tempDir, "_includes", "toc.xml"));
+    if (isNewML()) {
+      for (String lang : allLangs()) {
+        s = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><div style=\"col-12\"><table style=\"border:0px;font-size:11px;font-family:verdana;vertical-align:top;\" cellpadding=\"0\" border=\"0\" cellspacing=\"0\"><tbody>";
+        s = s + createTocPage(publishedIg.getDefinition().getPage(), insertPage, insertAfterName, insertOffset, null, "", "0", false, "", 0, lang);
+        s = s + "</tbody></table></div>";
+        FileUtilities.stringToFile(s, Utilities.path(tempDir, "_includes", lang, "toc.xml"));        
+      }
+    }
   }
 
-  private String createTocPage(ImplementationGuideDefinitionPageComponent page, ImplementationGuideDefinitionPageComponent insertPage, String insertAfterName, String insertOffset, String currentOffset, String indents, String label, boolean last, String idPrefix, int position) throws FHIRException {
+  private String createTocPage(ImplementationGuideDefinitionPageComponent page, ImplementationGuideDefinitionPageComponent insertPage, String insertAfterName, String insertOffset, String currentOffset, String indents, String label, boolean last, String idPrefix, int position, String lang) throws FHIRException {
     if (position > 222) {
       position = 222;
       if (!tocSizeWarning) {
@@ -11655,10 +11672,10 @@ private String fixPackageReference(String dep) {
         total++;
       }
 
-      s = s + createTocPage(childPage, insertPage, insertAfterName, insertOffset, currentOffset, newIndents, (label.equals("0") ? "" : label+".") + Integer.toString(i), i==total, id, i);
+      s = s + createTocPage(childPage, insertPage, insertAfterName, insertOffset, currentOffset, newIndents, (label.equals("0") ? "" : label+".") + Integer.toString(i), i==total, id, i, lang);
       i++;
       if (insertAfterName!=null && childPage.getName().equals(insertAfterName)) {
-        s = s + createTocPage(insertPage, null, null, "", insertOffset, newIndents, (label.equals("0") ? "" : label+".") + Integer.toString(i), i==total, id, i);
+        s = s + createTocPage(insertPage, null, null, "", insertOffset, newIndents, (label.equals("0") ? "" : label+".") + Integer.toString(i), i==total, id, i, lang);
         i++;
       }
     }
