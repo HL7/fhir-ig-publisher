@@ -4826,7 +4826,7 @@ private String fixPackageReference(String dep) {
           dep.setId(dep.getPackageId().substring(0, dep.getPackageId().indexOf("@npm:")));
         }
         dep.setPackageId(dep.getPackageId().substring(dep.getPackageId().indexOf("@npm:")+5));
-        dep.getPackageIdElement().setUserData(UserDataNames.IG_DEP_ALIASED, true); 
+//        dep.getPackageIdElement().setUserData(UserDataNames.IG_DEP_ALIASED, true); 
       }
     }
 
