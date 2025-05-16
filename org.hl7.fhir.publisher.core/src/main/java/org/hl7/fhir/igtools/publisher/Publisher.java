@@ -10121,17 +10121,13 @@ private String fixPackageReference(String dep) {
     }
     data.add("hasTranslations", hasTranslations);
     data.add("defLang", defaultTranslationLang);
-    JsonObject langs = new JsonObject();
+    JsonArray langs = new JsonArray();
     data.add("langs", langs); 
-    for (String s : allLangs()) {
+    for (String code : allLangs()) {
       JsonObject lu = new JsonObject();
-      langs.add(s, lu);
-      lu.add("param", "-"+s);
-      lu.add("display", getLangDesc(s, null));
-      for (String l : allLangs()) {
-        // todo: translation to other languages
-        lu.add("display"+l, getLangDesc(s, l));
-      }
+      langs.add(lu);
+      lu.add("code", code);
+      lu.add("display", getLangDesc(code, null));
     }
 
     json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(data, true);
