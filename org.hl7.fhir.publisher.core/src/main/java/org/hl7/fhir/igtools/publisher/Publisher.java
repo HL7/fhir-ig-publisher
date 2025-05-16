@@ -14876,7 +14876,7 @@ private String fixPackageReference(String dep) {
     }
     frag.record(System.currentTimeMillis() - start, fixedContent.length());
 
-    if (checkMakeFile(FileUtilities.stringToBytes(wrapLiquid(fixedContent)), Utilities.path(tempDir, "_includes", name+"-" + lang +".xhtml"), outputTracker)) {
+    if (checkMakeFile(FileUtilities.stringToBytes(wrapLiquid(fixedContent)), Utilities.path(tempDir, "_includes", name+(lang == null ? "" : "-" + lang)+".xhtml"), outputTracker)) {
       if (mode != IGBuildMode.AUTOBUILD && makeQA) {
         FileUtilities.stringToFile(pageWrap(fixedContent, name), Utilities.path(qaDir, name+".html"));
       }
