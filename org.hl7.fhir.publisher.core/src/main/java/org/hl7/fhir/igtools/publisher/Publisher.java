@@ -11273,7 +11273,7 @@ private String fixPackageReference(String dep) {
           checkMakeFile(makeLangRedirect(p), targetPath, f.getOutputNames());
         }
         for (String l : allLangs()) {
-          String s = "---\r\n---\r\n{% include " + template + " lang='"+l+"'%}";
+          String s = "---\r\n---\r\n{% include " + template + " lang='" + l + "' %}";
           targetPath = Utilities.path(tempDir, l, p);
           FileUtilities.stringToFile(s, targetPath);
           if (f==null) { // toc.xml
@@ -11283,7 +11283,7 @@ private String fixPackageReference(String dep) {
           }
         }        
       } else {
-        String s = "---\r\n---\r\n{% include " + template + "%}";
+        String s = "---\r\n---\r\n{% include " + template + " %}";
         String targetPath = Utilities.path(tempDir, p);
         FileUtilities.stringToFile(s, targetPath);
         if (f==null) { // toc.xml
@@ -12415,8 +12415,8 @@ private String fixPackageReference(String dep) {
       for (String ts : translationSources) {
         if (Utilities.endsWithInList(ts, "/"+l, "\\"+l, "-"+l)) {
           File t = new File(Utilities.path(rootDir, ts, f.getLoadPath()));
-          if (t.exists()) {
-            ff = t;
+        if (t.exists()) {
+          ff = t;
             f.setTranslation(l, true);
             break;
           }
@@ -14875,8 +14875,8 @@ private String fixPackageReference(String dep) {
       fragmentUses.put(context+"."+code, frag);
     }
     frag.record(System.currentTimeMillis() - start, fixedContent.length());
-    
-    if (checkMakeFile(FileUtilities.stringToBytes(wrapLiquid(fixedContent)), Utilities.path(tempDir, "_includes", lang == null ? "." : lang, name+".xhtml"), outputTracker)) {
+
+    if (checkMakeFile(FileUtilities.stringToBytes(wrapLiquid(fixedContent)), Utilities.path(tempDir, "_includes", name+"-" + lang +".xhtml"), outputTracker)) {
       if (mode != IGBuildMode.AUTOBUILD && makeQA) {
         FileUtilities.stringToFile(pageWrap(fixedContent, name), Utilities.path(qaDir, name+".html"));
       }
