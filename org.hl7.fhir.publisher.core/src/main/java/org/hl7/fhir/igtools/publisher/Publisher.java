@@ -5756,7 +5756,7 @@ private String fixPackageReference(String dep) {
       logMessage("Run Template");
       Session tts = tt.start("template");
       List<String> newFileList = new ArrayList<String>();
-      checkOutcomes(template.beforeGenerateEvent(publishedIg, tempDir, otherFilesRun, newFileList));
+      checkOutcomes(template.beforeGenerateEvent(publishedIg, tempDir, otherFilesRun, newFileList, allLangs()));
       for (String newFile: newFileList) {
         if (!newFile.isEmpty()) {
           try {
@@ -13925,7 +13925,7 @@ private String fixPackageReference(String dep) {
       vars.put("lang", lang);
     }
     vars.put("langsuffix", lang==null? "" : ("-" + lang));
-    
+
     template = igpkp.doReplacements(template, r, vars, format);
 
     outputName = determineOutputName(outputName, r, vars, format, extension);
