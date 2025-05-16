@@ -11301,6 +11301,7 @@ private String fixPackageReference(String dep) {
 
   private byte[] makeLangRedirect(String p) {
     StringBuilder b  = new StringBuilder();
+    b.append("<html><body>\r\n");
     b.append("<script type=\"text/javascript\">\r\n");
     b.append("doRedirect();\r\n");
     b.append("\r\n");
@@ -11324,7 +11325,7 @@ private String fixPackageReference(String dep) {
     }
     b.append("  window.location.replace(\""+defaultTranslationLang+"/"+p+"\");\r\n");
     b.append("}\r\n");
-    b.append("</script>\r\n");
+    b.append("</script></body></html>\r\n");
     
     return ("---\r\n---\r\n"+b.toString()).getBytes(StandardCharsets.UTF_8);
   }
