@@ -13918,12 +13918,13 @@ private String fixPackageReference(String dep) {
   private void genWrapperInner(FetchedFile ff, FetchedResource r, String template, String outputName, Set<String> outputTracker, Map<String, String> vars, String format, String extension, boolean recordPath, String lang) throws FileNotFoundException, IOException, FHIRException {
 
     template = fetcher.openAsString(Utilities.path(fetcher.pathForFile(configFile), template));
+    if (vars == null) {
+      vars = new HashMap<String, String>();
+    }
     if (lang != null) {
-      if (vars == null) {
-        vars = new HashMap<String, String>();
-      }
       vars.put("lang", lang);
     }
+    vars.put("langsuffix", lang==null? "" : ("-" + lang));
     
     template = igpkp.doReplacements(template, r, vars, format);
 
