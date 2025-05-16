@@ -12218,6 +12218,12 @@ private String fixPackageReference(String dep) {
                 checkMakeFile(processCustomLiquid(db, src, f), dst, f.getOutputNames());
               }
             }
+            dst = Utilities.path(tempDir, f.getRelativePath());
+            if (f.getPath().endsWith(".md")) {
+              checkMakeFile(processCustomLiquid(db, stripFrontMatter(f.getSource()), f), dst, f.getOutputNames());
+            } else {
+              checkMakeFile(processCustomLiquid(db, f.getSource(), f), dst, f.getOutputNames());
+            }
           } else {
             if (f.getPath().endsWith(".md")) {
               checkMakeFile(processCustomLiquid(db, stripFrontMatter(f.getSource()), f), dst, f.getOutputNames());
