@@ -11423,13 +11423,18 @@ private String fixPackageReference(String dep) {
     JsonObject jsonPage = new JsonObject();
     registerPageFile(pages, url, jsonPage);
     jsonPage.add("title", title);
+    JsonObject jsonTitle = new JsonObject();
+    jsonPage.add("titlelang", jsonTitle);
     for (String l : allLangs()) {
-      jsonPage.add("title"+l, titles.get(l));     
+      jsonTitle.add(l, titles.get(l));
     }
     jsonPage.add("label", label);
     jsonPage.add("breadcrumb", breadcrumb);
+    JsonObject jsonBreadcrumb = new JsonObject();
+    jsonPage.add("breadcrumblang", jsonBreadcrumb);
     for (String l : allLangs()) {
-      jsonPage.add("breadcrumb"+l, breadcrumbs.get(l));     
+      String tBreadcrumb = breadcrumbs.get(l) + "<li><b>" + titles.get(l) + "</b></li>";
+      jsonBreadcrumb.add(l, tBreadcrumb);
     }
     if (fmm != null)
       jsonPage.add("fmm", fmm);
