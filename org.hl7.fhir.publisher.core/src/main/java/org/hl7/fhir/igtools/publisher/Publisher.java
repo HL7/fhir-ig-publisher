@@ -4781,7 +4781,7 @@ private String fixPackageReference(String dep) {
       return true;
     if (s.startsWith("icon"))
       return true;
-    if (Utilities.existsInList(s, "modifier.png", "mustsupport.png", "information.png", "summary.png", "new.png", "lock.png", "external.png", "cc0.png", "target.png", "link.svg"))
+    if (Utilities.existsInList(s, "modifier.png", "tree-filter.png", "mustsupport.png", "information.png", "summary.png", "new.png", "lock.png", "external.png", "cc0.png", "target.png", "link.svg"))
       return true;
 
     return false;
@@ -4826,7 +4826,7 @@ private String fixPackageReference(String dep) {
           dep.setId(dep.getPackageId().substring(0, dep.getPackageId().indexOf("@npm:")));
         }
         dep.setPackageId(dep.getPackageId().substring(dep.getPackageId().indexOf("@npm:")+5));
-//        dep.getPackageIdElement().setUserData(UserDataNames.IG_DEP_ALIASED, true); 
+        dep.getPackageIdElement().setUserData(UserDataNames.IG_DEP_ALIASED, true); 
       }
     }
 
@@ -12415,8 +12415,8 @@ private String fixPackageReference(String dep) {
       for (String ts : translationSources) {
         if (Utilities.endsWithInList(ts, "/"+l, "\\"+l, "-"+l)) {
           File t = new File(Utilities.path(rootDir, ts, f.getLoadPath()));
-        if (t.exists()) {
-          ff = t;
+          if (t.exists()) {
+            ff = t;
             f.setTranslation(l, true);
             break;
           }

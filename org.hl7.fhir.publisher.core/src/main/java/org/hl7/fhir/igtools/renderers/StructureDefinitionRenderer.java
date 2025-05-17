@@ -52,7 +52,6 @@ import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.PackageInformation;
 import org.hl7.fhir.r5.model.PrimitiveType;
 import org.hl7.fhir.r5.model.Quantity;
-import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.SearchParameter;
 import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.r5.model.StructureDefinition;
@@ -69,8 +68,8 @@ import org.hl7.fhir.r5.renderers.AdditionalBindingsRenderer;
 import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.StructureDefinitionRendererMode;
+import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities.SystemReference;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
@@ -497,7 +496,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return "";
     else {
       sdr.getContext().setStructureMode(mode);
-      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, true, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? "da" : "d"), toTabs ? ANCHOR_PREFIX_DIFF : ANCHOR_PREFIX_SNAP, resE));
+      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, true, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? "da" : "d"), toTabs ? ANCHOR_PREFIX_DIFF : ANCHOR_PREFIX_SNAP, resE, all ? "DA" : "D"));
     }
   }
 
@@ -510,7 +509,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return "";
     else {
       sdr.getContext().setStructureMode(mode);
-      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? "sa" : null), toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP, resE));
+      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? "sa" : null), toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP, resE, all ? "SA" : "S"));
     }
   }
 
@@ -519,7 +518,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return "";
     else {
       sdr.getContext().setStructureMode(mode);
-      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? "sa" : null), toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP, resE));
+      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? "sa" : null), toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP, resE, all ? "OA" : "O"));
     }
   }
 
@@ -532,7 +531,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       
       sdCopy.getSnapshot().setElement(getKeyElements());
       sdr.getContext().setStructureMode(mode);
-      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(new RenderingStatus(), defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, true, outputTracker, true, gen.withUniqueLocalPrefix(all ? "ka" :"k"), toTabs ? ANCHOR_PREFIX_KEY : ANCHOR_PREFIX_SNAP, resE);
+      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(new RenderingStatus(), defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, true, outputTracker, true, gen.withUniqueLocalPrefix(all ? "ka" :"k"), toTabs ? ANCHOR_PREFIX_KEY : ANCHOR_PREFIX_SNAP, resE, all ? "KA" : "K");
 
       return composer.compose(table);
     }
@@ -547,7 +546,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       sdr.getContext().setStructureMode(mode);
 
       sdCopy.getSnapshot().setElement(getMustSupportElements());
-      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(new RenderingStatus(), defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, true, gen.withUniqueLocalPrefix(all ? "ma" :"m"), toTabs ? ANCHOR_PREFIX_MS : ANCHOR_PREFIX_SNAP, resE);
+      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(new RenderingStatus(), defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, true, gen.withUniqueLocalPrefix(all ? "ma" :"m"), toTabs ? ANCHOR_PREFIX_MS : ANCHOR_PREFIX_SNAP, resE, all ? "MA" : "M");
 
       return composer.compose(table);
     }
@@ -589,8 +588,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       StructureDefinition sdCopy = sd.copy();
       List<ElementDefinition> keyElements = getKeyElements();
 
-      sdCopy.getSnapshot().setElement(keyElements);
-      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(new RenderingStatus(), defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, true, outputTracker, true, gen, ANCHOR_PREFIX_KEY, resE);
+      sdCopy.getSnapshot().setElement(keyElements);      
+      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(new RenderingStatus(), defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, true, outputTracker, true, gen, ANCHOR_PREFIX_KEY, resE, "KK");
 
       return composer.compose(table);
     }
@@ -2790,7 +2789,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
             }
             sdr.getContext().setStructureMode(StructureDefinitionRendererMode.SUMMARY);
             x.add(sdr.generateTable(new RenderingStatus(), null, (StructureDefinition) sdv.getResource(), true, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, 
-                outputTracker, false, gen.withUniqueLocalPrefix(VersionUtilities.getNameForVersion(v)), ANCHOR_PREFIX_SNAP, resE));
+                outputTracker, false, gen.withUniqueLocalPrefix(VersionUtilities.getNameForVersion(v)), ANCHOR_PREFIX_SNAP, resE, "V"));
           }
         }
       }

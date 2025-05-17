@@ -224,7 +224,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     RenderingContext rc = new RenderingContext(engine.getVdr5(), new MarkDownProcessor(Dialect.COMMON_MARK), null, "http://hl7.org/fhir", "", null, ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
     rc.setPkp(this);
     var sdr = new org.hl7.fhir.r5.renderers.StructureDefinitionRenderer(rc);
-    body.add(sdr.generateTable(new RenderingStatus(), "todo", sd, true,  Utilities.path(path, "temp", "xver-qa"), false, "Extension", false, "http://hl7.org/fhir", "", false, false, null, false, rc, "", ResourceWrapper.forResource(rc.getContextUtilities(), sd)));
+    body.add(sdr.generateTable(new RenderingStatus(), "todo", sd, true,  Utilities.path(path, "temp", "xver-qa"), false, "Extension", false, "http://hl7.org/fhir", "", false, false, null, false, rc, "", ResourceWrapper.forResource(rc.getContextUtilities(), sd), "CV"));
     body.hr();
     
     body.pre().tx(new JsonParser().setOutputStyle(OutputStyle.PRETTY).composeString(sd));

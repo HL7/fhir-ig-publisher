@@ -54,6 +54,7 @@ import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
+import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
@@ -787,7 +788,7 @@ public class HTMLInspector {
     if (!Utilities.noString(src) && Utilities.isAbsoluteUrl(src) && !Utilities.existsInList(src, 
         "http://hl7.org/fhir/history-cm.js", "http://hl7.org/fhir/assets-hist/js/jquery.js") && !src.contains("googletagmanager.com")) {
       messages.add(new ValidationMessage(Source.Publisher, IssueType.INVALID, filename+(loc == null ? "" : " at "+loc.toString()), "The <script> src '"+src+"' is illegal", IssueSeverity.FATAL));
-    } else if (src == null && x.allText() != null) {
+    } else if (src == null && x.allText() != null && !x.allText().contains(HierarchicalTableGenerator.uuid)) {
       String js = x.allText();
       if (jsmsgs.containsKey(js)) {
         ValidationMessage vm = jsmsgs.get(js);
