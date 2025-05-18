@@ -466,7 +466,8 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
   }
   
   private void addFile(List<FetchedFile> res, File f, String cnt) throws IOException {
-    FetchedFile ff = new FetchedFile(new File(rootDir).toURI().relativize(f.toURI()).getPath(), getPathFromInput(f.getAbsolutePath()));
+    
+    FetchedFile ff = new FetchedFile(new File(rootDir).toURI().relativize(f.toURI()).getPath(), getPathFromInput(f.getAbsolutePath().replace("/", "\\")));
     ff.setPath(f.getCanonicalPath());
     ff.setName(fileTitle(f.getCanonicalPath()));
     ff.setTime(f.lastModified());
@@ -486,7 +487,9 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
     }
     String inputPath = Utilities.path(rootDir, "input");
     if (p.startsWith(inputPath)) {
-      return FileUtilities.getRelativePath(inputPath, p);
+      String v = FileUtilities.getRelativePath(inputPath, p);
+      System.out.println("loaded path for "+inputPath+", "+p+" is "+v);
+      return v;
     } else {
       return new File(p).getName();
     }
