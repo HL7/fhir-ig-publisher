@@ -7080,9 +7080,9 @@ private String fixPackageReference(String dep) {
     for (String l : allLangs()) {
       codes.add(l);
     }
-    for (String s : dir.split("\\"+File.separator)) {
-      if (codes.contains(s)) {
-        return s;
+    for (Path part : Paths.get(dir)) {
+      if (codes.contains(part.toString())) {
+          return part.toString();
       }
     }
     for (String s : fn.split("\\-")) {
