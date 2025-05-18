@@ -12447,6 +12447,7 @@ private String fixPackageReference(String dep) {
       for (String ts : translationSources) {
         if (Utilities.endsWithInList(ts, "/"+l, "\\"+l, "-"+l)) {
           File t = new File(Utilities.path(rootDir, ts, f.getLoadPath()));
+          System.out.println("look for "+f.getLoadPath()+" for "+l+" in "+t.getAbsolutePath());
           if (t.exists()) {
             ff = t;
             f.setTranslation(l, true);
