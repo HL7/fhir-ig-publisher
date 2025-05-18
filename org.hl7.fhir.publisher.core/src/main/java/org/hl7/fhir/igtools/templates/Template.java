@@ -48,7 +48,12 @@ import org.hl7.fhir.r5.model.OperationOutcome;
 import org.hl7.fhir.r5.model.OperationOutcome.OperationOutcomeIssueComponent;
 import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
+import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.i18n.LanguageFileProducer.TranslationUnit;
+import org.hl7.fhir.utilities.i18n.PoGetTextProducer;
+import org.hl7.fhir.utilities.i18n.POObject;
+import org.hl7.fhir.utilities.json.JsonException;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonElement;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -167,6 +172,79 @@ public class Template {
       for (String s : configuration.asString("summaryRows").split("\\ "))
       summaryRows.add(s);
     }
+    processTemplateTranslations();
+  }
+
+  private void processTemplateTranslations() throws IOException {
+    String tf = Utilities.path(templateDir, "translations");
+    for (File f : new File(tf).listFiles()) {
+      if (f.getName().endsWith(".json")) {
+        processTranslationFile(tf, f);
+      }
+    }
+    
+  }
+
+  private void processTranslationFile(String tf, File fl) throws JsonException, IOException {
+    String base = FileUtilities.fileTitle(fl.getName());
+    List<String> prefixes = new ArrayList<String>();
+    Map<String, List<POObject>> translations = new HashMap<>();
+
+    // load the base file
+    JsonObject lf = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(fl);
+    
+    // load all the translations
+    for (File f : new File(tf).listFiles()) {
+      if (f.getName().startsWith(base+"-") && f.getName().endsWith(".po")) {
+        String lang = f.getName().substring(base.length()+1).replace(".po", "");
+        translations.put(lang, POObject.loadPOFile(prefixes, f.getAbsolutePath()));
+      }
+    }
+    // create language files for entries in the base
+    for (JsonProperty langEntry : lf.getProperties()) {
+      String lang = langEntry.getName();
+      if (!"en".equals(lang)) {
+        List<POObject> units;
+        if (!translations.containsKey(lang)) {
+          units = new ArrayList<>();
+          translations.put(base, units);
+          for (JsonProperty p : langEntry.getValue().asJsonObject().getProperties()) {
+            units.add(new POObject(p.getName(), lf.getJsonObject("en").asString(p.getName()), p.getValue().asString()));
+          }
+        } else {
+          units = translations.get(lang);
+        }
+        for (JsonProperty p : lf.getJsonObject("en").getProperties()) {
+          POObject existing = null;
+          for (POObject t : units) {
+            if (t.getId().equals(p.getName())) {
+              existing = t;
+              break;
+            }
+          }
+          if (existing == null) {
+            units.add(new POObject(p.getName(), p.getValue().asString(), null));
+          } else {
+            existing.setMsgid(p.getValue().asString());
+          }
+        }
+        POObject.savePOFile(prefixes, Utilities.path(tf, base+"-"+lang+".po"), units, 1, 0);
+      }
+    }
+    // now populate from the PO files 
+    for (String lang : translations.keySet()) {
+      List<POObject> units = translations.get(lang);
+      for (POObject po : units) {
+        JsonObject l = lf.forceObject(lang);
+        l.remove(po.getId());
+        if (po.getMsgstr().isEmpty()) {
+          l.add(po.getId(), lf.getJsonObject("en").asString(po.getId()));          
+        } else {
+          l.add(po.getId(), po.getMsgstr().get(0));
+        }
+      }
+    }
+    org.hl7.fhir.utilities.json.parser.JsonParser.compose(lf, fl, true);
   }
 
   public boolean hasPreProcess() {
