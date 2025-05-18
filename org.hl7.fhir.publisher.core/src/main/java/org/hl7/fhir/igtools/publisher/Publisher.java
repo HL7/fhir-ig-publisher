@@ -11338,29 +11338,33 @@ private String fixPackageReference(String dep) {
     if (!page.hasName()) {
       errors.add(new ValidationMessage(Source.Publisher, IssueType.REQUIRED, "Base IG resource", "The page \""+page.getTitle()+"\" is missing a name/source element", IssueSeverity.ERROR));
     } else {
-      addPageData(pages, page, page.getName(), page.getTitle(), getLangTitles(page.getTitleElement()), label, breadcrumb, breadcrumbs);
+      addPageData(pages, page, page.getName(), page.getTitle(), label, breadcrumb, breadcrumbs);
     }
   }
 
-  private Map<String, String> getLangTitles(StringType titleElement) {
+  private Map<String, String> getLangTitles(StringType titleElement, String description) {
     Map<String, String> map = new HashMap<String, String>();
     for (String l : allLangs()) {
-      map.put(l, langUtils.getTranslationOrBase(titleElement, l));
+      String title = langUtils.getTranslationOrBase(titleElement, l);
+      if (!description.isEmpty()) {
+        title += " - " + langUtils.getTranslationOrBase(new StringType(description), l);
+      }
+      map.put(l, title);
     }
     return map;
   }
 
-  private void addPageData(JsonObject pages, ImplementationGuideDefinitionPageComponent page, String source, String title, Map<String, String> titles, String label, String breadcrumb, Map<String, String> breadcrumbs) throws FHIRException, IOException {
+  private void addPageData(JsonObject pages, ImplementationGuideDefinitionPageComponent page, String source, String title, String label, String breadcrumb, Map<String, String> breadcrumbs) throws FHIRException, IOException {
     FetchedResource r = resources.get(source);
     if (r==null) {
       String fmm = ToolingExtensions.readStringExtension(page, ToolingExtensions.EXT_FMM_LEVEL);
       String status = ToolingExtensions.readStringExtension(page, ToolingExtensions.EXT_STANDARDS_STATUS);
       String normVersion = ToolingExtensions.readStringExtension(page, ToolingExtensions.EXT_NORMATIVE_VERSION);
-      addPageDataRow(pages, source, title, titles, label + (page.hasPage() ? ".0" : ""), fmm, status, normVersion, breadcrumb + breadCrumbForPage(page, false), addToBreadcrumbs(breadcrumbs, page, false), null, null, null, page);
+      addPageDataRow(pages, source, title, getLangTitles(page.getTitleElement(), ""), label + (page.hasPage() ? ".0" : ""), fmm, status, normVersion, breadcrumb + breadCrumbForPage(page, false), addToBreadcrumbs(breadcrumbs, page, false), null, null, null, page);
     } else {
       Map<String, String> vars = makeVars(r);
       String outputName = determineOutputName(igpkp.getProperty(r, "base"), r, vars, null, "");
-      addPageDataRow(pages, outputName, title, titles, label, breadcrumb + breadCrumbForPage(page, false), breadcrumbs, r.getStatedExamples(), r.getFoundTestPlans(), r.getFoundTestScripts(), page);
+      addPageDataRow(pages, outputName, title, getLangTitles(page.getTitleElement(), ""), label, breadcrumb + breadCrumbForPage(page, false), breadcrumbs, r.getStatedExamples(), r.getFoundTestPlans(), r.getFoundTestScripts(), page);
       //      addPageDataRow(pages, source, title, label, breadcrumb + breadCrumbForPage(page, false), r.getStatedExamples());
       for (String templateName: extraTemplateList) {
         if (r.getConfig() !=null && r.getConfig().get("template-"+templateName)!=null && !r.getConfig().get("template-"+templateName).asString().isEmpty()) {
@@ -11370,7 +11374,8 @@ private String fixPackageReference(String dep) {
               String formatTemplateDesc = templateDesc.replace("FMT", format.toUpperCase());
               if (igpkp.wantGen(r, format)) {
                 outputName = determineOutputName(igpkp.getProperty(r, "format"), r, vars, format, "");
-                addPageDataRow(pages, outputName, page.getTitle() + " - " + formatTemplateDesc, titles, label, breadcrumb + breadCrumbForPage(page, false), addToBreadcrumbs(breadcrumbs, page, false), null, null, null, page);
+
+                addPageDataRow(pages, outputName, page.getTitle() + " - " + formatTemplateDesc, getLangTitles(page.getTitleElement(), formatTemplateDesc), label, breadcrumb + breadCrumbForPage(page, false), addToBreadcrumbs(breadcrumbs, page, false), null, null, null, page);
               }
             }
           } else if (page.hasGeneration() && page.getGeneration().equals(GuidePageGeneration.GENERATED) /*page.getKind().equals(ImplementationGuide.GuidePageKind.RESOURCE) */) {
@@ -11385,7 +11390,7 @@ private String fixPackageReference(String dep) {
               if (outputName==null)
                 throw new FHIRException("Error in publisher template.  Unable to find file-path property " + templateName + " for resource type " + r.fhirType() + " when property template-" + templateName + " is defined.");
               outputName = igpkp.doReplacements(outputName, r, vars, "");
-              addPageDataRow(pages, outputName, page.getTitle() + " - " + templateDesc, titles, label, breadcrumb + breadCrumbForPage(page, false), addToBreadcrumbs(breadcrumbs, page, false), null, null, null, page);
+              addPageDataRow(pages, outputName, page.getTitle() + " - " + templateDesc, getLangTitles(page.getTitleElement(), ""), label, breadcrumb + breadCrumbForPage(page, false), addToBreadcrumbs(breadcrumbs, page, false), null, null, null, page);
             }
           }          
         }
@@ -11433,7 +11438,9 @@ private String fixPackageReference(String dep) {
     JsonObject jsonBreadcrumb = new JsonObject();
     jsonPage.add("breadcrumblang", jsonBreadcrumb);
     for (String l : allLangs()) {
-      String tBreadcrumb = breadcrumbs.get(l) + "<li><b>" + titles.get(l) + "</b></li>";
+      String tBreadcrumb = breadcrumbs.get(l);
+      if (tBreadcrumb.endsWith("</a></li>"))
+        tBreadcrumb += "<li><b>" + titles.get(l) + "</b></li>";
       jsonBreadcrumb.add(l, tBreadcrumb);
     }
     if (fmm != null)
