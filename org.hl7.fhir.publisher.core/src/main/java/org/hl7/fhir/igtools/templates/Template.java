@@ -385,16 +385,30 @@ public class Template {
       return runScriptTarget(targetOnLoad, messages, ig, null, IG_ANY);
   }
   
-  public Map<String, List<ValidationMessage>> beforeGenerateEvent(ImplementationGuide ig, String tempDir, Set<String> fileList, List<String> newFileList) throws IOException, FHIRException {
+  public Map<String, List<ValidationMessage>> beforeGenerateEvent(ImplementationGuide ig, String tempDir, Set<String> fileList, List<String> newFileList, List<String> translationLangs) throws IOException, FHIRException {
     File src = new File(Utilities.path(templateDir, "content"));
     if (src.exists()) {
       for (File f : src.listFiles()) {
-        if (f.isDirectory())
-          FileUtils.copyDirectory(f, new File(Utilities.path(tempDir, f.getName())));
-        else {
-          File nf = new File(Utilities.path(tempDir, f.getName()));
-          fileList.add(nf.getAbsolutePath());
-          FileUtils.copyFile(f, nf);
+        if (f.isDirectory()) {
+          if (translationLangs.isEmpty())
+            FileUtils.copyDirectory(f, new File(Utilities.path(tempDir, f.getName())));
+          else {
+            for (String lang: translationLangs) {
+              FileUtils.copyDirectory(f, new File(Utilities.path(tempDir, lang, f.getName())));
+            }
+          }
+        } else {
+          if (translationLangs.isEmpty()) {
+            File nf = new File(Utilities.path(tempDir, f.getName()));
+            fileList.add(nf.getAbsolutePath());
+            FileUtils.copyFile(f, nf);
+          } else {
+            for (String lang: translationLangs) {
+              File nf = new File(Utilities.path(tempDir, lang, f.getName()));
+              fileList.add(nf.getAbsolutePath());
+              FileUtils.copyFile(f, nf);
+            }
+          }
         }
       }
     }
