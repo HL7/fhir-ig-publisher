@@ -1078,7 +1078,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     if (isBuildingTemplate) {
       packageTemplate();
     } else {
-      log("Load Content");
+      log("Load IG");
       try {
         createIg();
       } catch (Exception e) {
@@ -4801,6 +4801,7 @@ private String fixPackageReference(String dep) {
     fileList.clear();
     changeList.clear();
     bndIds.clear();
+    log("Load Translations");
 
     FetchedFile igf = fetcher.fetch(igName);
     noteFile(IG_NAME, igf);
@@ -4810,6 +4811,7 @@ private String fixPackageReference(String dep) {
     if (translations != null) {
       langUtils.importFromTranslations(sourceIg, translations, igf.getErrors());
     }
+    log("Load Content");
     publishedIg = sourceIg.copy();
     FetchedResource igr = igf.addResource("$IG");
     //      loadAsElementModel(igf, igr, null);
@@ -7032,9 +7034,13 @@ private String fixPackageReference(String dep) {
           if ((fn.startsWith(base+".") || fn.startsWith(base+"-") || fn.startsWith(base+"_")) ||
               (fn.startsWith(tbase+".") || fn.startsWith(tbase+"-") || fn.startsWith(tbase+"_"))) {
             LanguageFileProducer lp = null;
+            String lang = findLang(fn, dir);
             switch (Utilities.getFileExtension(fn)) {
             case "po":
-              lp = new PoGetTextProducer();
+              if (lang == null) {
+                throw new Error("Unable to determine language from filename for "+Utilities.path(rootDir, dir, fn));
+              }
+              lp = new PoGetTextProducer(lang);
               break;
             case "xliff":
               lp = new XLIFFProducer();
@@ -7067,6 +7073,24 @@ private String fixPackageReference(String dep) {
       }
     }
     return res;
+  }
+
+  private String findLang(String fn, String dir) {
+    Set<String> codes = new HashSet<>();
+    for (String l : allLangs()) {
+      codes.add(l);
+    }
+    for (String s : dir.split("\\"+File.separator)) {
+      if (codes.contains(s)) {
+        return s;
+      }
+    }
+    for (String s : fn.split("\\-")) {
+      if (codes.contains(s)) {
+        return s;
+      }
+    }
+    return null;
   }
 
   public void checkResourceUnique(String tid, String source, String cause) throws Error {
