@@ -5876,7 +5876,6 @@ private String fixPackageReference(String dep) {
 
     PreProcessInfo ppinfo = preProcessInfo.get(basePath);
     if (ppinfo==null) {
-      System.out.println("PreProcessInfo hash:" + preProcessInfo.toString());
       throw new Exception("Unable to find preProcessInfo for basePath: " + basePath);
     }
     if (!altMap.containsKey("pre-page/"+dir.getPath())) {
@@ -5894,7 +5893,6 @@ private String fixPackageReference(String dep) {
     }
     for (String link : dir.getFiles()) {
       FetchedFile f = fetcher.fetch(link);
-      //      System.out.println("find pre-page "+f.getPath()+" at "+link+" from "+basePath);
       if (basePath.startsWith("/var") && f.getPath().startsWith("/private/var")) {
         f.setPath(f.getPath().substring(8));
       }
@@ -8890,12 +8888,22 @@ private String fixPackageReference(String dep) {
     if (!isChild()) {
       log("Checking Output HTML");
       String statusMessage;
+      Map<String, String> statusMessages = new HashMap<>();
       if (mode == IGBuildMode.AUTOBUILD) { 
-        statusMessage = Utilities.escapeXml(sourceIg.present())+", published by "+Utilities.escapeXml(sourceIg.getPublisher())+". This guide is not an authorized publication; it is the continuous build for version "+workingVersion()+" built by the FHIR (HL7® FHIR® Standard) CI Build. This version is based on the current content of <a href=\""+gh()+"\">"+gh()+"</a> and changes regularly. See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>"; 
+        statusMessage = rc.formatPhrase(RenderingI18nContext.STATUS_MSG_AUTOBUILD, Utilities.escapeXml(sourceIg.present()), Utilities.escapeXml(sourceIg.getPublisher()), Utilities.escapeXml(workingVersion()), gh(), igpkp.getCanonical());
+        for (String lang : allLangs()) {
+          statusMessages.put(lang, rcLangs.get(lang).formatPhrase(RenderingI18nContext.STATUS_MSG_AUTOBUILD, Utilities.escapeXml(sourceIg.present()), Utilities.escapeXml(sourceIg.getPublisher()), Utilities.escapeXml(workingVersion()), gh(), igpkp.getCanonical()));
+        }
       } else if (mode == IGBuildMode.PUBLICATION) { 
-        statusMessage = "Publication Build: This will be filled in by the publication tooling"; 
+        statusMessage = rc.formatPhrase(RenderingI18nContext.STATUS_MSG_PUBLICATION_HOLDER);
+        for (String lang : allLangs()) {
+          statusMessages.put(lang, rcLangs.get(lang).formatPhrase(RenderingI18nContext.STATUS_MSG_PUBLICATION_HOLDER));
+        }
       } else { 
-        statusMessage = Utilities.escapeXml(sourceIg.present())+" - Local Development build (v"+workingVersion()+") built by the FHIR (HL7® FHIR® Standard) Build Tools. See the <a href=\""+igpkp.getCanonical()+"/history.html\">Directory of published versions</a>";
+        statusMessage = rc.formatPhrase(RenderingI18nContext.STATUS_MSG_LOCAL_BUILD, Utilities.escapeXml(sourceIg.present()), Utilities.escapeXml(workingVersion()), igpkp.getCanonical());
+        for (String lang : allLangs()) {
+          statusMessages.put(lang, rcLangs.get(lang).formatPhrase(RenderingI18nContext.STATUS_MSG_LOCAL_BUILD, Utilities.escapeXml(sourceIg.present()), Utilities.escapeXml(workingVersion()), igpkp.getCanonical()));
+        }
       }
 
       realmRules.addOtherFiles(inspector.getExceptions(), outputDir);
@@ -8907,7 +8915,7 @@ private String fixPackageReference(String dep) {
         ipsComparator.addOtherFiles(inspector.getExceptions(), outputDir);
       }
       
-      List<ValidationMessage> linkmsgs = generationOff ? new ArrayList<ValidationMessage>() : inspector.check(statusMessage);
+      List<ValidationMessage> linkmsgs = generationOff ? new ArrayList<ValidationMessage>() : inspector.check(statusMessage, statusMessages);
       int bl = 0;
       int lf = 0;
       for (ValidationMessage m : ValidationPresenter.filterMessages(null, linkmsgs, true, suppressedMessages)) {
@@ -12233,7 +12241,6 @@ private String fixPackageReference(String dep) {
     if (generationOff) {
       return;
     }
-    //    System.out.println("gen2: "+f.getName());
     if (f.getProcessMode() == FetchedFile.PROCESS_NONE) {
       String dst = Utilities.path(tempDir, f.getRelativePath());
       try {
@@ -12443,7 +12450,6 @@ private String fixPackageReference(String dep) {
 
   private byte[] loadTranslationSource(FetchedFile f, String l) throws IOException, FileNotFoundException {
     byte[] src;
-    System.out.println(f.getLoadPath());
     if (defaultTranslationLang.equals(l)) {
       src = f.getSource();
     } else {
@@ -12451,9 +12457,7 @@ private String fixPackageReference(String dep) {
       for (String ts : translationSources) {
         if (Utilities.endsWithInList(ts, "/"+l, "\\"+l, "-"+l)) {
           File t = new File(Utilities.path(rootDir, ts, f.getLoadPath()));
-          System.out.println("look for "+f.getLoadPath()+" for "+l+" in "+t.getAbsolutePath());
           if (t.exists()) {
-            System.out.println("found");
             ff = t;
             f.setTranslation(l, true);
             break;
@@ -14530,7 +14534,7 @@ private String fixPackageReference(String dep) {
     }
     if (igpkp.wantGen(r, "xref")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-sd-xref", sdr.references(), f.getOutputNames(), r, vars, null, start, "xref", "StructureDefinition",lang);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-sd-xref", sdr.references(lang, lrc), f.getOutputNames(), r, vars, null, start, "xref", "StructureDefinition",lang);
     }
     if (igpkp.wantGen(r, "use-context")) {
       long start = System.currentTimeMillis();
@@ -14541,7 +14545,7 @@ private String fixPackageReference(String dep) {
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-sd-changes", sdr.changeSummary(), f.getOutputNames(), r, vars, null, start, "changes", "StructureDefinition",lang);
     }
     long start = System.currentTimeMillis();
-    fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-typename", sdr.typeName(), f.getOutputNames(), r, vars, null, start, "-typename", "StructureDefinition",lang);
+    fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-typename", sdr.typeName(lang, lrc), f.getOutputNames(), r, vars, null, start, "-typename", "StructureDefinition",lang);
     if (sd.getDerivation() == TypeDerivationRule.CONSTRAINT && igpkp.wantGen(r, "span")) {
       start = System.currentTimeMillis();
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-span", sdr.span(true, igpkp.getCanonical(), otherFilesRun, "sp"), f.getOutputNames(), r, vars, null, start, "span", "StructureDefinition",lang);
@@ -14615,9 +14619,6 @@ private String fixPackageReference(String dep) {
     long now = System.currentTimeMillis();
     long d = now - last;
     last = now;
-    if (msg != null) {
-      //      System.out.println("  "+msg+": "+Long.toString(d));
-    }
   }
 
   private boolean anyMustSupport(StructureDefinition sd) {

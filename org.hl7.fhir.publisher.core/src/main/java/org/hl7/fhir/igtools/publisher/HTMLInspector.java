@@ -276,7 +276,7 @@ public class HTMLInspector {
     this.altRootFolder = Utilities.path(rootFolder, altRootFolder.replace("/", File.separator));
   }
 
-  public List<ValidationMessage> check(String statusText) throws IOException {  
+  public List<ValidationMessage> check(String statusText, Map<String, String> statusMessages) throws IOException {  
     this.statusText = statusText;
     iteration ++;
 

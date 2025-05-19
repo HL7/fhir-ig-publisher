@@ -2147,7 +2147,22 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return "// sliced by " + csv.toString() + " " + s;
   }
 
-  public String references() throws FHIRFormatError, IOException {
+
+  public String typeName(String lang, RenderingContext rc) {
+    if (ToolingExtensions.readBoolExtension(sd, ToolingExtensions.EXT_OBLIGATION_PROFILE_FLAG)) {
+      return rc.formatPhrase(RenderingI18nContext.SDT_OBLIGATION_PROFILE); // "Obligation Profile";
+    } else if ("Extension".equals(sd.getType())) {
+      return rc.formatPhrase(RenderingI18nContext.SDT_EXTENSION); // "Extension"
+    } else switch (sd.getKind()) {
+    case COMPLEXTYPE:   return rc.formatPhrase(sd.getDerivation() == TypeDerivationRule.CONSTRAINT ? RenderingI18nContext.SDT_DT_PROF  : RenderingI18nContext.SDT_DT); // "DataType Constraint" : "DataType" ;
+    case LOGICAL:       return rc.formatPhrase(sd.getDerivation() == TypeDerivationRule.CONSTRAINT ? RenderingI18nContext.SDT_LM_PROF  : RenderingI18nContext.SDT_LM); //"Logical Model" : "Logical Model Profile";
+    case PRIMITIVETYPE: return rc.formatPhrase(sd.getDerivation() == TypeDerivationRule.CONSTRAINT ? RenderingI18nContext.SDT_PT_PROF  : RenderingI18nContext.SDT_PT); //"PrimitiveType Constraint" : "PrimitiveType";
+    case RESOURCE:      return rc.formatPhrase(sd.getDerivation() == TypeDerivationRule.CONSTRAINT ? RenderingI18nContext.SDT_RES_PROF : RenderingI18nContext.SDT_RES); //"Resource Profile" : "Resource";
+      default:          return rc.formatPhrase(RenderingI18nContext.SDT_DEF);
+    }
+  }
+  
+  public String references(String lang, RenderingContext lrc) throws FHIRFormatError, IOException {
     
     Map<String, String> base = new HashMap<>();
     Map<String, String> invoked = new HashMap<>();
@@ -2253,49 +2268,47 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
 
     StringBuilder b = new StringBuilder();
+    String os = lrc.formatPhrase(RenderingI18nContext.SDT_ORIGINAL_SOURCE);
     if (sd.hasExtension(ToolingExtensions.EXT_WEB_SOURCE)) {
       String url = ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_WEB_SOURCE);
       if (Utilities.isAbsoluteUrlLinkable(url)) {
-        b.append("<p><b>Original Source:</b> <a href=\""+Utilities.escapeXml(url)+"\">"+Utilities.escapeXml(Utilities.extractDomain(url))+"</a></p>\r\n");      
+        b.append("<p><b>"+os+":</b> <a href=\""+Utilities.escapeXml(url)+"\">"+Utilities.escapeXml(Utilities.extractDomain(url))+"</a></p>\r\n");      
       } else {
-        b.append("<p><b>Original Source:</b> <code>"+Utilities.escapeXml(url)+"</a></p>\r\n");        
+        b.append("<p><b>"+os+"</b> <code>"+Utilities.escapeXml(url)+"</a></p>\r\n");        
       }
     } else if (sd.getMeta().hasSource() && Utilities.isAbsoluteUrlLinkable(sd.getMeta().getSource())) {
-      b.append("<p><b>Original Source:</b> <a href=\""+sd.getMeta().getSource()+"\">"+Utilities.extractDomain(sd.getMeta().getSource())+"</a></p>\r\n");
+      b.append("<p><b>"+os+":</b> <a href=\""+sd.getMeta().getSource()+"\">"+Utilities.extractDomain(sd.getMeta().getSource())+"</a></p>\r\n");
     }
-    String type = sd.describeType();
-    if (ToolingExtensions.readBoolExtension(sd, ToolingExtensions.EXT_OBLIGATION_PROFILE_FLAG)) {
-      type = "Obligation Profile";
-    }
-    b.append("<p><b>Usage:</b></p>\r\n<ul>\r\n");
+    String type = typeName(lang, lrc);
+    b.append("<p><b>"+lrc.formatPhrase(RenderingI18nContext.SDR_USAGE)+":</b></p>\r\n<ul>\r\n");
     if (!base.isEmpty())
-      b.append(" <li>Derived from this " + type + ": " + refList(base, "base") + "</li>\r\n");
+      b.append(" <li>"+Utilities.escapeXml(lrc.formatPhrase(RenderingI18nContext.SDR_DERIVED, type))+": " + refList(base, "base") + "</li>\r\n");
     if (!invoked.isEmpty()) {
-      b.append(" <li>Draw in Obligations &amp; Additional Bindings from this " + type + ": " + refList(invoked, "invoked") + "</li>\r\n");
+      b.append(" <li>"+Utilities.escapeXml(lrc.formatPhrase(RenderingI18nContext.SDR_DRAW_IN, type))+": " + refList(invoked, "invoked") + "</li>\r\n");
     }
     if (!imposed.isEmpty()) {
-      b.append(" <li>Impose this profile " + type + ": " + refList(imposed, "imposed") + "</li>\r\n");
+      b.append(" <li>"+Utilities.escapeXml(lrc.formatPhrase(RenderingI18nContext.SDR_IMPOSE, type))+": " + refList(imposed, "imposed") + "</li>\r\n");
     }
     if (!compliedWith.isEmpty()) {
-      b.append(" <li>Comply with this profile " + type + ": " + refList(compliedWith, "compliedWith") + "</li>\r\n");
+      b.append(" <li>"+Utilities.escapeXml(lrc.formatPhrase(RenderingI18nContext.SDR_COMPLY, type))+": " + refList(compliedWith, "compliedWith") + "</li>\r\n");
     }
     if (!refs.isEmpty()) {
-      b.append(" <li>Use this " + type + ": " + refList(refs, "ref") + "</li>\r\n");
+      b.append(" <li>"+Utilities.escapeXml(lrc.formatPhrase(RenderingI18nContext.SDR_USE, type))+": " + refList(refs, "ref") + "</li>\r\n");
     }
     if (!trefs.isEmpty()) {
-      b.append(" <li>Refer to this " + type + ": " + refList(trefs, "tref") + "</li>\r\n");
+      b.append(" <li>"+Utilities.escapeXml(lrc.formatPhrase(RenderingI18nContext.SDR_REFER, type))+": " + refList(trefs, "tref") + "</li>\r\n");
     }
     if (!examples.isEmpty()) {
-      b.append(" <li>Examples for this " + type + ": " + refList(examples, "ex") + "</li>\r\n");
+      b.append(" <li>"+Utilities.escapeXml(lrc.formatPhrase(RenderingI18nContext.SDR_EXAMPLE, type))+": " + refList(examples, "ex") + "</li>\r\n");
     }
     if (!searches.isEmpty()) {
-      b.append(" <li>Search Parameters using this " + type + ": " + refList(searches, "sp") + "</li>\r\n");
+      b.append(" <li>"+Utilities.escapeXml(lrc.formatPhrase(RenderingI18nContext.SDR_SEARCH, type))+": " + refList(searches, "sp") + "</li>\r\n");
     }
     if (!capStmts.isEmpty()) {
-      b.append(" <li>CapabilityStatements using this " + type + ": " + refList(capStmts, "cst") + "</li>\r\n");
+      b.append(" <li>"+Utilities.escapeXml(lrc.formatPhrase(RenderingI18nContext.SDR_CAPSTMT, type))+": " + refList(capStmts, "cst") + "</li>\r\n");
     }
     if (base.isEmpty() && refs.isEmpty() && trefs.isEmpty() && examples.isEmpty() & invoked.isEmpty() && imposed.isEmpty() && compliedWith.isEmpty()) {
-      b.append(" <li>This " + type + " is not used by any profiles in this Implementation Guide</li>\r\n");
+      b.append(" <li>"+Utilities.escapeXml(lrc.formatPhrase(RenderingI18nContext.SDR_NOT_USED, type))+"</li>\r\n");
     }
     b.append("</ul>\r\n");
     return b.toString()+changeSummary();
@@ -2342,13 +2355,6 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
   }
 
-  public String typeName() {
-    String type = sd.describeType();
-    if (ToolingExtensions.readBoolExtension(sd, ToolingExtensions.EXT_OBLIGATION_PROFILE_FLAG)) {
-      type = "Obligation Profile";
-    }
-    return type;
-  }
 
   private boolean usesSD(Element resource) {
     if (resource.hasChild("meta")) {
