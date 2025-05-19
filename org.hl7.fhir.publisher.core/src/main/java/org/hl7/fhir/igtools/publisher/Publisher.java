@@ -1257,7 +1257,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         }
       }
       checkForSnomedVersion();
-      FileUtilities.copyFile(txLog, Utilities.path(rootDir, "output", "qa-tx.html"));
+      if (txLog != null) {
+        FileUtilities.copyFile(txLog, Utilities.path(rootDir, "output", "qa-tx.html"));
+      }
       ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), rootDir, npmName, childPublisher == null? null : childPublisher.npmName,
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator, ipsComparator,
           new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine, rc, specMaps).render(publishedIg, true, false, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()),
@@ -2930,6 +2932,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     igMode = true;
     repoRoot = FileUtilities.getDirectoryForFile(ini.getFileName());
     rootDir = repoRoot;
+    fetcher.setRootDir(rootDir);
     killFile = new File(Utilities.path(rootDir, "ig-publisher.kill"));    
     // ok, first we load the template
     String templateName = ini.getStringProperty("IG", "template");
