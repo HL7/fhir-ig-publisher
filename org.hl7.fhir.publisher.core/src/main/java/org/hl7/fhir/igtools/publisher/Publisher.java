@@ -12449,6 +12449,7 @@ private String fixPackageReference(String dep) {
           File t = new File(Utilities.path(rootDir, ts, f.getLoadPath()));
           System.out.println("look for "+f.getLoadPath()+" for "+l+" in "+t.getAbsolutePath());
           if (t.exists()) {
+            System.out.println("found");
             ff = t;
             f.setTranslation(l, true);
             break;
