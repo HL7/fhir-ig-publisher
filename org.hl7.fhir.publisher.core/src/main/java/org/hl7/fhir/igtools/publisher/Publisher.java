@@ -10564,6 +10564,7 @@ private String fixPackageReference(String dep) {
   }
 
   private void addTranslationsToJson(JsonObject item, String name, PrimitiveType<?> element, boolean processDesc) {
+    JsonObject ph = item.forceObject(name+"lang");
     for (String l : allLangs()) {
       String s;
       if (processDesc) {
@@ -10571,7 +10572,7 @@ private String fixPackageReference(String dep) {
       } else {
         s = langUtils.getTranslationOrBase(element, l);
       }
-      item.add(name+l, s);
+      ph.add(l, s);
     }    
   }
 
