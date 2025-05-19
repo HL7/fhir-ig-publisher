@@ -231,20 +231,38 @@ public class Template {
         source.savePOFile(Utilities.path(tf, base+"-"+lang+".po"), 1, 0);
       }
     }
-    // now populate from the PO files 
+    // populate from the PO files 
     for (String lang : translations.keySet()) {
       POSource units = translations.get(lang);
+      JsonObject l = lf.forceObject(lang);
       for (POObject po : units.getEntries()) {
-        JsonObject l = lf.forceObject(lang);
         l.remove(po.getId());
-        if (po.getMsgstr().isEmpty()) {
+        if (po.getMsgstr().isEmpty() || Utilities.noString(po.getMsgstr().get(0))) {
           l.add(po.getId(), lf.getJsonObject("en").asString(po.getId()));          
         } else {
           l.add(po.getId(), po.getMsgstr().get(0));
         }
       }
     }
+    // fill out missing entries
+    for (JsonProperty langEntry : lf.getProperties()) {
+      String lang = langEntry.getName();
+      if (!"en".equals(lang)) {
+        JsonObject l = lf.getJsonObject(lang);
+        for (JsonProperty p : lf.getJsonObject("en").getProperties()) {
+          if (!hasEntry(l, p.getName())) {
+            l.remove(p.getName());
+            l.add(p.getName(), p.getValue());            
+          }
+        }
+      }
+    }
     org.hl7.fhir.utilities.json.parser.JsonParser.compose(lf, fl, true);
+  }
+
+  private boolean hasEntry(JsonObject l, String name) {
+    JsonElement v = l.get(name);
+    return !(v == null || v.isJsonNull() || Utilities.noString(v.asString()));
   }
 
   public boolean hasPreProcess() {
