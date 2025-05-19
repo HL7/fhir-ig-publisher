@@ -178,12 +178,14 @@ public class Template {
 
   private void processTemplateTranslations() throws IOException {
     String tf = Utilities.path(templateDir, "translations");
-    for (File f : new File(tf).listFiles()) {
-      if (f.getName().endsWith(".json")) {
-        processTranslationFile(tf, f);
+    File tff = new File(tf);
+    if (tff.exists()) {
+      for (File f : tff.listFiles()) {
+        if (f.getName().endsWith(".json")) {
+          processTranslationFile(tf, f);
+        }
       }
     }
-    
   }
 
   private void processTranslationFile(String tf, File fl) throws JsonException, IOException {
