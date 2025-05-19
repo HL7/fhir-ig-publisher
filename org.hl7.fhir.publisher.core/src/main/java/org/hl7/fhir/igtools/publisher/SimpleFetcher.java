@@ -491,8 +491,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
       return p;
     }
     String inputPath = Utilities.path(rootDir, "input");
-    System.out.println("pfi. root = "+rootDir+", input="+inputPath+", p = "+p);
-    if (p.startsWith(inputPath)) {
+    if (p.toLowerCase().startsWith(inputPath.toLowerCase())) {
       String v = FileUtilities.getRelativePath(inputPath, p);
       return v;
     } else {
