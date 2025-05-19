@@ -84,14 +84,12 @@ public class FetchedFile {
     super();
     this.statedPath = statedPath;
     this.loadPath = statedPath;
-    System.out.println("ff: "+statedPath);
   }
   
   public FetchedFile(String statedPath, String loadPath) {
     super();
     this.statedPath = statedPath;
     this.loadPath = loadPath;
-    System.out.println("ff: "+statedPath+" / "+loadPath);
   }
   public String getPath() {
     return path;
