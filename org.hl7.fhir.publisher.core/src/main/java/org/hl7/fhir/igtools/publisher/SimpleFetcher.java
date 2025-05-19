@@ -482,6 +482,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
   }
 
   private String getPathFromInput(String p) throws IOException {
+    System.out.println("pfi: "+rootDir+", p = "+p);
     if (rootDir == null) {
       return p;
     }
