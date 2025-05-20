@@ -4756,8 +4756,8 @@ private String fixPackageReference(String dep) {
   private boolean checkMakeFile(byte[] bs, String path, Set<String> outputTracker) throws IOException {
     // logDebugMessage(LogCategory.GENERATE, "Check Generate "+path);
     String s = path.toLowerCase();
-    if (allOutputs.contains(s))
-      throw new Error("Error generating build: the file "+path+" is being generated more than once (may differ by case)");
+//    if (allOutputs.contains(s))
+//      throw new Error("Error generating build: the file "+path+" is being generated more than once (may differ by case)");
     allOutputs.add(s);
     outputTracker.add(path);
     File f = new CSFile(path);
