@@ -489,7 +489,7 @@ public class Template {
       for (File f : src.listFiles()) {
         if (f.isDirectory()) {
           FileUtils.copyDirectory(f, new File(Utilities.path(tempDir, f.getName())));
-          if (!translationLangs.isEmpty())
+          if (!translationLangs.isEmpty()) {
             for (String lang: translationLangs) {
               FileUtils.copyDirectory(f, new File(Utilities.path(tempDir, lang, f.getName())));
             }
@@ -500,9 +500,9 @@ public class Template {
           FileUtils.copyFile(f, nf);
           if (!translationLangs.isEmpty()) {
             for (String lang: translationLangs) {
-              File nf = new File(Utilities.path(tempDir, lang, f.getName()));
-              fileList.add(nf.getAbsolutePath());
-              FileUtils.copyFile(f, nf);
+              File nfl = new File(Utilities.path(tempDir, lang, f.getName()));
+              fileList.add(nfl.getAbsolutePath());
+              FileUtils.copyFile(f, nfl);
             }
           }
         }

@@ -11334,33 +11334,20 @@ private String fixPackageReference(String dep) {
   private byte[] makeLangRedirect(String p) {
     StringBuilder b  = new StringBuilder();
     b.append("<html><body>\r\n");
-    b.append("<'!--ReleaseHeader--><'p id=\"publish-box\">Publish Box goes here<'/p><'!--EndReleaseHeader-->");
+    b.append("<!--ReleaseHeader--><p id=\"publish-box\">Publish Box goes here</p><!--EndReleaseHeader-->\r\n");
     b.append("<script type=\"text/javascript\">\r\n");
-    b.append("  // "+HierarchicalTableGenerator.uuid+"\n");
-    b.append("doRedirect();\r\n");
-    b.append("\r\n");
-    b.append("function doRedirect() {\r\n");
-    b.append("  var userLang = navigator.language || navigator.userLanguage;\r\n"); 
-
+    b.append("// "+HierarchicalTableGenerator.uuid+"\r\n");
+    b.append("langs=[");
+    boolean first = true;
     for (String l : allLangs()) {
-      b.append("  if ((userLang == \""+l+"\") || userLang.startsWith(\""+l+"-\")) {\r\n");
-      b.append("    window.location.replace(\""+l+"/"+p+"\");\r\n");
-      b.append("  return;\r\n");
-      b.append("  }\r\n");
+      if (!first) 
+    	b.append(",");
+      first = false;
+      b.append("\""+l+"\"");
     }
-    for (String l : allLangs()) {
-      if (l.contains("-")) {
-        String ll = l.substring(0, l.indexOf("-"));
-        b.append("  if ((userLang == \""+ll+"\") || userLang.startsWith(\""+ll+"-\")) {\r\n");
-        b.append("    window.location.replace(\""+l+"/"+p+"\");\r\n");
-        b.append("  return;\r\n");
-        b.append("  }\r\n");
-        }
-    }
-    b.append("  window.location.replace(\""+defaultTranslationLang+"/"+p+"\");\r\n");
-    b.append("}\r\n");
-    b.append("</script></body></html>\r\n");
-    
+    b.append("]\r\n</script>\r\n");
+    b.append("<script type=\"text/javascript\" src=\"{{site.data.info.assets}}assets/js/lang-redirects.js\"></script>\r\n"
+    		+ "</body></html>\r\n");
     return ("---\r\n---\r\n"+b.toString()).getBytes(StandardCharsets.UTF_8);
   }
 
