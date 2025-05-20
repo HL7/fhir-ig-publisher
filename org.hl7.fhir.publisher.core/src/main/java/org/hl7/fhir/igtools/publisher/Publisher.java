@@ -11336,6 +11336,7 @@ private String fixPackageReference(String dep) {
     b.append("<html><body>\r\n");
     b.append("<'!--ReleaseHeader--><'p id=\"publish-box\">Publish Box goes here<'/p><'!--EndReleaseHeader-->");
     b.append("<script type=\"text/javascript\">\r\n");
+    b.append("  // "+HierarchicalTableGenerator.uuid+"\n");
     b.append("doRedirect();\r\n");
     b.append("\r\n");
     b.append("function doRedirect() {\r\n");
