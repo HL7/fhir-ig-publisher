@@ -488,19 +488,17 @@ public class Template {
     if (src.exists()) {
       for (File f : src.listFiles()) {
         if (f.isDirectory()) {
-          if (translationLangs.isEmpty())
-            FileUtils.copyDirectory(f, new File(Utilities.path(tempDir, f.getName())));
-          else {
+          FileUtils.copyDirectory(f, new File(Utilities.path(tempDir, f.getName())));
+          if (!translationLangs.isEmpty())
             for (String lang: translationLangs) {
               FileUtils.copyDirectory(f, new File(Utilities.path(tempDir, lang, f.getName())));
             }
           }
         } else {
-          if (translationLangs.isEmpty()) {
-            File nf = new File(Utilities.path(tempDir, f.getName()));
-            fileList.add(nf.getAbsolutePath());
-            FileUtils.copyFile(f, nf);
-          } else {
+          File nf = new File(Utilities.path(tempDir, f.getName()));
+          fileList.add(nf.getAbsolutePath());
+          FileUtils.copyFile(f, nf);
+          if (!translationLangs.isEmpty()) {
             for (String lang: translationLangs) {
               File nf = new File(Utilities.path(tempDir, lang, f.getName()));
               fileList.add(nf.getAbsolutePath());
