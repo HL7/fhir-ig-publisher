@@ -11334,6 +11334,7 @@ private String fixPackageReference(String dep) {
   private byte[] makeLangRedirect(String p) {
     StringBuilder b  = new StringBuilder();
     b.append("<html><body>\r\n");
+    b.append("<'!--ReleaseHeader--><'p id=\"publish-box\">Publish Box goes here<'/p><'!--EndReleaseHeader-->");
     b.append("<script type=\"text/javascript\">\r\n");
     b.append("doRedirect();\r\n");
     b.append("\r\n");
@@ -13669,6 +13670,11 @@ private String fixPackageReference(String dep) {
   }
 
   private void saveDirectResourceOutputs(FetchedFile f, FetchedResource r, Resource res, Map<String, String> vars, String lang, RenderingContext lrc) throws FileNotFoundException, Exception {
+    Element langElement = r.getElement();
+    if (lang != null) {
+      langElement = langUtils.copyToLanguage(langElement, lang);
+      res = langUtils.copyToLanguage(res, lang);      
+    }
     boolean example = r.isExample();
     if (igpkp.wantGen(r, "maturity") && res != null) {
       long start = System.currentTimeMillis();
@@ -13698,7 +13704,7 @@ private String fixPackageReference(String dep) {
     if (igpkp.wantGen(r, "jekyll-data") && produceJekyllData) {
       org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(context);
       FileOutputStream bs = new FileOutputStream(Utilities.path(tempDir, "_data", r.fhirType()+"-"+r.getId()+".json"));
-      jp.compose(r.getElement(), bs, OutputStyle.NORMAL, null);
+      jp.compose(langElement, bs, OutputStyle.NORMAL, null);
       bs.close();      
     }
     if (igpkp.wantGen(r, "ttl")) {
@@ -13706,10 +13712,10 @@ private String fixPackageReference(String dep) {
     }
     org.hl7.fhir.r5.elementmodel.XmlParser xp = new org.hl7.fhir.r5.elementmodel.XmlParser(context);
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
-    xp.compose(r.getElement(), bs, OutputStyle.NORMAL, null);
+    xp.compose(langElement, bs, OutputStyle.NORMAL, null);
     int size = bs.size();
 
-    Element e = r.getElement();
+    Element e = langElement;
     if (SpecialTypeHandler.handlesType(r.fhirType(), context.getVersion())) {
       e = new ObjectConverter(context).convert(r.getResource());
     } else if (module.isNoNarrative() && e.hasChild("text")) {
@@ -13756,7 +13762,7 @@ private String fixPackageReference(String dep) {
       fragment(r.fhirType()+"-"+r.getId()+"-ttl-html", rdf.asHtml(size < PRISM_SIZE_LIMIT), f.getOutputNames(), r, vars, "ttl", start, "ttl-html", "Resource",lang);
     }
 
-    e = r.getElement();
+    e = langElement;
     generateHtml(f, r, vars, lrc, lang);
     
 
