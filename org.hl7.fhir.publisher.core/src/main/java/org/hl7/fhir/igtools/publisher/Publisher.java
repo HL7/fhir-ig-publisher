@@ -11841,7 +11841,9 @@ private String fixPackageReference(String dep) {
     data.add("genDay", genDate());
     if (db != null) {
       for (JsonProperty p : data.getProperties()) {
+        if (p.getValue().isJsonPrimitive()) {
         db.metadata(p.getName(), p.getValue().asString());
+        }
       }
       db.metadata("gitstatus", getGitStatus());
     }
