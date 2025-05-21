@@ -280,6 +280,8 @@ import org.hl7.fhir.r5.model.StructureMap.StructureMapStructureComponent;
 import org.hl7.fhir.r5.model.UriType;
 import org.hl7.fhir.r5.model.UsageContext;
 import org.hl7.fhir.r5.model.ValueSet;
+import org.hl7.fhir.r5.model.ValueSet.ConceptReferenceComponent;
+import org.hl7.fhir.r5.model.ValueSet.ConceptReferenceDesignationComponent;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
 import org.hl7.fhir.r5.openapi.OpenApiGenerator;
@@ -337,6 +339,7 @@ import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.validation.IValidationProfileUsageTracker;
 import org.hl7.fhir.r5.utils.validation.ValidatorSession;
+import org.hl7.fhir.utilities.CSVReader;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.CompressionUtilities;
 import org.hl7.fhir.utilities.DurationUtil;
@@ -344,6 +347,7 @@ import org.hl7.fhir.utilities.ENoDump;
 import org.hl7.fhir.utilities.FhirPublication;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.IniFile;
+import org.hl7.fhir.utilities.MagicResources;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.MimeType;
@@ -10158,16 +10162,88 @@ private String fixPackageReference(String dep) {
     data.add("defLang", defaultTranslationLang);
     JsonArray langs = new JsonArray();
     data.add("langs", langs); 
+    Map<String, Map<String, String>> langDisplays = loadLanguagesCsv();
+    ValueSet vs = context.fetchResource(ValueSet.class, "http://hl7.org/fhir/ValueSet/languages");
     for (String code : allLangs()) {
       JsonObject lu = new JsonObject();
       langs.add(lu);
       lu.add("code", code);
-      lu.add("display", getLangDesc(code, null));
+      String disp = null;
+      if (langDisplays.containsKey(code)) {
+        disp = langDisplays.get(code).get("en");
+      }
+      if (disp == null && vs != null) {
+        ConceptReferenceComponent cc = getConceptReference(vs, "urn:ietf:bcp:47", code);
+        if (cc != null) {
+          disp = cc.getDisplay();
+        }
+      }
+      if (disp == null) {
+        disp = getLangDesc(code, null);
+      }
+      lu.add("display", disp);
+
+      for (String code2 : allLangs()) {
+        String disp2 = null;
+        if (langDisplays.containsKey(code)) {
+          disp2 = langDisplays.get(code).get(code2);
+        }
+        if (disp2 == null && vs != null) {
+          ConceptReferenceComponent cc = getConceptReference(vs, "urn:ietf:bcp:47", code);
+          ConceptReferenceDesignationComponent dd = null;
+          for (ConceptReferenceDesignationComponent t : cc.getDesignation()) {
+            if (code2.equals(t.getLanguage())) {
+              dd = t;
+            }
+          }
+          if (dd != null) {
+            disp2 = dd.getValue();
+          }
+        }
+        if (disp2 != null) {
+          lu.add("display-"+code2, disp2);
+        }
+      }
     }
 
     json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(data, true);
     FileUtilities.stringToFile(json, Utilities.path(tempDir, "_data", "languages.json"));
   }
+
+  private Map<String, Map<String, String>> loadLanguagesCsv() throws FHIRException, IOException {    
+    Map<String, Map<String, String>> res = new HashMap<>();
+    CSVReader csv = MagicResources.loadLanguagesCSV();
+    boolean first = true;
+    String[] headers = csv.readHeaders();
+    for (String s : headers) {
+      if (first) {
+        first = false;
+      } else {
+        res.put(s, new HashMap<>());
+      }
+    }
+    while (csv.line()) {
+      String[] cells = csv.getCells();
+      for (int i = 1; i < cells.length; i++) {
+        res.get(headers[i]).put(cells[0], Utilities.noString(cells[i]) ? null : cells[i]);
+      }
+    }
+    return res;
+  }
+
+  public ConceptReferenceComponent getConceptReference(ValueSet vs, String system, String code) {
+    for (ConceptSetComponent inc : vs.getCompose().getInclude()) {
+      if (system.equals(inc.getSystem())) {
+        for (ConceptReferenceComponent cc : inc.getConcept()) {
+          if (cc.getCode().equals(code)) {
+            return cc;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
 
   private String generateVersionSummary(String v, String n) throws IOException {
 
