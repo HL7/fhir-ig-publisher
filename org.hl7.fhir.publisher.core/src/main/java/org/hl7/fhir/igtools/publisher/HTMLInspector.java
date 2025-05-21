@@ -237,7 +237,8 @@ public class HTMLInspector {
   private FilesystemPackageCacheManager pcm;
   private String canonical;
 
-  private String statusText;
+  private String statusMessageDef;
+  private Map<String, String> statusMessagesLang;
   private List<String> exemptHtmlPatterns = new ArrayList<>();
   private List<String> parseProblems = new ArrayList<>();
   private List<String> publishBoxProblems = new ArrayList<>();
@@ -276,8 +277,9 @@ public class HTMLInspector {
     this.altRootFolder = Utilities.path(rootFolder, altRootFolder.replace("/", File.separator));
   }
 
-  public List<ValidationMessage> check(String statusText, Map<String, String> statusMessages) throws IOException {  
-    this.statusText = statusText;
+  public List<ValidationMessage> check(String statusMessageDef, Map<String, String> statusMessagesLang) throws IOException {  
+    this.statusMessageDef = statusMessageDef;
+    this.statusMessagesLang = statusMessagesLang;
     iteration ++;
 
     List<ValidationMessage> messages = new ArrayList<ValidationMessage>();
@@ -577,12 +579,18 @@ public class HTMLInspector {
       }
     }
     if (x != null) {
+
       String src;
       try {
         src = FileUtilities.fileToString(f);
         hl7State = src.contains(RELEASE_HTML_MARKER);
         if (hl7State) {
-          src = src.replace(RELEASE_HTML_MARKER, START_HTML_MARKER + statusText+END_HTML_MARKER);
+          String msg = statusMessageDef;
+          String lang = getLang(x);
+          if (statusMessagesLang.containsKey(lang)) {
+            msg = statusMessagesLang.get(lang);
+          }
+          src = src.replace(RELEASE_HTML_MARKER, START_HTML_MARKER + msg + END_HTML_MARKER);
           FileUtilities.stringToFile(src, f);
         }
         x = new XhtmlParser().setMustBeWellFormed(strict).parse(new FileInputStream(f), null);
@@ -623,6 +631,24 @@ public class HTMLInspector {
     //    } catch (IOException e) {
     //      messages.add(new ValidationMessage(Source.Publisher, IssueType.STRUCTURE, s, "failed security testing: "+e.getMessage(), IssueSeverity.ERROR));
     //    } 
+  }
+
+  private String getLang(XhtmlNode x) {
+    if (!"html".equals(x.getName())) {
+      for (XhtmlNode t : x.getChildNodes()) {
+        if ("html".equals(t.getName())) {
+          x = t;
+          break;
+        }
+      }
+    }
+    if (x.getAttribute("lang") != null) {
+      return x.getAttribute("lang");
+    }
+    if (x.getAttribute("xml:lang") != null) {
+      return x.getAttribute("xml:lang");
+    }
+    return null;
   }
 
   private String getPath(String s, String base) {
