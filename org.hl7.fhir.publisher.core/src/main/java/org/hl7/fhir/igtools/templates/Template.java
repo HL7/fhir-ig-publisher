@@ -25,6 +25,9 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -260,6 +263,33 @@ public class Template {
       }
     }
     org.hl7.fhir.utilities.json.parser.JsonParser.compose(lf, fl, true);
+    String xml = translationsToXML(lf);
+    String xmlFile = fl.getAbsolutePath();
+    xmlFile = xmlFile.substring(0, xmlFile.length()-4)+"xml";
+    try {
+      Files.writeString(Paths.get(xmlFile), xml);
+    } catch (IOException e) {
+        System.err.println("An error occurred while writing to the file " + xmlFile + ": " + e.getMessage());
+    }
+  }
+  
+  private String translationsToXML(JsonObject jt) {
+  StringBuilder sb = new StringBuilder();
+  sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<translations>\r\n");
+  List<String> langs = jt.getNames();
+  JsonObject baseLang = jt.getJsonObject(langs.get(0));
+  for (int i = 0; i < baseLang.getNames().size(); i++) {
+    String key = baseLang.getNames().get(i);
+    sb.append("<translation name=\"" + key + "\"");
+    sb.append(" " + langs.get(0) + "=" + baseLang.getJsonString(key));
+    for (int j = 1; j < langs.size(); j++) {
+      JsonObject transLang = jt.getJsonObject(langs.get(j));
+      sb.append(" " + langs.get(j) + "=" + transLang.getJsonString(key));
+    }
+    sb.append("/>\r\n");
+  }
+  sb.append("</translations>");
+  return sb.toString();
   }
 
   private boolean hasEntry(JsonObject l, String name) {
