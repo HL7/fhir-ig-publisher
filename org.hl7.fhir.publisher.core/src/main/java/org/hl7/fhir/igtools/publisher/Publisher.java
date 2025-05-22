@@ -12379,6 +12379,7 @@ private String fixPackageReference(String dep) {
       }
     } else {
       if (isNewML()) {
+        generateHtmlOutputsInner(f, regen, db, null, rc);       
         for (String l : allLangs()) {
           generateHtmlOutputsInner(f, regen, db, l, rcLangs.get(l));        
         }        
@@ -14017,10 +14018,11 @@ private String fixPackageReference(String dep) {
         }
       }
       if (!existsAsPage) {
-        if (isNewML() && lang.equals(defaultTranslationLang)) {
+        if (isNewML() && lang == null) {
           genWrapperRedirect(ff, r, outputName, outputTracker, vars, format, extension, recordPath);
-        } 
-        genWrapperInner(ff, r, template, outputName, outputTracker, vars, format, extension, recordPath, lang);
+        } else {
+          genWrapperInner(ff, r, template, outputName, outputTracker, vars, format, extension, recordPath, lang);
+        }
       }
     }
   }
