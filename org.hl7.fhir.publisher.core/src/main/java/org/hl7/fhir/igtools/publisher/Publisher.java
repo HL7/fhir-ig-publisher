@@ -4760,8 +4760,8 @@ private String fixPackageReference(String dep) {
   private boolean checkMakeFile(byte[] bs, String path, Set<String> outputTracker) throws IOException {
     // logDebugMessage(LogCategory.GENERATE, "Check Generate "+path);
     String s = path.toLowerCase();
-//    if (allOutputs.contains(s))
-//      throw new Error("Error generating build: the file "+path+" is being generated more than once (may differ by case)");
+    if (allOutputs.contains(s))
+      throw new Error("Error generating build: the file "+path+" is being generated more than once (may differ by case)");
     allOutputs.add(s);
     outputTracker.add(path);
     File f = new CSFile(path);
@@ -4808,15 +4808,18 @@ private String fixPackageReference(String dep) {
     fileList.clear();
     changeList.clear();
     bndIds.clear();
-    log("Load Translations");
 
     FetchedFile igf = fetcher.fetch(igName);
     noteFile(IG_NAME, igf);
     if (sourceIg == null) // old JSON approach
       sourceIg = (ImplementationGuide) parse(igf);
-    List<TranslationUnit> translations = findTranslations(sourceIg.fhirType(), sourceIg.getId(), igf.getErrors());
-    if (translations != null) {
-      langUtils.importFromTranslations(sourceIg, translations, igf.getErrors());
+    if (isNewML()) {
+      log("Load Translations");
+      sourceIg.setLanguage(defaultTranslationLang);
+      List<TranslationUnit> translations = findTranslations(sourceIg.fhirType(), sourceIg.getId(), igf.getErrors());
+      if (translations != null) {
+        langUtils.importFromTranslations(sourceIg, translations, igf.getErrors());
+      }
     }
     log("Load Content");
     publishedIg = sourceIg.copy();
@@ -6997,11 +7000,14 @@ private String fixPackageReference(String dep) {
         if (new AdjunctFileLoader(binaryPaths, cql).replaceAttachments1(file, r, metadataResourceNames())) {
           altered = true;
         }
-        List<TranslationUnit> translations = findTranslations(r.fhirType(), r.getId(), r.getErrors());
-        if (translations != null) {
-          r.setHasTranslations(true);
-          if (langUtils.importFromTranslations(e, translations, r.getErrors()) > 0) {
-            altered = true;
+        if (isNewML()) {
+          e.setChildValue("language", defaultTranslationLang);
+          List<TranslationUnit> translations = findTranslations(r.fhirType(), r.getId(), r.getErrors());
+          if (translations != null) {
+            r.setHasTranslations(true);
+            if (langUtils.importFromTranslations(e, translations, r.getErrors()) > 0) {
+              altered = true;
+            }
           }
         }
         if (!binary && !customResourceNames.contains(r.fhirType()) && ((altered && r.getResource() != null) || (ver.equals(Constants.VERSION) && r.getResource() == null && context.getResourceNamesAsSet().contains(r.fhirType())))) {
@@ -10244,7 +10250,7 @@ private String fixPackageReference(String dep) {
     return null;
   }
 
-
+  
   private String generateVersionSummary(String v, String n) throws IOException {
 
     String ver = VersionUtilities.versionFromCode(v);
@@ -11842,7 +11848,7 @@ private String fixPackageReference(String dep) {
     if (db != null) {
       for (JsonProperty p : data.getProperties()) {
         if (p.getValue().isJsonPrimitive()) {
-        db.metadata(p.getName(), p.getValue().asString());
+          db.metadata(p.getName(), p.getValue().asString());
         }
       }
       db.metadata("gitstatus", getGitStatus());
@@ -13555,7 +13561,7 @@ private String fixPackageReference(String dep) {
     saveNativeResourceOutputFormats(f, r, element, ""); 
     for (String lang : allLangs()) {
       Element e = (Element) element.copy();
-      if (langUtils.switchLanguage(e, lang)) {
+      if (langUtils.switchLanguage(e, lang, true)) {
         saveNativeResourceOutputFormats(f, r, e, lang);         
       }
     }
@@ -13738,8 +13744,8 @@ private String fixPackageReference(String dep) {
   private void saveDirectResourceOutputs(FetchedFile f, FetchedResource r, Resource res, Map<String, String> vars, String lang, RenderingContext lrc) throws FileNotFoundException, Exception {
     Element langElement = r.getElement();
     if (lang != null) {
-      langElement = langUtils.copyToLanguage(langElement, lang);
-      res = langUtils.copyToLanguage(res, lang);      
+      langElement = langUtils.copyToLanguage(langElement, lang, true);
+      res = langUtils.copyToLanguage(res, lang, true);      
     }
     boolean example = r.isExample();
     if (igpkp.wantGen(r, "maturity") && res != null) {
