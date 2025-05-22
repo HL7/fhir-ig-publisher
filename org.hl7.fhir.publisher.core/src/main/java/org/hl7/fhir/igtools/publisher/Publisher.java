@@ -10174,6 +10174,8 @@ private String fixPackageReference(String dep) {
       JsonObject lu = new JsonObject();
       langs.add(lu);
       lu.add("code", code);
+    }
+    for (String code : allLangs()) {
       String disp = null;
       if (langDisplays.containsKey(code)) {
         disp = langDisplays.get(code).get("en");
@@ -10187,7 +10189,6 @@ private String fixPackageReference(String dep) {
       if (disp == null) {
         disp = getLangDesc(code, null);
       }
-      lu.add("display", disp);
 
       for (String code2 : allLangs()) {
         String disp2 = null;
@@ -10206,8 +10207,23 @@ private String fixPackageReference(String dep) {
             disp2 = dd.getValue();
           }
         }
+        if (code2.equals(code)) {
+          JsonObject lu = null;
+          for (JsonObject t : langs.asJsonObjects()) {
+            if (code2.equals(t.asString("code"))) {
+              lu = t;
+            }
+          }
+          lu.add("display", disp2);
+        }
+        JsonObject lu = null;
+        for (JsonObject t : langs.asJsonObjects()) {
+          if (code2.equals(t.asString("code"))) {
+            lu = t;
+          }
+        }
         if (disp2 != null) {
-          lu.add("display-"+code2, disp2);
+          lu.add("display-"+code, disp2);
         }
       }
     }
