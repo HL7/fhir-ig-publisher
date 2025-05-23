@@ -885,6 +885,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private NPMPackageGenerator npm;
   private Map<String, NPMPackageGenerator> vnpms = new HashMap<String, NPMPackageGenerator>();
+  private Map<String, NPMPackageGenerator> lnpms = new HashMap<String, NPMPackageGenerator>();
   
   private FilesystemPackageCacheManager pcm;
 
@@ -5123,6 +5124,13 @@ private String fixPackageReference(String dep) {
       vnpms.put(v, new NPMPackageGenerator(publishedIg.getPackageId()+"."+v, Utilities.path(outputDir, publishedIg.getPackageId()+"."+v+".tgz"), 
           igpkp.getCanonical(), targetUrl(), PackageType.IG,  vig, execTime.getTime(), relatedIgMap(), !publishing, VersionUtilities.versionFromCode(v)));
     }
+    if (isNewML()) {
+      for (String l : allLangs()) {
+        ImplementationGuide vig = (ImplementationGuide) langUtils.copyToLanguage(publishedIg, l, true);
+        lnpms.put(l, new NPMPackageGenerator(publishedIg.getPackageId()+"."+l, Utilities.path(outputDir, publishedIg.getPackageId()+"."+l+".tgz"), 
+            igpkp.getCanonical(), targetUrl(), PackageType.IG, vig, execTime.getTime(), relatedIgMap(), !publishing, context.getVersion()));
+      }
+    }
     execTime = Calendar.getInstance();
 
     rc = new RenderingContext(context, markdownEngine, ValidationOptions.defaults(), checkAppendSlash(specPath), "", locale, ResourceRendererMode.TECHNICAL, GenerationRules.IG_PUBLISHER);
@@ -8860,6 +8868,9 @@ private String fixPackageReference(String dep) {
         for (NPMPackageGenerator vnpm : vnpms.values()) {
           vnpm.finish();
         }
+        for (NPMPackageGenerator vnpm : lnpms.values()) {
+          vnpm.finish();
+        }
         if (r4tor4b.canBeR4() && r4tor4b.canBeR4B()) {
           try {
             r4tor4b.clonePackage(npmName, npm.filename());
@@ -10170,10 +10181,12 @@ private String fixPackageReference(String dep) {
     data.add("langs", langs); 
     Map<String, Map<String, String>> langDisplays = loadLanguagesCsv();
     ValueSet vs = context.fetchResource(ValueSet.class, "http://hl7.org/fhir/ValueSet/languages");
+    Pattern RtlLocalesRe = Pattern.compile("^(ar|dv|he|iw|fa|nqo|ps|sd|ug|ur|yi|.*[-_](Arab|Hebr|Thaa|Nkoo|Tfng))(?!.*[-_](Latn|Cyrl)($|-|_))($|-|_)");    
     for (String code : allLangs()) {
       JsonObject lu = new JsonObject();
       langs.add(lu);
       lu.add("code", code);
+      lu.add("rtl", RtlLocalesRe.matcher(code).find());      
     }
     for (String code : allLangs()) {
       String disp = null;
@@ -13525,6 +13538,14 @@ private String fixPackageReference(String dep) {
     jp.compose(element, bsj, OutputStyle.NORMAL, igpkp.getCanonical());
     if (!r.isCustomResource()) {
       npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsj.toByteArray());
+      if (isNewML()) {
+        for (String l : allLangs()) {
+          Element le = langUtils.copyToLanguage(element, l, true); // todo: should we keep this?
+          ByteArrayOutputStream bsjl = new ByteArrayOutputStream();
+          jp.compose(le, bsjl, OutputStyle.NORMAL, igpkp.getCanonical());
+          lnpms.get(l).addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsjl.toByteArray());
+        }
+      }
       for (String v : generateVersions) {
         String ver = VersionUtilities.versionFromCode(v);
         Resource res = r.hasOtherVersions() && r.getOtherVersions().containsKey(ver+"-"+r.fhirType()) ? r.getOtherVersions().get(ver+"-"+r.fhirType()).getResource() : r.getResource();
