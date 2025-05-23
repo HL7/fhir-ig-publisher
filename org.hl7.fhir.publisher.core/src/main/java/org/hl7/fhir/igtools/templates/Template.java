@@ -63,11 +63,13 @@ import org.hl7.fhir.utilities.json.model.JsonElement;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonPrimitive;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
+import org.hl7.fhir.utilities.json.model.JsonString;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.settings.FhirSettings;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
+import org.hl7.fhir.utilities.xml.XMLUtil;
 
 
 public class Template {
@@ -281,10 +283,11 @@ public class Template {
   for (int i = 0; i < baseLang.getNames().size(); i++) {
     String key = baseLang.getNames().get(i);
     sb.append("<translation name=\"" + key + "\"");
-    sb.append(" " + langs.get(0) + "=" + baseLang.getJsonString(key));
+    sb.append(" " + langs.get(0) + "=\"" + XMLUtil.escapeXML(baseLang.getJsonString(key).asString(), "UTF-8", false) + "\"");
     for (int j = 1; j < langs.size(); j++) {
       JsonObject transLang = jt.getJsonObject(langs.get(j));
-      sb.append(" " + langs.get(j) + "=" + transLang.getJsonString(key));
+      JsonString trans = transLang.getJsonString(key);
+      sb.append(" " + langs.get(j) + "=\"" + (trans==null ? "" : XMLUtil.escapeXML(trans.asString(), "UTF-8", false)) + "\"");
     }
     sb.append("/>\r\n");
   }
