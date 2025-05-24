@@ -342,7 +342,6 @@ import org.hl7.fhir.r5.utils.validation.ValidatorSession;
 import org.hl7.fhir.utilities.CSVReader;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.CompressionUtilities;
-import org.hl7.fhir.utilities.DebugUtilities;
 import org.hl7.fhir.utilities.DurationUtil;
 import org.hl7.fhir.utilities.ENoDump;
 import org.hl7.fhir.utilities.FhirPublication;
@@ -12402,9 +12401,6 @@ private String fixPackageReference(String dep) {
       throws IOException, FileNotFoundException, Exception, Error {
     saveFileOutputs(f, lang);
     for (FetchedResource r : f.getResources()) {
-      if ("SearchParameter".equals(r.fhirType())) {
-        DebugUtilities.breakpoint();      
-      }
           
       logDebugMessage(LogCategory.PROGRESS, "Produce outputs for "+r.fhirType()+"/"+r.getId());
       Map<String, String> vars = makeVars(r);
