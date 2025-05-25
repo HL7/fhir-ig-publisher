@@ -58,6 +58,7 @@ import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.i18n.RenderingI18nContext;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
@@ -94,9 +95,9 @@ public class ValueSetRenderer extends CanonicalRenderer {
     if (vsc.hasCompose()) {
       vsc.setExpansion(null); // we don't want to render an expansion by mistake
       RendererFactory.factory(vsc, gen).renderOrError(ResourceWrapper.forResource(gen, vsc));
-      return "<h3>Logical Definition (CLD)</h3>\r\n" + new XhtmlComposer(XhtmlComposer.HTML).compose(vsc.getText().getDiv());
+      return "<h3>"+gen.formatPhrase(RenderingContext.VSR_LOGICAL)+"</h3>\r\n" + new XhtmlComposer(XhtmlComposer.HTML).compose(vsc.getText().getDiv());
     } else {
-      return "<h3>Logical Definition (CLD)</h3>\r\n<p>No formal definition provided for this ValueSet</p>\r\n";
+      return "<h3>"+gen.formatPhrase(RenderingContext.VSR_LOGICAL)+"</h3>\r\n<p>"+gen.formatPhrase(RenderingI18nContext.VSR_NO_DEF)+"</p>\r\n";
       
     }
   }
@@ -126,7 +127,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
             first = false;
             b.append("<ul>\r\n");
           }
-          b.append(" <li>Used as a trigger criteria in <a href=\""+pd.getWebPath()+"\">"+Utilities.escapeXml(pd.present())+"</a></li>\r\n");
+          b.append(" <li>"+gen.formatPhrase(RenderingI18nContext.VSR_TRIGGER)+" <a href=\""+pd.getWebPath()+"\">"+Utilities.escapeXml(pd.present())+"</a></li>\r\n");
         }
       }
     }
@@ -245,37 +246,6 @@ public class ValueSetRenderer extends CanonicalRenderer {
 
   protected void changeSummaryDetails(StringBuilder b) {
     CanonicalResourceComparison<? extends CanonicalResource> comp = VersionComparisonAnnotation.artifactComparison(vs);
-    if (comp != null) {
-      if (comp.anyUpdates()) {
-        if (comp.getChangedMetadata() == ChangeAnalysisState.CannotEvaluate) {
-          b.append("<li>Unable to evaluate changes to metadata</li>\r\n");
-        } else if (comp.getChangedMetadata() == ChangeAnalysisState.Changed) {
-          b.append("<li>The resource metadata has changed ("+comp.getMetadataFieldsAsText()+")</li>\r\n");          
-        }
-        
-        if (comp.getChangedContent() == ChangeAnalysisState.CannotEvaluate) {
-          b.append("<li>Unable to evaluate changes to content</li>\r\n");
-        } else if (comp.getChangedContent() == ChangeAnalysisState.Changed) {
-          b.append("<li>The logical definition of the value set has changed</li>\r\n");          
-        }
-
-        if (comp.getChangedDefinitions() == ChangeAnalysisState.CannotEvaluate) {
-          b.append("<li>Unable to evaluate changes to definitions</li>\r\n");
-        } else if (comp.getChangedDefinitions() == ChangeAnalysisState.Changed) {
-          b.append("<li>One or more text definitions/displays have changed</li>\r\n");          
-        }
-
-        if (comp.getChangedContentInterpretation() == ChangeAnalysisState.CannotEvaluate) {
-          b.append("<li>Unable to evaluate changes to the expansion</li>\r\n");
-        } else if (comp.getChangedContentInterpretation() == ChangeAnalysisState.Changed) {
-          b.append("<li>The expansion has changed</li>\r\n");          
-        }
-
-      } else {
-        b.append("<li>No changes</li>\r\n");
-      }
-    } else {
-      b.append("<li>New Content</li>\r\n");
-    }
+    changeSummaryDetails(b, comp, RenderingI18nContext.SDR_CONT_CH_DET_VS, RenderingI18nContext.SDR_DEFN_CH_DET_VS, RenderingI18nContext.SDR_INTRP_CH_NO_VS, RenderingI18nContext.SDR_INTRP_CH_DET_VS);
   }
 }

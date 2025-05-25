@@ -167,7 +167,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
 
       if (sd.getDifferential() == null)
-        return "<p>" + gen.formatPhrase(RenderingContext.STRUC_DEF_NO_SUMMARY) + "</p>";
+        return "<p>" + gen.formatPhrase(RenderingI18nContext.STRUC_DEF_NO_SUMMARY) + "</p>";
 
       // references
       List<String> refs = new ArrayList<String>(); // profile references
@@ -223,7 +223,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           }
         }
       }
-      StringBuilder res = new StringBuilder("<a name=\""+(all ? "a" : "s")+"-summary\"> </a>\r\n<p><b>\r\n" + (gen.formatPhrase(RenderingContext.GENERAL_SUMM)) + "\r\n</b></p>\r\n");      
+      StringBuilder res = new StringBuilder("<a name=\""+(all ? "a" : "s")+"-summary\"> </a>\r\n<p><b>\r\n" + (gen.formatPhrase(RenderingI18nContext.GENERAL_SUMM)) + "\r\n</b></p>\r\n");      
       if (ToolingExtensions.hasExtension(sd, ToolingExtensions.EXT_SUMMARY)) {
         Extension v = ToolingExtensions.getExtension(sd, ToolingExtensions.EXT_SUMMARY);
         res.append(processMarkdown("Profile.summary", (PrimitiveType) v.getValue()));
@@ -236,45 +236,45 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           res.append("<p>");
           if (requiredOutrights > 0 || requiredNesteds > 0) {
             started = true;
-            res.append(gen.formatPhrase(RenderingContext.SD_SUMMARY_MANDATORY, gen.toStr(requiredOutrights), (requiredOutrights > 1 ? (Utilities.pluralizeMe(gen.formatPhrase(RenderingContext.STRUC_DEF_ELEMENT))) : (gen.formatPhrase(RenderingContext.STRUC_DEF_ELEMENT)))));
+            res.append(gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_MANDATORY, gen.toStr(requiredOutrights), (requiredOutrights > 1 ? (Utilities.pluralizeMe(gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ELEMENT))) : (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ELEMENT)))));
             if (requiredNesteds > 0)
-              res.append(gen.formatPhrase(RenderingContext.SD_SUMMARY_NESTED_MANDATORY, gen.toStr(requiredNesteds), requiredNesteds > 1 ? (Utilities.pluralizeMe(gen.formatPhrase(RenderingContext.STRUC_DEF_ELEMENT))) : (gen.formatPhrase(RenderingContext.STRUC_DEF_ELEMENT))));
+              res.append(gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_NESTED_MANDATORY, gen.toStr(requiredNesteds), requiredNesteds > 1 ? (Utilities.pluralizeMe(gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ELEMENT))) : (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ELEMENT))));
           }
           if (supports > 0) {
             if (started)
               res.append("<br/> ");
             started = true;
-            res.append(gen.formatPhrase(RenderingContext.SD_SUMMARY_MUST_SUPPORT, gen.toStr(supports), supports > 1 ? (Utilities.pluralizeMe(gen.formatPhrase(RenderingContext.STRUC_DEF_ELEMENT))) : (gen.formatPhrase(RenderingContext.STRUC_DEF_ELEMENT))));
+            res.append(gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_MUST_SUPPORT, gen.toStr(supports), supports > 1 ? (Utilities.pluralizeMe(gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ELEMENT))) : (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ELEMENT))));
           }
           if (fixeds > 0) {
             if (started)
               res.append("<br/> ");
             started = true;
-            res.append(gen.formatPhrase(RenderingContext.SD_SUMMARY_FIXED, gen.toStr(fixeds), fixeds > 1 ? (Utilities.pluralizeMe(gen.formatPhrase(RenderingContext.STRUC_DEF_ELEMENT))) : (gen.formatPhrase(RenderingContext.STRUC_DEF_ELEMENT))));
+            res.append(gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_FIXED, gen.toStr(fixeds), fixeds > 1 ? (Utilities.pluralizeMe(gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ELEMENT))) : (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ELEMENT))));
           }
           if (prohibits > 0) {
             if (started)
               res.append("<br/> ");
             started = true;
-            res.append(gen.formatPhrase(RenderingContext.SD_SUMMARY_PROHIBITED, gen.toStr(prohibits), prohibits > 1 ? (Utilities.pluralizeMe(gen.formatPhrase(RenderingContext.STRUC_DEF_ELEMENT))) : (gen.formatPhrase(RenderingContext.STRUC_DEF_ELEMENT))));
+            res.append(gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_PROHIBITED, gen.toStr(prohibits), prohibits > 1 ? (Utilities.pluralizeMe(gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ELEMENT))) : (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ELEMENT))));
           }
           res.append("</p>");
         }
 
         if (!refs.isEmpty()) {
-          res.append("<p><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_STRUCTURES)) + "</b></p>\r\n<p>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_THIS_REFERS)) + ":</p>\r\n<ul>\r\n");
+          res.append("<p><b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_STRUCTURES)) + "</b></p>\r\n<p>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_THIS_REFERS)) + ":</p>\r\n<ul>\r\n");
           for (String s : refs)
             res.append(s);
           res.append("\r\n</ul>\r\n\r\n");
         }
         if (!ext.isEmpty()) {
-          res.append("<p><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_EXTENSIONS)) + "</b></p>\r\n<p>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_REFERS_EXT)) + ":</p>\r\n<ul>\r\n");
+          res.append("<p><b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_EXTENSIONS)) + "</b></p>\r\n<p>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_REFERS_EXT)) + ":</p>\r\n<ul>\r\n");
           for (String s : ext)
             res.append(s);
           res.append("\r\n</ul>\r\n\r\n");
         }
         if (!slices.isEmpty()) {
-          res.append("<p><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_SLIC)) + "</b></p>\r\n<p>" + gen.formatPhrase(RenderingContext.SD_SUMMARY_SLICES, "<a href=\"" + corePath + "profiling.html#slices\">", "</a>") + ":</p>\r\n<ul>\r\n");
+          res.append("<p><b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_SLIC)) + "</b></p>\r\n<p>" + gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_SLICES, "<a href=\"" + corePath + "profiling.html#slices\">", "</a>") + ":</p>\r\n<ul>\r\n");
           for (String s : slices)
             res.append(s);
           res.append("\r\n</ul>\r\n\r\n");
@@ -282,7 +282,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
       if (ToolingExtensions.hasExtension(sd, ToolingExtensions.EXT_FMM_LEVEL)) {
         // Use hard-coded spec link to point to current spec because DSTU2 had maturity listed on a different page
-        res.append("<p><b><a class=\"fmm\" href=\"http://hl7.org/fhir/versions.html#maturity\" title=\"Maturity Level\">" + (gen.formatPhrase(RenderingContext.CANON_REND_MATURITY)) + "</a></b>: " + ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_FMM_LEVEL) + "</p>\r\n");
+        res.append("<p><b><a class=\"fmm\" href=\"http://hl7.org/fhir/versions.html#maturity\" title=\"Maturity Level\">" + (gen.formatPhrase(RenderingI18nContext.CANON_REND_MATURITY)) + "</a></b>: " + ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_FMM_LEVEL) + "</p>\r\n");
       }
 
       return res.toString();
@@ -311,7 +311,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
       StringBuilder b = new StringBuilder();
       String html = Utilities.stripAllPara(processMarkdown("description", sd.getDescriptionElement()));
-      b.append("<p>Complex Extension: "+html+"</p><ul>"); //Translate
+      b.append("<p>"+gen.formatPhrase(RenderingI18nContext.TEXT_ICON_EXTENSION_COMPLEX)+": "+html+"</p><ul>"); 
       for (ElementDefinition ed : subs) {
         ElementDefinition defn = (ElementDefinition) ed.getUserData(UserDataNames.render_extension_slice);
         if (defn != null) {
@@ -358,7 +358,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private String describeSlice(String path, ElementDefinitionSlicingComponent slicing) {
     if (!slicing.hasDiscriminator())
-      return "<li>" +gen.formatPhrase(RenderingContext.SD_SUMMARY_SLICE_NONE, path) + "</li>\r\n";
+      return "<li>" +gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_SLICE_NONE, path) + "</li>\r\n";
     String s = "";
     if (slicing.getOrdered())
       s = "ordered";
@@ -379,15 +379,15 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private String summariseExtension(List<CanonicalType> profiles, boolean modifier) throws Exception {
     if (profiles.size() != 1)
-      throw new Exception("Multiple profiles are not supported at this time (#1)"); //Translate
+      throw new Exception(gen.formatPhrase(RenderingI18nContext.SDR_MULTIPLE_PROFILES)+" (#1)"); 
     String url = profiles.get(0).getValue();
     StructureDefinition ed = context.fetchResource(StructureDefinition.class, url);
     if (ed == null)
-      return "<li>" + gen.formatPhrase(RenderingContext.SD_SUMMARY_MISSING_EXTENSION, url) + "</li>";
+      return "<li>" + gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_MISSING_EXTENSION, url) + "</li>";
     if (ed.getWebPath() == null)
-      return "<li><a href=\"" + "extension-" + ed.getId().toLowerCase() + ".html\">" + url + "</a>" + (modifier ? " (<b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_MODIF)) + "</b>) " : "") + "</li>\r\n";
+      return "<li><a href=\"" + "extension-" + ed.getId().toLowerCase() + ".html\">" + url + "</a>" + (modifier ? " (<b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_MODIF)) + "</b>) " : "") + "</li>\r\n";
     else
-      return "<li><a href=\"" + Utilities.escapeXml(ed.getWebPath()) + "\">" + url + "</a>" + (modifier ? " (<b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_MODIF)) + "</b>) " : "") + "</li>\r\n";
+      return "<li><a href=\"" + Utilities.escapeXml(ed.getWebPath()) + "\">" + url + "</a>" + (modifier ? " (<b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_MODIF)) + "</b>) " : "") + "</li>\r\n";
   }
 
   private String describeProfile(String url) throws Exception {
@@ -396,7 +396,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
     StructureDefinition ed = context.fetchResource(StructureDefinition.class, url);
     if (ed == null)
-      return "<li>" + gen.formatPhrase(RenderingContext.SD_SUMMARY_MISSING_PROFILE, url) + "</li>";
+      return "<li>" + gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_MISSING_PROFILE, url) + "</li>";
     return "<li><a href=\"" + Utilities.escapeXml(ed.getWebPath()) + "\">" + ed.present() + " <span style=\"font-size: 8px\">(" + url + ")</span></a></li>\r\n";
   }
 
@@ -411,7 +411,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return summarise((Quantity) fixed);
     if (fixed instanceof ContactPoint)
       return summarise((ContactPoint) fixed);
-    throw new FHIRException("Generating text summary of fixed value not yet done for type " + fixed.getClass().getName()); //Translate
+    throw new FHIRException(gen.formatPhrase(RenderingI18nContext.SDR_NOT_GEN, fixed.getClass().getName())); 
   }
 
   private String summarise(ContactPoint cp) {
@@ -422,9 +422,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   private String summarise(Quantity quantity) {
     String cu = "";
     if ("http://unitsofmeasure.org/".equals(quantity.getSystem()))
-      cu = " (" + (gen.formatPhrase(RenderingContext.GENERAL_UCUM)) + ": " + quantity.getCode() + ")";
+      cu = " (" + (gen.formatPhrase(RenderingI18nContext.GENERAL_UCUM)) + ": " + quantity.getCode() + ")";
     if ("http://snomed.info/sct".equals(quantity.getSystem()))
-      cu = " (" + (gen.formatPhrase(RenderingContext.STRUC_DEF_SNOMED_CODE)) + ": " + quantity.getCode() + ")";
+      cu = " (" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_SNOMED_CODE)) + ": " + quantity.getCode() + ")";
     return quantity.getValue().toString() + quantity.getUnit() + cu;
   }
 
@@ -440,17 +440,17 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
       return b.toString();
     } else {
-      throw new FHIRException("Error describing concept - not done yet (no codings, no text)"); //Translate
+      throw new FHIRException(gen.formatPhrase(RenderingI18nContext.SDR_NOT_DONE_CC)); 
     }
   }
 
   private String summarise(Coding coding) throws FHIRException {
     if ("http://snomed.info/sct".equals(coding.getSystem()))
-      return "" + (gen.formatPhrase(RenderingContext.STRUC_DEF_SNOMED_CODE)) + " " + coding.getCode() + (!coding.hasDisplay() ? "" : "(\"" + gen.getTranslated(coding.getDisplayElement()) + "\")");
+      return "" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_SNOMED_CODE)) + " " + coding.getCode() + (!coding.hasDisplay() ? "" : "(\"" + gen.getTranslated(coding.getDisplayElement()) + "\")");
     if ("http://loinc.org".equals(coding.getSystem()))
-      return "" + (gen.formatPhrase(RenderingContext.STRUC_DEF_LOINC)) + " " + coding.getCode() + (!coding.hasDisplay() ? "" : "(\"" + gen.getTranslated(coding.getDisplayElement()) + "\")");
+      return "" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_LOINC)) + " " + coding.getCode() + (!coding.hasDisplay() ? "" : "(\"" + gen.getTranslated(coding.getDisplayElement()) + "\")");
     if ("http://unitsofmeasure.org/".equals(coding.getSystem()))
-      return " (" + (gen.formatPhrase(RenderingContext.GENERAL_UCUM)) + ": " + coding.getCode() + ")";
+      return " (" + (gen.formatPhrase(RenderingI18nContext.GENERAL_UCUM)) + ": " + coding.getCode() + ")";
     CodeSystem cs = context.fetchCodeSystem(coding.getSystem());
     if (cs == null)
       return "<span title=\"" + coding.getSystem() + "\">" + coding.getCode() + "</a>" + (!coding.hasDisplay() ? "" : "(\"" + gen.getTranslated(coding.getDisplayElement()) + "\")");
@@ -479,15 +479,15 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     String sv = ext.hasExtension("startFhirVersion") ? ext.getExtensionString("startFhirVersion") : null;
     String ev = ext.hasExtension("endFhirVersion") ? ext.getExtensionString("endFhirVersion") : null;
     if (ev != null && ev.equals(sv)) {
-      x.tx("For version "+VersionUtilities.getNameForVersion(ev)); //Translate
+      x.tx(gen.formatPhrase(RenderingI18nContext.SDR_VER_FOR, VersionUtilities.getNameForVersion(ev))); 
     } else if (ev != null && sv != null) {
-      x.tx("For versions "+VersionUtilities.getNameForVersion(sv)+" to "+VersionUtilities.getNameForVersion(ev)); //Translate
+      x.tx(gen.formatPhrase(RenderingI18nContext.SDR_VER_RANGE, VersionUtilities.getNameForVersion(sv), VersionUtilities.getNameForVersion(ev))); 
     } else if (ev == null && sv != null) {
-      x.tx("For versions "+VersionUtilities.getNameForVersion(sv)+" onwards"); //Translate
+      x.tx(gen.formatPhrase(RenderingI18nContext.SDR_VER_ON, VersionUtilities.getNameForVersion(sv))); 
     } else if (ev == null && sv != null) {
-      x.tx("For versions until "+VersionUtilities.getNameForVersion(ev)); //Translate
+      x.tx(gen.formatPhrase(RenderingI18nContext.SDR_VER_BEF, VersionUtilities.getNameForVersion(ev))); 
     } else {
-      x.tx("For unknown versions"); //Translate
+      x.tx(gen.formatPhrase(RenderingI18nContext.SDR_VER_UNK)); 
     }
   }
 
@@ -817,9 +817,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     else {
       StringBuilder b = new StringBuilder();
       if (withHeadings)
-        b.append("<h4>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_TERM_BIND)) + "</h4>\r\n");
+        b.append("<h4>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_TERM_BIND)) + "</h4>\r\n");
       b.append("<table class=\"list\">\r\n");
-      b.append("<tr><td><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_PATH)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingContext.GENERAL_CONFORMANCE)) + "</b></td><td><b>" + (hasFixed ? (gen.formatPhrase(RenderingContext.STRUC_DEF_VALUESET_CODE)) : (gen.formatPhrase(RenderingContext.STRUC_DEF_VALUESET))) + "</b></td><td><b>" + (gen.formatPhrase(RenderingContext.GENERAL_URI)) + "</b></td></tr>\r\n");
+      b.append("<tr><td><b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_PATH)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingI18nContext.GENERAL_CONFORMANCE)) + "</b></td><td><b>" + (hasFixed ? (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_VALUESET_CODE)) : (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_VALUESET))) + "</b></td><td><b>" + (gen.formatPhrase(RenderingI18nContext.GENERAL_URI)) + "</b></td></tr>\r\n");
       for (String path : txlist) {
         txItem(txmap, b, path, sd.getUrl());
       }
@@ -858,10 +858,10 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     else {
       StringBuilder b = new StringBuilder();
       if (withHeadings)
-        b.append("<h4>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_TERM_BINDS)) + "</h4>\r\n");
+        b.append("<h4>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_TERM_BINDS)) + "</h4>\r\n");
       b.append("<table class=\"list\">\r\n");
-      b.append("<tr><td><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_PATH)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingContext.GENERAL_CONFORMANCE)) + "</b></td><td><b>" + (hasFixed ?  (gen.formatPhrase(RenderingContext.STRUC_DEF_VALUESET_CODE)) : (gen.formatPhrase(RenderingContext.STRUC_DEF_VALUESET))) + "</b></td>"+
-      "<td><b>" + (gen.formatPhrase(RenderingContext.GENERAL_URI)) + "</b></td></tr>\r\n");
+      b.append("<tr><td><b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_PATH)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingI18nContext.GENERAL_CONFORMANCE)) + "</b></td><td><b>" + (hasFixed ?  (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_VALUESET_CODE)) : (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_VALUESET))) + "</b></td>"+
+      "<td><b>" + (gen.formatPhrase(RenderingI18nContext.GENERAL_URI)) + "</b></td></tr>\r\n");
       for (String path : txlist) {
         txItem(txmap, b, path, sd.getUrl());
       }
@@ -911,15 +911,15 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
     if ("?ext".equals(brd.vsn)) {
       if (tx.getValueSet() != null) 
-         System.out.println("Value set '"+tx.getValueSet()+"' at " + url + "#" + path + " not found"); //Translate
+         System.out.println("Value set '"+tx.getValueSet()+"' at " + url + "#" + path + " not found"); 
       else if (!tx.hasDescription())
-        System.out.println("No value set specified at " + url + "#" + path + " (no url)"); //Translate
+        System.out.println("No value set specified at " + url + "#" + path + " (no url)"); 
     }
     if (tx.hasUserData(UserDataNames.render_tx_value)) {
-      brd.vss = "Fixed Value: " + summariseValue((DataType) tx.getUserData(UserDataNames.render_tx_value)); //Translate
+      brd.vss = gen.formatPhrase(RenderingI18nContext.SDR_FIXED_VALUE, summariseValue((DataType) tx.getUserData(UserDataNames.render_tx_value))); 
       brd.suffix = null;
     } else if (tx.hasUserData(UserDataNames.render_tx_pattern)) {
-      brd.vss = "Pattern: " + summariseValue((DataType) tx.getUserData(UserDataNames.render_tx_pattern)); //Translate
+      brd.vss = gen.formatPhrase(RenderingI18nContext.SDR_PATTERN_VALUE, summariseValue((DataType) tx.getUserData(UserDataNames.render_tx_pattern))); 
       brd.suffix = null;
     }
 
@@ -932,12 +932,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       b.append(brd.suffix);
     }
     if (tx.hasValueSet()) {
-      b.append("<div><code>"+Utilities.escapeXml(tx.getValueSet())+"</code><button title=\"Click to copy URL\" class=\"btn-copy\" data-clipboard-text=\""+Utilities.escapeXml(tx.getValueSet())+"\"></button></div>"); //Translate
+      b.append("<div><code>"+Utilities.escapeXml(tx.getValueSet())+"</code><button title=\""+gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)+"\" class=\"btn-copy\" data-clipboard-text=\""+Utilities.escapeXml(tx.getValueSet())+"\"></button></div>"); 
       if (link != null) {
         if (Utilities.isAbsoluteUrlLinkable(link)) {
-          b.append("<div>from <a href=\""+Utilities.escapeXml(link)+"\">"+Utilities.escapeXml(link)+"</a></div>"); //Translate
+          b.append("<div>"+gen.formatPhrase(RenderingI18nContext.SDR_FROM, "<a href=\""+Utilities.escapeXml(link)+"\">"+Utilities.escapeXml(link)+"</a></div>")); 
         } else {
-          b.append("<div>from "+Utilities.escapeXml(link)+"</div>"); //Translate
+          b.append("<div>"+gen.formatPhrase(RenderingI18nContext.SDR_FROM, Utilities.escapeXml(link)+"</div>")); 
         }
       }
     } else {
@@ -989,16 +989,16 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           link = vs.getUserString(UserDataNames.render_external_link);
         } else if (vs.hasSourcePackage()) {
           if (VersionUtilities.isCorePackage(vs.getSourcePackage().getId())) {
-            link = "the FHIR Standard"; //Translate
+            link = gen.formatPhrase(RenderingI18nContext.SDR_SRC_FHIR); 
           } else if (!Utilities.isAbsoluteUrlLinkable(vs.getWebPath())) {
-            link = "this IG"; //Translate
+            link = gen.formatPhrase(RenderingI18nContext.SDR_SRC_IG); 
           } else if (!Utilities.isAbsoluteUrlLinkable(vs.getWebPath())) {
-            link = "Package: "+vs.getSourcePackage(); //Translate
+            link = gen.formatPhrase(RenderingI18nContext.SDR_SRC_PACK, vs.getSourcePackage()); 
           }
         }
         StringBuilder b = new StringBuilder();
         if (p == null)
-          b.append("<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"??\">" + Utilities.escapeXml(gen.getTranslated(vs.getNameElement())) + " (" + (gen.formatPhrase(RenderingContext.STRUC_DEF_MISSING_LINK))+")");
+          b.append("<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"??\">" + Utilities.escapeXml(gen.getTranslated(vs.getNameElement())) + " (" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_MISSING_LINK))+")");
         else if (p.startsWith("http:"))
           b.append("<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"" + Utilities.escapeXml(p) + "\">" + Utilities.escapeXml(gen.getTranslated(vs.getNameElement())));
         else
@@ -1016,13 +1016,13 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         if (system != null) {
           SystemReference sr = CodeSystemUtilities.getSystemReference(system, context);
           if (sr == null) {
-            brd.suffix = " (a valid code from <code>"+system+"</code>)"; //Translate
+            brd.suffix = gen.formatPhrase(RenderingI18nContext.SDR_CODE_FROM, "<code>"+system+"</code>"); 
           } else if (sr.isLocal() || (sr.getText() != null && sr.getText().equals(vs.getName()))) {
             brd.suffix = "";
           } else if (sr.getLink() == null) {
-            brd.suffix = " (a valid code from "+sr.getText()+" (<code>"+system+"</code>)"; //Translate
+            brd.suffix = gen.formatPhrase(RenderingI18nContext.SDR_CODE_FROM, sr.getText()+" (<code>"+system+"</code>)"); 
           } else {
-            brd.suffix = " (a valid code from <a href=\""+sr.getLink()+"\">"+sr.getText()+"</a>)"; //Translate
+            brd.suffix = gen.formatPhrase(RenderingI18nContext.SDR_CODE_FROM, "<a href=\""+sr.getLink()+"\">"+sr.getText()+"</a>"); 
           }
         }
       }
@@ -1114,9 +1114,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
     public String getIds() {
       if (constraint.hasSource() && constraint.getSource().equals("http://hl7.org/fhir/StructureDefinition/Element"))
-        return "**ALL** elements"; //Translate
+        return gen.formatPhrase(RenderingI18nContext.SDR_ALL_ELEM); 
       else if (constraint.hasSource() && constraint.getSource().equals("http://hl7.org/fhir/StructureDefinition/Extension"))
-        return "**ALL** extensions"; //Translate
+        return gen.formatPhrase(RenderingI18nContext.SDR_ALL_EXT); 
       else
         return String.join(", ", elements);
     }
@@ -1156,9 +1156,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     else {
       StringBuilder b = new StringBuilder();
       if (withHeadings)
-        b.append("<h4>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_CONSTRAINTS)) + "</h4>\r\n");
+        b.append("<h4>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_CONSTRAINTS)) + "</h4>\r\n");
       b.append("<table class=\"list\">\r\n");
-      b.append("<tr><td width=\"60\"><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_ID)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_GRADE)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_PATHS)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingContext.GENERAL_DETAILS)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_REQUIREMENTS)) + "</b></td></tr>\r\n");
+      b.append("<tr><td width=\"60\"><b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ID)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_GRADE)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_PATHS)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingI18nContext.GENERAL_DETAILS)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_REQUIREMENTS)) + "</b></td></tr>\r\n");
       List<String> keys = new ArrayList<>(constraintMap.keySet());
 
       Collections.sort(keys, new ConstraintKeyComparator());
@@ -1196,7 +1196,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private String grade(ElementDefinitionConstraintComponent inv) {
     if (inv.hasExtension(ToolingExtensions.EXT_BEST_PRACTICE)) {
-      return "best practice";//Translate
+      return gen.formatPhrase(RenderingI18nContext.SDR_BP);
     } else {
       return gen.getTranslated(inv.getSeverityElement());
     }
@@ -1223,8 +1223,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   public String dict(boolean incProfiledOut, int mode, String anchorPrefix) throws Exception {
     XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
     var p = x.para();
-    p.tx("Guidance on how to interpret the contents of this table can be found ");  //Translate 
-    p.ah("https://build.fhir.org/ig/FHIR/ig-guidance//readingIgs.html#data-dictionaries").tx("here"); //Translate
+    p.tx(gen.formatPhrase(RenderingI18nContext.SDR_GUIDANCE_PFX));   
+    p.ah("https://build.fhir.org/ig/FHIR/ig-guidance//readingIgs.html#data-dictionaries").tx(gen.formatPhrase(RenderingI18nContext.SDR_GUIDANCE_HERE)); 
+    p.tx(gen.formatPhrase(RenderingI18nContext.SDR_GUIDANCE_SFX));   
     XhtmlNode t = x.table("dict", false);
 
     List<ElementDefinition> elements = elementsForMode(mode);
@@ -1237,7 +1238,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   public String mappings(boolean complete, boolean diff) {
     if (sd.getMapping().isEmpty())
-      return "<p>" + (gen.formatPhrase(RenderingContext.STRUC_DEF_NO_MAPPINGS)) + "</p>";
+      return "<p>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_NO_MAPPINGS)) + "</p>";
     else {
       boolean allEmpty = true;  // assume all the mappings are empty; 
       StringBuilder s = new StringBuilder();
@@ -1262,9 +1263,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           allEmpty = false; // that assumption is wrong
           String url = getUrlForUri(map.getUri());
           if (url == null)
-            s.append("<a name=\"" + map.getIdentity() + "\"> </a><h3>" +gen.formatPhrase(RenderingContext.SD_SUMMARY_MAPPINGS, Utilities.escapeXml(gen.getTranslated(map.getNameElement())), Utilities.escapeXml(map.getUri()), "", "") + "</h3>");
+            s.append("<a name=\"" + map.getIdentity() + "\"> </a><h3>" +gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_MAPPINGS, Utilities.escapeXml(gen.getTranslated(map.getNameElement())), Utilities.escapeXml(map.getUri()), "", "") + "</h3>");
           else
-            s.append("<a name=\"" + map.getIdentity() + "\"> </a><h3>" +gen.formatPhrase(RenderingContext.SD_SUMMARY_MAPPINGS, Utilities.escapeXml(gen.getTranslated(map.getNameElement())), Utilities.escapeXml(map.getUri()), "<a href=\"" + Utilities.escapeXml(url) + "\">", "</a>") + "</h3>");
+            s.append("<a name=\"" + map.getIdentity() + "\"> </a><h3>" +gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_MAPPINGS, Utilities.escapeXml(gen.getTranslated(map.getNameElement())), Utilities.escapeXml(map.getUri()), "<a href=\"" + Utilities.escapeXml(url) + "\">", "</a>") + "</h3>");
           if (map.hasComment())
             s.append("<p>" + Utilities.escapeXml(gen.getTranslated(map.getCommentElement())) + "</p>");
           //        else if (specmaps != null && preambles.has(map.getUri()))   
@@ -1288,7 +1289,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
       // Well all the mappings are empty
       if(allEmpty) {
-        s.append("<p>" + gen.formatPhrase(RenderingContext.STRUC_DEF_ALL_MAP_KEY) + "</p>");
+        s.append("<p>" + gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ALL_MAP_KEY) + "</p>");
       }
 
       return s.toString();
@@ -1423,7 +1424,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   public String header() throws Exception {
     StringBuilder b = new StringBuilder();
     b.append("<p class=\"profile-url-label\">\r\n");
-    b.append("The official URL for this profile is:" + "\r\n"); //Translate
+    b.append(gen.formatPhrase(RenderingI18nContext.SDR_OFF_URL)+":" + "\r\n"); 
     b.append("</p>\r\n");
     b.append("<pre class=\"profile-url\">" + sd.getUrl() + "</pre>\r\n");
     b.append("<div class=\"profile-description\">\r\n");
@@ -1433,13 +1434,13 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       b.append("<p class=\"profile-derivation\">\r\n");
       StructureDefinition sdb = context.fetchResource(StructureDefinition.class, sd.getBaseDefinition());
       if (sdb != null)
-        b.append(gen.formatPhrase(RenderingContext.STRUC_DEF_PROFILE_BUILDS) + " <a href=\"" + Utilities.escapeXml(sdb.getWebPath()) + "\">" + gen.getTranslated(sdb.getNameElement()) + "</a>.");
+        b.append(gen.formatPhrase(RenderingI18nContext.STRUC_DEF_PROFILE_BUILDS) + " <a href=\"" + Utilities.escapeXml(sdb.getWebPath()) + "\">" + gen.getTranslated(sdb.getNameElement()) + "</a>.");
       else
-        b.append(gen.formatPhrase(RenderingContext.STRUC_DEF_PROFILE_BUILDS) + " " + sd.getBaseDefinition() + ".");
+        b.append(gen.formatPhrase(RenderingI18nContext.STRUC_DEF_PROFILE_BUILDS) + " " + sd.getBaseDefinition() + ".");
       b.append("</p>\r\n");
     }
     b.append("<p class=\"profile-publication\">\r\n");
-    b.append(gen.formatPhrase(RenderingContext.SD_SUMMARY_PUBLICATION, renderDate(sd.getDateElement()), gen.getTranslated(sd.getStatusElement()), gen.getTranslated(sd.getPublisherElement()))+"\r\n");
+    b.append(gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_PUBLICATION, renderDate(sd.getDateElement()), gen.getTranslated(sd.getStatusElement()), gen.getTranslated(sd.getPublisherElement()))+"\r\n");
     b.append("</p>\r\n");
     return b.toString();
   }
@@ -1454,14 +1455,14 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     List<StructureDefinition> derived = findDerived(crl);
     if (!derived.isEmpty()) {
       b.append("<p>\r\n");
-      b.append(gen.formatPhrase(RenderingContext.STRUC_DEF_DERIVED_PROFILE) + " ");
+      b.append(gen.formatPhrase(RenderingI18nContext.STRUC_DEF_DERIVED_PROFILE) + " ");
       listResources(b, derived);
       b.append("</p>\r\n");
     }
     List<StructureDefinition> users = findUses(crl);
     if (!users.isEmpty()) {
       b.append("<p>\r\n");
-      b.append(gen.formatPhrase(RenderingContext.STRUC_DEF_REFER_PROFILE)+" ");
+      b.append(gen.formatPhrase(RenderingI18nContext.STRUC_DEF_REFER_PROFILE)+" ");
       listResources(b, users);
       b.append("</p>\r\n");
     }
@@ -1654,7 +1655,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     List<ElementDefinition> children = getChildren(sd.getSnapshot().getElement(), sd.getSnapshot().getElement().get(0));
     boolean complex = isComplex(children);
     if (!complex && !hasExtensionChild(children))
-      b.append("  // from Element: <a href=\"" + corePath + "extensibility.html\">extension</a>\r\n"); //Translate
+      b.append(gen.formatPhrase(RenderingI18nContext.SDR_FROM_ELEM, corePath + "extensibility.html")+"\r\n"); 
 
     int c = 0;
     int l = lastChild(children);
@@ -1672,7 +1673,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         generateCoreElem(b, sd.getSnapshot().getElement(), child, 2, rn, false, child.getType().get(0), ++c == l, complex);
       else {
         if (!"0".equals(child.getMax())) {
-          b.append("<span style=\"color: Gray\">// " + tail(child.getPath()) + ": <span style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(child.getShort()) + "</span>. One of these " + Integer.toString(child.getType().size()) + ":</span>\r\n"); //Translate
+          b.append("<span style=\"color: Gray\">// " + tail(child.getPath()) + ": <span style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(child.getShort()) + "</span>. "+gen.formatPhrase(RenderingI18nContext.SDR_ONE_OF, child.getType().size()) + ":</span>\r\n"); 
           for (TypeRefComponent t : child.getType())
             generateCoreElem(b, sd.getSnapshot().getElement(), child, 2, rn, false, t, ++c == l, false);
         }
@@ -1893,7 +1894,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     String en = asValue ? "value[x]" : name;
     if (en.contains("[x]")) {
       if (type == null) {
-        throw new Error("Type cannot be unknown for element with [x] in the name @ "+pathName); //Translate
+        throw new Error("Type cannot be unknown for element with [x] in the name @ "+pathName); 
       }
       en = en.replace("[x]", upFirst(type.getWorkingCode()));
     }
@@ -1926,7 +1927,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       boolean extcomplex = isComplex(extchildren) && complex;
       if (!extcomplex && !hasExtensionChild(extchildren)) {
         b.append(indentS + "  ");
-        b.append("  // from Element: <a href=\"" + corePath + "extensibility.html\">extension</a>\r\n"); //Translate
+        b.append(gen.formatPhrase(RenderingI18nContext.SDR_FROM_ELEM, corePath + "extensibility.html")+"\r\n"); 
       }
 
       int cc = 0;
@@ -1939,7 +1940,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         else if (child.getType().size() == 1)
           generateCoreElem(b, elements, child, indent + 2, pathName + "." + en, false, child.getType().get(0), ++cc == l, extcomplex);
         else {
-          b.append("<span style=\"color: Gray\">// value[x]: <span style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(child.getShort()) + "</span>. One of these " + Integer.toString(child.getType().size()) + ":</span>\r\n"); //Translate
+          b.append("<span style=\"color: Gray\">// value[x]: <span style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(child.getShort()) + "</span>. "+gen.formatPhrase(RenderingI18nContext.SDR_ONE_OF, child.getType().size()) + ":</span>\r\n"); 
           for (TypeRefComponent t : child.getType())
             generateCoreElem(b, elements, child, indent + 2, pathName + "." + en, false, t, ++cc == l, false);
         }
@@ -2003,7 +2004,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       List<ElementDefinition> extchildren = getChildren(elements, slice);
       if (extchildren.isEmpty()) {
         if (sdExt == null)
-          b.append("Not handled yet: unknown extension " + url + "\r\n"); //Translate
+          b.append(gen.formatPhrase(RenderingI18nContext.SDR_UNK_EXT,  url) + "\r\n"); 
         else
           extchildren = getChildren(sdExt.getSnapshot().getElement(), sdExt.getSnapshot().getElementFirstRep());
       }
@@ -2013,12 +2014,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         if (value.getType().size() == 1)
           generateCoreElem(b, elements, value, indent + 2, pathName + "." + en, false, value.getType().get(0), true, false);
         else {
-          b.append("<span style=\"color: Gray\">// value[x]: <span style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(value.getShort()) + "</span>. One of these " + Integer.toString(value.getType().size()) + ":</span>\r\n"); //Translate
+          b.append("<span style=\"color: Gray\">// value[x]: <span style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(value.getShort()) + "</span>. "+gen.formatPhrase(RenderingI18nContext.SDR_ONE_OF, value.getType().size()) + ":</span>\r\n"); 
           for (TypeRefComponent t : value.getType())
             generateCoreElem(b, elements, value, indent + 2, pathName + "." + en, false, t, t == value.getType().get(value.getType().size() - 1), false);
         }
       } else {
-        b.append("Not handled yet: complex extension " + url + "\r\n"); //Translate
+        b.append(gen.formatPhrase(RenderingI18nContext.SDR_NOT_HANDLED_EXT, "Not handled yet: complex extension " + url) + "\r\n"); 
       }
 
       c++;
@@ -2083,9 +2084,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       b.append(" <span style=\"color: brown\" title=\""
           + Utilities.escapeXml(getInvariants(elem)) + "\"><b>C?</b></span>");
     if (elem.getMin() > 0)
-      b.append(" <span style=\"color: brown\" title=\"This element is required\"><b>R!</b></span>");  //Translate
+      b.append(" <span style=\"color: brown\" title=\""+gen.formatPhrase(RenderingI18nContext.SDR_REQUIRED)+"\"><b>R!</b></span>");  
     if (unbounded && "1".equals(elem.getMax()))
-      b.append(" <span style=\"color: brown\" title=\"This element is an array in the base standard, but the profile only allows on element\"><b>Only One!</b></span> "); //Translate
+      b.append(" <span style=\"color: brown\" title=\""+gen.formatPhrase(RenderingI18nContext.SDR_LIMITED_ONE)+"\"><b>"+gen.formatPhrase(RenderingI18nContext.SDR_ONLY_ONE)+"</b></span> "); 
   }
 
   private String getInvariants(ElementDefinition elem) {
@@ -2106,11 +2107,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private String getEnhancedDefinition(ElementDefinition elem) {
     if (elem.getIsModifier() && elem.getMustSupport())
-      return Utilities.removePeriod(elem.getDefinition()) + " (this element modifies the meaning of other elements, and must be supported)"; //Translate
+      return Utilities.removePeriod(elem.getDefinition()) + " "+ gen.formatPhrase(RenderingI18nContext.SDR_MOD_SUPP); 
     else if (elem.getIsModifier())
-      return Utilities.removePeriod(elem.getDefinition()) + " (this element modifies the meaning of other elements)"; //Translate
+      return Utilities.removePeriod(elem.getDefinition()) + " "+gen.formatPhrase(RenderingI18nContext.SDR_MOD); 
     else if (elem.getMustSupport())
-      return Utilities.removePeriod(elem.getDefinition()) + " (this element must be supported)"; //Translate
+      return Utilities.removePeriod(elem.getDefinition()) + " "+gen.formatPhrase(RenderingI18nContext.SDR_SUPP); 
     else
       return Utilities.removePeriod(elem.getDefinition());
   }
@@ -2143,8 +2144,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     for (ElementDefinitionSlicingDiscriminatorComponent d : slicing.getDiscriminator()) {
       csv.append(d.getType().toCode() + ":" + d.getPath());
     }
-    String s = slicing.getOrdered() ? " in any order" : " in the specified order " + (slicing.hasRules() ? slicing.getRules().getDisplay() : ""); //Translate
-    return "// sliced by " + csv.toString() + " " + s;
+    String s = " " + gen.formatPhrase(slicing.getOrdered() ? RenderingI18nContext.SDR_ANY_ORDER : RenderingI18nContext.SDR_SORTED, csv.toString(), (slicing.hasRules() ? slicing.getRules().getDisplay() : "")); 
+    return s;
   }
 
 
@@ -2492,17 +2493,17 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     gc = gen.new Cell();
     row.getCells().add(gc);
     if (element.definition().getIsModifier()) {
-      gc.addStyledText((this.gen.formatPhrase(RenderingContext.STRUC_DEF_MOD)), "?!", null, null, null, false);
+      gc.addStyledText((this.gen.formatPhrase(RenderingI18nContext.STRUC_DEF_MOD)), "?!", null, null, null, false);
     }
     if (element.definition().getMustSupport() || element.definition().hasExtension(ToolingExtensions.EXT_OBLIGATION_CORE, ToolingExtensions.EXT_OBLIGATION_TOOLS)) {
-      gc.addStyledText((this.gen.formatPhrase(RenderingContext.STRUC_DEF_ELE_MUST_SUPP)), "S", "white", "red", null, false);
+      gc.addStyledText((this.gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ELE_MUST_SUPP)), "S", "white", "red", null, false);
     }
     if (element.definition().getIsSummary()) {
-      gc.addStyledText((this.gen.formatPhrase(RenderingContext.STRUC_DEF_ELE_INCLUDED)), "\u03A3", null, null, null, false);
+      gc.addStyledText((this.gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ELE_INCLUDED)), "\u03A3", null, null, null, false);
     }
     if (sdr.hasNonBaseConstraints(element.definition().getConstraint()) || sdr.hasNonBaseConditions(element.definition().getCondition())) {
       Piece p = gc.addText(org.hl7.fhir.r5.renderers.StructureDefinitionRenderer.CONSTRAINT_CHAR);
-      p.setHint((this.gen.formatPhrase(RenderingContext.STRUC_DEF_AFFECT_CONSTRAINTS)+sdr.listConstraintsAndConditions(element.definition())+")"));
+      p.setHint((this.gen.formatPhrase(RenderingI18nContext.STRUC_DEF_AFFECT_CONSTRAINTS)+sdr.listConstraintsAndConditions(element.definition())+")"));
       p.addStyle(org.hl7.fhir.r5.renderers.StructureDefinitionRenderer.CONSTRAINT_STYLE);
       p.setReference(Utilities.pathURL(VersionUtilities.getSpecUrl(context.getVersion()), "conformance-rules.html#constraints"));
     }
@@ -2533,9 +2534,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       TypeRefComponent tr = element.definition().getTypeFirstRep();
       StructureDefinition sd = context.fetchTypeDefinition(tr.getWorkingCode());
       if (sd != null) {
-        gc.addPiece(gen.new Piece(sd.getWebPath(), "("+tr.getWorkingCode()+" value)", "Primitive value "+tr.getWorkingCode()));         //Translate
+        gc.addPiece(gen.new Piece(sd.getWebPath(), "("+tr.getWorkingCode()+" value)", this.gen.formatPhrase(RenderingI18nContext.SDR_PRIM_VALUE, tr.getWorkingCode())));         
       } else {
-        gc.addPiece(gen.new Piece(null, "("+tr.getWorkingCode()+" value)", "Primitive value "+tr.getWorkingCode())); //Translate
+        gc.addPiece(gen.new Piece(null, "("+tr.getWorkingCode()+" value)", this.gen.formatPhrase(RenderingI18nContext.SDR_PRIM_VALUE, tr.getWorkingCode()))); 
       }
     } else {
       gc.addText("(multiple)");
@@ -2591,31 +2592,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   protected void changeSummaryDetails(StringBuilder b) {
     CanonicalResourceComparison<? extends CanonicalResource> comp = VersionComparisonAnnotation.artifactComparison(sd);
-    if (comp != null && comp.anyUpdates()) {
-      if (comp.getChangedMetadata() == ChangeAnalysisState.CannotEvaluate) {
-        b.append("<li>Unable to evaluate changes to metadata</li>\r\n"); //Translate
-      } else if (comp.getChangedMetadata() == ChangeAnalysisState.Changed) {
-        b.append("<li>The resource metadata has changed ("+comp.getMetadataFieldsAsText()+")</li>\r\n");           //Translate
-      }
-      
-      if (comp.getChangedContent() == ChangeAnalysisState.CannotEvaluate) {
-        b.append("<li>Unable to evaluate changes to content</li>\r\n"); //Translate
-      } else if (comp.getChangedContent() == ChangeAnalysisState.Changed) {
-        b.append("<li>The data elements list has changed</li>\r\n");           //Translate
-      }
-
-      if (comp.getChangedDefinitions() == ChangeAnalysisState.CannotEvaluate) {
-        b.append("<li>Unable to evaluate changes to definitions</li>\r\n"); //Translate
-      } else if (comp.getChangedDefinitions() == ChangeAnalysisState.Changed) {
-        b.append("<li>One or more text definitions, invariants or bindings have changed</li>\r\n");    //Translate       
-      }
-    } else if (comp == null) {
-      b.append("<li>New Content</li>\r\n"); //Translate
-    } else {
-      b.append("<li>No changes</li>\r\n"); //Translate
-    }
+    changeSummaryDetails(b, comp, RenderingI18nContext.SDR_CONT_CH_DET_SD, RenderingI18nContext.SDR_DEFN_CH_DET_SD, null, null);
   }
-  
 
   private String tail(String path) {
     if (path.contains("."))
@@ -2632,8 +2610,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (sd.getExperimental()) {
       return "<div><div style=\"border: 1px solid maroon; padding: 10px; background-color: #fffbf7; min-height: 160px;\">\r\n"+
              "<img src=\"assets/images/dragon.png\" width=\"150\" style=\"float:left; mix-blend-mode: multiply; margin-right: 10px;\" title=\"Here Be Dragons!\" height=\"150\"/>\r\n"+
-             "<p><b>This is an experimental extension definition; the committee is seeking implementation feedback, and the " + 
-             "definition or contents of the extension may change in future versions.</b></p></div></div>"; //Translate
+             "<p><b>"+gen.formatPhrase(RenderingI18nContext.SDR_EXPERIMENTAL)+"</b></p></div></div>"; 
     } else {
       return "";
     }
@@ -2647,29 +2624,30 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
     if ("deprecated".equals(ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_STANDARDS_STATUS))) {
       XhtmlNode ddiv = div.div("background-color: #ffe6e6; border: 1px solid black; border-radius: 10px; padding: 10px");
-      ddiv.para().b().tx("This extension is deprecated and should no longer be used"); //Translate
+      ddiv.para().b().tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_DEPR)); 
       Extension ext = sd.getExtensionByUrl(ToolingExtensions.EXT_STANDARDS_STATUS);
       ext = ext == null || !ext.hasValue() ? null : ext.getValue().getExtensionByUrl(ToolingExtensions.EXT_STANDARDS_STATUS_REASON);
       if (ext != null && ext.hasValue()) {
         String md = ext.getValue().primitiveValue();
         try {
           md = preProcessMarkdown("Standards-Status-Reason", md);
-          ddiv.markdown(md, "Standards-Status-Reason"); //Translate
+          ddiv.markdown(md, "Standards-Status-Reason"); 
         } catch (Exception e) {
           e.printStackTrace();
         }
       }
     }
     if (sd.getContext().isEmpty()) {
-      div.para().tx("This extension does not specify which elements it should be used on"); //Translate
+      div.para().tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_ANY));
     } else {
-      div.para().tx("This extension may be used on the following element(s):"); //Translate
+      div.para().tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_ELEM)); 
       var ul = div.ul();
       for (StructureDefinitionContextComponent c : sd.getContext()) {
         var li = ul.li();
         switch (c.getType()) {
         case ELEMENT:
-          li.tx("Element ID: "); //Translate
+          li.tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_ELEM_ID)); 
+          li.tx(": ");
           String tn = c.getExpression();
           if (tn.contains(".")) {
             tn = tn.substring(0, tn.indexOf("."));
@@ -2683,7 +2661,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           }
           break;
         case EXTENSION:
-          li.tx("Extension: "); //Translate
+          li.tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_EXT)); 
+          li.tx(": ");
           t = context.fetchResource(StructureDefinition.class, c.getExpression());
           if (t != null && t.hasWebPath()) {
             li.ah(t.getWebPath()).tx(t.present());
@@ -2692,8 +2671,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           }
           break;
         case FHIRPATH:
-          li.ah(Utilities.pathURL(context.getSpecUrl(), "fhirpath.html")).tx("Path");
-          li.tx(": ");
+          li.ah(Utilities.pathURL(context.getSpecUrl(), "fhirpath.html")).tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_PATH));
           li.tx(c.getExpression());
           break;
         default:
@@ -2710,10 +2688,14 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
     if (sd.hasContextInvariant()) {
       if (sd.getContextInvariant().size() == 1) {
-        div.para().tx("In addition, the extension can only be used when this FHIRPath expression is true:"); //Translate
+        XhtmlNode x = div.para();
+        x.tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_CTXT_PATH)); 
+        x.tx(": ");
         div.para().code().tx(sd.getContextInvariant().get(0).asStringValue());
       } else {
-        div.para().tx("In addition, the extension can only be used when these FHIRPath expressions are true:"); //Translate
+        XhtmlNode x = div.para();
+        x.tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_CTXT_PATHS)); 
+        x.tx(": ");
         var ul = div.ul();
         for (StringType sv : sd.getContextInvariant()) {
           ul.li().code().tx(sv.asStringValue());
@@ -2722,26 +2704,34 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
     if (sd.hasExtension(ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE)) {
       var p = div.para();
-      p.tx("This extension is allowed for use with ");  //Translate
+      p.tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_VER_PFX)+" ");  
       renderVersionRange(sd.getExtensionByUrl(ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE), p);
-      p.tx(".");        
+      p.tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_VER_SFX));        
     }
     return new XhtmlComposer(false, true).compose(div.getChildNodes());
   }
 
   public void renderVersionRange(Extension ext, XhtmlNode li) {
     if (!ext.hasExtension(ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_START)) {
-      li.tx("FHIR versions up to "); //Translate
+      li.tx(gen.formatPhrase(RenderingI18nContext.SDR_VER_TO_PFX)); 
+      li.tx(" ");
       linkToVersion(li, ToolingExtensions.readStringExtension(ext, ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_END));                
+      li.stx(gen.formatPhrase(RenderingI18nContext.SDR_VER_TO_SFX)); 
     } else if (!ext.hasExtension(ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_END)) {
-      li.tx("FHIR versions "); //Translate
+      li.tx(gen.formatPhrase(RenderingI18nContext.SDR_VER_FROM_PFX)); 
+      li.tx(" ");
       linkToVersion(li, ToolingExtensions.readStringExtension(ext, ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_START));
-      li.tx(" and after");         //Translate
+      li.stx(gen.formatPhrase(RenderingI18nContext.SDR_VER_FROM_SFX));      
     } else {
-      li.tx("FHIR versions "); //Translate
+      li.tx(gen.formatPhrase(RenderingI18nContext.SDR_VER_RANGE_PFX)); 
+      li.tx(" ");
       linkToVersion(li, ToolingExtensions.readStringExtension(ext, ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_START));
-      li.tx(" to ");
+      li.tx(" ");
+      li.tx(gen.formatPhrase(RenderingI18nContext.SDR_VER_RANGE_MID)); 
+      li.tx(" ");
       linkToVersion(li, ToolingExtensions.readStringExtension(ext, ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_END));        
+      li.tx(" ");
+      li.stx(gen.formatPhrase(RenderingI18nContext.SDR_VER_RANGE_SFX)); 
     }
   }
 
@@ -2776,9 +2766,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
               }
             }
           } else if (sdv.getLog().isEmpty()) {
-            x.para().tx("The extension is unchanged in "+VersionUtilities.getNameForVersion(v).toUpperCase()); //Translate
+            x.para().tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_UNCHANGED, VersionUtilities.getNameForVersion(v).toUpperCase())); 
           } else {
-            x.para().tx("The extension is represented a little differently in "+VersionUtilities.getNameForVersion(v).toUpperCase()+": "); //Translate
+            x.para().tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_CHANGED, VersionUtilities.getNameForVersion(v).toUpperCase())+": "); 
             XhtmlNode ul = x.ul();
             for (ConversionMessage msg : sdv.getLog()) {
               switch (msg.getStatus()) {
