@@ -1312,7 +1312,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
   
   private void checkForSnomedVersion() {
-    if ((igrealm != null && !"uv".equals(igrealm)) && context.getCodeSystemsUsed().contains("http://snomed.info/sct")) {
+    if (!(igrealm == null || "uv".equals(igrealm)) && context.getCodeSystemsUsed().contains("http://snomed.info/sct")) {
       boolean ok = false;
       for (ParametersParameterComponent p : context.getExpansionParameters().getParameter()) {
         if ("system-version".equals(p.getName()) && p.hasValuePrimitive() && p.getValue().primitiveValue().startsWith("http://snomed.info/sct")) {
