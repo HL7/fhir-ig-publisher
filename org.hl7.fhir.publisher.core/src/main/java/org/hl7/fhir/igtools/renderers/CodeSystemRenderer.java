@@ -51,6 +51,7 @@ import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.i18n.RenderingI18nContext;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
@@ -212,30 +213,7 @@ public class CodeSystemRenderer extends CanonicalRenderer {
 
   protected void changeSummaryDetails(StringBuilder b) {
     CanonicalResourceComparison<? extends CanonicalResource> comp = VersionComparisonAnnotation.artifactComparison(cs);
-    if (comp != null && comp.anyUpdates()) {
-      if (comp.getChangedMetadata() == ChangeAnalysisState.CannotEvaluate) {
-        b.append("<li>Unable to evaluate changes to metadata</li>\r\n");
-      } else if (comp.getChangedMetadata() == ChangeAnalysisState.Changed) {
-        b.append("<li>The resource metadata has changed ("+comp.getMetadataFieldsAsText()+")</li>\r\n");          
-      }
-      
-      if (comp.getChangedContent() == ChangeAnalysisState.CannotEvaluate) {
-        b.append("<li>Unable to evaluate changes to content</li>\r\n");
-      } else if (comp.getChangedContent() == ChangeAnalysisState.Changed) {
-        b.append("<li>The list of codes defined by the code system has changed</li>\r\n");          
-      }
-
-      if (comp.getChangedDefinitions() == ChangeAnalysisState.CannotEvaluate) {
-        b.append("<li>Unable to evaluate changes to definitions</li>\r\n");
-      } else if (comp.getChangedDefinitions() == ChangeAnalysisState.Changed) {
-        b.append("<li>One or more text definitions/displays have changed</li>\r\n");          
-      }
-
-    } else if (comp == null) {
-      b.append("<li>New Content</li>\r\n");
-    } else {
-      b.append("<li>No changes</li>\r\n");
-    }
+    changeSummaryDetails(b, comp, RenderingI18nContext.SDR_CONT_CH_DET_CS, RenderingI18nContext.SDR_DEFN_CH_DET_CS, null, null);
   }
   
 }

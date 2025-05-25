@@ -10,6 +10,8 @@ import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.RelatedIG;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.comparison.CanonicalResourceComparer;
+import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.CanonicalResourceComparison;
+import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.ChangeAnalysisState;
 import org.hl7.fhir.r5.conformance.R5ExtensionsLoader.CanonicalResourceSortByUrl;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.model.CanonicalResource;
@@ -25,6 +27,7 @@ import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.i18n.RenderingI18nContext;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.validation.instance.utils.CanonicalTypeSorter;
 
@@ -277,6 +280,41 @@ public class CanonicalRenderer extends BaseRenderer {
     }
     Collections.sort(list, new org.hl7.fhir.r5.utils.ResourceSorters.CanonicalResourceSortByUrl());
     return list;
+  }
+
+  protected void changeSummaryDetails(StringBuilder b, CanonicalResourceComparison<? extends CanonicalResource> comp, String listCode, String defDetailsCode, String interpCode1, String interpCode2) {
+    if (comp != null && comp.anyUpdates()) {
+      if (comp.getChangedMetadata() == ChangeAnalysisState.CannotEvaluate) {
+        b.append("<li>"+gen.formatPhrase(RenderingI18nContext.SDR_META_CH_NO)+"</li>\r\n"); 
+      } else if (comp.getChangedMetadata() == ChangeAnalysisState.Changed) {
+        b.append("<li>"+gen.formatPhrase(RenderingI18nContext.SDR_META_CH_DET, comp.getMetadataFieldsAsText())+"</li>\r\n");           
+      }
+      
+      if (comp.getChangedContent() == ChangeAnalysisState.CannotEvaluate) {
+        b.append("<li>"+gen.formatPhrase(RenderingI18nContext.SDR_CONT_CH_NO)+"</li>\r\n"); 
+      } else if (comp.getChangedContent() == ChangeAnalysisState.Changed) {
+        b.append("<li>"+gen.formatPhrase(listCode)+"</li>\r\n");           
+      }
+
+      if (comp.getChangedDefinitions() == ChangeAnalysisState.CannotEvaluate) {
+        b.append("<li>"+gen.formatPhrase(RenderingI18nContext.SDR_DEFN_CH_NO)+"</li>\r\n"); 
+      } else if (comp.getChangedDefinitions() == ChangeAnalysisState.Changed) {
+        b.append("<li>"+gen.formatPhrase(defDetailsCode)+"</li>\r\n");           
+      }
+
+      if (interpCode1 != null) {
+        if (comp.getChangedContentInterpretation() == ChangeAnalysisState.CannotEvaluate) {
+          b.append("<li>"+gen.formatPhrase(interpCode1)+"</li>\r\n");
+        } else if (comp.getChangedContentInterpretation() == ChangeAnalysisState.Changed) {
+          b.append("<li>"+gen.formatPhrase(interpCode2)+"</li>\r\n");          
+        }
+      }
+
+    } else if (comp == null) {
+      b.append("<li>"+gen.formatPhrase(RenderingI18nContext.SDR_CH_DET)+"</li>\r\n"); 
+    } else {
+      b.append("<li>"+gen.formatPhrase(RenderingI18nContext.SDR_CH_NO)+"</li>\r\n"); 
+    }
   }
   
 }
