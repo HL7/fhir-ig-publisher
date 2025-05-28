@@ -3835,7 +3835,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private boolean isNewML() {
-    return newMultiLangTemplateFormat && !translationLangs.isEmpty();
+    return newMultiLangTemplateFormat;
   }
 
   private String oidIniLocation() throws IOException {
