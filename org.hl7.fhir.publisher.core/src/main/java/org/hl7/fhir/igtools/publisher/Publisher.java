@@ -2998,6 +2998,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     
     Map<String, String> expParamMap = new HashMap<>();
     boolean allowExtensibleWarnings = false;
+    boolean noCIBuildIssues = false;
     List<String> conversionVersions = new ArrayList<>();
     int count = 0;
     for (ImplementationGuideDefinitionParameterComponent p : sourceIg.getDefinition().getParameter()) {
@@ -3339,6 +3340,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       case "fixed-value-format":
         fixedFormat = FixedValueFormat.fromCode(p.getValue());
         break;
+      case "no-cibuild-issues":
+        noCIBuildIssues = "true".equals(p.getValue());
+        break;
       case "logged-when-scanning":
         if ("false".equals(p.getValue())) {
           fetcher.setReport(false);
@@ -3590,7 +3594,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       }
     }
     
-    inspector = new HTMLInspector(outputDir, specMaps, linkSpecMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), trackedFragments, fileList, module, mode == IGBuildMode.AUTOBUILD || mode == IGBuildMode.WEBSERVER, trackFragments ? fragmentUses : null, relatedIGs);
+    inspector = new HTMLInspector(outputDir, specMaps, linkSpecMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), trackedFragments, fileList, module, mode == IGBuildMode.AUTOBUILD || mode == IGBuildMode.WEBSERVER, trackFragments ? fragmentUses : null, relatedIGs, noCIBuildIssues);
     inspector.getManual().add("full-ig.zip");
     if (historyPage != null) {
       inspector.getManual().add(historyPage);
@@ -8672,7 +8676,9 @@ private String fixPackageReference(String dep) {
     if (hasTranslations) {
       forceDir(tempLangDir);
     }
-
+    rc.setNoHeader(true);
+    rcLangs.setNoHeader(true);
+    
     otherFilesRun.add(Utilities.path(outputDir, "package.tgz"));
     otherFilesRun.add(Utilities.path(outputDir, "package.manifest.json"));
     otherFilesRun.add(Utilities.path(tempDir, "package.db"));
@@ -12819,7 +12825,7 @@ private String fixPackageReference(String dep) {
   private String processClassDiagram(String arguments, FetchedFile f) {
     try {
       JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(arguments);
-      return new ClassDiagramRenderer(Utilities.path(rootDir, "input", "diagrams"), Utilities.path(rootDir, "temp", "diagrams"), json.asString("id"), json.asString("prefix"), rc).buildClassDiagram(json);
+      return new ClassDiagramRenderer(Utilities.path(rootDir, "input", "diagrams"), Utilities.path(rootDir, "temp", "diagrams"), json.asString("id"), json.asString("prefix"), rc, null).buildClassDiagram(json);
     } catch (Exception e) {
       e.printStackTrace();
       return "<p style=\"color: maroon\"><b>"+Utilities.escapeXml(e.getMessage())+"</b></p>";      
@@ -14530,7 +14536,7 @@ private String fixPackageReference(String dep) {
     if (generateUml != UMLGenerationMode.NONE) {
       long start = System.currentTimeMillis();
       try {
-        ClassDiagramRenderer cdr = new ClassDiagramRenderer(Utilities.path(rootDir, "input", "diagrams"), Utilities.path(rootDir, "temp", "diagrams"), sd.getId(), null, rc);
+        ClassDiagramRenderer cdr = new ClassDiagramRenderer(Utilities.path(rootDir, "input", "diagrams"), Utilities.path(rootDir, "temp", "diagrams"), sd.getId(), null, rc, lang);
         String src = sd.getDerivation() == TypeDerivationRule.SPECIALIZATION ? cdr.buildClassDiagram(sd) : cdr.buildConstraintDiagram(sd);
         if (generateUml == UMLGenerationMode.ALL || cdr.hasSource()) {
           r.setUmlGenerated(true);
@@ -14543,7 +14549,7 @@ private String fixPackageReference(String dep) {
         fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-uml", e.getMessage(), null, f.getOutputNames(), start, "uml", "StructureDefinition", lang);          
       }
       try {
-        ClassDiagramRenderer cdr = new ClassDiagramRenderer(Utilities.path(rootDir, "input", "diagrams"), Utilities.path(rootDir, "temp", "diagrams"), sd.getId(), "all-", rc);
+        ClassDiagramRenderer cdr = new ClassDiagramRenderer(Utilities.path(rootDir, "input", "diagrams"), Utilities.path(rootDir, "temp", "diagrams"), sd.getId(), "all-", rc, lang);
         String src = sd.getDerivation() == TypeDerivationRule.SPECIALIZATION ? cdr.buildClassDiagram(sd) : cdr.buildConstraintDiagram(sd);
         if (generateUml == UMLGenerationMode.ALL || cdr.hasSource()) {
           r.setUmlGenerated(true);
@@ -14940,7 +14946,7 @@ private String fixPackageReference(String dep) {
     if (r.getResource() != null && res instanceof DomainResource) {
       DomainResource dr = (DomainResource) res;
       if (dr.getText().hasDiv())
-        return dr.getText().getDiv();
+        return removeResHeader(dr.getText().getDiv());
     }
     if (res != null && res instanceof Parameters) {
       Parameters p = (Parameters) r.getResource();
@@ -14981,7 +14987,20 @@ private String fixPackageReference(String dep) {
     if (div == null)
       return null;
     else
-      return div.getXhtml();
+      return removeResHeader(div.getXhtml());
+  }
+
+  private XhtmlNode removeResHeader(XhtmlNode xhtml) {
+    XhtmlNode res = new XhtmlNode(xhtml.getNodeType(), xhtml.getName());
+    res.getAttributes().putAll(xhtml.getAttributes());
+    for (XhtmlNode x : xhtml.getChildNodes()) {
+      if("div".equals(x.getName())) {
+        res.getChildNodes().add(removeResHeader(x));
+      } else if (!x.isClass("res-header-id"))  {
+        res.getChildNodes().add(x);
+      } 
+    }
+    return res;
   }
 
   private void fragmentIfNN(String name, String content, Set<String> outputTracker, long start, String code, String context, String lang) throws IOException, FHIRException {
