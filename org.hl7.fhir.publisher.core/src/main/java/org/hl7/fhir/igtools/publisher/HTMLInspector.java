@@ -892,7 +892,9 @@ public class HTMLInspector {
     if (ref.startsWith("data:")) {
       return true;
     }
-    boolean resolved = Utilities.existsInList(ref, "qa.html", "http://hl7.org/fhir", "http://hl7.org", "http://www.hl7.org", "http://hl7.org/fhir/search.cfm") || 
+    boolean subFolder = filename.substring(rootFolder.length()+1).contains("/");
+    boolean resolved = Utilities.existsInList(ref, subFolder ? "../qa.html" : "qa.html", 
+        "http://hl7.org/fhir", "http://hl7.org", "http://www.hl7.org", "http://hl7.org/fhir/search.cfm") || 
         ref.startsWith("http://gforge.hl7.org/gf/project/fhir/tracker/") || ref.startsWith("mailto:") || ref.startsWith("javascript:");
     if (!resolved && forHL7)
       resolved = Utilities.pathURL(canonical, "history.html").equals(ref) || ref.equals("searchform.html"); 
