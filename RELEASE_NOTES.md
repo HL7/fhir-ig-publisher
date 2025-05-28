@@ -31,7 +31,9 @@ Thanks for Lloyd Mckenzie and Jose Costa Teixeira for extensive work on this dev
 * Renderer: fix null locale in RenderingContext
 * Renderer: Remove generated narrative header in IG pages
 * Renderer: Fix NPE rendering some extensions
+* Renderer: Add plain language summary on ci-build
 * Package Generator: fix error generating metadata table in .db
 * Package Generator: require implementation guide resources in packages
 * QA: Flag to Suppress ci-build warnings
+
 

@@ -219,6 +219,7 @@ public class HTMLInspector {
   private static final String END_HTML_MARKER = "</p><!--EndReleaseHeader-->";
   public static final String TRACK_PREFIX = "<!--$$";
   public static final String TRACK_SUFFIX = "$$-->";
+  private static final String PLAIN_LANG_INSERTION = "\n<!--PlainLangHeader--><div id=\"plain-lang-box\">Plain Language Summary goes here</div><script src=\"/guides/plain-lang.js\"></script><script type=\"application/javascript\" src=\"/guides/history-cm.js\"> </script><script>showPlainLanguage('{0}', '{1}');</script><!--EndPlainLangHeader-->";
 
   private boolean strict;
   private String rootFolder;
@@ -257,8 +258,10 @@ public class HTMLInspector {
   private Map<String, XhtmlNode> imageRefs = new HashMap<>();
   private Map<String, String> copyrights = new HashMap<>();
   private boolean noCIBuildIssues;
+  private String packageId;
+  private String version;
 
-  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log, String canonical, String packageId, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, FragmentUseRecord> fragmentUses, List<RelatedIG> relatedIGs, boolean noCIBuildIssues) {
+  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log, String canonical, String packageId, String version, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, FragmentUseRecord> fragmentUses, List<RelatedIG> relatedIGs, boolean noCIBuildIssues) {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
     this.linkSpecs = linkSpecs;
@@ -272,6 +275,8 @@ public class HTMLInspector {
     this.fragmentUses = fragmentUses;
     this.relatedIGs = relatedIGs;
     this.noCIBuildIssues = noCIBuildIssues;
+    this.packageId = packageId;
+    this.version = version;
     requirePublishBox = Utilities.startsWithInList(packageId, "hl7."); 
   }
 
@@ -593,6 +598,13 @@ public class HTMLInspector {
             msg = statusMessagesLang.get(lang);
           }
           src = src.replace(RELEASE_HTML_MARKER, START_HTML_MARKER + msg + END_HTML_MARKER);
+          if (packageId.startsWith("hl7.") && f.getName().equals("index.html") && isCIBuild) {
+            int index = src.indexOf(END_HTML_MARKER) + END_HTML_MARKER.length();
+            String pl = PLAIN_LANG_INSERTION;
+            pl = pl.replace("{0}", packageId);
+            pl = pl.replace("{1}", version);
+            src = src.substring(0, index) + pl + src.substring(index);
+          }
           FileUtilities.stringToFile(src, f);
         }
         x = new XhtmlParser().setMustBeWellFormed(strict).parse(new FileInputStream(f), null);
