@@ -892,8 +892,13 @@ public class HTMLInspector {
     if (ref.startsWith("data:")) {
       return true;
     }
-    boolean subFolder = filename.substring(rootFolder.length()+1).contains("/");
-    boolean resolved = Utilities.existsInList(ref, subFolder ? "../qa.html" : "qa.html", 
+    boolean isSubFolder = filename.substring(rootFolder.length()+1).contains(File.separator);
+    String subFolder = ".";
+    if (isSubFolder) {
+      subFolder = filename.substring(rootFolder.length()+1);
+      subFolder = subFolder.substring(0, subFolder.lastIndexOf(File.separator));
+    }
+    boolean resolved = Utilities.existsInList(ref, isSubFolder ? "../qa.html" : "qa.html", 
         "http://hl7.org/fhir", "http://hl7.org", "http://www.hl7.org", "http://hl7.org/fhir/search.cfm") || 
         ref.startsWith("http://gforge.hl7.org/gf/project/fhir/tracker/") || ref.startsWith("mailto:") || ref.startsWith("javascript:");
     if (!resolved && forHL7)
@@ -1023,13 +1028,13 @@ public class HTMLInspector {
             if (altRootFolder != null && filename.startsWith(altRootFolder))
               page = Utilities.path(altRootFolder, page.substring(0, page.indexOf("#")).replace("/", File.separator));
             else
-              page = Utilities.path(rootFolder, page.substring(0, page.indexOf("#")).replace("/", File.separator));
+              page = Utilities.path(rootFolder, subFolder, page.substring(0, page.indexOf("#")).replace("/", File.separator));
           } catch (java.nio.file.InvalidPathException e) {
             page = null;
           }
         } else if (filename == null) {
           try {
-            page = PathBuilder.getPathBuilder().withRequiredTarget(rootFolder).buildPath(rootFolder, page.replace("/", File.separator));
+            page = PathBuilder.getPathBuilder().withRequiredTarget(rootFolder).buildPath(rootFolder, subFolder, page.replace("/", File.separator));
           } catch (java.nio.file.InvalidPathException e) {
             page = null;
           }
