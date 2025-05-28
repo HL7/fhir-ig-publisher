@@ -222,13 +222,7 @@ public class Template {
           source = translations.get(lang);
         }
         for (JsonProperty p : lf.getJsonObject("en").getProperties()) {
-          POObject existing = null;
-          for (POObject t : source.getEntries()) {
-            if (t.getId().equals(p.getName())) {
-              existing = t;
-              break;
-            }
-          }
+          POObject existing = findPO(source, p);
           if (existing == null) {
             source.getEntries().add(new POObject(p.getName(), p.getValue().asString(), null));
           } else {
@@ -264,6 +258,19 @@ public class Template {
         }
       }
     }
+
+    for (String lang : translations.keySet()) {
+      POSource source = translations.get(lang);
+      for (JsonProperty p : lf.getJsonObject("en").getProperties()) {
+        POObject existing = findPO(source, p);
+        if (existing == null) {
+          POObject n = new POObject(p.getName(), p.getValue().asString(), null);
+          source.getEntries().add(n);
+        }
+      }
+      source.savePOFile(Utilities.path(tf, base+"-"+lang+".po"), 1, 0);
+    }
+    
     org.hl7.fhir.utilities.json.parser.JsonParser.compose(lf, fl, true);
     String xml = translationsToXML(lf);
     String xmlFile = fl.getAbsolutePath();
@@ -273,6 +280,17 @@ public class Template {
     } catch (IOException e) {
         System.err.println("An error occurred while writing to the file " + xmlFile + ": " + e.getMessage());
     }
+  }
+
+  private POObject findPO(POSource source, JsonProperty p) {
+    POObject existing = null;
+    for (POObject t : source.getEntries()) {
+      if (t.getId().equals(p.getName())) {
+        existing = t;
+        break;
+      }
+    }
+    return existing;
   }
   
   private String translationsToXML(JsonObject jt) {

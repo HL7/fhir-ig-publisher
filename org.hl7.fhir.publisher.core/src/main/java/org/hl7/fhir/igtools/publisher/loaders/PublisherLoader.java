@@ -107,7 +107,8 @@ public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProv
           if (cr.hasExtension(ToolingExtensions.EXT_WEB_SOURCE)) {
             return ToolingExtensions.readStringExtension(cr, ToolingExtensions.EXT_WEB_SOURCE);
           }
-          throw new FHIRException("Internal error in IG "+npm.name()+"#"+npm.version()+" map: No identity found for "+u);
+          System.out.println("Internal error in IG "+npm.name()+"#"+npm.version()+" map: No identity found for "+u);
+          return u;
         }
         if (!r.hasId()) {
           r.setId(tail(u));

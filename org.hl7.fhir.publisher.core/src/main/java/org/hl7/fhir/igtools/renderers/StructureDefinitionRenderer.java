@@ -1760,7 +1760,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     boolean unbounded = elem.hasBase() && elem.getBase().hasMax() ? elem.getBase().getMax().equals("*") : "*".equals(elem.getMax());
     String defPage = igp.getLinkForProfile(sd, sd.getUrl());
     // 1. name
-    if (defPage.contains("|"))
+    if (defPage != null && defPage.contains("|"))
       defPage = defPage.substring(0, defPage.indexOf("|"));
     b.append("\"<a href=\"" + (defPage + "#" + pathName + "." + en) + "\" title=\"" + Utilities.escapeXml(getEnhancedDefinition(elem))
     + "\" class=\"dict\"><span style=\"text-decoration: underline\">" + en + "</span></a>\" : ");
@@ -1905,7 +1905,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       indentS += "  ";
     }
     String defPage = igp.getLinkForProfile(sd, sd.getUrl());
-    if (defPage.contains("|"))
+    if (defPage != null && defPage.contains("|"))
       defPage = defPage.substring(0, defPage.indexOf("|"));
     b.append(indentS);
     b.append("\"<a href=\"" + (defPage + "#" + pathName + "." + en) + "\" title=\"" + Utilities.escapeXml(getEnhancedDefinition(elem))

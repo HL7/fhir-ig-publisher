@@ -256,8 +256,9 @@ public class HTMLInspector {
   private List<ExternalReference> externalReferences = new ArrayList<>(); 
   private Map<String, XhtmlNode> imageRefs = new HashMap<>();
   private Map<String, String> copyrights = new HashMap<>();
+  private boolean noCIBuildIssues;
 
-  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log, String canonical, String packageId, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, FragmentUseRecord> fragmentUses, List<RelatedIG> relatedIGs) {
+  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log, String canonical, String packageId, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, FragmentUseRecord> fragmentUses, List<RelatedIG> relatedIGs, boolean noCIBuildIssues) {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
     this.linkSpecs = linkSpecs;
@@ -270,6 +271,7 @@ public class HTMLInspector {
     this.isCIBuild = isCIBuild;
     this.fragmentUses = fragmentUses;
     this.relatedIGs = relatedIGs;
+    this.noCIBuildIssues = noCIBuildIssues;
     requirePublishBox = Utilities.startsWithInList(packageId, "hl7."); 
   }
 
@@ -825,11 +827,15 @@ public class HTMLInspector {
           vm = new ValidationMessage(Source.Publisher, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> tag in the file '"+filename+"' containing the javascript '"+subset(x.allText())+"'... is illegal - put the script in a  .js file in a trusted template (if it is justified and needed)", IssueSeverity.FATAL);
         } else if (forHL7) {
           vm =  new ValidationMessage(Source.Publisher, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> containing the javascript '"+subset(x.allText())+"'... is illegal and not allowed on the HL7 ci-build - put the script in a  .js file in a trusted template (if it is justified and needed)", IssueSeverity.ERROR);
+        } else if (noCIBuildIssues) {
+          vm = null;
         } else {
           vm =  new ValidationMessage(Source.Publisher, IssueType.INVALID, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The <script> containing the javascript '"+subset(x.allText())+"'... is illegal and not allowed on the HL7 ci-build - need to put the script in a  .js file in a trusted template if this IG is to build on the HL7 ci-build (if it is justified and needed)", IssueSeverity.WARNING);
         }
-        messages.add(vm);
-        jsmsgs.put(js, vm);
+        if (vm != null) {
+          messages.add(vm);
+          jsmsgs.put(js, vm);
+        }
       }
     }
   }
@@ -886,7 +892,14 @@ public class HTMLInspector {
     if (ref.startsWith("data:")) {
       return true;
     }
-    boolean resolved = Utilities.existsInList(ref, "qa.html", "http://hl7.org/fhir", "http://hl7.org", "http://www.hl7.org", "http://hl7.org/fhir/search.cfm") || 
+    boolean isSubFolder = filename.substring(rootFolder.length()+1).contains(File.separator);
+    String subFolder = ".";
+    if (isSubFolder) {
+      subFolder = filename.substring(rootFolder.length()+1);
+      subFolder = subFolder.substring(0, subFolder.lastIndexOf(File.separator));
+    }
+    boolean resolved = Utilities.existsInList(ref, isSubFolder ? "../qa.html" : "qa.html", 
+        "http://hl7.org/fhir", "http://hl7.org", "http://www.hl7.org", "http://hl7.org/fhir/search.cfm") || 
         ref.startsWith("http://gforge.hl7.org/gf/project/fhir/tracker/") || ref.startsWith("mailto:") || ref.startsWith("javascript:");
     if (!resolved && forHL7)
       resolved = Utilities.pathURL(canonical, "history.html").equals(ref) || ref.equals("searchform.html"); 
@@ -1015,13 +1028,13 @@ public class HTMLInspector {
             if (altRootFolder != null && filename.startsWith(altRootFolder))
               page = Utilities.path(altRootFolder, page.substring(0, page.indexOf("#")).replace("/", File.separator));
             else
-              page = Utilities.path(rootFolder, page.substring(0, page.indexOf("#")).replace("/", File.separator));
+              page = Utilities.path(rootFolder, subFolder, page.substring(0, page.indexOf("#")).replace("/", File.separator));
           } catch (java.nio.file.InvalidPathException e) {
             page = null;
           }
         } else if (filename == null) {
           try {
-            page = PathBuilder.getPathBuilder().withRequiredTarget(rootFolder).buildPath(rootFolder, page.replace("/", File.separator));
+            page = PathBuilder.getPathBuilder().withRequiredTarget(rootFolder).buildPath(rootFolder, subFolder, page.replace("/", File.separator));
           } catch (java.nio.file.InvalidPathException e) {
             page = null;
           }
