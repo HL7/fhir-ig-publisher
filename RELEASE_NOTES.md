@@ -2,7 +2,9 @@
 
 This version is labelled as Release 2 of the IG Publisher, as it is the first version to support 
 a long requested feature, which is the ability to generate fully multi-lingual IGs (see 
-the [documentation](https://build.fhir.org/ig/FHIR/ig-guidance/languages.html)).
+the [documentation](https://build.fhir.org/ig/FHIR/ig-guidance/languages.html)). This is the
+first provisional release, with full support for multi-language IGs, but with known issues 
+so this is just suitable for testing at this time.
 
 Anything to do with language loading/processing/rendering has been entirely rewritten in this 
 version. We believe after extensive checking that mono-lingual IGs have not been affected at all.
