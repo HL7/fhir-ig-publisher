@@ -219,7 +219,7 @@ public class HTMLInspector {
   private static final String END_HTML_MARKER = "</p><!--EndReleaseHeader-->";
   public static final String TRACK_PREFIX = "<!--$$";
   public static final String TRACK_SUFFIX = "$$-->";
-  private static final String PLAIN_LANG_INSERTION = "\n<!--PlainLangHeader--><div id=\"plain-lang-box\">Plain Language Summary goes here</div><script src=\"https://hl7.org/fhir/plain-lang.js\"></script><script type=\"application/javascript\" src=\"/guides/history-cm.js\"> </script><script>showPlainLanguage('{0}', '{1}', '{2}');</script><!--EndPlainLangHeader-->";
+  private static final String PLAIN_LANG_INSERTION = "\n<!--PlainLangHeader--><div id=\"plain-lang-box\">Plain Language Summary goes here</div><script src=\"https://hl7.org/fhir/plain-lang.js\"></script><script type=\"application/javascript\" src=\"https://hl7.org/fhir/history-cm.js\"> </script><script>showPlainLanguage('{0}', '{1}', '{2}');</script><!--EndPlainLangHeader-->";
 
   private boolean strict;
   private String rootFolder;
@@ -906,7 +906,7 @@ public class HTMLInspector {
       return true;
     }
     boolean isSubFolder = filename.substring(rootFolder.length()+1).contains(File.separator);
-    String subFolder = ".";
+    String subFolder = null;
     if (isSubFolder) {
       subFolder = filename.substring(rootFolder.length()+1);
       subFolder = subFolder.substring(0, subFolder.lastIndexOf(File.separator));
@@ -1040,14 +1040,21 @@ public class HTMLInspector {
           try {
             if (altRootFolder != null && filename.startsWith(altRootFolder))
               page = Utilities.path(altRootFolder, page.substring(0, page.indexOf("#")).replace("/", File.separator));
-            else
+            else if (subFolder == null) {
+              page = Utilities.path(rootFolder, page.substring(0, page.indexOf("#")).replace("/", File.separator));              
+            } else {
               page = Utilities.path(rootFolder, subFolder, page.substring(0, page.indexOf("#")).replace("/", File.separator));
+            }
           } catch (java.nio.file.InvalidPathException e) {
             page = null;
           }
         } else if (filename == null) {
           try {
-            page = PathBuilder.getPathBuilder().withRequiredTarget(rootFolder).buildPath(rootFolder, subFolder, page.replace("/", File.separator));
+            if (subFolder == null) {
+              page = PathBuilder.getPathBuilder().withRequiredTarget(rootFolder).buildPath(rootFolder, page.replace("/", File.separator));              
+            } else {
+              page = PathBuilder.getPathBuilder().withRequiredTarget(rootFolder).buildPath(rootFolder, subFolder, page.replace("/", File.separator));
+            }
           } catch (java.nio.file.InvalidPathException e) {
             page = null;
           }
