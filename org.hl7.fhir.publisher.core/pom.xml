@@ -69,7 +69,7 @@
         <dependency>
             <groupId>commons-beanutils</groupId>
             <artifactId>commons-beanutils</artifactId>
-            <version>1.9.4</version>
+            <version>1.11.0</version>
         </dependency>
         <!-- JAXB-API, used by CQL-to-ELM translator, but no longer loaded by default -->
         <!-- Latest version of translator puts these dependencies in the model-jaxb and elm-jaxb modules -->
