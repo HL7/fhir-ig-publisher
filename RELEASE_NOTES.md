@@ -1,0 +1,1 @@
+* Renderer: Fix issue with HTML generation for Plain Langauge Summaries on CI-Build
