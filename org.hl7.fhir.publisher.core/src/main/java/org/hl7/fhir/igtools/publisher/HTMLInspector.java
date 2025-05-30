@@ -827,7 +827,7 @@ public class HTMLInspector {
   private void checkScriptElement(String filename, Location loc, String path, XhtmlNode x, List<ValidationMessage> messages) {
     String src = x.getAttribute("src");
     if (!Utilities.noString(src) && Utilities.isAbsoluteUrl(src) && !Utilities.existsInList(src, 
-        "http://hl7.org/fhir/history-cm.js", "http://hl7.org/fhir/assets-hist/js/jquery.js", "https://hl7.org/fhir/plain-lang.js") && !src.contains("googletagmanager.com")) {
+        "https://hl7.org/fhir/history-cm.js", "https://hl7.org/fhir/assets-hist/js/jquery.js", "https://hl7.org/fhir/plain-lang.js") && !src.contains("googletagmanager.com")) {
       messages.add(new ValidationMessage(Source.Publisher, IssueType.INVALID, filename+(loc == null ? "" : " at "+loc.toString()), "The <script> src '"+src+"' is illegal", IssueSeverity.FATAL));
     } else if (src == null && x.allText() != null && !x.allText().contains(HierarchicalTableGenerator.uuid)) {
       String js = x.allText();
