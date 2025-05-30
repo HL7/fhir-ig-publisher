@@ -12335,7 +12335,7 @@ private String fixPackageReference(String dep) {
           f.getOutputNames().add(dst);
           FileUtilities.createDirectory(dst);
         } else {
-          if (isNewML() && !f.getStatedPath().contains("template")) {
+          if (isNewML() && !f.getStatedPath().contains(File.separator+"template"+File.separator)) {
             for (String l : allLangs()) {
               if (f.getRelativePath().startsWith("_includes"+File.separator)) {
                 dst = Utilities.path(tempDir, addLangFolderToFilename(f.getRelativePath(), l));                
@@ -12374,7 +12374,7 @@ private String fixPackageReference(String dep) {
           f.getOutputNames().add(dst);
           FileUtilities.createDirectory(dst);
         } else {
-          if (isNewML() && !f.getStatedPath().contains("template")) {
+          if (isNewML() && !f.getStatedPath().contains(File.separator+"template"+File.separator)) {
             for (String l : allLangs()) {
               if (f.getRelativePath().startsWith("_includes"+File.separator)) {
                 dst = Utilities.path(tempDir, addLangFolderToFilename(f.getRelativePath(), l));                
