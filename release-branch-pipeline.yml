@@ -4,7 +4,7 @@ trigger:
 pr: none
 
 pool:
-  vmImage: "ubuntu-20.04"
+  vmImage: "ubuntu-24.04"
 
 variables:
 - group: PGP_VAR_GROUP

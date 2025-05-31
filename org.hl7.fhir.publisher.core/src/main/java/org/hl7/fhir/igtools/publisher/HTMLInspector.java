@@ -219,6 +219,7 @@ public class HTMLInspector {
   private static final String END_HTML_MARKER = "</p><!--EndReleaseHeader-->";
   public static final String TRACK_PREFIX = "<!--$$";
   public static final String TRACK_SUFFIX = "$$-->";
+  private static final String PLAIN_LANG_INSERTION = "\n<!--PlainLangHeader--><div id=\"plain-lang-box\">Plain Language Summary goes here</div><script src=\"https://hl7.org/fhir/plain-lang.js\"></script><script type=\"application/javascript\" src=\"https://hl7.org/fhir/history-cm.js\"> </script><script>showPlainLanguage('{0}', '{1}', '{2}');</script><!--EndPlainLangHeader-->";
 
   private boolean strict;
   private String rootFolder;
@@ -257,8 +258,10 @@ public class HTMLInspector {
   private Map<String, XhtmlNode> imageRefs = new HashMap<>();
   private Map<String, String> copyrights = new HashMap<>();
   private boolean noCIBuildIssues;
+  private String packageId;
+  private String version;
 
-  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log, String canonical, String packageId, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, FragmentUseRecord> fragmentUses, List<RelatedIG> relatedIGs, boolean noCIBuildIssues) {
+  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log, String canonical, String packageId, String version, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, FragmentUseRecord> fragmentUses, List<RelatedIG> relatedIGs, boolean noCIBuildIssues) {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
     this.linkSpecs = linkSpecs;
@@ -272,6 +275,8 @@ public class HTMLInspector {
     this.fragmentUses = fragmentUses;
     this.relatedIGs = relatedIGs;
     this.noCIBuildIssues = noCIBuildIssues;
+    this.packageId = packageId;
+    this.version = version;
     requirePublishBox = Utilities.startsWithInList(packageId, "hl7."); 
   }
 
@@ -593,6 +598,14 @@ public class HTMLInspector {
             msg = statusMessagesLang.get(lang);
           }
           src = src.replace(RELEASE_HTML_MARKER, START_HTML_MARKER + msg + END_HTML_MARKER);
+          if (packageId.startsWith("hl7.") && f.getName().equals("index.html") && isCIBuild) {
+            int index = src.indexOf(END_HTML_MARKER) + END_HTML_MARKER.length();
+            String pl = PLAIN_LANG_INSERTION;
+            pl = pl.replace("{0}", packageId);
+            pl = pl.replace("{1}", version);
+            pl = pl.replace("{2}", HierarchicalTableGenerator.uuid);
+            src = src.substring(0, index) + pl + src.substring(index);
+          }
           FileUtilities.stringToFile(src, f);
         }
         x = new XhtmlParser().setMustBeWellFormed(strict).parse(new FileInputStream(f), null);
@@ -814,7 +827,7 @@ public class HTMLInspector {
   private void checkScriptElement(String filename, Location loc, String path, XhtmlNode x, List<ValidationMessage> messages) {
     String src = x.getAttribute("src");
     if (!Utilities.noString(src) && Utilities.isAbsoluteUrl(src) && !Utilities.existsInList(src, 
-        "http://hl7.org/fhir/history-cm.js", "http://hl7.org/fhir/assets-hist/js/jquery.js") && !src.contains("googletagmanager.com")) {
+        "https://hl7.org/fhir/history-cm.js", "https://hl7.org/fhir/assets-hist/js/jquery.js", "https://hl7.org/fhir/plain-lang.js") && !src.contains("googletagmanager.com")) {
       messages.add(new ValidationMessage(Source.Publisher, IssueType.INVALID, filename+(loc == null ? "" : " at "+loc.toString()), "The <script> src '"+src+"' is illegal", IssueSeverity.FATAL));
     } else if (src == null && x.allText() != null && !x.allText().contains(HierarchicalTableGenerator.uuid)) {
       String js = x.allText();
@@ -893,7 +906,7 @@ public class HTMLInspector {
       return true;
     }
     boolean isSubFolder = filename.substring(rootFolder.length()+1).contains(File.separator);
-    String subFolder = ".";
+    String subFolder = null;
     if (isSubFolder) {
       subFolder = filename.substring(rootFolder.length()+1);
       subFolder = subFolder.substring(0, subFolder.lastIndexOf(File.separator));
@@ -1027,14 +1040,21 @@ public class HTMLInspector {
           try {
             if (altRootFolder != null && filename.startsWith(altRootFolder))
               page = Utilities.path(altRootFolder, page.substring(0, page.indexOf("#")).replace("/", File.separator));
-            else
+            else if (subFolder == null) {
+              page = Utilities.path(rootFolder, page.substring(0, page.indexOf("#")).replace("/", File.separator));              
+            } else {
               page = Utilities.path(rootFolder, subFolder, page.substring(0, page.indexOf("#")).replace("/", File.separator));
+            }
           } catch (java.nio.file.InvalidPathException e) {
             page = null;
           }
         } else if (filename == null) {
           try {
-            page = PathBuilder.getPathBuilder().withRequiredTarget(rootFolder).buildPath(rootFolder, subFolder, page.replace("/", File.separator));
+            if (subFolder == null) {
+              page = PathBuilder.getPathBuilder().withRequiredTarget(rootFolder).buildPath(rootFolder, page.replace("/", File.separator));              
+            } else {
+              page = PathBuilder.getPathBuilder().withRequiredTarget(rootFolder).buildPath(rootFolder, subFolder, page.replace("/", File.separator));
+            }
           } catch (java.nio.file.InvalidPathException e) {
             page = null;
           }
