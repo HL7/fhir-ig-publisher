@@ -14462,6 +14462,7 @@ private String fixPackageReference(String dep) {
       long start = System.currentTimeMillis();
       String adl = sd.hasUserData(UserDataNames.archetypeSource) ? sdr.adl() : "";
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-adl", adl, f.getOutputNames(), r, vars, null, start, "adl", "StructureDefinition", lang);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-adl-all", adl, f.getOutputNames(), r, vars, null, start, "adl", "StructureDefinition", lang);
     }
     if (igpkp.wantGen(r, "diff")) {
       long start = System.currentTimeMillis();
