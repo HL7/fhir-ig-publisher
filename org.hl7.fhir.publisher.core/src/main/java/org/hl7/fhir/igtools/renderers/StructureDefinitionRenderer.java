@@ -509,7 +509,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return "";
     else {
       sdr.getContext().setStructureMode(mode);
-      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? "sa" : null), toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP, resE, all ? "SA" : "S"));
+      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, true, outputTracker, false, gen.withUniqueLocalPrefix(all ? "sa" : null), toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP, resE, all ? "SA" : "S"));
     }
   }
 
@@ -1114,9 +1114,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
     public String getIds() {
       if (constraint.hasSource() && constraint.getSource().equals("http://hl7.org/fhir/StructureDefinition/Element"))
-        return gen.formatPhrase(RenderingI18nContext.SDR_ALL_ELEM); 
+        return "<b>"+gen.formatPhrase(RenderingI18nContext.SDR_ALL_ELEM)+"</b>"; 
       else if (constraint.hasSource() && constraint.getSource().equals("http://hl7.org/fhir/StructureDefinition/Extension"))
-        return gen.formatPhrase(RenderingI18nContext.SDR_ALL_EXT); 
+        return "<b>"+gen.formatPhrase(RenderingI18nContext.SDR_ALL_EXT)+"</b>"; 
       else
         return String.join(", ", elements);
     }
@@ -1166,7 +1166,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         ConstraintInfo ci = constraintMap.get(key);
         for (ConstraintVariation cv : ci.getVariations()) {
           ElementDefinitionConstraintComponent inv = cv.getConstraint();
-          if (!inv.hasSource() || inv.getSource().equals(sd.getUrl()) || allInvariants) {
+          if (!inv.hasSource() || inv.getSource().equals(sd.getUrl()) || allInvariants || genMode!=GEN_MODE_DIFF ) {
             b.append("<tr><td>").append(inv.getKey()).append("</td><td>").append(grade(inv)).append("</td><td>").append(cv.getIds()).append("</td><td>").append(Utilities.escapeXml(gen.getTranslated(inv.getHumanElement())))
             .append("<br/>: ").append(Utilities.escapeXml(inv.getExpression())).append("</td><td>").append(Utilities.escapeXml(gen.getTranslated(inv.getRequirementsElement()))).append("</td></tr>\r\n");
           }

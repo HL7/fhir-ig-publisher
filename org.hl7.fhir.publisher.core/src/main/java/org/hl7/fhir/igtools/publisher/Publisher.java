@@ -3839,7 +3839,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private boolean isNewML() {
-    return newMultiLangTemplateFormat && !translationLangs.isEmpty();
+    return newMultiLangTemplateFormat;
   }
 
   private String oidIniLocation() throws IOException {
@@ -12335,7 +12335,7 @@ private String fixPackageReference(String dep) {
           f.getOutputNames().add(dst);
           FileUtilities.createDirectory(dst);
         } else {
-          if (isNewML() && !f.getStatedPath().contains("template")) {
+          if (isNewML() && !f.getStatedPath().contains(File.separator+"template"+File.separator)) {
             for (String l : allLangs()) {
               if (f.getRelativePath().startsWith("_includes"+File.separator)) {
                 dst = Utilities.path(tempDir, addLangFolderToFilename(f.getRelativePath(), l));                
@@ -12374,7 +12374,7 @@ private String fixPackageReference(String dep) {
           f.getOutputNames().add(dst);
           FileUtilities.createDirectory(dst);
         } else {
-          if (isNewML() && !f.getStatedPath().contains("template")) {
+          if (isNewML() && !f.getStatedPath().contains(File.separator+"template"+File.separator)) {
             for (String l : allLangs()) {
               if (f.getRelativePath().startsWith("_includes"+File.separator)) {
                 dst = Utilities.path(tempDir, addLangFolderToFilename(f.getRelativePath(), l));                
@@ -12454,7 +12454,7 @@ private String fixPackageReference(String dep) {
             if (RendererFactory.hasSpecificRenderer(containedElement.fhirType())) {
               if (containedElement.fhirType().equals(containedResource.fhirType())) {
                 String prefixForContained = r.getResource().getId()+"_";
-                makeTemplatesContained(f, r, containedResource, vars, prefixForContained);
+                makeTemplatesContained(f, r, containedResource, vars, prefixForContained, lang);
                 String fn = saveDirectResourceOutputsContained(f, r, containedResource, vars, prefixForContained, lang);
                 if (containedResource instanceof CanonicalResource) {
                   CanonicalResource cr = ((CanonicalResource) containedResource).copy();
@@ -13725,22 +13725,22 @@ private String fixPackageReference(String dep) {
     }
   }
 
-  private void makeTemplatesContained(FetchedFile f, FetchedResource r, Resource res, Map<String, String> vars, String prefixForContained) throws FileNotFoundException, Exception {
+  private void makeTemplatesContained(FetchedFile f, FetchedResource r, Resource res, Map<String, String> vars, String prefixForContained, String lang) throws FileNotFoundException, Exception {
     String baseName = igpkp.getPropertyContained(r, "base", res);
     if (res != null && res instanceof StructureDefinition) {
       if (igpkp.hasProperty(r, "template-base-"+((StructureDefinition) res).getKind().toCode().toLowerCase(), res))
-        genWrapperContained(f, r, res, igpkp.getPropertyContained(r, "template-base-"+((StructureDefinition) res).getKind().toCode().toLowerCase(), res), baseName, f.getOutputNames(), vars, null, "", prefixForContained);
+        genWrapperContained(f, r, res, igpkp.getPropertyContained(r, "template-base-"+((StructureDefinition) res).getKind().toCode().toLowerCase(), res), baseName, f.getOutputNames(), vars, null, "", prefixForContained, lang);
       else
-        genWrapperContained(f, r, res, igpkp.getPropertyContained(r, "template-base", res), baseName, f.getOutputNames(), vars, null, "", prefixForContained);
+        genWrapperContained(f, r, res, igpkp.getPropertyContained(r, "template-base", res), baseName, f.getOutputNames(), vars, null, "", prefixForContained, lang);
     } else
-      genWrapperContained(f, r, res, igpkp.getPropertyContained(r, "template-base", res), baseName, f.getOutputNames(), vars, null, "", prefixForContained);
-    genWrapperContained(null, r, res, igpkp.getPropertyContained(r, "template-defns", res), igpkp.getPropertyContained(r, "defns", res), f.getOutputNames(), vars, null, "definitions", prefixForContained);
+      genWrapperContained(f, r, res, igpkp.getPropertyContained(r, "template-base", res), baseName, f.getOutputNames(), vars, null, "", prefixForContained, lang);
+    genWrapperContained(null, r, res, igpkp.getPropertyContained(r, "template-defns", res), igpkp.getPropertyContained(r, "defns", res), f.getOutputNames(), vars, null, "definitions", prefixForContained, lang);
     for (String templateName : extraTemplates.keySet()) {
       if (!templateName.equals("format") && !templateName.equals("defns") && !templateName.equals("change-history")) {
         String output = igpkp.getProperty(r, templateName);
         if (output == null)
           output = r.fhirType()+"-"+r.getId()+"_"+res.getId()+"-"+templateName+".html";
-        genWrapperContained(null, r, res, igpkp.getPropertyContained(r, "template-"+templateName, res), output, f.getOutputNames(), vars, null, templateName, prefixForContained);
+        genWrapperContained(null, r, res, igpkp.getPropertyContained(r, "template-"+templateName, res), output, f.getOutputNames(), vars, null, templateName, prefixForContained, lang);
       }
     }
   }
@@ -14081,8 +14081,15 @@ private String fixPackageReference(String dep) {
     }
   }
 
-  private void genWrapperContained(FetchedFile ff, FetchedResource r, Resource res, String template, String outputName, Set<String> outputTracker, Map<String, String> vars, String format, String extension, String prefixForContained) throws FileNotFoundException, IOException, FHIRException {
+  private void genWrapperContained(FetchedFile ff, FetchedResource r, Resource res, String template, String outputName, Set<String> outputTracker, Map<String, String> vars, String format, String extension, String prefixForContained, String lang) throws FileNotFoundException, IOException, FHIRException {
     if (template != null && !template.isEmpty()) {
+      if (vars == null) {
+        vars = new HashMap<String, String>();
+      }
+      if (lang != null) {
+        vars.put("lang", lang);
+      }
+      vars.put("langsuffix", lang==null? "" : ("-" + lang));
       boolean existsAsPage = false;
       if (ff != null) {
         String fn = igpkp.getLinkFor(r, true, res);
@@ -14102,13 +14109,17 @@ private String fixPackageReference(String dep) {
         }
       }
       if (!existsAsPage) {
-        template = fetcher.openAsString(Utilities.path(fetcher.pathForFile(configFile), template));
-        template = igpkp.doReplacements(template, r, res, vars, format, prefixForContained);
-
         outputName = determineOutputName(outputName, r, res, vars, format, extension, prefixForContained);
-        if (!outputName.contains("#")) {
-          String path = Utilities.path(tempDir, outputName);
-          checkMakeFile(FileUtilities.stringToBytes(template), path, outputTracker);
+        if (isNewML() && lang == null) {
+          genWrapperRedirect(ff, r, outputName, outputTracker, vars, format, extension, true);
+        } else {
+          template = fetcher.openAsString(Utilities.path(fetcher.pathForFile(configFile), template));
+          template = igpkp.doReplacements(template, r, res, vars, format, prefixForContained);
+  
+          if (!outputName.contains("#")) {
+            String path = lang == null ? Utilities.path(tempDir, outputName) : Utilities.path(tempDir, lang, outputName);
+            checkMakeFile(FileUtilities.stringToBytes(template), path, outputTracker);
+          }
         }
       }
     }
