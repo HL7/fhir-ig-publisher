@@ -6992,7 +6992,9 @@ private String fixPackageReference(String dep) {
           altered = true;
         }
         if (isNewML()) {
-          e.setChildValue("language", defaultTranslationLang);
+          if (e.canHaveChild("language")) {
+            e.setChildValue("language", defaultTranslationLang);
+          }
           List<TranslationUnit> translations = findTranslations(r.fhirType(), r.getId(), r.getErrors());
           if (translations != null) {
             r.setHasTranslations(true);
@@ -9960,6 +9962,7 @@ private String fixPackageReference(String dep) {
             item.add("basename", "Base");
             item.add("basepath", "http://hl7.org/fhir/StructureDefinition/Element");            
           }
+          item.add("adl", sd.hasUserData(UserDataNames.archetypeSource));
           if (sd.hasStatus()) {
             item.add("status", sd.getStatus().toCode());
           }
@@ -14455,9 +14458,11 @@ private String fixPackageReference(String dep) {
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-eview", sdr.eview(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, false), f.getOutputNames(), r, vars, null, start, "eview", "StructureDefinition", lang);
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-eview-all", sdr.eview(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, true), f.getOutputNames(), r, vars, null, start, "eview", "StructureDefinition", lang);
     }
-    if (igpkp.wantGen(r, "adl") && sd.hasUserData(UserDataNames.archetypeSource)) {
+    if (igpkp.wantGen(r, "adl")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-adl", sdr.adl(), f.getOutputNames(), r, vars, null, start, "adl", "StructureDefinition", lang);
+      String adl = sd.hasUserData(UserDataNames.archetypeSource) ? sdr.adl() : "";
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-adl", adl, f.getOutputNames(), r, vars, null, start, "adl", "StructureDefinition", lang);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-adl-all", adl, f.getOutputNames(), r, vars, null, start, "adl", "StructureDefinition", lang);
     }
     if (igpkp.wantGen(r, "diff")) {
       long start = System.currentTimeMillis();

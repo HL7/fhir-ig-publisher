@@ -481,9 +481,7 @@ public class PackageReleaser {
       return VersionConvertorFactory_14_50.convertResource(r);
     } else if ("3.0".equals(ver)) {
       org.hl7.fhir.dstu3.model.Resource r;
-      if (f.getName().endsWith(".map")) {
-        r = new org.hl7.fhir.dstu3.utils.StructureMapUtilities(r3).parse(FileUtilities.fileToString(f));
-      } else if (f.getName().endsWith(".xml")) {
+      if (f.getName().endsWith(".xml")) {
         r = new org.hl7.fhir.dstu3.formats.XmlParser().parse(new FileInputStream(f));
       } else { // if (f.getName().endsWith(".json")) {
         r = new org.hl7.fhir.dstu3.formats.JsonParser().parse(new FileInputStream(f));
