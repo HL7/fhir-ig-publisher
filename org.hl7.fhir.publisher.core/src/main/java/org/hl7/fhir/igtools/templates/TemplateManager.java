@@ -243,6 +243,7 @@ public class TemplateManager {
         // if you are proposing to change this list, discuss with FHIR Product Director first
         "fhir.test.template", 
         "fhir.base.template",
+        "fhir2.base.template",
         "hl7.base.template",
         "hl7.fhir.template",
         "hl7.au.base.template",
