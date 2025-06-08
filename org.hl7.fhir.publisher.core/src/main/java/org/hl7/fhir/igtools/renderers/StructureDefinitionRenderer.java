@@ -496,12 +496,22 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return "";
     else {
       sdr.getContext().setStructureMode(mode);
-      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, true, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? "da" : "d"), toTabs ? ANCHOR_PREFIX_DIFF : ANCHOR_PREFIX_SNAP, resE, all ? "DA" : "D"));
+      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, true, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? mc(mode)+"a" : mc(mode)), toTabs ? ANCHOR_PREFIX_DIFF : ANCHOR_PREFIX_SNAP, resE, all ? "DA" : "D"));
+    }
+  }
+
+  private String mc(StructureDefinitionRendererMode mode) {
+    switch (mode) {
+    case BINDINGS: return "b";
+    case DATA_DICT: return "d";
+    case OBLIGATIONS: return "o";
+    case SUMMARY: return "";
+    default:return "";
     }
   }
 
   public String eview(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode, boolean all) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
-   return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.buildElementTable(new RenderingStatus(), defnFile, sd, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? "da" : "d"), toTabs ? ANCHOR_PREFIX_DIFF : ANCHOR_PREFIX_SNAP, resE));
+   return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.buildElementTable(new RenderingStatus(), defnFile, sd, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? mc(mode)+"ea" : mc(mode)+"e"), toTabs ? ANCHOR_PREFIX_DIFF : ANCHOR_PREFIX_SNAP, resE));
   }
 
   public String snapshot(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode, boolean all) throws IOException, FHIRException, org.hl7.fhir.exceptions.FHIRException {
@@ -509,7 +519,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return "";
     else {
       sdr.getContext().setStructureMode(mode);
-      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, true, outputTracker, false, gen.withUniqueLocalPrefix(all ? "sa" : null), toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP, resE, all ? "SA" : "S"));
+      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, true, outputTracker, false, gen.withUniqueLocalPrefix(all ? mc(mode)+"sa" : mc(mode)+"s"), toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP, resE, all ? "SA" : "S"));
     }
   }
 
@@ -518,7 +528,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return "";
     else {
       sdr.getContext().setStructureMode(mode);
-      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? "sa" : null), toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP, resE, all ? "OA" : "O"));
+      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? mc(mode)+"oa" : mc(mode)+"o"), toTabs ? ANCHOR_PREFIX_SNAP : ANCHOR_PREFIX_SNAP, resE, all ? "OA" : "O"));
     }
   }
 
@@ -531,7 +541,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       
       sdCopy.getSnapshot().setElement(getKeyElements());
       sdr.getContext().setStructureMode(mode);
-      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(new RenderingStatus(), defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, true, outputTracker, false, gen.withUniqueLocalPrefix(all ? "ka" :"k"), toTabs ? ANCHOR_PREFIX_KEY : ANCHOR_PREFIX_SNAP, resE, all ? "KA" : "K");
+      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(new RenderingStatus(), defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, true, outputTracker, false, gen.withUniqueLocalPrefix(all ? mc(mode)+"ka" :mc(mode)+"k"), toTabs ? ANCHOR_PREFIX_KEY : ANCHOR_PREFIX_SNAP, resE, all ? "KA" : "K");
 
       return composer.compose(table);
     }
@@ -546,7 +556,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       sdr.getContext().setStructureMode(mode);
 
       sdCopy.getSnapshot().setElement(getMustSupportElements());
-      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(new RenderingStatus(), defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, true, gen.withUniqueLocalPrefix(all ? "ma" :"m"), toTabs ? ANCHOR_PREFIX_MS : ANCHOR_PREFIX_SNAP, resE, all ? "MA" : "M");
+      org.hl7.fhir.utilities.xhtml.XhtmlNode table = sdr.generateTable(new RenderingStatus(), defnFile, sdCopy, false, destDir, false, sdCopy.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, true, gen.withUniqueLocalPrefix(all ? mc(mode)+"ma" :mc(mode)+"m"), toTabs ? ANCHOR_PREFIX_MS : ANCHOR_PREFIX_SNAP, resE, all ? "MA" : "M");
 
       return composer.compose(table);
     }
