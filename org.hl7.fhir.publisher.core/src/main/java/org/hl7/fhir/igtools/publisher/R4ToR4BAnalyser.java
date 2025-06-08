@@ -37,10 +37,12 @@ import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
+import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.i18n.RenderingI18nContext;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.parser.JsonParser;
@@ -75,7 +77,7 @@ public class R4ToR4BAnalyser {
       return resource != null ? resource.getWebPath() : element.getWebPath();
     }
     public String present() {
-      return resource != null ? resource.present() : element.fhirType()+"/"+element.getIdBase();
+      return resource != null ? resource.present(rc.getLocale().toLanguageTag()) : element.fhirType()+"/"+element.getIdBase();
     }
   }
 
@@ -97,6 +99,7 @@ public class R4ToR4BAnalyser {
 //    Add canonical as an allowed type for  to ActivityDefinition and PlanDefinition
     
   private IWorkerContext context;
+  private RenderingContext rc;
   private boolean checking;
   private boolean r4OK;
   private boolean r4BOK;
@@ -104,9 +107,13 @@ public class R4ToR4BAnalyser {
   private List<String> r4BProblems = new ArrayList<>();
   private Map<String, ResPointer> r4Exemptions = new HashMap<>();
   private Map<String, ResPointer> r4BExemptions = new HashMap<>();
+
+  private boolean newFormat;
   
-  public R4ToR4BAnalyser() {
+  public R4ToR4BAnalyser(RenderingContext rc, boolean newFormat) {
     super();
+    this.rc = rc;
+    this.newFormat = newFormat;
   }
 
   public void setContext(IWorkerContext context) {
@@ -132,7 +139,7 @@ public class R4ToR4BAnalyser {
     if (!checking) {
       return;
     }
-    checkTypeDerivation(sd, "derives from", sd.getBaseDefinition());
+    checkTypeDerivation(sd, rc.formatPhrase(RenderingI18nContext.R44B_DERIVES_FROM), sd.getBaseDefinition());
     for (ElementDefinition ed : sd.getDifferential().getElement()) {
       checkPathUsage(sd, ed);
       for (TypeRefComponent tr : ed.getType()) {
@@ -145,14 +152,14 @@ public class R4ToR4BAnalyser {
     if (isExempt(e)) {
       return;
     }
-    checkTypeReference(e, "has type", e.fhirType());
+    checkTypeReference(e, rc.formatPhrase(RenderingI18nContext.R44B_HAS_TYPE), e.fhirType());
     for (Element c : e.getChildren()) {
       checkExample(e, c);
     }
   }
   
   public void checkExample(Element src, Element e) {
-    checkTypeReference(src, "has type", e.fhirType());
+    checkTypeReference(src, rc.formatPhrase(RenderingI18nContext.R44B_HAS_TYPE), e.fhirType());
     for (Element c : e.getChildren()) {
       checkExample(src, c);
     }
@@ -204,7 +211,7 @@ public class R4ToR4BAnalyser {
     if (Utilities.existsInList(ed.getPath(), "ActivityDefinition.subject[x]", "PlanDefinitionsubject[x]")) {
       for (TypeRefComponent tr : ed.getType()) {
         if ("canonical".equals(tr.getCode())) {
-          String msg = "<a href=\""+src.getWebPath()+"\">"+Utilities.escapeXml(src.present())+"</a> refers to the canonical type at "+ed.getPath();
+          String msg = rc.formatPhrase(RenderingI18nContext.R44B_REFERS_TO, src.getWebPath(), Utilities.escapeXml(src.present(rc.getLocale().toLanguageTag())), ed.getPath());
           r4OK = false;
           addToList(r4Problems, msg);
         }
@@ -213,9 +220,9 @@ public class R4ToR4BAnalyser {
   }
 
   private void checkTypeUsage(StructureDefinition src, TypeRefComponent tr) {
-    checkTypeReference(src, "derives from", tr.getCode());
+    checkTypeReference(src, rc.formatPhrase(RenderingI18nContext.R44B_DERIVES_FROM), tr.getCode());
     for (CanonicalType t : tr.getTargetProfile()) {
-      checkTypeDerivation(src, "has target", t.getValue());
+      checkTypeDerivation(src, rc.formatPhrase(RenderingI18nContext.R44B_HAS_TARGET), t.getValue());
     }
   }
 
@@ -232,7 +239,7 @@ public class R4ToR4BAnalyser {
 
 
   private void checkTypeReference(StructureDefinition src, String use, String type) {
-    String msg = "<a href=\""+src.getWebPath()+"\">"+Utilities.escapeXml(src.present())+"</a> "+use+" "+type;
+    String msg = "<a href=\""+src.getWebPath()+"\">"+Utilities.escapeXml(src.present(rc.getLocale().toLanguageTag()))+"</a> "+use+" "+type;
     if (Utilities.existsInList(type, R4BOnlyTypes) || (VersionUtilities.isR4BVer(context.getVersion()) && Utilities.existsInList(type, R4BChangedTypes))) {
       r4OK = false;
       addToList(r4Problems, msg);
@@ -285,7 +292,7 @@ public class R4ToR4BAnalyser {
       if (!inline) {
         b.append("<p>");
       }
-      b.append("Something went wrong with the cross-version analysis because: \r\n");
+      b.append(rc.formatPhrase(RenderingI18nContext.R44B_WRONG_MSG)+": \r\n");
       if (!inline) {
         b.append("</p>\r\n");
         b.append("<ul>\r\n");
@@ -308,8 +315,9 @@ public class R4ToR4BAnalyser {
       if (!inline) {
         b.append("<p>");
       }
-      b.append("This is an "+src+" IG. None of the features it uses are changed in "+dst+", so it can be used as is with "+dst+" systems. ");
-      b.append("Packages for both <a href=\"package.r4.tgz\">R4 ("+pid+".r4)</a> and <a href=\"package.r4b.tgz\">R4B ("+pid+".r4b)</a> are available.");
+      b.append(rc.formatPhrase(RenderingI18nContext.R44B_USE_OK, src, dst)+" ");
+      String ref = newFormat ? "../package" : "package";
+      b.append(rc.formatPhrase(RenderingI18nContext.R44B_PACKAGE_REF, ref+".r4.tgz", pid, ref+".r4b.tgz", pid));
       if (!inline) {
         b.append("</p>\r\n");
       }
@@ -318,7 +326,7 @@ public class R4ToR4BAnalyser {
       if (!inline) {
         b.append("<p>");
       }
-      b.append("This is an "+src+" IG that is not compatible with "+dst+" because: \r\n");
+      b.append(rc.formatPhrase(RenderingI18nContext.R44B_NOT_COMP, src, dst)+": \r\n");
       if (!inline) {
         b.append("</p>\r\n");
         b.append("<ul>\r\n");
@@ -340,15 +348,15 @@ public class R4ToR4BAnalyser {
     }
     if (!inline) {
       if (dstExempt.size() > 0) {
-        b.append("<p>The following resources are not in the "+dst+" version: </p>\r\n");
+        b.append("<p>"+rc.formatPhrase(RenderingI18nContext.R44B_NOT_IN, dst)+": </p>\r\n");
         renderExempList(dstExempt, b);            
       }
       if (srcExempt.size() > 0) {
-        b.append("<p>The following resources are only in the "+dst+" version: </p>\r\n");
+        b.append("<p>"+rc.formatPhrase(RenderingI18nContext.R44B_ONLY_IN, dst)+": </p>\r\n");
         renderExempList(srcExempt, b);            
       }
       if (srcProblems.size() > 0) {
-        b.append("<p>While checking for "+dst+" compatibility, the following "+src+" problems were found: </p>\r\n");
+        b.append("<p>"+rc.formatPhrase(RenderingI18nContext.R44B_PROBLEMS, dst, src)+": </p>\r\n");
         b.append("<ul>\r\n");
         for (String s : srcProblems) {
           b.append("<li>");
@@ -658,10 +666,6 @@ public class R4ToR4BAnalyser {
     return processMarkdown(ig, pathS, pathT) ||  true;
   }
   
-  public static void main(String[] args) throws Exception {
-    new R4ToR4BAnalyser().processPackage(args[0]);
-  }
-
   public SpecMapManager loadSpecDetails(byte[] bs, String name, String version, String specPath) throws IOException {
     SpecMapManager map = new SpecMapManager(bs, name, version);
     map.setBase(PackageHacker.fixPackageUrl(specPath));
