@@ -1259,17 +1259,17 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
       }
     }
-    XhtmlNode intTable = sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, 
+    XhtmlNode intTable = sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, 
         outputTracker, false, gen, ANCHOR_PREFIX_MAP, resE, "M");
 
     sdr.setMappingsMode(MapStructureMode.NOT_IN_LIST);
 
-    XhtmlNode extTable = sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, 
+    XhtmlNode extTable = sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, 
         outputTracker, false, gen, ANCHOR_PREFIX_MAP, resE, "M");
 
     sdr.setMappingsMode(MapStructureMode.OTHER);
 
-    XhtmlNode otherTable = sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, 
+    XhtmlNode otherTable = sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), true, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, 
         outputTracker, false, gen, ANCHOR_PREFIX_MAP, resE, "M");
 
     if (intTable == null && extTable == null && otherTable == null) {
