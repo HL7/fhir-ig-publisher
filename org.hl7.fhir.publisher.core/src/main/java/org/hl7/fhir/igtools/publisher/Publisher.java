@@ -3408,8 +3408,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         r5BundleRelativeReferencePolicy = R5BundleRelativeReferencePolicy.fromCode(p.getValue());
       case "suppress-mappings":
         if ("*".equals(p.getValue())) {
-          suppressedMappings.addAll(Utilities.strings("http://hl7.org/fhir/fivews", "http://hl7.org/fhir/workflow", "http://hl7.org/fhir/interface", "http://hl7.org/v2", "http://loinc.org",
-          "http://snomed.org/attributebinding", "http://snomed.info/conceptdomain", "http://hl7.org/v3/cda", "http://hl7.org/v3",
+          suppressedMappings.addAll(Utilities.strings("http://hl7.org/fhir/fivews", "http://hl7.org/fhir/workflow", "http://hl7.org/fhir/interface", "http://hl7.org/v2",
+          // "http://loinc.org",  "http://snomed.org/attributebinding", "http://snomed.info/conceptdomain", 
+          "http://hl7.org/v3/cda", "http://hl7.org/v3",
           "https://dicomstandard.org/current", "http://w3.org/vcard", "https://profiles.ihe.net/ITI/TF/Volume3", "http://www.w3.org/ns/prov",
           "http://ietf.org/rfc/2445", "http://www.omg.org/spec/ServD/1.0/", "http://metadata-standards.org/11179/", "http://ihe.net/data-element-exchange",
           "http://openehr.org", "http://siframework.org/ihe-sdc-profile", "http://siframework.org/cqf", "http://www.cdisc.org/define-xml", 
@@ -14711,19 +14712,7 @@ private String fixPackageReference(String dep) {
     }
     if (igpkp.wantGen(r, "maps")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps", sdr.mappings(false, false), f.getOutputNames(), r, vars, null, start, "maps", "StructureDefinition", lang);
-    }
-    if (igpkp.wantGen(r, "maps-all")) {
-      long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps-all", sdr.mappings(true, false), f.getOutputNames(), r, vars, null, start, "maps-all", "StructureDefinition", lang);
-    }
-    if (igpkp.wantGen(r, "maps-diff")) {
-      long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps-diff", sdr.mappings(false, true), f.getOutputNames(), r, vars, null, start, "maps-diff", "StructureDefinition", lang);
-    }
-    if (igpkp.wantGen(r, "maps-diff-all")) {
-      long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps-diff-all", sdr.mappings(true, true), f.getOutputNames(), r, vars, null, start, "maps-diff-all", "StructureDefinition", lang);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps", sdr.mappings(igpkp.getDefinitionsName(r), otherFilesRun), f.getOutputNames(), r, vars, null, start, "maps", "StructureDefinition", lang);
     }
     if (igpkp.wantGen(r, "xref")) {
       long start = System.currentTimeMillis();

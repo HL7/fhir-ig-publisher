@@ -18,6 +18,7 @@ import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent
 import org.hl7.fhir.r5.model.Enumerations.CapabilityStatementKind;
 import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
 import org.hl7.fhir.r5.model.NamingSystem.NamingSystemType;
+import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.ValueSet;
@@ -398,6 +399,12 @@ public class XIGRenderer extends XIGHandler implements ProfileKnowledgeProvider 
 
   @Override
   public String getCanonicalForDefaultContext() {
+    // TODO Auto-generated method stub
+    return null;
+  }
+
+  @Override
+  public String getDefinitionsName(Resource r) {
     // TODO Auto-generated method stub
     return null;
   }

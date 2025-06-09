@@ -334,6 +334,18 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     return doReplacements(getProperty(r, "defns"), r, null, null);
   }
 
+  public String getDefinitionsName(Resource r) { 
+    for (FetchedFile f : files) {
+      for (FetchedResource t : f.getResources()) {
+        if (t.getResource() == r) {
+          return getDefinitionsName(t);
+        }
+      }
+    }
+    String guess = r.getWebPath();
+    return guess.replace(".html", "-definitions.html");
+  }
+  
   // base specification only, only the old json style
   public void loadSpecPaths(SpecMapManager paths) throws Exception {
     this.specPaths = paths;
@@ -831,6 +843,8 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   public String getCanonicalForDefaultContext() {
     return canonical;
   }
+
+  
 
   
 }

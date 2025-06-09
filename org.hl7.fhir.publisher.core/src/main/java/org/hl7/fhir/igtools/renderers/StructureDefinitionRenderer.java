@@ -67,6 +67,7 @@ import org.hl7.fhir.r5.profilemodel.PEType;
 import org.hl7.fhir.r5.renderers.AdditionalBindingsRenderer;
 import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
+import org.hl7.fhir.r5.renderers.StructureDefinitionRenderer.MapStructureMode;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.StructureDefinitionRendererMode;
 import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
@@ -113,6 +114,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   public static final int GEN_MODE_DIFF = 2;
   public static final int GEN_MODE_MS = 3;
   public static final int GEN_MODE_KEY = 4;
+  public static final String ANCHOR_PREFIX_MAP = "";
   public static final String ANCHOR_PREFIX_SNAP = "";
   public static final String ANCHOR_PREFIX_DIFF = "diff_";
   public static final String ANCHOR_PREFIX_MS = "ms_";
@@ -1246,63 +1248,56 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
 
-  public String mappings(boolean complete, boolean diff) {
-    if (sd.getMapping().isEmpty())
-      return "<p>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_NO_MAPPINGS)) + "</p>";
-    else {
-      boolean allEmpty = true;  // assume all the mappings are empty; 
-      StringBuilder s = new StringBuilder();
-      for (StructureDefinitionMappingComponent map : sd.getMapping()) {
-
-        // Go check all the mappings have at least one Map or Comment defined (we want to suppress completely empty mappings)
-        boolean hasComments = false; boolean hasMaps = false;
-        String path = null;
-        for (ElementDefinition e : diff ? sd.getDifferential().getElement() : sd.getSnapshot().getElement()) {
-          if (path == null || !e.getPath().startsWith(path)) {
-            path = null;
-            if (e.hasMax() && e.getMax().equals("0") || !(complete || hasMappings(e, map))) {
-              path = e.getPath() + ".";
-            } else
-              hasComments = checkGenElementComments(e, map.getIdentity()) || hasComments;
-            hasMaps = checkGenElementMaps(e, map.getIdentity()) || hasMaps;
-          }  
-        }
-
-        // Don't include empty mappings...
-        if(hasMaps || hasComments) {
-          allEmpty = false; // that assumption is wrong
-          String url = getUrlForUri(map.getUri());
-          if (url == null)
-            s.append("<a name=\"" + map.getIdentity() + "\"> </a><h3>" +gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_MAPPINGS, Utilities.escapeXml(gen.getTranslated(map.getNameElement())), Utilities.escapeXml(map.getUri()), "", "") + "</h3>");
-          else
-            s.append("<a name=\"" + map.getIdentity() + "\"> </a><h3>" +gen.formatPhrase(RenderingI18nContext.SD_SUMMARY_MAPPINGS, Utilities.escapeXml(gen.getTranslated(map.getNameElement())), Utilities.escapeXml(map.getUri()), "<a href=\"" + Utilities.escapeXml(url) + "\">", "</a>") + "</h3>");
-          if (map.hasComment())
-            s.append("<p>" + Utilities.escapeXml(gen.getTranslated(map.getCommentElement())) + "</p>");
-          //        else if (specmaps != null && preambles.has(map.getUri()))   
-          //          s.append(preambles.get(map.getUri()).getAsString()); 
-
-          s.append("<table class=\"grid\">\r\n");
-          s.append(" <tr><td colspan=\"3\"><b>" + Utilities.escapeXml(gen.getTranslated(sd.getNameElement())) + "</b></td></tr>\r\n");
-          path = null;
-          for (ElementDefinition e : diff ? sd.getDifferential().getElement() : sd.getSnapshot().getElement()) {
-            if (path == null || !e.getPath().startsWith(path)) {
-              path = null;
-              if (e.hasMax() && e.getMax().equals("0") || !(complete || hasMappings(e, map))) {
-                path = e.getPath() + ".";
-              } else
-                genElement(s, e, map.getIdentity(), hasComments);
-            }
-          }
-          s.append("</table>\r\n");
+  public String mappings(String defnFile, Set<String> outputTracker) throws FHIRException, IOException {
+    sdr.getContext().setStructureMode(StructureDefinitionRendererMode.MAPPINGS);
+    sdr.setMappingsMode(MapStructureMode.IN_LIST);
+    sdr.getMappingTargets().clear();
+    for (FetchedFile f : files) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getResource() instanceof StructureDefinition) {
+          sdr.getMappingTargets().add((StructureDefinition) r.getResource());
         }
       }
+    }
+    XhtmlNode intTable = sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, 
+        outputTracker, false, gen, ANCHOR_PREFIX_MAP, resE, "M");
 
-      // Well all the mappings are empty
-      if(allEmpty) {
-        s.append("<p>" + gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ALL_MAP_KEY) + "</p>");
+    sdr.setMappingsMode(MapStructureMode.NOT_IN_LIST);
+
+    XhtmlNode extTable = sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, 
+        outputTracker, false, gen, ANCHOR_PREFIX_MAP, resE, "M");
+
+    sdr.setMappingsMode(MapStructureMode.OTHER);
+
+    XhtmlNode otherTable = sdr.generateTable(new RenderingStatus(), defnFile, sd, false, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, 
+        outputTracker, false, gen, ANCHOR_PREFIX_MAP, resE, "M");
+
+    if (intTable == null && extTable == null && otherTable == null) {
+      return "<p>"+sdr.getContext().formatPhrase(RenderingI18nContext.STRUC_DEF_NO_MAPPINGS)+"</p>";
+    } else {
+      StringBuilder b = new StringBuilder();
+      
+      b.append("<h4>Mappings to Structures in this Implentation Guide</h4>\r\n");
+      if (intTable == null) {
+        b.append("<p>No Mappings Found</p>\r\n");                
+      } else {
+        b.append(new XhtmlComposer(false, false).compose(intTable));        
+      }
+      
+      b.append("<h4>Mappings to other Structures</h4>\r\n");
+      if (extTable == null) {
+        b.append("<p>No Mappings Found</p>\r\n");                
+      } else {
+        b.append(new XhtmlComposer(false, false).compose(extTable));        
       }
 
-      return s.toString();
+      b.append("<h4>Other Mappings</h4>\r\n");
+      if (otherTable == null) {
+        b.append("<p>No Mappings Found</p>\r\n");                
+      } else {
+        b.append(new XhtmlComposer(false, false).compose(otherTable));        
+      }
+      return b.toString();
     }
   }
 
