@@ -261,6 +261,7 @@ public class TemplateManager {
         "ihe.fhir.template",
         "cqf.fhir.template",
         "ans.fr.template",
+        "openehr.fhir.template",
         "ch.fhir.ig.template")) {
       canExecute = false;
       templateThatCantExecute = template;

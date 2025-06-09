@@ -1,5 +1,7 @@
 package org.hl7.fhir.igtools.publisher;
 
+import java.awt.Container;
+
 /*-
  * #%L
  * org.hl7.fhir.publisher.core
@@ -478,9 +480,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
 
-  public enum PinningPolicy {NO_CHANGE, FIX, WHEN_MULTIPLE_CHOICES }
+  public enum PinningPolicy {NO_ACTION, FIX, WHEN_MULTIPLE_CHOICES}
 
-   private static final String TOOLING_IG_CURRENT_RELEASE = "0.5.0";
+  private static final String TOOLING_IG_CURRENT_RELEASE = "0.5.0";
 
   public class FragmentUseRecord {
 
@@ -1275,10 +1277,14 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private String pinSummary() {
+    String sfx = "";
+    if (pinDest != null) {
+      sfx = " (in manifest Parameters/"+pinDest+")";
+    }
     switch (pinningPolicy) {
-    case FIX: return ""+pinCount+" (all)";
-    case NO_CHANGE: return "n/a";
-    case WHEN_MULTIPLE_CHOICES: return ""+pinCount+" (when multiples)";
+    case FIX: return ""+pinCount+" (all)"+sfx;
+    case NO_ACTION: return "n/a";
+    case WHEN_MULTIPLE_CHOICES: return ""+pinCount+" (when multiples)"+sfx;
     default: return "??";    
     }
   }
@@ -2740,7 +2746,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         }
       }
     }
-    r4tor4b = new R4ToR4BAnalyser();
     IniFile ini = checkNewIg();
     if (ini != null) {
       newIg = true;
@@ -2752,9 +2757,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       throw new Error("Old style JSON configuration is no longer supported. If you see this, then ig.ini wasn't found in '"+rootDir+"'");
     }
     expectedJurisdiction = checkForJurisdiction();
-    if (context != null) {
-      r4tor4b.setContext(context);
-    }
+    
   }
 
   private void prescanSushiConfig(String dir) throws IOException {
@@ -2807,7 +2810,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private void installPackage(String id, String ver) {
     try {
-      if (!pcm.packageExists(id, ver)) {
+      if (!pcm.packageInstalled(id, ver)) {
         log("Found dependency on "+id+"#"+ver+" in Sushi config. Pre-installing");
         pcm.loadPackage(id, ver);
       }
@@ -3384,7 +3387,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       case "pin-canonicals":
         switch (p.getValue()) {
         case "pin-none":
-          pinningPolicy = PinningPolicy.NO_CHANGE;
+          pinningPolicy = PinningPolicy.NO_ACTION;
           break;
         case "pin-all": 
           pinningPolicy = PinningPolicy.FIX;
@@ -3396,11 +3399,30 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           throw new FHIRException("Unknown value for 'pin-canonicals' of '"+p.getValue()+"'");
         }
         break;
+      case "pin-manifest":
+        pinDest = p.getValue();
+        break;
       case "generate-uml":   
         generateUml = UMLGenerationMode.fromCode(p.getValue());
         break;
       case "r5-bundle-relative-reference-policy" : 
         r5BundleRelativeReferencePolicy = R5BundleRelativeReferencePolicy.fromCode(p.getValue());
+      case "suppress-mappings":
+        if ("*".equals(p.getValue())) {
+          suppressedMappings.addAll(Utilities.strings("http://hl7.org/fhir/fivews", "http://hl7.org/fhir/workflow", "http://hl7.org/fhir/interface", "http://hl7.org/v2",
+          // "http://loinc.org",  "http://snomed.org/attributebinding", "http://snomed.info/conceptdomain", 
+          "http://hl7.org/v3/cda", "http://hl7.org/v3",
+          "https://dicomstandard.org/current", "http://w3.org/vcard", "https://profiles.ihe.net/ITI/TF/Volume3", "http://www.w3.org/ns/prov",
+          "http://ietf.org/rfc/2445", "http://www.omg.org/spec/ServD/1.0/", "http://metadata-standards.org/11179/", "http://ihe.net/data-element-exchange",
+          "http://openehr.org", "http://siframework.org/ihe-sdc-profile", "http://siframework.org/cqf", "http://www.cdisc.org/define-xml", 
+          "http://www.cda-adc.ca/en/services/cdanet/", "http://www.pharmacists.ca/", "http://www.healthit.gov/quality-data-model",
+          "http://hl7.org/orim", "http://hl7.org/fhir/w5", "http://hl7.org/fhir/logical", "http://hl7.org/qidam", "http://hl7.org/fhir/object-implementation",
+          "http://github.com/MDMI/ReferentIndexContent", "http://hl7.org/fhir/rr", "http://www.hl7.org/v3/PORX_RM020070UV",
+          "https://bridgmodel.nci.nih.gov", "https://www.iso.org/obp/ui/#iso:std:iso:11615", "https://www.isbt128.org/uri/","http://nema.org/dicom",
+          "https://www.iso.org/obp/ui/#iso:std:iso:11238", "urn:iso:std:iso:11073:10201", "urn:iso:std:iso:11073:10207", "urn:iso:std:iso:11073:20701"));
+        } else {
+          suppressedMappings.add(p.getValue());          
+        }
       default:
         if (pc.startsWith("wantGen-")) {
           String code = pc.substring(8);
@@ -3598,7 +3620,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       }
     }
     
-    inspector = new HTMLInspector(outputDir, specMaps, linkSpecMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), sourceIg.getVersion(), trackedFragments, fileList, module, mode == IGBuildMode.AUTOBUILD || mode == IGBuildMode.WEBSERVER, trackFragments ? fragmentUses : null, relatedIGs, noCIBuildIssues);
+    inspector = new HTMLInspector(outputDir, specMaps, linkSpecMaps, this, igpkp.getCanonical(), sourceIg.getPackageId(), sourceIg.getVersion(), trackedFragments, fileList, module, mode == IGBuildMode.AUTOBUILD || mode == IGBuildMode.WEBSERVER, trackFragments ? fragmentUses : null, relatedIGs, noCIBuildIssues, allLangs());
     inspector.getManual().add("full-ig.zip");
     if (historyPage != null) {
       inspector.getManual().add(historyPage);
@@ -3666,7 +3688,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     validator.setWantCheckSnapshotUnchanged(true);
     validator.setForPublication(true);
     validator.getSettings().setDisplayWarningMode(displayWarnings);
-    cu = new ContextUtilities(context);
+    cu = new ContextUtilities(context, suppressedMappings);
 
     pvalidator = new ProfileValidator(context, validator.getSettings(), context.getXVer(), validatorSession);
     csvalidator = new CodeSystemValidator(context, validator.getSettings(), context.getXVer(), validatorSession);
@@ -3904,7 +3926,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private void generateLoadedSnapshots() {
-    for (StructureDefinition sd : new ContextUtilities(context).allStructures()) {
+    for (StructureDefinition sd : new ContextUtilities(context, suppressedMappings).allStructures()) {
       if (!sd.hasSnapshot() && sd.hasBaseDefinition()) {
         generateSnapshot(sd);
       }
@@ -3922,6 +3944,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         generateSnapshot(base);
       }
       utils.setIds(sd, true);
+      utils.setSuppressedMappings(suppressedMappings);
       try {
         utils.generateSnapshot(base, sd, sd.getUrl(), Utilities.extractBaseUrl(base.getWebPath()), sd.getName());
         if (!sd.hasSnapshot()) {
@@ -4366,10 +4389,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     sp = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(vsCache).fromPackage(pi, loader, false);
     sp.loadBinariesFromFolder(pi);
     sp.setForPublication(true);
+    sp.setSuppressedMappings(suppressedMappings);
     if (!version.equals(Constants.VERSION)) {
       // If it wasn't a 4.0 source, we need to set the ids because they might not have been set in the source
       ProfileUtilities utils = new ProfileUtilities(context, new ArrayList<ValidationMessage>(), igpkp);
-      for (StructureDefinition sd : new ContextUtilities(sp).allStructures()) {
+      for (StructureDefinition sd : new ContextUtilities(sp, suppressedMappings).allStructures()) {
         utils.setIds(sd, true);
       }
     }
@@ -5153,6 +5177,10 @@ private String fixPackageReference(String dep) {
       RenderingContext lrc = rc.copy(false);
       lrc.setLocale(Locale.forLanguageTag(l));
       rcLangs.seeLang(l, lrc);
+    }
+    r4tor4b = new R4ToR4BAnalyser(rc, isNewML());
+    if (context != null) {
+      r4tor4b.setContext(context);
     }
     realmRules = makeRealmBusinessRules();
     previousVersionComparator = makePreviousVersionComparator();
@@ -7564,7 +7592,11 @@ private String fixPackageReference(String dep) {
           f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.PROCESSING, path, "Pinned the version of "+url+" to "+tgt.getVersion(),
               IssueSeverity.INFORMATION).setMessageId(PublisherMessageIds.PIN_VERSION));
         }
-        ct.setValue(url+"|"+tgt.getVersion());
+        if (pinDest != null) {
+          pinInManifest(tgt.fhirType(), url, tgt.getVersion());
+        } else {
+          ct.setValue(url+"|"+tgt.getVersion());
+        }
         return true;
       } else {
         Map<String, String> lst = validationFetcher.fetchCanonicalResourceVersionMap(null, null, url);
@@ -7576,10 +7608,50 @@ private String fixPackageReference(String dep) {
             f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.PROCESSING, path, "Pinned the version of "+url+" to "+tgt.getVersion()+" from choices of "+stringify(",", lst), 
               IssueSeverity.INFORMATION).setMessageId(PublisherMessageIds.PIN_VERSION));
           }
-          ct.setValue(url+"|"+tgt.getVersion());
+          if (pinDest != null) {
+            pinInManifest(tgt.fhirType(), url, tgt.getVersion());
+          } else {
+            ct.setValue(url+"|"+tgt.getVersion());
+          }
           return true;
         }
       }
+    }
+
+    private void pinInManifest(String type, String url, String version) {
+      FetchedResource r = fetchByResource("Parameters", pinDest);
+      if (r == null) {
+        throw new Error("Unable to find nominated pin-manifest "+pinDest);
+      }
+      Element p = r.getElement();
+      String pn = null;
+      switch (type) {
+      case "CodeSystem":
+        pn = "system-version";
+        break;
+      case "ValueSet":
+        pn = "valueset-version";
+        break;
+      case "StructureDefinition":
+        pn = "profile-version";
+        break;
+      default:
+        throw new FHIRException("Can't use manifest for fixing version of a reference to "+type);    
+      }
+      String v = url+"|"+version;
+      for (Element t : p.getChildren("parameter")) {
+        String name = t.getNamedChildValue("name");
+        String value = t.getNamedChildValue("value");        
+        if (name.equals(pn) && value.startsWith(url+"|")) {
+          if (!v.equals(value)) {
+            throw new FHIRException("Conflict building Manifest: "+v+" vs "+value);            
+          }
+          return;
+        }
+      }
+      Element pp = p.addElement("parameter");
+      pp.setChildValue("name",pn);
+      pp.setChildValue("valueUri", v);    
     }
 
     private String stringify(String string, Map<String, String> lst) {
@@ -7592,7 +7664,7 @@ private String fixPackageReference(String dep) {
   }
     
   private boolean checkCanonicalsForVersions(FetchedFile f, CanonicalResource bc, boolean snapshotMode) {
-    if (pinningPolicy == PinningPolicy.NO_CHANGE) {
+    if (pinningPolicy == PinningPolicy.NO_ACTION) {
       return false;     
 //    } else if ("ImplementationGuide".equals(bc.fhirType())) {
 //      return false;
@@ -7960,6 +8032,7 @@ private String fixPackageReference(String dep) {
     sd.setFhirVersion(FHIRVersion.fromCode(version));
     List<ValidationMessage> messages = new ArrayList<>();
     utils.setMessages(messages);
+    utils.setSuppressedMappings(suppressedMappings);
     StructureDefinition base = sd.hasBaseDefinition() ? fetchSnapshotted(sd.getBaseDefinition()) : null;
     if (base == null) {
       throw new Exception("Cannot find or generate snapshot for base definition ("+sd.getBaseDefinition()+" from "+sd.getUrl()+")");
@@ -11893,7 +11966,7 @@ private String fixPackageReference(String dep) {
       rt.add(s);
     }
     rt = data.forceArray("dataTypes");
-    ContextUtilities cu = new ContextUtilities(context);
+    ContextUtilities cu = new ContextUtilities(context, suppressedMappings);
     for (String s : cu.getTypeNames()) {
       if (!rtl.contains(s)) {
         rt.add(s);
@@ -12431,7 +12504,7 @@ private String fixPackageReference(String dep) {
           if (Utilities.existsInList(r.fhirType(), "CodeSystem", "ValueSet", "ConceptMap", "List", "CapabilityStatement", "StructureDefinition", "OperationDefinition", "StructureMap", "Questionnaire", "Library")) {
             logMessage("Unable to convert resource " + r.getTitle() + " for rendering: " + e.getMessage());
             logMessage("This resource should already have been converted, so it is likely invalid. It won't be rendered correctly, and Jekyll is quite likely to fail (depends on the template)");                            
-          } else if (Utilities.existsInList(r.fhirType(), new ContextUtilities(context).getCanonicalResourceNames())) {
+          } else if (Utilities.existsInList(r.fhirType(), new ContextUtilities(context, suppressedMappings).getCanonicalResourceNames())) {
             logMessage("Unable to convert resource " + r.getTitle() + " for rendering: " + e.getMessage());
             logMessage("This resource is a canonical resource and might not be rendered correctly, and Jekyll may fail (depends on the template)");              
           } else if (r.getElement().hasChildren("contained")) {
@@ -12742,7 +12815,7 @@ private String fixPackageReference(String dep) {
     String src = new String(content);
     try {
       boolean changed = false;
-      String[] keywords = {"sql", "fragment", "json", "class-diagram"};
+      String[] keywords = {"sql", "fragment", "json", "class-diagram", "uml"};
       for (String keyword: Arrays.asList(keywords)) {
 
         while (db != null && src.contains("{% " + keyword)) {
@@ -12918,11 +12991,14 @@ private String fixPackageReference(String dep) {
 
   private String ipStmt;
 
-  private PinningPolicy pinningPolicy = PinningPolicy.NO_CHANGE;
+  private PinningPolicy pinningPolicy = PinningPolicy.NO_ACTION;
+  private String pinDest = null;
 
   private int pinCount;
 
   private UMLGenerationMode generateUml = UMLGenerationMode.NONE;
+
+  private List<String> suppressedMappings= new ArrayList<>();
   
   private String processSQLCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();
@@ -14640,19 +14716,7 @@ private String fixPackageReference(String dep) {
     }
     if (wantGen(r, "maps")) {
       long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps", sdr.mappings(false, false), f.getOutputNames(), r, vars, null, start, "maps", "StructureDefinition", lang);
-    }
-    if (wantGen(r, "maps-all")) {
-      long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps-all", sdr.mappings(true, false), f.getOutputNames(), r, vars, null, start, "maps-all", "StructureDefinition", lang);
-    }
-    if (wantGen(r, "maps-diff")) {
-      long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps-diff", sdr.mappings(false, true), f.getOutputNames(), r, vars, null, start, "maps-diff", "StructureDefinition", lang);
-    }
-    if (wantGen(r, "maps-diff-all")) {
-      long start = System.currentTimeMillis();
-      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps-diff-all", sdr.mappings(true, true), f.getOutputNames(), r, vars, null, start, "maps-diff-all", "StructureDefinition", lang);
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-maps", sdr.mappings(igpkp.getDefinitionsName(r), otherFilesRun), f.getOutputNames(), r, vars, null, start, "maps", "StructureDefinition", lang);
     }
     if (wantGen(r, "xref")) {
       long start = System.currentTimeMillis();

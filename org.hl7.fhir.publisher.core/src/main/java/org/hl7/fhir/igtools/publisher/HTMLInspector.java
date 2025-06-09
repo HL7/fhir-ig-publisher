@@ -164,6 +164,7 @@ public class HTMLInspector {
     private String path;
     private boolean hasXhtml;
     private int id = 0;
+    private boolean isLangRedirect;
 
     public LoadedFile(String filename, String path, long lastModified, int iteration, Boolean hl7State, boolean exempt, boolean hasXhtml) {
       this.filename = filename;
@@ -260,8 +261,9 @@ public class HTMLInspector {
   private boolean noCIBuildIssues;
   private String packageId;
   private String version;
+  private List<String> langList;
 
-  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log, String canonical, String packageId, String version, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, FragmentUseRecord> fragmentUses, List<RelatedIG> relatedIGs, boolean noCIBuildIssues) {
+  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log, String canonical, String packageId, String version, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, FragmentUseRecord> fragmentUses, List<RelatedIG> relatedIGs, boolean noCIBuildIssues, List<String> langList) {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
     this.linkSpecs = linkSpecs;
@@ -276,6 +278,7 @@ public class HTMLInspector {
     this.relatedIGs = relatedIGs;
     this.noCIBuildIssues = noCIBuildIssues;
     this.packageId = packageId;
+    this.langList = langList;
     this.version = version;
     requirePublishBox = Utilities.startsWithInList(packageId, "hl7."); 
   }
@@ -585,11 +588,13 @@ public class HTMLInspector {
         parseProblems.add(f.getName());
       }
     }
+    boolean lr = false;
     if (x != null) {
 
       String src;
       try {
         src = FileUtilities.fileToString(f);
+        lr = src.contains("lang-redirects.js");
         hl7State = src.contains(RELEASE_HTML_MARKER);
         if (hl7State) {
           String msg = statusMessageDef;
@@ -614,6 +619,7 @@ public class HTMLInspector {
       }
     }
     LoadedFile lf = new LoadedFile(s, getPath(s, base), f.lastModified(), iteration, hl7State, findExemptionComment(x) || Utilities.existsInList(f.getName(), "searchform.html"), x != null);
+    lf.isLangRedirect = lr;
     cache.put(s, lf);
     if (x != null && x.getElement("svg") != null) {
       lf.exempt = true;
@@ -1072,7 +1078,10 @@ public class HTMLInspector {
           if (f != null) {
             if (Utilities.noString(name))
               resolved = true;
-            else { 
+            else if (f.isLangRedirect) {
+              String fn = filename.replace(rootFolder, rootFolder+"/"+langList.get(0));
+              return checkTarget(fn, ref, rref, tgtList, bh, x, parent);
+            } else {
               resolved = f.targets.contains(name);
               tgtList.append(" (valid targets: "+(f.targets.size() > 40 ? Integer.toString(f.targets.size())+" targets"  :  f.targets.toString())+")");
               for (String s : f.targets) {

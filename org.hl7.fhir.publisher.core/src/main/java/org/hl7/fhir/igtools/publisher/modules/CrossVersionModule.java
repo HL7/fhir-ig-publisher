@@ -927,6 +927,12 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
   public boolean isNoNarrative() {
     return true;
   }
+
+  @Override
+  public String getDefinitionsName(Resource r) {
+    // TODO Auto-generated method stub
+    return null;
+  }
   
   
 }
