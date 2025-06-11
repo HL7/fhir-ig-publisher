@@ -83,7 +83,7 @@ runs:
       uses: actions/cache@v4
       with:
         path: ig-publisher.jar
-        key: ig-publisher-${{ inputs.ref }}
+        key: ig-publisher-${{ inputs.ref }}-${{ github.run_id }}
     - name: Run Publisher
       id: run-publisher
       run: java -Xmx${{ inputs.memory }} -jar ig-publisher.jar -ig ${{ env.TARGET_DIRECTORY }}

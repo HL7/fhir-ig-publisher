@@ -5,7 +5,7 @@ inputs:
     description: "The GitHub ref for the IG publisher JAR with expected results"
     required: true
   actual-ref:
-    description: "The GitHub ref for the IG publisher JAR with expected results"
+    description: "The GitHub ref for the IG publisher JAR with actual results"
     required: true
 
 runs:
