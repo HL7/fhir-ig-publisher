@@ -1,7 +1,5 @@
 package org.hl7.fhir.igtools.publisher;
 
-import java.awt.Container;
-
 /*-
  * #%L
  * org.hl7.fhir.publisher.core
@@ -34,7 +32,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
-import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
@@ -103,7 +100,6 @@ import org.hl7.fhir.igtools.openehr.ArchetypeImporter.ProcessedArchetype;
 import org.hl7.fhir.igtools.publisher.FetchedFile.FetchedBundleType;
 import org.hl7.fhir.igtools.publisher.FetchedResource.AlternativeVersionResource;
 import org.hl7.fhir.igtools.publisher.IFetchFile.FetchState;
-import org.hl7.fhir.igtools.publisher.Publisher.UMLGenerationMode;
 import org.hl7.fhir.igtools.publisher.RelatedIG.RelatedIGLoadingMode;
 import org.hl7.fhir.igtools.publisher.RelatedIG.RelatedIGRole;
 import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
@@ -415,8 +411,6 @@ import org.hl7.fhir.validation.instance.utils.ValidationContext;
 import org.hl7.fhir.validation.profile.ProfileValidator;
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
-
-import com.google.common.primitives.Bytes;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -2264,97 +2258,103 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       try {
         for (FetchedResource r : f.getResources()) {
           if (!isRegen || r.isRegenAfterValidation()) {
-          if (r.getExampleUri()==null || genExampleNarratives) {
-            if (!passesNarrativeFilter(r)) {
-              noNarrativeResources.add(r);
-              logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId()+" suppressed");
-              if (r.getResource() != null && r.getResource() instanceof DomainResource) {
-                ((DomainResource) r.getResource()).setText(null);
-              }
-              r.getElement().removeChild("text");
-            } else {
-              List<Locale> langs = translationLocales();
-              logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId());
-              if (r.getResource() != null && isConvertableResource(r.getResource().fhirType())) {
-                boolean regen = false;
-                for (Locale lang : langs) {
-                boolean first = true;
-                  RenderingContext lrc = rc.copy(false).setDefinitionsTarget(igpkp.getDefinitionsName(r));
-                  lrc.setLocale(lang);
-                  lrc.setRules(GenerationRules.VALID_RESOURCE);
-                  lrc.setDefinitionsTarget(igpkp.getDefinitionsName(r));
-                  lrc.setSecondaryLang(!first);
-                  first = false;
-                  if (r.getResource() instanceof DomainResource && (langs.size() > 1 || !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv()))) {
-                    regen = true;
+            if (r.getExampleUri()==null || genExampleNarratives) {
+              if (!passesNarrativeFilter(r)) {
+                noNarrativeResources.add(r);
+                logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId()+" suppressed");
+                if (r.getResource() != null && r.getResource() instanceof DomainResource) {
+                  ((DomainResource) r.getResource()).setText(null);
+                }
+                r.getElement().removeChild("text");
+              } else {
+                List<Locale> langs = translationLocales();
+                logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId());
+                if (r.getResource() != null && isConvertableResource(r.getResource().fhirType())) {
+                  boolean regen = false;
+                  boolean first = true;
+                  for (Locale lang : langs) {
+                    RenderingContext lrc = rc.copy(false).setDefinitionsTarget(igpkp.getDefinitionsName(r));
+                    lrc.setLocale(lang);
+                    lrc.setRules(GenerationRules.VALID_RESOURCE);
+                    lrc.setDefinitionsTarget(igpkp.getDefinitionsName(r));
+                    lrc.setSecondaryLang(!first);
+                    if (!first) {
+                      lrc.setUniqueLocalPrefix(lang.toLanguageTag());
+                    }
+                    first = false;
+                    if (r.getResource() instanceof DomainResource && (langs.size() > 1 || !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv()))) {
+                      regen = true;
                       ResourceRenderer rr = RendererFactory.factory(r.getResource(), lrc);
                       if (rr.renderingUsesValidation()) {
                         r.setRegenAfterValidation(true);
                         needsRegen = true;
                       }
                       rr.setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, r.getResource()));
-                  } else if (r.getResource() instanceof Bundle) {
-                    regen = true;
-                    new BundleRenderer(lrc).setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, r.getResource()));
-                  } else if (r.getResource() instanceof Parameters) {
-                    regen = true;
-                    Parameters p = (Parameters) r.getResource();
-                    new ParametersRenderer(lrc).setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, p));
-                  } else if (r.getResource() instanceof DomainResource) {
-                    checkExistingNarrative(f, r, ((DomainResource) r.getResource()).getText().getDiv());
+                    } else if (r.getResource() instanceof Bundle) {
+                      regen = true;
+                      new BundleRenderer(lrc).setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, r.getResource()));
+                    } else if (r.getResource() instanceof Parameters) {
+                      regen = true;
+                      Parameters p = (Parameters) r.getResource();
+                      new ParametersRenderer(lrc).setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, p));
+                    } else if (r.getResource() instanceof DomainResource) {
+                      checkExistingNarrative(f, r, ((DomainResource) r.getResource()).getText().getDiv());
+                    }
                   }
-                }
-                if (regen) {
-                  Element e = convertToElement(r, r.getResource());
-                  e.copyUserData(r.getElement());
-                  r.setElement(e);
-                }
-              } else {
-                boolean first = true;
-                for (Locale lang : langs) {
-                  RenderingContext lrc = rc.copy(false).setParser(getTypeLoader(f,r));
-                  lrc.clearAnchors();
-                  lrc.setLocale(lang);
-                  lrc.setRules(GenerationRules.VALID_RESOURCE);
-                  lrc.setSecondaryLang(!first);
-                  first = false;
+                  if (regen) {
+                    Element e = convertToElement(r, r.getResource());
+                    e.copyUserData(r.getElement());
+                    r.setElement(e);
+                  }
+                } else {
+                  boolean first = true;
+                  for (Locale lang : langs) {
+                    RenderingContext lrc = rc.copy(false).setParser(getTypeLoader(f,r));
+                    lrc.clearAnchors();
+                    lrc.setLocale(lang);
+                    lrc.setRules(GenerationRules.VALID_RESOURCE);
+                    lrc.setSecondaryLang(!first);
+                    if (!first) {
+                      lrc.setUniqueLocalPrefix(lang.toLanguageTag());
+                    }
+                    first = false;
                     if (isDomainResource(r) && (isRegen || langs.size() > 1 || !hasNarrative(r.getElement()))) {
-                    ResourceWrapper rw = ResourceWrapper.forResource(lrc, r.getElement());
+                      ResourceWrapper rw = ResourceWrapper.forResource(lrc, r.getElement());
                       ResourceRenderer rr = RendererFactory.factory(rw, lrc);
                       if (rr.renderingUsesValidation()) {
                         r.setRegenAfterValidation(true);
                         needsRegen = true;
                       }
                       rr.setMultiLangMode(langs.size() > 1).renderResource(rw);
-                    otherFilesRun.addAll(lrc.getFiles());
-                  } else if (r.fhirType().equals("Bundle")) {
-                    lrc.setAddName(true);
-                    for (Element e : r.getElement().getChildrenByName("entry")) {
-                      Element res = e.getNamedChild("resource");
-                      if (res!=null && "http://hl7.org/fhir/StructureDefinition/DomainResource".equals(res.getProperty().getStructure().getBaseDefinition())) {
-                        ResourceWrapper rw = ResourceWrapper.forResource(lrc, res);
+                      otherFilesRun.addAll(lrc.getFiles());
+                    } else if (r.fhirType().equals("Bundle")) {
+                      lrc.setAddName(true);
+                      for (Element e : r.getElement().getChildrenByName("entry")) {
+                        Element res = e.getNamedChild("resource");
+                        if (res!=null && "http://hl7.org/fhir/StructureDefinition/DomainResource".equals(res.getProperty().getStructure().getBaseDefinition())) {
+                          ResourceWrapper rw = ResourceWrapper.forResource(lrc, res);
                           ResourceRenderer rr = RendererFactory.factory(rw, lrc);
                           if (rr.renderingUsesValidation()) {
                             r.setRegenAfterValidation(true);
                             needsRegen = true;
                           }
-                        if (hasNarrative(res)) {
+                          if (hasNarrative(res)) {
                             rr.checkNarrative(rw);                        
-                        } else {
+                          } else {
                             rr.setMultiLangMode(langs.size() > 1).renderResource(rw);
+                          }
                         }
                       }
+                    } else if (isDomainResource(r) && hasNarrative(r.getElement())) {
+                      checkExistingNarrative(f, r, r.getElement().getNamedChild("text").getNamedChild("div").getXhtml());
                     }
-                  } else if (isDomainResource(r) && hasNarrative(r.getElement())) {
-                    checkExistingNarrative(f, r, r.getElement().getNamedChild("text").getNamedChild("div").getXhtml());
                   }
                 }
               }
+            } else {
+              logDebugMessage(LogCategory.PROGRESS, "skipped narrative for "+f.getName()+" : "+r.getId());
             }
-          } else {
-            logDebugMessage(LogCategory.PROGRESS, "skipped narrative for "+f.getName()+" : "+r.getId());
           }
-        }
         }
       } finally {
         f.finish("generateNarratives");
@@ -2383,7 +2383,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
     if (defaultTranslationLang != null) {
       if (logDecision) {
-        logMessage("Using " + defaultTranslationLang + " as the default narrative language. (i18n-default-lang has been set in Implementation Guide ini)");
+        logMessage("Using " + defaultTranslationLang + " as the default narrative language. (Implementation Guide param i18n-default-lang)");
       }
       return Locale.forLanguageTag(defaultTranslationLang);
     }
@@ -4828,10 +4828,7 @@ private String fixPackageReference(String dep) {
     if (isNewML()) {
       log("Load Translations");
       sourceIg.setLanguage(defaultTranslationLang);
-      List<TranslationUnit> translations = findTranslations(sourceIg.fhirType(), sourceIg.getId(), igf.getErrors());
-      if (translations != null) {
-        langUtils.importFromTranslations(sourceIg, translations, igf.getErrors());
-      }
+      // but we won't load the translations yet - it' yet to be fully populated. we'll wait till everything else is loaded
     }
     log("Load Content");
     publishedIg = sourceIg.copy();
@@ -4912,7 +4909,6 @@ private String fixPackageReference(String dep) {
     fetcher.setRootDir(rootDir);
     loadedIds = new HashMap<>();
     duplicateInputResourcesDetected = false;
-    
     loadCustomResources();
     
     if (sourceDir != null || igpkp.isAutoPath()) {
@@ -4931,6 +4927,7 @@ private String fixPackageReference(String dep) {
       processFactories(testDataFactories);
     }
     loadResources2(igf);
+    
     loadConformance1(false);
     
     int i = 0;
@@ -5085,6 +5082,7 @@ private String fixPackageReference(String dep) {
     if (duplicateInputResourcesDetected) {
       throw new Error("Unable to continue because duplicate input resources were identified");
     }
+
     loadConformance1(false);
     for (PageFactory pf : pageFactories) {
       pf.execute(rootDir, publishedIg);
@@ -5320,8 +5318,30 @@ private String fixPackageReference(String dep) {
       }
       
     }
+
+    if (isNewML()) {
+      List<TranslationUnit> translations = findTranslations(publishedIg.fhirType(), publishedIg.getId(), igf.getErrors());
+      if (translations != null) {
+        langUtils.importFromTranslations(publishedIg, translations, igf.getErrors());
+      }
+    }
+    Map<String, String> ids = new HashMap<>();
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (isBasicResource(r)) {
+          if (ids.containsKey(r.getId())) {
+            f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.DUPLICATE, r.fhirType(), "Because this resource is converted to a Basic resource in the package, it's id clashes with "+ids.get(r.getId()), IssueSeverity.ERROR));   
+          }
+          ids.put(r.getId(), r.fhirType()+"/"+r.getId()+" from "+f.getPath());
+        }
+      }
+    }
     extensionTracker.scan(publishedIg);
     finishLoadingCustomResources();
+  }
+
+  private boolean isBasicResource(FetchedResource r) {
+    return "Basic".equals(r.fhirType())|| Utilities.existsInList(r.fhirType(), VersionUtilities.isR4BVer(context.getVersion()) ? SpecialTypeHandler.SPECIAL_TYPES_4B : SpecialTypeHandler.SPECIAL_TYPES_OTHER);
   }
 
   private void checkIgDeps(ImplementationGuide vig, String ver) {
@@ -5518,6 +5538,9 @@ private String fixPackageReference(String dep) {
   }
 
   private void loadTranslationSupplement(File f) throws Exception {
+    if (f.isDirectory()) {
+      return;
+    }
     String name = f.getName();
     if (!name.contains("-")) {
       if (!name.equals(".DS_Store")) {
@@ -14430,17 +14453,18 @@ private String fixPackageReference(String dep) {
 
   private void generateOutputsCapabilityStatement(FetchedFile f, FetchedResource r, CapabilityStatement cpbs, Map<String, String> vars, String prefixForContainer, RenderingContext lrc, String lang) throws Exception {
     if (wantGen(r, "swagger") || wantGen(r, "openapi")) {
+      String lp = isNewML() && lang != null && !lang.equals(defaultTranslationLang) ? "-"+lang : "";
       Writer oa = null;
       if (openApiTemplate != null) 
-        oa = new Writer(new FileOutputStream(Utilities.path(tempDir, cpbs.getId()+ ".openapi.json")), new FileInputStream(Utilities.path(FileUtilities.getDirectoryForFile(configFile), openApiTemplate)));
+        oa = new Writer(new FileOutputStream(Utilities.path(tempDir, cpbs.getId()+ lp+".openapi.json")), new FileInputStream(Utilities.path(FileUtilities.getDirectoryForFile(configFile), openApiTemplate)));
       else
-        oa = new Writer(new FileOutputStream(Utilities.path(tempDir, cpbs.getId()+ ".openapi.json")));
+        oa = new Writer(new FileOutputStream(Utilities.path(tempDir, cpbs.getId()+ lp+".openapi.json")));
       String lic = license();
       String displ = context.validateCode(new ValidationOptions(FhirPublication.R5, "en-US"), new Coding("http://hl7.org/fhir/spdx-license",  lic, null), null).getDisplay();
       new OpenApiGenerator(context, cpbs, oa).generate(displ, "http://spdx.org/licenses/"+lic+".html");
       oa.commit();
-      otherFilesRun.add(Utilities.path(tempDir, cpbs.getId()+ ".openapi.json"));
-      addFileToNpm(Category.OPENAPI, cpbs.getId()+ ".openapi.json", FileUtilities.fileToBytes(Utilities.path(tempDir, cpbs.getId()+ ".openapi.json")));
+      otherFilesRun.add(Utilities.path(tempDir, cpbs.getId()+lp+ ".openapi.json"));
+      addFileToNpm(Category.OPENAPI, cpbs.getId()+ lp+".openapi.json", FileUtilities.fileToBytes(Utilities.path(tempDir, cpbs.getId()+lp+".openapi.json")));
     }
   }
 
