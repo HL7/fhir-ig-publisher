@@ -1357,7 +1357,9 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       b.append("<ul>");
       for (String url : r5Extensions) {
         String s = url.substring(url.lastIndexOf("-")+1);
-        s = s.substring(0, s.indexOf("."));
+        if (s.contains(".")) {
+          s = s.substring(0, s.indexOf("."));
+        }
         b.append("<li><a href=\"http://build.fhir.org/"+s.toLowerCase()+".html\">"+Utilities.escapeXml(url)+"</a></li>");
       }
       b.append("</ul>");
