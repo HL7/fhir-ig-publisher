@@ -888,12 +888,16 @@ public class HTMLInspector {
     if (!resolved) {
       if (text == null)
         text = "";
-      messages.add(new ValidationMessage(Source.LinkChecker, IssueType.NOTFOUND, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The link '"+ref+"' for \""+text.replaceAll("[\\s\\n]+", " ").trim()+"\" cannot be resolved"+tgtList, IssueSeverity.ERROR).setLocationLink(uuid == null ? null : makeLocal(filename)+"#"+uuid));
+      String fn = makeLocal(filename);
+      messages.add(new ValidationMessage(Source.LinkChecker, IssueType.NOTFOUND, fn+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())),
+          "The link '"+ref+"' for \""+text.replaceAll("[\\s\\n]+", " ").trim()+"\" cannot be resolved"+tgtList, IssueSeverity.ERROR).setLocationLink(uuid == null ? null : fn+"#"+uuid).setMessageId("HTML_LINK_CHECK_FAILED"));
       return true;
     } else if (!bh.ok()) {
       if (text == null)
         text = "";
-      messages.add(new ValidationMessage(Source.LinkChecker, IssueType.NOTFOUND, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The link '"+ref+"' for \""+text.replaceAll("[\\s\\n]+", " ").trim()+"\" is a canonical link and is therefore unsafe with regard to versions", IssueSeverity.WARNING).setLocationLink(uuid == null ? null : makeLocal(filename)+"#"+uuid));
+      String fn = makeLocal(filename);
+      messages.add(new ValidationMessage(Source.LinkChecker, IssueType.NOTFOUND, fn+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())),
+          "The link '"+ref+"' for \""+text.replaceAll("[\\s\\n]+", " ").trim()+"\" is a canonical link and is therefore unsafe with regard to versions", IssueSeverity.WARNING).setLocationLink(uuid == null ? null : fn+"#"+uuid).setMessageId("HTML_LINK_VERSIONLESS_CANONICAL"));
       return false;
     } else {
       return false;
@@ -1165,7 +1169,9 @@ public class HTMLInspector {
     if (resolved)
       return false;
     else {
-      messages.add(new ValidationMessage(Source.LinkChecker, IssueType.NOTFOUND, filename+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), "The image source '"+ref+"' cannot be resolved", IssueSeverity.ERROR).setLocationLink(uuid == null ? null : filename+"#"+uuid));
+      String fn = makeLocal(filename);
+      messages.add(new ValidationMessage(Source.LinkChecker, IssueType.NOTFOUND, fn+(path == null ? "" : "#"+path+(loc == null ? "" : " at "+loc.toString())), 
+          "The image source '"+ref+"' cannot be resolved", IssueSeverity.ERROR).setLocationLink(uuid == null ? null : fn+"#"+uuid).setMessageId("HTML_IMG_SRC_CHECK_FAILED"));
       return true;
     } 
   }

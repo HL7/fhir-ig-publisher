@@ -378,7 +378,6 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   boolean showReferenceMessages = false;
   boolean noExperimentalContent = false;
   boolean displayWarnings = false;
-  private List<String> versionProblems;
   private List<FetchedResource> fragments;
   private IGLanguageInformation langinfo;
   private List<RelatedIG> relatedIGs;
@@ -389,7 +388,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       String dependencies, String csAnalysis, String pubReqCheck, String globalCheck, String copyrightYear, IWorkerContext context,
       Set<String> r5Extensions, List<StructureDefinition> modifierExtensions, String draftDependencies,
       List<FetchedResource> noNarratives, List<FetchedResource> noValidation, boolean noValidate, boolean noGenerate, DependentIGFinder dependentIgs, 
-      TerminologyClientManager txServers, List<String> versionProblems, List<FetchedResource> fragments, IGLanguageInformation langinfo, List<RelatedIG> relatedIGs) {
+      TerminologyClientManager txServers, List<FetchedResource> fragments, IGLanguageInformation langinfo, List<RelatedIG> relatedIGs) {
     super();
     this.statedVersion = statedVersion;
     this.igVersion = igVersion;
@@ -419,7 +418,6 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     this.draftDependencies = draftDependencies;
     this.globalCheck = globalCheck;
     this.txServers = txServers;
-    this.versionProblems = versionProblems;
     this.fragments = fragments;
     this.langinfo = langinfo;
     this.relatedIGs = relatedIGs;
@@ -849,10 +847,6 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     b.append(genEnd());
     b.append(genStartInternal());
     int id = 0;
-    for (String vp : versionProblems) {
-      b.append(genDetails(vp, id));
-      id++;
-    }
     for (ValidationMessage vm : linkErrors) {
       b.append(genDetails(vm, id));
       id++;
