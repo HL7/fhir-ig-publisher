@@ -1168,7 +1168,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private String nowString() {
     LocalDateTime dateTime = LocalDateTime.now();
-    DateTimeFormatter shortFormat = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT).withLocale(rc.getLocale());
+    DateTimeFormatter shortFormat = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT).withLocale(rc.getLocale() == null ?  Locale.getDefault() : rc.getLocale());
     return dateTime.format(shortFormat);
   }
 

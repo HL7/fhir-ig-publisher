@@ -104,7 +104,12 @@ public class PublisherSigner {
     Manager.compose(context, bnd, ba, FhirFormat.JSON, OutputStyle.CANONICAL, null);
     byte[] toSign = ba.toByteArray();
  
-    sig.setChildValue("data", createJWS(toSign, "http://hl7.org/fhir/canonicalization/json", instant));    
+    sig.setChildValue("data", removePayload(createJWS(toSign, "http://hl7.org/fhir/canonicalization/json", instant)));    
+  }
+
+  private String removePayload(String jws) {
+    String[] parts = jws.split("\\.");
+    return parts[0]+".."+parts[2];
   }
 
   public String createJWS(byte[] canon, Object canonMethod, Instant instant) throws JOSEException, ParseException {
