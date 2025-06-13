@@ -1288,9 +1288,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if ("Bundle".equals(r.fhirType())) {
-          if (r.getResource() != null) {
-            DebugUtilities.breakpoint();
-          }
           Element sig = r.getElement().getNamedChild("signature");
           if (sig != null && !sig.hasChild("data") && "application/jose".equals(sig.getNamedChildValue("sigFormat"))) {
             signer.signBundle(r.getElement(), sig);
