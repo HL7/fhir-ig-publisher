@@ -162,10 +162,10 @@ public class IGReleaseVersionUpdater {
       if (fv.exists()) {
         i++;
         if (t.version().equals(version.asString("version"))) {
-          b.append("<b>"+Utilities.escapeXml(t.name())+"</b>");
+          b.append("<b>"+Utilities.escapeXml(t.milestoneName())+"</b>");
         } else {
           String link = Utilities.pathURL(t.path(), relpath);
-          b.append("<a data-no-external=\"true\" href=\""+link+"\">"+Utilities.escapeXml(t.name())+"</a>");
+          b.append("<a data-no-external=\"true\" href=\""+link+"\">"+Utilities.escapeXml(t.milestoneName())+"</a>");
         }
       }
     }

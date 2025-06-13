@@ -48,7 +48,7 @@ import com.google.gson.JsonSyntaxException;
 public class IGWebSiteMaintainer {
 
   public static void main(String[] args) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {
-    execute(args[0], args.length > 1 ? new IGRegistryMaintainer(args[1]) : null, args.length >= 3 && "true".equals(args[2]), null, false, args[3], true, args[4]);
+    execute(args[0], new IGRegistryMaintainer(args[1]), args.length >= 3 && "true".equals(args[2]), args[5], false, args[3], true, args[4]);
   }
   
   public static void execute(String folder, IGRegistryMaintainer reg, boolean doCore, String filter, boolean skipPrompt, String historyRepo, boolean updateStatements, String templateSrc) throws FileNotFoundException, IOException, JsonSyntaxException, ParseException {

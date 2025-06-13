@@ -120,13 +120,13 @@ public class IGReleaseUpdater {
   public void check(Map<String, IndexMaintainer> indexes, boolean throwError, boolean updateStatements, String templateSrc) throws IOException  {
     List<String> errs = new ArrayList<>(); 
     try {
-      List<PackageListEntry> milestones;
       String f = Utilities.path(folder, "package-list.json");
       if (!new File(f).exists())
         errs.add("unable to find package-list.json");
       else {
         JsonObject json = JsonParser.parseObjectFromFile(f);
         PackageList pl = new PackageList(json);
+        pl.setSource(f);
         String canonical = json.asString("canonical");
         String packageId = json.asString("package-id");
         String realm = Utilities.charCount(packageId, '.') > 1 ? packageId.split("\\.")[2] : null;
