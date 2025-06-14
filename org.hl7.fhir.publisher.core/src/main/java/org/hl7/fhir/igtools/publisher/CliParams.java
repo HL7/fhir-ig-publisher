@@ -1,6 +1,10 @@
 package org.hl7.fhir.igtools.publisher;
 
 public class CliParams {
+
+	public static final String DEBUG_LOG = "-debug-log";
+	public static final String TRACE_LOG = "-trace-log";
+
 	public static String getNamedParam(String[] args, String param) {
 	  boolean found = false;
 	  for (String a : args) {

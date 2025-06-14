@@ -99,6 +99,8 @@ import org.hl7.fhir.convertors.txClient.TerminologyClientFactory;
 import org.hl7.fhir.exceptions.DefinitionException;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
+import org.hl7.fhir.igtools.logging.Level;
+import org.hl7.fhir.igtools.logging.LogbackUtilities;
 import org.hl7.fhir.igtools.openehr.ArchetypeImporter;
 import org.hl7.fhir.igtools.openehr.ArchetypeImporter.ProcessedArchetype;
 import org.hl7.fhir.igtools.publisher.FetchedFile.FetchedBundleType;
@@ -15361,6 +15363,8 @@ private String fixPackageReference(String dep) {
     // Prevents SLF4J(I) from printing unnecessary info to the console.
     System.setProperty("slf4j.internal.verbosity", "WARN");
 
+    setLogbackConfiguration(args);
+
     org.hl7.fhir.utilities.FileFormat.checkCharsetAndWarnIfNotUTF8(System.out);
 
     NpmPackage.setLoadCustomResources(true);
@@ -15765,6 +15769,23 @@ private String fixPackageReference(String dep) {
     }
     if (!CliParams.hasNamedParam(args, "-no-exit")) {
       System.exit(exitCode);
+    }
+  }
+
+  private static void setLogbackConfiguration(String[] args) {
+    setLogbackConfiguration(args, CliParams.DEBUG_LOG, Level.DEBUG);
+    setLogbackConfiguration(args, CliParams.TRACE_LOG, Level.TRACE);
+    //log.debug("Test debug log");
+    //log.trace("Test trace log");
+    //log.info(MarkerFactory.getMarker("marker"), "Test marker interface");
+  }
+
+  private static void setLogbackConfiguration(String[] args, String logParam, Level logLevel) {
+    if (CliParams.hasNamedParam(args, logParam)) {
+      String logFile = CliParams.getNamedParam(args, logParam);
+      if (logFile != null) {
+        LogbackUtilities.setLogToFileAndConsole(logLevel, logFile);
+      }
     }
   }
 
