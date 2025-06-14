@@ -86,7 +86,7 @@ public class PublisherSigner {
 
   public void signBundle(Element bnd, Element sig) throws FHIRException, IOException, JOSEException, ParseException {
     Instant instant = Instant.now();
-    sig.setChildValue("targetFormat", "application/fhir+json+canonicalization=http://hl7.org/fhir/canonicalization/json");
+    sig.setChildValue("targetFormat", "application/fhir+json;canonicalization=http://hl7.org/fhir/canonicalization/json");
     sig.setChildValue("sigFormat", "application/jose");
     sig.setChildValue("when", DateTimeFormatter.ISO_INSTANT.format(instant));
     Element who = sig.getNamedChild("who");
