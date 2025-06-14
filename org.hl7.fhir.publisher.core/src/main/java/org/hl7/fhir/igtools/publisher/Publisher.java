@@ -40,7 +40,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.text.DateFormat;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -411,6 +415,8 @@ import org.hl7.fhir.validation.instance.utils.ValidationContext;
 import org.hl7.fhir.validation.profile.ProfileValidator;
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
+
+import com.nimbusds.jose.JOSEException;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -1156,9 +1162,15 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     new File(Utilities.path(tempDir, "full-ig.zip")).delete();
 
     // registering the package locally
-    log("Finished. "+DurationUtil.presentDuration(endTime - startTime)+". Output in "+outputDir);
+    log("Finished @ "+nowString()+". "+DurationUtil.presentDuration(endTime - startTime)+". Output in "+outputDir);
   }
 
+
+  private String nowString() {
+    LocalDateTime dateTime = LocalDateTime.now();
+    DateTimeFormatter shortFormat = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT).withLocale(rc.getLocale() == null ?  Locale.getDefault() : rc.getLocale());
+    return dateTime.format(shortFormat);
+  }
 
   private String makeTemplateIndexPage() {
     String page = "<!DOCTYPE HTML>\r\n"+
@@ -1224,6 +1236,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         log("Generating Translation artifacts");
         processTranslationOutputs();
       }
+      checkSignBundles();
       log("Generating Outputs in "+outputDir);
       Map<String, String> uncsList = scanForUnattributedCodeSystems();
       generate();
@@ -1246,7 +1259,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
           new DependencyRenderer(pcm, outputDir, npmName, templateManager, dependencyList, context, markdownEngine, rc, specMaps).render(publishedIg, true, false, false), new HTAAnalysisRenderer(context, outputDir, markdownEngine).render(publishedIg.getPackageId(), fileList, publishedIg.present()),
           new PublicationChecker(repoRoot, historyPage, markdownEngine, findReleaseLabelString(), publishedIg, relatedIGs).check(), renderGlobals(), copyrightYear, context, scanForR5Extensions(), modifierExtensions,
           generateDraftDependencies(), noNarrativeResources, noValidateResources, validationOff, generationOff, dependentIgFinder, context.getTxClientManager(), 
-          versionProblems, fragments, makeLangInfo(), relatedIGs);
+          fragments, makeLangInfo(), relatedIGs);
       val.setValidationFlags(hintAboutNonMustSupport, anyExtensionsAllowed, checkAggregation, autoLoad, showReferenceMessages, noExperimentalContent, displayWarnings);
       FileUtilities.stringToFile(new IPViewRenderer(uncsList, inspector.getExternalReferences(), inspector.getImageRefs(), inspector.getCopyrights(),
           ipStmt, inspector.getVisibleFragments().get("1"), context).execute(), Utilities.path(outputDir, "qa-ipreview.html"));
@@ -1259,7 +1272,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         log("Validation output in "+val.generate(sourceIg.getName(), errors, fileList, Utilities.path(destDir != null ? destDir : outputDir, "qa.html"), suppressedMessages, pinSummary()));
       }
       recordOutcome(null, val);
-      log("Finished. Max Memory Used = "+Utilities.describeSize(maxMemory)+logSummary());
+      log("Finished @ "+nowString()+". Max Memory Used = "+Utilities.describeSize(maxMemory)+logSummary());
     } catch (Exception e) {
       try {
         recordOutcome(e, null);
@@ -1267,6 +1280,20 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         ex.printStackTrace();
       }
       throw e;
+    }
+  }
+
+  private void checkSignBundles() throws FHIRException, IOException, JOSEException, ParseException {
+    log("Checking for Bundles to sign");
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if ("Bundle".equals(r.fhirType())) {
+          Element sig = r.getElement().getNamedChild("signature");
+          if (sig != null && !sig.hasChild("data") && "application/jose".equals(sig.getNamedChildValue("sigFormat"))) {
+            signer.signBundle(r.getElement(), sig);
+          }
+        }
+      }
     }
   }
 
@@ -3411,7 +3438,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         if ("*".equals(p.getValue())) {
           suppressedMappings.addAll(Utilities.strings("http://hl7.org/fhir/fivews", "http://hl7.org/fhir/workflow", "http://hl7.org/fhir/interface", "http://hl7.org/v2",
           // "http://loinc.org",  "http://snomed.org/attributebinding", "http://snomed.info/conceptdomain", 
-          "http://hl7.org/v3/cda", "http://hl7.org/v3",
+          "http://hl7.org/v3/cda", "http://hl7.org/v3", "http://ncpdp.org/SCRIPT10_6",
           "https://dicomstandard.org/current", "http://w3.org/vcard", "https://profiles.ihe.net/ITI/TF/Volume3", "http://www.w3.org/ns/prov",
           "http://ietf.org/rfc/2445", "http://www.omg.org/spec/ServD/1.0/", "http://metadata-standards.org/11179/", "http://ihe.net/data-element-exchange",
           "http://openehr.org", "http://siframework.org/ihe-sdc-profile", "http://siframework.org/cqf", "http://www.cdisc.org/define-xml", 
@@ -3554,17 +3581,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       loadConversionVersion(s);
     }
     langUtils = new LanguageUtils(context);
-
-    if (expParams != null) {
-      /* This call to uncheckedPath is allowed here because the path is used to
-         load an existing resource, and is not persisted in the loadFile method.
-       */
-      context.setExpansionParameters((Parameters) VersionConvertorFactory_40_50.convertResource(FormatUtilities.loadFile(Utilities.uncheckedPath(FileUtilities.getDirectoryForFile(igName), expParams))));
-    } else if (!expParamMap.isEmpty()) {
-      context.setExpansionParameters(new Parameters());      
-    }
-    for (String n : expParamMap.values())
-      context.getExpansionParameters().addParameter(n, expParamMap.get(n));
+    signer = new PublisherSigner(context, rootDir);
 
     txLog = FileUtilities.createTempFile("fhir-ig-", ".html").getAbsolutePath();
     System.out.println("Running Terminology Log: "+txLog);
@@ -3579,6 +3596,17 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       }
     } else { 
       context.connectToTSServer(new TerminologyClientFactory(version), webTxServer.getAddress(), "fhir/publisher", txLog, true);
+    }
+    if (expParams != null) {
+      /* This call to uncheckedPath is allowed here because the path is used to
+         load an existing resource, and is not persisted in the loadFile method.
+       */
+      context.setExpansionParameters(new ExpansionParameterUtilities(context).reviewVersions((Parameters) VersionConvertorFactory_40_50.convertResource(FormatUtilities.loadFile(Utilities.uncheckedPath(FileUtilities.getDirectoryForFile(igName), expParams)))));
+    } else if (!expParamMap.isEmpty()) {
+      context.setExpansionParameters(new Parameters());      
+    }
+    for (String n : expParamMap.values()) {
+      context.getExpansionParameters().addParameter(n, expParamMap.get(n));
     }
 
     newMultiLangTemplateFormat = template.config().asBoolean("multilanguage-format");  
@@ -4535,7 +4563,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     specMaps.add(igm);
     if (!VersionUtilities.versionsCompatible(version, pi.fhirVersion())) {
       if (!pi.isWarned()) {
-        versionProblems.add("This IG is version "+version+", while the IG '"+pi.name()+"' is from version "+pi.fhirVersion());
+        errors.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, sourceIg.fhirType()+"/"+sourceIg.getId(), "This IG is version "+version+", while the IG '"+pi.name()+"' is from version "+pi.fhirVersion(), IssueSeverity.ERROR));
         log("Version mismatch. This IG is version "+version+", while the IG '"+pi.name()+"' is from version "+pi.fhirVersion()+" (will try to run anyway)");
         pi.setWarned(true);   
       }
@@ -4594,7 +4622,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               npmList.add(dpi);
               if (!VersionUtilities.versionsCompatible(version, pi.fhirVersion())) {
                 if (!pi.isWarned()) {
-                  versionProblems.add("This IG is for FHIR version "+version+", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion());
+                  errors.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, sourceIg.fhirType()+"/"+sourceIg.getId(), "This IG is for FHIR version "+version+", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion(), IssueSeverity.ERROR));
                   log("Version mismatch. This IG is for FHIR version "+version+", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion()+" (will ignore that and try to run anyway)");
                   pi.setWarned(true);
                 }
@@ -5330,7 +5358,7 @@ private String fixPackageReference(String dep) {
       for (FetchedResource r : f.getResources()) {
         if (isBasicResource(r)) {
           if (ids.containsKey(r.getId())) {
-            f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.DUPLICATE, r.fhirType(), "Because this resource is converted to a Basic resource in the package, it's id clashes with "+ids.get(r.getId()), IssueSeverity.ERROR));   
+            f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.DUPLICATE, r.fhirType(), "Because this resource is converted to a Basic resource in the package, its id clashes with "+ids.get(r.getId())+". One of them will need a different id.", IssueSeverity.ERROR));   
           }
           ids.put(r.getId(), r.fhirType()+"/"+r.getId()+" from "+f.getPath());
         }
@@ -7600,6 +7628,13 @@ private String fixPackageReference(String dep) {
         return false;
       }
       CanonicalResource tgt = (CanonicalResource) context.fetchResource(Resource.class, url);
+      if (tgt instanceof CodeSystem) {
+        CodeSystem cs = (CodeSystem) tgt;
+        if (cs.getContent() == CodeSystemContentMode.NOTPRESENT && cs.hasSourcePackage() && cs.getSourcePackage().isTHO()) {
+          // we ignore these definitions - their version is completely wrong for a start
+          return false;
+        }
+      }
       if (tgt == null) {
         return false;
       }
@@ -7647,19 +7682,20 @@ private String fixPackageReference(String dep) {
         throw new Error("Unable to find nominated pin-manifest "+pinDest);
       }
       Element p = r.getElement();
+      if (!p.hasUserData(UserDataNames.EXP_REVIEWED)) {
+        new ExpansionParameterUtilities(context).reviewVersions(p);
+        p.setUserData(UserDataNames.EXP_REVIEWED, true);
+      }
       String pn = null;
       switch (type) {
       case "CodeSystem":
         pn = "system-version";
         break;
       case "ValueSet":
-        pn = "valueset-version";
-        break;
-      case "StructureDefinition":
-        pn = "profile-version";
+        pn = "default-valueset-version";
         break;
       default:
-        throw new FHIRException("Can't use manifest for fixing version of a reference to "+type);    
+        pn = "default-canonical-version";    
       }
       String v = url+"|"+version;
       for (Element t : p.getChildren("parameter")) {
@@ -7667,7 +7703,11 @@ private String fixPackageReference(String dep) {
         String value = t.getNamedChildValue("value");        
         if (name.equals(pn) && value.startsWith(url+"|")) {
           if (!v.equals(value)) {
-            throw new FHIRException("Conflict building Manifest: "+v+" vs "+value);            
+            if (t.hasUserData(UserDataNames.auto_added_parameter)) {
+              throw new FHIRException("An error occurred building the version manifest: the IGPublisher wanted to add version "+version+" but had already added version "+value.substring(version.indexOf("|")+1));
+            } else {
+              throw new FHIRException("An error occurred building the version manifest: the IGPublisher wanted to add version "+version+" but found version "+value.substring(version.indexOf("|")+1)+" already specified");              
+            }
           }
           return;
         }
@@ -7675,6 +7715,7 @@ private String fixPackageReference(String dep) {
       Element pp = p.addElement("parameter");
       pp.setChildValue("name",pn);
       pp.setChildValue("valueUri", v);    
+      pp.setUserData(UserDataNames.auto_added_parameter, true);
     }
 
     private String stringify(String string, Map<String, String> lst) {
@@ -12991,8 +13032,6 @@ private String fixPackageReference(String dep) {
 
   private boolean simplifierMode;
 
-  private List<String> versionProblems = new ArrayList<>();
-
   private ContextUtilities cu;
 
   private boolean logLoading;
@@ -13022,6 +13061,8 @@ private String fixPackageReference(String dep) {
   private UMLGenerationMode generateUml = UMLGenerationMode.NONE;
 
   private List<String> suppressedMappings= new ArrayList<>();
+
+  private PublisherSigner signer;
   
   private String processSQLCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();

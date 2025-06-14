@@ -113,7 +113,6 @@ public class DependentIGFinder {
     super();
     this.id = id;
     pcm = new FilesystemPackageCacheManager.Builder().build();
-    pcm.setSilent(true);
     outcome = "Finding Dependent IGs not done yet";
   }
 
