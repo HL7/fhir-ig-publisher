@@ -7,7 +7,7 @@ trigger:
 
 variables:
 - group: PGP_VAR_GROUP
-- group: SONATYPE_VAR_GROUP
+- group: MAVEN_CENTRAL_VAR_GROUP
 - group: GIT_VAR_GROUP
 
 jobs:
@@ -93,14 +93,14 @@ jobs:
           gpg --list-secret-keys --keyid-format LONG
         displayName: 'Import signing keys.'
 
-      # Deploy the SNAPSHOT artifact to sonatype nexus.
+      # Deploy the SNAPSHOT artifact to maven central.
       # This is done for the master branch merges only.
       - task: Maven@4
-        displayName: 'Deploy to Sonatype staging'
+        displayName: 'Deploy to Maven Central'
         inputs:
           mavenPomFile: '$(System.DefaultWorkingDirectory)/pom.xml'
           goals: deploy
-          options: '--settings $(System.DefaultWorkingDirectory)/settings.xml -Dmaven.test.skip -DdeployToSonatype -e'
+          options: '--settings $(System.DefaultWorkingDirectory)/settings.xml -Dmaven.test.skip -DdeployToMavenCentral -e'
           publishJUnitResults: false
 
       # Deploy the SNAPSHOT artifact to GitHub packages.
