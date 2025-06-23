@@ -8,7 +8,7 @@ pool:
 
 variables:
 - group: PGP_VAR_GROUP
-- group: SONATYPE_VAR_GROUP
+- group: MAVEN_CENTRAL_VAR_GROUP
 - group: GIT_VAR_GROUP 
 - name: VERSION
 
@@ -59,9 +59,9 @@ steps:
             <password>$(GIT_PAT)</password>
           </server>
           <server>
-            <id>ossrh</id>
-            <username>$(SONATYPE_USER)</username>
-            <password>$(SONATYPE_PASS)</password>
+            <id>central</id>
+            <username>$(MAVEN_CENTRAL_USER)</username>
+            <password>$(MAVEN_CENTRAL_PASS)</password>
           </server>
           <server>
             <id>github-releases</id>
