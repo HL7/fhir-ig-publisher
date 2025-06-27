@@ -1314,11 +1314,7 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       tr.td().tx(ig.getWebLocation());
       tr.td().tx(ig.getLinkCount());      
     }
-    try {
-      return new XhtmlComposer(false, true).compose(tbl);
-    } catch (IOException e) {
-      return e.getMessage();
-    }
+    return new XhtmlComposer(false, true).compose(tbl);
   }
 
   private String validationFlags() {
