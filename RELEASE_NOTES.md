@@ -1,5 +1,4 @@
 
-* General: Use maven central for release
 * Translations: update pt translations (#2055)
 * Loader: Add support for signing Bundles to the publisher
 * Loader: Improved canonical support for JSON and XML + refactor xhtml handling to fix canonical issues
@@ -18,7 +17,7 @@
 * Validator: Adjust errors for broken internal links in Resource.meta.source for HAPI users
 * Validator: Improved validation for attachments
 * Renderer: limit Obligations to active Actors
-* Renderer: Filter obligations - filter out actors not used
+* Renderer: Filter Obligations - filter out actors not used
 * Renderer: Fix stated paths for query type OperationDefinitions
 * QA: clean up 'see above' references in dependency view
 * QA: Fix error where bad html terminates QA rendering
