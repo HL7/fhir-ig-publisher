@@ -38,6 +38,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.cert.CertificateException;
 import java.sql.SQLException;
 import java.text.DateFormat;
 import java.text.ParseException;
@@ -106,6 +107,7 @@ import org.hl7.fhir.igtools.openehr.ArchetypeImporter.ProcessedArchetype;
 import org.hl7.fhir.igtools.publisher.FetchedFile.FetchedBundleType;
 import org.hl7.fhir.igtools.publisher.FetchedResource.AlternativeVersionResource;
 import org.hl7.fhir.igtools.publisher.IFetchFile.FetchState;
+import org.hl7.fhir.igtools.publisher.PublisherSigner.SignatureType;
 import org.hl7.fhir.igtools.publisher.RelatedIG.RelatedIGLoadingMode;
 import org.hl7.fhir.igtools.publisher.RelatedIG.RelatedIGRole;
 import org.hl7.fhir.igtools.publisher.comparators.IpaComparator;
@@ -1285,14 +1287,17 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
   }
 
-  private void checkSignBundles() throws FHIRException, IOException, JOSEException, ParseException {
+  private void checkSignBundles() throws Exception {
     log("Checking for Bundles to sign");
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
         if ("Bundle".equals(r.fhirType())) {
           Element sig = r.getElement().getNamedChild("signature");
           if (sig != null && !sig.hasChild("data") && "application/jose".equals(sig.getNamedChildValue("sigFormat"))) {
-            signer.signBundle(r.getElement(), sig);
+            signer.signBundle(r.getElement(), sig, SignatureType.JOSE);
+          }
+          if (sig != null && !sig.hasChild("data") && "application/pkcs7-signature".equals(sig.getNamedChildValue("sigFormat"))) {
+            signer.signBundle(r.getElement(), sig, SignatureType.DIGSIG);
           }
         }
       }
@@ -4949,6 +4954,9 @@ private String fixPackageReference(String dep) {
     loadBundles(igf);
     loadTranslationSupplements(igf);
 
+    context.getCutils().setMasterSourceNames(specMaps.get(0).getTargets());
+    context.getCutils().setLocalFileNames(pageTargets());
+    
     loadConformance1(true);
     for (String s : resourceFactoryDirs) {
       FileUtilities.clearDirectory(s);
@@ -5368,6 +5376,7 @@ private String fixPackageReference(String dep) {
     }
     extensionTracker.scan(publishedIg);
     finishLoadingCustomResources();
+
   }
 
   private boolean isBasicResource(FetchedResource r) {
@@ -6465,6 +6474,7 @@ private String fixPackageReference(String dep) {
       propagateStatus();
     }
     log("Generating Narratives");
+    doActorScan();
     generateNarratives(false);
     if (!validationOff) {
       log("Validating Conformance Resources");
@@ -6482,6 +6492,29 @@ private String fixPackageReference(String dep) {
     validateExpressions();
     errors.addAll(cql.getGeneralErrors());
     scanForUsageStats();
+  }
+
+  private void doActorScan() {
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r: f.getResources()) {
+        if (r.getResource() != null && r.getResource() instanceof StructureDefinition) {
+          for (ElementDefinition ed : ((StructureDefinition) r.getResource()).getDifferential().getElement()) {
+            for (Extension obd : ToolingExtensions.getExtensions(ed, ToolingExtensions.EXT_OBLIGATION_CORE)) {
+              for (Extension act : ToolingExtensions.getExtensions(obd, "actor")) {
+                ActorDefinition ad = context.fetchResource(ActorDefinition.class, act.getValue().primitiveValue());
+                if (ad != null) {
+                  rc.getActorWhiteList().add(ad);
+                }
+              }
+            }
+          }
+        }
+
+        if (r.getResource() != null && r.getResource() instanceof ActorDefinition) {
+          rc.getActorWhiteList().add((ActorDefinition) r.getResource());
+        }
+      }
+    }
   }
 
   private void assignComparisonIds() {
@@ -7629,7 +7662,7 @@ private String fixPackageReference(String dep) {
       if (url.contains("|")) {
         return false;
       }
-      CanonicalResource tgt = (CanonicalResource) context.fetchResource(Resource.class, url);
+      CanonicalResource tgt = (CanonicalResource) context.fetchResourceRaw(Resource.class, url);
       if (tgt instanceof CodeSystem) {
         CodeSystem cs = (CodeSystem) tgt;
         if (cs.getContent() == CodeSystemContentMode.NOTPRESENT && cs.hasSourcePackage() && cs.getSourcePackage().isTHO()) {
