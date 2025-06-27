@@ -827,4 +827,10 @@ public class XmlXHtmlRenderer implements IXMLWriter {
     attributes = null;
   }
 
+
+  @Override
+  public boolean isCanonical() throws IOException {
+    return false;
+  }
+
 }

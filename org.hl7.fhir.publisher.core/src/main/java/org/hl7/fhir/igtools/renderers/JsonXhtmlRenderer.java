@@ -249,4 +249,10 @@ public class JsonXhtmlRenderer implements JsonCreator {
     }
     b.append("...");
   }
+
+  @Override
+  public boolean isCanonical() {
+    return false;
+  }
+
 }
