@@ -11,6 +11,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>org.hl7.fhir.publisher.core</artifactId>
+    <name>HL7 FHIR IG Publisher - Core</name>
 
     <properties>
         <!-- GraalVM uses the JDK numbering scheme. These should always be LTS versions (17, 21, etc). -->

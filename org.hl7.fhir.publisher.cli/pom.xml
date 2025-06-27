@@ -11,6 +11,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>org.hl7.fhir.publisher.cli</artifactId>
+    <name>HL7 FHIR IG Publisher - CLI</name>
 
     <dependencies>
         <dependency>
