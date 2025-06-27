@@ -142,6 +142,11 @@
             <version>3.22.0</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.apache.santuario</groupId>
+            <artifactId>xmlsec</artifactId>
+            <version>4.0.4</version>
+        </dependency>
         <!--   TODO, figure out why this causes issues     -->
 <!--        <dependency>-->
 <!--            <groupId>org.eclipse.jgit</groupId>-->

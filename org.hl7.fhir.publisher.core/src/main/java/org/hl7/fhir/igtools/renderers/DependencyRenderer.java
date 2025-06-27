@@ -21,6 +21,7 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.DependencyAnalyser;
 import org.hl7.fhir.igtools.publisher.DependencyAnalyser.ArtifactDependency;
+import org.hl7.fhir.igtools.renderers.DependencyRenderer.PackageUsageInfo;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.igtools.templates.TemplateManager;
 import org.hl7.fhir.r5.context.IWorkerContext;
@@ -49,6 +50,19 @@ import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
 public class DependencyRenderer {
+
+  public class PackageUsageInfo {
+    private String comment;
+
+    public String getComment() {
+      return comment;
+    }
+
+    public void setComment(String comment) {
+      this.comment = comment;
+    }
+    
+  }
 
   public class GlobalProfile {
     private ImplementationGuide guide; 
@@ -103,7 +117,7 @@ public class DependencyRenderer {
 
   private BasePackageCacheManager pcm;
   private String dstFolder;
-  private Set<String> ids = new HashSet<>();
+  private Map<String, PackageUsageInfo> ids = new HashMap<>();
   private String fver;
   private String npmName;
   private TemplateManager templateManager;
@@ -365,11 +379,15 @@ public class DependencyRenderer {
     if (!npm.isCore() && (QA || !listed.contains(npm.name()+"#"+npm.version()))) {
       listed.add(npm.name()+"#"+npm.version());
       String idv = npm.name()+"#"+npm.version();
-      boolean isNew = !ids.contains(idv);
-      ids.add(idv);
+      PackageUsageInfo pui = ids.get(idv);
+      boolean isNew = pui == null;
+      if (isNew) {
+        pui = new PackageUsageInfo();
+        ids.put(idv, pui);
+      }
       String comment = "";
       if (!isNew) {
-        comment = "see above";
+        comment = pui.getComment() != null ? pui.getComment()+" (as above)" : "";
       } else if (!VersionUtilities.versionsCompatible(fver, npm.fhirVersion())) {
         comment = "FHIR Version Mismatch";
       } else if ("current".equals(npm.version())) {
@@ -387,6 +405,9 @@ public class DependencyRenderer {
             comment = "An realm publication for "+realm+" should not depend on a realm specific guide from ("+drealm+")";
           }
         }
+      }
+      if (isNew) {
+        pui.setComment(comment);
       }
       Row row = addRow(gen, rows, npm.name(), npm.title(), npm.version(), getVersionState(npm.name(), npm.version(), npm.canonical()), getLatestVersion(npm.name(), npm.canonical()), "current".equals(npm.version()), npm.fhirVersion(), 
           !VersionUtilities.versionsCompatible(fver, npm.fhirVersion()), npm.canonical(), PackageHacker.fixPackageUrl(npm.getWebLocation()), comment, desc, QA, hasDesc, loaded);
