@@ -5,8 +5,6 @@ trigger:
 - master
 
 variables:
-- group: PGP_VAR_GROUP
-- group: SONATYPE_VAR_GROUP
 - group: GIT_VAR_GROUP
 
 jobs:
