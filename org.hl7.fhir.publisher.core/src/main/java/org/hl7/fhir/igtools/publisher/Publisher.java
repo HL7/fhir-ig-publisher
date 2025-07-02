@@ -13915,6 +13915,7 @@ private String fixPackageReference(String dep) {
   }
 
   private void saveDirectResourceOutputs(FetchedFile f, FetchedResource r, Resource res, Map<String, String> vars, String lang, RenderingContext lrc) throws FileNotFoundException, Exception {
+// Lloyd debug: res!=null && res.getId().equals("SdcQuestionLibrary")
     Element langElement = r.getElement();
     if (lang != null) {
       langElement = langUtils.copyToLanguage(langElement, lang, true);
@@ -14030,6 +14031,7 @@ private String fixPackageReference(String dep) {
     XhtmlComposer xc = new XhtmlComposer(XhtmlComposer.XML, module.isNoNarrative());
     if (wantGen(rX, "html")) {
       long start = System.currentTimeMillis();
+      // Lloyd debug: rX.getId().equals("SdcQuestionLibrary")
       XhtmlNode xhtml = (lang == null || lang.equals(le.getNamedChildValue("language"))) ? getXhtml(f, rX, lr,le) : null;
       if (xhtml == null && HistoryGenerator.allEntriesAreHistoryProvenance(le)) {
         RenderingContext ctxt = lrc.copy(false).setParser(getTypeLoader(f, rX));
@@ -14064,6 +14066,7 @@ private String fixPackageReference(String dep) {
           RenderingContext xlrc = lrc.copy(false);
           ResourceRenderer rr = RendererFactory.factory(rX.fhirType(), xlrc);
           if (lr != null && lr instanceof DomainResource) {
+// Lloyd debug - getting here and dying
             xhtml = rr.buildNarrative(ResourceWrapper.forResource(xlrc, lr));
           } else {
             ResourceWrapper rw = ResourceWrapper.forResource(xlrc, le); 
