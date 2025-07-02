@@ -58,8 +58,12 @@ public class IPViewRenderer {
       p.tx("This fragment is available on ");
       p.ah(igFragPage).tx(igFragPage);
     }
-    XhtmlDocument cf = new XhtmlParser().parse("<div>"+ipFragment+"</div>", "div");
-    body.addChildNodes(cf.getChildNodes());    
+    try {
+      XhtmlDocument cf = new XhtmlParser().parse("<div>"+ipFragment+"</div>", "div");
+      body.addChildNodes(cf.getChildNodes());
+    } catch (Exception e) {
+      body.para().tx("Error parsing IP fragment: "+e.getMessage());
+    }
 
     body.h2().tx("Copyright and Registered Trademark Uses");
     ul = body.ul();
