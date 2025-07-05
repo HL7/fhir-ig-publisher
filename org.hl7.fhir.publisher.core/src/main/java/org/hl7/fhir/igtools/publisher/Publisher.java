@@ -137,6 +137,7 @@ import org.hl7.fhir.igtools.renderers.IPStatementsRenderer;
 import org.hl7.fhir.igtools.renderers.IPViewRenderer;
 import org.hl7.fhir.igtools.renderers.JsonXhtmlRenderer;
 import org.hl7.fhir.igtools.renderers.MappingSummaryRenderer;
+import org.hl7.fhir.igtools.renderers.MultiMapBuilder;
 import org.hl7.fhir.igtools.renderers.OperationDefinitionRenderer;
 import org.hl7.fhir.igtools.renderers.PublicationChecker;
 import org.hl7.fhir.igtools.renderers.QuestionnaireRenderer;
@@ -10281,6 +10282,9 @@ private String fixPackageReference(String dep) {
             p.add("sourceTail", tailPI(s));          
           }
         }
+        if (r.fhirType().equals("CodeSystem")) {
+          item.add("content", ((CodeSystem) r.getResource()).getContent().toCode());
+        }
         path = null;
         if (r.getPath() != null) {
           path = r.getPath();
@@ -12914,7 +12918,7 @@ private String fixPackageReference(String dep) {
     String src = new String(content);
     try {
       boolean changed = false;
-      String[] keywords = {"sql", "fragment", "json", "class-diagram", "uml"};
+      String[] keywords = {"sql", "fragment", "json", "class-diagram", "uml", "multi-map"};
       for (String keyword: Arrays.asList(keywords)) {
 
         while (db != null && src.contains("{% " + keyword)) {
@@ -12938,6 +12942,9 @@ private String fixPackageReference(String dep) {
               }
               break;
 
+            case "multi-map" : 
+              substitute = buildMultiMap(arguments, f);
+              
             case "fragment":
               substitute = processFragment(arguments, f);
               break;
@@ -13005,6 +13012,16 @@ private String fixPackageReference(String dep) {
     try {
       JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(arguments);
       return new ClassDiagramRenderer(Utilities.path(rootDir, "input", "diagrams"), Utilities.path(rootDir, "temp", "diagrams"), json.asString("id"), json.asString("prefix"), rc, null).buildClassDiagram(json);
+    } catch (Exception e) {
+      e.printStackTrace();
+      return "<p style=\"color: maroon\"><b>"+Utilities.escapeXml(e.getMessage())+"</b></p>";      
+    }
+  }
+  
+  private String buildMultiMap(String arguments, FetchedFile f) {
+    try {
+      JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(arguments);
+      return new MultiMapBuilder(rc).buildMap(json);
     } catch (Exception e) {
       e.printStackTrace();
       return "<p style=\"color: maroon\"><b>"+Utilities.escapeXml(e.getMessage())+"</b></p>";      
