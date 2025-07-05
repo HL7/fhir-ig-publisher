@@ -19,18 +19,24 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.codec.binary.Base64;
+import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.Manager;
 import org.hl7.fhir.r5.elementmodel.Manager.FhirFormat;
 import org.hl7.fhir.r5.elementmodel.ParserBase;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
+import org.hl7.fhir.r5.terminologies.utilities.ValidationResult;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.MimeType;
+import org.hl7.fhir.utilities.OIDUtilities;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.validation.ValidationOptions;
 import org.hl7.fhir.validation.instance.utils.DigitalSignatureSupport;
 import org.hl7.fhir.validation.instance.utils.DigitalSignatureSupport.SignedInfo;
 
@@ -111,13 +117,16 @@ public class PublisherSigner {
       + "-----END PRIVATE KEY-----";
 
 
-  private SimpleWorkerContext context;
+  private IWorkerContext context;
 
   private X509Certificate certificate;
   private JWK jwk;
 
-  public PublisherSigner(SimpleWorkerContext context, String rootDir) throws Exception {
+  private ValidationOptions validationOptions;
+
+  public PublisherSigner(IWorkerContext context, String rootDir, ValidationOptions validationOptions) throws Exception {
     this.context = context;
+    this.validationOptions = validationOptions;
 
     String pem = DEF_X509_CERT;
     String key = DEF_X509_KEY;
@@ -281,16 +290,39 @@ public class PublisherSigner {
     } else {
       sig.setChildValue("targetFormat", "application/fhir+json;canonicalization="+canon);      
     }
-    sig.setChildValue("when", DateTimeFormatter.ISO_INSTANT.format(instant));
+    String when = DateTimeFormatter.ISO_INSTANT.format(instant);
+    sig.setChildValue("when", when);
     Element who = sig.getNamedChild("who");
     if (who != null) {
       sig.removeChild(who);
     }
     who = sig.addElement("who");
     Element id = who.addElement("identifier");
-
     id.setChildValue("system", "http://example.org/certificates");
     id.setChildValue("value", certificate.getSubjectX500Principal().getName());
+
+    String purpose = null;
+    String purposeDesc = null;
+    List<Element> types = sig.getChildren("type");
+    if (!types.isEmpty()) {
+      Element type = types.get(0);
+      String system = type.getNamedChildValue("system");
+      String code = type.getNamedChildValue("code"); 
+      if (OIDUtilities.isValidOID(code)) {
+        purpose = "urn:oid:"+code;
+      } else {
+        purpose = system+"#"+code;
+      }
+      purposeDesc = type.getNamedChildValue("display");
+      if (purposeDesc == null) {
+        ValidationResult vr = context.validateCode(validationOptions, system, null, code, null);
+        if (vr.isOk()) {
+          purposeDesc = vr.getDisplay();
+        }
+      }
+    }
+    
+    
 
     ByteArrayOutputStream ba = new ByteArrayOutputStream();
     ParserBase p = Manager.makeParser(context, xml ? FhirFormat.XML : FhirFormat.JSON);
@@ -305,10 +337,10 @@ public class PublisherSigner {
 
     if (sigType == SignatureType.JOSE) {
       sig.setChildValue("sigFormat", "application/jose");
-      sig.setChildValue("data", Base64.encodeBase64String(removePayload(createJWS(toSign, canon, instant)).getBytes(StandardCharsets.US_ASCII)));
+      sig.setChildValue("data", Base64.encodeBase64String(removePayload(createJWS(toSign, canon, when, purpose, purposeDesc)).getBytes(StandardCharsets.US_ASCII)));
     } else {
       sig.setChildValue("sigFormat", "application/pkcs7-signature");
-      sig.setChildValue("data", Base64.encodeBase64String(generateXMLDetachedSignature(toSign, instant, canon)));
+      sig.setChildValue("data", Base64.encodeBase64String(generateXMLDetachedSignature(toSign, instant, canon, purpose, purposeDesc)));
     }
   }
 
@@ -335,11 +367,14 @@ public class PublisherSigner {
     return jwk;
   }
 
-  public String createJWS(byte[] canon, Object canonMethod, Instant instant) throws JOSEException, ParseException, CertificateException {
+  public String createJWS(byte[] canon, Object canonMethod, String when, String purpose, String purposeDesc) throws JOSEException, ParseException, CertificateException {
 
     JWSHeader.Builder builder = new JWSHeader.Builder(jwk.getKeyType().toString().equals("EC") ? JWSAlgorithm.ES256 : JWSAlgorithm.RS256).type(JOSEObjectType.JOSE);
     builder.keyID(jwk.getKeyID());
-    builder.customParam("sigT", instant.getEpochSecond()).customParam("canon", canonMethod);
+    builder.customParam("sigT", when).customParam("canon", canonMethod);
+    if (purpose != null) {
+      builder.customParam("srCms", makeSrCMS(purpose, purposeDesc));
+    }
  // Add the certificate chain
     try {
         List<com.nimbusds.jose.util.Base64> certChain = new ArrayList<>();
@@ -376,9 +411,22 @@ public class PublisherSigner {
   }
 
 
-  public byte[] generateXMLDetachedSignature(byte[] signThis, Instant instant, String canon) throws Exception {
+  private Object makeSrCMS(String purpose, String purposeDesc) {
+    List<Object> list = new ArrayList<Object>();
+    Map<String, Object> object = new HashMap<>();
+    list.add(object);
+    Map<String, Object> commId = new HashMap<>();
+    object.put("commId", commId);
+    commId.put("id", purpose);
+    if (purposeDesc != null) {
+      commId.put("desc", purposeDesc);
+    }
+    return list;
+  }
 
-    SignedInfo signedInfo = DigitalSignatureSupport.buildSignInfo(certificate, signThis, canon, instant, "signing");
+  public byte[] generateXMLDetachedSignature(byte[] signThis, Instant instant, String canon, String purpose, String purposeDesc) throws Exception {
+
+    SignedInfo signedInfo = DigitalSignatureSupport.buildSignInfo(certificate, signThis, canon, instant, "signing", purpose, purposeDesc);
 
     // Sign the SignedInfo with the private key
     PrivateKey privateKey = getPrivateKeyFromJWK(jwk);
@@ -401,7 +449,8 @@ public class PublisherSigner {
       xml.append("  <Object>\n");
       xml.append("    <x:QualifyingProperties xmlns:x=\"http://uri.etsi.org/01903/v1.3.2#\" Target=\"#signature\">\n");
       // no whitespace in the XADES signed block
-      xml.append("      <x:SignedProperties Id=\"SignedProperties\"><x:SignedSignatureProperties><x:SigningTime>"+DateTimeFormatter.ISO_INSTANT.format(instant)+"</x:SigningTime></x:SignedSignatureProperties></x:SignedProperties>\n");
+      xml.append("      <x:SignedProperties Id=\"SignedProperties\"><x:SignedSignatureProperties><x:SigningTime>"+DateTimeFormatter.ISO_INSTANT.format(instant)+
+          "</x:SigningTime></x:SignedSignatureProperties>"+DigitalSignatureSupport.cmmId(purpose, purposeDesc)+"</x:SignedProperties>\n");
       xml.append("    </x:QualifyingProperties>");
       xml.append("  </Object>\n");
     }

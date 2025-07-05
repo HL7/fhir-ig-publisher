@@ -1,30 +1,21 @@
 package org.hl7.fhir.igtools.publisher.utils;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
-import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.json.JsonException;
-import org.hl7.fhir.utilities.json.model.JsonElement;
-import org.hl7.fhir.utilities.json.model.JsonObject;
-import org.hl7.fhir.utilities.json.parser.JsonParser;
 import org.hl7.fhir.utilities.npm.PackageList;
 import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
 
 public class HL7OrgFhirVersionRedirectRemover {
 
   public static void main(String[] args) throws IOException {
-    File folderRoot = new File("/Users/grahamegrieve/web/www.hl7.org.fhir");
+    File folderRoot = new File("/Users/grahamegrieve/web/www.hl7.org.cda");
     new HL7OrgFhirVersionRedirectRemover().execute(folderRoot);
   }
 

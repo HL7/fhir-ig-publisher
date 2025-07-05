@@ -1178,17 +1178,15 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private String makeTemplateIndexPage() {
-    String page = "<!DOCTYPE HTML>\r\n"+
-        "<html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\">\r\n"+
-        "<head>\r\n"+
-        "  <title>Template Page</title>\r\n"+
-        "</head>\r\n"+
-        "<body>\r\n"+
-        "  <p><b>Template {{npm}}</b></p>\r\n"+
-        "  <p>You can <a href=\"package.tgz\">download the template</a>, though you should not need to; just refer to the template as {{npm}} in your IG configuration.</p>\r\n"+
-        "  <p>A <a href=\"{{canonical}}/history.html\">full version history is published</a></p>\r\n"+
-        "</body>\r\n"+
-        "</html>\r\n";
+    String page = "---\n"
+        + "layout: page\n"
+        + "title: {pid}\n"
+        + "---\n"
+        + "  <p><b>Template {pid}{vid}</b></p>\n"
+        + "  <p>You can <a href=\"package.tgz\">download the template</a>, though you should not need to; just refer to the template as {pid} in your IG configuration.</p>\n"
+        + "  <p>Dependencies: {dep}</p>\n"
+        + "  <p>A <a href=\"{path}history.html\">full version history is published</a></p>\n"
+        + "";
     return page.replace("{{npm}}", templateInfo.asString("name")).replace("{{canonical}}", templateInfo.asString("canonical"));
   }
 
@@ -1220,6 +1218,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       log("Checking Language");
       checkLanguage();
       loadConformance2();
+      checkSignBundles();
 
       if (!validationOff) {
         log("Validating Resources");
@@ -1241,7 +1240,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         log("Generating Translation artifacts");
         processTranslationOutputs();
       }
-      checkSignBundles();
       log("Generating Outputs in "+outputDir);
       Map<String, String> uncsList = scanForUnattributedCodeSystems();
       generate();
@@ -3589,8 +3587,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       loadConversionVersion(s);
     }
     langUtils = new LanguageUtils(context);
-    signer = new PublisherSigner(context, rootDir);
-
     txLog = FileUtilities.createTempFile("fhir-ig-", ".html").getAbsolutePath();
     System.out.println("Running Terminology Log: "+txLog);
     if (mode != IGBuildMode.WEBSERVER) {
@@ -5209,6 +5205,7 @@ private String fixPackageReference(String dep) {
         }
       }
     }
+    signer = new PublisherSigner(context, rootDir, rc.getTerminologyServiceOptions());
     rcLangs = new RenderingContextLangs(rc);
     for (String l : allLangs()) {
       RenderingContext lrc = rc.copy(false);
