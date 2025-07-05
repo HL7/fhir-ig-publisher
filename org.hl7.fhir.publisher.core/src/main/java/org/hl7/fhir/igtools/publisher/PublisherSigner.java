@@ -2,23 +2,37 @@ package org.hl7.fhir.igtools.publisher;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyFactory;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.cert.CertificateEncodingException;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
+import java.security.interfaces.ECPrivateKey;
+import java.security.interfaces.ECPublicKey;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.text.ParseException;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
-import org.hl7.fhir.exceptions.FHIRException;
+import org.apache.commons.codec.binary.Base64;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.Manager;
 import org.hl7.fhir.r5.elementmodel.Manager.FhirFormat;
+import org.hl7.fhir.r5.elementmodel.ParserBase;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.utilities.FileUtilities;
+import org.hl7.fhir.utilities.MimeType;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.json.JsonException;
-import org.hl7.fhir.utilities.json.model.JsonObject;
-import org.hl7.fhir.utilities.json.model.JsonProperty;
-import org.hl7.fhir.utilities.json.parser.JsonParser;
+import org.hl7.fhir.validation.instance.utils.DigitalSignatureSupport;
+import org.hl7.fhir.validation.instance.utils.DigitalSignatureSupport.SignedInfo;
 
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JOSEObjectType;
@@ -29,82 +43,273 @@ import com.nimbusds.jose.JWSSigner;
 import com.nimbusds.jose.Payload;
 import com.nimbusds.jose.crypto.ECDSASigner;
 import com.nimbusds.jose.crypto.RSASSASigner;
+import com.nimbusds.jose.jwk.Curve;
+import com.nimbusds.jose.jwk.ECKey;
 import com.nimbusds.jose.jwk.JWK;
+import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.util.Base64URL;
+import com.nimbusds.jose.util.X509CertUtils;
 
 public class PublisherSigner {
+
+  public enum SignatureType { JOSE, DIGSIG };
 
   // this is the default key, 
   // when the ig is built for release, either on the ci-build or -go-publish, an actual 
   // private key will be used that overrrides this one
-  
-  // alternatively, an implementer can provide their own in /input/jwk.json
-  private static final String DEF_JWKS_JSON = "{ \n"
-      + "  \"jwk\" : {\n"
-      + "    \"p\": \"93dPpZDAt7KN7OdwForp4Xr9q3FU23gUO9Ate_uoc7liaB7CNxKZVE5ZKJ33p_bczIAKzeuQjxSCgR8LXFT6uvHUuCH8oxBXC182EWlWljhbselqCGN7YQShSM7suSeVzif6CXUeafsR-XcBERxHHy5dSoh5zYq7JRdARzZCg78\",\n"
-      + "    \"kty\": \"RSA\",\n"
-      + "    \"q\": \"ku2zF8DQrfiXBuzlk0KC_xJGDKQfb07VEidzFYE1C-uBRqQytTlT6BGTF90UDcsZ_CjD3x6dp78Ec13GbF_WVzzZNrjIMsVSEC5dPsXdheLqdKLt8fRG35-hLl3DwYu6d55vVhDbP-QAfRE60bX0yScMkBjP20O_0mpUJjCDoas\",\n"
-      + "    \"d\": \"DHy_h_C-zhPhPg7dvUJJc3HvnLtuQxCD_215WqJBrOZ6cbZX1Cwd6cp2QVEK7p5U4jbHdZpsKuRLQKDlpkSqjxNiVRmP8_5MHzs0oi7m40OKdOQ8HTw39lhTxzJx9XT2VWEdXwYwyNM9tGYcnml61fiBXHqXt-DSXpNkGrf1fht2fQacTF7oFG28VVWrGbAiitcir5JdAUW3MpZjSgWra3P3H7Dku_AjO_XfT5WGGpiUeXUEqLQxWjVSxZSonKgRmuKE3snaDUNJzd66k0Cvjm4irFtb0owJC0LZf9nVzkF-uqWeEIBzDXGDK604vLhWj6cCMYRvvgQnw5hlG6PSWQ\",\n"
-      + "    \"e\": \"AQAB\",\n"
-      + "    \"use\": \"sig\",\n"
-      + "    \"kid\": \"K_E0WTm6hVrXvYFrK4hJjF0etvhRsh0LAPUFsS6gzKg\",\n"
-      + "    \"qi\": \"KZXSpxETiz4ILyxzwI_pMIm1E8P0cMaMuDjoTy2IvClgdkCBBcFZ0W37hOMXaoIM5Hy72uYydV1lljYGMwc8_VQMZLh_22xSSFJnV8PPjTzW5do4ryfizJUg52AsPBhNn_i6pa2L5jkmb98muD2HbDHXOFCEV57YuEEiSWRVCJA\",\n"
-      + "    \"dp\": \"xTFWz0jkuLzYqWHXCK-TJTD7eKUriGNMRElkJTrpBaZBC1UPUBFLC0oPc_VExpxJX8_cTDCdFdazE68oP2AcF-HirwOuLEY2BoLNM9yrubKZJtEnxB150Fp_JuR08CniDs_-R5EDNlJyBUbWG8tbxTYN8vmDjc0xyaGYf-Z15EM\",\n"
-      + "    \"alg\": \"RS256\",\n"
-      + "    \"dq\": \"Dtrdeo9SCeTSUC7vXx4gZG2Si4CkdPqBbF50sj3oARaEcYH0ZoIvS41LU-RUPLjGHcp5UzujMOyNJKTchOSDpTpPs8qm4ws0KtKlNs2GghzZG4XFjOrnp4BaKXftbMoVxjZMh2UY5bLFod92FPHSl-vMx1za1w5YfIunilzpUhU\",\n"
-      + "    \"n\": \"jgfSAIuhDB14fR3vp9qfT4AuJaIfCJCehSy69kwTguUMARntGJx7mPD8K1Te10Uywx4E_je0LHMT2zgrrlp-hbqTWR6z6vOnYzl8MkXj1uC1pSEC0eXAUFcs2igJl6H6mEc1aOv_mdB8B6I2DIiKmBh-wVpgnA8HK7UfdercdbJOQmem-FG0uP98_CSiCw8NpWtq5ci7nEqf_ylneeL7pqOkQtL_huDZCShgW0WK7vTgYtp_zHZH0OQ17WCWYdqAaJ7Q964JPnvWYlNEMA8uSH0z5hd5lVTC4FKr5gSGFAyEg99RwXGw4usJjmHvhnxi9RJ_7elN7MbAwi_ITgYflQ\"\n"
-      + "  },\n"
-      + "  \"claims\" : {\n"
-      + "    \"iss\" : \"http://hl7.org/fhir/tools/Device/ig-publisher\",\n"
-      + "    \"sub\" : \"IG Publisher\"\n"
-      + "  }\n"
-      + "}";
 
-  
-  private String jwk;
-  private JsonObject claims;
+  private static final String DEF_X509_CERT = "-----BEGIN CERTIFICATE-----\n"
+      + "MIIDozCCAoqgAwIBAgIBADANBgkqhkiG9w0BAQ0FADBrMQswCQYDVQQGEwJ1czER\n"
+      + "MA8GA1UECAwITWlzc291cmkxDDAKBgNVBAoMA0hMNzEQMA4GA1UEAwwHaGw3Lm9y\n"
+      + "ZzESMBAGA1UEBwwJQW5uIEFyYm9yMRUwEwYDVQQLDAxJRyBQdWJsaXNoZXIwHhcN\n"
+      + "MjUwNjE5MDIzMDMzWhcNMjYwNjIwMDIzMDMzWjBrMQswCQYDVQQGEwJ1czERMA8G\n"
+      + "A1UECAwITWlzc291cmkxDDAKBgNVBAoMA0hMNzEQMA4GA1UEAwwHaGw3Lm9yZzES\n"
+      + "MBAGA1UEBwwJQW5uIEFyYm9yMRUwEwYDVQQLDAxJRyBQdWJsaXNoZXIwggEjMA0G\n"
+      + "CSqGSIb3DQEBAQUAA4IBEAAwggELAoIBAgC9Us8v0UyOy+XWLRff29GHQa9axqtD\n"
+      + "ao7azsWnF2/ABdg1g6dOF/0ZkrhLdqJISj8MlSP5VLou67iZIH0RxRMfSA0e/fi9\n"
+      + "DE8QSzpIOlueeH2M8Q2VesKp3hIkp+xCaGPbc4L0kZVkE6EW+TUR7QTs1NkaxtwY\n"
+      + "vW87gKzn6BL0Yx/5mu1UFWcJ/XtLHkiagtIbSiEXSdsjxviObJM2SaV3taCaayGK\n"
+      + "VFpU6rPLD/VRart6ZP1CJQ2zlIskEEOnnUKEUuwcFpL7t5FXiHVOX0hZ5fsuGYt8\n"
+      + "EuLwa7giEQvf/PaQbTrTVMOdKH/EGVJI81MfNgzEbrA/CvcG/lgG3DM+JwIDAQAB\n"
+      + "o1AwTjAdBgNVHQ4EFgQUqBKo2iQ0R5r5GiNlh2sNCzEq9QIwHwYDVR0jBBgwFoAU\n"
+      + "qBKo2iQ0R5r5GiNlh2sNCzEq9QIwDAYDVR0TBAUwAwEB/zANBgkqhkiG9w0BAQ0F\n"
+      + "AAOCAQIAi8FVsqZJ4Ofiigjgp4+CeHDx6LJRuq6YoiNerxJ4l+ET4Bb7j8E/DDeE\n"
+      + "febEQvwPrhlOyFOfyoszaBnF8Ep/Hk7Oj6cpLhoAHjeV3GUy+3xg3NB3DuE7Jhnx\n"
+      + "99kwfRL9tOXJ5+Ll1AIhyT0JID8J6/99Q5VmwSCUeRfnhnnigZlwS4VhAoanhrqz\n"
+      + "wXvpOco+HyhL0y3mmbBH/eKU+H5P+L2IFiSFL6XAL4PM3pYI/zj+NyhAXZZZwllR\n"
+      + "joIKflGOO8HUc5iJiTHhYo0iKS1lPxCHoKyA+aVEaVE/goqBwoe3V9mxHAz4Uq8e\n"
+      + "/aQ0OfciFmj55s6mx5eUdy5lQqfoekE=\n"
+      + "-----END CERTIFICATE-----";
+
+  private static final String DEF_X509_KEY = "-----BEGIN PRIVATE KEY-----\n"
+      + "MIIEwQIBADANBgkqhkiG9w0BAQEFAASCBKswggSnAgEAAoIBAgC9Us8v0UyOy+XW\n"
+      + "LRff29GHQa9axqtDao7azsWnF2/ABdg1g6dOF/0ZkrhLdqJISj8MlSP5VLou67iZ\n"
+      + "IH0RxRMfSA0e/fi9DE8QSzpIOlueeH2M8Q2VesKp3hIkp+xCaGPbc4L0kZVkE6EW\n"
+      + "+TUR7QTs1NkaxtwYvW87gKzn6BL0Yx/5mu1UFWcJ/XtLHkiagtIbSiEXSdsjxviO\n"
+      + "bJM2SaV3taCaayGKVFpU6rPLD/VRart6ZP1CJQ2zlIskEEOnnUKEUuwcFpL7t5FX\n"
+      + "iHVOX0hZ5fsuGYt8EuLwa7giEQvf/PaQbTrTVMOdKH/EGVJI81MfNgzEbrA/CvcG\n"
+      + "/lgG3DM+JwIDAQABAoIBAQ3lKAOwbtgEKwg/IwNxFL3CmmYlMqiuB3ITvvn2hGMp\n"
+      + "iqbS1NKsfA0GcbRILrzzhhEcWRmRmGCdOF00vzkwp6iiFyRxK3JkluDxRIPMlLDa\n"
+      + "0wwnHQIdkm/5NoeuM27kTn/qyG++x6Iitq4C+FwqczQWoyCN+9VtAd7yIL6cj9eT\n"
+      + "9N2qPIH4dAHfbp0gN1yTqTJi/IoIk2nAFs/6CBzjDS8jbr5qdEtX/VRVhVvb4p0k\n"
+      + "ICle9wQ6VMCUM9tEJaPea7NqieJ+z7fFVKGMthFnIKqJ9VHpjpcRHgjH/6HqAvvM\n"
+      + "pnRnWH3pIk9AXJSZ5s5dM4W4pLEXy3OX1Eizud7HSzdRAoGBDgmZRLl3hIJZXAO7\n"
+      + "PN+wTT+J1qg3NcIXJcJvescMLTewWymkpfDISbhHlZYVtqPlkaz6pw3mpaRQRd/k\n"
+      + "IY4gDmNwaxgmJ5LpGk6TGu2emkKr+95Cj2HaiYTRaOz3UVlpnTYvm7UTcNkfzXXe\n"
+      + "mVXyfzJtl8SapVFaZpV5v2QobGfrAoGBDXyrANX2PD7c1NgbmGhhKs2wzpWL6o2s\n"
+      + "0CHYQsAuxsvbO1YZr1e/wuPNtlmHQllIa5y1yRnhUkvjs62Ne2fvjGFFbbGew9WJ\n"
+      + "kuBwGrfCziX9OYtLumSIw1ahodA1rQRpty5KImeCWXOGoTkgrMzlQ7/avlqZk1El\n"
+      + "xED6gbkZpQ+1AoGBAIb/yQMmqEW1Ua2aNRk6KEzAwt2i5VQbRoHdakFcBb7X0zTn\n"
+      + "SIyZGZvgpI/01N2nXCehavEsvwBDO7zDdzc9oQy/Rmar2ES+mQxmnlZa5PSoPVgG\n"
+      + "LBjC+vOQYl60k8vGGe/VLgZJaq3dcfyBlkUSTRD56P+rx5YczUnEPxpmIlxtAoGB\n"
+      + "DMvdX+SiRZULZ7NHs3pNvxP8DnYbk8cqUSvbibHYb+wZrRnLMu+Z1SrZEoutZwlZ\n"
+      + "Sikc3Zp9i9zPRbqEQ7NguJvOCP7++SYQ6teh5ee2oGuw8Dk297nNfTEkGGh5lRhb\n"
+      + "yV7VHgGBzqdq9GtEkk+xs29D91n03q6em69fP1fFejQFAoGBB/k1UBOMCjo+iNPH\n"
+      + "bI+OzUqOy5NL7nd+SqB9FG53VE+w1b8XfCW3Cuf0Vm52AFudtXuAt5aEsezAJsfV\n"
+      + "2XZfr+txSIgRbbFWQ39VccOFjckVzD2egXnFdL5Ac2s9JkAJZHqWU8pppJTVEuPF\n"
+      + "KrYFFnz13zUOg9B7zxatELWn9rNV\n"
+      + "-----END PRIVATE KEY-----";
 
 
   private SimpleWorkerContext context;
-  public PublisherSigner(SimpleWorkerContext context, String rootDir) throws IOException {
+
+  private X509Certificate certificate;
+  private JWK jwk;
+
+  public PublisherSigner(SimpleWorkerContext context, String rootDir) throws Exception {
     this.context = context;
-    setJson(JsonParser.parseObject(DEF_JWKS_JSON));
-    File f = new File(Utilities.path(rootDir, "input", "signing-key.json"));
-    if (f.exists()) {
-      setJson(JsonParser.parseObject(f));
+
+    String pem = DEF_X509_CERT;
+    String key = DEF_X509_KEY;
+
+    File fc = new File(Utilities.path(rootDir, "input", "signing-key.pem"));
+    File fk = new File(Utilities.path(rootDir, "input", "signing-key.key"));
+    if (fc.exists() && fk.exists()) {
+      pem = FileUtilities.fileToString(fc);
+      key = FileUtilities.fileToString(fk);
+    } 
+    certificate = loadCertificate(pem);
+    PrivateKey privateKey = loadPrivateKey(key);
+    jwk = createJWK(certificate, privateKey);
+
+    System.out.println("Signing Certificate: " + jwk.getKeyType()+" key for Subject: " + certificate.getSubjectDN()+" from: " + certificate.getIssuerDN());
+  }
+
+  /**
+   * Load X.509 Certificate from PEM string using Nimbus
+   */
+  public static X509Certificate loadCertificate(String pemCert) throws Exception {
+    // Using Nimbus X509CertUtils
+    X509Certificate cert = X509CertUtils.parse(pemCert);
+    if (cert == null) {
+      throw new Exception("Failed to parse certificate - invalid format");
+    }
+    return cert;
+  }
+
+  /**
+   * Load Private Key from PEM string
+   */
+  public static PrivateKey loadPrivateKey(String pemKey) throws Exception {
+    // Remove PEM headers and whitespace
+    String keyData = pemKey
+        .replace("-----BEGIN PRIVATE KEY-----", "")
+        .replace("-----END PRIVATE KEY-----", "")
+        .replace("-----BEGIN RSA PRIVATE KEY-----", "")
+        .replace("-----END RSA PRIVATE KEY-----", "")
+        .replaceAll("\\s", "");
+
+    // Decode Base64
+    byte[] keyBytes = Base64.decodeBase64(keyData);
+
+    // Create key spec
+    PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
+
+    // Try RSA first, then EC
+    try {
+      KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+      return keyFactory.generatePrivate(spec);
+    } catch (Exception e) {
+      try {
+        KeyFactory keyFactory = KeyFactory.getInstance("EC");
+        return keyFactory.generatePrivate(spec);
+      } catch (Exception e2) {
+        throw new Exception("Unable to load private key as RSA or EC", e2);
+      }
     }
   }
 
-  public void setJwk(String jwk) throws JsonException, IOException {
-    setJson(JsonParser.parseObject(jwk));
+  /**
+   * Create JWK from X.509 Certificate and Private Key
+   */
+  public static JWK createJWK(X509Certificate certificate, PrivateKey privateKey) throws Exception {
+    if (privateKey instanceof RSAPrivateKey) {
+      return createRSAJWK(certificate, (RSAPrivateKey) privateKey);
+    } else if (privateKey instanceof ECPrivateKey) {
+      return createECJWK(certificate, (ECPrivateKey) privateKey);
+    } else {
+      throw new Exception("Unsupported private key type: " + privateKey.getClass().getName());
+    }
   }
 
-  private void setJson(JsonObject json) {
-    jwk = JsonParser.compose(json.getJsonObject("jwk"));
-    claims = json.getJsonObject("claims");
+  /**
+   * Create RSA JWK
+   */
+  private static RSAKey createRSAJWK(X509Certificate certificate, RSAPrivateKey privateKey) throws Exception {
+    RSAPublicKey publicKey = (RSAPublicKey) certificate.getPublicKey();
+
+    return new RSAKey.Builder(publicKey)
+        .privateKey(privateKey)
+        .x509CertChain(Arrays.asList(com.nimbusds.jose.util.Base64.encode(certificate.getEncoded())))
+        .keyID(generateKeyId(certificate))
+        .build();
   }
 
-  public void signBundle(Element bnd, Element sig) throws FHIRException, IOException, JOSEException, ParseException {
-    Instant instant = Instant.now();
-    sig.setChildValue("targetFormat", "application/fhir+json;canonicalization=http://hl7.org/fhir/canonicalization/json");
-    sig.setChildValue("sigFormat", "application/jose");
+  /**
+   * Create EC JWK
+   */
+  private static ECKey createECJWK(X509Certificate certificate, ECPrivateKey privateKey) throws Exception {
+    ECPublicKey publicKey = (ECPublicKey) certificate.getPublicKey();
+
+    // Get the curve from the public key
+    Curve curve = Curve.forECParameterSpec(publicKey.getParams());
+
+    return new ECKey.Builder(curve, publicKey)
+        .privateKey(privateKey)
+        .x509CertChain(Arrays.asList(com.nimbusds.jose.util.Base64.encode(certificate.getEncoded())))
+        .keyID(generateKeyId(certificate))
+        .build();
+  }
+
+  /**
+   * Generate a key ID from the certificate
+   */
+  private static String generateKeyId(X509Certificate certificate) throws Exception {
+    // Simple approach: use part of the serial number
+    if (certificate.getSerialNumber().toString(16).length() <= 1) {
+      return null;
+    } else {
+      return certificate.getSerialNumber().toString(16);
+    }
+  }
+
+  /**
+   * Alternative method: Create JWK directly from PEM strings
+   */
+  public static JWK createJWKFromPEM(String pemCert, String pemKey) throws Exception {
+    X509Certificate certificate = loadCertificate(pemCert);
+    PrivateKey privateKey = loadPrivateKey(pemKey);
+    return createJWK(certificate, privateKey);
+  }
+
+  /**
+   * Utility method to validate the loaded certificate and key match
+   */
+  public static boolean validateKeyPair(X509Certificate certificate, PrivateKey privateKey) throws Exception {
+    // Simple validation: check if the public key from cert matches the private key
+    String certPublicKeyAlgorithm = certificate.getPublicKey().getAlgorithm();
+    String privateKeyAlgorithm = privateKey.getAlgorithm();
+
+    return certPublicKeyAlgorithm.equals(privateKeyAlgorithm);
+  }
+
+
+  public Instant roundToNearestSecond(Instant instant) {
+    // Convert to millis, round to nearest 1000ms, back to Instant
+    long epochMillis = instant.toEpochMilli();
+    long roundedMillis = Math.round(epochMillis / 1000.0) * 1000;
+    return Instant.ofEpochMilli(roundedMillis);
+  }
+
+  public void signBundle(Element bnd, Element sig, SignatureType sigType) throws Exception {
+    boolean xml = false;
+    String canon = null;
+    if (sig.hasChild("targetFormat")) { 
+      MimeType mt = new MimeType(sig.getNamedChildValue("targetFormat"));       
+      xml = mt.getBase().contains("xml");
+      canon = mt.getParams().get("canonicalization");
+    }
+    if (canon == null) {
+      canon = xml ? "http://hl7.org/fhir/canonicalization/xml" : "http://hl7.org/fhir/canonicalization/json";
+      if ("document".equals(bnd.getNamedChildValue("type"))) {
+        canon += "#document";
+      }
+    }
+    Instant instant = roundToNearestSecond(Instant.now());
+    if (xml) {
+      sig.setChildValue("targetFormat", "application/fhir+xml;canonicalization="+canon);
+    } else {
+      sig.setChildValue("targetFormat", "application/fhir+json;canonicalization="+canon);      
+    }
     sig.setChildValue("when", DateTimeFormatter.ISO_INSTANT.format(instant));
     Element who = sig.getNamedChild("who");
     if (who != null) {
       sig.removeChild(who);
     }
     who = sig.addElement("who");
-    who.setChildValue("reference", claims.asString("iss"));
-    who.setChildValue("display", claims.asString("sub"));
-    
-    Element data = sig.getNamedChild("data");
-    sig.removeChild(data);
-    
+    Element id = who.addElement("identifier");
+
+    id.setChildValue("system", "http://example.org/certificates");
+    id.setChildValue("value", certificate.getSubjectX500Principal().getName());
+
     ByteArrayOutputStream ba = new ByteArrayOutputStream();
-    Manager.compose(context, bnd, ba, FhirFormat.JSON, OutputStyle.CANONICAL, null);
+    ParserBase p = Manager.makeParser(context, xml ? FhirFormat.XML : FhirFormat.JSON);
+
+    if (canon.endsWith("#document")) {
+      p.setCanonicalFilter("Bundle.id", "Bundle.meta", "Bundle.signature");
+    } else {
+      p.setCanonicalFilter("Bundle.signature");
+    }
+    p.compose(bnd, ba, OutputStyle.CANONICAL, null);
     byte[] toSign = ba.toByteArray();
- 
-    sig.setChildValue("data", removePayload(createJWS(toSign, "http://hl7.org/fhir/canonicalization/json", instant)));    
+
+    if (sigType == SignatureType.JOSE) {
+      sig.setChildValue("sigFormat", "application/jose");
+      sig.setChildValue("data", Base64.encodeBase64String(removePayload(createJWS(toSign, canon, instant)).getBytes(StandardCharsets.US_ASCII)));
+    } else {
+      sig.setChildValue("sigFormat", "application/pkcs7-signature");
+      sig.setChildValue("data", Base64.encodeBase64String(generateXMLDetachedSignature(toSign, instant, canon)));
+    }
   }
 
   private String removePayload(String jws) {
@@ -112,14 +317,38 @@ public class PublisherSigner {
     return parts[0]+".."+parts[2];
   }
 
-  public String createJWS(byte[] canon, Object canonMethod, Instant instant) throws JOSEException, ParseException {
-    JWK key = JWK.parse(jwk);
-    
-    JWSHeader.Builder builder = new JWSHeader.Builder(key.getKeyType().toString().equals("EC") ? JWSAlgorithm.ES256 : JWSAlgorithm.RS256).type(JOSEObjectType.JOSE);
-    builder.customParam("iat", instant.getEpochSecond()).customParam("canon", canonMethod);
-    for (String p : claims.getNames()) {
-      builder.customParam(p, claims.asString(p));
-    }    
+  private JWK parseX509c(X509Certificate certificate) throws CertificateException {
+    // Extract the public key
+    PublicKey publicKey = certificate.getPublicKey();
+
+    // Convert to JWK based on key type
+    JWK jwk;
+    if (publicKey instanceof RSAPublicKey) {
+      jwk = new RSAKey.Builder((RSAPublicKey) publicKey).build();
+    } else if (publicKey instanceof ECPublicKey) {
+      jwk = new ECKey.Builder(Curve.forECParameterSpec(
+          ((ECPublicKey) publicKey).getParams()), (ECPublicKey) publicKey)
+          .build();
+    } else {
+      throw new IllegalArgumentException("Unsupported key type: " + publicKey.getAlgorithm());
+    }
+    return jwk;
+  }
+
+  public String createJWS(byte[] canon, Object canonMethod, Instant instant) throws JOSEException, ParseException, CertificateException {
+
+    JWSHeader.Builder builder = new JWSHeader.Builder(jwk.getKeyType().toString().equals("EC") ? JWSAlgorithm.ES256 : JWSAlgorithm.RS256).type(JOSEObjectType.JOSE);
+    builder.keyID(jwk.getKeyID());
+    builder.customParam("sigT", instant.getEpochSecond()).customParam("canon", canonMethod);
+ // Add the certificate chain
+    try {
+        List<com.nimbusds.jose.util.Base64> certChain = new ArrayList<>();
+        certChain.add(com.nimbusds.jose.util.Base64.encode(certificate.getEncoded()));
+        builder.x509CertChain(certChain);
+    } catch (CertificateEncodingException e) {
+        throw new RuntimeException("Failed to encode certificate", e);
+    }
+
     JWSHeader header = builder.build();
 
     // Create payload from bytes
@@ -128,15 +357,15 @@ public class PublisherSigner {
     // Create JWS object
     JWSObject jwsObject = new JWSObject(header, payload);
 
-    
+
     // Create signer based on key type
     JWSSigner signer;
-    if (key.getKeyType().toString().equals("RSA")) {
-      signer = new RSASSASigner(key.toRSAKey());
-    } else if (key.getKeyType().toString().equals("EC")) {
-      signer = new ECDSASigner(key.toECKey());
+    if (jwk.getKeyType().toString().equals("RSA")) {
+      signer = new RSASSASigner(jwk.toRSAKey());
+    } else if (jwk.getKeyType().toString().equals("EC")) {
+      signer = new ECDSASigner(jwk.toECKey());
     } else {
-      throw new IllegalArgumentException("Unsupported key type: " + key.getKeyType());
+      throw new IllegalArgumentException("Unsupported key type: " + jwk.getKeyType());
     }
 
     // Sign the JWS
@@ -144,6 +373,62 @@ public class PublisherSigner {
 
     // Return compact serialization
     return jwsObject.serialize();
+  }
+
+
+  public byte[] generateXMLDetachedSignature(byte[] signThis, Instant instant, String canon) throws Exception {
+
+    SignedInfo signedInfo = DigitalSignatureSupport.buildSignInfo(certificate, signThis, canon, instant, "signing");
+
+    // Sign the SignedInfo with the private key
+    PrivateKey privateKey = getPrivateKeyFromJWK(jwk);
+    byte[] signatureValue = generateSignatureValue(signedInfo.getSignable(), privateKey);
+    String signatureB64 = java.util.Base64.getEncoder().encodeToString(signatureValue);
+    String certB64 = java.util.Base64.getEncoder().encodeToString(certificate.getEncoded());
+
+    StringBuilder xml = new StringBuilder();
+    xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+    xml.append("<Signature xmlns=\"http://www.w3.org/2000/09/xmldsig#\">\n");
+    xml.append(signedInfo.getSource());
+    xml.append("  <SignatureValue>").append(signatureB64).append("</SignatureValue>\n");
+    xml.append("  <SignedBytes>").append(java.util.Base64.getEncoder().encodeToString(signThis)).append("</SignedBytes>\n");
+    xml.append("  <KeyInfo>\n");
+    xml.append("    <X509Data>\n");
+    xml.append("      <X509Certificate>").append(certB64).append("</X509Certificate>\n");
+    xml.append("    </X509Data>\n");
+    xml.append("  </KeyInfo>\n");
+    if (instant != null) {
+      xml.append("  <Object>\n");
+      xml.append("    <x:QualifyingProperties xmlns:x=\"http://uri.etsi.org/01903/v1.3.2#\" Target=\"#signature\">\n");
+      // no whitespace in the XADES signed block
+      xml.append("      <x:SignedProperties Id=\"SignedProperties\"><x:SignedSignatureProperties><x:SigningTime>"+DateTimeFormatter.ISO_INSTANT.format(instant)+"</x:SigningTime></x:SignedSignatureProperties></x:SignedProperties>\n");
+      xml.append("    </x:QualifyingProperties>");
+      xml.append("  </Object>\n");
+    }
+    xml.append("</Signature>\n");
+    
+    return xml.toString().getBytes(StandardCharsets.US_ASCII);
+  }
+
+  // Helper method to generate signature value
+  private static byte[] generateSignatureValue(byte[] data, PrivateKey privateKey) throws Exception {
+    String signatureAlgorithm = privateKey.getAlgorithm().equals("RSA") ? 
+        "SHA256withRSA" : "SHA256withECDSA";
+
+    java.security.Signature signature = java.security.Signature.getInstance(signatureAlgorithm);
+    signature.initSign(privateKey);
+    signature.update(data);
+    return signature.sign();
+  }
+
+  private static PrivateKey getPrivateKeyFromJWK(JWK jwk) throws Exception {
+    if (jwk.getKeyType().toString().equals("RSA")) {
+      return jwk.toRSAKey().toPrivateKey();
+    } else if (jwk.getKeyType().toString().equals("EC")) {
+      return jwk.toECKey().toPrivateKey();
+    } else {
+      throw new Exception("Unsupported key type: " + jwk.getKeyType());
+    }
   }
 
 }
