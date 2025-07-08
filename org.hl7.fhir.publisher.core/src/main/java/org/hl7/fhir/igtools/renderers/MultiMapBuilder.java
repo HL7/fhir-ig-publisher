@@ -45,13 +45,14 @@ public class MultiMapBuilder extends DataRenderer {
   public class SourceDataProvider {
     private CodeSystem cs;
     private ValueSet vs;
+    private String title;
     private List<Coding> codings = new ArrayList<>();
     
     public void heading(XhtmlNode b) {
       if (cs != null) {
-        b.ah(cs.getWebPath()).tx(cs.present());
+        b.ah(cs.getWebPath()).tx(title == null ? cs.present() : title);
       } else {
-        b.ah(vs.getWebPath()).tx(vs.present());
+        b.ah(vs.getWebPath()).tx(title == null ? vs.present() : title);
       }      
     }
     
@@ -104,7 +105,7 @@ public class MultiMapBuilder extends DataRenderer {
 
     @Override
     protected void heading(XhtmlNode b) {
-      b.ah(map.getWebPath()).tx(map.present());
+      b.ah(map.getWebPath()).tx(config.has("title") ? config.asString("title") : map.present());
     }
 
     @Override
@@ -276,7 +277,7 @@ public class MultiMapBuilder extends DataRenderer {
 
     @Override
     protected void heading(XhtmlNode b) {
-      b.ah(cs.getWebPath()).tx(cs.present());
+      b.ah(cs.getWebPath()).tx(config.has("title") ? config.asString("title") : cs.present());
     }
 
     @Override
@@ -360,8 +361,8 @@ public class MultiMapBuilder extends DataRenderer {
       RenderingStatus status = new RenderingStatus();
         
       XhtmlNode node = new XhtmlNode(NodeType.Element, "div");
-      if (config.has("title")) {
-        node.para().b().tx(config.asString("title"));
+      if (config.has("caption")) {
+        node.para().b().tx(config.asString("caption"));
       }
       XhtmlNode tbl = node.table("grid");
       XhtmlNode tr = tbl.tr();
@@ -386,6 +387,7 @@ public class MultiMapBuilder extends DataRenderer {
   
   private SourceDataProvider loadSource(JsonObject config) {
     SourceDataProvider source = new SourceDataProvider();
+    source.title = config.asString("title");
     Resource res = context.getContext().fetchResource(Resource.class, config.asString("source"));
     if (res == null) {
       throw new FHIRException("Source not found: "+config.asString("source"));
