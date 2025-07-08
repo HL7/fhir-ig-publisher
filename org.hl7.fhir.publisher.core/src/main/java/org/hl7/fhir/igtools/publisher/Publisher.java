@@ -10936,7 +10936,11 @@ private String fixPackageReference(String dep) {
           String link = r.getWebPath();
           links.add(r.fhirType()+"/"+r.getIdBase());
           if (link != null) {
-            item.add(link,  title);
+            if (!item.has(link)) {
+              item.add(link, title);
+            } else if (!item.asString(link).equals(title)) {
+              log("inconsistent link info for "+link+": already "+item.asString(link)+", now "+title);
+            }
           }
         }
       }
@@ -12941,7 +12945,8 @@ private String fixPackageReference(String dep) {
 
             case "multi-map" : 
               substitute = buildMultiMap(arguments, f);
-              
+              break;
+
             case "fragment":
               substitute = processFragment(arguments, f);
               break;
