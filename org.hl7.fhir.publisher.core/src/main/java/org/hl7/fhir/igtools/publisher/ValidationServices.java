@@ -125,7 +125,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
         return new ObjectConverter(context).convert(res);
     }
 
-    ValueSet vs = ImplicitValueSets.generateImplicitValueSet(url);
+    ValueSet vs = new ImplicitValueSets(context.getExpansionParameters()).generateImplicitValueSet(url);
     if (vs != null)
       return new ObjectConverter(context).convert(vs);
     
