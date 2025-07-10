@@ -3037,6 +3037,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     boolean allowExtensibleWarnings = false;
     boolean noCIBuildIssues = false;
     List<String> conversionVersions = new ArrayList<>();
+    List<String> liquid0 = new ArrayList<>();
+    List<String> liquid1 = new ArrayList<>();
+    List<String> liquid2 = new ArrayList<>();
     int count = 0;
     for (ImplementationGuideDefinitionParameterComponent p : sourceIg.getDefinition().getParameter()) {
       // documentation for this list: https://confluence.hl7.org/display/FHIR/Implementation+Guide+Parameters
@@ -3103,7 +3106,13 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         vsCache =  Paths.get(p.getValue()).isAbsolute() ? p.getValue() : Utilities.path(rootDir, p.getValue());
         break;
       case "path-liquid":
-        templateProvider.load(Utilities.path(rootDir, p.getValue()));
+        liquid1.add(p.getValue());
+        break;
+      case "path-liquid-template":
+        liquid0.add(p.getValue());
+        break;
+      case "path-liquid-ig":
+        liquid2.add(p.getValue());
         break;
       case "path-temp":
         tempDir = Utilities.path(rootDir, p.getValue());
@@ -3481,6 +3490,16 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
     if (ini.hasProperty("IG", "jekyll-timeout")) { //todo: consider adding this to ImplementationGuideDefinitionParameterComponent
       jekyllTimeout = ini.getLongProperty("IG", "jekyll-timeout") * 1000;
+    }
+
+    for (String s : liquid0) {
+      templateProvider.load(Utilities.path(rootDir, s));
+    }
+    for (String s : liquid1) {
+      templateProvider.load(Utilities.path(rootDir, s));
+    }
+    for (String s : liquid2) {
+      templateProvider.load(Utilities.path(rootDir, s));
     }
 
     // ok process the paths
