@@ -125,7 +125,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
         return new ObjectConverter(context).convert(res);
     }
 
-    ValueSet vs = ImplicitValueSets.build(url);
+    ValueSet vs = new ImplicitValueSets(context.getExpansionParameters()).generateImplicitValueSet(url);
     if (vs != null)
       return new ObjectConverter(context).convert(vs);
     
@@ -367,7 +367,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
       }
       
     }
-    if (path.endsWith(".system")) {
+    if (Utilities.existsInList(path, "ValueSet.compose.include.system", "ValueSet.compose.exclude.system")) {
       CodeSystem cs = context.findTxResource(CodeSystem.class, url);
       if (cs != null) {
         return true;

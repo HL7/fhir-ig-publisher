@@ -3037,6 +3037,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     boolean allowExtensibleWarnings = false;
     boolean noCIBuildIssues = false;
     List<String> conversionVersions = new ArrayList<>();
+    List<String> liquid0 = new ArrayList<>();
+    List<String> liquid1 = new ArrayList<>();
+    List<String> liquid2 = new ArrayList<>();
     int count = 0;
     for (ImplementationGuideDefinitionParameterComponent p : sourceIg.getDefinition().getParameter()) {
       // documentation for this list: https://confluence.hl7.org/display/FHIR/Implementation+Guide+Parameters
@@ -3103,7 +3106,13 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         vsCache =  Paths.get(p.getValue()).isAbsolute() ? p.getValue() : Utilities.path(rootDir, p.getValue());
         break;
       case "path-liquid":
-        templateProvider.load(Utilities.path(rootDir, p.getValue()));
+        liquid1.add(p.getValue());
+        break;
+      case "path-liquid-template":
+        liquid0.add(p.getValue());
+        break;
+      case "path-liquid-ig":
+        liquid2.add(p.getValue());
         break;
       case "path-temp":
         tempDir = Utilities.path(rootDir, p.getValue());
@@ -3481,6 +3490,16 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
     if (ini.hasProperty("IG", "jekyll-timeout")) { //todo: consider adding this to ImplementationGuideDefinitionParameterComponent
       jekyllTimeout = ini.getLongProperty("IG", "jekyll-timeout") * 1000;
+    }
+
+    for (String s : liquid0) {
+      templateProvider.load(Utilities.path(rootDir, s));
+    }
+    for (String s : liquid1) {
+      templateProvider.load(Utilities.path(rootDir, s));
+    }
+    for (String s : liquid2) {
+      templateProvider.load(Utilities.path(rootDir, s));
     }
 
     // ok process the paths
@@ -10936,7 +10955,11 @@ private String fixPackageReference(String dep) {
           String link = r.getWebPath();
           links.add(r.fhirType()+"/"+r.getIdBase());
           if (link != null) {
-            item.add(link,  title);
+            if (!item.has(link)) {
+              item.add(link, title);
+            } else if (!item.asString(link).equals(title)) {
+              log("inconsistent link info for "+link+": already "+item.asString(link)+", now "+title);
+            }
           }
         }
       }
@@ -12941,7 +12964,8 @@ private String fixPackageReference(String dep) {
 
             case "multi-map" : 
               substitute = buildMultiMap(arguments, f);
-              
+              break;
+
             case "fragment":
               substitute = processFragment(arguments, f);
               break;
