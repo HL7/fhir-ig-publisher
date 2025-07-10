@@ -25,6 +25,7 @@ import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.terminologies.ConceptMapUtilities;
 import org.hl7.fhir.r5.terminologies.ConceptMapUtilities.MappingTriple;
 import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
+import org.hl7.fhir.r5.terminologies.utilities.VCLParser;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -42,11 +43,28 @@ public class MultiMapBuilder extends DataRenderer {
     super(context);
   }
 
+  public class SourceSection {
+    private ValueSet vs;
+    private String title;
+    private List<Coding> codings = new ArrayList<>();
+
+    public void populate() {
+      ValueSetExpansionOutcome vse = context.getContext().expandVS(vs, true, false);
+      if (!vse.isOk()) {
+        throw new FHIRException(vse.getError());
+      }
+      for (ValueSetExpansionContainsComponent ce : vse.getValueset().getExpansion().getContains()) {
+        codings.add(new Coding().setSystem(ce.getSystem()).setVersion(ce.getVersion()).setCode(ce.getCode()));
+      }
+    }
+  }
+
   public class SourceDataProvider {
     private CodeSystem cs;
     private ValueSet vs;
     private String title;
     private List<Coding> codings = new ArrayList<>();
+    private List<SourceSection> sections = new ArrayList<>();
     
     public void heading(XhtmlNode b) {
       if (cs != null) {
@@ -370,57 +388,97 @@ public class MultiMapBuilder extends DataRenderer {
       for (MappingDataProvider map : maps) {
         map.heading(tr.th().b());
       }
-      for (Coding c : source.getCodings()) {
-        tr = tbl.tr();
-        renderDataType(status, tr.td(), ResourceWrapper.forType(context.getContextUtilities(), c));
-
-        for (MappingDataProvider map : maps) {
-          map.cell(tr.td(), c, status);
-        } 
+      if (source.sections.size() > 0) {
+        for (SourceSection section : source.sections) {
+          addHeaderRow(section.title, tbl, maps);
+          for (Coding c : source.getCodings()) {
+            addDataRow(c, tbl, status, maps);
+          }
+        }
+      } else {
+        for (Coding c : source.getCodings()) {
+          addDataRow(c, tbl, status, maps);
+        }
       }
       return new XhtmlComposer(false, true).compose(node.getChildNodes());
-      
+
     } catch (Exception e) {
       return "<p style=\"font-weight: bold; color: maroon\">"+Utilities.escapeXml(e.getMessage())+"</p>";
     }
   }
-  
-  private SourceDataProvider loadSource(JsonObject config) {
+
+  private void addHeaderRow(String title, XhtmlNode tbl, List<MappingDataProvider> maps) throws Exception {
+    XhtmlNode td = tbl.tr().style("background-color: #eeeeee").td();
+    td.colspan(1+maps.size());
+    td.b().tx(title);
+  }
+
+  private void addDataRow(Coding c, XhtmlNode tbl, RenderingStatus status, List<MappingDataProvider> maps) throws Exception {
+    XhtmlNode tr;
+    tr = tbl.tr();
+    renderDataType(status, tr.td(), ResourceWrapper.forType(context.getContextUtilities(), c));
+
+    for (MappingDataProvider map : maps) {
+      map.cell(tr.td(), c, status);
+    }
+  }
+
+  private SourceDataProvider loadSource(JsonObject config) throws VCLParser.VCLParseException, IOException {
     SourceDataProvider source = new SourceDataProvider();
     source.title = config.asString("title");
-    Resource res = context.getContext().fetchResource(Resource.class, config.asString("source"));
-    if (res == null) {
-      throw new FHIRException("Source not found: "+config.asString("source"));
-    }
-    if (res instanceof CodeSystem) {
-      source.cs = (CodeSystem) res;
-    } else if (res instanceof ValueSet) {
-      source.vs = (ValueSet) res;
-    } else if (res instanceof ConceptMap) {
-      ConceptMap cm = (ConceptMap) res;
-      if (cm.hasSourceScope()) {
-        res = context.getContext().fetchResource(ValueSet.class, cm.getSourceScope().primitiveValue());
-        if (res == null) {
-          throw new FHIRException("Source ConceptMap source valueset not found: "+cm.getSourceScope().primitiveValue());
+    if (config.has("vcl")) {
+      source.vs = VCLParser.parseAndId(config.asString("vcl"));
+    } else {
+      Resource res = context.getContext().fetchResource(Resource.class, config.asString("source"));
+      if (res == null) {
+        throw new FHIRException("Source not found: " + config.asString("source"));
+      }
+      if (res instanceof CodeSystem) {
+        source.cs = (CodeSystem) res;
+      } else if (res instanceof ValueSet) {
+        source.vs = (ValueSet) res;
+      } else if (res instanceof ConceptMap) {
+        ConceptMap cm = (ConceptMap) res;
+        if (cm.hasSourceScope()) {
+          res = context.getContext().fetchResource(ValueSet.class, cm.getSourceScope().primitiveValue());
+          if (res == null) {
+            throw new FHIRException("Source ConceptMap source valueset not found: " + cm.getSourceScope().primitiveValue());
+          } else {
+            source.vs = (ValueSet) res;
+          }
+        } else if (cm.getGroup().size() == 0) {
+          throw new FHIRException("Source ConceptMap has no groups: " + cm.getSourceScope().primitiveValue());
+        } else if (cm.getGroup().size() > 1) {
+          throw new FHIRException("Source ConceptMap has multiple groups");
+        } else if (!cm.getGroupFirstRep().hasSource()) {
+          throw new FHIRException("Source ConceptMap group has no source");
         } else {
-          source.vs = (ValueSet) res; 
-        }
-      } else if (cm.getGroup().size() == 0) {
-        throw new FHIRException("Source ConceptMap has no groups: "+cm.getSourceScope().primitiveValue());          
-      } else if (cm.getGroup().size() > 1) {
-        throw new FHIRException("Source ConceptMap has multiple groups");          
-      } else if (!cm.getGroupFirstRep().hasSource()) {
-        throw new FHIRException("Source ConceptMap group has no source");          
-      } else {
-        res = context.getContext().fetchResource(CodeSystem.class, cm.getGroupFirstRep().getSource());
-        if (res == null) {
-          throw new FHIRException("Source ConceptMap group source cannot be found: "); 
-        } else {
-          source.cs = (CodeSystem) res;
+          res = context.getContext().fetchResource(CodeSystem.class, cm.getGroupFirstRep().getSource());
+          if (res == null) {
+            throw new FHIRException("Source ConceptMap group source cannot be found: ");
+          } else {
+            source.cs = (CodeSystem) res;
+          }
         }
       }
     }
     source.populate();
+    if (config.has("sections")) {
+      for (JsonObject o : config.getJsonObjects("sections")) {
+        SourceSection ss = new SourceSection();
+        ss.title = o.asString("title");
+        if (o.has("vcl")) {
+          ss.vs = VCLParser.parseAndId(o.asString("vcl"));
+        } else {
+          ss.vs = getContext().getContext().fetchResource(ValueSet.class, o.asString("url"));
+          if (ss.vs == null) {
+            throw new FHIRException("Value set not found: " + o.asString("url"));
+          }
+        }
+        ss.populate();
+        source.sections.add(ss);
+      }
+    }
     return source;
   }
 
