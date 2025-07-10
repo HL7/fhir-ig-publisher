@@ -512,7 +512,7 @@
                 <configuration>
                     <trimStackTrace>false</trimStackTrace>
                     <testFailureIgnore>false</testFailureIgnore>
-                    <argLine>-Xmx4096m</argLine>
+                    <argLine>-Xmx8192m</argLine>
                     <redirectTestOutputToFile>false</redirectTestOutputToFile>
 
                 </configuration>

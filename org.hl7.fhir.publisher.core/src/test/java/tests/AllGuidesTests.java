@@ -181,7 +181,7 @@ public class AllGuidesTests {
     long totalMemory = runtime.totalMemory();
     long freeMemory = runtime.freeMemory();
     long usedMemory = totalMemory - freeMemory;
-    System.out.println(name+": "+usedMemory);
+    System.out.println(name+": "+usedMemory+" of "+runtime.maxMemory()+" ("+((usedMemory * 100) / runtime.maxMemory())+"%)");
   }
 
   //---- todo: this class is only run by Grahame, so these paths are hard-coded
