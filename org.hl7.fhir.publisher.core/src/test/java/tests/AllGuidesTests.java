@@ -71,10 +71,16 @@ public class AllGuidesTests {
     pub.execute();
     
     System.out.println("===== Analysis ======================================================================");
-    System.out.println("-- output in "+Utilities.path(FhirSettings.getTestIgsPath(), "actual", id+".json")+" --");
+    System.out.println("-- output in "+Utilities.path(FhirSettings.getTestIgsPath(), "actual", id+".txt")+" --");
     
     // to make diff programs easy to run
-    IOUtils.copy(new FileInputStream(Utilities.path(FhirSettings.getTestIgsPath(), id, "output", "qa.json")), new FileOutputStream(Utilities.path(FhirSettings.getTestIgsPath(), "actual", id+".json")));
+    File actual = new File(Utilities.path(FhirSettings.getTestIgsPath(), "actual", id + ".json"));
+    IOUtils.copy(new FileInputStream(Utilities.path(FhirSettings.getTestIgsPath(), id, "output", "qa.json")), new FileOutputStream(actual));
+    JsonObject o = JsonParser.parseObject(actual);
+    o.remove("date");
+    o.remove("dateISO8601");
+    o.remove("maxMemory");
+    JsonParser.compose(o, actual, true);
     IOUtils.copy(new FileInputStream(Utilities.path(FhirSettings.getTestIgsPath(), id, "output", "qa.compare.txt")), new FileOutputStream(Utilities.path(FhirSettings.getTestIgsPath(), "actual", id+".txt")));
     
     JsonObject current = JsonParser.parseObject(new FileInputStream(Utilities.path(FhirSettings.getTestIgsPath(), id, "output", "qa.json")));
