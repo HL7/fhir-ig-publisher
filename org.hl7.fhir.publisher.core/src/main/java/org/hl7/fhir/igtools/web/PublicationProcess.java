@@ -285,7 +285,7 @@ public class PublicationProcess {
 
         publishInner2(source, web, date, dd, registrySource, history, templateSrc, temp, logger, args,
             destination, workingRoot, res, src, id, canonical, version, npm, pubSetup, qa,
-            fSource, fOutput, fRoot, fRegistry, fHistory, jsonXmlClones, igBuildZipDir, prSrc, mode);
+            fSource, fOutput, fRoot, fRegistry, fHistory, jsonXmlClones, igBuildZipDir, prSrc, mode, pubSetup.asBoolean("canonical-mismatch"));
       }
     }
     check(res, !help, "For help, consult https://chat.fhir.org/#narrow/stream/179252-IG-creation");
@@ -329,7 +329,7 @@ public class PublicationProcess {
   public List<ValidationMessage> publishInner2(String source, String web, String date, Date dd, String registrySource, String history, String templateSrc, String temp, 
       PublisherConsoleLogger logger, String[] args, String destination, String workingRoot, List<ValidationMessage> res, WebSourceProvider src,
       String id, String canonical, String version, NpmPackage npm, JsonObject pubSetup, JsonObject qa, 
-      File fSource, File fOutput, File fRoot, File fRegistry, File fHistory, boolean jsonXmlClones, File igBuildZipDir, JsonObject prSrc, PublicationProcessMode mode) throws Exception {
+      File fSource, File fOutput, File fRoot, File fRegistry, File fHistory, boolean jsonXmlClones, File igBuildZipDir, JsonObject prSrc, PublicationProcessMode mode, boolean canonicalMisMatch) throws Exception {
     System.out.println("Relative directory for IG is '"+destination.substring(workingRoot.length())+"'");
     String relDest = FileUtilities.getRelativePath(workingRoot, destination);
     FileUtilities.createDirectory(destination);
@@ -401,8 +401,9 @@ public class PublicationProcess {
     check(res, prSrc.has("desc") || prSrc.has("descmd"), "Source publication request has no description for v"+version);
     String pathVer = prSrc.asString("path");
     String vCode = pathVer.substring(pathVer.lastIndexOf("/")+1);
-    
-    check(res, pathVer.equals(Utilities.pathURL(canonical, vCode)), "Source publication request path is wrong - is '"+pathVer+"', doesn't match expected based on canonical of '"+Utilities.pathURL(canonical, vCode)+"')");
+
+
+    check(res, canonicalMisMatch || pathVer.equals(Utilities.pathURL(canonical, vCode)), "Source publication request path is wrong - is '"+pathVer+"', doesn't match expected based on canonical of '"+Utilities.pathURL(canonical, vCode)+"')");
     // ok, the ids and canonicals are all lined up, and w're ready to publish     
 
     check(res, id.equals(qa.asString("package-id")), "Generated IG has wrong package "+qa.asString("package-id"));
