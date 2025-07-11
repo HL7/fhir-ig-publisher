@@ -3,7 +3,9 @@ package org.hl7.fhir.igtools.renderers;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.hl7.fhir.exceptions.DefinitionException;
 import org.hl7.fhir.exceptions.FHIRException;
@@ -15,7 +17,6 @@ import org.hl7.fhir.r5.model.Coding;
 import org.hl7.fhir.r5.model.ConceptMap;
 import org.hl7.fhir.r5.model.ConceptMap.TargetElementComponent;
 import org.hl7.fhir.r5.model.DataType;
-import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
 import org.hl7.fhir.r5.renderers.DataRenderer;
@@ -57,9 +58,15 @@ public class MultiMapBuilder extends DataRenderer {
         codings.add(new Coding().setSystem(ce.getSystem()).setVersion(ce.getVersion()).setCode(ce.getCode()));
       }
     }
+
+    public List<Coding> getCodings() {
+      return codings;
+    }
   }
 
   public class SourceDataProvider {
+    public String otherTitle;
+    public boolean showSystem;
     private CodeSystem cs;
     private ValueSet vs;
     private String title;
@@ -99,14 +106,28 @@ public class MultiMapBuilder extends DataRenderer {
         }
       }
     }
-    
+
+    public boolean hasCoding(Coding c) {
+      for (Coding cd : codings) {
+        if (c.toToken().equals(cd.toToken())) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    public String getOtherTitle() {
+      return otherTitle == null ? "Others" : otherTitle;
+    }
   }
 
   public abstract class MappingDataProvider {
     protected JsonObject config;
+    protected boolean showSystem;
     public MappingDataProvider(JsonObject config) {
       super();
       this.config = config;
+      showSystem = config.has("show-system") ? config.asBoolean("show-system") : true;
     }
     protected abstract void heading(XhtmlNode b);
     protected abstract void cell(XhtmlNode td, Coding c, RenderingStatus status) throws Exception ;
@@ -166,7 +187,7 @@ public class MultiMapBuilder extends DataRenderer {
         }
         CanonicalType ct = trip.getGrp().getTargetElement();
         Coding code = new Coding().setSystem(ct.baseUrl()).setVersion(ct.version()).setCode(trip.getTgt().getCode());
-        renderDataType(status, x, ResourceWrapper.forType(context.getContextUtilities(), code));
+        addCoding(code, x, showSystem);
         if (ccm.hasComment()) {
           x.title(ccm.getComment());
         }
@@ -316,7 +337,7 @@ public class MultiMapBuilder extends DataRenderer {
 
     private void cellTgt(XhtmlNode x, ConceptDefinitionComponent cd, RenderingStatus status) throws FHIRFormatError, DefinitionException, IOException {
       Coding code = new Coding().setSystem(cs.getUrl()).setVersion(cs.getVersion()).setCode(cd.getCode()).setDisplay(cd.getDisplay());
-      renderDataType(status, x, ResourceWrapper.forType(context.getContextUtilities(), code));
+      addCoding(code, x, showSystem);
     }
 
     private void findMatchingConcepts(List<ConceptDefinitionComponent> list, Coding c, List<ConceptDefinitionComponent> concepts) {
@@ -347,7 +368,7 @@ public class MultiMapBuilder extends DataRenderer {
   public String buildMap(JsonObject config) {
     try {
       // first, resolve the left, source column
-      SourceDataProvider source = loadSource(config);
+      SourceDataProvider source = loadSource(config.forceObject("source"));
 
       // then make a list of all the mapping sources in mapping providers
       List<MappingDataProvider> maps = new ArrayList<>();     
@@ -389,15 +410,31 @@ public class MultiMapBuilder extends DataRenderer {
         map.heading(tr.th().b());
       }
       if (source.sections.size() > 0) {
+        Set<String> done = new HashSet<>();
         for (SourceSection section : source.sections) {
           addHeaderRow(section.title, tbl, maps);
-          for (Coding c : source.getCodings()) {
-            addDataRow(c, tbl, status, maps);
+          for (Coding c : section.getCodings()) {
+            if (source.hasCoding(c)) {
+              done.add(c.toToken());
+              addDataRow(c, tbl, status, source, maps);
+            }
+          }
+        }
+        List<Coding> others = new ArrayList<>();
+        for (Coding c : source.getCodings()) {
+          if (!done.contains(c.toToken())) {
+            others.add(c);
+          }
+        }
+        if (!others.isEmpty()) {
+          addHeaderRow(source.getOtherTitle(), tbl, maps);
+          for (Coding c : others) {
+            addDataRow(c, tbl, status, source, maps);
           }
         }
       } else {
         for (Coding c : source.getCodings()) {
-          addDataRow(c, tbl, status, maps);
+          addDataRow(c, tbl, status, source, maps);
         }
       }
       return new XhtmlComposer(false, true).compose(node.getChildNodes());
@@ -413,13 +450,34 @@ public class MultiMapBuilder extends DataRenderer {
     td.b().tx(title);
   }
 
-  private void addDataRow(Coding c, XhtmlNode tbl, RenderingStatus status, List<MappingDataProvider> maps) throws Exception {
-    XhtmlNode tr;
-    tr = tbl.tr();
-    renderDataType(status, tr.td(), ResourceWrapper.forType(context.getContextUtilities(), c));
+  private void addDataRow(Coding c, XhtmlNode tbl, RenderingStatus status, SourceDataProvider source, List<MappingDataProvider> maps) throws Exception {
+    XhtmlNode tr = tbl.tr();
+    XhtmlNode td = tr.td();
+    addCoding(c, td, source.showSystem);
 
     for (MappingDataProvider map : maps) {
       map.cell(tr.td(), c, status);
+    }
+  }
+
+  private void addCoding(Coding c, XhtmlNode td, boolean showSystem) {
+    String link = getLinkForCode(c.getSystem(), c.getVersion(), c.getCode());
+    XhtmlNode x = td.ahOrNot(link);
+    if (showSystem) {
+      x.tx(displaySystem(c.getSystem()));
+      x.tx(" ");
+    }
+    x.tx(c.getCode());
+    String d;
+    if (c.getDisplay() != null) {
+      d = context.getTranslated(c.getDisplayElement());
+    } else {
+      d = lookupCode(c.getSystem(), c.getVersion(), c.getCode());
+    }
+    if (d != null) {
+      td.tx(" (");
+      td.tx(d);
+      td.tx(")");
     }
   }
 
@@ -428,40 +486,45 @@ public class MultiMapBuilder extends DataRenderer {
     source.title = config.asString("title");
     if (config.has("vcl")) {
       source.vs = VCLParser.parseAndId(config.asString("vcl"));
+    } else if (config.has("CodeSystem")) {
+      source.cs = context.getContext().fetchResource(CodeSystem.class, config.asString("CodeSystem"));
+      if (source.cs == null) {
+        throw new FHIRException("Source not found: " + config.asString("CodeSystem"));
+      }
+    } else if (config.has("ValueSet")) {
+      source.vs = context.getContext().fetchResource(ValueSet.class, config.asString("ValueSet"));
+      if (source.vs == null) {
+        throw new FHIRException("Source not found: " + config.asString("ValueSet"));
+      }
+    } else if (config.has("vcl")) {
+      source.vs = VCLParser.parseAndId(config.asString("vcl"));
     } else {
-      Resource res = context.getContext().fetchResource(Resource.class, config.asString("source"));
-      if (res == null) {
-        throw new FHIRException("Source not found: " + config.asString("source"));
-      }
-      if (res instanceof CodeSystem) {
-        source.cs = (CodeSystem) res;
-      } else if (res instanceof ValueSet) {
-        source.vs = (ValueSet) res;
-      } else if (res instanceof ConceptMap) {
-        ConceptMap cm = (ConceptMap) res;
-        if (cm.hasSourceScope()) {
-          res = context.getContext().fetchResource(ValueSet.class, cm.getSourceScope().primitiveValue());
-          if (res == null) {
-            throw new FHIRException("Source ConceptMap source valueset not found: " + cm.getSourceScope().primitiveValue());
-          } else {
-            source.vs = (ValueSet) res;
-          }
-        } else if (cm.getGroup().size() == 0) {
-          throw new FHIRException("Source ConceptMap has no groups: " + cm.getSourceScope().primitiveValue());
-        } else if (cm.getGroup().size() > 1) {
-          throw new FHIRException("Source ConceptMap has multiple groups");
-        } else if (!cm.getGroupFirstRep().hasSource()) {
-          throw new FHIRException("Source ConceptMap group has no source");
-        } else {
-          res = context.getContext().fetchResource(CodeSystem.class, cm.getGroupFirstRep().getSource());
-          if (res == null) {
-            throw new FHIRException("Source ConceptMap group source cannot be found: ");
-          } else {
-            source.cs = (CodeSystem) res;
-          }
-        }
-      }
+      throw new FHIRException("no Source provided");
+//        ConceptMap cm = (ConceptMap) res;
+//        if (cm.hasSourceScope()) {
+//          res = context.getContext().fetchResource(ValueSet.class, cm.getSourceScope().primitiveValue());
+//          if (res == null) {
+//            throw new FHIRException("Source ConceptMap source valueset not found: " + cm.getSourceScope().primitiveValue());
+//          } else {
+//            source.vs = (ValueSet) res;
+//          }
+//        } else if (cm.getGroup().size() == 0) {
+//          throw new FHIRException("Source ConceptMap has no groups: " + cm.getSourceScope().primitiveValue());
+//        } else if (cm.getGroup().size() > 1) {
+//          throw new FHIRException("Source ConceptMap has multiple groups");
+//        } else if (!cm.getGroupFirstRep().hasSource()) {
+//          throw new FHIRException("Source ConceptMap group has no source");
+//        } else {
+//          res = context.getContext().fetchResource(CodeSystem.class, cm.getGroupFirstRep().getSource());
+//          if (res == null) {
+//            throw new FHIRException("Source ConceptMap group source cannot be found: ");
+//          } else {
+//            source.cs = (CodeSystem) res;
+//          }
+//        }
+//      }
     }
+    source.showSystem = config.asBoolean("show-system");
     source.populate();
     if (config.has("sections")) {
       for (JsonObject o : config.getJsonObjects("sections")) {
@@ -478,6 +541,7 @@ public class MultiMapBuilder extends DataRenderer {
         ss.populate();
         source.sections.add(ss);
       }
+      source.otherTitle = config.asString("others");
     }
     return source;
   }
