@@ -253,6 +253,7 @@ import org.hl7.fhir.r5.model.Measure;
 import org.hl7.fhir.r5.model.MessageDefinition;
 import org.hl7.fhir.r5.model.MessageDefinition.MessageDefinitionAllowedResponseComponent;
 import org.hl7.fhir.r5.model.MessageDefinition.MessageDefinitionFocusComponent;
+import org.hl7.fhir.r5.model.Narrative.NarrativeStatus;
 import org.hl7.fhir.r5.model.OperationDefinition;
 import org.hl7.fhir.r5.model.OperationDefinition.OperationDefinitionParameterComponent;
 import org.hl7.fhir.r5.model.OperationOutcome;
@@ -1230,10 +1231,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         }
         validatorSession.close();
       }
+      
       if (needsRegen) {
         log("Regenerating Narratives");
         generateNarratives(true);
       }
+
       log("Processing Provenance Records");
       processProvenanceDetails();
       if (hasTranslations) {
@@ -2285,6 +2288,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private void generateNarratives(boolean isRegen) throws Exception {
+    langUtils = new LanguageUtils(context);
     Session tts = tt.start("narrative generation");
     logDebugMessage(LogCategory.PROGRESS, isRegen ? "regen narratives" : "gen narratives");
     for (FetchedFile f : fileList) {
@@ -2303,36 +2307,45 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
               } else {
                 List<Locale> langs = translationLocales();
                 logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId());
-                if (r.getResource() != null && isConvertableResource(r.getResource().fhirType())) {
+                if (r.getResource() != null  && r.getResource() instanceof DomainResource && isConvertableResource(r.getResource().fhirType())) {
                   boolean regen = false;
                   boolean first = true;
                   for (Locale lang : langs) {
-                    RenderingContext lrc = rc.copy(false).setDefinitionsTarget(igpkp.getDefinitionsName(r));
-                    lrc.setLocale(lang);
-                    lrc.setRules(GenerationRules.VALID_RESOURCE);
-                    lrc.setDefinitionsTarget(igpkp.getDefinitionsName(r));
-                    lrc.setSecondaryLang(!first);
-                    if (!first) {
-                      lrc.setUniqueLocalPrefix(lang.toLanguageTag());
-                    }
-                    first = false;
-                    if (r.getResource() instanceof DomainResource && (langs.size() > 1 || !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv()))) {
-                      regen = true;
-                      ResourceRenderer rr = RendererFactory.factory(r.getResource(), lrc);
-                      if (rr.renderingUsesValidation()) {
-                        r.setRegenAfterValidation(true);
-                        needsRegen = true;
+                    int narrativeStatus = langUtils.narrativeForLangStatus((DomainResource)r.getResource(), lang.getLanguage());
+                    if (narrativeStatus==LanguageUtils.NARRATIVE_NONE || narrativeStatus==LanguageUtils.NARRATIVE_ROOT) {
+                      RenderingContext lrc = rc.copy(false).setDefinitionsTarget(igpkp.getDefinitionsName(r));
+                      lrc.setLocale(lang);
+                      lrc.setRules(GenerationRules.VALID_RESOURCE);
+                      lrc.setDefinitionsTarget(igpkp.getDefinitionsName(r));
+                      lrc.setSecondaryLang(!first);
+                      if (!first) {
+                        lrc.setUniqueLocalPrefix(lang.toLanguageTag());
                       }
-                      rr.setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, r.getResource()));
-                    } else if (r.getResource() instanceof Bundle) {
-                      regen = true;
-                      new BundleRenderer(lrc).setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, r.getResource()));
-                    } else if (r.getResource() instanceof Parameters) {
-                      regen = true;
-                      Parameters p = (Parameters) r.getResource();
-                      new ParametersRenderer(lrc).setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, p));
-                    } else if (r.getResource() instanceof DomainResource) {
-                      checkExistingNarrative(f, r, ((DomainResource) r.getResource()).getText().getDiv());
+                      first = false;
+                      if (narrativeStatus==LanguageUtils.NARRATIVE_ROOT) {
+                        ResourceWrapper rw = ResourceWrapper.forResource(lrc, r.getResource());
+                        XhtmlNode x = langUtils.divForLang(((DomainResource)r.getResource()), lang.getLanguage(), r.getErrors()).copy();
+                        NarrativeStatus status = ((DomainResource)r.getResource()).getText().getStatus();;
+                        rw.setNarrative(x, status.toCode(), langs.size() > 1, context.getLocale(), lrc.isPretty());
+                        
+                      } else if (r.getResource() instanceof DomainResource && (langs.size() > 1 || !(((DomainResource) r.getResource()).hasText() && ((DomainResource) r.getResource()).getText().hasDiv()))) {
+                        regen = true;
+                        ResourceRenderer rr = RendererFactory.factory(r.getResource(), lrc);
+                        if (rr.renderingUsesValidation()) {
+                          r.setRegenAfterValidation(true);
+                          needsRegen = true;
+                        }
+                        rr.setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, r.getResource()));
+                      } else if (r.getResource() instanceof Bundle) {
+                        regen = true;
+                        new BundleRenderer(lrc).setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, r.getResource()));
+                      } else if (r.getResource() instanceof Parameters) {
+                        regen = true;
+                        Parameters p = (Parameters) r.getResource();
+                        new ParametersRenderer(lrc).setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, p));
+                      } else if (r.getResource() instanceof DomainResource) {
+                        checkExistingNarrative(f, r, ((DomainResource) r.getResource()).getText().getDiv());
+                      }
                     }
                   }
                   if (regen) {
@@ -2419,6 +2432,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       if (logDecision) {
         logMessage("Using " + defaultTranslationLang + " as the default narrative language. (Implementation Guide param i18n-default-lang)");
       }
+      context.setDefaultLang(defaultTranslationLang);
       return Locale.forLanguageTag(defaultTranslationLang);
     }
     if (sourceIg != null) {
@@ -2503,24 +2517,12 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private void checkExistingNarrative(FetchedFile f, FetchedResource r, XhtmlNode xhtml) {
     if (xhtml != null) {
-      boolean hasGenNarrative = scanForGeneratedNarrative(xhtml);
+      boolean hasGenNarrative = LanguageUtils.scanForGeneratedNarrative(xhtml, r.getResource().getLanguage());
       if (hasGenNarrative) {
         f.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, r.fhirType()+".text.div", "Resource has provided narrative, but the narrative indicates that it is generated - remove the narrative or fix it up", IssueSeverity.ERROR));
         r.getErrors().add(new ValidationMessage(Source.Publisher, IssueType.NOTFOUND, r.fhirType()+".text.div", "Resource has provided narrative, but the narrative indicates that it is generated - remove the narrative or fix it up", IssueSeverity.ERROR));
       }
     }
-  }
-
-  private boolean scanForGeneratedNarrative(XhtmlNode x) {
-    if (x.getContent() != null && x.getContent().contains("Generated Narrative")) {
-      return true;
-    }
-    for (XhtmlNode c : x.getChildNodes()) {
-      if (scanForGeneratedNarrative(c)) {
-        return true;
-      }
-    }
-    return false;
   }
 
   private boolean isConvertableResource(String t) {
@@ -5173,7 +5175,7 @@ private String fixPackageReference(String dep) {
     }
     if (isNewML()) {
       for (String l : allLangs()) {
-        ImplementationGuide vig = (ImplementationGuide) langUtils.copyToLanguage(publishedIg, l, true);
+        ImplementationGuide vig = (ImplementationGuide) langUtils.copyToLanguage(publishedIg, l, true, errors);
         lnpms.put(l, new NPMPackageGenerator(publishedIg.getPackageId()+"."+l, Utilities.path(outputDir, publishedIg.getPackageId()+"."+l+".tgz"), 
             igpkp.getCanonical(), targetUrl(), PackageType.IG, vig, execTime.getTime(), relatedIgMap(), !publishing, context.getVersion()));
       }
@@ -13704,11 +13706,11 @@ private String fixPackageReference(String dep) {
     Element element = r.getElement();
     Element eNN = element;
     jp.compose(element, bsj, OutputStyle.NORMAL, igpkp.getCanonical());
-    if (!r.isCustomResource()) {
+    if (!r.isCustomResource()) {      
       npm.addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsj.toByteArray());
       if (isNewML()) {
         for (String l : allLangs()) {
-          Element le = langUtils.copyToLanguage(element, l, true); // todo: should we keep this?
+          Element le = langUtils.copyToLanguage(element, l, true, r.getElement().getChildValue("language"), r.getErrors()); // todo: should we keep this?
           ByteArrayOutputStream bsjl = new ByteArrayOutputStream();
           jp.compose(le, bsjl, OutputStyle.NORMAL, igpkp.getCanonical());
           lnpms.get(l).addFile(isExample(f,r ) ? Category.EXAMPLE : Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsjl.toByteArray());
@@ -13767,8 +13769,8 @@ private String fixPackageReference(String dep) {
     saveNativeResourceOutputFormats(f, r, element, ""); 
     for (String lang : allLangs()) {
       Element e = (Element) element.copy();
-      if (langUtils.switchLanguage(e, lang, true)) {
-        saveNativeResourceOutputFormats(f, r, e, lang);         
+      if (langUtils.switchLanguage(e, lang, true, r.getElement().getChildValue("language"), r.getErrors())) {
+        saveNativeResourceOutputFormats(f, r, e, lang);
       }
     }
     
@@ -13948,11 +13950,10 @@ private String fixPackageReference(String dep) {
   }
 
   private void saveDirectResourceOutputs(FetchedFile f, FetchedResource r, Resource res, Map<String, String> vars, String lang, RenderingContext lrc) throws FileNotFoundException, Exception {
-// Lloyd debug: res!=null && res.getId().equals("SdcQuestionLibrary")
     Element langElement = r.getElement();
     if (lang != null) {
-      langElement = langUtils.copyToLanguage(langElement, lang, true);
-      res = langUtils.copyToLanguage(res, lang, true);      
+      langElement = langUtils.copyToLanguage(langElement, lang, true, r.getResource().getLanguage(), r.getErrors());
+      res = langUtils.copyToLanguage(res, lang, true, r.getErrors());
     }
     boolean example = r.isExample();
     if (wantGen(r, "maturity") && res != null) {
@@ -14064,7 +14065,6 @@ private String fixPackageReference(String dep) {
     XhtmlComposer xc = new XhtmlComposer(XhtmlComposer.XML, module.isNoNarrative());
     if (wantGen(rX, "html")) {
       long start = System.currentTimeMillis();
-      // Lloyd debug: rX.getId().equals("SdcQuestionLibrary")
       XhtmlNode xhtml = (lang == null || lang.equals(le.getNamedChildValue("language"))) ? getXhtml(f, rX, lr,le) : null;
       if (xhtml == null && HistoryGenerator.allEntriesAreHistoryProvenance(le)) {
         RenderingContext ctxt = lrc.copy(false).setParser(getTypeLoader(f, rX));
@@ -14097,9 +14097,9 @@ private String fixPackageReference(String dep) {
       } else {
         if (xhtml == null) {
           RenderingContext xlrc = lrc.copy(false);
+          xlrc.setStructureMode(StructureDefinitionRendererMode.SUMMARY);
           ResourceRenderer rr = RendererFactory.factory(rX.fhirType(), xlrc);
           if (lr != null && lr instanceof DomainResource) {
-// Lloyd debug - getting here and dying
             xhtml = rr.buildNarrative(ResourceWrapper.forResource(xlrc, lr));
           } else {
             ResourceWrapper rw = ResourceWrapper.forResource(xlrc, le); 
