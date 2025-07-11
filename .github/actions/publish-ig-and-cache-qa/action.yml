@@ -88,7 +88,14 @@ runs:
       id: run-publisher
       run: java -Xmx${{ inputs.memory }} -jar ig-publisher.jar -ig ${{ env.TARGET_DIRECTORY }}
       shell: bash
-    - name: Move JAR to project root
+      continue-on-error: true
+    - name: Generate empty QA on failure
+      if: steps.run-publisher.outcome != 'success'
+      run: |
+        mkdir -p ${{ env.TARGET_DIRECTORY }}/output
+        touch ${{ env.TARGET_DIRECTORY }}/output/qa.compare.txt
+      shell: bash
+    - name: Move QA to project root
       run: mv ${{ env.TARGET_DIRECTORY }}/output/qa.compare.txt ${{ github.workspace }}/qa.compare.${{ inputs.ref }}.txt
       shell: bash
     - name: Cache QA compare
