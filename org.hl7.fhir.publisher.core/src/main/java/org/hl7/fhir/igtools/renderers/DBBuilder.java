@@ -1050,7 +1050,7 @@ public class DBBuilder {
         sql = con.prepareStatement("insert into CodeSystemListRefs (CodeSystemListKey, Type, Id, ResourceKey, Title, Web) values (?, ?, ?, ?, ?, ?)");      
         for (Resource r : rl) {
           String key = r.fhirType()+"/"+r.getIdBase();
-          if (!keys.contains(key)) {
+          if (!keys.contains(key) && r.getIdBase() != null) {
             keys.add(key);
             sql.setInt(1, lastCLKey);
             sql.setString(2, r.fhirType());      

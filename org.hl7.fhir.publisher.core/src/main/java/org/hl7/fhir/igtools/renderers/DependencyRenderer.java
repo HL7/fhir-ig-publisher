@@ -150,7 +150,6 @@ public class DependencyRenderer {
     @Getter
     @Setter
     private boolean direct;
-    @Getter
     @Setter
     private String reason;
     private String parent;

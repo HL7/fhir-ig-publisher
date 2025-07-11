@@ -137,6 +137,7 @@ import org.hl7.fhir.igtools.renderers.IPStatementsRenderer;
 import org.hl7.fhir.igtools.renderers.IPViewRenderer;
 import org.hl7.fhir.igtools.renderers.JsonXhtmlRenderer;
 import org.hl7.fhir.igtools.renderers.MappingSummaryRenderer;
+import org.hl7.fhir.igtools.renderers.MultiMapBuilder;
 import org.hl7.fhir.igtools.renderers.OperationDefinitionRenderer;
 import org.hl7.fhir.igtools.renderers.PublicationChecker;
 import org.hl7.fhir.igtools.renderers.QuestionnaireRenderer;
@@ -1178,17 +1179,15 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   }
 
   private String makeTemplateIndexPage() {
-    String page = "<!DOCTYPE HTML>\r\n"+
-        "<html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\">\r\n"+
-        "<head>\r\n"+
-        "  <title>Template Page</title>\r\n"+
-        "</head>\r\n"+
-        "<body>\r\n"+
-        "  <p><b>Template {{npm}}</b></p>\r\n"+
-        "  <p>You can <a href=\"package.tgz\">download the template</a>, though you should not need to; just refer to the template as {{npm}} in your IG configuration.</p>\r\n"+
-        "  <p>A <a href=\"{{canonical}}/history.html\">full version history is published</a></p>\r\n"+
-        "</body>\r\n"+
-        "</html>\r\n";
+    String page = "---\n"
+        + "layout: page\n"
+        + "title: {pid}\n"
+        + "---\n"
+        + "  <p><b>Template {pid}{vid}</b></p>\n"
+        + "  <p>You can <a href=\"package.tgz\">download the template</a>, though you should not need to; just refer to the template as {pid} in your IG configuration.</p>\n"
+        + "  <p>Dependencies: {dep}</p>\n"
+        + "  <p>A <a href=\"{path}history.html\">full version history is published</a></p>\n"
+        + "";
     return page.replace("{{npm}}", templateInfo.asString("name")).replace("{{canonical}}", templateInfo.asString("canonical"));
   }
 
@@ -1220,6 +1219,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       log("Checking Language");
       checkLanguage();
       loadConformance2();
+      checkSignBundles();
 
       if (!validationOff) {
         log("Validating Resources");
@@ -1243,7 +1243,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         log("Generating Translation artifacts");
         processTranslationOutputs();
       }
-      checkSignBundles();
       log("Generating Outputs in "+outputDir);
       Map<String, String> uncsList = scanForUnattributedCodeSystems();
       generate();
@@ -3040,6 +3039,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     boolean allowExtensibleWarnings = false;
     boolean noCIBuildIssues = false;
     List<String> conversionVersions = new ArrayList<>();
+    List<String> liquid0 = new ArrayList<>();
+    List<String> liquid1 = new ArrayList<>();
+    List<String> liquid2 = new ArrayList<>();
     int count = 0;
     for (ImplementationGuideDefinitionParameterComponent p : sourceIg.getDefinition().getParameter()) {
       // documentation for this list: https://confluence.hl7.org/display/FHIR/Implementation+Guide+Parameters
@@ -3106,7 +3108,13 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         vsCache =  Paths.get(p.getValue()).isAbsolute() ? p.getValue() : Utilities.path(rootDir, p.getValue());
         break;
       case "path-liquid":
-        templateProvider.load(Utilities.path(rootDir, p.getValue()));
+        liquid1.add(p.getValue());
+        break;
+      case "path-liquid-template":
+        liquid0.add(p.getValue());
+        break;
+      case "path-liquid-ig":
+        liquid2.add(p.getValue());
         break;
       case "path-temp":
         tempDir = Utilities.path(rootDir, p.getValue());
@@ -3486,6 +3494,16 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       jekyllTimeout = ini.getLongProperty("IG", "jekyll-timeout") * 1000;
     }
 
+    for (String s : liquid0) {
+      templateProvider.load(Utilities.path(rootDir, s));
+    }
+    for (String s : liquid1) {
+      templateProvider.load(Utilities.path(rootDir, s));
+    }
+    for (String s : liquid2) {
+      templateProvider.load(Utilities.path(rootDir, s));
+    }
+
     // ok process the paths
     log("Root directory: "+rootDir);
     if (resourceDirs.isEmpty())
@@ -3590,8 +3608,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       loadConversionVersion(s);
     }
     langUtils = new LanguageUtils(context);
-    signer = new PublisherSigner(context, rootDir);
-
     txLog = FileUtilities.createTempFile("fhir-ig-", ".html").getAbsolutePath();
     System.out.println("Running Terminology Log: "+txLog);
     if (mode != IGBuildMode.WEBSERVER) {
@@ -5210,6 +5226,7 @@ private String fixPackageReference(String dep) {
         }
       }
     }
+    signer = new PublisherSigner(context, rootDir, rc.getTerminologyServiceOptions());
     rcLangs = new RenderingContextLangs(rc);
     for (String l : allLangs()) {
       RenderingContext lrc = rc.copy(false);
@@ -10283,6 +10300,9 @@ private String fixPackageReference(String dep) {
             p.add("sourceTail", tailPI(s));          
           }
         }
+        if (r.fhirType().equals("CodeSystem")) {
+          item.add("content", ((CodeSystem) r.getResource()).getContent().toCode());
+        }
         path = null;
         if (r.getPath() != null) {
           path = r.getPath();
@@ -10937,7 +10957,11 @@ private String fixPackageReference(String dep) {
           String link = r.getWebPath();
           links.add(r.fhirType()+"/"+r.getIdBase());
           if (link != null) {
-            item.add(link,  title);
+            if (!item.has(link)) {
+              item.add(link, title);
+            } else if (!item.asString(link).equals(title)) {
+              log("inconsistent link info for "+link+": already "+item.asString(link)+", now "+title);
+            }
           }
         }
       }
@@ -12916,7 +12940,7 @@ private String fixPackageReference(String dep) {
     String src = new String(content);
     try {
       boolean changed = false;
-      String[] keywords = {"sql", "fragment", "json", "class-diagram", "uml"};
+      String[] keywords = {"sql", "fragment", "json", "class-diagram", "uml", "multi-map"};
       for (String keyword: Arrays.asList(keywords)) {
 
         while (db != null && src.contains("{% " + keyword)) {
@@ -12938,6 +12962,10 @@ private String fixPackageReference(String dep) {
               } else {
                 substitute = processSQLCommand(db, arguments, f);
               }
+              break;
+
+            case "multi-map" : 
+              substitute = buildMultiMap(arguments, f);
               break;
 
             case "fragment":
@@ -13007,6 +13035,16 @@ private String fixPackageReference(String dep) {
     try {
       JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(arguments);
       return new ClassDiagramRenderer(Utilities.path(rootDir, "input", "diagrams"), Utilities.path(rootDir, "temp", "diagrams"), json.asString("id"), json.asString("prefix"), rc, null).buildClassDiagram(json);
+    } catch (Exception e) {
+      e.printStackTrace();
+      return "<p style=\"color: maroon\"><b>"+Utilities.escapeXml(e.getMessage())+"</b></p>";      
+    }
+  }
+  
+  private String buildMultiMap(String arguments, FetchedFile f) {
+    try {
+      JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(arguments);
+      return new MultiMapBuilder(rc).buildMap(json);
     } catch (Exception e) {
       e.printStackTrace();
       return "<p style=\"color: maroon\"><b>"+Utilities.escapeXml(e.getMessage())+"</b></p>";      
