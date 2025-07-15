@@ -812,11 +812,11 @@ public class CrossViewRenderer extends Renderer {
     var td = tr.td();
     td.b().tx("Identity");
     td.an("ext-"+type);
-    tr.td().b().ah(Utilities.pathURL(worker.getSpecUrl(), "defining-extensions.html#cardinality")).tx("Conf.");
+    tr.td().b().tx("Card.");
     tr.td().b().tx("Type");
-    tr.td().b().ah(Utilities.pathURL(worker.getSpecUrl(), "defining-extensions.html")+"#context").tx("Context");
+    tr.td().b().tx("Context");
     tr.td().b().tx("WG");
-    tr.td().b().ah(Utilities.pathURL(worker.getSpecUrl(), "versions.html")+"#std-process").tx("Status");
+    tr.td().b().tx("Status");
     if (context.getChangeVersion() != null) {
       tr.td().b().tx("Δ v"+context.getChangeVersion());
     }
@@ -839,7 +839,7 @@ public class CrossViewRenderer extends Renderer {
       tr.td().colspan(5).tx("None found");      
     } else {
       for (String s : Utilities.sorted(map.keySet())) {
-        genExtensionRow(tbl, map.get(s));
+        genExtensionRow(tbl, map.get(s), context.getChangeVersion());
       }
     }
 
@@ -866,7 +866,7 @@ public class CrossViewRenderer extends Renderer {
           tbl.tr().td().colspan(5).tx("None found");         
         } else {
           for (String s : Utilities.sorted(map.keySet())) {
-            genExtensionRow(tbl, map.get(s));
+            genExtensionRow(tbl, map.get(s), context.getChangeVersion());
           }
         }
 
@@ -881,7 +881,7 @@ public class CrossViewRenderer extends Renderer {
           tbl.tr().td().colspan(5).tx("None found");        
         } else {
           for (String s : Utilities.sorted(map.keySet())) {
-            genExtensionRow(tbl, map.get(s));
+            genExtensionRow(tbl, map.get(s), context.getChangeVersion());
           }
         }
         tbl.tr().td().colspan(5).b().tx("Extensions that refer to many resources including the "+type+" resource");
@@ -895,7 +895,7 @@ public class CrossViewRenderer extends Renderer {
           tbl.tr().td().colspan(5).tx("None found");       
         } else {
           for (String s : Utilities.sorted(map.keySet())) {
-            genExtensionRow(tbl, map.get(s));
+            genExtensionRow(tbl, map.get(s), context.getChangeVersion());
           }
         }
       } else {
@@ -956,7 +956,7 @@ public class CrossViewRenderer extends Renderer {
     return false;
   }
 
-  private void genExtensionRow(XhtmlNode tbl, StructureDefinition ed) throws Exception {
+  private void genExtensionRow(XhtmlNode tbl, StructureDefinition ed, String versionToAnnotate) throws Exception {
     StandardsStatus status = ToolingExtensions.getStandardsStatus(ed);
     XhtmlNode tr;
     if (status  == StandardsStatus.DEPRECATED) {
@@ -1046,7 +1046,7 @@ public class CrossViewRenderer extends Renderer {
     }
     td.tx(Utilities.noString(fmm) ? "" : ": FMM"+fmm+"");
     if (context.getChangeVersion() != null) {
-      renderStatusSummary(context, ed, tr.td(), "status");
+      renderStatusSummary(context, ed, tr.td(), versionToAnnotate );
     }
   }
 
