@@ -104,8 +104,8 @@ public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProv
             // these weird packages don't always have paths
             return null;
           }
-          if (cr.hasExtension(ToolingExtensions.EXT_WEB_SOURCE)) {
-            return ToolingExtensions.readStringExtension(cr, ToolingExtensions.EXT_WEB_SOURCE);
+          if (cr.hasExtension(ToolingExtensions.EXT_WEB_SOURCE_OLD, ToolingExtensions.EXT_WEB_SOURCE_NEW)) {
+            return ToolingExtensions.readStringExtension(cr, ToolingExtensions.EXT_WEB_SOURCE_OLD, ToolingExtensions.EXT_WEB_SOURCE_NEW);
           }
           System.out.println("Internal error in IG "+npm.name()+"#"+npm.version()+" map: No identity found for "+u);
           return u;
@@ -121,8 +121,8 @@ public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProv
         }
         if (r instanceof DomainResource) {
           DomainResource dr = (DomainResource) r;
-          if (dr.hasExtension(ToolingExtensions.EXT_WEB_SOURCE)) {
-            path = ToolingExtensions.readStringExtension(dr, ToolingExtensions.EXT_WEB_SOURCE);
+          if (dr.hasExtension(ToolingExtensions.EXT_WEB_SOURCE_OLD, ToolingExtensions.EXT_WEB_SOURCE_NEW)) {
+            path = ToolingExtensions.readStringExtension(dr, ToolingExtensions.EXT_WEB_SOURCE_OLD, ToolingExtensions.EXT_WEB_SOURCE_NEW);
           }
         }
         r.setWebPath(path);
