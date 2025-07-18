@@ -13,30 +13,27 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.xmlbeans.impl.xb.ltgfmt.Code;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
 import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CodeSystem;
+import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionDesignationComponent;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptPropertyComponent;
 import org.hl7.fhir.r5.model.CodeSystem.PropertyComponent;
-import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.ConceptMap;
 import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
 import org.hl7.fhir.r5.model.ConceptMap.SourceElementComponent;
 import org.hl7.fhir.r5.model.ConceptMap.TargetElementComponent;
-import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
 import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
+import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
@@ -341,8 +338,8 @@ public class DBBuilder {
         r.getElement().setUserData(UserDataNames.Storage_key, lastResKey);
       } else {
         CanonicalResource cr = (CanonicalResource) r.getResource();
-        PreparedStatement psql = con.prepareStatement("Insert into Resources (key, type, custom, id, web, url, version, status, date, name, title, experimental, realm, description, purpose, copyright, copyrightLabel, json) "+
-            "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        PreparedStatement psql = con.prepareStatement("Insert into Resources (key, type, custom, id, web, url, version, status, date, name, title, experimental, realm, description, purpose, copyright, copyrightLabel, standardStatus, derivation, kind, sdType, base, content, supplements, json) "+
+            "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         psql.setInt(1, ++lastResKey);
         bindString(psql, 2,  r.fhirType());
         psql.setInt(3, r.getElement().getProperty().getStructure().hasUserData(UserDataNames.loader_custom_resource) ? 1 : 0);
@@ -360,7 +357,14 @@ public class DBBuilder {
         bindString(psql, 15, cr.getPurpose());
         bindString(psql, 16, cr.getCopyright());
         bindString(psql, 17, cr.getCopyrightLabel());
-        psql.setBytes(18, json);
+        bindString(psql, 18, ToolingExtensions.getStandardsStatus(cr) == null ? null : ToolingExtensions.getStandardsStatus(cr).toCode());
+        bindString(psql, 19, derivation(cr));
+        bindString(psql, 20, kind(cr));
+        bindString(psql, 21, sdType(cr));
+        bindString(psql, 22, base(cr));
+        bindString(psql, 23, content(cr));
+        bindString(psql, 24, supplements(cr));
+        psql.setBytes(25, json);
         psql.executeUpdate();    
         if (cr instanceof CodeSystem) {
           codesystems.add((CodeSystem) cr);
@@ -378,6 +382,54 @@ public class DBBuilder {
       }
     }
     time(start);
+  }
+
+  private String derivation(CanonicalResource cr) {
+    if (cr instanceof StructureDefinition) {
+      return ((StructureDefinition) cr).getDerivation().toCode();
+    } else {
+      return null;
+    }
+  }
+
+  private String kind(CanonicalResource cr) {
+    if (cr instanceof StructureDefinition) {
+      return ((StructureDefinition) cr).getKind().toCode();
+    } else {
+      return null;
+    }
+  }
+
+  private String sdType(CanonicalResource cr) {
+    if (cr instanceof StructureDefinition) {
+      return ((StructureDefinition) cr).getType();
+    } else {
+      return null;
+    }
+  }
+
+  private String base(CanonicalResource cr) {
+    if (cr instanceof StructureDefinition) {
+      return ((StructureDefinition) cr).getBaseDefinition();
+    } else {
+      return null;
+    }
+  }
+
+  private String content(CanonicalResource cr) {
+    if (cr instanceof CodeSystem) {
+      return ((CodeSystem) cr).getContent().toCode();
+    } else {
+      return null;
+    }
+  }
+
+  private String supplements(CanonicalResource cr) {
+    if (cr instanceof CodeSystem) {
+      return ((CodeSystem) cr).getSupplements();
+    } else {
+      return null;
+    }
   }
 
   private String getSingleChildValue(FetchedResource r, String name, String defaultValue) {
@@ -705,6 +757,13 @@ public class DBBuilder {
         "Purpose         nvarchar NULL,\r\n"+
         "Copyright       nvarchar NULL,\r\n"+
         "CopyrightLabel  nvarchar NULL,\r\n"+
+        "derivation      nvarchar NULL,\r\n"+
+        "standardStatus  nvarchar NULL,\r\n"+
+        "kind            nvarchar NULL,\r\n"+
+        "sdType          nvarchar NULL,\r\n"+
+        "base            nvarchar NULL,\r\n"+
+        "content         nvarchar NULL,\r\n"+
+        "supplements     nvarchar NULL,\r\n"+
         "Json            nvarchar NOT NULL,\r\n"+
         "PRIMARY KEY (Key))\r\n");
   }
@@ -836,7 +895,9 @@ public class DBBuilder {
       ResultSet rs = stmt.executeQuery(ctrl.getQuery());
       ResultSetMetaData rsmd = rs.getMetaData();
       ctrl.checkResultSet(rsmd);
-      
+
+      String plainText = null;
+      int fc = 0;
       XhtmlNode tbl = new XhtmlNode(NodeType.Element, "table").attribute("class", ctrl.getClss());
       XhtmlNode tr = tbl.tr();
       if (ctrl.isTitles()) {
@@ -849,7 +910,9 @@ public class DBBuilder {
         tr = tbl.tr();
         for (SQLControlColumn col : ctrl.getColumns()) {    
           XhtmlNode td = tr.td();
-          String s = rs.getString(col.getSourceIndex()); 
+          String s = rs.getString(col.getSourceIndex());
+          fc++;
+          plainText = s;
           if (!Utilities.noString(s)) {
             switch (col.getType()) {
             case Auto: 
@@ -946,7 +1009,11 @@ public class DBBuilder {
         }
       }
       time(start);
-      return new XhtmlComposer(true, false).compose(tbl);
+      if (fc == 1 && plainText != null) {
+        return plainText;
+      } else {
+        return new XhtmlComposer(true, false).compose(tbl);
+      }
     } catch (Exception e) {
       errors.add(e.getMessage());
       if (debug) {
