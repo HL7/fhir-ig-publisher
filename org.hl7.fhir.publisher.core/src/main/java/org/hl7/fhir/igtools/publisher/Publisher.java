@@ -3426,6 +3426,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         break;
       case "profile-test-cases": 
         profileTestCases.add(p.getValue());
+        break;    
       case "pin-canonicals":
         switch (p.getValue()) {
         case "pin-none":
