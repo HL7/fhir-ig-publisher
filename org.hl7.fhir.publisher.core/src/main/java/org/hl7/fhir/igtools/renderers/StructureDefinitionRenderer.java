@@ -77,11 +77,7 @@ import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.utils.ElementDefinitionUtilities;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.UserDataNames;
-import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
-import org.hl7.fhir.utilities.MarkDownProcessor;
-import org.hl7.fhir.utilities.StandardsStatus;
-import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.i18n.RenderingI18nContext;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
@@ -98,6 +94,7 @@ import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
 public class StructureDefinitionRenderer extends CanonicalRenderer {
+
   public class BindingResolutionDetails {
     private String vss;
     private String vsn;
@@ -143,12 +140,14 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   private List<ElementDefinition> keyElements = null;
   private static JsonObject usages;
   private String specPath;
+  private final String packageId;
 
   private org.hl7.fhir.r5.renderers.StructureDefinitionRenderer sdr;
   private ResourceWrapper resE;
 
-  public StructureDefinitionRenderer(IWorkerContext context, String corePath, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants,Map<String, Map<String, ElementDefinition>> mapCache, String specPath, String versionToAnnotate, List<RelatedIG> relatedIgs) {
+  public StructureDefinitionRenderer(IWorkerContext context, String packageId, String corePath, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants,Map<String, Map<String, ElementDefinition>> mapCache, String specPath, String versionToAnnotate, List<RelatedIG> relatedIgs) {
     super(context, corePath, sd, destDir, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate, relatedIgs);
+    this.packageId = packageId;
     this.sd = sd;
     this.destDir = destDir;
     utils = new ProfileUtilities(context, null, igp);
@@ -2153,9 +2152,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return s;
   }
 
-
   public String typeName(String lang, RenderingContext rc) {
-    if (ToolingExtensions.readBoolExtension(sd, ToolingExtensions.EXT_OBLIGATION_PROFILE_FLAG)) {
+    if (ToolingExtensions.readBoolExtension(sd, ToolingExtensions.EXT_OBLIGATION_PROFILE_FLAG_NEW, ToolingExtensions.EXT_OBLIGATION_PROFILE_FLAG_OLD)) {
       return rc.formatPhrase(RenderingI18nContext.SDT_OBLIGATION_PROFILE); // "Obligation Profile";
     } else if ("Extension".equals(sd.getType())) {
       return rc.formatPhrase(RenderingI18nContext.SDT_EXTENSION); // "Extension"
@@ -2184,7 +2182,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       if (refersToThisSD(sdt.getBaseDefinition())) {
         base.put(sdt.getWebPath(), sdt.present());
       }
-      scanExtensions(invoked, sdt, ToolingExtensions.EXT_OBLIGATION_INHERITS);
+      scanExtensions(invoked, sdt, ToolingExtensions.EXT_OBLIGATION_INHERITS_NEW);
+      scanExtensions(invoked, sdt, ToolingExtensions.EXT_OBLIGATION_INHERITS_OLD);
       scanExtensions(imposed, sdt, ToolingExtensions.EXT_SD_IMPOSE_PROFILE);
       scanExtensions(compliedWith, sdt, ToolingExtensions.EXT_SD_COMPLIES_WITH_PROFILE);
 
@@ -2275,8 +2274,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
     StringBuilder b = new StringBuilder();
     String os = lrc.formatPhrase(RenderingI18nContext.SDT_ORIGINAL_SOURCE);
-    if (sd.hasExtension(ToolingExtensions.EXT_WEB_SOURCE)) {
-      String url = ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_WEB_SOURCE);
+    if (sd.hasExtension(ToolingExtensions.EXT_WEB_SOURCE_OLD, ToolingExtensions.EXT_WEB_SOURCE_NEW)) {
+      String url = ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_WEB_SOURCE_OLD, ToolingExtensions.EXT_WEB_SOURCE_NEW);
       if (Utilities.isAbsoluteUrlLinkable(url)) {
         b.append("<p><b>"+os+":</b> <a href=\""+Utilities.escapeXml(url)+"\">"+Utilities.escapeXml(Utilities.extractDomain(url))+"</a></p>\r\n");      
       } else {
@@ -2317,7 +2316,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       b.append(" <li>"+Utilities.escapeXml(lrc.formatPhrase(RenderingI18nContext.SDR_NOT_USED, type))+"</li>\r\n");
     }
     b.append("</ul>\r\n");
-    return b.toString()+changeSummary();
+    return b.toString()+xigReference()+changeSummary();
+  }
+
+  private String xigReference() {
+    return "<p>You can also check for <a href=\"https://packages2.fhir.org/xig/"+packageId+"|current/StructureDefinition/"+sd.getId()+"\">usages in the FHIR IG Statistics</a></p>";
   }
 
   public void scanCapStmt(Map<String, String> capStmts, CapabilityStatement cst) {

@@ -10,8 +10,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.antlr.v4.runtime.tree.xpath.XPathLexer;
+import org.apache.commons.lang3.StringUtils;
+import org.hl7.fhir.convertors.misc.LoincToDEConvertor;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
+import org.hl7.fhir.igtools.publisher.ProfileTestCaseExecutor;
 import org.hl7.fhir.igtools.renderers.utils.ObligationsAnalysis;
 import org.hl7.fhir.igtools.renderers.utils.ObligationsAnalysis.ActorInfo;
 import org.hl7.fhir.igtools.renderers.utils.ObligationsAnalysis.ProfileActorObligationsAnalysis;
@@ -55,15 +59,14 @@ import org.hl7.fhir.r5.terminologies.utilities.ValidationResult;
 import org.hl7.fhir.r5.utils.ResourceSorters.CanonicalResourceSortByUrl;
 import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.UserDataNames;
-import org.hl7.fhir.utilities.HL7WorkGroups;
+import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.HL7WorkGroups.HL7WorkGroup;
-import org.hl7.fhir.utilities.OIDUtilities;
-import org.hl7.fhir.utilities.StandardsStatus;
-import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.validation.ValidationOptions;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
+
+import javax.lang.model.type.ArrayType;
 
 public class CrossViewRenderer extends Renderer {
 
@@ -809,16 +812,25 @@ public class CrossViewRenderer extends Renderer {
     }
     var tbl = x.table("list", false);
     var tr = tbl.tr();
-    var td = tr.td();
-    td.b().tx("Identity");
-    td.an("ext-"+type);
-    tr.td().b().tx("Card.");
-    tr.td().b().tx("Type");
-    tr.td().b().tx("Context");
-    tr.td().b().tx("WG");
-    tr.td().b().tx("Status");
+    tr.td().tx("Identity");
+    tr.td().tx("Card.");
+    tr.td().tx("Type");
+    tr.td().tx("Context");
+    tr.td().tx("WG");
+    tr.td().tx("Status");
     if (context.getChangeVersion() != null) {
-      tr.td().b().tx("Δ v"+context.getChangeVersion());
+      tr.td().b().tx("Δ v"+context.getChangeVersion()+" ");
+    }
+
+    tr = tbl.tr();
+    tr.td().input(null, "text", null, 15).attribute("class", "filter-input").attribute("id", "filter-identity");
+    tr.td().input(null, "text", null, 3).attribute("class", "filter-input").attribute("id", "filter-card");
+    tr.td().input(null, "text", null, 8).attribute("class", "filter-input").attribute("id", "filter-type");
+    tr.td().input(null, "text", null, 20).attribute("class", "filter-input").attribute("id", "filter-context");
+    tr.td().input(null, "text", null, 3).attribute("class", "filter-input").attribute("id", "filter-wg");
+    tr.td().input(null, "text", null, 6).attribute("class", "filter-input").attribute("id", "filter-status");
+    if (context.getChangeVersion() != null) {
+      tr.td().input(null, "checkbox", null, 0).attribute("id", "hideUnchanged");
     }
 
     if (type != null) {
@@ -902,15 +914,257 @@ public class CrossViewRenderer extends Renderer {
         StructureDefinition sd = worker.fetchTypeDefinition(type);
         if (sd != null && sd.hasBaseDefinition()) {
           String bt = Utilities.tail(sd.getBaseDefinition());
-          td = tr.td().colspan(5);
+          XhtmlNode td = tr.td().colspan(5);
           td.br();
           td.tx("(See also Extensions defined on ");
           td.ah("extensions-types.html#ext-"+bt).tx(bt);      
         }
       }
     }
+    x.para().tx(""+(tbl.getChildNodes().size() - 1)+" Extensions");
+    x.styles(".list {\n" +
+            "            border-collapse: collapse;\n" +
+            "            width: 100%;\n" +
+            "            margin-top: 20px;\n" +
+            "        }\n" +
+            "        \n" +
+            "        .list td, .list th {\n" +
+            "            border: 1px solid #ddd;\n" +
+            "            padding: 8px;\n" +
+            "            text-align: left;\n" +
+            "            vertical-align: top;\n" +
+            "        }\n" +
+            "        \n" +
+            "        .list tr:nth-child(odd) {\n" +
+            "            background-color: #f9f9f9;\n" +
+            "        }\n" +
+            "        \n" +
+            "        .list tr:nth-child(even) {\n" +
+            "            background-color: #ffffff;\n" +
+            "        }\n" +
+            "        \n" +
+            "        .filter-row {\n" +
+            "            background-color: #f0f0f0 !important;\n" +
+            "        }\n" +
+            "        \n" +
+            "        .filter-input {\n" +
+            "            width: 95%;\n" +
+            "            padding: 4px;\n" +
+            "            border: 1px solid #ccc;\n" +
+            "            border-radius: 3px;\n" +
+            "            font-size: 12px;\n" +
+            "        }\n" +
+            "        \n" +
+            "        .trial-use-flag {\n" +
+            "            background-color: #e6f3ff;\n" +
+            "            border: 1px solid #007acc;\n" +
+            "            padding: 2px 4px;\n" +
+            "            border-radius: 3px;\n" +
+            "            text-decoration: none;\n" +
+            "        }\n" +
+            "        \n" +
+            "        .hidden-row {\n" +
+            "            display: none !important;\n" +
+            "        }\n" +
+            "        \n" +
+            "        a {\n" +
+            "            color: #007acc;\n" +
+            "            text-decoration: none;\n" +
+            "        }\n" +
+            "        \n" +
+            "        a:hover {\n" +
+            "            text-decoration: underline;\n" +
+            "        }");
+    x.js("document.getElementById('hideUnchanged').addEventListener('change', function() {\n" +
+            "    const table = document.querySelector('.list');\n" +
+            "    const rows = table.querySelectorAll('tr[data-change=\"false\"]');\n" +
+            "    \n" +
+            "    if (this.checked) {\n" +
+            "        // Hide rows with data-change=\"false\"\n" +
+            "        rows.forEach(row => {\n" +
+            "            row.style.display = 'none';\n" +
+            "        });\n" +
+            "    } else {\n" +
+            "        // Show all rows\n" +
+            "        rows.forEach(row => {\n" +
+            "            row.style.display = '';\n" +
+            "        });\n" +
+            "    }\n" +
+            "});");
+    x.js("// localStorage version - replace the script section in the HTML with this\n" +
+            "\n" +
+            "// Helper functions for localStorage\n" +
+            "function saveFilterState(key, value) {\n" +
+            "    try {\n" +
+            "        localStorage.setItem(`tableFilter_${key}`, JSON.stringify(value));\n" +
+            "    } catch (e) {\n" +
+            "        console.warn('Could not save filter state to localStorage:', e);\n" +
+            "    }\n" +
+            "}\n" +
+            "\n" +
+            "function loadFilterState(key, defaultValue) {\n" +
+            "    try {\n" +
+            "        const stored = localStorage.getItem(`tableFilter_${key}`);\n" +
+            "        return stored ? JSON.parse(stored) : defaultValue;\n" +
+            "    } catch (e) {\n" +
+            "        console.warn('Could not load filter state from localStorage:', e);\n" +
+            "        return defaultValue;\n" +
+            "    }\n" +
+            "}\n" +
+            "\n" +
+            "// Initialize filters and event listeners\n" +
+            "document.addEventListener('DOMContentLoaded', function() {\n" +
+            "    // Set up filter inputs\n" +
+            "    const filterInputs = [\n" +
+            "        { id: 'filter-identity', key: 'identity' },\n" +
+            "        { id: 'filter-card', key: 'card' },\n" +
+            "        { id: 'filter-type', key: 'type' },\n" +
+            "        { id: 'filter-context', key: 'context' },\n" +
+            "        { id: 'filter-wg', key: 'wg' },\n" +
+            "        { id: 'filter-status', key: 'status' }\n" +
+            "    ];\n" +
+            "\n" +
+            "    // Add event listeners for text filters\n" +
+            "    filterInputs.forEach(filter => {\n" +
+            "        const input = document.getElementById(filter.id);\n" +
+            "        if (input) {\n" +
+            "            // Load and restore saved value from localStorage\n" +
+            "            const savedValue = loadFilterState(filter.key, '');\n" +
+            "            input.value = savedValue;\n" +
+            "            \n" +
+            "            // Add event listener\n" +
+            "            input.addEventListener('input', function() {\n" +
+            "                saveFilterState(filter.key, this.value);\n" +
+            "                applyFilters();\n" +
+            "            });\n" +
+            "        }\n" +
+            "    });\n" +
+            "\n" +
+            "    // Add event listener for checkbox\n" +
+            "    const hideUnchangedCheckbox = document.getElementById('hideUnchanged');\n" +
+            "    if (hideUnchangedCheckbox) {\n" +
+            "        // Load and restore saved checkbox state\n" +
+            "        const savedChecked = loadFilterState('hideUnchanged', false);\n" +
+            "        hideUnchangedCheckbox.checked = savedChecked;\n" +
+            "        \n" +
+            "        hideUnchangedCheckbox.addEventListener('change', function() {\n" +
+            "            saveFilterState('hideUnchanged', this.checked);\n" +
+            "            applyFilters();\n" +
+            "        });\n" +
+            "    }\n" +
+            "\n" +
+            "    // Apply initial filters\n" +
+            "    applyFilters();\n" +
+            "});\n" +
+            "\n" +
+            "function applyFilters() {\n" +
+            "    const dataRows = document.querySelectorAll('.data-row');\n" +
+            "    \n" +
+            "    // Load current filter values from localStorage\n" +
+            "    const filterValues = {\n" +
+            "        identity: loadFilterState('identity', ''),\n" +
+            "        card: loadFilterState('card', ''),\n" +
+            "        type: loadFilterState('type', ''),\n" +
+            "        context: loadFilterState('context', ''),\n" +
+            "        wg: loadFilterState('wg', ''),\n" +
+            "        status: loadFilterState('status', ''),\n" +
+            "        hideUnchanged: loadFilterState('hideUnchanged', false)\n" +
+            "    };\n" +
+            "    \n" +
+            "    dataRows.forEach(row => {\n" +
+            "        let shouldShow = true;\n" +
+            "        const cells = row.querySelectorAll('td');\n" +
+            "        \n" +
+            "        // Check text filters for each column\n" +
+            "        const filters = [\n" +
+            "            { value: filterValues.identity, cellIndex: 0 },\n" +
+            "            { value: filterValues.card, cellIndex: 1 },\n" +
+            "            { value: filterValues.type, cellIndex: 2 },\n" +
+            "            { value: filterValues.context, cellIndex: 3 },\n" +
+            "            { value: filterValues.wg, cellIndex: 4 },\n" +
+            "            { value: filterValues.status, cellIndex: 5 }\n" +
+            "        ];\n" +
+            "\n" +
+            "        filters.forEach(filter => {\n" +
+            "            if (filter.value && cells[filter.cellIndex]) {\n" +
+            "                const cellText = cells[filter.cellIndex].textContent.toLowerCase();\n" +
+            "                const filterText = filter.value.toLowerCase();\n" +
+            "                if (!cellText.includes(filterText)) {\n" +
+            "                    shouldShow = false;\n" +
+            "                }\n" +
+            "            }\n" +
+            "        });\n" +
+            "\n" +
+            "        // Check \"Hide Unchanged\" filter\n" +
+            "        if (filterValues.hideUnchanged && row.getAttribute('data-change') !== 'true') {\n" +
+            "            shouldShow = false;\n" +
+            "        }\n" +
+            "\n" +
+            "        // Apply visibility\n" +
+            "        if (shouldShow) {\n" +
+            "            row.classList.remove('hidden-row');\n" +
+            "        } else {\n" +
+            "            row.classList.add('hidden-row');\n" +
+            "        }\n" +
+            "    });\n" +
+            "}\n" +
+            "\n" +
+            "// Function to clear all filters\n" +
+            "function clearAllFilters() {\n" +
+            "    const filterInputs = document.querySelectorAll('.filter-input');\n" +
+            "    filterInputs.forEach(input => {\n" +
+            "        input.value = '';\n" +
+            "    });\n" +
+            "    \n" +
+            "    const hideUnchangedCheckbox = document.getElementById('hideUnchanged');\n" +
+            "    if (hideUnchangedCheckbox) {\n" +
+            "        hideUnchangedCheckbox.checked = false;\n" +
+            "    }\n" +
+            "\n" +
+            "    // Clear localStorage for all filter keys\n" +
+            "    const filterKeys = ['identity', 'card', 'type', 'context', 'wg', 'status', 'hideUnchanged'];\n" +
+            "    filterKeys.forEach(key => {\n" +
+            "        try {\n" +
+            "            localStorage.removeItem(`tableFilter_${key}`);\n" +
+            "        } catch (e) {\n" +
+            "            console.warn('Could not clear filter from localStorage:', e);\n" +
+            "        }\n" +
+            "    });\n" +
+            "\n" +
+            "    applyFilters();\n" +
+            "}\n" +
+            "\n" +
+            "// Optional: Function to export filter settings\n" +
+            "function exportFilterSettings() {\n" +
+            "    const filterKeys = ['identity', 'card', 'type', 'context', 'wg', 'status', 'hideUnchanged'];\n" +
+            "    const settings = {};\n" +
+            "    \n" +
+            "    filterKeys.forEach(key => {\n" +
+            "        settings[key] = loadFilterState(key, key === 'hideUnchanged' ? false : '');\n" +
+            "    });\n" +
+            "    \n" +
+            "    return JSON.stringify(settings, null, 2);\n" +
+            "}\n" +
+            "\n" +
+            "// Optional: Function to import filter settings\n" +
+            "function importFilterSettings(settingsJson) {\n" +
+            "    try {\n" +
+            "        const settings = JSON.parse(settingsJson);\n" +
+            "        \n" +
+            "        Object.keys(settings).forEach(key => {\n" +
+            "            saveFilterState(key, settings[key]);\n" +
+            "        });\n" +
+            "        \n" +
+            "        // Refresh the page or reload filter inputs\n" +
+            "        location.reload();\n" +
+            "    } catch (e) {\n" +
+            "        console.error('Could not import filter settings:', e);\n" +
+            "        alert('Invalid settings format');\n" +
+            "    }\n" +
+            "}");
 
-    return new XhtmlComposer(false, false).compose(x.getChildNodes());
+    x.button(null, null).attribute("onclick", "clearAllFilters()").style("padding: 8px 16px; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;").tx("Clear All Filters");
+    return new XhtmlComposer(false, true).compose(x.getChildNodes());
   }
 
   private boolean refersToThisType(String type, ExtensionDefinition sd) {
@@ -968,6 +1222,7 @@ public class CrossViewRenderer extends Renderer {
     } else {
       tr = tbl.tr();
     }
+    tr.clss("data-row");
     tr.td().ah(ed.getWebPath(), ed.getDescription()).tx(ed.getId());
     displayExtensionCardinality(ed, tr.td());
     determineExtensionType(ed, tr.td());
@@ -1046,7 +1301,13 @@ public class CrossViewRenderer extends Renderer {
     }
     td.tx(Utilities.noString(fmm) ? "" : ": FMM"+fmm+"");
     if (context.getChangeVersion() != null) {
-      renderStatusSummary(context, ed, tr.td(), versionToAnnotate );
+      if (renderStatusSummary(context, ed, tr.td(), versionToAnnotate )) {
+        tr.attribute("data-change", "true");
+      } else {
+        tr.attribute("data-change", "false");
+      }
+    } else {
+      tr.attribute("data-change", "false");
     }
   }
 
