@@ -38,10 +38,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.cert.CertificateException;
 import java.sql.SQLException;
 import java.text.DateFormat;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -124,32 +122,9 @@ import org.hl7.fhir.igtools.publisher.realm.NullRealmBusinessRules;
 import org.hl7.fhir.igtools.publisher.realm.RealmBusinessRules;
 import org.hl7.fhir.igtools.publisher.realm.USRealmBusinessRules;
 import org.hl7.fhir.igtools.publisher.xig.XIGGenerator;
-import org.hl7.fhir.igtools.renderers.CanonicalRenderer;
-import org.hl7.fhir.igtools.renderers.CodeSystemRenderer;
-import org.hl7.fhir.igtools.renderers.CrossViewRenderer;
-import org.hl7.fhir.igtools.renderers.DBBuilder;
-import org.hl7.fhir.igtools.renderers.DependencyRenderer;
-import org.hl7.fhir.igtools.renderers.DraftDependenciesRenderer;
-import org.hl7.fhir.igtools.renderers.ExampleScenarioRenderer;
-import org.hl7.fhir.igtools.renderers.HTAAnalysisRenderer;
-import org.hl7.fhir.igtools.renderers.HistoryGenerator;
-import org.hl7.fhir.igtools.renderers.IPStatementsRenderer;
-import org.hl7.fhir.igtools.renderers.IPViewRenderer;
-import org.hl7.fhir.igtools.renderers.JsonXhtmlRenderer;
-import org.hl7.fhir.igtools.renderers.MappingSummaryRenderer;
-import org.hl7.fhir.igtools.renderers.MultiMapBuilder;
-import org.hl7.fhir.igtools.renderers.OperationDefinitionRenderer;
-import org.hl7.fhir.igtools.renderers.PublicationChecker;
-import org.hl7.fhir.igtools.renderers.QuestionnaireRenderer;
-import org.hl7.fhir.igtools.renderers.QuestionnaireResponseRenderer;
-import org.hl7.fhir.igtools.renderers.StatusRenderer;
-import org.hl7.fhir.igtools.renderers.StructureDefinitionRenderer;
-import org.hl7.fhir.igtools.renderers.StructureMapRenderer;
-import org.hl7.fhir.igtools.renderers.ValidationPresenter;
+import org.hl7.fhir.igtools.renderers.*;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter.IGLanguageInformation;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter.LanguagePopulationPolicy;
-import org.hl7.fhir.igtools.renderers.ValueSetRenderer;
-import org.hl7.fhir.igtools.renderers.XmlXHtmlRenderer;
 import org.hl7.fhir.igtools.spreadsheets.IgSpreadsheetParser;
 import org.hl7.fhir.igtools.spreadsheets.MappingSpace;
 import org.hl7.fhir.igtools.spreadsheets.ObservationSummarySpreadsheetGenerator;
@@ -167,10 +142,7 @@ import org.hl7.fhir.r4.formats.FormatUtilities;
 import org.hl7.fhir.r5.conformance.ConstraintJavaGenerator;
 import org.hl7.fhir.r5.conformance.R5ExtensionsLoader;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
-import org.hl7.fhir.r5.context.ContextUtilities;
-import org.hl7.fhir.r5.context.IContextResourceLoader;
-import org.hl7.fhir.r5.context.ILoggingService;
-import org.hl7.fhir.r5.context.SimpleWorkerContext;
+import org.hl7.fhir.r5.context.*;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.FmlParser;
 import org.hl7.fhir.r5.elementmodel.LanguageUtils;
@@ -319,6 +291,7 @@ import org.hl7.fhir.r5.renderers.utils.Resolver.IReferenceResolver;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceReferenceKind;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceWithReference;
 import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
+import org.hl7.fhir.r5.terminologies.TerminologyFunctions;
 import org.hl7.fhir.r5.terminologies.TerminologyUtilities;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.terminologies.client.TerminologyClientContext;
@@ -389,15 +362,10 @@ import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonPrimitive;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.json.model.JsonString;
-import org.hl7.fhir.utilities.npm.CommonPackages;
-import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
-import org.hl7.fhir.utilities.npm.NpmPackage;
+import org.hl7.fhir.utilities.npm.*;
 import org.hl7.fhir.utilities.npm.NpmPackage.PackageResourceInformation;
 import org.hl7.fhir.utilities.npm.PackageGenerator.PackageType;
-import org.hl7.fhir.utilities.npm.PackageHacker;
-import org.hl7.fhir.utilities.npm.PackageList;
 import org.hl7.fhir.utilities.npm.PackageList.PackageListEntry;
-import org.hl7.fhir.utilities.npm.ToolsVersion;
 import org.hl7.fhir.utilities.settings.FhirSettings;
 import org.hl7.fhir.utilities.turtle.Turtle;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
@@ -413,6 +381,7 @@ import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 import org.hl7.fhir.utilities.xhtml.XhtmlParser;
 import org.hl7.fhir.utilities.xml.XMLUtil;
 import org.hl7.fhir.utilities.xml.XmlEscaper;
+import org.hl7.fhir.validation.SQLiteINpmPackageIndexBuilderDBImpl;
 import org.hl7.fhir.validation.ValidatorSettings;
 import org.hl7.fhir.validation.ValidatorUtils;
 import org.hl7.fhir.validation.instance.InstanceValidator;
@@ -420,8 +389,6 @@ import org.hl7.fhir.validation.instance.utils.ValidationContext;
 import org.hl7.fhir.validation.profile.ProfileValidator;
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
-
-import com.nimbusds.jose.JOSEException;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -1036,6 +1003,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private static PublisherConsoleLogger consoleLogger;
   private IPublisherModule module;
   private boolean milestoneBuild;
+  private BaseRenderer bdr;
   
   private class PreProcessInfo {
     private String xsltName;
@@ -1060,6 +1028,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     public String getRelativePath() {
       return relativePath;
     }
+  }
+
+  public Publisher() {
+    NpmPackageIndexBuilder.setExtensionFactory(new SQLiteINpmPackageIndexBuilderDBImpl.SQLiteINpmPackageIndexBuilderDBImplFactory());
   }
 
   public void execute() throws Exception {
@@ -1622,7 +1594,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
         j.add("url", sourceIg.getUrl());
         j.add("name", sourceIg.getName());
         j.add("title", sourceIg.getTitle());
-        j.add("description", sourceIg.getDescription());
+        j.add("description", preProcessMarkdown(sourceIg.getDescription()));
         if (sourceIg.hasDate()) {
           j.add("ig-date", sourceIg.getDateElement().primitiveValue());
         }
@@ -1687,6 +1659,13 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       // nothing at all
       e.printStackTrace();
     }
+  }
+
+  private String preProcessMarkdown(String description) throws Exception {
+    if (bdr == null) {
+      return "description";
+    }
+    return bdr.preProcessMarkdown("json", description);
   }
 
   public CacheOption getCacheOption() {
@@ -3728,6 +3707,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     hs.registerFunction(new BaseTableWrapper.TableDateColumnFunction());
     hs.registerFunction(new TestDataFactory.CellLookupFunction());
     hs.registerFunction(new TestDataFactory.TableLookupFunction());
+    hs.registerFunction(new TerminologyFunctions.ExpandFunction());
+    hs.registerFunction(new TerminologyFunctions.ValidateVSFunction());
+    hs.registerFunction(new TerminologyFunctions.TranslateFunction());
+
     validator = new InstanceValidator(context, hs, context.getXVer(), validatorSession, new ValidatorSettings()); // todo: host services for reference resolution....
     validator.setAllowXsiLocation(true);
     validator.setNoBindingMsgSuppressed(true);
@@ -3754,7 +3737,13 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     validator.setPolicyAdvisor(validationFetcher);
     validator.setTracker(this);
     validator.getSettings().setR5BundleRelativeReferencePolicy(r5BundleRelativeReferencePolicy);
-    
+
+    if (!generateVersions.isEmpty()) {
+      Collections.sort(generateVersions);
+      validator.getSettings().setMinVersion(VersionUtilities.getMajMin(generateVersions.get(0)));
+      validator.getSettings().setMaxVersion(VersionUtilities.getMajMin(generateVersions.get(generateVersions.size()-1)));
+    }
+
     for (String s : context.getBinaryKeysAsSet()) {
       if (needFile(s)) {
         if (makeQA)
@@ -7256,7 +7245,7 @@ private String fixPackageReference(String dep) {
     if (!VersionUtilities.isR4Plus(context.getVersion())) {
       throw new Error("Loading Map Files is not supported for version "+VersionUtilities.getNameForVersion(context.getVersion()));
     }
-    FmlParser fp = new FmlParser(context);
+    FmlParser fp = new FmlParser(context, validator.getFHIRPathEngine());
     fp.setupValidation(ValidationPolicy.EVERYTHING);     
     Element res = fp.parse(file.getErrors(), FileUtilities.bytesToString(file.getSource()));
     if (res == null) {
@@ -8864,6 +8853,7 @@ private String fixPackageReference(String dep) {
       return;
     }
     Base.setCopyUserData(true); // just keep all the user data when copying while rendering
+    bdr = new BaseRenderer(context, checkAppendSlash(specPath), igpkp, specMaps, pageTargets(), markdownEngine, packge, rc);
 
     forceDir(tempDir);
     forceDir(Utilities.path(tempDir, "_includes"));
@@ -10036,6 +10026,10 @@ private String fixPackageReference(String dep) {
     otherFilesRun.add(path);
     vsg.generate(cvr.getObservations());
     vsg.finish(new FileOutputStream(path));
+    DeprecationRenderer dpr = new DeprecationRenderer(context, checkAppendSlash(specPath), igpkp, specMaps, pageTargets(), markdownEngine, packge, rc.copy(false));
+    fragment("deprecated-list", dpr.deprecationSummary(fileList, previousVersionComparator), otherFilesRun, start, "deprecated-list", "Cross", lang);
+    fragment("new-extensions", dpr.listNewResources(fileList, previousVersionComparator, "StructureDefinition.extension"), otherFilesRun, start, "new-extensions", "Cross", lang);
+    fragment("deleted-extensions", dpr.listDeletedResources(fileList, previousVersionComparator, "StructureDefinition.extension"), otherFilesRun, start, "deleted-extensions", "Cross", lang);
 
     JsonObject data = new JsonObject();
     JsonArray ecl = new JsonArray();
@@ -10140,7 +10134,7 @@ private String fixPackageReference(String dep) {
           item.add("name", sd.getName());
           item.add("title", sd.present());
           item.add("uml", r.isUmlGenerated());
-          addTranslationsToJson(item, "title", sd.getTitleElement(), false); 
+          addTranslationsToJson(item, "title", sd.getTitleElement(), false);
           item.add("path", sd.getWebPath());
           if (sd.hasKind()) {
             item.add("kind", sd.getKind().toCode());
@@ -10167,10 +10161,10 @@ private String fixPackageReference(String dep) {
             item.add("derivation", sd.getDerivation().toCode());
           }
           item.add("publisher", sd.getPublisher());
-          addTranslationsToJson(item, "publisher", sd.getPublisherElement(), false); 
+          addTranslationsToJson(item, "publisher", sd.getPublisherElement(), false);
           item.add("copyright", sd.getCopyright());
-          addTranslationsToJson(item, "copyright", sd.getCopyrightElement(), false); 
-          item.add("description", ProfileUtilities.processRelativeUrls(sd.getDescription(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
+          addTranslationsToJson(item, "copyright", sd.getCopyrightElement(), false);
+          item.add("description", preProcessMarkdown(sd.getDescription()));
           addTranslationsToJson(item, "description", publishedIg.getDescriptionElement(), true);
           item.add("obligations", ProfileUtilities.hasObligations(sd));
           
@@ -10258,16 +10252,16 @@ private String fixPackageReference(String dep) {
           item.add("index", i);
           item.add("url", q.getUrl());
           item.add("name", q.getName());
-          addTranslationsToJson(item, "name", q.getNameElement(), false); 
+          addTranslationsToJson(item, "name", q.getNameElement(), false);
           item.add("path", q.getWebPath());
           item.add("status", q.getStatus().toCode());
           item.add("date", q.getDate().toString());
           item.add("publisher", q.getPublisher());
-          addTranslationsToJson(item, "publisher", q.getPublisherElement(), false); 
+          addTranslationsToJson(item, "publisher", q.getPublisherElement(), false);
           item.add("copyright", q.getCopyright());
-          addTranslationsToJson(item, "copyright", q.getCopyrightElement(), false); 
-          item.add("description", ProfileUtilities.processRelativeUrls(q.getDescription(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
-          addTranslationsToJson(item, "description", q.getDescriptionElement(), true);           
+          addTranslationsToJson(item, "copyright", q.getCopyrightElement(), false);
+          item.add("description", preProcessMarkdown(q.getDescription()));
+          addTranslationsToJson(item, "description", q.getDescriptionElement(), true);
           i++;
         }
       }
@@ -10328,8 +10322,8 @@ private String fixPackageReference(String dep) {
           contained.add(jo);
           jo.add("type", crd.getType());
           jo.add("id", crd.getId());
-          jo.add("title", crd.getTitle()); 
-          jo.add("description", ProfileUtilities.processRelativeUrls(crd.getDescription(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
+          jo.add("title", crd.getTitle());
+          jo.add("description", preProcessMarkdown(crd.getDescription()));
 
           JsonObject citem = new JsonObject();
           data.add(crd.getType()+"/"+r.getId()+"_"+crd.getId(), citem); 
@@ -10592,7 +10586,7 @@ private String fixPackageReference(String dep) {
     return new XhtmlComposer(false, true).compose(tbl);
   }
 
-  private void populateCustomResourceEntry(FetchedResource r, JsonObject item, Object object) {
+  private void populateCustomResourceEntry(FetchedResource r, JsonObject item, Object object) throws Exception {
     Element e = r.getElement();
 //      item.add("layout-type", "canonical");
     if (e.getChildren("url").size() == 1) {
@@ -10626,7 +10620,7 @@ private String fixPackageReference(String dep) {
         item.add("date", e.getNamedChildValue("date"));
       }
       if (e.getChildren("description").size() == 1) {
-        item.add("description", ProfileUtilities.processRelativeUrls(e.getNamedChildValue("description"), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
+        item.add("description", preProcessMarkdown(e.getNamedChildValue("description")));
 //        addTranslationsToJson(item, "description", e.getNamedChild("description"), false);
       }
 
@@ -10866,14 +10860,13 @@ private String fixPackageReference(String dep) {
     return tag.present();
   }
 
-  private void addTranslationsToJson(JsonObject item, String name, PrimitiveType<?> element, boolean processDesc) {
+  private void addTranslationsToJson(JsonObject item, String name, PrimitiveType<?> element, boolean preprocess) throws Exception {
     JsonObject ph = item.forceObject(name+"lang");
     for (String l : allLangs()) {
       String s;
-      if (processDesc) {
-        s = ProfileUtilities.processRelativeUrls(langUtils.getTranslationOrBase(element, l), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false);        
-      } else {
-        s = langUtils.getTranslationOrBase(element, l);
+      s = langUtils.getTranslationOrBase(element, l);
+      if (preprocess) {
+        s = preProcessMarkdown(s);
       }
       ph.add(l, s);
     }    
@@ -10916,7 +10909,7 @@ private String fixPackageReference(String dep) {
     }
   }
 
-  private void saveCSList(String name, List<CodeSystem> cslist, DBBuilder db, int view) throws IOException {
+  private void saveCSList(String name, List<CodeSystem> cslist, DBBuilder db, int view) throws Exception {
     StringBuilder b = new StringBuilder();
     JsonObject json = new JsonObject();
     JsonArray items = new JsonArray();
@@ -10935,7 +10928,7 @@ private String fixPackageReference(String dep) {
       }
       item.add("name", cs.getName());
       item.add("title", cs.getTitle());
-      item.add("description", cs.getDescription());
+      item.add("description", preProcessMarkdown(cs.getDescription()));
 
       Set<String> oids = TerminologyUtilities.listOids(cs);
       if (!oids.isEmpty()) {
@@ -10993,7 +10986,7 @@ private String fixPackageReference(String dep) {
     otherFilesRun.add(Utilities.path(tempDir, name+".json"));    
   }
 
-  private void saveVSList(String name, List<ValueSet> vslist, DBBuilder db, int view) throws IOException {
+  private void saveVSList(String name, List<ValueSet> vslist, DBBuilder db, int view) throws Exception {
     StringBuilder b = new StringBuilder();
     JsonObject json = new JsonObject();
     JsonArray items = new JsonArray();
@@ -11012,7 +11005,7 @@ private String fixPackageReference(String dep) {
       }
       item.add("name", vs.getName());
       item.add("title", vs.getTitle());
-      item.add("description", vs.getDescription());
+      item.add("description", preProcessMarkdown(vs.getDescription()));
 
       Set<String> used = ValueSetUtilities.listSystems(context, vs);
       if (!used.isEmpty()) {
@@ -11144,7 +11137,7 @@ private String fixPackageReference(String dep) {
       // status gets overridden later, and it appears in there
       // publisher & description are exposed in domain resource as  'owner' & 'link'
       if (cr.hasDescription()) {
-        item.add("description", ProfileUtilities.processRelativeUrls(cr.getDescription(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
+        item.add("description", preProcessMarkdown(cr.getDescription()));
         addTranslationsToJson(item, "description", cr.getDescriptionElement(), true);
       }
       if (cr.hasUseContext() && !containedCr) {
@@ -12033,7 +12026,7 @@ private String fixPackageReference(String dep) {
     }
   }
 
-  private void generateDataFile(DBBuilder db) throws IOException, FHIRException, SQLException {
+  private void generateDataFile(DBBuilder db) throws Exception {
     JsonObject data = new JsonObject();
     data.add("path", checkAppendSlash(specPath));
     data.add("canonical", igpkp.getCanonical());
@@ -12165,14 +12158,14 @@ private String fixPackageReference(String dep) {
       }
     }
     ig.add("date", publishedIg.getDateElement().asStringValue());
-    ig.add("description", ProfileUtilities.processRelativeUrls(publishedIg.getDescription(), "", igpkp.specPath(), context.getResourceNames(), specMaps.get(0).listTargets(), pageTargets(), false));
-    addTranslationsToJson(ig, "description", publishedIg.getDescriptionElement(), true);
+    ig.add("description", preProcessMarkdown(publishedIg.getDescription()));
+    addTranslationsToJson(ig, "description", publishedIg.getDescriptionElement(), false);
 
     if (context.getTxClientManager() != null && context.getTxClientManager().getMaster() != null) {
       ig.add("tx-server", context.getTxClientManager().getMaster().getAddress());
     }
     ig.add("copyright", publishedIg.getCopyright());
-    addTranslationsToJson(ig, "copyright", publishedIg.getCopyrightElement(), true);
+    addTranslationsToJson(ig, "copyright", publishedIg.getCopyrightElement(), false);
 
     for (Enumeration<FHIRVersion> v : publishedIg.getFhirVersion()) {
       ig.add("fhirVersion", v.asStringValue());
@@ -13815,7 +13808,7 @@ private String fixPackageReference(String dep) {
 
   private byte[] convVersion(Resource res, String v) throws FHIRException, IOException {
     if (res.hasWebPath() && (res instanceof DomainResource)) {
-      ToolingExtensions.setUrlExtension((DomainResource) res, ToolingExtensions.EXT_WEB_SOURCE, res.getWebPath());
+      ToolingExtensions.setUrlExtension((DomainResource) res, ToolingExtensions.EXT_WEB_SOURCE_NEW, res.getWebPath());
     }
     String version = v.startsWith("r") ? VersionUtilities.versionFromCode(v) : v;
 //    checkForCoreDependencies(res);
@@ -14640,7 +14633,7 @@ private String fixPackageReference(String dep) {
       fragmentError("StructureDefinition-"+prefixForContainer+sd.getId()+"-json-schema", "yet to be done: json schema as html", null, f.getOutputNames(), start, "json-schema", "StructureDefinition", lang);
     }
 
-    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, lrc, allInvariants, sdMapCache, specPath, versionToAnnotate, relatedIGs);
+    StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, sourceIg.getPackageId(), checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, lrc, allInvariants, sdMapCache, specPath, versionToAnnotate, relatedIGs);
 
     if (wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
@@ -16388,5 +16381,6 @@ private String fixPackageReference(String dep) {
     }      
     self.execute();
   }
+
 
 }
