@@ -10,17 +10,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.antlr.v4.runtime.tree.xpath.XPathLexer;
-import org.apache.commons.lang3.StringUtils;
-import org.hl7.fhir.convertors.misc.LoincToDEConvertor;
 import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.igtools.publisher.FetchedResource;
-import org.hl7.fhir.igtools.publisher.ProfileTestCaseExecutor;
 import org.hl7.fhir.igtools.renderers.utils.ObligationsAnalysis;
 import org.hl7.fhir.igtools.renderers.utils.ObligationsAnalysis.ActorInfo;
 import org.hl7.fhir.igtools.renderers.utils.ObligationsAnalysis.ProfileActorObligationsAnalysis;
 import org.hl7.fhir.igtools.renderers.utils.ObligationsAnalysis.ProfileObligationsAnalysis;
 import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.fhirpath.ExpressionNode;
 import org.hl7.fhir.r5.fhirpath.ExpressionNode.Kind;
 import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
@@ -57,7 +55,6 @@ import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.terminologies.utilities.ValidationResult;
 import org.hl7.fhir.r5.utils.ResourceSorters.CanonicalResourceSortByUrl;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.HL7WorkGroups.HL7WorkGroup;
@@ -65,8 +62,6 @@ import org.hl7.fhir.utilities.validation.ValidationOptions;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
-
-import javax.lang.model.type.ArrayType;
 
 public class CrossViewRenderer extends Renderer {
 
@@ -341,7 +336,7 @@ public class CrossViewRenderer extends Renderer {
   }
 
   private boolean isMustSupport(ElementDefinition ed, TypeRefComponent tr) {
-    return ed.getMustSupport() || "true".equals(ToolingExtensions.readStringExtension(tr, ToolingExtensions.EXT_MUST_SUPPORT));
+    return ed.getMustSupport() || "true".equals(ExtensionUtilities.readStringExtension(tr, ExtensionDefinitions.EXT_MUST_SUPPORT));
   }
 
   private int processObservationComponent(ObservationProfile parent, List<ElementDefinition> list, String compSlice, int i) {
@@ -1211,7 +1206,7 @@ public class CrossViewRenderer extends Renderer {
   }
 
   private void genExtensionRow(XhtmlNode tbl, StructureDefinition ed, String versionToAnnotate) throws Exception {
-    StandardsStatus status = ToolingExtensions.getStandardsStatus(ed);
+    StandardsStatus status = ExtensionUtilities.getStandardsStatus(ed);
     XhtmlNode tr;
     if (status  == StandardsStatus.DEPRECATED) {
       tr = tbl.tr().style("background-color: #ffeeee");
@@ -1271,7 +1266,7 @@ public class CrossViewRenderer extends Renderer {
       }
     }
 
-    String wg = ToolingExtensions.readStringExtension(ed, ToolingExtensions.EXT_WORKGROUP);
+    String wg = ExtensionUtilities.readStringExtension(ed, ExtensionDefinitions.EXT_WORKGROUP);
     if (wg == null) {
       tr.td();
     } else {
@@ -1282,7 +1277,7 @@ public class CrossViewRenderer extends Renderer {
         tr.td().ah(wgd.getLink()).tx(wg);
       }
     }
-    String fmm = ToolingExtensions.readStringExtension(ed, ToolingExtensions.EXT_FMM_LEVEL);
+    String fmm = ExtensionUtilities.readStringExtension(ed, ExtensionDefinitions.EXT_FMM_LEVEL);
     td = tr.td();
     if (status == StandardsStatus.NORMATIVE) {
       td.ahWithText("", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Normative", "Normative", null).attribute("class", "normative-flag");
@@ -1621,15 +1616,15 @@ public class CrossViewRenderer extends Renderer {
       renderStatus(vs.getTitleElement(), td).tx(vs.getTitle());
       td = tr.td();
       renderStatus(vs.getStatusElement(), td).tx(vs.getStatus() == null ? "null" : vs.getStatus().toCode());
-      if (vs.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
+      if (vs.hasExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS)) {
         td.tx(" / ");
-        Extension ext = vs.getExtensionByUrl(ToolingExtensions.EXT_STANDARDS_STATUS);
-        String v = ToolingExtensions.getStandardsStatus(vs).toCode();
+        Extension ext = vs.getExtensionByUrl(ExtensionDefinitions.EXT_STANDARDS_STATUS);
+        String v = ExtensionUtilities.getStandardsStatus(vs).toCode();
         renderStatus(ext, td).attribute("class", v+"-flag").tx(v);
       }
-      if (vs.hasExtension(ToolingExtensions.EXT_FMM_LEVEL)) {
+      if (vs.hasExtension(ExtensionDefinitions.EXT_FMM_LEVEL)) {
         td.tx(" / ");
-        Extension ext = vs.getExtensionByUrl(ToolingExtensions.EXT_FMM_LEVEL);
+        Extension ext = vs.getExtensionByUrl(ExtensionDefinitions.EXT_FMM_LEVEL);
         renderStatus(ext, td).tx("FMM"+ext.getValue().primitiveValue());
       }
       if (vs.getExperimental()) {
@@ -1916,15 +1911,15 @@ public class CrossViewRenderer extends Renderer {
       renderStatus(cs.getTitleElement(), td).tx(cs.getTitle());
       td = tr.td();
       renderStatus(cs.getStatusElement(), td).tx(cs.getStatus().toCode());
-      if (cs.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
+      if (cs.hasExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS)) {
         td.tx(" / ");
-        Extension ext = cs.getExtensionByUrl(ToolingExtensions.EXT_STANDARDS_STATUS);
-        String v = ToolingExtensions.getStandardsStatus(cs).toCode();
+        Extension ext = cs.getExtensionByUrl(ExtensionDefinitions.EXT_STANDARDS_STATUS);
+        String v = ExtensionUtilities.getStandardsStatus(cs).toCode();
         renderStatus(ext, td).attribute("class", v+"-flag").tx(v);
       }
-      if (cs.hasExtension(ToolingExtensions.EXT_FMM_LEVEL)) {
+      if (cs.hasExtension(ExtensionDefinitions.EXT_FMM_LEVEL)) {
         td.tx(" / ");
-        Extension ext = cs.getExtensionByUrl(ToolingExtensions.EXT_FMM_LEVEL);
+        Extension ext = cs.getExtensionByUrl(ExtensionDefinitions.EXT_FMM_LEVEL);
         renderStatus(ext, td).tx("FMM"+ext.getValue().primitiveValue());
       }
       if (cs.getExperimental()) {
