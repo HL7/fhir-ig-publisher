@@ -5,31 +5,22 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
-import org.hl7.fhir.igtools.publisher.FetchedResource;
-import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
-import org.hl7.fhir.igtools.publisher.RelatedIG;
-import org.hl7.fhir.igtools.publisher.SpecMapManager;
-import org.hl7.fhir.r5.comparison.CanonicalResourceComparer;
+import org.hl7.fhir.igtools.publisher.*;
 import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.CanonicalResourceComparison;
 import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.ChangeAnalysisState;
-import org.hl7.fhir.r5.conformance.R5ExtensionsLoader.CanonicalResourceSortByUrl;
 import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.ContactDetail;
-import org.hl7.fhir.r5.model.ContactPoint;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
+import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.model.ContactPoint.ContactPointSystem;
-import org.hl7.fhir.r5.model.DateTimeType;
 import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
-import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.i18n.RenderingI18nContext;
 import org.hl7.fhir.utilities.npm.NpmPackage;
-import org.hl7.fhir.validation.instance.utils.CanonicalTypeSorter;
 
 public class CanonicalRenderer extends BaseRenderer {
 
@@ -45,6 +36,24 @@ public class CanonicalRenderer extends BaseRenderer {
     this.destDir = destDir;
     this.versionToAnnotate = versionToAnnotate;
     this.relatedIgs = relatedIgs;
+  }
+
+  protected List<CanonicalResource> scanAllLocalResources(Class<? extends CanonicalResource> class_, String className) {
+    List<CanonicalResource> list = new ArrayList<>();
+    for (FetchedFile f : fileList) {
+      for (FetchedResource r : f.getResources()) {
+        if (r.getResource() != null && r.getResource().getClass().equals(class_)) {
+          list.add((CanonicalResource) r.getResource());
+        }
+      }
+    }
+    for (RelatedIG ig : relatedIgs) {
+      for (Resource res : ig.load(className)) {
+        list.add((CanonicalResource) res);
+      }
+    }
+    Collections.sort(list, new org.hl7.fhir.r5.utils.ResourceSorters.CanonicalResourceSortByUrl());
+    return list;
   }
 
   public String summaryTable(FetchedResource r, boolean xml, boolean json, boolean ttl, Set<String> rows) throws Exception {
@@ -63,7 +72,7 @@ public class CanonicalRenderer extends BaseRenderer {
       if (cr.hasUrl()) {
         b.append("<tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_DEFINING_URL))+":</td><td>"+Utilities.escapeXml(cr.getUrl())+"</td></tr>\r\n");
       } else if (cr.hasExtension("http://hl7.org/fhir/5.0/StructureDefinition/extension-NamingSystem.url")) {
-        b.append("<tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_DEFINING_URL))+":</td><td>"+Utilities.escapeXml(ToolingExtensions.readStringExtension(cr, "http://hl7.org/fhir/5.0/StructureDefinition/extension-NamingSystem.url"))+"</td></tr>\r\n");      
+        b.append("<tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_DEFINING_URL))+":</td><td>"+Utilities.escapeXml(ExtensionUtilities.readStringExtension(cr, "http://hl7.org/fhir/5.0/StructureDefinition/extension-NamingSystem.url"))+"</td></tr>\r\n");
       } else {                                          
         b.append("<tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_DEFINING_URL))+":</td><td></td></tr>\r\n");      
       }
@@ -72,7 +81,7 @@ public class CanonicalRenderer extends BaseRenderer {
       if (cr.hasVersion()) {
         b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_VER))+":</td><td>"+Utilities.escapeXml(cr.getVersion())+"</td></tr>\r\n");
       } else if (cr.hasExtension("http://terminology.hl7.org/StructureDefinition/ext-namingsystem-version")) {
-        b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_VER))+":</td><td>"+Utilities.escapeXml(ToolingExtensions.readStringExtension(cr, "http://terminology.hl7.org/StructureDefinition/ext-namingsystem-version"))+"</td></tr>\r\n");
+        b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_VER))+":</td><td>"+Utilities.escapeXml(ExtensionUtilities.readStringExtension(cr, "http://terminology.hl7.org/StructureDefinition/ext-namingsystem-version"))+"</td></tr>\r\n");
       }
     }
 
@@ -100,7 +109,7 @@ public class CanonicalRenderer extends BaseRenderer {
         b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.CANON_REND_PUBLISHER))+":</td><td>"+buildPublisherLinks(cr)+"</td></tr>\r\n");
     }
     if (hasSummaryRow(rows, "committee")) {
-      if (cr.hasExtension(ToolingExtensions.EXT_WORKGROUP)) {
+      if (cr.hasExtension(ExtensionDefinitions.EXT_WORKGROUP)) {
         b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.CANON_REND_COMMITTEE))+":</td><td>"+renderCommitteeLink(cr)+"</td></tr>\r\n");
       }
     }
@@ -109,9 +118,9 @@ public class CanonicalRenderer extends BaseRenderer {
         b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_COPYRIGHT))+":</td><td>"+processMarkdown("copyright", cr.getCopyrightElement())+"</td></tr>\r\n");
     }
     if (hasSummaryRow(rows, "maturity")) {
-      if (ToolingExtensions.hasExtension(cr, ToolingExtensions.EXT_FMM_LEVEL)) {
+      if (ExtensionUtilities.hasExtension(cr, ExtensionDefinitions.EXT_FMM_LEVEL)) {
         // Use hard-coded spec link to point to current spec because DSTU2 had maturity listed on a different page
-        b.append(" <tr><td><a class=\"fmm\" href=\"http://hl7.org/fhir/versions.html#maturity\" title=\"Maturity Level\">"+(gen.formatPhrase(RenderingContext.CANON_REND_MATURITY))+"</a>:</td><td>"+ToolingExtensions.readStringExtension(cr, ToolingExtensions.EXT_FMM_LEVEL)+"</td></tr>\r\n");
+        b.append(" <tr><td><a class=\"fmm\" href=\"http://hl7.org/fhir/versions.html#maturity\" title=\"Maturity Level\">"+(gen.formatPhrase(RenderingContext.CANON_REND_MATURITY))+"</a>:</td><td>"+ExtensionUtilities.readStringExtension(cr, ExtensionDefinitions.EXT_FMM_LEVEL)+"</td></tr>\r\n");
       }    
     }
   }
@@ -199,9 +208,9 @@ public class CanonicalRenderer extends BaseRenderer {
   }
 
   protected String describeStatus(CanonicalResource cr) {
-    String s = describeStatus(cr.getStatus(), cr.hasExperimental() ? cr.getExperimental() : false, cr.hasDate() ? cr.getDateElement() : null, ToolingExtensions.readBooleanExtension(cr, "http://hl7.org/fhir/StructureDefinition/valueset-deprecated"));
-    if (cr.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
-      s = s + presentStandardsStatus(ToolingExtensions.readStringExtension(cr, ToolingExtensions.EXT_STANDARDS_STATUS));
+    String s = describeStatus(cr.getStatus(), cr.hasExperimental() ? cr.getExperimental() : false, cr.hasDate() ? cr.getDateElement() : null, ExtensionUtilities.readBooleanExtension(cr, "http://hl7.org/fhir/StructureDefinition/valueset-deprecated"));
+    if (cr.hasExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS)) {
+      s = s + presentStandardsStatus(ExtensionUtilities.readStringExtension(cr, ExtensionDefinitions.EXT_STANDARDS_STATUS));
     }
     return s;
   }

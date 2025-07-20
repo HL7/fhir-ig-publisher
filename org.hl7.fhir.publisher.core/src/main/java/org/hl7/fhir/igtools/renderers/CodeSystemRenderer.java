@@ -33,16 +33,12 @@ import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.RelatedIG;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.CanonicalResourceComparison;
-import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.ChangeAnalysisState;
 import org.hl7.fhir.r5.comparison.VersionComparisonAnnotation;
 import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CodeSystem;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
+import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
-import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.NamingSystem.NamingSystemUniqueIdComponent;
-import org.hl7.fhir.r5.model.NamingSystem;
-import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.renderers.NamingSystemRenderer;
 import org.hl7.fhir.r5.renderers.RendererFactory;
@@ -50,9 +46,9 @@ import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.graphql.Value;
 import org.hl7.fhir.utilities.i18n.RenderingI18nContext;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.xhtml.NodeType;
@@ -130,18 +126,18 @@ public class CodeSystemRenderer extends CanonicalRenderer {
     b.append("\r\n");
 
     Set<String> processed = new HashSet<String>();
-    for (CanonicalResource cr : scanAllResources(ValueSet.class, "ValueSet")) {
-      ValueSet vc = (ValueSet) cr;
+    for (CanonicalResource cr : scanAllLocalResources(ValueSet.class, "ValueSet")) {
+      ValueSet vs = (ValueSet) cr;
       if (cs.getContent() != CodeSystemContentMode.SUPPLEMENT) {
-        for (ConceptSetComponent ed : vc.getCompose().getInclude()) {
-          first = addLink(b, first, vc, ed, processed);
+        for (ConceptSetComponent ed : vs.getCompose().getInclude()) {
+          first = addLink(b, first, vs, ed, processed);
         }
-        for (ConceptSetComponent ed : vc.getCompose().getExclude()) {
-          first = addLink(b, first, vc, ed, processed);
+        for (ConceptSetComponent ed : vs.getCompose().getExclude()) {
+          first = addLink(b, first, vs, ed, processed);
         }
       } else {
-        for (Extension ex : vc.getExtensionsByUrl(ToolingExtensions.EXT_VS_CS_SUPPL_NEEDED)) {
-          first = addLink(b, first, vc, ex, processed); 
+        for (Extension ex : vs.getExtensionsByUrl(ExtensionDefinitions.EXT_VS_CS_SUPPL_NEEDED)) {
+          first = addLink(b, first, vs, ex, processed);
         }
       }
     }
@@ -193,7 +189,7 @@ public class CodeSystemRenderer extends CanonicalRenderer {
           first = addLink(b, first, vc, ed, processed);
         } 
       } else {
-        for (Extension ex : vc.getExtensionsByUrl(ToolingExtensions.EXT_VS_CS_SUPPL_NEEDED)) {
+        for (Extension ex : vc.getExtensionsByUrl(ExtensionDefinitions.EXT_VS_CS_SUPPL_NEEDED)) {
           first = addLink(b, first, vc, ex, processed); 
         }
       }
