@@ -28,12 +28,13 @@ import org.hl7.fhir.r5.conformance.profile.BindingResolution;
 import org.hl7.fhir.r5.conformance.profile.ProfileKnowledgeProvider;
 import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CanonicalType;
-import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.ConceptMap;
 import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
@@ -60,7 +61,6 @@ import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.GenerationRules;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.ResourceRendererMode;
 import org.hl7.fhir.r5.utils.ResourceSorters;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
@@ -213,9 +213,9 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
       li.tx(ctxt.getType().toCode());
       li.tx(" ");
       li.tx(ctxt.getExpression());
-      if (ctxt.hasExtension(ToolingExtensions.EXT_APPLICABLE_VERSION)) {
+      if (ctxt.hasExtension(ExtensionDefinitions.EXT_APPLICABLE_VERSION)) {
         li.tx(" (");
-        renderVersionRange(li, ctxt.getExtensionByUrl(ToolingExtensions.EXT_APPLICABLE_VERSION));
+        renderVersionRange(li, ctxt.getExtensionByUrl(ExtensionDefinitions.EXT_APPLICABLE_VERSION));
         li.tx(")");
       }
     }
@@ -455,7 +455,7 @@ public class CrossVersionModule implements IPublisherModule, ProfileKnowledgePro
     p.setName("cross-version-"+sd.getName()+".html");
     p.setTitle("Cross-Version summary for "+sd.getName());
     p.setGeneration(GuidePageGeneration.MARKDOWN);
-    ToolingExtensions.setStandardsStatus(p, StandardsStatus.INFORMATIVE, null);
+    ExtensionUtilities.setStandardsStatus(p, StandardsStatus.INFORMATIVE, null);
     FileUtilities.stringToFile(new XhtmlComposer(false, true).compose(wrapPage(body, sd.getName())), Utilities.path(path, "temp", "xver-qa", "cross-version-"+sd.getName()+".html"));
   }
 

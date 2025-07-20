@@ -23,11 +23,11 @@ import org.hl7.fhir.r5.comparison.ComparisonSession;
 import org.hl7.fhir.r5.conformance.profile.ProfileKnowledgeProvider;
 import org.hl7.fhir.r5.context.ILoggingService;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.DomainResource;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.IniFile;
 import org.hl7.fhir.utilities.Utilities;
@@ -388,11 +388,11 @@ public class PreviousVersionComparator {
       return null;
     }
     Set<String> result = new HashSet<>();
-    for (Resource r : lastVersion().context.fetchResourcesByType(Resource.class)) {
+    for (Resource r : lastVersion().resources) {
       if (r instanceof DomainResource) {
         DomainResource dr = (DomainResource) r;
-        if (dr.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
-          String st = dr.getExtensionString(ToolingExtensions.EXT_STANDARDS_STATUS);
+        if (dr.hasExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS)) {
+          String st = dr.getExtensionString(ExtensionDefinitions.EXT_STANDARDS_STATUS);
           if ("deprecated".equals(st)) {
             result.add(r.fhirType()+"/"+r.getId());
           }

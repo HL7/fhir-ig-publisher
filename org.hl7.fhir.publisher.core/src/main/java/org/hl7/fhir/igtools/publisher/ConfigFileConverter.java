@@ -12,6 +12,7 @@ import org.hl7.fhir.convertors.factory.VersionConvertorFactory_14_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
 import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.XmlParser;
@@ -31,7 +32,6 @@ import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.r5.terminologies.utilities.ValidationResult;
 import org.hl7.fhir.r5.utils.GuideParameterCode;
 import org.hl7.fhir.r5.utils.IGHelper;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.FhirPublication;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.IniFile;
@@ -121,9 +121,9 @@ public class ConfigFileConverter {
     if (configuration.has("html-template"))
       IGHelper.setParameter(ig.getDefinition(), GuideParameterCode.HTMLTEMPLATE.toCode(), configuration.asString("html-template"));
     for (String s : resourceDirs)
-      ig.addExtension(ToolingExtensions.EXT_IGP_RESOURCES, new StringType(s));
+      ig.addExtension(ExtensionDefinitions.EXT_IGP_RESOURCES, new StringType(s));
     for (String s : pagesDirs)
-      ig.addExtension(ToolingExtensions.EXT_IGP_PAGES, new StringType(s));
+      ig.addExtension(ExtensionDefinitions.EXT_IGP_PAGES, new StringType(s));
     ig.setPackageId(configuration.asString("npm-name"));
     if (configuration.has("jurisdiction")) {
       ig.getJurisdiction().clear();
@@ -167,11 +167,11 @@ public class ConfigFileConverter {
     new JsonParser().compose(new FileOutputStream(Utilities.path(FileUtilities.getDirectoryForFile(igName), "ig-validation-parameters.json")), ig);
     if (paths.get("spreadsheets") instanceof JsonArray) {
       for (JsonElement e : (JsonArray) paths.get("spreadsheets"))
-        ig.addExtension(ToolingExtensions.EXT_IGP_SPREADSHEET, new StringType(e.asJsonPrimitive().asString()));
+        ig.addExtension(ExtensionDefinitions.EXT_IGP_SPREADSHEET, new StringType(e.asJsonPrimitive().asString()));
     }
     if (paths.get("bundles") instanceof JsonArray) {
       for (JsonElement e : (JsonArray) paths.get("bundles"))
-        ig.addExtension(ToolingExtensions.EXT_IGP_BUNDLE, new StringType(e.asJsonPrimitive().asString()));
+        ig.addExtension(ExtensionDefinitions.EXT_IGP_BUNDLE, new StringType(e.asJsonPrimitive().asString()));
     }
     JsonObject defaults = configuration.getJsonObject("defaults");
     if (defaults != null) {
@@ -229,10 +229,10 @@ public class ConfigFileConverter {
                 res = ig.getDefinition().addResource();
                 res.setReference(new Reference(s));
               }
-              res.addExtension(ToolingExtensions.EXT_IGP_BASE, new StringType(vb.asJsonPrimitive().asString()));
-              res.addExtension(ToolingExtensions.EXT_IGP_DEFNS, new StringType(vd.asJsonPrimitive().asString()));
-              res.addExtension(ToolingExtensions.EXT_IGP_FORMAT, new StringType(vf.asJsonPrimitive().asString()));
-              res.addExtension(ToolingExtensions.EXT_IGP_SOURCE, new StringType(vs.asJsonPrimitive().asString()));
+              res.addExtension(ExtensionDefinitions.EXT_IGP_BASE, new StringType(vb.asJsonPrimitive().asString()));
+              res.addExtension(ExtensionDefinitions.EXT_IGP_DEFNS, new StringType(vd.asJsonPrimitive().asString()));
+              res.addExtension(ExtensionDefinitions.EXT_IGP_FORMAT, new StringType(vf.asJsonPrimitive().asString()));
+              res.addExtension(ExtensionDefinitions.EXT_IGP_SOURCE, new StringType(vs.asJsonPrimitive().asString()));
             }
           }
         }

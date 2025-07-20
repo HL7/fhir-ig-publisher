@@ -10,6 +10,8 @@ import java.util.Set;
 import org.hl7.fhir.exceptions.DefinitionException;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.CodeSystem;
 import org.hl7.fhir.r5.model.CodeSystem.ConceptDefinitionComponent;
@@ -27,7 +29,6 @@ import org.hl7.fhir.r5.terminologies.ConceptMapUtilities;
 import org.hl7.fhir.r5.terminologies.ConceptMapUtilities.MappingTriple;
 import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
 import org.hl7.fhir.r5.terminologies.utilities.VCLParser;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.xhtml.NodeType;
@@ -179,8 +180,8 @@ public class MultiMapBuilder extends DataRenderer {
         x.tx("--");
       } else {
         TargetElementComponent ccm = trip.getTgt();
-        if (ccm.hasExtension(ToolingExtensions.EXT_OLD_CONCEPTMAP_EQUIVALENCE)) {
-          String code = ToolingExtensions.readStringExtension(ccm, ToolingExtensions.EXT_OLD_CONCEPTMAP_EQUIVALENCE);
+        if (ccm.hasExtension(ExtensionDefinitions.EXT_OLD_CONCEPTMAP_EQUIVALENCE)) {
+          String code = ExtensionUtilities.readStringExtension(ccm, ExtensionDefinitions.EXT_OLD_CONCEPTMAP_EQUIVALENCE);
           x.ah(context.prefixLocalHref(csRel.getWebPath()+"#"+code), code).tx(presentEquivalenceCode(code));                
         } else {
           x.ah(context.prefixLocalHref(csRel.getWebPath()+"#"+ccm.getRelationship().toCode()), ccm.getRelationship().toCode()).tx(presentRelationshipCode(ccm.getRelationship().toCode()));
@@ -203,8 +204,8 @@ public class MultiMapBuilder extends DataRenderer {
     private void cellSrc(XhtmlNode x, MappingTriple trip, RenderingStatus status) throws FHIRFormatError, DefinitionException, IOException {
 
       TargetElementComponent ccm = trip.getTgt();
-      if (ccm.hasExtension(ToolingExtensions.EXT_OLD_CONCEPTMAP_EQUIVALENCE)) {
-        String code = ToolingExtensions.readStringExtension(ccm, ToolingExtensions.EXT_OLD_CONCEPTMAP_EQUIVALENCE);
+      if (ccm.hasExtension(ExtensionDefinitions.EXT_OLD_CONCEPTMAP_EQUIVALENCE)) {
+        String code = ExtensionUtilities.readStringExtension(ccm, ExtensionDefinitions.EXT_OLD_CONCEPTMAP_EQUIVALENCE);
         x.ah(context.prefixLocalHref(csRel.getWebPath()+"#"+code), code).tx(presentEquivalenceCodeInReverse(code));                
       } else {
         x.ah(context.prefixLocalHref(csRel.getWebPath()+"#"+ccm.getRelationship().toCode()), ccm.getRelationship().toCode()).tx(presentRelationshipCodeInReverse(ccm.getRelationship().toCode()));

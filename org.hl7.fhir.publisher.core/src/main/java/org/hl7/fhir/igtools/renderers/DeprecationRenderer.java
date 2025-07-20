@@ -7,11 +7,10 @@ import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.igtools.publisher.comparators.PreviousVersionComparator;
 import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.model.Base;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
@@ -35,7 +34,7 @@ public class DeprecationRenderer extends BaseRenderer {
     List<DeprecationInfo> list = new ArrayList<>();
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
-        org.hl7.fhir.r5.elementmodel.Element sse = r.getElement().getExtension(ToolingExtensions.EXT_STANDARDS_STATUS);
+        org.hl7.fhir.r5.elementmodel.Element sse = r.getElement().getExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS);
         boolean dep = false;
         if (sse != null) {
           org.hl7.fhir.r5.elementmodel.Element ssv = sse.getNamedChild("value");
@@ -43,7 +42,7 @@ public class DeprecationRenderer extends BaseRenderer {
           if ("deprecated".equals(ss)) {
             dep = true;
             String d = r.getElement().getNamedChildValue("description");
-            String sr =  ssv.getExtensionString(ToolingExtensions.EXT_STANDARDS_STATUS_REASON);
+            String sr =  ssv.getExtensionString(ExtensionDefinitions.EXT_STANDARDS_STATUS_REASON);
             String t = r.getElement().getNamedChildValue("title");
             if (t == null) {
               t = r.getElement().getNamedChildValue("name");
@@ -57,7 +56,7 @@ public class DeprecationRenderer extends BaseRenderer {
                     determineDStatus(r.fhirType()+"/"+r.getId(), oldDeprecatedIds)));
           }
         }
-        if (!dep) {
+        if (!dep && oldDeprecatedIds != null) {
           if (oldDeprecatedIds.contains(r.fhirType()+"/"+r.getId())) {
             String d = r.getElement().getNamedChildValue("description");
             String t = r.getElement().getNamedChildValue("title");
@@ -268,6 +267,9 @@ public class DeprecationRenderer extends BaseRenderer {
       return "";
     }
     List<CanonicalResource> oldResources = previous.listAllResources();
+    if (oldResources == null) {
+      return "<i>(n/a)</i>";
+    }
     Set<String> ids = new HashSet<>();
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {

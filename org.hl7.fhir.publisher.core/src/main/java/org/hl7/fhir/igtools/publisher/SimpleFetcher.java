@@ -40,6 +40,7 @@ import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.FmlParser;
 import org.hl7.fhir.r5.elementmodel.JsonParser.ILogicalModelResolver;
 import org.hl7.fhir.r5.elementmodel.ValidatedFragment;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
 import org.hl7.fhir.r5.formats.FormatUtilities;
 import org.hl7.fhir.r5.model.CanonicalType;
@@ -48,7 +49,6 @@ import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.UriType;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -576,8 +576,8 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
     }
     ProfileUtilities pu = new ProfileUtilities(context, null, pkp);
     for (StructureDefinition sd : context.fetchResourcesByType(StructureDefinition.class)) {
-      if (ToolingExtensions.readBoolExtension(sd, org.hl7.fhir.r5.utils.ToolingExtensions.EXT_LOGICAL_TARGET) &&
-          ToolingExtensions.readBoolExtension(sd, org.hl7.fhir.r5.utils.ToolingExtensions.EXT_SUPPRESS_RESOURCE_TYPE)) {
+      if (ExtensionUtilities.readBoolExtension(sd, org.hl7.fhir.r5.extensions.ExtensionDefinitions.EXT_LOGICAL_TARGET) &&
+          ExtensionUtilities.readBoolExtension(sd, org.hl7.fhir.r5.extensions.ExtensionDefinitions.EXT_SUPPRESS_RESOURCE_TYPE)) {
         // well, it's a candidate. 
         List<ElementDefinition> rootProps = pu.getChildList(sd, sd.getSnapshot().getElementFirstRep());
         if (rootProps.size() > 0) {
