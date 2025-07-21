@@ -6717,11 +6717,11 @@
       "memory" : 543680520
     },
     "hl7.fhir.us.core" : {
-      "errors" : 13,
-      "warnings" : 45,
-      "hints" : 18,
-      "time" : 2274627,
-      "memory" : 7274512904
+      "errors" : 0,
+      "warnings" : 1,
+      "hints" : 1,
+      "time" : 2632965,
+      "memory" : 7549342952
     },
     "hl7.fhir.uv.extensions" : {
       "errors" : 249,
@@ -6729,6 +6729,17 @@
       "hints" : 22,
       "time" : 417622,
       "memory" : 5334788688
+    }
+  },
+  "2.0.10" : {
+    "sync-date" : "2025-07-21",
+    "date" : "2025-07-21",
+    "hl7.fhir.uv.extensions" : {
+      "errors" : 481,
+      "warnings" : 36,
+      "hints" : 198,
+      "time" : 461213,
+      "memory" : 5777203224
     }
   }
 }
