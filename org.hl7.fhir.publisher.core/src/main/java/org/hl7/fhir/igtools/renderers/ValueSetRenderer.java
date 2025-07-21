@@ -107,9 +107,9 @@ public class ValueSetRenderer extends CanonicalRenderer {
     StringBuilder b = new StringBuilder();
     boolean first = true;
     b.append("\r\n");
-    if (vs.hasUrl()) {      
-      for (CanonicalResource cr : scanAllResources(ValueSet.class, "ValueSet")) {
-        first = checkReferencesVS(b, first, (ValueSet) cr);
+    if (vs.hasUrl()) {
+      for (CanonicalResource vs : scanAllLocalResources(ValueSet.class, "ValueSet")) {
+        first = checkReferencesVS(b, first, (ValueSet) vs);
       }
 
       for (CanonicalResource cr : scanAllResources(StructureDefinition.class, "StructureDefinition")) {

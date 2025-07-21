@@ -54,10 +54,10 @@ import java.util.List;
 
 import org.hl7.fhir.r5.context.BaseWorkerContext;
 import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
 import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.TypesUtilities;
 import org.hl7.fhir.utilities.Utilities;
 
@@ -213,7 +213,7 @@ public class TypeParser {
           list.add(new TypeRefComponent().setCode("BackboneElement"));
         else
           list.add(new TypeRefComponent().setCode("Element"));
-        ToolingExtensions.addStringExtension(ed, "http://hl7.org/fhir/StructureDefinition/structuredefinition-explicit-type-name", t.getName().substring(1));
+        ExtensionUtilities.addStringExtension(ed, "http://hl7.org/fhir/StructureDefinition/structuredefinition-explicit-type-name", t.getName().substring(1));
       } else {
         StructureDefinition sd = context.fetchTypeDefinition(t.getName());
         if (sd == null)

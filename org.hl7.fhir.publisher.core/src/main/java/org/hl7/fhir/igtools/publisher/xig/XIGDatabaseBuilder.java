@@ -30,6 +30,8 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.IGR2ConvertorAdvisor5;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CanonicalType;
@@ -87,7 +89,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
       con = connect(dest, init, date);
 
       psqlP = con.prepareStatement("Insert into Packages (PackageKey, PID, Id, Date, Title, Canonical, Web, Version, R2, R2B, R3, R4, R4B, R5, R6, Realm, Auth, Package, Published) Values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)");
-      psqlR = con.prepareStatement("Insert into Resources (ResourceKey, PackageKey, ResourceType, ResourceTypeR5, Id, R2, R2B, R3, R4, R4B, R5, R6, Web, Url, Version, Status, Date, Name, Title, Experimental, Realm, Description, Purpose, Copyright, CopyrightLabel, Kind, Type, Supplements, ValueSet, Content, Authority, Details) Values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      psqlR = con.prepareStatement("Insert into Resources (ResourceKey, PackageKey, ResourceType, ResourceTypeR5, Id, R2, R2B, R3, R4, R4B, R5, R6, Web, Url, Version, Status, Date, Name, Title, Experimental, Realm, Description, Purpose, Copyright,  CopyrightLabel, Kind, Type, Supplements, ValueSet, Content, Authority, Details, StandardsStatus, FMM, WG) Values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
       psqlC = con.prepareStatement("Insert into Contents (ResourceKey, Json, JsonR5) Values (?, ?, ?)");
       psqlCat = con.prepareStatement("Insert into Categories (ResourceKey, Mode, Code) Values (?, ?, ?)");
       psqlRI = con.prepareStatement("Insert into ResourceFTS (ResourceKey, Name, Title, Description, Narrative) Values (?, ?, ?, ?, ?)");
@@ -247,6 +249,9 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
         "ValueSet        nvarchar NULL,\r\n"+
         "Kind            nvarchar NULL,\r\n"+
         "Details         nvarchar NULL,\r\n"+
+        "StandardsStatus nvarchar NULL,\r\n"+
+        "FMM             nvarchar NULL,\r\n"+
+        "WG              nvarchar NULL,\r\n"+
         "PRIMARY KEY (ResourceKey))\r\n");
   }
 
@@ -505,8 +510,11 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
             psqlR.setString(28, j.asString("supplements"));        
             psqlR.setString(29, j.asString("valueSet"));        
             psqlR.setString(30, j.asString("content"));         
-            psqlR.setString(31, auth);                
-            psqlR.setString(32, details);        
+            psqlR.setString(31, auth);
+            psqlR.setString(32, details);
+            psqlR.setString(33, ExtensionUtilities.readStringExtension(cr, ExtensionDefinitions.EXT_STANDARDS_STATUS));
+            psqlR.setString(34, ExtensionUtilities.readStringExtension(cr, ExtensionDefinitions.EXT_FMM_LEVEL));
+            psqlR.setString(35, ExtensionUtilities.readStringExtension(cr, ExtensionDefinitions.EXT_WORKGROUP));
             psqlR.execute();
 
             psqlC.setInt(1, resKey);

@@ -23,7 +23,9 @@ import org.hl7.fhir.r5.comparison.ComparisonSession;
 import org.hl7.fhir.r5.conformance.profile.ProfileKnowledgeProvider;
 import org.hl7.fhir.r5.context.ILoggingService;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
 import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.r5.model.DomainResource;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.Resource;
 import org.hl7.fhir.utilities.FileUtilities;
@@ -94,6 +96,7 @@ public class PreviousVersionComparator {
   private String lastUrl;
   private String businessVersion;
   private RenderingI18nContext i18n;
+  private VersionInstance workingVersion;
   
   public PreviousVersionComparator(SimpleWorkerContext context, String version, String businessVersion, String rootDir, String dstDir, String canonical, ProfileKnowledgeProvider pkp, ILoggingService logger, List<String> versions, String versionToAnnotate, RenderingI18nContext i18n) {
     super();
@@ -141,7 +144,8 @@ public class PreviousVersionComparator {
           if(last == null) {
             throw new FHIRException("no {last} version found in package-list.json");
           } else if (!last.equals(businessVersion)) {
-            versionList.add(new VersionInstance(last, makeIni(rootDir, last), last.equals(versionToAnnotate) || "{last}".equals(versionToAnnotate)));
+            VersionInstance vi = new VersionInstance(last, makeIni(rootDir, last), last.equals(versionToAnnotate) || "{last}".equals(versionToAnnotate));
+            versionList.add(vi);
           }
         } 
         if ("{current}".equals(v)) {
@@ -272,7 +276,8 @@ public class PreviousVersionComparator {
       }
     }
   }
-private String fixForIniMap(String url, IniFile ini) {
+
+  private String fixForIniMap(String url, IniFile ini) {
     if (ini == null) {
       return url;
     }
@@ -377,4 +382,46 @@ private String fixForIniMap(String url, IniFile ini) {
     return lastUrl;
   }
 
+
+  public Set<String> deprecatedResourceIds() {
+    if (lastVersion() == null) {
+      return null;
+    }
+    Set<String> result = new HashSet<>();
+    for (Resource r : lastVersion().resources) {
+      if (r instanceof DomainResource) {
+        DomainResource dr = (DomainResource) r;
+        if (dr.hasExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS)) {
+          String st = dr.getExtensionString(ExtensionDefinitions.EXT_STANDARDS_STATUS);
+          if ("deprecated".equals(st)) {
+            result.add(r.fhirType()+"/"+r.getId());
+          }
+        }
+      }
+    }
+    return result;
+  }
+
+  private VersionInstance lastVersion() {
+    return versionList.isEmpty() ? null : versionList.get(0);
+  }
+
+  public Set<String> listAllResourceIds() {
+    if (lastVersion() == null) {
+      return null;
+    }
+    Set<String> result = new HashSet<>();
+    for (Resource r : lastVersion().resources) {
+      result.add(r.fhirType()+"/"+r.getId());
+    }
+    return result;
+  }
+
+  public List<CanonicalResource> listAllResources() {
+    if (lastVersion() == null) {
+      return null;
+    } else {
+      return lastVersion().resources;
+    }
+  }
 }

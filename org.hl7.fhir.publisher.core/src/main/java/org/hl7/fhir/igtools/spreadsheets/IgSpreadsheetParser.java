@@ -35,6 +35,8 @@ import org.hl7.fhir.igtools.publisher.FetchedFile;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.XmlParser;
@@ -102,7 +104,6 @@ import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.model.ValueSet.ValueSetComposeComponent;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
@@ -229,9 +230,9 @@ public class IgSpreadsheetParser {
   }
   private void processMetadata(StructureDefinition first) {
     if (hasMetadata("logical-mapping-prefix"))
-      ToolingExtensions.addStringExtension(first, ToolingExtensions.EXT_MAPPING_PREFIX, metadata("logical-mapping-prefix"));
+      ExtensionUtilities.addStringExtension(first, ExtensionDefinitions.EXT_MAPPING_PREFIX, metadata("logical-mapping-prefix"));
     if (hasMetadata("logical-mapping-suffix"))
-      ToolingExtensions.addStringExtension(first, ToolingExtensions.EXT_MAPPING_SUFFIX, metadata("logical-mapping-suffix"));
+      ExtensionUtilities.addStringExtension(first, ExtensionDefinitions.EXT_MAPPING_SUFFIX, metadata("logical-mapping-suffix"));
   }
 
   private void checkOutputs(FetchedFile f) throws Exception {
@@ -603,7 +604,7 @@ public class IgSpreadsheetParser {
             cc.setDisplay(Utilities.humanize(cc.getCode()));
           cc.setDefinition(sheet.getColumn(row, "Definition"));
           if (!Utilities.noString(sheet.getColumn(row, "Comment")))
-            ToolingExtensions.addCSComment(cc, sheet.getColumn(row, "Comment"));
+            ExtensionUtilities.addCSComment(cc, sheet.getColumn(row, "Comment"));
 //          cc.setUserData(!"v2", sheet.getColumn(row, "v2"));
 //          cc.setUserData(!"v3", sheet.getColumn(row, "v3"));
           for (String ct : sheet.columns)
@@ -640,9 +641,9 @@ public class IgSpreadsheetParser {
         codes.put(cc.getCode(), null);
         cc.setDisplay(sheet.getColumn(row, "Display"));
         if (!Utilities.noString(sheet.getColumn(row, "Definition")))
-          ToolingExtensions.addDefinition(cc, sheet.getColumn(row, "Definition"));
+          ExtensionUtilities.addDefinition(cc, sheet.getColumn(row, "Definition"));
         if (!Utilities.noString(sheet.getColumn(row, "Comment")))
-          ToolingExtensions.addVSComment(cc, sheet.getColumn(row, "Comment"));
+          ExtensionUtilities.addVSComment(cc, sheet.getColumn(row, "Comment"));
         cc.setUserDataINN("v2", sheet.getColumn(row, "v2"));
         cc.setUserDataINN("v3", sheet.getColumn(row, "v3"));
         for (String ct : sheet.columns)
@@ -815,7 +816,7 @@ public class IgSpreadsheetParser {
     }
     String regex = sheet.getColumn(row, "Regex");
     if (!Utilities.noString(regex) && e.hasType())
-      ToolingExtensions.addStringExtension(e, ToolingExtensions.EXT_REGEX, regex);
+      ExtensionUtilities.addStringExtension(e, ExtensionDefinitions.EXT_REGEX, regex);
 
     if ((path.endsWith(".extension") || path.endsWith(".modifierExtension")) && e.hasType() && e.getType().get(0).hasProfile() && Utilities.noString(profileName))
         throw new Exception("need to have a profile name if a profiled extension is referenced for "+ e.getType().get(0).getProfile());
@@ -865,7 +866,7 @@ public class IgSpreadsheetParser {
     processOtherExamples(e, sheet, row);
     String dh = sheet.getColumn(row, "Display Hint");
     if (!Utilities.noString(dh))
-      ToolingExtensions.addDisplayHint(e, dh);
+      ExtensionUtilities.addDisplayHint(e, dh);
     e.setFixed(processValue(sheet, row, "Value", sheet.getColumn(row, "Value"), e));
     e.setPattern(processValue(sheet, row, "Pattern", sheet.getColumn(row, "Pattern"), e));
     return e;

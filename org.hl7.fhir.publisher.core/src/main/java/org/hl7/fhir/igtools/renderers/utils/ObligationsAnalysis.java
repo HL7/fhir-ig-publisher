@@ -8,16 +8,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.hl7.fhir.igtools.renderers.utils.ObligationsAnalysis.ActorInfo;
-import org.hl7.fhir.igtools.renderers.utils.ObligationsAnalysis.ProfileActorObligationsAnalysis;
-import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.model.ActorDefinition;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
 import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.utils.ResourceSorters.CanonicalResourceSortByUrl;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
 
 public class ObligationsAnalysis {
 
@@ -84,15 +80,15 @@ public class ObligationsAnalysis {
     ObligationsAnalysis self = new ObligationsAnalysis();
 
     for (StructureDefinition sd : profiles) {
-      for (Extension ob : sd.getExtensionsByUrl(ToolingExtensions.EXT_OBLIGATION_CORE)) {
+      for (Extension ob : sd.getExtensionsByUrl(ExtensionDefinitions.EXT_OBLIGATION_CORE)) {
         seeObligation(self, sd, null, ob);
       }
       for (ElementDefinition ed : sd.getSnapshot().getElement()) {
-        for (Extension ob : ed.getExtensionsByUrl(ToolingExtensions.EXT_OBLIGATION_CORE)) {
+        for (Extension ob : ed.getExtensionsByUrl(ExtensionDefinitions.EXT_OBLIGATION_CORE)) {
           seeObligation(self, sd, ed, ob);
         }
         for (TypeRefComponent tr : ed.getType()) {
-          for (Extension ob : tr.getExtensionsByUrl(ToolingExtensions.EXT_OBLIGATION_CORE)) {
+          for (Extension ob : tr.getExtensionsByUrl(ExtensionDefinitions.EXT_OBLIGATION_CORE)) {
             seeObligation(self, sd, ed, ob);
           }
         }
