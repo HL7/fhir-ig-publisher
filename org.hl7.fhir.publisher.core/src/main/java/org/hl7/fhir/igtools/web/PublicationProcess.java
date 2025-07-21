@@ -573,7 +573,7 @@ public class PublicationProcess {
       zipFolder(temp, Utilities.path(igBuildZipDir, npm.name()+"#"+npm.version()+".zip"));
 
       System.out.println("");        
-      System.out.println("ok. All checks passed. Publish v"+npm.version()+" to "+destVer);        
+      System.out.println("ok. All checks passed. Publish v"+npm.version()+" to "+destVer);
 
       // 3. create the folder {root}/{realm}/{code}/{subdir}
       System.out.println("Copy the IG to "+destVer);    
@@ -663,8 +663,8 @@ public class PublicationProcess {
         src.cleanFolder(relDest);
       }
       NpmPackage npmB = NpmPackage.fromPackage(new FileInputStream(Utilities.path(destVer, "package.tgz")));
-      updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("package"), false, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(genDate), username, version, gitSrcId);
-      updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("publication"), true, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(genDate), username, version, gitSrcId);
+      updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("package"), false, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(genDate), username, version, gitSrcId, subPackages);
+      updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("publication"), true, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(genDate), username, version, gitSrcId, subPackages);
       new PackageRegistryBuilder(workingRoot).update(destination.substring(workingRoot.length()+1), pl);
       IndexMaintainer ndx = getIndexForIg(indexes, npmB.id());
       if (ndx != null) {
@@ -832,10 +832,10 @@ public class PublicationProcess {
     return realm == null || ("uv".equals(realm) && Utilities.existsInList(code, "smart-app-launch", "extensions", "tools")) ? null : indexes.get(realm);
   }
 
-  private void updateFeed(File fRoot, String destVer, PackageList pl, PackageListEntry plVer, String file, boolean isPublication, WebSourceProvider src, String orgName, NpmPackage npm, String genDate, String username, String version, String gitSrcId) throws IOException {
+  private void updateFeed(File fRoot, String destVer, PackageList pl, PackageListEntry plVer, String file, boolean isPublication, WebSourceProvider src, String orgName, NpmPackage npm, String genDate, String username, String version, String gitSrcId, List<String> otherPackages) throws IOException {
     if (!Utilities.noString(file)) {
       src.needFile(file);
-      if (!updateFeedAsXml(Utilities.path(fRoot.getAbsolutePath(), file), pl, plVer, isPublication, orgName, npm, genDate, username, version, gitSrcId)) {
+      if (!updateFeedAsXml(Utilities.path(fRoot.getAbsolutePath(), file), pl, plVer, isPublication, orgName, npm, genDate, username, version, gitSrcId, otherPackages)) {
         String newContent = makeEntry(pl, plVer, isPublication, orgName, npm, genDate, username, version, gitSrcId);
         String rss = FileUtilities.fileToString(Utilities.path(fRoot.getAbsolutePath(), file));
         int i = rss.indexOf("<item");
@@ -848,7 +848,7 @@ public class PublicationProcess {
     }
   }
 
-  private boolean updateFeedAsXml(String file, PackageList pl, PackageListEntry plVer, boolean isPublication, String orgName, NpmPackage npm, String genDate, String username, String version, String gitSrcId) {
+  private boolean updateFeedAsXml(String file, PackageList pl, PackageListEntry plVer, boolean isPublication, String orgName, NpmPackage npm, String genDate, String username, String version, String gitSrcId, List<String> otherPackages) {
     String link = Utilities.pathURL(plVer.path(), isPublication ? "index.html" : "package.tgz");
     try {
       Document xml = XMLUtil.parseFileToDom(file);
@@ -865,6 +865,25 @@ public class PublicationProcess {
         channel.insertBefore(nitem, item);        
         channel.insertBefore(xml.createTextNode("\n    "), item);        
       }
+      if (!isPublication && otherPackages != null) {
+        for (String p : otherPackages) {
+          String pid = npm.name()+"."+p;
+          XMLUtil.addTextTag(xml, nitem, "title", pid + "#" + plVer.version(), 6);
+          XMLUtil.addTextTag(xml, nitem, "description", plVer.desc(), 6);
+          String l = link.replace("package.tgz", pid+".tgz");
+          XMLUtil.addTextTag(xml, nitem, "link", l, 6);
+          XMLUtil.addTextTag(xml, nitem, "guid", l, 6).setAttribute("isPermaLink", "true");
+          XMLUtil.addTextTag(xml, nitem, "dc:creator", orgName, 6);
+          XMLUtil.addTextTag(xml, nitem, "fhir:version", VersionUtilities.versionFromCode(p), 6);
+          XMLUtil.addTextTag(xml, nitem, "fhir:kind", npm.getNpm().asString("type"), 6);
+          XMLUtil.addTextTag(xml, nitem, "pubDate", presentDate(npm.dateAsDate()), 6);
+          XMLUtil.addTextTag(xml, nitem, "fhir:details", "Publication run at " + genDate + " by " + username + " using " + version + (gitSrcId != null ? " source id " + gitSrcId : ""), 6);
+          nitem.appendChild(xml.createTextNode("\n    "));
+          nitem = xml.createElement("item");
+          channel.insertBefore(nitem, item);
+          channel.insertBefore(xml.createTextNode("\n    "), item);
+        }
+      }
       XMLUtil.addTextTag(xml, nitem, "title", isPublication ? pl.title()+" version "+plVer.version() : pl.pid()+"#"+plVer.version(), 6);
       XMLUtil.addTextTag(xml, nitem, "description", plVer.desc(), 6);
       XMLUtil.addTextTag(xml, nitem, "link", link, 6);
@@ -875,7 +894,8 @@ public class PublicationProcess {
       XMLUtil.addTextTag(xml, nitem, "pubDate", presentDate(npm.dateAsDate()), 6);
       XMLUtil.addTextTag(xml, nitem, "fhir:details", "Publication run at "+genDate+" by "+username+" using "+version+(gitSrcId != null ? " source id "+gitSrcId : ""), 6);
       nitem.appendChild(xml.createTextNode("\n    "));
-      
+
+
       Element dt = XMLUtil.getNamedChild(channel, "lastBuildDate");
       dt.getChildNodes().item(0).setTextContent(presentDate(npm.dateAsDate()));
       dt = XMLUtil.getNamedChild(channel, "pubDate");
@@ -1217,8 +1237,8 @@ public class PublicationProcess {
     String username = getComputerName();
 
     NpmPackage npmB = NpmPackage.fromPackage(new FileInputStream(Utilities.path(destVer, "package.tgz")));
-    updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("package"), false, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(dd), username, version, null);
-    updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("publication"), true, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(dd), username, version, null);
+    updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("package"), false, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(dd), username, version, null, null);
+    updateFeed(fRoot, destVer, pl, plVer, pubSetup.forceObject("feeds").asString("publication"), true, src, pubSetup.forceObject("website").asString("org"), npmB, genDateS(dd), username, version, null, null);
     new PackageRegistryBuilder(workingRoot).update(destination.substring(workingRoot.length()+1), pl);
     new HistoryPageUpdater().updateHistoryPage(history, destination, templateSrc, false);
 

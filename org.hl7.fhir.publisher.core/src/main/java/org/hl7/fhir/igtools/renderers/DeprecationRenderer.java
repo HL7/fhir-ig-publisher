@@ -51,7 +51,9 @@ public class DeprecationRenderer extends BaseRenderer {
               t = r.getId();
             }
             String path = r.getPath();
-            deprecatedIds.add(r.fhirType()+"/"+r.getId());
+            if (deprecatedIds != null) {
+              deprecatedIds.add(r.fhirType() + "/" + r.getId());
+            }
             list.add(new DeprecationInfo(path, r.fhirType(), t, sr, d, r.getElement().getNamedChildValue("status"), r.getId(),
                     determineDStatus(r.fhirType()+"/"+r.getId(), oldDeprecatedIds)));
           }
