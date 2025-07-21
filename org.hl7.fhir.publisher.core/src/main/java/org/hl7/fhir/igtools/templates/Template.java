@@ -26,7 +26,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -43,6 +42,8 @@ import org.apache.tools.ant.ProjectHelper;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_40_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
 import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.XmlParser;
 import org.hl7.fhir.r5.model.ImplementationGuide;
@@ -50,11 +51,8 @@ import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionRe
 import org.hl7.fhir.r5.model.OperationOutcome;
 import org.hl7.fhir.r5.model.OperationOutcome.OperationOutcomeIssueComponent;
 import org.hl7.fhir.r5.model.Reference;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.i18n.LanguageFileProducer.TranslationUnit;
-import org.hl7.fhir.utilities.i18n.PoGetTextProducer;
 import org.hl7.fhir.utilities.i18n.POObject;
 import org.hl7.fhir.utilities.i18n.POSource;
 import org.hl7.fhir.utilities.json.JsonException;
@@ -216,7 +214,7 @@ public class Template {
           source = new POSource();
           translations.put(base, source);
           for (JsonProperty p : langEntry.getValue().asJsonObject().getProperties()) {
-            source.getEntries().add(new POObject(p.getName(), lf.getJsonObject("en").asString(p.getName()), p.getValue().asString()));
+            source.getPOObjects().add(new POObject(p.getName(), lf.getJsonObject("en").asString(p.getName()), p.getValue().asString()));
           }
         } else {
           source = translations.get(lang);
@@ -224,7 +222,7 @@ public class Template {
         for (JsonProperty p : lf.getJsonObject("en").getProperties()) {
           POObject existing = findPO(source, p);
           if (existing == null) {
-            source.getEntries().add(new POObject(p.getName(), p.getValue().asString(), null));
+            source.getPOObjects().add(new POObject(p.getName(), p.getValue().asString(), null));
           } else {
             existing.setMsgid(p.getValue().asString());
           }
@@ -236,7 +234,7 @@ public class Template {
     for (String lang : translations.keySet()) {
       POSource units = translations.get(lang);
       JsonObject l = lf.forceObject(lang);
-      for (POObject po : units.getEntries()) {
+      for (POObject po : units.getPOObjects()) {
         l.remove(po.getId());
         if (po.getMsgstr().isEmpty() || Utilities.noString(po.getMsgstr().get(0))) {
           l.add(po.getId(), lf.getJsonObject("en").asString(po.getId()));          
@@ -265,7 +263,7 @@ public class Template {
         POObject existing = findPO(source, p);
         if (existing == null) {
           POObject n = new POObject(p.getName(), p.getValue().asString(), null);
-          source.getEntries().add(n);
+          source.getPOObjects().add(n);
         }
       }
       source.savePOFile(Utilities.path(tf, base+"-"+lang+".po"), 1, 0);
@@ -284,7 +282,7 @@ public class Template {
 
   private POObject findPO(POSource source, JsonProperty p) {
     POObject existing = null;
-    for (POObject t : source.getEntries()) {
+    for (POObject t : source.getPOObjects()) {
       if (t.getId().equals(p.getName())) {
         existing = t;
         break;
@@ -462,12 +460,12 @@ public class Template {
 
   private void loadValidationMessages(OperationOutcome op, Map<String, List<ValidationMessage>> res) throws FHIRException {
     for (OperationOutcomeIssueComponent issue : op.getIssue()) {
-      String source = ToolingExtensions.readStringExtension(issue, ToolingExtensions.EXT_ISSUE_SOURCE);
+      String source = ExtensionUtilities.readStringExtension(issue, ExtensionDefinitions.EXT_ISSUE_SOURCE);
       if (source == null)
         source = "";
       if (!res.containsKey(source))
         res.put(source, new ArrayList<>());
-      ValidationMessage vm = ToolingExtensions.readValidationMessage(issue, Source.Template);
+      ValidationMessage vm = ExtensionUtilities.readValidationMessage(issue, Source.Template);
       if (vm.getLevel() == IssueSeverity.FATAL)
         throw new FHIRException("Fatal Error from Template: "+vm.getMessage());
       res.get(source).add(vm);

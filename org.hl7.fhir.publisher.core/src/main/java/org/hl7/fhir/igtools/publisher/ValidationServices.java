@@ -42,6 +42,8 @@ import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.Manager;
 import org.hl7.fhir.r5.elementmodel.Manager.FhirFormat;
 import org.hl7.fhir.r5.elementmodel.ObjectConverter;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.model.ActorDefinition;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CanonicalType;
@@ -61,14 +63,11 @@ import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureMap;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.terminologies.ImplicitValueSets;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.r5.utils.validation.IMessagingServices;
 import org.hl7.fhir.r5.utils.validation.IResourceValidator;
 import org.hl7.fhir.r5.utils.validation.IValidationPolicyAdvisor;
 import org.hl7.fhir.r5.utils.validation.IValidatorResourceFetcher;
-import org.hl7.fhir.r5.utils.validation.IValidationPolicyAdvisor.ReferenceDestinationType;
-import org.hl7.fhir.r5.utils.validation.IValidationPolicyAdvisor.SpecialValidationAction;
 import org.hl7.fhir.r5.utils.validation.constants.BindingKind;
 import org.hl7.fhir.r5.utils.validation.constants.ContainedReferenceValidationPolicy;
 import org.hl7.fhir.r5.utils.validation.constants.ReferenceValidationPolicy;
@@ -125,7 +124,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
         return new ObjectConverter(context).convert(res);
     }
 
-    ValueSet vs = ImplicitValueSets.build(url);
+    ValueSet vs = new ImplicitValueSets(context.getExpansionParameters()).generateImplicitValueSet(url);
     if (vs != null)
       return new ObjectConverter(context).convert(vs);
     
@@ -205,12 +204,12 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
       for (FetchedResource r : f.getResources()) {
         if ("ActorDefinition".equals(r.fhirType())) {
           ActorDefinition act = ((ActorDefinition) r.getResource());
-          String aurl = ToolingExtensions.readStringExtension(act, "http://hl7.org/fhir/tools/StructureDefinition/ig-actor-example-url");
+          String aurl = ExtensionUtilities.readStringExtension(act, "http://hl7.org/fhir/tools/StructureDefinition/ig-actor-example-url");
           if (aurl != null && turl.startsWith(aurl)) {
             String tail = turl.substring(aurl.length()+1);
             for (ImplementationGuideDefinitionResourceComponent igr : ig.getDefinition().getResource()) {
               if (tail.equals(igr.getReference().getReference())) {
-                String actor = ToolingExtensions.readStringExtension(igr, "http://hl7.org/fhir/tools/StructureDefinition/ig-example-actor");
+                String actor = ExtensionUtilities.readStringExtension(igr, "http://hl7.org/fhir/tools/StructureDefinition/ig-example-actor");
                 if (actor.equals(act.getUrl())) {
                   for (FetchedFile f2 : files) {
                     for (FetchedResource r2 : f2.getResources()) {
@@ -336,7 +335,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
       return true;
     }
     
-    for (Extension ext : ig.getExtensionsByUrl(ToolingExtensions.EXT_IG_URL)) {
+    for (Extension ext : ig.getExtensionsByUrl(ExtensionDefinitions.EXT_IG_URL)) {
       String value = ext.getExtensionString("uri");
       if (value != null && value.equals(url)) {
         return true;
@@ -367,7 +366,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
       }
       
     }
-    if (path.endsWith(".system")) {
+    if (Utilities.existsInList(path, "ValueSet.compose.include.system", "ValueSet.compose.exclude.system")) {
       CodeSystem cs = context.findTxResource(CodeSystem.class, url);
       if (cs != null) {
         return true;

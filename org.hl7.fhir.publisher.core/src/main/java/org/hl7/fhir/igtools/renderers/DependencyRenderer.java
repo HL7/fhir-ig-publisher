@@ -21,17 +21,17 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.DependencyAnalyser;
 import org.hl7.fhir.igtools.publisher.DependencyAnalyser.ArtifactDependency;
-import org.hl7.fhir.igtools.renderers.DependencyRenderer.PackageUsageInfo;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.igtools.templates.TemplateManager;
 import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideGlobalComponent;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
@@ -150,7 +150,6 @@ public class DependencyRenderer {
     @Getter
     @Setter
     private boolean direct;
-    @Getter
     @Setter
     private String reason;
     private String parent;
@@ -211,7 +210,7 @@ public class DependencyRenderer {
       NpmPackage p = resolve(d);
       boolean dloaded = isLoaded(p);
       if (dloaded) {
-        addPackage(p, d.hasReason() ? d.getReason() : ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_IGDEP_COMMENT), true);
+        addPackage(p, d.hasReason() ? d.getReason() : ExtensionUtilities.readStringExtension(d, ExtensionDefinitions.EXT_IGDEP_COMMENT), true);
       }
     }
 
@@ -297,7 +296,7 @@ public class DependencyRenderer {
   public String render(ImplementationGuide ig, boolean QA, boolean details, boolean first) throws FHIRException, IOException {
     boolean hasDesc = false;
     for (ImplementationGuideDependsOnComponent d : ig.getDependsOn()) {
-      hasDesc = hasDesc || d.hasExtension(ToolingExtensions.EXT_IGDEP_COMMENT) || d.hasReason();
+      hasDesc = hasDesc || d.hasExtension(ExtensionDefinitions.EXT_IGDEP_COMMENT) || d.hasReason();
     }
     
     HierarchicalTableGenerator gen = new HierarchicalTableGenerator(rc, dstFolder, true, true, "dep");
@@ -316,7 +315,7 @@ public class DependencyRenderer {
         NpmPackage p = resolve(d);
         boolean dloaded = isLoaded(p);
         if (QA || dloaded) {
-          addPackageRow(gen, row.getSubRows(), p, d.getVersion(), realm, QA, b, d.hasReason() ? d.getReason() : ToolingExtensions.readStringExtension(d, ToolingExtensions.EXT_IGDEP_COMMENT), hasDesc, processed, listed, dloaded);
+          addPackageRow(gen, row.getSubRows(), p, d.getVersion(), realm, QA, b, d.hasReason() ? d.getReason() : ExtensionUtilities.readStringExtension(d, ExtensionDefinitions.EXT_IGDEP_COMMENT), hasDesc, processed, listed, dloaded);
         }
       } catch (Exception e) {
         e.printStackTrace();

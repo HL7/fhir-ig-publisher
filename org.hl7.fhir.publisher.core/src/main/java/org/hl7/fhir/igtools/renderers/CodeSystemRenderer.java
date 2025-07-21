@@ -33,15 +33,12 @@ import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.RelatedIG;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.CanonicalResourceComparison;
-import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.ChangeAnalysisState;
 import org.hl7.fhir.r5.comparison.VersionComparisonAnnotation;
 import org.hl7.fhir.r5.context.IWorkerContext;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CodeSystem;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
+import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
 import org.hl7.fhir.r5.model.NamingSystem.NamingSystemUniqueIdComponent;
-import org.hl7.fhir.r5.model.NamingSystem;
-import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.renderers.NamingSystemRenderer;
 import org.hl7.fhir.r5.renderers.RendererFactory;
@@ -51,6 +48,7 @@ import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.graphql.Value;
 import org.hl7.fhir.utilities.i18n.RenderingI18nContext;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.xhtml.NodeType;
@@ -128,17 +126,30 @@ public class CodeSystemRenderer extends CanonicalRenderer {
     b.append("\r\n");
 
     Set<String> processed = new HashSet<String>();
-    for (CanonicalResource cr : scanAllResources(ValueSet.class, "ValueSet")) {
-      ValueSet vc = (ValueSet) cr;
-      for (ConceptSetComponent ed : vc.getCompose().getInclude())
-        first = addLink(b, first, vc, ed, processed);
-      for (ConceptSetComponent ed : vc.getCompose().getExclude())
-        first = addLink(b, first, vc, ed, processed);
+    for (CanonicalResource cr : scanAllLocalResources(ValueSet.class, "ValueSet")) {
+      ValueSet vs = (ValueSet) cr;
+      if (cs.getContent() != CodeSystemContentMode.SUPPLEMENT) {
+        for (ConceptSetComponent ed : vs.getCompose().getInclude()) {
+          first = addLink(b, first, vs, ed, processed);
+        }
+        for (ConceptSetComponent ed : vs.getCompose().getExclude()) {
+          first = addLink(b, first, vs, ed, processed);
+        }
+      } else {
+        for (Extension ex : vs.getExtensionsByUrl(ExtensionDefinitions.EXT_VS_CS_SUPPL_NEEDED)) {
+          first = addLink(b, first, vs, ex, processed);
+        }
+      }
     }
-    if (first)
-      b.append("<ul><li>"+(gen.formatPhrase(RenderingContext.CODE_SYS_CODE_NOT_HERE))+"</li></ul>\r\n");
-    else
-      b.append("</ul>\r\n");    
+    if (first) {
+      if (cs.getContent() == CodeSystemContentMode.SUPPLEMENT) {
+        b.append("<ul><li>"+(gen.formatPhrase(RenderingContext.CODE_SYS_SUPP_CODE_NOT_HERE))+"</li></ul>\r\n");
+      } else {
+        b.append("<ul><li>"+(gen.formatPhrase(RenderingContext.CODE_SYS_CODE_NOT_HERE))+"</li></ul>\r\n");
+      }
+    } else {
+      b.append("</ul>\r\n");
+    }
     return b.toString()+changeSummary();
   }
 
@@ -170,15 +181,28 @@ public class CodeSystemRenderer extends CanonicalRenderer {
     Set<String> processed = new HashSet<String>();
     for (String url : vsurls) {
       ValueSet vc = context.findTxResource(ValueSet.class, url);
-      for (ConceptSetComponent ed : vc.getCompose().getInclude())
-        first = addLink(b, first, vc, ed, processed);
-      for (ConceptSetComponent ed : vc.getCompose().getExclude())
-        first = addLink(b, first, vc, ed, processed);
+      if (cs.getContent() != CodeSystemContentMode.SUPPLEMENT) {
+        for (ConceptSetComponent ed : vc.getCompose().getInclude()) {
+          first = addLink(b, first, vc, ed, processed);
+        }
+        for (ConceptSetComponent ed : vc.getCompose().getExclude()) {
+          first = addLink(b, first, vc, ed, processed);
+        } 
+      } else {
+        for (Extension ex : vc.getExtensionsByUrl(ExtensionDefinitions.EXT_VS_CS_SUPPL_NEEDED)) {
+          first = addLink(b, first, vc, ex, processed); 
+        }
+      }
     }
-    if (first)
-      b.append("<ul><li>"+(gen.formatPhrase(RenderingContext.CODE_SYS_CODE_NOT_HERE))+"</li></ul>\r\n");
-    else
-      b.append("</ul>\r\n");    
+    if (first) {
+      if (cs.getContent() == CodeSystemContentMode.SUPPLEMENT) {
+        b.append("<ul><li>"+(gen.formatPhrase(RenderingContext.CODE_SYS_SUPP_CODE_NOT_HERE))+"</li></ul>\r\n");
+      } else {
+        b.append("<ul><li>"+(gen.formatPhrase(RenderingContext.CODE_SYS_CODE_NOT_HERE))+"</li></ul>\r\n");        
+      }
+    } else {
+      b.append("</ul>\r\n");
+    }
     return b.toString()+changeSummary();
   }
 
@@ -193,6 +217,26 @@ public class CodeSystemRenderer extends CanonicalRenderer {
 
   private boolean addLink(StringBuilder b, boolean first, ValueSet vc, ConceptSetComponent ed, Set<String> processed) {
     if (ed.hasSystem() && ed.getSystem().equals(cs.getUrl())) {
+      String path = vc.getWebPath();
+      if (!processed.contains(path)) {
+        if (first) {
+          first = false;
+          b.append("<ul>\r\n");
+        } 
+        if (path == null) {
+          System.out.println("No path for "+vc.getUrl());
+        } else {
+          b.append(" <li><a href=\""+path+"\">"+Utilities.escapeXml(gen.getTranslated(vc.getNameElement()))+"</a></li>\r\n");
+        }
+        processed.add(path);
+      }
+    }
+    return first;
+  }
+
+
+  private boolean addLink(StringBuilder b, boolean first, ValueSet vc, Extension ex, Set<String> processed) {
+    if (ex.hasValue() && Utilities.existsInList(ex.getValue().primitiveValue(), cs.getUrl(), cs.getVersionedUrl())) {
       String path = vc.getWebPath();
       if (!processed.contains(path)) {
         if (first) {

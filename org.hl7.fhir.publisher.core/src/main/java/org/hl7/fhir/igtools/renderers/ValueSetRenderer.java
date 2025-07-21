@@ -107,9 +107,9 @@ public class ValueSetRenderer extends CanonicalRenderer {
     StringBuilder b = new StringBuilder();
     boolean first = true;
     b.append("\r\n");
-    if (vs.hasUrl()) {      
-      for (CanonicalResource cr : scanAllResources(ValueSet.class, "ValueSet")) {
-        first = checkReferencesVS(b, first, (ValueSet) cr);
+    if (vs.hasUrl()) {
+      for (CanonicalResource vs : scanAllLocalResources(ValueSet.class, "ValueSet")) {
+        first = checkReferencesVS(b, first, (ValueSet) vs);
       }
 
       for (CanonicalResource cr : scanAllResources(StructureDefinition.class, "StructureDefinition")) {
@@ -147,7 +147,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
 
   public boolean checkReferencesVS(StringBuilder b, boolean first, Questionnaire q) {
     if (q != null) {
-      if (questionnaireUsesValueSet(q.getItem(), vs.getUrl())) {
+      if (questionnaireUsesValueSet(q.getItem(), vs.getUrl(), vs.getVersionedUrl())) {
         if (first) {
           first = false;
           b.append("<ul>\r\n");
@@ -166,7 +166,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
   public boolean checkReferencesVS(StringBuilder b, boolean first, ValueSet vc) {
     for (ConceptSetComponent t : vc.getCompose().getInclude()) {
       for (UriType ed : t.getValueSet()) {
-        if (ed.getValueAsString().equals(vs.getUrl())) {
+        if (Utilities.existsInList(ed.getValueAsString(), vs.getUrl(), vs.getVersionedUrl())) {
           if (first) {
             first = false;
             b.append("<ul>\r\n");
@@ -178,7 +178,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
     }
     for (ConceptSetComponent t : vc.getCompose().getExclude()) {
       for (UriType ed : t.getValueSet()) {
-        if (ed.getValueAsString().equals(vs.getUrl())) {
+        if (Utilities.existsInList(ed.getValueAsString(), vs.getUrl(), vs.getVersionedUrl())) {
           if (first) {
             first = false;
             b.append("<ul>\r\n");
@@ -195,7 +195,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
     if (sd != null) {
       for (ElementDefinition ed : sd.getDifferential().getElement()) {
         if (ed.hasBinding() && ed.getBinding().hasValueSet()) {
-          if ((ed.getBinding().hasValueSet() && ed.getBinding().getValueSet().equals(vs.getUrl()))) {
+          if ((ed.getBinding().hasValueSet() && Utilities.existsInList(ed.getBinding().getValueSet(), vs.getUrl(), vs.getVersionedUrl()))) {
             if (first) {
               first = false;
               b.append("<ul>\r\n");
@@ -214,11 +214,11 @@ public class ValueSetRenderer extends CanonicalRenderer {
     return first;
   }
 
-  private boolean questionnaireUsesValueSet(List<QuestionnaireItemComponent> items, String url) {
+  private boolean questionnaireUsesValueSet(List<QuestionnaireItemComponent> items, String url, String url2) {
     for (QuestionnaireItemComponent i : items) {
-      if (i.hasAnswerValueSet() && url.equals(i.getAnswerValueSet()))
+      if (i.hasAnswerValueSet() && Utilities.existsInList(i.getAnswerValueSet(), url, url2))
         return true;
-      if (questionnaireUsesValueSet(i.getItem(), url))
+      if (questionnaireUsesValueSet(i.getItem(), url, url2))
         return true;
     }
     return false;
@@ -236,7 +236,7 @@ public class ValueSetRenderer extends CanonicalRenderer {
       for (TriggerDefinition td : pda.getTrigger()) {
         for (DataRequirement dr : td.getData())
           for (DataRequirementCodeFilterComponent ed : dr.getCodeFilter())
-            if (ed.getValueSet().equals(vs.getUrl()))
+            if (Utilities.existsInList(ed.getValueSet(), vs.getUrl(), vs.getVersionedUrl()))
               return true;
       }
     }

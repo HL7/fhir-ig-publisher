@@ -142,9 +142,10 @@ public class TemplateReleaser {
     System.out.println("Destination: "+dest);
     SimpleDateFormat df = new SimpleDateFormat(RSS_DATE, new Locale("en", "US"));
     checkDest(dest);
+    
     Map<String, String> currentPublishedVersions = scanForCurrentVersions(dest);
     Map<String, String> currentVersions = scanForCurrentVersions(source);
-    summary(currentPublishedVersions, currentVersions);
+    summary(source, dest, currentPublishedVersions, currentVersions);
     List<VersionDecision> versionsList = analyseVersions(source, currentVersions, currentPublishedVersions, dest);
     System.out.println("Actions to take");
     for (VersionDecision vd : versionsList) {
@@ -197,14 +198,62 @@ public class TemplateReleaser {
         bak.delete();
       xml.renameTo(bak);
       saveXml(new FileOutputStream(xml)); 
-      
+
+      System.out.println("Updating Indexes");
+      tidyDirectory(source, new File(dest), new File(dest), false);
       buildIndexPage(currentVersions, dest);
       System.out.println("Published");
     }
   }
 
   
-  private void summary(Map<String, String> currentPublishedVersions, Map<String, String> currentVersions) {
+  private void tidyDirectory(String source, File dest, File folder, boolean ver) throws IOException {
+    for (File f : folder.listFiles()) {
+      if (f.isDirectory()) {
+        File npmf = new File(Utilities.path(f, "package.tgz"));
+        File ndxf = new File(Utilities.path(f, "index.html"));
+        if (npmf.exists() && ndxf.exists()) {
+          NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(npmf));
+          String index = FileUtilities.fileToString(Utilities.path(source, "index.template"));
+          index = index.replace("{pid}", npm.name());
+          if (ver) {
+            index = index.replace("{path}", "../");
+            index = index.replace("{vid}", " version "+npm.version());
+          } else {
+            index = index.replace("{path}", "");
+            index = index.replace("{vid}", "");
+          }
+          String dep = buildDep(dest, npm);
+          index = index.replace("{dep}", dep);         
+          FileUtilities.stringToFile(index, Utilities.path(f, "index.html"));
+          tidyDirectory(source, dest, f, true);
+        } else {
+          tidyDirectory(source, dest, f, false);
+        }
+      } 
+    }
+  }
+
+  private String buildDep(File dest, NpmPackage npm) throws IOException {
+    String npmf2 = Utilities.path(dest, npm.name(), "package.tgz");
+    
+    String base = npm.getNpm().asString("base");
+    if (base == null) {
+      return npm.name()+"#"+npm.version();
+    } else {
+      String baseVer = npm.getNpm().getJsonObject("dependencies").asString(base);
+      String npmf = Utilities.path(dest, base, baseVer, "package.tgz");
+      File f = new File(npmf);
+      if (!f.exists()) {
+        return npm.name()+"#"+npm.version()+ " --> "+base+"#"+baseVer+" (broken)";
+      } else {
+        NpmPackage bnpm = NpmPackage.fromPackage(new FileInputStream(npmf));
+        return npm.name()+"#"+npm.version()+ " --> "+buildDep(dest, bnpm);       
+      }
+    }
+  }
+
+  private void summary(String source, String target, Map<String, String> currentPublishedVersions, Map<String, String> currentVersions) throws JsonException, IOException {
     // TODO Auto-generated method stub
 
     Set<String> all = new HashSet<>();
@@ -218,7 +267,30 @@ public class TemplateReleaser {
     for (String s: Utilities.sorted(all)) {
       String v = currentPublishedVersions.containsKey(s) ? currentPublishedVersions.get(s) : "--";
       String nv = currentVersions.containsKey(s) ? currentVersions.get(s) : "--";
-      System.out.println("  "+Utilities.padRight(s, ' ', l)+"  "+Utilities.padRight(v, ' ', 10)+"  "+Utilities.padRight(nv, ' ', 10));      
+      String base = findCurrentBase(source, target, s);
+      System.out.println("  "+Utilities.padRight(s, ' ', l)+"  "+Utilities.padRight(v, ' ', 10)+"  "+Utilities.padRight(nv, ' ', 10)+"    base = "+base);      
+    }
+  }
+
+  private String findCurrentBase(String source, String target, String pid) throws JsonException, IOException {
+    File f = new File(Utilities.path(source, pid, "package", "package.json"));
+    if (!f.exists()) {
+      return "?";
+    }
+    JsonObject json = JsonParser.parseObject(f);
+    String base = json.asString("base");
+    String cver = null;
+    if (base == null) {
+      return "--";
+    } else {
+      cver = base+"#"+json.forceObject("dependencies").asString(base);
+    }
+    f = new File(Utilities.path(target, pid, "package.tgz"));
+    if (!f.exists()) {
+      return cver + " / ?";
+    } else {
+      NpmPackage npm = NpmPackage.fromPackage(new FileInputStream(f));
+      return cver +" / "+npm.getNpm().forceObject("dependencies").asString(base);
     }
   }
 
@@ -395,6 +467,9 @@ public class TemplateReleaser {
     List<String> dependendencies = listDependencies(source, vd.getId());
     for (String s : dependendencies) {
       VersionDecision v = findVersion(versions, s);
+      if (v == null) {
+        throw new Error("Unable to find version for "+s+" for "+vd.getId());
+      }
       if (v.checked == null) {
         checkDependencies(source, v, versions);
       } else if (!v.checked) {
@@ -531,16 +606,8 @@ public class TemplateReleaser {
       checkNote(vd.releaseNote);
 
       File dst = new File(Utilities.path(dest, npm.name(), npm.version()));
-      check(!dst.exists(), "Implied destination "+dst.getAbsolutePath()+" already exists - check that a new version is being released.");  
-    
-      // if jekyll.html exists, delete index.html and rename jekyll.html to index.html
-      File src = new File(Utilities.path(source, vd.getId(), "output"));
-      File jf = new File(Utilities.path(source, vd.getId(), "output", "jekyll.html"));
-      File xf = new File(Utilities.path(source, vd.getId(), "output", "index.html"));
-      if (jf.exists()) {
-        xf.delete();
-        jf.renameTo(xf);
-      }
+      check(!dst.exists() || FileUtilities.isEmptyDirectory(dst), "Implied destination "+dst.getAbsolutePath()+" already exists - check that a new version is being released.");  
+      
       // copy files
       FileUtilities.createDirectory(dst.getAbsolutePath());
       FileUtilities.copyDirectory(Utilities.path(source, vd.getId(), "output"), Utilities.path(dest, npm.name(), npm.version()), null);
@@ -553,6 +620,11 @@ public class TemplateReleaser {
       history = history.replace("{{id}}", vd.getId());
       history = history.replace("{{pl}}", JsonParser.compose(jh, false));
       FileUtilities.stringToFile(history, Utilities.path(dest, vd.getId(), "history.html"));
+
+      // create index page 
+      String index = FileUtilities.fileToString(Utilities.path(source, "index.template"));
+      index = index.replace("{{id}}", vd.getId());
+      FileUtilities.stringToFile(index, Utilities.path(dest, vd.getId(), "index.html"));
       
       // update rss feed      
       Element item = rss.createElement("item");

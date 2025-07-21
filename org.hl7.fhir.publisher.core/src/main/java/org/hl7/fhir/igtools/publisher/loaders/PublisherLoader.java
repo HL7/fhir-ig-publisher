@@ -10,16 +10,16 @@ import org.hl7.fhir.convertors.loaders.loaderR5.R3ToR5Loader;
 import org.hl7.fhir.convertors.loaders.loaderR5.R4BToR5Loader;
 import org.hl7.fhir.convertors.loaders.loaderR5.R4ToR5Loader;
 import org.hl7.fhir.convertors.loaders.loaderR5.R5ToR5Loader;
-import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.igtools.publisher.SpecMapManager.SpecialPackageType;
 import org.hl7.fhir.igtools.publisher.SpecialTypeHandler;
 import org.hl7.fhir.r5.context.IContextResourceLoader;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.DomainResource;
 import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
@@ -104,8 +104,8 @@ public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProv
             // these weird packages don't always have paths
             return null;
           }
-          if (cr.hasExtension(ToolingExtensions.EXT_WEB_SOURCE)) {
-            return ToolingExtensions.readStringExtension(cr, ToolingExtensions.EXT_WEB_SOURCE);
+          if (cr.hasExtension(ExtensionDefinitions.EXT_WEB_SOURCE_OLD, ExtensionDefinitions.EXT_WEB_SOURCE_NEW)) {
+            return ExtensionUtilities.readStringExtension(cr, ExtensionDefinitions.EXT_WEB_SOURCE_OLD, ExtensionDefinitions.EXT_WEB_SOURCE_NEW);
           }
           System.out.println("Internal error in IG "+npm.name()+"#"+npm.version()+" map: No identity found for "+u);
           return u;
@@ -121,8 +121,8 @@ public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProv
         }
         if (r instanceof DomainResource) {
           DomainResource dr = (DomainResource) r;
-          if (dr.hasExtension(ToolingExtensions.EXT_WEB_SOURCE)) {
-            path = ToolingExtensions.readStringExtension(dr, ToolingExtensions.EXT_WEB_SOURCE);
+          if (dr.hasExtension(ExtensionDefinitions.EXT_WEB_SOURCE_OLD, ExtensionDefinitions.EXT_WEB_SOURCE_NEW)) {
+            path = ExtensionUtilities.readStringExtension(dr, ExtensionDefinitions.EXT_WEB_SOURCE_OLD, ExtensionDefinitions.EXT_WEB_SOURCE_NEW);
           }
         }
         r.setWebPath(path);

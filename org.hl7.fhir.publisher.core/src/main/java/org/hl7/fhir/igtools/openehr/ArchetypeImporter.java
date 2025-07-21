@@ -13,6 +13,7 @@ import javax.xml.parsers.ParserConfigurationException;
 
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
 import org.hl7.fhir.r5.model.Bundle;
 import org.hl7.fhir.r5.model.Bundle.BundleType;
 import org.hl7.fhir.r5.model.CanonicalResource;
@@ -36,7 +37,6 @@ import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.xml.XMLUtil;
@@ -352,7 +352,7 @@ public class ArchetypeImporter {
           at = at.substring(at.indexOf("[")+1).replace("]", "");
           var ct = ed.addType().setCode(c.getRmTypeName()).addProfileElement();
           ct.setValue(sd.getUrl());
-          ct.addExtension(ToolingExtensions.EXT_PROFILE_ELEMENT, new StringType(atMap.get(at)));
+          ct.addExtension(ExtensionDefinitions.EXT_PROFILE_ELEMENT, new StringType(atMap.get(at)));
         } else {
           System.out.println("not done yet: "+path+"."+name+": "+o.getClass().getName());
         }

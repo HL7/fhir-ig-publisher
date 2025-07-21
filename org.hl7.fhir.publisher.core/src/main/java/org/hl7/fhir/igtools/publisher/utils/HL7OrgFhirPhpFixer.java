@@ -19,7 +19,7 @@ import org.hl7.fhir.utilities.json.parser.JsonParser;
 public class HL7OrgFhirPhpFixer {
 
   public static void main(String[] args) throws IOException {
-    File folderRoot = new File("/Users/grahamegrieve/web/www.hl7.org.fhir");
+    File folderRoot = new File("/Users/grahamegrieve/web/www.hl7.org.cda");
     new HL7OrgFhirPhpFixer().execute(folderRoot, folderRoot, true);
   }
 

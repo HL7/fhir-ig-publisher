@@ -11,6 +11,7 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r5.context.CanonicalResourceManager;
 import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureMap;
@@ -22,7 +23,6 @@ import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
@@ -121,7 +121,7 @@ public class MappingSummaryRenderer {
       for (StructureMap map : list) {
         x.an(mode+"-"+map.getId(), " ");
         x.h4().tx(map.getTitle()+" ("+(map.getStatus() == PublicationStatus.ACTIVE ? "Ready for Use" : map.getStatus().getDisplay())+
-            (ToolingExtensions.getStandardsStatus(map) != null ? "/"+ToolingExtensions.getStandardsStatus(map).toDisplay() : "")+")");
+            (ExtensionUtilities.getStandardsStatus(map) != null ? "/"+ ExtensionUtilities.getStandardsStatus(map).toDisplay() : "")+")");
         new org.hl7.fhir.r5.renderers.StructureMapRenderer(rc).buildNarrative(new RenderingStatus(), x, ResourceWrapper.forResource(rc.getContextUtilities(), map));
       }
     }
