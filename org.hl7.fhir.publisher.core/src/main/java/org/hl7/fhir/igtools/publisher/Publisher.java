@@ -436,7 +436,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   public enum PinningPolicy {NO_ACTION, FIX, WHEN_MULTIPLE_CHOICES}
 
-  private static final String TOOLING_IG_CURRENT_RELEASE = "0.6.0";
+  private static final String TOOLING_IG_CURRENT_RELEASE = "0.7.0";
 
   public class FragmentUseRecord {
 
@@ -1210,6 +1210,21 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       checkForSnomedVersion();
       if (txLog != null) {
         FileUtilities.copyFile(txLog, Utilities.path(rootDir, "output", "qa-tx.html"));
+      }
+      for (FetchedFile f : fileList) {
+        for (FetchedResource r : f.getResources()) {
+          for (ValidationMessage vm : r.getErrors()) {
+            boolean inBase = false;
+            for (ValidationMessage t :f.getErrors()) {
+              if (vm.equals(t)) {
+                inBase = true;
+              }
+            }
+            if (!inBase) {
+              f.getErrors().add(vm);
+            }
+          }
+        }
       }
       ValidationPresenter val = new ValidationPresenter(version, workingVersion(), igpkp, childPublisher == null? null : childPublisher.getIgpkp(), rootDir, npmName, childPublisher == null? null : childPublisher.npmName,
           IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), realmRules, previousVersionComparator, ipaComparator, ipsComparator,
