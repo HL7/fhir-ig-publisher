@@ -8,7 +8,7 @@ RUN mvn dependency:go-offline
 COPY . .
 RUN mvn install -Dmaven.test.skip=true
 
-FROM eclipse-temurin:11
+FROM eclipse-temurin:17
 WORKDIR /app
 
 USER root
