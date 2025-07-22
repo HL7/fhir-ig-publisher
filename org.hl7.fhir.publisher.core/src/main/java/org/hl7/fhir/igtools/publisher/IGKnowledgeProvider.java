@@ -21,10 +21,7 @@ package org.hl7.fhir.igtools.publisher;
  */
 
  
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import org.hl7.fhir.convertors.VersionConvertorConstants;
 import org.hl7.fhir.exceptions.FHIRException;
@@ -81,6 +78,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   private XVerExtensionManager xver;
   private List<FetchedFile> files;
   private IPublisherModule module;
+  private Map<String, List<ExtensionUsage>> coreExtensionMap;
   
   public IGKnowledgeProvider(IWorkerContext context, String pathToSpec, String canonical, JsonObject igs, List<ValidationMessage> errors, boolean noXhtml, Template template, List<String> listedURLExemptions, String altCanonical, List<FetchedFile> files, IPublisherModule module) throws Exception {
     super();
@@ -844,7 +842,28 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     return canonical;
   }
 
-  
+  public Map<String, List<ExtensionUsage>> getCoreExtensionMap() {
+    if (coreExtensionMap == null) {
+      coreExtensionMap = new HashMap<>();
+    }
+    return coreExtensionMap;
+  }
 
-  
+  public static class ExtensionUsage {
+    private String name;
+    private String url;
+
+    public ExtensionUsage(String name, String url) {
+      this.name = name;
+      this.url = url;
+    }
+
+    public String getName() {
+      return name;
+    }
+
+    public String getUrl() {
+      return url;
+    }
+  }
 }
