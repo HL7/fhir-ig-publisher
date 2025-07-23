@@ -55,6 +55,7 @@ import org.hl7.fhir.utilities.npm.ToolsVersion;
  */
 public class SpecMapManager {
 
+
   public enum SpecialPackageType {
     Simplifier, PhinVads, Vsac, Examples, DICOM, FACADE
   }
@@ -260,6 +261,11 @@ public class SpecMapManager {
     }
     
     return null;
+  }
+
+  public String getPath(String type, String id) {
+    String url = Utilities.pathURL(base, type, id);
+    return paths.has(url) ? Utilities.pathURL(spec.asString("webUrl"), paths.asString(url)) : null;
   }
 
   public boolean isValidFilename(String filename) {

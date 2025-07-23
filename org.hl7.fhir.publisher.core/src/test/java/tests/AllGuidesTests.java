@@ -278,6 +278,16 @@ public class AllGuidesTests {
     testIg("hl7.cda.uv.core", null);
   }
 
+  @Test
+  public void testDaVinciCRD() throws Exception {
+    testIg("hl7.fhir.us.davinci-crd", null);
+  }
+
+  @Test
+  public void testWHOICVP() throws Exception {
+    testIg("smart.who.int.icvp", null);
+  }
+
 //
 //  @Test
 //  public void testOldIg() throws Exception {

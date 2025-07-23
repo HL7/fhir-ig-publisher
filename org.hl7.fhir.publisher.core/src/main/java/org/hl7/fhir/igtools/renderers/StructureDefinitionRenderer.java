@@ -1,6 +1,8 @@
 package org.hl7.fhir.igtools.renderers;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -29,18 +31,10 @@ import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
 import org.hl7.fhir.r5.extensions.ExtensionUtilities;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CanonicalType;
-import org.hl7.fhir.r5.model.CapabilityStatement;
+import org.hl7.fhir.r5.formats.JsonParser;
+import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestComponent;
 import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceComponent;
-import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.CodeableConcept;
-import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.ContactPoint;
-import org.hl7.fhir.r5.model.DataType;
-import org.hl7.fhir.r5.model.DateTimeType;
-import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionConstraintComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionMappingComponent;
@@ -49,18 +43,10 @@ import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionSlicingDiscrimin
 import org.hl7.fhir.r5.model.ElementDefinition.SlicingRules;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
 import org.hl7.fhir.r5.model.Enumerations.BindingStrength;
-import org.hl7.fhir.r5.model.Extension;
-import org.hl7.fhir.r5.model.PackageInformation;
-import org.hl7.fhir.r5.model.PrimitiveType;
-import org.hl7.fhir.r5.model.Quantity;
-import org.hl7.fhir.r5.model.SearchParameter;
-import org.hl7.fhir.r5.model.StringType;
-import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionMappingComponent;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
-import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.profilemodel.PEBuilder;
 import org.hl7.fhir.r5.profilemodel.PEBuilder.PEElementPropertiesPolicy;
 import org.hl7.fhir.r5.profilemodel.PEDefinition;
@@ -76,6 +62,7 @@ import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities.SystemReference;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.utils.ElementDefinitionUtilities;
+import org.hl7.fhir.r5.utils.ElementVisitor;
 import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.i18n.RenderingI18nContext;
@@ -93,7 +80,11 @@ import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
+import static org.hl7.fhir.r5.utils.ElementVisitor.ElementVisitorInstruction.VISIT_CHILDREN;
+
 public class StructureDefinitionRenderer extends CanonicalRenderer {
+
+  private static final int EXAMPLE_UPPER_LIMIT = 50;
 
   public class BindingResolutionDetails {
     private String vss;
@@ -2237,10 +2228,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
       if (usages.has(sd.getUrl())) {
         for (JsonProperty p : usages.getJsonObject(sd.getUrl()).getProperties()) {
-          examples.put(Utilities.pathURL(specPath, p.getName()), p.getValue().asString());
+          if (examples.size() < EXAMPLE_UPPER_LIMIT) {
+            examples.put(Utilities.pathURL(specPath, p.getName()), p.getValue().asString());
+          }
         }
-      } 
-
+      }
     }
 
     for (FetchedFile f : files) {
@@ -2256,7 +2248,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           if (usesSD(r.getElement())) {
             String p = igp.getLinkFor(r, true);
             if (p != null) {
-              examples.put(p, r.getTitle());
+              if (examples.size() < EXAMPLE_UPPER_LIMIT) {
+                examples.put(p, r.getTitle());
+              }
             } else {
               System.out.println("Res "+f.getName()+" has no path");
             }
@@ -2267,8 +2261,24 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     for (RelatedIG ig : relatedIgs) {
       for (Element r : ig.loadE(context, sd.getType())) {
         if (usesSD(r)) {
-          examples.put(r.getWebPath(), r.getUserString(UserDataNames.renderer_title));
+          if (examples.size() < EXAMPLE_UPPER_LIMIT) {
+            examples.put(r.getWebPath(), r.getUserString(UserDataNames.renderer_title));
+          }
         }        
+      }
+    }
+
+    if ("hl7.fhir.uv.extensions".equals(packageId)) {
+      if (igp.getCoreExtensionMap().isEmpty()) {
+        loadCoreExtensionMap();
+      }
+      List<IGKnowledgeProvider.ExtensionUsage> usages = igp.getCoreExtensionMap().get(sd.getUrl());
+      if (usages != null) {
+        for (IGKnowledgeProvider.ExtensionUsage u : usages) {
+          if (examples.size() < EXAMPLE_UPPER_LIMIT) {
+            examples.put(Utilities.pathURL(specPath, u.getUrl()), u.getName());
+          }
+        }
       }
     }
 
@@ -2317,6 +2327,79 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
     b.append("</ul>\r\n");
     return b.toString()+xigReference()+changeSummary();
+  }
+
+  private void loadCoreExtensionMap() throws IOException {
+    ClassLoader classLoader = HierarchicalTableGenerator.class.getClassLoader();
+    InputStream map = classLoader.getResourceAsStream("r5-examples.json");
+    JsonObject examples = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(map);
+
+    FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager.Builder().build();
+    NpmPackage npm = pcm.loadPackage("hl7.fhir.r5.examples");
+    for (String fn : npm.getFolders().get("package").listFiles()) {
+      try {
+        Resource r = new JsonParser().parse(npm.getFolders().get("package").fetchFile(fn));
+        JsonObject details = examples.getJsonObject(r.fhirType()+"/"+r.getId());
+        if (details != null) {
+          new ElementVisitor(new ExtensionVisitor(details.asString("path"), details.asString("name"))).visit(null, r);
+        }
+      } catch (Exception e) {
+        // npthing
+      }
+    }
+  }
+
+   private class ExtensionVisitor implements ElementVisitor.IElementVisitor {
+
+    private String path;
+    private String name;
+    public ExtensionVisitor(String path, String name) {
+      this.path = path;
+      this.name = name;
+    }
+
+    @Override
+    public ElementVisitor.ElementVisitorInstruction visit(Object context, Resource resource) {
+      if (resource instanceof DomainResource) {
+        DomainResource dr = (DomainResource) resource;
+        for (Extension ex : dr.getExtension()) {
+          seeExtension(path, name, ex.getUrl());
+        }
+        for (Extension ex : dr.getModifierExtension()) {
+          seeExtension(path, name, ex.getUrl());
+        }
+      }
+      return VISIT_CHILDREN;
+    }
+
+    @Override
+    public ElementVisitor.ElementVisitorInstruction visit(Object context, org.hl7.fhir.r5.model.Element element) {
+      for (Extension ex : element.getExtension()) {
+        seeExtension(path, name, ex.getUrl());
+      }
+      if (element instanceof BackboneElement) {
+        BackboneElement be = (BackboneElement) element;
+        for (Extension ex : be.getModifierExtension()) {
+          seeExtension(path, name, ex.getUrl());
+        }
+      }
+      if (element instanceof BackboneType) {
+        BackboneType be = (BackboneType) element;
+        for (Extension ex : be.getModifierExtension()) {
+          seeExtension(path, name, ex.getUrl());
+        }
+      }
+      return VISIT_CHILDREN;
+    }
+  }
+
+  private void seeExtension(String path, String name, String url) {
+    List<IGKnowledgeProvider.ExtensionUsage> list = igp.getCoreExtensionMap().get(url);
+    if (list == null) {
+      list = new ArrayList<>();
+      igp.getCoreExtensionMap().put(url, list);
+    }
+    list.add(new IGKnowledgeProvider.ExtensionUsage(path, name));
   }
 
   private String xigReference() {
