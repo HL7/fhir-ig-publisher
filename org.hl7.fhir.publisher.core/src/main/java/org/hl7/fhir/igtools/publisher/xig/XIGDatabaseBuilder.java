@@ -584,6 +584,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
           }
         }
       } catch (Exception e) {
+        e.printStackTrace();
         throw new IOException(e);
       }
     }
