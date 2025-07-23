@@ -86,8 +86,8 @@ public class StatusRenderer {
       if (ExtensionUtilities.hasExtension(resource, ExtensionDefinitions.EXT_FMM_LEVEL)) {
         setFmm(ExtensionUtilities.readStringExtension(resource, ExtensionDefinitions.EXT_FMM_LEVEL));
         IntegerType fmm = resource.getExtensionByUrl(ExtensionDefinitions.EXT_FMM_LEVEL).getValueIntegerType();
-        if (fmm.hasExtension(ExtensionDefinitions.EXT_FMM_SUPPORT))
-          setFmmSupport(fmm.getExtensionByUrl(ExtensionDefinitions.EXT_FMM_SUPPORT).getValueStringType().getValue());
+        if (resource.hasExtension(ExtensionDefinitions.EXT_FMM_SUPPORT))
+          setFmmSupport(resource.getExtensionByUrl(ExtensionDefinitions.EXT_FMM_SUPPORT).getValueStringType().getValue());
         else if (fmm.hasExtension(ExtensionDefinitions.EXT_FMM_DERIVED)) {
           List<Extension> derivations = fmm.getExtensionsByUrl(ExtensionDefinitions.EXT_FMM_DERIVED);
           String s = "Inherited from ";
@@ -118,8 +118,8 @@ public class StatusRenderer {
       if (ExtensionUtilities.hasExtension(resource, ExtensionDefinitions.EXT_STANDARDS_STATUS)) {
         setSstatus(ExtensionUtilities.readStringExtension(resource, ExtensionDefinitions.EXT_STANDARDS_STATUS));
         StringType sstatus = resource.getExtensionByUrl(ExtensionDefinitions.EXT_STANDARDS_STATUS).getValueStringType();
-        if (sstatus.hasExtension(ExtensionDefinitions.EXT_FMM_SUPPORT))
-          setFmmSupport(sstatus.getExtensionByUrl(ExtensionDefinitions.EXT_FMM_SUPPORT).getValueStringType().getValue());
+        if (resource.hasExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS_REASON))
+          setSstatusSupport(resource.getExtensionByUrl(ExtensionDefinitions.EXT_STANDARDS_STATUS_REASON).getValueStringType().getValue());
         else if (sstatus.hasExtension(ExtensionDefinitions.EXT_FMM_DERIVED)) {
           List<Extension> derivations = sstatus.getExtensionsByUrl(ExtensionDefinitions.EXT_FMM_DERIVED);
           String s = "Inherited from ";
