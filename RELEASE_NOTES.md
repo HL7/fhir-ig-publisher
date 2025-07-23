@@ -4,4 +4,5 @@
 * Validator: snapshot-source extension type fixes
 * Renderer: fix up extension view scripting issue
 * Renderer: Split dstu3 package contents to prevent duplicate packages (#2105)
+* Renderer: Corrected handling of standards status reason and FMM support
 * XIG: Add extension tracking to XIG
