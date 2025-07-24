@@ -22,8 +22,8 @@ variables:
   value: xig.db
 
 jobs:
-- job: xig_step_1
-  timeoutInMinutes: 70
+- job: xig_step_0
+  timeoutInMinutes: 150
   steps:
   - task: Bash@3
     displayName: 'Download latest publisher'
@@ -44,99 +44,24 @@ jobs:
       script: 'mkdir $(XIG_CACHE_FOLDER)'
 
   - task: Bash@3
-    displayName: 'Run publisher with xig param step 1'
+    displayName: 'Run publisher with xig param step 0 (all steps)'
     inputs:
       targetType: 'inline'
-      script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FOLDER)/$(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 1'
+      script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FOLDER)/$(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 0'
 
   - task: PublishPipelineArtifact@1
     inputs:
       targetPath: $(XIG_DB_FOLDER)
-      artifactName: xig_step_1_db
-  - task: PublishPipelineArtifact@1
-    inputs:
-      targetPath: $(XIG_CACHE_FOLDER)
-      artifactName: xig_step_1_cache
-
-- job: xig_step_2
-  dependsOn: xig_step_1
-  steps:
-  - task: Bash@3
-    displayName: 'Download latest publisher'
-    inputs:
-      targetType: 'inline'
-      script: 'wget https://github.com/HL7/fhir-ig-publisher/releases/latest/download/publisher.jar'
-
-  - task: DownloadPipelineArtifact@2
-    inputs:
-      buildType: 'current'
-      artifactName: xig_step_1_cache
-      targetPath: $(XIG_CACHE_FOLDER)
-  - task: DownloadPipelineArtifact@2
-    inputs:
-      buildType: 'current'
-      artifactName: xig_step_1_db
-      targetPath: $(XIG_DB_FOLDER)
-
-  - task: Bash@3
-    displayName: 'Run publisher with xig param step 2'
-    inputs:
-      targetType: 'inline'
-      script: 'java -Xmx7168m -jar ./publisher.jar -xig $(XIG_DB_FOLDER)/$(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 2'
-
-  - task: PublishPipelineArtifact@1
-    inputs:
-      targetPath: $(XIG_DB_FOLDER)
-      artifactName: xig_step_2_db
-  - task: PublishPipelineArtifact@1
-    inputs:
-      targetPath: $(XIG_CACHE_FOLDER)
-      artifactName: xig_step_2_cache
-
-- job: xig_step_3
-  dependsOn: xig_step_2
-  pool:
-    vmImage: 'macOS-latest'
-  timeoutInMinutes: 360
-  steps:
-    - task: Bash@3
-      displayName: 'Download latest publisher'
-      inputs:
-        targetType: 'inline'
-        script: 'wget https://github.com/HL7/fhir-ig-publisher/releases/latest/download/publisher.jar'
-
-    - task: DownloadPipelineArtifact@2
-      inputs:
-        buildType: 'current'
-        artifactName: xig_step_2_cache
-        targetPath: $(XIG_CACHE_FOLDER)
-    - task: DownloadPipelineArtifact@2
-      inputs:
-        buildType: 'current'
-        artifactName: xig_step_2_db
-        targetPath: $(XIG_DB_FOLDER)
-
-    - task: Bash@3
-      displayName: 'Run publisher with xig param step 3'
-      inputs:
-        targetType: 'inline'
-        script: 'java -Xmx13G -jar ./publisher.jar -xig $(XIG_DB_FOLDER)/$(XIG_DB_FILE) -xig-cache $(XIG_CACHE_FOLDER) -xig-step 3'
-
-    - task: PublishPipelineArtifact@1
-      inputs:
-        targetPath: $(XIG_DB_FOLDER)
-        artifactName: xig_step_3_db
+      artifactName: xig_step_0_db
 
 - job: transfer_db_to_remote
   dependsOn:
-  - xig_step_1
-  - xig_step_2
-  - xig_step_3
+  - xig_step_0
   steps:
   - task: DownloadPipelineArtifact@2
     inputs:
       buildType: 'current'
-      artifactName: xig_step_3_db
+      artifactName: xig_step_0_db
       targetPath: $(XIG_DB_FOLDER)
 
   - task: DownloadSecureFile@1
