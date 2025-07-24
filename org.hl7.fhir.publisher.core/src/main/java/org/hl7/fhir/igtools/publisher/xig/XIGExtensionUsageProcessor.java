@@ -6,8 +6,8 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.*;
 
-public class XOGExtensionUsageProcessor {
-  private static Set<String> used = new HashSet<>();
+public class XIGExtensionUsageProcessor {
+  public static Set<String> used = new HashSet<>();
 
   protected static class BaseVisitor {
     private final int userKey;

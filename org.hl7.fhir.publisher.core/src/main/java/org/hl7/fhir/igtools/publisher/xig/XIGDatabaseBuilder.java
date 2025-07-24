@@ -20,18 +20,13 @@ import org.apache.commons.collections4.map.HashedMap;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipParameters;
 import org.apache.commons.io.IOUtils;
-import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_10_50;
 import org.hl7.fhir.convertors.analytics.PackageVisitor.IPackageVisitorProcessor;
 import org.hl7.fhir.convertors.analytics.PackageVisitor.PackageContext;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_10_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_14_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_43_50;
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.igtools.publisher.IGR2ConvertorAdvisor5;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
-import org.hl7.fhir.igtools.renderers.StructureDefinitionRenderer;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
 import org.hl7.fhir.r5.extensions.ExtensionUtilities;
@@ -57,9 +52,7 @@ import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
 import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionContainsComponent;
 import org.hl7.fhir.r5.model.ValueSet.ValueSetExpansionParameterComponent;
-import org.hl7.fhir.r5.terminologies.utilities.CommonsTerminologyCapabilitiesCache;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
-import org.hl7.fhir.r5.utils.ElementVisitor;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
@@ -168,6 +161,19 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
       psql.setString(2, "date");
       psql.setString(3, date);
       psql.executeUpdate();
+      rs = con.createStatement().executeQuery("select ExtensionUserKey, Url from ExtensionUsers");
+      while (rs.next()) {
+        extensionUsers.put(rs.getString("Url"), rs.getInt("ExtensionUserKey"));
+      }
+      rs = con.createStatement().executeQuery("select ExtensionDefnKey, Url from ExtensionDefns");
+      while (rs.next()) {
+        extensionUrls.put(rs.getString("Url"), rs.getInt("ExtensionDefnKey"));
+      }
+      rs = con.createStatement().executeQuery("select ExtensionDefnKey, ExtensionUserKey from ExtensionUsages");
+      while (rs.next()) {
+        String k = "" + rs.getString("ExtensionDefnKey") + ":" + rs.getString("ExtensionUserKey");
+        XIGExtensionUsageProcessor.used.add(k);
+      }
     }
     return con;    
   }
@@ -475,7 +481,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
 
       try {
         Resource r = loadResource(context.getPid(), context.getVersion(), type, id, content, smm);
-        if (resourceTypes.contains(r.fhirType())) {
+        if (r != null && resourceTypes.contains(r.fhirType())) {
           String auth = smm.getAuth();
           String realm = smm.getRealm();
 
@@ -959,12 +965,12 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
       if (VersionUtilities.isR3Ver(parseVersion)) {
         org.hl7.fhir.dstu3.model.Resource res;
         res = new org.hl7.fhir.dstu3.formats.JsonParser(true).parse(source);
-        scanForExtensionUsage(res, smm.getPath(res.fhirType(), res.getIdBase()));
+        scanForExtensionUsage(pid, res, smm.getPath(res.fhirType(), res.getIdBase()));
         return VersionConvertorFactory_30_50.convertResource(res);
       } else if (VersionUtilities.isR4Ver(parseVersion)) {
         org.hl7.fhir.r4.model.Resource res;
         res = new org.hl7.fhir.r4.formats.JsonParser(true, true).parse(source);
-        scanForExtensionUsage(res, smm.getPath(res.fhirType(), res.getIdBase()));
+        scanForExtensionUsage(pid, res, smm.getPath(res.fhirType(), res.getIdBase()));
         return VersionConvertorFactory_40_50.convertResource(res);
 //      } else if (VersionUtilities.isR2BVer(parseVersion)) {
 //        org.hl7.fhir.dstu2016may.model.Resource res;
@@ -981,11 +987,11 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
       } else if (VersionUtilities.isR4BVer(parseVersion)) {
         org.hl7.fhir.r4b.model.Resource res;
         res = new org.hl7.fhir.r4b.formats.JsonParser(true).parse(source);
-        scanForExtensionUsage(res, smm.getPath(res.fhirType(), res.getIdBase()));
+        scanForExtensionUsage(pid, res, smm.getPath(res.fhirType(), res.getIdBase()));
         return VersionConvertorFactory_43_50.convertResource(res);
       } else if (VersionUtilities.isR5Plus(parseVersion)) {
         Resource res = new JsonParser(true, true).parse(source);
-        scanForExtensionUsage(res, smm.getPath(res.fhirType(), res.getIdBase()));
+        scanForExtensionUsage(pid, res, smm.getPath(res.fhirType(), res.getIdBase()));
         return res;
       } else if (Utilities.existsInList(parseVersion, "4.6.0", "3.5.0", "1.8.0")) {
         return null;
@@ -995,40 +1001,40 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
 
     } catch (Exception e) {
       System.out.println("Error loading "+type+"/"+id+" from "+pid+"("+parseVersion+"):" +e.getMessage());
-      e.printStackTrace();
+//      e.printStackTrace();
       return null;
     }
   }
 
-  private void scanForExtensionUsage(org.hl7.fhir.dstu3.model.Resource res, String path) throws SQLException {
+  private void scanForExtensionUsage(String pid,org.hl7.fhir.dstu3.model.Resource res, String path) throws SQLException {
     if (path != null) {
-      int key = getExtnUsageKey(res.fhirType(), res.getId(), path, 3);
-      new org.hl7.fhir.dstu3.utils.ElementVisitor(new XOGExtensionUsageProcessor.ExtensionVisitorR3(key, extensionUrls, psqlExtnUrl, psqlExtnUse)).visit(null, res);
+      int key = getExtnUsageKey(pid, res.fhirType(), res.getId(), path, 3);
+      new org.hl7.fhir.dstu3.utils.ElementVisitor(new XIGExtensionUsageProcessor.ExtensionVisitorR3(key, extensionUrls, psqlExtnUrl, psqlExtnUse)).visit(null, res);
     }
   }
 
-  private void scanForExtensionUsage(org.hl7.fhir.r4.model.Resource res, String path) throws SQLException {
+  private void scanForExtensionUsage(String pid,org.hl7.fhir.r4.model.Resource res, String path) throws SQLException {
     if (path != null) {
-      int key = getExtnUsageKey(res.fhirType(), res.getId(), path, 4);
-      new org.hl7.fhir.r4.utils.ElementVisitor(new XOGExtensionUsageProcessor.ExtensionVisitorR4(key, extensionUrls, psqlExtnUrl, psqlExtnUse)).visit(null, res);
+      int key = getExtnUsageKey(pid, res.fhirType(), res.getId(), path, 4);
+      new org.hl7.fhir.r4.utils.ElementVisitor(new XIGExtensionUsageProcessor.ExtensionVisitorR4(key, extensionUrls, psqlExtnUrl, psqlExtnUse)).visit(null, res);
     }
   }
 
-  private void scanForExtensionUsage(org.hl7.fhir.r4b.model.Resource res, String path) throws SQLException {
+  private void scanForExtensionUsage(String pid,org.hl7.fhir.r4b.model.Resource res, String path) throws SQLException {
     if (path != null) {
-      int key = getExtnUsageKey(res.fhirType(), res.getId(), path, 5);
-      new org.hl7.fhir.r4b.utils.ElementVisitor(new XOGExtensionUsageProcessor.ExtensionVisitorR4B(key, extensionUrls, psqlExtnUrl, psqlExtnUse)).visit(null, res);
+      int key = getExtnUsageKey(pid, res.fhirType(), res.getId(), path, 5);
+      new org.hl7.fhir.r4b.utils.ElementVisitor(new XIGExtensionUsageProcessor.ExtensionVisitorR4B(key, extensionUrls, psqlExtnUrl, psqlExtnUse)).visit(null, res);
     }
   }
 
-  private void scanForExtensionUsage(org.hl7.fhir.r5.model.Resource res, String path) throws SQLException {
+  private void scanForExtensionUsage(String pid,org.hl7.fhir.r5.model.Resource res, String path) throws SQLException {
     if (path != null) {
-      int key = getExtnUsageKey(res.fhirType(), res.getId(), path, 6);
-      new org.hl7.fhir.r5.utils.ElementVisitor(new XOGExtensionUsageProcessor.ExtensionVisitorR5(key, extensionUrls, psqlExtnUrl, psqlExtnUse)).visit(null, res);
+      int key = getExtnUsageKey(pid, res.fhirType(), res.getId(), path, 6);
+      new org.hl7.fhir.r5.utils.ElementVisitor(new XIGExtensionUsageProcessor.ExtensionVisitorR5(key, extensionUrls, psqlExtnUrl, psqlExtnUse)).visit(null, res);
     }
   }
 
-  private int getExtnUsageKey(String type, String id, String path, int ver) throws SQLException {
+  private int getExtnUsageKey(String pid,String type, String id, String path, int ver) throws SQLException {
     int key;
     if (extensionUsers.containsKey(path)) {
       key = extensionUsers.get(path);
@@ -1037,7 +1043,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
       extensionUsers.put(path, key);
       psqlExtnUser.setInt(1, key);
       psqlExtnUser.setString(2, path);
-      psqlExtnUser.setString(3, type+"/"+id);
+      psqlExtnUser.setString(3, pid+":"+type+"/"+id);
       psqlExtnUser.setInt(4, ver);
       psqlExtnUser.execute();
     }
