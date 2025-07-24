@@ -8010,6 +8010,7 @@ private String fixPackageReference(String dep) {
             f.finish("generateOtherVersions");      
           }
         }
+        pva.generateSnapshots();
         
         for (FetchedFile f: fileList) {
           f.start("generateOtherVersions");
