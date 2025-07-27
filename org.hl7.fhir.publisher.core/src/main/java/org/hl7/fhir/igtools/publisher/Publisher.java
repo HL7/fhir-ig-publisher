@@ -131,13 +131,7 @@ import org.hl7.fhir.igtools.spreadsheets.ObservationSummarySpreadsheetGenerator;
 import org.hl7.fhir.igtools.templates.Template;
 import org.hl7.fhir.igtools.templates.TemplateManager;
 import org.hl7.fhir.igtools.ui.IGPublisherUI;
-import org.hl7.fhir.igtools.web.HistoryPageUpdater;
-import org.hl7.fhir.igtools.web.IGRegistryMaintainer;
-import org.hl7.fhir.igtools.web.IGReleaseVersionDeleter;
-import org.hl7.fhir.igtools.web.IGWebSiteMaintainer;
-import org.hl7.fhir.igtools.web.PackageRegistryBuilder;
-import org.hl7.fhir.igtools.web.PublicationProcess;
-import org.hl7.fhir.igtools.web.PublisherConsoleLogger;
+import org.hl7.fhir.igtools.web.*;
 import org.hl7.fhir.r4.formats.FormatUtilities;
 import org.hl7.fhir.r5.conformance.ConstraintJavaGenerator;
 import org.hl7.fhir.r5.conformance.R5ExtensionsLoader;
@@ -436,7 +430,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   public enum PinningPolicy {NO_ACTION, FIX, WHEN_MULTIPLE_CHOICES}
 
-  private static final String TOOLING_IG_CURRENT_RELEASE = "0.7.0";
+  private static final String TOOLING_IG_CURRENT_RELEASE = "0.7.1";
 
   public class FragmentUseRecord {
 
@@ -8010,6 +8004,7 @@ private String fixPackageReference(String dep) {
             f.finish("generateOtherVersions");      
           }
         }
+        pva.generateSnapshots();
         
         for (FetchedFile f: fileList) {
           f.start("generateOtherVersions");
@@ -9129,6 +9124,11 @@ private String fixPackageReference(String dep) {
       }
       generateFragmentUsage();
       log("Build final .zip");
+      if (mode == IGBuildMode.PUBLICATION) {
+        IGReleaseVersionUpdater igvu = new IGReleaseVersionUpdater(outputDir, null, null, new ArrayList<>(), new ArrayList<>(), null, outputDir);
+        String fragment = sourceIg.present()+" - Downloaded Version "+businessVersion+" See the <a href=\""+ igpkp.getCanonical()+"/history.html\">Directory of published versions</a></p>";
+        igvu.updateStatement(fragment, 0, null);
+      }
       ZipGenerator zip = new ZipGenerator(Utilities.path(tempDir, "full-ig.zip"));
       zip.addFolder(outputDir, "site/", false);
       zip.addFileSource("index.html", REDIRECT_SOURCE, false);
