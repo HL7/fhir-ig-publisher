@@ -85,6 +85,7 @@ import static org.hl7.fhir.r5.utils.ElementVisitor.ElementVisitorInstruction.VIS
 public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private static final int EXAMPLE_UPPER_LIMIT = 50;
+  private boolean noXigLink;
 
   public class BindingResolutionDetails {
     private String vss;
@@ -2403,7 +2404,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   private String xigReference() {
-    return "<p>You can also check for <a href=\"https://packages2.fhir.org/xig/"+packageId+"|current/StructureDefinition/"+sd.getId()+"\">usages in the FHIR IG Statistics</a></p>";
+    if (noXigLink) {
+      return "";
+    } else {
+      return gen.formatPhrase(RenderingI18nContext.SD_XIG_LINK, packageId, sd.getId());
+    }
   }
 
   public void scanCapStmt(Map<String, String> capStmts, CapabilityStatement cst) {
@@ -2883,5 +2888,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return new XhtmlComposer(false, true).compose(x.getChildNodes());
     }
   }
-  
+
+  public boolean isNoXigLink() {
+    return noXigLink;
+  }
+
+  public void setNoXigLink(boolean noXigLink) {
+    this.noXigLink = noXigLink;
+  }
 }
