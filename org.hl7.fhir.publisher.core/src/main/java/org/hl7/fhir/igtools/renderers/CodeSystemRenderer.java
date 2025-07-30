@@ -9,9 +9,9 @@ package org.hl7.fhir.igtools.renderers;
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -68,21 +68,21 @@ public class CodeSystemRenderer extends CanonicalRenderer {
   protected void genSummaryRowsSpecific(StringBuilder b, Set<String> rows) {
     if (hasSummaryRow(rows, "content")) {
       if (cs.hasContent()) {
-        b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_CONTENT))+":</td><td>"+(cs.getContent().getDisplay())+": "+describeContent(cs.getContent())+"</td></tr>\r\n");
+        b.append(" <tr><td>" + (gen.formatPhrase(RenderingContext.GENERAL_CONTENT)) + ":</td><td>" + (cs.getContent().getDisplay()) + ": " + describeContent(cs.getContent()) + "</td></tr>\r\n");
       }
     }
     if (hasSummaryRow(rows, "oid")) {
       if (CodeSystemUtilities.hasOID(cs)) {
-        b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_OID))+":</td><td>"+CodeSystemUtilities.getOID(cs)+" ("+(gen.formatPhrase(RenderingContext.CODE_SYS_FOR_OID))+")</td></tr>\r\n");
+        b.append(" <tr><td>" + (gen.formatPhrase(RenderingContext.GENERAL_OID)) + ":</td><td>" + CodeSystemUtilities.getOID(cs) + " (" + (gen.formatPhrase(RenderingContext.CODE_SYS_FOR_OID)) + ")</td></tr>\r\n");
       }
     }
     if (hasSummaryRow(rows, "cs.vs")) {
       if (cs.hasValueSet()) {
         ValueSet vs = context.findTxResource(ValueSet.class, cs.getValueSet());
         if (vs == null) {
-          b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_VALUESET))+":</td><td>"+ cs.getValueSet()+" ("+(" "+gen.formatPhrase(RenderingContext.CODE_SYS_THE_VALUE_SET))+")</td></tr>\r\n");
+          b.append(" <tr><td>" + (gen.formatPhrase(RenderingContext.GENERAL_VALUESET)) + ":</td><td>" + cs.getValueSet() + " (" + (" " + gen.formatPhrase(RenderingContext.CODE_SYS_THE_VALUE_SET)) + ")</td></tr>\r\n");
         } else {
-          b.append(" <tr><td>"+(gen.formatPhrase(RenderingContext.GENERAL_VALUESET))+":</td><td><a href=\""+vs.getWebPath()+"\">"+ cs.getValueSet()+"</a> ("+(" "+ gen.formatPhrase(RenderingContext.CODE_SYS_THE_VALUE_SET))+")</td></tr>\r\n");        
+          b.append(" <tr><td>" + (gen.formatPhrase(RenderingContext.GENERAL_VALUESET)) + ":</td><td><a href=\"" + vs.getWebPath() + "\">" + cs.getValueSet() + "</a> (" + (" " + gen.formatPhrase(RenderingContext.CODE_SYS_THE_VALUE_SET)) + ")</td></tr>\r\n");
         }
       }
     }
@@ -90,26 +90,31 @@ public class CodeSystemRenderer extends CanonicalRenderer {
 
   private String describeContent(CodeSystemContentMode content) {
     switch (content) {
-    case COMPLETE: return (gen.formatPhrase(RenderingContext.CODE_SYS_COMPLETE));
-    case NOTPRESENT: return (gen.formatPhrase(RenderingContext.CODE_SYS_NOTPRESENT));
-    case EXAMPLE: return (gen.formatPhrase(RenderingContext.CODE_SYS_EXAMPLE));
-    case FRAGMENT: return (gen.formatPhrase(RenderingContext.CODE_SYS_FRAGMENT));
-    case SUPPLEMENT: return (gen.formatPhrase(RenderingContext.CODE_SYS_SUPPLEMENT) + " ")+refCS(cs.getSupplements());
-    default:
-      return "?? illegal content status value "+(content == null ? "(null)" : content.toCode());
+      case COMPLETE:
+        return (gen.formatPhrase(RenderingContext.CODE_SYS_COMPLETE));
+      case NOTPRESENT:
+        return (gen.formatPhrase(RenderingContext.CODE_SYS_NOTPRESENT));
+      case EXAMPLE:
+        return (gen.formatPhrase(RenderingContext.CODE_SYS_EXAMPLE));
+      case FRAGMENT:
+        return (gen.formatPhrase(RenderingContext.CODE_SYS_FRAGMENT));
+      case SUPPLEMENT:
+        return (gen.formatPhrase(RenderingContext.CODE_SYS_SUPPLEMENT) + " ") + refCS(cs.getSupplements());
+      default:
+        return "?? illegal content status value " + (content == null ? "(null)" : content.toCode());
     }
   }
 
   private String refCS(String supplements) {
     CodeSystem tgt = context.fetchCodeSystem(supplements);
     if (tgt != null) {
-      return "<a href=\""+tgt.getWebPath()+"\"><code>"+supplements+"</code></a>";
+      return "<a href=\"" + tgt.getWebPath() + "\"><code>" + supplements + "</code></a>";
     } else {
-      return "<code>"+supplements+"</code>";
+      return "<code>" + supplements + "</code>";
     }
   }
 
-  public String content(Set<String> outputTracker) throws EOperationOutcome, FHIRException, IOException, org.hl7.fhir.exceptions.FHIRException  {
+  public String content(Set<String> outputTracker) throws EOperationOutcome, FHIRException, IOException, org.hl7.fhir.exceptions.FHIRException {
     CodeSystem csc = cs.copy();
 
     csc.setId(cs.getId()); // because that's not copied
@@ -143,14 +148,14 @@ public class CodeSystemRenderer extends CanonicalRenderer {
     }
     if (first) {
       if (cs.getContent() == CodeSystemContentMode.SUPPLEMENT) {
-        b.append("<ul><li>"+(gen.formatPhrase(RenderingContext.CODE_SYS_SUPP_CODE_NOT_HERE))+"</li></ul>\r\n");
+        b.append("<ul><li>" + (gen.formatPhrase(RenderingContext.CODE_SYS_SUPP_CODE_NOT_HERE)) + "</li></ul>\r\n");
       } else {
-        b.append("<ul><li>"+(gen.formatPhrase(RenderingContext.CODE_SYS_CODE_NOT_HERE))+"</li></ul>\r\n");
+        b.append("<ul><li>" + (gen.formatPhrase(RenderingContext.CODE_SYS_CODE_NOT_HERE)) + "</li></ul>\r\n");
       }
     } else {
       b.append("</ul>\r\n");
     }
-    return b.toString()+changeSummary();
+    return b.toString() + changeSummary();
   }
 
 
@@ -164,7 +169,7 @@ public class CodeSystemRenderer extends CanonicalRenderer {
     if (nsl.isEmpty()) {
       return "";
     } else {
-      NamingSystemRenderer nsr = new NamingSystemRenderer(gen);      
+      NamingSystemRenderer nsr = new NamingSystemRenderer(gen);
       XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
       nsr.renderList(x, nsl);
     }
@@ -173,8 +178,8 @@ public class CodeSystemRenderer extends CanonicalRenderer {
     boolean first = true;
     b.append("\r\n");
     List<String> vsurls = new ArrayList<String>();
-    for (ValueSet vs : context.fetchResourcesByType(ValueSet.class)) {
-        vsurls.add(vs.getUrl());
+    for (CanonicalResource vs : scanAllResources(ValueSet.class, "ValueSet")) {
+      vsurls.add(vs.getUrl());
     }
     Collections.sort(vsurls);
 
@@ -187,23 +192,23 @@ public class CodeSystemRenderer extends CanonicalRenderer {
         }
         for (ConceptSetComponent ed : vc.getCompose().getExclude()) {
           first = addLink(b, first, vc, ed, processed);
-        } 
+        }
       } else {
         for (Extension ex : vc.getExtensionsByUrl(ExtensionDefinitions.EXT_VS_CS_SUPPL_NEEDED)) {
-          first = addLink(b, first, vc, ex, processed); 
+          first = addLink(b, first, vc, ex, processed);
         }
       }
     }
     if (first) {
       if (cs.getContent() == CodeSystemContentMode.SUPPLEMENT) {
-        b.append("<ul><li>"+(gen.formatPhrase(RenderingContext.CODE_SYS_SUPP_CODE_NOT_HERE))+"</li></ul>\r\n");
+        b.append("<ul><li>" + (gen.formatPhrase(RenderingContext.CODE_SYS_SUPP_CODE_NOT_HERE)) + "</li></ul>\r\n");
       } else {
-        b.append("<ul><li>"+(gen.formatPhrase(RenderingContext.CODE_SYS_CODE_NOT_HERE))+"</li></ul>\r\n");        
+        b.append("<ul><li>" + (gen.formatPhrase(RenderingContext.CODE_SYS_CODE_NOT_HERE)) + "</li></ul>\r\n");
       }
     } else {
       b.append("</ul>\r\n");
     }
-    return b.toString()+changeSummary();
+    return b.toString() + changeSummary();
   }
 
   private boolean isNSforCS(NamingSystem t) {
@@ -222,11 +227,11 @@ public class CodeSystemRenderer extends CanonicalRenderer {
         if (first) {
           first = false;
           b.append("<ul>\r\n");
-        } 
+        }
         if (path == null) {
-          System.out.println("No path for "+vc.getUrl());
+          System.out.println("No path for " + vc.getUrl());
         } else {
-          b.append(" <li><a href=\""+path+"\">"+Utilities.escapeXml(gen.getTranslated(vc.getNameElement()))+"</a></li>\r\n");
+          b.append(" <li><a href=\"" + path + "\">" + Utilities.escapeXml(gen.getTranslated(vc.getNameElement())) + "</a></li>\r\n");
         }
         processed.add(path);
       }
@@ -242,11 +247,11 @@ public class CodeSystemRenderer extends CanonicalRenderer {
         if (first) {
           first = false;
           b.append("<ul>\r\n");
-        } 
+        }
         if (path == null) {
-          System.out.println("No path for "+vc.getUrl());
+          System.out.println("No path for " + vc.getUrl());
         } else {
-          b.append(" <li><a href=\""+path+"\">"+Utilities.escapeXml(gen.getTranslated(vc.getNameElement()))+"</a></li>\r\n");
+          b.append(" <li><a href=\"" + path + "\">" + Utilities.escapeXml(gen.getTranslated(vc.getNameElement())) + "</a></li>\r\n");
         }
         processed.add(path);
       }
@@ -259,5 +264,5 @@ public class CodeSystemRenderer extends CanonicalRenderer {
     CanonicalResourceComparison<? extends CanonicalResource> comp = VersionComparisonAnnotation.artifactComparison(cs);
     changeSummaryDetails(b, comp, RenderingI18nContext.SDR_CONT_CH_DET_CS, RenderingI18nContext.SDR_DEFN_CH_DET_CS, null, null);
   }
-  
+
 }
