@@ -406,7 +406,8 @@ import lombok.Setter;
 
 public class Publisher implements ILoggingService, IReferenceResolver, IValidationProfileUsageTracker, IResourceLinkResolver {
 
-   public enum UMLGenerationMode {
+
+  public enum UMLGenerationMode {
     NONE, SOURCED, ALL;
 
     public static UMLGenerationMode fromCode(String value) {
@@ -980,7 +981,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private IPublisherModule module;
   private boolean milestoneBuild;
   private BaseRenderer bdr;
-  
+  private boolean noXigLink;
+
   private class PreProcessInfo {
     private String xsltName;
     private byte[] xslt;
@@ -3415,8 +3417,11 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       case "pin-manifest":
         pinDest = p.getValue();
         break;
-      case "generate-uml":   
-        generateUml = UMLGenerationMode.fromCode(p.getValue());
+        case "generate-uml":
+          generateUml = UMLGenerationMode.fromCode(p.getValue());
+          break;
+      case "no-xig-link":
+        noXigLink = "true".equals(p.getValue());
         break;
       case "r5-bundle-relative-reference-policy" : 
         r5BundleRelativeReferencePolicy = R5BundleRelativeReferencePolicy.fromCode(p.getValue());
@@ -7108,7 +7113,7 @@ private String fixPackageReference(String dep) {
           altered = true;
         }
         if (isNewML()) {
-          if (e.canHaveChild("language")) {
+          if (e.canHaveChild("language") && !e.hasChild("language")) {
             e.setChildValue("language", defaultTranslationLang);
           }
           List<TranslationUnit> translations = findTranslations(r.fhirType(), r.getId(), r.getErrors());
@@ -14637,6 +14642,7 @@ private String fixPackageReference(String dep) {
     }
 
     StructureDefinitionRenderer sdr = new StructureDefinitionRenderer(context, sourceIg.getPackageId(), checkAppendSlash(specPath), sd, Utilities.path(tempDir), igpkp, specMaps, pageTargets(), markdownEngine, packge, fileList, lrc, allInvariants, sdMapCache, specPath, versionToAnnotate, relatedIGs);
+    sdr.setNoXigLink(noXigLink);
 
     if (wantGen(r, "summary")) {
       long start = System.currentTimeMillis();
