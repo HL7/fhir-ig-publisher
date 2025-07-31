@@ -7991,7 +7991,7 @@ private String fixPackageReference(String dep) {
 
         NpmPackage targetNpm = pcm.loadPackage(VersionUtilities.packageForVersion(version));
         IContextResourceLoader loader = ContextResourceLoaderFactory.makeLoader(targetNpm.fhirVersion(), new NullLoaderKnowledgeProviderR5());
-        SimpleWorkerContext tctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().fromPackage(targetNpm, loader, true);
+        SimpleWorkerContext tctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().withAllowLoadingDuplicates(true).fromPackage(targetNpm, loader, true);
         ProfileVersionAdaptor pva = new ProfileVersionAdaptor(context, tctxt);
 
         for (FetchedFile f : fileList) {
