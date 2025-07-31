@@ -2705,8 +2705,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   public String experimentalWarning() {
     if (sd.getExperimental()) {
       return "<div><div style=\"border: 1px solid maroon; padding: 10px; background-color: #fffbf7; min-height: 160px;\">\r\n"+
-             "<img src=\"assets/images/dragon.png\" width=\"150\" style=\"float:left; mix-blend-mode: multiply; margin-right: 10px;\" title=\"Here Be Dragons!\" height=\"150\"/>\r\n"+
-             "<p><b>"+gen.formatPhrase(RenderingI18nContext.SDR_EXPERIMENTAL)+"</b></p></div></div>"; 
+              "<img src=\"assets/images/dragon.png\" width=\"150\" style=\"float:left; mix-blend-mode: multiply; margin-right: 10px;\" title=\"Here Be Dragons!\" height=\"150\"/>\r\n"+
+              "<p><b>"+gen.formatPhrase(RenderingI18nContext.SDR_EXPERIMENTAL)+"</b></p></div></div>";
+    } else if (sd.getStatus() == Enumerations.PublicationStatus.DRAFT) {
+      return "<div><div style=\"border: 1px solid maroon; padding: 10px; background-color: #efefef; min-height: 160px;\">\r\n"+
+              "<p><b>"+gen.formatPhrase(RenderingI18nContext.SDR_DRAFT)+"</b></p></div></div>";
     } else {
       return "";
     }
