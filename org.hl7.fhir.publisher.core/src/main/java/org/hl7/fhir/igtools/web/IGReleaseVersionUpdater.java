@@ -153,6 +153,9 @@ public class IGReleaseVersionUpdater {
   }
 
   private String addPageVersions(File f, List<PackageListEntry> milestones) throws IOException {
+    if (milestones == null) {
+      return "";
+    }
     String relpath = FileUtilities.getRelativePath(folder, f.getAbsolutePath()); 
     CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder(" ");
     int i = 0;

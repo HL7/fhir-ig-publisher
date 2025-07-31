@@ -170,7 +170,8 @@ public class PackageReleaser {
   private Element channel;
   private String linkRoot;
   private org.hl7.fhir.r4.context.SimpleWorkerContext r4;
-  private org.hl7.fhir.dstu3.context.SimpleWorkerContext r3;
+  private org.hl7.fhir.dstu3.support.context.SimpleWorkerContext r3;
+
 
   private File xml;
   private IniFile config;
@@ -216,7 +217,7 @@ public class PackageReleaser {
     System.out.println("Load hl7.fhir.r4.core");
     r4 = org.hl7.fhir.r4.context.SimpleWorkerContext.fromPackage(pcm.loadPackage("hl7.fhir.r4.core", "4.0.1"));
     System.out.println("Load hl7.fhir.r3.core");
-    r3 = org.hl7.fhir.dstu3.context.SimpleWorkerContext.fromPackage(pcm.loadPackage("hl7.fhir.r3.core", "3.0.2"));
+    r3 = org.hl7.fhir.dstu3.support.context.SimpleWorkerContext.fromPackage(pcm.loadPackage("hl7.fhir.r3.core", "3.0.2"));
     System.out.println("Scanning "+source+" and comaparing to "+dest);
 
     SimpleDateFormat df = new SimpleDateFormat(RSS_DATE, new Locale("en", "US"));

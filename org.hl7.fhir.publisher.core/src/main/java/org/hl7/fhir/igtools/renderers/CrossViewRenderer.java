@@ -17,6 +17,8 @@ import org.hl7.fhir.igtools.renderers.utils.ObligationsAnalysis.ActorInfo;
 import org.hl7.fhir.igtools.renderers.utils.ObligationsAnalysis.ProfileActorObligationsAnalysis;
 import org.hl7.fhir.igtools.renderers.utils.ObligationsAnalysis.ProfileObligationsAnalysis;
 import org.hl7.fhir.r5.context.IWorkerContext;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.fhirpath.ExpressionNode;
 import org.hl7.fhir.r5.fhirpath.ExpressionNode.Kind;
 import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
@@ -53,13 +55,9 @@ import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.terminologies.utilities.ValidationResult;
 import org.hl7.fhir.r5.utils.ResourceSorters.CanonicalResourceSortByUrl;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.UserDataNames;
-import org.hl7.fhir.utilities.HL7WorkGroups;
+import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.HL7WorkGroups.HL7WorkGroup;
-import org.hl7.fhir.utilities.OIDUtilities;
-import org.hl7.fhir.utilities.StandardsStatus;
-import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.validation.ValidationOptions;
 import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
@@ -338,7 +336,7 @@ public class CrossViewRenderer extends Renderer {
   }
 
   private boolean isMustSupport(ElementDefinition ed, TypeRefComponent tr) {
-    return ed.getMustSupport() || "true".equals(ToolingExtensions.readStringExtension(tr, ToolingExtensions.EXT_MUST_SUPPORT));
+    return ed.getMustSupport() || "true".equals(ExtensionUtilities.readStringExtension(tr, ExtensionDefinitions.EXT_MUST_SUPPORT));
   }
 
   private int processObservationComponent(ObservationProfile parent, List<ElementDefinition> list, String compSlice, int i) {
@@ -809,16 +807,25 @@ public class CrossViewRenderer extends Renderer {
     }
     var tbl = x.table("list", false);
     var tr = tbl.tr();
-    var td = tr.td();
-    td.b().tx("Identity");
-    td.an("ext-"+type);
-    tr.td().b().ah(Utilities.pathURL(worker.getSpecUrl(), "defining-extensions.html#cardinality")).tx("Conf.");
-    tr.td().b().tx("Type");
-    tr.td().b().ah(Utilities.pathURL(worker.getSpecUrl(), "defining-extensions.html")+"#context").tx("Context");
-    tr.td().b().tx("WG");
-    tr.td().b().ah(Utilities.pathURL(worker.getSpecUrl(), "versions.html")+"#std-process").tx("Status");
+    tr.td().tx("Identity");
+    tr.td().tx("Card.");
+    tr.td().tx("Type");
+    tr.td().tx("Context");
+    tr.td().tx("WG");
+    tr.td().tx("Status");
     if (context.getChangeVersion() != null) {
-      tr.td().b().tx("Δ v"+context.getChangeVersion());
+      tr.td().b().tx("Δ v"+context.getChangeVersion()+" ");
+    }
+
+    tr = tbl.tr();
+    tr.td().input(null, "text", null, 15).attribute("class", "filter-input").attribute("id", "filter-identity");
+    tr.td().input(null, "text", null, 3).attribute("class", "filter-input").attribute("id", "filter-card");
+    tr.td().input(null, "text", null, 8).attribute("class", "filter-input").attribute("id", "filter-type");
+    tr.td().input(null, "text", null, 20).attribute("class", "filter-input").attribute("id", "filter-context");
+    tr.td().input(null, "text", null, 3).attribute("class", "filter-input").attribute("id", "filter-wg");
+    tr.td().input(null, "text", null, 6).attribute("class", "filter-input").attribute("id", "filter-status");
+    if (context.getChangeVersion() != null) {
+      tr.td().input(null, "checkbox", null, 0).attribute("id", "hideUnchanged");
     }
 
     if (type != null) {
@@ -839,7 +846,7 @@ public class CrossViewRenderer extends Renderer {
       tr.td().colspan(5).tx("None found");      
     } else {
       for (String s : Utilities.sorted(map.keySet())) {
-        genExtensionRow(tbl, map.get(s));
+        genExtensionRow(tbl, map.get(s), context.getChangeVersion());
       }
     }
 
@@ -866,7 +873,7 @@ public class CrossViewRenderer extends Renderer {
           tbl.tr().td().colspan(5).tx("None found");         
         } else {
           for (String s : Utilities.sorted(map.keySet())) {
-            genExtensionRow(tbl, map.get(s));
+            genExtensionRow(tbl, map.get(s), context.getChangeVersion());
           }
         }
 
@@ -881,7 +888,7 @@ public class CrossViewRenderer extends Renderer {
           tbl.tr().td().colspan(5).tx("None found");        
         } else {
           for (String s : Utilities.sorted(map.keySet())) {
-            genExtensionRow(tbl, map.get(s));
+            genExtensionRow(tbl, map.get(s), context.getChangeVersion());
           }
         }
         tbl.tr().td().colspan(5).b().tx("Extensions that refer to many resources including the "+type+" resource");
@@ -895,22 +902,25 @@ public class CrossViewRenderer extends Renderer {
           tbl.tr().td().colspan(5).tx("None found");       
         } else {
           for (String s : Utilities.sorted(map.keySet())) {
-            genExtensionRow(tbl, map.get(s));
+            genExtensionRow(tbl, map.get(s), context.getChangeVersion());
           }
         }
       } else {
         StructureDefinition sd = worker.fetchTypeDefinition(type);
         if (sd != null && sd.hasBaseDefinition()) {
           String bt = Utilities.tail(sd.getBaseDefinition());
-          td = tr.td().colspan(5);
+          XhtmlNode td = tr.td().colspan(5);
           td.br();
           td.tx("(See also Extensions defined on ");
           td.ah("extensions-types.html#ext-"+bt).tx(bt);      
         }
       }
     }
+    x.para().tx(""+(tbl.getChildNodes().size() - 1)+" Extensions");
+    x.jsSrc("assets/js/table.js");
 
-    return new XhtmlComposer(false, false).compose(x.getChildNodes());
+    x.button(null, null).attribute("onclick", "clearAllFilters()").style("padding: 8px 16px; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;").tx("Clear All Filters");
+    return new XhtmlComposer(false, true).compose(x.getChildNodes());
   }
 
   private boolean refersToThisType(String type, ExtensionDefinition sd) {
@@ -956,8 +966,8 @@ public class CrossViewRenderer extends Renderer {
     return false;
   }
 
-  private void genExtensionRow(XhtmlNode tbl, StructureDefinition ed) throws Exception {
-    StandardsStatus status = ToolingExtensions.getStandardsStatus(ed);
+  private void genExtensionRow(XhtmlNode tbl, StructureDefinition ed, String versionToAnnotate) throws Exception {
+    StandardsStatus status = ExtensionUtilities.getStandardsStatus(ed);
     XhtmlNode tr;
     if (status  == StandardsStatus.DEPRECATED) {
       tr = tbl.tr().style("background-color: #ffeeee");
@@ -968,6 +978,7 @@ public class CrossViewRenderer extends Renderer {
     } else {
       tr = tbl.tr();
     }
+    tr.clss("data-row");
     tr.td().ah(ed.getWebPath(), ed.getDescription()).tx(ed.getId());
     displayExtensionCardinality(ed, tr.td());
     determineExtensionType(ed, tr.td());
@@ -1016,7 +1027,7 @@ public class CrossViewRenderer extends Renderer {
       }
     }
 
-    String wg = ToolingExtensions.readStringExtension(ed, ToolingExtensions.EXT_WORKGROUP);
+    String wg = ExtensionUtilities.readStringExtension(ed, ExtensionDefinitions.EXT_WORKGROUP);
     if (wg == null) {
       tr.td();
     } else {
@@ -1027,7 +1038,7 @@ public class CrossViewRenderer extends Renderer {
         tr.td().ah(wgd.getLink()).tx(wg);
       }
     }
-    String fmm = ToolingExtensions.readStringExtension(ed, ToolingExtensions.EXT_FMM_LEVEL);
+    String fmm = ExtensionUtilities.readStringExtension(ed, ExtensionDefinitions.EXT_FMM_LEVEL);
     td = tr.td();
     if (status == StandardsStatus.NORMATIVE) {
       td.ahWithText("", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Normative", "Normative", null).attribute("class", "normative-flag");
@@ -1046,7 +1057,13 @@ public class CrossViewRenderer extends Renderer {
     }
     td.tx(Utilities.noString(fmm) ? "" : ": FMM"+fmm+"");
     if (context.getChangeVersion() != null) {
-      renderStatusSummary(context, ed, tr.td(), "status");
+      if (renderStatusSummary(context, ed, tr.td(), versionToAnnotate )) {
+        tr.attribute("data-change", "true");
+      } else {
+        tr.attribute("data-change", "false");
+      }
+    } else {
+      tr.attribute("data-change", "false");
     }
   }
 
@@ -1360,15 +1377,15 @@ public class CrossViewRenderer extends Renderer {
       renderStatus(vs.getTitleElement(), td).tx(vs.getTitle());
       td = tr.td();
       renderStatus(vs.getStatusElement(), td).tx(vs.getStatus() == null ? "null" : vs.getStatus().toCode());
-      if (vs.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
+      if (vs.hasExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS)) {
         td.tx(" / ");
-        Extension ext = vs.getExtensionByUrl(ToolingExtensions.EXT_STANDARDS_STATUS);
-        String v = ToolingExtensions.getStandardsStatus(vs).toCode();
+        Extension ext = vs.getExtensionByUrl(ExtensionDefinitions.EXT_STANDARDS_STATUS);
+        String v = ExtensionUtilities.getStandardsStatus(vs).toCode();
         renderStatus(ext, td).attribute("class", v+"-flag").tx(v);
       }
-      if (vs.hasExtension(ToolingExtensions.EXT_FMM_LEVEL)) {
+      if (vs.hasExtension(ExtensionDefinitions.EXT_FMM_LEVEL)) {
         td.tx(" / ");
-        Extension ext = vs.getExtensionByUrl(ToolingExtensions.EXT_FMM_LEVEL);
+        Extension ext = vs.getExtensionByUrl(ExtensionDefinitions.EXT_FMM_LEVEL);
         renderStatus(ext, td).tx("FMM"+ext.getValue().primitiveValue());
       }
       if (vs.getExperimental()) {
@@ -1655,15 +1672,15 @@ public class CrossViewRenderer extends Renderer {
       renderStatus(cs.getTitleElement(), td).tx(cs.getTitle());
       td = tr.td();
       renderStatus(cs.getStatusElement(), td).tx(cs.getStatus().toCode());
-      if (cs.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
+      if (cs.hasExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS)) {
         td.tx(" / ");
-        Extension ext = cs.getExtensionByUrl(ToolingExtensions.EXT_STANDARDS_STATUS);
-        String v = ToolingExtensions.getStandardsStatus(cs).toCode();
+        Extension ext = cs.getExtensionByUrl(ExtensionDefinitions.EXT_STANDARDS_STATUS);
+        String v = ExtensionUtilities.getStandardsStatus(cs).toCode();
         renderStatus(ext, td).attribute("class", v+"-flag").tx(v);
       }
-      if (cs.hasExtension(ToolingExtensions.EXT_FMM_LEVEL)) {
+      if (cs.hasExtension(ExtensionDefinitions.EXT_FMM_LEVEL)) {
         td.tx(" / ");
-        Extension ext = cs.getExtensionByUrl(ToolingExtensions.EXT_FMM_LEVEL);
+        Extension ext = cs.getExtensionByUrl(ExtensionDefinitions.EXT_FMM_LEVEL);
         renderStatus(ext, td).tx("FMM"+ext.getValue().primitiveValue());
       }
       if (cs.getExperimental()) {

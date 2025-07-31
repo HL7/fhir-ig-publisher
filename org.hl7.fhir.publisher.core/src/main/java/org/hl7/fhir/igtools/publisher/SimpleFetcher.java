@@ -40,6 +40,8 @@ import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.FmlParser;
 import org.hl7.fhir.r5.elementmodel.JsonParser.ILogicalModelResolver;
 import org.hl7.fhir.r5.elementmodel.ValidatedFragment;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
+import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
 import org.hl7.fhir.r5.formats.FormatUtilities;
 import org.hl7.fhir.r5.model.CanonicalType;
 import org.hl7.fhir.r5.model.DataType;
@@ -47,7 +49,6 @@ import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.UriType;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonObject;
@@ -72,6 +73,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
   private FmlParser fp;
   private boolean debug = false;
   private boolean report = true;
+  private FHIRPathEngine fpe;
 
   
   public SimpleFetcher(ILoggingService log) {
@@ -406,16 +408,17 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
               if (!ok && !Utilities.existsInList(ext, "json", "xml", "html", "txt", "adl")) {
                 try {
                   if (fp==null) {
-                    fp = new FmlParser(context);
+                    fp = new FmlParser(context, fpe);
                   }
                   org.hl7.fhir.r5.elementmodel.Element e  = fp.parse(new FileInputStream(f)).get(0).getElement();
                   addFileForElement(res, f, e, "fml");
                   count++;
                   ok = true;
                 } catch (Exception e) {
+                  e.printStackTrace();
                   if (!f.getName().startsWith("Binary-")) { // we don't notify here because Binary is special. 
                     if (report) {
-                      log.logMessage("ADL Error loading "+f+": "+e.getMessage());
+                      log.logMessage("Error loading "+f+": "+e.getMessage());
                       if (debug) {
                         e.printStackTrace();
                       }
@@ -432,7 +435,7 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
                 } catch (Exception e) {
                   if (!f.getName().startsWith("Binary-")) { // we don't notify here because Binary is special. 
                     if (report) {
-                      log.logMessage("Error loading "+f+" as an Archetype: "+e.getMessage());
+                      log.logMessage("ADL Error loading "+f+" as an Archetype: "+e.getMessage());
                       if (debug) {
                         e.printStackTrace();
                       }
@@ -573,8 +576,8 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
     }
     ProfileUtilities pu = new ProfileUtilities(context, null, pkp);
     for (StructureDefinition sd : context.fetchResourcesByType(StructureDefinition.class)) {
-      if (ToolingExtensions.readBoolExtension(sd, org.hl7.fhir.r5.utils.ToolingExtensions.EXT_LOGICAL_TARGET) &&
-          ToolingExtensions.readBoolExtension(sd, org.hl7.fhir.r5.utils.ToolingExtensions.EXT_SUPPRESS_RESOURCE_TYPE)) {
+      if (ExtensionUtilities.readBoolExtension(sd, org.hl7.fhir.r5.extensions.ExtensionDefinitions.EXT_LOGICAL_TARGET) &&
+          ExtensionUtilities.readBoolExtension(sd, org.hl7.fhir.r5.extensions.ExtensionDefinitions.EXT_SUPPRESS_RESOURCE_TYPE)) {
         // well, it's a candidate. 
         List<ElementDefinition> rootProps = pu.getChildList(sd, sd.getSnapshot().getElementFirstRep());
         if (rootProps.size() > 0) {
@@ -595,5 +598,11 @@ public class SimpleFetcher implements IFetchFile, ILogicalModelResolver {
     return null;
   }
 
-   
+  public FHIRPathEngine getFpe() {
+    return fpe;
+  }
+
+  public void setFpe(FHIRPathEngine fpe) {
+    this.fpe = fpe;
+  }
 }

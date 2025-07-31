@@ -1,0 +1,3726 @@
+{
+  "TerminologyCapabilities/example" : {
+    "name" : "TerminologyCapabilities/example",
+    "path" : "terminologycapabilities-example"
+  },
+  "TerminologyCapabilities/example-terminology-server" : {
+    "name" : "TerminologyCapabilities/example-terminology-server",
+    "path" : "terminologycapabilities-terminology-server"
+  },
+  "Organization/hl7" : {
+    "name" : "Organization/hl7",
+    "path" : "organization-example"
+  },
+  "Organization/1" : {
+    "name" : "Organization/1",
+    "path" : "organization-example-gastro"
+  },
+  "Organization/1832473e-2fe0-452d-abe9-3cdb9879522f" : {
+    "name" : "Organization/1832473e-2fe0-452d-abe9-3cdb9879522f",
+    "path" : "organization-example-lab"
+  },
+  "Organization/2" : {
+    "name" : "Organization/2",
+    "path" : "organization-example-insurer"
+  },
+  "Organization/2.16.840.1.113883.19.5" : {
+    "name" : "Organization/2.16.840.1.113883.19.5",
+    "path" : "organization-example-good-health-care"
+  },
+  "Organization/f001" : {
+    "name" : "Organization/f001",
+    "path" : "organization-example-f001-burgers"
+  },
+  "Organization/f002" : {
+    "name" : "Organization/f002",
+    "path" : "organization-example-f002-burgers-card"
+  },
+  "Organization/f201" : {
+    "name" : "Organization/f201",
+    "path" : "organization-example-f201-aumc"
+  },
+  "Organization/f203" : {
+    "name" : "Organization/f203",
+    "path" : "organization-example-f203-bumc"
+  },
+  "Organization/f003" : {
+    "name" : "Organization/f003",
+    "path" : "organization-example-f003-burgers-ENT"
+  },
+  "Organization/mmanu" : {
+    "name" : "Organization/mmanu",
+    "path" : "organization-example-mmanu"
+  },
+  "Organization/3" : {
+    "name" : "Organization/3",
+    "path" : "organization-example-mihealth"
+  },
+  "Organization/hl7pay" : {
+    "name" : "Organization/hl7pay",
+    "path" : "organization-example-hl7pay"
+  },
+  "Citation/citation-example-research-doi" : {
+    "name" : "Citation/citation-example-research-doi",
+    "path" : "citation-example-research-doi"
+  },
+  "NutritionIntake/example" : {
+    "name" : "NutritionIntake/example",
+    "path" : "nutritionintake-example"
+  },
+  "AuditEvent/example" : {
+    "name" : "AuditEvent/example",
+    "path" : "auditevent-example"
+  },
+  "AuditEvent/example-login" : {
+    "name" : "AuditEvent/example-login",
+    "path" : "audit-event-example-login"
+  },
+  "AuditEvent/example-logout" : {
+    "name" : "AuditEvent/example-logout",
+    "path" : "audit-event-example-logout"
+  },
+  "AuditEvent/example-rest" : {
+    "name" : "AuditEvent/example-rest",
+    "path" : "audit-event-example-vread"
+  },
+  "AuditEvent/example-rest-create-traceID" : {
+    "name" : "AuditEvent/example-rest-create-traceID",
+    "path" : "audit-event-example-create-traceID"
+  },
+  "AuditEvent/example-disclosure" : {
+    "name" : "AuditEvent/example-disclosure",
+    "path" : "auditevent-example-disclosure"
+  },
+  "AuditEvent/example-search" : {
+    "name" : "AuditEvent/example-search",
+    "path" : "audit-event-example-search"
+  },
+  "AuditEvent/example-pixQuery" : {
+    "name" : "AuditEvent/example-pixQuery",
+    "path" : "audit-event-example-pixQuery"
+  },
+  "AuditEvent/example-media" : {
+    "name" : "AuditEvent/example-media",
+    "path" : "audit-event-example-media"
+  },
+  "AuditEvent/example-error" : {
+    "name" : "AuditEvent/example-error",
+    "path" : "auditevent-example-error"
+  },
+  "AuditEvent/example-breakglass-start" : {
+    "name" : "AuditEvent/example-breakglass-start",
+    "path" : "auditevent-example-breakglass-start"
+  },
+  "AuditEvent/example-consent-permit-authz" : {
+    "name" : "AuditEvent/example-consent-permit-authz",
+    "path" : "auditevent-example-consent-authz"
+  },
+  "AuditEvent/example-advanced-create" : {
+    "name" : "AuditEvent/example-advanced-create",
+    "path" : "auditevent-example-advanced-create"
+  },
+  "ClaimResponse/R3500" : {
+    "name" : "ClaimResponse/R3500",
+    "path" : "claimresponse-example"
+  },
+  "ClaimResponse/R3501" : {
+    "name" : "ClaimResponse/R3501",
+    "path" : "claimresponse-example-2"
+  },
+  "ClaimResponse/R3502" : {
+    "name" : "ClaimResponse/R3502",
+    "path" : "claimresponse-example-vision-3tier"
+  },
+  "ClaimResponse/R3503" : {
+    "name" : "ClaimResponse/R3503",
+    "path" : "claimresponse-example-additem"
+  },
+  "ClaimResponse/UR3503" : {
+    "name" : "ClaimResponse/UR3503",
+    "path" : "claimresponse-example-unsolicited-preauth"
+  },
+  "StructureDefinition/example-section-library" : {
+    "name" : "StructureDefinition/example-section-library",
+    "path" : "structuredefinition-example-section-library"
+  },
+  "StructureDefinition/example-composition" : {
+    "name" : "StructureDefinition/example-composition",
+    "path" : "structuredefinition-example-composition"
+  },
+  "CapabilityStatement/example" : {
+    "name" : "CapabilityStatement/example",
+    "path" : "capabilitystatement-example"
+  },
+  "CapabilityStatement/phr" : {
+    "name" : "CapabilityStatement/phr",
+    "path" : "capabilitystatement-phr-example"
+  },
+  "null/capabilitystatement-base" : {
+    "name" : "null/capabilitystatement-base",
+    "path" : "capabilitystatement-base"
+  },
+  "null/capabilitystatement-base2" : {
+    "name" : "null/capabilitystatement-base2",
+    "path" : "capabilitystatement-base2"
+  },
+  "CapabilityStatement/example-terminology-server" : {
+    "name" : "CapabilityStatement/example-terminology-server",
+    "path" : "capabilitystatement-terminology-server"
+  },
+  "CapabilityStatement/knowledge-repository" : {
+    "name" : "CapabilityStatement/knowledge-repository",
+    "path" : "capabilitystatement-knowledge-repository"
+  },
+  "CapabilityStatement/measure-processor" : {
+    "name" : "CapabilityStatement/measure-processor",
+    "path" : "capabilitystatement-measure-processor"
+  },
+  "CapabilityStatement/messagedefinition" : {
+    "name" : "CapabilityStatement/messagedefinition",
+    "path" : "capabilitystatement-messagedefinition"
+  },
+  "Flag/example" : {
+    "name" : "Flag/example",
+    "path" : "flag-example"
+  },
+  "Flag/example-encounter" : {
+    "name" : "Flag/example-encounter",
+    "path" : "flag-example-encounter"
+  },
+  "SupplyDelivery/simpledelivery" : {
+    "name" : "SupplyDelivery/simpledelivery",
+    "path" : "supplydelivery-example"
+  },
+  "SupplyDelivery/pumpdelivery" : {
+    "name" : "SupplyDelivery/pumpdelivery",
+    "path" : "supplydelivery-example-pumpdelivery"
+  },
+  "SupplyDelivery/ISBT128" : {
+    "name" : "SupplyDelivery/ISBT128",
+    "path" : "supplydelivery-example-ISBT128"
+  },
+  "SupplyDelivery/mphodelivery" : {
+    "name" : "SupplyDelivery/mphodelivery",
+    "path" : "supplydelivery-example-mphodelivery"
+  },
+  "Appointment/example" : {
+    "name" : "Appointment/example",
+    "path" : "appointment-example"
+  },
+  "Appointment/2docs" : {
+    "name" : "Appointment/2docs",
+    "path" : "appointment-example2doctors"
+  },
+  "Appointment/examplereq" : {
+    "name" : "Appointment/examplereq",
+    "path" : "appointment-example-request"
+  },
+  "RegulatedAuthorization/example" : {
+    "name" : "RegulatedAuthorization/example",
+    "path" : "regulatedauthorization-example"
+  },
+  "RegulatedAuthorization/basic-drug-auth" : {
+    "name" : "RegulatedAuthorization/basic-drug-auth",
+    "path" : "regulatedauthorization-example-basic-drug-auth"
+  },
+  "CarePlan/example" : {
+    "name" : "CarePlan/example",
+    "path" : "careplan-example"
+  },
+  "CarePlan/preg" : {
+    "name" : "CarePlan/preg",
+    "path" : "careplan-example-pregnancy"
+  },
+  "CarePlan/integrate" : {
+    "name" : "CarePlan/integrate",
+    "path" : "careplan-example-integrated"
+  },
+  "CarePlan/gpvisit" : {
+    "name" : "CarePlan/gpvisit",
+    "path" : "careplan-example-GPVisit"
+  },
+  "CarePlan/f001" : {
+    "name" : "CarePlan/f001",
+    "path" : "careplan-example-f001-heart"
+  },
+  "CarePlan/f002" : {
+    "name" : "CarePlan/f002",
+    "path" : "careplan-example-f002-lung"
+  },
+  "CarePlan/f003" : {
+    "name" : "CarePlan/f003",
+    "path" : "careplan-example-f003-pharynx"
+  },
+  "CarePlan/f201" : {
+    "name" : "CarePlan/f201",
+    "path" : "careplan-example-f201-renal"
+  },
+  "CarePlan/f202" : {
+    "name" : "CarePlan/f202",
+    "path" : "careplan-example-f202-malignancy"
+  },
+  "CarePlan/f203" : {
+    "name" : "CarePlan/f203",
+    "path" : "careplan-example-f203-sepsis"
+  },
+  "CarePlan/obesity-narrative" : {
+    "name" : "CarePlan/obesity-narrative",
+    "path" : "careplan-example-obesity-narrative"
+  },
+  "Contract/C-123" : {
+    "name" : "Contract/C-123",
+    "path" : "contract-example"
+  },
+  "Contract/pcd-example-notOrg" : {
+    "name" : "Contract/pcd-example-notOrg",
+    "path" : "pcd-example-notOrg"
+  },
+  "Contract/pcd-example-notThem" : {
+    "name" : "Contract/pcd-example-notThem",
+    "path" : "pcd-example-notThem"
+  },
+  "Contract/pcd-example-notThis" : {
+    "name" : "Contract/pcd-example-notThis",
+    "path" : "pcd-example-notThis"
+  },
+  "Contract/pcd-example-notAuthor" : {
+    "name" : "Contract/pcd-example-notAuthor",
+    "path" : "pcd-example-notAuthor"
+  },
+  "Contract/pcd-example-notLabs" : {
+    "name" : "Contract/pcd-example-notLabs",
+    "path" : "pcd-example-notLabs"
+  },
+  "Contract/C-2121" : {
+    "name" : "Contract/C-2121",
+    "path" : "contract-example-42cfr-part2"
+  },
+  "Contract/INS-101" : {
+    "name" : "Contract/INS-101",
+    "path" : "contract-example-ins-policy"
+  },
+  "Schedule/example" : {
+    "name" : "Schedule/example",
+    "path" : "schedule-example"
+  },
+  "Schedule/exampleloc1" : {
+    "name" : "Schedule/exampleloc1",
+    "path" : "schedule-provider-location1-example"
+  },
+  "Schedule/exampleloc2" : {
+    "name" : "Schedule/exampleloc2",
+    "path" : "schedule-provider-location2-example"
+  },
+  "DocumentReference/xds" : {
+    "name" : "DocumentReference/xds",
+    "path" : "xds-example"
+  },
+  "DocumentReference/example" : {
+    "name" : "DocumentReference/example",
+    "path" : "documentreference-example"
+  },
+  "DocumentReference/example-diagram" : {
+    "name" : "DocumentReference/example-diagram",
+    "path" : "documentreference-example-diagram"
+  },
+  "DocumentReference/1.2.840.11361907579238403408700.3.1.04.19970327150033" : {
+    "name" : "DocumentReference/1.2.840.11361907579238403408700.3.1.04.19970327150033",
+    "path" : "documentreference-example-dicom"
+  },
+  "DocumentReference/sound" : {
+    "name" : "DocumentReference/sound",
+    "path" : "documentreference-example-sound"
+  },
+  "DocumentReference/xray" : {
+    "name" : "DocumentReference/xray",
+    "path" : "documentreference-example-xray"
+  },
+  "DocumentReference/example-comprehensive" : {
+    "name" : "DocumentReference/example-comprehensive",
+    "path" : "documentreference-example-comprehensive"
+  },
+  "DocumentReference/example-composition" : {
+    "name" : "DocumentReference/example-composition",
+    "path" : "documentreference-example-composition"
+  },
+  "DocumentReference/example-bundle" : {
+    "name" : "DocumentReference/example-bundle",
+    "path" : "documentreference-example-bundle"
+  },
+  "VisionPrescription/33123" : {
+    "name" : "VisionPrescription/33123",
+    "path" : "visionprescription-example"
+  },
+  "VisionPrescription/33124" : {
+    "name" : "VisionPrescription/33124",
+    "path" : "visionprescription-example-1"
+  },
+  "ExampleScenario/example" : {
+    "name" : "ExampleScenario/example",
+    "path" : "examplescenario-example"
+  },
+  "ExampleScenario/example-laborder" : {
+    "name" : "ExampleScenario/example-laborder",
+    "path" : "examplescenario-example-laborder"
+  },
+  "RelatedPerson/benedicte" : {
+    "name" : "RelatedPerson/benedicte",
+    "path" : "relatedperson-example"
+  },
+  "RelatedPerson/peter" : {
+    "name" : "RelatedPerson/peter",
+    "path" : "relatedperson-example-peter"
+  },
+  "RelatedPerson/f001" : {
+    "name" : "RelatedPerson/f001",
+    "path" : "relatedperson-example-f001-sarah"
+  },
+  "RelatedPerson/f002" : {
+    "name" : "RelatedPerson/f002",
+    "path" : "relatedperson-example-f002-ariadne"
+  },
+  "RelatedPerson/newborn-mom" : {
+    "name" : "RelatedPerson/newborn-mom",
+    "path" : "relatedperson-example-newborn-mom"
+  },
+  "MedicinalProductDefinition/example" : {
+    "name" : "MedicinalProductDefinition/example",
+    "path" : "medicinalproductdefinition-example"
+  },
+  "MedicinalProductDefinition/equilidem-basics" : {
+    "name" : "MedicinalProductDefinition/equilidem-basics",
+    "path" : "medicinalproductdefinition-example-equilidem-basics"
+  },
+  "MedicinalProductDefinition/equilidem-with-ing-and-auth" : {
+    "name" : "MedicinalProductDefinition/equilidem-with-ing-and-auth",
+    "path" : "medicinalproductdefinition-example-equilidem-using-ingredient-and-auth"
+  },
+  "MedicinalProductDefinition/drug-and-device" : {
+    "name" : "MedicinalProductDefinition/drug-and-device",
+    "path" : "medicinalproductdefinition-example-co-packaged-liquid-and-syringe"
+  },
+  "MedicinalProductDefinition/drug-and-device-complete" : {
+    "name" : "MedicinalProductDefinition/drug-and-device-complete",
+    "path" : "medicinalproductdefinition-example-co-packaged-liquid-and-syringe-complete"
+  },
+  "MedicinalProductDefinition/Acetamin-500-20-generic" : {
+    "name" : "MedicinalProductDefinition/Acetamin-500-20-generic",
+    "path" : "medicinalproductdefinition-acetaminophen-500mg-tablets-box-of-20"
+  },
+  "MedicinalProductDefinition/drug-combo-product" : {
+    "name" : "MedicinalProductDefinition/drug-combo-product",
+    "path" : "medicinalproductdefinition-example-combo-product"
+  },
+  "MedicinalProductDefinition/drug-combo-product-bundle" : {
+    "name" : "MedicinalProductDefinition/drug-combo-product-bundle",
+    "path" : "medicinalproductdefinition-example-combo-product-bundle"
+  },
+  "MedicinalProductDefinition/product-with-contained-package-and-ingredient" : {
+    "name" : "MedicinalProductDefinition/product-with-contained-package-and-ingredient",
+    "path" : "medicinalproductdefinition-with-contained-package-and-ingredient"
+  },
+  "InventoryReport/example" : {
+    "name" : "InventoryReport/example",
+    "path" : "inventoryreport-example"
+  },
+  "SpecimenDefinition/2364" : {
+    "name" : "SpecimenDefinition/2364",
+    "path" : "specimendefinition-example-serum-plasma"
+  },
+  "SpecimenDefinition/7" : {
+    "name" : "SpecimenDefinition/7",
+    "path" : "specimendefinition-example"
+  },
+  "SubstanceSourceMaterial/example" : {
+    "name" : "SubstanceSourceMaterial/example",
+    "path" : "substancesourcematerial-example"
+  },
+  "Transport/simpledelivery" : {
+    "name" : "Transport/simpledelivery",
+    "path" : "transport-example"
+  },
+  "MedicationStatement/example001" : {
+    "name" : "MedicationStatement/example001",
+    "path" : "medicationstatementexample1"
+  },
+  "MedicationStatement/example002" : {
+    "name" : "MedicationStatement/example002",
+    "path" : "medicationstatementexample2"
+  },
+  "MedicationStatement/example004" : {
+    "name" : "MedicationStatement/example004",
+    "path" : "medicationstatementexample4"
+  },
+  "MedicationStatement/example005" : {
+    "name" : "MedicationStatement/example005",
+    "path" : "medicationstatementexample5"
+  },
+  "MedicationStatement/example006" : {
+    "name" : "MedicationStatement/example006",
+    "path" : "medicationstatementexample6"
+  },
+  "MedicationStatement/example007" : {
+    "name" : "MedicationStatement/example007",
+    "path" : "medicationstatementexample7"
+  },
+  "MedicationStatement/example003" : {
+    "name" : "MedicationStatement/example003",
+    "path" : "medicationstatementexample3"
+  },
+  "MedicationStatement/example008" : {
+    "name" : "MedicationStatement/example008",
+    "path" : "medicationstatementexample8"
+  },
+  "MedicationStatement/example009" : {
+    "name" : "MedicationStatement/example009",
+    "path" : "medicationstatementexample9"
+  },
+  "DeviceDefinition/example" : {
+    "name" : "DeviceDefinition/example",
+    "path" : "devicedefinition-example"
+  },
+  "ManufacturedItemDefinition/example" : {
+    "name" : "ManufacturedItemDefinition/example",
+    "path" : "manufactureditemdefinition-example"
+  },
+  "Evidence/example-stroke-alteplase-fatalICH" : {
+    "name" : "Evidence/example-stroke-alteplase-fatalICH",
+    "path" : "evidence-example-stroke-alteplase-fatalICH"
+  },
+  "Evidence/example-stroke-no-alteplase-fatalICH" : {
+    "name" : "Evidence/example-stroke-no-alteplase-fatalICH",
+    "path" : "evidence-example-stroke-no-alteplase-fatalICH"
+  },
+  "Evidence/example-stroke-0-3-alteplase-vs-no-alteplase-mRS3-6" : {
+    "name" : "Evidence/example-stroke-0-3-alteplase-vs-no-alteplase-mRS3-6",
+    "path" : "evidence-example-stroke-0-3-alteplase-vs-no-alteplase-mRS3-6"
+  },
+  "Evidence/example-stroke-3-4half-alteplase-vs-no-alteplase-mRS0-2" : {
+    "name" : "Evidence/example-stroke-3-4half-alteplase-vs-no-alteplase-mRS0-2",
+    "path" : "evidence-example-stroke-3-4half-alteplase-vs-no-alteplase-mRS0-2"
+  },
+  "Evidence/example-ASTRAL-12-alteplase-mRS3-6" : {
+    "name" : "Evidence/example-ASTRAL-12-alteplase-mRS3-6",
+    "path" : "evidence-example-ASTRAL-12-alteplase-mRS3-6"
+  },
+  "PlanDefinition/low-suicide-risk-order-set" : {
+    "name" : "PlanDefinition/low-suicide-risk-order-set",
+    "path" : "plandefinition-example"
+  },
+  "PlanDefinition/chlamydia-screening-intervention" : {
+    "name" : "PlanDefinition/chlamydia-screening-intervention",
+    "path" : "plandefinition-chlamydia-screening-intervention"
+  },
+  "PlanDefinition/exclusive-breastfeeding-intervention-01" : {
+    "name" : "PlanDefinition/exclusive-breastfeeding-intervention-01",
+    "path" : "plandefinition-exclusive-breastfeeding-intervention-01"
+  },
+  "PlanDefinition/exclusive-breastfeeding-intervention-02" : {
+    "name" : "PlanDefinition/exclusive-breastfeeding-intervention-02",
+    "path" : "plandefinition-exclusive-breastfeeding-intervention-02"
+  },
+  "PlanDefinition/exclusive-breastfeeding-intervention-03" : {
+    "name" : "PlanDefinition/exclusive-breastfeeding-intervention-03",
+    "path" : "plandefinition-exclusive-breastfeeding-intervention-03"
+  },
+  "PlanDefinition/exclusive-breastfeeding-intervention-04" : {
+    "name" : "PlanDefinition/exclusive-breastfeeding-intervention-04",
+    "path" : "plandefinition-exclusive-breastfeeding-intervention-04"
+  },
+  "PlanDefinition/protocol-example" : {
+    "name" : "PlanDefinition/protocol-example",
+    "path" : "plandefinition-protocol-example"
+  },
+  "PlanDefinition/KDN5" : {
+    "name" : "PlanDefinition/KDN5",
+    "path" : "plandefinition-example-kdn5-simplified"
+  },
+  "PlanDefinition/zika-virus-intervention" : {
+    "name" : "PlanDefinition/zika-virus-intervention",
+    "path" : "plandefinition-zika-virus-intervention"
+  },
+  "PlanDefinition/options-example" : {
+    "name" : "PlanDefinition/options-example",
+    "path" : "plandefinition-options-example"
+  },
+  "PlanDefinition/plandefinition-predecessor-example" : {
+    "name" : "PlanDefinition/plandefinition-predecessor-example",
+    "path" : "plandefinition-predecessor-example"
+  },
+  "PlanDefinition/opioidcds-04" : {
+    "name" : "PlanDefinition/opioidcds-04",
+    "path" : "plandefinition-opioidcds-04"
+  },
+  "PlanDefinition/opioidcds-05" : {
+    "name" : "PlanDefinition/opioidcds-05",
+    "path" : "plandefinition-opioidcds-05"
+  },
+  "PlanDefinition/opioidcds-07" : {
+    "name" : "PlanDefinition/opioidcds-07",
+    "path" : "plandefinition-opioidcds-07"
+  },
+  "PlanDefinition/opioidcds-08" : {
+    "name" : "PlanDefinition/opioidcds-08",
+    "path" : "plandefinition-opioidcds-08"
+  },
+  "PlanDefinition/opioidcds-10" : {
+    "name" : "PlanDefinition/opioidcds-10",
+    "path" : "plandefinition-opioidcds-10"
+  },
+  "PlanDefinition/opioidcds-11" : {
+    "name" : "PlanDefinition/opioidcds-11",
+    "path" : "plandefinition-opioidcds-11"
+  },
+  "PlanDefinition/example-cardiology-os" : {
+    "name" : "PlanDefinition/example-cardiology-os",
+    "path" : "plandefinition-example-cardiology-os"
+  },
+  "CoverageEligibilityRequest/52345" : {
+    "name" : "CoverageEligibilityRequest/52345",
+    "path" : "coverageeligibilityrequest-example"
+  },
+  "CoverageEligibilityRequest/52346" : {
+    "name" : "CoverageEligibilityRequest/52346",
+    "path" : "coverageeligibilityrequest-example-2"
+  },
+  "MeasureReport/measurereport-cms146-cat3-example" : {
+    "name" : "MeasureReport/measurereport-cms146-cat3-example",
+    "path" : "measurereport-cms146-cat3-example"
+  },
+  "MeasureReport/measurereport-cms146-cat1-example" : {
+    "name" : "MeasureReport/measurereport-cms146-cat1-example",
+    "path" : "measurereport-cms146-cat1-example"
+  },
+  "MeasureReport/hiv-indicators" : {
+    "name" : "MeasureReport/hiv-indicators",
+    "path" : "measurereport-hiv-indicators"
+  },
+  "MeasureReport/general-example-of-report" : {
+    "name" : "MeasureReport/general-example-of-report",
+    "path" : "measurereport-general-example"
+  },
+  "MeasureReport/788ca455-e11b1a59" : {
+    "name" : "MeasureReport/788ca455-e11b1a59",
+    "path" : "measurereport-788ca455-e11b1a59"
+  },
+  "TestScript/testscript-example" : {
+    "name" : "TestScript/testscript-example",
+    "path" : "testscript-example"
+  },
+  "TestScript/testscript-example-history" : {
+    "name" : "TestScript/testscript-example-history",
+    "path" : "testscript-example-history"
+  },
+  "TestScript/testscript-example-multisystem" : {
+    "name" : "TestScript/testscript-example-multisystem",
+    "path" : "testscript-example-multisystem"
+  },
+  "TestScript/testscript-example-readtest" : {
+    "name" : "TestScript/testscript-example-readtest",
+    "path" : "testscript-example-readtest"
+  },
+  "TestScript/testscript-example-search" : {
+    "name" : "TestScript/testscript-example-search",
+    "path" : "testscript-example-search"
+  },
+  "TestScript/testscript-example-update" : {
+    "name" : "TestScript/testscript-example-update",
+    "path" : "testscript-example-update"
+  },
+  "EncounterHistory/example" : {
+    "name" : "EncounterHistory/example",
+    "path" : "encounterhistory-example"
+  },
+  "Practitioner/example" : {
+    "name" : "Practitioner/example",
+    "path" : "practitioner-example"
+  },
+  "Practitioner/xcda-author" : {
+    "name" : "Practitioner/xcda-author",
+    "path" : "practitioner-example-xcda-author"
+  },
+  "Practitioner/3ad0687e-f477-468c-afd5-fcc2bf897809" : {
+    "name" : "Practitioner/3ad0687e-f477-468c-afd5-fcc2bf897809",
+    "path" : "practitioner-examples-general"
+  },
+  "Practitioner/f001" : {
+    "name" : "Practitioner/f001",
+    "path" : "practitioner-example-f001-evdb"
+  },
+  "Practitioner/f002" : {
+    "name" : "Practitioner/f002",
+    "path" : "practitioner-example-f002-pv"
+  },
+  "Practitioner/f003" : {
+    "name" : "Practitioner/f003",
+    "path" : "practitioner-example-f003-mv"
+  },
+  "Practitioner/f004" : {
+    "name" : "Practitioner/f004",
+    "path" : "practitioner-example-f004-rb"
+  },
+  "Practitioner/f005" : {
+    "name" : "Practitioner/f005",
+    "path" : "practitioner-example-f005-al"
+  },
+  "Practitioner/f201" : {
+    "name" : "Practitioner/f201",
+    "path" : "practitioner-example-f201-ab"
+  },
+  "Practitioner/f202" : {
+    "name" : "Practitioner/f202",
+    "path" : "practitioner-example-f202-lm"
+  },
+  "Practitioner/f203" : {
+    "name" : "Practitioner/f203",
+    "path" : "practitioner-example-f203-jvg"
+  },
+  "Practitioner/f204" : {
+    "name" : "Practitioner/f204",
+    "path" : "practitioner-example-f204-ce"
+  },
+  "Practitioner/f006" : {
+    "name" : "Practitioner/f006",
+    "path" : "practitioner-example-f006-rvdb"
+  },
+  "Practitioner/f007" : {
+    "name" : "Practitioner/f007",
+    "path" : "practitioner-example-f007-sh"
+  },
+  "Practitioner/xcda1" : {
+    "name" : "Practitioner/xcda1",
+    "path" : "practitioner-example-xcda1"
+  },
+  "Practitioner/prac4" : {
+    "name" : "Practitioner/prac4",
+    "path" : "practitioner-example-prac4"
+  },
+  "EvidenceVariable/example-placebo" : {
+    "name" : "EvidenceVariable/example-placebo",
+    "path" : "evidencevariable-example-placebo"
+  },
+  "EvidenceVariable/example-no-alteplase" : {
+    "name" : "EvidenceVariable/example-no-alteplase",
+    "path" : "evidencevariable-example-no-alteplase"
+  },
+  "EvidenceVariable/example-alteplase-for-stroke" : {
+    "name" : "EvidenceVariable/example-alteplase-for-stroke",
+    "path" : "evidencevariable-example-alteplase-for-stroke"
+  },
+  "EvidenceVariable/example-fatal-ICH-in-7-days" : {
+    "name" : "EvidenceVariable/example-fatal-ICH-in-7-days",
+    "path" : "evidencevariable-example-fatal-ICH-in-7-days"
+  },
+  "EvidenceVariable/example-alive-independent-90day" : {
+    "name" : "EvidenceVariable/example-alive-independent-90day",
+    "path" : "evidencevariable-example-alive-independent-90day"
+  },
+  "EvidenceVariable/example-dead-or-dependent-90day" : {
+    "name" : "EvidenceVariable/example-dead-or-dependent-90day",
+    "path" : "evidencevariable-example-dead-or-dependent-90day"
+  },
+  "EvidenceVariable/example-mRS0-2-at-90days" : {
+    "name" : "EvidenceVariable/example-mRS0-2-at-90days",
+    "path" : "evidencevariable-example-mRS0-2-at-90days"
+  },
+  "EvidenceVariable/example-mRS3-6-at-90days" : {
+    "name" : "EvidenceVariable/example-mRS3-6-at-90days",
+    "path" : "evidencevariable-example-mRS3-6-at-90days"
+  },
+  "EvidenceVariable/example-Wardlaw2014Analysis1.16.3EvidenceSet" : {
+    "name" : "EvidenceVariable/example-Wardlaw2014Analysis1.16.3EvidenceSet",
+    "path" : "evidencevariable-example-Wardlaw2014Analysis1.16.3EvidenceSet"
+  },
+  "EvidenceVariable/example-Stroke-Thrombolysis-Trialists-2014-2016-IPD-MA-Cohort" : {
+    "name" : "EvidenceVariable/example-Stroke-Thrombolysis-Trialists-2014-2016-IPD-MA-Cohort",
+    "path" : "evidencevariable-example-Stroke-Thrombolysis-Trialists-2014-2016-IPD-MA-Cohort"
+  },
+  "EvidenceVariable/example-eligibility-criteria-diabetes-surgery" : {
+    "name" : "EvidenceVariable/example-eligibility-criteria-diabetes-surgery",
+    "path" : "evidencevariable-example-eligibility-criteria-diabetes-surgery"
+  },
+  "EvidenceVariable/example-eligibility-criteria-ada-rec-bariatric" : {
+    "name" : "EvidenceVariable/example-eligibility-criteria-ada-rec-bariatric",
+    "path" : "evidencevariable-example-eligibility-criteria-ada-rec-bariatric"
+  },
+  "EvidenceVariable/example-eligibility-criteria-adults-with-obesity" : {
+    "name" : "EvidenceVariable/example-eligibility-criteria-adults-with-obesity",
+    "path" : "evidencevariable-example-eligibility-criteria-adults-with-obesity"
+  },
+  "EvidenceReport/example" : {
+    "name" : "EvidenceReport/example",
+    "path" : "evidencereport-example"
+  },
+  "ImagingStudy/example" : {
+    "name" : "ImagingStudy/example",
+    "path" : "imagingstudy-example"
+  },
+  "ImagingStudy/example-xr" : {
+    "name" : "ImagingStudy/example-xr",
+    "path" : "imagingstudy-example-xr"
+  },
+  "Group/101" : {
+    "name" : "Group/101",
+    "path" : "group-example"
+  },
+  "Group/102" : {
+    "name" : "Group/102",
+    "path" : "group-example-member"
+  },
+  "Group/herd1" : {
+    "name" : "Group/herd1",
+    "path" : "group-example-herd1"
+  },
+  "Group/example-patientlist" : {
+    "name" : "Group/example-patientlist",
+    "path" : "group-example-patientlist"
+  },
+  "DeviceRequest/example" : {
+    "name" : "DeviceRequest/example",
+    "path" : "devicerequest-example"
+  },
+  "DeviceRequest/insulinpump" : {
+    "name" : "DeviceRequest/insulinpump",
+    "path" : "devicerequest-example-insulinpump"
+  },
+  "DeviceRequest/right-lens" : {
+    "name" : "DeviceRequest/right-lens",
+    "path" : "devicerequest-right-lens"
+  },
+  "DeviceRequest/left-lens" : {
+    "name" : "DeviceRequest/left-lens",
+    "path" : "devicerequest-left-lens"
+  },
+  "PackagedProductDefinition/example" : {
+    "name" : "PackagedProductDefinition/example",
+    "path" : "packagedproductdefinition-example"
+  },
+  "PackagedProductDefinition/package-with-liquid-and-syringe" : {
+    "name" : "PackagedProductDefinition/package-with-liquid-and-syringe",
+    "path" : "packagedproductdefinition-example-co-packaged-liquid-and-syringe"
+  },
+  "Person/example" : {
+    "name" : "Person/example",
+    "path" : "person-example"
+  },
+  "Person/grahame" : {
+    "name" : "Person/grahame",
+    "path" : "person-grahame"
+  },
+  "Person/pp" : {
+    "name" : "Person/pp",
+    "path" : "person-patient-portal"
+  },
+  "Person/pd" : {
+    "name" : "Person/pd",
+    "path" : "person-provider-directory"
+  },
+  "Person/f002" : {
+    "name" : "Person/f002",
+    "path" : "person-example-f002-ariadne"
+  },
+  "Person/per4" : {
+    "name" : "Person/per4",
+    "path" : "person-example-per4"
+  },
+  "ResearchStudy/example-ctgov-study-record" : {
+    "name" : "ResearchStudy/example-ctgov-study-record",
+    "path" : "researchstudy-example-ctgov-study-record"
+  },
+  "StructureMap/example" : {
+    "name" : "StructureMap/example",
+    "path" : "structuremap-example"
+  },
+  "StructureMap/supplyrequest-transform" : {
+    "name" : "StructureMap/supplyrequest-transform",
+    "path" : "structuremap-supplyrequest-transform"
+  },
+  "Location/1" : {
+    "name" : "Location/1",
+    "path" : "location-example"
+  },
+  "Location/2" : {
+    "name" : "Location/2",
+    "path" : "location-example-room"
+  },
+  "Location/amb" : {
+    "name" : "Location/amb",
+    "path" : "location-example-ambulance"
+  },
+  "Location/ph" : {
+    "name" : "Location/ph",
+    "path" : "location-example-patients-home"
+  },
+  "Location/ukp" : {
+    "name" : "Location/ukp",
+    "path" : "location-example-ukpharmacy"
+  },
+  "Location/hl7" : {
+    "name" : "Location/hl7",
+    "path" : "location-example-hl7hq"
+  },
+  "Location/3ad0687e-f477-468c-afd5-fcc2bf897819" : {
+    "name" : "Location/3ad0687e-f477-468c-afd5-fcc2bf897819",
+    "path" : "location-examples-general"
+  },
+  "Location/wash-dc-metro" : {
+    "name" : "Location/wash-dc-metro",
+    "path" : "location-wash-dc-metro"
+  },
+  "PaymentNotice/77654" : {
+    "name" : "PaymentNotice/77654",
+    "path" : "paymentnotice-example"
+  },
+  "MedicationDispense/meddisp008" : {
+    "name" : "MedicationDispense/meddisp008",
+    "path" : "medicationdispenseexample8"
+  },
+  "MedicationDispense/meddisp0301" : {
+    "name" : "MedicationDispense/meddisp0301",
+    "path" : "medicationdispense0301"
+  },
+  "MedicationDispense/meddisp0302" : {
+    "name" : "MedicationDispense/meddisp0302",
+    "path" : "medicationdispense0302"
+  },
+  "MedicationDispense/meddisp0303" : {
+    "name" : "MedicationDispense/meddisp0303",
+    "path" : "medicationdispense0303"
+  },
+  "MedicationDispense/meddisp0304" : {
+    "name" : "MedicationDispense/meddisp0304",
+    "path" : "medicationdispense0304"
+  },
+  "MedicationDispense/meddisp0305" : {
+    "name" : "MedicationDispense/meddisp0305",
+    "path" : "medicationdispense0305"
+  },
+  "MedicationDispense/meddisp0306" : {
+    "name" : "MedicationDispense/meddisp0306",
+    "path" : "medicationdispense0306"
+  },
+  "MedicationDispense/meddisp0307" : {
+    "name" : "MedicationDispense/meddisp0307",
+    "path" : "medicationdispense0307"
+  },
+  "MedicationDispense/meddisp0308" : {
+    "name" : "MedicationDispense/meddisp0308",
+    "path" : "medicationdispense0308"
+  },
+  "MedicationDispense/meddisp0309" : {
+    "name" : "MedicationDispense/meddisp0309",
+    "path" : "medicationdispense0309"
+  },
+  "MedicationDispense/meddisp0310" : {
+    "name" : "MedicationDispense/meddisp0310",
+    "path" : "medicationdispense0310"
+  },
+  "MedicationDispense/meddisp0311" : {
+    "name" : "MedicationDispense/meddisp0311",
+    "path" : "medicationdispense0311"
+  },
+  "MedicationDispense/meddisp0312" : {
+    "name" : "MedicationDispense/meddisp0312",
+    "path" : "medicationdispense0312"
+  },
+  "MedicationDispense/meddisp0313" : {
+    "name" : "MedicationDispense/meddisp0313",
+    "path" : "medicationdispense0313"
+  },
+  "MedicationDispense/meddisp0314" : {
+    "name" : "MedicationDispense/meddisp0314",
+    "path" : "medicationdispense0314"
+  },
+  "MedicationDispense/meddisp0315" : {
+    "name" : "MedicationDispense/meddisp0315",
+    "path" : "medicationdispense0315"
+  },
+  "MedicationDispense/meddisp0316" : {
+    "name" : "MedicationDispense/meddisp0316",
+    "path" : "medicationdispense0316"
+  },
+  "MedicationDispense/meddisp0317" : {
+    "name" : "MedicationDispense/meddisp0317",
+    "path" : "medicationdispense0317"
+  },
+  "MedicationDispense/meddisp0318" : {
+    "name" : "MedicationDispense/meddisp0318",
+    "path" : "medicationdispense0318"
+  },
+  "MedicationDispense/meddisp0319" : {
+    "name" : "MedicationDispense/meddisp0319",
+    "path" : "medicationdispense0319"
+  },
+  "MedicationDispense/meddisp0320" : {
+    "name" : "MedicationDispense/meddisp0320",
+    "path" : "medicationdispense0320"
+  },
+  "MedicationDispense/meddisp0321" : {
+    "name" : "MedicationDispense/meddisp0321",
+    "path" : "medicationdispense0321"
+  },
+  "MedicationDispense/meddisp0322" : {
+    "name" : "MedicationDispense/meddisp0322",
+    "path" : "medicationdispense0322"
+  },
+  "MedicationDispense/meddisp0324" : {
+    "name" : "MedicationDispense/meddisp0324",
+    "path" : "medicationdispense0324"
+  },
+  "MedicationDispense/meddisp0325" : {
+    "name" : "MedicationDispense/meddisp0325",
+    "path" : "medicationdispense0325"
+  },
+  "MedicationDispense/meddisp0326" : {
+    "name" : "MedicationDispense/meddisp0326",
+    "path" : "medicationdispense0326"
+  },
+  "MedicationDispense/meddisp0327" : {
+    "name" : "MedicationDispense/meddisp0327",
+    "path" : "medicationdispense0327"
+  },
+  "MedicationDispense/meddisp0328" : {
+    "name" : "MedicationDispense/meddisp0328",
+    "path" : "medicationdispense0328"
+  },
+  "MedicationDispense/meddisp0329" : {
+    "name" : "MedicationDispense/meddisp0329",
+    "path" : "medicationdispense0329"
+  },
+  "MedicationDispense/meddisp0330" : {
+    "name" : "MedicationDispense/meddisp0330",
+    "path" : "medicationdispense0330"
+  },
+  "MedicationDispense/meddisp0331" : {
+    "name" : "MedicationDispense/meddisp0331",
+    "path" : "medicationdispense0331"
+  },
+  "MedicationDispense/meddisp0332" : {
+    "name" : "MedicationDispense/meddisp0332",
+    "path" : "medicationdispense0332"
+  },
+  "EnrollmentResponse/ER2500" : {
+    "name" : "EnrollmentResponse/ER2500",
+    "path" : "enrollmentresponse-example"
+  },
+  "GenomicStudy/example" : {
+    "name" : "GenomicStudy/example",
+    "path" : "genomicstudy-example"
+  },
+  "GenomicStudy/example-trio2" : {
+    "name" : "GenomicStudy/example-trio2",
+    "path" : "genomicstudy-example-trio2"
+  },
+  "GenomicStudy/example-lungMass" : {
+    "name" : "GenomicStudy/example-lungMass",
+    "path" : "genomicstudy-example-lungMass"
+  },
+  "DocumentReference/CNVAnalysis-called" : {
+    "name" : "DocumentReference/CNVAnalysis-called",
+    "path" : "DocumentReference-CNVAnalysis_called"
+  },
+  "DocumentReference/genomicBEDfile" : {
+    "name" : "DocumentReference/genomicBEDfile",
+    "path" : "DocumentReference-genomicBEDfile"
+  },
+  "DocumentReference/genomicFile1" : {
+    "name" : "DocumentReference/genomicFile1",
+    "path" : "DocumentReference-genomicFile1"
+  },
+  "DocumentReference/genomicFile2" : {
+    "name" : "DocumentReference/genomicFile2",
+    "path" : "DocumentReference-genomicFile2"
+  },
+  "DocumentReference/genomicFile3" : {
+    "name" : "DocumentReference/genomicFile3",
+    "path" : "DocumentReference-genomicFile3"
+  },
+  "DocumentReference/genomicFile4" : {
+    "name" : "DocumentReference/genomicFile4",
+    "path" : "DocumentReference-genomicFile4"
+  },
+  "DocumentReference/genomicVCFfile-cnv" : {
+    "name" : "DocumentReference/genomicVCFfile-cnv",
+    "path" : "DocumentReference-genomicVCFfile_cnv"
+  },
+  "DocumentReference/genomicVCFfile-simple" : {
+    "name" : "DocumentReference/genomicVCFfile-simple",
+    "path" : "DocumentReference-genomicVCFfile_simple"
+  },
+  "DocumentReference/genomicVCFfile" : {
+    "name" : "DocumentReference/genomicVCFfile",
+    "path" : "DocumentReference-genomicVCFfile"
+  },
+  "DocumentReference/SimpleVariantAnalysis-called" : {
+    "name" : "DocumentReference/SimpleVariantAnalysis-called",
+    "path" : "DocumentReference-SimpleVariantAnalysis_called"
+  },
+  "DocumentReference/WES-FullSequencedRegion-GRCh38" : {
+    "name" : "DocumentReference/WES-FullSequencedRegion-GRCh38",
+    "path" : "DocumentReference-WES_FullSequencedRegion_GRCh38"
+  },
+  "DocumentReference/genomicFileProband" : {
+    "name" : "DocumentReference/genomicFileProband",
+    "path" : "DocumentReference-genomicFileProband"
+  },
+  "DocumentReference/genomicFileMother" : {
+    "name" : "DocumentReference/genomicFileMother",
+    "path" : "DocumentReference-genomicFileMother"
+  },
+  "DocumentReference/genomicFileFather" : {
+    "name" : "DocumentReference/genomicFileFather",
+    "path" : "DocumentReference-genomicFileFather"
+  },
+  "DocumentReference/genomicFileGroupAsSubject" : {
+    "name" : "DocumentReference/genomicFileGroupAsSubject",
+    "path" : "DocumentReference-genomicFileGroupAsSubject"
+  },
+  "Device/NGS-device" : {
+    "name" : "Device/NGS-device",
+    "path" : "Device-NGS-device"
+  },
+  "Device/Triodenovo-SW" : {
+    "name" : "Device/Triodenovo-SW",
+    "path" : "Device-Triodenovo-SW"
+  },
+  "Encounter/denovoEncounter" : {
+    "name" : "Encounter/denovoEncounter",
+    "path" : "Encounter-denovoEncounter"
+  },
+  "Encounter/genomicEncounter" : {
+    "name" : "Encounter/genomicEncounter",
+    "path" : "Encounter-genomicEncounter"
+  },
+  "Group/groupDenovoFamily" : {
+    "name" : "Group/groupDenovoFamily",
+    "path" : "Group-denovoFamily"
+  },
+  "Patient/denovoChild" : {
+    "name" : "Patient/denovoChild",
+    "path" : "Patient-denovoChild"
+  },
+  "Patient/denovoFather" : {
+    "name" : "Patient/denovoFather",
+    "path" : "Patient-denovoFather"
+  },
+  "Patient/denovoMother" : {
+    "name" : "Patient/denovoMother",
+    "path" : "Patient-denovoMother"
+  },
+  "Patient/genomicPatient" : {
+    "name" : "Patient/genomicPatient",
+    "path" : "Patient-genomicPatient"
+  },
+  "Practitioner/practitioner01" : {
+    "name" : "Practitioner/practitioner01",
+    "path" : "Practitioner-practitioner01"
+  },
+  "Practitioner/practitioner02" : {
+    "name" : "Practitioner/practitioner02",
+    "path" : "Practitioner-practitioner02"
+  },
+  "RelatedPerson/relatedPersonDenovoMother" : {
+    "name" : "RelatedPerson/relatedPersonDenovoMother",
+    "path" : "RelatedPerson-denovoMother"
+  },
+  "RelatedPerson/relatedPersonDenovoFather" : {
+    "name" : "RelatedPerson/relatedPersonDenovoFather",
+    "path" : "RelatedPerson-denovoFather"
+  },
+  "ServiceRequest/genomicServiceRequest" : {
+    "name" : "ServiceRequest/genomicServiceRequest",
+    "path" : "ServiceRequest-genomicServiceRequest"
+  },
+  "ServiceRequest/genomicServiceRequest2" : {
+    "name" : "ServiceRequest/genomicServiceRequest2",
+    "path" : "ServiceRequest-genomicServiceRequest2"
+  },
+  "ServiceRequest/genomicServiceRequest3" : {
+    "name" : "ServiceRequest/genomicServiceRequest3",
+    "path" : "ServiceRequest-genomicServiceRequest3"
+  },
+  "ServiceRequest/genomicServiceRequest4" : {
+    "name" : "ServiceRequest/genomicServiceRequest4",
+    "path" : "ServiceRequest-genomicServiceRequest4"
+  },
+  "ServiceRequest/genomicSRProband" : {
+    "name" : "ServiceRequest/genomicSRProband",
+    "path" : "ServiceRequest-genomicSRProband"
+  },
+  "ServiceRequest/genomicSRMother" : {
+    "name" : "ServiceRequest/genomicSRMother",
+    "path" : "ServiceRequest-genomicSRMother"
+  },
+  "ServiceRequest/genomicSRFather" : {
+    "name" : "ServiceRequest/genomicSRFather",
+    "path" : "ServiceRequest-genomicSRFather"
+  },
+  "Specimen/denovo-1" : {
+    "name" : "Specimen/denovo-1",
+    "path" : "Specimen-denovo-1"
+  },
+  "Specimen/denovo-2" : {
+    "name" : "Specimen/denovo-2",
+    "path" : "Specimen-denovo-2"
+  },
+  "Specimen/denovo-3" : {
+    "name" : "Specimen/denovo-3",
+    "path" : "Specimen-denovo-3"
+  },
+  "Specimen/specimenProband" : {
+    "name" : "Specimen/specimenProband",
+    "path" : "Specimen-specimenProband"
+  },
+  "Specimen/specimenMother" : {
+    "name" : "Specimen/specimenMother",
+    "path" : "Specimen-specimenMother"
+  },
+  "Specimen/specimenFather" : {
+    "name" : "Specimen/specimenFather",
+    "path" : "Specimen-specimenFather"
+  },
+  "Specimen/genomicSpecimen" : {
+    "name" : "Specimen/genomicSpecimen",
+    "path" : "Specimen-genomicSpecimen"
+  },
+  "Substance/example" : {
+    "name" : "Substance/example",
+    "path" : "substance-example"
+  },
+  "Substance/f201" : {
+    "name" : "Substance/f201",
+    "path" : "substance-example-f201-dust"
+  },
+  "Substance/f202" : {
+    "name" : "Substance/f202",
+    "path" : "substance-example-f202-staphylococcus"
+  },
+  "Substance/f203" : {
+    "name" : "Substance/f203",
+    "path" : "substance-example-f203-potassium"
+  },
+  "Substance/f204" : {
+    "name" : "Substance/f204",
+    "path" : "substance-example-silver-nitrate-product"
+  },
+  "Substance/f205" : {
+    "name" : "Substance/f205",
+    "path" : "substance-example-amoxicillin-clavulanate"
+  },
+  "ImagingSelection/example-basic-image-selection" : {
+    "name" : "ImagingSelection/example-basic-image-selection",
+    "path" : "imagingselection-example-basic-image-selection"
+  },
+  "ImagingSelection/example-multiframe-image-selection" : {
+    "name" : "ImagingSelection/example-multiframe-image-selection",
+    "path" : "imagingselection-example-multiframe-image-selection"
+  },
+  "ImagingSelection/example-segmentation-image-selection" : {
+    "name" : "ImagingSelection/example-segmentation-image-selection",
+    "path" : "imagingselection-example-segmentation-image-selection"
+  },
+  "ImagingSelection/example-dicom-sr-selection" : {
+    "name" : "ImagingSelection/example-dicom-sr-selection",
+    "path" : "imagingselection-example-dicom-sr-selection"
+  },
+  "ImagingSelection/example-presentation-state-selection" : {
+    "name" : "ImagingSelection/example-presentation-state-selection",
+    "path" : "imagingselection-example-presentation-state-selection"
+  },
+  "ImagingSelection/example-2d-image-region-selection" : {
+    "name" : "ImagingSelection/example-2d-image-region-selection",
+    "path" : "imagingselection-example-2d-image-region-selection"
+  },
+  "ImagingSelection/example-3d-image-region-selection" : {
+    "name" : "ImagingSelection/example-3d-image-region-selection",
+    "path" : "imagingselection-example-3d-image-region-selection"
+  },
+  "ConceptMap/101" : {
+    "name" : "ConceptMap/101",
+    "path" : "conceptmap-example"
+  },
+  "ConceptMap/103" : {
+    "name" : "ConceptMap/103",
+    "path" : "conceptmap-103"
+  },
+  "ConceptMap/102" : {
+    "name" : "ConceptMap/102",
+    "path" : "conceptmap-example-specimen-type"
+  },
+  "ConceptMap/example2" : {
+    "name" : "ConceptMap/example2",
+    "path" : "conceptmap-example-2"
+  },
+  "ConceptMap/cdshooks-indicator" : {
+    "name" : "ConceptMap/cdshooks-indicator",
+    "path" : "conceptmap-cdshooks-indicator"
+  },
+  "ConceptMap/example-metadata" : {
+    "name" : "ConceptMap/example-metadata",
+    "path" : "conceptmap-example-metadata"
+  },
+  "ConceptMap/example-metadata-2" : {
+    "name" : "ConceptMap/example-metadata-2",
+    "path" : "conceptmap-example-metadata-2"
+  },
+  "ConceptMap/example-priority" : {
+    "name" : "ConceptMap/example-priority",
+    "path" : "conceptmap-example-priority"
+  },
+  "ConceptMap/message-adt-a04-to-bundle" : {
+    "name" : "ConceptMap/message-adt-a04-to-bundle",
+    "path" : "conceptmap-message-adt-a04-to-bundle"
+  },
+  "MessageDefinition/example" : {
+    "name" : "MessageDefinition/example",
+    "path" : "messagedefinition-example"
+  },
+  "MessageDefinition/patient-link-notification" : {
+    "name" : "MessageDefinition/patient-link-notification",
+    "path" : "messagedefinition-patient-link-notification"
+  },
+  "MessageDefinition/patient-link-response" : {
+    "name" : "MessageDefinition/patient-link-response",
+    "path" : "messagedefinition-patient-link-response"
+  },
+  "FormularyItem/formularyitemexample01" : {
+    "name" : "FormularyItem/formularyitemexample01",
+    "path" : "formularyitemexample01"
+  },
+  "ClinicalUseDefinition/example" : {
+    "name" : "ClinicalUseDefinition/example",
+    "path" : "clinicalusedefinition-example"
+  },
+  "EpisodeOfCare/example" : {
+    "name" : "EpisodeOfCare/example",
+    "path" : "episodeofcare-example"
+  },
+  "BiologicallyDerivedProduct/example" : {
+    "name" : "BiologicallyDerivedProduct/example",
+    "path" : "biologicallyderivedproduct-example"
+  },
+  "BiologicallyDerivedProduct/allogeneicHCT" : {
+    "name" : "BiologicallyDerivedProduct/allogeneicHCT",
+    "path" : "biologicallyderivedproduct-example-allogeneicHCT"
+  },
+  "BiologicallyDerivedProduct/autologousHCT" : {
+    "name" : "BiologicallyDerivedProduct/autologousHCT",
+    "path" : "biologicallyderivedproduct-example-autologousHCT"
+  },
+  "MedicationAdministration/medadminexample03" : {
+    "name" : "MedicationAdministration/medadminexample03",
+    "path" : "medicationadministrationexample3"
+  },
+  "MedicationAdministration/medadmin0301" : {
+    "name" : "MedicationAdministration/medadmin0301",
+    "path" : "medicationadministration0301"
+  },
+  "MedicationAdministration/medadmin0302" : {
+    "name" : "MedicationAdministration/medadmin0302",
+    "path" : "medicationadministration0302"
+  },
+  "MedicationAdministration/medadmin0303" : {
+    "name" : "MedicationAdministration/medadmin0303",
+    "path" : "medicationadministration0303"
+  },
+  "MedicationAdministration/medadmin0304" : {
+    "name" : "MedicationAdministration/medadmin0304",
+    "path" : "medicationadministration0304"
+  },
+  "MedicationAdministration/medadmin0305" : {
+    "name" : "MedicationAdministration/medadmin0305",
+    "path" : "medicationadministration0305"
+  },
+  "MedicationAdministration/medadmin0306" : {
+    "name" : "MedicationAdministration/medadmin0306",
+    "path" : "medicationadministration0306"
+  },
+  "MedicationAdministration/medadmin0307" : {
+    "name" : "MedicationAdministration/medadmin0307",
+    "path" : "medicationadministration0307"
+  },
+  "MedicationAdministration/medadmin0308" : {
+    "name" : "MedicationAdministration/medadmin0308",
+    "path" : "medicationadministration0308"
+  },
+  "MedicationAdministration/medadmin0309" : {
+    "name" : "MedicationAdministration/medadmin0309",
+    "path" : "medicationadministration0309"
+  },
+  "MedicationAdministration/medadmin0310" : {
+    "name" : "MedicationAdministration/medadmin0310",
+    "path" : "medicationadministration0310"
+  },
+  "MedicationAdministration/medadmin0311" : {
+    "name" : "MedicationAdministration/medadmin0311",
+    "path" : "medicationadministration0311"
+  },
+  "MedicationAdministration/medadmin0312" : {
+    "name" : "MedicationAdministration/medadmin0312",
+    "path" : "medicationadministration0312"
+  },
+  "MedicationAdministration/medadmin0313" : {
+    "name" : "MedicationAdministration/medadmin0313",
+    "path" : "medicationadministration0313"
+  },
+  "Basic/referral" : {
+    "name" : "Basic/referral",
+    "path" : "basic-example"
+  },
+  "Basic/classModel" : {
+    "name" : "Basic/classModel",
+    "path" : "basic-example2"
+  },
+  "Basic/basic-example-narrative" : {
+    "name" : "Basic/basic-example-narrative",
+    "path" : "basic-example-narrative"
+  },
+  "AppointmentResponse/example" : {
+    "name" : "AppointmentResponse/example",
+    "path" : "appointmentresponse-example"
+  },
+  "AppointmentResponse/example-loc" : {
+    "name" : "AppointmentResponse/example-loc",
+    "path" : "appointmentresponse-example-loc"
+  },
+  "AppointmentResponse/exampleresp" : {
+    "name" : "AppointmentResponse/exampleresp",
+    "path" : "appointmentresponse-example-req"
+  },
+  "CodeSystem/example" : {
+    "name" : "CodeSystem/example",
+    "path" : "codesystem-example"
+  },
+  "CodeSystem/nhin-purposeofuse" : {
+    "name" : "CodeSystem/nhin-purposeofuse",
+    "path" : "codesystem-nhin-purposeofuse"
+  },
+  "CodeSystem/summary" : {
+    "name" : "CodeSystem/summary",
+    "path" : "codesystem-example-summary"
+  },
+  "CodeSystem/example-supplement" : {
+    "name" : "CodeSystem/example-supplement",
+    "path" : "codesystem-example-supplement"
+  },
+  "CodeSystem/example-supplement-2" : {
+    "name" : "CodeSystem/example-supplement-2",
+    "path" : "codesystem-example-supplement-2"
+  },
+  "CodeSystem/example-metadata" : {
+    "name" : "CodeSystem/example-metadata",
+    "path" : "codesystem-example-metadata"
+  },
+  "CodeSystem/example-metadata-2" : {
+    "name" : "CodeSystem/example-metadata-2",
+    "path" : "codesystem-example-metadata-2"
+  },
+  "Bundle/bundle-example" : {
+    "name" : "Bundle/bundle-example",
+    "path" : "bundle-example"
+  },
+  "Bundle/bundle-transaction" : {
+    "name" : "Bundle/bundle-transaction",
+    "path" : "bundle-transaction"
+  },
+  "Bundle/bundle-response" : {
+    "name" : "Bundle/bundle-response",
+    "path" : "bundle-response"
+  },
+  "Bundle/bundle-request-medsallergies" : {
+    "name" : "Bundle/bundle-request-medsallergies",
+    "path" : "bundle-request-medsallergies"
+  },
+  "Bundle/bundle-response-medsallergies" : {
+    "name" : "Bundle/bundle-response-medsallergies",
+    "path" : "bundle-response-medsallergies"
+  },
+  "Bundle/bundle-request-simplesummary" : {
+    "name" : "Bundle/bundle-request-simplesummary",
+    "path" : "bundle-request-simplesummary"
+  },
+  "Bundle/bundle-response-simplesummary" : {
+    "name" : "Bundle/bundle-response-simplesummary",
+    "path" : "bundle-response-simplesummary"
+  },
+  "Bundle/bundle-search-warning" : {
+    "name" : "Bundle/bundle-search-warning",
+    "path" : "bundle-search-warning"
+  },
+  "Bundle/bundle-references" : {
+    "name" : "Bundle/bundle-references",
+    "path" : "bundle-references"
+  },
+  "ResearchSubject/example-crossover-placebo-to-drug" : {
+    "name" : "ResearchSubject/example-crossover-placebo-to-drug",
+    "path" : "researchsubject-example-crossover-placebo-to-drug"
+  },
+  "Library/example" : {
+    "name" : "Library/example",
+    "path" : "library-example"
+  },
+  "Library/library-exclusive-breastfeeding-cds-logic" : {
+    "name" : "Library/library-exclusive-breastfeeding-cds-logic",
+    "path" : "library-exclusive-breastfeeding-cds-logic"
+  },
+  "Library/library-exclusive-breastfeeding-cqm-logic" : {
+    "name" : "Library/library-exclusive-breastfeeding-cqm-logic",
+    "path" : "library-exclusive-breastfeeding-cqm-logic"
+  },
+  "Library/library-cms146-example" : {
+    "name" : "Library/library-cms146-example",
+    "path" : "library-cms146-example"
+  },
+  "Library/library-quick-model-definition" : {
+    "name" : "Library/library-quick-model-definition",
+    "path" : "library-quick-model-definition"
+  },
+  "Library/library-fhir-model-definition" : {
+    "name" : "Library/library-fhir-model-definition",
+    "path" : "library-fhir-model-definition"
+  },
+  "Library/suiciderisk-orderset-logic" : {
+    "name" : "Library/suiciderisk-orderset-logic",
+    "path" : "library-mmi-suiciderisk-orderset-logic"
+  },
+  "Library/library-fhir-helpers" : {
+    "name" : "Library/library-fhir-helpers",
+    "path" : "library-fhir-helpers"
+  },
+  "Library/zika-virus-intervention-logic" : {
+    "name" : "Library/zika-virus-intervention-logic",
+    "path" : "library-zika-virus-intervention-logic"
+  },
+  "Library/composition-example" : {
+    "name" : "Library/composition-example",
+    "path" : "library-composition-example"
+  },
+  "Library/library-fhir-helpers-predecessor" : {
+    "name" : "Library/library-fhir-helpers-predecessor",
+    "path" : "library-predecessor-example"
+  },
+  "Library/omtk-logic" : {
+    "name" : "Library/omtk-logic",
+    "path" : "library-omtk-logic"
+  },
+  "Library/omtk-modelinfo" : {
+    "name" : "Library/omtk-modelinfo",
+    "path" : "library-omtk-modelinfo"
+  },
+  "Library/opioidcds-common" : {
+    "name" : "Library/opioidcds-common",
+    "path" : "library-opioidcds-common"
+  },
+  "Library/opioidcds-recommendation-04" : {
+    "name" : "Library/opioidcds-recommendation-04",
+    "path" : "library-opioidcds-recommendation-04"
+  },
+  "Library/opioidcds-recommendation-05" : {
+    "name" : "Library/opioidcds-recommendation-05",
+    "path" : "library-opioidcds-recommendation-05"
+  },
+  "Library/opioidcds-recommendation-07" : {
+    "name" : "Library/opioidcds-recommendation-07",
+    "path" : "library-opioidcds-recommendation-07"
+  },
+  "Library/opioidcds-recommendation-08" : {
+    "name" : "Library/opioidcds-recommendation-08",
+    "path" : "library-opioidcds-recommendation-08"
+  },
+  "Library/opioidcds-recommendation-10" : {
+    "name" : "Library/opioidcds-recommendation-10",
+    "path" : "library-opioidcds-recommendation-10"
+  },
+  "Library/opioidcds-recommendation-11" : {
+    "name" : "Library/opioidcds-recommendation-11",
+    "path" : "library-opioidcds-recommendation-11"
+  },
+  "Library/hiv-indicators" : {
+    "name" : "Library/hiv-indicators",
+    "path" : "library-hiv-indicators"
+  },
+  "DeviceAssociation/example" : {
+    "name" : "DeviceAssociation/example",
+    "path" : "deviceassociation-example"
+  },
+  "BiologicallyDerivedProductDispense/example" : {
+    "name" : "BiologicallyDerivedProductDispense/example",
+    "path" : "biologicallyderivedproductdispense-example"
+  },
+  "RiskAssessment/genetic" : {
+    "name" : "RiskAssessment/genetic",
+    "path" : "riskassessment-example"
+  },
+  "RiskAssessment/prognosis" : {
+    "name" : "RiskAssessment/prognosis",
+    "path" : "riskassessment-example-prognosis"
+  },
+  "RiskAssessment/cardiac" : {
+    "name" : "RiskAssessment/cardiac",
+    "path" : "riskassessment-example-cardiac"
+  },
+  "RiskAssessment/population" : {
+    "name" : "RiskAssessment/population",
+    "path" : "riskassessment-example-population"
+  },
+  "RiskAssessment/breastcancer-risk" : {
+    "name" : "RiskAssessment/breastcancer-risk",
+    "path" : "riskassessment-example-breastcancer"
+  },
+  "RiskAssessment/riskexample" : {
+    "name" : "RiskAssessment/riskexample",
+    "path" : "riskassessment-riskexample"
+  },
+  "Requirements/example1" : {
+    "name" : "Requirements/example1",
+    "path" : "Requirements-example1"
+  },
+  "Requirements/example2" : {
+    "name" : "Requirements/example2",
+    "path" : "Requirements-example2"
+  },
+  "DeviceMetric/example" : {
+    "name" : "DeviceMetric/example",
+    "path" : "devicemetric-example"
+  },
+  "ActivityDefinition/referralPrimaryCareMentalHealthEx" : {
+    "name" : "ActivityDefinition/referralPrimaryCareMentalHealthEx",
+    "path" : "activitydefinition-example"
+  },
+  "ActivityDefinition/citalopramPrescription" : {
+    "name" : "ActivityDefinition/citalopramPrescription",
+    "path" : "activitydefinition-medicationorder-example"
+  },
+  "ActivityDefinition/administer-zika-virus-exposure-assessment" : {
+    "name" : "ActivityDefinition/administer-zika-virus-exposure-assessment",
+    "path" : "activitydefinition-administer-zika-virus-exposure-assessment"
+  },
+  "ActivityDefinition/serum-zika-dengue-virus-igm" : {
+    "name" : "ActivityDefinition/serum-zika-dengue-virus-igm",
+    "path" : "activitydefinition-order-serum-zika-dengue-virus-igm"
+  },
+  "ActivityDefinition/provide-mosquito-prevention-advice" : {
+    "name" : "ActivityDefinition/provide-mosquito-prevention-advice",
+    "path" : "activitydefinition-provide-mosquito-prevention-advice"
+  },
+  "ActivityDefinition/heart-valve-replacement" : {
+    "name" : "ActivityDefinition/heart-valve-replacement",
+    "path" : "activitydefinition-servicerequest-example"
+  },
+  "ActivityDefinition/blood-tubes-supply" : {
+    "name" : "ActivityDefinition/blood-tubes-supply",
+    "path" : "activitydefinition-supplyrequest-example"
+  },
+  "ActivityDefinition/referralPrimaryCareMentalHealth-initial" : {
+    "name" : "ActivityDefinition/referralPrimaryCareMentalHealth-initial",
+    "path" : "activitydefinition-predecessor-example"
+  },
+  "ActivityDefinition/serum-dengue-virus-igm" : {
+    "name" : "ActivityDefinition/serum-dengue-virus-igm",
+    "path" : "activitydefinition-order-serum-dengue-virus-igm"
+  },
+  "ActivityDefinition/example-alteplase-dosing" : {
+    "name" : "ActivityDefinition/example-alteplase-dosing",
+    "path" : "activitydefinition-example-alteplase-dosing"
+  },
+  "Composition/example" : {
+    "name" : "Composition/example",
+    "path" : "composition-example"
+  },
+  "Composition/father" : {
+    "name" : "Composition/father",
+    "path" : "document-example-dischargesummary"
+  },
+  "Composition/example-mixed" : {
+    "name" : "Composition/example-mixed",
+    "path" : "composition-example-mixed"
+  },
+  "ValueSet/example" : {
+    "name" : "ValueSet/example",
+    "path" : "valueset-example"
+  },
+  "ValueSet/example-intensional" : {
+    "name" : "ValueSet/example-intensional",
+    "path" : "valueset-example-intensional"
+  },
+  "ValueSet/example-filter" : {
+    "name" : "ValueSet/example-filter",
+    "path" : "valueset-example-filter"
+  },
+  "ValueSet/example-expansion" : {
+    "name" : "ValueSet/example-expansion",
+    "path" : "valueset-example-expansion"
+  },
+  "ValueSet/ucum-common" : {
+    "name" : "ValueSet/ucum-common",
+    "path" : "valueset-ucum-common"
+  },
+  "ValueSet/example-cpt-all" : {
+    "name" : "ValueSet/example-cpt-all",
+    "path" : "valueset-example-cpt-all"
+  },
+  "ValueSet/yesnodontknow" : {
+    "name" : "ValueSet/yesnodontknow",
+    "path" : "valueset-example-yesnodontknow"
+  },
+  "ValueSet/nhin-purposeofuse" : {
+    "name" : "ValueSet/nhin-purposeofuse",
+    "path" : "valueset-nhin-purposeofuse"
+  },
+  "ValueSet/inactive" : {
+    "name" : "ValueSet/inactive",
+    "path" : "valueset-example-inactive"
+  },
+  "ValueSet/example-metadata" : {
+    "name" : "ValueSet/example-metadata",
+    "path" : "valueset-example-metadata"
+  },
+  "ValueSet/example-metadata-2" : {
+    "name" : "ValueSet/example-metadata-2",
+    "path" : "valueset-example-metadata-2"
+  },
+  "FamilyMemberHistory/father" : {
+    "name" : "FamilyMemberHistory/father",
+    "path" : "familymemberhistory-example"
+  },
+  "FamilyMemberHistory/mother" : {
+    "name" : "FamilyMemberHistory/mother",
+    "path" : "familymemberhistory-example-mother"
+  },
+  "FamilyMemberHistory/negation" : {
+    "name" : "FamilyMemberHistory/negation",
+    "path" : "familymemberhistory-example-negation"
+  },
+  "ImmunizationRecommendation/example" : {
+    "name" : "ImmunizationRecommendation/example",
+    "path" : "immunizationrecommendation-example"
+  },
+  "ImmunizationRecommendation/example-target-disease" : {
+    "name" : "ImmunizationRecommendation/example-target-disease",
+    "path" : "immunizationrecommendation-example-target-disease"
+  },
+  "Questionnaire/3141" : {
+    "name" : "Questionnaire/3141",
+    "path" : "questionnaire-example"
+  },
+  "Questionnaire/f201" : {
+    "name" : "Questionnaire/f201",
+    "path" : "questionnaire-example-f201-lifelines"
+  },
+  "Questionnaire/bb" : {
+    "name" : "Questionnaire/bb",
+    "path" : "questionnaire-example-bluebook"
+  },
+  "Questionnaire/gcs" : {
+    "name" : "Questionnaire/gcs",
+    "path" : "questionnaire-example-gcs"
+  },
+  "Questionnaire/zika-virus-exposure-assessment" : {
+    "name" : "Questionnaire/zika-virus-exposure-assessment",
+    "path" : "questionnaire-zika-virus-exposure-assessment"
+  },
+  "Questionnaire/ussg-fht" : {
+    "name" : "Questionnaire/ussg-fht",
+    "path" : "questionnaire-profile-example-ussg-fht"
+  },
+  "Questionnaire/example-practitioner-info" : {
+    "name" : "Questionnaire/example-practitioner-info",
+    "path" : "questionnaire-example-practitioner-info"
+  },
+  "DeviceDispense/example" : {
+    "name" : "DeviceDispense/example",
+    "path" : "devicedispense-example"
+  },
+  "Subscription/example" : {
+    "name" : "Subscription/example",
+    "path" : "subscription-example"
+  },
+  "Subscription/admission" : {
+    "name" : "Subscription/admission",
+    "path" : "subscription-admission"
+  },
+  "NamingSystem/example" : {
+    "name" : "NamingSystem/example",
+    "path" : "namingsystem-example"
+  },
+  "NamingSystem/example-id" : {
+    "name" : "NamingSystem/example-id",
+    "path" : "namingsystem-example-id"
+  },
+  "namingSystem/example-metadata" : {
+    "name" : "namingSystem/example-metadata",
+    "path" : "namingsystem-example-metadata"
+  },
+  "NamingSystem/example-metadata-2" : {
+    "name" : "NamingSystem/example-metadata-2",
+    "path" : "namingsystem-example-metadata-2"
+  },
+  "ArtifactAssessment/risk-of-bias-example" : {
+    "name" : "ArtifactAssessment/risk-of-bias-example",
+    "path" : "artifactassessment-risk-of-bias-example"
+  },
+  "ArtifactAssessment/example-certainty-rating" : {
+    "name" : "ArtifactAssessment/example-certainty-rating",
+    "path" : "artifactassessment-example-certainty-rating"
+  },
+  "ExplanationOfBenefit/EB3500" : {
+    "name" : "ExplanationOfBenefit/EB3500",
+    "path" : "explanationofbenefit-example"
+  },
+  "ExplanationOfBenefit/EB3501" : {
+    "name" : "ExplanationOfBenefit/EB3501",
+    "path" : "explanationofbenefit-example-2"
+  },
+  "BodyStructure/fetus" : {
+    "name" : "BodyStructure/fetus",
+    "path" : "bodystructure-example-fetus"
+  },
+  "BodyStructure/tumor" : {
+    "name" : "BodyStructure/tumor",
+    "path" : "bodystructure-example-tumor"
+  },
+  "BodyStructure/skin-patch" : {
+    "name" : "BodyStructure/skin-patch",
+    "path" : "bodystructure-example-skin-patch"
+  },
+  "DetectedIssue/ddi" : {
+    "name" : "DetectedIssue/ddi",
+    "path" : "detectedissue-example"
+  },
+  "DetectedIssue/duplicate" : {
+    "name" : "DetectedIssue/duplicate",
+    "path" : "detectedissue-example-dup"
+  },
+  "DetectedIssue/allergy" : {
+    "name" : "DetectedIssue/allergy",
+    "path" : "detectedissue-example-allergy"
+  },
+  "DetectedIssue/lab" : {
+    "name" : "DetectedIssue/lab",
+    "path" : "detectedissue-example-lab"
+  },
+  "Encounter/example" : {
+    "name" : "Encounter/example",
+    "path" : "encounter-example"
+  },
+  "Encounter/home" : {
+    "name" : "Encounter/home",
+    "path" : "encounter-example-home"
+  },
+  "Encounter/f201" : {
+    "name" : "Encounter/f201",
+    "path" : "encounter-example-f201-20130404"
+  },
+  "Encounter/f202" : {
+    "name" : "Encounter/f202",
+    "path" : "encounter-example-f202-20130128"
+  },
+  "Encounter/f203" : {
+    "name" : "Encounter/f203",
+    "path" : "encounter-example-f203-20130311"
+  },
+  "Encounter/f001" : {
+    "name" : "Encounter/f001",
+    "path" : "encounter-example-f001-heart"
+  },
+  "Encounter/f002" : {
+    "name" : "Encounter/f002",
+    "path" : "encounter-example-f002-lung"
+  },
+  "Encounter/f003" : {
+    "name" : "Encounter/f003",
+    "path" : "encounter-example-f003-abscess"
+  },
+  "Encounter/xcda" : {
+    "name" : "Encounter/xcda",
+    "path" : "encounter-example-xcda"
+  },
+  "Encounter/emerg" : {
+    "name" : "Encounter/emerg",
+    "path" : "encounter-example-emerg"
+  },
+  "Encounter/colonoscopy" : {
+    "name" : "Encounter/colonoscopy",
+    "path" : "encounter-example-colonoscopy"
+  },
+  "TestReport/testreport-example" : {
+    "name" : "TestReport/testreport-example",
+    "path" : "testreport-example"
+  },
+  "SubscriptionStatus/example" : {
+    "name" : "SubscriptionStatus/example",
+    "path" : "subscriptionstatus-example"
+  },
+  "SubscriptionStatus/e2c9dc20-615e-4603-9005-74deb209cbb0" : {
+    "name" : "SubscriptionStatus/e2c9dc20-615e-4603-9005-74deb209cbb0",
+    "path" : "notification-error"
+  },
+  "SubscriptionStatus/54f808cf-d159-4c9b-accb-c33eb20f0ecc" : {
+    "name" : "SubscriptionStatus/54f808cf-d159-4c9b-accb-c33eb20f0ecc",
+    "path" : "notification-handshake"
+  },
+  "SubscriptionStatus/3d20ea4b-90dc-4d0d-b15a-c7a893389401" : {
+    "name" : "SubscriptionStatus/3d20ea4b-90dc-4d0d-b15a-c7a893389401",
+    "path" : "notification-heartbeat"
+  },
+  "SubscriptionStatus/9601c07a-e34f-4945-93ca-6efb5394c995" : {
+    "name" : "SubscriptionStatus/9601c07a-e34f-4945-93ca-6efb5394c995",
+    "path" : "notification-empty"
+  },
+  "SubscriptionStatus/3945182f-d315-4dbf-9259-09d863c7e7da" : {
+    "name" : "SubscriptionStatus/3945182f-d315-4dbf-9259-09d863c7e7da",
+    "path" : "notification-id-only"
+  },
+  "SubscriptionStatus/920a46b7-045a-4773-82bd-8e90c3e15653" : {
+    "name" : "SubscriptionStatus/920a46b7-045a-4773-82bd-8e90c3e15653",
+    "path" : "notification-id-only-with-patient"
+  },
+  "SubscriptionStatus/00b99077-2bda-436e-98cc-a4f65d6c2fe0" : {
+    "name" : "SubscriptionStatus/00b99077-2bda-436e-98cc-a4f65d6c2fe0",
+    "path" : "notification-full-resource"
+  },
+  "SubscriptionStatus/fdd78223-f79f-43b4-8979-ad49d4ac248c" : {
+    "name" : "SubscriptionStatus/fdd78223-f79f-43b4-8979-ad49d4ac248c",
+    "path" : "notification-full-resource-with-patient"
+  },
+  "SubscriptionStatus/40464b74-fad0-4f45-ab60-e67f949c5e92" : {
+    "name" : "SubscriptionStatus/40464b74-fad0-4f45-ab60-e67f949c5e92",
+    "path" : "notification-query-status"
+  },
+  "SubscriptionStatus/787e69f6-81a8-44e4-b404-257013dec332" : {
+    "name" : "SubscriptionStatus/787e69f6-81a8-44e4-b404-257013dec332",
+    "path" : "notification-query-event"
+  },
+  "SubscriptionStatus/0f322dbe-4f8d-4cbd-9ecb-bc8dc6f65f6a" : {
+    "name" : "SubscriptionStatus/0f322dbe-4f8d-4cbd-9ecb-bc8dc6f65f6a",
+    "path" : "notification-message-full-resource"
+  },
+  "Immunization/example" : {
+    "name" : "Immunization/example",
+    "path" : "immunization-example"
+  },
+  "Immunization/reaction" : {
+    "name" : "Immunization/reaction",
+    "path" : "immunization-example-reaction"
+  },
+  "Immunization/notGiven" : {
+    "name" : "Immunization/notGiven",
+    "path" : "immunization-example-refused"
+  },
+  "Immunization/historical" : {
+    "name" : "Immunization/historical",
+    "path" : "immunization-example-historical"
+  },
+  "Immunization/subpotent" : {
+    "name" : "Immunization/subpotent",
+    "path" : "immunization-example-subpotent"
+  },
+  "Immunization/protocol" : {
+    "name" : "Immunization/protocol",
+    "path" : "immunization-example-protocol"
+  },
+  "ImmunizationEvaluation/example" : {
+    "name" : "ImmunizationEvaluation/example",
+    "path" : "immunizationevaluation-example"
+  },
+  "ImmunizationEvaluation/notValid" : {
+    "name" : "ImmunizationEvaluation/notValid",
+    "path" : "immunizationevaluation-example-notvalid"
+  },
+  "Procedure/example" : {
+    "name" : "Procedure/example",
+    "path" : "procedure-example"
+  },
+  "Procedure/biopsy" : {
+    "name" : "Procedure/biopsy",
+    "path" : "procedure-example-biopsy"
+  },
+  "Procedure/f201" : {
+    "name" : "Procedure/f201",
+    "path" : "procedure-example-f201-tpf"
+  },
+  "Procedure/f001" : {
+    "name" : "Procedure/f001",
+    "path" : "procedure-example-f001-heart"
+  },
+  "Procedure/f002" : {
+    "name" : "Procedure/f002",
+    "path" : "procedure-example-f002-lung"
+  },
+  "Procedure/f003" : {
+    "name" : "Procedure/f003",
+    "path" : "procedure-example-f003-abscess"
+  },
+  "Procedure/f004" : {
+    "name" : "Procedure/f004",
+    "path" : "procedure-example-f004-tracheotomy"
+  },
+  "Procedure/example-implant" : {
+    "name" : "Procedure/example-implant",
+    "path" : "procedure-example-implant"
+  },
+  "Procedure/ambulation" : {
+    "name" : "Procedure/ambulation",
+    "path" : "procedure-example-ambulation"
+  },
+  "Procedure/colon-biopsy" : {
+    "name" : "Procedure/colon-biopsy",
+    "path" : "procedure-example-colon-biopsy"
+  },
+  "Procedure/colonoscopy" : {
+    "name" : "Procedure/colonoscopy",
+    "path" : "procedure-example-colonoscopy"
+  },
+  "Procedure/appendectomy-narrative" : {
+    "name" : "Procedure/appendectomy-narrative",
+    "path" : "procedure-example-appendectomy-narrative"
+  },
+  "Procedure/ob" : {
+    "name" : "Procedure/ob",
+    "path" : "procedure-example-ob"
+  },
+  "Procedure/physical-therapy" : {
+    "name" : "Procedure/physical-therapy",
+    "path" : "procedure-example-physical-therapy"
+  },
+  "Procedure/education" : {
+    "name" : "Procedure/education",
+    "path" : "procedure-example-education"
+  },
+  "Procedure/HCBS" : {
+    "name" : "Procedure/HCBS",
+    "path" : "procedure-example-HCBS"
+  },
+  "SubstancePolymer/example" : {
+    "name" : "SubstancePolymer/example",
+    "path" : "substancepolymer-example"
+  },
+  "AllergyIntolerance/example" : {
+    "name" : "AllergyIntolerance/example",
+    "path" : "allergyintolerance-example"
+  },
+  "AllergyIntolerance/medication" : {
+    "name" : "AllergyIntolerance/medication",
+    "path" : "allergyintolerance-medication"
+  },
+  "AllergyIntolerance/fishallergy" : {
+    "name" : "AllergyIntolerance/fishallergy",
+    "path" : "allergyintolerance-fishallergy"
+  },
+  "AllergyIntolerance/nka" : {
+    "name" : "AllergyIntolerance/nka",
+    "path" : "allergyintolerance-nka"
+  },
+  "AllergyIntolerance/nkda" : {
+    "name" : "AllergyIntolerance/nkda",
+    "path" : "allergyintolerance-nkda"
+  },
+  "AllergyIntolerance/nkla" : {
+    "name" : "AllergyIntolerance/nkla",
+    "path" : "allergyintolerance-nkla"
+  },
+  "MolecularSequence/example" : {
+    "name" : "MolecularSequence/example",
+    "path" : "molecularsequence-example"
+  },
+  "MolecularSequence/sequence-complex-variant" : {
+    "name" : "MolecularSequence/sequence-complex-variant",
+    "path" : "sequence-complex-variant"
+  },
+  "MolecularSequence/example-pgx-1" : {
+    "name" : "MolecularSequence/example-pgx-1",
+    "path" : "sequence-example-pgx-1"
+  },
+  "MolecularSequence/example-pgx-2" : {
+    "name" : "MolecularSequence/example-pgx-2",
+    "path" : "sequence-example-pgx-2"
+  },
+  "MolecularSequence/example-TPMT-one" : {
+    "name" : "MolecularSequence/example-TPMT-one",
+    "path" : "sequence-example-TPMT-one"
+  },
+  "MolecularSequence/example-TPMT-two" : {
+    "name" : "MolecularSequence/example-TPMT-two",
+    "path" : "sequence-example-TPMT-two"
+  },
+  "MolecularSequence/coord-0-base" : {
+    "name" : "MolecularSequence/coord-0-base",
+    "path" : "coord-0base-example"
+  },
+  "MolecularSequence/coord-1-base" : {
+    "name" : "MolecularSequence/coord-1-base",
+    "path" : "coord-1base-example"
+  },
+  "MolecularSequence/breastcancer" : {
+    "name" : "MolecularSequence/breastcancer",
+    "path" : "sequence-genetics-example-breastcancer"
+  },
+  "MolecularSequence/seq-ordinal" : {
+    "name" : "MolecularSequence/seq-ordinal",
+    "path" : "sequence-example-ordinal"
+  },
+  "MolecularSequence/sequence-example-fusion" : {
+    "name" : "MolecularSequence/sequence-example-fusion",
+    "path" : "sequence-example-fusion"
+  },
+  "MolecularSequence/molecularsequence-focus-example" : {
+    "name" : "MolecularSequence/molecularsequence-focus-example",
+    "path" : "molecularsequence-focus-example"
+  },
+  "HealthcareService/example" : {
+    "name" : "HealthcareService/example",
+    "path" : "healthcareservice-example"
+  },
+  "CommunicationRequest/example" : {
+    "name" : "CommunicationRequest/example",
+    "path" : "communicationrequest-example"
+  },
+  "CommunicationRequest/fm-solicit" : {
+    "name" : "CommunicationRequest/fm-solicit",
+    "path" : "communicationrequest-example-fm-solicit-attachment"
+  },
+  "null/patient" : {
+    "name" : "null/patient",
+    "path" : "compartmentdefinition-patient"
+  },
+  "null/practitioner" : {
+    "name" : "null/practitioner",
+    "path" : "compartmentdefinition-practitioner"
+  },
+  "null/relatedperson" : {
+    "name" : "null/relatedperson",
+    "path" : "compartmentdefinition-relatedperson"
+  },
+  "null/device" : {
+    "name" : "null/device",
+    "path" : "compartmentdefinition-device"
+  },
+  "null/encounter" : {
+    "name" : "null/encounter",
+    "path" : "compartmentdefinition-encounter"
+  },
+  "CompartmentDefinition/example" : {
+    "name" : "CompartmentDefinition/example",
+    "path" : "compartmentdefinition-example"
+  },
+  "AdministrableProductDefinition/example" : {
+    "name" : "AdministrableProductDefinition/example",
+    "path" : "administrableproductdefinition-example"
+  },
+  "Condition/example" : {
+    "name" : "Condition/example",
+    "path" : "condition-example"
+  },
+  "Condition/example2" : {
+    "name" : "Condition/example2",
+    "path" : "condition-example2"
+  },
+  "Condition/f201" : {
+    "name" : "Condition/f201",
+    "path" : "condition-example-f201-fever"
+  },
+  "Condition/f202" : {
+    "name" : "Condition/f202",
+    "path" : "condition-example-f202-malignancy"
+  },
+  "Condition/f203" : {
+    "name" : "Condition/f203",
+    "path" : "condition-example-f203-sepsis"
+  },
+  "Condition/f204" : {
+    "name" : "Condition/f204",
+    "path" : "condition-example-f204-renal"
+  },
+  "Condition/f205" : {
+    "name" : "Condition/f205",
+    "path" : "condition-example-f205-infection"
+  },
+  "Condition/f001" : {
+    "name" : "Condition/f001",
+    "path" : "condition-example-f001-heart"
+  },
+  "Condition/f002" : {
+    "name" : "Condition/f002",
+    "path" : "condition-example-f002-lung"
+  },
+  "Condition/f003" : {
+    "name" : "Condition/f003",
+    "path" : "condition-example-f003-abscess"
+  },
+  "Condition/stroke" : {
+    "name" : "Condition/stroke",
+    "path" : "condition-example-stroke"
+  },
+  "Condition/family-history" : {
+    "name" : "Condition/family-history",
+    "path" : "condition-example-family-history"
+  },
+  "Condition/example-linkage" : {
+    "name" : "Condition/example-linkage",
+    "path" : "condition-example-linkage"
+  },
+  "SubscriptionTopic/example" : {
+    "name" : "SubscriptionTopic/example",
+    "path" : "subscriptiontopic-example"
+  },
+  "SubscriptionTopic/admission" : {
+    "name" : "SubscriptionTopic/admission",
+    "path" : "subscriptiontopic-example-admission"
+  },
+  "Provenance/example" : {
+    "name" : "Provenance/example",
+    "path" : "provenance-example"
+  },
+  "Provenance/example1" : {
+    "name" : "Provenance/example1",
+    "path" : "provenance-example1"
+  },
+  "Provenance/example2" : {
+    "name" : "Provenance/example2",
+    "path" : "provenance-example2"
+  },
+  "Provenance/example3" : {
+    "name" : "Provenance/example3",
+    "path" : "provenance-example3"
+  },
+  "Provenance/signature" : {
+    "name" : "Provenance/signature",
+    "path" : "provenance-example-sig"
+  },
+  "Provenance/consent-signature" : {
+    "name" : "Provenance/consent-signature",
+    "path" : "provenance-consent-signature"
+  },
+  "Provenance/example-biocompute-object" : {
+    "name" : "Provenance/example-biocompute-object",
+    "path" : "provenance-example-biocompute-object"
+  },
+  "Provenance/example-cwl" : {
+    "name" : "Provenance/example-cwl",
+    "path" : "provenance-example-cwl"
+  },
+  "Provenance/example-create-consent" : {
+    "name" : "Provenance/example-create-consent",
+    "path" : "provenance-example-create-consent"
+  },
+  "Provenance/example-advanced" : {
+    "name" : "Provenance/example-advanced",
+    "path" : "provenance-example-advanced"
+  },
+  "Provenance/example-diagnosticreport-sig" : {
+    "name" : "Provenance/example-diagnosticreport-sig",
+    "path" : "provenance-example-diagnosticreport-sig"
+  },
+  "Provenance/example-import" : {
+    "name" : "Provenance/example-import",
+    "path" : "provenance-example-import"
+  },
+  "Provenance/example-delete" : {
+    "name" : "Provenance/example-delete",
+    "path" : "provenance-example-delete"
+  },
+  "Provenance/example-anon0" : {
+    "name" : "Provenance/example-anon0",
+    "path" : "provenance-example-anon0"
+  },
+  "TestPlan/example" : {
+    "name" : "TestPlan/example",
+    "path" : "testplan-example"
+  },
+  "Consent/consent-example-basic" : {
+    "name" : "Consent/consent-example-basic",
+    "path" : "consent-example"
+  },
+  "Consent/consent-example-Out" : {
+    "name" : "Consent/consent-example-Out",
+    "path" : "consent-example-Out"
+  },
+  "Consent/consent-example-Emergency" : {
+    "name" : "Consent/consent-example-Emergency",
+    "path" : "consent-example-Emergency"
+  },
+  "Consent/consent-example-notThis" : {
+    "name" : "Consent/consent-example-notThis",
+    "path" : "consent-example-notThis"
+  },
+  "Consent/consent-example-notTime" : {
+    "name" : "Consent/consent-example-notTime",
+    "path" : "consent-example-notTime"
+  },
+  "Consent/consent-example-notOrg" : {
+    "name" : "Consent/consent-example-notOrg",
+    "path" : "consent-example-notOrg"
+  },
+  "Consent/consent-example-notThem" : {
+    "name" : "Consent/consent-example-notThem",
+    "path" : "consent-example-notThem"
+  },
+  "Consent/consent-example-notAuthor" : {
+    "name" : "Consent/consent-example-notAuthor",
+    "path" : "consent-example-notAuthor"
+  },
+  "Consent/consent-example-grantor" : {
+    "name" : "Consent/consent-example-grantor",
+    "path" : "consent-example-grantor"
+  },
+  "Consent/consent-example-pkb" : {
+    "name" : "Consent/consent-example-pkb",
+    "path" : "consent-example-pkb"
+  },
+  "Consent/consent-example-smartonfhir" : {
+    "name" : "Consent/consent-example-smartonfhir",
+    "path" : "consent-example-smartonfhir"
+  },
+  "Consent/consent-example-CDA" : {
+    "name" : "Consent/consent-example-CDA",
+    "path" : "consent-example-CDA"
+  },
+  "ObservationDefinition/example" : {
+    "name" : "ObservationDefinition/example",
+    "path" : "observationdefinition-example"
+  },
+  "ConditionDefinition/example" : {
+    "name" : "ConditionDefinition/example",
+    "path" : "conditiondefinition-example"
+  },
+  "GraphDefinition/example" : {
+    "name" : "GraphDefinition/example",
+    "path" : "graphdefinition-example"
+  },
+  "Patient/example" : {
+    "name" : "Patient/example",
+    "path" : "patient-example"
+  },
+  "Patient/pat1" : {
+    "name" : "Patient/pat1",
+    "path" : "patient-example-a"
+  },
+  "Patient/pat2" : {
+    "name" : "Patient/pat2",
+    "path" : "patient-example-b"
+  },
+  "Patient/pat3" : {
+    "name" : "Patient/pat3",
+    "path" : "patient-example-c"
+  },
+  "Patient/pat4" : {
+    "name" : "Patient/pat4",
+    "path" : "patient-example-d"
+  },
+  "Patient/b248b1b2-1686-4b94-9936-37d7a5f94b51" : {
+    "name" : "Patient/b248b1b2-1686-4b94-9936-37d7a5f94b51",
+    "path" : "patient-examples-general"
+  },
+  "Patient/patient-example-sex-and-gender" : {
+    "name" : "Patient/patient-example-sex-and-gender",
+    "path" : "patient-example-sex-and-gender"
+  },
+  "Patient/b3f24cf14-d349-45b3-8134-3d83e9104875" : {
+    "name" : "Patient/b3f24cf14-d349-45b3-8134-3d83e9104875",
+    "path" : "patient-examples-cypress-template"
+  },
+  "Patient/xcda" : {
+    "name" : "Patient/xcda",
+    "path" : "patient-example-xcda"
+  },
+  "Patient/xds" : {
+    "name" : "Patient/xds",
+    "path" : "patient-example-xds"
+  },
+  "Patient/animal" : {
+    "name" : "Patient/animal",
+    "path" : "patient-example-animal"
+  },
+  "Patient/dicom" : {
+    "name" : "Patient/dicom",
+    "path" : "patient-example-dicom"
+  },
+  "Patient/ihe-pcd" : {
+    "name" : "Patient/ihe-pcd",
+    "path" : "patient-example-ihe-pcd"
+  },
+  "Patient/f001" : {
+    "name" : "Patient/f001",
+    "path" : "patient-example-f001-pieter"
+  },
+  "Patient/f201" : {
+    "name" : "Patient/f201",
+    "path" : "patient-example-f201-roel"
+  },
+  "Patient/glossy" : {
+    "name" : "Patient/glossy",
+    "path" : "patient-glossy-example"
+  },
+  "Patient/proband" : {
+    "name" : "Patient/proband",
+    "path" : "patient-example-proband"
+  },
+  "Patient/genetics-example1" : {
+    "name" : "Patient/genetics-example1",
+    "path" : "patient-genetics-example1"
+  },
+  "Patient/ch-example" : {
+    "name" : "Patient/ch-example",
+    "path" : "patient-example-chinese"
+  },
+  "Patient/newborn" : {
+    "name" : "Patient/newborn",
+    "path" : "patient-example-newborn"
+  },
+  "Patient/mom" : {
+    "name" : "Patient/mom",
+    "path" : "patient-example-mom"
+  },
+  "Patient/infant-twin-1" : {
+    "name" : "Patient/infant-twin-1",
+    "path" : "patient-example-infant-twin-1"
+  },
+  "Patient/infant-twin-2" : {
+    "name" : "Patient/infant-twin-2",
+    "path" : "patient-example-infant-twin-2"
+  },
+  "Patient/infant-fetal" : {
+    "name" : "Patient/infant-fetal",
+    "path" : "patient-example-infant-fetal"
+  },
+  "Patient/infant-mom" : {
+    "name" : "Patient/infant-mom",
+    "path" : "patient-example-infant-mom"
+  },
+  "ClinicalImpression/example" : {
+    "name" : "ClinicalImpression/example",
+    "path" : "clinicalimpression-example"
+  },
+  "SearchParameter/example" : {
+    "name" : "SearchParameter/example",
+    "path" : "searchparameter-example"
+  },
+  "SearchParameter/example-extension" : {
+    "name" : "SearchParameter/example-extension",
+    "path" : "searchparameter-example-extension"
+  },
+  "SearchParameter/example-reference" : {
+    "name" : "SearchParameter/example-reference",
+    "path" : "searchparameter-example-reference"
+  },
+  "SearchParameter/filter" : {
+    "name" : "SearchParameter/filter",
+    "path" : "searchparameter-filter"
+  },
+  "SearchParameter/example-constraint" : {
+    "name" : "SearchParameter/example-constraint",
+    "path" : "searchparameter-example-constraint"
+  },
+  "Endpoint/example" : {
+    "name" : "Endpoint/example",
+    "path" : "endpoint-example"
+  },
+  "Endpoint/b5711af0a-d678-46d1-86e9-66e454cf1522" : {
+    "name" : "Endpoint/b5711af0a-d678-46d1-86e9-66e454cf1522",
+    "path" : "endpoint-examples-general-template"
+  },
+  "Endpoint/example-wadors" : {
+    "name" : "Endpoint/example-wadors",
+    "path" : "endpoint-example-wadors"
+  },
+  "Endpoint/direct-endpoint" : {
+    "name" : "Endpoint/direct-endpoint",
+    "path" : "endpoint-example-direct"
+  },
+  "InsurancePlan/example" : {
+    "name" : "InsurancePlan/example",
+    "path" : "insuranceplan-example"
+  },
+  "List/example" : {
+    "name" : "List/example",
+    "path" : "list-example"
+  },
+  "List/example-empty" : {
+    "name" : "List/example-empty",
+    "path" : "list-example-empty"
+  },
+  "List/example-simple-empty" : {
+    "name" : "List/example-simple-empty",
+    "path" : "list-example-simple-empty"
+  },
+  "List/med-list" : {
+    "name" : "List/med-list",
+    "path" : "list-example-medlist"
+  },
+  "List/f201" : {
+    "name" : "List/f201",
+    "path" : "list-example-familyhistory-f201-roel"
+  },
+  "List/genetic" : {
+    "name" : "List/genetic",
+    "path" : "list-example-familyhistory-genetics-profile"
+  },
+  "List/prognosis" : {
+    "name" : "List/prognosis",
+    "path" : "list-example-familyhistory-genetics-profile-annie"
+  },
+  "List/current-allergies" : {
+    "name" : "List/current-allergies",
+    "path" : "list-example-allergies"
+  },
+  "List/example-double-cousin-relationship" : {
+    "name" : "List/example-double-cousin-relationship",
+    "path" : "list-example-double-cousin-relationship-pedigree"
+  },
+  "List/long" : {
+    "name" : "List/long",
+    "path" : "list-example-long"
+  },
+  "List/example-xds" : {
+    "name" : "List/example-xds",
+    "path" : "list-example-xds"
+  },
+  "OperationOutcome/101" : {
+    "name" : "OperationOutcome/101",
+    "path" : "operationoutcome-example"
+  },
+  "OperationOutcome/exception" : {
+    "name" : "OperationOutcome/exception",
+    "path" : "operationoutcome-example-exception"
+  },
+  "OperationOutcome/allok" : {
+    "name" : "OperationOutcome/allok",
+    "path" : "operationoutcome-example-allok"
+  },
+  "OperationOutcome/validationfail" : {
+    "name" : "OperationOutcome/validationfail",
+    "path" : "operationoutcome-example-validationfail"
+  },
+  "OperationOutcome/searchfail" : {
+    "name" : "OperationOutcome/searchfail",
+    "path" : "operationoutcome-example-searchfail"
+  },
+  "OperationOutcome/break-the-glass" : {
+    "name" : "OperationOutcome/break-the-glass",
+    "path" : "operationoutcome-example-break-the-glass"
+  },
+  "NutritionOrder/pureeddiet-simple" : {
+    "name" : "NutritionOrder/pureeddiet-simple",
+    "path" : "nutritionorder-example-pureeddiet-simple"
+  },
+  "NutritionOrder/cardiacdiet" : {
+    "name" : "NutritionOrder/cardiacdiet",
+    "path" : "nutritionorder-example-cardiacdiet"
+  },
+  "NutritionOrder/diabeticdiet" : {
+    "name" : "NutritionOrder/diabeticdiet",
+    "path" : "nutritionorder-example-diabeticdiet"
+  },
+  "NutritionOrder/texturemodified" : {
+    "name" : "NutritionOrder/texturemodified",
+    "path" : "nutritionorder-example-texture-modified"
+  },
+  "NutritionOrder/pureeddiet" : {
+    "name" : "NutritionOrder/pureeddiet",
+    "path" : "nutritionorder-example-pureeddiet"
+  },
+  "NutritionOrder/renaldiet" : {
+    "name" : "NutritionOrder/renaldiet",
+    "path" : "nutritionorder-example-renaldiet"
+  },
+  "NutritionOrder/fiberrestricteddiet" : {
+    "name" : "NutritionOrder/fiberrestricteddiet",
+    "path" : "nutritionorder-example-fiberrestricteddiet"
+  },
+  "NutritionOrder/diabeticsupplement" : {
+    "name" : "NutritionOrder/diabeticsupplement",
+    "path" : "nutritionorder-example-diabeticsupplement"
+  },
+  "NutritionOrder/proteinsupplement" : {
+    "name" : "NutritionOrder/proteinsupplement",
+    "path" : "nutritionorder-example-proteinsupplement"
+  },
+  "NutritionOrder/energysupplement" : {
+    "name" : "NutritionOrder/energysupplement",
+    "path" : "nutritionorder-example-energysupplement"
+  },
+  "NutritionOrder/enteralbolus" : {
+    "name" : "NutritionOrder/enteralbolus",
+    "path" : "nutritionorder-example-enteralbolus"
+  },
+  "NutritionOrder/enteralcontinuous" : {
+    "name" : "NutritionOrder/enteralcontinuous",
+    "path" : "nutritionorder-example-enteralcontinuous"
+  },
+  "NutritionOrder/infantenteral" : {
+    "name" : "NutritionOrder/infantenteral",
+    "path" : "nutritionorder-example-infantenteral"
+  },
+  "Task/example1" : {
+    "name" : "Task/example1",
+    "path" : "task-example1"
+  },
+  "Task/example2" : {
+    "name" : "Task/example2",
+    "path" : "task-example2"
+  },
+  "Task/example4" : {
+    "name" : "Task/example4",
+    "path" : "task-example4"
+  },
+  "Task/example5" : {
+    "name" : "Task/example5",
+    "path" : "task-example5"
+  },
+  "Task/example6" : {
+    "name" : "Task/example6",
+    "path" : "task-example6"
+  },
+  "Task/example3" : {
+    "name" : "Task/example3",
+    "path" : "task-example3"
+  },
+  "Task/fm-example1" : {
+    "name" : "Task/fm-example1",
+    "path" : "task-example-fm-cancel"
+  },
+  "Task/fm-example2" : {
+    "name" : "Task/fm-example2",
+    "path" : "task-example-fm-poll"
+  },
+  "Task/fm-example3" : {
+    "name" : "Task/fm-example3",
+    "path" : "task-example-fm-release"
+  },
+  "Task/fm-example4" : {
+    "name" : "Task/fm-example4",
+    "path" : "task-example-fm-reprocess"
+  },
+  "Task/fm-example5" : {
+    "name" : "Task/fm-example5",
+    "path" : "task-example-fm-status"
+  },
+  "Task/fm-example6" : {
+    "name" : "Task/fm-example6",
+    "path" : "task-example-fm-status-resp"
+  },
+  "Task/cpg-example-1" : {
+    "name" : "Task/cpg-example-1",
+    "path" : "task-cpg-example-1"
+  },
+  "SubstanceProtein/example" : {
+    "name" : "SubstanceProtein/example",
+    "path" : "substanceprotein-example"
+  },
+  "Parameters/example" : {
+    "name" : "Parameters/example",
+    "path" : "parameters-example"
+  },
+  "ActorDefinition/client" : {
+    "name" : "ActorDefinition/client",
+    "path" : "actordefinition-client"
+  },
+  "ActorDefinition/server" : {
+    "name" : "ActorDefinition/server",
+    "path" : "actordefinition-server"
+  },
+  "EventDefinition/example" : {
+    "name" : "EventDefinition/example",
+    "path" : "eventdefinition-example"
+  },
+  "ImplementationGuide/example" : {
+    "name" : "ImplementationGuide/example",
+    "path" : "implementationguide-example"
+  },
+  "Measure/measure-exclusive-breastfeeding" : {
+    "name" : "Measure/measure-exclusive-breastfeeding",
+    "path" : "measure-exclusive-breastfeeding"
+  },
+  "Measure/measure-cms146-example" : {
+    "name" : "Measure/measure-cms146-example",
+    "path" : "measure-cms146-example"
+  },
+  "Measure/component-a-example" : {
+    "name" : "Measure/component-a-example",
+    "path" : "measure-component-a-example"
+  },
+  "Measure/component-b-example" : {
+    "name" : "Measure/component-b-example",
+    "path" : "measure-component-b-example"
+  },
+  "Measure/composite-example" : {
+    "name" : "Measure/composite-example",
+    "path" : "measure-composite-example"
+  },
+  "Measure/measure-predecessor-example" : {
+    "name" : "Measure/measure-predecessor-example",
+    "path" : "measure-predecessor-example"
+  },
+  "Measure/hiv-indicators" : {
+    "name" : "Measure/hiv-indicators",
+    "path" : "measure-hiv-indicators"
+  },
+  "RequestOrchestration/example" : {
+    "name" : "RequestOrchestration/example",
+    "path" : "requestorchestration-example"
+  },
+  "RequestOrchestration/kdn5-example" : {
+    "name" : "RequestOrchestration/kdn5-example",
+    "path" : "requestorchestration-kdn5-example"
+  },
+  "SupplyRequest/simpleorder" : {
+    "name" : "SupplyRequest/simpleorder",
+    "path" : "supplyrequest-example-simpleorder"
+  },
+  "Device/example" : {
+    "name" : "Device/example",
+    "path" : "device-example"
+  },
+  "Device/f001" : {
+    "name" : "Device/f001",
+    "path" : "device-example-f001-feedingtube"
+  },
+  "Device/and20601bpmonitor" : {
+    "name" : "Device/and20601bpmonitor",
+    "path" : "device-example-AND20601BPMonitor"
+  },
+  "Device/ANDThermometer" : {
+    "name" : "Device/ANDThermometer",
+    "path" : "device-example-ANDThermometer"
+  },
+  "Device/AndroidGatewayPHG" : {
+    "name" : "Device/AndroidGatewayPHG",
+    "path" : "device-example-AndroidGatewayPHG"
+  },
+  "Device/Bodimetrics" : {
+    "name" : "Device/Bodimetrics",
+    "path" : "device-example-Bodimetrics"
+  },
+  "Device/KinsaThermometer" : {
+    "name" : "Device/KinsaThermometer",
+    "path" : "device-example-KinsaThermometer"
+  },
+  "Device/Nonin20601PulseOx" : {
+    "name" : "Device/Nonin20601PulseOx",
+    "path" : "device-example-Nonin20601PulseOx"
+  },
+  "Device/NoninBlePulseOx" : {
+    "name" : "Device/NoninBlePulseOx",
+    "path" : "device-example-NoninBlePulseOx"
+  },
+  "Device/PhilipsThermometer" : {
+    "name" : "Device/PhilipsThermometer",
+    "path" : "device-example-PhilipsThermometer"
+  },
+  "Device/RocheGlucoseMonitor" : {
+    "name" : "Device/RocheGlucoseMonitor",
+    "path" : "device-example-RocheGlucoseMonitor"
+  },
+  "Device/ihe-pcd" : {
+    "name" : "Device/ihe-pcd",
+    "path" : "device-example-ihe-pcd"
+  },
+  "Device/example-pacemaker" : {
+    "name" : "Device/example-pacemaker",
+    "path" : "device-example-pacemaker"
+  },
+  "Device/example-software" : {
+    "name" : "Device/example-software",
+    "path" : "device-example-software"
+  },
+  "Device/example-udi1" : {
+    "name" : "Device/example-udi1",
+    "path" : "device-example-udi1"
+  },
+  "Device/example-udi2" : {
+    "name" : "Device/example-udi2",
+    "path" : "device-example-udi2"
+  },
+  "Device/example-udi3" : {
+    "name" : "Device/example-udi3",
+    "path" : "device-example-udi3"
+  },
+  "Device/example-udi4" : {
+    "name" : "Device/example-udi4",
+    "path" : "device-example-udi4"
+  },
+  "Device/device-example-specimen-container-green-gel-vacutainer" : {
+    "name" : "Device/device-example-specimen-container-green-gel-vacutainer",
+    "path" : "device-example-specimen-container-green-gel-vacutainer"
+  },
+  "Device/device-example-specimen-container-lavender-vacutainer" : {
+    "name" : "Device/device-example-specimen-container-lavender-vacutainer",
+    "path" : "device-example-specimen-container-lavender-vacutainer"
+  },
+  "Device/device-example-specimen-container-red-top-vacutainer" : {
+    "name" : "Device/device-example-specimen-container-red-top-vacutainer",
+    "path" : "device-example-specimen-container-red-top-vacutainer"
+  },
+  "Device/device-example-specimen-container-polycup" : {
+    "name" : "Device/device-example-specimen-container-polycup",
+    "path" : "device-example-specimen-container-polycup"
+  },
+  "Device/device-example-specimen-container-example-sst-vacutainer" : {
+    "name" : "Device/device-example-specimen-container-example-sst-vacutainer",
+    "path" : "device-example-specimen-container-example-sst-vacutainer"
+  },
+  "ChargeItemDefinition/ebm" : {
+    "name" : "ChargeItemDefinition/ebm",
+    "path" : "chargeitemdefinition-ebm-example"
+  },
+  "ChargeItemDefinition/device" : {
+    "name" : "ChargeItemDefinition/device",
+    "path" : "chargeitemdefinition-device-example"
+  },
+  "ChargeItem/example" : {
+    "name" : "ChargeItem/example",
+    "path" : "chargeitem-example"
+  },
+  "OperationDefinition/example" : {
+    "name" : "OperationDefinition/example",
+    "path" : "operationdefinition-example"
+  },
+  "null/ValueSet-expand" : {
+    "name" : "null/ValueSet-expand",
+    "path" : "operation-valueset-expand"
+  },
+  "null/ValueSet-validate-code" : {
+    "name" : "null/ValueSet-validate-code",
+    "path" : "operation-valueset-validate-code"
+  },
+  "null/CodeSystem-lookup" : {
+    "name" : "null/CodeSystem-lookup",
+    "path" : "operation-codesystem-lookup"
+  },
+  "null/ConceptMap-translate" : {
+    "name" : "null/ConceptMap-translate",
+    "path" : "operation-conceptmap-translate"
+  },
+  "null/ConceptMap-closure" : {
+    "name" : "null/ConceptMap-closure",
+    "path" : "operation-conceptmap-closure"
+  },
+  "null/Library-data-requirements" : {
+    "name" : "null/Library-data-requirements",
+    "path" : "operation-library-data-requirements"
+  },
+  "null/Measure-data-requirements" : {
+    "name" : "null/Measure-data-requirements",
+    "path" : "operation-measure-data-requirements"
+  },
+  "null/Measure-evaluate-measure" : {
+    "name" : "null/Measure-evaluate-measure",
+    "path" : "operation-measure-evaluate-measure"
+  },
+  "OperationDefinition/example-query-high-risk" : {
+    "name" : "OperationDefinition/example-query-high-risk",
+    "path" : "operationdefinition-example-query-high-risk"
+  },
+  "Binary/example" : {
+    "name" : "Binary/example",
+    "path" : "binary-example"
+  },
+  "Binary/f006" : {
+    "name" : "Binary/f006",
+    "path" : "binary-f006"
+  },
+  "PaymentReconciliation/ER2500" : {
+    "name" : "PaymentReconciliation/ER2500",
+    "path" : "paymentreconciliation-example"
+  },
+  "DiagnosticReport/101" : {
+    "name" : "DiagnosticReport/101",
+    "path" : "diagnosticreport-example"
+  },
+  "DiagnosticReport/72ac8493-52ac-41bd-8d5d-7258c289b5ea" : {
+    "name" : "DiagnosticReport/72ac8493-52ac-41bd-8d5d-7258c289b5ea",
+    "path" : "diagnosticreport-examples-general"
+  },
+  "DiagnosticReport/f001" : {
+    "name" : "DiagnosticReport/f001",
+    "path" : "diagnosticreport-example-f001-bloodexam"
+  },
+  "DiagnosticReport/f201" : {
+    "name" : "DiagnosticReport/f201",
+    "path" : "diagnosticreport-example-f201-brainct"
+  },
+  "DiagnosticReport/f202" : {
+    "name" : "DiagnosticReport/f202",
+    "path" : "diagnosticreport-example-f202-bloodculture"
+  },
+  "DiagnosticReport/102" : {
+    "name" : "DiagnosticReport/102",
+    "path" : "diagnosticreport-example-dxa"
+  },
+  "DiagnosticReport/micro" : {
+    "name" : "DiagnosticReport/micro",
+    "path" : "diagnosticreport-micro1"
+  },
+  "Bundle/lri-example" : {
+    "name" : "Bundle/lri-example",
+    "path" : "bundle-lri-example"
+  },
+  "DiagnosticReport/ultrasound" : {
+    "name" : "DiagnosticReport/ultrasound",
+    "path" : "diagnosticreport-example-ultrasound"
+  },
+  "DiagnosticReport/ghp" : {
+    "name" : "DiagnosticReport/ghp",
+    "path" : "diagnosticreport-example-ghp"
+  },
+  "DiagnosticReport/pap" : {
+    "name" : "DiagnosticReport/pap",
+    "path" : "diagnosticreport-example-papsmear"
+  },
+  "DiagnosticReport/gingival-mass" : {
+    "name" : "DiagnosticReport/gingival-mass",
+    "path" : "diagnosticreport-example-gingival-mass"
+  },
+  "DiagnosticReport/gingival-biopsy" : {
+    "name" : "DiagnosticReport/gingival-biopsy",
+    "path" : "diagnosticreport-example-gingival-biopsy"
+  },
+  "DeviceUsage/example" : {
+    "name" : "DeviceUsage/example",
+    "path" : "deviceusage-example"
+  },
+  "InventoryItem/example" : {
+    "name" : "InventoryItem/example",
+    "path" : "inventoryitem-example"
+  },
+  "Specimen/101" : {
+    "name" : "Specimen/101",
+    "path" : "specimen-example"
+  },
+  "Specimen/isolate" : {
+    "name" : "Specimen/isolate",
+    "path" : "specimen-example-isolate"
+  },
+  "Specimen/vma-urine" : {
+    "name" : "Specimen/vma-urine",
+    "path" : "specimen-example-urine"
+  },
+  "Specimen/sst" : {
+    "name" : "Specimen/sst",
+    "path" : "specimen-example-serum"
+  },
+  "Specimen/pooled-serum" : {
+    "name" : "Specimen/pooled-serum",
+    "path" : "specimen-example-pooled-serum"
+  },
+  "Communication/example" : {
+    "name" : "Communication/example",
+    "path" : "communication-example"
+  },
+  "Communication/fm-solicited" : {
+    "name" : "Communication/fm-solicited",
+    "path" : "communication-example-fm-solicited-attachment"
+  },
+  "Communication/fm-attachment" : {
+    "name" : "Communication/fm-attachment",
+    "path" : "communication-example-fm-attachment"
+  },
+  "Slot/example" : {
+    "name" : "Slot/example",
+    "path" : "slot-example"
+  },
+  "Slot/1" : {
+    "name" : "Slot/1",
+    "path" : "slot-example-busy"
+  },
+  "Slot/2" : {
+    "name" : "Slot/2",
+    "path" : "slot-example-tentative"
+  },
+  "Slot/3" : {
+    "name" : "Slot/3",
+    "path" : "slot-example-unavailable"
+  },
+  "Slot/example-hcs" : {
+    "name" : "Slot/example-hcs",
+    "path" : "slot-example-hcs"
+  },
+  "CareTeam/example" : {
+    "name" : "CareTeam/example",
+    "path" : "careteam-example"
+  },
+  "Medication/medicationexample1" : {
+    "name" : "Medication/medicationexample1",
+    "path" : "medicationexample1"
+  },
+  "Medication/medexample015" : {
+    "name" : "Medication/medexample015",
+    "path" : "medicationexample15"
+  },
+  "Medication/med0301" : {
+    "name" : "Medication/med0301",
+    "path" : "medicationexample0301"
+  },
+  "Medication/med0302" : {
+    "name" : "Medication/med0302",
+    "path" : "medicationexample0302"
+  },
+  "Medication/med0303" : {
+    "name" : "Medication/med0303",
+    "path" : "medicationexample0303"
+  },
+  "Medication/med0304" : {
+    "name" : "Medication/med0304",
+    "path" : "medicationexample0304"
+  },
+  "Medication/med0305" : {
+    "name" : "Medication/med0305",
+    "path" : "medicationexample0305"
+  },
+  "Medication/med0306" : {
+    "name" : "Medication/med0306",
+    "path" : "medicationexample0306"
+  },
+  "Medication/med0307" : {
+    "name" : "Medication/med0307",
+    "path" : "medicationexample0307"
+  },
+  "Medication/med0308" : {
+    "name" : "Medication/med0308",
+    "path" : "medicationexample0308"
+  },
+  "Medication/med0309" : {
+    "name" : "Medication/med0309",
+    "path" : "medicationexample0309"
+  },
+  "Medication/med0310" : {
+    "name" : "Medication/med0310",
+    "path" : "medicationexample0310"
+  },
+  "Medication/med0311" : {
+    "name" : "Medication/med0311",
+    "path" : "medicationexample0311"
+  },
+  "Medication/med0312" : {
+    "name" : "Medication/med0312",
+    "path" : "medicationexample0312"
+  },
+  "Medication/med0313" : {
+    "name" : "Medication/med0313",
+    "path" : "medicationexample0313"
+  },
+  "Medication/med0314" : {
+    "name" : "Medication/med0314",
+    "path" : "medicationexample0314"
+  },
+  "Medication/med0315" : {
+    "name" : "Medication/med0315",
+    "path" : "medicationexample0315"
+  },
+  "Medication/med0316" : {
+    "name" : "Medication/med0316",
+    "path" : "medicationexample0316"
+  },
+  "Medication/med0317" : {
+    "name" : "Medication/med0317",
+    "path" : "medicationexample0317"
+  },
+  "Medication/med0318" : {
+    "name" : "Medication/med0318",
+    "path" : "medicationexample0318"
+  },
+  "Medication/med0319" : {
+    "name" : "Medication/med0319",
+    "path" : "medicationexample0319"
+  },
+  "Medication/med0320" : {
+    "name" : "Medication/med0320",
+    "path" : "medicationexample0320"
+  },
+  "Medication/med0321" : {
+    "name" : "Medication/med0321",
+    "path" : "medicationexample0321"
+  },
+  "Medication/med0323" : {
+    "name" : "Medication/med0323",
+    "path" : "medicationexample0323"
+  },
+  "QuestionnaireResponse/3141" : {
+    "name" : "QuestionnaireResponse/3141",
+    "path" : "questionnaireresponse-example"
+  },
+  "QuestionnaireResponse/f201" : {
+    "name" : "QuestionnaireResponse/f201",
+    "path" : "questionnaireresponse-example-f201-lifelines"
+  },
+  "QuestionnaireResponse/bb" : {
+    "name" : "QuestionnaireResponse/bb",
+    "path" : "questionnaireresponse-example-bluebook"
+  },
+  "QuestionnaireResponse/gcs" : {
+    "name" : "QuestionnaireResponse/gcs",
+    "path" : "questionnaireresponse-example-gcs"
+  },
+  "QuestionnaireResponse/ussg-fht-answers" : {
+    "name" : "QuestionnaireResponse/ussg-fht-answers",
+    "path" : "questionnaireresponse-example-ussg-fht-answers"
+  },
+  "Account/example" : {
+    "name" : "Account/example",
+    "path" : "account-example"
+  },
+  "Account/ewg" : {
+    "name" : "Account/ewg",
+    "path" : "account-example-with-guarantor"
+  },
+  "MedicationKnowledge/example" : {
+    "name" : "MedicationKnowledge/example",
+    "path" : "medicationknowledge-example"
+  },
+  "VerificationResult/example" : {
+    "name" : "VerificationResult/example",
+    "path" : "verificationresult-example"
+  },
+  "MessageHeader/1cbdfb97-5859-48a4-8301-d54eab818d68" : {
+    "name" : "MessageHeader/1cbdfb97-5859-48a4-8301-d54eab818d68",
+    "path" : "messageheader-example"
+  },
+  "MessageHeader/10bb101f-a121-4264-a920-67be9cb82c74" : {
+    "name" : "MessageHeader/10bb101f-a121-4264-a920-67be9cb82c74",
+    "path" : "message-request-link"
+  },
+  "MessageHeader/3a0707d3-549e-4467-b8b8-5a2ab3800efe" : {
+    "name" : "MessageHeader/3a0707d3-549e-4467-b8b8-5a2ab3800efe",
+    "path" : "message-response-link"
+  },
+  "Permission/example" : {
+    "name" : "Permission/example",
+    "path" : "permission-example"
+  },
+  "Permission/example-saner" : {
+    "name" : "Permission/example-saner",
+    "path" : "permission-example-saner"
+  },
+  "Permission/example-vhdir" : {
+    "name" : "Permission/example-vhdir",
+    "path" : "permission-example-vhdir"
+  },
+  "CoverageEligibilityResponse/E2500" : {
+    "name" : "CoverageEligibilityResponse/E2500",
+    "path" : "coverageeligibilityresponse-example"
+  },
+  "CoverageEligibilityResponse/E2501" : {
+    "name" : "CoverageEligibilityResponse/E2501",
+    "path" : "coverageeligibilityresponse-example-benefits"
+  },
+  "CoverageEligibilityResponse/E2502" : {
+    "name" : "CoverageEligibilityResponse/E2502",
+    "path" : "coverageeligibilityresponse-example-benefits-2"
+  },
+  "CoverageEligibilityResponse/E2503" : {
+    "name" : "CoverageEligibilityResponse/E2503",
+    "path" : "coverageeligibilityresponse-example-error"
+  },
+  "EnrollmentRequest/22345" : {
+    "name" : "EnrollmentRequest/22345",
+    "path" : "enrollmentrequest-example"
+  },
+  "ServiceRequest/lipid" : {
+    "name" : "ServiceRequest/lipid",
+    "path" : "servicerequest-example-lipid"
+  },
+  "ServiceRequest/di" : {
+    "name" : "ServiceRequest/di",
+    "path" : "servicerequest-example-di"
+  },
+  "ServiceRequest/ft4" : {
+    "name" : "ServiceRequest/ft4",
+    "path" : "servicerequest-example-ft4"
+  },
+  "ServiceRequest/example" : {
+    "name" : "ServiceRequest/example",
+    "path" : "servicerequest-example"
+  },
+  "ServiceRequest/subrequest" : {
+    "name" : "ServiceRequest/subrequest",
+    "path" : "servicerequest-example-subrequest"
+  },
+  "ServiceRequest/physiotherapy" : {
+    "name" : "ServiceRequest/physiotherapy",
+    "path" : "servicerequest-example2"
+  },
+  "ServiceRequest/do-not-turn" : {
+    "name" : "ServiceRequest/do-not-turn",
+    "path" : "servicerequest-example3"
+  },
+  "ServiceRequest/benchpress" : {
+    "name" : "ServiceRequest/benchpress",
+    "path" : "servicerequest-example4"
+  },
+  "ServiceRequest/example-implant" : {
+    "name" : "ServiceRequest/example-implant",
+    "path" : "servicerequest-example-implant"
+  },
+  "ServiceRequest/ambulation" : {
+    "name" : "ServiceRequest/ambulation",
+    "path" : "servicerequest-example-ambulation"
+  },
+  "ServiceRequest/colon-biopsy" : {
+    "name" : "ServiceRequest/colon-biopsy",
+    "path" : "servicerequest-example-colonoscopy-bx"
+  },
+  "ServiceRequest/colonoscopy" : {
+    "name" : "ServiceRequest/colonoscopy",
+    "path" : "servicerequest-example-colonoscopy"
+  },
+  "ServiceRequest/appendectomy-narrative" : {
+    "name" : "ServiceRequest/appendectomy-narrative",
+    "path" : "servicerequest-example-appendectomy"
+  },
+  "ServiceRequest/ob" : {
+    "name" : "ServiceRequest/ob",
+    "path" : "servicerequest-example-ob"
+  },
+  "ServiceRequest/physical-therapy" : {
+    "name" : "ServiceRequest/physical-therapy",
+    "path" : "servicerequest-example-pt"
+  },
+  "ServiceRequest/education" : {
+    "name" : "ServiceRequest/education",
+    "path" : "servicerequest-example-edu"
+  },
+  "ServiceRequest/myringotomy" : {
+    "name" : "ServiceRequest/myringotomy",
+    "path" : "servicerequest-example-myringotomy"
+  },
+  "ServiceRequest/vent" : {
+    "name" : "ServiceRequest/vent",
+    "path" : "servicerequest-example-ventilation"
+  },
+  "PractitionerRole/example" : {
+    "name" : "PractitionerRole/example",
+    "path" : "practitionerrole-example"
+  },
+  "Bundle/3ad0687e-f477-468c-afd5-fcc2bf897808" : {
+    "name" : "Bundle/3ad0687e-f477-468c-afd5-fcc2bf897808",
+    "path" : "practitionerrole-examples-general"
+  },
+  "MedicationRequest/medrx002" : {
+    "name" : "MedicationRequest/medrx002",
+    "path" : "medicationrequestexample2"
+  },
+  "MedicationRequest/medrx0302" : {
+    "name" : "MedicationRequest/medrx0302",
+    "path" : "medicationrequest0302"
+  },
+  "MedicationRequest/medrx0301" : {
+    "name" : "MedicationRequest/medrx0301",
+    "path" : "medicationrequest0301"
+  },
+  "MedicationRequest/medrx0303" : {
+    "name" : "MedicationRequest/medrx0303",
+    "path" : "medicationrequest0303"
+  },
+  "MedicationRequest/medrx0304" : {
+    "name" : "MedicationRequest/medrx0304",
+    "path" : "medicationrequest0304"
+  },
+  "MedicationRequest/medrx0305" : {
+    "name" : "MedicationRequest/medrx0305",
+    "path" : "medicationrequest0305"
+  },
+  "MedicationRequest/medrx0306" : {
+    "name" : "MedicationRequest/medrx0306",
+    "path" : "medicationrequest0306"
+  },
+  "MedicationRequest/medrx0307" : {
+    "name" : "MedicationRequest/medrx0307",
+    "path" : "medicationrequest0307"
+  },
+  "MedicationRequest/medrx0308" : {
+    "name" : "MedicationRequest/medrx0308",
+    "path" : "medicationrequest0308"
+  },
+  "MedicationRequest/medrx0309" : {
+    "name" : "MedicationRequest/medrx0309",
+    "path" : "medicationrequest0309"
+  },
+  "MedicationRequest/medrx0310" : {
+    "name" : "MedicationRequest/medrx0310",
+    "path" : "medicationrequest0310"
+  },
+  "MedicationRequest/medrx0311" : {
+    "name" : "MedicationRequest/medrx0311",
+    "path" : "medicationrequestexample1"
+  },
+  "MedicationRequest/medrx0312" : {
+    "name" : "MedicationRequest/medrx0312",
+    "path" : "medicationrequest0312"
+  },
+  "MedicationRequest/medrx0313" : {
+    "name" : "MedicationRequest/medrx0313",
+    "path" : "medicationrequest0313"
+  },
+  "MedicationRequest/medrx0314" : {
+    "name" : "MedicationRequest/medrx0314",
+    "path" : "medicationrequest0314"
+  },
+  "MedicationRequest/medrx0315" : {
+    "name" : "MedicationRequest/medrx0315",
+    "path" : "medicationrequest0315"
+  },
+  "MedicationRequest/medrx0316" : {
+    "name" : "MedicationRequest/medrx0316",
+    "path" : "medicationrequest0316"
+  },
+  "MedicationRequest/medrx0317" : {
+    "name" : "MedicationRequest/medrx0317",
+    "path" : "medicationrequest0317"
+  },
+  "MedicationRequest/medrx0318" : {
+    "name" : "MedicationRequest/medrx0318",
+    "path" : "medicationrequest0318"
+  },
+  "MedicationRequest/medrx0319" : {
+    "name" : "MedicationRequest/medrx0319",
+    "path" : "medicationrequest0319"
+  },
+  "MedicationRequest/medrx0320" : {
+    "name" : "MedicationRequest/medrx0320",
+    "path" : "medicationrequest0320"
+  },
+  "MedicationRequest/medrx0321" : {
+    "name" : "MedicationRequest/medrx0321",
+    "path" : "medicationrequest0321"
+  },
+  "MedicationRequest/medrx0322" : {
+    "name" : "MedicationRequest/medrx0322",
+    "path" : "medicationrequest0322"
+  },
+  "MedicationRequest/medrx0323" : {
+    "name" : "MedicationRequest/medrx0323",
+    "path" : "medicationrequest0323"
+  },
+  "MedicationRequest/medrx0324" : {
+    "name" : "MedicationRequest/medrx0324",
+    "path" : "medicationrequest0324"
+  },
+  "MedicationRequest/medrx0325" : {
+    "name" : "MedicationRequest/medrx0325",
+    "path" : "medicationrequest0325"
+  },
+  "MedicationRequest/medrx0326" : {
+    "name" : "MedicationRequest/medrx0326",
+    "path" : "medicationrequest0326"
+  },
+  "MedicationRequest/medrx0327" : {
+    "name" : "MedicationRequest/medrx0327",
+    "path" : "medicationrequest0327"
+  },
+  "MedicationRequest/medrx0328" : {
+    "name" : "MedicationRequest/medrx0328",
+    "path" : "medicationrequest0328"
+  },
+  "MedicationRequest/medrx0329" : {
+    "name" : "MedicationRequest/medrx0329",
+    "path" : "medicationrequest0329"
+  },
+  "MedicationRequest/medrx0330" : {
+    "name" : "MedicationRequest/medrx0330",
+    "path" : "medicationrequest0330"
+  },
+  "MedicationRequest/medrx0331" : {
+    "name" : "MedicationRequest/medrx0331",
+    "path" : "medicationrequest0331"
+  },
+  "MedicationRequest/medrx0332" : {
+    "name" : "MedicationRequest/medrx0332",
+    "path" : "medicationrequest0332"
+  },
+  "MedicationRequest/medrx0333" : {
+    "name" : "MedicationRequest/medrx0333",
+    "path" : "medicationrequest0333"
+  },
+  "MedicationRequest/medrx0334" : {
+    "name" : "MedicationRequest/medrx0334",
+    "path" : "medicationrequest0334"
+  },
+  "MedicationRequest/medrx0335" : {
+    "name" : "MedicationRequest/medrx0335",
+    "path" : "medicationrequest0335"
+  },
+  "MedicationRequest/medrx0336" : {
+    "name" : "MedicationRequest/medrx0336",
+    "path" : "medicationrequest0336"
+  },
+  "MedicationRequest/medrx0337" : {
+    "name" : "MedicationRequest/medrx0337",
+    "path" : "medicationrequest0337"
+  },
+  "MedicationRequest/medrx0338" : {
+    "name" : "MedicationRequest/medrx0338",
+    "path" : "medicationrequest0338"
+  },
+  "MedicationRequest/medrx0339" : {
+    "name" : "MedicationRequest/medrx0339",
+    "path" : "medicationrequest0339"
+  },
+  "MedicationRequest/medrx0343a" : {
+    "name" : "MedicationRequest/medrx0343a",
+    "path" : "medicationrequest0343a"
+  },
+  "MedicationRequest/medrx0343b" : {
+    "name" : "MedicationRequest/medrx0343b",
+    "path" : "medicationrequest0343b"
+  },
+  "MedicationRequest/medrx003" : {
+    "name" : "MedicationRequest/medrx003",
+    "path" : "medicationrequestexample3"
+  },
+  "MedicationRequest/medrx004" : {
+    "name" : "MedicationRequest/medrx004",
+    "path" : "medicationrequestexample4"
+  },
+  "SubstanceReferenceInformation/example" : {
+    "name" : "SubstanceReferenceInformation/example",
+    "path" : "substancereferenceinformation-example"
+  },
+  "Coverage/9876B1" : {
+    "name" : "Coverage/9876B1",
+    "path" : "coverage-example"
+  },
+  "Coverage/7546D" : {
+    "name" : "Coverage/7546D",
+    "path" : "coverage-example-2"
+  },
+  "Coverage/7547E" : {
+    "name" : "Coverage/7547E",
+    "path" : "coverage-example-ehic"
+  },
+  "Coverage/SP1234" : {
+    "name" : "Coverage/SP1234",
+    "path" : "coverage-example-selfpay"
+  },
+  "Ingredient/example" : {
+    "name" : "Ingredient/example",
+    "path" : "ingredient-example"
+  },
+  "SubstanceNucleicAcid/example" : {
+    "name" : "SubstanceNucleicAcid/example",
+    "path" : "substancenucleicacid-example"
+  },
+  "SubstanceDefinition/example" : {
+    "name" : "SubstanceDefinition/example",
+    "path" : "substancedefinition-example"
+  },
+  "OrganizationAffiliation/example" : {
+    "name" : "OrganizationAffiliation/example",
+    "path" : "organizationaffiliation-example"
+  },
+  "OrganizationAffiliation/orgrole2" : {
+    "name" : "OrganizationAffiliation/orgrole2",
+    "path" : "orgrole-example-hie"
+  },
+  "OrganizationAffiliation/orgrole1" : {
+    "name" : "OrganizationAffiliation/orgrole1",
+    "path" : "orgrole-example-services"
+  },
+  "Observation/example" : {
+    "name" : "Observation/example",
+    "path" : "observation-example"
+  },
+  "Observation/respiratory-rate" : {
+    "name" : "Observation/respiratory-rate",
+    "path" : "observation-example-respiratory-rate"
+  },
+  "Observation/heart-rate" : {
+    "name" : "Observation/heart-rate",
+    "path" : "observation-example-heart-rate"
+  },
+  "Observation/body-temperature" : {
+    "name" : "Observation/body-temperature",
+    "path" : "observation-example-body-temperature"
+  },
+  "Observation/body-height" : {
+    "name" : "Observation/body-height",
+    "path" : "observation-example-body-height"
+  },
+  "Observation/body-length" : {
+    "name" : "Observation/body-length",
+    "path" : "observation-example-body-length"
+  },
+  "Observation/head-circumference" : {
+    "name" : "Observation/head-circumference",
+    "path" : "observation-example-head-circumference"
+  },
+  "Observation/bmi" : {
+    "name" : "Observation/bmi",
+    "path" : "observation-example-bmi"
+  },
+  "Observation/bmi-using-related" : {
+    "name" : "Observation/bmi-using-related",
+    "path" : "observation-example-bmi-using-related"
+  },
+  "Observation/satO2" : {
+    "name" : "Observation/satO2",
+    "path" : "observation-example-satO2"
+  },
+  "Observation/blood-pressure" : {
+    "name" : "Observation/blood-pressure",
+    "path" : "observation-example-bloodpressure"
+  },
+  "Observation/blood-pressure-dar" : {
+    "name" : "Observation/blood-pressure-dar",
+    "path" : "observation-example-bloodpressure-dar"
+  },
+  "Observation/mbp" : {
+    "name" : "Observation/mbp",
+    "path" : "observation-example-mbp"
+  },
+  "Observation/vitals-panel" : {
+    "name" : "Observation/vitals-panel",
+    "path" : "observation-example-vitals-panel"
+  },
+  "Observation/blood-pressure-cancel" : {
+    "name" : "Observation/blood-pressure-cancel",
+    "path" : "observation-example-bloodpressure-cancel"
+  },
+  "Observation/f001" : {
+    "name" : "Observation/f001",
+    "path" : "observation-example-f001-glucose"
+  },
+  "Observation/unsat" : {
+    "name" : "Observation/unsat",
+    "path" : "observation-example-unsat"
+  },
+  "Observation/f002" : {
+    "name" : "Observation/f002",
+    "path" : "observation-example-f002-excess"
+  },
+  "Observation/f003" : {
+    "name" : "Observation/f003",
+    "path" : "observation-example-f003-co2"
+  },
+  "Observation/f004" : {
+    "name" : "Observation/f004",
+    "path" : "observation-example-f004-erythrocyte"
+  },
+  "Observation/f005" : {
+    "name" : "Observation/f005",
+    "path" : "observation-example-f005-hemoglobin"
+  },
+  "Observation/date-lastmp" : {
+    "name" : "Observation/date-lastmp",
+    "path" : "observation-example-date-lastmp"
+  },
+  "Observation/f202" : {
+    "name" : "Observation/f202",
+    "path" : "observation-example-f202-temperature"
+  },
+  "Observation/f203" : {
+    "name" : "Observation/f203",
+    "path" : "observation-example-f203-bicarbonate"
+  },
+  "Observation/f204" : {
+    "name" : "Observation/f204",
+    "path" : "observation-example-f204-creatinine"
+  },
+  "Observation/f205" : {
+    "name" : "Observation/f205",
+    "path" : "observation-example-f205-egfr"
+  },
+  "Observation/f206" : {
+    "name" : "Observation/f206",
+    "path" : "observation-example-f206-staphylococcus"
+  },
+  "Observation/ekg" : {
+    "name" : "Observation/ekg",
+    "path" : "observation-example-sample-data"
+  },
+  "Observation/glasgow" : {
+    "name" : "Observation/glasgow",
+    "path" : "observation-example-glasgow"
+  },
+  "Observation/gcs-qa" : {
+    "name" : "Observation/gcs-qa",
+    "path" : "observation-example-glasgow-qa"
+  },
+  "Observation/1minute-apgar-score" : {
+    "name" : "Observation/1minute-apgar-score",
+    "path" : "observation-example-1minute-apgar-score"
+  },
+  "Observation/2minute-apgar-score" : {
+    "name" : "Observation/2minute-apgar-score",
+    "path" : "observation-example-2minute-apgar-score"
+  },
+  "Observation/5minute-apgar-score" : {
+    "name" : "Observation/5minute-apgar-score",
+    "path" : "observation-example-5minute-apgar-score"
+  },
+  "Observation/10minute-apgar-score" : {
+    "name" : "Observation/10minute-apgar-score",
+    "path" : "observation-example-10minute-apgar-score"
+  },
+  "Observation/20minute-apgar-score" : {
+    "name" : "Observation/20minute-apgar-score",
+    "path" : "observation-example-20minute-apgar-score"
+  },
+  "Observation/clinical-gender" : {
+    "name" : "Observation/clinical-gender",
+    "path" : "observation-example-clinical-gender"
+  },
+  "Observation/eye-color" : {
+    "name" : "Observation/eye-color",
+    "path" : "observation-example-eye-color"
+  },
+  "Observation/bmd" : {
+    "name" : "Observation/bmd",
+    "path" : "observation-example-bmd"
+  },
+  "Observation/656" : {
+    "name" : "Observation/656",
+    "path" : "observation-example-spirometry"
+  },
+  "Observation/alcohol-type" : {
+    "name" : "Observation/alcohol-type",
+    "path" : "observation-example-alcohol-type"
+  },
+  "Observation/vp-oyster" : {
+    "name" : "Observation/vp-oyster",
+    "path" : "observation-example-vp-oyster"
+  },
+  "Observation/herd1" : {
+    "name" : "Observation/herd1",
+    "path" : "observation-example-herd1"
+  },
+  "Observation/vomiting" : {
+    "name" : "Observation/vomiting",
+    "path" : "observation-example-vomiting"
+  },
+  "Observation/secondsmoke" : {
+    "name" : "Observation/secondsmoke",
+    "path" : "observation-example-secondsmoke"
+  },
+  "Observation/trachcare" : {
+    "name" : "Observation/trachcare",
+    "path" : "observation-example-trachcare"
+  },
+  "Observation/bgpanel" : {
+    "name" : "Observation/bgpanel",
+    "path" : "observation-example-bgpanel"
+  },
+  "Observation/bloodgroup" : {
+    "name" : "Observation/bloodgroup",
+    "path" : "observation-example-bloodgroup"
+  },
+  "Observation/rhstatus" : {
+    "name" : "Observation/rhstatus",
+    "path" : "observation-example-rhstatus"
+  },
+  "Observation/decimal" : {
+    "name" : "Observation/decimal",
+    "path" : "observation-decimal"
+  },
+  "Observation/map-sitting" : {
+    "name" : "Observation/map-sitting",
+    "path" : "observation-example-map-sitting"
+  },
+  "Observation/abdo-tender" : {
+    "name" : "Observation/abdo-tender",
+    "path" : "observation-example-abdo-tender"
+  },
+  "Observation/krcore-observation-labresult-example-01" : {
+    "name" : "Observation/krcore-observation-labresult-example-01",
+    "path" : "krcore-observation-labresult-example-01"
+  },
+  "Observation/body-weight-with-arabic-code" : {
+    "name" : "Observation/body-weight-with-arabic-code",
+    "path" : "observation-example-body-weight-with-arabic-code"
+  },
+  "Linkage/example" : {
+    "name" : "Linkage/example",
+    "path" : "linkage-example"
+  },
+  "Claim/100150" : {
+    "name" : "Claim/100150",
+    "path" : "claim-example"
+  },
+  "Claim/100151" : {
+    "name" : "Claim/100151",
+    "path" : "claim-example-oral-average"
+  },
+  "Claim/100152" : {
+    "name" : "Claim/100152",
+    "path" : "claim-example-oral-contained"
+  },
+  "Claim/100154" : {
+    "name" : "Claim/100154",
+    "path" : "claim-example-oral-identifier"
+  },
+  "Claim/100155" : {
+    "name" : "Claim/100155",
+    "path" : "claim-example-oral-contained-identifier"
+  },
+  "Claim/100156" : {
+    "name" : "Claim/100156",
+    "path" : "claim-example-oral-bridge"
+  },
+  "Claim/100153" : {
+    "name" : "Claim/100153",
+    "path" : "claim-example-oral-orthoplan"
+  },
+  "Claim/660150" : {
+    "name" : "Claim/660150",
+    "path" : "claim-example-vision"
+  },
+  "Claim/660151" : {
+    "name" : "Claim/660151",
+    "path" : "claim-example-vision-glasses"
+  },
+  "Claim/660152" : {
+    "name" : "Claim/660152",
+    "path" : "claim-example-vision-glasses-3tier"
+  },
+  "Claim/960150" : {
+    "name" : "Claim/960150",
+    "path" : "claim-example-institutional"
+  },
+  "Claim/960151" : {
+    "name" : "Claim/960151",
+    "path" : "claim-example-institutional-rich"
+  },
+  "Claim/860150" : {
+    "name" : "Claim/860150",
+    "path" : "claim-example-professional"
+  },
+  "Claim/760150" : {
+    "name" : "Claim/760150",
+    "path" : "claim-example-pharmacy"
+  },
+  "Claim/760151" : {
+    "name" : "Claim/760151",
+    "path" : "claim-example-pharmacy-medication"
+  },
+  "Claim/760152" : {
+    "name" : "Claim/760152",
+    "path" : "claim-example-pharmacy-compound"
+  },
+  "Claim/MED-00050" : {
+    "name" : "Claim/MED-00050",
+    "path" : "claim-example-cms1500-medical"
+  },
+  "Goal/example" : {
+    "name" : "Goal/example",
+    "path" : "goal-example"
+  },
+  "Goal/stop-smoking" : {
+    "name" : "Goal/stop-smoking",
+    "path" : "goal-example-stop-smoking"
+  },
+  "GuidanceResponse/example" : {
+    "name" : "GuidanceResponse/example",
+    "path" : "guidanceresponse-example"
+  },
+  "GuidanceResponse/additional-data-example" : {
+    "name" : "GuidanceResponse/additional-data-example",
+    "path" : "guidanceresponse-additional-data-example"
+  },
+  "Invoice/example" : {
+    "name" : "Invoice/example",
+    "path" : "invoice-example"
+  },
+  "NutritionProduct/example" : {
+    "name" : "NutritionProduct/example",
+    "path" : "nutritionproduct-example"
+  }
+}

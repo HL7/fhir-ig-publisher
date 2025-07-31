@@ -1,6 +1,8 @@
 package org.hl7.fhir.igtools.renderers;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -21,25 +23,18 @@ import org.hl7.fhir.igtools.publisher.IGKnowledgeProvider;
 import org.hl7.fhir.igtools.publisher.RelatedIG;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.CanonicalResourceComparison;
-import org.hl7.fhir.r5.comparison.CanonicalResourceComparer.ChangeAnalysisState;
 import org.hl7.fhir.r5.comparison.VersionComparisonAnnotation;
 import org.hl7.fhir.r5.conformance.profile.BindingResolution;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.conformance.profile.SnapshotGenerationPreProcessor;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.elementmodel.Element;
-import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.r5.model.CanonicalType;
-import org.hl7.fhir.r5.model.CapabilityStatement;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
+import org.hl7.fhir.r5.formats.JsonParser;
+import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestComponent;
 import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceComponent;
-import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.CodeableConcept;
-import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.ContactPoint;
-import org.hl7.fhir.r5.model.DataType;
-import org.hl7.fhir.r5.model.DateTimeType;
-import org.hl7.fhir.r5.model.ElementDefinition;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionBindingComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionConstraintComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionMappingComponent;
@@ -48,18 +43,10 @@ import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionSlicingDiscrimin
 import org.hl7.fhir.r5.model.ElementDefinition.SlicingRules;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
 import org.hl7.fhir.r5.model.Enumerations.BindingStrength;
-import org.hl7.fhir.r5.model.Extension;
-import org.hl7.fhir.r5.model.PackageInformation;
-import org.hl7.fhir.r5.model.PrimitiveType;
-import org.hl7.fhir.r5.model.Quantity;
-import org.hl7.fhir.r5.model.SearchParameter;
-import org.hl7.fhir.r5.model.StringType;
-import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionContextComponent;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionMappingComponent;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
-import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.profilemodel.PEBuilder;
 import org.hl7.fhir.r5.profilemodel.PEBuilder.PEElementPropertiesPolicy;
 import org.hl7.fhir.r5.profilemodel.PEDefinition;
@@ -75,13 +62,9 @@ import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
 import org.hl7.fhir.r5.terminologies.CodeSystemUtilities.SystemReference;
 import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.utils.ElementDefinitionUtilities;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
+import org.hl7.fhir.r5.utils.ElementVisitor;
 import org.hl7.fhir.r5.utils.UserDataNames;
-import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
-import org.hl7.fhir.utilities.MarkDownProcessor;
-import org.hl7.fhir.utilities.StandardsStatus;
-import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.i18n.RenderingI18nContext;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonProperty;
@@ -97,7 +80,12 @@ import org.hl7.fhir.utilities.xhtml.NodeType;
 import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode;
 
+import static org.hl7.fhir.r5.utils.ElementVisitor.ElementVisitorInstruction.VISIT_CHILDREN;
+
 public class StructureDefinitionRenderer extends CanonicalRenderer {
+
+  private static final int EXAMPLE_UPPER_LIMIT = 50;
+
   public class BindingResolutionDetails {
     private String vss;
     private String vsn;
@@ -143,12 +131,14 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   private List<ElementDefinition> keyElements = null;
   private static JsonObject usages;
   private String specPath;
+  private final String packageId;
 
   private org.hl7.fhir.r5.renderers.StructureDefinitionRenderer sdr;
   private ResourceWrapper resE;
 
-  public StructureDefinitionRenderer(IWorkerContext context, String corePath, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants,Map<String, Map<String, ElementDefinition>> mapCache, String specPath, String versionToAnnotate, List<RelatedIG> relatedIgs) {
+  public StructureDefinitionRenderer(IWorkerContext context, String packageId, String corePath, StructureDefinition sd, String destDir, IGKnowledgeProvider igp, List<SpecMapManager> maps, Set<String> allTargets, MarkDownProcessor markdownEngine, NpmPackage packge, List<FetchedFile> files, RenderingContext gen, boolean allInvariants,Map<String, Map<String, ElementDefinition>> mapCache, String specPath, String versionToAnnotate, List<RelatedIG> relatedIgs) {
     super(context, corePath, sd, destDir, igp, maps, allTargets, markdownEngine, packge, gen, versionToAnnotate, relatedIgs);
+    this.packageId = packageId;
     this.sd = sd;
     this.destDir = destDir;
     utils = new ProfileUtilities(context, null, igp);
@@ -164,8 +154,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   public String summary(boolean all) {
     try {
-      if (sd.hasExtension(ToolingExtensions.EXT_SUMMARY)) {
-        return processMarkdown("Profile Summary", (PrimitiveType) sd.getExtensionByUrl(ToolingExtensions.EXT_SUMMARY).getValue());
+      if (sd.hasExtension(ExtensionDefinitions.EXT_SUMMARY)) {
+        return processMarkdown("Profile Summary", (PrimitiveType) sd.getExtensionByUrl(ExtensionDefinitions.EXT_SUMMARY).getValue());
       }
 
       if (sd.getDifferential() == null)
@@ -226,8 +216,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
       }
       StringBuilder res = new StringBuilder("<a name=\""+(all ? "a" : "s")+"-summary\"> </a>\r\n<p><b>\r\n" + (gen.formatPhrase(RenderingI18nContext.GENERAL_SUMM)) + "\r\n</b></p>\r\n");      
-      if (ToolingExtensions.hasExtension(sd, ToolingExtensions.EXT_SUMMARY)) {
-        Extension v = ToolingExtensions.getExtension(sd, ToolingExtensions.EXT_SUMMARY);
+      if (ExtensionUtilities.hasExtension(sd, ExtensionDefinitions.EXT_SUMMARY)) {
+        Extension v = ExtensionUtilities.getExtension(sd, ExtensionDefinitions.EXT_SUMMARY);
         res.append(processMarkdown("Profile.summary", (PrimitiveType) v.getValue()));
       }
       if (sd.getType().equals("Extension")) {
@@ -282,9 +272,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           res.append("\r\n</ul>\r\n\r\n");
         }
       }
-      if (ToolingExtensions.hasExtension(sd, ToolingExtensions.EXT_FMM_LEVEL)) {
+      if (ExtensionUtilities.hasExtension(sd, ExtensionDefinitions.EXT_FMM_LEVEL)) {
         // Use hard-coded spec link to point to current spec because DSTU2 had maturity listed on a different page
-        res.append("<p><b><a class=\"fmm\" href=\"http://hl7.org/fhir/versions.html#maturity\" title=\"Maturity Level\">" + (gen.formatPhrase(RenderingI18nContext.CANON_REND_MATURITY)) + "</a></b>: " + ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_FMM_LEVEL) + "</p>\r\n");
+        res.append("<p><b><a class=\"fmm\" href=\"http://hl7.org/fhir/versions.html#maturity\" title=\"Maturity Level\">" + (gen.formatPhrase(RenderingI18nContext.CANON_REND_MATURITY)) + "</a></b>: " + ExtensionUtilities.readStringExtension(sd, ExtensionDefinitions.EXT_FMM_LEVEL) + "</p>\r\n");
       }
 
       return res.toString();
@@ -467,9 +457,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       li.tx(ctxt.getType().toCode());
       li.tx(" ");
       li.tx(ctxt.getExpression());
-      if (ctxt.hasExtension(ToolingExtensions.EXT_APPLICABLE_VERSION)) {
+      if (ctxt.hasExtension(ExtensionDefinitions.EXT_APPLICABLE_VERSION)) {
         li.tx(" (");
-        renderVersionRange(li, ctxt.getExtensionByUrl(ToolingExtensions.EXT_APPLICABLE_VERSION));
+        renderVersionRange(li, ctxt.getExtensionByUrl(ExtensionDefinitions.EXT_APPLICABLE_VERSION));
         li.tx(")");
           
       }
@@ -955,14 +945,14 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     } else {
     }
     AdditionalBindingsRenderer abr = new AdditionalBindingsRenderer(igp, corePath, sd, path, gen, this, sdr);
-    if (tx.hasExtension(ToolingExtensions.EXT_MAX_VALUESET)) {
-      abr.seeMaxBinding(ToolingExtensions.getExtension(tx, ToolingExtensions.EXT_MAX_VALUESET));
+    if (tx.hasExtension(ExtensionDefinitions.EXT_MAX_VALUESET)) {
+      abr.seeMaxBinding(ExtensionUtilities.getExtension(tx, ExtensionDefinitions.EXT_MAX_VALUESET));
     }
-    if (tx.hasExtension(ToolingExtensions.EXT_MIN_VALUESET)) {
-      abr.seeMinBinding(ToolingExtensions.getExtension(tx, ToolingExtensions.EXT_MIN_VALUESET));
+    if (tx.hasExtension(ExtensionDefinitions.EXT_MIN_VALUESET)) {
+      abr.seeMinBinding(ExtensionUtilities.getExtension(tx, ExtensionDefinitions.EXT_MIN_VALUESET));
     }
-    if (tx.hasExtension(ToolingExtensions.EXT_BINDING_ADDITIONAL)) {
-      abr.seeAdditionalBindings(tx.getExtensionsByUrl(ToolingExtensions.EXT_BINDING_ADDITIONAL));
+    if (tx.hasExtension(ExtensionDefinitions.EXT_BINDING_ADDITIONAL)) {
+      abr.seeAdditionalBindings(tx.getExtensionsByUrl(ExtensionDefinitions.EXT_BINDING_ADDITIONAL));
     }
     if (abr.hasBindings()) {
       XhtmlNode x = new XhtmlNode(NodeType.Element, "table");
@@ -1207,7 +1197,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   private String grade(ElementDefinitionConstraintComponent inv) {
-    if (inv.hasExtension(ToolingExtensions.EXT_BEST_PRACTICE)) {
+    if (inv.hasExtension(ExtensionDefinitions.EXT_BEST_PRACTICE)) {
       return gen.formatPhrase(RenderingI18nContext.SDR_BP);
     } else {
       return gen.getTranslated(inv.getSeverityElement());
@@ -2153,9 +2143,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return s;
   }
 
-
   public String typeName(String lang, RenderingContext rc) {
-    if (ToolingExtensions.readBoolExtension(sd, ToolingExtensions.EXT_OBLIGATION_PROFILE_FLAG)) {
+    if (ExtensionUtilities.readBoolExtension(sd, ExtensionDefinitions.EXT_OBLIGATION_PROFILE_FLAG_NEW, ExtensionDefinitions.EXT_OBLIGATION_PROFILE_FLAG_OLD)) {
       return rc.formatPhrase(RenderingI18nContext.SDT_OBLIGATION_PROFILE); // "Obligation Profile";
     } else if ("Extension".equals(sd.getType())) {
       return rc.formatPhrase(RenderingI18nContext.SDT_EXTENSION); // "Extension"
@@ -2184,9 +2173,10 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       if (refersToThisSD(sdt.getBaseDefinition())) {
         base.put(sdt.getWebPath(), sdt.present());
       }
-      scanExtensions(invoked, sdt, ToolingExtensions.EXT_OBLIGATION_INHERITS);
-      scanExtensions(imposed, sdt, ToolingExtensions.EXT_SD_IMPOSE_PROFILE);
-      scanExtensions(compliedWith, sdt, ToolingExtensions.EXT_SD_COMPLIES_WITH_PROFILE);
+      scanExtensions(invoked, sdt, ExtensionDefinitions.EXT_OBLIGATION_INHERITS_NEW);
+      scanExtensions(invoked, sdt, ExtensionDefinitions.EXT_OBLIGATION_INHERITS_OLD);
+      scanExtensions(imposed, sdt, ExtensionDefinitions.EXT_SD_IMPOSE_PROFILE);
+      scanExtensions(compliedWith, sdt, ExtensionDefinitions.EXT_SD_COMPLIES_WITH_PROFILE);
 
       for (ElementDefinition ed : sdt.getDifferential().getElement()) {
         for (TypeRefComponent tr : ed.getType()) {
@@ -2225,7 +2215,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
       }
     }
-    for (CanonicalResource cr : scanAllResources(null, "StructureDefinition")) {
+    for (CanonicalResource cr : scanAllResources(CapabilityStatement.class, "CapabilityStatement")) {
       CapabilityStatement cst = (CapabilityStatement) cr;
       scanCapStmt(capStmts, cst);
     }
@@ -2238,10 +2228,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
       if (usages.has(sd.getUrl())) {
         for (JsonProperty p : usages.getJsonObject(sd.getUrl()).getProperties()) {
-          examples.put(Utilities.pathURL(specPath, p.getName()), p.getValue().asString());
+          if (examples.size() < EXAMPLE_UPPER_LIMIT) {
+            examples.put(Utilities.pathURL(specPath, p.getName()), p.getValue().asString());
+          }
         }
-      } 
-
+      }
     }
 
     for (FetchedFile f : files) {
@@ -2257,7 +2248,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           if (usesSD(r.getElement())) {
             String p = igp.getLinkFor(r, true);
             if (p != null) {
-              examples.put(p, r.getTitle());
+              if (examples.size() < EXAMPLE_UPPER_LIMIT) {
+                examples.put(p, r.getTitle());
+              }
             } else {
               System.out.println("Res "+f.getName()+" has no path");
             }
@@ -2268,15 +2261,31 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     for (RelatedIG ig : relatedIgs) {
       for (Element r : ig.loadE(context, sd.getType())) {
         if (usesSD(r)) {
-          examples.put(r.getWebPath(), r.getUserString(UserDataNames.renderer_title));
+          if (examples.size() < EXAMPLE_UPPER_LIMIT) {
+            examples.put(r.getWebPath(), r.getUserString(UserDataNames.renderer_title));
+          }
         }        
+      }
+    }
+
+    if ("hl7.fhir.uv.extensions".equals(packageId)) {
+      if (igp.getCoreExtensionMap().isEmpty()) {
+        loadCoreExtensionMap();
+      }
+      List<IGKnowledgeProvider.ExtensionUsage> usages = igp.getCoreExtensionMap().get(sd.getUrl());
+      if (usages != null) {
+        for (IGKnowledgeProvider.ExtensionUsage u : usages) {
+          if (examples.size() < EXAMPLE_UPPER_LIMIT) {
+            examples.put(Utilities.pathURL(specPath, u.getUrl()), u.getName());
+          }
+        }
       }
     }
 
     StringBuilder b = new StringBuilder();
     String os = lrc.formatPhrase(RenderingI18nContext.SDT_ORIGINAL_SOURCE);
-    if (sd.hasExtension(ToolingExtensions.EXT_WEB_SOURCE)) {
-      String url = ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_WEB_SOURCE);
+    if (sd.hasExtension(ExtensionDefinitions.EXT_WEB_SOURCE_OLD, ExtensionDefinitions.EXT_WEB_SOURCE_NEW)) {
+      String url = ExtensionUtilities.readStringExtension(sd, ExtensionDefinitions.EXT_WEB_SOURCE_OLD, ExtensionDefinitions.EXT_WEB_SOURCE_NEW);
       if (Utilities.isAbsoluteUrlLinkable(url)) {
         b.append("<p><b>"+os+":</b> <a href=\""+Utilities.escapeXml(url)+"\">"+Utilities.escapeXml(Utilities.extractDomain(url))+"</a></p>\r\n");      
       } else {
@@ -2317,7 +2326,84 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       b.append(" <li>"+Utilities.escapeXml(lrc.formatPhrase(RenderingI18nContext.SDR_NOT_USED, type))+"</li>\r\n");
     }
     b.append("</ul>\r\n");
-    return b.toString()+changeSummary();
+    return b.toString()+xigReference()+changeSummary();
+  }
+
+  private void loadCoreExtensionMap() throws IOException {
+    ClassLoader classLoader = HierarchicalTableGenerator.class.getClassLoader();
+    InputStream map = classLoader.getResourceAsStream("r5-examples.json");
+    JsonObject examples = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(map);
+
+    FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager.Builder().build();
+    NpmPackage npm = pcm.loadPackage("hl7.fhir.r5.examples");
+    for (String fn : npm.getFolders().get("package").listFiles()) {
+      try {
+        Resource r = new JsonParser().parse(npm.getFolders().get("package").fetchFile(fn));
+        JsonObject details = examples.getJsonObject(r.fhirType()+"/"+r.getId());
+        if (details != null) {
+          new ElementVisitor(new ExtensionVisitor(details.asString("path"), details.asString("name"))).visit(null, r);
+        }
+      } catch (Exception e) {
+        // npthing
+      }
+    }
+  }
+
+   private class ExtensionVisitor implements ElementVisitor.IElementVisitor {
+
+    private String path;
+    private String name;
+    public ExtensionVisitor(String path, String name) {
+      this.path = path;
+      this.name = name;
+    }
+
+    @Override
+    public ElementVisitor.ElementVisitorInstruction visit(Object context, Resource resource) {
+      if (resource instanceof DomainResource) {
+        DomainResource dr = (DomainResource) resource;
+        for (Extension ex : dr.getExtension()) {
+          seeExtension(path, name, ex.getUrl());
+        }
+        for (Extension ex : dr.getModifierExtension()) {
+          seeExtension(path, name, ex.getUrl());
+        }
+      }
+      return VISIT_CHILDREN;
+    }
+
+    @Override
+    public ElementVisitor.ElementVisitorInstruction visit(Object context, org.hl7.fhir.r5.model.Element element) {
+      for (Extension ex : element.getExtension()) {
+        seeExtension(path, name, ex.getUrl());
+      }
+      if (element instanceof BackboneElement) {
+        BackboneElement be = (BackboneElement) element;
+        for (Extension ex : be.getModifierExtension()) {
+          seeExtension(path, name, ex.getUrl());
+        }
+      }
+      if (element instanceof BackboneType) {
+        BackboneType be = (BackboneType) element;
+        for (Extension ex : be.getModifierExtension()) {
+          seeExtension(path, name, ex.getUrl());
+        }
+      }
+      return VISIT_CHILDREN;
+    }
+  }
+
+  private void seeExtension(String path, String name, String url) {
+    List<IGKnowledgeProvider.ExtensionUsage> list = igp.getCoreExtensionMap().get(url);
+    if (list == null) {
+      list = new ArrayList<>();
+      igp.getCoreExtensionMap().put(url, list);
+    }
+    list.add(new IGKnowledgeProvider.ExtensionUsage(path, name));
+  }
+
+  private String xigReference() {
+    return "<p>You can also check for <a href=\"https://packages2.fhir.org/xig/"+packageId+"|current/StructureDefinition/"+sd.getId()+"\">usages in the FHIR IG Statistics</a></p>";
   }
 
   public void scanCapStmt(Map<String, String> capStmts, CapabilityStatement cst) {
@@ -2500,7 +2586,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (element.definition().getIsModifier()) {
       gc.addStyledText((this.gen.formatPhrase(RenderingI18nContext.STRUC_DEF_MOD)), "?!", null, null, null, false);
     }
-    if (element.definition().getMustSupport() || element.definition().hasExtension(ToolingExtensions.EXT_OBLIGATION_CORE, ToolingExtensions.EXT_OBLIGATION_TOOLS)) {
+    if (element.definition().getMustSupport() || element.definition().hasExtension(ExtensionDefinitions.EXT_OBLIGATION_CORE, ExtensionDefinitions.EXT_OBLIGATION_TOOLS)) {
       gc.addStyledText((this.gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ELE_MUST_SUPP)), "S", "white", "red", null, false);
     }
     if (element.definition().getIsSummary()) {
@@ -2512,8 +2598,8 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       p.addStyle(org.hl7.fhir.r5.renderers.StructureDefinitionRenderer.CONSTRAINT_STYLE);
       p.setReference(Utilities.pathURL(VersionUtilities.getSpecUrl(context.getVersion()), "conformance-rules.html#constraints"));
     }
-    if (element != null && element.definition().hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
-      StandardsStatus ss = StandardsStatus.fromCode(element.definition().getExtensionString(ToolingExtensions.EXT_STANDARDS_STATUS));
+    if (element != null && element.definition().hasExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS)) {
+      StandardsStatus ss = StandardsStatus.fromCode(element.definition().getExtensionString(ExtensionDefinitions.EXT_STANDARDS_STATUS));
       gc.addStyledText("Standards Status = "+ss.toDisplay(), ss.getAbbrev(), "black", ss.getColor(), context.getSpecUrl()+"versions.html#std-process", true);
     }
 
@@ -2627,11 +2713,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   public String useContext() throws IOException {
     XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
-    if ("deprecated".equals(ToolingExtensions.readStringExtension(sd, ToolingExtensions.EXT_STANDARDS_STATUS))) {
+    if ("deprecated".equals(ExtensionUtilities.readStringExtension(sd, ExtensionDefinitions.EXT_STANDARDS_STATUS))) {
       XhtmlNode ddiv = div.div("background-color: #ffe6e6; border: 1px solid black; border-radius: 10px; padding: 10px");
       ddiv.para().b().tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_DEPR)); 
-      Extension ext = sd.getExtensionByUrl(ToolingExtensions.EXT_STANDARDS_STATUS);
-      ext = ext == null || !ext.hasValue() ? null : ext.getValue().getExtensionByUrl(ToolingExtensions.EXT_STANDARDS_STATUS_REASON);
+      Extension ext = sd.getExtensionByUrl(ExtensionDefinitions.EXT_STANDARDS_STATUS);
+      ext = ext == null || !ext.hasValue() ? null : ext.getValue().getExtensionByUrl(ExtensionDefinitions.EXT_STANDARDS_STATUS_REASON);
       if (ext != null && ext.hasValue()) {
         String md = ext.getValue().primitiveValue();
         try {
@@ -2684,9 +2770,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           li.tx(c.getExpression());
           break;
         }
-        if (c.hasExtension(ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE)) {
+        if (c.hasExtension(ExtensionDefinitions.EXT_FHIRVERSION_SPECIFIC_USE)) {
           li.tx(" (");
-          renderVersionRange(c.getExtensionByUrl(ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE), li);
+          renderVersionRange(c.getExtensionByUrl(ExtensionDefinitions.EXT_FHIRVERSION_SPECIFIC_USE), li);
           li.tx(")");        
         }
       }
@@ -2707,34 +2793,34 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
       }
     }
-    if (sd.hasExtension(ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE)) {
+    if (sd.hasExtension(ExtensionDefinitions.EXT_FHIRVERSION_SPECIFIC_USE)) {
       var p = div.para();
       p.tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_VER_PFX)+" ");  
-      renderVersionRange(sd.getExtensionByUrl(ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE), p);
+      renderVersionRange(sd.getExtensionByUrl(ExtensionDefinitions.EXT_FHIRVERSION_SPECIFIC_USE), p);
       p.tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_VER_SFX));        
     }
     return new XhtmlComposer(false, true).compose(div.getChildNodes());
   }
 
   public void renderVersionRange(Extension ext, XhtmlNode li) {
-    if (!ext.hasExtension(ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_START)) {
+    if (!ext.hasExtension(ExtensionDefinitions.EXT_FHIRVERSION_SPECIFIC_USE_START)) {
       li.tx(gen.formatPhrase(RenderingI18nContext.SDR_VER_TO_PFX)); 
       li.tx(" ");
-      linkToVersion(li, ToolingExtensions.readStringExtension(ext, ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_END));                
+      linkToVersion(li, ExtensionUtilities.readStringExtension(ext, ExtensionDefinitions.EXT_FHIRVERSION_SPECIFIC_USE_END));                
       li.stx(gen.formatPhrase(RenderingI18nContext.SDR_VER_TO_SFX)); 
-    } else if (!ext.hasExtension(ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_END)) {
+    } else if (!ext.hasExtension(ExtensionDefinitions.EXT_FHIRVERSION_SPECIFIC_USE_END)) {
       li.tx(gen.formatPhrase(RenderingI18nContext.SDR_VER_FROM_PFX)); 
       li.tx(" ");
-      linkToVersion(li, ToolingExtensions.readStringExtension(ext, ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_START));
+      linkToVersion(li, ExtensionUtilities.readStringExtension(ext, ExtensionDefinitions.EXT_FHIRVERSION_SPECIFIC_USE_START));
       li.stx(gen.formatPhrase(RenderingI18nContext.SDR_VER_FROM_SFX));      
     } else {
       li.tx(gen.formatPhrase(RenderingI18nContext.SDR_VER_RANGE_PFX)); 
       li.tx(" ");
-      linkToVersion(li, ToolingExtensions.readStringExtension(ext, ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_START));
+      linkToVersion(li, ExtensionUtilities.readStringExtension(ext, ExtensionDefinitions.EXT_FHIRVERSION_SPECIFIC_USE_START));
       li.tx(" ");
       li.tx(gen.formatPhrase(RenderingI18nContext.SDR_VER_RANGE_MID)); 
       li.tx(" ");
-      linkToVersion(li, ToolingExtensions.readStringExtension(ext, ToolingExtensions.EXT_FHIRVERSION_SPECIFIC_USE_END));        
+      linkToVersion(li, ExtensionUtilities.readStringExtension(ext, ExtensionDefinitions.EXT_FHIRVERSION_SPECIFIC_USE_END));        
       li.tx(" ");
       li.stx(gen.formatPhrase(RenderingI18nContext.SDR_VER_RANGE_SFX)); 
     }

@@ -3,6 +3,8 @@ package org.hl7.fhir.igtools.renderers;
 import java.util.List;
 
 import org.hl7.fhir.r5.elementmodel.Element;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
+import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.ContactDetail;
 import org.hl7.fhir.r5.model.ContactPoint;
@@ -12,7 +14,6 @@ import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.IntegerType;
 import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.utilities.Utilities;
 
 public class StatusRenderer {
@@ -82,13 +83,13 @@ public class StatusRenderer {
       this.colorClass = colorClass;
     }
     public void processFmm(DomainResource resource) {
-      if (ToolingExtensions.hasExtension(resource, ToolingExtensions.EXT_FMM_LEVEL)) {
-        setFmm(ToolingExtensions.readStringExtension(resource, ToolingExtensions.EXT_FMM_LEVEL));
-        IntegerType fmm = resource.getExtensionByUrl(ToolingExtensions.EXT_FMM_LEVEL).getValueIntegerType();
-        if (fmm.hasExtension(ToolingExtensions.EXT_FMM_SUPPORT))
-          setFmmSupport(fmm.getExtensionByUrl(ToolingExtensions.EXT_FMM_SUPPORT).getValueStringType().getValue());
-        else if (fmm.hasExtension(ToolingExtensions.EXT_FMM_DERIVED)) {
-          List<Extension> derivations = fmm.getExtensionsByUrl(ToolingExtensions.EXT_FMM_DERIVED);
+      if (ExtensionUtilities.hasExtension(resource, ExtensionDefinitions.EXT_FMM_LEVEL)) {
+        setFmm(ExtensionUtilities.readStringExtension(resource, ExtensionDefinitions.EXT_FMM_LEVEL));
+        IntegerType fmm = resource.getExtensionByUrl(ExtensionDefinitions.EXT_FMM_LEVEL).getValueIntegerType();
+        if (resource.hasExtension(ExtensionDefinitions.EXT_FMM_SUPPORT))
+          setFmmSupport(resource.getExtensionByUrl(ExtensionDefinitions.EXT_FMM_SUPPORT).getValueStringType().getValue());
+        else if (fmm.hasExtension(ExtensionDefinitions.EXT_FMM_DERIVED)) {
+          List<Extension> derivations = fmm.getExtensionsByUrl(ExtensionDefinitions.EXT_FMM_DERIVED);
           String s = "Inherited from ";
           for (Extension ex: derivations) {
             s += ", " + ex.getValueCanonicalType();
@@ -98,13 +99,13 @@ public class StatusRenderer {
       }
     }
     public void processFmm(Element resource) {
-      if (resource.hasExtension(ToolingExtensions.EXT_FMM_LEVEL)) {
-        setFmm(resource.getExtensionString(ToolingExtensions.EXT_FMM_LEVEL));
-        Element fmm = resource.getExtension(ToolingExtensions.EXT_FMM_LEVEL).getNamedChild("value");
-        if (fmm.hasExtension(ToolingExtensions.EXT_FMM_SUPPORT))
-          setFmmSupport(fmm.getExtensionString(ToolingExtensions.EXT_FMM_SUPPORT));
-        else if (fmm.hasExtension(ToolingExtensions.EXT_FMM_DERIVED)) {
-          List<Element> derivations = fmm.getExtensions(ToolingExtensions.EXT_FMM_DERIVED);
+      if (resource.hasExtension(ExtensionDefinitions.EXT_FMM_LEVEL)) {
+        setFmm(resource.getExtensionString(ExtensionDefinitions.EXT_FMM_LEVEL));
+        Element fmm = resource.getExtension(ExtensionDefinitions.EXT_FMM_LEVEL).getNamedChild("value");
+        if (fmm.hasExtension(ExtensionDefinitions.EXT_FMM_SUPPORT))
+          setFmmSupport(fmm.getExtensionString(ExtensionDefinitions.EXT_FMM_SUPPORT));
+        else if (fmm.hasExtension(ExtensionDefinitions.EXT_FMM_DERIVED)) {
+          List<Element> derivations = fmm.getExtensions(ExtensionDefinitions.EXT_FMM_DERIVED);
           String s = "Inherited from ";
           for (Element ex: derivations) {
             s += ", " + ex.primitiveValue();
@@ -114,13 +115,13 @@ public class StatusRenderer {
       }
     }
     public void processSStatus(DomainResource resource) {
-      if (ToolingExtensions.hasExtension(resource, ToolingExtensions.EXT_STANDARDS_STATUS)) {
-        setSstatus(ToolingExtensions.readStringExtension(resource, ToolingExtensions.EXT_STANDARDS_STATUS));
-        StringType sstatus = resource.getExtensionByUrl(ToolingExtensions.EXT_STANDARDS_STATUS).getValueStringType();
-        if (sstatus.hasExtension(ToolingExtensions.EXT_FMM_SUPPORT))
-          setFmmSupport(sstatus.getExtensionByUrl(ToolingExtensions.EXT_FMM_SUPPORT).getValueStringType().getValue());
-        else if (sstatus.hasExtension(ToolingExtensions.EXT_FMM_DERIVED)) {
-          List<Extension> derivations = sstatus.getExtensionsByUrl(ToolingExtensions.EXT_FMM_DERIVED);
+      if (ExtensionUtilities.hasExtension(resource, ExtensionDefinitions.EXT_STANDARDS_STATUS)) {
+        setSstatus(ExtensionUtilities.readStringExtension(resource, ExtensionDefinitions.EXT_STANDARDS_STATUS));
+        StringType sstatus = resource.getExtensionByUrl(ExtensionDefinitions.EXT_STANDARDS_STATUS).getValueStringType();
+        if (resource.hasExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS_REASON))
+          setSstatusSupport(resource.getExtensionByUrl(ExtensionDefinitions.EXT_STANDARDS_STATUS_REASON).getValueStringType().getValue());
+        else if (sstatus.hasExtension(ExtensionDefinitions.EXT_FMM_DERIVED)) {
+          List<Extension> derivations = sstatus.getExtensionsByUrl(ExtensionDefinitions.EXT_FMM_DERIVED);
           String s = "Inherited from ";
           for (Extension ex: derivations) {
             s += ", " + ex.getValueCanonicalType();
@@ -131,13 +132,13 @@ public class StatusRenderer {
     }
     
     public void processSStatus(Element resource) {
-      if (resource.hasExtension(ToolingExtensions.EXT_STANDARDS_STATUS)) {
-        setSstatus(resource.getExtensionString(ToolingExtensions.EXT_STANDARDS_STATUS));
-        Element sstatus = resource.getExtension(ToolingExtensions.EXT_STANDARDS_STATUS).getNamedChild("value");
-        if (sstatus.hasExtension(ToolingExtensions.EXT_FMM_SUPPORT))
-          setFmmSupport(sstatus.getExtensionString(ToolingExtensions.EXT_FMM_SUPPORT));
-        else if (sstatus.hasExtension(ToolingExtensions.EXT_FMM_DERIVED)) {
-          List<Element> derivations = sstatus.getExtensions(ToolingExtensions.EXT_FMM_DERIVED);
+      if (resource.hasExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS)) {
+        setSstatus(resource.getExtensionString(ExtensionDefinitions.EXT_STANDARDS_STATUS));
+        Element sstatus = resource.getExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS).getNamedChild("value");
+        if (sstatus.hasExtension(ExtensionDefinitions.EXT_FMM_SUPPORT))
+          setFmmSupport(sstatus.getExtensionString(ExtensionDefinitions.EXT_FMM_SUPPORT));
+        else if (sstatus.hasExtension(ExtensionDefinitions.EXT_FMM_DERIVED)) {
+          List<Element> derivations = sstatus.getExtensions(ExtensionDefinitions.EXT_FMM_DERIVED);
           String s = "Inherited from ";
           for (Element ex: derivations) {
             s += ", " + ex.primitiveValue();
@@ -201,16 +202,16 @@ public class StatusRenderer {
 
 
   private static String readStandardsStatus(DomainResource resource) {
-    return ToolingExtensions.readStringExtension(resource, ToolingExtensions.EXT_STANDARDS_STATUS);
+    return ExtensionUtilities.readStringExtension(resource, ExtensionDefinitions.EXT_STANDARDS_STATUS);
   }
 
   
   private static String readNormativeVersion(DomainResource resource) {
-    return ToolingExtensions.readStringExtension(resource, ToolingExtensions.EXT_NORMATIVE_VERSION);
+    return ExtensionUtilities.readStringExtension(resource, ExtensionDefinitions.EXT_NORMATIVE_VERSION);
   }
 
   private static String readNormativeVersion(Element resource) {
-    return resource.getExtensionString(ToolingExtensions.EXT_NORMATIVE_VERSION);
+    return resource.getExtensionString(ExtensionDefinitions.EXT_NORMATIVE_VERSION);
   }
 
 

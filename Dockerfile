@@ -1,4 +1,4 @@
-FROM maven:3.9.9-eclipse-temurin-11 AS build
+FROM maven:3.9.9-eclipse-temurin-17 AS build
 WORKDIR /build
 COPY lib ./lib
 COPY pom.xml ./pom.xml
@@ -8,7 +8,7 @@ RUN mvn dependency:go-offline
 COPY . .
 RUN mvn install -Dmaven.test.skip=true
 
-FROM eclipse-temurin:11
+FROM eclipse-temurin:17
 WORKDIR /app
 
 USER root

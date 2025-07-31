@@ -1,20 +1,17 @@
 package org.hl7.fhir.igtools.publisher;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.apache.commons.lang3.NotImplementedException;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.PathEngineException;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
+import org.hl7.fhir.r5.fhirpath.BaseHostServices;
 import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
 import org.hl7.fhir.r5.fhirpath.TypeDetails;
 import org.hl7.fhir.r5.liquid.GlobalObject;
 import org.hl7.fhir.r5.fhirpath.ExpressionNode.CollectionStatus;
-import org.hl7.fhir.r5.fhirpath.FHIRPathEngine.IEvaluationContext;
-import org.hl7.fhir.r5.fhirpath.FHIRPathUtilityClasses.FunctionDetails;
 import org.hl7.fhir.r5.model.Base;
 import org.hl7.fhir.r5.model.DateTimeType;
 import org.hl7.fhir.r5.model.Resource;
@@ -22,35 +19,29 @@ import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.utils.validation.IResourceValidator;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.fhirpath.FHIRPathConstantEvaluationMode;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 
-public class IGPublisherHostServices implements IEvaluationContext {
-
-
+public class IGPublisherHostServices extends BaseHostServices {
+  
   private IGKnowledgeProvider igpkp;
   private List<FetchedFile> fileList = new ArrayList<FetchedFile>();
   private SimpleWorkerContext context;
   private DateTimeType dt;
   private StringType pathToSpec;
-  private Map<String, FunctionDefinition> functions = new HashMap<>();
   
   public IGPublisherHostServices(IGKnowledgeProvider igpkp, List<FetchedFile> fileList,
       SimpleWorkerContext context, DateTimeType dt, StringType pathToSpec) {
-    super();
+    super(context);
     this.igpkp = igpkp;
     this.fileList = fileList;
     this.context = context;
     this.dt = dt;
     this.pathToSpec = pathToSpec;
   }
-
-  public IGPublisherHostServices registerFunction(FunctionDefinition function) {
-    functions.put(function.name(), function);
-    return this;
-  }
   
   @Override
-  public List<Base> resolveConstant(FHIRPathEngine engine, Object appContext, String name, boolean beforeContext, boolean explicitConstant) throws PathEngineException {
+  public List<Base> resolveConstant(FHIRPathEngine engine, Object appContext, String name, FHIRPathConstantEvaluationMode mode) throws PathEngineException {
     if ("Globals".equals(name)) {
       List<Base> list = new ArrayList<Base>();
       list.add(new GlobalObject(dt, pathToSpec));
@@ -61,7 +52,7 @@ public class IGPublisherHostServices implements IEvaluationContext {
   }
 
   @Override
-  public TypeDetails resolveConstantType(FHIRPathEngine engine, Object appContext, String name, boolean explicitConstant) throws PathEngineException {
+  public TypeDetails resolveConstantType(FHIRPathEngine engine, Object appContext, String name, FHIRPathConstantEvaluationMode mode) throws PathEngineException {
     if ("Globals".equals(name)) {
       return new TypeDetails(CollectionStatus.SINGLETON, "GlobalObject");
     } else {
@@ -77,24 +68,6 @@ public class IGPublisherHostServices implements IEvaluationContext {
   @Override
   public boolean log(String argument, List<Base> focus) {
     return false;
-  }
-
-  @Override
-  public FunctionDetails resolveFunction(FHIRPathEngine engine, String functionName) {
-    FunctionDefinition fd = functions.get(functionName);
-    return fd == null ? null : fd.details();
-  }
-
-  @Override
-  public TypeDetails checkFunction(FHIRPathEngine engine, Object appContext, String functionName, TypeDetails focus, List<TypeDetails> parameters) throws PathEngineException {
-    FunctionDefinition fd = functions.get(functionName);
-    return fd == null ? null : fd.check(engine, appContext, focus, parameters);
-  }
-
-  @Override
-  public List<Base> executeFunction(FHIRPathEngine engine, Object appContext, List<Base> focus, String functionName, List<List<Base>> parameters) {
-    FunctionDefinition fd = functions.get(functionName);
-    return fd == null ? null : fd.execute(engine, appContext, focus, parameters);
   }
 
   @Override

@@ -26,6 +26,7 @@ import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.modules.xver.SourcedElementDefinition.ElementValidState;
 import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
+import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
 import org.hl7.fhir.r5.formats.IParser.OutputStyle;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.model.CanonicalResource;
@@ -78,7 +79,6 @@ import org.hl7.fhir.r5.renderers.ConceptMapRenderer.RenderMultiRowSortPolicy;
 import org.hl7.fhir.r5.terminologies.ConceptMapUtilities;
 import org.hl7.fhir.r5.terminologies.ConceptMapUtilities.TranslatedCode;
 import org.hl7.fhir.r5.terminologies.expansion.ValueSetExpansionOutcome;
-import org.hl7.fhir.r5.utils.ToolingExtensions;
 import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
@@ -650,7 +650,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
 
   private void tagForVersion(String tgtVer, Element element) {
     Extension ext = element.addExtension();
-    ext.setUrl(ToolingExtensions.EXT_APPLICABLE_VERSION);
+    ext.setUrl(ExtensionDefinitions.EXT_APPLICABLE_VERSION);
     ext.addExtension("startFhirVersion", new CodeType(tgtVer));    
     ext.addExtension("endFhirVersion", new CodeType(tgtVer));    
   }
