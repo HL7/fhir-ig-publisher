@@ -3,12 +3,10 @@ package org.hl7.fhir.igtools.web;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -21,7 +19,6 @@ import org.hl7.fhir.igtools.publisher.PastProcessHackerUtilities;
 import org.hl7.fhir.igtools.publisher.Publisher;
 import org.hl7.fhir.igtools.web.IGRegistryMaintainer.ImplementationGuideEntry;
 import org.hl7.fhir.igtools.web.IGReleaseUpdater.ServerType;
-import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.utilities.FhirPublication;
@@ -469,7 +466,7 @@ public class PublicationProcess {
     if (res.size() == 0) {
       doPublish(fSource, fOutput, qa, destination, destVer, pathVer, fRoot, pubSetup, pl, prSrc, fRegistry, npm, mode, date, fHistory, temp, logger, 
           pubSetup.getJsonObject("website").asString("url"), src, sft, relDest, templateSrc, first, indexes, dd, getComputerName(), 
-          IGVersionUtil.getVersionString(), gitSrcId(source), tcName, tcPath, tcVer, workingRoot, jsonXmlClones, igBuildZipDir);
+          IGVersionUtil.getVersionString(), gitSrcId(source), tcName, tcPath, tcVer, workingRoot, jsonXmlClones, igBuildZipDir, args);
     }        
     return res;    
   }
@@ -539,9 +536,9 @@ public class PublicationProcess {
     return new FileInputStream(f);
   }
 
-  private void doPublish(File fSource, File fOutput, JsonObject qa, String destination, String destVer, String pathVer, File fRoot, JsonObject pubSetup, PackageList pl, JsonObject prSrc, File fRegistry, NpmPackage npm, 
-      PublicationProcessMode mode, String date, File history, String tempDir, PublisherConsoleLogger logger, String url, WebSourceProvider src, File sft, String relDest, String templateSrc, boolean first, Map<String, IndexMaintainer> indexes,
-      Date genDate, String username, String version, String gitSrcId, String tcName, String tcPath, PackageListEntry tcVer, String workingRoot, boolean jsonXmlClones, File igBuildZipDir) throws Exception {
+  private void doPublish(File fSource, File fOutput, JsonObject qa, String destination, String destVer, String pathVer, File fRoot, JsonObject pubSetup, PackageList pl, JsonObject prSrc, File fRegistry, NpmPackage npm,
+                         PublicationProcessMode mode, String date, File history, String tempDir, PublisherConsoleLogger logger, String url, WebSourceProvider src, File sft, String relDest, String templateSrc, boolean first, Map<String, IndexMaintainer> indexes,
+                         Date genDate, String username, String version, String gitSrcId, String tcName, String tcPath, PackageListEntry tcVer, String workingRoot, boolean jsonXmlClones, File igBuildZipDir, String[] args) throws Exception {
     // ok. all our tests have passed.
     // 1. do the publication build(s)
     List<String> existingFiles = new ArrayList<>();
@@ -553,13 +550,18 @@ public class PublicationProcess {
       // create a temporary copy and build in that:
       File temp = cloneToTemp(tempDir, fSource, npm.name()+"#"+npm.version());
       File tempM = null; 
-      System.out.println("Build IG at "+fSource.getAbsolutePath()+": final copy suitable for publication (in "+temp.getAbsolutePath()+")");        
-      runBuild(qa, temp.getAbsolutePath(), new String[] {"-ig", temp.getAbsolutePath(), "-resetTx", "-publish", pathVer, "-no-exit"});
+      System.out.println("Build IG at "+fSource.getAbsolutePath()+": final copy suitable for publication (in "+temp.getAbsolutePath()+")");
+      String[] baseParams = new String[] {"-publish", pathVer, "-no-exit" };
+      String tx = getNamedParam(args, "-tx");
+      if (tx != null) {
+        baseParams = Utilities.appendStr(baseParams, new String[] {"-tx", tx});
+      }
+      runBuild(qa, temp.getAbsolutePath(), Utilities.appendStr(baseParams, new String[] {"-ig", temp.getAbsolutePath(), "-resetTx"}));
 
       if (mode != PublicationProcessMode.WORKING) {
         tempM = cloneToTemp(tempDir, temp, npm.name()+"#"+npm.version()+"-milestone");
         System.out.println("Build IG at "+fSource.getAbsolutePath()+": final copy suitable for publication (in "+tempM.getAbsolutePath()+") (milestone build)");        
-        runBuild(qa, tempM.getAbsolutePath(), new String[] {"-ig", tempM.getAbsolutePath(), "-publish", pathVer, "-milestone", "-no-exit"});      
+        runBuild(qa, tempM.getAbsolutePath(), Utilities.appendStr(baseParams, new String[] {"-ig", tempM.getAbsolutePath(), "-milestone"}));
       }
 
       // 2. make a copy of what we built

@@ -73,6 +73,7 @@ public class CrossViewRenderer extends Renderer {
       this.name = name;
       this.ms = ms;
     }
+
     public String name;
     public boolean ms;
   }
@@ -96,14 +97,14 @@ public class CrossViewRenderer extends Renderer {
   }
 
   public class ObservationProfile extends StructureDefinitionNote {
-    public List<Coding> code = new ArrayList<>(); 
+    public List<Coding> code = new ArrayList<>();
     public ElementDefinitionBindingComponent codeVS;
     public List<Coding> category = new ArrayList<>();
     public ElementDefinitionBindingComponent catVS;
     public List<UsedType> effectiveTypes = new ArrayList<>();
     public List<UsedType> types = new ArrayList<>();
     public Boolean dataAbsentReason;
-    public List<Coding> bodySite = new ArrayList<>(); 
+    public List<Coding> bodySite = new ArrayList<>();
     public List<Coding> method = new ArrayList<>();
     public List<ObservationProfile> components = new ArrayList<>();
     public List<String> members = new ArrayList<String>();
@@ -111,7 +112,7 @@ public class CrossViewRenderer extends Renderer {
 
     public boolean hasValue() {
       return code.size() > 0 || category.size() > 0;
-    }    
+    }
   }
 
   public class ExtensionDefinition extends StructureDefinitionNote {
@@ -122,7 +123,7 @@ public class CrossViewRenderer extends Renderer {
   }
 
   private String canonical;
-  private String canonical2; 
+  private String canonical2;
   private IWorkerContext worker;
   private List<ObservationProfile> obsList = new ArrayList<>();
   private List<ExtensionDefinition> extList = new ArrayList<>();
@@ -168,7 +169,7 @@ public class CrossViewRenderer extends Renderer {
         for (TypeRefComponent tr : ed.getType())
           if (!baseExtTypes.contains(tr.getCode()))
             baseExtTypes.add(tr.getCode());
-      } 
+      }
     }
   }
 
@@ -188,7 +189,7 @@ public class CrossViewRenderer extends Renderer {
     } catch (Exception e) {
       // do nothing in this case
     }
-    searchParams.add(sp);    
+    searchParams.add(sp);
   }
 
   public void seeStructureDefinition(StructureDefinition sd) {
@@ -199,7 +200,7 @@ public class CrossViewRenderer extends Renderer {
     if ("Observation".equals(sd.getType())) {
       seeObservation(sd);
     }
-    checkForExtensions(sd);    
+    checkForExtensions(sd);
   }
 
   private void checkForExtensions(StructureDefinition sd) {
@@ -243,7 +244,7 @@ public class CrossViewRenderer extends Renderer {
         } else if (ed.getBinding().hasValueSet()) {
           obs.codeVS = ed.getBinding();
         }
-      } 
+      }
       if (ed.getPath().equals("Observation.code.coding")) {
         system = null;
         if (ed.hasFixedOrPattern() && ed.getFixedOrPattern() instanceof Coding) {
@@ -393,10 +394,10 @@ public class CrossViewRenderer extends Renderer {
   private void seeExtensionDefinition(StructureDefinition sd) {
     allExtensions.add(sd);
     String code = null;
-    if (sd.getUrl().startsWith(canonical+"/StructureDefinition/")) {
-      code = sd.getUrl().substring(canonical.length()+21);
-    } else if (canonical2 != null && sd.getUrl().startsWith(canonical2+"/StructureDefinition/")) {
-      code = sd.getUrl().substring(canonical2.length()+21);
+    if (sd.getUrl().startsWith(canonical + "/StructureDefinition/")) {
+      code = sd.getUrl().substring(canonical.length() + 21);
+    } else if (canonical2 != null && sd.getUrl().startsWith(canonical2 + "/StructureDefinition/")) {
+      code = sd.getUrl().substring(canonical2.length() + 21);
     } else {
       //  System.out.println("extension url doesn't follow canonical pattern: "+sd.getUrl()+"/StructureDefinition, so omitted from extension summary");
       return;
@@ -413,9 +414,9 @@ public class CrossViewRenderer extends Renderer {
         for (TypeRefComponent tr : ed.getType())
           if (!typesContain(exd.types, tr.getCode()))
             exd.types.add(new UsedType(tr.getCode(), isMustSupport(ed, tr)));
-      } 
+      }
       if (ed.getPath().startsWith("Extension.extension.")) {
-        i = processExtensionComponent(exd, sd.getSnapshot().getElement(), sd.getSnapshot().getElement().get(i-1).getDefinition(), i);
+        i = processExtensionComponent(exd, sd.getSnapshot().getElement(), sd.getSnapshot().getElement().get(i - 1).getDefinition(), i);
       } else {
         i++;
       }
@@ -439,15 +440,15 @@ public class CrossViewRenderer extends Renderer {
         exd.code = ed.getFixedOrPattern().primitiveValue();
         if (exd.code.startsWith(canonical)) {
           if (exd.code.length() > canonical.length() + 21) {
-            System.out.println("extension code doesn't follow canonical pattern: "+exd.code);
-          } else { 
+            System.out.println("extension code doesn't follow canonical pattern: " + exd.code);
+          } else {
             exd.code = exd.code.substring(canonical.length() + 21);
           }
         }
         if (canonical2 != null && exd.code.startsWith(canonical2)) {
           if (exd.code.length() > canonical2.length() + 21) {
-            System.out.println("extension code doesn't follow canonical2 pattern: "+exd.code);
-          } else { 
+            System.out.println("extension code doesn't follow canonical2 pattern: " + exd.code);
+          } else {
             exd.code = exd.code.substring(canonical2.length() + 21);
           }
         }
@@ -480,15 +481,15 @@ public class CrossViewRenderer extends Renderer {
 
       for (ExtensionDefinition op : extList) {
         b.append(" <tr>");
-        b.append("<td><a href=\""+op.source.getWebPath()+"\">"+op.code+"</a></td>");
-        renderTypeCell(b, true, op.types, baseExtTypes);        
-        b.append("<td>"+Utilities.escapeXml(op.definition)+"</td>");
+        b.append("<td><a href=\"" + op.source.getWebPath() + "\">" + op.code + "</a></td>");
+        renderTypeCell(b, true, op.types, baseExtTypes);
+        b.append("<td>" + Utilities.escapeXml(op.definition) + "</td>");
         b.append("</tr>\r\n");
         for (ExtensionDefinition inner : op.components) {
           b.append(" <tr>");
-          b.append("<td>&nbsp;&nbsp;"+inner.code+"</td>");
-          renderTypeCell(b, true, inner.types, baseExtTypes);        
-          b.append("<td>"+Utilities.escapeXml(inner.definition)+"</td>");
+          b.append("<td>&nbsp;&nbsp;" + inner.code + "</td>");
+          renderTypeCell(b, true, inner.types, baseExtTypes);
+          b.append("<td>" + Utilities.escapeXml(inner.definition) + "</td>");
           b.append("</tr>\r\n");
 
         }
@@ -540,9 +541,9 @@ public class CrossViewRenderer extends Renderer {
         }
         if (!diff) {
           if (cat.isEmpty()) {
-            b.append("<p>All the observations have the no assigned category</p>\r\n");            
+            b.append("<p>All the observations have the no assigned category</p>\r\n");
           } else {
-            b.append("<p>All the observations have the category "+new DataRenderer(context).displayCoding(cat)+"</p>\r\n");
+            b.append("<p>All the observations have the category " + new DataRenderer(context).displayCoding(cat) + "</p>\r\n");
           }
           hasCat = false;
         }
@@ -561,7 +562,7 @@ public class CrossViewRenderer extends Renderer {
       for (ObservationProfile op : obsList) {
         b.append(" <tr>");
 
-        b.append("<td><a href=\""+op.source.getWebPath()+"\" title=\""+op.source.present()+"\">"+op.source.getId()+"</a></td>");
+        b.append("<td><a href=\"" + op.source.getWebPath() + "\" title=\"" + op.source.present() + "\">" + op.source.getId() + "</a></td>");
         renderCodingCell(b, hasCat, op.category, op.catVS);
         renderCodingCell(b, hasCode, op.code, op.codeVS);
         renderTypeCell(b, hasEffective, op.effectiveTypes, baseEffectiveTypes);
@@ -572,7 +573,7 @@ public class CrossViewRenderer extends Renderer {
         b.append("</tr>\r\n");
         for (ObservationProfile op2 : op.components) {
           b.append(" <tr style=\"background-color: #eeeeee\">");
-          b.append("<td>&nbsp;&nbsp;"+op2.name+"</td>");
+          b.append("<td>&nbsp;&nbsp;" + op2.name + "</td>");
           b.append("<td></td>");
           renderCodingCell(b, hasCode, op2.code, op2.codeVS);
           renderTypeCell(b, hasEffective, op2.effectiveTypes, baseEffectiveTypes);
@@ -613,8 +614,8 @@ public class CrossViewRenderer extends Renderer {
       } else {
         b.append("<img src=\"conf-prohibited.png\"/>");
       }
-      b.append("</td>");      
-    }    
+      b.append("</td>");
+    }
   }
 
   private void renderTypeCell(StringBuilder b, boolean render, List<UsedType> types, List<String> base) {
@@ -622,20 +623,21 @@ public class CrossViewRenderer extends Renderer {
       b.append("<td>");
       if (types.size() == base.size() && allMSAreSame(types)) {
         if (types.size() > 0 && types.get(0).ms) {
-          b.append(" <span style=\"color:white; background-color: red; font-weight:bold\">S</span> ");          
+          b.append(" <span style=\"color:white; background-color: red; font-weight:bold\">S</span> ");
         }
-        b.append("(all)");        
+        b.append("(all)");
       } else {
         boolean doMS = !allMSAreSame(types);
         boolean first = true;
         for (UsedType t : types) {
           if (!doMS && first && t.ms) {
-            b.append(" <span style=\"color:white; background-color: red; font-weight:bold\">S</span> ");          
+            b.append(" <span style=\"color:white; background-color: red; font-weight:bold\">S</span> ");
           }
-          if (first) first = false; else b.append(" | ");
+          if (first) first = false;
+          else b.append(" | ");
           StructureDefinition sd = worker.fetchTypeDefinition(t.name);
           if (sd != null) {
-            b.append("<a href=\""+sd.getWebPath()+"\" title=\""+t.name+"\">"+t.name+"</a>");
+            b.append("<a href=\"" + sd.getWebPath() + "\" title=\"" + t.name + "\">" + t.name + "</a>");
           } else {
             b.append(t.name);
           }
@@ -645,7 +647,7 @@ public class CrossViewRenderer extends Renderer {
         }
       }
       b.append("</td>");
-    }    
+    }
   }
 
   private boolean allMSAreSame(List<UsedType> types) {
@@ -675,18 +677,19 @@ public class CrossViewRenderer extends Renderer {
       b.append("<td>");
       boolean first = true;
       if (binding != null) {
-        b.append("<a href=\""+Utilities.pathURL(corePath, "terminologies.html#"+binding.getStrength().toCode())+"\">"+binding.getStrength().toCode()+"</a> VS ");           
+        b.append("<a href=\"" + Utilities.pathURL(corePath, "terminologies.html#" + binding.getStrength().toCode()) + "\">" + binding.getStrength().toCode() + "</a> VS ");
         ValueSet vs = worker.findTxResource(ValueSet.class, binding.getValueSet());
         if (vs == null) {
-          b.append(Utilities.escapeXml(binding.getValueSet()));                     
+          b.append(Utilities.escapeXml(binding.getValueSet()));
         } else if (vs.hasWebPath()) {
-          b.append("<a href=\""+vs.getWebPath()+"\">"+Utilities.escapeXml(vs.present())+"</a>");
-        } else { 
+          b.append("<a href=\"" + vs.getWebPath() + "\">" + Utilities.escapeXml(vs.present()) + "</a>");
+        } else {
           b.append(Utilities.escapeXml(vs.present()));
         }
       } else {
         for (Coding t : list) {
-          if (first) first = false; else b.append(", ");
+          if (first) first = false;
+          else b.append(", ");
           String sys = new DataRenderer(context).displaySystem(t.getSystem());
           if (sys.equals(t.getSystem()))
             sys = null;
@@ -703,13 +706,13 @@ public class CrossViewRenderer extends Renderer {
             //          else {
             CodeSystem cs = worker.fetchCodeSystem(t.getSystem());
             if (cs != null && cs.hasWebPath()) {
-              b.append("<a href=\""+cs.getWebPath()+"#"+cs.getId()+"-"+t.getCode()+"\" title=\""+t.getSystem()+(sys == null ? "" : " ("+sys+")")+": "+ vr.getDisplay()+"\">"+t.getCode()+"</a>");                  
+              b.append("<a href=\"" + cs.getWebPath() + "#" + cs.getId() + "-" + t.getCode() + "\" title=\"" + t.getSystem() + (sys == null ? "" : " (" + sys + ")") + ": " + vr.getDisplay() + "\">" + t.getCode() + "</a>");
             } else {
-              b.append("<span title=\""+t.getSystem()+(sys == null ? "" : " ("+sys+")")+": "+ vr.getDisplay()+"\">"+t.getCode()+"</span>");
+              b.append("<span title=\"" + t.getSystem() + (sys == null ? "" : " (" + sys + ")") + ": " + vr.getDisplay() + "\">" + t.getCode() + "</span>");
             }
             //          }
           } else {
-            b.append("<span title=\""+t.getSystem()+(sys == null ? "" : " ("+sys+"): ")+"\">"+t.getCode()+"</span>");           
+            b.append("<span title=\"" + t.getSystem() + (sys == null ? "" : " (" + sys + "): ") + "\">" + t.getCode() + "</span>");
           }
         }
       }
@@ -742,40 +745,40 @@ public class CrossViewRenderer extends Renderer {
       return set;
     }
     switch (ctxt.getType()) {
-    case ELEMENT:
-      String s = ctxt.getExpression();
-      if (s.contains(":")) {
-        if (s.contains("#")) {
-          s = s.substring(s.indexOf("#")+1);
-        } else {
-          s = null;
-        }                  
-      } 
-      if (s != null) {
-        if (s.contains(".")) {
-          s = s.substring(0, s.indexOf("."));
+      case ELEMENT:
+        String s = ctxt.getExpression();
+        if (s.contains(":")) {
+          if (s.contains("#")) {
+            s = s.substring(s.indexOf("#") + 1);
+          } else {
+            s = null;
+          }
         }
-        if (worker.isPrimitiveType(s)) {
-          set.add("primitives");
-          s = null;
-        } 
-        if (worker.isDataType(s)) {
-          set.add("datatypes");
-        } 
         if (s != null) {
-          set.add(s);
+          if (s.contains(".")) {
+            s = s.substring(0, s.indexOf("."));
+          }
+          if (worker.isPrimitiveType(s)) {
+            set.add("primitives");
+            s = null;
+          }
+          if (worker.isDataType(s)) {
+            set.add("datatypes");
+          }
+          if (s != null) {
+            set.add(s);
+          }
         }
-      }
-      break;
-    case EXTENSION:
-      set.add("Extension");
-      break;
-    case FHIRPATH:
-      set.add("Path");
-      break;
-    case NULL:
-    default:
-      set.add("none");
+        break;
+      case EXTENSION:
+        set.add("Extension");
+        break;
+      case FHIRPATH:
+        set.add("Path");
+        break;
+      case NULL:
+      default:
+        set.add("none");
     }
     return set;
   }
@@ -813,8 +816,10 @@ public class CrossViewRenderer extends Renderer {
     tr.td().tx("Context");
     tr.td().tx("WG");
     tr.td().tx("Status");
+    int width = 6;
     if (context.getChangeVersion() != null) {
-      tr.td().b().tx("Δ v"+context.getChangeVersion()+" ");
+      tr.td().b().tx("Δ v" + context.getChangeVersion() + " ");
+      width++;
     }
 
     tr = tbl.tr();
@@ -834,7 +839,7 @@ public class CrossViewRenderer extends Renderer {
       } else if ("primitives".equals(type)) {
         tbl.tr().td().colspan(5).b().tx("Extensions defined on primitive types");
       } else {
-        tbl.tr().td().colspan(5).b().tx("Extensions defined for the "+type+" "+kind);
+        tbl.tr().td().colspan(5).b().tx("Extensions defined for the " + type + " " + kind);
       }
     }
     Map<String, StructureDefinition> map = new HashMap<>();
@@ -843,7 +848,7 @@ public class CrossViewRenderer extends Renderer {
         map.put(sd.source.getUrl(), sd.source);
     }
     if (map.size() == 0) {
-      tr.td().colspan(5).tx("None found");      
+      tr.td().colspan(width).tx("None found");
     } else {
       for (String s : Utilities.sorted(map.keySet())) {
         genExtensionRow(tbl, map.get(s), context.getChangeVersion());
@@ -862,61 +867,119 @@ public class CrossViewRenderer extends Renderer {
       }
 
       if (Utilities.existsInList(type, worker.getResourceNames())) {
-        tbl.tr().td().colspan(5).b().tx("Extensions defined for many resources including the "+type+" resource");
-        map = new HashMap<>();
-        for (ExtensionDefinition sd : this.extList) {
-          if (forAncestor(ancestors, sd)) {
-            map.put(sd.source.getUrl(), sd.source);
-          }
-        }
-        if (map.size() == 0) {
-          tbl.tr().td().colspan(5).tx("None found");         
+        if (!context.getContextUtilities().isDomainResource(type)) {
+          tbl.tr().td().colspan(width).b().tx("Resources of type " + type + " do not have extensions at the root element, but extensions MAY be present on the elements in the resource.");
         } else {
-          for (String s : Utilities.sorted(map.keySet())) {
-            genExtensionRow(tbl, map.get(s), context.getChangeVersion());
+          tbl.tr().td().colspan(width).b().tx("Extensions defined for many resources including the " + type + " resource");
+          map = new HashMap<>();
+          for (ExtensionDefinition sd : this.extList) {
+            if (forAncestor(ancestors, sd)) {
+              map.put(sd.source.getUrl(), sd.source);
+            }
           }
-        }
+          if (map.size() == 0) {
+            tbl.tr().td().colspan(width).tx("None found");
+          } else {
+            for (String s : Utilities.sorted(map.keySet())) {
+              genExtensionRow(tbl, map.get(s), context.getChangeVersion());
+            }
+          }
 
-        tbl.tr().td().colspan(5).b().tx("Extensions that refer to the "+type+" resource");
-        map = new HashMap<>();
-        for (ExtensionDefinition sd : this.extList) {
-          if (refersToThisType(type, sd)) {
-            map.put(sd.source.getUrl(), sd.source);
+          tbl.tr().td().colspan(width).b().tx("Extensions that refer to the " + type + " resource");
+          map = new HashMap<>();
+          for (ExtensionDefinition sd : this.extList) {
+            if (refersToThisType(type, sd)) {
+              map.put(sd.source.getUrl(), sd.source);
+            }
           }
-        }
-        if (map.size() == 0) {
-          tbl.tr().td().colspan(5).tx("None found");        
-        } else {
-          for (String s : Utilities.sorted(map.keySet())) {
-            genExtensionRow(tbl, map.get(s), context.getChangeVersion());
+          if (map.size() == 0) {
+            tbl.tr().td().colspan(width).tx("None found");
+          } else {
+            for (String s : Utilities.sorted(map.keySet())) {
+              genExtensionRow(tbl, map.get(s), context.getChangeVersion());
+            }
           }
-        }
-        tbl.tr().td().colspan(5).b().tx("Extensions that refer to many resources including the "+type+" resource");
-        map = new HashMap<>();
-        for (ExtensionDefinition sd : this.extList) {
-          if (refersToThisTypesAncestors(ancestors, sd)) {
-            map.put(sd.source.getUrl(), sd.source);
+          tbl.tr().td().colspan(width).b().tx("Extensions that refer to many resources including the " + type + " resource");
+          map = new HashMap<>();
+          for (ExtensionDefinition sd : this.extList) {
+            if (refersToThisTypesAncestors(ancestors, sd)) {
+              map.put(sd.source.getUrl(), sd.source);
+            }
           }
-        }
-        if (map.size() == 0) {
-          tbl.tr().td().colspan(5).tx("None found");       
-        } else {
-          for (String s : Utilities.sorted(map.keySet())) {
-            genExtensionRow(tbl, map.get(s), context.getChangeVersion());
+          if (map.size() == 0) {
+            tbl.tr().td().colspan(width).tx("None found");
+          } else {
+            for (String s : Utilities.sorted(map.keySet())) {
+              genExtensionRow(tbl, map.get(s), context.getChangeVersion());
+            }
           }
         }
       } else {
         StructureDefinition sd = worker.fetchTypeDefinition(type);
         if (sd != null && sd.hasBaseDefinition()) {
           String bt = Utilities.tail(sd.getBaseDefinition());
-          XhtmlNode td = tr.td().colspan(5);
+          String p = "extensions-types.html#ext-" + bt;
+          if ("Base".equals(bt)) {
+            // do nothing
+          } else {
+            if (context.getContextUtilities().isPrimitiveType(bt)) {
+              p = "extensions-datatypes.html#" + bt;
+            } else {
+              switch (bt) {
+                case "Element":
+                case "BackboneElement":
+                case "DataType":
+                case "BackboneType":
+                case "PrimitiveType":
+                  p = "extensions-types.html#" + bt;
+                  break;
+                case "Attachment":
+                case "Coding":
+                case "CodeableConcept":
+                case "Quantity":
+                case "Money":
+                case "Range":
+                case "Ratio":
+                case "RatioRange":
+                case "Period":
+                case "SampledData":
+                case "Identifier":
+                case "HumanName":
+                case "Address":
+                case "ContactPoint":
+                case "Timing":
+                case "Signature":
+                case "Annotation":
+                  p = "extensions-datatypes.html#" + bt;
+                  break;
+
+                case "ContactDetail":
+                case "DataRequirement":
+                case "ParameterDefinition":
+                case "RelatedArtifact":
+                case "TriggerDefinition":
+                case "Expression":
+                case "UsageContext":
+                case "ExtendedContactDetail":
+                case "VirtualServiceDetail":
+                case "Availability":
+                case "MonetaryComponent":
+                  p = "extensions-metadatatypes.html#" + bt;
+                  break;
+                default:
+                  break;
+              }
+            }
+          }
+          XhtmlNode td = tbl.tr().td().colspan(width);
           td.br();
           td.tx("(See also Extensions defined on ");
-          td.ah("extensions-types.html#ext-"+bt).tx(bt);      
+          td.ah(p).tx(bt);
+          td.tx(")");
         }
       }
     }
-    x.para().tx(""+(tbl.getChildNodes().size() - 1)+" Extensions");
+    x.para().tx("" + (tbl.getChildNodes().size() - 1) + " Extensions");
     x.jsSrc("assets/js/table.js");
 
     x.button(null, null).attribute("onclick", "clearAllFilters()").style("padding: 8px 16px; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;").tx("Clear All Filters");
@@ -924,7 +987,7 @@ public class CrossViewRenderer extends Renderer {
   }
 
   private boolean refersToThisType(String type, ExtensionDefinition sd) {
-    String url = "http://hl7.org/fhir/StructureDefinition/"+type;
+    String url = "http://hl7.org/fhir/StructureDefinition/" + type;
     for (ElementDefinition ed : sd.source.getSnapshot().getElement()) {
       for (TypeRefComponent t : ed.getType()) {
         for (CanonicalType u : t.getTargetProfile()) {
@@ -941,7 +1004,7 @@ public class CrossViewRenderer extends Renderer {
   private boolean refersToThisTypesAncestors(List<String> ancestors, ExtensionDefinition sd) {
     List<String> urls = new ArrayList<>();
     for (String t : ancestors) {
-      urls.add("http://hl7.org/fhir/StructureDefinition/"+t);
+      urls.add("http://hl7.org/fhir/StructureDefinition/" + t);
     }
 
     for (ElementDefinition ed : sd.source.getSnapshot().getElement()) {
@@ -969,11 +1032,11 @@ public class CrossViewRenderer extends Renderer {
   private void genExtensionRow(XhtmlNode tbl, StructureDefinition ed, String versionToAnnotate) throws Exception {
     StandardsStatus status = ExtensionUtilities.getStandardsStatus(ed);
     XhtmlNode tr;
-    if (status  == StandardsStatus.DEPRECATED) {
+    if (status == StandardsStatus.DEPRECATED) {
       tr = tbl.tr().style("background-color: #ffeeee");
-    } else if (status  == StandardsStatus.NORMATIVE) {
+    } else if (status == StandardsStatus.NORMATIVE) {
       tr = tbl.tr().style("background-color: #f2fff2");
-    } else if (status  == StandardsStatus.INFORMATIVE) {
+    } else if (status == StandardsStatus.INFORMATIVE) {
       tr = tbl.tr().style("background-color: #fffff6");
     } else {
       tr = tbl.tr();
@@ -995,7 +1058,7 @@ public class CrossViewRenderer extends Renderer {
         l = 0;
       } else {
         td.tx(", ");
-        l++;        
+        l++;
       }
       l = l + (ec.hasExpression() ? ec.getExpression().length() : 0);
       if (ec.getType() == ExtensionContextType.ELEMENT) {
@@ -1007,7 +1070,7 @@ public class CrossViewRenderer extends Renderer {
         }
         StructureDefinition sd = worker.fetchTypeDefinition(ref);
         if (sd != null && sd.hasWebPath()) {
-          td.ah(sd.getWebPath()).tx(ec.getExpression());          
+          td.ah(sd.getWebPath()).tx(ec.getExpression());
         } else {
           td.tx(ec.getExpression());
         }
@@ -1015,13 +1078,13 @@ public class CrossViewRenderer extends Renderer {
         td.tx(Utilities.escapeXml(ec.getExpression()));
       } else if (ec.getType() == ExtensionContextType.EXTENSION) {
         StructureDefinition extension = worker.fetchResource(StructureDefinition.class, ec.getExpression());
-        if (extension==null)
+        if (extension == null)
           td.tx(Utilities.escapeXml(ec.getExpression()));
         else {
           td.ah(extension.getWebPath()).tx(ec.getExpression());
         }
       } else if (ec.getType() == null) {
-        td.tx("??error??: "+Utilities.escapeXml(ec.getExpression()));
+        td.tx("??error??: " + Utilities.escapeXml(ec.getExpression()));
       } else {
         throw new Error("Not done yet");
       }
@@ -1033,7 +1096,7 @@ public class CrossViewRenderer extends Renderer {
     } else {
       HL7WorkGroup wgd = HL7WorkGroups.find(wg);
       if (wgd == null) {
-        tr.td().tx(wg);        
+        tr.td().tx(wg);
       } else {
         tr.td().ah(wgd.getLink()).tx(wg);
       }
@@ -1041,23 +1104,23 @@ public class CrossViewRenderer extends Renderer {
     String fmm = ExtensionUtilities.readStringExtension(ed, ExtensionDefinitions.EXT_FMM_LEVEL);
     td = tr.td();
     if (status == StandardsStatus.NORMATIVE) {
-      td.ahWithText("", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Normative", "Normative", null).attribute("class", "normative-flag");
+      td.ahWithText("", Utilities.pathURL(corePath, "versions.html") + "#std-process", "Normative", "Normative", null).attribute("class", "normative-flag");
     } else if (status == StandardsStatus.DEPRECATED) {
-      td.ahWithText("", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Deprecated", "Deprecated", null).attribute("class", "deprecated-flag");
+      td.ahWithText("", Utilities.pathURL(corePath, "versions.html") + "#std-process", "Deprecated", "Deprecated", null).attribute("class", "deprecated-flag");
     } else if (status == StandardsStatus.INFORMATIVE) {
-      td.ahWithText("", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Informative", "Informative", null).attribute("class", "informative-flag");
+      td.ahWithText("", Utilities.pathURL(corePath, "versions.html") + "#std-process", "Informative", "Informative", null).attribute("class", "informative-flag");
     } else if (status == StandardsStatus.DRAFT) {
       if (ed.getExperimental()) {
-        td.ahWithText("", Utilities.pathURL(corePath, "canonicalresource-definitions.html") +"#CanonicalResource.experimental", "Experimental", "Experimental", null).attribute("class", "experimental-flag");
+        td.ahWithText("", Utilities.pathURL(corePath, "canonicalresource-definitions.html") + "#CanonicalResource.experimental", "Experimental", "Experimental", null).attribute("class", "experimental-flag");
         td.br();
-      } 
-      td.ahWithText("", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Draft", "Draft", null).attribute("class", "draft-flag");
-    } else { 
-      td.ahWithText("", Utilities.pathURL(corePath, "versions.html")+"#std-process", "Trial-Use", "Trial-Use", null).attribute("class", "trial-use-flag");
+      }
+      td.ahWithText("", Utilities.pathURL(corePath, "versions.html") + "#std-process", "Draft", "Draft", null).attribute("class", "draft-flag");
+    } else {
+      td.ahWithText("", Utilities.pathURL(corePath, "versions.html") + "#std-process", "Trial-Use", "Trial-Use", null).attribute("class", "trial-use-flag");
     }
-    td.tx(Utilities.noString(fmm) ? "" : ": FMM"+fmm+"");
+    td.tx(Utilities.noString(fmm) ? "" : ": FMM" + fmm + "");
     if (context.getChangeVersion() != null) {
-      if (renderStatusSummary(context, ed, tr.td(), versionToAnnotate )) {
+      if (renderStatusSummary(context, ed, tr.td(), versionToAnnotate)) {
         tr.attribute("data-change", "true");
       } else {
         tr.attribute("data-change", "false");
@@ -1069,7 +1132,7 @@ public class CrossViewRenderer extends Renderer {
 
   private void displayExtensionCardinality(StructureDefinition ed, XhtmlNode x) {
     ElementDefinition e = ed.getSnapshot().getElementFirstRep();
-    x.tx(Integer.toString(e.getMin())+".."+e.getMax());
+    x.tx(Integer.toString(e.getMin()) + ".." + e.getMax());
     if (ed.getSnapshot().getElementFirstRep().getIsModifier()) {
       x.b().attribute("title", "This is a modifier extension").tx("M");
     }
@@ -1081,7 +1144,7 @@ public class CrossViewRenderer extends Renderer {
         if (e.getType().size() == 1) {
           StructureDefinition sd = worker.fetchTypeDefinition(e.getType().get(0).getWorkingCode());
           if (sd != null) {
-            x.ah(sd.getWebPath()).tx(e.getType().get(0).getWorkingCode());   
+            x.ah(sd.getWebPath()).tx(e.getType().get(0).getWorkingCode());
             return;
           } else {
             x.tx(e.getType().get(0).getWorkingCode());
@@ -1128,9 +1191,9 @@ public class CrossViewRenderer extends Renderer {
       b.append("<ul>\r\n");
       for (SearchParameter sp : list) {
         if (sp.hasDescription()) {
-          b.append(" <li><a href=\""+sp.getWebPath()+"\">"+Utilities.escapeXml(sp.present())+"</a>: "+Utilities.escapeXml(sp.getDescription())+"</li>\r\n");
+          b.append(" <li><a href=\"" + sp.getWebPath() + "\">" + Utilities.escapeXml(sp.present()) + "</a>: " + Utilities.escapeXml(sp.getDescription()) + "</li>\r\n");
         } else {
-          b.append(" <li><a href=\""+sp.getWebPath()+"\">"+Utilities.escapeXml(sp.present())+"</a></li>\r\n");
+          b.append(" <li><a href=\"" + sp.getWebPath() + "\">" + Utilities.escapeXml(sp.present()) + "</a></li>\r\n");
         }
       }
       b.append("</ul>\r\n");
@@ -1155,11 +1218,11 @@ public class CrossViewRenderer extends Renderer {
       }
     }
     if (ext == null) {
-      return "<p>Unknown Extension "+id+"</p>";
+      return "<p>Unknown Extension " + id + "</p>";
     } else {
       List<SearchParameter> list = new ArrayList<>();
       for (SearchParameter sp : searchParams) {
-        ExpressionNode n = (ExpressionNode) sp.getExpressionElement() .getUserData(UserDataNames.xver_expression);
+        ExpressionNode n = (ExpressionNode) sp.getExpressionElement().getUserData(UserDataNames.xver_expression);
         if (n != null && refersToExtension(n, ext.getUrl())) {
           list.add(sp);
         }
@@ -1197,7 +1260,7 @@ public class CrossViewRenderer extends Renderer {
           findValueSetReferences(vslist, r.getResource(), all);
         }
       }
-    }  
+    }
     return vslist;
     //    return renderVSList(versionToAnnotate, x, vslist, true, true);
   }
@@ -1235,7 +1298,8 @@ public class CrossViewRenderer extends Renderer {
     for (OperationDefinitionParameterComponent p : opd.getParameter()) {
       if (p.hasBinding()) {
         resolveVS(list, p.getBinding().getValueSet(), opd);
-      };
+      }
+      ;
     }
   }
 
@@ -1272,7 +1336,7 @@ public class CrossViewRenderer extends Renderer {
     resolveVS(list, item.getAnswerValueSet(), source);
     for (QuestionnaireItemComponent c : item.getItem()) {
       findValueSets(list, c, source);
-    }    
+    }
   }
 
   private void findValueSets(List<ValueSet> list, StructureDefinition sd, boolean all) {
@@ -1329,7 +1393,7 @@ public class CrossViewRenderer extends Renderer {
           vslist.add(vs);
         }
       }
-    }  
+    }
     return vslist;
     //    return renderVSList(versionToAnnotate, x, vslist, versions, false);
   }
@@ -1343,7 +1407,7 @@ public class CrossViewRenderer extends Renderer {
   }
 
   public String renderVSList(String versionToAnnotate, List<ValueSet> vslist, boolean versions, boolean used)
-      throws IOException {
+          throws IOException {
 
     XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
     Collections.sort(vslist, new CanonicalResourceSortByUrl());
@@ -1381,12 +1445,12 @@ public class CrossViewRenderer extends Renderer {
         td.tx(" / ");
         Extension ext = vs.getExtensionByUrl(ExtensionDefinitions.EXT_STANDARDS_STATUS);
         String v = ExtensionUtilities.getStandardsStatus(vs).toCode();
-        renderStatus(ext, td).attribute("class", v+"-flag").tx(v);
+        renderStatus(ext, td).attribute("class", v + "-flag").tx(v);
       }
       if (vs.hasExtension(ExtensionDefinitions.EXT_FMM_LEVEL)) {
         td.tx(" / ");
         Extension ext = vs.getExtensionByUrl(ExtensionDefinitions.EXT_FMM_LEVEL);
-        renderStatus(ext, td).tx("FMM"+ext.getValue().primitiveValue());
+        renderStatus(ext, td).tx("FMM" + ext.getValue().primitiveValue());
       }
       if (vs.getExperimental()) {
         td.tx(":");
@@ -1447,13 +1511,13 @@ public class CrossViewRenderer extends Renderer {
         if (rl != null) {
           if (rl.size() < 10) {
             for (Resource r : rl) {
-              String title = (r instanceof CanonicalResource) ? ((CanonicalResource) r).present() : r.fhirType()+"/"+r.getIdBase();
+              String title = (r instanceof CanonicalResource) ? ((CanonicalResource) r).present() : r.fhirType() + "/" + r.getIdBase();
               String link = r.getWebPath();
               td.sep(", ");
               td.ah(link).tx(title);
             }
           } else {
-            td.tx(""+rl.size()+" references");
+            td.tx("" + rl.size() + " references");
           }
         }
       }
@@ -1497,7 +1561,7 @@ public class CrossViewRenderer extends Renderer {
           cslist.add(cs);
         }
       }
-    }  
+    }
     return cslist;
     //    return renderCSList(versionToAnnotate, x, cslist, versions, false);
   }
@@ -1512,7 +1576,7 @@ public class CrossViewRenderer extends Renderer {
           findCodeSystemReferences(cslist, r.getResource(), all);
         }
       }
-    }  
+    }
     return cslist;
     //    return renderCSList(versionToAnnotate, x, cslist, true, true);
   }
@@ -1559,7 +1623,7 @@ public class CrossViewRenderer extends Renderer {
     resolveCSFromVS(list, cm.getTargetScope(), all, cm);
     for (ConceptMapGroupComponent grp : cm.getGroup()) {
       resolveCS(list, grp.getSource(), cm);
-      resolveCS(list, grp.getTarget(), cm);      
+      resolveCS(list, grp.getTarget(), cm);
     }
   }
 
@@ -1573,7 +1637,7 @@ public class CrossViewRenderer extends Renderer {
     resolveCSFromVS(list, item.getAnswerValueSet(), all, source);
     for (QuestionnaireItemComponent c : item.getItem()) {
       findCodeSystems(list, c, all, source);
-    }    
+    }
   }
 
   private void findCodeSystems(List<CodeSystem> list, StructureDefinition sd, boolean all) {
@@ -1614,14 +1678,14 @@ public class CrossViewRenderer extends Renderer {
       if (vs != null) {
         findCodeSystems(list, vs, all, resource);
       }
-    }    
+    }
   }
 
   private void resolveCSFromVS(List<CodeSystem> list, DataType ref, boolean all, Resource resource) {
     if (ref != null && ref.isPrimitive()) {
       resolveCSFromVS(list, ref.primitiveValue(), all, resource);
     }
-  }  
+  }
 
   private void resolveCS(List<CodeSystem> list, String url, Resource source) {
     if (url != null) {
@@ -1653,7 +1717,7 @@ public class CrossViewRenderer extends Renderer {
     tr.th().tx("Flags");
     tr.th().tx("Count");
     if (used) {
-      tr.th().tx("References");      
+      tr.th().tx("References");
     }
     if (versionToAnnotate != null) {
       var td = tr.th();
@@ -1676,12 +1740,12 @@ public class CrossViewRenderer extends Renderer {
         td.tx(" / ");
         Extension ext = cs.getExtensionByUrl(ExtensionDefinitions.EXT_STANDARDS_STATUS);
         String v = ExtensionUtilities.getStandardsStatus(cs).toCode();
-        renderStatus(ext, td).attribute("class", v+"-flag").tx(v);
+        renderStatus(ext, td).attribute("class", v + "-flag").tx(v);
       }
       if (cs.hasExtension(ExtensionDefinitions.EXT_FMM_LEVEL)) {
         td.tx(" / ");
         Extension ext = cs.getExtensionByUrl(ExtensionDefinitions.EXT_FMM_LEVEL);
-        renderStatus(ext, td).tx("FMM"+ext.getValue().primitiveValue());
+        renderStatus(ext, td).tx("FMM" + ext.getValue().primitiveValue());
       }
       if (cs.getExperimental()) {
         td.tx(": ");
@@ -1717,13 +1781,13 @@ public class CrossViewRenderer extends Renderer {
         if (rl != null) {
           if (rl.size() < 10) {
             for (Resource r : rl) {
-              String title = (r instanceof CanonicalResource) ? ((CanonicalResource) r).present() : r.fhirType()+"/"+r.getIdBase();
+              String title = (r instanceof CanonicalResource) ? ((CanonicalResource) r).present() : r.fhirType() + "/" + r.getIdBase();
               String link = r.getWebPath();
               td.sep(", ");
               td.ah(link).tx(title);
             }
           } else {
-            td.tx(""+rl.size()+" references");
+            td.tx("" + rl.size() + " references");
           }
         }
       }
@@ -1738,7 +1802,7 @@ public class CrossViewRenderer extends Renderer {
 
 
   public String renderObligationSummary() throws IOException {
-    CodeSystem cs = context.getContext().fetchCodeSystem("http://hl7.org/fhir/CodeSystem/obligation");    
+    CodeSystem cs = context.getContext().fetchCodeSystem("http://hl7.org/fhir/CodeSystem/obligation");
     ObligationsAnalysis oa = ObligationsAnalysis.build(allProfiles);
     XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
     XhtmlNode tbl = x.table("grid");
@@ -1753,7 +1817,7 @@ public class CrossViewRenderer extends Renderer {
     for (String a : actors) {
       actorHeader(tr, tr2, oa, a, cs);
     }
-    
+
     for (StructureDefinition sd : allProfiles) {
       ProfileObligationsAnalysis p = oa.getProfile(sd);
       if (p != null) {
@@ -1799,11 +1863,11 @@ public class CrossViewRenderer extends Renderer {
       for (String c : actor.getObligations()) {
         if (!ai.getCommonObligations().contains(c)) {
           td.sep(", ");
-          td.ah("https://hl7.org/fhir/extensions/CodeSystem-obligation.html#obligation-"+Utilities.nmtokenize(c), title(cs, c)).tx(c);
+          td.ah("https://hl7.org/fhir/extensions/CodeSystem-obligation.html#obligation-" + Utilities.nmtokenize(c), title(cs, c)).tx(c);
         }
       }
     }
-      
+
   }
 
   private void actorHeader(XhtmlNode tr, XhtmlNode tr2, ObligationsAnalysis oa, String a, CodeSystem cs) {
@@ -1813,9 +1877,9 @@ public class CrossViewRenderer extends Renderer {
     } else {
       ActorDefinition ad = context.getContext().fetchResource(ActorDefinition.class, a);
       if (ad == null) {
-        tr.th().colspan(ai.colspan()).style(HARD_BORDER).span(null, a).code().tx(tail(a));        
+        tr.th().colspan(ai.colspan()).style(HARD_BORDER).span(null, a).code().tx(tail(a));
       } else {
-        tr.th().colspan(ai.colspan()).style(HARD_BORDER).ah(ad.getWebPath()).tx(ad.present());        
+        tr.th().colspan(ai.colspan()).style(HARD_BORDER).ah(ad.getWebPath()).tx(ad.present());
       }
     }
     boolean first = true;
@@ -1825,7 +1889,7 @@ public class CrossViewRenderer extends Renderer {
         td.style(HARD_BORDER);
         first = false;
       }
-      td.ah("https://hl7.org/fhir/extensions/CodeSystem-obligation.html#obligation-"+s.replace(":", ".58"), title(cs, s)).tx(s.replace(":", ":\u200B"));
+      td.ah("https://hl7.org/fhir/extensions/CodeSystem-obligation.html#obligation-" + s.replace(":", ".58"), title(cs, s)).tx(s.replace(":", ":\u200B"));
     }
     if (ai.hasOthers()) {
       XhtmlNode td = tr2.td();
@@ -1837,7 +1901,7 @@ public class CrossViewRenderer extends Renderer {
   }
 
   private String tail(String url) {
-    return url.contains("/") ? url.substring(url.lastIndexOf("/")+1) : url;
+    return url.contains("/") ? url.substring(url.lastIndexOf("/") + 1) : url;
   }
 
   private String title(CodeSystem cs, String s) {

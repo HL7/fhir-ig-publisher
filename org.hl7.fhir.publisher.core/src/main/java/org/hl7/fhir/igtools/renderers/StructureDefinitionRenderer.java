@@ -85,6 +85,7 @@ import static org.hl7.fhir.r5.utils.ElementVisitor.ElementVisitorInstruction.VIS
 public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   private static final int EXAMPLE_UPPER_LIMIT = 50;
+  private boolean noXigLink;
 
   public class BindingResolutionDetails {
     private String vss;
@@ -2403,7 +2404,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   private String xigReference() {
-    return "<p>You can also check for <a href=\"https://packages2.fhir.org/xig/"+packageId+"|current/StructureDefinition/"+sd.getId()+"\">usages in the FHIR IG Statistics</a></p>";
+    if (noXigLink) {
+      return "";
+    } else {
+      return gen.formatPhrase(RenderingI18nContext.SD_XIG_LINK, packageId, sd.getId());
+    }
   }
 
   public void scanCapStmt(Map<String, String> capStmts, CapabilityStatement cst) {
@@ -2700,8 +2705,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   public String experimentalWarning() {
     if (sd.getExperimental()) {
       return "<div><div style=\"border: 1px solid maroon; padding: 10px; background-color: #fffbf7; min-height: 160px;\">\r\n"+
-             "<img src=\"assets/images/dragon.png\" width=\"150\" style=\"float:left; mix-blend-mode: multiply; margin-right: 10px;\" title=\"Here Be Dragons!\" height=\"150\"/>\r\n"+
-             "<p><b>"+gen.formatPhrase(RenderingI18nContext.SDR_EXPERIMENTAL)+"</b></p></div></div>"; 
+              "<img src=\"assets/images/dragon.png\" width=\"150\" style=\"float:left; mix-blend-mode: multiply; margin-right: 10px;\" title=\"Here Be Dragons!\" height=\"150\"/>\r\n"+
+              "<p><b>"+gen.formatPhrase(RenderingI18nContext.SDR_EXPERIMENTAL)+"</b></p></div></div>";
+    } else if (sd.getStatus() == Enumerations.PublicationStatus.DRAFT) {
+      return "<div><div style=\"border: 1px solid maroon; padding: 10px; background-color: #efefef; min-height: 160px;\">\r\n"+
+              "<p><b>"+gen.formatPhrase(RenderingI18nContext.SDR_DRAFT)+"</b></p></div></div>";
     } else {
       return "";
     }
@@ -2883,5 +2891,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       return new XhtmlComposer(false, true).compose(x.getChildNodes());
     }
   }
-  
+
+  public boolean isNoXigLink() {
+    return noXigLink;
+  }
+
+  public void setNoXigLink(boolean noXigLink) {
+    this.noXigLink = noXigLink;
+  }
 }
