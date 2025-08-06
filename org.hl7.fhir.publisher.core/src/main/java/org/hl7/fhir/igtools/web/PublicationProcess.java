@@ -342,7 +342,7 @@ public class PublicationProcess {
       if (dep != null) {
         for (JsonProperty jp : dep.getProperties()) {
           String ver = jp.getValue().asJsonString().getValue();
-          if ("current".equals(ver) || "dev".equals(ver)) {
+          if (Utilities.existsInList(ver, "current", "cibuild", "dev")) {
             if (!prSrc.asBoolean("allow-current-dependencies")) {
               check(res, false, "Package "+json.asString("name")+"#"+json.asString("version")+" depends on "+jp.getName()+"#"+ver+" which is not allowed (current version check)");
               return res;
@@ -554,14 +554,14 @@ public class PublicationProcess {
       String[] baseParams = new String[] {"-publish", pathVer, "-no-exit" };
       String tx = getNamedParam(args, "-tx");
       if (tx != null) {
-        baseParams = Utilities.appendStr(baseParams, new String[] {"-tx", tx});
+        baseParams = Utilities.concatStringArray(baseParams, new String[] {"-tx", tx});
       }
-      runBuild(qa, temp.getAbsolutePath(), Utilities.appendStr(baseParams, new String[] {"-ig", temp.getAbsolutePath(), "-resetTx"}));
+      runBuild(qa, temp.getAbsolutePath(), Utilities.concatStringArray(baseParams, new String[] {"-ig", temp.getAbsolutePath(), "-resetTx"}));
 
       if (mode != PublicationProcessMode.WORKING) {
         tempM = cloneToTemp(tempDir, temp, npm.name()+"#"+npm.version()+"-milestone");
         System.out.println("Build IG at "+fSource.getAbsolutePath()+": final copy suitable for publication (in "+tempM.getAbsolutePath()+") (milestone build)");        
-        runBuild(qa, tempM.getAbsolutePath(), Utilities.appendStr(baseParams, new String[] {"-ig", tempM.getAbsolutePath(), "-milestone"}));
+        runBuild(qa, tempM.getAbsolutePath(), Utilities.concatStringArray(baseParams, new String[] {"-ig", tempM.getAbsolutePath(), "-milestone"}));
       }
 
       // 2. make a copy of what we built
