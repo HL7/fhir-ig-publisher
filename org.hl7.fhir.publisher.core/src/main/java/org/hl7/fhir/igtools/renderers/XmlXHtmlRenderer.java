@@ -51,7 +51,7 @@ public class XmlXHtmlRenderer implements IXMLWriter {
   private List<ElementDecoration> decorations2 = new ArrayList<ElementDecoration>();
   private boolean prism;
   private boolean elideAttributes;
-  private int nsIndex = 0;
+  private int nameSpaceIndex = 0;
   private boolean autoNamespaces = false;
 
   protected boolean condition(boolean bTest, String message) throws IOException {
@@ -381,7 +381,7 @@ public class XmlXHtmlRenderer implements IXMLWriter {
             abbrev = "sdtc";
             break;
           default:
-            abbrev = "ns"+(++nsIndex);
+            abbrev = "ns"+(++nameSpaceIndex);
             break;
         }
         attribute("xmlns:"+abbrev, namespace, false);

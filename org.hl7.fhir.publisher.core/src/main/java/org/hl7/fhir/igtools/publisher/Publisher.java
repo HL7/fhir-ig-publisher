@@ -6326,7 +6326,7 @@ private String fixPackageReference(String dep) {
     return url.substring(url.lastIndexOf("/")+1);
   }
 
-  private String fileTail(String url) {
+  private String fileNameTail(String url) {
     return url.substring(url.lastIndexOf(File.separator)+1);
   }
 
@@ -6981,7 +6981,7 @@ private String fixPackageReference(String dep) {
                 }
               }
             } else {
-              id = fileTail(file.getName());
+              id = fileNameTail(file.getName());
             }
             e.setChildValue("id", id);
             altered = true;
@@ -14060,34 +14060,32 @@ private String fixPackageReference(String dep) {
         }
         String html = null;
         if (rX.getLogicalElement() != null) {
-          String mt = rX.getElement().getNamedChildValue("contentType");
-          if (mt.contains("xml")) {
-            org.hl7.fhir.r5.elementmodel.XmlParser xp = new org.hl7.fhir.r5.elementmodel.XmlParser(context);
-            XmlXHtmlRenderer x = new XmlXHtmlRenderer();
-            x.setPrism(true);
-            xp.setElideElements(true);
-            x.setAutoNamespaces(true);
-            xp.setLinkResolver(igpkp);
-            xp.setShowDecorations(false);
+          String rXContentType = rX.getElement().getNamedChildValue("contentType");
+          if (rXContentType.contains("xml")) {
+            org.hl7.fhir.r5.elementmodel.XmlParser xmlParser = new org.hl7.fhir.r5.elementmodel.XmlParser(context);
+            XmlXHtmlRenderer xmlXHtmlRenderer = new XmlXHtmlRenderer();
+            xmlXHtmlRenderer.setPrism(true);
+            xmlParser.setElideElements(true);
+            xmlXHtmlRenderer.setAutoNamespaces(true);
+            xmlParser.setLinkResolver(igpkp);
+            xmlParser.setShowDecorations(false);
             if (suppressId(f, rX)) {
-              xp.setIdPolicy(IdRenderingPolicy.NotRoot);
+              xmlParser.setIdPolicy(IdRenderingPolicy.NotRoot);
             }
-            xp.compose(rX.getLogicalElement(), x);
-            html = x.toString();
-          } else if (mt.contains("json")) {
-            JsonXhtmlRenderer j = new JsonXhtmlRenderer();
-            j.setPrism(true);
-            org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(context);
-            jp.setLinkResolver(igpkp);
-            jp.setAllowComments(true);
-            jp.setElideElements(true);
-/*        if (fragExpr != null || r.getLogicalElement() != null)
-          jp.setSuppressResourceType(true);*/
+            xmlParser.compose(rX.getLogicalElement(), xmlXHtmlRenderer);
+            html = xmlXHtmlRenderer.toString();
+          } else if (rXContentType.contains("json")) {
+            JsonXhtmlRenderer jsonXhtmlRenderer = new JsonXhtmlRenderer();
+            jsonXhtmlRenderer.setPrism(true);
+            org.hl7.fhir.r5.elementmodel.JsonParser jsonParser = new org.hl7.fhir.r5.elementmodel.JsonParser(context);
+            jsonParser.setLinkResolver(igpkp);
+            jsonParser.setAllowComments(true);
+            jsonParser.setElideElements(true);
             if (suppressId(f, rX)) {
-              jp.setIdPolicy(IdRenderingPolicy.NotRoot);
+              jsonParser.setIdPolicy(IdRenderingPolicy.NotRoot);
             }
-            jp.compose(rX.getLogicalElement(), j);
-            html = j.toString();
+            jsonParser.compose(rX.getLogicalElement(), jsonXhtmlRenderer);
+            html = jsonXhtmlRenderer.toString();
           }
         }
         if (html == null) {
