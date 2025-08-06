@@ -317,6 +317,7 @@ import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.MarkDownProcessor.Dialect;
 import org.hl7.fhir.utilities.TimeTracker.Session;
 import org.hl7.fhir.utilities.filesystem.CSFile;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 import org.hl7.fhir.utilities.http.HTTPResult;
 import org.hl7.fhir.utilities.http.ManagedWebAccess;
 import org.hl7.fhir.utilities.i18n.I18nConstants;
@@ -1205,7 +1206,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       }
       checkForSnomedVersion();
       if (txLog != null) {
-        FileUtilities.copyFile(txLog, Utilities.path(rootDir, "output", "qa-tx.html"));
+        if (ManagedFileAccess.file(txLog).exists()) {
+           FileUtilities.copyFile(txLog, Utilities.path(rootDir, "output", "qa-tx.html"));
+        }
       }
       for (FetchedFile f : fileList) {
         for (FetchedResource r : f.getResources()) {
@@ -2925,6 +2928,9 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     igMode = true;
     repoRoot = FileUtilities.getDirectoryForFile(ini.getFileName());
     rootDir = repoRoot;
+    if (!rootDir.equals(configFile)) {
+      log("Root directory: " + rootDir);
+    }
     fetcher.setRootDir(rootDir);
     killFile = new File(Utilities.path(rootDir, "ig-publisher.kill"));    
     // ok, first we load the template
@@ -3479,7 +3485,6 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     }
 
     // ok process the paths
-    log("Root directory: "+rootDir);
     if (resourceDirs.isEmpty())
       resourceDirs.add(Utilities.path(rootDir, "resources"));
     if (pagesDirs.isEmpty())
@@ -3624,7 +3629,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       dep.setId("hl7ext");
       dep.setPackageId(getExtensionsPackageName());
       dep.setUri("http://hl7.org/fhir/extensions/ImplementationGuide/hl7.fhir.uv.extensions");
-      dep.setVersion(pcm.getLatestVersion(dep.getPackageId()));
+      dep.setVersion(pcm.getLatestVersion(dep.getPackageId(), true));
       dep.addExtension(ExtensionDefinitions.EXT_IGDEP_COMMENT, new MarkdownType("Automatically added as a dependency - all IGs depend on the HL7 Extension Pack"));
       sourceIg.getDependsOn().add(0, dep);
     } 
@@ -3634,7 +3639,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       dep.setId("hl7tx");
       dep.setPackageId(getUTGPackageName());
       dep.setUri("http://terminology.hl7.org/ImplementationGuide/hl7.terminology");
-      dep.setVersion(pcm.getLatestVersion(dep.getPackageId()));
+      dep.setVersion(pcm.getLatestVersion(dep.getPackageId(), true));
       dep.addExtension(ExtensionDefinitions.EXT_IGDEP_COMMENT, new MarkdownType("Automatically added as a dependency - all IGs depend on HL7 Terminology"));
       sourceIg.getDependsOn().add(0, dep);
     }    
@@ -4044,7 +4049,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
 
   private boolean dependsOnExtensions(List<ImplementationGuideDependsOnComponent> dependsOn) {
     for (ImplementationGuideDependsOnComponent d : dependsOn) {
-      if (d.hasPackageId() && d.getPackageId().equals("hl7.fhir.uv.extensions")) {
+      if (d.hasPackageId() && Utilities.existsInList(d.getPackageId(), "hl7.fhir.uv.extensions", "hl7.fhir.uv.extensions.r3", "hl7.fhir.uv.extensions.r4", "hl7.fhir.uv.extensions.r5", "hl7.fhir.uv.extensions.r6")) {
         return true;
       }
       if (d.hasUri() && d.getUri().contains("hl7.org/fhir/extensions")) {
@@ -4395,10 +4400,10 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
     String v = version;
     
     if (Utilities.noString(igPack)) {
-      System.out.println("Core Package "+VersionUtilities.packageForVersion(v)+"#"+v);
+      log("Core Package "+VersionUtilities.packageForVersion(v)+"#"+v);
       pi = pcm.loadPackage(VersionUtilities.packageForVersion(v), v);
     } else {
-      System.out.println("Load from provided file "+igPack);
+      log("Load Core from provided file "+igPack);
       pi = NpmPackage.fromPackage(new FileInputStream(igPack));
     }
     if (pi == null) {
@@ -4505,7 +4510,7 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
       throw new Exception("You must specify a canonical URL for the IG "+name);
     String igver = dep.getVersion();
     if (Utilities.noString(igver)) {
-      igver = pcm.getLatestVersion(packageId);
+      igver = pcm.getLatestVersion(packageId, true);
       if (Utilities.noString(igver)) {
         throw new Exception("The latest version could not be determined, so you must specify a version for the IG "+packageId+" ("+canonical+")");
       }
@@ -4685,69 +4690,6 @@ private String fixPackageReference(String dep) {
     }
     return dep;
   }
-
-//  private void loadIg(JsonObject dep, boolean loadDeps) throws Exception {
-//    String name = str(dep, "name");
-//    if (!isValidIGToken(name))
-//      throw new Exception("IG Name must be a valid token ("+name+")");
-//    String canonical = ostr(dep, "location");
-//    String igver = ostr(dep, "version");
-//    if (Utilities.noString(igver))
-//      throw new Exception("You must specify a version for the IG "+name+" ("+canonical+")");
-//    String packageId = ostr(dep, "package");
-//    if (Utilities.noString(packageId))
-//      packageId = pcm.getPackageId(canonical);
-//    if (Utilities.noString(canonical) && !Utilities.noString(packageId))
-//      canonical = pcm.getPackageUrl(packageId);
-//
-//    NpmPackage pi = packageId == null ? null : pcm.loadPackageFromCacheOnly(packageId, igver);
-//    if (pi != null)
-//      npmList.add(pi);
-//    if (pi == null) {
-//      if (Utilities.noString(canonical))
-//        throw new Exception("You must specify a canonical URL for the IG "+name);
-//      pi = resolveDependency(canonical, packageId, igver);
-//      if (pi == null) {
-//        if (Utilities.noString(packageId))
-//          throw new Exception("Package Id for guide at "+canonical+" is unknown (contact FHIR Product Director");
-//        else
-//          throw new Exception("Unknown Package "+packageId+"#"+igver);
-//      }
-//    }
-//    if (packageId == null) {
-//      packageId = pi.name();
-//    }
-//    if (Utilities.noString(canonical)) {
-//      canonical = pi.canonical();
-//    }
-//
-//    log("Load "+name+" ("+canonical+") from "+packageId+"#"+igver);
-//    if (ostr(dep, "package") == null && packageId != null)
-//      dep.add("package", packageId);
-//
-//    String webref = pi.getWebLocation();
-//    String location = dep.has("location") ? dep.asString("location") : ""; 
-//    if (location.startsWith(".."))
-//      webref = location;
-//    webref = PackageHacker.fixPackageUrl(webref);
-//
-//    String ver = pi.fhirVersion();
-//    SpecMapManager igm = new SpecMapManager(TextFile.streamToBytes(pi.load("other", "spec.internals")), pi.vid(), ver);
-//    igm.setName(name);
-//    igm.setBase2(PackageHacker.fixPackageUrl(webref));
-//    igm.setBase(canonical);
-//    specMaps.add(igm);
-//    if (!VersionUtilities.versionsCompatible(version, igm.getVersion())) {
-//      if (pi.isWarned()) {
-//        log("Version mismatch. This IG is for FHIR version "+version+", while the IG '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+igm.getVersion()+" (will try to run anyway)");
-//        pi.setWarned(true);
-//      }
-//    }
-//
-//    loadFromPackage(name, canonical, pi, webref, igm, loadDeps);
-//    jsonDependencies .add(new JsonDependency(name, canonical, pi.name(), pi.version()));
-//  }
-
 
   private NpmPackage resolveDependency(String canonical, String packageId, String igver) throws Exception {
     PackageList pl;
@@ -6380,9 +6322,12 @@ private String fixPackageReference(String dep) {
       throw new Exception("base/ resource url mismatch: "+igpkp.getCanonical()+" vs "+rurl);
   }
 
-
   private String tail(String url) {
     return url.substring(url.lastIndexOf("/")+1);
+  }
+
+  private String fileTail(String url) {
+    return url.substring(url.lastIndexOf(File.separator)+1);
   }
 
   private String tailPI(String url) {
@@ -7036,7 +6981,7 @@ private String fixPackageReference(String dep) {
                 }
               }
             } else {
-              id = tail(file.getName());
+              id = fileTail(file.getName());
             }
             e.setChildValue("id", id);
             altered = true;
@@ -10466,7 +10411,7 @@ private String fixPackageReference(String dep) {
     String ver = VersionUtilities.versionFromCode(v);
     
     XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
-    div.h3().tx("Summary: "+n+" resources in "+v.toUpperCase());
+    div.h4().tx("Summary: "+n+" resources in "+v.toUpperCase());
     XhtmlNode tbl = null;
     for (FetchedFile f : fileList) {
       for (FetchedResource r : f.getResources()) {
@@ -10481,7 +10426,7 @@ private String fixPackageReference(String dep) {
             }
             XhtmlNode tr = tbl.tr();
 
-            tr.td().tx(r.getId());
+            tr.td().ah(n+"-"+r.getId()+".html").tx(r.getId());
             AlternativeVersionResource vv = r.getOtherVersions().get(ver+"-"+n);
             if (vv == null) {
               tr.td().tx("Unchanged"); 
@@ -14114,18 +14059,51 @@ private String fixPackageReference(String dep) {
           }          
         }
         String html = null;
-        BinaryRenderer br = new BinaryRenderer(tempDir, template.getScriptMappings());
-        if (lr instanceof Binary) {
-          html = pfx+br.display((Binary) lr);
-        } else if (le.fhirType().equals("Binary")) {
-          html = pfx+br.display(le);
-        } else if (f.getResources().size() == 1 && f.getSource() != null) {
-          html = pfx+br.display(rX.getId(), rX.getContentType(), f.getSource());        
-        } else {
-          html = pfx+br.display(le);
+        if (rX.getLogicalElement() != null) {
+          String mt = rX.getElement().getNamedChildValue("contentType");
+          if (mt.contains("xml")) {
+            org.hl7.fhir.r5.elementmodel.XmlParser xp = new org.hl7.fhir.r5.elementmodel.XmlParser(context);
+            XmlXHtmlRenderer x = new XmlXHtmlRenderer();
+            x.setPrism(true);
+            xp.setElideElements(true);
+            x.setAutoNamespaces(true);
+            xp.setLinkResolver(igpkp);
+            xp.setShowDecorations(false);
+            if (suppressId(f, rX)) {
+              xp.setIdPolicy(IdRenderingPolicy.NotRoot);
+            }
+            xp.compose(rX.getLogicalElement(), x);
+            html = x.toString();
+          } else if (mt.contains("json")) {
+            JsonXhtmlRenderer j = new JsonXhtmlRenderer();
+            j.setPrism(true);
+            org.hl7.fhir.r5.elementmodel.JsonParser jp = new org.hl7.fhir.r5.elementmodel.JsonParser(context);
+            jp.setLinkResolver(igpkp);
+            jp.setAllowComments(true);
+            jp.setElideElements(true);
+/*        if (fragExpr != null || r.getLogicalElement() != null)
+          jp.setSuppressResourceType(true);*/
+            if (suppressId(f, rX)) {
+              jp.setIdPolicy(IdRenderingPolicy.NotRoot);
+            }
+            jp.compose(rX.getLogicalElement(), j);
+            html = j.toString();
+          }
         }
-        for (String fn : br.getFilenames()) {
-          otherFilesRun.add(Utilities.path(tempDir, fn));
+        if (html == null) {
+          BinaryRenderer br = new BinaryRenderer(tempDir, template.getScriptMappings());
+          if (lr instanceof Binary) {
+            html = pfx + br.display((Binary) lr);
+          } else if (le.fhirType().equals("Binary")) {
+            html = pfx + br.display(le);
+          } else if (f.getResources().size() == 1 && f.getSource() != null) {
+            html = pfx + br.display(rX.getId(), rX.getContentType(), f.getSource());
+          } else {
+            html = pfx + br.display(le);
+          }
+          for (String fn : br.getFilenames()) {
+            otherFilesRun.add(Utilities.path(tempDir, fn));
+          }
         }
         fragment(rX.fhirType()+"-"+rX.getId()+"-html", html, f.getOutputNames(), rX, vars, null, start, "html", "Resource", lang);
       } else {
@@ -14655,6 +14633,10 @@ private String fixPackageReference(String dep) {
     if (wantGen(r, "summary-table")) {
       long start = System.currentTimeMillis();
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-summary-table", sdr.summaryTable(r, wantGen(r, "xml"), wantGen(r, "json"), wantGen(r, "ttl"), igpkp.summaryRows()), f.getOutputNames(), r, vars, null, start, "summary-table", "StructureDefinition", lang);
+    }
+    if (wantGen(r, "class-table")) {
+      long start = System.currentTimeMillis();
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-class-table", sdr.classTable(igpkp.getDefinitionsName(r), otherFilesRun, tabbedSnapshots, StructureDefinitionRendererMode.SUMMARY, false), f.getOutputNames(), r, vars, null, start, "class-table", "StructureDefinition", lang);
     }
     if (wantGen(r, "header")) {
       long start = System.currentTimeMillis();
