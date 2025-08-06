@@ -604,7 +604,7 @@ public class IgSpreadsheetParser {
             cc.setDisplay(Utilities.humanize(cc.getCode()));
           cc.setDefinition(sheet.getColumn(row, "Definition"));
           if (!Utilities.noString(sheet.getColumn(row, "Comment")))
-            ExtensionUtilities.addCSComment(cc, sheet.getColumn(row, "Comment"));
+            CodeSystemUtilities.addCSComments(cs, cc, sheet.getColumn(row, "Comment"));
 //          cc.setUserData(!"v2", sheet.getColumn(row, "v2"));
 //          cc.setUserData(!"v3", sheet.getColumn(row, "v3"));
           for (String ct : sheet.columns)
