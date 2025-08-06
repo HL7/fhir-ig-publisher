@@ -2708,7 +2708,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
               "<img src=\"assets/images/dragon.png\" width=\"150\" style=\"float:left; mix-blend-mode: multiply; margin-right: 10px;\" title=\"Here Be Dragons!\" height=\"150\"/>\r\n"+
               "<p><b>"+gen.formatPhrase(RenderingI18nContext.SDR_EXPERIMENTAL)+"</b></p></div></div>";
     } else if (sd.getStatus() == Enumerations.PublicationStatus.DRAFT) {
-      return "<div><div style=\"border: 1px solid maroon; padding: 10px; background-color: #efefef; min-height: 160px;\">\r\n"+
+      return "<div><div style=\"border: 1px solid maroon; padding: 10px; background-color: #efefef; min-height: 60px;\">\r\n"+
               "<p><b>"+gen.formatPhrase(RenderingI18nContext.SDR_DRAFT)+"</b></p></div></div>";
     } else {
       return "";
@@ -2899,4 +2899,110 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   public void setNoXigLink(boolean noXigLink) {
     this.noXigLink = noXigLink;
   }
+
+
+  public String classTable(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode, boolean all) throws IOException {
+    try {
+      XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
+      XhtmlNode tbl = div.table("box");
+      // row 1: Class Definition
+      XhtmlNode tr = tbl.tr();
+      XhtmlNode td = tr.td();
+      td.colspan(5);
+      td.style("text-align: center");
+      var x = td;
+      if (sd.getAbstract()) {
+        x = x.i();
+      }
+      x.b().tx(sd.getTypeName());
+      StructureDefinition sdb = context.fetchTypeDefinition(sd.getBaseDefinition());
+      if (sdb != null) {
+        x.tx(" : ");
+        x.ah(sdb.getWebPath()).tx(sdb.getTypeName());
+      }
+      if (sd.hasDescription()) {
+        tr = tbl.tr();
+        tr.td().colspan(5).markdownSimple(sd.getDescription(), "desc");
+      }
+      tr.styleChildren("border-bottom: 1px solid #666");
+      // generate a heirarchical table, and put it in td
+      gen.setStructureMode(StructureDefinitionRendererMode.SUMMARY);
+      XhtmlNode tblt = sdr.generateAttributeTable(new RenderingStatus(), defnFile, sd, true, destDir, false, sd.getId(), false, corePath, "", sd.getKind() == StructureDefinitionKind.LOGICAL, false, outputTracker, false, gen.withUniqueLocalPrefix(all ? mc(mode) + "a" : mc(mode)), toTabs ? ANCHOR_PREFIX_DIFF : ANCHOR_PREFIX_SNAP, resE, all ? "DA" : "D");
+      if (!tblt.getChildNodes().isEmpty()) {
+        XhtmlNode tt = null;
+        for (XhtmlNode t : tblt.getChildNodes()) {
+          if ("tr".equals(t.getName())) {
+            tt = t;
+          }
+        }
+        if (tt != null) {
+          tt.styleChildren("border-bottom: 1px solid #666");
+        }
+      }
+      tbl.getChildNodes().addAll(tblt.getChildNodes());
+
+      if (sd.hasExtension(ExtensionDefinitions.EXT_TYPE_OPERATION)) {
+        for (Extension ext : sd.getExtensionsByUrl(ExtensionDefinitions.EXT_TYPE_OPERATION)) {
+          OperationDefinition od = context.fetchResource(OperationDefinition.class, ext.getValue().primitiveValue(), sd);
+          if (od != null) {
+            tr = tbl.tr();
+            tr.style("padding: 0px; background-color: white");
+            td = tr.td().colspan(4);
+            td.style("padding: 0px 4px 0px 4px");
+            List<OperationDefinition.OperationDefinitionParameterComponent> inp = new ArrayList<>();
+            List<OperationDefinition.OperationDefinitionParameterComponent> outp = new ArrayList<>();
+            for (OperationDefinition.OperationDefinitionParameterComponent p : od.getParameter()) {
+              if (p.getUse() == Enumerations.OperationParameterUse.IN) {
+                inp.add(p);
+              } else {
+                outp.add(p);
+              }
+            }
+            td.img("icon-type-operation.png", "icon-type-operation").style("vertical-align: text-bottom");
+            td.tx(" ");
+            td.tx(od.getCode());
+            td.tx("(");
+            boolean first = true;
+            for (OperationDefinition.OperationDefinitionParameterComponent p : inp) {
+              if (first) first = false; else td.tx(", ");
+              td.tx(p.getName());
+              if (p.hasType()) {
+                td.tx(" : ");
+                td.tx(p.getType().toCode());
+              }
+            }
+            td.tx(")");
+            if (!outp.isEmpty()) {
+              td.tx(" : ");
+              if (outp.size() == 1) {
+                td.tx(outp.get(0).getType().toCode());
+              } else {
+                td.tx("[");
+                first = true;
+                for (OperationDefinition.OperationDefinitionParameterComponent p : outp) {
+                  if (first) first = false; else td.tx(", ");
+                  td.tx(p.getName());
+                  if (p.hasType()) {
+                    td.tx(" : ");
+                    td.tx(p.getType().toCode());
+                  }
+                }
+                td.tx("]");
+              }
+            }
+            tr.td().style("padding: 0px 4px 0px 4px").markdownSimple(od.getDescription(), "desc");
+          }
+        }
+      }
+      div.styles("table.box { margin-bottom: 10px; border: 1px black solid;  margin-right: inherit; }\n" +
+              "table.box th { border: none; }\n" +
+              "table.box td { border: none; font-size : 11px; }\n");
+      return new XhtmlComposer(true, true).compose(div.getChildNodes());
+    } catch (Exception e) {
+      e.printStackTrace();
+      return "<p><i>" + Utilities.escapeXml(e.getMessage()) + "</i></p>";
+    }
+  }
+
+
 }
