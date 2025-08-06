@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.igtools.publisher.loaders.PublisherLoader;
 import org.hl7.fhir.r4.test.utils.TestingUtilities;
 import org.hl7.fhir.r5.context.IContextResourceLoader;
@@ -20,6 +21,7 @@ import org.hl7.fhir.utilities.npm.NpmPackage;
 
 import com.google.gson.JsonSyntaxException;
 
+@Slf4j
 public class PackagCanonicalClashDetector {
 
   public class LoadedCanonicalResource {
@@ -94,7 +96,7 @@ public class PackagCanonicalClashDetector {
 
 
   private void check(String pid) throws IOException {
-    System.out.println("Load Package "+pid);
+    log.info("Load Package "+pid);
     FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager.Builder().build();
     NpmPackage npm = pcm.loadPackage(pid);
 //    SpecMapManager spm = new SpecMapManager(TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.fhirVersion());

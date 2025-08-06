@@ -178,7 +178,7 @@ public class CodeSystemRenderer extends CanonicalRenderer {
     boolean first = true;
     b.append("\r\n");
     List<String> vsurls = new ArrayList<String>();
-    for (CanonicalResource vs : scanAllResources(ValueSet.class, "ValueSet")) {
+    for (CanonicalResource vs : scanAllLocalResources(ValueSet.class, "ValueSet")) {
       vsurls.add(vs.getUrl());
     }
     Collections.sort(vsurls);
