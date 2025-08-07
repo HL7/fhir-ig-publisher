@@ -8,7 +8,7 @@
     <packaging>pom</packaging>
 
     <properties>
-        <core_version>6.6.3-SNAPSHOT</core_version>
+        <core_version>6.6.3</core_version>
         <maven_surefire_version>3.0.0-M5</maven_surefire_version>
         <apache_poi_version>5.4.1</apache_poi_version>
         <commons_io_version>2.17.0</commons_io_version>
