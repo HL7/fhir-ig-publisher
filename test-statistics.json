@@ -7102,13 +7102,13 @@
   },
   "2.0.13" : {
     "sync-date" : "2025-07-21",
-    "date" : "2025-08-06",
+    "date" : "2025-08-07",
     "hl7.fhir.template.ig" : {
       "errors" : 0,
       "warnings" : 0,
       "hints" : 0,
-      "time" : 1213,
-      "memory" : 26210096
+      "time" : 1117,
+      "memory" : 19229128
     },
     "hl7.cda.uv.core" : {
       "errors" : 6,
