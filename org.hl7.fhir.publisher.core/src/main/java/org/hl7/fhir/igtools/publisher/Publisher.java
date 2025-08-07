@@ -673,8 +673,8 @@ public class Publisher implements ILoggingService, IReferenceResolver, IValidati
   private static final int PRISM_SIZE_LIMIT = 16384;
 
   private String consoleLog;
-  private String configFile;
   private String sourceDir;
+  private String configFile;
   private String destDir;
   private FHIRToolingClient webTxServer;
   private String txServer;
@@ -12369,6 +12369,7 @@ private String fixPackageReference(String dep) {
 
     genResourceReferencesList(rt, items, "", lang);
     Collections.sort(items, new ItemSorterById());
+    genResourceReferencesGrid(rt, items, "grid-", lang);
     genResourceReferencesList(rt, items, "byid-", lang);
     Collections.sort(items, new ItemSorterByName());
     genResourceReferencesList(rt, items, "name-", lang);
@@ -12391,6 +12392,65 @@ private String fixPackageReference(String dep) {
       String r = arg1.r == null ? null : arg1.r.getTitle();
       return l == null ? 0 : l.compareTo(r);
     }
+  }
+
+  public void genResourceReferencesGrid(String rt, List<Item> items, String ext, String lang) throws Exception, IOException {
+    long start = System.currentTimeMillis();
+    boolean cs = "CodeSystem".equals(rt);
+
+    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+    XhtmlNode tbl = x.table("grid");
+    gridHeader(tbl, cs);
+    for (Item i : items) {
+      Element e = i.r.getElement();
+      if (rt == null || rt.equals(e.fhirType())) {
+        XhtmlNode tr = tbl.tr();
+        tr.clss("data-row");
+        tr.td().ah(i.r.getLocalRef(), e.getIdBase()).tx(trunc(e.getIdBase()));
+        tr.td().tx(e.getNamedChildValue("title", "name"));
+        tr.td().tx(e.getNamedChildValue("version"));
+        describeStatus(tr.td(), e);
+        if (cs) {
+          tr.td().tx(e.getNamedChildValue("content"));
+        }
+        describeOwner(tr.td(), e);
+        tr.td().tx(describeCopyRight(e.getNamedChildValue("copyright"), e.getNamedChildValue("copyrightLabel")));
+        tr.td().tx(dateOnly(e.getNamedChildValue("date")));
+        describeDescription(tr.td(), e.getNamedChildValue("description"));
+      }
+    }
+    x.jsSrc("assets/js/table.js");
+    String html = new XhtmlComposer(false, true).compose(x.getChildNodes());
+    String pm = Utilities.pluralizeMe(rt.toLowerCase());
+    fragment("table-"+ext+pm, html, otherFilesRun, start, "table-"+ext+pm, "Cross", lang);
+  }
+
+  private void gridHeader(XhtmlNode tbl, boolean cs) {
+    XhtmlNode tr = tbl.tr();
+    tr.th().tx("Identity");
+    tr.th().tx("Name");
+    tr.th().tx("Version");
+    tr.th().tx("Status");
+    if (cs) {
+      tr.th().tx("Content");
+    }
+    tr.th().tx("Owner");
+    tr.th().tx("Copyright");
+    tr.th().tx("Date");
+    tr.th().tx("Description");
+
+    tr = tbl.tr();
+    tr.td().input(null, "text", null, 10).attribute("id", "filter-identity").clss("filter-input");
+    tr.td().input(null, "text", null, 30).attribute("id", "filter-name").clss("filter-input");
+    tr.td().input(null, "text", null, 4).attribute("id", "filter-version").clss("filter-input");
+    tr.td().input(null, "text", null, 4).attribute("id", "filter-status").clss("filter-input");
+    if (cs) {
+      tr.td().input(null, "text", null, 6).attribute("id", "filter-content").clss("filter-input");
+    }
+    tr.td().input(null, "text", null, 5).attribute("id", "filter-owner").clss("filter-input");
+    tr.td().input(null, "text", null, 5).attribute("id", "filter-copyright").clss("filter-input");
+    tr.td().input(null, "text", null, 6).attribute("id", "filter-date").clss("filter-input");
+    tr.td().input(null, "text", null, 30).attribute("id", "filter-desc").clss("filter-input");
   }
 
   public void genResourceReferencesList(String rt, List<Item> items, String ext, String lang) throws Exception, IOException {
@@ -13479,8 +13539,20 @@ private String fixPackageReference(String dep) {
         }
       }
     }
+
+    String types = igpkp.getProperty(r, "list-types");
+    Collections.sort(list, new ListViewSorterById());
+    if (types != null) {
+      for (String type : types.split("\\|")) {
+        long start = System.currentTimeMillis();
+        String html = genGridView(list, type);
+        fragmentIfNN("List-"+resource.getId()+"-list-grid"+(type == null ? "" : "-"+type), html, f.getOutputNames(), start, "list-list-table", "List", lang);
+      }
+    }
+    if (wantGen(r, "list-list-grid")) {
+    }
+
     String script = igpkp.getProperty(r, "list-script");
-    String types = igpkp.getProperty(r, "list-types"); 
     genListViews(f, r, resource, list, script, "no", null, lang);
     if (types != null) {
       for (String t : types.split("\\|")) {
@@ -13562,6 +13634,157 @@ private String fixPackageReference(String dep) {
       }
     }
     return b.toString();
+  }
+
+  private String genGridView(List<ListItemEntry> list, String type) throws IOException {
+    boolean cs = "CodeSystem".equals(type);
+    XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
+    XhtmlNode tbl = x.table("grid");
+    gridHeader(tbl, cs);
+    for (ListItemEntry i : list) {
+      if (type == null || type.equals(i.getType())) {
+        XhtmlNode tr = tbl.tr();
+        tr.clss("data-row");
+        tr.td().ah(i.link, i.getId()).tx(trunc(i.getId()));
+        tr.td().tx(i.getTitle());
+        tr.td().tx(i.element.getNamedChildValue("version"));
+        describeStatus(tr.td(), i.element);
+        if (cs) {
+          tr.td().tx(i.element.getNamedChildValue("content"));
+        }
+        describeOwner(tr.td(), i.element);
+        tr.td().tx(describeCopyRight(i.element.getNamedChildValue("copyright"), i.element.getNamedChildValue("copyrightLabel")));
+        tr.td().tx(dateOnly(i.element.getNamedChildValue("date")));
+        describeDescription(tr.td(), i.getDesc());
+      }
+    }
+    return new XhtmlComposer(false, true).compose(x.getChildNodes());
+  }
+
+  private void describeDescription(XhtmlNode x, String md) throws IOException {
+    if (md != null) {
+      String mds = md;
+      if (md.length() > 100) {
+        mds = md.substring(0, 99) + "\u2026";
+      }
+      x.attribute("title", md).markdownSimple(mds, "List reference description");
+    }
+  }
+
+  private String dateOnly(String n) {
+    if (n == null) {
+      return "n/a";
+    } else if (n.length() > 10) {
+      return n.substring(0, 10);
+    } else {
+      return n;
+    }
+  }
+
+  private String trunc(String n) {
+    if (n.contains("/")) {
+      n = n.substring(n.indexOf("/")+1);
+    }
+    if (n.length() > 20) {
+      return n.substring(0, 19)+"\u2026";
+    } else {
+      return n;
+    }
+  }
+
+  private void describeStatus(XhtmlNode x, Element element) {
+    String ss = element.getExtensionString(ExtensionDefinitions.EXT_STANDARDS_STATUS);
+    if (ss != null) {
+      x.tx(ss);
+    } else {
+      x.tx(element.getNamedChildValue("status"));
+    }
+  }
+
+  private void describeOwner(XhtmlNode x, Element element) {
+    if (element.hasExtension(ExtensionDefinitions.EXT_WORKGROUP)) {
+      String wg = element.getExtensionString(ExtensionDefinitions.EXT_WORKGROUP);
+      HL7WorkGroups.HL7WorkGroup wgo = HL7WorkGroups.find(wg);
+      if (wgo == null) {
+        x.tx(wg+"?");
+      } else
+        x.ah(wgo.getLink()).tx(wg);
+    } else {
+      String url = null;
+      for (Element tc : element.getChildrenByName("contact")) {
+        if (tc != null) {
+          for (Element t : tc.getChildrenByName("telecom")) {
+            if ("url".equals(t.getNamedChildValue("system"))) {
+              url = t.getNamedChildValue("value");
+            }
+          }
+        }
+      }
+      String pub = element.getNamedChildValue("publisher");
+      if (pub == null) {
+        x.ahOrNot(url).tx("n/a");
+      } else {
+        pub = pub.toLowerCase();
+        String n = "external";
+        if (Utilities.containsInList(pub, "health level seven", "health level 7", "hl7")) {
+          n = "HL7";
+        } else if (Utilities.containsInList(pub, "international organization for standardization", "(iso)")) {
+          n = "ISO";
+        } else if (Utilities.containsInList(pub, "iana")) {
+          n = "IANA";
+        } else if (Utilities.containsInList(pub, "world health")) {
+          n = "WHO";
+        } else if (Utilities.containsInList(pub, "cdc")) {
+          n = "CDC";
+        } else if (Utilities.containsInList(pub, "national library of medicine")) {
+          n = "NLM";
+        } else if (Utilities.containsInList(pub, "x12")) {
+          n = "X12";
+        } else if (Utilities.containsInList(pub, "national council for prescription drug programs")) {
+          n = "NCPDP";
+        } else if (Utilities.containsInList(pub, "national cancer institute", "(nci)")) {
+          n ="NCI";
+        } else if (Utilities.containsInList(pub, "national institute of standards and technology")) {
+          n = "NIST";
+        } else if (Utilities.containsInList(pub, "medicaid")) {
+          n ="CMS";
+        }
+        x.ahOrNot(url, pub).tx(n);
+      }
+    }
+  }
+
+  private String describeCopyRight(String copyright, String label) {
+    Set<String> labels = new HashSet<>();
+    if (label != null) {
+      labels.add(label);
+    } else if (copyright != null) {
+      copyright = copyright.toLowerCase();
+      if (copyright.contains("(tho)") || copyright.contains("hl7 terminology") || copyright.contains("terminology.hl7")) {
+        labels.add("THO");
+      }
+      if (copyright.contains("dicom")) {
+        labels.add("DICOM");
+      }
+      if (copyright.contains("loinc")) {
+        labels.add("LOINC");
+      }
+      if (copyright.contains("snomed")) {
+        labels.add("SCT");
+      }
+      if (copyright.contains("iso.org")) {
+        labels.add("ISO");
+      }
+      if (copyright.contains("creative commons public domain")) {
+        labels.add("CC0");
+      }
+      if (labels.isEmpty()) {
+        labels.add("other");
+      }
+    } else {
+      labels.add("n/a");
+    }
+    return CommaSeparatedStringBuilder.join(",", Utilities.sorted(labels));
   }
 
   private String trimPara(String output) {
