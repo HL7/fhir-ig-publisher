@@ -4634,7 +4634,9 @@ public class PublisherGenerator extends PublisherBase {
 
     genResourceReferencesList(rt, items, "", lang);
     Collections.sort(items, new ItemSorterById());
-    genResourceReferencesGrid(rt, items, "grid-", lang);
+    if (f.cu.getCanonicalResourceNames().contains(rt)) {
+      genResourceReferencesGrid(rt, items, "grid-", lang);
+    }
     genResourceReferencesList(rt, items, "byid-", lang);
     Collections.sort(items, new ItemSorterByName());
     genResourceReferencesList(rt, items, "name-", lang);
@@ -4971,12 +4973,12 @@ public class PublisherGenerator extends PublisherBase {
     Collections.sort(list, new ListViewSorterById());
     if (types != null) {
       for (String type : types.split("\\|")) {
-        long start = System.currentTimeMillis();
-        String html = genGridView(list, type);
-        fragmentIfNN("List-"+resource.getId()+"-list-grid"+(type == null ? "" : "-"+type), html, f.getOutputNames(), start, "list-list-table", "List", lang);
+        if (this.f.cu.getCanonicalResourceNames().contains(type)) {
+          long start = System.currentTimeMillis();
+          String html = genGridView(list, type);
+          fragmentIfNN("List-" + resource.getId() + "-list-grid" + (type == null ? "" : "-" + type), html, f.getOutputNames(), start, "list-list-table", "List", lang);
+        }
       }
-    }
-    if (wantGen(r, "list-list-grid")) {
     }
 
     String script = this.f.igpkp.getProperty(r, "list-script");
