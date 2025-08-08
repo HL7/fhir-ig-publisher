@@ -72,6 +72,7 @@ import org.hl7.fhir.r5.utils.OperationOutcomeUtilities;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.VersionUtilities;
 import org.hl7.fhir.utilities.i18n.I18nConstants;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
@@ -1911,8 +1912,12 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       }
       b.append("v"+toolsVersion);
       if (!toolsVersion.equals(currentToolsVersion)) {
-        b.append(", which is out of date. The current version is ");
-        b.append("v"+currentToolsVersion);      
+        if (VersionUtilities.isThisOrLater(currentToolsVersion, toolsVersion)) {
+          b.append(" which is a development version. The latest official release version is");
+        } else {
+          b.append(", which is out of date. The current version is ");
+        }
+        b.append("v" + currentToolsVersion);
         b.append(" <a href=\"https://github.com/HL7/fhir-ig-publisher/releases/latest/download/publisher.jar\">Download Latest</a>");
       }
     }

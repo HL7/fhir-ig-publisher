@@ -51,6 +51,8 @@ public class XmlXHtmlRenderer implements IXMLWriter {
   private List<ElementDecoration> decorations2 = new ArrayList<ElementDecoration>();
   private boolean prism;
   private boolean elideAttributes;
+  private int nameSpaceIndex = 0;
+  private boolean autoNamespaces = false;
 
   protected boolean condition(boolean bTest, String message) throws IOException {
     if (!bTest)
@@ -371,8 +373,23 @@ public class XmlXHtmlRenderer implements IXMLWriter {
       return "";
     
     XMLNamespace ns = findByNamespace(namespace);
-    if (ns == null)
-      throw new IOException("Namespace "+namespace+" is not defined");
+    if (ns == null) {
+      if (autoNamespaces) {
+        String abbrev = null;
+        switch (namespace) {
+          case "urn:hl7-org:sdtc" :
+            abbrev = "sdtc";
+            break;
+          default:
+            abbrev = "ns"+(++nameSpaceIndex);
+            break;
+        }
+        attribute("xmlns:"+abbrev, namespace, false);
+        return abbrev;
+      } else {
+        throw new IOException("Namespace " + namespace + " is not defined");
+      }
+    }
     else if (ns.getAbbreviation() == null)
       return "";
     else
@@ -558,10 +575,15 @@ public class XmlXHtmlRenderer implements IXMLWriter {
         if (levels.current().hasChildren())
           writePretty();
         b.append("&lt;/");
+        String href= useHref();
+        if (href != null)
+          b.append("<a href=\""+href+"\">");
         if (levels.current().getNamespace() == null)
           b.append(levels.current().getName());
         else
           b.append(getNSAbbreviation(levels.current().getNamespace())+levels.current().getName());
+        if (href != null)
+          b.append("</a>");
         b.append("&gt;");
       }
       levels.pop();
@@ -833,4 +855,11 @@ public class XmlXHtmlRenderer implements IXMLWriter {
     return false;
   }
 
+  public boolean isAutoNamespaces() {
+    return autoNamespaces;
+  }
+
+  public void setAutoNamespaces(boolean autoNamespaces) {
+    this.autoNamespaces = autoNamespaces;
+  }
 }
