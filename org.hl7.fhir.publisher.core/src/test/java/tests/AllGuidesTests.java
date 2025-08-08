@@ -20,9 +20,8 @@ import javax.management.MBeanServer;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.apache.commons.io.IOUtils;
-import org.hl7.fhir.igtools.publisher.IGVersionUtil;
 import org.hl7.fhir.igtools.publisher.Publisher;
-import org.hl7.fhir.igtools.publisher.Publisher.CacheOption;
+import org.hl7.fhir.igtools.publisher.PublisherUtils;
 import org.hl7.fhir.utilities.FileUtilities;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.VersionUtilities;
@@ -67,7 +66,7 @@ public class AllGuidesTests {
     Publisher pub = new Publisher();
     pub.setConfigFile(p);
     pub.setTxServer(FhirSettings.getTxFhirDevelopment());
-    pub.setCacheOption(CacheOption.CLEAR_ALL);
+    pub.setCacheOption(PublisherUtils.CacheOption.CLEAR_ALL);
     pub.execute();
     
     System.out.println("===== Analysis ======================================================================");
