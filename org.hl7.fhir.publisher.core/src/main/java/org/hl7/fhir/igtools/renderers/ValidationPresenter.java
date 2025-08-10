@@ -476,6 +476,9 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
   
   public String generate(String title, List<ValidationMessage> allErrors, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, String pinned) throws IOException {
     for (FetchedFile f : files) {
+      for (FetchedResource r: f.getResources()) {
+        f.getErrors().addAll(r.getErrors());
+      }
       for (ValidationMessage vm : filterMessages(f, f.getErrors(), false, filteredMessages)) {
         if (vm.getLevel().equals(ValidationMessage.IssueSeverity.FATAL)||vm.getLevel().equals(ValidationMessage.IssueSeverity.ERROR))
           err++;
