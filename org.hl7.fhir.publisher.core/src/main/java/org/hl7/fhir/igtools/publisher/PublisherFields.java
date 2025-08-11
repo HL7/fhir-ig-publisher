@@ -40,10 +40,12 @@ import java.io.File;
 import java.util.*;
 
 public class PublisherFields {
-
+    @Getter @Setter
   String sourceDir;
+    @Getter @Setter
+    String destDir;
   String configFile;
-  String destDir;
+
   FHIRToolingClient webTxServer;
   String txServer;
   Locale forcedLanguage;
@@ -82,8 +84,8 @@ public class PublisherFields {
   String qaDir;
   String version;
   FhirPublication pubVersion;
-  long jekyllTimeout;
-  long fshTimeout;
+  long jekyllTimeout = Publisher.JEKYLL_TIMEOUT;
+  long fshTimeout = Publisher.FSH_TIMEOUT;
   SuppressedMessageInformation suppressedMessages = new SuppressedMessageInformation();
   boolean tabbedSnapshots = false;
   String igName;
@@ -272,21 +274,15 @@ public class PublisherFields {
   List<RelatedIG> relatedIGs = new ArrayList<RelatedIG>();
   long last = System.currentTimeMillis();
   List<String> unknownParams = new ArrayList<String>();
-  RenderingContext.FixedValueFormat fixedFormat;
+  RenderingContext.FixedValueFormat fixedFormat = RenderingContext.FixedValueFormat.JSON;
   static PublisherConsoleLogger consoleLogger;
   IPublisherModule module;
   boolean milestoneBuild;
   BaseRenderer bdr;
   boolean noXigLink;
 
-  public PublisherFields() {
-    this.jekyllTimeout = Publisher.JEKYLL_TIMEOUT;
-    this.fshTimeout = Publisher.FSH_TIMEOUT;
-    this.fixedFormat = RenderingContext.FixedValueFormat.JSON;
-  }
-
   int sqlIndex = 0;
-
+  
   boolean isSushi;
 
   LanguageSubtagRegistry registry;

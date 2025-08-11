@@ -917,13 +917,6 @@ public class PublisherBase implements ILoggingService {
     return i;
   }
 
-  public String getDestDir() {
-    return publisherFields.destDir;
-  }
-
-  public void setDestDir(String destDir) {
-    this.publisherFields.destDir = destDir;
-  }
 
   public void setTxServer(String s) {
     if (!Utilities.noString(s))

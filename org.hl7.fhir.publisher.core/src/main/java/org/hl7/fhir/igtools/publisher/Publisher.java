@@ -1047,14 +1047,6 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     this.publisherFields.configFile = configFile;
   }
 
-  public String getSourceDir() {
-    return publisherFields.sourceDir;
-  }
-
-  public void setSourceDir(String sourceDir) {
-    this.publisherFields.sourceDir = sourceDir;
-  }
-
   public void setLogger(ILoggingService logger) {
     this.publisherFields.logger = logger;
     publisherFields.fetcher.setLogger(logger);
@@ -1386,8 +1378,8 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       setTxServerValue(args, self);
       if (CliParams.hasNamedParam(args, "-source")) {
         // run with standard template. this is publishing lite
-        self.setSourceDir(CliParams.getNamedParam(args, "-source"));
-        self.setDestDir(CliParams.getNamedParam(args, "-destination"));
+        self.publisherFields.setSourceDir(CliParams.getNamedParam(args, "-source"));
+        self.publisherFields.setDestDir(CliParams.getNamedParam(args, "-destination"));
         self.publisherFields.specifiedVersion = CliParams.getNamedParam(args, "-version");
       } else if (!CliParams.hasNamedParam(args, "-ig") && args.length == 1 && new File(args[0]).exists()) {
         self.setConfigFile(determineActualIG(args[0], PublisherUtils.IGBuildMode.MANUAL));
