@@ -92,6 +92,10 @@ import java.util.regex.Pattern;
 
 import static org.hl7.fhir.igtools.publisher.Publisher.*;
 
+/**
+ * this class is part of the Publisher Core cluster, and handles all the routines that generate content (other than QA). See @Publisher for discussion
+ */
+
 public class PublisherGenerator extends PublisherBase {
 
   public class Item {

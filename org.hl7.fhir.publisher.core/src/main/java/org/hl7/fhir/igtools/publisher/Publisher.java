@@ -24,7 +24,6 @@ import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -45,115 +44,45 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import org.apache.commons.io.FileUtils;
-import org.hl7.fhir.convertors.context.ContextResourceLoaderFactory;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
-import org.hl7.fhir.convertors.factory.VersionConvertorFactory_43_50;
-import org.hl7.fhir.convertors.loaders.loaderR5.NullLoaderKnowledgeProviderR5;
-import org.hl7.fhir.convertors.misc.ProfileVersionAdaptor;
-import org.hl7.fhir.convertors.misc.ProfileVersionAdaptor.ConversionMessage;
-import org.hl7.fhir.convertors.misc.ProfileVersionAdaptor.ConversionMessageStatus;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.logging.Level;
 import org.hl7.fhir.igtools.logging.LogbackUtilities;
-import org.hl7.fhir.igtools.publisher.FetchedResource.AlternativeVersionResource;
-import org.hl7.fhir.igtools.publisher.PublisherSigner.SignatureType;
 import org.hl7.fhir.igtools.publisher.loaders.PublisherLoader;
 import org.hl7.fhir.igtools.publisher.xig.XIGGenerator;
 import org.hl7.fhir.igtools.renderers.*;
 import org.hl7.fhir.igtools.renderers.ValidationPresenter.IGLanguageInformation;
-import org.hl7.fhir.igtools.renderers.ValidationPresenter.LanguagePopulationPolicy;
 import org.hl7.fhir.igtools.ui.IGPublisherUI;
 import org.hl7.fhir.igtools.web.*;
-import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.*;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.elementmodel.Manager.FhirFormat;
-import org.hl7.fhir.r5.fhirpath.ExpressionNode;
-import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
 import org.hl7.fhir.r5.extensions.*;
-import org.hl7.fhir.r5.model.ActivityDefinition;
 import org.hl7.fhir.r5.model.ActorDefinition;
-import org.hl7.fhir.r5.model.Base;
-import org.hl7.fhir.r5.model.Binary;
-import org.hl7.fhir.r5.model.Bundle;
-import org.hl7.fhir.r5.model.Bundle.BundleEntryComponent;
-import org.hl7.fhir.r5.model.Bundle.BundleType;
 import org.hl7.fhir.r5.model.CanonicalResource;
 import org.hl7.fhir.r5.model.CanonicalType;
-import org.hl7.fhir.r5.model.CapabilityStatement;
-import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementDocumentComponent;
-import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementMessagingComponent;
-import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementMessagingSupportedMessageComponent;
-import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestComponent;
-import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceComponent;
-import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceOperationComponent;
-import org.hl7.fhir.r5.model.CapabilityStatement.CapabilityStatementRestResourceSearchParamComponent;
 import org.hl7.fhir.r5.model.CodeSystem;
-import org.hl7.fhir.r5.model.CodeType;
-import org.hl7.fhir.r5.model.CodeableConcept;
-import org.hl7.fhir.r5.model.Coding;
-import org.hl7.fhir.r5.model.ConceptMap;
-import org.hl7.fhir.r5.model.ConceptMap.ConceptMapGroupComponent;
 import org.hl7.fhir.r5.model.Constants;
 import org.hl7.fhir.r5.model.DateTimeType;
-import org.hl7.fhir.r5.model.DomainResource;
 import org.hl7.fhir.r5.model.ElementDefinition;
-import org.hl7.fhir.r5.model.ElementDefinition.ElementDefinitionConstraintComponent;
 import org.hl7.fhir.r5.model.ElementDefinition.TypeRefComponent;
 import org.hl7.fhir.r5.model.Enumerations.CodeSystemContentMode;
-import org.hl7.fhir.r5.model.Enumerations.PublicationStatus;
 import org.hl7.fhir.r5.model.Extension;
-import org.hl7.fhir.r5.model.GraphDefinition;
-import org.hl7.fhir.r5.model.Identifier;
-import org.hl7.fhir.r5.model.Identifier.IdentifierUse;
-import org.hl7.fhir.r5.model.ImplementationGuide;
-import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionPageComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDefinitionResourceComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideGlobalComponent;
-import org.hl7.fhir.r5.model.IntegerType;
-import org.hl7.fhir.r5.model.ListResource;
-import org.hl7.fhir.r5.model.Measure;
-import org.hl7.fhir.r5.model.MessageDefinition;
-import org.hl7.fhir.r5.model.MessageDefinition.MessageDefinitionAllowedResponseComponent;
-import org.hl7.fhir.r5.model.MessageDefinition.MessageDefinitionFocusComponent;
-import org.hl7.fhir.r5.model.OperationDefinition;
-import org.hl7.fhir.r5.model.OperationDefinition.OperationDefinitionParameterComponent;
-import org.hl7.fhir.r5.model.Parameters;
 import org.hl7.fhir.r5.model.Parameters.ParametersParameterComponent;
-import org.hl7.fhir.r5.model.PlanDefinition;
-import org.hl7.fhir.r5.model.PlanDefinition.PlanDefinitionActionComponent;
-import org.hl7.fhir.r5.model.Property;
-import org.hl7.fhir.r5.model.Questionnaire;
-import org.hl7.fhir.r5.model.Questionnaire.QuestionnaireItemComponent;
-import org.hl7.fhir.r5.model.Reference;
 import org.hl7.fhir.r5.model.Resource;
-import org.hl7.fhir.r5.model.ResourceFactory;
-import org.hl7.fhir.r5.model.SearchParameter;
-import org.hl7.fhir.r5.model.SearchParameter.SearchParameterComponentComponent;
-import org.hl7.fhir.r5.model.StringType;
 import org.hl7.fhir.r5.model.StructureDefinition;
-import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
-import org.hl7.fhir.r5.model.StructureMap;
-import org.hl7.fhir.r5.model.StructureMap.StructureMapModelMode;
-import org.hl7.fhir.r5.model.StructureMap.StructureMapStructureComponent;
 import org.hl7.fhir.r5.model.UriType;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.model.ValueSet.ConceptSetComponent;
-import org.hl7.fhir.r5.renderers.BundleRenderer;
-import org.hl7.fhir.r5.renderers.ParametersRenderer;
-import org.hl7.fhir.r5.renderers.RendererFactory;
-import org.hl7.fhir.r5.renderers.ResourceRenderer;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
-import org.hl7.fhir.r5.renderers.utils.RenderingContext.GenerationRules;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.IResourceLinkResolver;
 import org.hl7.fhir.r5.renderers.utils.Resolver.IReferenceResolver;
 import org.hl7.fhir.r5.renderers.utils.Resolver.ResourceReferenceKind;
@@ -162,23 +91,17 @@ import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
 import org.hl7.fhir.r5.terminologies.client.TerminologyClientContext;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
-import org.hl7.fhir.r5.utils.NPMPackageGenerator.Category;
 import org.hl7.fhir.r5.utils.UserDataNames;
 import org.hl7.fhir.r5.utils.XVerExtensionManager;
-import org.hl7.fhir.r5.utils.structuremap.StructureMapAnalysis;
-import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.validation.IValidationProfileUsageTracker;
 import org.hl7.fhir.utilities.*;
-import org.hl7.fhir.utilities.TimeTracker.Session;
 import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 import org.hl7.fhir.utilities.http.HTTPResult;
 import org.hl7.fhir.utilities.http.ManagedWebAccess;
-import org.hl7.fhir.utilities.i18n.I18nConstants;
 import org.hl7.fhir.utilities.json.model.JsonArray;
 import org.hl7.fhir.utilities.json.model.JsonBoolean;
 import org.hl7.fhir.utilities.json.model.JsonObject;
 import org.hl7.fhir.utilities.json.model.JsonPrimitive;
-import org.hl7.fhir.utilities.json.model.JsonProperty;
 import org.hl7.fhir.utilities.json.model.JsonString;
 import org.hl7.fhir.utilities.npm.*;
 import org.hl7.fhir.utilities.npm.NpmPackage.PackageResourceInformation;
@@ -222,6 +145,16 @@ import org.hl7.fhir.validation.instance.utils.ValidationContext;
  *   generate summary file
  *
  * Documentation: see http://wiki.hl7.org/index.php?title=IG_Publisher_Documentation
+ *
+ * The Publisher has 4 main related classes (and was broken up into these classes in August 2025)
+ *  - @PublisherFields: a class that solely exists to carry all the data shared between the next 4 classes (when split, none of them had any other fields of their own, but they are allowed to)
+ *  - @PublisherBase : shared routines (and maybe fields) common the next 3 classes
+ *  - @PublisherIGLoader: routines concerned with loading all the content that's related to the IG (technically: initialise() and load())
+ *  - @PublisherProcessor: routines related to checking and changing content of the loaded resources
+ *  - @PublisherGenerator: routines concerned with generating all the content that's produced as part of the IG (technically:generate())
+ *
+ *  The division of labor between the resources is not proscriptive; it ijust a device to split up what had become a very large
+ *  class that was otherwise hard to split because the content really is very internally related. Further refactoring is anticipated
  *
  * @author Grahame Grieve
  */

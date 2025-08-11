@@ -43,6 +43,10 @@ import java.util.*;
 
 import static org.hl7.fhir.igtools.publisher.Publisher.FMM_DERIVATION_MAX;
 
+/**
+ * this class is part of the Publisher Core cluster, and handles all the checking and changing of resources once they're loaded. See @Publisher for discussion
+ */
+
 public class PublisherProcessor extends PublisherBase  {
   public PublisherProcessor(PublisherFields publisherFields) {
     super(publisherFields);

@@ -85,6 +85,9 @@ import java.util.*;
 import static org.hl7.fhir.igtools.publisher.Publisher.IG_NAME;
 import static org.hl7.fhir.igtools.publisher.Publisher.TOOLING_IG_CURRENT_RELEASE;
 
+/**
+ * this class is part of the Publisher Core cluster, and handles loading all the content relevant to the IG. See @Publisher for discussion
+ */
 
 public class PublisherIGLoader extends PublisherBase {
   public PublisherIGLoader(PublisherFields publisherFields) {
