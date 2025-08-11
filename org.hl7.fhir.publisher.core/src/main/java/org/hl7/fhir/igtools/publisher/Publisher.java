@@ -177,39 +177,39 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
   public Publisher() {
     super();
-    loader = new PublisherIGLoader(f);
-    processor = new PublisherProcessor(f);
-    generator = new PublisherGenerator(f);
+    loader = new PublisherIGLoader(publisherFields);
+    processor = new PublisherProcessor(publisherFields);
+    generator = new PublisherGenerator(publisherFields);
 
     setLogger(this);
     NpmPackageIndexBuilder.setExtensionFactory(new SQLiteINpmPackageIndexBuilderDBImpl.SQLiteINpmPackageIndexBuilderDBImplFactory());
   }
 
   public boolean isNoSushi() {
-    return f.noSushi;
+    return publisherFields.noSushi;
   }
 
   public void setNoSushi(boolean noSushi) {
-    f.noSushi = noSushi;
+    publisherFields.noSushi = noSushi;
   }
 
   private void setRepoSource(final String repoSource) {
     if (repoSource == null) {
       return;
     }
-    this.f.repoSource = GitUtilities.getURLWithNoUserInfo(repoSource, "-repo CLI parameter");
+    this.publisherFields.repoSource = GitUtilities.getURLWithNoUserInfo(repoSource, "-repo CLI parameter");
   }
 
   public void execute() throws Exception {
     XhtmlNode.setCheckParaGeneral(true);
 
-    f.tt = new TimeTracker();
+    publisherFields.tt = new TimeTracker();
     loader.initialize();
-    if (f.validator != null) {
-      f.validator.setTracker(this);
+    if (publisherFields.validator != null) {
+      publisherFields.validator.setTracker(this);
     }
 
-    if (f.isBuildingTemplate) {
+    if (publisherFields.isBuildingTemplate) {
       packageTemplate();
     } else {
       log("Load IG");
@@ -220,13 +220,13 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         throw e;
       }
     }
-    if (f.templateLoaded && new File(f.rootDir).exists()) {
-      FileUtilities.clearDirectory(Utilities.path(f.rootDir, "template"));
+    if (publisherFields.templateLoaded && new File(publisherFields.rootDir).exists()) {
+      FileUtilities.clearDirectory(Utilities.path(publisherFields.rootDir, "template"));
     }
-    if (f.folderToDelete != null) {
+    if (publisherFields.folderToDelete != null) {
       try {
-        FileUtilities.clearDirectory(f.folderToDelete);
-        new File(f.folderToDelete).delete();
+        FileUtilities.clearDirectory(publisherFields.folderToDelete);
+        new File(publisherFields.folderToDelete).delete();
       } catch (Throwable e) {
         // nothing
       }
@@ -234,13 +234,13 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   }
 
   private String renderGlobals() {
-    if (f.sourceIg.hasGlobal()) {
+    if (publisherFields.sourceIg.hasGlobal()) {
       StringBuilder b = new StringBuilder();
-      boolean list = f.sourceIg.getGlobal().size() > 1;
+      boolean list = publisherFields.sourceIg.getGlobal().size() > 1;
       if (list) {
         b.append("<ul>\r\n");
       }
-      for (ImplementationGuideGlobalComponent g : f.sourceIg.getGlobal()) {
+      for (ImplementationGuideGlobalComponent g : publisherFields.sourceIg.getGlobal()) {
         b.append(list ? "<li>" : "");
         b.append(""+g.getType()+": "+g.getProfile());
         b.append(list ? "</li>" : "");
@@ -255,38 +255,38 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   }
 
   private void packageTemplate() throws IOException {
-    FileUtilities.createDirectory(f.outputDir);
+    FileUtilities.createDirectory(publisherFields.outputDir);
     long startTime = System.nanoTime();
     JsonObject qaJson = new JsonObject();
     StringBuilder txt = new StringBuilder();
     StringBuilder txtGen = new StringBuilder();
-    qaJson.add("url", f.templateInfo.asString("canonical"));
-    txt.append("url = "+ f.templateInfo.asString("canonical")+"\r\n");
-    txtGen.append("url = "+ f.templateInfo.asString("canonical")+"\r\n");
-    qaJson.add("package-id", f.templateInfo.asString("name"));
-    txt.append("package-id = "+ f.templateInfo.asString("name")+"\r\n");
-    txtGen.append("package-id = "+ f.templateInfo.asString("name")+"\r\n");
-    qaJson.add("ig-ver", f.templateInfo.asString("version"));
-    txt.append("ig-ver = "+ f.templateInfo.asString("version")+"\r\n");
-    txtGen.append("ig-ver = "+ f.templateInfo.asString("version")+"\r\n");
-    qaJson.add("date", new SimpleDateFormat("EEE, dd MMM, yyyy HH:mm:ss Z", new Locale("en", "US")).format(f.execTime.getTime()));
-    qaJson.add("dateISO8601", new DateTimeType(f.execTime).asStringValue());
+    qaJson.add("url", publisherFields.templateInfo.asString("canonical"));
+    txt.append("url = "+ publisherFields.templateInfo.asString("canonical")+"\r\n");
+    txtGen.append("url = "+ publisherFields.templateInfo.asString("canonical")+"\r\n");
+    qaJson.add("package-id", publisherFields.templateInfo.asString("name"));
+    txt.append("package-id = "+ publisherFields.templateInfo.asString("name")+"\r\n");
+    txtGen.append("package-id = "+ publisherFields.templateInfo.asString("name")+"\r\n");
+    qaJson.add("ig-ver", publisherFields.templateInfo.asString("version"));
+    txt.append("ig-ver = "+ publisherFields.templateInfo.asString("version")+"\r\n");
+    txtGen.append("ig-ver = "+ publisherFields.templateInfo.asString("version")+"\r\n");
+    qaJson.add("date", new SimpleDateFormat("EEE, dd MMM, yyyy HH:mm:ss Z", new Locale("en", "US")).format(publisherFields.execTime.getTime()));
+    qaJson.add("dateISO8601", new DateTimeType(publisherFields.execTime).asStringValue());
     qaJson.add("version", Constants.VERSION);
     qaJson.add("tool", Constants.VERSION+" ("+ToolsVersion.TOOLS_VERSION+")");
     try {
-      File od = new File(f.outputDir);
+      File od = new File(publisherFields.outputDir);
       FileUtils.cleanDirectory(od);
-      f.npm = new NPMPackageGenerator(Utilities.path(f.outputDir, "package.tgz"), f.templateInfo, f.execTime.getTime(), !f.publishing);
-      f.npm.loadFiles(f.rootDir, new File(f.rootDir), ".git", "output", "package", "temp");
-      f.npm.finish();
+      publisherFields.npm = new NPMPackageGenerator(Utilities.path(publisherFields.outputDir, "package.tgz"), publisherFields.templateInfo, publisherFields.execTime.getTime(), !publisherFields.publishing);
+      publisherFields.npm.loadFiles(publisherFields.rootDir, new File(publisherFields.rootDir), ".git", "output", "package", "temp");
+      publisherFields.npm.finish();
 
-      FileUtilities.stringToFile(makeTemplateIndexPage(), Utilities.path(f.outputDir, "index.html"));
-      FileUtilities.stringToFile(makeTemplateJekyllIndexPage(), Utilities.path(f.outputDir, "jekyll.html"));
-      FileUtilities.stringToFile(makeTemplateQAPage(), Utilities.path(f.outputDir, "qa.html"));
+      FileUtilities.stringToFile(makeTemplateIndexPage(), Utilities.path(publisherFields.outputDir, "index.html"));
+      FileUtilities.stringToFile(makeTemplateJekyllIndexPage(), Utilities.path(publisherFields.outputDir, "jekyll.html"));
+      FileUtilities.stringToFile(makeTemplateQAPage(), Utilities.path(publisherFields.outputDir, "qa.html"));
 
-      if (f.mode != PublisherUtils.IGBuildMode.AUTOBUILD) {
-        f.pcm.addPackageToCache(f.templateInfo.asString("name"), f.templateInfo.asString("version"), new FileInputStream(f.npm.filename()), Utilities.path(f.outputDir, "package.tgz"));
-        f.pcm.addPackageToCache(f.templateInfo.asString("name"), "dev", new FileInputStream(f.npm.filename()), Utilities.path(f.outputDir, "package.tgz"));
+      if (publisherFields.mode != PublisherUtils.IGBuildMode.AUTOBUILD) {
+        publisherFields.pcm.addPackageToCache(publisherFields.templateInfo.asString("name"), publisherFields.templateInfo.asString("version"), new FileInputStream(publisherFields.npm.filename()), Utilities.path(publisherFields.outputDir, "package.tgz"));
+        publisherFields.pcm.addPackageToCache(publisherFields.templateInfo.asString("name"), "dev", new FileInputStream(publisherFields.npm.filename()), Utilities.path(publisherFields.outputDir, "package.tgz"));
       }
     } catch (Exception e) {
       e.printStackTrace();
@@ -296,26 +296,26 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     }
     long endTime = System.nanoTime();
     String json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(qaJson, true);
-    FileUtilities.stringToFile(json, Utilities.path(f.outputDir, "qa.json"));
-    FileUtilities.stringToFile(txt.toString(), Utilities.path(f.outputDir, "qa.txt"));
-    FileUtilities.stringToFile(txtGen.toString(), Utilities.path(f.outputDir, "qa.compare.txt"));
+    FileUtilities.stringToFile(json, Utilities.path(publisherFields.outputDir, "qa.json"));
+    FileUtilities.stringToFile(txt.toString(), Utilities.path(publisherFields.outputDir, "qa.txt"));
+    FileUtilities.stringToFile(txtGen.toString(), Utilities.path(publisherFields.outputDir, "qa.compare.txt"));
 
-    FileUtilities.createDirectory(f.tempDir);
-    ZipGenerator zip = new ZipGenerator(Utilities.path(f.tempDir, "full-ig.zip"));
-    zip.addFolder(f.outputDir, "site/", false);
+    FileUtilities.createDirectory(publisherFields.tempDir);
+    ZipGenerator zip = new ZipGenerator(Utilities.path(publisherFields.tempDir, "full-ig.zip"));
+    zip.addFolder(publisherFields.outputDir, "site/", false);
     zip.addFileSource("index.html", REDIRECT_SOURCE, false);
     zip.close();
-    FileUtilities.copyFile(Utilities.path(f.tempDir, "full-ig.zip"), Utilities.path(f.outputDir, "full-ig.zip"));
-    new File(Utilities.path(f.tempDir, "full-ig.zip")).delete();
+    FileUtilities.copyFile(Utilities.path(publisherFields.tempDir, "full-ig.zip"), Utilities.path(publisherFields.outputDir, "full-ig.zip"));
+    new File(Utilities.path(publisherFields.tempDir, "full-ig.zip")).delete();
 
     // registering the package locally
-    log("Finished @ "+nowString()+". "+DurationUtil.presentDuration(endTime - startTime)+". Output in "+ f.outputDir);
+    log("Finished @ "+nowString()+". "+DurationUtil.presentDuration(endTime - startTime)+". Output in "+ publisherFields.outputDir);
   }
 
 
   private String nowString() {
     LocalDateTime dateTime = LocalDateTime.now();
-    DateTimeFormatter shortFormat = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT).withLocale(f.rc == null || f.rc.getLocale() == null ?  Locale.getDefault() : f.rc.getLocale());
+    DateTimeFormatter shortFormat = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT).withLocale(publisherFields.rc == null || publisherFields.rc.getLocale() == null ?  Locale.getDefault() : publisherFields.rc.getLocale());
     return dateTime.format(shortFormat);
   }
 
@@ -329,7 +329,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         + "  <p>Dependencies: {dep}</p>\n"
         + "  <p>A <a href=\"{path}history.html\">full version history is published</a></p>\n"
         + "";
-    return page.replace("{{npm}}", f.templateInfo.asString("name")).replace("{{canonical}}", f.templateInfo.asString("canonical"));
+    return page.replace("{{npm}}", publisherFields.templateInfo.asString("name")).replace("{{canonical}}", publisherFields.templateInfo.asString("canonical"));
   }
 
   private String makeTemplateJekyllIndexPage() {
@@ -340,24 +340,24 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         "  <p><b>Template {{npm}}</b></p>\r\n"+
         "  <p>You can <a href=\"package.tgz\">download the template</a>, though you should not need to; just refer to the template as {{npm}} in your IG configuration.</p>\r\n"+
         "  <p>A <a href=\"{{canonical}}/history.html\">full version history is published</a></p>\r\n";
-    return page.replace("{{npm}}", f.templateInfo.asString("name")).replace("{{canonical}}", f.templateInfo.asString("canonical"));
+    return page.replace("{{npm}}", publisherFields.templateInfo.asString("name")).replace("{{canonical}}", publisherFields.templateInfo.asString("canonical"));
   }
 
   private String makeTemplateQAPage() {
     String page = "<!DOCTYPE HTML><html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\" lang=\"en\"><head><title>Template QA Page</title></head><body><p><b>Template {{npm}} QA</b></p><p>No useful QA on templates - if you see this page, the template built ok.</p></body></html>";
-    return page.replace("{{npm}}", f.templateInfo.asString("name"));
+    return page.replace("{{npm}}", publisherFields.templateInfo.asString("name"));
   }
 
   public void createIg() throws Exception, IOException, EOperationOutcome, FHIRException {
     try {
-      TimeTracker.Session tts = f.tt.start("loading");
+      TimeTracker.Session tts = publisherFields.tt.start("loading");
       loader.load();
-      f.rc.setResolver(this);
-      f.rc.setResolveLinkResolver(this);
+      publisherFields.rc.setResolver(this);
+      publisherFields.rc.setResolveLinkResolver(this);
 
       tts.end();
 
-      tts = f.tt.start("generate");
+      tts = publisherFields.tt.start("generate");
       log("Processing Conformance Resources");
 
       log("Checking Language");
@@ -365,7 +365,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       processor.loadConformance2();
       processor.checkSignBundles();
 
-      if (!f.validationOff) {
+      if (!publisherFields.validationOff) {
         log("Validating Resources");
         try {
           processor.validate();
@@ -373,25 +373,25 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
           log("Unhandled Exception: " +ex.toString());
           throw(ex);
         }
-        f.validatorSession.close();
+        publisherFields.validatorSession.close();
       }
-      if (f.needsRegen) {
+      if (publisherFields.needsRegen) {
         log("Regenerating Narratives");
         processor.generateNarratives(true);
       }
       log("Processing Provenance Records");
       processor.processProvenanceDetails();
-      if (f.hasTranslations) {
+      if (publisherFields.hasTranslations) {
         log("Generating Translation artifacts");
         processor.processTranslationOutputs();
       }
-      log("Generating Outputs in "+ f.outputDir);
+      log("Generating Outputs in "+ publisherFields.outputDir);
       Map<String, String> uncsList = scanForUnattributedCodeSystems();
       generator.generate();
       clean();
-      f.dependentIgFinder.finish(f.outputDir, f.sourceIg.present());
+      publisherFields.dependentIgFinder.finish(publisherFields.outputDir, publisherFields.sourceIg.present());
       List<FetchedResource> fragments = new ArrayList<>(); 
-      for (var f : f.fileList) {
+      for (var f : publisherFields.fileList) {
         for (var r : f.getResources()) {
           if (r.getResource() != null && r.getResource() instanceof CodeSystem && ((CodeSystem) r.getResource()).getContent() == CodeSystemContentMode.FRAGMENT) {
             fragments.add(r);
@@ -399,12 +399,12 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         }
       }
       checkForSnomedVersion();
-      if (f.txLog != null) {
-        if (ManagedFileAccess.file(f.txLog).exists()) {
-           FileUtilities.copyFile(f.txLog, Utilities.path(f.rootDir, "output", "qa-tx.html"));
+      if (publisherFields.txLog != null) {
+        if (ManagedFileAccess.file(publisherFields.txLog).exists()) {
+           FileUtilities.copyFile(publisherFields.txLog, Utilities.path(publisherFields.rootDir, "output", "qa-tx.html"));
         }
       }
-      for (FetchedFile f : f.fileList) {
+      for (FetchedFile f : publisherFields.fileList) {
         for (FetchedResource r : f.getResources()) {
           for (ValidationMessage vm : r.getErrors()) {
             boolean inBase = false;
@@ -419,25 +419,25 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
           }
         }
       }
-      ValidationPresenter val = new ValidationPresenter(f.version, workingVersion(), f.igpkp, f.childPublisher == null? null : f.childPublisher.getIgpkp(), f.rootDir, f.npmName, f.childPublisher == null? null : f.childPublisher.f.npmName,
-          IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), f.realmRules, f.previousVersionComparator, f.ipaComparator, f.ipsComparator,
-          new DependencyRenderer(f.pcm, f.outputDir, f.npmName, f.templateManager, f.dependencyList, f.context, f.markdownEngine, f.rc, f.specMaps).render(f.publishedIg, true, false, false), new HTAAnalysisRenderer(f.context, f.outputDir, f.markdownEngine).render(f.publishedIg.getPackageId(), f.fileList, f.publishedIg.present()),
-          new PublicationChecker(f.repoRoot, f.historyPage, f.markdownEngine, findReleaseLabelString(), f.publishedIg, f.relatedIGs).check(), renderGlobals(), f.copyrightYear, f.context, scanForR5Extensions(), f.modifierExtensions,
-          generateDraftDependencies(), f.noNarrativeResources, f.noValidateResources, f.validationOff, f.generationOff, f.dependentIgFinder, f.context.getTxClientManager(),
-          fragments, makeLangInfo(), f.relatedIGs);
-      val.setValidationFlags(f.hintAboutNonMustSupport, f.anyExtensionsAllowed, f.checkAggregation, f.autoLoad, f.showReferenceMessages, f.noExperimentalContent, f.displayWarnings);
-      FileUtilities.stringToFile(new IPViewRenderer(uncsList, f.inspector.getExternalReferences(), f.inspector.getImageRefs(), f.inspector.getCopyrights(),
-              f.ipStmt, f.inspector.getVisibleFragments().get("1"), f.context).execute(), Utilities.path(f.outputDir, "qa-ipreview.html"));
+      ValidationPresenter val = new ValidationPresenter(publisherFields.version, workingVersion(), publisherFields.igpkp, publisherFields.childPublisher == null? null : publisherFields.childPublisher.getIgpkp(), publisherFields.rootDir, publisherFields.npmName, publisherFields.childPublisher == null? null : publisherFields.childPublisher.publisherFields.npmName,
+          IGVersionUtil.getVersion(), fetchCurrentIGPubVersion(), publisherFields.realmRules, publisherFields.previousVersionComparator, publisherFields.ipaComparator, publisherFields.ipsComparator,
+          new DependencyRenderer(publisherFields.pcm, publisherFields.outputDir, publisherFields.npmName, publisherFields.templateManager, publisherFields.dependencyList, publisherFields.context, publisherFields.markdownEngine, publisherFields.rc, publisherFields.specMaps).render(publisherFields.publishedIg, true, false, false), new HTAAnalysisRenderer(publisherFields.context, publisherFields.outputDir, publisherFields.markdownEngine).render(publisherFields.publishedIg.getPackageId(), publisherFields.fileList, publisherFields.publishedIg.present()),
+          new PublicationChecker(publisherFields.repoRoot, publisherFields.historyPage, publisherFields.markdownEngine, findReleaseLabelString(), publisherFields.publishedIg, publisherFields.relatedIGs).check(), renderGlobals(), publisherFields.copyrightYear, publisherFields.context, scanForR5Extensions(), publisherFields.modifierExtensions,
+          generateDraftDependencies(), publisherFields.noNarrativeResources, publisherFields.noValidateResources, publisherFields.validationOff, publisherFields.generationOff, publisherFields.dependentIgFinder, publisherFields.context.getTxClientManager(),
+          fragments, makeLangInfo(), publisherFields.relatedIGs);
+      val.setValidationFlags(publisherFields.hintAboutNonMustSupport, publisherFields.anyExtensionsAllowed, publisherFields.checkAggregation, publisherFields.autoLoad, publisherFields.showReferenceMessages, publisherFields.noExperimentalContent, publisherFields.displayWarnings);
+      FileUtilities.stringToFile(new IPViewRenderer(uncsList, publisherFields.inspector.getExternalReferences(), publisherFields.inspector.getImageRefs(), publisherFields.inspector.getCopyrights(),
+              publisherFields.ipStmt, publisherFields.inspector.getVisibleFragments().get("1"), publisherFields.context).execute(), Utilities.path(publisherFields.outputDir, "qa-ipreview.html"));
       tts.end();
       if (isChild()) {
-        log("Built. "+ f.tt.report());
+        log("Built. "+ publisherFields.tt.report());
       } else {
-        log("Built. "+ f.tt.report());
+        log("Built. "+ publisherFields.tt.report());
         log("Generating QA");
-        log("Validation output in "+val.generate(f.sourceIg.getName(), f.errors, f.fileList, Utilities.path(f.destDir != null ? f.destDir : f.outputDir, "qa.html"), f.suppressedMessages, pinSummary()));
+        log("Validation output in "+val.generate(publisherFields.sourceIg.getName(), publisherFields.errors, publisherFields.fileList, Utilities.path(publisherFields.destDir != null ? publisherFields.destDir : publisherFields.outputDir, "qa.html"), publisherFields.suppressedMessages, pinSummary()));
       }
       recordOutcome(null, val);
-      log("Finished @ "+nowString()+". Max Memory Used = "+Utilities.describeSize(f.maxMemory)+logSummary());
+      log("Finished @ "+nowString()+". Max Memory Used = "+Utilities.describeSize(publisherFields.maxMemory)+logSummary());
     } catch (Exception e) {
       try {
         recordOutcome(e, null);
@@ -450,22 +450,22 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
   private String pinSummary() {
     String sfx = "";
-    if (f.pinDest != null) {
-      sfx = " (in manifest Parameters/"+ f.pinDest+")";
+    if (publisherFields.pinDest != null) {
+      sfx = " (in manifest Parameters/"+ publisherFields.pinDest+")";
     }
-    switch (f.pinningPolicy) {
-    case FIX: return ""+ f.pinCount+" (all)"+sfx;
+    switch (publisherFields.pinningPolicy) {
+    case FIX: return ""+ publisherFields.pinCount+" (all)"+sfx;
     case NO_ACTION: return "n/a";
-    case WHEN_MULTIPLE_CHOICES: return ""+ f.pinCount+" (when multiples)"+sfx;
+    case WHEN_MULTIPLE_CHOICES: return ""+ publisherFields.pinCount+" (when multiples)"+sfx;
     default: return "??";    
     }
   }
 
   private Map<String, String> scanForUnattributedCodeSystems() {
     Map<String, String> list = new HashMap<>();
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       for (FetchedResource r : f.getResources()) {
-        String link = this.f.igpkp.getLinkFor(r, true);
+        String link = this.publisherFields.igpkp.getLinkFor(r, true);
         r.setPath(link);
         scanForUnattributedCodeSystems(list, link, r.getElement());
       }
@@ -477,7 +477,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     if ("Coding.system".equals(e.getProperty().getDefinition().getBase().getPath())) {
       String url = e.primitiveValue();
       if (url != null && !url.contains("example.org/") && !url.contains("acme.") && !url.contains("hl7.org")) {
-        CodeSystem cs = f.context.fetchCodeSystem(url);
+        CodeSystem cs = publisherFields.context.fetchCodeSystem(url);
         if (cs == null || !cs.hasCopyright()) {
           list.put(url, link);
         }
@@ -491,15 +491,15 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   }
   
   private void checkForSnomedVersion() {
-    if (!(f.igrealm == null || "uv".equals(f.igrealm)) && f.context.getCodeSystemsUsed().contains("http://snomed.info/sct")) {
+    if (!(publisherFields.igrealm == null || "uv".equals(publisherFields.igrealm)) && publisherFields.context.getCodeSystemsUsed().contains("http://snomed.info/sct")) {
       boolean ok = false;
-      for (ParametersParameterComponent p : f.context.getExpansionParameters().getParameter()) {
+      for (ParametersParameterComponent p : publisherFields.context.getExpansionParameters().getParameter()) {
         if ("system-version".equals(p.getName()) && p.hasValuePrimitive() && p.getValue().primitiveValue().startsWith("http://snomed.info/sct")) {
           ok = true;
         }
       }
       if (!ok) {
-        f.errors.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "IG", "The IG is not for the international realm, and it uses SNOMED CT, so it should fix the SCT edition in the expansion parameters", IssueSeverity.WARNING));
+        publisherFields.errors.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "IG", "The IG is not for the international realm, and it uses SNOMED CT, so it should fix the SCT edition in the expansion parameters", IssueSeverity.WARNING));
       }
     }
 
@@ -508,13 +508,13 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   
   private IGLanguageInformation makeLangInfo() {
     IGLanguageInformation info = new IGLanguageInformation();
-    info.setIgResourceLanguage(f.publishedIg.getLanguage());
-    for (FetchedFile f : f.fileList) {
+    info.setIgResourceLanguage(publisherFields.publishedIg.getLanguage());
+    for (FetchedFile f : publisherFields.fileList) {
       for (FetchedResource r : f.getResources()) {
         info.seeResource(r.getElement().hasChild("language")) ;
       }
     }
-    info.setPolicy(f.langPolicy );
+    info.setPolicy(publisherFields.langPolicy );
     info.setIgLangs(new ArrayList<String>());
     return info;
   }
@@ -528,8 +528,8 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   }
 
   private String generateDraftDependencies() throws IOException {
-    DraftDependenciesRenderer dr = new DraftDependenciesRenderer(f.context, f.packageInfo.getVID());
-    for (FetchedFile f : f.fileList) {
+    DraftDependenciesRenderer dr = new DraftDependenciesRenderer(publisherFields.context, publisherFields.packageInfo.getVID());
+    for (FetchedFile f : publisherFields.fileList) {
       for (FetchedResource r : f.getResources()) {
         dr.checkResource(r);
       }
@@ -538,7 +538,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   }
 
   private Set<String> scanForR5Extensions() {
-    XVerExtensionManager xver = new XVerExtensionManager(f.context);
+    XVerExtensionManager xver = new XVerExtensionManager(publisherFields.context);
     Set<String> set = new HashSet<>();
     scanProfilesForR5(xver, set);
     scanExamplesForR5(xver, set);
@@ -546,7 +546,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   }
 
   private void scanExamplesForR5(XVerExtensionManager xver, Set<String> set) {
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       f.start("scanExamplesForR5");
       try {
         for (FetchedResource r : f.getResources()) {
@@ -569,7 +569,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   }
 
   private void scanProfilesForR5(XVerExtensionManager xver, Set<String> set) {
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       f.start("scanProfilesForR5");
       try {
 
@@ -589,7 +589,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
   private void scanProfileForR5(XVerExtensionManager xver, Set<String> set, StructureDefinition sd) {
     scanRefForR5(xver, set, sd.getBaseDefinition());
-    StructureDefinition base = f.context.fetchResource(StructureDefinition.class, sd.getBaseDefinition());
+    StructureDefinition base = publisherFields.context.fetchResource(StructureDefinition.class, sd.getBaseDefinition());
     if (base != null) {
       scanProfileForR5(xver, set, base);
     }
@@ -618,24 +618,24 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   private void recordOutcome(Exception ex, ValidationPresenter val) {
     try {
       JsonObject j = new JsonObject();
-      if (f.sourceIg != null) {
-        j.add("url", f.sourceIg.getUrl());
-        j.add("name", f.sourceIg.getName());
-        j.add("title", f.sourceIg.getTitle());
-        j.add("description", preProcessMarkdown(f.sourceIg.getDescription()));
-        if (f.sourceIg.hasDate()) {
-          j.add("ig-date", f.sourceIg.getDateElement().primitiveValue());
+      if (publisherFields.sourceIg != null) {
+        j.add("url", publisherFields.sourceIg.getUrl());
+        j.add("name", publisherFields.sourceIg.getName());
+        j.add("title", publisherFields.sourceIg.getTitle());
+        j.add("description", preProcessMarkdown(publisherFields.sourceIg.getDescription()));
+        if (publisherFields.sourceIg.hasDate()) {
+          j.add("ig-date", publisherFields.sourceIg.getDateElement().primitiveValue());
         }
-        if (f.sourceIg.hasStatus()) {
-          j.add("status", f.sourceIg.getStatusElement().primitiveValue());
+        if (publisherFields.sourceIg.hasStatus()) {
+          j.add("status", publisherFields.sourceIg.getStatusElement().primitiveValue());
         }
       }
-      if (f.publishedIg != null && f.publishedIg.hasPackageId()) {
-        j.add("package-id", f.publishedIg.getPackageId());
-        j.add("ig-ver", f.publishedIg.getVersion());
+      if (publisherFields.publishedIg != null && publisherFields.publishedIg.hasPackageId()) {
+        j.add("package-id", publisherFields.publishedIg.getPackageId());
+        j.add("ig-ver", publisherFields.publishedIg.getVersion());
       }
-      j.add("date", new SimpleDateFormat("EEE, dd MMM, yyyy HH:mm:ss Z", new Locale("en", "US")).format(f.execTime.getTime()));
-      j.add("dateISO8601", new DateTimeType(f.execTime).asStringValue());
+      j.add("date", new SimpleDateFormat("EEE, dd MMM, yyyy HH:mm:ss Z", new Locale("en", "US")).format(publisherFields.execTime.getTime()));
+      j.add("dateISO8601", new DateTimeType(publisherFields.execTime).asStringValue());
       if (val != null) {
         j.add("errs", val.getErr());
         j.add("warnings", val.getWarn());
@@ -646,26 +646,26 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       if (ex != null) {
         j.add("exception", ex.getMessage());
       }
-      j.add("version", f.version);
-      if (f.templatePck != null) {
-        j.add("template", f.templatePck);
+      j.add("version", publisherFields.version);
+      if (publisherFields.templatePck != null) {
+        j.add("template", publisherFields.templatePck);
       }
       j.add("tool", Constants.VERSION+" ("+ToolsVersion.TOOLS_VERSION+")");
-      j.add("maxMemory", f.maxMemory);
+      j.add("maxMemory", publisherFields.maxMemory);
       String json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(j, true);
-      FileUtilities.stringToFile(json, Utilities.path(f.destDir != null ? f.destDir : f.outputDir, "qa.json"));
+      FileUtilities.stringToFile(json, Utilities.path(publisherFields.destDir != null ? publisherFields.destDir : publisherFields.outputDir, "qa.json"));
 
       j = new JsonObject();
-      j.add("date", new SimpleDateFormat("EEE, dd MMM, yyyy HH:mm:ss Z", new Locale("en", "US")).format(f.execTime.getTime()));
+      j.add("date", new SimpleDateFormat("EEE, dd MMM, yyyy HH:mm:ss Z", new Locale("en", "US")).format(publisherFields.execTime.getTime()));
       j.add("doco", "For each file: start is seconds after start activity occurred. Length = milliseconds activity took");
 
-      for (FetchedFile f : f.fileList) {
+      for (FetchedFile f : publisherFields.fileList) {
         JsonObject fj = new JsonObject();
         j.forceArray("files").add(fj);
         f.processReport(f, fj);
       }
       json = org.hl7.fhir.utilities.json.parser.JsonParser.compose(j, true);
-      FileUtilities.stringToFile(json, Utilities.path(f.destDir != null ? f.destDir : f.outputDir, "qa-time-report.json"));
+      FileUtilities.stringToFile(json, Utilities.path(publisherFields.destDir != null ? publisherFields.destDir : publisherFields.outputDir, "qa-time-report.json"));
 
       StringBuilder b = new StringBuilder();
       b.append("Source File");
@@ -676,11 +676,11 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         b.append(s);
       }
       b.append("\r\n");
-      for (FetchedFile f : f.fileList) {
+      for (FetchedFile f : publisherFields.fileList) {
         f.appendReport(b);
         b.append("\r\n");
       }
-      FileUtilities.stringToFile(b.toString(), Utilities.path(f.destDir != null ? f.destDir : f.outputDir, "qa-time-report.tsv"));
+      FileUtilities.stringToFile(b.toString(), Utilities.path(publisherFields.destDir != null ? publisherFields.destDir : publisherFields.outputDir, "qa-time-report.tsv"));
 
 
     } catch (Exception e) {
@@ -698,28 +698,28 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
     String[] parts = url.split("\\/");
     if (parts.length >= 2 && !Utilities.startsWithInList(url, "urn:uuid:", "urn:oid:", "cid:")) {
-      for (FetchedFile f : f.fileList) {
+      for (FetchedFile f : publisherFields.fileList) {
         for (FetchedResource r : f.getResources()) {
           if (r.getElement() != null && r.fhirType().equals(parts[0]) && r.getId().equals(parts[1])) {
-            String path = this.f.igpkp.getLinkFor(r, true);
+            String path = this.publisherFields.igpkp.getLinkFor(r, true);
             return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, ResourceWrapper.forResource(context, r.getElement()));
           }
           if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
             if (url.equals(((CanonicalResource) r.getResource()).getUrl())) {
-              String path = this.f.igpkp.getLinkFor(r, true);
+              String path = this.publisherFields.igpkp.getLinkFor(r, true);
               return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, ResourceWrapper.forResource(context, r.getResource()));
             }
           }
         }
       }
-      for (FetchedFile f : f.fileList) {
+      for (FetchedFile f : publisherFields.fileList) {
         for (FetchedResource r : f.getResources()) {
           if (r.fhirType().equals("Bundle")) {
             List<Element> entries = r.getElement().getChildrenByName("entry");
             for (Element entry : entries) {
               Element res = entry.getNamedChild("resource");
               if (res != null && res.fhirType().equals(parts[0]) && res.hasChild("id") && res.getNamedChildValue("id").equals(parts[1])) {
-                String path = this.f.igpkp.getLinkFor(r, true)+"#"+parts[0]+"_"+parts[1];
+                String path = this.publisherFields.igpkp.getLinkFor(r, true)+"#"+parts[0]+"_"+parts[1];
                 return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, ResourceWrapper.forResource(context, r.getElement()));
               }
             }
@@ -727,7 +727,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         }
       }
     }
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.fhirType().equals("Bundle")) {
           List<Element> entries = r.getElement().getChildrenByName("entry");
@@ -735,7 +735,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
             Element res = entry.getNamedChild("resource");
             String fu = entry.getNamedChildValue("fullUrl");
             if (res != null && fu != null && fu.equals(url)) {
-              String path = this.f.igpkp.getLinkFor(r, true)+"#"+fu.replace(":", "-");
+              String path = this.publisherFields.igpkp.getLinkFor(r, true)+"#"+fu.replace(":", "-");
               return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, ResourceWrapper.forResource(context, r.getElement()));
             }
           }
@@ -743,7 +743,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       }
     }
 
-    for (SpecMapManager sp : f.specMaps) {
+    for (SpecMapManager sp : publisherFields.specMaps) {
       String fp = Utilities.isAbsoluteUrl(url) ? url : sp.getBase()+"/"+url;
       
       String path;
@@ -779,22 +779,22 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       }
     }
 
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       for (FetchedResource r : f.getResources()) {
         if ("ActorDefinition".equals(r.fhirType())) {
           ActorDefinition act = ((ActorDefinition) r.getResource());
           String aurl = ExtensionUtilities.readStringExtension(act, "http://hl7.org/fhir/tools/StructureDefinition/ig-actor-example-url");
           if (aurl != null && url.startsWith(aurl)) {
             String tail = url.substring(aurl.length()+1);
-            for (ImplementationGuideDefinitionResourceComponent igr : this.f.sourceIg.getDefinition().getResource()) {
+            for (ImplementationGuideDefinitionResourceComponent igr : this.publisherFields.sourceIg.getDefinition().getResource()) {
               if (tail.equals(igr.getReference().getReference())) {
                 String actor = ExtensionUtilities.readStringExtension(igr, "http://hl7.org/fhir/tools/StructureDefinition/ig-example-actor");
                 if (actor.equals(act.getUrl())) {
-                  for (FetchedFile f2 : this.f.fileList) {
+                  for (FetchedFile f2 : this.publisherFields.fileList) {
                     for (FetchedResource r2 : f2.getResources()) {
                       String id = r2.fhirType()+"/"+r2.getId();
                       if (tail.equals(id)) {
-                        String path = this.f.igpkp.getLinkFor(r2, true);
+                        String path = this.publisherFields.igpkp.getLinkFor(r2, true);
                         return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, ResourceWrapper.forResource(context, r2.getElement()));
                       }
                     }
@@ -811,19 +811,19 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   }
 
   private void clean() throws Exception {
-    for (Resource r : f.loaded) {
-      f.context.dropResource(r);
+    for (Resource r : publisherFields.loaded) {
+      publisherFields.context.dropResource(r);
     }
-    if (f.destDir != null) {
-      if (!(new File(f.destDir).exists()))
-        FileUtilities.createDirectory(f.destDir);
-      FileUtilities.copyDirectory(f.outputDir, f.destDir, null);
+    if (publisherFields.destDir != null) {
+      if (!(new File(publisherFields.destDir).exists()))
+        FileUtilities.createDirectory(publisherFields.destDir);
+      FileUtilities.copyDirectory(publisherFields.outputDir, publisherFields.destDir, null);
     }
   }
 
   private void checkDependencies() {
     // first, we load all the direct dependency lists
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       if (f.getDependencies() == null) {
         loadDependencyList(f);
       }
@@ -833,14 +833,14 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     boolean changed;
     do {
       changed = false;
-      for (FetchedFile f : f.fileList) {
-        if (!this.f.changeList.contains(f)) {
+      for (FetchedFile f : publisherFields.fileList) {
+        if (!this.publisherFields.changeList.contains(f)) {
           boolean dep = false;
           for (FetchedFile d : f.getDependencies())
-            if (this.f.changeList.contains(d))
+            if (this.publisherFields.changeList.contains(d))
               dep = true;
           if (dep) {
-            this.f.changeList.add(f);
+            this.publisherFields.changeList.add(f);
             changed = true;
           }
         }
@@ -939,23 +939,23 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   }
 
   private void copyDefaultTemplate() throws IOException, FHIRException {
-    if (!new File(f.adHocTmpDir).exists())
-      FileUtilities.createDirectory(f.adHocTmpDir);
-    FileUtilities.clearDirectory(f.adHocTmpDir);
+    if (!new File(publisherFields.adHocTmpDir).exists())
+      FileUtilities.createDirectory(publisherFields.adHocTmpDir);
+    FileUtilities.clearDirectory(publisherFields.adHocTmpDir);
 
     FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager.Builder().build();
 
     NpmPackage npm = null; 
-    if (f.specifiedVersion == null) {
+    if (publisherFields.specifiedVersion == null) {
       npm = pcm.loadPackage("hl7.fhir.r5.core", Constants.VERSION);
     } else {
-      String vid = VersionUtilities.getCurrentVersion(f.specifiedVersion);
+      String vid = VersionUtilities.getCurrentVersion(publisherFields.specifiedVersion);
       String pid = VersionUtilities.packageForVersion(vid);
       npm = pcm.loadPackage(pid, vid);
     }
 
     InputStream igTemplateInputStream = npm.load("other", "ig-template.zip");
-    String zipTargetDirectory = f.adHocTmpDir;
+    String zipTargetDirectory = publisherFields.adHocTmpDir;
     unzipToDirectory(igTemplateInputStream, zipTargetDirectory);
   }
 
@@ -985,9 +985,9 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   }
 
   private void buildConfigFile() throws IOException, org.hl7.fhir.exceptions.FHIRException, FHIRFormatError {
-    f.configFile = Utilities.path(f.adHocTmpDir, "ig.json");
+    publisherFields.configFile = Utilities.path(publisherFields.adHocTmpDir, "ig.json");
     // temporary config, until full ig template is in place
-    String v = f.specifiedVersion != null ? VersionUtilities.getCurrentVersion(f.specifiedVersion) : Constants.VERSION;
+    String v = publisherFields.specifiedVersion != null ? VersionUtilities.getCurrentVersion(publisherFields.specifiedVersion) : Constants.VERSION;
     String igs = VersionUtilities.isR3Ver(v) ? "ig3.xml" : "ig4.xml";
     FileUtilities.stringToFile(
         "{\r\n"+
@@ -1007,9 +1007,9 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
             "  },\r\n"+
             "  \"sct-edition\": \"http://snomed.info/sct/900000000000207008\",\r\n"+
             "  \"source\": \""+igs+"\"\r\n"+
-            "}\r\n", f.configFile);
-    FileUtilities.createDirectory(Utilities.path(f.adHocTmpDir, "resources"));
-    FileUtilities.createDirectory(Utilities.path(f.adHocTmpDir, "pages"));
+            "}\r\n", publisherFields.configFile);
+    FileUtilities.createDirectory(Utilities.path(publisherFields.adHocTmpDir, "resources"));
+    FileUtilities.createDirectory(Utilities.path(publisherFields.adHocTmpDir, "pages"));
   }
 
 
@@ -1044,24 +1044,24 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   }
 
   public void setConfigFile(String configFile) {
-    this.f.configFile = configFile;
+    this.publisherFields.configFile = configFile;
   }
 
   public String getSourceDir() {
-    return f.sourceDir;
+    return publisherFields.sourceDir;
   }
 
   public void setSourceDir(String sourceDir) {
-    this.f.sourceDir = sourceDir;
+    this.publisherFields.sourceDir = sourceDir;
   }
 
   public void setLogger(ILoggingService logger) {
-    this.f.logger = logger;
-    f.fetcher.setLogger(logger);
+    this.publisherFields.logger = logger;
+    publisherFields.fetcher.setLogger(logger);
   }
 
   public String getQAFile() throws IOException {
-    return Utilities.path(f.outputDir, "qa.html");
+    return Utilities.path(publisherFields.outputDir, "qa.html");
   }
 
 
@@ -1304,7 +1304,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
             e.printStackTrace();
             break;
           }
-          FileUtilities.stringToFile(buildReport(ig, null, self.f.filelog.toString(), Utilities.path(self.f.qaDir, "validation.txt"), self.f.txServer), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher-"+Integer.toString(i)+".log"));
+          FileUtilities.stringToFile(buildReport(ig, null, self.publisherFields.filelog.toString(), Utilities.path(self.publisherFields.qaDir, "validation.txt"), self.publisherFields.txServer), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher-"+Integer.toString(i)+".log"));
           System.out.println("=======================================================================================");
           System.out.println("");
           System.out.println("");
@@ -1338,11 +1338,11 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       //      for (String e : System.getenv().keySet()) {
       //        self.logMessage("  "+e+": "+System.getenv().get(e));
       //      }
-      self.logMessage("Start Clock @ "+nowAsString(self.f.execTime)+" ("+nowAsDate(self.f.execTime)+")");
+      self.logMessage("Start Clock @ "+nowAsString(self.publisherFields.execTime)+" ("+nowAsDate(self.publisherFields.execTime)+")");
       self.logMessage("");
       if (CliParams.hasNamedParam(args, "-auto-ig-build")) {
         self.setMode(PublisherUtils.IGBuildMode.AUTOBUILD);
-        self.f.targetOutput = CliParams.getNamedParam(args, "-target");
+        self.publisherFields.targetOutput = CliParams.getNamedParam(args, "-target");
         self.setRepoSource( CliParams.getNamedParam(args, "-repo"));
       }
 
@@ -1358,7 +1358,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         FhirSettings.setProhibitNetworkAccess(true);
       }
       if (CliParams.hasNamedParam(args, "-trackFragments")) {
-        self.f.trackFragments = true;
+        self.publisherFields.trackFragments = true;
       }
       if (CliParams.hasNamedParam(args, "-milestone")) {
         self.setMilestoneBuild(true);
@@ -1369,17 +1369,17 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       }
 
       if (CliParams.hasNamedParam(args, "-validation-off")) {
-        self.f.validationOff = true;
+        self.publisherFields.validationOff = true;
         System.out.println("Running without validation to shorten the run time (editor process only)");
       }
       if (CliParams.hasNamedParam(args, "-generation-off")) {
-        self.f.generationOff = true;
+        self.publisherFields.generationOff = true;
         System.out.println("Running without generation to shorten the run time (editor process only)");
       }
       
       // deprecated
       if (CliParams.hasNamedParam(args, "-new-template-format")) {
-        self.f.newMultiLangTemplateFormat = true;
+        self.publisherFields.newMultiLangTemplateFormat = true;
         System.out.println("Using new style template format for multi-lang IGs");
       }
 
@@ -1388,7 +1388,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         // run with standard template. this is publishing lite
         self.setSourceDir(CliParams.getNamedParam(args, "-source"));
         self.setDestDir(CliParams.getNamedParam(args, "-destination"));
-        self.f.specifiedVersion = CliParams.getNamedParam(args, "-version");
+        self.publisherFields.specifiedVersion = CliParams.getNamedParam(args, "-version");
       } else if (!CliParams.hasNamedParam(args, "-ig") && args.length == 1 && new File(args[0]).exists()) {
         self.setConfigFile(determineActualIG(args[0], PublisherUtils.IGBuildMode.MANUAL));
       } else if (CliParams.hasNamedParam(args, "-prompt")) {
@@ -1429,7 +1429,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
           self.setConfigFile(determineActualIG(last, PublisherUtils.IGBuildMode.MANUAL));
         }
       } else {
-        self.setConfigFile(determineActualIG(CliParams.getNamedParam(args, "-ig"), self.f.mode));
+        self.setConfigFile(determineActualIG(CliParams.getNamedParam(args, "-ig"), self.publisherFields.mode));
         if (Utilities.noString(self.getConfigFile())) {
           throw new Exception("No Implementation Guide Specified (-ig parameter)");
         }
@@ -1457,16 +1457,16 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         throw new Error("Watch mode (-watch) is no longer supported");
       }
       if (CliParams.hasNamedParam(args, "-simplifier")) {
-        self.f.simplifierMode = true;
-        self.f.generationOff = true;
+        self.publisherFields.simplifierMode = true;
+        self.publisherFields.generationOff = true;
       }
-      self.f.debug = CliParams.hasNamedParam(args, "-debug");
-      self.f.cacheVersion = CliParams.hasNamedParam(args, "-cacheVersion");
+      self.publisherFields.debug = CliParams.hasNamedParam(args, "-debug");
+      self.publisherFields.cacheVersion = CliParams.hasNamedParam(args, "-cacheVersion");
       if (CliParams.hasNamedParam(args, "-publish")) {
         self.setMode(PublisherUtils.IGBuildMode.PUBLICATION);
-        self.f.targetOutput = CliParams.getNamedParam(args, "-publish");
-        self.f.publishing = true;
-        self.f.targetOutputNested = CliParams.getNamedParam(args, "-nested");
+        self.publisherFields.targetOutput = CliParams.getNamedParam(args, "-publish");
+        self.publisherFields.publishing = true;
+        self.publisherFields.targetOutputNested = CliParams.getNamedParam(args, "-nested");
       }
       if (CliParams.hasNamedParam(args, "-resetTx")) {
         self.setCacheOption(PublisherUtils.CacheOption.CLEAR_ALL);
@@ -1479,7 +1479,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         self.setNoSushi(true);
       }
       if (CliParams.hasNamedParam(args, PACKAGE_CACHE_FOLDER_PARAM)) {
-        self.f.setPackageCacheFolder(CliParams.getNamedParam(args, PACKAGE_CACHE_FOLDER_PARAM));
+        self.publisherFields.setPackageCacheFolder(CliParams.getNamedParam(args, PACKAGE_CACHE_FOLDER_PARAM));
       }
       if (CliParams.hasNamedParam(args, "-authorise-non-conformant-tx-servers")) {
         TerminologyClientContext.setAllowNonConformantServers(true);
@@ -1488,7 +1488,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       try {
         self.execute();
         if (CliParams.hasNamedParam(args, "-no-errors")) {
-          exitCode = self.countErrs(self.f.errors) > 0 ? 1 : 0;
+          exitCode = self.countErrs(self.publisherFields.errors) > 0 ? 1 : 0;
         }
       } catch (ENoDump e) {
         self.log("Publishing Content Failed: "+e.getMessage());
@@ -1505,15 +1505,15 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
           self.log("Stack Dump (for debugging):");
           e.printStackTrace();
           for (StackTraceElement st : e.getStackTrace()) {
-            if (st != null && self.f.filelog != null) {
-              self.f.filelog.append(st.toString());
+            if (st != null && self.publisherFields.filelog != null) {
+              self.publisherFields.filelog.append(st.toString());
             }
           }
         }
         exitCode = 1;
       } finally {
-        if (self.f.mode == PublisherUtils.IGBuildMode.MANUAL) {
-          FileUtilities.stringToFile(buildReport(CliParams.getNamedParam(args, "-ig"), CliParams.getNamedParam(args, "-source"), self.f.filelog.toString(), Utilities.path(self.f.qaDir, "validation.txt"), self.f.txServer), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher.log"));
+        if (self.publisherFields.mode == PublisherUtils.IGBuildMode.MANUAL) {
+          FileUtilities.stringToFile(buildReport(CliParams.getNamedParam(args, "-ig"), CliParams.getNamedParam(args, "-source"), self.publisherFields.filelog.toString(), Utilities.path(self.publisherFields.qaDir, "validation.txt"), self.publisherFields.txServer), Utilities.path(System.getProperty("java.io.tmpdir"), "fhir-ig-publisher.log"));
         }
     }
       PublisherFields.consoleLogger.stop();
@@ -1541,7 +1541,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   }
 
   private void setForcedLanguage(String language) {
-    this.f.forcedLanguage = Locale.forLanguageTag(language);
+    this.publisherFields.forcedLanguage = Locale.forLanguageTag(language);
   }
 
   public static String getAbsoluteConfigFilePath(String configFilePath) throws IOException {
@@ -1553,13 +1553,13 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
   public static void parseAndAddNoNarrativeParam(Publisher self, String param) {
     for (String p : param.split("\\,")) {
-      self.f.noNarratives.add(p);
+      self.publisherFields.noNarratives.add(p);
     }
   }
 
   public static void parseAndAddNoValidateParam(Publisher publisher, String param) {
     for (String p : param.split("\\,")) {
-      publisher.f.noValidate.add(p);
+      publisher.publisherFields.noValidate.add(p);
     }
   }
 
@@ -1656,7 +1656,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
 
   private void setPackagesFolder(String value) {
-    f.packagesFolder = value;
+    publisherFields.packagesFolder = value;
   }
 
 
@@ -1770,30 +1770,30 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
   protected void updateInspector(HTMLInspector parentInspector, String path) {
     parentInspector.getManual().add(path+"/full-ig.zip");
-    parentInspector.getManual().add("../"+ f.historyPage);
-    parentInspector.getSpecMaps().addAll(f.specMaps);
+    parentInspector.getManual().add("../"+ publisherFields.historyPage);
+    parentInspector.getSpecMaps().addAll(publisherFields.specMaps);
   }
 
   private String fetchCurrentIGPubVersion() {
-    if (f.currVer == null) {
+    if (publisherFields.currVer == null) {
       try {
         // This calls the GitHub api, to fetch the info on the latest release. As part of our release process, we name
         // all tagged releases as the version number. ex: "1.1.2".
         // This value can be grabbed from the "tag_name" field, or the "name" field of the returned JSON.
         JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObjectFromUrl("https://api.github.com/repos/HL7/fhir-ig-publisher/releases/latest");
-        f.currVer = json.asString("name").toString();
+        publisherFields.currVer = json.asString("name").toString();
       } catch (IOException e) {
-        f.currVer = "?pub-ver-1?";
+        publisherFields.currVer = "?pub-ver-1?";
       } catch (FHIRException e) {
-        f.currVer = "$unknown-version$";
+        publisherFields.currVer = "$unknown-version$";
       }
     }
-    return f.currVer;
+    return publisherFields.currVer;
   }
 
   @Override
   public void recordProfileUsage(StructureDefinition profile, Object appContext, Element element) {
-    if (profile != null && profile.getUrl().startsWith(f.igpkp.getCanonical())) { // ignore anything we didn't define
+    if (profile != null && profile.getUrl().startsWith(publisherFields.igpkp.getCanonical())) { // ignore anything we didn't define
       FetchedResource example = null;
       if (appContext != null) {
         if (appContext instanceof ValidationContext) {
@@ -1804,7 +1804,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       }
       if (example != null) {
         FetchedResource source = null;
-        for (FetchedFile f : f.fileList) {
+        for (FetchedFile f : publisherFields.fileList) {
           for (FetchedResource r : f.getResources()) {
             if (r.getResource() == profile) {
               source = r;
@@ -1825,18 +1825,18 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     self.setConfigFile(Publisher.determineActualIG(path, PublisherUtils.IGBuildMode.PUBLICATION));
     self.execute();
     self.setTxServer(FhirSettings.getTxFhirProduction());
-    if (self.countErrs(self.f.errors) > 0) {
+    if (self.countErrs(self.publisherFields.errors) > 0) {
       throw new Exception("Building IG '"+path+"' caused an error");
     }
   }
 
   public long getMaxMemory() {
-    return f.maxMemory;
+    return publisherFields.maxMemory;
   }
 
   @Override
   public String resolveUri(RenderingContext context, String uri) {
-    for (Extension ext : f.sourceIg.getExtensionsByUrl(ExtensionDefinitions.EXT_IG_URL)) {
+    for (Extension ext : publisherFields.sourceIg.getExtensionsByUrl(ExtensionDefinitions.EXT_IG_URL)) {
       String value = ext.getExtensionString("uri");
       if (value != null && value.equals(uri)) {
         return ext.getExtensionString("target");
@@ -1848,7 +1848,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
   @Override
   public <T extends Resource> T findLinkableResource(Class<T> class_, String uri) throws IOException {
-    for (PublisherUtils.LinkedSpecification spec : f.linkSpecMaps) {
+    for (PublisherUtils.LinkedSpecification spec : publisherFields.linkSpecMaps) {
       String name = class_.getSimpleName();
       Set<String> names = "Resource".equals(name) ? Utilities.stringSet("StructureDefinition", "ValueSet", "CodeSystem", "OperationDefinition") : Utilities.stringSet(name);
       for (PackageResourceInformation pri : spec.getNpm().listIndexedResources(names)) {
@@ -1860,7 +1860,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         }
         if (match) {
           InputStream s = spec.getNpm().load(pri);
-          IContextResourceLoader pl = new PublisherLoader(spec.getNpm(), spec.getSpm(), PackageHacker.fixPackageUrl(spec.getNpm().getWebLocation()), f.igpkp).makeLoader();
+          IContextResourceLoader pl = new PublisherLoader(spec.getNpm(), spec.getSpm(), PackageHacker.fixPackageUrl(spec.getNpm().getWebLocation()), publisherFields.igpkp).makeLoader();
           Resource res = pl.loadResource(s, true);
           return (T) res;
         }
@@ -1873,20 +1873,20 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     Publisher self = new Publisher();
     self.logMessage("FHIR IG Publisher "+IGVersionUtil.getVersionString());
     self.logMessage("Detected Java version: " + System.getProperty("java.version")+" from "+System.getProperty("java.home")+" on "+System.getProperty("os.name")+"/"+System.getProperty("os.arch")+" ("+System.getProperty("sun.arch.data.model")+"bit). "+toMB(Runtime.getRuntime().maxMemory())+"MB available");
-    self.logMessage("Start Clock @ "+nowAsString(self.f.execTime)+" ("+nowAsDate(self.f.execTime)+")");
+    self.logMessage("Start Clock @ "+nowAsString(self.publisherFields.execTime)+" ("+nowAsDate(self.publisherFields.execTime)+")");
     self.logMessage("");
     if (noValidation) {
-      self.f.validationOff = noValidation;
+      self.publisherFields.validationOff = noValidation;
       System.out.println("Running without generation to shorten the run time (editor process only)");
     }
     if (noGeneration) {
-      self.f.generationOff = noGeneration;
+      self.publisherFields.generationOff = noGeneration;
       System.out.println("Running without generation to shorten the run time (editor process only)");
     }
     self.setTxServer(txServer);
     self.setConfigFile(determineActualIG(folderPath, PublisherUtils.IGBuildMode.MANUAL));
 
-    self.f.debug = wantDebug;
+    self.publisherFields.debug = wantDebug;
 
     if (clearTermCache) {
       self.setCacheOption(PublisherUtils.CacheOption.CLEAR_ALL);

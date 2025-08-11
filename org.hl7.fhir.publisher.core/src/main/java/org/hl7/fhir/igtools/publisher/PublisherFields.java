@@ -37,38 +37,10 @@ import org.hl7.fhir.validation.instance.InstanceValidator;
 import org.hl7.fhir.validation.profile.ProfileValidator;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.*;
 
 public class PublisherFields {
 
-  public static class PreProcessInfo {
-    private String xsltName;
-    private byte[] xslt;
-    private String relativePath;
-    public PreProcessInfo(String xsltName, String relativePath) throws IOException {
-      this.xsltName = xsltName;
-      if (xsltName!=null) {
-        this.xslt = FileUtilities.fileToBytes(xsltName);
-      }
-      this.relativePath = relativePath;
-    }
-    public boolean hasXslt() {
-      return xslt!=null;
-    }
-    public byte[] getXslt() {
-      return xslt;
-    }
-    public boolean hasRelativePath() {
-      return relativePath != null && !relativePath.isEmpty();
-    }
-    public String getRelativePath() {
-      return relativePath;
-    }
-  }
-
-
-  String consoleLog;
   String sourceDir;
   String configFile;
   String destDir;
@@ -122,10 +94,8 @@ public class PublisherFields {
   InstanceValidator validator;
   ProfileValidator pvalidator;
   CodeSystemValidator csvalidator;
-  XVerExtensionManager xverManager;
   IGKnowledgeProvider igpkp;
   List<SpecMapManager> specMaps = new ArrayList<SpecMapManager>();
-  List<NpmPackage> npms = new ArrayList<NpmPackage>();
   List<PublisherUtils.LinkedSpecification> linkSpecMaps = new ArrayList<PublisherUtils.LinkedSpecification>();
   List<String> suppressedIds = new ArrayList<String>();
   Map<String, MappingSpace> mappingSpaces = new HashMap<String, MappingSpace>();

@@ -54,16 +54,16 @@ public class PublisherProcessor extends PublisherBase  {
 
 
   public void checkLanguage() {
-    if ((f.langPolicy == ValidationPresenter.LanguagePopulationPolicy.ALL || f.langPolicy == ValidationPresenter.LanguagePopulationPolicy.OTHERS)) {
-      for (FetchedFile f : f.fileList) {
+    if ((publisherFields.langPolicy == ValidationPresenter.LanguagePopulationPolicy.ALL || publisherFields.langPolicy == ValidationPresenter.LanguagePopulationPolicy.OTHERS)) {
+      for (FetchedFile f : publisherFields.fileList) {
         for (FetchedResource r : f.getResources()) {
           logDebugMessage(LogCategory.PROGRESS, "process language in res: "+r.fhirType()+"/"+r.getId());
-          if (!this.f.sourceIg.hasLanguage()) {
+          if (!this.publisherFields.sourceIg.hasLanguage()) {
             if (r.getElement().hasChild("language")) {
               r.getElement().removeChild("language");
             }
           } else {
-            r.getElement().setChildValue("language", this.f.sourceIg.getLanguage());
+            r.getElement().setChildValue("language", this.publisherFields.sourceIg.getLanguage());
           }
         }
       }
@@ -86,14 +86,14 @@ public class PublisherProcessor extends PublisherBase  {
 
     log("Assign Comparison Ids");
     assignComparisonIds();
-    if (f.isPropagateStatus) {
+    if (publisherFields.isPropagateStatus) {
       log("Propagating status");
       propagateStatus();
     }
     log("Generating Narratives");
     doActorScan();
     generateNarratives(false);
-    if (!f.validationOff) {
+    if (!publisherFields.validationOff) {
       log("Validating Conformance Resources");
       for (String s : metadataResourceNames()) {
         validate(s);
@@ -107,20 +107,20 @@ public class PublisherProcessor extends PublisherBase  {
     generateAdditionalExamples();
     executeTransforms();
     validateExpressions();
-    f.errors.addAll(f.cql.getGeneralErrors());
+    publisherFields.errors.addAll(publisherFields.cql.getGeneralErrors());
     scanForUsageStats();
   }
 
   private void doActorScan() {
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       for (FetchedResource r: f.getResources()) {
         if (r.getResource() != null && r.getResource() instanceof StructureDefinition) {
           for (ElementDefinition ed : ((StructureDefinition) r.getResource()).getDifferential().getElement()) {
             for (Extension obd : ExtensionUtilities.getExtensions(ed, ExtensionDefinitions.EXT_OBLIGATION_CORE)) {
               for (Extension act : ExtensionUtilities.getExtensions(obd, "actor")) {
-                ActorDefinition ad = this.f.context.fetchResource(ActorDefinition.class, act.getValue().primitiveValue());
+                ActorDefinition ad = this.publisherFields.context.fetchResource(ActorDefinition.class, act.getValue().primitiveValue());
                 if (ad != null) {
-                  this.f.rc.getActorWhiteList().add(ad);
+                  this.publisherFields.rc.getActorWhiteList().add(ad);
                 }
               }
             }
@@ -128,7 +128,7 @@ public class PublisherProcessor extends PublisherBase  {
         }
 
         if (r.getResource() != null && r.getResource() instanceof ActorDefinition) {
-          this.f.rc.getActorWhiteList().add((ActorDefinition) r.getResource());
+          this.publisherFields.rc.getActorWhiteList().add((ActorDefinition) r.getResource());
         }
       }
     }
@@ -136,7 +136,7 @@ public class PublisherProcessor extends PublisherBase  {
 
   private void scanUrls(String type) throws Exception {
     logDebugMessage(LogCategory.PROGRESS, "process type: "+type);
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       f.start("scan");
       try {
         for (FetchedResource r : f.getResources()) {
@@ -147,9 +147,9 @@ public class PublisherProcessor extends PublisherBase  {
               if (title == null) {
                 title = r.getElement().getChildValue("name");
               }
-              String link = this.f.igpkp.getLinkFor(r, true);
+              String link = this.publisherFields.igpkp.getLinkFor(r, true);
               r.getElement().setWebPath(link);
-              this.f.validationFetcher.getOtherUrls().add(url);
+              this.publisherFields.validationFetcher.getOtherUrls().add(url);
             }
           }
         }
@@ -161,7 +161,7 @@ public class PublisherProcessor extends PublisherBase  {
 
 
   private void loadDepInfo() {
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       f.start("loadDepInfo");
       try {
         for (FetchedResource r : f.getResources()) {
@@ -171,29 +171,29 @@ public class PublisherProcessor extends PublisherBase  {
             if (title == null) {
               title = r.getElement().getChildValue("name");
             }
-            String link = this.f.igpkp.getLinkFor(r, true);
+            String link = this.publisherFields.igpkp.getLinkFor(r, true);
             switch (r.fhirType() ) {
               case "CodeSystem":
-                this.f.dependentIgFinder.addCodeSystem(url, title, link);
+                this.publisherFields.dependentIgFinder.addCodeSystem(url, title, link);
                 break;
               case "ValueSet":
-                this.f.dependentIgFinder.addValueSet(url, title, link);
+                this.publisherFields.dependentIgFinder.addValueSet(url, title, link);
                 break;
               case "StructureDefinition":
                 String kind = r.getElement().getChildValue("url");
                 if ("logical".equals(kind)) {
-                  this.f.dependentIgFinder.addLogical(url, title, link);
+                  this.publisherFields.dependentIgFinder.addLogical(url, title, link);
                 } else if ("Extension".equals(r.getElement().getChildValue("type"))) {
-                  this.f.dependentIgFinder.addExtension(url, title, link);
+                  this.publisherFields.dependentIgFinder.addExtension(url, title, link);
                 } else {
-                  this.f.dependentIgFinder.addProfile(url, title, link);
+                  this.publisherFields.dependentIgFinder.addProfile(url, title, link);
                 }
                 break;
               case "SearchParameter":
-                this.f.dependentIgFinder.addSearchParam(url, title, link);
+                this.publisherFields.dependentIgFinder.addSearchParam(url, title, link);
                 break;
               case "CapabilityStatement":
-                this.f.dependentIgFinder.addCapabilityStatement(url, title, link);
+                this.publisherFields.dependentIgFinder.addCapabilityStatement(url, title, link);
                 break;
               default:
                 // do nothing
@@ -204,12 +204,12 @@ public class PublisherProcessor extends PublisherBase  {
         f.finish("loadDepInfo");
       }
     }
-    f.dependentIgFinder.go();
+    publisherFields.dependentIgFinder.go();
   }
 
 
   private void loadInfo() {
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       f.start("loadInfo");
       try {
         for (FetchedResource r : f.getResources()) {
@@ -229,10 +229,10 @@ public class PublisherProcessor extends PublisherBase  {
 
 
   private void loadPaths() {
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       for (FetchedResource r : f.getResources()) {
         if (!r.getElement().hasWebPath()) {
-          this.f.igpkp.checkForPath(f, r, r.getElement());
+          this.publisherFields.igpkp.checkForPath(f, r, r.getElement());
         }
       }
     }
@@ -240,14 +240,14 @@ public class PublisherProcessor extends PublisherBase  {
 
   private void checkR4R4B() throws Exception {
     logDebugMessage(LogCategory.PROGRESS, "R4/R4B Check");
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       f.start("checkR4R4B");
       try {
         for (FetchedResource r : f.getResources()) {
           if (r.getResource() instanceof StructureDefinition) {
-            this.f.r4tor4b.checkProfile((StructureDefinition) r.getResource());
+            this.publisherFields.r4tor4b.checkProfile((StructureDefinition) r.getResource());
           } else {
-            this.f.r4tor4b.checkExample(r.getElement());
+            this.publisherFields.r4tor4b.checkExample(r.getElement());
           }
         }
       } finally {
@@ -257,17 +257,17 @@ public class PublisherProcessor extends PublisherBase  {
   }
 
   private void generateOtherVersions() throws Exception {
-    for (String v : f.generateVersions) {
+    for (String v : publisherFields.generateVersions) {
       String version = VersionUtilities.versionFromCode(v);
-      if (!VersionUtilities.versionsMatch(version, f.context.getVersion())) {
+      if (!VersionUtilities.versionsMatch(version, publisherFields.context.getVersion())) {
         logDebugMessage(LogCategory.PROGRESS, "Generate Other Version: "+version);
 
-        NpmPackage targetNpm = f.pcm.loadPackage(VersionUtilities.packageForVersion(version));
+        NpmPackage targetNpm = publisherFields.pcm.loadPackage(VersionUtilities.packageForVersion(version));
         IContextResourceLoader loader = ContextResourceLoaderFactory.makeLoader(targetNpm.fhirVersion(), new NullLoaderKnowledgeProviderR5());
         SimpleWorkerContext tctxt = new SimpleWorkerContext.SimpleWorkerContextBuilder().withAllowLoadingDuplicates(true).fromPackage(targetNpm, loader, true);
-        ProfileVersionAdaptor pva = new ProfileVersionAdaptor(f.context, tctxt);
+        ProfileVersionAdaptor pva = new ProfileVersionAdaptor(publisherFields.context, tctxt);
 
-        for (FetchedFile f : f.fileList) {
+        for (FetchedFile f : publisherFields.fileList) {
           f.start("generateOtherVersions");
           try {
             for (FetchedResource r : f.getResources()) {
@@ -284,12 +284,12 @@ public class PublisherProcessor extends PublisherBase  {
         }
         pva.generateSnapshots();
 
-        for (FetchedFile f: f.fileList) {
+        for (FetchedFile f: publisherFields.fileList) {
           f.start("generateOtherVersions");
           try {
             for (FetchedResource r : f.getResources()) {
               if (r.getResource() != null) {
-                checkForCoreDependencies(this.f.vnpms.get(v), tctxt, r.getResource(), targetNpm);
+                checkForCoreDependencies(this.publisherFields.vnpms.get(v), tctxt, r.getResource(), targetNpm);
               }
             }
           } finally {
@@ -313,7 +313,7 @@ public class PublisherProcessor extends PublisherBase  {
   private void checkForCoreDependenciesSD(NPMPackageGenerator npm, SimpleWorkerContext tctxt, StructureDefinition sd, NpmPackage tnpm) throws IOException {
     for (ElementDefinition ed : sd.getSnapshot().getElement()) {
       if (ed.hasBinding() && ed.getBinding().hasValueSet()) {
-        ValueSet vs = f.context.fetchResource(ValueSet.class, ed.getBinding().getValueSet());
+        ValueSet vs = publisherFields.context.fetchResource(ValueSet.class, ed.getBinding().getValueSet());
         if (vs != null) {
           checkForCoreDependenciesVS(npm, tctxt, vs, tnpm);
         }
@@ -333,13 +333,13 @@ public class PublisherProcessor extends PublisherBase  {
     }
     for (ValueSet.ConceptSetComponent inc : valueSet.getCompose().getInclude()) {
       for (CanonicalType c : inc.getValueSet()) {
-        ValueSet vs = f.context.fetchResource(ValueSet.class, c.getValue());
+        ValueSet vs = publisherFields.context.fetchResource(ValueSet.class, c.getValue());
         if (vs != null) {
           checkForCoreDependenciesVS(npm, tctxt, vs, tnpm);
         }
       }
       if (inc.hasSystem()) {
-        CodeSystem cs = f.context.fetchResource(CodeSystem.class, inc.getSystem(), inc.getVersion());
+        CodeSystem cs = publisherFields.context.fetchResource(CodeSystem.class, inc.getSystem(), inc.getVersion());
         if (cs != null) {
           checkForCoreDependenciesCS(npm, tctxt, cs, tnpm);
         }
@@ -359,10 +359,10 @@ public class PublisherProcessor extends PublisherBase  {
   }
 
   private void noteOtherVersionAddedFile(String ver, String type, String id) {
-    Set<String> ids = f.otherVersionAddedResources.get(ver+"-"+type);
+    Set<String> ids = publisherFields.otherVersionAddedResources.get(ver+"-"+type);
     if (ids == null) {
       ids = new HashSet<String>();
-      f.otherVersionAddedResources .put(ver+"-"+type, ids);
+      publisherFields.otherVersionAddedResources .put(ver+"-"+type, ids);
     }
     ids.add(id);
   }
@@ -403,7 +403,7 @@ public class PublisherProcessor extends PublisherBase  {
 
   private void validateExpressions() {
     logDebugMessage(LogCategory.PROGRESS, "Validate Expressions");
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       f.start("validateExpressions");
       try {
         for (FetchedResource r : f.getResources()) {
@@ -419,7 +419,7 @@ public class PublisherProcessor extends PublisherBase  {
   }
 
   private void validateExpressions(FetchedFile f, StructureDefinition sd, FetchedResource r) {
-    FHIRPathEngine fpe = new FHIRPathEngine(this.f.context);
+    FHIRPathEngine fpe = new FHIRPathEngine(this.publisherFields.context);
     for (ElementDefinition ed : sd.getSnapshot().getElement()) {
       for (ElementDefinition.ElementDefinitionConstraintComponent inv : ed.getConstraint()) {
         validateExpression(f, sd, fpe, ed, inv, r);
@@ -444,8 +444,8 @@ public class PublisherProcessor extends PublisherBase  {
   }
 
   private void generateLogicalMaps() throws Exception {
-    StructureMapUtilities mu = new StructureMapUtilities(f.context, null, null);
-    for (FetchedFile f : f.fileList) {
+    StructureMapUtilities mu = new StructureMapUtilities(publisherFields.context, null, null);
+    for (FetchedFile f : publisherFields.fileList) {
       f.start("generateLogicalMaps");
       try {
         List<StructureMap> maps = new ArrayList<StructureMap>();
@@ -463,7 +463,7 @@ public class PublisherProcessor extends PublisherBase  {
           nr.setElement(convertToElement(nr, map));
           nr.setId(map.getId());
           nr.setTitle(map.getName());
-          this.f.igpkp.findConfiguration(f, nr);
+          this.publisherFields.igpkp.findConfiguration(f, nr);
         }
       } finally {
         f.finish("generateLogicalMaps");
@@ -473,14 +473,14 @@ public class PublisherProcessor extends PublisherBase  {
 
 
   public void validate() throws Exception {
-    if (f.validationOff) {
+    if (publisherFields.validationOff) {
       return;
     }
 
     checkURLsUnique();
     checkOIDsUnique();
 
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       f.start("validate");
       try {
         logDebugMessage(LogCategory.PROGRESS, " .. validate "+f.getName());
@@ -498,13 +498,13 @@ public class PublisherProcessor extends PublisherBase  {
           }
           if (f.getLogical() != null && f.getResources().size() == 1 && r0.fhirType().equals("Binary")) {
             Binary bin = (Binary) r0.getResource();
-            StructureDefinition profile = this.f.context.fetchResource(StructureDefinition.class, f.getLogical());
+            StructureDefinition profile = this.publisherFields.context.fetchResource(StructureDefinition.class, f.getLogical());
             List<ValidationMessage> errs = new ArrayList<ValidationMessage>();
             if (profile == null) {
-              errs.add(new ValidationMessage(ValidationMessage.Source.InstanceValidator, ValidationMessage.IssueType.NOTFOUND, "file", this.f.context.formatMessage(I18nConstants.Bundle_BUNDLE_Entry_NO_LOGICAL_EXPL, r0.getId(), f.getLogical()), ValidationMessage.IssueSeverity.ERROR));
+              errs.add(new ValidationMessage(ValidationMessage.Source.InstanceValidator, ValidationMessage.IssueType.NOTFOUND, "file", this.publisherFields.context.formatMessage(I18nConstants.Bundle_BUNDLE_Entry_NO_LOGICAL_EXPL, r0.getId(), f.getLogical()), ValidationMessage.IssueSeverity.ERROR));
             } else {
               Manager.FhirFormat fmt = Manager.FhirFormat.readFromMimeType(bin.getContentType() == null ? f.getContentType() : bin.getContentType());
-              TimeTracker.Session tts = this.f.tt.start("validation");
+              TimeTracker.Session tts = this.publisherFields.tt.start("validation");
               List<StructureDefinition> profiles = new ArrayList<>();
               profiles.add(profile);
               validate(f, r0, bin, errs, fmt, profiles);
@@ -519,7 +519,7 @@ public class PublisherProcessor extends PublisherBase  {
     }
     logDebugMessage(LogCategory.PROGRESS, " .. check Profile Examples");
     logDebugMessage(LogCategory.PROGRESS, "gen narratives");
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.fhirType().equals("StructureDefinition")) {
           validateSD(f, r);
@@ -530,27 +530,27 @@ public class PublisherProcessor extends PublisherBase  {
 
   private void validate(FetchedFile f, FetchedResource r, Binary bin, List<ValidationMessage> errs, Manager.FhirFormat fmt, List<StructureDefinition> profiles) {
     long ts = System.currentTimeMillis();
-    r.setLogicalElement(this.f.validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), fmt, profiles));
+    r.setLogicalElement(this.publisherFields.validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), fmt, profiles));
     long tf = System.currentTimeMillis();
-    if (tf-ts > this.f.validationLogTime && this.f.validationLogTime > 0) {
+    if (tf-ts > this.publisherFields.validationLogTime && this.publisherFields.validationLogTime > 0) {
       reportLongValidation(f, r, tf-ts);
     }
   }
 
   private void validate(FetchedFile f, FetchedResource r, List<ValidationMessage> errs, List<StructureDefinition> profiles) {
     long ts = System.currentTimeMillis();
-    this.f.validator.validate(r.getElement(), errs, null, r.getElement(), profiles);
+    this.publisherFields.validator.validate(r.getElement(), errs, null, r.getElement(), profiles);
     long tf = System.currentTimeMillis();
-    if (tf-ts > this.f.validationLogTime && this.f.validationLogTime > 0) {
+    if (tf-ts > this.publisherFields.validationLogTime && this.publisherFields.validationLogTime > 0) {
       reportLongValidation(f, r, tf-ts);
     }
   }
 
   private void validate(FetchedFile f, FetchedResource r, List<ValidationMessage> errs, Binary bin) {
     long ts = System.currentTimeMillis();
-    this.f.validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), Manager.FhirFormat.readFromMimeType(bin.getContentType() == null ? f.getContentType() : bin.getContentType()));
+    this.publisherFields.validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), Manager.FhirFormat.readFromMimeType(bin.getContentType() == null ? f.getContentType() : bin.getContentType()));
     long tf = System.currentTimeMillis();
-    if (tf-ts > this.f.validationLogTime && this.f.validationLogTime > 0) {
+    if (tf-ts > this.publisherFields.validationLogTime && this.publisherFields.validationLogTime > 0) {
       reportLongValidation(f, r, tf-ts);
     }
   }
@@ -559,27 +559,27 @@ public class PublisherProcessor extends PublisherBase  {
     long ts = System.currentTimeMillis();
     List<StructureDefinition> profiles = new ArrayList<StructureDefinition>();
     profiles.add(sd);
-    this.f.validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), Manager.FhirFormat.readFromMimeType(bin.getContentType() == null ? f.getContentType(): bin.getContentType()), profiles);
+    this.publisherFields.validator.validate(r.getElement(), errs, new ByteArrayInputStream(bin.getContent()), Manager.FhirFormat.readFromMimeType(bin.getContentType() == null ? f.getContentType(): bin.getContentType()), profiles);
     long tf = System.currentTimeMillis();
-    if (tf-ts > this.f.validationLogTime && this.f.validationLogTime > 0) {
+    if (tf-ts > this.publisherFields.validationLogTime && this.publisherFields.validationLogTime > 0) {
       reportLongValidation(f, r, tf-ts);
     }
   }
 
   private void validate(FetchedFile f, FetchedResource r, List<ValidationMessage> errs, Resource ber) {
     long ts = System.currentTimeMillis();
-    this.f.validator.validate(r.getElement(), errs, ber, ber.getUserString(UserDataNames.map_profile));
+    this.publisherFields.validator.validate(r.getElement(), errs, ber, ber.getUserString(UserDataNames.map_profile));
     long tf = System.currentTimeMillis();
-    if (tf-ts > this.f.validationLogTime && this.f.validationLogTime > 0) {
+    if (tf-ts > this.publisherFields.validationLogTime && this.publisherFields.validationLogTime > 0) {
       reportLongValidation(f, r, tf-ts);
     }
   }
 
   private void validate(FetchedFile f, FetchedResource r, List<ValidationMessage> errs) {
     long ts = System.currentTimeMillis();
-    this.f.validator.validate(r.getElement(), errs, null, r.getElement());
+    this.publisherFields.validator.validate(r.getElement(), errs, null, r.getElement());
     long tf = System.currentTimeMillis();
-    if (tf-ts > this.f.validationLogTime && this.f.validationLogTime > 0) {
+    if (tf-ts > this.publisherFields.validationLogTime && this.publisherFields.validationLogTime > 0) {
       reportLongValidation(f, r, tf-ts);
     }
   }
@@ -587,12 +587,12 @@ public class PublisherProcessor extends PublisherBase  {
   private void reportLongValidation(FetchedFile f, FetchedResource r, long l) {
     String bps = Long.toString(f.getSize()/l);
     System.out.println("Long Validation for "+f.getTitle()+" resource "+r.fhirType()+"/"+r.getId()+": "+Long.toString(l)+"ms ("+bps+" kb/sec)");
-    System.out.println("  * "+ this.f.validator.reportTimes());
+    System.out.println("  * "+ this.publisherFields.validator.reportTimes());
   }
 
   private void checkURLsUnique() {
     Map<String, FetchedResource> urls = new HashMap<>();
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       f.start("checkURLsUnique");
       try {
         for (FetchedResource r : f.getResources()) {
@@ -605,7 +605,7 @@ public class PublisherProcessor extends PublisherBase  {
                 CanonicalResource crs = (CanonicalResource) rs.getResource();
                 if (!(crs.getStatus() == Enumerations.PublicationStatus.RETIRED || cr.getStatus() == Enumerations.PublicationStatus.RETIRED)) {
                   FetchedFile fs = findFileForResource(rs);
-                  boolean local = url.startsWith(this.f.igpkp.getCanonical());
+                  boolean local = url.startsWith(this.publisherFields.igpkp.getCanonical());
                   f.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, "Resource", "The URL '"+url+"' has already been used by "+rs.getId()+" in "+fs.getName(), local ? ValidationMessage.IssueSeverity.ERROR : ValidationMessage.IssueSeverity.WARNING));
                   fs.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, "Resource", "The URL '"+url+"' is also used by "+r.getId()+" in "+f.getName(), local ? ValidationMessage.IssueSeverity.ERROR : ValidationMessage.IssueSeverity.WARNING));
                 }
@@ -622,34 +622,34 @@ public class PublisherProcessor extends PublisherBase  {
   }
 
   private void checkOIDsUnique() {
-    if (f.oidRoot != null) {
+    if (publisherFields.oidRoot != null) {
       try {
         JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObjectFromUrl("https://fhir.github.io/ig-registry/oid-assignments.json");
         JsonObject assignments = json.getJsonObject("assignments");
         String ig = null;
         String oid = null;
-        if (assignments.has(f.oidRoot)) {
-          ig = assignments.getJsonObject(f.oidRoot).asString("id");
+        if (assignments.has(publisherFields.oidRoot)) {
+          ig = assignments.getJsonObject(publisherFields.oidRoot).asString("id");
         }
         for (JsonProperty p : assignments.getProperties()) {
-          if (p.getValue().isJsonObject() && f.sourceIg.getPackageId().equals(p.getValue().asJsonObject().asString("id"))) {
+          if (p.getValue().isJsonObject() && publisherFields.sourceIg.getPackageId().equals(p.getValue().asJsonObject().asString("id"))) {
             oid = p.getName();
           }
         }
         if (oid == null && ig == null) {
-          f.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, "ImplementationGuide", "The assigned auto-oid-root value '"+ f.oidRoot +"' is not registered in https://github.com/FHIR/ig-registry/blob/master/oid-assignments.json so isn't known to be valid", ValidationMessage.IssueSeverity.WARNING));
-        } else if (oid != null && !oid.equals(f.oidRoot)) {
-          throw new FHIRException("The assigned auto-oid-root value '"+ f.oidRoot +"' does not match the value of '"+ f.oidRoot +"' registered in https://github.com/FHIR/ig-registry/blob/master/oid-assignments.json so cannot proceed");
-        } else if (ig != null && !ig.equals(f.sourceIg.getPackageId())) {
-          throw new FHIRException("The assigned auto-oid-root value '"+ f.oidRoot +"' is already registered to the IG '"+ig+"' in https://github.com/FHIR/ig-registry/blob/master/oid-assignments.json so cannot proceed");
+          publisherFields.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, "ImplementationGuide", "The assigned auto-oid-root value '"+ publisherFields.oidRoot +"' is not registered in https://github.com/FHIR/ig-registry/blob/master/oid-assignments.json so isn't known to be valid", ValidationMessage.IssueSeverity.WARNING));
+        } else if (oid != null && !oid.equals(publisherFields.oidRoot)) {
+          throw new FHIRException("The assigned auto-oid-root value '"+ publisherFields.oidRoot +"' does not match the value of '"+ publisherFields.oidRoot +"' registered in https://github.com/FHIR/ig-registry/blob/master/oid-assignments.json so cannot proceed");
+        } else if (ig != null && !ig.equals(publisherFields.sourceIg.getPackageId())) {
+          throw new FHIRException("The assigned auto-oid-root value '"+ publisherFields.oidRoot +"' is already registered to the IG '"+ig+"' in https://github.com/FHIR/ig-registry/blob/master/oid-assignments.json so cannot proceed");
         }
       } catch (Exception e) {
-        f.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, "ImplementationGuide", "Unable to check auto-oid-root because "+e.getMessage(), ValidationMessage.IssueSeverity.INFORMATION));
+        publisherFields.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, "ImplementationGuide", "Unable to check auto-oid-root because "+e.getMessage(), ValidationMessage.IssueSeverity.INFORMATION));
       }
     }
     String oidHint = " (OIDs are easy to assign - see https://build.fhir.org/ig/FHIR/fhir-tools-ig/CodeSystem-ig-parameters.html#ig-parameters-auto-oid-root)";
     Map<String, FetchedResource> oidMap = new HashMap<>();
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
           CanonicalResource cr = (CanonicalResource) r.getResource();
@@ -707,7 +707,7 @@ public class PublisherProcessor extends PublisherBase  {
           r.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, "StructureDefinition.where(url = '"+sd.getUrl()+"')", "The Implementation Guide contains no explicitly linked examples for this profile", ValidationMessage.IssueSeverity.INFORMATION));
         }
       } else if (sd.getKind() == StructureDefinition.StructureDefinitionKind.COMPLEXTYPE) {
-        if (!this.f.noUsageCheck) {
+        if (!this.publisherFields.noUsageCheck) {
           if (sd.getType().equals("Extension")) {
             int c = countUsages(getFixedUrl(sd));
             if (c == 0) {
@@ -729,12 +729,12 @@ public class PublisherProcessor extends PublisherBase  {
 
   private void assignComparisonIds() {
     int i = 0;
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() instanceof StructureDefinition) {
           StructureDefinition sd = (StructureDefinition) r.getResource();
           for (Extension ext : sd.getExtensionsByUrl(ExtensionDefinitions.EXT_SD_IMPOSE_PROFILE)) {
-            StructureDefinition sdi = this.f.context.fetchResource(StructureDefinition.class, ext.getValue().primitiveValue());
+            StructureDefinition sdi = this.publisherFields.context.fetchResource(StructureDefinition.class, ext.getValue().primitiveValue());
             if (sdi != null && !sdi.hasUserData(UserDataNames.pub_imposes_compare_id)) {
               String cid = "c"+Integer.toString(i);
               sdi.setUserData(UserDataNames.pub_imposes_compare_id, cid);
@@ -759,31 +759,31 @@ public class PublisherProcessor extends PublisherBase  {
    * dependencies.
    */
   private void propagateStatus() throws Exception {
-    TimeTracker.Session tts = f.tt.start("propagating status");
+    TimeTracker.Session tts = publisherFields.tt.start("propagating status");
     logDebugMessage(LogCategory.PROGRESS, "propagating status");
-    IntegerType igFMM = f.sourceIg.hasExtension(ExtensionDefinitions.EXT_FMM_LEVEL) ? f.sourceIg.getExtensionByUrl(ExtensionDefinitions.EXT_FMM_LEVEL).getValueIntegerType() : null;
-    CodeType igStandardsStatus = f.sourceIg.hasExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS) ? f.sourceIg.getExtensionByUrl(ExtensionDefinitions.EXT_STANDARDS_STATUS).getValueCodeType() : null;
-    String igNormVersion = f.sourceIg.hasExtension(ExtensionDefinitions.EXT_NORMATIVE_VERSION) ? f.sourceIg.getExtensionByUrl(ExtensionDefinitions.EXT_NORMATIVE_VERSION).getValueStringType().asStringValue() : null;
+    IntegerType igFMM = publisherFields.sourceIg.hasExtension(ExtensionDefinitions.EXT_FMM_LEVEL) ? publisherFields.sourceIg.getExtensionByUrl(ExtensionDefinitions.EXT_FMM_LEVEL).getValueIntegerType() : null;
+    CodeType igStandardsStatus = publisherFields.sourceIg.hasExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS) ? publisherFields.sourceIg.getExtensionByUrl(ExtensionDefinitions.EXT_STANDARDS_STATUS).getValueCodeType() : null;
+    String igNormVersion = publisherFields.sourceIg.hasExtension(ExtensionDefinitions.EXT_NORMATIVE_VERSION) ? publisherFields.sourceIg.getExtensionByUrl(ExtensionDefinitions.EXT_NORMATIVE_VERSION).getValueStringType().asStringValue() : null;
 
     // If IG doesn't declare FMM or standards status, nothing to do
     if (igFMM == null && igStandardsStatus == null)
       return;
 
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       for (FetchedResource r : f.getResources()) {
         if (!r.isExample())
-          updateResourceStatus(r, igFMM, igStandardsStatus, igNormVersion, this.f.sourceIg.getUrl());
+          updateResourceStatus(r, igFMM, igStandardsStatus, igNormVersion, this.publisherFields.sourceIg.getUrl());
       }
     }
 
-    updatePageStatus(f.publishedIg.getDefinition().getPage(), null, new CodeType("informative"), null);
+    updatePageStatus(publisherFields.publishedIg.getDefinition().getPage(), null, new CodeType("informative"), null);
     tts.end();
   }
 
   private void updatePageStatus(ImplementationGuide.ImplementationGuideDefinitionPageComponent page, IntegerType parentFmm, CodeType parentStatus, String parentNormVersion) {
     IntegerType fmm = null;
     CodeType standardsStatus = page.hasExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS) ? page.getExtensionByUrl(ExtensionDefinitions.EXT_STANDARDS_STATUS).getValueCodeType() : null;
-    String normVersion = f.sourceIg.hasExtension(ExtensionDefinitions.EXT_NORMATIVE_VERSION) ? f.sourceIg.getExtensionByUrl(ExtensionDefinitions.EXT_NORMATIVE_VERSION).getValueStringType().asStringValue() : null;
+    String normVersion = publisherFields.sourceIg.hasExtension(ExtensionDefinitions.EXT_NORMATIVE_VERSION) ? publisherFields.sourceIg.getExtensionByUrl(ExtensionDefinitions.EXT_NORMATIVE_VERSION).getValueStringType().asStringValue() : null;
 
     Extension fmmExt = page.getExtensionByUrl(ExtensionDefinitions.EXT_FMM_LEVEL);
 
@@ -810,7 +810,7 @@ public class PublisherProcessor extends PublisherBase  {
         fmm = fmmExt.getValueIntegerType();
     }
     for (ImplementationGuide.ImplementationGuideDefinitionPageComponent childPage: page.getPage()) {
-      FetchedResource res = f.resources.get(page.getName());
+      FetchedResource res = publisherFields.resources.get(page.getName());
       if (res == null)
         updatePageStatus(childPage, fmm, standardsStatus, normVersion);
     }
@@ -821,8 +821,8 @@ public class PublisherProcessor extends PublisherBase  {
     if (canonical == null)
       return;
     if (!canonical.contains("://"))
-      canonical = f.igpkp.getCanonical() + "/" + canonical;
-    FetchedResource r = f.canonicalResources.get(canonical);
+      canonical = publisherFields.igpkp.getCanonical() + "/" + canonical;
+    FetchedResource r = publisherFields.canonicalResources.get(canonical);
     if (r != null) {
       updateResourceStatus(r, parentFmm, parentStatus, parentNormVersion, parentCanonical);
     }
@@ -833,15 +833,15 @@ public class PublisherProcessor extends PublisherBase  {
     if (canonical == null)
       return;
     if (!canonical.contains("://"))
-      canonical = f.igpkp.getCanonical() + "/" + canonical;
-    FetchedResource r = f.canonicalResources.get(canonical);
+      canonical = publisherFields.igpkp.getCanonical() + "/" + canonical;
+    FetchedResource r = publisherFields.canonicalResources.get(canonical);
     if (r != null) {
       updateResourceStatus(r, parentFmm, parentStatus, parentNormVersion, parentCanonical);
     }
   }
 
   private void updateResourceStatus(CanonicalType canonical, IntegerType parentFmm, CodeType parentStatus, String parentNormVersion, String parentCanonical) {
-    FetchedResource r = f.canonicalResources.get(canonical.getValue());
+    FetchedResource r = publisherFields.canonicalResources.get(canonical.getValue());
     if (r != null) {
       updateResourceStatus(r, parentFmm, parentStatus, parentNormVersion, parentCanonical);
     }
@@ -889,7 +889,7 @@ public class PublisherProcessor extends PublisherBase  {
         code.addExtension(ExtensionDefinitions.EXT_FMM_DERIVED, new CanonicalType(parentCanonical));
         res.addExtension(ExtensionDefinitions.EXT_STANDARDS_STATUS, code);
       } else if (!Utilities.existsInList(status.getValue(), "informative", "draft", "deprecated")) {
-        f.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.INVALID, res.getResourceType() + " " + r.getId(), "If a resource is not implementable, is marked as experimental or example, the standards status can only be 'informative', 'draft' or 'deprecated', not '"+status.getValue()+"'.", ValidationMessage.IssueSeverity.ERROR));
+        publisherFields.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.INVALID, res.getResourceType() + " " + r.getId(), "If a resource is not implementable, is marked as experimental or example, the standards status can only be 'informative', 'draft' or 'deprecated', not '"+status.getValue()+"'.", ValidationMessage.IssueSeverity.ERROR));
       }
 
     } else {
@@ -1198,16 +1198,16 @@ public class PublisherProcessor extends PublisherBase  {
 
 
   public void generateNarratives(boolean isRegen) throws Exception {
-    TimeTracker.Session tts = f.tt.start("narrative generation");
+    TimeTracker.Session tts = publisherFields.tt.start("narrative generation");
     logDebugMessage(LogCategory.PROGRESS, isRegen ? "regen narratives" : "gen narratives");
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       f.start("generateNarratives");
       try {
         for (FetchedResource r : f.getResources()) {
           if (!isRegen || r.isRegenAfterValidation()) {
-            if (r.getExampleUri()==null || this.f.genExampleNarratives) {
+            if (r.getExampleUri()==null || this.publisherFields.genExampleNarratives) {
               if (!passesNarrativeFilter(r)) {
-                this.f.noNarrativeResources.add(r);
+                this.publisherFields.noNarrativeResources.add(r);
                 logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId()+" suppressed");
                 if (r.getResource() != null && r.getResource() instanceof DomainResource) {
                   ((DomainResource) r.getResource()).setText(null);
@@ -1220,10 +1220,10 @@ public class PublisherProcessor extends PublisherBase  {
                   boolean regen = false;
                   boolean first = true;
                   for (Locale lang : langs) {
-                    RenderingContext lrc = this.f.rc.copy(false).setDefinitionsTarget(this.f.igpkp.getDefinitionsName(r));
+                    RenderingContext lrc = this.publisherFields.rc.copy(false).setDefinitionsTarget(this.publisherFields.igpkp.getDefinitionsName(r));
                     lrc.setLocale(lang);
                     lrc.setRules(RenderingContext.GenerationRules.VALID_RESOURCE);
-                    lrc.setDefinitionsTarget(this.f.igpkp.getDefinitionsName(r));
+                    lrc.setDefinitionsTarget(this.publisherFields.igpkp.getDefinitionsName(r));
                     lrc.setSecondaryLang(!first);
                     if (!first) {
                       lrc.setUniqueLocalPrefix(lang.toLanguageTag());
@@ -1234,7 +1234,7 @@ public class PublisherProcessor extends PublisherBase  {
                       ResourceRenderer rr = RendererFactory.factory(r.getResource(), lrc);
                       if (rr.renderingUsesValidation()) {
                         r.setRegenAfterValidation(true);
-                        this.f.needsRegen = true;
+                        this.publisherFields.needsRegen = true;
                       }
                       rr.setMultiLangMode(langs.size() > 1).renderResource(ResourceWrapper.forResource(lrc, r.getResource()));
                     } else if (r.getResource() instanceof Bundle) {
@@ -1256,7 +1256,7 @@ public class PublisherProcessor extends PublisherBase  {
                 } else {
                   boolean first = true;
                   for (Locale lang : langs) {
-                    RenderingContext lrc = this.f.rc.copy(false).setParser(getTypeLoader(f,r));
+                    RenderingContext lrc = this.publisherFields.rc.copy(false).setParser(getTypeLoader(f,r));
                     lrc.clearAnchors();
                     lrc.setLocale(lang);
                     lrc.setRules(RenderingContext.GenerationRules.VALID_RESOURCE);
@@ -1270,10 +1270,10 @@ public class PublisherProcessor extends PublisherBase  {
                       ResourceRenderer rr = RendererFactory.factory(rw, lrc);
                       if (rr.renderingUsesValidation()) {
                         r.setRegenAfterValidation(true);
-                        this.f.needsRegen = true;
+                        this.publisherFields.needsRegen = true;
                       }
                       rr.setMultiLangMode(langs.size() > 1).renderResource(rw);
-                      this.f.otherFilesRun.addAll(lrc.getFiles());
+                      this.publisherFields.otherFilesRun.addAll(lrc.getFiles());
                     } else if (r.fhirType().equals("Bundle")) {
                       lrc.setAddName(true);
                       for (org.hl7.fhir.r5.elementmodel.Element e : r.getElement().getChildrenByName("entry")) {
@@ -1283,7 +1283,7 @@ public class PublisherProcessor extends PublisherBase  {
                           ResourceRenderer rr = RendererFactory.factory(rw, lrc);
                           if (rr.renderingUsesValidation()) {
                             r.setRegenAfterValidation(true);
-                            this.f.needsRegen = true;
+                            this.publisherFields.needsRegen = true;
                           }
                           if (hasNarrative(res)) {
                             rr.checkNarrative(rw);
@@ -1312,7 +1312,7 @@ public class PublisherProcessor extends PublisherBase  {
 
 
   private void loadLists() throws Exception {
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       f.start("loadLists");
       try {
         for (FetchedResource r : f.getResources()) {
@@ -1361,13 +1361,13 @@ public class PublisherProcessor extends PublisherBase  {
       if ("DomainResource".equals(sd.getType())) {
         return true;
       }
-      sd = f.context.fetchResource(StructureDefinition.class, sd.getBaseDefinition());
+      sd = publisherFields.context.fetchResource(StructureDefinition.class, sd.getBaseDefinition());
     }
     return false;
   }
 
   private boolean passesNarrativeFilter(FetchedResource r) {
-    for (String s : f.noNarratives) {
+    for (String s : publisherFields.noNarratives) {
       String[] p = s.split("\\/");
       if (p.length == 2) {
         if (("*".equals(p[0]) || r.fhirType().equals(p[0])) &&
@@ -1380,7 +1380,7 @@ public class PublisherProcessor extends PublisherBase  {
   }
 
   private boolean passesValidationFilter(FetchedResource r) {
-    for (String s : f.noValidate) {
+    for (String s : publisherFields.noValidate) {
       String[] p = s.split("\\/");
       if (p.length == 2) {
         if (("*".equals(p[0]) || r.fhirType().equals(p[0])) &&
@@ -1395,7 +1395,7 @@ public class PublisherProcessor extends PublisherBase  {
 
   private void checkConformanceResources() throws IOException {
     log("Check profiles & code systems");
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       f.start("checkConformanceResources");
       try {
         for (FetchedResource r : f.getResources()) {
@@ -1405,7 +1405,7 @@ public class PublisherProcessor extends PublisherBase  {
             if (sd == null) {
               f.getErrors().add(new ValidationMessage(ValidationMessage.Source.ProfileValidator, ValidationMessage.IssueType.INVALID, "StructureDefinition", "Unable to validate - Profile not loaded", ValidationMessage.IssueSeverity.ERROR));
             } else {
-              f.getErrors().addAll(this.f.pvalidator.validate(sd, false));
+              f.getErrors().addAll(this.publisherFields.pvalidator.validate(sd, false));
               checkJurisdiction(f, (CanonicalResource) r.getResource(), ValidationMessage.IssueSeverity.ERROR, "must");
             }
           } else if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
@@ -1415,7 +1415,7 @@ public class PublisherProcessor extends PublisherBase  {
             logDebugMessage(LogCategory.PROGRESS, "process CodeSystem: "+r.getId());
             CodeSystem cs = (CodeSystem) r.getResource();
             if (cs != null) {
-              f.getErrors().addAll(this.f.csvalidator.validate(cs, false));
+              f.getErrors().addAll(this.publisherFields.csvalidator.validate(cs, false));
             }
           }
         }
@@ -1423,48 +1423,48 @@ public class PublisherProcessor extends PublisherBase  {
         f.finish("checkConformanceResources");
       }
     }
-    TimeTracker.Session tts = f.tt.start("realm-rules");
-    if (!f.realmRules.isExempt(f.publishedIg.getPackageId())) {
+    TimeTracker.Session tts = publisherFields.tt.start("realm-rules");
+    if (!publisherFields.realmRules.isExempt(publisherFields.publishedIg.getPackageId())) {
       log("Check realm rules");
-      f.realmRules.startChecks(f.publishedIg);
-      for (FetchedFile f : f.fileList) {
+      publisherFields.realmRules.startChecks(publisherFields.publishedIg);
+      for (FetchedFile f : publisherFields.fileList) {
         f.start("checkConformanceResources2");
         try {
           for (FetchedResource r : f.getResources()) {
             if (r.fhirType().equals("StructureDefinition")) {
               StructureDefinition sd = (StructureDefinition) r.getResource();
-              this.f.realmRules.checkSD(f, sd);
+              this.publisherFields.realmRules.checkSD(f, sd);
             } else if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
-              this.f.realmRules.checkCR(f, (CanonicalResource) r.getResource());
+              this.publisherFields.realmRules.checkCR(f, (CanonicalResource) r.getResource());
             }
           }
         } finally {
           f.finish("checkConformanceResources2");
         }
       }
-      f.realmRules.finishChecks();
+      publisherFields.realmRules.finishChecks();
     }
     tts.end();
     log("Previous Version Comparison");
-    tts = f.tt.start("previous-version");
-    f.previousVersionComparator.startChecks(f.publishedIg);
-    if (f.ipaComparator != null) {
-      f.ipaComparator.startChecks(f.publishedIg);
+    tts = publisherFields.tt.start("previous-version");
+    publisherFields.previousVersionComparator.startChecks(publisherFields.publishedIg);
+    if (publisherFields.ipaComparator != null) {
+      publisherFields.ipaComparator.startChecks(publisherFields.publishedIg);
     }
-    if (f.ipsComparator != null) {
-      f.ipsComparator.startChecks(f.publishedIg);
+    if (publisherFields.ipsComparator != null) {
+      publisherFields.ipsComparator.startChecks(publisherFields.publishedIg);
     }
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       f.start("checkConformanceResources3");
       try {
         for (FetchedResource r : f.getResources()) {
           if (r.getResource() != null && r.getResource() instanceof CanonicalResource) {
-            this.f.previousVersionComparator.check((CanonicalResource) r.getResource());
-            if (this.f.ipaComparator != null) {
-              this.f.ipaComparator.check((CanonicalResource) r.getResource());
+            this.publisherFields.previousVersionComparator.check((CanonicalResource) r.getResource());
+            if (this.publisherFields.ipaComparator != null) {
+              this.publisherFields.ipaComparator.check((CanonicalResource) r.getResource());
             }
-            if (this.f.ipsComparator != null) {
-              this.f.ipsComparator.check((CanonicalResource) r.getResource());
+            if (this.publisherFields.ipsComparator != null) {
+              this.publisherFields.ipsComparator.check((CanonicalResource) r.getResource());
             }
           }
 
@@ -1473,29 +1473,29 @@ public class PublisherProcessor extends PublisherBase  {
         f.finish("checkConformanceResources3");
       }
     }
-    f.previousVersionComparator.finishChecks();
-    if (f.ipaComparator != null) {
-      f.ipaComparator.finishChecks();
+    publisherFields.previousVersionComparator.finishChecks();
+    if (publisherFields.ipaComparator != null) {
+      publisherFields.ipaComparator.finishChecks();
     }
-    if (f.ipsComparator != null) {
-      f.ipsComparator.finishChecks();
+    if (publisherFields.ipsComparator != null) {
+      publisherFields.ipsComparator.finishChecks();
     }
     tts.end();
   }
 
   private void checkJurisdiction(FetchedFile f, CanonicalResource resource, ValidationMessage.IssueSeverity error, String verb) {
-    if (this.f.expectedJurisdiction != null) {
+    if (this.publisherFields.expectedJurisdiction != null) {
       boolean ok = false;
       CommaSeparatedStringBuilder b = new CommaSeparatedStringBuilder();
       for (CodeableConcept cc : resource.getJurisdiction()) {
-        ok = ok || cc.hasCoding(this.f.expectedJurisdiction);
+        ok = ok || cc.hasCoding(this.publisherFields.expectedJurisdiction);
         b.append(cc.toString());
       }
       if (!ok) {
         f.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, resource.fhirType()+".jurisdiction",
-                "The resource "+verb+" declare its jurisdiction to match the package id ("+ this.f.npmName +", jurisdiction = "+ this.f.expectedJurisdiction.toString()+
+                "The resource "+verb+" declare its jurisdiction to match the package id ("+ this.publisherFields.npmName +", jurisdiction = "+ this.publisherFields.expectedJurisdiction.toString()+
                         (Utilities.noString(b.toString()) ? "" : " instead of or as well as "+b.toString())+
-                        ") (for Sushi users: in sushi-config.yaml, 'jurisdiction: "+toFSH(this.f.expectedJurisdiction)+"')",
+                        ") (for Sushi users: in sushi-config.yaml, 'jurisdiction: "+toFSH(this.publisherFields.expectedJurisdiction)+"')",
                 error).setMessageId(PublisherMessageIds.RESOURCE_JURISDICTION_MISMATCH));
       }
     }
@@ -1514,9 +1514,9 @@ public class PublisherProcessor extends PublisherBase  {
 
 
   private void generateAdditionalExamples() throws Exception {
-    if (f.genExamples) {
-      ProfileUtilities utils = new ProfileUtilities(f.context, null, null);
-      for (FetchedFile f : f.changeList) {
+    if (publisherFields.genExamples) {
+      ProfileUtilities utils = new ProfileUtilities(publisherFields.context, null, null);
+      for (FetchedFile f : publisherFields.changeList) {
         f.start("generateAdditionalExamples");
         try {
           List<StructureDefinition> list = new ArrayList<StructureDefinition>();
@@ -1533,7 +1533,7 @@ public class PublisherProcessor extends PublisherBase  {
               nr.setTitle("Generated Example");
               nr.getStatedProfiles().add(sd.getUrl());
               f.getResources().add(nr);
-              this.f.igpkp.findConfiguration(f, nr);
+              this.publisherFields.igpkp.findConfiguration(f, nr);
             }
           }
         } finally {
@@ -1545,29 +1545,29 @@ public class PublisherProcessor extends PublisherBase  {
 
 
   private void executeTransforms() throws FHIRException, Exception {
-    if (f.doTransforms) {
-      MappingServices services = new MappingServices(f.context, f.igpkp.getCanonical());
-      StructureMapUtilities utils = new StructureMapUtilities(f.context, services, f.igpkp);
+    if (publisherFields.doTransforms) {
+      MappingServices services = new MappingServices(publisherFields.context, publisherFields.igpkp.getCanonical());
+      StructureMapUtilities utils = new StructureMapUtilities(publisherFields.context, services, publisherFields.igpkp);
 
       // ok, our first task is to generate the profiles
-      for (FetchedFile f : f.changeList) {
+      for (FetchedFile f : publisherFields.changeList) {
         f.start("executeTransforms");
         try {
           List<StructureMap> worklist = new ArrayList<StructureMap>();
           for (FetchedResource r : f.getResources()) {
             if (r.getResource() != null && r.getResource() instanceof StructureDefinition) {
-              List<StructureMap> transforms = this.f.context.findTransformsforSource(((StructureDefinition) r.getResource()).getUrl());
+              List<StructureMap> transforms = this.publisherFields.context.findTransformsforSource(((StructureDefinition) r.getResource()).getUrl());
               worklist.addAll(transforms);
             }
           }
 
 
-          ProfileUtilities putils = new ProfileUtilities(this.f.context, null, this.f.igpkp);
-          putils.setXver(this.f.context.getXVer());
+          ProfileUtilities putils = new ProfileUtilities(this.publisherFields.context, null, this.publisherFields.igpkp);
+          putils.setXver(this.publisherFields.context.getXVer());
           putils.setForPublication(true);
-          putils.setMasterSourceFileNames(this.f.specMaps.get(0).getTargets());
+          putils.setMasterSourceFileNames(this.publisherFields.specMaps.get(0).getTargets());
           putils.setLocalFileNames(pageTargets());
-          if (VersionUtilities.isR4Plus(this.f.version)) {
+          if (VersionUtilities.isR4Plus(this.publisherFields.version)) {
             putils.setNewSlicingProcessing(true);
           }
 
@@ -1582,8 +1582,8 @@ public class PublisherProcessor extends PublisherBase  {
               nr.setResource(sd);
               nr.setTitle("Generated Profile (by Transform)");
               f.getResources().add(nr);
-              this.f.igpkp.findConfiguration(f, nr);
-              sd.setWebPath(this.f.igpkp.getLinkFor(nr, true));
+              this.publisherFields.igpkp.findConfiguration(f, nr);
+              sd.setWebPath(this.publisherFields.igpkp.getLinkFor(nr, true));
               generateSnapshot(f, nr, sd, true, putils);
             }
           }
@@ -1592,12 +1592,12 @@ public class PublisherProcessor extends PublisherBase  {
         }
       }
 
-      for (FetchedFile f : f.changeList) {
+      for (FetchedFile f : publisherFields.changeList) {
         f.start("executeTransforms2");
         try {
           Map<FetchedResource, List<StructureMap>> worklist = new HashMap<FetchedResource, List<StructureMap>>();
           for (FetchedResource r : f.getResources()) {
-            List<StructureMap> transforms = this.f.context.findTransformsforSource(r.getElement().getProperty().getStructure().getUrl());
+            List<StructureMap> transforms = this.publisherFields.context.findTransformsforSource(r.getElement().getProperty().getStructure().getUrl());
             if (transforms.size() > 0) {
               worklist.put(r, transforms);
             }
@@ -1618,7 +1618,7 @@ public class PublisherProcessor extends PublisherBase  {
               if (ok) {
                 Resource target = new Bundle().setType(Bundle.BundleType.COLLECTION);
                 if (tgturl != null) {
-                  StructureDefinition tsd = this.f.context.fetchResource(StructureDefinition.class, tgturl);
+                  StructureDefinition tsd = this.publisherFields.context.fetchResource(StructureDefinition.class, tgturl);
                   if (tsd == null)
                     throw new Exception("Unable to find definition "+tgturl);
                   target = ResourceFactory.createResource(tsd.getType());
@@ -1637,7 +1637,7 @@ public class PublisherProcessor extends PublisherBase  {
                 nr.setTitle("Generated Example (by Transform)");
                 nr.setValidateAsResource(true);
                 f.getResources().add(nr);
-                this.f.igpkp.findConfiguration(f, nr);
+                this.publisherFields.igpkp.findConfiguration(f, nr);
               }
             }
           }
@@ -1651,13 +1651,13 @@ public class PublisherProcessor extends PublisherBase  {
 
   private void scanForUsageStats() {
     logDebugMessage(LogCategory.PROGRESS, "scanForUsageStats");
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       f.start("scanForUsageStats");
       try {
         for (FetchedResource r : f.getResources()) {
           if (r.fhirType().equals("StructureDefinition"))
-            this.f.extensionTracker.scan((StructureDefinition) r.getResource());
-          this.f.extensionTracker.scan(r.getElement(), f.getName());
+            this.publisherFields.extensionTracker.scan((StructureDefinition) r.getResource());
+          this.publisherFields.extensionTracker.scan(r.getElement(), f.getName());
         }
       } finally {
         f.finish("scanForUsageStats");
@@ -1667,18 +1667,18 @@ public class PublisherProcessor extends PublisherBase  {
 
   private void validate(FetchedFile file, FetchedResource r) throws Exception {
     if (!passesValidationFilter(r)) {
-      f.noValidateResources.add(r);
+      publisherFields.noValidateResources.add(r);
       return;
     }
-    if ("ImplementationGuide".equals(r.fhirType()) && !f.unknownParams.isEmpty()) {
-      file.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.INVALID, file.getName(), "Unknown Parameters: "+ f.unknownParams.toString(), ValidationMessage.IssueSeverity.WARNING));
+    if ("ImplementationGuide".equals(r.fhirType()) && !publisherFields.unknownParams.isEmpty()) {
+      file.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.INVALID, file.getName(), "Unknown Parameters: "+ publisherFields.unknownParams.toString(), ValidationMessage.IssueSeverity.WARNING));
     }
 
-    TimeTracker.Session tts = f.tt.start("validation");
+    TimeTracker.Session tts = publisherFields.tt.start("validation");
     List<ValidationMessage> errs = new ArrayList<ValidationMessage>();
     r.getElement().setUserData(UserDataNames.pub_context_file, file);
     r.getElement().setUserData(UserDataNames.pub_context_resource, r);
-    f.validator.setExample(r.isExample());
+    publisherFields.validator.setExample(r.isExample());
     if (r.isValidateAsResource()) {
       Resource res = r.getResource();
       if (res instanceof Bundle) {
@@ -1693,15 +1693,15 @@ public class PublisherProcessor extends PublisherBase  {
       } else if (res.hasUserData(UserDataNames.map_profile)) {
         validate(file, r, errs, res);
       }
-    } else if (r.getResource() != null && r.getResource() instanceof Binary && file.getLogical() != null && f.context.hasResource(StructureDefinition.class, file.getLogical())) {
-      StructureDefinition sd = f.context.fetchResource(StructureDefinition.class, file.getLogical());
+    } else if (r.getResource() != null && r.getResource() instanceof Binary && file.getLogical() != null && publisherFields.context.hasResource(StructureDefinition.class, file.getLogical())) {
+      StructureDefinition sd = publisherFields.context.fetchResource(StructureDefinition.class, file.getLogical());
       Binary bin = (Binary) r.getResource();
       validate(file, r, errs, bin, sd);
     } else if (r.getResource() != null && r.getResource() instanceof Binary && r.getExampleUri() != null) {
       Binary bin = (Binary) r.getResource();
       validate(file, r, errs, bin);
     } else {
-      f.validator.setNoCheckAggregation(r.isExample() && ExtensionUtilities.readBoolExtension(r.getResEntry(), "http://hl7.org/fhir/tools/StructureDefinition/igpublisher-no-check-aggregation"));
+      publisherFields.validator.setNoCheckAggregation(r.isExample() && ExtensionUtilities.readBoolExtension(r.getResEntry(), "http://hl7.org/fhir/tools/StructureDefinition/igpublisher-no-check-aggregation"));
       List<StructureDefinition> profiles = new ArrayList<>();
 
       if (r.getElement().hasUserData(UserDataNames.map_profile)) {
@@ -1715,7 +1715,7 @@ public class PublisherProcessor extends PublisherBase  {
     processValidationOutcomes(file, r, errs);
     r.setValidated(true);
     if (r.getConfig() == null) {
-      f.igpkp.findConfiguration(file, r);
+      publisherFields.igpkp.findConfiguration(file, r);
     }
     tts.end();
   }
@@ -1745,14 +1745,14 @@ public class PublisherProcessor extends PublisherBase  {
 
   private void addProfile(List<StructureDefinition> profiles, String ref, String rt) {
     if (!Utilities.isAbsoluteUrl(ref)) {
-      ref = Utilities.pathURL(f.igpkp.getCanonical(), ref);
+      ref = Utilities.pathURL(publisherFields.igpkp.getCanonical(), ref);
     }
     for (StructureDefinition sd : profiles) {
       if (ref.equals(sd.getUrl())) {
         return;
       }
     }
-    StructureDefinition sd = f.context.fetchResource(StructureDefinition.class, ref);
+    StructureDefinition sd = publisherFields.context.fetchResource(StructureDefinition.class, ref);
     if (sd != null && (rt == null || sd.getType().equals(rt))) {
       profiles.add(sd);
     }
@@ -1773,7 +1773,7 @@ public class PublisherProcessor extends PublisherBase  {
 
   private int countUsages(String fixedUrl) {
     int res = 0;
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       for (FetchedResource r : f.getResources()) {
         res = res + countExtensionUsage(r.getElement(), fixedUrl);
       }
@@ -1809,7 +1809,7 @@ public class PublisherProcessor extends PublisherBase  {
 
   private int countStatedExamples(String url, String vurl) {
     int res = 0;
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       for (FetchedResource r : f.getResources()) {
         for (String p : r.getStatedProfiles()) {
           if (url.equals(p) || vurl.equals(p)) {
@@ -1823,7 +1823,7 @@ public class PublisherProcessor extends PublisherBase  {
 
   private int countFoundExamples(String url, String vurl) {
     int res = 0;
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       for (FetchedResource r : f.getResources()) {
         for (String p : r.getFoundProfiles()) {
           if (url.equals(p) || vurl.equals(p)) {
@@ -1853,15 +1853,15 @@ public class PublisherProcessor extends PublisherBase  {
 
   public void checkSignBundles() throws Exception {
     log("Checking for Bundles to sign");
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       for (FetchedResource r : f.getResources()) {
         if ("Bundle".equals(r.fhirType())) {
           Element sig = r.getElement().getNamedChild("signature");
           if (sig != null && !sig.hasChild("data") && "application/jose".equals(sig.getNamedChildValue("sigFormat"))) {
-            this.f.signer.signBundle(r.getElement(), sig, PublisherSigner.SignatureType.JOSE);
+            this.publisherFields.signer.signBundle(r.getElement(), sig, PublisherSigner.SignatureType.JOSE);
           }
           if (sig != null && !sig.hasChild("data") && "application/pkcs7-signature".equals(sig.getNamedChildValue("sigFormat"))) {
-            this.f.signer.signBundle(r.getElement(), sig, PublisherSigner.SignatureType.DIGSIG);
+            this.publisherFields.signer.signBundle(r.getElement(), sig, PublisherSigner.SignatureType.DIGSIG);
           }
         }
       }
@@ -1870,7 +1870,7 @@ public class PublisherProcessor extends PublisherBase  {
 
 
   public void processProvenanceDetails() throws Exception {
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       f.start("processProvenanceDetails");
       try {
 
@@ -1878,7 +1878,7 @@ public class PublisherProcessor extends PublisherBase  {
           if (!r.isExample()) {
             if (r.fhirType().equals("Provenance")) {
               logDebugMessage(LogCategory.PROGRESS, "Process Provenance "+f.getName()+" : "+r.getId());
-              if (processProvenance(this.f.igpkp.getLinkFor(r, true), r.getElement(), r.getResource()))
+              if (processProvenance(this.publisherFields.igpkp.getLinkFor(r, true), r.getElement(), r.getResource()))
                 r.setProvenance(true);
             } else if (r.fhirType().equals("Bundle")) {
               if (processProvenanceEntries(f, r))
@@ -1901,7 +1901,7 @@ public class PublisherProcessor extends PublisherBase  {
       Element res = entry.getNamedChild("resource");
       if (res != null && "Provenance".equals(res.fhirType())) {
         logDebugMessage(LogCategory.PROGRESS, "Process Provenance "+f.getName()+" : "+r.getId()+".entry["+i+"]");
-        if (processProvenance(this.f.igpkp.getLinkFor(r, true), res, b == null ? null : b.getEntry().get(i).getResource()))
+        if (processProvenance(this.publisherFields.igpkp.getLinkFor(r, true), res, b == null ? null : b.getEntry().get(i).getResource()))
           isHistory = true;
       }
     }
@@ -1911,9 +1911,9 @@ public class PublisherProcessor extends PublisherBase  {
 
   public void processTranslationOutputs() throws IOException {
 
-    PublisherTranslator pt = new PublisherTranslator(f.context, f.sourceIg.hasLanguage() ? f.sourceIg.getLanguage() : "en", f.defaultTranslationLang, f.translationLangs);
-    pt.start(f.tempLangDir);
-    for (FetchedFile f : f.fileList) {
+    PublisherTranslator pt = new PublisherTranslator(publisherFields.context, publisherFields.sourceIg.hasLanguage() ? publisherFields.sourceIg.getLanguage() : "en", publisherFields.defaultTranslationLang, publisherFields.translationLangs);
+    pt.start(publisherFields.tempLangDir);
+    for (FetchedFile f : publisherFields.fileList) {
       f.start("translate");
       try {
         for (FetchedResource r : f.getResources()) {
@@ -1928,7 +1928,7 @@ public class PublisherProcessor extends PublisherBase  {
 
 
   private void validate(String type) throws Exception {
-    for (FetchedFile f : f.fileList) {
+    for (FetchedFile f : publisherFields.fileList) {
       f.start("validate");
       try {
         for (FetchedResource r : f.getResources()) {
@@ -1937,23 +1937,23 @@ public class PublisherProcessor extends PublisherBase  {
             if (!r.isValidated()) {
               validate(f, r);
             }
-            if (SpecialTypeHandler.handlesType(r.fhirType(), this.f.context.getVersion()) && !VersionUtilities.isR5Plus(this.f.version)) {
+            if (SpecialTypeHandler.handlesType(r.fhirType(), this.publisherFields.context.getVersion()) && !VersionUtilities.isR5Plus(this.publisherFields.version)) {
               // we validated the resource as it was supplied, but now we need to
               // switch it for the correct representation in the underlying version
               byte[] cnt = null;
-              if (VersionUtilities.isR3Ver(this.f.version)) {
+              if (VersionUtilities.isR3Ver(this.publisherFields.version)) {
                 org.hl7.fhir.dstu3.model.Resource res = VersionConvertorFactory_30_50.convertResource(r.getResource());
                 cnt = new org.hl7.fhir.dstu3.formats.JsonParser().setOutputStyle(org.hl7.fhir.dstu3.formats.IParser.OutputStyle.PRETTY).composeBytes(res);
-              } else if (VersionUtilities.isR4Ver(this.f.version)) {
+              } else if (VersionUtilities.isR4Ver(this.publisherFields.version)) {
                 org.hl7.fhir.r4.model.Resource res = VersionConvertorFactory_40_50.convertResource(r.getResource());
                 cnt = new org.hl7.fhir.r4.formats.JsonParser().setOutputStyle(org.hl7.fhir.r4.formats.IParser.OutputStyle.PRETTY).composeBytes(res);
-              } else if (VersionUtilities.isR4BVer(this.f.version)) {
+              } else if (VersionUtilities.isR4BVer(this.publisherFields.version)) {
                 org.hl7.fhir.r4b.model.Resource res = VersionConvertorFactory_43_50.convertResource(r.getResource());
                 cnt = new org.hl7.fhir.r4b.formats.JsonParser().setOutputStyle(org.hl7.fhir.r4b.formats.IParser.OutputStyle.PRETTY).composeBytes(res);
               } else {
-                throw new Error("Cannot use resources of type "+r.fhirType()+" in a IG with version "+ this.f.version);
+                throw new Error("Cannot use resources of type "+r.fhirType()+" in a IG with version "+ this.publisherFields.version);
               }
-              Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(this.f.context).parseSingle(new ByteArrayInputStream(cnt), null);
+              Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(this.publisherFields.context).parseSingle(new ByteArrayInputStream(cnt), null);
               e.copyUserData(r.getElement());
               r.setElement(e);
             }
@@ -1976,7 +1976,7 @@ public class PublisherProcessor extends PublisherBase  {
     List<Locale> res = new ArrayList<>();
     res.add(inferDefaultNarrativeLang());
 
-    for (String translationLang : f.translationLangs) {
+    for (String translationLang : publisherFields.translationLangs) {
       Locale locale = Locale.forLanguageTag(translationLang);
       if (!res.contains(locale)) {
         res.add(locale);
