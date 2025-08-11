@@ -91,6 +91,8 @@ public class PublisherFields {
   String igName;
   PublisherUtils.IGBuildMode mode; // for the IG publication infrastructure
   SimpleFetcher fetcher = new SimpleFetcher(null);
+
+  @Getter
   SimpleWorkerContext context; //
   DataRenderer dr;
   InstanceValidator validator;
