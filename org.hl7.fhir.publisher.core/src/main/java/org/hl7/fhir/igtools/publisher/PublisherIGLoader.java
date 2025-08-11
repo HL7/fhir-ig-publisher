@@ -1375,16 +1375,6 @@ public class PublisherIGLoader extends PublisherBase {
     publisherFields.context.loadFromPackage(npm, null);
   }
 
-  private void loadUTG() throws FHIRException, IOException {
-    String vs = getUTGPackageName();
-    if (vs != null) {
-      NpmPackage npm = publisherFields.pcm.loadPackage(vs, null);
-      SpecMapManager spm = new SpecMapManager(FileUtilities.streamToBytes(npm.load("other", "spec.internals")), npm.vid(), npm.fhirVersion());
-      IContextResourceLoader loader = new PublisherLoader(npm, spm, npm.getWebLocation(), publisherFields.igpkp).makeLoader();
-      publisherFields.context.loadFromPackage(npm, loader);
-    }
-  }
-
   private String getUTGPackageName() throws FHIRException, IOException {
     String vs = null;
     if (VersionUtilities.isR3Ver(publisherFields.version)) {
