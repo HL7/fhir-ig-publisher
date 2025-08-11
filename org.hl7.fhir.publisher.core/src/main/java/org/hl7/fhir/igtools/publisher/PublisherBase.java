@@ -1,11 +1,12 @@
 package org.hl7.fhir.igtools.publisher;
 
-import org.apache.commons.lang3.NotImplementedException;
+import lombok.Getter;
 import org.hl7.fhir.convertors.advisors.impl.BaseAdvisor_30_50;
 import org.hl7.fhir.convertors.factory.*;
 import org.hl7.fhir.exceptions.DefinitionException;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
+import org.hl7.fhir.igtools.publisher.parsers.*;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.ILoggingService;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
@@ -32,7 +33,6 @@ import org.hl7.fhir.utilities.validation.ValidationMessage;
 
 import javax.annotation.Nonnull;
 import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -41,7 +41,8 @@ import java.util.*;
  * this class is part of the Publisher Core cluster. See @Publisher for discussion
  */
 public class PublisherBase implements ILoggingService {
-  final PublisherFields publisherFields;
+    @Getter
+    final PublisherFields publisherFields;
 
   public PublisherBase() {
     publisherFields = new PublisherFields();
@@ -384,7 +385,7 @@ public class PublisherBase implements ILoggingService {
     if (VersionUtilities.isR3Ver(ver)) {
       return new TypeParserR3();
     } else if (VersionUtilities.isR4Ver(ver)) {
-      return new TypeParserR4();
+      return new TypeParserR4(this.publisherFields);
     } else if (VersionUtilities.isR2BVer(ver)) {
       return new TypeParserR14();
     } else if (VersionUtilities.isR2Ver(ver)) {
@@ -1264,88 +1265,7 @@ public class PublisherBase implements ILoggingService {
 
   }
 
-  public class TypeParserR2 implements RenderingContext.ITypeParser {
-
-    @Override
-    public Base parseType(String xml, String type) throws IOException, FHIRException {
-      org.hl7.fhir.dstu2.model.Type t = new org.hl7.fhir.dstu2.formats.XmlParser().parseType(xml, type);
-      return VersionConvertorFactory_10_50.convertType(t);
-    }
-
-    @Override
-    public Base parseType(Element base) throws FHIRFormatError, IOException, FHIRException {
-      throw new NotImplementedException();
-    }
-  }
-
-  public class TypeParserR14 implements RenderingContext.ITypeParser {
-
-    @Override
-    public Base parseType(String xml, String type) throws IOException, FHIRException {
-      org.hl7.fhir.dstu2016may.model.Type t = new org.hl7.fhir.dstu2016may.formats.XmlParser().parseType(xml, type);
-      return VersionConvertorFactory_14_50.convertType(t);
-    }
-    @Override
-    public Base parseType(Element base) throws FHIRFormatError, IOException, FHIRException {
-      throw new NotImplementedException();
-    }
-  }
-
-  public class TypeParserR3 implements RenderingContext.ITypeParser {
-
-    @Override
-    public Base parseType(String xml, String type) throws IOException, FHIRException {
-      org.hl7.fhir.dstu3.model.Type t = new org.hl7.fhir.dstu3.formats.XmlParser().parseType(xml, type);
-      return VersionConvertorFactory_30_50.convertType(t);
-    }
-    @Override
-    public Base parseType(Element base) throws FHIRFormatError, IOException, FHIRException {
-      throw new NotImplementedException();
-    }
-  }
-
-  public class TypeParserR4 implements RenderingContext.ITypeParser {
-
-    @Override
-    public Base parseType(String xml, String type) throws IOException, FHIRException {
-      org.hl7.fhir.r4.model.Type t = new org.hl7.fhir.r4.formats.XmlParser().parseType(xml, type);
-      return VersionConvertorFactory_40_50.convertType(t);
-    }
-    @Override
-    public Base parseType(Element base) throws FHIRFormatError, IOException, FHIRException {
-      ByteArrayOutputStream bs = new ByteArrayOutputStream();
-      new org.hl7.fhir.r5.elementmodel.XmlParser(publisherFields.context).compose(base, bs, IParser.OutputStyle.NORMAL, null);
-      String xml = new String(bs.toByteArray(), StandardCharsets.UTF_8);
-      return parseType(xml, base.fhirType());
-    }
-  }
-
-  public class TypeParserR4B implements RenderingContext.ITypeParser {
-
-    @Override
-    public Base parseType(String xml, String type) throws IOException, FHIRException {
-      org.hl7.fhir.r4b.model.DataType t = new org.hl7.fhir.r4b.formats.XmlParser().parseType(xml, type);
-      return VersionConvertorFactory_43_50.convertType(t);
-    }
-    @Override
-    public Base parseType(Element base) throws FHIRFormatError, IOException, FHIRException {
-      throw new NotImplementedException();
-    }
-  }
-
-  public class TypeParserR5 implements RenderingContext.ITypeParser {
-
-    @Override
-    public Base parseType(String xml, String type) throws IOException, FHIRException {
-      return new org.hl7.fhir.r5.formats.XmlParser().parseType(xml, type);
-    }
-    @Override
-    public Base parseType(Element base) throws FHIRFormatError, IOException, FHIRException {
-      throw new NotImplementedException();
-    }
-  }
-
-  public class CanonicalVisitor<T> implements DataTypeVisitor.IDatatypeVisitor {
+    public class CanonicalVisitor<T> implements DataTypeVisitor.IDatatypeVisitor {
     private FetchedFile f;
     private boolean snapshotMode;
 
