@@ -40,7 +40,7 @@ public class FSHRunner {
         logger.logMessage(string);
     }
 
-    protected void runFsh(File file, Publisher.IGBuildMode mode) throws IOException {
+    protected void runFsh(File file, PublisherUtils.IGBuildMode mode) throws IOException {
         File fshIni = new File(Utilities.path(file.getAbsolutePath(), "fsh.ini"));
         /* Changed 2023-03-20 by dotasek. If the fshIni file resolution below is still commented out
         // by 2023-06-20, delete the code below.
@@ -105,7 +105,7 @@ public class FSHRunner {
 
 
     @Nonnull
-    protected CommandLine getDefaultCommandLine(String fshVersion, Publisher.IGBuildMode mode) {
+    protected CommandLine getDefaultCommandLine(String fshVersion, PublisherUtils.IGBuildMode mode) {
         final List<String> sushiCommandList = getSushiCommandList(fshVersion, mode);
         CommandLine commandLine = new CommandLine(sushiCommandList.get(0));
         for (int i = 1; i < sushiCommandList.size(); i++) {
@@ -116,7 +116,7 @@ public class FSHRunner {
     }
 
     @Nonnull
-    protected CommandLine getNpmPathCommandLine(String fshVersion, Publisher.IGBuildMode mode) {
+    protected CommandLine getNpmPathCommandLine(String fshVersion, PublisherUtils.IGBuildMode mode) {
         CommandLine commandLine = new CommandLine("bash").addArgument("-c");
         for (String argument : getSushiCommandList(fshVersion,mode)) {
             commandLine.addArgument(argument);
@@ -126,7 +126,7 @@ public class FSHRunner {
     }
 
     @Nonnull
-    protected CommandLine getWindowsCommandLine(String fshVersion, Publisher.IGBuildMode mode) {
+    protected CommandLine getWindowsCommandLine(String fshVersion, PublisherUtils.IGBuildMode mode) {
         CommandLine commandLine = new CommandLine("cmd").addArgument("/C");
         for (String argument : getSushiCommandList(fshVersion,mode)) {
             commandLine.addArgument(argument);
@@ -135,14 +135,14 @@ public class FSHRunner {
         return commandLine;
     }
 
-    protected List<String> getSushiCommandList(String fshVersion, Publisher.IGBuildMode mode) {
+    protected List<String> getSushiCommandList(String fshVersion, PublisherUtils.IGBuildMode mode) {
         final List<String> cmd = fshVersion == null ? List.of("sushi"): List.of("npx", "fsh-sushi@"+fshVersion);
-        if (mode == Publisher.IGBuildMode.PUBLICATION || mode == Publisher.IGBuildMode.AUTOBUILD) {
+        if (mode == PublisherUtils.IGBuildMode.PUBLICATION || mode == PublisherUtils.IGBuildMode.AUTOBUILD) {
             return new ImmutableList.Builder<String>().addAll(cmd).add("--require-latest").build();
         }
         return cmd;
     }
-    protected String getSushiCommandString(String fshVersion, Publisher.IGBuildMode mode) {
+    protected String getSushiCommandString(String fshVersion, PublisherUtils.IGBuildMode mode) {
 
         StringJoiner stringJoiner = new StringJoiner(" ");
         for (String argument : getSushiCommandList(fshVersion,mode)) {
