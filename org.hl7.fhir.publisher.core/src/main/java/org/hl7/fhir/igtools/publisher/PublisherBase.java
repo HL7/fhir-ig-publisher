@@ -42,15 +42,15 @@ import java.util.*;
  */
 public class PublisherBase implements ILoggingService {
     @Getter
-    final PublisherFields publisherFields;
+    final PublisherFields pf;
 
   public PublisherBase() {
-    publisherFields = new PublisherFields();
+    pf = new PublisherFields();
   }
 
   public PublisherBase(PublisherFields publisherFields) {
     super();
-    this.publisherFields = publisherFields;
+    this.pf = publisherFields;
   }
 
   protected static String getCurentDirectory() {
@@ -72,25 +72,25 @@ public class PublisherBase implements ILoggingService {
 
   @Nonnull
   protected FilesystemPackageCacheManager getFilesystemPackageCacheManager() throws IOException {
-    if (publisherFields.getPackageCacheFolder() != null) {
-      return new FilesystemPackageCacheManager.Builder().withCacheFolder(publisherFields.getPackageCacheFolder()).build();
+    if (pf.getPackageCacheFolder() != null) {
+      return new FilesystemPackageCacheManager.Builder().withCacheFolder(pf.getPackageCacheFolder()).build();
     }
-    return publisherFields.mode == null || publisherFields.mode == PublisherUtils.IGBuildMode.MANUAL || publisherFields.mode == PublisherUtils.IGBuildMode.PUBLICATION ?
+    return pf.mode == null || pf.mode == PublisherUtils.IGBuildMode.MANUAL || pf.mode == PublisherUtils.IGBuildMode.PUBLICATION ?
             new FilesystemPackageCacheManager.Builder().build()
             : new FilesystemPackageCacheManager.Builder().withSystemCacheFolder().build();
 
   }
 
   protected void log(String s) {
-    publisherFields.logger.logMessage(s);
+    pf.logger.logMessage(s);
   }
 
   protected String getTargetOutput() {
-    return publisherFields.targetOutput;
+    return pf.targetOutput;
   }
 
   protected String focusDir() {
-    String dir = publisherFields.configFile.endsWith("ig.ini") ? publisherFields.configFile.substring(0, publisherFields.configFile.length()-6) : publisherFields.configFile;
+    String dir = pf.configFile.endsWith("ig.ini") ? pf.configFile.substring(0, pf.configFile.length()-6) : pf.configFile;
     if (dir.endsWith(File.separatorChar+".")) {
       dir = dir.substring(0, dir.length()-2);
     }
@@ -108,18 +108,18 @@ public class PublisherBase implements ILoggingService {
     long totalMemory = runtime.totalMemory();
     long freeMemory = runtime.freeMemory();
     long usedMemory = totalMemory - freeMemory;
-    if (usedMemory > publisherFields.maxMemory) {
-      publisherFields.maxMemory = usedMemory;
+    if (usedMemory > pf.maxMemory) {
+      pf.maxMemory = usedMemory;
     }
 
     String s = msg;
-    if (publisherFields.tt == null) {
+    if (pf.tt == null) {
       System.out.println(Utilities.padRight(s, ' ', 100));
     } else { // if (tt.longerThan(4)) {
-      System.out.println(Utilities.padRight(s, ' ', 100)+" ("+ publisherFields.tt.milestone()+" / "+ publisherFields.tt.clock()+", "+Utilities.describeSize(usedMemory)+")");
+      System.out.println(Utilities.padRight(s, ' ', 100)+" ("+ pf.tt.milestone()+" / "+ pf.tt.clock()+", "+Utilities.describeSize(usedMemory)+")");
     }
-    if (publisherFields.killFile != null && publisherFields.killFile.exists()) {
-      publisherFields.killFile.delete();
+    if (pf.killFile != null && pf.killFile.exists()) {
+      pf.killFile.delete();
       System.out.println("Terminating Process now");
       System.exit(1);
     }
@@ -127,24 +127,24 @@ public class PublisherBase implements ILoggingService {
 
   @Override
   public void logDebugMessage(LogCategory category, String msg) {
-    if (publisherFields.logOptions.contains(category.toString().toLowerCase())) {
+    if (pf.logOptions.contains(category.toString().toLowerCase())) {
       logMessage(msg);
     }
   }
 
   @Override
   public boolean isDebugLogging() {
-    return publisherFields.debug;
+    return pf.debug;
   }
 
   protected boolean isTemplate() throws IOException {
-    File pack = new File(Utilities.path(publisherFields.configFile, "package", "package.json"));
+    File pack = new File(Utilities.path(pf.configFile, "package", "package.json"));
     if (pack.exists()) {
       JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(pack);
       if (json.has("type") && "fhir.template".equals(json.asString("type"))) {
-        publisherFields.isBuildingTemplate = true;
-        publisherFields.templateInfo = json;
-        publisherFields.npmName = json.asString("name");
+        pf.isBuildingTemplate = true;
+        pf.templateInfo = json;
+        pf.npmName = json.asString("name");
         //        System.out.println("targetOutput: "+targetOutput);
         return true;
       }
@@ -158,7 +158,7 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected boolean checkDir(String dir, boolean emptyOk) throws Exception {
-    IFetchFile.FetchState state = publisherFields.fetcher.check(dir);
+    IFetchFile.FetchState state = pf.fetcher.check(dir);
     if (state == IFetchFile.FetchState.NOT_FOUND) {
       if (emptyOk)
         return false;
@@ -169,7 +169,7 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected void checkFile(String fn) throws Exception {
-    IFetchFile.FetchState state = publisherFields.fetcher.check(fn);
+    IFetchFile.FetchState state = pf.fetcher.check(fn);
     if (state == IFetchFile.FetchState.NOT_FOUND)
       throw new Exception(String.format("Error: file %s not found", fn));
     else if (state == IFetchFile.FetchState.DIR)
@@ -185,7 +185,7 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected FetchedFile getFileForFile(String path) {
-    for (FetchedFile f : publisherFields.fileList) {
+    for (FetchedFile f : pf.fileList) {
       if (f.getPath().equals(path))
         return f;
     }
@@ -199,7 +199,7 @@ public class PublisherBase implements ILoggingService {
     for (String s : outcomes.keySet()) {
       FetchedFile f = getFileForFile(s);
       if (f == null)
-        this.publisherFields.errors.addAll(outcomes.get(s));
+        this.pf.errors.addAll(outcomes.get(s));
       else
         f.getErrors().addAll(outcomes.get(s));
     }
@@ -210,7 +210,7 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected String pathForVersion() {
-    String v = publisherFields.version;
+    String v = pf.version;
     while (v.indexOf(".") != v.lastIndexOf(".")) {
       v = v.substring(0, v.lastIndexOf("."));
     }
@@ -233,18 +233,18 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected String oidIniLocation() throws IOException {
-    String f = Utilities.path(FileUtilities.getDirectoryForFile(this.publisherFields.igName), "oids.ini");
+    String f = Utilities.path(FileUtilities.getDirectoryForFile(this.pf.igName), "oids.ini");
     if (new File(f).exists()) {
-      if (this.publisherFields.isSushi) {
-        String nf = Utilities.path(this.publisherFields.rootDir, "oids.ini");
+      if (this.pf.isSushi) {
+        String nf = Utilities.path(this.pf.rootDir, "oids.ini");
         FileUtilities.copyFile(f, nf);
         new File(f).delete();
         return nf;
       }
       return f;
     }
-    if (this.publisherFields.isSushi) {
-      f = Utilities.path(this.publisherFields.rootDir, "oids.ini");
+    if (this.pf.isSushi) {
+      f = Utilities.path(this.pf.rootDir, "oids.ini");
     }
     return f;
   }
@@ -261,14 +261,14 @@ public class PublisherBase implements ILoggingService {
   protected List<String> allLangs() {
     List<String> all = new ArrayList<String>();
     if (isNewML()) {
-      all.add(publisherFields.defaultTranslationLang);
-      all.addAll(publisherFields.translationLangs);
+      all.add(pf.defaultTranslationLang);
+      all.addAll(pf.translationLangs);
     }
     return all;
   }
 
   protected boolean isNewML() {
-    return publisherFields.newMultiLangTemplateFormat;
+    return pf.newMultiLangTemplateFormat;
   }
 
   protected String checkAppendSlash(String s) {
@@ -281,7 +281,7 @@ public class PublisherBase implements ILoggingService {
     if (url.contains("/ImplementationGuide/"))
       return url.substring(0, url.indexOf("/ImplementationGuide/"));
     if (path != null) {
-      publisherFields.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.INVALID, path, "The canonical URL for an Implementation Guide must point directly to the implementation guide resource, not to the Implementation Guide as a whole", ValidationMessage.IssueSeverity.WARNING));
+      pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.INVALID, path, "The canonical URL for an Implementation Guide must point directly to the implementation guide resource, not to the Implementation Guide as a whole", ValidationMessage.IssueSeverity.WARNING));
     }
     return url;
   }
@@ -289,9 +289,9 @@ public class PublisherBase implements ILoggingService {
   protected boolean checkMakeFile(byte[] bs, String path, Set<String> outputTracker) throws IOException {
     // logDebugMessage(LogCategory.GENERATE, "Check Generate "+path);
     String s = path.toLowerCase();
-    if (publisherFields.allOutputs.contains(s))
+    if (pf.allOutputs.contains(s))
       throw new Error("Error generating build: the file "+path+" is being generated more than once (may differ by case)");
-    publisherFields.allOutputs.add(s);
+    pf.allOutputs.add(s);
     outputTracker.add(path);
     File f = new CSFile(path);
     File folder = new File(FileUtilities.getDirectoryForFile(f));
@@ -338,35 +338,35 @@ public class PublisherBase implements ILoggingService {
   }
 
   public boolean isChild() {
-    return this.publisherFields.isChild;
+    return this.pf.isChild;
   }
 
   public boolean isMilestoneBuild() {
-    return publisherFields.milestoneBuild;
+    return pf.milestoneBuild;
   }
 
   public void setMilestoneBuild(boolean milestoneBuild) {
-    this.publisherFields.milestoneBuild = milestoneBuild;
+    this.pf.milestoneBuild = milestoneBuild;
   }
 
   protected String targetUrl() {
-    if (publisherFields.mode == null)
-      return "file://"+ publisherFields.outputDir;
-    switch (publisherFields.mode) {
-    case AUTOBUILD: return publisherFields.targetOutput == null ? "https://build.fhir.org/ig/[org]/[repo]" : publisherFields.targetOutput;
-    case MANUAL: return "file://"+ publisherFields.outputDir;
+    if (pf.mode == null)
+      return "file://"+ pf.outputDir;
+    switch (pf.mode) {
+    case AUTOBUILD: return pf.targetOutput == null ? "https://build.fhir.org/ig/[org]/[repo]" : pf.targetOutput;
+    case MANUAL: return "file://"+ pf.outputDir;
     case WEBSERVER: return "http://unknown";
-    case PUBLICATION: return publisherFields.targetOutput;
-    default: return publisherFields.igpkp.getCanonical();
+    case PUBLICATION: return pf.targetOutput;
+    default: return pf.igpkp.getCanonical();
     }
   }
 
   protected Map<String, String> relatedIgMap() {
-    if (publisherFields.relatedIGs.isEmpty()) {
+    if (pf.relatedIGs.isEmpty()) {
       return null;
     }
     Map<String, String> map = new HashMap<>();
-    for (RelatedIG ig : publisherFields.relatedIGs) {
+    for (RelatedIG ig : pf.relatedIGs) {
       if (ig.getVersion() != null) {
         map.put(ig.getId(), ig.getVersion());
       }
@@ -381,11 +381,11 @@ public class PublisherBase implements ILoggingService {
 
   protected RenderingContext.ITypeParser getTypeLoader(String ver) throws Exception {
     if (ver == null)
-      ver = publisherFields.version; // fall back to global version
+      ver = pf.version; // fall back to global version
     if (VersionUtilities.isR3Ver(ver)) {
       return new TypeParserR3();
     } else if (VersionUtilities.isR4Ver(ver)) {
-      return new TypeParserR4(this.publisherFields);
+      return new TypeParserR4(this.pf);
     } else if (VersionUtilities.isR2BVer(ver)) {
       return new TypeParserR14();
     } else if (VersionUtilities.isR2Ver(ver)) {
@@ -399,12 +399,12 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected Element convertToElement(FetchedResource r, Resource res) throws Exception {
-    String parseVersion = publisherFields.version;
+    String parseVersion = pf.version;
     if (r != null) {
-      if (Utilities.existsInList(r.fhirType(), SpecialTypeHandler.specialTypes(publisherFields.context.getVersion()))) {
+      if (Utilities.existsInList(r.fhirType(), SpecialTypeHandler.specialTypes(pf.context.getVersion()))) {
         parseVersion = SpecialTypeHandler.VERSION;
       } else if (r.getConfig() != null) {
-        parseVersion = str(r.getConfig(), "version", publisherFields.version);
+        parseVersion = str(r.getConfig(), "version", pf.version);
       }
     }
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
@@ -429,27 +429,27 @@ public class PublisherBase implements ILoggingService {
     }
     byte[] cnt = bs.toByteArray();
     ByteArrayInputStream bi = new ByteArrayInputStream(cnt);
-    Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(publisherFields.context).parseSingle(bi, null);
+    Element e = new org.hl7.fhir.r5.elementmodel.JsonParser(pf.context).parseSingle(bi, null);
     return e;
   }
 
   protected Resource convertFromElement(Element res) throws IOException, FHIRException, FHIRFormatError, DefinitionException {
     ByteArrayOutputStream bs = new ByteArrayOutputStream();
-    new org.hl7.fhir.r5.elementmodel.JsonParser(publisherFields.context).compose(res, bs, IParser.OutputStyle.NORMAL, null);
+    new org.hl7.fhir.r5.elementmodel.JsonParser(pf.context).compose(res, bs, IParser.OutputStyle.NORMAL, null);
     ByteArrayInputStream bi = new ByteArrayInputStream(bs.toByteArray());
-    if (VersionUtilities.isR3Ver(publisherFields.version)) {
+    if (VersionUtilities.isR3Ver(pf.version)) {
       org.hl7.fhir.dstu3.formats.JsonParser jp = new org.hl7.fhir.dstu3.formats.JsonParser();
       return  VersionConvertorFactory_30_50.convertResource(jp.parse(bi));
-    } else if (VersionUtilities.isR4Ver(publisherFields.version)) {
+    } else if (VersionUtilities.isR4Ver(pf.version)) {
       org.hl7.fhir.r4.formats.JsonParser jp = new org.hl7.fhir.r4.formats.JsonParser();
       return  VersionConvertorFactory_40_50.convertResource(jp.parse(bi));
-    } else if (VersionUtilities.isR4BVer(publisherFields.version)) {
+    } else if (VersionUtilities.isR4BVer(pf.version)) {
       org.hl7.fhir.r4b.formats.JsonParser jp = new org.hl7.fhir.r4b.formats.JsonParser();
       return  VersionConvertorFactory_43_50.convertResource(jp.parse(bi));
-    } else if (VersionUtilities.isR2BVer(publisherFields.version)) {
+    } else if (VersionUtilities.isR2BVer(pf.version)) {
       org.hl7.fhir.dstu2016may.formats.JsonParser jp = new org.hl7.fhir.dstu2016may.formats.JsonParser();
       return  VersionConvertorFactory_14_50.convertResource(jp.parse(bi));
-    } else if (VersionUtilities.isR2Ver(publisherFields.version)) {
+    } else if (VersionUtilities.isR2Ver(pf.version)) {
       org.hl7.fhir.dstu2.formats.JsonParser jp = new org.hl7.fhir.dstu2.formats.JsonParser();
       return VersionConvertorFactory_10_50.convertResource(jp.parse(bi));
     } else { // if (version.equals(Constants.VERSION)) {
@@ -459,14 +459,14 @@ public class PublisherBase implements ILoggingService {
   }
 
   public String license() throws Exception {
-    if (Utilities.noString(publisherFields.license)) {
+    if (Utilities.noString(pf.license)) {
       throw new Exception("A license is required in the configuration file, and it must be a SPDX license identifier (see https://spdx.org/licenses/), or \"not-open-source\"");
     }
-    return publisherFields.license;
+    return pf.license;
   }
 
   protected FetchedResource fetchByResource(String type, String id) {
-    for (FetchedFile f : publisherFields.fileList) {
+    for (FetchedFile f : pf.fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.fhirType().equals(type) && r.getId().equals(id))
           return r;
@@ -490,10 +490,10 @@ public class PublisherBase implements ILoggingService {
 
   protected Set<String> pageTargets() {
     Set<String> set = new HashSet<>();
-    if (publisherFields.sourceIg.getDefinition().getPage().hasName()) {
-      set.add(publisherFields.sourceIg.getDefinition().getPage().getName());
+    if (pf.sourceIg.getDefinition().getPage().hasName()) {
+      set.add(pf.sourceIg.getDefinition().getPage().getName());
     }
-    listPageTargets(set, publisherFields.sourceIg.getDefinition().getPage().getPage());
+    listPageTargets(set, pf.sourceIg.getDefinition().getPage().getPage());
     return set;
   }
 
@@ -554,33 +554,33 @@ public class PublisherBase implements ILoggingService {
 
   protected Locale inferDefaultNarrativeLang(final boolean logDecision) {
     if (logDecision) {
-      logDebugMessage(LogCategory.INIT, "-force-language="+ publisherFields.forcedLanguage
-              + " defaultTranslationLang="+ publisherFields.defaultTranslationLang
-              + (publisherFields.sourceIg == null ? "" : " sourceIg.language="+ publisherFields.sourceIg.getLanguage()
-              + " sourceIg.jurisdiction="+ publisherFields.sourceIg.getJurisdictionFirstRep().getCodingFirstRep().getCode())
+      logDebugMessage(LogCategory.INIT, "-force-language="+ pf.forcedLanguage
+              + " defaultTranslationLang="+ pf.defaultTranslationLang
+              + (pf.sourceIg == null ? "" : " sourceIg.language="+ pf.sourceIg.getLanguage()
+              + " sourceIg.jurisdiction="+ pf.sourceIg.getJurisdictionFirstRep().getCodingFirstRep().getCode())
       );
     }
-    if (publisherFields.forcedLanguage != null) {
+    if (pf.forcedLanguage != null) {
       if (logDecision) {
-        logMessage("Using " + publisherFields.forcedLanguage + " as the default narrative language. (-force-language has been set)");
+        logMessage("Using " + pf.forcedLanguage + " as the default narrative language. (-force-language has been set)");
       }
-      return publisherFields.forcedLanguage;
+      return pf.forcedLanguage;
     }
-    if (publisherFields.defaultTranslationLang != null) {
+    if (pf.defaultTranslationLang != null) {
       if (logDecision) {
-        logMessage("Using " + publisherFields.defaultTranslationLang + " as the default narrative language. (Implementation Guide param i18n-default-lang)");
+        logMessage("Using " + pf.defaultTranslationLang + " as the default narrative language. (Implementation Guide param i18n-default-lang)");
       }
-      return Locale.forLanguageTag(publisherFields.defaultTranslationLang);
+      return Locale.forLanguageTag(pf.defaultTranslationLang);
     }
-    if (publisherFields.sourceIg != null) {
-      if (publisherFields.sourceIg.hasLanguage()) {
+    if (pf.sourceIg != null) {
+      if (pf.sourceIg.hasLanguage()) {
         if (logDecision) {
-          logMessage("Using " + publisherFields.sourceIg.getLanguage() + " as the default narrative language. (ImplementationGuide.language has been set)");
+          logMessage("Using " + pf.sourceIg.getLanguage() + " as the default narrative language. (ImplementationGuide.language has been set)");
         }
-        return Locale.forLanguageTag(publisherFields.sourceIg.getLanguage());
+        return Locale.forLanguageTag(pf.sourceIg.getLanguage());
       }
-      if (publisherFields.sourceIg.hasJurisdiction()) {
-        final String jurisdiction = publisherFields.sourceIg.getJurisdictionFirstRep().getCodingFirstRep().getCode();
+      if (pf.sourceIg.hasJurisdiction()) {
+        final String jurisdiction = pf.sourceIg.getJurisdictionFirstRep().getCodingFirstRep().getCode();
         Locale localeFromRegion = RegionToLocaleMapper.getLocaleFromRegion(jurisdiction);
         if (localeFromRegion != null) {
           if (logDecision) {
@@ -604,22 +604,22 @@ public class PublisherBase implements ILoggingService {
     //  	if (fileNames.contains(file.getPath())) {
     //  		dlog("Found multiple definitions for file: " + file.getName()+ ".  Using first definition only.");
     //  	} else {
-    publisherFields.fileNames.add(file.getPath());
+    pf.fileNames.add(file.getPath());
     if (file.getRelativePath()!=null)
-      publisherFields.relativeNames.put(file.getRelativePath(), file);
-    publisherFields.changeList.add(file);
+      pf.relativeNames.put(file.getRelativePath(), file);
+    pf.changeList.add(file);
     //  	}
   }
 
   protected boolean loadPrePage(FetchedFile file, PreProcessInfo ppinfo) {
-    FetchedFile existing = publisherFields.altMap.get("pre-page/"+file.getPath());
+    FetchedFile existing = pf.altMap.get("pre-page/"+file.getPath());
     if (existing == null || existing.getTime() != file.getTime() || existing.getHash() != file.getHash()) {
       file.setProcessMode(ppinfo.hasXslt() && !file.getPath().endsWith(".md") ? FetchedFile.PROCESS_XSLT : FetchedFile.PROCESS_NONE);
       file.setXslt(ppinfo.getXslt());
       if (ppinfo.hasRelativePath())
         file.setRelativePath(ppinfo.getRelativePath() + File.separator + file.getRelativePath());
       addFile(file);
-      publisherFields.altMap.put("pre-page/"+file.getPath(), file);
+      pf.altMap.put("pre-page/"+file.getPath(), file);
       return true;
     } else {
       return false;
@@ -635,7 +635,7 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected ImplementationGuide.ImplementationGuideDefinitionResourceComponent findIGReference(String type, String id) {
-    for (ImplementationGuide.ImplementationGuideDefinitionResourceComponent r : publisherFields.publishedIg.getDefinition().getResource()) {
+    for (ImplementationGuide.ImplementationGuideDefinitionResourceComponent r : pf.publishedIg.getDefinition().getResource()) {
       if (r.hasReference() && r.getReference().getReference().equals(type+"/"+id)) {
         return r;
       }
@@ -644,25 +644,25 @@ public class PublisherBase implements ILoggingService {
   }
 
   public String getConfigFile() {
-    return publisherFields.configFile;
+    return pf.configFile;
   }
 
   protected StructureDefinition fetchSnapshotted(String url) throws Exception {
 
     ProfileUtilities utils = null;
-    for (FetchedFile f : publisherFields.fileList) {
+    for (FetchedFile f : pf.fileList) {
       for (FetchedResource r : f.getResources()) {
         if (r.getResource() instanceof StructureDefinition) {
           StructureDefinition sd = (StructureDefinition) r.getResource();
           if (sd.getUrl().equals(url)) {
             if (!r.isSnapshotted()) {
               if (utils == null) {
-                utils = new ProfileUtilities(this.publisherFields.context, null, this.publisherFields.igpkp);
-                utils.setXver(this.publisherFields.context.getXVer());
+                utils = new ProfileUtilities(this.pf.context, null, this.pf.igpkp);
+                utils.setXver(this.pf.context.getXVer());
                 utils.setForPublication(true);
-                utils.setMasterSourceFileNames(this.publisherFields.specMaps.get(0).getTargets());
+                utils.setMasterSourceFileNames(this.pf.specMaps.get(0).getTargets());
                 utils.setLocalFileNames(pageTargets());
-                if (VersionUtilities.isR4Plus(this.publisherFields.version)) {
+                if (VersionUtilities.isR4Plus(this.pf.version)) {
                   utils.setNewSlicingProcessing(true);
                 }
               }
@@ -673,17 +673,17 @@ public class PublisherBase implements ILoggingService {
         }
       }
     }
-    return publisherFields.context.fetchResource(StructureDefinition.class, url);
+    return pf.context.fetchResource(StructureDefinition.class, url);
   }
 
   protected void generateSnapshot(FetchedFile f, FetchedResource r, StructureDefinition sd, boolean close, ProfileUtilities utils) throws Exception {
     boolean changed = false;
 
     logDebugMessage(LogCategory.PROGRESS, "Check Snapshot for "+sd.getUrl());
-    sd.setFhirVersion(Enumerations.FHIRVersion.fromCode(this.publisherFields.version));
+    sd.setFhirVersion(Enumerations.FHIRVersion.fromCode(this.pf.version));
     List<ValidationMessage> messages = new ArrayList<>();
     utils.setMessages(messages);
-    utils.setSuppressedMappings(this.publisherFields.suppressedMappings);
+    utils.setSuppressedMappings(this.pf.suppressedMappings);
     StructureDefinition base = sd.hasBaseDefinition() ? fetchSnapshotted(sd.getBaseDefinition()) : null;
     if (base == null) {
       throw new Exception("Cannot find or generate snapshot for base definition ("+sd.getBaseDefinition()+" from "+sd.getUrl()+")");
@@ -722,7 +722,7 @@ public class PublisherBase implements ILoggingService {
           changed = true;
           sd.getDifferential().getElement().add(0, new ElementDefinition().setPath(p == null ? sd.getType() : p.substring(0, p.indexOf("."))));
         }
-        utils.setDefWebRoot(this.publisherFields.igpkp.getCanonical());
+        utils.setDefWebRoot(this.pf.igpkp.getCanonical());
         try {
           if (base.getUserString(UserDataNames.render_webroot) != null) {
             utils.generateSnapshot(base, sd, sd.getUrl(), base.getUserString(UserDataNames.render_webroot), sd.getName());
@@ -730,7 +730,7 @@ public class PublisherBase implements ILoggingService {
             utils.generateSnapshot(base, sd, sd.getUrl(), null, sd.getName());
           }
         } catch (Exception e) {
-          if (this.publisherFields.debug) {
+          if (this.pf.debug) {
             e.printStackTrace();
           }
           throw new FHIRException("Unable to generate snapshot for "+sd.getUrl()+" in "+f.getName()+" because "+e.getMessage(), e);
@@ -740,7 +740,7 @@ public class PublisherBase implements ILoggingService {
     } else { //sd.getKind() == StructureDefinitionKind.LOGICAL
       logDebugMessage(LogCategory.PROGRESS, "Generate Snapshot for Logical Model or specialization"+sd.getUrl());
       if (!sd.hasSnapshot()) {
-        utils.setDefWebRoot(this.publisherFields.igpkp.getCanonical());
+        utils.setDefWebRoot(this.pf.igpkp.getCanonical());
         utils.generateSnapshot(base, sd, sd.getUrl(), Utilities.extractBaseUrl(base.getWebPath()), sd.getName());
         changed = true;
       }
@@ -754,11 +754,11 @@ public class PublisherBase implements ILoggingService {
     f.getErrors().addAll(messages);
     r.setSnapshotted(true);
     logDebugMessage(LogCategory.CONTEXT, "Context.See "+sd.getUrl());
-    this.publisherFields.context.cacheResourceFromPackage(sd, this.publisherFields.packageInfo);
+    this.pf.context.cacheResourceFromPackage(sd, this.pf.packageInfo);
   }
 
   protected boolean checkCanonicalsForVersions(FetchedFile f, CanonicalResource bc, boolean snapshotMode) {
-    if (this.publisherFields.pinningPolicy == PublisherUtils.PinningPolicy.NO_ACTION) {
+    if (this.pf.pinningPolicy == PublisherUtils.PinningPolicy.NO_ACTION) {
       return false;
 //    } else if ("ImplementationGuide".equals(bc.fhirType())) {
 //      return false;
@@ -770,19 +770,19 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected void generateSnapshots() throws Exception {
-    publisherFields.context.setAllowLoadingDuplicates(true);
+    pf.context.setAllowLoadingDuplicates(true);
 
-    ProfileUtilities utils = new ProfileUtilities(publisherFields.context, null, publisherFields.igpkp);
-    utils.setXver(publisherFields.context.getXVer());
+    ProfileUtilities utils = new ProfileUtilities(pf.context, null, pf.igpkp);
+    utils.setXver(pf.context.getXVer());
     utils.setForPublication(true);
-    utils.setMasterSourceFileNames(publisherFields.specMaps.get(0).getTargets());
+    utils.setMasterSourceFileNames(pf.specMaps.get(0).getTargets());
     utils.setLocalFileNames(pageTargets());
-    if (VersionUtilities.isR4Plus(publisherFields.version)) {
+    if (VersionUtilities.isR4Plus(pf.version)) {
       utils.setNewSlicingProcessing(true);
     }
 
     boolean first = true;
-    for (FetchedFile f : publisherFields.fileList) {
+    for (FetchedFile f : pf.fileList) {
       if (!f.isLoaded()) {
         f.start("generateSnapshots");
         try {
@@ -806,7 +806,7 @@ public class PublisherBase implements ILoggingService {
               }
               checkCanonicalsForVersions(f, sd, false);
               if ("Extension".equals(sd.getType()) && sd.getSnapshot().getElementFirstRep().getIsModifier()) {
-                this.publisherFields.modifierExtensions.add(sd);
+                this.pf.modifierExtensions.add(sd);
               }
             }
           }
@@ -818,7 +818,7 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected boolean isExampleResource(CanonicalResource mr) {
-    for (ImplementationGuide.ImplementationGuideDefinitionResourceComponent ir : publisherFields.publishedIg.getDefinition().getResource()) {
+    for (ImplementationGuide.ImplementationGuideDefinitionResourceComponent ir : pf.publishedIg.getDefinition().getResource()) {
       if (isSameResource(ir, mr)) {
         return ir.getIsExample() || ir.hasProfile();
       }
@@ -831,14 +831,14 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected String preProcessMarkdown(String description) throws Exception {
-    if (publisherFields.bdr == null) {
+    if (pf.bdr == null) {
       return "description";
     }
-    return publisherFields.bdr.preProcessMarkdown("json", description);
+    return pf.bdr.preProcessMarkdown("json", description);
   }
 
   public String workingVersion() {
-    return publisherFields.businessVersion == null ? publisherFields.publishedIg.getVersion() : publisherFields.businessVersion;
+    return pf.businessVersion == null ? pf.publishedIg.getVersion() : pf.businessVersion;
   }
 
   protected void printMemUsage() {
@@ -856,18 +856,18 @@ public class PublisherBase implements ILoggingService {
     if (p.contains("tbl_bck")) {
       return true; // these are not always tracked
     }
-    if (publisherFields.otherFilesStartup.contains(p)) {
+    if (pf.otherFilesStartup.contains(p)) {
       return true;
     }
-    if (publisherFields.otherFilesRun.contains(p)) {
+    if (pf.otherFilesRun.contains(p)) {
       return true;
     }
-    for (FetchedFile f : publisherFields.fileList) {
+    for (FetchedFile f : pf.fileList) {
       if (f.getOutputNames().contains(p)) {
         return true;
       }
     }
-    for (FetchedFile f : publisherFields.altMap.values()) {
+    for (FetchedFile f : pf.altMap.values()) {
       if (f.getOutputNames().contains(p)) {
         return true;
       }
@@ -877,24 +877,24 @@ public class PublisherBase implements ILoggingService {
 
   public void setJekyllCommand(String theJekyllCommand) {
     if (!Utilities.noString(theJekyllCommand)) {
-      this.publisherFields.jekyllCommand = theJekyllCommand;
+      this.pf.jekyllCommand = theJekyllCommand;
     }
   }
 
   public String getJekyllCommand() {
-    return this.publisherFields.jekyllCommand;
+    return this.pf.jekyllCommand;
   }
 
   protected boolean forHL7orFHIR() {
-    return publisherFields.igpkp.getCanonical().contains("hl7.org") || publisherFields.igpkp.getCanonical().contains("fhir.org") ;
+    return pf.igpkp.getCanonical().contains("hl7.org") || pf.igpkp.getCanonical().contains("fhir.org") ;
   }
 
   protected boolean suppressId(FetchedFile f, FetchedResource r) {
-    if (this.publisherFields.suppressedIds.size() == 0) {
+    if (this.pf.suppressedIds.size() == 0) {
       return false;
-    } else if (this.publisherFields.suppressedIds.contains(r.getId()) || this.publisherFields.suppressedIds.contains(r.fhirType()+"/"+r.getId())) {
+    } else if (this.pf.suppressedIds.contains(r.getId()) || this.pf.suppressedIds.contains(r.fhirType()+"/"+r.getId())) {
       return true;
-    } else if (this.publisherFields.suppressedIds.get(0).equals("$examples") && r.isExample()) {
+    } else if (this.pf.suppressedIds.get(0).equals("$examples") && r.isExample()) {
       return true;
     } else {
       return false;
@@ -902,8 +902,8 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected int getErrorCount() {
-    int result = countErrs(publisherFields.errors);
-    for (FetchedFile f : publisherFields.fileList) {
+    int result = countErrs(pf.errors);
+    for (FetchedFile f : pf.fileList) {
       result = result + countErrs(f.getErrors());
     }
     return result;
@@ -921,104 +921,104 @@ public class PublisherBase implements ILoggingService {
 
   public void setTxServer(String s) {
     if (!Utilities.noString(s))
-      publisherFields.txServer = s;
+      pf.txServer = s;
   }
 
   String getTxServer() {
-    return publisherFields.txServer;
+    return pf.txServer;
   }
 
   protected void setIgPack(String s) {
     if (!Utilities.noString(s))
-      publisherFields.igPack = s;
+      pf.igPack = s;
   }
 
   public PublisherUtils.CacheOption getCacheOption() {
-    return publisherFields.cacheOption;
+    return pf.cacheOption;
   }
 
   public void setCacheOption(PublisherUtils.CacheOption cacheOption) {
-    this.publisherFields.cacheOption = cacheOption;
+    this.pf.cacheOption = cacheOption;
   }
 
   public PublisherUtils.IGBuildMode getMode() {
-    return publisherFields.mode;
+    return pf.mode;
   }
 
   public void setMode(PublisherUtils.IGBuildMode mode) {
-    this.publisherFields.mode = mode;
+    this.pf.mode = mode;
   }
 
   public void setFetcher(SimpleFetcher theFetcher) {
-    publisherFields.fetcher = theFetcher;
+    pf.fetcher = theFetcher;
   }
 
   public void setContext(SimpleWorkerContext theContext) {
-    publisherFields.context = theContext;
+    pf.context = theContext;
   }
 
   public void setSpecPath(String theSpecPath) {
-    publisherFields.specPath = theSpecPath;
+    pf.specPath = theSpecPath;
   }
 
   public void setTempDir(String theTempDir) {
-    publisherFields.tempDir = theTempDir;
+    pf.tempDir = theTempDir;
   }
 
   public void setOutputDir(String theDir) {
-    publisherFields.outputDir = theDir;
+    pf.outputDir = theDir;
   }
 
   public void setIgName(String theIgName) {
-    publisherFields.igName = theIgName;
+    pf.igName = theIgName;
   }
 
   public void setConfigFileRootPath(String theConfigFileRootPath) {
-    publisherFields.configFileRootPath = theConfigFileRootPath;
+    pf.configFileRootPath = theConfigFileRootPath;
   }
 
   public FHIRToolingClient getWebTxServer() {
-    return publisherFields.webTxServer;
+    return pf.webTxServer;
   }
 
   public void setWebTxServer(FHIRToolingClient webTxServer) {
-    this.publisherFields.webTxServer = webTxServer;
+    this.pf.webTxServer = webTxServer;
   }
 
   public void setDebug(boolean theDebug) {
-    this.publisherFields.debug = theDebug;
+    this.pf.debug = theDebug;
   }
 
   public void setIsChild(boolean newIsChild) {
-    this.publisherFields.isChild = newIsChild;
+    this.pf.isChild = newIsChild;
   }
 
   public IGKnowledgeProvider getIgpkp() {
-    return publisherFields.igpkp;
+    return pf.igpkp;
   }
 
   public List<FetchedFile> getFileList() {
-    return publisherFields.fileList;
+    return pf.fileList;
   }
 
   public ImplementationGuide getSourceIg() {
-    return publisherFields.sourceIg;
+    return pf.sourceIg;
   }
 
   public ImplementationGuide getPublishedIg() {
-    return publisherFields.publishedIg;
+    return pf.publishedIg;
   }
 
   public void setTargetOutput(String targetOutput) {
-    this.publisherFields.targetOutput = targetOutput;
+    this.pf.targetOutput = targetOutput;
   }
 
   public String getTargetOutputNested() {
-    return publisherFields.targetOutputNested;
+    return pf.targetOutputNested;
   }
 
   public void setTargetOutputNested(String targetOutputNested) {
-    this.publisherFields.targetOutputNested = targetOutputNested;
+    this.pf.targetOutputNested = targetOutputNested;
   }
 
   protected FetchedResource getResourceForRef(FetchedFile f, String ref) {
@@ -1026,7 +1026,7 @@ public class PublisherBase implements ILoggingService {
       if ((r.fhirType()+"/"+r.getId()).equals(ref))
         return r;
     }
-    for (FetchedFile f1 : this.publisherFields.fileList) {
+    for (FetchedFile f1 : this.pf.fileList) {
       for (FetchedResource r : f1.getResources()) {
         if ((r.fhirType()+"/"+r.getId()).equals(ref))
           return r;
@@ -1043,7 +1043,7 @@ public class PublisherBase implements ILoggingService {
     Provenance pv = null;
     try {
       pv = (Provenance) (r == null ? convertFromElement(resource) : r);
-      RendererFactory.factory(pv, publisherFields.rc.setParser(getTypeLoader(null))).renderResource(ResourceWrapper.forResource(publisherFields.rc, pv));
+      RendererFactory.factory(pv, pf.rc.setParser(getTypeLoader(null))).renderResource(ResourceWrapper.forResource(pf.rc, pv));
     } catch (Exception e) {
       // nothing, if there's a problem, we'll take it up elsewhere
     }
@@ -1086,7 +1086,7 @@ public class PublisherBase implements ILoggingService {
   private int chooseType(String[] ref) {
     int res = -1;
     for (int i = 0; i < ref.length-1; i++) { // note -1 - don't bother checking the last value, which might also be a resource name (e.g StructureDefinition/XXX)
-      if (publisherFields.context.getResourceNames().contains(ref[i])) {
+      if (pf.context.getResourceNames().contains(ref[i])) {
         res = i;
       }
     }
@@ -1109,7 +1109,7 @@ public class PublisherBase implements ILoggingService {
           d = c.getChildValue("definition");
         }
         CanonicalResource canonical = null;
-        if (VersionUtilities.getCanonicalResourceNames(publisherFields.context.getVersion()).contains(c.fhirType())) {
+        if (VersionUtilities.getCanonicalResourceNames(pf.context.getVersion()).contains(c.fhirType())) {
           try {
             canonical = (CanonicalResource)convertFromElement(c);
           } catch (Exception ex) {
@@ -1123,7 +1123,7 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected StringType findReleaseLabel() {
-    for (ImplementationGuide.ImplementationGuideDefinitionParameterComponent p : publisherFields.publishedIg.getDefinition().getParameter()) {
+    for (ImplementationGuide.ImplementationGuideDefinitionParameterComponent p : pf.publishedIg.getDefinition().getParameter()) {
       if ("releaselabel".equals(p.getCode().getCode())) {
         return p.getValueElement();
       }
@@ -1137,7 +1137,7 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected FetchedFile getFileForUri(String uri) {
-    for (FetchedFile f : publisherFields.fileList) {
+    for (FetchedFile f : pf.fileList) {
       if (getResourceForUri(f, uri) != null)
         return f;
     }
@@ -1156,7 +1156,7 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected FetchedResource getResourceForUri(String uri) {
-    for (FetchedFile f : publisherFields.fileList) {
+    for (FetchedFile f : pf.fileList) {
       FetchedResource r = getResourceForUri(f, uri);
       if (r != null)
         return r;
@@ -1165,7 +1165,7 @@ public class PublisherBase implements ILoggingService {
   }
 
   protected FetchedFile findFileForResource(FetchedResource r) {
-    for (FetchedFile f : publisherFields.fileList) {
+    for (FetchedFile f : pf.fileList) {
       if (f.getResources().contains(r)) {
         return f;
       }
@@ -1212,8 +1212,8 @@ public class PublisherBase implements ILoggingService {
     if (res instanceof ImplementationGuide) {
       ImplementationGuide ig = (ImplementationGuide) res;
       ig.getFhirVersion().clear();
-      ig.getFhirVersion().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), publisherFields.version));
-      ig.setPackageId(publisherFields.publishedIg.getPackageId()+"."+v);
+      ig.getFhirVersion().add(new Enumeration<>(new Enumerations.FHIRVersionEnumFactory(), pf.version));
+      ig.setPackageId(pf.publishedIg.getPackageId()+"."+v);
     }
     if (res instanceof StructureDefinition) {
       StructureDefinition sd = (StructureDefinition) res;
@@ -1244,7 +1244,7 @@ public class PublisherBase implements ILoggingService {
       b.append(time);
       b.append(",");
       b.append(size);
-      if (publisherFields.trackFragments) {
+      if (pf.trackFragments) {
         b.append(",");
         b.append(used);
       }
@@ -1254,9 +1254,9 @@ public class PublisherBase implements ILoggingService {
 
   protected void installPackage(String id, String ver) {
     try {
-      if (!publisherFields.pcm.packageInstalled(id, ver)) {
+      if (!pf.pcm.packageInstalled(id, ver)) {
         log("Found dependency on "+id+"#"+ver+" in Sushi config. Pre-installing");
-        publisherFields.pcm.loadPackage(id, ver);
+        pf.pcm.loadPackage(id, ver);
       }
     } catch (FHIRException | IOException e) {
       log("Unable to install "+id+"#"+ver+": "+e.getMessage());
@@ -1287,7 +1287,7 @@ public class PublisherBase implements ILoggingService {
       if (url.contains("|")) {
         return false;
       }
-      CanonicalResource tgt = (CanonicalResource) PublisherBase.this.publisherFields.context.fetchResourceRaw(Resource.class, url);
+      CanonicalResource tgt = (CanonicalResource) PublisherBase.this.pf.context.fetchResourceRaw(Resource.class, url);
       if (tgt instanceof CodeSystem) {
         CodeSystem cs = (CodeSystem) tgt;
         if (cs.getContent() == Enumerations.CodeSystemContentMode.NOTPRESENT && cs.hasSourcePackage() && cs.getSourcePackage().isTHO()) {
@@ -1304,29 +1304,29 @@ public class PublisherBase implements ILoggingService {
       if (Utilities.startsWithInList(path, "ImplementationGuide.dependsOn")) {
         return false;
       }
-      if (PublisherBase.this.publisherFields.pinningPolicy == PublisherUtils.PinningPolicy.FIX) {
+      if (PublisherBase.this.pf.pinningPolicy == PublisherUtils.PinningPolicy.FIX) {
         if (!snapshotMode) {
-          PublisherBase.this.publisherFields.pinCount++;
+          PublisherBase.this.pf.pinCount++;
           f.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.PROCESSING, path, "Pinned the version of "+url+" to "+tgt.getVersion(),
                   ValidationMessage.IssueSeverity.INFORMATION).setMessageId(PublisherMessageIds.PIN_VERSION));
         }
-        if (PublisherBase.this.publisherFields.pinDest != null) {
+        if (PublisherBase.this.pf.pinDest != null) {
           pinInManifest(tgt.fhirType(), url, tgt.getVersion());
         } else {
           ct.setValue(url+"|"+tgt.getVersion());
         }
         return true;
       } else {
-        Map<String, String> lst = PublisherBase.this.publisherFields.validationFetcher.fetchCanonicalResourceVersionMap(null, null, url);
+        Map<String, String> lst = PublisherBase.this.pf.validationFetcher.fetchCanonicalResourceVersionMap(null, null, url);
         if (lst.size() < 2) {
           return false;
         } else {
           if (!snapshotMode) {
-            PublisherBase.this.publisherFields.pinCount++;
+            PublisherBase.this.pf.pinCount++;
             f.getErrors().add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.PROCESSING, path, "Pinned the version of "+url+" to "+tgt.getVersion()+" from choices of "+stringify(",", lst),
                     ValidationMessage.IssueSeverity.INFORMATION).setMessageId(PublisherMessageIds.PIN_VERSION));
           }
-          if (PublisherBase.this.publisherFields.pinDest != null) {
+          if (PublisherBase.this.pf.pinDest != null) {
             pinInManifest(tgt.fhirType(), url, tgt.getVersion());
           } else {
             ct.setValue(url+"|"+tgt.getVersion());
@@ -1337,13 +1337,13 @@ public class PublisherBase implements ILoggingService {
     }
 
     private void pinInManifest(String type, String url, String version) {
-      FetchedResource r = fetchByResource("Parameters", PublisherBase.this.publisherFields.pinDest);
+      FetchedResource r = fetchByResource("Parameters", PublisherBase.this.pf.pinDest);
       if (r == null) {
-        throw new Error("Unable to find nominated pin-manifest "+ PublisherBase.this.publisherFields.pinDest);
+        throw new Error("Unable to find nominated pin-manifest "+ PublisherBase.this.pf.pinDest);
       }
       Element p = r.getElement();
       if (!p.hasUserData(UserDataNames.EXP_REVIEWED)) {
-        new ExpansionParameterUtilities(PublisherBase.this.publisherFields.context).reviewVersions(p);
+        new ExpansionParameterUtilities(PublisherBase.this.pf.context).reviewVersions(p);
         p.setUserData(UserDataNames.EXP_REVIEWED, true);
       }
       String pn = null;
