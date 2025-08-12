@@ -65,7 +65,7 @@ public class AllGuidesTests {
     
     Publisher pub = new Publisher();
     pub.setConfigFile(p);
-    pub.setTxServer(FhirSettings.getTxFhirDevelopment());
+    pub.getPf().setTxServer(FhirSettings.getTxFhirDevelopment());
     pub.setCacheOption(PublisherUtils.CacheOption.CLEAR_ALL);
     pub.execute();
     

@@ -332,7 +332,7 @@ public class PublisherGenerator extends PublisherBase {
       pf.childPublisher = new Publisher();
       pf.childPublisher.setConfigFile(Utilities.path(FileUtilities.getDirectoryForFile(this.getConfigFile()), pf.nestedIgConfig));
       pf.childPublisher.setJekyllCommand(this.getJekyllCommand());
-      pf.childPublisher.setTxServer(this.getTxServer());
+      pf.childPublisher.pf.setTxServer(this.pf.getTxServer());
       pf.childPublisher.setDebug(this.pf.debug);
       pf.childPublisher.setCacheOption(this.getCacheOption());
       pf.childPublisher.setIsChild(true);
