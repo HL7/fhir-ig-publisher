@@ -1438,7 +1438,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         System.setProperty("https.proxyPort", p[1]);
         System.out.println("Web Proxy = "+p[0]+":"+p[1]);
       }
-      self.setTxServer(CliParams.getNamedParam(args, "-tx"));
+      self.pf.setTxServer(CliParams.getNamedParam(args, "-tx"));
       self.setPackagesFolder(CliParams.getNamedParam(args, "-packages"));
 
       if (CliParams.hasNamedParam(args, "-force-language")) {
@@ -1570,11 +1570,11 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
 
   public static void setTxServerValue(String[] args, Publisher self) {
     if (CliParams.hasNamedParam(args, "-tx")) {
-      self.setTxServer(CliParams.getNamedParam(args, "-tx"));
+      self.pf.setTxServer(CliParams.getNamedParam(args, "-tx"));
     } else if (CliParams.hasNamedParam(args, "-devtx")) {
-      self.setTxServer(FhirSettings.getTxFhirDevelopment());
+      self.pf.setTxServer(FhirSettings.getTxFhirDevelopment());
     } else {
-      self.setTxServer(FhirSettings.getTxFhirProduction());
+      self.pf.setTxServer(FhirSettings.getTxFhirProduction());
     }
   }
 
@@ -1816,7 +1816,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
     Publisher self = new Publisher();
     self.setConfigFile(Publisher.determineActualIG(path, PublisherUtils.IGBuildMode.PUBLICATION));
     self.execute();
-    self.setTxServer(FhirSettings.getTxFhirProduction());
+    self.pf.setTxServer(FhirSettings.getTxFhirProduction());
     if (self.countErrs(self.pf.errors) > 0) {
       throw new Exception("Building IG '"+path+"' caused an error");
     }
@@ -1875,7 +1875,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
       self.pf.generationOff = noGeneration;
       System.out.println("Running without generation to shorten the run time (editor process only)");
     }
-    self.setTxServer(txServer);
+    self.pf.setTxServer(txServer);
     self.setConfigFile(determineActualIG(folderPath, PublisherUtils.IGBuildMode.MANUAL));
 
     self.pf.debug = wantDebug;

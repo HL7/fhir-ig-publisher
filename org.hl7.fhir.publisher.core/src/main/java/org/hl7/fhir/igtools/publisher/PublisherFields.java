@@ -40,292 +40,302 @@ import java.io.File;
 import java.util.*;
 
 public class PublisherFields {
-    @Getter @Setter
-  String sourceDir;
-    @Getter @Setter
+    @Getter
+    @Setter
+    String sourceDir;
+    @Getter
+    @Setter
     String destDir;
-  String configFile;
 
-  FHIRToolingClient webTxServer;
-  String txServer;
-  Locale forcedLanguage;
-  String igPack = "";
-  boolean debug;
-  boolean isChild;
-  boolean cacheVersion;
-  boolean appendTrailingSlashInDataFile;
-  boolean newIg = false;
-  Map<String, String> countryCodeForName = null;
-  Map<String, String> countryNameForCode = null;
-  Map<String, String> countryCodeForNumeric = null;
-  Map<String, String> countryCodeFor2Letter = null;
-  Map<String, String> shortCountryCode = null;
-  Map<String, String> stateNameForCode = null;
-  Map<String, Map<String, ElementDefinition>> sdMapCache = new HashMap<String, Map<String, ElementDefinition>>();
-  List<String> ignoreFlags = null;
-  Map<String, Boolean> wantGenParams = new HashMap<String, Boolean>();
-  Publisher childPublisher = null;
-  boolean genExampleNarratives = true;
-  final List<String> noNarratives = new ArrayList<String>();
-  List<FetchedResource> noNarrativeResources = new ArrayList<FetchedResource>();
-  final List<String> noValidate = new ArrayList<String>();
-  final List<String> customResourceFiles = new ArrayList<String>();
-  List<FetchedResource> noValidateResources = new ArrayList<FetchedResource>();
-  List<String> resourceDirs = new ArrayList<String>();
-  List<String> resourceFactoryDirs = new ArrayList<String>();
-  List<String> pagesDirs = new ArrayList<String>();
-  List<String> testDirs = new ArrayList<String>();
-  List<String> dataDirs = new ArrayList<String>();
-  List<String> otherDirs = new ArrayList<String>();
-  String tempDir;
-  String tempLangDir;
-  String outputDir;
-  String specPath;
-  String qaDir;
-  String version;
-  FhirPublication pubVersion;
-  long jekyllTimeout = Publisher.JEKYLL_TIMEOUT;
-  long fshTimeout = Publisher.FSH_TIMEOUT;
-  SuppressedMessageInformation suppressedMessages = new SuppressedMessageInformation();
-  boolean tabbedSnapshots = false;
-  String igName;
-  PublisherUtils.IGBuildMode mode; // for the IG publication infrastructure
-  SimpleFetcher fetcher = new SimpleFetcher(null);
+    FHIRToolingClient webTxServer;
+    @Getter
+    String txServer;
 
-  @Getter
-  SimpleWorkerContext context; //
-  DataRenderer dr;
-  InstanceValidator validator;
-  ProfileValidator pvalidator;
-  CodeSystemValidator csvalidator;
-  IGKnowledgeProvider igpkp;
-  List<SpecMapManager> specMaps = new ArrayList<SpecMapManager>();
-  List<PublisherUtils.LinkedSpecification> linkSpecMaps = new ArrayList<PublisherUtils.LinkedSpecification>();
-  List<String> suppressedIds = new ArrayList<String>();
-  Map<String, MappingSpace> mappingSpaces = new HashMap<String, MappingSpace>();
-  Map<ImplementationGuide.ImplementationGuideDefinitionResourceComponent, FetchedFile> fileMap = new HashMap<ImplementationGuide.ImplementationGuideDefinitionResourceComponent, FetchedFile>();
-  Map<String, FetchedFile> altMap = new HashMap<String, FetchedFile>();
-  Map<String, FetchedResource> canonicalResources = new HashMap<String, FetchedResource>();
-  List<FetchedFile> fileList = new ArrayList<FetchedFile>();
-  List<FetchedFile> changeList = new ArrayList<FetchedFile>();
-  List<String> fileNames = new ArrayList<String>();
-  Map<String, FetchedFile> relativeNames = new HashMap<String, FetchedFile>();
-  Set<String> bndIds = new HashSet<String>();
-  List<Resource> loaded = new ArrayList<Resource>();
-  ImplementationGuide sourceIg;
-  ImplementationGuide publishedIg;
-  List<ValidationMessage> errors = new ArrayList<ValidationMessage>();
-  Calendar execTime = Calendar.getInstance();
-  Set<String> otherFilesStartup = new HashSet<String>();
-  Set<String> otherFilesRun = new HashSet<String>();
-  Set<String> regenList = new HashSet<String>();
-  StringBuilder filelog;
-  Set<String> allOutputs = new HashSet<String>();
-  Set<FetchedResource> examples = new HashSet<FetchedResource>();
-  Set<FetchedResource> testplans = new HashSet<FetchedResource>();
-  Set<FetchedResource> testscripts = new HashSet<FetchedResource>();
-  Set<String> profileTestCases = new HashSet<String>();
-  HashMap<String, FetchedResource> resources = new HashMap<String, FetchedResource>();
-  HashMap<String, ImplementationGuide.ImplementationGuideDefinitionPageComponent> igPages = new HashMap<String, ImplementationGuide.ImplementationGuideDefinitionPageComponent>();
-  List<String> logOptions = new ArrayList<String>();
-  List<String> listedURLExemptions = new ArrayList<String>();
-  String altCanonical;
-  String jekyllCommand = "jekyll";
-  boolean makeQA = true;
-  boolean bundleReferencesResolve = true;
-  CqlSubSystem cql;
-  File killFile;
-  List<PageFactory> pageFactories = new ArrayList<PageFactory>();
-  ILoggingService logger = null;
-  HTMLInspector inspector;
-  List<String> prePagesDirs = new ArrayList<String>();
-  HashMap<String, PreProcessInfo> preProcessInfo = new HashMap<String, PreProcessInfo>();
-  String historyPage;
-  String vsCache;
-  String adHocTmpDir;
-  RenderingContext rc;
-  RenderingContext.RenderingContextLangs rcLangs; // prepared lang alternatives
-  List<ContactDetail> contacts;
-  List<UsageContext> contexts;
-  List<String> binaryPaths = new ArrayList<String>();
-  MarkdownType copyright;
-  List<CodeableConcept> jurisdictions;
-  Enumeration<ImplementationGuide.SPDXLicense> licenseInfo;
-  StringType publisher;
-  String businessVersion;
-  String wgm;
-  List<ContactDetail> defaultContacts;
-  List<UsageContext> defaultContexts;
-  MarkdownType defaultCopyright;
-  String defaultWgm;
-  List<CodeableConcept> defaultJurisdictions;
-  Enumeration<ImplementationGuide.SPDXLicense> defaultLicenseInfo;
-  StringType defaultPublisher;
-  String defaultBusinessVersion;
-  PublisherUtils.CacheOption cacheOption;
-  String configFileRootPath;
-  MarkDownProcessor markdownEngine;
-  List<ValueSet> expansions = new ArrayList<ValueSet>();
-  String npmName;
-  NPMPackageGenerator npm;
-  Map<String, NPMPackageGenerator> vnpms = new HashMap<String, NPMPackageGenerator>();
-  Map<String, NPMPackageGenerator> lnpms = new HashMap<String, NPMPackageGenerator>();
-  FilesystemPackageCacheManager pcm;
-  TemplateManager templateManager;
-  String rootDir;
-  String templatePck;
-  boolean templateLoaded;
-  String packagesFolder;
-  String targetOutput;
-  String repoSource;
-  String targetOutputNested;
-  String folderToDelete;
-  String specifiedVersion;
-  NpmPackage packge;
-  String txLog;
-  boolean includeHeadings;
-  String openApiTemplate;
-  boolean isPropagateStatus;
-  Collection<String> extraTemplateList = new ArrayList<String>(); // List of templates in order they should appear when navigating next/prev
-  Map<String, String> extraTemplates = new HashMap<String, String>();
-  Collection<String> historyTemplates = new ArrayList<String>(); // What templates should only be turned on if there's history
-  Collection<String> exampleTemplates = new ArrayList<String>(); // What templates should only be turned on if there are examples
-  String license;
-  String htmlTemplate;
-  String mdTemplate;
-  boolean brokenLinksError;
-  String nestedIgConfig;
-  String igArtifactsPage;
-  String nestedIgOutput;
-  boolean genExamples;
-  boolean doTransforms;
-  boolean allInvariants = true;
-  List<String> spreadsheets = new ArrayList<String>();
-  List<String> bundles = new ArrayList<String>();
-  List<String> mappings = new ArrayList<String>();
-  List<String> generateVersions = new ArrayList<String>();
-  RealmBusinessRules realmRules;
-  PreviousVersionComparator previousVersionComparator;
-  IpaComparator ipaComparator;
-  IpsComparator ipsComparator;
-  IGPublisherLiquidTemplateServices templateProvider;
-  List<NpmPackage> npmList = new ArrayList<NpmPackage>();
-  String repoRoot;
-  ValidationServices validationFetcher;
-  Template template;
-  boolean igMode;
-  boolean isBuildingTemplate;
-  JsonObject templateInfo;
-  ExtensionTracker extensionTracker;
-  String currVer;
-  List<String> codeSystemProps = new ArrayList<String>();
-  List<PublisherUtils.JsonDependency> jsonDependencies = new ArrayList<PublisherUtils.JsonDependency>();
-  Coding expectedJurisdiction;
-  boolean noSushi;
-  Map<String, String> loadedIds;
-  boolean duplicateInputResourcesDetected;
-  List<String> comparisonVersions;
-  List<String> ipaComparisons;
-  List<String> ipsComparisons;
-  String versionToAnnotate;
-  TimeTracker tt;
-  boolean publishing = false;
-  String igrealm;
-  String copyrightYear;
-  @Getter
-  @Setter
-  boolean validationOff;
-  @Getter
-  @Setter
-  boolean generationOff;
-  @Getter
-  @Setter
-  String packageCacheFolder = null;
-  String fmtDateTime = "yyyy-MM-dd HH:mm:ssZZZ";
-  String fmtDate = "yyyy-MM-dd";
-  DependentIGFinder dependentIgFinder;
-  List<StructureDefinition> modifierExtensions = new ArrayList<StructureDefinition>();
-  Object branchName;
-  R4ToR4BAnalyser r4tor4b;
-  List<DependencyAnalyser.ArtifactDependency> dependencyList;
-  Map<String, List<String>> trackedFragments = new HashMap<String, List<String>>();
-  PackageInformation packageInfo;
-  boolean tocSizeWarning = false;
-  CSVWriter allProfilesCsv;
-  StructureDefinitionSpreadsheetGenerator allProfilesXlsx;
-  boolean produceJekyllData;
-  boolean noUsageCheck;
-  boolean hasTranslations;
-  String defaultTranslationLang;
-  List<String> translationLangs = new ArrayList<String>();
-  List<String> translationSources = new ArrayList<String>();
-  List<String> usedLangFiles = new ArrayList<String>();
-  List<String> viewDefinitions = new ArrayList<String>();
-  int validationLogTime = 0;
-  long maxMemory = 0;
-  String oidRoot;
-  IniFile oidIni;
-  boolean hintAboutNonMustSupport = false;
-  boolean anyExtensionsAllowed = false;
-  boolean checkAggregation = false;
-  boolean autoLoad = false;
-  boolean showReferenceMessages = false;
-  boolean noExperimentalContent = false;
-  boolean displayWarnings = false;
-  boolean newMultiLangTemplateFormat = false;
-  List<RelatedIG> relatedIGs = new ArrayList<RelatedIG>();
-  long last = System.currentTimeMillis();
-  List<String> unknownParams = new ArrayList<String>();
-  RenderingContext.FixedValueFormat fixedFormat = RenderingContext.FixedValueFormat.JSON;
-  static PublisherConsoleLogger consoleLogger;
-  IPublisherModule module;
-  boolean milestoneBuild;
-  BaseRenderer bdr;
-  boolean noXigLink;
+    public void setTxServer(String s) {
+        if (!Utilities.noString(s))
+            txServer = s;
+    }
 
-  int sqlIndex = 0;
-  
-  boolean isSushi;
+    String configFile;
 
-  LanguageSubtagRegistry registry;
+    Locale forcedLanguage;
+    String igPack = "";
+    boolean debug;
+    boolean isChild;
+    boolean cacheVersion;
+    boolean appendTrailingSlashInDataFile;
+    boolean newIg = false;
+    Map<String, String> countryCodeForName = null;
+    Map<String, String> countryNameForCode = null;
+    Map<String, String> countryCodeForNumeric = null;
+    Map<String, String> countryCodeFor2Letter = null;
+    Map<String, String> shortCountryCode = null;
+    Map<String, String> stateNameForCode = null;
+    Map<String, Map<String, ElementDefinition>> sdMapCache = new HashMap<String, Map<String, ElementDefinition>>();
+    List<String> ignoreFlags = null;
+    Map<String, Boolean> wantGenParams = new HashMap<String, Boolean>();
+    Publisher childPublisher = null;
+    boolean genExampleNarratives = true;
+    final List<String> noNarratives = new ArrayList<String>();
+    List<FetchedResource> noNarrativeResources = new ArrayList<FetchedResource>();
+    final List<String> noValidate = new ArrayList<String>();
+    final List<String> customResourceFiles = new ArrayList<String>();
+    List<FetchedResource> noValidateResources = new ArrayList<FetchedResource>();
+    List<String> resourceDirs = new ArrayList<String>();
+    List<String> resourceFactoryDirs = new ArrayList<String>();
+    List<String> pagesDirs = new ArrayList<String>();
+    List<String> testDirs = new ArrayList<String>();
+    List<String> dataDirs = new ArrayList<String>();
+    List<String> otherDirs = new ArrayList<String>();
+    String tempDir;
+    String tempLangDir;
+    String outputDir;
+    String specPath;
+    String qaDir;
+    String version;
+    FhirPublication pubVersion;
+    long jekyllTimeout = Publisher.JEKYLL_TIMEOUT;
+    long fshTimeout = Publisher.FSH_TIMEOUT;
+    SuppressedMessageInformation suppressedMessages = new SuppressedMessageInformation();
+    boolean tabbedSnapshots = false;
+    String igName;
+    PublisherUtils.IGBuildMode mode; // for the IG publication infrastructure
+    SimpleFetcher fetcher = new SimpleFetcher(null);
 
-  public Map<String, PublisherBase.FragmentUseRecord> fragmentUses = new HashMap<>();
-  boolean trackFragments = false;
+    @Getter
+    SimpleWorkerContext context; //
+    DataRenderer dr;
+    InstanceValidator validator;
+    ProfileValidator pvalidator;
+    CodeSystemValidator csvalidator;
+    IGKnowledgeProvider igpkp;
+    List<SpecMapManager> specMaps = new ArrayList<SpecMapManager>();
+    List<PublisherUtils.LinkedSpecification> linkSpecMaps = new ArrayList<PublisherUtils.LinkedSpecification>();
+    List<String> suppressedIds = new ArrayList<String>();
+    Map<String, MappingSpace> mappingSpaces = new HashMap<String, MappingSpace>();
+    Map<ImplementationGuide.ImplementationGuideDefinitionResourceComponent, FetchedFile> fileMap = new HashMap<ImplementationGuide.ImplementationGuideDefinitionResourceComponent, FetchedFile>();
+    Map<String, FetchedFile> altMap = new HashMap<String, FetchedFile>();
+    Map<String, FetchedResource> canonicalResources = new HashMap<String, FetchedResource>();
+    List<FetchedFile> fileList = new ArrayList<FetchedFile>();
+    List<FetchedFile> changeList = new ArrayList<FetchedFile>();
+    List<String> fileNames = new ArrayList<String>();
+    Map<String, FetchedFile> relativeNames = new HashMap<String, FetchedFile>();
+    Set<String> bndIds = new HashSet<String>();
+    List<Resource> loaded = new ArrayList<Resource>();
+    ImplementationGuide sourceIg;
+    ImplementationGuide publishedIg;
+    List<ValidationMessage> errors = new ArrayList<ValidationMessage>();
+    Calendar execTime = Calendar.getInstance();
+    Set<String> otherFilesStartup = new HashSet<String>();
+    Set<String> otherFilesRun = new HashSet<String>();
+    Set<String> regenList = new HashSet<String>();
+    StringBuilder filelog;
+    Set<String> allOutputs = new HashSet<String>();
+    Set<FetchedResource> examples = new HashSet<FetchedResource>();
+    Set<FetchedResource> testplans = new HashSet<FetchedResource>();
+    Set<FetchedResource> testscripts = new HashSet<FetchedResource>();
+    Set<String> profileTestCases = new HashSet<String>();
+    HashMap<String, FetchedResource> resources = new HashMap<String, FetchedResource>();
+    HashMap<String, ImplementationGuide.ImplementationGuideDefinitionPageComponent> igPages = new HashMap<String, ImplementationGuide.ImplementationGuideDefinitionPageComponent>();
+    List<String> logOptions = new ArrayList<String>();
+    List<String> listedURLExemptions = new ArrayList<String>();
+    String altCanonical;
+    String jekyllCommand = "jekyll";
+    boolean makeQA = true;
+    boolean bundleReferencesResolve = true;
+    CqlSubSystem cql;
+    File killFile;
+    List<PageFactory> pageFactories = new ArrayList<PageFactory>();
+    ILoggingService logger = null;
+    HTMLInspector inspector;
+    List<String> prePagesDirs = new ArrayList<String>();
+    HashMap<String, PreProcessInfo> preProcessInfo = new HashMap<String, PreProcessInfo>();
+    String historyPage;
+    String vsCache;
+    String adHocTmpDir;
+    RenderingContext rc;
+    RenderingContext.RenderingContextLangs rcLangs; // prepared lang alternatives
+    List<ContactDetail> contacts;
+    List<UsageContext> contexts;
+    List<String> binaryPaths = new ArrayList<String>();
+    MarkdownType copyright;
+    List<CodeableConcept> jurisdictions;
+    Enumeration<ImplementationGuide.SPDXLicense> licenseInfo;
+    StringType publisher;
+    String businessVersion;
+    String wgm;
+    List<ContactDetail> defaultContacts;
+    List<UsageContext> defaultContexts;
+    MarkdownType defaultCopyright;
+    String defaultWgm;
+    List<CodeableConcept> defaultJurisdictions;
+    Enumeration<ImplementationGuide.SPDXLicense> defaultLicenseInfo;
+    StringType defaultPublisher;
+    String defaultBusinessVersion;
+    PublisherUtils.CacheOption cacheOption;
+    String configFileRootPath;
+    MarkDownProcessor markdownEngine;
+    List<ValueSet> expansions = new ArrayList<ValueSet>();
+    String npmName;
+    NPMPackageGenerator npm;
+    Map<String, NPMPackageGenerator> vnpms = new HashMap<String, NPMPackageGenerator>();
+    Map<String, NPMPackageGenerator> lnpms = new HashMap<String, NPMPackageGenerator>();
+    FilesystemPackageCacheManager pcm;
+    TemplateManager templateManager;
+    String rootDir;
+    String templatePck;
+    boolean templateLoaded;
+    String packagesFolder;
+    String targetOutput;
+    String repoSource;
+    String targetOutputNested;
+    String folderToDelete;
+    String specifiedVersion;
+    NpmPackage packge;
+    String txLog;
+    boolean includeHeadings;
+    String openApiTemplate;
+    boolean isPropagateStatus;
+    Collection<String> extraTemplateList = new ArrayList<String>(); // List of templates in order they should appear when navigating next/prev
+    Map<String, String> extraTemplates = new HashMap<String, String>();
+    Collection<String> historyTemplates = new ArrayList<String>(); // What templates should only be turned on if there's history
+    Collection<String> exampleTemplates = new ArrayList<String>(); // What templates should only be turned on if there are examples
+    String license;
+    String htmlTemplate;
+    String mdTemplate;
+    boolean brokenLinksError;
+    String nestedIgConfig;
+    String igArtifactsPage;
+    String nestedIgOutput;
+    boolean genExamples;
+    boolean doTransforms;
+    boolean allInvariants = true;
+    List<String> spreadsheets = new ArrayList<String>();
+    List<String> bundles = new ArrayList<String>();
+    List<String> mappings = new ArrayList<String>();
+    List<String> generateVersions = new ArrayList<String>();
+    RealmBusinessRules realmRules;
+    PreviousVersionComparator previousVersionComparator;
+    IpaComparator ipaComparator;
+    IpsComparator ipsComparator;
+    IGPublisherLiquidTemplateServices templateProvider;
+    List<NpmPackage> npmList = new ArrayList<NpmPackage>();
+    String repoRoot;
+    ValidationServices validationFetcher;
+    Template template;
+    boolean igMode;
+    boolean isBuildingTemplate;
+    JsonObject templateInfo;
+    ExtensionTracker extensionTracker;
+    String currVer;
+    List<String> codeSystemProps = new ArrayList<String>();
+    List<PublisherUtils.JsonDependency> jsonDependencies = new ArrayList<PublisherUtils.JsonDependency>();
+    Coding expectedJurisdiction;
+    boolean noSushi;
+    Map<String, String> loadedIds;
+    boolean duplicateInputResourcesDetected;
+    List<String> comparisonVersions;
+    List<String> ipaComparisons;
+    List<String> ipsComparisons;
+    String versionToAnnotate;
+    TimeTracker tt;
+    boolean publishing = false;
+    String igrealm;
+    String copyrightYear;
+    @Getter
+    @Setter
+    boolean validationOff;
+    @Getter
+    @Setter
+    boolean generationOff;
+    @Getter
+    @Setter
+    String packageCacheFolder = null;
+    String fmtDateTime = "yyyy-MM-dd HH:mm:ssZZZ";
+    String fmtDate = "yyyy-MM-dd";
+    DependentIGFinder dependentIgFinder;
+    List<StructureDefinition> modifierExtensions = new ArrayList<StructureDefinition>();
+    Object branchName;
+    R4ToR4BAnalyser r4tor4b;
+    List<DependencyAnalyser.ArtifactDependency> dependencyList;
+    Map<String, List<String>> trackedFragments = new HashMap<String, List<String>>();
+    PackageInformation packageInfo;
+    boolean tocSizeWarning = false;
+    CSVWriter allProfilesCsv;
+    StructureDefinitionSpreadsheetGenerator allProfilesXlsx;
+    boolean produceJekyllData;
+    boolean noUsageCheck;
+    boolean hasTranslations;
+    String defaultTranslationLang;
+    List<String> translationLangs = new ArrayList<String>();
+    List<String> translationSources = new ArrayList<String>();
+    List<String> usedLangFiles = new ArrayList<String>();
+    List<String> viewDefinitions = new ArrayList<String>();
+    int validationLogTime = 0;
+    long maxMemory = 0;
+    String oidRoot;
+    IniFile oidIni;
+    boolean hintAboutNonMustSupport = false;
+    boolean anyExtensionsAllowed = false;
+    boolean checkAggregation = false;
+    boolean autoLoad = false;
+    boolean showReferenceMessages = false;
+    boolean noExperimentalContent = false;
+    boolean displayWarnings = false;
+    boolean newMultiLangTemplateFormat = false;
+    List<RelatedIG> relatedIGs = new ArrayList<RelatedIG>();
+    long last = System.currentTimeMillis();
+    List<String> unknownParams = new ArrayList<String>();
+    RenderingContext.FixedValueFormat fixedFormat = RenderingContext.FixedValueFormat.JSON;
+    static PublisherConsoleLogger consoleLogger;
+    IPublisherModule module;
+    boolean milestoneBuild;
+    BaseRenderer bdr;
+    boolean noXigLink;
 
-  LanguageUtils langUtils;
+    int sqlIndex = 0;
 
-  boolean simplifierMode;
+    boolean isSushi;
 
-  ContextUtilities cu;
+    LanguageSubtagRegistry registry;
 
-  boolean logLoading;
+    public Map<String, PublisherBase.FragmentUseRecord> fragmentUses = new HashMap<>();
+    boolean trackFragments = false;
 
-  JsonObject approvedIgsForCustomResources;
-  Set<String> customResourceNames = new HashSet<>();
-  List<StructureDefinition> customResources = new ArrayList<>();
+    LanguageUtils langUtils;
 
-  boolean needsRegen = false;
+    boolean simplifierMode;
 
-  ValidatorSession validatorSession;
-  ValidationPresenter.LanguagePopulationPolicy langPolicy = ValidationPresenter.LanguagePopulationPolicy.NONE;
+    ContextUtilities cu;
 
-  List<String> testDataFactories;
+    boolean logLoading;
 
-  Map<String, String> factoryProfileMap = new HashMap<>();
+    JsonObject approvedIgsForCustomResources;
+    Set<String> customResourceNames = new HashSet<>();
+    List<StructureDefinition> customResources = new ArrayList<>();
 
-  Map<String, Set<String>> otherVersionAddedResources= new HashMap<>();
+    boolean needsRegen = false;
 
-  String ipStmt;
+    ValidatorSession validatorSession;
+    ValidationPresenter.LanguagePopulationPolicy langPolicy = ValidationPresenter.LanguagePopulationPolicy.NONE;
 
-  PublisherUtils.PinningPolicy pinningPolicy = PublisherUtils.PinningPolicy.NO_ACTION;
-  String pinDest = null;
+    List<String> testDataFactories;
 
-  int pinCount;
+    Map<String, String> factoryProfileMap = new HashMap<>();
 
-  PublisherUtils.UMLGenerationMode generateUml = PublisherUtils.UMLGenerationMode.NONE;
+    Map<String, Set<String>> otherVersionAddedResources = new HashMap<>();
 
-  List<String> suppressedMappings= new ArrayList<>();
+    String ipStmt;
 
-  PublisherSigner signer;
+    PublisherUtils.PinningPolicy pinningPolicy = PublisherUtils.PinningPolicy.NO_ACTION;
+    String pinDest = null;
+
+    int pinCount;
+
+    PublisherUtils.UMLGenerationMode generateUml = PublisherUtils.UMLGenerationMode.NONE;
+
+    List<String> suppressedMappings = new ArrayList<>();
+
+    PublisherSigner signer;
 
 }

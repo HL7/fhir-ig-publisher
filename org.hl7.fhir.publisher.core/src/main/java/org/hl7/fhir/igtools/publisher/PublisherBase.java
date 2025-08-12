@@ -919,14 +919,9 @@ public class PublisherBase implements ILoggingService {
   }
 
 
-  public void setTxServer(String s) {
-    if (!Utilities.noString(s))
-      pf.txServer = s;
-  }
 
-  String getTxServer() {
-    return pf.txServer;
-  }
+
+
 
   protected void setIgPack(String s) {
     if (!Utilities.noString(s))
