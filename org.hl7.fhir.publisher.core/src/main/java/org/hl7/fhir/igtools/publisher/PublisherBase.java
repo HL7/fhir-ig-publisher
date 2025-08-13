@@ -41,8 +41,12 @@ import java.util.*;
  * this class is part of the Publisher Core cluster. See @Publisher for discussion
  */
 public class PublisherBase implements ILoggingService {
-    @Getter
+
     final PublisherFields pf;
+
+    public PublisherFields getPublisherFields() {
+        return pf;
+    }
 
   public PublisherBase() {
     pf = new PublisherFields();
