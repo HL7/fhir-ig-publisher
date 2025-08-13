@@ -11,19 +11,27 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
+permissions:  # added using https://github.com/step-security/secure-repo
+  contents: read
+
 jobs:
   bidi_checker_job:
     runs-on: ubuntu-latest
     name: Check for bidi unicode characters in repo
     steps:
       # Checkout the repo code. IMPORTANT, this step is needed to populate the directory defined by GITHUB_WORKSPACE
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+        with:
+          egress-policy: audit
+
       - name: Checkout repo
-        uses: actions/checkout@v1
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         id: checkout
       # Run the check for bidi characters.
       - name: Check for bidi characters
         id: bidi_check
-        uses: HL7/bidi-checker-action@v1.9
+        uses: HL7/bidi-checker-action@02112ffc62b81938f58a5dd7c69ef537e3a4b999 # v1.9
         env:
           IGNORE: \.png$
       - name: Get the output time

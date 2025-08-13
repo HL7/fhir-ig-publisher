@@ -8,6 +8,9 @@ on:
         default: 'master'
         type: string
 
+permissions:  # added using https://github.com/step-security/secure-repo
+  contents: read
+
 jobs:
   find-latest-release-ref:
     name: Find latest IG publisher release ref
@@ -15,8 +18,13 @@ jobs:
     outputs:
       ref: ${{ steps.find-latest-release-ref.outputs.ref }}
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+        with:
+          egress-policy: audit
+
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           sparse-checkout: |
             .github
@@ -33,11 +41,16 @@ jobs:
       igs: ${{ steps.load-ig-list-json.outputs.igs }}
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
         with:
-         sparse-checkout: |
-          .github
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          sparse-checkout: |
+            .github
       - name: Load IG repositories JSON
         id: load-ig-list-json
         uses: ./.github/actions/load-ig-list-json
@@ -52,8 +65,13 @@ jobs:
         ref: ["${{ inputs.actual-ref }}", "${{ needs.find-latest-release-ref.outputs.ref }}" ]
 
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+        with:
+          egress-policy: audit
+
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           sparse-checkout: |
             .github
@@ -62,7 +80,7 @@ jobs:
         with:
           ref: ${{ matrix.ref }}
 
-  generate-and-cache-qa:  
+  generate-and-cache-qa:
     name: Generate and cache QA
     needs: [find-latest-release-ref, load-ig-list, build-ig-publisher-jars]
     runs-on: ubuntu-latest
@@ -72,18 +90,23 @@ jobs:
         ref: ["${{ inputs.actual-ref }}", "${{ needs.find-latest-release-ref.outputs.ref }}" ]
         repo: ${{ fromJson(needs.load-ig-list.outputs.igs) }}
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        sparse-checkout: |
-          .github
-    - name: Publish IG and create QA artifact
-      uses: ./.github/actions/publish-ig-and-cache-qa
-      with:
-        ref: ${{ matrix.ref }}
-        ig: ${{ matrix.repo }}
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+        with:
+          egress-policy: audit
 
-  diff-cached-qa:  
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          sparse-checkout: |
+            .github
+      - name: Publish IG and create QA artifact
+        uses: ./.github/actions/publish-ig-and-cache-qa
+        with:
+          ref: ${{ matrix.ref }}
+          ig: ${{ matrix.repo }}
+
+  diff-cached-qa:
     name: Verify QA is the same
     needs: [ find-latest-release-ref, load-ig-list, generate-and-cache-qa]
     runs-on: ubuntu-latest
@@ -94,11 +117,16 @@ jobs:
       fail-fast: false
 
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+        with:
+          egress-policy: audit
+
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           sparse-checkout: |
-           .github
+            .github
       - name: Verify QA is the same
         uses: ./.github/actions/diff-cached-qa
         with:
@@ -111,8 +139,13 @@ jobs:
     needs: [ find-latest-release-ref, diff-cached-qa ]
     runs-on: ubuntu-latest
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+        with:
+          egress-policy: audit
+
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           sparse-checkout: |
             .github

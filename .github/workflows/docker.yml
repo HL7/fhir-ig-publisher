@@ -11,17 +11,25 @@ on:
     branches:
       - master
 
+permissions:  # added using https://github.com/step-security/secure-repo
+  contents: read
+
 jobs:
   docker-build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout project
-      uses: actions/checkout@v4
-    - name: Build (no push)
-      uses: docker/build-push-action@v6
-      with:
-        push: false
-        tags: user/app:latest
-        build-args: |
-          BUILDKIT_CONTEXT_KEEP_GIT_DIR=true
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout project
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Build (no push)
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          push: false
+          tags: user/app:latest
+          build-args: |
+            BUILDKIT_CONTEXT_KEEP_GIT_DIR=true

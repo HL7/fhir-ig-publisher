@@ -15,6 +15,8 @@ Please maintain this README.md as a linkable document, as other documentation ma
 --->
 
 # HL7 FHIR IG Publisher Artifacts
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/HL7/fhir-ig-publisher/badge)](https://scorecard.dev/viewer/?uri=github.com/HL7/fhir-ig-publisher)
+
 
 | CI Status (master) | Release Pipeline | Current Release | Latest SNAPSHOT |
 | :---: | :---: | :---: | :---: |
