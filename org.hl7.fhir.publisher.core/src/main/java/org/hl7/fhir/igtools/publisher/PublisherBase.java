@@ -1357,6 +1357,7 @@ public class PublisherBase implements ILoggingService {
           pn = "default-canonical-version";
       }
       String v = url+"|"+version;
+      boolean add = true;
       for (Element t : p.getChildren("parameter")) {
         String name = t.getNamedChildValue("name");
         String value = t.getNamedChildValue("value");
@@ -1368,13 +1369,18 @@ public class PublisherBase implements ILoggingService {
               throw new FHIRException("An error occurred building the version manifest: the IGPublisher wanted to add version "+version+" but found version "+value.substring(version.indexOf("|")+1)+" already specified");
             }
           }
-          return;
+          add = false;
         }
       }
-      Element pp = p.addElement("parameter");
-      pp.setChildValue("name",pn);
-      pp.setChildValue("valueUri", v);
-      pp.setUserData(UserDataNames.auto_added_parameter, true);
+      if (add) {
+        Element pp = p.addElement("parameter");
+        pp.setChildValue("name", pn);
+        pp.setChildValue("valueUri", v);
+        pp.setUserData(UserDataNames.auto_added_parameter, true);
+        if (pf.context.getExpansionParameters() != null) {
+          pf.context.getExpansionParameters().addParameter(pn, new UriType(v));
+        }
+      }
     }
 
     private String stringify(String string, Map<String, String> lst) {
