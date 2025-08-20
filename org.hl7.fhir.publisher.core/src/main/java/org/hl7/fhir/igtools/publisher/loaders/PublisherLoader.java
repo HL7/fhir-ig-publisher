@@ -1,9 +1,6 @@
 package org.hl7.fhir.igtools.publisher.loaders;
 
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.util.List;
 import java.util.Set;
 
 import org.hl7.fhir.convertors.loaders.loaderR5.ILoaderKnowledgeProviderR5;
@@ -32,11 +29,13 @@ import com.google.gson.JsonSyntaxException;
 
 public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProviderR5 {
 
+  private final boolean internalUseOnly;
   private IGKnowledgeProvider igpkp;
 
-  public PublisherLoader(NpmPackage npm, SpecMapManager spm, String pathToSpec, IGKnowledgeProvider igpkp) {
+  public PublisherLoader(NpmPackage npm, SpecMapManager spm, String pathToSpec, IGKnowledgeProvider igpkp, boolean internalUseOnly) {
     super(npm, spm, pathToSpec);
     this.igpkp = igpkp;
+    this.internalUseOnly = internalUseOnly;
   }
 
   public IContextResourceLoader makeLoader() {
@@ -52,17 +51,17 @@ public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProv
       types.addAll(SpecialTypeHandler.SPECIAL_TYPES_OTHER);
     }
     if (VersionUtilities.isR2Ver(npm.fhirVersion())) {
-      return new R2ToR5Loader(types, this);
+      return new R2ToR5Loader(types, this).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
     } else if (VersionUtilities.isR2BVer(npm.fhirVersion())) {
-      return new R2016MayToR5Loader(types, this);
+      return new R2016MayToR5Loader(types, this).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
     } else if (VersionUtilities.isR3Ver(npm.fhirVersion())) {
-      return new R3ToR5Loader(types, this);
+      return new R3ToR5Loader(types, this).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
     } else if (VersionUtilities.isR4Ver(npm.fhirVersion())) {
-      return new R4ToR5Loader(types, this, npm.version());
+      return new R4ToR5Loader(types, this, npm.fhirVersion()).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
     } else if (VersionUtilities.isR4BVer(npm.fhirVersion())) {
-      return new R4BToR5Loader(types, this, npm.version());
+      return new R4BToR5Loader(types, this, npm.fhirVersion()).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
     } else {
-      return new R5ToR5Loader(types, this);
+      return new R5ToR5Loader(types, this).addTag(internalUseOnly ? UserDataNames.RESOURCE_INTERNAL_USE_ONLY : null);
     }
   }
   
@@ -155,7 +154,7 @@ public class PublisherLoader extends LoaderUtils implements ILoaderKnowledgeProv
 
   @Override
   public ILoaderKnowledgeProviderR5 forNewPackage(NpmPackage npm) throws JsonSyntaxException, IOException {
-    return new PublisherLoader(npm, SpecMapManager.fromPackage(npm), npm.getWebLocation(), igpkp);
+    return new PublisherLoader(npm, SpecMapManager.fromPackage(npm), npm.getWebLocation(), igpkp, internalUseOnly);
   }
 
   @Override

@@ -29,7 +29,7 @@ public class XIGExtensionHandler {
   public void seeExtension(StructureDefinition sd) {
 //    System.out.println("extension: "+sd.getVersionedUrl());
     StructureDefinition existing = extensions.get(sd.getUrl());
-    if (existing == null || !existing.hasVersion() || VersionUtilities.isThisOrLater(sd.getVersion(), existing.getVersion())) {
+    if (existing == null || !existing.hasVersion() || VersionUtilities.isThisOrLater(sd.getVersion(), existing.getVersion(), VersionUtilities.VersionPrecision.MINOR)) {
       extensions.put(sd.getUrl(), sd);
     }
   }

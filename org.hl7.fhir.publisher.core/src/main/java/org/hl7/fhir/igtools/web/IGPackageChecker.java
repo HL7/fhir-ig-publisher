@@ -63,7 +63,7 @@ public class IGPackageChecker {
         if (json.getJsonArray("fhirVersions").size() == 0) {
           System.out.println("Problem #3 with "+pf+": fhirVersions size = "+json.getJsonArray("fhirVersions").size());          
         }
-        if (!VersionUtilities.versionsCompatible(json.getJsonArray("fhirVersions").getItems().get(0).asString(), fhirversion)) {
+        if (!VersionUtilities.versionMatches(json.getJsonArray("fhirVersions").getItems().get(0).asString(), fhirversion)) {
           System.out.println("Problem #4 with "+pf+": fhirVersions value mismatch (expected "+(fhirversion.contains("|") ? "one of "+fhirversion : fhirversion)+", found "+json.getJsonArray("fhirVersions").get(0).asString()+")");
         }
       }
@@ -75,25 +75,25 @@ public class IGPackageChecker {
         if (fhirversion.startsWith("1.0")) {
           if (!dep.has("hl7.fhir.r2.core")) {
             System.out.println("Problem #6 with "+pf+": R2 guide doesn't list R2 in it's dependencies");
-          } else if (!VersionUtilities.versionsCompatible(fhirversion, dep.asString("hl7.fhir.r2.core"))) {
+          } else if (!VersionUtilities.versionMatches(fhirversion, dep.asString("hl7.fhir.r2.core"))) {
             System.out.println("Problem #7 with "+pf+": fhirVersions value mismatch on hl7.fhir.r2.core (expected "+fhirversion+", found "+dep.asString("hl7.fhir.r2.core"));
           }
         } else if (fhirversion.startsWith("1.4")) {
           if (!dep.has("hl7.fhir.r2b.core")) {
             System.out.println("Problem #8 with "+pf+": R2B guide doesn't list R2B in it's dependencies");
-          } else if (!VersionUtilities.versionsCompatible(fhirversion, dep.asString("hl7.fhir.r2b.core"))) {
+          } else if (!VersionUtilities.versionMatches(fhirversion, dep.asString("hl7.fhir.r2b.core"))) {
             System.out.println("Problem #9 with "+pf+": fhirVersions value mismatch on hl7.fhir.r2b.core (expected "+fhirversion+", found "+dep.asString("hl7.fhir.r2b.core"));
           }          
         } else if (fhirversion.startsWith("3.0")) {
           if (!dep.has("hl7.fhir.r3.core")) {
             System.out.println("Problem #10 with "+pf+": R3 guide doesn't list R3 in it's dependencies");
-          } else if (!VersionUtilities.versionsCompatible(fhirversion, dep.asString("hl7.fhir.r3.core"))) {
+          } else if (!VersionUtilities.versionMatches(fhirversion, dep.asString("hl7.fhir.r3.core"))) {
             System.out.println("Problem #11 with "+pf+": fhirVersions value mismatch on hl7.fhir.r3.core (expected "+fhirversion+", found "+dep.asString("hl7.fhir.r3.core"));
           }
         } else if (fhirversion.startsWith("4.0")) {
           if (!dep.has("hl7.fhir.r4.core")) {
             System.out.println("Problem #12 with "+pf+": R4 guide doesn't list R4 in it's dependencies");
-          } else if (!VersionUtilities.versionsCompatible(fhirversion, dep.asString("hl7.fhir.r4.core"))) {
+          } else if (!VersionUtilities.versionMatches(fhirversion, dep.asString("hl7.fhir.r4.core"))) {
             System.out.println("Problem #13 with "+pf+": fhirVersions value mismatch on hl7.fhir.r4.core (expected "+fhirversion+", found "+dep.asString("hl7.fhir.r4.core"));
           }
         }

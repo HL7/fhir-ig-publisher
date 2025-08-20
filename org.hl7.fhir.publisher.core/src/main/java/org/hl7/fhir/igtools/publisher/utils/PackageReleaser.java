@@ -712,7 +712,7 @@ public class PackageReleaser {
   private VersionChangeType checkVersionChangeType(String v, String nv) {
     if (v.equals(nv)) { 
       return VersionChangeType.NONE;
-    } else if (VersionUtilities.versionsCompatible(v, nv)) {
+    } else if (VersionUtilities.versionMatches(v, nv)) {
       return VersionChangeType.PATCH;
     } else if (v.charAt(0) == nv.charAt(0)) {
       return VersionChangeType.MINOR;
