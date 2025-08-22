@@ -100,7 +100,7 @@ public class PackagCanonicalClashDetector {
     FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager.Builder().build();
     NpmPackage npm = pcm.loadPackage(pid);
 //    SpecMapManager spm = new SpecMapManager(TextFile.streamToBytes(npm.load("other", "spec.internals")), npm.fhirVersion());
-    IContextResourceLoader loader = new PublisherLoader(npm, null, npm.getWebLocation(), null).makeLoader();
+    IContextResourceLoader loader = new PublisherLoader(npm, null, npm.getWebLocation(), null, false).makeLoader();
     String[] types = new String[] { "StructureDefinition", "ValueSet", "SearchParameter", "OperationDefinition", "Questionnaire", "ConceptMap", "StructureMap", "NamingSystem" };
     for (String s : npm.listResources(types)) {
       Resource r = loader.loadResource(npm.load("package", s), true);

@@ -1852,7 +1852,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         }
         if (match) {
           InputStream s = spec.getNpm().load(pri);
-          IContextResourceLoader pl = new PublisherLoader(spec.getNpm(), spec.getSpm(), PackageHacker.fixPackageUrl(spec.getNpm().getWebLocation()), pf.igpkp).makeLoader();
+          IContextResourceLoader pl = new PublisherLoader(spec.getNpm(), spec.getSpm(), PackageHacker.fixPackageUrl(spec.getNpm().getWebLocation()), pf.igpkp, false).makeLoader();
           Resource res = pl.loadResource(s, true);
           return (T) res;
         }

@@ -99,7 +99,7 @@ public class XIGLoader implements IPackageVisitorProcessor {
           info.fillOutJson(pid, cr, j);
           if (info.getResources().containsKey(cr.getUrl())) {
             CanonicalResource crt = info.getResources().get(cr.getUrl());
-            if (VersionUtilities.isThisOrLater(crt.getVersion(), cr.getVersion())) {
+            if (VersionUtilities.isThisOrLater(crt.getVersion(), cr.getVersion(), VersionUtilities.VersionPrecision.MINOR)) {
               info.getResources().put(cr.getUrl(), cr);
             }
           } else {
@@ -331,7 +331,7 @@ public class XIGLoader implements IPackageVisitorProcessor {
         info.fillOutJson(pid, cr, j);
         if (info.getResources().containsKey(cr.getUrl())) {
           CanonicalResource crt = info.getResources().get(cr.getUrl());
-          if (VersionUtilities.isThisOrLater(crt.getVersion(), cr.getVersion())) {
+          if (VersionUtilities.isThisOrLater(crt.getVersion(), cr.getVersion(), VersionUtilities.VersionPrecision.MINOR)) {
             info.getResources().put(cr.getUrl(), cr);
           }
         } else {

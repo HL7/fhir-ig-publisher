@@ -44,6 +44,7 @@ import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.terminologies.TerminologyFunctions;
 import org.hl7.fhir.r5.testfactory.TestDataFactory;
+import org.hl7.fhir.r5.tools.ExtensionConstants;
 import org.hl7.fhir.r5.utils.MappingSheetParser;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.r5.utils.ResourceUtilities;
@@ -243,7 +244,7 @@ public class PublisherIGLoader extends PublisherBase {
         pf.sourceIg = (ImplementationGuide) org.hl7.fhir.r5.formats.FormatUtilities.loadFileTight(pf.igName);
         boolean isR5 = false;
         for (Enumeration<Enumerations.FHIRVersion> v : pf.sourceIg.getFhirVersion()) {
-          isR5 = isR5 || VersionUtilities.isR5VerOrLater(v.getCode());
+          isR5 = isR5 || VersionUtilities.isR5Plus(v.getCode());
         }
         if (!isR5) {
           pf.sourceIg = (ImplementationGuide) VersionConvertorFactory_40_50.convertResource(FormatUtilities.loadFile(pf.igName));
@@ -935,11 +936,18 @@ public class PublisherIGLoader extends PublisherBase {
       pf.sourceIg.getDependsOn().add(0, dep);
     }
     if (!"hl7.fhir.uv.tools".equals(pf.sourceIg.getPackageId()) && !dependsOnTooling(pf.sourceIg.getDependsOn())) {
-      String toolingPackageId = getToolingPackageName()+"#"+TOOLING_IG_CURRENT_RELEASE;
-      if (pf.sourceIg.getDefinition().hasExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency")) {
-        pf.sourceIg.getDefinition().getExtensionByUrl("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency").setValue(new CodeType(toolingPackageId));
-      } else {
-        pf.sourceIg.getDefinition().addExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency", new CodeType(toolingPackageId));
+      String toolingPackageName = getToolingPackageName();
+      String toolingPackageId = toolingPackageName +"#"+TOOLING_IG_CURRENT_RELEASE;
+      boolean toolsExists = false;
+      for (Extension ext : pf.sourceIg.getExtensionsByUrl(ExtensionConstants.EXT_IGINTERNAL_DEPENDENCY)) {
+        String pid = ext.getValue().primitiveValue();
+        if (pid != null && (pid.equals(toolingPackageName) || pid.startsWith(toolingPackageName+"#"))) {
+          toolsExists = true;
+          ext.setValue(new CodeType(toolingPackageId));
+        }
+      }
+      if (!toolsExists) {
+        pf.sourceIg.getDefinition().addExtension(ExtensionConstants.EXT_IGINTERNAL_DEPENDENCY, new CodeType(toolingPackageId));
       }
     }
 
@@ -957,11 +965,17 @@ public class PublisherIGLoader extends PublisherBase {
 
     int i = 0;
     for (ImplementationGuide.ImplementationGuideDependsOnComponent dep : pf.sourceIg.getDependsOn()) {
-      loadIg(dep, i, !dep.hasUserData(UserDataNames.pub_no_load_deps));
+      loadIg(dep, i, !dep.hasUserData(UserDataNames.pub_no_load_deps), false);
       i++;
     }
     if (!"hl7.fhir.uv.tools".equals(pf.sourceIg.getPackageId()) && !dependsOnTooling(pf.sourceIg.getDependsOn())) {
-      loadIg("igtools", getToolingPackageName(), TOOLING_IG_CURRENT_RELEASE, "http://hl7.org/fhir/tools/ImplementationGuide/hl7.fhir.uv.tools", i, false);
+      loadIg("igtools", getToolingPackageName(), TOOLING_IG_CURRENT_RELEASE, "http://hl7.org/fhir/tools/ImplementationGuide/hl7.fhir.uv.tools", i, false, true);
+    }
+    for (Extension ig : pf.sourceIg.getDefinition().getExtensionsByUrl(ExtensionConstants.EXT_IGINTERNAL_DEPENDENCY)) {
+      String pid = ig.getValue().primitiveValue();
+      if (!pid.startsWith("hl7.fhir.uv.tools") && pid.contains("#")) {
+        loadIg("igtools", pid.substring(0, pid.indexOf("#")), pid.substring(pid.indexOf("#")+1), null, i, true, true);
+      }
     }
 
     // we're also going to look for packages that can be referred to but aren't dependencies
@@ -1319,7 +1333,7 @@ public class PublisherIGLoader extends PublisherBase {
 
     SpecMapManager spm = loadSpecDetails(FileUtilities.streamToBytes(pi.load("other", "spec.internals")), "basespec", pi, pf.specPath);
     SimpleWorkerContext sp;
-    IContextResourceLoader loader = new PublisherLoader(pi, spm, pf.specPath, pf.igpkp).makeLoader();
+    IContextResourceLoader loader = new PublisherLoader(pi, spm, pf.specPath, pf.igpkp, false).makeLoader();
     sp = new SimpleWorkerContext.SimpleWorkerContextBuilder().withTerminologyCachePath(pf.vsCache).fromPackage(pi, loader, false);
     sp.loadBinariesFromFolder(pi);
     sp.setForPublication(true);
@@ -1351,7 +1365,7 @@ public class PublisherIGLoader extends PublisherBase {
 
   private void loadConversionVersion(String version) throws FHIRException, IOException {
     String v = VersionUtilities.getMajMin(version);
-    if (VersionUtilities.versionsMatch(v, pf.context.getVersion())) {
+    if (VersionUtilities.versionMatches(v, pf.context.getVersion())) {
       throw new FHIRException("Unable to load conversion version "+version+" when base version is already "+ pf.context.getVersion());
     }
     String pid = VersionUtilities.packageForVersion(v);
@@ -1457,7 +1471,7 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
 
-  private void loadIg(ImplementationGuide.ImplementationGuideDependsOnComponent dep, int index, boolean loadDeps) throws Exception {
+  private void loadIg(ImplementationGuide.ImplementationGuideDependsOnComponent dep, int index, boolean loadDeps, boolean internal) throws Exception {
     String name = dep.getId();
     if (!dep.hasId()) {
       logMessage("Dependency '"+idForDep(dep)+"' has no id, so can't be referred to in markdown in the IG");
@@ -1499,11 +1513,11 @@ public class PublisherIGLoader extends PublisherBase {
       }
     }
 
-    loadIGPackage(name, canonical, packageId, igver, pi, loadDeps);
+    loadIGPackage(name, canonical, packageId, igver, pi, loadDeps, internal);
 
   }
 
-  private void loadIg(String name, String packageId, String igver, String uri, int index, boolean loadDeps) throws Exception {
+  private void loadIg(String name, String packageId, String igver, String uri, int index, boolean loadDeps, boolean internal) throws Exception {
     String canonical = determineCanonical(uri, "ImplementationGuide.dependency["+index+"].url");
     if (Utilities.noString(canonical) && !Utilities.noString(packageId))
       canonical = pf.pcm.getPackageUrl(packageId);
@@ -1521,10 +1535,10 @@ public class PublisherIGLoader extends PublisherBase {
           throw new Exception("Unknown Package "+packageId+"#"+igver);
       }
     }
-    loadIGPackage(name, canonical, packageId, igver, pi, loadDeps);
+    loadIGPackage(name, canonical, packageId, igver, pi, loadDeps, internal);
   }
 
-  private void loadIGPackage(String name, String canonical, String packageId, String igver, NpmPackage pi, boolean loadDeps)
+  private void loadIGPackage(String name, String canonical, String packageId, String igver, NpmPackage pi, boolean loadDeps, boolean internal)
           throws IOException {
     if (pi != null)
       pf.npmList.add(pi);
@@ -1540,7 +1554,7 @@ public class PublisherIGLoader extends PublisherBase {
     igm.setBase2(PackageHacker.fixPackageUrl(pi.url()));
     igm.setNpm(pi);
     pf.specMaps.add(igm);
-    if (!VersionUtilities.versionsCompatible(pf.version, pi.fhirVersion())) {
+    if (!VersionUtilities.versionMatches(pf.version, pi.fhirVersion())) {
       if (!pi.isWarned()) {
         pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, pf.sourceIg.fhirType()+"/"+ pf.sourceIg.getId(), "This IG is version "+ pf.version +", while the IG '"+pi.name()+"' is from version "+pi.fhirVersion(), ValidationMessage.IssueSeverity.ERROR));
         log("Version mismatch. This IG is version "+ pf.version +", while the IG '"+pi.name()+"' is from version "+pi.fhirVersion()+" (will try to run anyway)");
@@ -1548,7 +1562,7 @@ public class PublisherIGLoader extends PublisherBase {
       }
     }
 
-    igm.setLoader(loadFromPackage(name, canonical, pi, webref, igm, loadDeps));
+    igm.setLoader(loadFromPackage(name, canonical, pi, webref, igm, loadDeps, internal));
   }
 
   private boolean isValidIGToken(String tail) {
@@ -1585,7 +1599,7 @@ public class PublisherIGLoader extends PublisherBase {
 
 
 
-  public IContextResourceLoader loadFromPackage(String name, String canonical, NpmPackage pi, String webref, SpecMapManager igm, boolean loadDeps) throws IOException {
+  public IContextResourceLoader loadFromPackage(String name, String canonical, NpmPackage pi, String webref, SpecMapManager igm, boolean loadDeps, boolean internal) throws IOException {
     if (loadDeps) { // we do not load dependencies for packages the tooling loads on it's own initiative
       for (String dep : pi.dependencies()) {
         if (!pf.context.hasPackage(dep)) {
@@ -1599,7 +1613,7 @@ public class PublisherIGLoader extends PublisherBase {
               logDebugMessage(LogCategory.CONTEXT, "Unable to find package dependency "+fdep+". Will proceed, but likely to be be errors in qa.html etc");
             } else {
               pf.npmList.add(dpi);
-              if (!VersionUtilities.versionsCompatible(pf.version, pi.fhirVersion())) {
+              if (!VersionUtilities.versionMatches(pf.version, pi.fhirVersion())) {
                 if (!pi.isWarned()) {
                   pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, pf.sourceIg.fhirType()+"/"+ pf.sourceIg.getId(), "This IG is for FHIR version "+ pf.version +", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion(), ValidationMessage.IssueSeverity.ERROR));
                   log("Version mismatch. This IG is for FHIR version "+ pf.version +", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion()+" (will ignore that and try to run anyway)");
@@ -1622,7 +1636,7 @@ public class PublisherIGLoader extends PublisherBase {
               }
 
               try {
-                smm.setLoader(loadFromPackage(dpi.title(), dpi.canonical(), dpi, PackageHacker.fixPackageUrl(dpi.getWebLocation()), smm, true));
+                smm.setLoader(loadFromPackage(dpi.title(), dpi.canonical(), dpi, PackageHacker.fixPackageUrl(dpi.getWebLocation()), smm, true, internal));
               } catch (Exception e) {
                 throw new IOException("Error loading "+dpi.name()+"#"+dpi.version()+": "+e.getMessage(), e);
               }
@@ -1631,7 +1645,7 @@ public class PublisherIGLoader extends PublisherBase {
         }
       }
     }
-    IContextResourceLoader loader = new PublisherLoader(pi, igm, webref, pf.igpkp).makeLoader();
+    IContextResourceLoader loader = new PublisherLoader(pi, igm, webref, pf.igpkp, internal).makeLoader();
     pf.context.loadFromPackage(pi, loader);
     return loader;
   }
@@ -3372,8 +3386,6 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
   private void loadPrePages(FetchedFile dir, String basePath) throws Exception {
-    System.out.println("loadPrePages from " + dir+ " as "+basePath);
-
     PreProcessInfo ppinfo = pf.preProcessInfo.get(basePath);
     if (ppinfo==null) {
       throw new Exception("Unable to find preProcessInfo for basePath: " + basePath);

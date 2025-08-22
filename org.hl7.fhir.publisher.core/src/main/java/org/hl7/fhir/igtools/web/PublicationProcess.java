@@ -1163,7 +1163,7 @@ public class PublicationProcess {
     PackageListEntry curr = pl.current();
     PackageListEntry last = pl.latest();
     String currentVersion = curr == null ? last.version() : curr.version();
-    String version = VersionUtilities.getNoPatch(currentVersion)+"-withdrawal";
+    String version = VersionUtilities.versionWithoutLabels(currentVersion)+"-withdrawal";
     String sequence = curr == null ? last.sequence() : curr.sequence();
     String destVer = Utilities.path(destination, version);
     File destVerF = new File(destVer);

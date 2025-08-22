@@ -27,11 +27,13 @@ import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
 import org.hl7.fhir.r5.extensions.ExtensionUtilities;
 import org.hl7.fhir.r5.model.CanonicalResource;
+import org.hl7.fhir.r5.model.Extension;
 import org.hl7.fhir.r5.model.ImplementationGuide;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideDependsOnComponent;
 import org.hl7.fhir.r5.model.ImplementationGuide.ImplementationGuideGlobalComponent;
 import org.hl7.fhir.r5.model.StructureDefinition;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
+import org.hl7.fhir.r5.tools.ExtensionConstants;
 import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
 import org.hl7.fhir.utilities.MarkDownProcessor;
 import org.hl7.fhir.utilities.Utilities;
@@ -315,11 +317,28 @@ public class DependencyRenderer {
         NpmPackage p = resolve(d);
         boolean dloaded = isLoaded(p);
         if (QA || dloaded) {
-          addPackageRow(gen, row.getSubRows(), p, d.getVersion(), realm, QA, b, d.hasReason() ? d.getReason() : ExtensionUtilities.readStringExtension(d, ExtensionDefinitions.EXT_IGDEP_COMMENT), hasDesc, processed, listed, dloaded);
+          addPackageRow(gen, row.getSubRows(), p, d.getVersion(), realm, QA, b, d.hasReason() ? d.getReason() : ExtensionUtilities.readStringExtension(d, ExtensionDefinitions.EXT_IGDEP_COMMENT), hasDesc, processed, listed, dloaded, false);
         }
       } catch (Exception e) {
         e.printStackTrace();
         addErrorRow(gen, row.getSubRows(), d.getPackageId(), d.getVersion(), d.getUri(), null, e.getMessage(), QA, hasDesc);
+      }
+    }
+    for (Extension ext : ig.getDefinition().getExtensionsByUrl(ExtensionConstants.EXT_IGINTERNAL_DEPENDENCY)) {
+      String pidv = ext.getValue().primitiveValue();
+      if (pidv != null && pidv.contains("#")) {
+        String pid = pidv.substring(0, pidv.indexOf("#"));
+        String ver = pidv.substring(pidv.indexOf("#") + 1);
+        try {
+          NpmPackage p = resolve(pid, ver);
+          boolean dloaded = isLoaded(p);
+          if (QA || dloaded) {
+            addPackageRow(gen, row.getSubRows(), p, ver, realm, QA, b, "for example references", hasDesc, processed, listed, dloaded, true);
+          }
+        } catch (Exception e) {
+          e.printStackTrace();
+          addErrorRow(gen, row.getSubRows(), pid, ver, null, null, e.getMessage(), QA, hasDesc);
+        }
       }
     }
     if (QA) {
@@ -351,13 +370,6 @@ public class DependencyRenderer {
       p.tx("No templates used");
     }
 
-    if (ig.getDefinition().hasExtension("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency")) {
-      String s = ig.getDefinition().getExtensionByUrl("http://hl7.org/fhir/tools/StructureDefinition/ig-internal-dependency").getValue().primitiveValue();
-      p.tx(". Tools: "+(s == null ? "N/A" : s.substring(s.indexOf("#")+1)));      
-    } else {
-      p.tx(". Tools: N/A");      
-    }
-    
     return p;
   }
 
@@ -374,7 +386,7 @@ public class DependencyRenderer {
     return null;
   }
 
-  private void addPackageRow(HierarchicalTableGenerator gen, List<Row> rows, NpmPackage npm, String originalVersion, String realm, boolean QA, StringBuilder b, String desc, boolean hasDesc, Set<String> processed, Set<String> listed, boolean loaded) throws FHIRException, IOException {
+  private void addPackageRow(HierarchicalTableGenerator gen, List<Row> rows, NpmPackage npm, String originalVersion, String realm, boolean QA, StringBuilder b, String desc, boolean hasDesc, Set<String> processed, Set<String> listed, boolean loaded, boolean internal) throws FHIRException, IOException {
     if (!npm.isCore() && (QA || !listed.contains(npm.name()+"#"+npm.version()))) {
       listed.add(npm.name()+"#"+npm.version());
       String idv = npm.name()+"#"+npm.version();
@@ -387,7 +399,7 @@ public class DependencyRenderer {
       String comment = "";
       if (!isNew) {
         comment = pui.getComment() != null ? pui.getComment()+" (as above)" : "";
-      } else if (!VersionUtilities.versionsCompatible(fver, npm.fhirVersion())) {
+      } else if (!VersionUtilities.versionMatches(fver, npm.fhirVersion())) {
         comment = "FHIR Version Mismatch";
       } else if ("current".equals(npm.version())) {
         comment = "Cannot be published with a dependency on a current build version";
@@ -398,19 +410,28 @@ public class DependencyRenderer {
         if (drealm != null) {
           if ("uv".equals(realm)) {
             if (!"uv".equals(drealm)) {
-              comment = "An international realm (uv) publication cannot depend on a realm specific guide ("+drealm+")";
+              if (!internal) {
+                comment = "An international realm (uv) publication cannot depend on a realm specific guide (" + drealm + ")";
+              }
             }
           } else if (!"uv".equals(drealm) && !realm.equals(drealm)) {
             comment = "An realm publication for "+realm+" should not depend on a realm specific guide from ("+drealm+")";
           }
         }
       }
+      if (internal) {
+        if (!Utilities.noString(comment)) {
+          comment = "Internal Dependency. "+comment;
+        } else {
+          comment = "Internal Dependency";
+        }
+      }
       if (isNew) {
         pui.setComment(comment);
       }
       Row row = addRow(gen, rows, npm.name(), npm.title(), npm.version(), getVersionState(npm.name(), npm.version(), npm.canonical()), getLatestVersion(npm.name(), npm.canonical()), "current".equals(npm.version()), npm.fhirVersion(), 
-          !VersionUtilities.versionsCompatible(fver, npm.fhirVersion()), npm.canonical(), PackageHacker.fixPackageUrl(npm.getWebLocation()), comment, desc, QA, hasDesc, loaded);
-      if (isNew) {
+          !VersionUtilities.versionMatches(fver, npm.fhirVersion()), npm.canonical(), PackageHacker.fixPackageUrl(npm.getWebLocation()), comment, desc, QA, hasDesc, loaded, internal);
+      if (isNew && !internal) {
         for (String d : npm.dependencies()) {
           boolean dloaded = isLoaded(d);
           if (QA || dloaded) {
@@ -418,7 +439,7 @@ public class DependencyRenderer {
             String version = d.substring(d.indexOf("#")+1);
             try {
               NpmPackage p = resolve(id, version);
-              addPackageRow(gen, row.getSubRows(), p, d.substring(d.indexOf("#")+1), realm, QA, b, null, hasDesc, processed, listed, dloaded);
+              addPackageRow(gen, row.getSubRows(), p, d.substring(d.indexOf("#")+1), realm, QA, b, null, hasDesc, processed, listed, dloaded, internal);
             } catch (Exception e) {
               addErrorRow(gen, row.getSubRows(), id, version, null, null, e.getMessage(), QA, hasDesc);
             }
@@ -629,7 +650,7 @@ public class DependencyRenderer {
     } else if (id.startsWith("hl7") && !id.startsWith("hl7.cda.") && !id.startsWith("hl7.fhir.") && !id.startsWith("hl7.v2.") && !id.startsWith("hl7.ehrs.")) {
       comment = "HL7 Packages must have an id that starts with hl7.cda., hl7.fhir., hl7.v2., or hl7.ehrs.";
     }
-    Row row = addRow(gen, model.getRows(), id,  ig.present(), ver, null, null, false, fver, false, canonical, web, comment, null, QA, hasDesc, true);
+    Row row = addRow(gen, model.getRows(), id,  ig.present(), ver, null, null, false, fver, false, canonical, web, comment, null, QA, hasDesc, true, false);
     if (QA && comment != null) {
       row.getCells().get(5).addStyle("background-color: #ffcccc");
     }
@@ -637,13 +658,16 @@ public class DependencyRenderer {
     return row;
   }
 
-  private Row addRow(HierarchicalTableGenerator gen, List<Row> rows, String id, String title, String ver, VersionState verState, String latestVer, boolean verError, String fver, boolean fverError, String canonical, String web, String problems, String desc, boolean QA, boolean hasDesc, boolean loaded) {
+  private Row addRow(HierarchicalTableGenerator gen, List<Row> rows, String id, String title, String ver, VersionState verState, String latestVer, boolean verError, String fver, boolean fverError, String canonical, String web, String problems, String desc, boolean QA, boolean hasDesc, boolean loaded, boolean internal) {
     Row row = gen.new Row();
     rows.add(row);
-    if (loaded) {
-      row.setIcon("icon-fhir-16.png", "NPM Package");
-    } else {
+    if (!loaded) {
       row.setIcon("icon-fhir-16-grey.png", "NPM Package (not loaded)");
+    } else if (internal) {
+      row.setIcon("icon-fhir-16-grey.png", "NPM Package IG Dependency");
+      row.setColor("#fcf7c0");
+    } else {
+      row.setIcon("icon-fhir-16.png", "NPM Package");
     }
     if (QA) {
       row.getCells().add(gen.new Cell(null, null, id, null, null));

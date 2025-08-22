@@ -659,7 +659,7 @@ public class XVerAnalysisEngine implements IMultiMapRendererAdvisor {
     // ok we have a handle to the parent. it's in multiple chains, and we're going to walk forward or backwards to the tgtVer looking for a match
     List<SourcedElementDefinition> list = new ArrayList<>();
     list.add(ed);
-    boolean forwards = VersionUtilities.isThisOrLater(ver, tgtVer);
+    boolean forwards = VersionUtilities.isThisOrLater(ver, tgtVer, VersionUtilities.VersionPrecision.MINOR);
     MakeLinkMode mode = forwards ? MakeLinkMode.OUTWARD : MakeLinkMode.INWARD;
     while (true) {
       List<SourcedElementDefinition> nlist = new ArrayList<>();

@@ -259,7 +259,7 @@ public class PublisherProcessor extends PublisherBase  {
   private void generateOtherVersions() throws Exception {
     for (String v : pf.generateVersions) {
       String version = VersionUtilities.versionFromCode(v);
-      if (!VersionUtilities.versionsMatch(version, pf.context.getVersion())) {
+      if (!VersionUtilities.versionMatches(version, pf.context.getVersion())) {
         logDebugMessage(LogCategory.PROGRESS, "Generate Other Version: "+version);
 
         NpmPackage targetNpm = pf.pcm.loadPackage(VersionUtilities.packageForVersion(version));
