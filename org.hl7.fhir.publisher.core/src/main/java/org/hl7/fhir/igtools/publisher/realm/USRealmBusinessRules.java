@@ -177,7 +177,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
     try {
       PackageList pl = PackageList.fromUrl("https://hl7.org/fhir/us/core/package-list.json");
       for (PackageListEntry v : pl.versions()) {
-        if (VersionUtilities.versionsCompatible(version, v.fhirVersion())) {
+        if (VersionUtilities.versionMatches(version, v.fhirVersion())) {
           return new FilesystemPackageCacheManager.Builder().build().loadPackage("hl7.fhir.us.core", v.version());
         }
       }

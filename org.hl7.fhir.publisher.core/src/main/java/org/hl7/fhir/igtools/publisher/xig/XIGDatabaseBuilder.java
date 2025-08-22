@@ -304,6 +304,32 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
         "FMM             nvarchar NULL,\r\n"+
         "WG              nvarchar NULL,\r\n"+
         "PRIMARY KEY (ResourceKey))\r\n");
+
+    stmt.execute("CREATE INDEX IF NOT EXISTS idx_resources_type_kind_type ON Resources(ResourceType, Kind, Type)");
+    stmt.execute("CREATE INDEX IF NOT EXISTS idx_resources_packagekey ON Resources(PackageKey)");
+    stmt.execute("CREATE INDEX IF NOT EXISTS idx_resources_resourcetype ON Resources(ResourceType)");
+    stmt.execute("CREATE INDEX IF NOT EXISTS idx_resources_realm ON Resources(Realm)");
+    stmt.execute("CREATE INDEX IF NOT EXISTS idx_resources_authority ON Resources(Authority)");
+
+    stmt.execute("CREATE INDEX IF NOT EXISTS idx_resources_r2 ON Resources(ResourceType, Kind) WHERE R2 = 1");
+    stmt.execute("CREATE INDEX IF NOT EXISTS idx_resources_r2b ON Resources(ResourceType, Kind) WHERE R2B = 1");
+    stmt.execute("CREATE INDEX IF NOT EXISTS idx_resources_r3 ON Resources(ResourceType, Kind) WHERE R3 = 1");
+    stmt.execute("CREATE INDEX IF NOT EXISTS idx_resources_r4 ON Resources(ResourceType, Kind) WHERE R4 = 1");
+    stmt.execute("CREATE INDEX IF NOT EXISTS idx_resources_r4b ON Resources(ResourceType, Kind) WHERE R4B = 1");
+    stmt.execute("CREATE INDEX IF NOT EXISTS idx_resources_r5 ON Resources(ResourceType, Kind) WHERE R5 = 1");
+    stmt.execute("CREATE INDEX IF NOT EXISTS idx_resources_r6 ON Resources(ResourceType, Kind) WHERE R6 = 1");
+
+    stmt.execute("CREATE INDEX IF NOT EXISTS idx_resources_realm_auth_type ON Resources(Realm, Authority, ResourceType)");
+    stmt.execute("CREATE INDEX IF NOT EXISTS idx_resources_package_id ON Resources(PackageKey, ResourceType, Id)");
+
+    stmt.execute("CREATE INDEX IF NOT EXISTS idx_resources_supplements ON Resources(Supplements) WHERE Supplements IS NOT NULL");
+    stmt.execute("CREATE INDEX IF NOT EXISTS idx_resources_url ON Resources(Url) WHERE Url IS NOT NULL");
+    stmt.execute("CREATE INDEX IF NOT EXISTS idx_resources_stats ON Resources(ResourceType, Kind, Realm, Authority)");
+
+    stmt.execute("CREATE INDEX IF NOT EXISTS idx_resources_covering ON Resources(" +
+                    "ResourceType, Kind, Type, PackageKey, Realm, Authority, " +
+                    "Id, Url, Version, Status, Date, Name, Title, " +
+                    "Description, FMM, WG, StandardsStatus)");
   }
 
 

@@ -250,7 +250,7 @@ public class PublicationChecker {
           return pr;          
         }
         String cv = getLatestVersion(pl);
-        check(messages, cv == null || VersionUtilities.isThisOrLater(cv, v), "Proposed version v"+v+" is older than already published version v"+cv+mkError());
+        check(messages, cv == null || VersionUtilities.isThisOrLater(cv, v, VersionUtilities.VersionPrecision.MINOR), "Proposed version v"+v+" is older than already published version v"+cv+mkError());
       }
     }
     if (check(messages, pr.has("path"), "No publication request path found"+mkError())) {
@@ -441,7 +441,7 @@ public class PublicationChecker {
     for (PackageListEntry j : pl.list()) {
       String v = j.version();
       if (!Utilities.noString(v) && !"current".equals(v)) {
-        if (cv == null || VersionUtilities.isThisOrLater(cv, v)) {
+        if (cv == null || VersionUtilities.isThisOrLater(cv, v, VersionUtilities.VersionPrecision.MINOR)) {
           cv = v;
           res = j.sequence();
         }
@@ -455,7 +455,7 @@ public class PublicationChecker {
     for (PackageListEntry j : pl.list()) {
       String v = j.version();
       if (!Utilities.noString(v) && !"current".equals(v)) {
-        if (cv == null || VersionUtilities.isThisOrLater(v, cv)) {
+        if (cv == null || VersionUtilities.isThisOrLater(v, cv, VersionUtilities.VersionPrecision.MINOR)) {
           cv = v;
         }
       }

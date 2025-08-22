@@ -685,7 +685,7 @@ public class R4ToR4BAnalyser {
     
     SpecMapManager spm = loadSpecDetails(FileUtilities.streamToBytes(pi.load("other", "spec.internals")), pi.name(), version, specPath);
     SimpleWorkerContext sp;
-    IContextResourceLoader loader = new PublisherLoader(pi, spm, specPath, null).makeLoader();
+    IContextResourceLoader loader = new PublisherLoader(pi, spm, specPath, null, false).makeLoader();
     sp = new SimpleWorkerContext.SimpleWorkerContextBuilder().fromPackage(pi, loader, true);
     ProfileUtilities utils = new ProfileUtilities(context, new ArrayList<ValidationMessage>(), null);
     for (StructureDefinition sd : new ContextUtilities(sp).allStructures()) {
