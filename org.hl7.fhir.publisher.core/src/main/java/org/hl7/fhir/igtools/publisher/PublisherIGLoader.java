@@ -1426,7 +1426,7 @@ public class PublisherIGLoader extends PublisherBase {
     } else if (VersionUtilities.isR5Ver(pf.version)) {
       vs = "hl7.fhir.uv.extensions.r5";
     } else if (VersionUtilities.isR6Ver(pf.version)) {
-      vs = "hl7.fhir.uv.extensions.r6";
+      vs = "hl7.fhir.uv.extensions.r5";
     }
     return vs;
   }
