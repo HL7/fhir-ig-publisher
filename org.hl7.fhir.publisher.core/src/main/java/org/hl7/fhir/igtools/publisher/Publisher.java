@@ -1775,9 +1775,9 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
         JsonObject json = org.hl7.fhir.utilities.json.parser.JsonParser.parseObjectFromUrl("https://api.github.com/repos/HL7/fhir-ig-publisher/releases/latest");
         pf.currVer = json.asString("name").toString();
       } catch (IOException e) {
-        pf.currVer = "?pub-ver-1?";
+        pf.currVer = null;
       } catch (FHIRException e) {
-        pf.currVer = "$unknown-version$";
+        pf.currVer = null;
       }
     }
     return pf.currVer;

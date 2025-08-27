@@ -1011,7 +1011,7 @@ public class PublisherGenerator extends PublisherBase {
     if (wantGen(rX, "html")) {
       long start = System.currentTimeMillis();
       // Lloyd debug: rX.getId().equals("SdcQuestionLibrary")
-      XhtmlNode xhtml = (lang == null || lang.equals(le.getNamedChildValue("language"))) ? getXhtml(f, rX, lr,le) : null;
+      XhtmlNode xhtml = (lang == null || lang.equals(le.getNamedChildValueSingle("language"))) ? getXhtml(f, rX, lr,le) : null;
       if (xhtml == null && HistoryGenerator.allEntriesAreHistoryProvenance(le)) {
         RenderingContext ctxt = lrc.copy(false).setParser(getTypeLoader(f, rX));
         List<ProvenanceDetails> entries = loadProvenanceForBundle(this.pf.igpkp.getLinkFor(rX, true), le, f);
@@ -1027,7 +1027,7 @@ public class PublisherGenerator extends PublisherBase {
         }
         String html = null;
         if (rX.getLogicalElement() != null) {
-          String rXContentType = rX.getElement().getNamedChildValue("contentType");
+          String rXContentType = rX.getElement().getNamedChildValueSingle("contentType");
           if (rXContentType.contains("xml")) {
             org.hl7.fhir.r5.elementmodel.XmlParser xmlParser = new org.hl7.fhir.r5.elementmodel.XmlParser(this.pf.context);
             XmlXHtmlRenderer xmlXHtmlRenderer = new XmlXHtmlRenderer();
@@ -4678,16 +4678,16 @@ public class PublisherGenerator extends PublisherBase {
         XhtmlNode tr = tbl.tr();
         tr.clss("data-row");
         tr.td().ah(i.r.getLocalRef(), e.getIdBase()).tx(trunc(e.getIdBase()));
-        tr.td().tx(e.getNamedChildValue("title", "name"));
-        tr.td().tx(e.getNamedChildValue("version"));
+        tr.td().tx(e.getNamedChildValueSingle("title", "name"));
+        tr.td().tx(e.getNamedChildValueSingle("version"));
         describeStatus(tr.td(), e);
         if (cs) {
-          tr.td().tx(e.getNamedChildValue("content"));
+          tr.td().tx(e.getNamedChildValueSingle("content"));
         }
         describeOwner(tr.td(), e);
-        tr.td().tx(describeCopyRight(e.getNamedChildValue("copyright"), e.getNamedChildValue("copyrightLabel")));
-        tr.td().tx(dateOnly(e.getNamedChildValue("date")));
-        describeDescription(tr.td(), e.getNamedChildValue("description"));
+        tr.td().tx(describeCopyRight(e.getNamedChildValueSingle("copyright"), e.getNamedChildValueSingle("copyrightLabel")));
+        tr.td().tx(dateOnly(e.getNamedChildValueSingle("date")));
+        describeDescription(tr.td(), e.getNamedChildValueSingle("description"));
       }
     }
     x.para().clss("table-filter-summary").tx("Showing "+t+" of "+t+" entries");
@@ -5081,14 +5081,14 @@ public class PublisherGenerator extends PublisherBase {
         tr.clss("data-row");
         tr.td().ah(i.link, i.getId()).tx(trunc(i.getId()));
         tr.td().tx(i.getTitle());
-        tr.td().tx(i.element.getNamedChildValue("version"));
+        tr.td().tx(i.element.getNamedChildValueSingle("version"));
         describeStatus(tr.td(), i.element);
         if (cs) {
-          tr.td().tx(i.element.getNamedChildValue("content"));
+          tr.td().tx(i.element.getNamedChildValueSingle("content"));
         }
         describeOwner(tr.td(), i.element);
-        tr.td().tx(describeCopyRight(i.element.getNamedChildValue("copyright"), i.element.getNamedChildValue("copyrightLabel")));
-        tr.td().tx(dateOnly(i.element.getNamedChildValue("date")));
+        tr.td().tx(describeCopyRight(i.element.getNamedChildValueSingle("copyright"), i.element.getNamedChildValueSingle("copyrightLabel")));
+        tr.td().tx(dateOnly(i.element.getNamedChildValueSingle("date")));
         describeDescription(tr.td(), i.getDesc());
       }
     }
@@ -5133,7 +5133,7 @@ public class PublisherGenerator extends PublisherBase {
     if (ss != null) {
       x.tx(ss);
     } else {
-      x.tx(element.getNamedChildValue("status"));
+      x.tx(element.getNamedChildValueSingle("status"));
     }
   }
 
@@ -5150,13 +5150,13 @@ public class PublisherGenerator extends PublisherBase {
       for (Element tc : element.getChildrenByName("contact")) {
         if (tc != null) {
           for (Element t : tc.getChildrenByName("telecom")) {
-            if ("url".equals(t.getNamedChildValue("system"))) {
-              url = t.getNamedChildValue("value");
+            if ("url".equals(t.getNamedChildValueSingle("system"))) {
+              url = t.getNamedChildValueSingle("value");
             }
           }
         }
       }
-      String pub = element.getNamedChildValue("publisher");
+      String pub = element.getNamedChildValueSingle("publisher");
       if (pub == null) {
         x.ahOrNot(url).tx("n/a");
       } else {
@@ -6254,7 +6254,7 @@ public class PublisherGenerator extends PublisherBase {
     Element e = r.getElement();
 //      item.add("layout-type", "canonical");
     if (e.getChildren("url").size() == 1) {
-      item.add("url", e.getNamedChildValue("url"));
+      item.add("url", e.getNamedChildValueSingle("url"));
     }
     if (e.hasChildren("identifier")) {
       List<String> ids = new ArrayList<String>();
@@ -6268,23 +6268,23 @@ public class PublisherGenerator extends PublisherBase {
       }
     }
     if (e.getChildren("version").size() == 1) {
-      item.add("version", e.getNamedChildValue("version"));
+      item.add("version", e.getNamedChildValueSingle("version"));
     }
     if (e.getChildren("name").size() == 1) {
-      item.add("name", e.getNamedChildValue("name"));
+      item.add("name", e.getNamedChildValueSingle("name"));
     }
     if (e.getChildren("title").size() == 1) {
-      item.add("title", e.getNamedChildValue("title"));
+      item.add("title", e.getNamedChildValueSingle("title"));
 //        addTranslationsToJson(item, "title", e.getNamedChild("title"), false);
     }
     if (e.getChildren("experimental").size() == 1) {
-      item.add("experimental", e.getNamedChildValue("experimental"));
+      item.add("experimental", e.getNamedChildValueSingle("experimental"));
     }
     if (e.getChildren("date").size() == 1) {
-      item.add("date", e.getNamedChildValue("date"));
+      item.add("date", e.getNamedChildValueSingle("date"));
     }
     if (e.getChildren("description").size() == 1) {
-      item.add("description", preProcessMarkdown(e.getNamedChildValue("description")));
+      item.add("description", preProcessMarkdown(e.getNamedChildValueSingle("description")));
 //        addTranslationsToJson(item, "description", e.getNamedChild("description"), false);
     }
 
@@ -6393,14 +6393,14 @@ public class PublisherGenerator extends PublisherBase {
 //      }
 
     if (e.getChildren("purpose").size() == 1) {
-      item.add("purpose", ProfileUtilities.processRelativeUrls(e.getNamedChildValue("purpose"), "", pf.igpkp.specPath(), pf.context.getResourceNames(), pf.specMaps.get(0).listTargets(), pageTargets(), false));
+      item.add("purpose", ProfileUtilities.processRelativeUrls(e.getNamedChildValueSingle("purpose"), "", pf.igpkp.specPath(), pf.context.getResourceNames(), pf.specMaps.get(0).listTargets(), pageTargets(), false));
 //        addTranslationsToJson(item, "purpose", e.getNamedChild("purpose"), false);
     }
     if (e.getChildren("status").size() == 1) {
-      item.add("status", e.getNamedChildValue("status"));
+      item.add("status", e.getNamedChildValueSingle("status"));
     }
     if (e.getChildren("copyright").size() == 1) {
-      item.add("copyright", ProfileUtilities.processRelativeUrls(e.getNamedChildValue("copyright"), "", pf.igpkp.specPath(), pf.context.getResourceNames(), pf.specMaps.get(0).listTargets(), pageTargets(), false));
+      item.add("copyright", ProfileUtilities.processRelativeUrls(e.getNamedChildValueSingle("copyright"), "", pf.igpkp.specPath(), pf.context.getResourceNames(), pf.specMaps.get(0).listTargets(), pageTargets(), false));
 //        addTranslationsToJson(item, "description", e.getNamedChild("description"), false);
     }
 
