@@ -7432,6 +7432,34 @@
       "hints" : 0,
       "time" : 1182,
       "memory" : 35920856
+    },
+    "hl7.fhir.au.base" : {
+      "errors" : 1,
+      "warnings" : 333,
+      "hints" : 20,
+      "time" : 656825,
+      "memory" : 2950275088
+    },
+    "example.fhir.uv.myig" : {
+      "errors" : 32,
+      "warnings" : 31,
+      "hints" : 8,
+      "time" : 267659,
+      "memory" : 1021916232
+    },
+    "hl7.fhir.us.core" : {
+      "errors" : 5,
+      "warnings" : 24,
+      "hints" : 18,
+      "time" : 2548665,
+      "memory" : 7336889760
+    },
+    "hl7.fhir.uv.extensions" : {
+      "errors" : 4,
+      "warnings" : 2,
+      "hints" : 5,
+      "time" : 590813,
+      "memory" : 7132900248
     }
   }
 }
