@@ -13,6 +13,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 /**
  * Utility class for converting BMM (Basic Meta-Model) class definitions to FHIR R5 StructureDefinitions
@@ -101,8 +103,8 @@ public class BmmToFhirConverter {
 
       StructureDefinition sd = createStructureDefinition(className, classData, rmRelease, conversionDate, locations, invariants);
 
-      // Write to file
-      String fileName = className + ".json";
+      // Write to file - replace underscores with hyphens in filename
+      String fileName = className.replace("_", "-") + ".json";
       Path outputPath = Paths.get(outputFolder, fileName);
 
       try (FileOutputStream fos = new FileOutputStream(outputPath.toFile())) {
@@ -116,9 +118,10 @@ public class BmmToFhirConverter {
                                                         Map<String, Map<String, InvariantMapping>> invariants) {
     StructureDefinition sd = new StructureDefinition();
 
-    // Basic fields
-    sd.setId(className);
-    sd.setUrl(OPENEHR_BASE_URL + className);
+    // Basic fields - replace underscores with hyphens in ID and URLs
+    String fhirId = className.replace("_", "-");
+    sd.setId(fhirId);
+    sd.setUrl(OPENEHR_BASE_URL + fhirId);
     sd.setVersion(rmRelease);
     sd.setName(className);
     sd.setTitle(className);
@@ -214,6 +217,20 @@ public class BmmToFhirConverter {
       String invName = invEntry.getName();
       String originalExpression = invEntry.getValue().asString();
 
+      // Check if this is a terminology binding invariant
+      String codeSetId = extractCodeSetId(originalExpression);
+      if (codeSetId != null) {
+        // This is a terminology binding - add as binding instead of constraint
+        ElementDefinition.ElementDefinitionBindingComponent binding =
+                new ElementDefinition.ElementDefinitionBindingComponent();
+        binding.setStrength(Enumerations.BindingStrength.REQUIRED);
+        binding.setValueSet("https://specifications.openehr.org/fhir/valueset-" + codeSetId);
+        element.setBinding(binding);
+        // Skip adding this as a regular constraint
+        continue;
+      }
+
+      // Regular invariant - add as constraint
       ElementDefinition.ElementDefinitionConstraintComponent constraint =
               new ElementDefinition.ElementDefinitionConstraintComponent();
 
@@ -235,6 +252,41 @@ public class BmmToFhirConverter {
 
       element.addConstraint(constraint);
     }
+  }
+
+  /**
+   * Extracts the code set ID from a terminology binding invariant expression.
+   *
+   * @param expression The invariant expression to check
+   * @return The code set ID if this is a terminology binding, null otherwise
+   */
+  private String extractCodeSetId(String expression) {
+    if (expression == null) {
+      return null;
+    }
+
+    // Pattern: language \/= Void implies code_set (Code_set_id_xxxx).has_code (language)
+    // Also handle variations with/without spaces around parentheses
+
+    // Look for the pattern "code_set (Code_set_id_" or "code_set(Code_set_id_"
+    String pattern1 = "code_set\\s*\\(\\s*Code_set_id_([^)]+)\\)";
+    Pattern regex1 = Pattern.compile(pattern1);
+    Matcher matcher1 = regex1.matcher(expression);
+
+    if (matcher1.find()) {
+      return matcher1.group(1);
+    }
+
+    // Alternative pattern with different spacing or capitalization
+    String pattern2 = "code_set\\s*\\(\\s*CODE_SET_ID_([^)]+)\\)";
+    Pattern regex2 = Pattern.compile(pattern2, Pattern.CASE_INSENSITIVE);
+    Matcher matcher2 = regex2.matcher(expression);
+
+    if (matcher2.find()) {
+      return matcher2.group(1);
+    }
+
+    return null;
   }
 
   private String generateFallbackHumanDescription(String invName, String expression) {
@@ -535,8 +587,8 @@ public class BmmToFhirConverter {
       case "Any":
         return "Element"; // FHIR base type for Any
       default:
-        // For BMM-defined types, use openEHR namespace
-        return OPENEHR_BASE_URL + typeName;
+        // For BMM-defined types, use openEHR namespace with hyphens
+        return OPENEHR_BASE_URL + typeName.replace("_", "-");
     }
   }
 
@@ -902,7 +954,7 @@ public class BmmToFhirConverter {
           conformsToType = paramData.asString("conforms_to_type");
         }
 
-        typeExt.setValue(new UriType(OPENEHR_BASE_URL + conformsToType));
+        typeExt.setValue(new UriType(OPENEHR_BASE_URL + conformsToType.replace("_", "-")));
         typeParamExt.addExtension(typeExt);
 
         sd.addExtension(typeParamExt);
@@ -920,7 +972,7 @@ public class BmmToFhirConverter {
 
         // Skip "Any" as it's not a real FHIR type
         if (!"Any".equals(firstAncestor)) {
-          baseDefinition = OPENEHR_BASE_URL + firstAncestor;
+          baseDefinition = OPENEHR_BASE_URL + firstAncestor.replace("_", "-");
         }
       }
     }
