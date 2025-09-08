@@ -45,7 +45,8 @@ import org.hl7.fhir.r5.model.StructureDefinition.StructureDefinitionKind;
 import org.hl7.fhir.r5.model.StructureDefinition.TypeDerivationRule;
 import org.hl7.fhir.r5.model.ValueSet;
 import org.hl7.fhir.r5.utils.UserDataNames;
-import org.hl7.fhir.r5.utils.XVerExtensionManager;
+import org.hl7.fhir.r5.utils.xver.XVerExtensionManager;
+import org.hl7.fhir.r5.utils.xver.XVerExtensionManagerFactory;
 import org.hl7.fhir.utilities.LoincLinker;
 import org.hl7.fhir.utilities.Utilities;
 import org.hl7.fhir.utilities.json.model.JsonElement;
@@ -96,7 +97,7 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
     if (igs != null) {
       loadPaths(igs);
     }
-    this.xver = new XVerExtensionManager(context);
+    this.xver = XVerExtensionManagerFactory.createExtensionManager(context);
     this.module = module;
   }
   

@@ -273,10 +273,10 @@ public class PublisherIGLoader extends PublisherBase {
     checkOutcomes(messages);
     // ok, loaded. Now we start loading settings out of the IG
     pf.version = processVersion(pf.sourceIg.getFhirVersion().get(0).asStringValue()); // todo: support multiple versions
-    if (VersionUtilities.isR2Ver(pf.version) || VersionUtilities.isR2Ver(pf.version)) {
-      throw new Error("As of the end of 2024, the FHIR  R2 (version "+ pf.version +") is no longer supported by the IG Publisher");
-    }
-    if (!Utilities.existsInList(pf.version, "5.0.0", "4.3.0", "4.0.1", "3.0.2", "6.0.0-ballot3")) {
+//    if (VersionUtilities.isR2Ver(pf.version) || VersionUtilities.isR2Ver(pf.version)) {
+//      throw new Error("As of the end of 2024, the FHIR  R2 (version "+ pf.version +") is no longer supported by the IG Publisher");
+//    }
+    if (!Utilities.existsInList(pf.version, "5.0.0", "4.3.0", "4.0.1", "3.0.2", "1.0.2", "6.0.0-ballot3")) {
       throw new Error("Unable to support version '"+ pf.version +"' - must be one of 5.0.0, 4.3.0, 4.0.1, 3.0.2 or 6.0.0-ballot3");
     }
 
@@ -723,6 +723,7 @@ public class PublisherIGLoader extends PublisherBase {
           break;
         case "r5-bundle-relative-reference-policy" :
           r5BundleRelativeReferencePolicy = ValidationOptions.R5BundleRelativeReferencePolicy.fromCode(p.getValue());
+          break;
         case "suppress-mappings":
           if ("*".equals(p.getValue())) {
             pf.suppressedMappings.addAll(Utilities.strings("http://hl7.org/fhir/fivews", "http://hl7.org/fhir/workflow", "http://hl7.org/fhir/interface", "http://hl7.org/v2",
@@ -739,6 +740,13 @@ public class PublisherIGLoader extends PublisherBase {
           } else {
             pf.suppressedMappings.add(p.getValue());
           }
+          break;
+        case "no-expansions-files":
+          pf.savingExpansions = false;
+          break;
+        case "no-ig-database":
+          pf.generatingDatabase = false;
+          break;
         default:
           if (pc.startsWith("wantGen-")) {
             String code = pc.substring(8);
@@ -1391,7 +1399,9 @@ public class PublisherIGLoader extends PublisherBase {
 
   private String getUTGPackageName() throws FHIRException, IOException {
     String vs = null;
-    if (VersionUtilities.isR3Ver(pf.version)) {
+    if (VersionUtilities.isR2Ver(pf.version)) {
+      vs = "hl7.terminology.r3";
+    } else if (VersionUtilities.isR3Ver(pf.version)) {
       vs = "hl7.terminology.r3";
     } else if (VersionUtilities.isR4Ver(pf.version) || VersionUtilities.isR4BVer(pf.version)) {
       vs = "hl7.terminology.r4";
@@ -1405,7 +1415,9 @@ public class PublisherIGLoader extends PublisherBase {
 
   private String getToolingPackageName() throws FHIRException, IOException {
     String pn = null;
-    if (VersionUtilities.isR3Ver(pf.version)) {
+    if (VersionUtilities.isR2Ver(pf.version)) {
+      pn = "hl7.fhir.uv.tools.r3";
+    } else if (VersionUtilities.isR3Ver(pf.version)) {
       pn = "hl7.fhir.uv.tools.r3";
     } else if (VersionUtilities.isR4Ver(pf.version) || VersionUtilities.isR4BVer(pf.version)) {
       pn = "hl7.fhir.uv.tools.r4";
@@ -1554,7 +1566,7 @@ public class PublisherIGLoader extends PublisherBase {
     igm.setBase2(PackageHacker.fixPackageUrl(pi.url()));
     igm.setNpm(pi);
     pf.specMaps.add(igm);
-    if (!VersionUtilities.versionMatches(pf.version, pi.fhirVersion())) {
+    if (!VersionUtilities.versionMatches(pi.fhirVersion(), pf.version)) {
       if (!pi.isWarned()) {
         pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, pf.sourceIg.fhirType()+"/"+ pf.sourceIg.getId(), "This IG is version "+ pf.version +", while the IG '"+pi.name()+"' is from version "+pi.fhirVersion(), ValidationMessage.IssueSeverity.ERROR));
         log("Version mismatch. This IG is version "+ pf.version +", while the IG '"+pi.name()+"' is from version "+pi.fhirVersion()+" (will try to run anyway)");
@@ -1613,7 +1625,7 @@ public class PublisherIGLoader extends PublisherBase {
               logDebugMessage(LogCategory.CONTEXT, "Unable to find package dependency "+fdep+". Will proceed, but likely to be be errors in qa.html etc");
             } else {
               pf.npmList.add(dpi);
-              if (!VersionUtilities.versionMatches(pf.version, pi.fhirVersion())) {
+              if (!VersionUtilities.versionMatches(pi.fhirVersion(), pf.version)) {
                 if (!pi.isWarned()) {
                   pf.errors.add(new ValidationMessage(ValidationMessage.Source.Publisher, ValidationMessage.IssueType.BUSINESSRULE, pf.sourceIg.fhirType()+"/"+ pf.sourceIg.getId(), "This IG is for FHIR version "+ pf.version +", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion(), ValidationMessage.IssueSeverity.ERROR));
                   log("Version mismatch. This IG is for FHIR version "+ pf.version +", while the package '"+pi.name()+"#"+pi.version()+"' is for FHIR version "+pi.fhirVersion()+" (will ignore that and try to run anyway)");
@@ -2283,9 +2295,9 @@ public class PublisherIGLoader extends PublisherBase {
               } else if (r.getElement().hasExtension(ExtensionDefinitions.EXT_ARTIFACT_NAME)) {
                 rg.setName(r.getElement().getExtensionValue(ExtensionDefinitions.EXT_ARTIFACT_NAME).primitiveValue());
               } else if (!rg.hasName()) {
-                if (r.getElement().hasChild("title")) {
+                if (r.getElement().hasChildren("title")) {
                   rg.setName(r.getElement().getChildValue("title"));
-                } else if (r.getElement().hasChild("name") && r.getElement().getNamedChild("name").isPrimitive()) {
+                } else if (r.getElement().hasChildren("name") && r.getElement().getNamedChildSingle("name", false).isPrimitive()) {
                   rg.setName(r.getElement().getChildValue("name"));
                 } else if ("Bundle".equals(r.getElement().getName())) {
                   // If the resource is a document Bundle, get the title from the Composition
@@ -2304,14 +2316,14 @@ public class PublisherIGLoader extends PublisherBase {
               } else if (r.getElement().hasExtension(ExtensionDefinitions.EXT_ARTIFACT_DESC)) {
                 rg.setDescription(r.getElement().getExtensionValue(ExtensionDefinitions.EXT_ARTIFACT_DESC).primitiveValue());
               } else if (!rg.hasDescription()) {
-                if (r.getElement().hasChild("description")) {
-                  Element descriptionElement = r.getElement().getNamedChild("description");
+                if (r.getElement().hasChildren("description")) {
+                  Element descriptionElement = r.getElement().getNamedChildSingle("description", false);
                   if (descriptionElement.hasValue()) {
                     rg.setDescription(r.getElement().getChildValue("description").trim());
                   }
                   else {
-                    if (descriptionElement.hasChild("text")) {
-                      Element textElement = descriptionElement.getNamedChild("text");
+                    if (descriptionElement.hasChildren("text")) {
+                      Element textElement = descriptionElement.getNamedChildSingle("text", false);
                       if (textElement.hasValue()) {
                         rg.setDescription(textElement.getValue().trim());
                       }
@@ -3895,7 +3907,7 @@ public class PublisherIGLoader extends PublisherBase {
           if (this.pf.adHocTmpDir == null && !this.pf.listedURLExemptions.contains(bc.getUrl()) && !isExampleResource(bc) && !canonicalUrlIsOk(bc)) {
             if (!bc.fhirType().equals("CapabilityStatement") || !bc.getUrl().contains("/Conformance/")) {
               f.getErrors().add(new ValidationMessage(ValidationMessage.Source.ProfileValidator, ValidationMessage.IssueType.INVALID, bc.fhirType()+".where(url = '"+bc.getUrl()+"')", "Conformance resource "+f.getPath()+" - the canonical URL ("+Utilities.pathURL(this.pf.igpkp.getCanonical(), bc.fhirType(),
-                      bc.getId())+") does not match the URL ("+bc.getUrl()+")", ValidationMessage.IssueSeverity.ERROR).setMessageId(PublisherMessageIds.RESOURCE_CANONICAL_MISMATCH));
+                      bc.getId())+") does not match the URL ("+bc.getUrl()+"). Use the special-url parameter if you really mean for it not to match", ValidationMessage.IssueSeverity.ERROR).setMessageId(PublisherMessageIds.RESOURCE_CANONICAL_MISMATCH));
               // throw new Exception("Error: conformance resource "+f.getPath()+" canonical URL ("+Utilities.pathURL(igpkp.getCanonical(), bc.fhirType(), bc.getId())+") does not match the URL ("+bc.getUrl()+")");
             }
           }
