@@ -23,7 +23,6 @@ import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.spreadsheets.StructureDefinitionSpreadsheetGenerator;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
-import org.hl7.fhir.r5.utils.XVerExtensionManager;
 import org.hl7.fhir.r5.utils.client.FHIRToolingClient;
 import org.hl7.fhir.r5.utils.formats.CSVWriter;
 import org.hl7.fhir.r5.utils.validation.ValidatorSession;
@@ -175,7 +174,9 @@ public class PublisherFields {
     PublisherUtils.CacheOption cacheOption;
     String configFileRootPath;
     MarkDownProcessor markdownEngine;
+    boolean savingExpansions = true;
     List<ValueSet> expansions = new ArrayList<ValueSet>();
+    boolean generatingDatabase = true;
     String npmName;
     NPMPackageGenerator npm;
     Map<String, NPMPackageGenerator> vnpms = new HashMap<String, NPMPackageGenerator>();

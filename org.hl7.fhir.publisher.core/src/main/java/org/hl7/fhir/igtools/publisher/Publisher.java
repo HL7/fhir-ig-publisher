@@ -92,8 +92,9 @@ import org.hl7.fhir.r5.terminologies.client.TerminologyClientContext;
 import org.hl7.fhir.r5.utils.EOperationOutcome;
 import org.hl7.fhir.r5.utils.NPMPackageGenerator;
 import org.hl7.fhir.r5.utils.UserDataNames;
-import org.hl7.fhir.r5.utils.XVerExtensionManager;
+import org.hl7.fhir.r5.utils.xver.XVerExtensionManager;
 import org.hl7.fhir.r5.utils.validation.IValidationProfileUsageTracker;
+import org.hl7.fhir.r5.utils.xver.XVerExtensionManagerFactory;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 import org.hl7.fhir.utilities.http.HTTPResult;
@@ -168,7 +169,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   public static final long JEKYLL_TIMEOUT = 60000 * 5; // 5 minutes....
   public static final long FSH_TIMEOUT = 60000 * 5; // 5 minutes....
   public static final int PRISM_SIZE_LIMIT = 16384;
-  public static final String TOOLING_IG_CURRENT_RELEASE = "0.7.1";
+  public static final String TOOLING_IG_CURRENT_RELEASE = "0.8.0";
   public static final String PACKAGE_CACHE_FOLDER_PARAM = "-package-cache-folder";
 
   private PublisherIGLoader loader;
@@ -538,7 +539,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
   }
 
   private Set<String> scanForR5Extensions() {
-    XVerExtensionManager xver = new XVerExtensionManager(pf.context);
+    XVerExtensionManager xver = XVerExtensionManagerFactory.createExtensionManager(pf.context);
     Set<String> set = new HashSet<>();
     scanProfilesForR5(xver, set);
     scanExamplesForR5(xver, set);

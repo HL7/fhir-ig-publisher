@@ -1912,7 +1912,9 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       }
       b.append("v"+toolsVersion);
       if (!toolsVersion.equals(currentToolsVersion)) {
-        if (currentToolsVersion == null) {
+        if ("(unknown)".equals(toolsVersion)) {
+          b.append(". Development Version in use. ");
+        } else if (currentToolsVersion == null) {
           b.append(". The latest official release version is unknown");
         } else if (VersionUtilities.isThisOrLater(currentToolsVersion, toolsVersion, VersionUtilities.VersionPrecision.MINOR)) {
           b.append(" which is a development version. The latest official release version is");

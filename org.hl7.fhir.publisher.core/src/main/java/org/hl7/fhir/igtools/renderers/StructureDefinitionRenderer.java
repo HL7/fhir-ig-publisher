@@ -285,10 +285,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   private String extensionSummary() {
+    boolean isMod = ProfileUtilities.isModifierExtension(sd);
     if (ProfileUtilities.isSimpleExtension(sd)) {
-      ElementDefinition value = sd.getSnapshot().getElementByPath("Extension.value");      
+      ElementDefinition value = sd.getSnapshot().getElementByPath("Extension.value");
       return "<p>"+
-          gen.formatPhrase(RenderingI18nContext.SDR_EXTENSION_SUMMARY, value.typeSummary(), Utilities.stripPara(processMarkdown("ext-desc", sd.getDescriptionElement())))+
+          gen.formatPhrase(isMod ? RenderingI18nContext.SDR_EXTENSION_SUMMARY_MODIFIER : RenderingI18nContext.SDR_EXTENSION_SUMMARY , value.typeSummary(), Utilities.stripPara(processMarkdown("ext-desc", sd.getDescriptionElement())))+
           "</p>";
     } else {
       List<ElementDefinition> subs = new ArrayList<>();
@@ -2736,6 +2737,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
       }
     }
+    if (ProfileUtilities.isModifierExtension(sd)) {
+      XhtmlNode ddiv = div.div("border: 1px solid black; border-radius: 10px; padding: 10px");
+      ddiv.para().b().tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_MOD));
+    }
+
+
     if (sd.getContext().isEmpty()) {
       div.para().tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_ANY));
     } else {

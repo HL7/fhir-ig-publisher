@@ -86,7 +86,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   private ImplementationGuide ig;
   private List<FetchedFile> files;
   private List<NpmPackage> packages;
-  private List<String> otherUrls = new ArrayList<>();
+  private Set<String> otherUrls = new HashSet<>();
   private List<String> mappingUrls = new ArrayList<>();
   private boolean bundleReferencesResolve;
   private List<SpecMapManager> specMaps;
@@ -406,7 +406,7 @@ public class ValidationServices implements IValidatorResourceFetcher, IValidatio
   }
 
 
-  public List<String> getOtherUrls() {
+  public Set<String> getOtherUrls() {
     return otherUrls;
   }
 

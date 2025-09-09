@@ -282,7 +282,11 @@ public class PublisherProcessor extends PublisherBase  {
             f.finish("generateOtherVersions");
           }
         }
-        pva.generateSnapshots();
+        List<ProfileVersionAdaptor.ConversionMessage> log = new ArrayList<>();
+        pva.generateSnapshots(log);
+        for (ProfileVersionAdaptor.ConversionMessage m : log) {
+          System.out.println(m.getMessage());
+        }
 
         for (FetchedFile f: pf.fileList) {
           f.start("generateOtherVersions");

@@ -217,7 +217,7 @@ public class PublisherGenerator extends PublisherBase {
     pf.otherFilesRun.add(Utilities.path(pf.outputDir, "package.tgz"));
     pf.otherFilesRun.add(Utilities.path(pf.outputDir, "package.manifest.json"));
     pf.otherFilesRun.add(Utilities.path(pf.tempDir, "package.db"));
-    DBBuilder db = new DBBuilder(Utilities.path(pf.tempDir, "package.db"), pf.context, pf.rc, pf.cu, pf.fileList);
+    DBBuilder db = pf.generatingDatabase ? new DBBuilder(Utilities.path(pf.tempDir, "package.db"), pf.context, pf.rc, pf.cu, pf.fileList) : null;
     copyData();
     for (String rg : pf.regenList) {
       regenerate(rg);
@@ -289,7 +289,9 @@ public class PublisherGenerator extends PublisherBase {
       }
     }
     genBasePages();
-    db.closeUp();
+    if (db != null) {
+      db.closeUp();
+    }
     FileUtilities.bytesToFile(pf.extensionTracker.generate(), Utilities.path(pf.tempDir, "usage-stats.json"));
     try {
       log("Sending Usage Stats to Server");
@@ -1385,9 +1387,13 @@ public class PublisherGenerator extends PublisherBase {
       } else {
         ValueSetExpansionOutcome exp = this.pf.context.expandVS(vs, true, true, true);
 
-        db.recordExpansion(vs, exp);
+        if (db != null) {
+          db.recordExpansion(vs, exp);
+        }
         if (exp.getValueset() != null) {
-          this.pf.expansions.add(exp.getValueset());
+          if (pf.savingExpansions) {
+            this.pf.expansions.add(exp.getValueset());
+          }
           RenderingContext elrc = lrc.withUniqueLocalPrefix("x").withMode(RenderingContext.ResourceRendererMode.END_USER);
           exp.getValueset().setCompose(null);
           exp.getValueset().setText(null);
@@ -3836,22 +3842,25 @@ public class PublisherGenerator extends PublisherBase {
 
 
   private void generateExpansions() throws FileNotFoundException, IOException {
-    Bundle exp = new Bundle();
-    exp.setType(Bundle.BundleType.COLLECTION);
-    exp.setId(UUID.randomUUID().toString());
-    exp.getMeta().setLastUpdated(pf.execTime.getTime());
-    for (ValueSet vs : pf.expansions) {
-      exp.addEntry().setResource(vs).setFullUrl(vs.getUrl());
-    }
 
-    new JsonParser().setOutputStyle(IParser.OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(pf.outputDir, "expansions.json")), exp);
-    new XmlParser().setOutputStyle(IParser.OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(pf.outputDir, "expansions.xml")), exp);
-    ZipGenerator zip = new ZipGenerator(Utilities.path(pf.outputDir, "expansions.json.zip"));
-    zip.addFileName("expansions.json", Utilities.path(pf.outputDir, "expansions.json"), false);
-    zip.close();
-    zip = new ZipGenerator(Utilities.path(pf.outputDir, "expansions.xml.zip"));
-    zip.addFileName("expansions.xml", Utilities.path(pf.outputDir, "expansions.xml"), false);
-    zip.close();
+    if (pf.savingExpansions) {
+      Bundle exp = new Bundle();
+      exp.setType(Bundle.BundleType.COLLECTION);
+      exp.setId(UUID.randomUUID().toString());
+      exp.getMeta().setLastUpdated(pf.execTime.getTime());
+      for (ValueSet vs : pf.expansions) {
+        exp.addEntry().setResource(vs).setFullUrl(vs.getUrl());
+      }
+
+      new JsonParser().setOutputStyle(IParser.OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(pf.outputDir, "expansions.json")), exp);
+      new XmlParser().setOutputStyle(IParser.OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(pf.outputDir, "expansions.xml")), exp);
+      ZipGenerator zip = new ZipGenerator(Utilities.path(pf.outputDir, "expansions.json.zip"));
+      zip.addFileName("expansions.json", Utilities.path(pf.outputDir, "expansions.json"), false);
+      zip.close();
+      zip = new ZipGenerator(Utilities.path(pf.outputDir, "expansions.xml.zip"));
+      zip.addFileName("expansions.xml", Utilities.path(pf.outputDir, "expansions.xml"), false);
+      zip.close();
+    }
   }
 
 
@@ -6055,7 +6064,9 @@ public class PublisherGenerator extends PublisherBase {
         }
       }
 
-      db.addToCSList(view, cs, oids, rl);
+      if (db != null) {
+        db.addToCSList(view, cs, oids, rl);
+      }
 
       b.append(cs.getUrl());
       b.append(",");
@@ -6145,7 +6156,9 @@ public class PublisherGenerator extends PublisherBase {
         }
       }
 
-      db.addToVSList(view, vs, oids, used, sources, rl);
+      if (db != null) {
+        db.addToVSList(view, vs, oids, used, sources, rl);
+      }
 
       b.append(vs.getUrl());
       b.append(",");
