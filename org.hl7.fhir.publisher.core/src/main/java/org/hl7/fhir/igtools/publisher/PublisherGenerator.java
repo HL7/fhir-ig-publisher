@@ -2646,7 +2646,7 @@ public class PublisherGenerator extends PublisherBase {
           if (base != null) {
             item.add("basename", base.getName());
             item.add("basepath", Utilities.escapeXml(base.getWebPath()));
-          } else if ("http://hl7.org/fhir/StructureDefinition/Base".equals(sd.getBaseDefinition())) {
+          } else if ("http://hl7.org/fhir/StructureDefinition/Base".equals(sd.getBaseDefinitionNoVersion())) {
             item.add("basename", "Base");
             item.add("basepath", "http://hl7.org/fhir/StructureDefinition/Element");
           }

@@ -917,7 +917,7 @@ public class CrossViewRenderer extends Renderer {
       } else {
         StructureDefinition sd = worker.fetchTypeDefinition(type);
         if (sd != null && sd.hasBaseDefinition()) {
-          String bt = Utilities.tail(sd.getBaseDefinition());
+          String bt = Utilities.tail(sd.getBaseDefinitionNoVersion());
           String p = "extensions-types.html#ext-" + bt;
           if ("Base".equals(bt)) {
             // do nothing
