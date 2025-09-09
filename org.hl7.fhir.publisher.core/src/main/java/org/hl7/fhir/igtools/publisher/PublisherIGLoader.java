@@ -2786,7 +2786,7 @@ public class PublisherIGLoader extends PublisherBase {
       return "The URL of this definition is not in the proper canonical URL space of the IG ("+ pf.igpkp.getCanonical()+")";
     }
     // 3. is this based on Resource or DomainResource
-    if (!Utilities.existsInList(def.getBaseDefinition(),
+    if (!Utilities.existsInList(def.getBaseDefinitionNoVersion(),
             "http://hl7.org/fhir/StructureDefinition/Resource",
             "http://hl7.org/fhir/StructureDefinition/DomainResource",
             "http://hl7.org/fhir/StructureDefinition/CanonicalResource",
