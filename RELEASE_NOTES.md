@@ -14,6 +14,7 @@
 * Validator: Add missing SIDs to validator definitions
 * Validator: Fix error trying to validate against a broken profile (no snapshot)
 * Validator: Fix validation of max decimal places in Questionnaire
+* Validator: Fix erroneous use of alternate tx servers to validate value set codes in batch mode
 * Renderer: render modifier extensions better
 * Renderer: Fix web source for LOINC attachments value set
 * Renderer: Render modifier explicitly on extensions
@@ -21,3 +22,4 @@
 * Renderer: Add rendering support for additional SCT editions
 * Renderer: Allow suppressing db & expansions
 * Cross-Version support: Fix error generating cross-version definitions for canonical resources
+* XIG: Phase one of document tracking

@@ -9,10 +9,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.zip.Deflater;
 import java.util.zip.GZIPInputStream;
 
@@ -25,6 +22,7 @@ import org.hl7.fhir.convertors.analytics.PackageVisitor.PackageContext;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_30_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_40_50;
 import org.hl7.fhir.convertors.factory.VersionConvertorFactory_43_50;
+import org.hl7.fhir.dstu3.model.Composition;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.igtools.publisher.SpecMapManager;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
@@ -66,12 +64,18 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
 
   private Connection con;
 
-  private PreparedStatement psqlP;
+  private PreparedStatement sqlInsertPackage;
   private int pckKey;
-  private PreparedStatement psqlR;
+  private PreparedStatement sqlInsertResource;
+  private PreparedStatement sqlUpdateResource;
   private PreparedStatement psqlCat;
   private int resKey;
-  private PreparedStatement psqlC;
+  private int docKey;
+  private PreparedStatement sqlInsertContents;
+  private PreparedStatement sqlUpdateContents;
+  private PreparedStatement sqlAddDocument;
+  private PreparedStatement sqlAddDocumentProfile;
+  private PreparedStatement sqlAddDocumentCode;
   private PreparedStatement psqlRI;
   private PreparedStatement psqlCI;
   private PreparedStatement psqlDep;
@@ -90,11 +94,19 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
   public XIGDatabaseBuilder(String dest, boolean init, String date) throws IOException {
     super();
     try {
+      System.out.println("Product XIG at "+dest);
       con = connect(dest, init, date);
 
-      psqlP = con.prepareStatement("Insert into Packages (PackageKey, PID, Id, Date, Title, Canonical, Web, Version, R2, R2B, R3, R4, R4B, R5, R6, Realm, Auth, Package, Published) Values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)");
-      psqlR = con.prepareStatement("Insert into Resources (ResourceKey, PackageKey, ResourceType, ResourceTypeR5, Id, R2, R2B, R3, R4, R4B, R5, R6, Web, Url, Version, Status, Date, Name, Title, Experimental, Realm, Description, Purpose, Copyright,  CopyrightLabel, Kind, Type, Supplements, ValueSet, Content, Authority, Details, StandardsStatus, FMM, WG) Values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-      psqlC = con.prepareStatement("Insert into Contents (ResourceKey, Json, JsonR5) Values (?, ?, ?)");
+      sqlInsertPackage = con.prepareStatement("Insert into Packages (PackageKey, PID, Id, Date, Title, Canonical, Web, Version, R2, R2B, R3, R4, R4B, R5, R6, Realm, Auth, Package, Published) Values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)");
+      sqlInsertResource = con.prepareStatement("Insert into Resources (ResourceKey, PackageKey, ResourceType, Id, R2, R2B, R3, R4, R4B, R5, R6) Values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      sqlUpdateResource = con.prepareStatement("Update Resources set ResourceTypeR5 = ?, Web = ?, Url = ?, Version = ?, Status = ?, Date = ?, Name = ?, Title = ?, Experimental = ?, Realm = ?, Description = ?, Purpose = ?, Copyright = ?, CopyrightLabel = ?, "+
+              "Kind = ?, Type = ?, Supplements = ?, ValueSet = ?, Content = ?, Authority = ?, Details = ?, StandardsStatus = ?, FMM = ?, WG = ? where ResourceKey = ?");
+      sqlInsertContents = con.prepareStatement("Insert into Contents (ResourceKey, Json) Values (?, ?)");
+      sqlUpdateContents = con.prepareStatement("Update Contents set JsonR5 = ? where ResourceKey = ?");
+      sqlAddDocument = con.prepareStatement("insert into Documents (DocumentKey, ResourceKey, Instance) values (?, ?, ?)");
+      sqlAddDocumentProfile = con.prepareStatement("insert into DocumentProfiles (DocumentKey, Profile) values (?, ?)");
+      sqlAddDocumentCode = con.prepareStatement("insert into DocumentCodes (DocumentKey, System, Version, Code, Display) values (?, ?, ?, ?, ?)");
+
       psqlCat = con.prepareStatement("Insert into Categories (ResourceKey, Mode, Code) Values (?, ?, ?)");
       psqlRI = con.prepareStatement("Insert into ResourceFTS (ResourceKey, Name, Title, Description, Narrative) Values (?, ?, ?, ?, ?)");
       psqlCI = con.prepareStatement("Insert into CodeSystemFTS (ResourceKey, Code, Display, Definition) Values (?, ?, ?, ?)");
@@ -125,6 +137,9 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
       makeExtensionDefnTable(con);
       makeExtensionUserTable(con);
       makeExtensionUsageTable(con);
+      makeDocumentsTable(con);
+      makeDocumentProfilesTable(con);
+      makeDocumentCodesTable(con);
       PreparedStatement psql = con.prepareStatement("Insert into Metadata (key, name, value) values (?, ?, ?)");
       psql.setInt(1, ++lastMDKey);
       psql.setString(2, "date");
@@ -148,6 +163,9 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
         }
         if ("resKey".equals(rs.getString(2))) {
           resKey = rs.getInt(3);
+        }
+        if ("docKey".equals(rs.getString(2))) {
+          docKey = rs.getInt(3);
         }
         if ("totalpackages".equals(rs.getString(2))) {
           pck = rs.getInt(3);
@@ -204,6 +222,34 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
             "ExtensionDefnKey         integer NOT NULL,\r\n"+
             "ExtensionUserKey         integer NOT NULL,\r\n"+
             "PRIMARY KEY (ExtensionDefnKey, ExtensionUserKey))\r\n");
+  }
+
+  private void makeDocumentsTable(Connection con) throws SQLException {
+    Statement stmt = con.createStatement();
+    stmt.execute("CREATE TABLE Documents (\r\n"+
+            "DocumentKey         integer NOT NULL,\r\n"+
+            "ResourceKey         integer NOT NULL,\r\n"+
+            "Instance            integer NOT NULL,\r\n"+
+            "PRIMARY KEY (DocumentKey))\r\n");
+  }
+
+  private void makeDocumentProfilesTable(Connection con) throws SQLException {
+    Statement stmt = con.createStatement();
+    stmt.execute("CREATE TABLE DocumentProfiles (\r\n"+
+            "DocumentKey         integer NOT NULL,\r\n"+
+            "Profile             nvarchar NULL,\r\n"+
+            "PRIMARY KEY (DocumentKey, Profile))\r\n");
+  }
+
+  private void makeDocumentCodesTable(Connection con) throws SQLException {
+    Statement stmt = con.createStatement();
+    stmt.execute("CREATE TABLE DocumentCodes (\r\n"+
+            "DocumentKey         integer NOT NULL,\r\n"+
+            "System              nvarchar NOT NULL,\r\n"+
+            "Code                nvarchar NOT NULL,\r\n"+
+            "Display             nvarchar NULL,\r\n"+
+            "Version             nvarchar NULL,\r\n"+
+            "PRIMARY KEY (DocumentKey, System, Code))\r\n");
   }
 
   private void makeDependencyTable(Connection con) throws SQLException {
@@ -270,7 +316,7 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
         "ResourceKey     integer NOT NULL,\r\n"+
         "PackageKey      integer NOT NULL,\r\n"+
         "ResourceType    nvarchar NOT NULL,\r\n"+
-        "ResourceTypeR5  nvarchar NOT NULL,\r\n"+
+        "ResourceTypeR5  nvarchar NULL,\r\n"+
         "Id              nvarchar NOT NULL,\r\n"+
         "R2              INTEGER NULL,\r\n"+
         "R2B             INTEGER NULL,\r\n"+
@@ -445,6 +491,10 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
       psql.setString(2, "resKey");
       psql.setString(3, ""+resKey);
       psql.executeUpdate();
+      psql.setInt(1, ++lastMDKey);
+      psql.setString(2, "docKey");
+      psql.setString(3, ""+docKey);
+      psql.executeUpdate();
 
       con.close();
     } catch (Exception e) {
@@ -472,25 +522,25 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
       smm.setAuth(auth);
       smm.setRealm(realm);
 
-      psqlP.setInt(1, pckKey);
-      psqlP.setString(2, pid);
-      psqlP.setString(3, npm.name());
-      psqlP.setString(4, npm.date());
-      psqlP.setString(5, npm.title());
-      psqlP.setString(6, npm.canonical()); 
-      psqlP.setString(7, npm.getWebLocation());
-      psqlP.setString(8, npm.version()); 
-      psqlP.setInt(9, hasVersion(npm.fhirVersionList(), "1.0"));
-      psqlP.setInt(10, hasVersion(npm.fhirVersionList(), "1.4"));
-      psqlP.setInt(11, hasVersion(npm.fhirVersionList(), "3.0"));
-      psqlP.setInt(12, hasVersion(npm.fhirVersionList(), "4.0"));
-      psqlP.setInt(13, hasVersion(npm.fhirVersionList(), "4.3"));
-      psqlP.setInt(14, hasVersion(npm.fhirVersionList(), "5.0"));
-      psqlP.setInt(15, hasVersion(npm.fhirVersionList(), "6.0"));
-      psqlP.setString(16, realm);
-      psqlP.setString(17, auth);
-      psqlP.setBytes(18, org.hl7.fhir.utilities.json.parser.JsonParser.composeBytes(npm.getNpm()));
-      psqlP.execute();
+      sqlInsertPackage.setInt(1, pckKey);
+      sqlInsertPackage.setString(2, pid);
+      sqlInsertPackage.setString(3, npm.name());
+      sqlInsertPackage.setString(4, npm.date());
+      sqlInsertPackage.setString(5, npm.title());
+      sqlInsertPackage.setString(6, npm.canonical());
+      sqlInsertPackage.setString(7, npm.getWebLocation());
+      sqlInsertPackage.setString(8, npm.version());
+      sqlInsertPackage.setInt(9, hasVersion(npm.fhirVersionList(), "1.0"));
+      sqlInsertPackage.setInt(10, hasVersion(npm.fhirVersionList(), "1.4"));
+      sqlInsertPackage.setInt(11, hasVersion(npm.fhirVersionList(), "3.0"));
+      sqlInsertPackage.setInt(12, hasVersion(npm.fhirVersionList(), "4.0"));
+      sqlInsertPackage.setInt(13, hasVersion(npm.fhirVersionList(), "4.3"));
+      sqlInsertPackage.setInt(14, hasVersion(npm.fhirVersionList(), "5.0"));
+      sqlInsertPackage.setInt(15, hasVersion(npm.fhirVersionList(), "6.0"));
+      sqlInsertPackage.setString(16, realm);
+      sqlInsertPackage.setString(17, auth);
+      sqlInsertPackage.setBytes(18, org.hl7.fhir.utilities.json.parser.JsonParser.composeBytes(npm.getNpm()));
+      sqlInsertPackage.execute();
       pck++;
 
       return smm;
@@ -506,6 +556,24 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
       SpecMapManager smm = (SpecMapManager) clientContext;
 
       try {
+        resKey++;
+        sqlInsertResource.setInt(1, resKey);
+        sqlInsertResource.setInt(2, smm.getKey());
+        sqlInsertResource.setString(3, type);
+        sqlInsertResource.setString(4, id);
+        sqlInsertResource.setInt(5, hasVersion(context.getVersion(), "1.0"));
+        sqlInsertResource.setInt(6, hasVersion(context.getVersion(), "1.4"));
+        sqlInsertResource.setInt(7, hasVersion(context.getVersion(), "3.0"));
+        sqlInsertResource.setInt(8, hasVersion(context.getVersion(), "4.0"));
+        sqlInsertResource.setInt(9, hasVersion(context.getVersion(), "4.3"));
+        sqlInsertResource.setInt(10, hasVersion(context.getVersion(), "5.0"));
+        sqlInsertResource.setInt(11, hasVersion(context.getVersion(), "6.0"));
+        sqlInsertResource.execute();
+
+        sqlInsertContents.setInt(1, resKey);
+        sqlInsertContents.setBytes(2, gzip(content));
+        sqlInsertContents.execute();
+
         Resource r = loadResource(context.getPid(), context.getVersion(), type, id, content, smm);
         if (r != null && resourceTypes.contains(r.fhirType())) {
           String auth = smm.getAuth();
@@ -535,7 +603,6 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
               JsonObject j = org.hl7.fhir.utilities.json.parser.JsonParser.parseObject(content);
               String narrative = cr.getText().getDiv().allText();
               cr.setText(null);
-              resKey++;
 
               String details = null;
 
@@ -559,47 +626,36 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
               }
 
               String rid = r.hasId() ? r.getId() : id.replace(".json", "");
-              psqlR.setInt(1, resKey);
-              psqlR.setInt(2, smm.getKey());
-              psqlR.setString(3, type);
-              psqlR.setString(4, r.fhirType());
-              psqlR.setString(5, rid);
-              psqlR.setInt(6, hasVersion(context.getVersion(), "1.0"));
-              psqlR.setInt(7, hasVersion(context.getVersion(), "1.4"));
-              psqlR.setInt(8, hasVersion(context.getVersion(), "3.0"));
-              psqlR.setInt(9, hasVersion(context.getVersion(), "4.0"));
-              psqlR.setInt(10, hasVersion(context.getVersion(), "4.3"));
-              psqlR.setInt(11, hasVersion(context.getVersion(), "5.0"));
-              psqlR.setInt(12, hasVersion(context.getVersion(), "6.0"));
-              psqlR.setString(13, Utilities.pathURL(smm.getBase(), smm.getPath(cr.getUrl(), null, cr.fhirType(), cr.getIdBase())));
-              psqlR.setString(14, cr.getUrl());
-              psqlR.setString(15, cr.getVersion());
-              psqlR.setString(16, cr.getStatus().toCode());
-              psqlR.setString(17, cr.getDateElement().primitiveValue());
-              psqlR.setString(18, cr.getName());
-              psqlR.setString(19, cr.getTitle());
-              psqlR.setBoolean(20, cr.getExperimental());
-              psqlR.setString(21, realm);
-              psqlR.setString(22, cr.getDescription());
-              psqlR.setString(23, cr.getPurpose());
-              psqlR.setString(24, cr.getCopyright());
-              psqlR.setString(25, cr.getCopyrightLabel());
-              psqlR.setString(26, j.asString("kind"));
-              psqlR.setString(27, j.asString("type"));
-              psqlR.setString(28, j.asString("supplements"));
-              psqlR.setString(29, j.asString("valueSet"));
-              psqlR.setString(30, j.asString("content"));
-              psqlR.setString(31, auth);
-              psqlR.setString(32, details);
-              psqlR.setString(33, ExtensionUtilities.readStringExtension(cr, ExtensionDefinitions.EXT_STANDARDS_STATUS));
-              psqlR.setString(34, ExtensionUtilities.readStringExtension(cr, ExtensionDefinitions.EXT_FMM_LEVEL));
-              psqlR.setString(35, ExtensionUtilities.readStringExtension(cr, ExtensionDefinitions.EXT_WORKGROUP));
-              psqlR.execute();
+              sqlUpdateResource.setString(1, r.fhirType());
+              sqlUpdateResource.setString(2, Utilities.pathURL(smm.getBase(), smm.getPath(cr.getUrl(), null, cr.fhirType(), cr.getIdBase())));
+              sqlUpdateResource.setString(3, cr.getUrl());
+              sqlUpdateResource.setString(4, cr.getVersion());
+              sqlUpdateResource.setString(5, cr.getStatus().toCode());
+              sqlUpdateResource.setString(6, cr.getDateElement().primitiveValue());
+              sqlUpdateResource.setString(7, cr.getName());
+              sqlUpdateResource.setString(8, cr.getTitle());
+              sqlUpdateResource.setBoolean(9, cr.getExperimental());
+              sqlUpdateResource.setString(10, realm);
+              sqlUpdateResource.setString(11, cr.getDescription());
+              sqlUpdateResource.setString(12, cr.getPurpose());
+              sqlUpdateResource.setString(13, cr.getCopyright());
+              sqlUpdateResource.setString(14, cr.getCopyrightLabel());
+              sqlUpdateResource.setString(15, j.asString("kind"));
+              sqlUpdateResource.setString(16, j.asString("type"));
+              sqlUpdateResource.setString(17, j.asString("supplements"));
+              sqlUpdateResource.setString(18, j.asString("valueSet"));
+              sqlUpdateResource.setString(19, j.asString("content"));
+              sqlUpdateResource.setString(20, auth);
+              sqlUpdateResource.setString(21, details);
+              sqlUpdateResource.setString(22, ExtensionUtilities.readStringExtension(cr, ExtensionDefinitions.EXT_STANDARDS_STATUS));
+              sqlUpdateResource.setString(23, ExtensionUtilities.readStringExtension(cr, ExtensionDefinitions.EXT_FMM_LEVEL));
+              sqlUpdateResource.setString(24, ExtensionUtilities.readStringExtension(cr, ExtensionDefinitions.EXT_WORKGROUP));
+              sqlUpdateResource.setInt(25, resKey);
+              sqlUpdateResource.execute();
 
-              psqlC.setInt(1, resKey);
-              psqlC.setBytes(2, gzip(content));
-              psqlC.setBytes(3, gzip(new JsonParser().composeBytes(cr)));
-              psqlC.execute();
+              sqlUpdateContents.setBytes(1, gzip(new JsonParser().composeBytes(cr)));
+              sqlUpdateContents.setInt(2, resKey);
+              sqlUpdateContents.execute();
 
               psqlRI.setInt(1, resKey);
               psqlRI.setString(2, cr.getName());
@@ -992,11 +1048,13 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
         org.hl7.fhir.dstu3.model.Resource res;
         res = new org.hl7.fhir.dstu3.formats.JsonParser(true).parse(source);
         scanForExtensionUsage(pid, res, smm.getPath(res.fhirType(), res.getIdBase()));
+        scanForDocuments(res);
         return VersionConvertorFactory_30_50.convertResource(res);
       } else if (VersionUtilities.isR4Ver(parseVersion)) {
         org.hl7.fhir.r4.model.Resource res;
         res = new org.hl7.fhir.r4.formats.JsonParser(true, true).parse(source);
         scanForExtensionUsage(pid, res, smm.getPath(res.fhirType(), res.getIdBase()));
+        scanForDocuments(res);
         return VersionConvertorFactory_40_50.convertResource(res);
 //      } else if (VersionUtilities.isR2BVer(parseVersion)) {
 //        org.hl7.fhir.dstu2016may.model.Resource res;
@@ -1014,10 +1072,12 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
         org.hl7.fhir.r4b.model.Resource res;
         res = new org.hl7.fhir.r4b.formats.JsonParser(true).parse(source);
         scanForExtensionUsage(pid, res, smm.getPath(res.fhirType(), res.getIdBase()));
+        scanForDocuments(res);
         return VersionConvertorFactory_43_50.convertResource(res);
       } else if (VersionUtilities.isR5Plus(parseVersion)) {
         Resource res = new JsonParser(true, true).parse(source);
         scanForExtensionUsage(pid, res, smm.getPath(res.fhirType(), res.getIdBase()));
+        scanForDocuments(res);
         return res;
       } else if (Utilities.existsInList(parseVersion, "4.6.0", "3.5.0", "1.8.0")) {
         return null;
@@ -1031,6 +1091,159 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
       return null;
     }
   }
+
+  private void scanForDocuments(org.hl7.fhir.dstu3.model.Resource res) throws SQLException {
+    org.hl7.fhir.dstu3.model.Composition cmp = null;
+    List<org.hl7.fhir.dstu3.model.UriType> p = new ArrayList<>();
+    if (res instanceof org.hl7.fhir.dstu3.model.Composition) {
+      cmp = (org.hl7.fhir.dstu3.model.Composition) res;
+      p.addAll(cmp.getMeta().getProfile());
+    } else if (res instanceof org.hl7.fhir.dstu3.model.Bundle) {
+      org.hl7.fhir.dstu3.model.Bundle b = (org.hl7.fhir.dstu3.model.Bundle) res;
+      org.hl7.fhir.dstu3.model.Resource r = b.getEntryFirstRep().getResource();
+      if (r != null && r instanceof Composition) {
+        cmp = (org.hl7.fhir.dstu3.model.Composition) r;
+        p.addAll(b.getMeta().getProfile());
+        p.addAll(cmp.getMeta().getProfile());
+      }
+    }
+    if (cmp != null) {
+      docKey++;
+      sqlAddDocument.setInt(1, docKey);
+      sqlAddDocument.setInt(2, resKey);
+      sqlAddDocument.setInt(3, 1);
+      sqlAddDocument.execute();
+      for (var pi : p) {
+        sqlAddDocumentProfile.setInt(1, docKey);
+        sqlAddDocumentProfile.setString(2, pi.primitiveValue());
+        sqlAddDocumentProfile.execute();
+      }
+      for (var c : cmp.getType().getCoding()) {
+        sqlAddDocumentCode.setInt(1, docKey);
+        sqlAddDocumentCode.setString(2, c.getSystem());
+        sqlAddDocumentCode.setString(3, c.getVersion());
+        sqlAddDocumentCode.setString(4, c.getCode());
+        sqlAddDocumentCode.setString(5, c.getDisplay());
+        sqlAddDocumentCode.execute();
+      }
+    }
+  }
+
+
+  private void scanForDocuments(org.hl7.fhir.r4.model.Resource res) throws SQLException {
+    org.hl7.fhir.r4.model.Composition cmp = null;
+    List<org.hl7.fhir.r4.model.CanonicalType> p = new ArrayList<>();
+    if (res instanceof org.hl7.fhir.r4.model.Composition) {
+      cmp = (org.hl7.fhir.r4.model.Composition) res;
+      p.addAll(cmp.getMeta().getProfile());
+    } else if (res instanceof org.hl7.fhir.r4.model.Bundle) {
+      org.hl7.fhir.r4.model.Bundle b = (org.hl7.fhir.r4.model.Bundle) res;
+      org.hl7.fhir.r4.model.Resource r = b.getEntryFirstRep().getResource();
+      if (r != null && r instanceof org.hl7.fhir.r4.model.Composition) {
+        cmp = (org.hl7.fhir.r4.model.Composition) r;
+        p.addAll(b.getMeta().getProfile());
+        p.addAll(cmp.getMeta().getProfile());
+      }
+    }
+    if (cmp != null) {
+      docKey++;
+      sqlAddDocument.setInt(1, docKey);
+      sqlAddDocument.setInt(2, resKey);
+      sqlAddDocument.setInt(3, 1);
+      sqlAddDocument.execute();
+      for (var pi : p) {
+        sqlAddDocumentProfile.setInt(1, docKey);
+        sqlAddDocumentProfile.setString(2, pi.primitiveValue());
+        sqlAddDocumentProfile.execute();
+      }
+      for (var c : cmp.getType().getCoding()) {
+        sqlAddDocumentCode.setInt(1, docKey);
+        sqlAddDocumentCode.setString(2, c.getSystem());
+        sqlAddDocumentCode.setString(3, c.getVersion());
+        sqlAddDocumentCode.setString(4, c.getCode());
+        sqlAddDocumentCode.setString(5, c.getDisplay());
+        sqlAddDocumentCode.execute();
+      }
+    }
+  }
+
+
+  private void scanForDocuments(org.hl7.fhir.r4b.model.Resource res) throws SQLException {
+    org.hl7.fhir.r4b.model.Composition cmp = null;
+    List<org.hl7.fhir.r4b.model.CanonicalType> p = new ArrayList<>();
+    if (res instanceof org.hl7.fhir.r4b.model.Composition) {
+      cmp = (org.hl7.fhir.r4b.model.Composition) res;
+      p.addAll(cmp.getMeta().getProfile());
+    } else if (res instanceof org.hl7.fhir.r4b.model.Bundle) {
+      org.hl7.fhir.r4b.model.Bundle b = (org.hl7.fhir.r4b.model.Bundle) res;
+      org.hl7.fhir.r4b.model.Resource r = b.getEntryFirstRep().getResource();
+      if (r != null && r instanceof org.hl7.fhir.r4b.model.Composition) {
+        cmp = (org.hl7.fhir.r4b.model.Composition) r;
+        p.addAll(b.getMeta().getProfile());
+        p.addAll(cmp.getMeta().getProfile());
+      }
+    }
+    if (cmp != null) {
+      docKey++;
+      sqlAddDocument.setInt(1, docKey);
+      sqlAddDocument.setInt(2, resKey);
+      sqlAddDocument.setInt(3, 1);
+      sqlAddDocument.execute();
+      for (var pi : p) {
+        sqlAddDocumentProfile.setInt(1, docKey);
+        sqlAddDocumentProfile.setString(2, pi.primitiveValue());
+        sqlAddDocumentProfile.execute();
+      }
+      for (var c : cmp.getType().getCoding()) {
+        sqlAddDocumentCode.setInt(1, docKey);
+        sqlAddDocumentCode.setString(2, c.getSystem());
+        sqlAddDocumentCode.setString(3, c.getVersion());
+        sqlAddDocumentCode.setString(4, c.getCode());
+        sqlAddDocumentCode.setString(5, c.getDisplay());
+        sqlAddDocumentCode.execute();
+      }
+    }
+  }
+
+
+  private void scanForDocuments(org.hl7.fhir.r5.model.Resource res) throws SQLException {
+    org.hl7.fhir.r5.model.Composition cmp = null;
+    List<org.hl7.fhir.r5.model.CanonicalType> p = new ArrayList<>();
+    if (res instanceof org.hl7.fhir.r5.model.Composition) {
+      cmp = (org.hl7.fhir.r5.model.Composition) res;
+      p.addAll(cmp.getMeta().getProfile());
+    } else if (res instanceof org.hl7.fhir.r5.model.Bundle) {
+      org.hl7.fhir.r5.model.Bundle b = (org.hl7.fhir.r5.model.Bundle) res;
+      org.hl7.fhir.r5.model.Resource r = b.getEntryFirstRep().getResource();
+      if (r != null && r instanceof org.hl7.fhir.r5.model.Composition) {
+        cmp = (org.hl7.fhir.r5.model.Composition) r;
+        p.addAll(b.getMeta().getProfile());
+        p.addAll(cmp.getMeta().getProfile());
+      }
+    }
+    if (cmp != null) {
+      docKey++;
+      sqlAddDocument.setInt(1, docKey);
+      sqlAddDocument.setInt(2, resKey);
+      sqlAddDocument.setInt(3, 1);
+      sqlAddDocument.execute();
+      for (var pi : p) {
+        sqlAddDocumentProfile.setInt(1, docKey);
+        sqlAddDocumentProfile.setString(2, pi.primitiveValue());
+        sqlAddDocumentProfile.execute();
+      }
+      for (var c : cmp.getType().getCoding()) {
+        sqlAddDocumentCode.setInt(1, docKey);
+        sqlAddDocumentCode.setString(2, c.getSystem());
+        sqlAddDocumentCode.setString(3, c.getVersion());
+        sqlAddDocumentCode.setString(4, c.getCode());
+        sqlAddDocumentCode.setString(5, c.getDisplay());
+        sqlAddDocumentCode.execute();
+      }
+    }
+  }
+
+
 
   private void scanForExtensionUsage(String pid,org.hl7.fhir.dstu3.model.Resource res, String path) throws SQLException {
     if (path != null) {
