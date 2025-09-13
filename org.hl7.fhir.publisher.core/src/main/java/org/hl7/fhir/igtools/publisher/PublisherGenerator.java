@@ -827,7 +827,7 @@ public class PublisherGenerator extends PublisherBase {
       Map<String, String> vars = new HashMap<>();
       FetchedResource r = f.getResources().get(0);
       StringBuilder b = new StringBuilder();
-      b.append("<table class=\"grid\">\r\n");
+      b.append("<table class=\"grid\" data-fhir=\"generated-heirarchy\">\r\n");
       b.append("<tr><td><b>Level</b></td><td><b>Type</b></td><td><b>Location</b></td><td><b>Message</b></td></tr>\r\n");
       genVMessage(b, f.getErrors(), ValidationMessage.IssueSeverity.FATAL);
       genVMessage(b, f.getErrors(), ValidationMessage.IssueSeverity.ERROR);
@@ -1157,13 +1157,13 @@ public class PublisherGenerator extends PublisherBase {
     String version = this.pf.mode == PublisherUtils.IGBuildMode.AUTOBUILD ? "current" : this.pf.mode == PublisherUtils.IGBuildMode.PUBLICATION ? this.pf.publishedIg.getVersion() : "dev";
     if (isExample(f, r)) {
       // we're going to use javascript to determine the relative path of this for the user.
-      b.append("<p><b>Validation Links:</b></p><ul><li><a href=\"https://confluence.hl7.org/display/FHIR/Using+the+FHIR+Validator\">Validate using FHIR Validator</a> (Java): <code id=\"vl-"+r.fhirType()+"-"+r.getId()+"\">$cmd$</code></li></ul>\r\n");
+      b.append("<p data-fhir=\"generated\"><b>Validation Links:</b></p><ul><li><a href=\"https://confluence.hl7.org/display/FHIR/Using+the+FHIR+Validator\">Validate using FHIR Validator</a> (Java): <code id=\"vl-"+r.fhirType()+"-"+r.getId()+"\">$cmd$</code></li></ul>\r\n");
       b.append("<script type=\"text/javascript\">\r\n");
       b.append("  var x = window.location.href;\r\n");
       b.append("  document.getElementById(\"vl-"+r.fhirType()+"-"+r.getId()+"\").innerHTML = \"java -jar [path]/org.hl7.fhir.validator.jar -ig "+ this.pf.publishedIg.getPackageId()+"#"+version+" \"+x.substr(0, x.lastIndexOf(\".\")).replace(\"file:///\", \"\") + \".json\";\r\n");
       b.append("</script>\r\n");
     } else if (r.getResource() instanceof StructureDefinition) {
-      b.append("<p>Validate this resource:</b></p><ul><li><a href=\"https://confluence.hl7.org/display/FHIR/Using+the+FHIR+Validator\">Validate using FHIR Validator</a> (Java): <code>"+
+      b.append("<p data-fhir=\"generated\">Validate this resource:</b></p><ul><li><a href=\"https://confluence.hl7.org/display/FHIR/Using+the+FHIR+Validator\">Validate using FHIR Validator</a> (Java): <code>"+
               "java -jar [path]/org.hl7.fhir.validator.jar -ig "+ this.pf.publishedIg.getPackageId()+"#"+version+" -profile "+((StructureDefinition) r.getResource()).getUrl()+" [resource-to-validate]"+
               "</code></li></ul>\r\n");
     } else {
@@ -5743,7 +5743,7 @@ public class PublisherGenerator extends PublisherBase {
 
   private String processSQLCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();
-    String output = db == null ? "<span style=\"color: maroon\">No SQL this build</span>" : db.processSQL(src);
+    String output = db == null ? "<span style=\"color: maroon\" data-fhir=\"generated\">No SQL this build</span>" : db.processSQL(src);
     int i = this.pf.sqlIndex++;
     fragment("sql-"+i+"-fragment", output, f.getOutputNames(), start, "sql", "SQL", null);
     return "{% include sql-"+i+"-fragment.xhtml %}";
@@ -5944,7 +5944,7 @@ public class PublisherGenerator extends PublisherBase {
   private String genContainedIndex(FetchedResource r, List<StringPair> clist, String lang) {
     StringBuilder b = new StringBuilder();
     if (clist.size() > 0) {
-      b.append("<ul>\r\n");
+      b.append("<ul data-fhir=\"generated\">\r\n");
       for (StringPair sp : clist) {
         b.append("<li><a href=\""+sp.getValue()+"\">"+Utilities.escapeXml(sp.getName())+"</a></li>\r\n");
       }
