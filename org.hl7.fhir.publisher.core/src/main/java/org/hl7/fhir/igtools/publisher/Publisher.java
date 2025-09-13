@@ -721,7 +721,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
               Element res = entry.getNamedChild("resource");
               if (res != null && res.fhirType().equals(parts[0]) && res.hasChild("id") && res.getNamedChildValue("id").equals(parts[1])) {
                 String path = this.pf.igpkp.getLinkFor(r, true)+"#"+parts[0]+"_"+parts[1];
-                return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, ResourceWrapper.forResource(context, r.getElement()));
+                return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, ResourceWrapper.forResource(context, res));
               }
             }
           }
@@ -737,7 +737,7 @@ public class Publisher extends PublisherBase implements IReferenceResolver, IVal
             String fu = entry.getNamedChildValue("fullUrl");
             if (res != null && fu != null && fu.equals(url)) {
               String path = this.pf.igpkp.getLinkFor(r, true)+"#"+fu.replace(":", "-");
-              return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, ResourceWrapper.forResource(context, r.getElement()));
+              return new ResourceWithReference(ResourceReferenceKind.EXTERNAL, url, path, ResourceWrapper.forResource(context, res));
             }
           }
         }
