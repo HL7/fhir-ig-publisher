@@ -625,9 +625,13 @@ public class XIGDatabaseBuilder implements IPackageVisitorProcessor {
                 details = processCapabilityStatement(resKey, (CapabilityStatement) cr, context.getNpm(), dependencies);
               }
 
+              String web = smm.getPath(cr.getUrl(), null, cr.fhirType(), cr.getIdBase());
+              if (web != null && !Utilities.isAbsoluteUrl(web)) {
+                web = Utilities.pathURL(smm.getBase(), web);
+              }
               String rid = r.hasId() ? r.getId() : id.replace(".json", "");
               sqlUpdateResource.setString(1, r.fhirType());
-              sqlUpdateResource.setString(2, Utilities.pathURL(smm.getBase(), smm.getPath(cr.getUrl(), null, cr.fhirType(), cr.getIdBase())));
+              sqlUpdateResource.setString(2, web);
               sqlUpdateResource.setString(3, cr.getUrl());
               sqlUpdateResource.setString(4, cr.getVersion());
               sqlUpdateResource.setString(5, cr.getStatus().toCode());
