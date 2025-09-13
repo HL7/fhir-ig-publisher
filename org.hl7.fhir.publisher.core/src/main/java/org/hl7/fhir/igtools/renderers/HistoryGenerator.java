@@ -60,7 +60,7 @@ public class HistoryGenerator {
       XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
       div.hr();
       div.para().b().tx("History");
-      XhtmlNode tbl = div.table("grid", false);
+      XhtmlNode tbl = div.table("grid", false).markGenerated(!context.forValidResource());
       
       // headers
       XhtmlNode tr = tbl.tr();

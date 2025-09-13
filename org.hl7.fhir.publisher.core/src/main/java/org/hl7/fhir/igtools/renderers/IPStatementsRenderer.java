@@ -145,7 +145,7 @@ public class IPStatementsRenderer {
         key1++;
         b.append("<li>");
         b.append(stmt);
-        b.append("<div id=\"ipp_"+key1+"\" onClick=\"if (document.getElementById('ipp2_"+key1+"').innerHTML != '') {document.getElementById('ipp_"+key1+"').innerHTML = document.getElementById('ipp2_"+key1+"').innerHTML; document.getElementById('ipp2_"+key1+"').innerHTML = ''}\">"+
+        b.append("<div data-fhir=\"generated\" id=\"ipp_"+key1+"\" onClick=\"if (document.getElementById('ipp2_"+key1+"').innerHTML != '') {document.getElementById('ipp_"+key1+"').innerHTML = document.getElementById('ipp2_"+key1+"').innerHTML; document.getElementById('ipp2_"+key1+"').innerHTML = ''}\">"+
             " <span style=\"cursor: pointer; border: 1px grey solid; background-color: #fcdcb3; padding-left: 3px; padding-right: 3px; color: black\">"+
             "Show Usage</span></div><div id=\"ipp2_"+key1+"\" style=\"display: none\">");
         b.append("\r\n<ul>\r\n");
