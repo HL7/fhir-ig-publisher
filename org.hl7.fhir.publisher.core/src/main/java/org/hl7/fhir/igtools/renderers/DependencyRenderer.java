@@ -120,7 +120,7 @@ public class DependencyRenderer {
   private BasePackageCacheManager pcm;
   private String dstFolder;
   private Map<String, PackageUsageInfo> ids = new HashMap<>();
-  private String fver;
+  private String fhirVersion;
   private String npmName;
   private TemplateManager templateManager;
   private Map<String, PackageList> packageListCache = new HashMap<>();
@@ -399,7 +399,7 @@ public class DependencyRenderer {
       String comment = "";
       if (!isNew) {
         comment = pui.getComment() != null ? pui.getComment()+" (as above)" : "";
-      } else if (!VersionUtilities.versionMatches(fver, npm.fhirVersion())) {
+      } else if (!VersionUtilities.versionMatches(npm.fhirVersion(), fhirVersion)) {
         comment = "FHIR Version Mismatch";
       } else if ("current".equals(npm.version())) {
         comment = "Cannot be published with a dependency on a current build version";
@@ -430,7 +430,7 @@ public class DependencyRenderer {
         pui.setComment(comment);
       }
       Row row = addRow(gen, rows, npm.name(), npm.title(), npm.version(), getVersionState(npm.name(), npm.version(), npm.canonical()), getLatestVersion(npm.name(), npm.canonical()), "current".equals(npm.version()), npm.fhirVersion(), 
-          !VersionUtilities.versionMatches(fver, npm.fhirVersion()), npm.canonical(), PackageHacker.fixPackageUrl(npm.getWebLocation()), comment, desc, QA, hasDesc, loaded, internal);
+          !VersionUtilities.versionMatches(npm.fhirVersion(), fhirVersion), npm.canonical(), PackageHacker.fixPackageUrl(npm.getWebLocation()), comment, desc, QA, hasDesc, loaded, internal);
       if (isNew && !internal) {
         for (String d : npm.dependencies()) {
           boolean dloaded = isLoaded(d);
@@ -638,7 +638,7 @@ public class DependencyRenderer {
     String id = ig.getPackageId();
     String ver = ig.getVersion();
     String fver = ig.getFhirVersion().get(0).asStringValue();
-    this.fver = fver;
+    this.fhirVersion = fver;
     String canonical = ig.getUrl();
     String web = ig.getManifest().getRendering();
     if (canonical.contains("/ImplementationGuide/")) {
