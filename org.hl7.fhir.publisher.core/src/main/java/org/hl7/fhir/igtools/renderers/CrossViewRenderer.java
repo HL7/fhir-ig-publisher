@@ -808,7 +808,7 @@ public class CrossViewRenderer extends Renderer {
     } else {
       kind = "data type";
     }
-    var tbl = x.table("list", false);
+    var tbl = x.table("list", false).markGenerated(!context.forValidResource());
     var tr = tbl.tr();
     tr.td().tx("Identity");
     tr.td().tx("Card.");

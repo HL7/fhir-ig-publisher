@@ -58,7 +58,7 @@ public class CanonicalRenderer extends BaseRenderer {
 
   public String summaryTable(FetchedResource r, boolean xml, boolean json, boolean ttl, Set<String> rows) throws Exception {
     StringBuilder b = new StringBuilder();
-    b.append("<table class=\"grid\">\r\n<tbody>\r\n");
+    b.append("<table class=\"grid\" data-fhir=\"generated-heirarchy\">\r\n<tbody>\r\n");
     genSummaryCore1(b, rows);
     genSummaryRowsSpecific(b, rows);
     genSummaryCore2(b, r, xml, json, ttl, rows);
