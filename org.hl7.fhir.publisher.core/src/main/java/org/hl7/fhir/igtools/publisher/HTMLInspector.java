@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -45,24 +46,18 @@ import org.hl7.fhir.r5.context.ILoggingService;
 import org.hl7.fhir.r5.context.ILoggingService.LogCategory;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.model.CanonicalResource;
-import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
-import org.hl7.fhir.utilities.FileUtilities;
-import org.hl7.fhir.utilities.PathBuilder;
-import org.hl7.fhir.utilities.Utilities;
+import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.npm.FilesystemPackageCacheManager;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
-import org.hl7.fhir.utilities.xhtml.HierarchicalTableGenerator;
-import org.hl7.fhir.utilities.xhtml.NodeType;
-import org.hl7.fhir.utilities.xhtml.XhtmlComposer;
-import org.hl7.fhir.utilities.xhtml.XhtmlNode;
+import org.hl7.fhir.utilities.xhtml.*;
 import org.hl7.fhir.utilities.xhtml.XhtmlNode.Location;
-import org.hl7.fhir.utilities.xhtml.XhtmlParser;
 import org.hl7.fhir.validation.BaseValidator.BooleanHolder;
 
 public class HTMLInspector {
+
 
   public enum ExternalReferenceType { FILE, WEB, IMG }
 
@@ -154,6 +149,13 @@ public class HTMLInspector {
     }
   }
 
+  private class ConformanceClause {
+    LoadedFile source;
+    int index;
+    XhtmlNode heading;
+    XhtmlNode node;
+  }
+
   public class LoadedFile {
     private String filename;
     private long lastModified;
@@ -165,6 +167,7 @@ public class HTMLInspector {
     private boolean hasXhtml;
     private int id = 0;
     private boolean isLangRedirect;
+    public XhtmlNode xhtml;
 
     public LoadedFile(String filename, String path, long lastModified, int iteration, Boolean hl7State, boolean exempt, boolean hasXhtml) {
       this.filename = filename;
@@ -262,8 +265,12 @@ public class HTMLInspector {
   private String packageId;
   private String version;
   private List<String> langList;
+  private ZipGenerator zipGenerator;
+  private XhtmlNode confHome;
+  private LoadedFile confSource;
+  private List<ConformanceClause> clauses = new ArrayList<>();
 
-  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log, String canonical, String packageId, String version, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, PublisherBase.FragmentUseRecord> fragmentUses, List<RelatedIG> relatedIGs, boolean noCIBuildIssues, List<String> langList) {
+  public HTMLInspector(String rootFolder, List<SpecMapManager> specs, List<LinkedSpecification> linkSpecs, ILoggingService log, String canonical, String packageId, String version, Map<String, List<String>> trackedFragments, List<FetchedFile> sources, IPublisherModule module, boolean isCIBuild, Map<String, PublisherBase.FragmentUseRecord> fragmentUses, List<RelatedIG> relatedIGs, boolean noCIBuildIssues, List<String> langList) throws IOException {
     this.rootFolder = rootFolder.replace("/", File.separator);
     this.specs = specs;
     this.linkSpecs = linkSpecs;
@@ -280,14 +287,15 @@ public class HTMLInspector {
     this.packageId = packageId;
     this.langList = langList;
     this.version = version;
-    requirePublishBox = Utilities.startsWithInList(packageId, "hl7."); 
+    requirePublishBox = Utilities.startsWithInList(packageId, "hl7.");
   }
 
   public void setAltRootFolder(String altRootFolder) throws IOException {
     this.altRootFolder = Utilities.path(rootFolder, altRootFolder.replace("/", File.separator));
   }
 
-  public List<ValidationMessage> check(String statusMessageDef, Map<String, String> statusMessagesLang) throws IOException {  
+  public List<ValidationMessage> check(String statusMessageDef, Map<String, String> statusMessagesLang) throws IOException {
+    zipGenerator = new ZipGenerator(Utilities.path(rootFolder, "ai-md.zip"));
     this.statusMessageDef = statusMessageDef;
     this.statusMessagesLang = statusMessagesLang;
     iteration ++;
@@ -361,11 +369,14 @@ public class HTMLInspector {
           checkFragmentMarkers(FileUtilities.fileToString(lf.getFilename()));
         }
         XhtmlNode x = new XhtmlParser().setMustBeWellFormed(strict).parse(new FileInputStream(lf.filename), null);
+        BooleanHolder bh = new BooleanHolder(false);
+        readConformanceClauses(lf, x, bh, new BooleanHolder(false), messages);
+        processAsMarkdown(lf, x);
         referencesValidatorPack = false;
         DuplicateAnchorTracker dat = new DuplicateAnchorTracker();
         Stack<XhtmlNode> stack = new Stack<XhtmlNode>();
         checkVisibleFragments(lf.path, stack, x);
-        if (checkLinks(lf, s, "", x, null, messages, false, dat, null) != NodeChangeType.NONE) { // returns true if changed
+        if (checkLinks(lf, s, "", x, null, messages, false, dat, null) != NodeChangeType.NONE || bh.ok()) { // returns true if changed
           saveFile(lf, x);
         }
         if (dat.hasDuplicates()) {
@@ -386,6 +397,7 @@ public class HTMLInspector {
       i++;
     }
     System.out.println();
+    zipGenerator.close();
 
     log.logDebugMessage(LogCategory.HTML, "Checking Other Links");
     // check other links:
@@ -393,6 +405,25 @@ public class HTMLInspector {
       checkResolveLink(sp.source, null, null, sp.link, sp.text, messages, null, new XhtmlNode(NodeType.Element, "p").tx(sp.text), null);
     }
 
+    log.logDebugMessage(LogCategory.HTML, "Sorting Conformance Clauses");
+    if (confHome != null) {
+      Set<LoadedFile> sources = new HashSet<>();
+      sources.add(confSource);
+      int ci = 0;
+      for (ConformanceClause clause : clauses) {
+        sources.add(clause.source);
+        ci++;
+        XhtmlNode li = confHome.li();
+        li.ah(clause.source.path+"#ci-c-"+ci).tx("§"+ci);
+        li.an("ci-c-"+ci).tx(" ");
+        li.getChildNodes().addAll(clause.node.getChildNodes());
+        clause.node.an("ci-c-"+ci).tx(" ");
+        clause.node.ah(confSource.path+"#ci-c-"+ci).supr("§"+ci);
+      }
+      for (LoadedFile lf : sources) {
+        saveFile(lf, lf.xhtml);
+      }
+    }
     log.logDebugMessage(LogCategory.HTML, "Done checking");
 
     for (String s : trackedFragments.keySet()) {
@@ -407,6 +438,179 @@ public class HTMLInspector {
       }
     }
     return messages;
+  }
+
+  private void readConformanceClauses(LoadedFile source, XhtmlNode x, BooleanHolder hasClauses, BooleanHolder hasWarning, List<ValidationMessage> messages) {
+    // there's two kinds of conformance clauses:
+    // from XML
+    //  <span class="fhir-conformance">clause</span>
+    // and from markdown
+    //  §clause$.
+    // the first pass is finding and fixing the markdown clauses, and then we process the
+    // spans
+
+    processMarkdownConformanceClauses(x, hasClauses);
+    List<XhtmlNode> parents = new ArrayList<>();
+    processConformanceClauses(source, parents, x, hasClauses, hasWarning, messages);
+    if (hasClauses.ok()) {
+      source.xhtml = x;
+    }
+  }
+
+  private void processConformanceClauses(LoadedFile source, List<XhtmlNode> parents, XhtmlNode x, BooleanHolder hasClauses, BooleanHolder hasWarning, List<ValidationMessage> messages) {
+    List<XhtmlNode> nparents = new ArrayList<>();
+    nparents.addAll(parents);
+    nparents.add(x);
+    for (XhtmlNode c : x.getChildNodes()) {
+      if (c.getNodeType() == NodeType.Element && "span".equals(c.getName()) && c.isClass("fhir-conformance")) {
+        ConformanceClause clause = new ConformanceClause();
+        clause.heading = getHeading(parents, x);
+        clause.node = c;
+        clause.source = source;
+        clauses.add(clause);
+      } else if (c.getNodeType() == NodeType.Element && "ul".equals(c.getName()) && c.isClass("fhir-conformance-list")) {
+        confHome = c;
+        c.getChildNodes().clear();
+        confSource = source;
+        hasClauses.set(true);
+      } else if (c.getNodeType() == NodeType.Element) {
+        boolean process = true;
+        if (c.hasAttribute("data-fhir")) {
+          process = !c.getAttribute("data-fhir").startsWith("generated");
+        }
+        if (process) {
+          processConformanceClauses(source, nparents, c, hasClauses, hasWarning, messages);
+        }
+      } else if (c.getNodeType() == NodeType.Text && forHL7) {
+        String s = c.getContent();
+        if (s.contains("SHALL")) {
+          if (!hasWarning.ok()) {
+            messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, source.path,
+                    "The html source contains the word 'SHALL' but it is not in a text phrase marked as a conformance clause", IssueSeverity.WARNING));
+          }
+          hasWarning.set(true);
+        } else if (s.contains("SHOULD")) {
+          if (!hasWarning.ok()) {
+            messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE,source.path,
+                    "The html source contains the word 'SHOULD' but it is not in a text phrase marked as a conformance clause", IssueSeverity.WARNING));
+          }
+          hasWarning.set(true);
+        }
+      }
+    }
+  }
+
+  private XhtmlNode getHeading(List<XhtmlNode> parents, XhtmlNode x) {
+    // walk backwards up the parents list
+    for (int i = parents.size() - 1; i >= 0; i--) {
+      // looking for any heading element
+      XhtmlNode p = parents.get(i);
+      int index = p.getChildNodes().indexOf(x);
+      for (int j = index - 1; j >- 0; j--) {
+        if (Utilities.existsInList(p.getChildNodes().get(j).getName(), "h1", "h2", "h3", "h4", "h5", "h6")) {
+          return p.getChildNodes().get(j);
+        }
+      }
+      x = p;
+    }
+    return null;
+  }
+
+  private void processMarkdownConformanceClauses(XhtmlNode x, BooleanHolder hasClauses) {
+    boolean found = false;
+    boolean tryAgain = false; // for if there's more than one clause in a run of text
+    if ("p".equals(x.getName()) && "§§§".equals(x.allText())) {
+      x.setName("ul");
+      x.getChildNodes().clear();
+      x.setAttribute("class", "fhir-conformance-list");
+      return;
+    }
+    do {
+      int start = -1;
+      int end = -1;
+      tryAgain = false;
+      for (int i = 0; i < x.getChildNodes().size(); i++) {
+        XhtmlNode c = x.getChildNodes().get(i);
+        if (c.getNodeType() == NodeType.Text && c.getContent().contains("§")) {
+          int offset = c.getContent().indexOf("§");
+          if (start == -1) {
+            start = i;
+            String s = c.getContent().substring(offset+1);
+            if (s.contains("§")) {
+              end = i;
+              break;
+            }
+          } else if (end == -1) {
+            end = i;
+            break;
+          } else {
+            // we ignore it - we'll get back to it
+          }
+        }
+      }
+      if (end > -1) {
+        hasClauses.set(true);
+        found = true;
+        tryAgain = true;
+        if (end == start) {
+          XhtmlNode span = new XhtmlNode(NodeType.Element, "span");
+          span.setAttribute("class", "fhir-conformance");
+          XhtmlNode c = x.getChildNodes().get(start);
+          String cnt = c.getContent();
+          int si = cnt.indexOf("§");
+          int ei = cnt.substring(si).indexOf("§") + si;
+          span.addText(cnt.substring(si + 1, ei));
+          x.getChildNodes().add(start + 1, span);
+          String ss = cnt.substring(si);
+          String es = cnt.substring(ei + 1);
+          c.setContent(ss);
+          if (!Utilities.noString(es)) {
+            XhtmlNode t = new XhtmlNode(NodeType.Text);
+            t.setContent(es);
+            x.getChildNodes().add(start + 2, span);
+          }
+        } else {
+          XhtmlNode sc = x.getChildNodes().get(start);
+          XhtmlNode ec = x.getChildNodes().get(end);
+          XhtmlNode span = new XhtmlNode(NodeType.Element, "span");
+          span.setAttribute("class", "fhir-conformance");
+          int si = sc.getContent().indexOf("§");
+          int ei = ec.getContent().indexOf("§");
+          span.addText(sc.getContent().substring(si + 1));
+          for (int i = start + 1; i < end; i++) {
+            span.add(x.getChildNodes().get(start + 1));
+            x.getChildNodes().remove(start + 1);
+          }
+          span.addText(ec.getContent().substring(0, ei));
+          x.getChildNodes().add(start + 1, span);
+          sc.setContent(sc.getContent().substring(0, si));
+          ec.setContent(ec.getContent().substring(ei + 1));
+        }
+      }
+    } while (tryAgain);
+
+    if (!found) {
+      for (XhtmlNode c : x.getChildNodes()) {
+        processMarkdownConformanceClauses(c, hasClauses);
+      }
+    }
+  }
+
+  private void processAsMarkdown(LoadedFile lf, XhtmlNode x) throws IOException {
+    XhtmlToMarkdownConverter conv = new XhtmlToMarkdownConverter(false);
+    conv.getImageFilters().add("^tbl_.*");
+    conv.getImageFilters().add("^icon_.*");
+    conv.getImageFilters().add("^assets\\/*");
+    conv.getImageFilters().add("^https://hl7\\.org/.*");
+    conv.getImageFilters().add("^tree-filter");
+    conv.getIdFilters().add("^segment-header");
+    conv.getIdFilters().add("^segment-navbar");
+    conv.getIdFilters().add("^ppprofile");
+    conv.setIgnoreGeneratedTables(true);
+    conv.setAiMode(true);
+    String md = conv.convert(x);
+    String fn = "ai/"+lf.path.replace(".html", ".md");
+    zipGenerator.addBytes(fn, md.getBytes(StandardCharsets.UTF_8), false);
   }
 
   private void checkVisibleFragments(String pageName, Stack<XhtmlNode> stack, XhtmlNode x) {
