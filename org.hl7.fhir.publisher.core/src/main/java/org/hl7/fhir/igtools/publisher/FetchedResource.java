@@ -398,6 +398,35 @@ public class FetchedResource {
 
   public boolean isCanonical(IWorkerContext context) {
     StructureDefinition sd = getElement().getProperty().getStructure();
+    // Enumerate the R4 canonicals because they won't have CanonicalResource in their hierarchy
+    switch (sd.getType()) {
+      case "ActivityDefinition":
+      case "CapabilityStatement":
+      case "ChargeItemDefinition":
+      case "CodeSystem":
+      case "CompartmentDefinition":
+      case "ConceptMap":
+      case "EventDefinition":
+      case "ExampleScenario":
+      case "GraphDefinition":
+      case "ImplementationGuide":
+      case "Library":
+      case "Measure":
+      case "MessageDefinition":
+      case "NamingSystem":
+      case "ObservationDefinition":
+      case "OperationDefinition":
+      case "PlanDefinition":
+      case "Questionnaire":
+      case "SearchParameter":
+      case "SpecimenDefinition":
+      case "StructureDefinition":
+      case "StructureMap":
+      case "TerminologyCapabilities":
+      case "TestScript":
+      case "ValueSet":
+        return true;
+    }
     while (sd != null) {
       if ("CanonicalResource".equals(sd.getType())) {
         return true;
