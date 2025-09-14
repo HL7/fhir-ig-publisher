@@ -1220,7 +1220,7 @@ public class PublisherProcessor extends PublisherBase  {
               } else {
                 List<Locale> langs = translationLocales();
                 logDebugMessage(LogCategory.PROGRESS, "narrative for "+f.getName()+" : "+r.getId());
-                if (r.getResource() != null && isConvertableResource(r.getResource().fhirType())) {
+                if (r.getResource() != null && r.getResource() instanceof DomainResource && isConvertableResource(r.getResource().fhirType())) {
                   boolean regen = false;
                   boolean first = true;
                   for (Locale lang : langs) {

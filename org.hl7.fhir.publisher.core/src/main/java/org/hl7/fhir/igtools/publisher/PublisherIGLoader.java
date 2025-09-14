@@ -2218,7 +2218,7 @@ public class PublisherIGLoader extends PublisherBase {
     }
     if (isNewML()) {
       for (String l : allLangs()) {
-        ImplementationGuide vig = (ImplementationGuide) pf.langUtils.copyToLanguage(pf.publishedIg, l, true);
+        ImplementationGuide vig = (ImplementationGuide) pf.langUtils.copyToLanguage(pf.publishedIg, l, true, pf.defaultTranslationLang, igf.getErrors());
         pf.lnpms.put(l, new NPMPackageGenerator(pf.publishedIg.getPackageId()+"."+l, Utilities.path(pf.outputDir, pf.publishedIg.getPackageId()+"."+l+".tgz"),
                 pf.igpkp.getCanonical(), targetUrl(), PackageGenerator.PackageType.IG, vig, pf.execTime.getTime(), relatedIgMap(), !pf.publishing, pf.context.getVersion()));
       }
