@@ -282,7 +282,11 @@ public class PublisherProcessor extends PublisherBase  {
             f.finish("generateOtherVersions");
           }
         }
-        pva.generateSnapshots();
+        List<ProfileVersionAdaptor.ConversionMessage> log = new ArrayList<>();
+        pva.generateSnapshots(log);
+        for (ProfileVersionAdaptor.ConversionMessage m : log) {
+          System.out.println(m.getMessage());
+        }
 
         for (FetchedFile f: pf.fileList) {
           f.start("generateOtherVersions");
@@ -1278,7 +1282,7 @@ public class PublisherProcessor extends PublisherBase  {
                       lrc.setAddName(true);
                       for (org.hl7.fhir.r5.elementmodel.Element e : r.getElement().getChildrenByName("entry")) {
                         Element res = e.getNamedChild("resource");
-                        if (res!=null && "http://hl7.org/fhir/StructureDefinition/DomainResource".equals(res.getProperty().getStructure().getBaseDefinition())) {
+                        if (res!=null && isDomainResource(res.getProperty().getStructure())) {
                           ResourceWrapper rw = ResourceWrapper.forResource(lrc, res);
                           ResourceRenderer rr = RendererFactory.factory(rw, lrc);
                           if (rr.renderingUsesValidation()) {
@@ -1309,7 +1313,6 @@ public class PublisherProcessor extends PublisherBase  {
     }
     tts.end();
   }
-
 
   private void loadLists() throws Exception {
     for (FetchedFile f : pf.fileList) {
@@ -1354,6 +1357,18 @@ public class PublisherProcessor extends PublisherBase  {
   private boolean hasNarrative(Element element) {
     return element.hasChild("text") && element.getNamedChild("text").hasChild("div");
   }
+
+  private boolean isDomainResource(StructureDefinition structure) {
+    StructureDefinition sd = structure;
+    while (sd != null) {
+      if ("DomainResource".equals(sd.getType())) {
+        return true;
+      }
+      sd = pf.context.fetchResource(StructureDefinition.class, sd.getBaseDefinition());
+    }
+    return false;
+  }
+
 
   private boolean isDomainResource(FetchedResource r) {
     StructureDefinition sd = r.getElement().getProperty().getStructure();

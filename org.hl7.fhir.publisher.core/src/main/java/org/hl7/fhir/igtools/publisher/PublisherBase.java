@@ -1283,6 +1283,9 @@ public class PublisherBase implements ILoggingService {
     public boolean visit(String path, DataType node) {
       CanonicalType ct = (CanonicalType) node;
       String url = ct.asStringValue();
+      if (url == null) {
+        return false;
+      }
       if (url.contains("|")) {
         return false;
       }

@@ -217,7 +217,7 @@ public class PublisherGenerator extends PublisherBase {
     pf.otherFilesRun.add(Utilities.path(pf.outputDir, "package.tgz"));
     pf.otherFilesRun.add(Utilities.path(pf.outputDir, "package.manifest.json"));
     pf.otherFilesRun.add(Utilities.path(pf.tempDir, "package.db"));
-    DBBuilder db = new DBBuilder(Utilities.path(pf.tempDir, "package.db"), pf.context, pf.rc, pf.cu, pf.fileList);
+    DBBuilder db = pf.generatingDatabase ? new DBBuilder(Utilities.path(pf.tempDir, "package.db"), pf.context, pf.rc, pf.cu, pf.fileList) : null;
     copyData();
     for (String rg : pf.regenList) {
       regenerate(rg);
@@ -289,7 +289,9 @@ public class PublisherGenerator extends PublisherBase {
       }
     }
     genBasePages();
-    db.closeUp();
+    if (db != null) {
+      db.closeUp();
+    }
     FileUtilities.bytesToFile(pf.extensionTracker.generate(), Utilities.path(pf.tempDir, "usage-stats.json"));
     try {
       log("Sending Usage Stats to Server");
@@ -825,7 +827,7 @@ public class PublisherGenerator extends PublisherBase {
       Map<String, String> vars = new HashMap<>();
       FetchedResource r = f.getResources().get(0);
       StringBuilder b = new StringBuilder();
-      b.append("<table class=\"grid\">\r\n");
+      b.append("<table class=\"grid\" data-fhir=\"generated-heirarchy\">\r\n");
       b.append("<tr><td><b>Level</b></td><td><b>Type</b></td><td><b>Location</b></td><td><b>Message</b></td></tr>\r\n");
       genVMessage(b, f.getErrors(), ValidationMessage.IssueSeverity.FATAL);
       genVMessage(b, f.getErrors(), ValidationMessage.IssueSeverity.ERROR);
@@ -1011,7 +1013,7 @@ public class PublisherGenerator extends PublisherBase {
     if (wantGen(rX, "html")) {
       long start = System.currentTimeMillis();
       // Lloyd debug: rX.getId().equals("SdcQuestionLibrary")
-      XhtmlNode xhtml = (lang == null || lang.equals(le.getNamedChildValue("language"))) ? getXhtml(f, rX, lr,le) : null;
+      XhtmlNode xhtml = (lang == null || lang.equals(le.getNamedChildValueSingle("language"))) ? getXhtml(f, rX, lr,le) : null;
       if (xhtml == null && HistoryGenerator.allEntriesAreHistoryProvenance(le)) {
         RenderingContext ctxt = lrc.copy(false).setParser(getTypeLoader(f, rX));
         List<ProvenanceDetails> entries = loadProvenanceForBundle(this.pf.igpkp.getLinkFor(rX, true), le, f);
@@ -1027,7 +1029,7 @@ public class PublisherGenerator extends PublisherBase {
         }
         String html = null;
         if (rX.getLogicalElement() != null) {
-          String rXContentType = rX.getElement().getNamedChildValue("contentType");
+          String rXContentType = rX.getElement().getNamedChildValueSingle("contentType");
           if (rXContentType.contains("xml")) {
             org.hl7.fhir.r5.elementmodel.XmlParser xmlParser = new org.hl7.fhir.r5.elementmodel.XmlParser(this.pf.context);
             XmlXHtmlRenderer xmlXHtmlRenderer = new XmlXHtmlRenderer();
@@ -1155,13 +1157,13 @@ public class PublisherGenerator extends PublisherBase {
     String version = this.pf.mode == PublisherUtils.IGBuildMode.AUTOBUILD ? "current" : this.pf.mode == PublisherUtils.IGBuildMode.PUBLICATION ? this.pf.publishedIg.getVersion() : "dev";
     if (isExample(f, r)) {
       // we're going to use javascript to determine the relative path of this for the user.
-      b.append("<p><b>Validation Links:</b></p><ul><li><a href=\"https://confluence.hl7.org/display/FHIR/Using+the+FHIR+Validator\">Validate using FHIR Validator</a> (Java): <code id=\"vl-"+r.fhirType()+"-"+r.getId()+"\">$cmd$</code></li></ul>\r\n");
+      b.append("<p data-fhir=\"generated\"><b>Validation Links:</b></p><ul><li><a href=\"https://confluence.hl7.org/display/FHIR/Using+the+FHIR+Validator\">Validate using FHIR Validator</a> (Java): <code id=\"vl-"+r.fhirType()+"-"+r.getId()+"\">$cmd$</code></li></ul>\r\n");
       b.append("<script type=\"text/javascript\">\r\n");
       b.append("  var x = window.location.href;\r\n");
       b.append("  document.getElementById(\"vl-"+r.fhirType()+"-"+r.getId()+"\").innerHTML = \"java -jar [path]/org.hl7.fhir.validator.jar -ig "+ this.pf.publishedIg.getPackageId()+"#"+version+" \"+x.substr(0, x.lastIndexOf(\".\")).replace(\"file:///\", \"\") + \".json\";\r\n");
       b.append("</script>\r\n");
     } else if (r.getResource() instanceof StructureDefinition) {
-      b.append("<p>Validate this resource:</b></p><ul><li><a href=\"https://confluence.hl7.org/display/FHIR/Using+the+FHIR+Validator\">Validate using FHIR Validator</a> (Java): <code>"+
+      b.append("<p data-fhir=\"generated\">Validate this resource:</b></p><ul><li><a href=\"https://confluence.hl7.org/display/FHIR/Using+the+FHIR+Validator\">Validate using FHIR Validator</a> (Java): <code>"+
               "java -jar [path]/org.hl7.fhir.validator.jar -ig "+ this.pf.publishedIg.getPackageId()+"#"+version+" -profile "+((StructureDefinition) r.getResource()).getUrl()+" [resource-to-validate]"+
               "</code></li></ul>\r\n");
     } else {
@@ -1385,9 +1387,13 @@ public class PublisherGenerator extends PublisherBase {
       } else {
         ValueSetExpansionOutcome exp = this.pf.context.expandVS(vs, true, true, true);
 
-        db.recordExpansion(vs, exp);
+        if (db != null) {
+          db.recordExpansion(vs, exp);
+        }
         if (exp.getValueset() != null) {
-          this.pf.expansions.add(exp.getValueset());
+          if (pf.savingExpansions) {
+            this.pf.expansions.add(exp.getValueset());
+          }
           RenderingContext elrc = lrc.withUniqueLocalPrefix("x").withMode(RenderingContext.ResourceRendererMode.END_USER);
           exp.getValueset().setCompose(null);
           exp.getValueset().setText(null);
@@ -2640,7 +2646,7 @@ public class PublisherGenerator extends PublisherBase {
           if (base != null) {
             item.add("basename", base.getName());
             item.add("basepath", Utilities.escapeXml(base.getWebPath()));
-          } else if ("http://hl7.org/fhir/StructureDefinition/Base".equals(sd.getBaseDefinition())) {
+          } else if ("http://hl7.org/fhir/StructureDefinition/Base".equals(sd.getBaseDefinitionNoVersion())) {
             item.add("basename", "Base");
             item.add("basepath", "http://hl7.org/fhir/StructureDefinition/Element");
           }
@@ -3836,22 +3842,25 @@ public class PublisherGenerator extends PublisherBase {
 
 
   private void generateExpansions() throws FileNotFoundException, IOException {
-    Bundle exp = new Bundle();
-    exp.setType(Bundle.BundleType.COLLECTION);
-    exp.setId(UUID.randomUUID().toString());
-    exp.getMeta().setLastUpdated(pf.execTime.getTime());
-    for (ValueSet vs : pf.expansions) {
-      exp.addEntry().setResource(vs).setFullUrl(vs.getUrl());
-    }
 
-    new JsonParser().setOutputStyle(IParser.OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(pf.outputDir, "expansions.json")), exp);
-    new XmlParser().setOutputStyle(IParser.OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(pf.outputDir, "expansions.xml")), exp);
-    ZipGenerator zip = new ZipGenerator(Utilities.path(pf.outputDir, "expansions.json.zip"));
-    zip.addFileName("expansions.json", Utilities.path(pf.outputDir, "expansions.json"), false);
-    zip.close();
-    zip = new ZipGenerator(Utilities.path(pf.outputDir, "expansions.xml.zip"));
-    zip.addFileName("expansions.xml", Utilities.path(pf.outputDir, "expansions.xml"), false);
-    zip.close();
+    if (pf.savingExpansions) {
+      Bundle exp = new Bundle();
+      exp.setType(Bundle.BundleType.COLLECTION);
+      exp.setId(UUID.randomUUID().toString());
+      exp.getMeta().setLastUpdated(pf.execTime.getTime());
+      for (ValueSet vs : pf.expansions) {
+        exp.addEntry().setResource(vs).setFullUrl(vs.getUrl());
+      }
+
+      new JsonParser().setOutputStyle(IParser.OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(pf.outputDir, "expansions.json")), exp);
+      new XmlParser().setOutputStyle(IParser.OutputStyle.PRETTY).compose(new FileOutputStream(Utilities.path(pf.outputDir, "expansions.xml")), exp);
+      ZipGenerator zip = new ZipGenerator(Utilities.path(pf.outputDir, "expansions.json.zip"));
+      zip.addFileName("expansions.json", Utilities.path(pf.outputDir, "expansions.json"), false);
+      zip.close();
+      zip = new ZipGenerator(Utilities.path(pf.outputDir, "expansions.xml.zip"));
+      zip.addFileName("expansions.xml", Utilities.path(pf.outputDir, "expansions.xml"), false);
+      zip.close();
+    }
   }
 
 
@@ -4678,16 +4687,16 @@ public class PublisherGenerator extends PublisherBase {
         XhtmlNode tr = tbl.tr();
         tr.clss("data-row");
         tr.td().ah(i.r.getLocalRef(), e.getIdBase()).tx(trunc(e.getIdBase()));
-        tr.td().tx(e.getNamedChildValue("title", "name"));
-        tr.td().tx(e.getNamedChildValue("version"));
+        tr.td().tx(e.getNamedChildValueSingle("title", "name"));
+        tr.td().tx(e.getNamedChildValueSingle("version"));
         describeStatus(tr.td(), e);
         if (cs) {
-          tr.td().tx(e.getNamedChildValue("content"));
+          tr.td().tx(e.getNamedChildValueSingle("content"));
         }
         describeOwner(tr.td(), e);
-        tr.td().tx(describeCopyRight(e.getNamedChildValue("copyright"), e.getNamedChildValue("copyrightLabel")));
-        tr.td().tx(dateOnly(e.getNamedChildValue("date")));
-        describeDescription(tr.td(), e.getNamedChildValue("description"));
+        tr.td().tx(describeCopyRight(e.getNamedChildValueSingle("copyright"), e.getNamedChildValueSingle("copyrightLabel")));
+        tr.td().tx(dateOnly(e.getNamedChildValueSingle("date")));
+        describeDescription(tr.td(), e.getNamedChildValueSingle("description"));
       }
     }
     x.para().clss("table-filter-summary").tx("Showing "+t+" of "+t+" entries");
@@ -5081,14 +5090,14 @@ public class PublisherGenerator extends PublisherBase {
         tr.clss("data-row");
         tr.td().ah(i.link, i.getId()).tx(trunc(i.getId()));
         tr.td().tx(i.getTitle());
-        tr.td().tx(i.element.getNamedChildValue("version"));
+        tr.td().tx(i.element.getNamedChildValueSingle("version"));
         describeStatus(tr.td(), i.element);
         if (cs) {
-          tr.td().tx(i.element.getNamedChildValue("content"));
+          tr.td().tx(i.element.getNamedChildValueSingle("content"));
         }
         describeOwner(tr.td(), i.element);
-        tr.td().tx(describeCopyRight(i.element.getNamedChildValue("copyright"), i.element.getNamedChildValue("copyrightLabel")));
-        tr.td().tx(dateOnly(i.element.getNamedChildValue("date")));
+        tr.td().tx(describeCopyRight(i.element.getNamedChildValueSingle("copyright"), i.element.getNamedChildValueSingle("copyrightLabel")));
+        tr.td().tx(dateOnly(i.element.getNamedChildValueSingle("date")));
         describeDescription(tr.td(), i.getDesc());
       }
     }
@@ -5133,7 +5142,7 @@ public class PublisherGenerator extends PublisherBase {
     if (ss != null) {
       x.tx(ss);
     } else {
-      x.tx(element.getNamedChildValue("status"));
+      x.tx(element.getNamedChildValueSingle("status"));
     }
   }
 
@@ -5150,13 +5159,13 @@ public class PublisherGenerator extends PublisherBase {
       for (Element tc : element.getChildrenByName("contact")) {
         if (tc != null) {
           for (Element t : tc.getChildrenByName("telecom")) {
-            if ("url".equals(t.getNamedChildValue("system"))) {
-              url = t.getNamedChildValue("value");
+            if ("url".equals(t.getNamedChildValueSingle("system"))) {
+              url = t.getNamedChildValueSingle("value");
             }
           }
         }
       }
-      String pub = element.getNamedChildValue("publisher");
+      String pub = element.getNamedChildValueSingle("publisher");
       if (pub == null) {
         x.ahOrNot(url).tx("n/a");
       } else {
@@ -5734,7 +5743,7 @@ public class PublisherGenerator extends PublisherBase {
 
   private String processSQLCommand(DBBuilder db, String src, FetchedFile f) throws FHIRException, IOException {
     long start = System.currentTimeMillis();
-    String output = db == null ? "<span style=\"color: maroon\">No SQL this build</span>" : db.processSQL(src);
+    String output = db == null ? "<span style=\"color: maroon\" data-fhir=\"generated\">No SQL this build</span>" : db.processSQL(src);
     int i = this.pf.sqlIndex++;
     fragment("sql-"+i+"-fragment", output, f.getOutputNames(), start, "sql", "SQL", null);
     return "{% include sql-"+i+"-fragment.xhtml %}";
@@ -5935,7 +5944,7 @@ public class PublisherGenerator extends PublisherBase {
   private String genContainedIndex(FetchedResource r, List<StringPair> clist, String lang) {
     StringBuilder b = new StringBuilder();
     if (clist.size() > 0) {
-      b.append("<ul>\r\n");
+      b.append("<ul data-fhir=\"generated\">\r\n");
       for (StringPair sp : clist) {
         b.append("<li><a href=\""+sp.getValue()+"\">"+Utilities.escapeXml(sp.getName())+"</a></li>\r\n");
       }
@@ -6055,7 +6064,9 @@ public class PublisherGenerator extends PublisherBase {
         }
       }
 
-      db.addToCSList(view, cs, oids, rl);
+      if (db != null) {
+        db.addToCSList(view, cs, oids, rl);
+      }
 
       b.append(cs.getUrl());
       b.append(",");
@@ -6145,7 +6156,9 @@ public class PublisherGenerator extends PublisherBase {
         }
       }
 
-      db.addToVSList(view, vs, oids, used, sources, rl);
+      if (db != null) {
+        db.addToVSList(view, vs, oids, used, sources, rl);
+      }
 
       b.append(vs.getUrl());
       b.append(",");
@@ -6254,7 +6267,7 @@ public class PublisherGenerator extends PublisherBase {
     Element e = r.getElement();
 //      item.add("layout-type", "canonical");
     if (e.getChildren("url").size() == 1) {
-      item.add("url", e.getNamedChildValue("url"));
+      item.add("url", e.getNamedChildValueSingle("url"));
     }
     if (e.hasChildren("identifier")) {
       List<String> ids = new ArrayList<String>();
@@ -6268,23 +6281,23 @@ public class PublisherGenerator extends PublisherBase {
       }
     }
     if (e.getChildren("version").size() == 1) {
-      item.add("version", e.getNamedChildValue("version"));
+      item.add("version", e.getNamedChildValueSingle("version"));
     }
     if (e.getChildren("name").size() == 1) {
-      item.add("name", e.getNamedChildValue("name"));
+      item.add("name", e.getNamedChildValueSingle("name"));
     }
     if (e.getChildren("title").size() == 1) {
-      item.add("title", e.getNamedChildValue("title"));
+      item.add("title", e.getNamedChildValueSingle("title"));
 //        addTranslationsToJson(item, "title", e.getNamedChild("title"), false);
     }
     if (e.getChildren("experimental").size() == 1) {
-      item.add("experimental", e.getNamedChildValue("experimental"));
+      item.add("experimental", e.getNamedChildValueSingle("experimental"));
     }
     if (e.getChildren("date").size() == 1) {
-      item.add("date", e.getNamedChildValue("date"));
+      item.add("date", e.getNamedChildValueSingle("date"));
     }
     if (e.getChildren("description").size() == 1) {
-      item.add("description", preProcessMarkdown(e.getNamedChildValue("description")));
+      item.add("description", preProcessMarkdown(e.getNamedChildValueSingle("description")));
 //        addTranslationsToJson(item, "description", e.getNamedChild("description"), false);
     }
 
@@ -6393,14 +6406,14 @@ public class PublisherGenerator extends PublisherBase {
 //      }
 
     if (e.getChildren("purpose").size() == 1) {
-      item.add("purpose", ProfileUtilities.processRelativeUrls(e.getNamedChildValue("purpose"), "", pf.igpkp.specPath(), pf.context.getResourceNames(), pf.specMaps.get(0).listTargets(), pageTargets(), false));
+      item.add("purpose", ProfileUtilities.processRelativeUrls(e.getNamedChildValueSingle("purpose"), "", pf.igpkp.specPath(), pf.context.getResourceNames(), pf.specMaps.get(0).listTargets(), pageTargets(), false));
 //        addTranslationsToJson(item, "purpose", e.getNamedChild("purpose"), false);
     }
     if (e.getChildren("status").size() == 1) {
-      item.add("status", e.getNamedChildValue("status"));
+      item.add("status", e.getNamedChildValueSingle("status"));
     }
     if (e.getChildren("copyright").size() == 1) {
-      item.add("copyright", ProfileUtilities.processRelativeUrls(e.getNamedChildValue("copyright"), "", pf.igpkp.specPath(), pf.context.getResourceNames(), pf.specMaps.get(0).listTargets(), pageTargets(), false));
+      item.add("copyright", ProfileUtilities.processRelativeUrls(e.getNamedChildValueSingle("copyright"), "", pf.igpkp.specPath(), pf.context.getResourceNames(), pf.specMaps.get(0).listTargets(), pageTargets(), false));
 //        addTranslationsToJson(item, "description", e.getNamedChild("description"), false);
     }
 

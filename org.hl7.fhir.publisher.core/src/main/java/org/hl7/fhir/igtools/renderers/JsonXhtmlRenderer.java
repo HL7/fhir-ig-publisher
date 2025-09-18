@@ -71,9 +71,9 @@ public class JsonXhtmlRenderer implements JsonCreator {
     if (b == null) {
       b = new StringBuilder();
       if (prism) {
-        b.append("<pre class=\"json\" style=\"white-space: pre; text-wrap: nowrap; width: auto;\"><code class=\"language-json\" style=\"white-space: pre; text-wrap: nowrap;\">");
+        b.append("<pre class=\"json\" data-fhir=\"generated\" style=\"white-space: pre; text-wrap: nowrap; width: auto;\"><code class=\"language-json\" style=\"white-space: pre; text-wrap: nowrap;\">");
       } else {
-        b.append("<pre class=\"json\" style=\"white-space: pre; text-wrap: nowrap; width: auto;\"><code style=\"white-space: pre; text-wrap: nowrap;\">");
+        b.append("<pre class=\"json\" data-fhir=\"generated\" style=\"white-space: pre; text-wrap: nowrap; width: auto;\"><code style=\"white-space: pre; text-wrap: nowrap;\">");
       }
     }
     commitComments();

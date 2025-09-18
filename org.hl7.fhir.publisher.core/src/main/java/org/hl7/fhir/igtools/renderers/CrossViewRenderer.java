@@ -808,7 +808,7 @@ public class CrossViewRenderer extends Renderer {
     } else {
       kind = "data type";
     }
-    var tbl = x.table("list", false);
+    var tbl = x.table("list", false).markGenerated(!context.forValidResource());
     var tr = tbl.tr();
     tr.td().tx("Identity");
     tr.td().tx("Card.");
@@ -917,7 +917,7 @@ public class CrossViewRenderer extends Renderer {
       } else {
         StructureDefinition sd = worker.fetchTypeDefinition(type);
         if (sd != null && sd.hasBaseDefinition()) {
-          String bt = Utilities.tail(sd.getBaseDefinition());
+          String bt = Utilities.tail(sd.getBaseDefinitionNoVersion());
           String p = "extensions-types.html#ext-" + bt;
           if ("Base".equals(bt)) {
             // do nothing

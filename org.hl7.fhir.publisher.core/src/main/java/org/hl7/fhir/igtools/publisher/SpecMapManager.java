@@ -111,11 +111,15 @@ public class SpecMapManager {
   public SpecMapManager(byte[] bytes, String vid, String version) throws IOException {
     this.version = version;
     this.npmVId = vid;
-    spec = JsonParser.parseObject(bytes);
-    paths = spec.getJsonObject("paths");
-    pages = spec.getJsonObject("pages");
-    targets = spec.getJsonArray("targets");
-    images = spec.getJsonArray("images");
+    try {
+      spec = JsonParser.parseObject(bytes);
+    } catch (Exception e) {
+      spec = new JsonObject();
+    }
+    paths = spec.forceObject("paths");
+    pages = spec.forceObject("pages");
+    targets = spec.forceArray("targets");
+    images = spec.forceArray("images");
     if (targets != null)
       for (String e : targets.asStrings()) {
         if (e != null){
@@ -165,8 +169,10 @@ public class SpecMapManager {
   public String getBuild() throws FHIRException {
     if (spec.has("tool-build")) 
       return str(spec, "tool-build");
-    else
+    else if (spec.has("build"))
       return str(spec, "build");
+    else
+      return null;
   }
 
   /**

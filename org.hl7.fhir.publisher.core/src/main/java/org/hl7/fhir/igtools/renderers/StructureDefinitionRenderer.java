@@ -285,10 +285,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   }
 
   private String extensionSummary() {
+    boolean isMod = ProfileUtilities.isModifierExtension(sd);
     if (ProfileUtilities.isSimpleExtension(sd)) {
-      ElementDefinition value = sd.getSnapshot().getElementByPath("Extension.value");      
+      ElementDefinition value = sd.getSnapshot().getElementByPath("Extension.value");
       return "<p>"+
-          gen.formatPhrase(RenderingI18nContext.SDR_EXTENSION_SUMMARY, value.typeSummary(), Utilities.stripPara(processMarkdown("ext-desc", sd.getDescriptionElement())))+
+          gen.formatPhrase(isMod ? RenderingI18nContext.SDR_EXTENSION_SUMMARY_MODIFIER : RenderingI18nContext.SDR_EXTENSION_SUMMARY , value.typeSummary(), Utilities.stripPara(processMarkdown("ext-desc", sd.getDescriptionElement())))+
           "</p>";
     } else {
       List<ElementDefinition> subs = new ArrayList<>();
@@ -304,7 +305,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       }
       StringBuilder b = new StringBuilder();
       String html = Utilities.stripAllPara(processMarkdown("description", sd.getDescriptionElement()));
-      b.append("<p>"+gen.formatPhrase(RenderingI18nContext.TEXT_ICON_EXTENSION_COMPLEX)+": "+html+"</p><ul>"); 
+      b.append("<p>"+gen.formatPhrase(RenderingI18nContext.TEXT_ICON_EXTENSION_COMPLEX)+": "+html+"</p><ul data-fhir=\"generated-heirarchy\">");
       for (ElementDefinition ed : subs) {
         ElementDefinition defn = (ElementDefinition) ed.getUserData(UserDataNames.render_extension_slice);
         if (defn != null) {
@@ -787,7 +788,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (sd.getSnapshot().getElement().isEmpty())
       return "";
     else
-      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateGrid(defnFile, sd, destDir, false, sd.getId(), corePath, "", outputTracker));
+      return new XhtmlComposer(XhtmlComposer.HTML).compose(sdr.generateGrid(defnFile, sd, destDir, false, sd.getId(), corePath, "", outputTracker, false));
   }
 
   public String txDiff(boolean withHeadings, boolean mustSupportOnly) throws FHIRException, IOException {
@@ -821,7 +822,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       StringBuilder b = new StringBuilder();
       if (withHeadings)
         b.append("<h4>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_TERM_BIND)) + "</h4>\r\n");
-      b.append("<table class=\"list\">\r\n");
+      b.append("<table class=\"list\" data-fhir=\"generated-heirarchy\">\r\n");
       b.append("<tr><td><b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_PATH)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingI18nContext.GENERAL_CONFORMANCE)) + "</b></td><td><b>" + (hasFixed ? (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_VALUESET_CODE)) : (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_VALUESET))) + "</b></td><td><b>" + (gen.formatPhrase(RenderingI18nContext.GENERAL_URI)) + "</b></td></tr>\r\n");
       for (String path : txlist) {
         txItem(txmap, b, path, sd.getUrl());
@@ -862,7 +863,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       StringBuilder b = new StringBuilder();
       if (withHeadings)
         b.append("<h4>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_TERM_BINDS)) + "</h4>\r\n");
-      b.append("<table class=\"list\">\r\n");
+      b.append("<table class=\"list\" data-fhir=\"generated-heirarchy\">\r\n");
       b.append("<tr><td><b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_PATH)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingI18nContext.GENERAL_CONFORMANCE)) + "</b></td><td><b>" + (hasFixed ?  (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_VALUESET_CODE)) : (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_VALUESET))) + "</b></td>"+
       "<td><b>" + (gen.formatPhrase(RenderingI18nContext.GENERAL_URI)) + "</b></td></tr>\r\n");
       for (String path : txlist) {
@@ -1160,7 +1161,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       StringBuilder b = new StringBuilder();
       if (withHeadings)
         b.append("<h4>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_CONSTRAINTS)) + "</h4>\r\n");
-      b.append("<table class=\"list\">\r\n");
+      b.append("<table class=\"list\" data-fhir=\"generated-heirarchy\">\r\n");
       b.append("<tr><td width=\"60\"><b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ID)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_GRADE)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_PATHS)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingI18nContext.GENERAL_DETAILS)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_REQUIREMENTS)) + "</b></td></tr>\r\n");
       List<String> keys = new ArrayList<>(constraintMap.keySet());
 
@@ -1222,14 +1223,13 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
 
   }
 
-
   public String dict(boolean incProfiledOut, int mode, String anchorPrefix) throws Exception {
     XhtmlNode x = new XhtmlNode(NodeType.Element, "div");
     var p = x.para();
     p.tx(gen.formatPhrase(RenderingI18nContext.SDR_GUIDANCE_PFX));   
-    p.ah("https://build.fhir.org/ig/FHIR/ig-guidance//readingIgs.html#data-dictionaries").tx(gen.formatPhrase(RenderingI18nContext.SDR_GUIDANCE_HERE)); 
+    p.ah("https://build.fhir.org/ig/FHIR/ig-guidance/readingIgs.html#data-dictionaries").tx(gen.formatPhrase(RenderingI18nContext.SDR_GUIDANCE_HERE));
     p.tx(gen.formatPhrase(RenderingI18nContext.SDR_GUIDANCE_SFX));   
-    XhtmlNode t = x.table("dict", false);
+    XhtmlNode t = x.table("dict", false).markGenerated(true);
 
     List<ElementDefinition> elements = elementsForMode(mode);
 
@@ -1237,7 +1237,6 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     
     return new XhtmlComposer(false, false).compose(x.getChildNodes());
   }
-
 
   public String mappings(String defnFile, Set<String> outputTracker) throws FHIRException, IOException {
     sdr.getContext().setStructureMode(StructureDefinitionRendererMode.MAPPINGS);
@@ -1817,8 +1816,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       if (unbounded) {
         b.append("]");
       }
-      if (!last)
+      if (!last) {
         b.append(",");
+      }
     }
 
     b.append(" <span style=\"color: Gray\">//</span>");
@@ -1830,12 +1830,14 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (!elem.hasFixed()) {
       if (elem.hasBinding() && elem.getBinding().hasValueSet()) {
         ValueSet vs = context.findTxResource(ValueSet.class, elem.getBinding().getValueSet());
-        if (vs != null)
+        if (vs != null) {
           b.append(" <span style=\"color: navy; opacity: 0.8\"><a href=\"" + corePath + vs.getUserData(UserDataNames.render_filename) + ".html\" style=\"color: navy\">" + Utilities.escapeXml(elem.getShort()) + "</a></span>");
-        else
+        } else {
           b.append(" <span style=\"color: navy; opacity: 0.8\"><a href=\"" + elem.getBinding().getValueSet() + ".html\" style=\"color: navy\">" + Utilities.escapeXml(elem.getShort()) + "</a></span>");
-      } else
+        }
+      } else {
         b.append(" <span style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(elem.getShort()) + "</span>");
+      }
     }
 
     b.append("\r\n");
@@ -1846,45 +1848,52 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       boolean extDone = false;
       for (ElementDefinition child : children) {
         if (isExtension(child)) {
-          if (!extDone)
+          if (!extDone) {
             generateCoreElemExtension(b, sd.getSnapshot().getElement(), child, children, indent + 1, pathName + "." + name, false, child.getType().get(0), ++c == l, complex);
+          }
           extDone = true;
-        } else if (child.hasSlicing())
+        } else if (child.hasSlicing()) {
           generateCoreElemSliced(b, sd.getSnapshot().getElement(), child, children, indent + 1, pathName + "." + name, false, child.hasType() ? child.getType().get(0) : null, ++c == l, complex);
-        else if (wasSliced(child, children))
+        } else if (wasSliced(child, children)) {
           ; // nothing
-        else if (child.getType().size() == 1 || allTypesAreReference(child))
+        } else if (child.getType().size() == 1 || allTypesAreReference(child)) {
           generateCoreElem(b, elements, child, indent + 1, pathName + "." + name, false, child.getType().get(0), ++c == l, false);
-        else {
+        } else {
           if (!"0".equals(child.getMax())) {
             b.append("<span style=\"color: Gray\">// value[x]: <span style=\"color: navy; opacity: 0.8\">" + Utilities.escapeXml(child.getShort()) + "</span>. One of these " + Integer.toString(child.getType().size()) + ":</span>\r\n");
-            for (TypeRefComponent t : child.getType())
+            for (TypeRefComponent t : child.getType()) {
               generateCoreElem(b, elements, child, indent + 1, pathName + "." + name, false, t, ++c == l, false);
+            }
           }
         }
       }
       b.append(indentS);
       b.append("}");
-      if (unbounded)
+      if (unbounded) {
         b.append("]");
-      if (!last)
+      }
+      if (!last) {
         b.append(",");
+      }
       b.append("\r\n");
     }
   }
 
   private String suffix(String link, String suffix) {
-    if (link.contains("|"))
+    if (link.contains("|")) {
       link = link.substring(0, link.indexOf("|"));
-    if (link.contains("#"))
+    }
+    if (link.contains("#")) {
       return link;
-    else
+    } else {
       return link + "#" + suffix;
+    }
   }
 
   private void generateCoreElemSliced(StringBuilder b, List<ElementDefinition> elements, ElementDefinition elem, List<ElementDefinition> children, int indent, String pathName, boolean asValue, TypeRefComponent type, boolean last, boolean complex) throws Exception {
-    if (elem.getMax().equals("0"))
+    if (elem.getMax().equals("0")) {
       return;
+    }
 
     String name = tail(elem.getPath());
     String en = asValue ? "value[x]" : name;
@@ -1901,8 +1910,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       indentS += "  ";
     }
     String defPage = igp.getLinkForProfile(sd, sd.getUrl());
-    if (defPage != null && defPage.contains("|"))
+    if (defPage != null && defPage.contains("|")) {
       defPage = defPage.substring(0, defPage.indexOf("|"));
+    }
     b.append(indentS);
     b.append("\"<a href=\"" + (defPage + "#" + pathName + "." + en) + "\" title=\"" + Utilities.escapeXml(getEnhancedDefinition(elem))
     + "\" class=\"dict\"><span style=\"text-decoration: underline\">" + en + "</span></a>\" : ");
@@ -2736,6 +2746,12 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
       }
     }
+    if (ProfileUtilities.isModifierExtension(sd)) {
+      XhtmlNode ddiv = div.div("border: 1px solid black; border-radius: 10px; padding: 10px");
+      ddiv.para().b().tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_MOD));
+    }
+
+
     if (sd.getContext().isEmpty()) {
       div.para().tx(gen.formatPhrase(RenderingI18nContext.SDR_EXT_ANY));
     } else {
@@ -2904,7 +2920,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   public String classTable(String defnFile, Set<String> outputTracker, boolean toTabs, StructureDefinitionRendererMode mode, boolean all) throws IOException {
     try {
       XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
-      XhtmlNode tbl = div.table("box");
+      XhtmlNode tbl = div.table("box").markGenerated(true);
       // row 1: Class Definition
       XhtmlNode tr = tbl.tr();
       XhtmlNode td = tr.td();

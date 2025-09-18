@@ -1912,12 +1912,17 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
       }
       b.append("v"+toolsVersion);
       if (!toolsVersion.equals(currentToolsVersion)) {
-        if (VersionUtilities.isThisOrLater(currentToolsVersion, toolsVersion, VersionUtilities.VersionPrecision.MINOR)) {
+        if ("(unknown)".equals(toolsVersion)) {
+          b.append(". Development Version in use. ");
+        } else if (currentToolsVersion == null) {
+          b.append(". The latest official release version is unknown");
+        } else if (VersionUtilities.isThisOrLater(currentToolsVersion, toolsVersion, VersionUtilities.VersionPrecision.MINOR)) {
           b.append(" which is a development version. The latest official release version is");
+          b.append("v" + currentToolsVersion);
         } else {
           b.append(", which is out of date. The current version is ");
+          b.append("v" + currentToolsVersion);
         }
-        b.append("v" + currentToolsVersion);
         b.append(" <a href=\"https://github.com/HL7/fhir-ig-publisher/releases/latest/download/publisher.jar\">Download Latest</a>");
       }
     }
