@@ -412,10 +412,18 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
   public void findConfiguration(FetchedFile f, FetchedResource r) {
     if (template != null) {
       JsonObject cfg = null;
-      if (r.isCanonical(context)) {
-        if (r.isExample()) {
+      if (cfg == null && r.fhirType().equals("StructureDefinition")) {
+        cfg = defaultConfig.getJsonObject(r.fhirType()+":"+getSDType(r));
+      }
+      if (cfg == null)
+        cfg = template.getConfig(r.fhirType(), r.getId());        
+      if (cfg == null && r.isExample()) {
+        if (r.isCanonical(context))
           cfg = defaultConfig.getJsonObject("example:canonical");
-        }
+        if (cfg == null)
+          cfg = defaultConfig.getJsonObject("example");
+      }        
+      if (cfg == null && r.isCanonical(context)) {
         if (cfg == null) {
           cfg = defaultConfig.getJsonObject(r.fhirType()+":canonical");
         }
@@ -423,14 +431,6 @@ public class IGKnowledgeProvider implements ProfileKnowledgeProvider, ParserBase
           cfg = defaultConfig.getJsonObject("Any:canonical");
         }
       }
-      if (cfg == null && r.isExample()) {
-        cfg = defaultConfig.getJsonObject("example");
-      }        
-      if (cfg == null && r.fhirType().equals("StructureDefinition")) {
-        cfg = defaultConfig.getJsonObject(r.fhirType()+":"+getSDType(r));
-      }
-      if (cfg == null)
-        cfg = template.getConfig(r.fhirType(), r.getId());        
       r.setConfig(cfg);
     }
     if (r.getConfig() == null && resourceConfig != null) {

@@ -899,8 +899,8 @@ public class PublisherGenerator extends PublisherBase {
 // Lloyd debug: res!=null && res.getId().equals("SdcQuestionLibrary")
     Element langElement = r.getElement();
     if (lang != null) {
-      langElement = this.pf.langUtils.copyToLanguage(langElement, lang, true);
-      res = this.pf.langUtils.copyToLanguage(res, lang, true);
+      langElement = this.pf.langUtils.copyToLanguage(langElement, lang, true, r.getElement().getChildValue("language"), pf.defaultTranslationLang, r.getErrors());
+      res = this.pf.langUtils.copyToLanguage(res, lang, true, pf.defaultTranslationLang, r.getErrors());
     }
     boolean example = r.isExample();
     if (wantGen(r, "maturity") && res != null) {
@@ -5354,7 +5354,7 @@ public class PublisherGenerator extends PublisherBase {
       this.pf.npm.addFile(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsj.toByteArray());
       if (isNewML()) {
         for (String l : allLangs()) {
-          Element le = this.pf.langUtils.copyToLanguage(element, l, true); // todo: should we keep this?
+          Element le = this.pf.langUtils.copyToLanguage(element, l, true, r.getElement().getChildValue("language"), pf.defaultTranslationLang, r.getErrors()); // todo: should we keep this?
           ByteArrayOutputStream bsjl = new ByteArrayOutputStream();
           jp.compose(le, bsjl, IParser.OutputStyle.NORMAL, this.pf.igpkp.getCanonical());
           this.pf.lnpms.get(l).addFile(isExample(f,r ) ? NPMPackageGenerator.Category.EXAMPLE : NPMPackageGenerator.Category.RESOURCE, element.fhirTypeRoot()+"-"+r.getId()+".json", bsjl.toByteArray());
@@ -5413,7 +5413,7 @@ public class PublisherGenerator extends PublisherBase {
     saveNativeResourceOutputFormats(f, r, element, "");
     for (String lang : allLangs()) {
       Element e = (Element) element.copy();
-      if (this.pf.langUtils.switchLanguage(e, lang, true)) {
+      if (this.pf.langUtils.switchLanguage(e, lang, true, r.getElement().getChildValue("language"), pf.defaultTranslationLang, r.getErrors())) {
         saveNativeResourceOutputFormats(f, r, e, lang);
       }
     }
