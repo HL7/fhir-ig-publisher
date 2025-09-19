@@ -58,14 +58,7 @@ import org.hl7.elm_modelinfo.r1.ModelInfo;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.r5.context.ILoggingService;
-import org.hl7.fhir.r5.model.ActivityDefinition;
-import org.hl7.fhir.r5.model.DataRequirement;
-import org.hl7.fhir.r5.model.Enumerations;
-import org.hl7.fhir.r5.model.Library;
-import org.hl7.fhir.r5.model.Measure;
-import org.hl7.fhir.r5.model.ParameterDefinition;
-import org.hl7.fhir.r5.model.PlanDefinition;
-import org.hl7.fhir.r5.model.RelatedArtifact;
+import org.hl7.fhir.r5.model.*;
 import org.hl7.fhir.utilities.npm.NpmPackage;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
@@ -937,4 +930,21 @@ public class CqlSubSystem {
   private CompiledLibrary resolveLibrary(LibraryManager libraryManager, VersionedIdentifier libraryIdentifier) {
     return libraryManager.resolveLibrary(libraryIdentifier);
   }
+
+  /**
+   * return true if the resource is modified
+   * @param f for errors
+   * @param resource
+   * @return
+   */
+  public boolean processArtifact(FetchedFile f, Resource resource) {
+    if (resource instanceof Measure) {
+      Measure m = (Measure) resource;
+
+      return true;
+    }
+    return false;
+  }
+
+
 }

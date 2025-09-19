@@ -176,22 +176,24 @@ public class Template {
       for (String s : configuration.asString("summaryRows").split("\\ "))
       summaryRows.add(s);
     }
-    processTemplateTranslations();
   }
 
-  private void processTemplateTranslations() throws IOException {
+  public void processTemplateTranslations(String defLang, List<String> langCodes) throws IOException {
+    List<String> allLangCodes = new ArrayList<>();
+    allLangCodes.add(defLang);
+    allLangCodes.addAll(langCodes);
     String tf = Utilities.path(templateDir, "translations");
     File tff = new File(tf);
     if (tff.exists()) {
       for (File f : tff.listFiles()) {
         if (f.getName().endsWith(".json")) {
-          processTranslationFile(tf, f);
+          processTranslationFile(tf, f, allLangCodes);
         }
       }
     }
   }
 
-  private void processTranslationFile(String tf, File fl) throws JsonException, IOException {
+  private void processTranslationFile(String tf, File fl, List<String> langCodes) throws JsonException, IOException {
     String base = FileUtilities.fileTitle(fl.getName());
     Map<String, POSource> translations = new HashMap<>();
 
@@ -231,16 +233,20 @@ public class Template {
       }
     }
     // populate from the PO files 
-    for (String lang : translations.keySet()) {
+    for (String lang : langCodes) {
       POSource units = translations.get(lang);
-      JsonObject l = lf.forceObject(lang);
-      for (POObject po : units.getPOObjects()) {
-        l.remove(po.getId());
-        if (po.getMsgstr().isEmpty() || Utilities.noString(po.getMsgstr().get(0))) {
-          l.add(po.getId(), lf.getJsonObject("en").asString(po.getId()));          
-        } else {
-          l.add(po.getId(), po.getMsgstr().get(0));
+      if (!"en".equals(lang)) {
+      if (units != null) {
+        JsonObject l = lf.forceObject(lang);
+        for (POObject po : units.getPOObjects()) {
+          l.remove(po.getId());
+          if (po.getMsgstr().isEmpty() || Utilities.noString(po.getMsgstr().get(0))) {
+            l.add(po.getId(), lf.getJsonObject("en").asString(po.getId()));
+          } else {
+            l.add(po.getId(), po.getMsgstr().get(0));
+          }
         }
+      }
       }
     }
     // fill out missing entries
@@ -257,16 +263,18 @@ public class Template {
       }
     }
 
-    for (String lang : translations.keySet()) {
+    for (String lang : langCodes) {
       POSource source = translations.get(lang);
-      for (JsonProperty p : lf.getJsonObject("en").getProperties()) {
-        POObject existing = findPO(source, p);
-        if (existing == null) {
-          POObject n = new POObject(p.getName(), p.getValue().asString(), null);
-          source.getPOObjects().add(n);
+      if (source != null) {
+        for (JsonProperty p : lf.getJsonObject("en").getProperties()) {
+          POObject existing = findPO(source, p);
+          if (existing == null) {
+            POObject n = new POObject(p.getName(), p.getValue().asString(), null);
+            source.getPOObjects().add(n);
+          }
         }
+        source.savePOFile(Utilities.path(tf, base+"-"+lang+".po"), 1, 0);
       }
-      source.savePOFile(Utilities.path(tf, base+"-"+lang+".po"), 1, 0);
     }
     
     org.hl7.fhir.utilities.json.parser.JsonParser.compose(lf, fl, true);
