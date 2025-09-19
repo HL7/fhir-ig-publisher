@@ -44,6 +44,15 @@ import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueType;
 import org.hl7.fhir.utilities.validation.ValidationMessage.Source;
 
+/*
+// todo:
+// any us realm owned by public health
+// jursdiction = US
+// publisher = HL7 International / Public Health
+//
+
+
+ */
 public class USRealmBusinessRules extends RealmBusinessRules {
 
   public class ProfilePair {
@@ -70,24 +79,30 @@ public class USRealmBusinessRules extends RealmBusinessRules {
   private static final Object US_SNOMED = "http://snomed.info/sct/731000124108";
 
   List<StructureDefinition> usCoreProfiles;
+  List<StructureDefinition> usPHProfiles;
   private IWorkerContext context;
   private String version;
   private String dstDir;
   private List<StructureDefinition> problems = new ArrayList<>();
-  private List<ProfilePair> comparisons = new ArrayList<>();
+  private List<ProfilePair> comparisonsCore = new ArrayList<>();
+  private List<ProfilePair> comparisonsPH = new ArrayList<>();
 
   private String name;
   private ProfileKnowledgeProvider pkp;
 
   private RenderingI18nContext i18n;
 
-  public USRealmBusinessRules(IWorkerContext context, String version, String dstDir, String canonical, ProfileKnowledgeProvider pkp, RenderingI18nContext i18n) {
+  private boolean isPH;
+
+  public USRealmBusinessRules(IWorkerContext context, String version, String dstDir, String canonical,
+                              ProfileKnowledgeProvider pkp, RenderingI18nContext i18n, ImplementationGuide ig) {
     super();
     this.context = context;
     this.version = version;
     this.dstDir = dstDir;
     this.pkp = pkp;
     this.i18n = i18n;
+    isPH = false; // ig.getPublisher() != null && ig.getPublisher().contains("Public Health");
   }
 
 
@@ -98,23 +113,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
 
   @Override
   public void checkSD(FetchedFile f, StructureDefinition sd) throws IOException {
-    if (usCoreProfiles == null) {
-      usCoreProfiles = new ArrayList<>();
-      NpmPackage uscore = fetchLatestUSCore();
-      PackageInformation pi = new PackageInformation(uscore);
-      if (uscore != null) {
-        for (String id : uscore.listResources("StructureDefinition", "ValueSet", "CodeSystem")) {
-          CanonicalResource usd = (CanonicalResource) loadResourceFromPackage(uscore, id);
-          usd.setWebPath(Utilities.pathURL(uscore.getWebLocation(), usd.fhirType()+"-"+usd.getId()+".html"));
-          if (usd instanceof StructureDefinition) {
-            usCoreProfiles.add((StructureDefinition) usd);
-          }
-          if (!context.hasResource(Resource.class, usd.getUrl())) {
-            context.cacheResourceFromPackage(usd, pi);
-          }
-        }
-      }
-    }
+    checkUSCoreLoaded();
     List<String> types = new ArrayList<>();
     for (StructureDefinition usd : usCoreProfiles) {
       if (!types.contains(usd.getType()) && usd.getKind() == StructureDefinitionKind.RESOURCE) {
@@ -136,10 +135,80 @@ public class USRealmBusinessRules extends RealmBusinessRules {
         f.getErrors().add(vm);
         // actually, that should be an error, but US realm doesn't have a proper base, so we're going to report the differences against the base
         for (StructureDefinition candidate : candidateProfiles(sd.getType())) {
-          comparisons.add(new ProfilePair(f.getErrors(), sd, candidate));
+          comparisonsCore.add(new ProfilePair(f.getErrors(), sd, candidate));
           b.append(". <a href=\"us-core-comparisons/sd-"+candidate.getId()+"-"+sd.getId()+".html\">Comparison with "+candidate.present()+"</a>");
         }
         vm.setHtml(b.toString());
+      }
+    }
+
+    if (isPH) {
+      checkUSPHLoaded();
+      for (StructureDefinition usd : usPHProfiles) {
+        if (!types.contains(usd.getType()) && usd.getKind() == StructureDefinitionKind.RESOURCE) {
+          types.add(usd.getType());
+        }
+      }
+      if (Utilities.existsInList(sd.getType(), types)) {
+        StructureDefinition t = sd;
+        while (t != null && !existsInSDList(usPHProfiles, t.getUrl())) {
+          t = context.fetchResource(StructureDefinition.class, t.getBaseDefinition());
+        }
+        if (t == null) {
+          problems.add(sd);
+          StringBuilder b = new StringBuilder();
+          ValidationMessage vm = new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, "StructureDefinition.where(url = '" + sd.getUrl() + "').baseDefinition", "US Public Health FHIR Usage rules require that all profiles on " + sd.getType() +
+                  (matches(usPHProfiles, sd.getType()) > 1 ? " derive from one of the base US Public Health profiles" : " derive from the core US Public Health profile") + ". See https://confluence.hl7.org/display/CGP/US+Core+Variance+Request+Process",
+                  IssueSeverity.WARNING).setMessageId(PublisherMessageIds.US_CORE_DERIVATION);
+          b.append(vm.getMessage());
+          f.getErrors().add(vm);
+          // actually, that should be an error, but US realm doesn't have a proper base, so we're going to report the differences against the base
+          for (StructureDefinition candidate : candidateProfiles(sd.getType())) {
+            comparisonsPH.add(new ProfilePair(f.getErrors(), sd, candidate));
+            b.append(". <a href=\"us-ph-comparisons/sd-" + candidate.getId() + "-" + sd.getId() + ".html\">Comparison with " + candidate.present() + "</a>");
+          }
+          vm.setHtml(b.toString());
+        }
+      }
+    }
+  }
+
+  private void checkUSCoreLoaded() throws IOException {
+    if (usCoreProfiles == null) {
+      usCoreProfiles = new ArrayList<>();
+      NpmPackage uscore = fetchLatestUSCore();
+      PackageInformation pi = new PackageInformation(uscore);
+      if (uscore != null) {
+        for (String id : uscore.listResources("StructureDefinition", "ValueSet", "CodeSystem")) {
+          CanonicalResource usd = (CanonicalResource) loadResourceFromPackage(uscore, id);
+          usd.setWebPath(Utilities.pathURL(uscore.getWebLocation(), usd.fhirType()+"-"+usd.getId()+".html"));
+          if (usd instanceof StructureDefinition) {
+            usCoreProfiles.add((StructureDefinition) usd);
+          }
+          if (!context.hasResource(Resource.class, usd.getUrl())) {
+            context.cacheResourceFromPackage(usd, pi);
+          }
+        }
+      }
+    }
+  }
+
+  private void checkUSPHLoaded() throws IOException {
+    if (usPHProfiles == null) {
+      usPHProfiles = new ArrayList<>();
+      NpmPackage usph = fetchLatestUSPH();
+      PackageInformation pi = new PackageInformation(usph);
+      if (usph != null) {
+        for (String id : usph.listResources("StructureDefinition", "ValueSet", "CodeSystem")) {
+          CanonicalResource usd = (CanonicalResource) loadResourceFromPackage(usph, id);
+          usd.setWebPath(Utilities.pathURL(usph.getWebLocation(), usd.fhirType()+"-"+usd.getId()+".html"));
+          if (usd instanceof StructureDefinition) {
+            usPHProfiles.add((StructureDefinition) usd);
+          }
+          if (!context.hasResource(Resource.class, usd.getUrl())) {
+            context.cacheResourceFromPackage(usd, pi);
+          }
+        }
       }
     }
   }
@@ -193,6 +262,26 @@ public class USRealmBusinessRules extends RealmBusinessRules {
     return pcm.loadPackage("hl7.fhir.us.core");
   }
 
+  private NpmPackage fetchLatestUSPH() throws IOException {
+    try {
+      PackageList pl = PackageList.fromUrl("https://hl7.org/fhir/us/ph-library/package-list.json");
+      for (PackageListEntry v : pl.versions()) {
+        if (VersionUtilities.versionMatches(version, v.fhirVersion())) {
+          return new FilesystemPackageCacheManager.Builder().build().loadPackage("hl7.fhir.us.ph-library", v.version());
+        }
+      }
+      // we didn't find a compatible version, we'll just take the last version
+      for (PackageListEntry v : pl.versions()) {
+        return new FilesystemPackageCacheManager.Builder().build().loadPackage("hl7.fhir.us.ph-library", v.version());
+      }
+      return null;
+    } catch (Exception e) {
+      System.out.println("Error checking US Core: "+e.getMessage());
+    }
+    FilesystemPackageCacheManager pcm = new FilesystemPackageCacheManager.Builder().build();
+    return pcm.loadPackage("hl7.fhir.us.ph-library");
+  }
+
   private Resource loadResourceFromPackage(NpmPackage uscore, String filename) throws FHIRException, IOException {
     InputStream s = uscore.loadResource(filename);
     if (VersionUtilities.isR3Ver(uscore.fhirVersion())) {
@@ -230,7 +319,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
     try {
       ComparisonSession session = new ComparisonSession(i18n, context, context, "Comparison of "+name+" with US-Core", pkp, pkp);
       //    session.setDebug(true);
-      for (ProfilePair c : comparisons) {
+      for (ProfilePair c : comparisonsCore) {
 //        System.out.println("US Core Comparison: compare "+c.local+" to "+c.uscore);
         session.compare(c.uscore, c.local);      
       }
@@ -243,6 +332,26 @@ public class USRealmBusinessRules extends RealmBusinessRules {
     } catch (Throwable e) {
       System.out.println("US Core Comparison failed: "+e.getMessage());
       e.printStackTrace();
+    }
+    if (isPH) {
+      try {
+        ComparisonSession session = new ComparisonSession(i18n, context, context, "Comparison of "+name+" with US-Public Health", pkp, pkp);
+        //    session.setDebug(true);
+        for (ProfilePair c : comparisonsPH) {
+//        System.out.println("US Core Comparison: compare "+c.local+" to "+c.uscore);
+          session.compare(c.uscore, c.local);
+        }
+        FileUtilities.createDirectory(Utilities.path(dstDir, "us-ph-comparisons"));
+        ComparisonRenderer cr = new ComparisonRenderer(context, context, Utilities.path(dstDir, "us-ph-comparisons"), session);
+        cr.loadTemplates(context);
+        cr.setPreamble(renderProblems());
+        cr.render("US Realm", "Current Build");
+        System.out.println("US Public Health Comparisons Finished");
+      } catch (Throwable e) {
+        System.out.println("US Public Health Comparison failed: "+e.getMessage());
+        e.printStackTrace();
+      }
+
     }
   }
 

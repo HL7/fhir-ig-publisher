@@ -820,6 +820,7 @@ public class PublisherIGLoader extends PublisherBase {
         missingDirs.add(s);
     }
     pf.resourceDirs.removeAll(missingDirs);
+    pf.template.processTemplateTranslations(pf.defaultTranslationLang, pf.translationLangs);
 
     missingDirs.clear();
     for (String s : pf.pagesDirs) {
@@ -2548,7 +2549,7 @@ public class PublisherIGLoader extends PublisherBase {
 
   private RealmBusinessRules makeRealmBusinessRules() {
     if (pf.expectedJurisdiction != null && pf.expectedJurisdiction.getCode().equals("US")) {
-      return new USRealmBusinessRules(pf.context, pf.version, pf.tempDir, pf.igpkp.getCanonical(), pf.igpkp, pf.rc);
+      return new USRealmBusinessRules(pf.context, pf.version, pf.tempDir, pf.igpkp.getCanonical(), pf.igpkp, pf.rc, pf.publishedIg);
     } else {
       return new NullRealmBusinessRules(pf.igrealm);
     }
@@ -4029,6 +4030,10 @@ public class PublisherIGLoader extends PublisherBase {
           bc.getIdentifier().add(new Identifier().setSystem("urn:ietf:rfc:3986").setValue("urn:oid:"+oid));
           altered = true;
         }
+        if (r.getResource() != null && pf.cql.processArtifact(f, r.getResource())) {
+          altered = true;
+        }
+
         if (altered) {
           if ((this.pf.langPolicy == ValidationPresenter.LanguagePopulationPolicy.ALL || this.pf.langPolicy == ValidationPresenter.LanguagePopulationPolicy.OTHERS)) {
             if (!this.pf.sourceIg.hasLanguage()) {
