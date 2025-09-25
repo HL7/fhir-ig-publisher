@@ -69,10 +69,7 @@ import org.hl7.fhir.r5.terminologies.client.TerminologyClientContext.Terminology
 import org.hl7.fhir.r5.terminologies.client.TerminologyClientManager;
 import org.hl7.fhir.r5.terminologies.client.TerminologyClientManager.InternalLogEvent;
 import org.hl7.fhir.r5.utils.OperationOutcomeUtilities;
-import org.hl7.fhir.utilities.CommaSeparatedStringBuilder;
-import org.hl7.fhir.utilities.FileUtilities;
-import org.hl7.fhir.utilities.Utilities;
-import org.hl7.fhir.utilities.VersionUtilities;
+import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.i18n.I18nConstants;
 import org.hl7.fhir.utilities.validation.ValidationMessage;
 import org.hl7.fhir.utilities.validation.ValidationMessage.IssueSeverity;
@@ -473,11 +470,24 @@ public class ValidationPresenter implements Comparator<FetchedFile> {
     Collections.sort(list, this);
     return list;
   }
-  
+
+  private boolean hasMessage(List<ValidationMessage> errors, ValidationMessage newMsg) {
+    for (ValidationMessage m : errors) {
+      if (m.preciseMatch(newMsg)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   public String generate(String title, List<ValidationMessage> allErrors, List<FetchedFile> files, String path, SuppressedMessageInformation filteredMessages, String pinned) throws IOException {
     for (FetchedFile f : files) {
       for (FetchedResource r: f.getResources()) {
-        f.getErrors().addAll(r.getErrors());
+        for (ValidationMessage v : r.getErrors()) {
+          if (!hasMessage(f.getErrors(), v)) {
+            f.getErrors().add(v);
+          }
+        }
       }
       for (ValidationMessage vm : filterMessages(f, f.getErrors(), false, filteredMessages)) {
         if (vm.getLevel().equals(ValidationMessage.IssueSeverity.FATAL)||vm.getLevel().equals(ValidationMessage.IssueSeverity.ERROR))
