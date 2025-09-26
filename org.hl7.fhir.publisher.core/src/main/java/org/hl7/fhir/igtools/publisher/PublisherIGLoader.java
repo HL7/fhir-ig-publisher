@@ -3140,18 +3140,16 @@ public class PublisherIGLoader extends PublisherBase {
     }
   }
 
-  private boolean loadBundle(String name, FetchedFile igf, String cause) throws Exception {
+  private void loadBundle(String name, FetchedFile igf, String cause) throws Exception {
     FetchedFile f = this.pf.fetcher.fetch(new Reference().setReference("Bundle/"+name), igf);
     boolean changed = noteFile("Bundle/"+name, f);
     processBundle(name, cause, changed, f, null);
-    return changed;
   }
 
-  private boolean loadSearchBundle(String name, FetchedFile igf, String cause, String baseName) throws Exception {
+  private void loadSearchBundle(String name, FetchedFile igf, String cause, String baseName) throws Exception {
     FetchedFile f = this.pf.fetcher.fetch(Utilities.path(pf.rootDir, name));
     boolean changed = noteFile("Bundle/"+name, f);
     processBundle(name, cause, changed, f, baseName);
-    return changed;
   }
 
   private void processBundle(String name, String cause, boolean changed, FetchedFile f, String baseName) throws Exception {
@@ -4192,7 +4190,7 @@ public class PublisherIGLoader extends PublisherBase {
   }
 
   private boolean isCustomResource(FetchedFile f) throws IOException {
-    for (String fn : pf.additionalResourceFiles) {
+    for (String fn : pf.customResourceFiles) {
       if (Utilities.path(pf.rootDir, fn).equals(f.getPath())) {
         return true;
       }

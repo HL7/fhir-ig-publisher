@@ -477,7 +477,7 @@ public class HTMLInspector {
     //  <span class="fhir-conformance" id="id">clause</span> - in paragraph clause id is optional but recommended
     //  <div class=="fhir-conformance" id="id" summary="summary">multi-paragraphs</div> - summary is mandatory
     // and from markdown
-    //  §id:clause$. in-parapgraph clause. Id must be a token if present. it's optional but recommended
+    //  §id:clause$. in-paragraph clause. Id must be a token if present. it's optional but recommended
     //  §§id:summary. both id and summary are mandatory
     //
     // the first pass is finding and fixing the markdown clauses, and then we process them at the end
