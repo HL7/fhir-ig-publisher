@@ -2443,25 +2443,59 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       b.append(" <li>"+Utilities.escapeXml(lrc.formatPhrase(RenderingI18nContext.SDR_NOT_USED, type))+"</li>\r\n");
     }
     b.append("</ul>\r\n");
-//    if (sd.hasUserData(UserDataNames.loader_custom_resource)) {
-//      b.append("<p>This is an <a href=\"https://build.fhir.org/resource.html#additional\">Additional Resource</a>.");
-//      List<String> compartments = new ArrayList<>();
-//      for (Extension ext : sd.getExtensionsByUrl(ExtensionDefinitions.EXT_ADDITIONAL_COMPARTMENT)) {
-//        String name = ext.hasValue() && ext.getValue().isPrimitive() ? ext.getValue().primitiveValue() : null;
-//        compartments.add("<a href=\"https://build.fhir.org/compartmentdefinition-"+name.toLowerCase()+".html\">"+name+"</a>");
-//      }
-//      if (!compartments.isEmpty()) {
-//        b.append(" This resource is in the compartments "+CommaSeparatedStringBuilder.join2(", ", " and ", compartments));
-//      } else {
-//        b.append(" This resource is not in any compartments.");
-//      }
-//      b.append("</a>.");
-//      for (Extension ext : sd.getExtensionsByUrl(ExtensionDefinitions.EXT_ADDITIONAL_REFERENCE)) {
-//        String name = ext.hasValue() && ext.getValue().isPrimitive() ? ext.getValue().primitiveValue() : null;
-//        compartments.add("<a href=\"https://build.fhir.org/compartmentdefinition-"+name.toLowerCase()+".html\">"+name+"</a>");
-//      }
-//    }
+    if (sd.hasUserData(UserDataNames.loader_custom_resource)) {
+      b.append("<p>This is an <a href=\"https://build.fhir.org/resource.html#additional\">Additional Resource</a>.");
+      boolean hasCompartments = false;
+      for (Extension ext : sd.getExtensionsByUrl(ExtensionDefinitions.EXT_ADDITIONAL_COMPARTMENT)) {
+        if (ext.hasExtension("param")) {
+          hasCompartments = true;
+        }
+      }
+      boolean hasReferences = false;
+      for (Extension ext : sd.getExtensionsByUrl(ExtensionDefinitions.EXT_ADDITIONAL_REFERENCE)) {
+        hasReferences = true;
+      }
+      if (!hasCompartments) {
+        b.append(" This resource is not in any compartments.");
+      }
+      if (!hasReferences) {
+        b.append(" This resource does not hook into any existing resources.");
+      }
+      b.append("</p>\n");
+
+      if (hasCompartments) {
+        b.append("<p>This resource is in the following compartments:</p><table class=\"grid\">\r\n");
+        b.append("<tr><td><b>Compartment</b></td> <td><b>Param(s)</b></td> <td><b>Documentation</b></td> <td title=\"For the $everything operation\"><b>StartParam</b></td> <td title=\"For the $everything operation\"><b>EndParam</b></td></tr>\r\n");
+        for (Extension ext : sd.getExtensionsByUrl(ExtensionDefinitions.EXT_ADDITIONAL_COMPARTMENT)) {
+          List<String> params = new ArrayList<>();
+          for (Extension param : ext.getExtensionsByUrl("param")) {
+            params.add(param.getValue().primitiveValue());
+          }
+          String name = ext.getExtensionString("code");
+          String md = processMarkdown("doco", ext.getExtensionString("documentation"));
+          b.append("<tr><td><a href=\"https://build.fhir.org/compartmentdefinition-"+name.toLowerCase()+".html\">"+name+"</a></td> <td>"+CommaSeparatedStringBuilder.join(",", params)+"</td>"+
+                  "<td>"+md+"</td> <td>"+nn(ext.getExtensionString("startParam"))+"</td> <td>"+nn(ext.getExtensionString("endParam"))+"</td></tr>\r\n");
+        }
+        b.append("</table>\r\n");
+      }
+
+      if (hasReferences) {
+        b.append("<p>This resource can be the target of the follow base resource references:</p><table class=\"grid\">\r\n");
+        b.append("<tr><td><b>Location</b></td> <td><b>Documentation</b></td></tr>\r\n");
+        for (Extension ext : sd.getExtensionsByUrl(ExtensionDefinitions.EXT_ADDITIONAL_REFERENCE)) {
+          String path = ext.getExtensionString("path");
+          String res = path.contains(".") ? path.substring(0, path.lastIndexOf('.')) : path;
+          String md = processMarkdown("doco", ext.getExtensionString("documentation"));
+          b.append("<tr><td><a href=\"https://build.fhir.org/"+res.toLowerCase()+".html\">"+path+"</a></td><td>"+md+"</td> </tr>\r\n");
+        }
+        b.append("</table>\r\n");
+      }
+    }
     return b.toString()+xigReference()+changeSummary();
+  }
+
+  private String nn(String s) {
+    return s == null ? "" : s;
   }
 
   private void loadCoreExtensionMap() throws IOException {
