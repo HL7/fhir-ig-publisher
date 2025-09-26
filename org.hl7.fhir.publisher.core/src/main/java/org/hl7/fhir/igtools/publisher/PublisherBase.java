@@ -553,6 +553,9 @@ public class PublisherBase implements ILoggingService {
     res.add("ActorDefinition");
     res.add("SubscriptionTopic");
     res.add("Requirements");
+    for (String s : pf.customResourceNames) {
+      res.remove(s);
+    }
     return res;
   }
 

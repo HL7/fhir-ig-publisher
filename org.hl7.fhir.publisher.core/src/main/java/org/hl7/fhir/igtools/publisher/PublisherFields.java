@@ -79,6 +79,7 @@ public class PublisherFields {
     List<FetchedResource> noNarrativeResources = new ArrayList<FetchedResource>();
     final List<String> noValidate = new ArrayList<String>();
     final List<String> customResourceFiles = new ArrayList<String>();
+    final List<String> additionalResourceFiles = new ArrayList<String>();
     List<FetchedResource> noValidateResources = new ArrayList<FetchedResource>();
     List<String> resourceDirs = new ArrayList<String>();
     List<String> resourceFactoryDirs = new ArrayList<String>();

@@ -37,6 +37,7 @@ import java.util.Stack;
 
 import javax.annotation.Nonnull;
 
+import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.exceptions.FHIRFormatError;
 import org.hl7.fhir.igtools.publisher.PublisherBase.FragmentUseRecord;
 import org.hl7.fhir.igtools.publisher.PublisherUtils.LinkedSpecification;
@@ -57,7 +58,10 @@ import org.hl7.fhir.utilities.xhtml.XhtmlNode.Location;
 import org.hl7.fhir.validation.BaseValidator.BooleanHolder;
 
 public class HTMLInspector {
-
+  public class XhtmlNodeHolder {
+    XhtmlNode start;
+    XhtmlNode end;
+  }
 
   public enum ExternalReferenceType { FILE, WEB, IMG }
 
@@ -151,9 +155,11 @@ public class HTMLInspector {
 
   private class ConformanceClause {
     LoadedFile source;
-    int index;
+    String id;
+    String summary;
     XhtmlNode heading;
     XhtmlNode node;
+    boolean div;
   }
 
   public class LoadedFile {
@@ -371,7 +377,11 @@ public class HTMLInspector {
         XhtmlNode x = new XhtmlParser().setMustBeWellFormed(strict).parse(new FileInputStream(lf.filename), null);
         BooleanHolder bh = new BooleanHolder(false);
         readConformanceClauses(lf, x, bh, new BooleanHolder(false), messages);
-        processAsMarkdown(lf, x);
+        try {
+          processAsMarkdown(lf, x);
+        } catch (Exception e) {
+          messages.add(new ValidationMessage(Source.Publisher, IssueType.INVALID, s, "Illegal HTML: "+e.getMessage(), IssueSeverity.WARNING));
+        }
         referencesValidatorPack = false;
         DuplicateAnchorTracker dat = new DuplicateAnchorTracker();
         Stack<XhtmlNode> stack = new Stack<XhtmlNode>();
@@ -412,13 +422,34 @@ public class HTMLInspector {
       int ci = 0;
       for (ConformanceClause clause : clauses) {
         sources.add(clause.source);
-        ci++;
+        String id = clause.id;
+        if (Utilities.noString(id)) {
+          ci++;
+          id = "cnf-"+ci;
+        }
         XhtmlNode li = confHome.li();
-        li.ah(clause.source.path+"#ci-c-"+ci).tx("§"+ci);
-        li.an("ci-c-"+ci).tx(" ");
-        li.getChildNodes().addAll(clause.node.getChildNodes());
-        clause.node.an("ci-c-"+ci).tx(" ");
-        clause.node.ah(confSource.path+"#ci-c-"+ci).supr("§"+ci);
+        li.ah(clause.source.path+"#ci-c-"+id).tx("§"+id);
+        li.an("ci-c-"+id).tx(": ");
+        if (clause.summary != null) {
+          li.tx(clause.summary);
+        } else {
+          li.getChildNodes().addAll(clause.node.getChildNodes());
+        }
+        XhtmlNode focus = clause.node;
+        if (clause.div) {
+          focus = clause.node.firstNamedDescendent("p");
+          if (focus == null) {
+            focus = clause.node;
+          }
+        }
+        focus.an("ci-c-" + ci).tx(" ");
+        XhtmlNode f = focus.ah(confSource.path + "#ci-c-" + id);
+        if (clause.div) {
+          f.img("conformance.png", "conf").attribute("width", "20").attribute("class", "self-link").attribute("height", "20");
+          f.tx("§" + id);
+        } else {
+          f.supr("§" + id);
+        }
       }
       for (LoadedFile lf : sources) {
         saveFile(lf, lf.xhtml);
@@ -443,13 +474,17 @@ public class HTMLInspector {
   private void readConformanceClauses(LoadedFile source, XhtmlNode x, BooleanHolder hasClauses, BooleanHolder hasWarning, List<ValidationMessage> messages) {
     // there's two kinds of conformance clauses:
     // from XML
-    //  <span class="fhir-conformance">clause</span>
+    //  <span class="fhir-conformance" id="id">clause</span> - in paragraph clause id is optional but recommended
+    //  <div class=="fhir-conformance" id="id" summary="summary">multi-paragraphs</div> - summary is mandatory
     // and from markdown
-    //  §clause$.
-    // the first pass is finding and fixing the markdown clauses, and then we process the
+    //  §id:clause$. in-paragraph clause. Id must be a token if present. it's optional but recommended
+    //  §§id:summary. both id and summary are mandatory
+    //
+    // the first pass is finding and fixing the markdown clauses, and then we process them at the end
     // spans
 
-    processMarkdownConformanceClauses(x, hasClauses);
+    List<XhtmlNodeHolder> divs = new ArrayList<>();
+    processMarkdownConformanceClauses(x, hasClauses, divs);
     List<XhtmlNode> parents = new ArrayList<>();
     processConformanceClauses(source, parents, x, hasClauses, hasWarning, messages);
     if (hasClauses.ok()) {
@@ -467,6 +502,19 @@ public class HTMLInspector {
         clause.heading = getHeading(parents, x);
         clause.node = c;
         clause.source = source;
+        clause.id = c.getAttribute("id");
+        clauses.add(clause);
+      } else if (c.getNodeType() == NodeType.Element && "div".equals(c.getName()) && c.isClass("fhir-conformance")) {
+        ConformanceClause clause = new ConformanceClause();
+        clause.heading = getHeading(parents, x);
+        clause.node = c;
+        clause.source = source;
+        clause.id = c.getAttribute("id");
+        clause.summary = c.getAttribute("summary");
+        if (Utilities.noString(clause.summary)) {
+          throw new FHIRException("no summary provided for conformance statement '"+clause.id+"'");
+        }
+        clause.div = true;
         clauses.add(clause);
       } else if (c.getNodeType() == NodeType.Element && "ul".equals(c.getName()) && c.isClass("fhir-conformance-list")) {
         confHome = c;
@@ -486,13 +534,13 @@ public class HTMLInspector {
         if (s.contains("SHALL")) {
           if (!hasWarning.ok()) {
             messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE, source.path,
-                    "The html source contains the word 'SHALL' but it is not in a text phrase marked as a conformance clause", IssueSeverity.WARNING));
+                    "The html source contains the word 'SHALL' but it is not in a text phrase marked as a conformance clause", IssueSeverity.INFORMATION));
           }
           hasWarning.set(true);
         } else if (s.contains("SHOULD")) {
           if (!hasWarning.ok()) {
             messages.add(new ValidationMessage(Source.Publisher, IssueType.BUSINESSRULE,source.path,
-                    "The html source contains the word 'SHOULD' but it is not in a text phrase marked as a conformance clause", IssueSeverity.WARNING));
+                    "The html source contains the word 'SHOULD' but it is not in a text phrase marked as a conformance clause", IssueSeverity.INFORMATION));
           }
           hasWarning.set(true);
         }
@@ -516,7 +564,7 @@ public class HTMLInspector {
     return null;
   }
 
-  private void processMarkdownConformanceClauses(XhtmlNode x, BooleanHolder hasClauses) {
+  private void processMarkdownConformanceClauses(XhtmlNode x, BooleanHolder hasClauses, List<XhtmlNodeHolder> divs) {
     boolean found = false;
     boolean tryAgain = false; // for if there's more than one clause in a run of text
     if ("p".equals(x.getName()) && "§§§".equals(x.allText())) {
@@ -525,73 +573,119 @@ public class HTMLInspector {
       x.setAttribute("class", "fhir-conformance-list");
       return;
     }
-    do {
-      int start = -1;
-      int end = -1;
-      tryAgain = false;
-      for (int i = 0; i < x.getChildNodes().size(); i++) {
-        XhtmlNode c = x.getChildNodes().get(i);
-        if (c.getNodeType() == NodeType.Text && c.getContent().contains("§")) {
-          int offset = c.getContent().indexOf("§");
-          if (start == -1) {
-            start = i;
-            String s = c.getContent().substring(offset+1);
-            if (s.contains("§")) {
+
+    if (x.allText() != null && "p".equals(x.getName()) && x.allText().startsWith("§§")) {
+      if (divs.isEmpty() || divs.get(0).end != null) {
+        // this is the starting node
+        divs.add(0, new XhtmlNodeHolder());
+        divs.get(0).start = x;
+      } else {
+        XhtmlNodeHolder div = divs.get(0);
+        div.end = x;
+        String cnt = div.start.allText().substring(2);
+        String id = cnt.substring(0, cnt.indexOf(":"));
+        if (!id.matches("^[a-zA-Z0-9._-]+$")) {
+          throw new FHIRException("Invalid conformance clause id: '"+id+"' in " +cnt);
+        }
+        cnt = cnt.substring(cnt.indexOf(":")+1);
+        String summary = cnt.substring(0, cnt.indexOf("^"));
+        cnt = cnt.substring(cnt.indexOf("^")+1);
+        x.setName("div");
+        div.start.setName("div");
+        div.start.setAttribute("class", "fhir-conformance");
+        div.start.setAttribute("id", id);
+        div.start.setAttribute("summary", summary);
+        div.start.getChildNodes().clear();
+        div.start.para(cnt);
+        x.getChildNodes().clear();
+        x.para("!");
+      }
+    } else {
+      do {
+        int start = -1;
+        int end = -1;
+        tryAgain = false;
+        for (int i = 0; i < x.getChildNodes().size(); i++) {
+          XhtmlNode c = x.getChildNodes().get(i);
+          if (c.getNodeType() == NodeType.Text && c.getContent().contains("§")) {
+            int offset = c.getContent().indexOf("§");
+            if (start == -1) {
+              start = i;
+              String s = c.getContent().substring(offset+1);
+              if (s.contains("§")) {
+                end = i;
+                break;
+              }
+            } else if (end == -1) {
               end = i;
               break;
+            } else {
+              // we ignore it - we'll get back to it
             }
-          } else if (end == -1) {
-            end = i;
-            break;
+          }
+        }
+        if (end > -1) {
+          hasClauses.set(true);
+          found = true;
+          tryAgain = true;
+          if (end == start) {
+            XhtmlNode span = new XhtmlNode(NodeType.Element, "span");
+            span.setAttribute("class", "fhir-conformance");
+            XhtmlNode c = x.getChildNodes().get(start);
+            String cnt = c.getContent();
+            int si = cnt.indexOf("§");
+            int ei = cnt.substring(si).indexOf("§") + si;
+            span.addText(cnt.substring(si + 1, ei));
+            x.getChildNodes().add(start + 1, span);
+            String ss = cnt.substring(si);
+            String es = cnt.substring(ei + 1);
+            c.setContent(ss);
+            if (!Utilities.noString(es)) {
+              XhtmlNode t = new XhtmlNode(NodeType.Text);
+              t.setContent(es);
+              x.getChildNodes().add(start + 2, span);
+            }
           } else {
-            // we ignore it - we'll get back to it
+            XhtmlNode sc = x.getChildNodes().get(start);
+            XhtmlNode ec = x.getChildNodes().get(end);
+            XhtmlNode span = new XhtmlNode(NodeType.Element, "span");
+            span.setAttribute("class", "fhir-conformance");
+            int si = sc.getContent().indexOf("§");
+            int ei = ec.getContent().indexOf("§");
+            String cnt = sc.getContent().substring(si + 1);
+            if (cnt.contains(":")) {
+              String token = cnt.substring(0, cnt.indexOf(":"));
+              if (token.matches("^[a-zA-Z0-9._-]+$")) {
+                span.setAttribute("id", token);
+                cnt = cnt.substring(cnt.indexOf(":")+1);
+              }
+            }
+            span.addText(cnt);
+            for (int i = start + 1; i < end; i++) {
+              span.add(x.getChildNodes().get(start + 1));
+              x.getChildNodes().remove(start + 1);
+            }
+            span.addText(ec.getContent().substring(0, ei));
+            x.getChildNodes().add(start + 1, span);
+            sc.setContent(sc.getContent().substring(0, si));
+            ec.setContent(ec.getContent().substring(ei + 1));
           }
         }
-      }
-      if (end > -1) {
-        hasClauses.set(true);
-        found = true;
-        tryAgain = true;
-        if (end == start) {
-          XhtmlNode span = new XhtmlNode(NodeType.Element, "span");
-          span.setAttribute("class", "fhir-conformance");
-          XhtmlNode c = x.getChildNodes().get(start);
-          String cnt = c.getContent();
-          int si = cnt.indexOf("§");
-          int ei = cnt.substring(si).indexOf("§") + si;
-          span.addText(cnt.substring(si + 1, ei));
-          x.getChildNodes().add(start + 1, span);
-          String ss = cnt.substring(si);
-          String es = cnt.substring(ei + 1);
-          c.setContent(ss);
-          if (!Utilities.noString(es)) {
-            XhtmlNode t = new XhtmlNode(NodeType.Text);
-            t.setContent(es);
-            x.getChildNodes().add(start + 2, span);
-          }
-        } else {
-          XhtmlNode sc = x.getChildNodes().get(start);
-          XhtmlNode ec = x.getChildNodes().get(end);
-          XhtmlNode span = new XhtmlNode(NodeType.Element, "span");
-          span.setAttribute("class", "fhir-conformance");
-          int si = sc.getContent().indexOf("§");
-          int ei = ec.getContent().indexOf("§");
-          span.addText(sc.getContent().substring(si + 1));
-          for (int i = start + 1; i < end; i++) {
-            span.add(x.getChildNodes().get(start + 1));
-            x.getChildNodes().remove(start + 1);
-          }
-          span.addText(ec.getContent().substring(0, ei));
-          x.getChildNodes().add(start + 1, span);
-          sc.setContent(sc.getContent().substring(0, si));
-          ec.setContent(ec.getContent().substring(ei + 1));
-        }
-      }
-    } while (tryAgain);
+      } while (tryAgain);
+    }
 
     if (!found) {
+      List<XhtmlNodeHolder> childDivs = new ArrayList<>();
       for (XhtmlNode c : x.getChildNodes()) {
-        processMarkdownConformanceClauses(c, hasClauses);
+        processMarkdownConformanceClauses(c, hasClauses, childDivs);
+      }
+      for (XhtmlNodeHolder childDiv : childDivs) {
+        int start = x.getChildNodes().indexOf(childDiv.start);
+        int end = x.getChildNodes().indexOf(childDiv.end);
+        for (int i = start+1; i < end-1; i++) {
+          childDiv.start.getChildNodes().add(x.getChildNodes().get(i));
+        }
+        x.getChildNodes().subList(start+1, end).clear();
       }
     }
   }

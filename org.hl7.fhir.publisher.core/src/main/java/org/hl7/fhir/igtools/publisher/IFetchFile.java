@@ -43,7 +43,7 @@ public interface IFetchFile {
   FetchedFile fetch(DataType source, FetchedFile base) throws Exception;
   FetchedFile fetchResourceFile(String name) throws Exception; 
   void setPkp(IGKnowledgeProvider pkp);
-  List<FetchedFile> scan(String sourceDir, IWorkerContext context, boolean autoScan) throws IOException, FHIRException;
+  List<FetchedFile> scan(String sourceDir, IWorkerContext context, boolean autoScan, List<String> exemptions) throws IOException, FHIRException;
 
   public ILoggingService getLogger();
   public void setLogger(ILoggingService log);

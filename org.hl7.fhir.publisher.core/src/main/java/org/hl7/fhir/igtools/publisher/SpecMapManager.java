@@ -116,6 +116,7 @@ public class SpecMapManager {
     } catch (Exception e) {
       spec = new JsonObject();
     }
+    base = spec.asString("webUrl");
     paths = spec.forceObject("paths");
     pages = spec.forceObject("pages");
     targets = spec.forceArray("targets");
