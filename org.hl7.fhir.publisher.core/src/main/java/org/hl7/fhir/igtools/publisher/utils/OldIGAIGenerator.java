@@ -48,8 +48,8 @@ public class OldIGAIGenerator {
     NpmPackage npm = loadResources(dir, resources);
     if (npm != null) {
       // now list all the pages in the IG, and decide whether they are a page, a resource, or an alternate view of a resource
-      int oldSize = loadPages(dir, pages, resources);
-      int newSize = 0;
+      long oldSize = loadPages(dir, pages, resources);
+      long newSize = 0;
 
       ZipGenerator zip = new ZipGenerator(Utilities.path(dir, "ai-prep.zip"));
       StringBuilder llms = new StringBuilder();
@@ -273,8 +273,8 @@ public class OldIGAIGenerator {
     return false;
   }
 
-  private int loadPages(File dir, List<Page> pages, List<LoadedResource> resources) {
-    int res = 0;
+  private long loadPages(File dir, List<Page> pages, List<LoadedResource> resources) {
+    long res = 0;
     for (File f : dir.listFiles()) {
       if ((f.getName().endsWith(".html") || f.getName().endsWith(".json") || f.getName().endsWith(".xml")) && !f.getName().startsWith("qa")) {
         res += f.length();
