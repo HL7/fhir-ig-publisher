@@ -1099,11 +1099,11 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     } else if (actualVersion != null) {
       td.attribute("title", gen.formatPhrase(RenderingI18nContext.VS_VERSION_FOUND, actualVersion));
       td.attribute("opacity", "0.5");
-      td.tx("⏿");
+      td.tx("\u23FF");
       td.tx(actualVersion);
     } else if (vs != null) {
       td.attribute("title", gen.formatPhrase(RenderingI18nContext.VS_VERSION_NONE));
-      td.tx("∅");
+      td.tx("\u2205");
       td.tx(actualVersion);
     } else {
       td.attribute("title", gen.formatPhrase(RenderingI18nContext.VS_VERSION_NOTHING));
