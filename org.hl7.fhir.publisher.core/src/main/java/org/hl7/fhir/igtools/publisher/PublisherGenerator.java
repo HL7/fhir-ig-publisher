@@ -943,7 +943,7 @@ public class PublisherGenerator extends PublisherBase {
     int size = bs.size();
 
     Element e = langElement;
-    if (SpecialTypeHandler.handlesType(r.fhirType(), this.pf.context.getVersion())) {
+    if (SpecialTypeHandler.handlesType(r.fhirType(), this.pf.context.getVersion()) && !pf.customResourceNames.contains(r.fhirType())) {
       e = new ObjectConverter(this.pf.context).convert(r.getResource());
     } else if (this.pf.module.isNoNarrative() && e.hasChild("text")) {
       e = (Element) e.copy();
@@ -1549,7 +1549,7 @@ public class PublisherGenerator extends PublisherBase {
       lapsed("all-xslx");
     }
 
-    if (!regen && sd.getKind() != StructureDefinition.StructureDefinitionKind.LOGICAL &&  wantGen(r, "sch")) {
+    if (!regen && sd.getDerivation() == StructureDefinition.TypeDerivationRule.CONSTRAINT && wantGen(r, "sch")) {
       String path = Utilities.path(this.pf.tempDir, sdPrefix + r.getId()+".sch");
       f.getOutputNames().add(path);
       new ProfileUtilities(this.pf.context, this.pf.errors, this.pf.igpkp).generateSchematrons(new FileOutputStream(path), sd);
@@ -1806,6 +1806,10 @@ public class PublisherGenerator extends PublisherBase {
     if (wantGen(r, "use-context")) {
       long start = System.currentTimeMillis();
       fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-sd-use-context", sdr.useContext(), f.getOutputNames(), r, vars, null, start, "use-context", "StructureDefinition", lang);
+    }
+    if (wantGen(r, "search-params")) {
+      long start = System.currentTimeMillis();
+      fragment("StructureDefinition-"+prefixForContainer+sd.getId()+"-search-params", sdr.searchParameters(), f.getOutputNames(), r, vars, null, start, "search-params", "StructureDefinition", lang);
     }
     if (wantGen(r, "changes")) {
       long start = System.currentTimeMillis();

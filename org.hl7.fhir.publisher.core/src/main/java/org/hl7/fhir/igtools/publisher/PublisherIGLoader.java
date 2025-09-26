@@ -24,14 +24,17 @@ import org.hl7.fhir.igtools.spreadsheets.MappingSpace;
 import org.hl7.fhir.igtools.templates.TemplateManager;
 import org.hl7.fhir.r4.formats.FormatUtilities;
 import org.hl7.fhir.r5.conformance.R5ExtensionsLoader;
+import org.hl7.fhir.r5.conformance.profile.ProfileKnowledgeProvider;
 import org.hl7.fhir.r5.conformance.profile.ProfileUtilities;
 import org.hl7.fhir.r5.context.ContextUtilities;
 import org.hl7.fhir.r5.context.IContextResourceLoader;
+import org.hl7.fhir.r5.context.IWorkerContext;
 import org.hl7.fhir.r5.context.SimpleWorkerContext;
 import org.hl7.fhir.r5.elementmodel.*;
 import org.hl7.fhir.r5.elementmodel.Element;
 import org.hl7.fhir.r5.extensions.ExtensionDefinitions;
 import org.hl7.fhir.r5.extensions.ExtensionUtilities;
+import org.hl7.fhir.r5.fhirpath.FHIRPathEngine;
 import org.hl7.fhir.r5.formats.IParser;
 import org.hl7.fhir.r5.formats.JsonParser;
 import org.hl7.fhir.r5.formats.XmlParser;
@@ -53,6 +56,7 @@ import org.hl7.fhir.r5.utils.structuremap.StructureMapUtilities;
 import org.hl7.fhir.r5.utils.validation.ValidatorSession;
 import org.hl7.fhir.utilities.*;
 import org.hl7.fhir.utilities.filesystem.CSFile;
+import org.hl7.fhir.utilities.filesystem.ManagedFileAccess;
 import org.hl7.fhir.utilities.i18n.*;
 import org.hl7.fhir.utilities.json.JsonException;
 import org.hl7.fhir.utilities.json.model.JsonArray;
@@ -550,6 +554,16 @@ public class PublisherIGLoader extends PublisherBase {
         case "custom-resource":
           pf.customResourceFiles.add(p.getValue());
           break;
+        case "additional-resource": {
+          pf.additionalResourceFiles.add(p.getValue());
+          try {
+            StructureDefinition sd = (StructureDefinition) new XmlParser().parse(new FileInputStream(Utilities.path(pf.rootDir, p.getValue())));
+            pf.customResourceNames.add(sd.getType());
+          } catch (Exception e) {
+            throw new Error("Unable to parse additional resource definition "+p.getValue(), e);
+          }
+          break;
+        }
         case "related-ig":
           relatedIGParams.add(p.getValue());
           break;
@@ -972,6 +986,15 @@ public class PublisherIGLoader extends PublisherBase {
     pf.inspector.getExemptHtmlPatterns().addAll(exemptHtmlPatterns);
     pf.inspector.setPcm(pf.pcm);
 
+    for (String name : pf.customResourceNames) {
+      // if it's already defined (transition from R6) we scrub the existing definition
+      StructureDefinition sd = pf.context.fetchResource(StructureDefinition.class, "http://hl7.org/fhir/StructureDefinition/" + name);
+      if (sd != null) {
+        pf.context.dropResource(sd.fhirType(), sd.getId());
+      }
+    }
+
+
     int i = 0;
     for (ImplementationGuide.ImplementationGuideDependsOnComponent dep : pf.sourceIg.getDependsOn()) {
       loadIg(dep, i, !dep.hasUserData(UserDataNames.pub_no_load_deps), false);
@@ -1246,7 +1269,6 @@ public class PublisherIGLoader extends PublisherBase {
 
   private void scanDirectories(String dir, List<String> extraDirs) {
     pf.fetcher.scanFolders(dir, extraDirs);
-
   }
 
 
@@ -2743,10 +2765,15 @@ public class PublisherIGLoader extends PublisherBase {
         }
       }
     }
+    // look for new additional resources in this IG
+    for (String s : pf.additionalResourceFiles) {
+      System.out.print("Load Additional Resource from "+s+":");
+      System.out.println(loadAdditionalResource(s, false));
+    }
     // look for new custom resources in this IG
     for (String s : pf.customResourceFiles) {
       System.out.print("Load Custom Resource from "+s+":");
-      System.out.println(loadCustomResource(s));
+      System.out.println(loadAdditionalResource(s, true));
     }
   }
 
@@ -2759,7 +2786,7 @@ public class PublisherIGLoader extends PublisherBase {
    * @throws FHIRException
    * @throws FileNotFoundException
    */
-  private String loadCustomResource(String filename) throws FileNotFoundException, FHIRException, IOException {
+  private String loadAdditionalResource(String filename, boolean custom) throws FileNotFoundException, FHIRException, IOException {
     // we load it as an R5 resource.
     StructureDefinition def = null;
     try {
@@ -2780,11 +2807,18 @@ public class PublisherIGLoader extends PublisherBase {
     // we'll validate it properly later. For now, we want to know:
     // 1. is this IG authorized to define custom resources?
     if (!pf.approvedIgsForCustomResources.asBoolean(pf.npmName)) {
-      return "This IG is not authorised to define custom resources";
+      return "This IG is not authorised to define custom or additional resources";
     }
     // 2. is this in the namespace of the IG (no flex there)
-    if (!def.getUrl().startsWith(pf.igpkp.getCanonical())) {
-      return "The URL of this definition is not in the proper canonical URL space of the IG ("+ pf.igpkp.getCanonical()+")";
+
+    if (custom) {
+      if (!def.getUrl().startsWith(pf.igpkp.getCanonical())) {
+        return "The URL of this definition is not in the proper canonical URL space of the IG (" + pf.igpkp.getCanonical() + ")";
+      }
+    } else {
+      if (!def.getUrl().startsWith("http://hl7.org/fhir/StructureDefinition/")) {
+        return "The URL of this definition must start with http://hl7.org/fhir/StructureDefinition (" + pf.igpkp.getCanonical() + ")";
+      }
     }
     // 3. is this based on Resource or DomainResource
     if (!Utilities.existsInList(def.getBaseDefinitionNoVersion(),
@@ -2819,6 +2853,10 @@ public class PublisherIGLoader extends PublisherBase {
     def.setUserData(UserDataNames.loader_custom_resource, "true");
     def.setWebPath("placeholder.html"); // we'll figure it out later
     pf.context.cacheResource(def);
+
+    StructureDefinition base = pf.context.fetchResource(StructureDefinition.class, def.getBaseDefinitionNoVersion());
+
+    new ProfileUtilities(pf.context, new ArrayList<>(), pf.igpkp).generateSnapshot(base, def, def.getUrl(), def.getWebPath(), def.getName());
 
     // work around for a sushi limitation
     for (ImplementationGuide.ImplementationGuideDefinitionResourceComponent res : pf.publishedIg.getDefinition().getResource()) {
@@ -2859,7 +2897,7 @@ public class PublisherIGLoader extends PublisherBase {
 
 
   private void loadResources(FetchedFile igf) throws Exception { // igf is not currently used, but it was about relative references?
-    List<FetchedFile> resources = pf.fetcher.scan(pf.sourceDir, pf.context, pf.igpkp.isAutoPath());
+    List<FetchedFile> resources = pf.fetcher.scan(pf.sourceDir, pf.context, pf.igpkp.isAutoPath(), makeExemptions());
     for (FetchedFile ff : resources) {
       ff.start("loadResources");
       if (ff.getContentType().equals("adl")) {
@@ -2874,6 +2912,29 @@ public class PublisherIGLoader extends PublisherBase {
         }
       }
     }
+  }
+
+  private List<String> makeExemptions() throws IOException {
+    List<String> result = new ArrayList<>();
+    for (String s : pf.additionalResourceFiles) {
+      String fn = Utilities.path(pf.rootDir, getSearchParamsFileName(s));
+      result.add(fn);
+    }
+    return result;
+  }
+
+  private String getSearchParamsFileName(String s) throws IOException {
+    File f = ManagedFileAccess.file(s);
+    String fn = f.getName().replace("StructureDefinition-", "").replace(".xml", "");
+    fn = "bundle-"+fn+"-search-params.xml";
+    fn = Utilities.path(f.getParent(), fn);
+    return fn;
+  }
+
+  private String getSearchParamsResourceName(String s) throws IOException {
+    File f = ManagedFileAccess.file(s);
+    String fn = f.getName().replace("StructureDefinition-", "").replace(".xml", "");
+    return fn;
   }
 
   private boolean loadArchetype(FetchedFile f, String cause) throws Exception {
@@ -3074,11 +3135,26 @@ public class PublisherIGLoader extends PublisherBase {
     for (String be : pf.bundles) {
       loadBundle(be, igf, "listed as a bundle");
     }
+    for (String ar : pf.additionalResourceFiles) {
+      loadSearchBundle(getSearchParamsFileName(ar), igf, "additional Resource Search Bundle", getSearchParamsResourceName(ar));
+    }
   }
 
   private boolean loadBundle(String name, FetchedFile igf, String cause) throws Exception {
     FetchedFile f = this.pf.fetcher.fetch(new Reference().setReference("Bundle/"+name), igf);
     boolean changed = noteFile("Bundle/"+name, f);
+    processBundle(name, cause, changed, f, null);
+    return changed;
+  }
+
+  private boolean loadSearchBundle(String name, FetchedFile igf, String cause, String baseName) throws Exception {
+    FetchedFile f = this.pf.fetcher.fetch(Utilities.path(pf.rootDir, name));
+    boolean changed = noteFile("Bundle/"+name, f);
+    processBundle(name, cause, changed, f, baseName);
+    return changed;
+  }
+
+  private void processBundle(String name, String cause, boolean changed, FetchedFile f, String baseName) throws Exception {
     if (changed) {
       f.setBundle(new FetchedResource(f.getName()+" (bundle)"));
       f.setBundleType(FetchedFile.FetchedBundleType.NATIVE);
@@ -3095,6 +3171,24 @@ public class PublisherIGLoader extends PublisherBase {
           checkResourceUnique(res.fhirType()+"/"+res.getIdBase(), name, cause);
           FetchedResource r = f.addResource(f.getName()+"["+i+"]");
           r.setElement(res);
+
+          // special support for Additional resources Search Parameter
+          if (baseName != null && res.fhirType().equals("SearchParameter")) {
+            boolean wantAdd = true;
+            for (Element e : res.getChildren("base")) {
+              if (baseName.equals(e.primitiveValue())) {
+                wantAdd = false;
+              }
+            }
+            if (wantAdd) {
+              res.addElement("base").setValue(baseName);
+            }
+            String code = res.getNamedChildValue("code");
+            res.forceElement("id").setValue(baseName+"-"+code);
+            res.forceElement("url").setValue("http://hl7.org/fhir/SearchParameter/"+baseName+"-"+code);
+            res.forceElement("name").setValue(baseName+Utilities.capitalize(code)+"SearchParam");
+            res.forceElement("title").setValue(baseName+" "+Utilities.capitalize(code)+" Search Parameter");
+          }
           r.setId(res.getIdBase());
           List<Element> profiles = new ArrayList<Element>();
           Element meta = res.getNamedChild("meta");
@@ -3107,7 +3201,7 @@ public class PublisherIGLoader extends PublisherBase {
         }
       }
     } else
-      f = this.pf.altMap.get("Bundle/"+name);
+      f = this.pf.altMap.get("Bundle/"+ name);
     for (FetchedResource r : f.getResources()) {
       this.pf.bndIds.add(r.fhirType()+"/"+r.getId());
       ImplementationGuide.ImplementationGuideDefinitionResourceComponent res = findIGReference(r.fhirType(), r.getId());
@@ -3134,7 +3228,6 @@ public class PublisherIGLoader extends PublisherBase {
         }
       }
     }
-    return changed;
   }
 
   private void loadTranslationSupplements(FetchedFile igf) throws Exception {
@@ -3476,7 +3569,7 @@ public class PublisherIGLoader extends PublisherBase {
   private void loadResources2(FetchedFile igf) throws Exception {
     if (!pf.resourceFactoryDirs.isEmpty()) {
       pf.fetcher.setResourceDirs(pf.resourceFactoryDirs);
-      List<FetchedFile> resources = pf.fetcher.scan(null, pf.context, true);
+      List<FetchedFile> resources = pf.fetcher.scan(null, pf.context, true, makeExemptions());
       for (FetchedFile ff : resources) {
         ff.start("loadResources");
         try {
@@ -3888,6 +3981,10 @@ public class PublisherIGLoader extends PublisherBase {
           } else {
             r.setResource(parse(f));
           }
+          if (isCustomResource(f)) {
+            // actually, we already loaded it - we need to use that instance
+            r.setResource(pf.context.fetchResource(StructureDefinition.class, ((CanonicalResource) r.getResource()).getUrl()));
+          }
           r.getResource().setUserData(UserDataNames.pub_element, r.getElement());
         } catch (Exception e) {
           if (isMandatory) {
@@ -4086,6 +4183,20 @@ public class PublisherIGLoader extends PublisherBase {
         }
       }
     }
+  }
+
+  private boolean isCustomResource(FetchedFile f) throws IOException {
+    for (String fn : pf.additionalResourceFiles) {
+      if (Utilities.path(pf.rootDir, fn).equals(f.getPath())) {
+        return true;
+      }
+    }
+    for (String fn : pf.additionalResourceFiles) {
+      if (Utilities.path(pf.rootDir, fn).equals(f.getPath())) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private Resource parseInternal(FetchedFile file, FetchedResource res) throws Exception {

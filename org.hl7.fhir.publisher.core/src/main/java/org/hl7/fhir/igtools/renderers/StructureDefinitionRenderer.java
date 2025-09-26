@@ -1,8 +1,8 @@
 package org.hl7.fhir.igtools.renderers;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -51,16 +51,12 @@ import org.hl7.fhir.r5.profilemodel.PEBuilder;
 import org.hl7.fhir.r5.profilemodel.PEBuilder.PEElementPropertiesPolicy;
 import org.hl7.fhir.r5.profilemodel.PEDefinition;
 import org.hl7.fhir.r5.profilemodel.PEType;
-import org.hl7.fhir.r5.renderers.AdditionalBindingsRenderer;
 import org.hl7.fhir.r5.renderers.DataRenderer;
 import org.hl7.fhir.r5.renderers.Renderer.RenderingStatus;
 import org.hl7.fhir.r5.renderers.StructureDefinitionRenderer.MapStructureMode;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext;
 import org.hl7.fhir.r5.renderers.utils.RenderingContext.StructureDefinitionRendererMode;
 import org.hl7.fhir.r5.renderers.utils.ResourceWrapper;
-import org.hl7.fhir.r5.terminologies.CodeSystemUtilities;
-import org.hl7.fhir.r5.terminologies.CodeSystemUtilities.SystemReference;
-import org.hl7.fhir.r5.terminologies.ValueSetUtilities;
 import org.hl7.fhir.r5.utils.ElementDefinitionUtilities;
 import org.hl7.fhir.r5.utils.ElementVisitor;
 import org.hl7.fhir.r5.utils.UserDataNames;
@@ -794,6 +790,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   public String txDiff(boolean withHeadings, boolean mustSupportOnly) throws FHIRException, IOException {
     List<String> txlist = new ArrayList<String>();
     boolean hasFixed = false;
+    boolean hasDesc = false;
     Map<String, ElementDefinition> txmap = new HashMap<String, ElementDefinition>();
     for (ElementDefinition ed : sd.getDifferential().getElement()) {
       if (ed.hasBinding() && !"0".equals(ed.getMax()) && (!mustSupportOnly || ed.getMustSupport())) {
@@ -812,6 +809,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         }
         if (ed.getType().size() == 1 && ed.getType().get(0).getWorkingCode().equals("Extension"))
           id = id + "<br/>" + ed.getType().get(0).getProfile();
+        hasDesc = hasDesc || ed.getBinding().hasDescription();
         txlist.add(id);
         txmap.put(id, ed);
       }
@@ -819,22 +817,33 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (txlist.isEmpty())
       return "";
     else {
-      StringBuilder b = new StringBuilder();
-      if (withHeadings)
-        b.append("<h4>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_TERM_BIND)) + "</h4>\r\n");
-      b.append("<table class=\"list\" data-fhir=\"generated-heirarchy\">\r\n");
-      b.append("<tr><td><b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_PATH)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingI18nContext.GENERAL_CONFORMANCE)) + "</b></td><td><b>" + (hasFixed ? (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_VALUESET_CODE)) : (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_VALUESET))) + "</b></td><td><b>" + (gen.formatPhrase(RenderingI18nContext.GENERAL_URI)) + "</b></td></tr>\r\n");
-      for (String path : txlist) {
-        txItem(txmap, b, path, sd.getUrl());
+      XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
+      if (withHeadings) {
+        div.h4().tx(gen.formatPhrase(RenderingI18nContext.STRUC_DEF_TERM_BIND));
       }
-      b.append("</table>\r\n");
-      return b.toString();
+      XhtmlNode tbl = div.table("list").setAttribute("data-fhir", "generated-heirarchy");
+      txItemHeadings(tbl, false);
+      for (String path : txlist) {
+        txItem(txmap, tbl, path, sd.getUrl(), false);
+      }
+      return new XhtmlComposer(false, true).compose(div.getChildNodes());
     }
+  }
+
+  private void txItemHeadings(XhtmlNode tbl, boolean hasFixed) {
+    XhtmlNode tr = tbl.tr();
+    tr.td().b().tx(gen.formatPhrase(RenderingI18nContext.STRUC_DEF_PATH));
+    tr.td().b().tx(gen.formatPhrase(RenderingI18nContext.GENERAL_STATUS));
+    tr.td().b().tx(gen.formatPhrase(RenderingI18nContext.GENERAL_USAGE));
+    tr.td().b().tx(hasFixed ? gen.formatPhrase(RenderingI18nContext.STRUC_DEF_VALUESET_CODE) : gen.formatPhrase(RenderingI18nContext.STRUC_DEF_VALUESET));
+    tr.td().b().tx(gen.formatPhrase(RenderingI18nContext.GENERAL_VER));
+    tr.td().b().tx(gen.formatPhrase(RenderingI18nContext.GENERAL_SOURCE));
   }
 
   public String tx(boolean withHeadings, boolean mustSupportOnly, boolean keyOnly) throws FHIRException, IOException {
     List<String> txlist = new ArrayList<String>();
     boolean hasFixed = false;
+    boolean hasDesc = false;
     Map<String, ElementDefinition> txmap = new HashMap<String, ElementDefinition>();
     for (ElementDefinition ed : keyOnly? getKeyElements() : sd.getSnapshot().getElement()) {
       if (ed.hasBinding() && !"0".equals(ed.getMax()) && (!mustSupportOnly || ed.getMustSupport())) {
@@ -855,23 +864,22 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
           id = id + "<br/>" + ed.getType().get(0).getProfile();
         txlist.add(id);
         txmap.put(id, ed);
+        hasDesc = hasDesc || ed.getBinding().hasDescription();
       }
     }
     if (txlist.isEmpty())
       return "";
     else {
-      StringBuilder b = new StringBuilder();
-      if (withHeadings)
-        b.append("<h4>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_TERM_BINDS)) + "</h4>\r\n");
-      b.append("<table class=\"list\" data-fhir=\"generated-heirarchy\">\r\n");
-      b.append("<tr><td><b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_PATH)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingI18nContext.GENERAL_CONFORMANCE)) + "</b></td><td><b>" + (hasFixed ?  (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_VALUESET_CODE)) : (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_VALUESET))) + "</b></td>"+
-      "<td><b>" + (gen.formatPhrase(RenderingI18nContext.GENERAL_URI)) + "</b></td></tr>\r\n");
-      for (String path : txlist) {
-        txItem(txmap, b, path, sd.getUrl());
+      XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
+      if (withHeadings) {
+        div.h4().tx(gen.formatPhrase(RenderingI18nContext.STRUC_DEF_TERM_BINDS));
       }
-      b.append("</table>\r\n");
-      return b.toString();
-
+      XhtmlNode tbl = div.table("list").setAttribute("data-fhir", "generated-heirarchy");
+      txItemHeadings(tbl, false);
+      for (String path : txlist) {
+        txItem(txmap, tbl, path, sd.getUrl(), false);
+      }
+      return new XhtmlComposer(false, true).compose(div.getChildNodes());
     }
   }
 
@@ -892,17 +900,9 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     return null;
   }
 
-  public void txItem(Map<String, ElementDefinition> txmap, StringBuilder b, String path, String url) throws FHIRException, IOException {
+  public void txItem(Map<String, ElementDefinition> txmap, XhtmlNode tbl, String path, String url, boolean hasDesc) throws FHIRException, IOException {
     ElementDefinition ed = txmap.get(path);
     ElementDefinitionBindingComponent tx = ed.getBinding();
-    BindingResolutionDetails brd = new BindingResolutionDetails("", "?ext");
-    String link = null;
-    if (tx.hasValueSet()) {
-      link = txDetails(tx, brd, false);
-    } else if (ed.hasUserData(UserDataNames.SNAPSHOT_DERIVATION_POINTER)) {
-      ElementDefinitionBindingComponent txi = ((ElementDefinition) ed.getUserData(UserDataNames.SNAPSHOT_DERIVATION_POINTER)).getBinding();
-      link = txDetails(txi, brd, true);
-    }
     boolean strengthInh = false;
     BindingStrength strength = null;
     if (tx.hasStrength()) {
@@ -913,125 +913,202 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       strengthInh = true;
     }
 
-    if ("?ext".equals(brd.vsn)) {
-      if (tx.getValueSet() != null) 
-         System.out.println("Value set '"+tx.getValueSet()+"' at " + url + "#" + path + " not found"); 
-      else if (!tx.hasDescription())
-        System.out.println("No value set specified at " + url + "#" + path + " (no url)"); 
-    }
-    if (tx.hasUserData(UserDataNames.render_tx_value)) {
-      brd.vss = gen.formatPhrase(RenderingI18nContext.SDR_FIXED_VALUE, summariseValue((DataType) tx.getUserData(UserDataNames.render_tx_value))); 
-      brd.suffix = null;
-    } else if (tx.hasUserData(UserDataNames.render_tx_pattern)) {
-      brd.vss = gen.formatPhrase(RenderingI18nContext.SDR_PATTERN_VALUE, summariseValue((DataType) tx.getUserData(UserDataNames.render_tx_pattern))); 
-      brd.suffix = null;
-    }
-
-    b.append("<tr><td>").append(path).append("</td><td><a style=\"opacity: " + opacityStr(strengthInh) + "\" href=\"").append(corePath).append("terminologies.html#").append(strength == null ? "" : gen.getTranslated(tx.getStrengthElement()));
-    if (tx.hasDescription())
-      b.append("\">").append(strength == null ? "" : gen.getTranslated(tx.getStrengthElement())).append("</a></td><td title=\"").append(Utilities.escapeXml(tx.getDescription())).append("\">").append(brd.vss);
-    else
-      b.append("\">").append(strength == null ? "" : gen.getTranslated(tx.getStrengthElement())).append("</a></td><td>").append(brd.vss);
-    if (brd.suffix != null) {
-      b.append(brd.suffix);
-    }
-    if (tx.hasValueSet()) {
-      b.append("<div><code>"+Utilities.escapeXml(tx.getValueSet())+"</code><button title=\""+gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)+"\" class=\"btn-copy\" data-clipboard-text=\""+Utilities.escapeXml(tx.getValueSet())+"\"></button></div>"); 
-      if (link != null) {
-        if (Utilities.isAbsoluteUrlLinkable(link)) {
-          b.append("<div>"+gen.formatPhrase(RenderingI18nContext.SDR_FROM, "<a href=\""+Utilities.escapeXml(link)+"\">"+Utilities.escapeXml(link)+"</a></div>")); 
-        } else {
-          b.append("<div>"+gen.formatPhrase(RenderingI18nContext.SDR_FROM, Utilities.escapeXml(link)+"</div>")); 
-        }
-      }
+    XhtmlNode tr = tbl.tr();
+    tr.td().tx(Utilities.insertBreakingSpaces(path, new HashSet<>(Arrays.asList('.'))));
+    tr.td().tx("Base");
+    if (strength == null) {
+      tr.td();
     } else {
+      tr.td().ah(Utilities.pathURL(corePath, "terminologies.html#" + tx.getStrengthElement())).setAttribute("opacity", opacityStr(strengthInh)).tx(gen.getTranslated(tx.getStrengthElement()));
     }
-    AdditionalBindingsRenderer abr = new AdditionalBindingsRenderer(igp, corePath, sd, path, gen, this, sdr);
-    if (tx.hasExtension(ExtensionDefinitions.EXT_MAX_VALUESET)) {
-      abr.seeMaxBinding(ExtensionUtilities.getExtension(tx, ExtensionDefinitions.EXT_MAX_VALUESET));
+    XhtmlNode td = tr.td();
+    if (tx.hasDescription()) {
+      td.setAttribute("title", tx.getDescription());
     }
-    if (tx.hasExtension(ExtensionDefinitions.EXT_MIN_VALUESET)) {
-      abr.seeMinBinding(ExtensionUtilities.getExtension(tx, ExtensionDefinitions.EXT_MIN_VALUESET));
-    }
-    if (tx.hasExtension(ExtensionDefinitions.EXT_BINDING_ADDITIONAL)) {
-      abr.seeAdditionalBindings(tx.getExtensionsByUrl(ExtensionDefinitions.EXT_BINDING_ADDITIONAL));
-    }
-    if (abr.hasBindings()) {
-      XhtmlNode x = new XhtmlNode(NodeType.Element, "table");
-      x.setAttribute("class", "grid");
-      abr.render(x.getChildNodes(), true);
-      b.append(new XhtmlComposer(true, true).compose(x));
-    }
-    b.append("</td>");
-    b.append("</tr>\r\n");
-  }
 
-  public String txDetails(ElementDefinitionBindingComponent tx, BindingResolutionDetails brd, boolean inherited) {
+    boolean inherited = ed.hasUserData(UserDataNames.SNAPSHOT_DERIVATION_POINTER);
     String uri = null;
-    String link = null;
     if (tx.getValueSet() != null) {
       uri = tx.getValueSet().trim();
     }
     String name = getSpecialValueSetName(uri);
     if (name != null) {
-      brd.vss = "<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"" + Utilities.escapeXml(getSpecialValueSetUrl(uri)) + "\">" + Utilities.escapeXml(name) + "</a>";
-      brd.vsn = name;
+      td.ah(getSpecialValueSetUrl(uri)).setAttribute("opacity", opacityStr(inherited)).tx(name);
     } else {
       ValueSet vs = context.findTxResource(ValueSet.class, canonicalise(uri));
       if (vs == null) {
         BindingResolution br = igp.resolveActualUrl(uri);
-        if (br.url == null)
-          brd.vss = "<code>" + processMarkdown("binding", br.display) + "</code>";
-        else if (Utilities.isAbsoluteUrlLinkable(br.url))
-          brd.vss = "<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"" + Utilities.escapeXml(br.url) + "\">" + Utilities.escapeXml(br.display) + "</a>";
-        else {
-          brd.vss = "<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"" + Utilities.escapeXml(prefix + br.url) + "\">" + Utilities.escapeXml(br.display) + "</a>";
+        if (br.url == null) {
+          td.markdown(br.display, "binding");
+        } else if (Utilities.isAbsoluteUrlLinkable(br.url)) {
+          td.ah(br.url).setAttribute("opacity", opacityStr(inherited)).tx(br.display);
+          td.button("btn-copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
+        } else {
+          td.ah(prefix + br.url).setAttribute("opacity", opacityStr(inherited)).tx(br.display);
+          td.button("btn-copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
         }
+        showVersion(tr.td(), uri, null);
+        tr.td().tx("Unknown");
       } else {
         String p = vs.getWebPath();
+        if (p == null) {
+          td.ah("??").setAttribute("opacity", opacityStr(inherited)).tx(gen.getTranslated(vs.getTitleElement(), vs.getNameElement()) + " (" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_MISSING_LINK)) + ")");
+        } else {
+          td.ah(p).setAttribute("opacity", opacityStr(inherited)).tx(gen.getTranslated(vs.getTitleElement(), vs.getNameElement()));
+        }
+        td.button("btn-copy", gen.formatPhrase(RenderingI18nContext.SDR_CLICK_COPY)).setAttribute("data-clipboard-text", tx.getValueSet());
         if (vs.hasUserData(UserDataNames.render_external_link)) {
-          link = vs.getUserString(UserDataNames.render_external_link);
-        } else if (vs.hasSourcePackage()) {
+          td.img("external.png", ".");
+        }
+        showVersion(tr.td(), uri, vs);
+
+        String src = null;
+        String link = null;
+        if (vs.hasSourcePackage()) {
           if (VersionUtilities.isCorePackage(vs.getSourcePackage().getId())) {
-            link = gen.formatPhrase(RenderingI18nContext.SDR_SRC_FHIR); 
+            src = gen.formatPhrase(RenderingI18nContext.SDR_SRC_FHIR);
+            link = gen.getLink(RenderingContext.KnownLinkType.SPEC, true);
           } else if (!Utilities.isAbsoluteUrlLinkable(vs.getWebPath())) {
-            link = gen.formatPhrase(RenderingI18nContext.SDR_SRC_IG); 
-          } else if (!Utilities.isAbsoluteUrlLinkable(vs.getWebPath())) {
-            link = gen.formatPhrase(RenderingI18nContext.SDR_SRC_PACK, vs.getSourcePackage()); 
-          }
-        }
-        StringBuilder b = new StringBuilder();
-        if (p == null)
-          b.append("<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"??\">" + Utilities.escapeXml(gen.getTranslated(vs.getNameElement())) + " (" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_MISSING_LINK))+")");
-        else if (p.startsWith("http:"))
-          b.append("<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"" + Utilities.escapeXml(p) + "\">" + Utilities.escapeXml(gen.getTranslated(vs.getNameElement())));
-        else
-          b.append("<a style=\"opacity: " + opacityStr(inherited) + "\" href=\"" + Utilities.escapeXml(p) + "\">" + Utilities.escapeXml(gen.getTranslated(vs.getNameElement())));
-        if (vs.hasUserData(UserDataNames.render_external_link)) {
-          b.append(" <img src=\"external.png\" alt=\".\"/>");
-        }
-        b.append("</a>");
-        brd.vss = b.toString();
-        StringType title = vs.hasTitleElement() ? vs.getTitleElement() : vs.getNameElement();
-        if (title != null) {
-          brd.vsn = gen.getTranslated(title);
-        }
-        String system = ValueSetUtilities.getAllCodesSystem(vs);
-        if (system != null) {
-          SystemReference sr = CodeSystemUtilities.getSystemReference(system, context);
-          if (sr == null) {
-            brd.suffix = gen.formatPhrase(RenderingI18nContext.SDR_CODE_FROM, "<code>"+system+"</code>"); 
-          } else if (sr.isLocal() || (sr.getText() != null && sr.getText().equals(vs.getName()))) {
-            brd.suffix = "";
-          } else if (sr.getLink() == null) {
-            brd.suffix = gen.formatPhrase(RenderingI18nContext.SDR_CODE_FROM, sr.getText()+" (<code>"+system+"</code>)"); 
+            src = gen.formatPhrase(RenderingI18nContext.SDR_SRC_IG);
+            link = null;
           } else {
-            brd.suffix = gen.formatPhrase(RenderingI18nContext.SDR_CODE_FROM, "<a href=\""+sr.getLink()+"\">"+sr.getText()+"</a>"); 
+            String pname = getSourcePackageName(vs.getSourcePackage());
+            src = pname + " v" + presentVersion(vs.getSourcePackage());
+            link = vs.getSourcePackage().getWeb();
           }
+        } else if (vs.hasUserData(UserDataNames.render_external_link)) {
+          src =  vs.getUserString(UserDataNames.render_external_link);
+          link = vs.getUserString(UserDataNames.render_external_link);
+          try {
+            src = new URL(src).getHost();
+          } catch (Exception e) {
+            // nothing
+          }
+        } else {
+          src = "unknown?";
         }
+        tr.td().ahOrNot(link).tx(src);
       }
+//        String system = ValueSetUtilities.getAllCodesSystem(vs);
+//        if (system != null) {
+//          SystemReference sr = CodeSystemUtilities.getSystemReference(system, context);
+//          if (sr == null) {
+//            brd.suffix = gen.formatPhrase(RenderingI18nContext.SDR_CODE_FROM, "<code>"+system+"</code>");
+//          } else if (sr.isLocal() || (sr.getText() != null && sr.getText().equals(vs.getName()))) {
+//            brd.suffix = "";
+//          } else if (sr.getLink() == null) {
+//            brd.suffix = gen.formatPhrase(RenderingI18nContext.SDR_CODE_FROM, sr.getText()+" (<code>"+system+"</code>)");
+//          } else {
+//            brd.suffix = gen.formatPhrase(RenderingI18nContext.SDR_CODE_FROM, "<a href=\""+sr.getLink()+"\">"+sr.getText()+"</a>");
+//          }
+//        }
+      }
+
+//    if (link != null) {
+//      if (Utilities.isAbsoluteUrlLinkable(link)) {
+//        b.append("<div>"+gen.formatPhrase(RenderingI18nContext.SDR_FROM, "<a href=\""+Utilities.escapeXml(link)+"\">"+Utilities.escapeXml(link)+"</a></div>"));
+//      } else {
+//        b.append("<div>"+gen.formatPhrase(RenderingI18nContext.SDR_FROM, Utilities.escapeXml(link)+"</div>"));
+//      }
+//    }
+//    AdditionalBindingsRenderer abr = new AdditionalBindingsRenderer(igp, corePath, sd, path, gen, this, sdr);
+//    if (tx.hasExtension(ExtensionDefinitions.EXT_MAX_VALUESET)) {
+//      abr.seeMaxBinding(ExtensionUtilities.getExtension(tx, ExtensionDefinitions.EXT_MAX_VALUESET));
+//    }
+//    if (tx.hasExtension(ExtensionDefinitions.EXT_MIN_VALUESET)) {
+//      abr.seeMinBinding(ExtensionUtilities.getExtension(tx, ExtensionDefinitions.EXT_MIN_VALUESET));
+//    }
+//    if (tx.hasExtension(ExtensionDefinitions.EXT_BINDING_ADDITIONAL)) {
+//      abr.seeAdditionalBindings(tx.getExtensionsByUrl(ExtensionDefinitions.EXT_BINDING_ADDITIONAL));
+//    }
+//    if (abr.hasBindings()) {
+//      XhtmlNode x = new XhtmlNode(NodeType.Element, "table");
+//      x.setAttribute("class", "grid");
+//      abr.render(x.getChildNodes(), true);
+//      b.append(new XhtmlComposer(true, true).compose(x));
+//    }
+//    b.append("</td>");
+//    b.append("</tr>\r\n");
+    if (hasDesc) {
+      tr.td().markdown(tx.getDescription(), "binding description");
     }
-    return link;
+  }
+
+  private String presentVersion(PackageInformation sourcePackage) {
+    switch (sourcePackage.getCanonical()) {
+      case "http://fhir.org/packages/fhir.dicom":
+        String[] vp = sourcePackage.getVersion().split("\\.");
+        return vp[0]+String.valueOf((char)('a' + (vp[1].charAt(0) - '1')));
+      default:
+        return VersionUtilities.getMajMin(sourcePackage.getVersion());
+    }
+  }
+
+  private String getSourcePackageName(PackageInformation sourcePackage) {
+    switch (sourcePackage.getCanonical()) {
+      case "http://terminology.hl7.org":
+        return "THO";
+      case "http://hl7.org/fhir/us/core":
+        return "US Core";
+      case "http://fhir.org/packages/us.nlm.vsac":
+        return "VSAC";
+      case "http://fhir.org/packages/fhir.dicom":
+        return "DICOM";
+      default:
+        if (sourcePackage.getName() == null) {
+          return sourcePackage.getId();
+        } else if (sourcePackage.getName().contains("(")) {
+          return sourcePackage.getName().substring(0, sourcePackage.getName().indexOf("(")).replace(")", "");
+        } else {
+          return sourcePackage.getName();
+        }
+    }
+  }
+
+  private void showVersion(XhtmlNode td, String uri, ValueSet vs) {
+    String statedVersion = uri != null && uri.contains("|") ? uri.substring(uri.indexOf("|")+1) : null;
+    String actualVersion = vs == null ? null : vs.getVersion();
+    boolean fromPackages = vs == null ? false : vs.hasSourcePackage();
+    boolean fromThisPackage = vs == null ? false : !Utilities.isAbsoluteUrlLinkable(vs.getWebPath());
+    if (statedVersion != null && actualVersion != null && !statedVersion.equals(actualVersion) && fromPackages) {
+      td.attribute("title", gen.formatPhrase(RenderingI18nContext.VS_VERSION_WILDCARD_BY_PACKAGE, statedVersion, actualVersion));
+      td.tx("\uD83D\uDCCD");
+      td.tx(actualVersion);
+      td.tx(" → ");
+      td.tx(statedVersion);
+    } else if (statedVersion != null && actualVersion != null && !statedVersion.equals(actualVersion) && fromPackages) {
+      td.attribute("title", gen.formatPhrase(RenderingI18nContext.VS_VERSION_WILDCARD, statedVersion, actualVersion));
+      td.tx("\uD83D\uDCCD");
+      td.tx(actualVersion);
+      XhtmlNode span = td.span();
+      span.attribute("opacity", "0.5");
+      span.tx(" → ");
+      span.tx(statedVersion);
+  } else if (statedVersion != null) {
+      td.attribute("title", gen.formatPhrase(RenderingI18nContext.VS_VERSION_STATED, statedVersion));
+      td.tx("\uD83D\uDCCD");
+      td.tx(actualVersion);
+    } else if (fromThisPackage) {
+      td.attribute("title", gen.formatPhrase(RenderingI18nContext.VS_VERSION_THIS_PACKAGE));
+      td.tx("\uD83D\uDCE6");
+      td.tx(actualVersion);
+    } else if (fromPackages) {
+      td.attribute("title", gen.formatPhrase(RenderingI18nContext.VS_VERSION_BY_PACKAGE, actualVersion));
+      td.tx("\uD83D\uDCE6");
+      td.tx(actualVersion);
+    } else if (actualVersion != null) {
+      td.attribute("title", gen.formatPhrase(RenderingI18nContext.VS_VERSION_FOUND, actualVersion));
+      td.attribute("opacity", "0.5");
+      td.tx("⏿");
+      td.tx(actualVersion);
+    } else if (vs != null) {
+      td.attribute("title", gen.formatPhrase(RenderingI18nContext.VS_VERSION_NONE));
+      td.tx("∅");
+      td.tx(actualVersion);
+    } else {
+      td.attribute("title", gen.formatPhrase(RenderingI18nContext.VS_VERSION_NOTHING));
+      td.tx("?");
+    }
   }
 
   private String opacityStr(boolean inherited) {
@@ -1118,11 +1195,19 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
     public String getIds() {
       if (constraint.hasSource() && constraint.getSource().equals("http://hl7.org/fhir/StructureDefinition/Element"))
-        return "<b>"+gen.formatPhrase(RenderingI18nContext.SDR_ALL_ELEM)+"</b>"; 
+        return gen.formatPhrase(RenderingI18nContext.SDR_ALL_ELEM);
       else if (constraint.hasSource() && constraint.getSource().equals("http://hl7.org/fhir/StructureDefinition/Extension"))
-        return "<b>"+gen.formatPhrase(RenderingI18nContext.SDR_ALL_EXT)+"</b>"; 
+        return gen.formatPhrase(RenderingI18nContext.SDR_ALL_EXT);
       else
         return String.join(", ", elements);
+    }
+    public boolean isBold() {
+      if (constraint.hasSource() && constraint.getSource().equals("http://hl7.org/fhir/StructureDefinition/Element"))
+        return true;
+      else if (constraint.hasSource() && constraint.getSource().equals("http://hl7.org/fhir/StructureDefinition/Extension"))
+        return true;
+      else
+        return false;
     }
   }
 
@@ -1139,7 +1224,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
   }
 
-  public String invOldMode(boolean withHeadings, int genMode) {
+  public String invOldMode(boolean withHeadings, int genMode) throws IOException {
     Map<String, ConstraintInfo> constraintMap = new HashMap<String,ConstraintInfo>();
     List<ElementDefinition> list = elementsForMode(genMode);
     for (ElementDefinition ed : list) {
@@ -1158,11 +1243,18 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     if (constraintMap.isEmpty())
       return "";
     else {
-      StringBuilder b = new StringBuilder();
-      if (withHeadings)
-        b.append("<h4>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_CONSTRAINTS)) + "</h4>\r\n");
-      b.append("<table class=\"list\" data-fhir=\"generated-heirarchy\">\r\n");
-      b.append("<tr><td width=\"60\"><b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ID)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_GRADE)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_PATHS)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingI18nContext.GENERAL_DETAILS)) + "</b></td><td><b>" + (gen.formatPhrase(RenderingI18nContext.STRUC_DEF_REQUIREMENTS)) + "</b></td></tr>\r\n");
+      XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
+      if (withHeadings) {
+        div.h4().tx(gen.formatPhrase(RenderingI18nContext.STRUC_DEF_CONSTRAINTS));
+      }
+      XhtmlNode tbl = div.table("list", true).setAttribute("data-fhir", "generated-heirarchy");
+      XhtmlNode tr = tbl.tr();
+      tr.tdW(60).b().tx(gen.formatPhrase(RenderingI18nContext.STRUC_DEF_ID));
+      tr.td().b().tx(gen.formatPhrase(RenderingI18nContext.STRUC_DEF_GRADE));
+      tr.td().b().tx(gen.formatPhrase(RenderingI18nContext.STRUC_DEF_PATHS));
+      tr.td().b().tx(gen.formatPhrase(RenderingI18nContext.GENERAL_DESC));
+      tr.td().b().tx(gen.formatPhrase(RenderingI18nContext.SEARCH_PAR_EXP));
+
       List<String> keys = new ArrayList<>(constraintMap.keySet());
 
       Collections.sort(keys, new ConstraintKeyComparator());
@@ -1171,13 +1263,27 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
         for (ConstraintVariation cv : ci.getVariations()) {
           ElementDefinitionConstraintComponent inv = cv.getConstraint();
           if (!inv.hasSource() || inv.getSource().equals(sd.getUrl()) || allInvariants || genMode!=GEN_MODE_DIFF ) {
-            b.append("<tr><td>").append(inv.getKey()).append("</td><td>").append(grade(inv)).append("</td><td>").append(cv.getIds()).append("</td><td>").append(Utilities.escapeXml(gen.getTranslated(inv.getHumanElement())))
-            .append("<br/>: ").append(Utilities.escapeXml(inv.getExpression())).append("</td><td>").append(Utilities.escapeXml(gen.getTranslated(inv.getRequirementsElement()))).append("</td></tr>\r\n");
+            tr = tbl.tr();
+            tr.td().tx(inv.getKey());
+            tr.td().tx(grade(inv));
+            if (cv.isBold()) {
+              tr.td().b().tx(cv.getIds());
+            } else {
+              tr.td().tx(cv.getIds());
+            }
+            XhtmlNode td = tr.td();
+            td.tx(gen.getTranslated(inv.getHumanElement()));
+            if (inv.hasRequirements()) {
+              td.br();
+              td.tx(gen.formatPhrase(RenderingI18nContext.STRUC_DEF_REQUIREMENTS));
+              td.tx(": ");
+              td.markdown(gen.getTranslated(inv.getRequirementsElement()), "requirements");
+            }
+            tr.td().code(inv.getExpression());
           }
         }
       }
-      b.append("</table>\r\n");
-      return b.toString();
+      return new XhtmlComposer(false, true).compose(div.getChildNodes());
     }
   }
 
@@ -3020,5 +3126,39 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
     }
   }
 
+  public String searchParameters() throws IOException {
+    Map<String, SearchParameter> splist = new HashMap<>();
+    for (SearchParameter sp : context.fetchResourcesByType(SearchParameter.class)) {
+      if (hasBase(sp, sd.getType())) {
+        splist.put(sp.getCode(), sp);
+      }
+    }
+    XhtmlNode div = new XhtmlNode(NodeType.Element, "div");
+    XhtmlNode tbl = div.table("list");
+    XhtmlNode tr = tbl.tr();
+    tr.td().b().tx(gen.formatPhrase(RenderingI18nContext.GENERAL_NAME));
+    tr.td().b().tx(gen.formatPhrase(RenderingI18nContext.GENERAL_TYPE));
+    tr.td().b().tx(gen.formatPhrase(RenderingI18nContext.GENERAL_DESC));
+    tr.td().b().tx(gen.formatPhrase(RenderingI18nContext.SEARCH_PAR_EXP));
+
+    for (String code : Utilities.sorted(splist.keySet())) {
+      SearchParameter sp = splist.get(code);
+      tr = tbl.tr();
+      tr.td().ah(sp.getWebPath()).tx(sp.getCode());
+      tr.td().ah(Utilities.pathURL(gen.getLink(RenderingContext.KnownLinkType.SPEC, true), "search.html#"+sp.getType().toCode())).tx(sp.getType().toCode());
+      tr.td().markdown(sp.getDescription(), "description");
+      tr.td().code(sp.getExpression());
+    }
+    return new XhtmlComposer(false, true).compose(div.getChildNodes());
+  }
+
+  private boolean hasBase(SearchParameter sp, String type) {
+    for (Enumeration<Enumerations.VersionIndependentResourceTypesAll> c : sp.getBase()) {
+      if (type.equals(c.getCode())) {
+        return true;
+      }
+    }
+    return false;
+  }
 
 }
