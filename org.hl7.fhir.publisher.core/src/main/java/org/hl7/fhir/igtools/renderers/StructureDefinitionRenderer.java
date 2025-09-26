@@ -790,7 +790,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   public String txDiff(boolean withHeadings, boolean mustSupportOnly) throws FHIRException, IOException {
     List<String> txlist = new ArrayList<String>();
     boolean hasFixed = false;
-    boolean hasDesc = false;
+    boolean hasDesc = false; // this is currently unused - have to figure out whether we want to try and show descriptions or not
     Map<String, ElementDefinition> txmap = new HashMap<String, ElementDefinition>();
     for (ElementDefinition ed : sd.getDifferential().getElement()) {
       if (ed.hasBinding() && !"0".equals(ed.getMax()) && (!mustSupportOnly || ed.getMustSupport())) {
@@ -843,7 +843,7 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
   public String tx(boolean withHeadings, boolean mustSupportOnly, boolean keyOnly) throws FHIRException, IOException {
     List<String> txlist = new ArrayList<String>();
     boolean hasFixed = false;
-    boolean hasDesc = false;
+    boolean hasDesc = false; // this is currently unused - have to figure out whether we want to try and show descriptions or not
     Map<String, ElementDefinition> txmap = new HashMap<String, ElementDefinition>();
     for (ElementDefinition ed : keyOnly? getKeyElements() : sd.getSnapshot().getElement()) {
       if (ed.hasBinding() && !"0".equals(ed.getMax()) && (!mustSupportOnly || ed.getMustSupport())) {

@@ -3617,6 +3617,12 @@ public class PublisherIGLoader extends PublisherBase {
       }
       res.setUserData(UserDataNames.pub_loaded_resource, r);
       r.setResEntry(res);
+
+      if (pf.customResourceNames.contains(r.fhirType())) {
+        // we're automatically an example
+        res.setIsExample(true);
+        res.addProfile("http://hl7.org/fhir/StructureDefinition/"+r.fhirType());
+      }
     }
     return changed;
   }
