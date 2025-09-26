@@ -2443,6 +2443,24 @@ public class StructureDefinitionRenderer extends CanonicalRenderer {
       b.append(" <li>"+Utilities.escapeXml(lrc.formatPhrase(RenderingI18nContext.SDR_NOT_USED, type))+"</li>\r\n");
     }
     b.append("</ul>\r\n");
+    if (sd.hasUserData(UserDataNames.loader_custom_resource)) {
+      b.append("<p>This is an <a href=\"https://build.fhir.org/resource.html#additional\">Additional Resource</a>.");
+      List<String> compartments = new ArrayList<>();
+      for (Extension ext : sd.getExtensionsByUrl(ExtensionDefinitions.EXT_ADDITIONAL_COMPARTMENT)) {
+        String name = ext.hasValue() && ext.getValue().isPrimitive() ? ext.getValue().primitiveValue() : null;
+        compartments.add("<a href=\"https://build.fhir.org/compartmentdefinition-"+name.toLowerCase()+".html\">"+name+"</a>");
+      }
+      if (!compartments.isEmpty()) {
+        b.append(" This resource is in the compartments "+CommaSeparatedStringBuilder.join2(", ", " and ", compartments));
+      } else {
+        b.append(" This resource is not in any compartments.");
+      }
+      b.append("</a>.");
+      for (Extension ext : sd.getExtensionsByUrl(ExtensionDefinitions.EXT_ADDITIONAL_REFERENCE)) {
+        String name = ext.hasValue() && ext.getValue().isPrimitive() ? ext.getValue().primitiveValue() : null;
+        compartments.add("<a href=\"https://build.fhir.org/compartmentdefinition-"+name.toLowerCase()+".html\">"+name+"</a>");
+      }
+    }
     return b.toString()+xigReference()+changeSummary();
   }
 
