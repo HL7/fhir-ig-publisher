@@ -93,7 +93,7 @@ runs:
       if: steps.run-publisher.outcome != 'success'
       run: |
         mkdir -p ${{ env.TARGET_DIRECTORY }}/output
-        touch ${{ env.TARGET_DIRECTORY }}/output/qa.compare.txt
+        echo "IG Publish step failed. Check outputs of Publish IG and cache QA for ${{ inputs.ig }}" > ${{ env.TARGET_DIRECTORY }}/output/qa.compare.txt
       shell: bash
     - name: Move QA to project root
       run: mv ${{ env.TARGET_DIRECTORY }}/output/qa.compare.txt ${{ github.workspace }}/qa.compare.${{ inputs.ref }}.txt
