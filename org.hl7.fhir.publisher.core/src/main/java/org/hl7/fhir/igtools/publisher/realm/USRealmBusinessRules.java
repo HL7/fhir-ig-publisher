@@ -186,7 +186,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
             usCoreProfiles.add((StructureDefinition) usd);
           }
           if (!context.hasResource(Resource.class, usd.getUrl())) {
-            context.cacheResourceFromPackage(usd, pi);
+            context.getManager().cacheResourceFromPackage(usd, pi);
           }
         }
       }
@@ -206,7 +206,7 @@ public class USRealmBusinessRules extends RealmBusinessRules {
             usPHProfiles.add((StructureDefinition) usd);
           }
           if (!context.hasResource(Resource.class, usd.getUrl())) {
-            context.cacheResourceFromPackage(usd, pi);
+            context.getManager().cacheResourceFromPackage(usd, pi);
           }
         }
       }
