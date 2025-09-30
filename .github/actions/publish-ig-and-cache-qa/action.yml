@@ -93,7 +93,8 @@ runs:
       if: steps.run-publisher.outcome != 'success'
       run: |
         mkdir -p ${{ env.TARGET_DIRECTORY }}/output
-        touch ${{ env.TARGET_DIRECTORY }}/output/qa.compare.txt
+        echo "IG Publish step failed. Check outputs in https://github.com/HL7/fhir-ig-publisher/actions/runs/${{ github.run_id }}$/job/${{ github.job }} for ${{ inputs.ig }}" > ${{ env.TARGET_DIRECTORY }}/output/qa.compare.txt
+        echo "::warning::IG Publish step failed."
       shell: bash
     - name: Move QA to project root
       run: mv ${{ env.TARGET_DIRECTORY }}/output/qa.compare.txt ${{ github.workspace }}/qa.compare.${{ inputs.ref }}.txt
